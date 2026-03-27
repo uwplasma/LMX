@@ -10,6 +10,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - arXiv source: https://arxiv.org/abs/2409.08950
 - FreeMHD repository: https://github.com/PlasmaControl/FreeMHD
 - Zenodo assets: https://zenodo.org/records/13964055
+- Canonical LMX repository: https://github.com/uwplasma/LMX
 
 ## Working Scope
 
@@ -113,6 +114,13 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Added machine-readable analytical comparison output in `lmx/validation.py`.
 - Verified the validation CLI writes outputs and reports current error metrics.
 - The next best technical step is no longer “add validation scaffolding”; it is improving solver fidelity and extending analytical comparisons to Shercliff and Hunt.
+
+### 2026-03-27 16:10 America/Chicago
+
+- Initialized this directory as a git repository on `main`.
+- Created the private GitHub repository `uwplasma/LMX`.
+- Pushed the initial codebase and this execution log to `origin/main`.
+- Current best next step remains solver-fidelity work for the laminar duct parity cases, starting with Shercliff/Hunt analytical comparisons and better coupled iteration stability.
 
 ## Instruction For Future Agents
 
