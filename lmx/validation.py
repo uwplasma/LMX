@@ -31,6 +31,13 @@ class AnalyticComparison:
     linf_error: float
 
 
+@dataclass(frozen=True)
+class ProfileSymmetry:
+    axis: str
+    mean_abs_error: float
+    max_abs_error: float
+
+
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
     denom = jnp.cosh(ha) - 1.0
     denom = jnp.where(jnp.abs(denom) < 1e-12, 1.0, denom)
@@ -76,15 +83,40 @@ def compare_profile_to_reference(
     )
 
 
+def symmetry_metrics(profile: jnp.ndarray, axis: str) -> ProfileSymmetry:
+    mirrored = jnp.flip(profile)
+    diff = profile - mirrored
+    return ProfileSymmetry(
+        axis=axis,
+        mean_abs_error=float(jnp.mean(jnp.abs(diff))),
+        max_abs_error=float(jnp.max(jnp.abs(diff))),
+    )
+
+
+def duct_profile_metrics(solution: Solution) -> dict[str, float]:
+    y_profile = extract_midplane_profile(solution, axis="y")["u"]
+    z_profile = extract_midplane_profile(solution, axis="z")["u"]
+    y_sym = symmetry_metrics(y_profile, axis="y")
+    z_sym = symmetry_metrics(z_profile, axis="z")
+    return {
+        "symmetry_y_mean_abs_error": y_sym.mean_abs_error,
+        "symmetry_y_max_abs_error": y_sym.max_abs_error,
+        "symmetry_z_mean_abs_error": z_sym.mean_abs_error,
+        "symmetry_z_max_abs_error": z_sym.max_abs_error,
+        "u_max": float(jnp.max(solution.state.u)),
+        "u_mean": float(jnp.mean(solution.state.u)),
+    }
+
+
 def hartmann_validation(solution: Solution, ha: float) -> AnalyticComparison:
     profile = extract_centerline(solution)
-    y = profile["y"] / jnp.max(jnp.abs(profile["y"]))
+    coordinate = profile["y"] / jnp.max(jnp.abs(profile["y"]))
     u = profile["u"]
     scale = jnp.max(jnp.abs(u))
     scale = jnp.where(scale > 0.0, scale, 1.0)
     normalized = u / scale
-    reference = hartmann_analytic_profile(y, ha)
-    return compare_profile_to_reference(y, normalized, reference)
+    reference = hartmann_analytic_profile(coordinate, ha)
+    return compare_profile_to_reference(coordinate, normalized, reference)
 
 
 def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
@@ -145,6 +177,13 @@ def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, 
         "linf_error": comparison.linf_error,
     }
     path.write_text(json.dumps(payload, indent=2))
+    return path
+
+
+def write_metrics_json(metrics: dict[str, float], path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(metrics, indent=2))
     return path
 
 

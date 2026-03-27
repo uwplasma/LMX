@@ -77,6 +77,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The initial solver branch that tried to decide between `lineax` and Jacobi inside a traced JAX function failed due to traced boolean conversion.
 - The initial unconstrained pseudo-transient update produced `NaN` blow-up; explicit wall enforcement and bounded updates were needed to stabilize the first implementation.
 - The first Shercliff symmetry assertion was too strong for the current solver and had to be downgraded to a finite-field/no-slip smoke test until better parity numerics are implemented.
+- A later attempt to replace the pseudo-transient steady path with a more directly coupled fixed-point steady solver was not robust enough and was rolled back instead of being left on `main`.
 
 ## Chronological Log
 
@@ -121,6 +122,20 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Created the private GitHub repository `uwplasma/LMX`.
 - Pushed the initial codebase and this execution log to `origin/main`.
 - Current best next step remains solver-fidelity work for the laminar duct parity cases, starting with Shercliff/Hunt analytical comparisons and better coupled iteration stability.
+
+### 2026-03-27 16:35 America/Chicago
+
+- Added richer validation/reporting support:
+  - CLI `validate` subcommand remains available.
+  - machine-readable metrics JSON output for duct-profile symmetry and basic field statistics
+  - CSV output for both centerline and orthogonal midplane cuts
+- Attempted a more directly coupled steady solver for the duct cases.
+- That solver branch proved numerically unstable in fresh runs, so it was rolled back instead of being kept on `main`.
+- Net result kept on `main`: validation/reporting improved; solver remains on the earlier pseudo-transient relaxation path.
+- Best next step is now narrower and clearer:
+  1. ingest the Zenodo analytical closed-channel files locally
+  2. build Shercliff/Hunt comparison loaders and reports against those references
+  3. only then revisit the steady solver with stronger acceptance checks and rollback criteria
 
 ## Instruction For Future Agents
 

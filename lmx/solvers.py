@@ -79,7 +79,10 @@ def _solve_potential(
     conv_z = sigma_z * face_average_z(uxb_z)
     face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
     face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
-    rhs = (face_conv_y[1:, :] - face_conv_y[:-1, :]) / mesh.dy[:, None] + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
+    rhs = -(
+        (face_conv_y[1:, :] - face_conv_y[:-1, :]) / mesh.dy[:, None]
+        + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
+    )
 
     diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
     phi, _ = solve_poisson_jacobi(diagonal, west, east, south, north, rhs, anchor, iterations)

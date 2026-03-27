@@ -10,7 +10,15 @@ from .benchmarks import benchmark_solver
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
 from .solvers import solve_steady
-from .validation import extract_centerline, hartmann_validation, write_analytic_comparison, write_profile_csv
+from .validation import (
+    duct_profile_metrics,
+    extract_centerline,
+    extract_midplane_profile,
+    hartmann_validation,
+    write_analytic_comparison,
+    write_metrics_json,
+    write_profile_csv,
+)
 
 
 def _build_case(args: argparse.Namespace):
@@ -53,12 +61,16 @@ def main(argv: list[str] | None = None) -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         write_paraview(solution, out_dir)
         write_profile_csv(out_dir / f"{case.name}_centerline.csv", extract_centerline(solution))
+        z_profile = extract_midplane_profile(solution, axis="z")
+        write_profile_csv(out_dir / f"{case.name}_midplane_z.csv", z_profile)
         payload = {"case": case.name, "time": solution.state.time, "residual": solution.state.residual}
+        payload.update(duct_profile_metrics(solution))
         if args.case == "hartmann":
             comparison = hartmann_validation(solution, args.ha)
             write_analytic_comparison(comparison, out_dir / f"{case.name}_analytic.json", axis_name="y")
             payload["l2_error"] = comparison.l2_error
             payload["linf_error"] = comparison.linf_error
+        write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 0
 

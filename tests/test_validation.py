@@ -5,10 +5,12 @@ import jax.numpy as jnp
 from lmx.cases import make_hartmann_case
 from lmx.solvers import solve_steady
 from lmx.validation import (
+    duct_profile_metrics,
     compare_with_freemhd,
     hartmann_analytic_profile,
     hartmann_validation,
     write_analytic_comparison,
+    write_metrics_json,
     write_validation_report,
 )
 
@@ -31,4 +33,12 @@ def test_hartmann_validation_writer(tmp_path: Path):
     solution = solve_steady(case)
     comparison = hartmann_validation(solution, ha=5.0)
     path = write_analytic_comparison(comparison, tmp_path / "analytic.json", axis_name="y")
+    assert path.exists()
+
+
+def test_duct_profile_metrics_writer(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=16, nz=16)
+    solution = solve_steady(case)
+    metrics = duct_profile_metrics(solution)
+    path = write_metrics_json(metrics, tmp_path / "metrics.json")
     assert path.exists()
