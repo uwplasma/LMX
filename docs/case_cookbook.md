@@ -28,8 +28,11 @@ This creates a duct with explicit conducting Hartmann-wall layers.
 
 ```bash
 python3 scripts/fetch_freemhd_assets.py --dest ./external
+python3 scripts/fetch_freemhd_assets.py --dest ./external --include-starting-files
 python3 scripts/write_freemhd_container_files.py
 ```
+
+The first command fetches the FreeMHD repository and the processed-figures archive. The `--include-starting-files` variant is optional and downloads the much larger case-input archive.
 
 ## Hartmann validation
 
@@ -39,6 +42,15 @@ python3 scripts/write_freemhd_container_files.py
 ```
 
 This writes a JSON summary with the normalized Hartmann-profile error against the current analytical helper. The validation suite runner also emits Shercliff and Hunt artifacts for CI.
+
+## Shercliff and Hunt reference comparison
+
+```bash
+/Users/rogerio/base_env/bin/python3 -m lmx.cli validate shercliff --ha 20 --output ./artifacts/reference_compare/shercliff --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+/Users/rogerio/base_env/bin/python3 -m lmx.cli validate hunt --ha 20 --output ./artifacts/reference_compare/hunt --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+```
+
+These commands write normalized midplane error reports against the ingested Zenodo analytical files for the corresponding closed-channel cases.
 
 ## Benchmark
 

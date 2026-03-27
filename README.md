@@ -10,6 +10,7 @@ This first implementation includes:
 - ParaView XML writers for structured and mapped grids.
 - Validation helpers, analytical Hartmann reference profiles, and a FreeMHD asset/container harness.
 - Explicit unit, regression, physics, validation, and benchmark entrypoints with GitHub Actions workflows.
+- Zenodo closed-channel analytical and processed-slice loaders for Shercliff and Hunt reference ingestion.
 
 This repository does **not** yet include:
 
@@ -29,14 +30,16 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 -m pytest -m validation
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run shercliff --ha 20 --output ./out
 /Users/rogerio/base_env/bin/python3 -m lmx.cli validate hartmann --ha 20 --output ./out_validation
+/Users/rogerio/base_env/bin/python3 -m lmx.cli validate shercliff --ha 20 --output ./out_validation/shercliff --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_validation_suite.py --output ./artifacts/validation
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
+/Users/rogerio/base_env/bin/python3 scripts/fetch_freemhd_assets.py --dest ./external
 ```
 
 ## Layout
 
 - `lmx/`: package code.
-- `tests/`: unit and smoke tests.
+- `tests/`: unit, regression, physics, and validation tests.
 - `.github/workflows/`: CI and benchmark workflows.
 - `docs/`: theory, developer, cookbook, and validation notes.
-- `scripts/`: FreeMHD data and container helpers.
+- `scripts/`: FreeMHD data, reference ingestion, and container helpers.

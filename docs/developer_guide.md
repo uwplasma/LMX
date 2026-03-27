@@ -9,6 +9,7 @@
 - `lmx.solvers`: laminar inductionless solver entrypoints.
 - `lmx.io`: ParaView XML and CSV outputs.
 - `lmx.validation`: analytical helpers and FreeMHD harness.
+- `lmx.reference_data`: Zenodo closed-channel analytical and processed-slice loaders.
 
 ## Array layout
 
@@ -36,8 +37,14 @@
 - `pytest -m validation`: analytical and FreeMHD-harness metadata checks.
 - `python scripts/run_validation_suite.py --output artifacts/validation`: writes validation CSV, JSON, and VTK artifacts for Hartmann, Shercliff, and Hunt cases.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`: writes the current benchmark report.
+- `python -m lmx.cli validate shercliff --ha 20 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel --output ./artifacts/reference_compare`: compares the current solution against the ingested Zenodo analytical file.
 
 GitHub Actions now mirrors these entrypoints:
 
 - `.github/workflows/ci.yml`: matrix over `unit`, `regression`, `physics`, and `validation`, plus a validation-artifact job.
 - `.github/workflows/benchmarks.yml`: benchmark run with uploaded JSON artifacts.
+
+## Reference data policy
+
+- `scripts/fetch_freemhd_assets.py` now downloads the FreeMHD repo and the processed-figures archive by default.
+- The much larger `StartingFiles.zip` archive is opt-in through `--include-starting-files` because it is roughly 8.9 GB and not needed for the current analytical ingestion path.

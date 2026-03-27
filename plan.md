@@ -28,6 +28,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Validation helpers and FreeMHD container/asset fetch stubs.
 - Explicit unit, regression, physics, validation, and benchmark entrypoints.
 - GitHub Actions workflows for categorized pytest runs plus validation and benchmark artifact jobs.
+- Zenodo closed-channel analytical and processed-slice reference-data loaders.
 - Unit and categorized tests passing in `/Users/rogerio/base_env/bin/python3`.
 
 ### Explicitly deferred
@@ -59,13 +60,12 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
    - stable iterative coupling between `u`, `phi`, and `J x B`
    - explicit acceptance checks for Shercliff and Hunt profile symmetry and monotonicity
 2. Extend analytical validation beyond the current Hartmann implementation:
-   - add Shercliff and Hunt profile comparison hooks
-   - compare against closed-form or semi-analytical reference profiles
-   - ingest Zenodo analytical text files where appropriate
-3. Tighten CI acceptance criteria once better references are available:
+   - Shercliff and Hunt profile comparison hooks now exist
+   - remaining work is improving solver parity enough that the new reference reports can become acceptance tests
+3. Tighten CI acceptance criteria once better parity is available:
    - convert validation artifact generation into pass/fail parity checks
    - add benchmark threshold tracking with explicit tolerances
-4. Add real reference-data ingestion from Zenodo analytical files and processed CSVs.
+4. Use the newly ingested processed closed-channel CSV slices to add figure-level Shercliff/Hunt comparisons.
 5. Implement mapped-operator support for the fringing-field pipe case.
 6. Build and test the FreeMHD container workflow locally, then add parity runner automation.
 
@@ -77,6 +77,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Test suite is green after tightening the expectations to match current implementation state rather than full parity claims.
 - Small Hartmann and Shercliff low-Ha cases are deterministic enough for regression snapshots.
 - GitHub Actions workflows now cover unit, regression, physics, validation, and benchmark paths.
+- The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.
 
 ## What Did Not Work
 
@@ -86,6 +87,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The first Shercliff symmetry assertion was too strong for the current solver and had to be downgraded to a finite-field/no-slip smoke test until better parity numerics are implemented.
 - A later attempt to replace the pseudo-transient steady path with a more directly coupled fixed-point steady solver was not robust enough and was rolled back instead of being left on `main`.
 - The Hunt validation path remains artifact-only for now because the current solver still clips and saturates on that case; it should not be treated as parity-complete.
+- The current Shercliff `Ha=20` reference comparison also shows large normalized error, confirming that solver-fidelity work is still the critical path after reference ingestion.
 
 ## Chronological Log
 
@@ -163,6 +165,28 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - `/Users/rogerio/base_env/bin/python3 scripts/run_validation_suite.py --output artifacts/validation_local`
   - `/Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output artifacts/benchmarks_local/benchmark.json --repeats 2 --ha 5 --ny 16 --nz 16`
 - Resulting best next step did not change at the solver level: ingest Zenodo reference data and improve Shercliff/Hunt parity before tightening validation thresholds.
+
+### 2026-03-27 18:10 America/Chicago
+
+- Inspected the Zenodo record and confirmed:
+  - `FreeMHDPaperAllFigures.zip` is about 18 MB and contains the closed-channel analytical and processed CSV data needed immediately.
+  - `StartingFiles.zip` is about 8.9 GB and should not be a default download.
+- Updated `scripts/fetch_freemhd_assets.py` so it now downloads:
+  - the FreeMHD repository
+  - the processed-figures archive by default
+  - the large starting-files archive only when `--include-starting-files` is requested
+- Added `lmx/reference_data.py` with:
+  - analytical closed-channel loaders for Shercliff and Hunt
+  - processed-slice CSV loaders for the paper figures
+  - midplane extraction helpers for future figure-level parity checks
+- Added closed-channel validation hooks that compare normalized LMX midplane profiles against the ingested Shercliff and Hunt analytical references.
+- Verified against the real downloaded Zenodo data:
+  - analytical Shercliff and Hunt files load correctly
+  - processed Hunt slice CSV loads correctly
+  - `lmx.cli validate shercliff --ha 20 --reference-root ...` now writes actual Shercliff reference-comparison metrics
+- Current quantitative result is intentionally honest:
+  - Shercliff `Ha=20` still has large normalized errors and the solver clips at this regime
+  - this confirms the next best step is solver-fidelity work, not more validation plumbing
 
 ## Instruction For Future Agents
 

@@ -4,6 +4,7 @@ from .benchmarks import benchmark_solver
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
 from .mesh import generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
+from .reference_data import load_closed_channel_analytical, load_processed_slice
 from .solvers import solve_steady, solve_transient
 from .validation import compare_with_freemhd
 
@@ -13,6 +14,8 @@ __all__ = [
     "generate_layered_duct_mesh",
     "generate_pipe_ogrid_mesh",
     "generate_rect_duct_mesh",
+    "load_closed_channel_analytical",
+    "load_processed_slice",
     "make_hartmann_case",
     "make_hunt_case",
     "make_shercliff_case",

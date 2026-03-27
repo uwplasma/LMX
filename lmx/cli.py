@@ -11,11 +11,13 @@ from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
 from .solvers import solve_steady
 from .validation import (
+    closed_channel_validation,
     extract_centerline,
     extract_midplane_profile,
     hartmann_validation,
     validation_summary,
     write_analytic_comparison,
+    write_closed_channel_validation,
     write_metrics_json,
     write_profile_csv,
 )
@@ -51,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"])
     validate_parser.add_argument("--ha", type=float, default=20.0)
     validate_parser.add_argument("--output", type=str, default="./out")
+    validate_parser.add_argument("--reference-root", type=str, default="")
 
     args = parser.parse_args(argv)
 
@@ -74,6 +77,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.case == "hartmann":
             comparison = hartmann_validation(solution, args.ha)
             write_analytic_comparison(comparison, out_dir / f"{case.name}_analytic.json", axis_name="y")
+        elif args.reference_root:
+            comparison = closed_channel_validation(solution, args.case, int(args.ha), reference_root=args.reference_root)
+            write_closed_channel_validation(comparison, out_dir / f"{case.name}_analytic.json")
+            payload["y_l2_error"] = comparison.y_profile.l2_error
+            payload["y_linf_error"] = comparison.y_profile.linf_error
+            payload["z_l2_error"] = comparison.z_profile.l2_error
+            payload["z_linf_error"] = comparison.z_profile.linf_error
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 0

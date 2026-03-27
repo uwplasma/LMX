@@ -12,6 +12,7 @@ import jax.numpy as jnp
 from .core import Solution
 from .mesh import StructuredMesh
 from .operators import center_coordinates
+from .reference_data import ClosedChannelAnalyticalReference, load_closed_channel_analytical
 from .specs import CaseSpec
 
 
@@ -36,6 +37,16 @@ class ProfileSymmetry:
     axis: str
     mean_abs_error: float
     max_abs_error: float
+
+
+@dataclass(frozen=True)
+class ClosedChannelValidation:
+    case_kind: str
+    ha: int
+    y_profile: AnalyticComparison
+    z_profile: AnalyticComparison
+    reference_pressure_drop: float | None
+    reference_path: str
 
 
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
@@ -81,6 +92,24 @@ def compare_profile_to_reference(
         l2_error=l2,
         linf_error=linf,
     )
+
+
+def compare_normalized_profiles(
+    simulated_coordinate: jnp.ndarray,
+    simulated: jnp.ndarray,
+    reference_coordinate: jnp.ndarray,
+    reference: jnp.ndarray,
+) -> AnalyticComparison:
+    sim_coord = simulated_coordinate / jnp.max(jnp.abs(simulated_coordinate))
+    ref_coord = reference_coordinate / jnp.max(jnp.abs(reference_coordinate))
+    sim_scale = jnp.max(jnp.abs(simulated))
+    ref_scale = jnp.max(jnp.abs(reference))
+    sim_scale = jnp.where(sim_scale > 0.0, sim_scale, 1.0)
+    ref_scale = jnp.where(ref_scale > 0.0, ref_scale, 1.0)
+    normalized_simulated = simulated / sim_scale
+    normalized_reference = reference / ref_scale
+    interpolated_reference = jnp.interp(sim_coord, ref_coord, normalized_reference)
+    return compare_profile_to_reference(sim_coord, normalized_simulated, interpolated_reference)
 
 
 def symmetry_metrics(profile: jnp.ndarray, axis: str) -> ProfileSymmetry:
@@ -131,6 +160,37 @@ def hartmann_validation(solution: Solution, ha: float) -> AnalyticComparison:
     normalized = u / scale
     reference = hartmann_analytic_profile(coordinate, ha)
     return compare_profile_to_reference(coordinate, normalized, reference)
+
+
+def closed_channel_validation(
+    solution: Solution,
+    case_kind: str,
+    ha: int,
+    reference_root: str | Path | None = None,
+) -> ClosedChannelValidation:
+    reference: ClosedChannelAnalyticalReference = load_closed_channel_analytical(case_kind, ha, reference_root)
+    y_profile = extract_midplane_profile(solution, axis="y")
+    z_profile = extract_midplane_profile(solution, axis="z")
+    y_comparison = compare_normalized_profiles(
+        y_profile["y"],
+        y_profile["u"],
+        reference.coordinate,
+        reference.midplane_y,
+    )
+    z_comparison = compare_normalized_profiles(
+        z_profile["z"],
+        z_profile["u"],
+        reference.coordinate,
+        reference.midplane_z,
+    )
+    return ClosedChannelValidation(
+        case_kind=case_kind,
+        ha=ha,
+        y_profile=y_comparison,
+        z_profile=z_comparison,
+        reference_pressure_drop=reference.pressure_drop,
+        reference_path=reference.path,
+    )
 
 
 def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
@@ -189,6 +249,33 @@ def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, 
         "reference": jnp.asarray(comparison.reference).tolist(),
         "l2_error": comparison.l2_error,
         "linf_error": comparison.linf_error,
+    }
+    path.write_text(json.dumps(payload, indent=2))
+    return path
+
+
+def write_closed_channel_validation(report: ClosedChannelValidation, path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "case_kind": report.case_kind,
+        "ha": report.ha,
+        "reference_pressure_drop": report.reference_pressure_drop,
+        "reference_path": report.reference_path,
+        "y_profile": {
+            "coordinate": jnp.asarray(report.y_profile.coordinate).tolist(),
+            "simulated": jnp.asarray(report.y_profile.simulated).tolist(),
+            "reference": jnp.asarray(report.y_profile.reference).tolist(),
+            "l2_error": report.y_profile.l2_error,
+            "linf_error": report.y_profile.linf_error,
+        },
+        "z_profile": {
+            "coordinate": jnp.asarray(report.z_profile.coordinate).tolist(),
+            "simulated": jnp.asarray(report.z_profile.simulated).tolist(),
+            "reference": jnp.asarray(report.z_profile.reference).tolist(),
+            "l2_error": report.z_profile.l2_error,
+            "linf_error": report.z_profile.linf_error,
+        },
     }
     path.write_text(json.dumps(payload, indent=2))
     return path
