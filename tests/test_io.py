@@ -1,9 +1,14 @@
 from pathlib import Path
 
+import pytest
+
 from lmx.cases import make_hartmann_case
 from lmx.io import write_paraview, write_vtu
 from lmx.mesh import generate_pipe_ogrid_mesh
 from lmx.solvers import solve_steady
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_paraview_writer(tmp_path: Path):

@@ -35,6 +35,13 @@ python3 scripts/write_freemhd_container_files.py
 
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli validate hartmann --ha 20 --output ./out_validation/hartmann
+/Users/rogerio/base_env/bin/python3 scripts/run_validation_suite.py --output ./artifacts/validation
 ```
 
-This writes a JSON summary with the normalized Hartmann-profile error against the current analytical helper.
+This writes a JSON summary with the normalized Hartmann-profile error against the current analytical helper. The validation suite runner also emits Shercliff and Hunt artifacts for CI.
+
+## Benchmark
+
+```bash
+/Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
+```

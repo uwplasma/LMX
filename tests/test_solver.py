@@ -1,7 +1,11 @@
 import jax.numpy as jnp
+import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.solvers import solve_steady
+
+
+pytestmark = pytest.mark.physics
 
 
 def test_hartmann_solver_runs():

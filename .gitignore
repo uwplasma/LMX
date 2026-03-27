@@ -4,4 +4,5 @@ __pycache__/
 out/
 out_*/
 external/
+artifacts/
 .DS_Store

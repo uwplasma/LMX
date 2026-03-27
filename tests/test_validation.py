@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import jax.numpy as jnp
+import pytest
 
 from lmx.cases import make_hartmann_case
 from lmx.solvers import solve_steady
@@ -13,6 +14,9 @@ from lmx.validation import (
     write_metrics_json,
     write_validation_report,
 )
+
+
+pytestmark = pytest.mark.validation
 
 
 def test_hartmann_profile_center_is_maximum():

@@ -6,15 +6,15 @@ from pathlib import Path
 
 import jax.numpy as jnp
 
-from .benchmarks import benchmark_solver
+from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
 from .solvers import solve_steady
 from .validation import (
-    duct_profile_metrics,
     extract_centerline,
     extract_midplane_profile,
     hartmann_validation,
+    validation_summary,
     write_analytic_comparison,
     write_metrics_json,
     write_profile_csv,
@@ -42,6 +42,10 @@ def main(argv: list[str] | None = None) -> int:
 
     bench_parser = subparsers.add_parser("benchmark")
     bench_parser.add_argument("--repeats", type=int, default=3)
+    bench_parser.add_argument("--ha", type=float, default=20.0)
+    bench_parser.add_argument("--ny", type=int, default=48)
+    bench_parser.add_argument("--nz", type=int, default=48)
+    bench_parser.add_argument("--output", type=str, default="")
 
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"])
@@ -51,7 +55,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "benchmark":
-        print(json.dumps(benchmark_solver(repeats=args.repeats), indent=2))
+        payload = benchmark_solver(repeats=args.repeats, ha=args.ha, ny=args.ny, nz=args.nz)
+        if args.output:
+            write_benchmark_report(payload, args.output)
+        print(json.dumps(payload, indent=2))
         return 0
 
     if args.command == "validate":
@@ -63,13 +70,10 @@ def main(argv: list[str] | None = None) -> int:
         write_profile_csv(out_dir / f"{case.name}_centerline.csv", extract_centerline(solution))
         z_profile = extract_midplane_profile(solution, axis="z")
         write_profile_csv(out_dir / f"{case.name}_midplane_z.csv", z_profile)
-        payload = {"case": case.name, "time": solution.state.time, "residual": solution.state.residual}
-        payload.update(duct_profile_metrics(solution))
+        payload = validation_summary(solution, case.name, ha=args.ha)
         if args.case == "hartmann":
             comparison = hartmann_validation(solution, args.ha)
             write_analytic_comparison(comparison, out_dir / f"{case.name}_analytic.json", axis_name="y")
-            payload["l2_error"] = comparison.l2_error
-            payload["linf_error"] = comparison.linf_error
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 0

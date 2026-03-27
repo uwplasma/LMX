@@ -31,5 +31,11 @@ where = ["."]
 include = ["lmx*"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -q"
+addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
+markers = [
+  "unit: fast local checks for isolated functionality",
+  "regression: deterministic golden-profile and serialized-output checks",
+  "physics: physics-level invariants for the current solver implementation",
+  "validation: validation and parity harness checks",
+]

@@ -27,3 +27,17 @@
 - Add full pressure-velocity coupling in `lmx.solvers`.
 - Add mapped-grid differential operators for the fringing-field pipe case.
 - Replace the current pseudo-transient laminar step with a fuller implicit Newton/Krylov formulation when parity demands it.
+
+## Test and CI workflow
+
+- `pytest -m unit`: mesh, operators, I/O, and benchmark report helpers.
+- `pytest -m regression`: deterministic Hartmann and Shercliff golden centerline checks.
+- `pytest -m physics`: solver smoke tests and low-Ha physical-invariant checks.
+- `pytest -m validation`: analytical and FreeMHD-harness metadata checks.
+- `python scripts/run_validation_suite.py --output artifacts/validation`: writes validation CSV, JSON, and VTK artifacts for Hartmann, Shercliff, and Hunt cases.
+- `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`: writes the current benchmark report.
+
+GitHub Actions now mirrors these entrypoints:
+
+- `.github/workflows/ci.yml`: matrix over `unit`, `regression`, `physics`, and `validation`, plus a validation-artifact job.
+- `.github/workflows/benchmarks.yml`: benchmark run with uploaded JSON artifacts.

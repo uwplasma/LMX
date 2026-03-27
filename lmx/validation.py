@@ -108,6 +108,20 @@ def duct_profile_metrics(solution: Solution) -> dict[str, float]:
     }
 
 
+def validation_summary(solution: Solution, case_name: str, ha: float | None = None) -> dict[str, float | str]:
+    payload: dict[str, float | str] = {
+        "case": case_name,
+        "time": solution.state.time,
+        "residual": solution.state.residual,
+    }
+    payload.update(duct_profile_metrics(solution))
+    if case_name.startswith("hartmann") and ha is not None:
+        comparison = hartmann_validation(solution, ha)
+        payload["l2_error"] = comparison.l2_error
+        payload["linf_error"] = comparison.linf_error
+    return payload
+
+
 def hartmann_validation(solution: Solution, ha: float) -> AnalyticComparison:
     profile = extract_centerline(solution)
     coordinate = profile["y"] / jnp.max(jnp.abs(profile["y"]))
@@ -180,7 +194,7 @@ def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, 
     return path
 
 
-def write_metrics_json(metrics: dict[str, float], path: str | Path) -> Path:
+def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metrics, indent=2))

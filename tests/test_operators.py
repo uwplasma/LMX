@@ -1,7 +1,11 @@
 import jax.numpy as jnp
+import pytest
 
 from lmx.mesh import generate_rect_duct_mesh
 from lmx.operators import gradient_scalar, laplacian_scalar
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_gradient_of_linear_field():

@@ -1,4 +1,9 @@
+import pytest
+
 from lmx.mesh import generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_rect_duct_mesh_shape():
