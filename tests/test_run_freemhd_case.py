@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import os
+
 import pytest
 
 from scripts import run_freemhd_case as runner
@@ -50,8 +52,14 @@ def test_main_runs_container_when_image_exists(
     monkeypatch.setattr(runner, "docker_cli_available", lambda: True)
     monkeypatch.setattr(runner, "docker_daemon_available", lambda: True)
     monkeypatch.setattr(runner, "docker_image_available", lambda image: True)
+    (case_dir / "system").mkdir()
+    (case_dir / "system" / "controlDict").write_text("application epotMultiRegionInterFoam;\n")
+    (case_dir / "system" / "decomposeParDict").write_text("numberOfSubdomains 95;\n")
 
     def fake_run(**kwargs):
+        assert kwargs["solver"] == "epotMultiRegionInterFoam"
+        assert kwargs["platform"] == "linux/amd64"
+        assert kwargs["cores"] == 95
         return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
@@ -75,3 +83,96 @@ def test_main_runs_container_when_image_exists(
     assert exit_code == 0
     assert '"status": "ok"' in captured
     assert '"docker_image_available": true' in payload
+    assert '"solver": "epotMultiRegionInterFoam"' in payload
+    assert '"platform": "linux/amd64"' in payload
+    assert '"cores": 95' in payload
+
+
+def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    bundle_root = tmp_path / "docker"
+    case_dir = tmp_path / "case"
+    bundle_root.mkdir()
+    case_dir.mkdir()
+    (bundle_root / "run_freemhd_case.sh").write_text("#!/usr/bin/env bash\n")
+
+    recorded = {}
+
+    def fake_subprocess_run(command, text, capture_output, check):
+        recorded["command"] = command
+        return runner.subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_subprocess_run)
+    runner.run_freemhd_case(
+        image="lmx-freemhd-smoke",
+        case_dir=case_dir,
+        bundle_root=bundle_root,
+        solver="epotMultiRegionInterFoam",
+        platform="linux/amd64",
+        end_time="1e-3",
+        write_interval="1e-3",
+        delta_t="1e-4",
+    )
+
+    command = recorded["command"]
+    assert command[:5] == ["docker", "run", "--rm", "--platform", "linux/amd64"]
+    assert "--user" in command
+    assert f"{os.getuid()}:{os.getgid()}" in command
+    assert "HOME=/tmp" in command
+    assert "LMX_END_TIME=1e-3" in command
+    assert "LMX_WRITE_INTERVAL=1e-3" in command
+    assert "LMX_DELTA_T=1e-4" in command
+    assert "--entrypoint" in command
+    assert "/opt/lmx/run_freemhd_case.sh" in command
+    assert "epotMultiRegionInterFoam" in command
+
+
+def test_main_uses_explicit_cores_when_requested(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    case_dir = tmp_path / "case"
+    bundle_root = tmp_path / "docker"
+    case_dir.mkdir()
+    bundle_root.mkdir()
+    (case_dir / "system").mkdir()
+    (case_dir / "system" / "controlDict").write_text("application epotMultiRegionInterFoam;\n")
+    (case_dir / "system" / "decomposeParDict").write_text("numberOfSubdomains 95;\n")
+
+    monkeypatch.setattr(runner, "docker_cli_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_daemon_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_image_available", lambda image: True)
+
+    def fake_run(**kwargs):
+        assert kwargs["cores"] == 8
+        assert kwargs["solver"] == "epotMultiRegionInterFoam"
+        assert kwargs["end_time"] == "1e-3"
+        assert kwargs["write_interval"] == "5e-4"
+        assert kwargs["delta_t"] == "1e-4"
+        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
+
+    monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
+
+    exit_code = runner.main(
+        [
+            "--image",
+            "available-image:latest",
+            "--case-dir",
+            str(case_dir),
+            "--bundle-root",
+            str(bundle_root),
+            "--cores",
+            "8",
+            "--end-time",
+            "1e-3",
+            "--write-interval",
+            "5e-4",
+            "--delta-t",
+            "1e-4",
+        ]
+    )
+
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert '"cores": 8' in captured
+    assert '"end_time": "1e-3"' in captured
+    assert '"write_interval": "5e-4"' in captured
+    assert '"delta_t": "1e-4"' in captured

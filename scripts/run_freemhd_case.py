@@ -3,13 +3,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.freemhd import docker_cli_available, docker_daemon_available, docker_image_available
+from lmx.freemhd import (
+    control_dict_application,
+    decompose_par_subdomains,
+    docker_cli_available,
+    docker_daemon_available,
+    docker_image_available,
+)
 
 
 def run_freemhd_case(
@@ -18,20 +25,38 @@ def run_freemhd_case(
     bundle_root: str | Path,
     cores: int = 4,
     solver: str = "epotMultiRegionFoam",
+    platform: str = "linux/amd64",
+    end_time: str | None = None,
+    write_interval: str | None = None,
+    delta_t: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     case_path = Path(case_dir).resolve()
     bundle_path = Path(bundle_root).resolve()
     runner = bundle_path / "run_freemhd_case.sh"
+    user_spec = f"{os.getuid()}:{os.getgid()}"
     command = [
         "docker",
         "run",
         "--rm",
+        "--platform",
+        platform,
+        "--user",
+        user_spec,
+        "-e",
+        "HOME=/tmp",
+        "-e",
+        f"LMX_END_TIME={end_time or ''}",
+        "-e",
+        f"LMX_WRITE_INTERVAL={write_interval or ''}",
+        "-e",
+        f"LMX_DELTA_T={delta_t or ''}",
+        "--entrypoint",
+        "/bin/bash",
         "-v",
         f"{case_path}:/workspace/case",
         "-v",
         f"{runner}:/opt/lmx/run_freemhd_case.sh:ro",
         image,
-        "bash",
         "/opt/lmx/run_freemhd_case.sh",
         "/workspace/case",
         str(cores),
@@ -50,18 +75,33 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(__file__).resolve().parents[1] / "docker",
         help="Directory containing run_freemhd_case.sh.",
     )
-    parser.add_argument("--cores", type=int, default=4)
-    parser.add_argument("--solver", type=str, default="epotMultiRegionFoam")
+    parser.add_argument("--cores", type=str, default="auto")
+    parser.add_argument("--solver", type=str, default="auto")
+    parser.add_argument("--platform", type=str, default="linux/amd64")
+    parser.add_argument("--end-time", type=str, default=None)
+    parser.add_argument("--write-interval", type=str, default=None)
+    parser.add_argument("--delta-t", type=str, default=None)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
+    resolved_solver = control_dict_application(args.case_dir) if args.solver == "auto" else args.solver
+    if resolved_solver is None:
+        resolved_solver = "epotMultiRegionFoam"
+    if args.cores == "auto":
+        resolved_cores = decompose_par_subdomains(args.case_dir) or 4
+    else:
+        resolved_cores = int(args.cores)
 
     if not docker_cli_available():
         payload = {
             "image": args.image,
             "case_dir": str(args.case_dir.resolve()),
             "bundle_root": str(args.bundle_root.resolve()),
-            "cores": args.cores,
-            "solver": args.solver,
+            "cores": resolved_cores,
+            "solver": resolved_solver,
+            "platform": args.platform,
+            "end_time": args.end_time,
+            "write_interval": args.write_interval,
+            "delta_t": args.delta_t,
             "docker_cli_available": False,
             "docker_available": False,
             "status": "docker-cli-unavailable",
@@ -77,8 +117,12 @@ def main(argv: list[str] | None = None) -> int:
             "image": args.image,
             "case_dir": str(args.case_dir.resolve()),
             "bundle_root": str(args.bundle_root.resolve()),
-            "cores": args.cores,
-            "solver": args.solver,
+            "cores": resolved_cores,
+            "solver": resolved_solver,
+            "platform": args.platform,
+            "end_time": args.end_time,
+            "write_interval": args.write_interval,
+            "delta_t": args.delta_t,
             "docker_cli_available": True,
             "docker_available": False,
             "status": "docker-daemon-unavailable",
@@ -94,8 +138,12 @@ def main(argv: list[str] | None = None) -> int:
             "image": args.image,
             "case_dir": str(args.case_dir.resolve()),
             "bundle_root": str(args.bundle_root.resolve()),
-            "cores": args.cores,
-            "solver": args.solver,
+            "cores": resolved_cores,
+            "solver": resolved_solver,
+            "platform": args.platform,
+            "end_time": args.end_time,
+            "write_interval": args.write_interval,
+            "delta_t": args.delta_t,
             "docker_cli_available": True,
             "docker_available": True,
             "docker_image_available": False,
@@ -111,15 +159,23 @@ def main(argv: list[str] | None = None) -> int:
         image=args.image,
         case_dir=args.case_dir,
         bundle_root=args.bundle_root,
-        cores=args.cores,
-        solver=args.solver,
+        cores=resolved_cores,
+        solver=resolved_solver,
+        platform=args.platform,
+        end_time=args.end_time,
+        write_interval=args.write_interval,
+        delta_t=args.delta_t,
     )
     payload = {
         "image": args.image,
         "case_dir": str(args.case_dir.resolve()),
         "bundle_root": str(args.bundle_root.resolve()),
-        "cores": args.cores,
-        "solver": args.solver,
+        "cores": resolved_cores,
+        "solver": resolved_solver,
+        "platform": args.platform,
+        "end_time": args.end_time,
+        "write_interval": args.write_interval,
+        "delta_t": args.delta_t,
         "docker_cli_available": True,
         "docker_available": True,
         "docker_image_available": True,

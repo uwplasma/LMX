@@ -56,3 +56,17 @@ def test_hunt_default_case_now_stays_bounded():
     assert solution.state.residual <= 1.1e-3
     assert float(jnp.max(fluid_u)) < 0.01
     assert float(jnp.min(fluid_u)) > -1e-3
+
+
+def test_transient_solver_can_start_from_nonzero_initial_velocity():
+    case = make_hartmann_case(ha=0.0, ny=12, nz=12)
+    case = replace(
+        case,
+        forcing=0.0,
+        initial_velocity=0.5,
+        time_stepper=replace(case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0),
+    )
+    solution = solve_steady(case)
+    center_value = float(solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2])
+    assert center_value > 0.0
+    assert float(solution.state.u[0, 0]) == pytest.approx(0.0)

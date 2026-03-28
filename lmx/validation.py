@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,7 @@ from .reference_data import (
     load_processed_slice,
 )
 from .specs import CaseSpec
+from .solvers import solve_transient
 
 
 @dataclass(frozen=True)
@@ -75,6 +77,18 @@ class FreeMHDCaseInspection:
     block_mesh_dicts: tuple[str, ...]
     boundary_field_dirs: tuple[str, ...]
     latest_time_dirs: tuple[str, ...]
+    region_zero_dirs: tuple[str, ...]
+    zero_field_files: tuple[str, ...]
+    processor_layout_dirs: tuple[str, ...]
+    parallel_time_dirs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FieldMinMaxRecord:
+    time: float
+    field: str
+    min_value: float
+    max_value: float
 
 
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
@@ -283,6 +297,9 @@ def freemhd_case_command(case_dir: str | Path, cores: int = 4, solver: str = "ep
 def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> ValidationReport:
     run_dir = Path(freemhd_run_dir)
     inspection = inspect_freemhd_case(run_dir)
+    expected_region_count = float(len(case_spec.regions))
+    expected_solid_count = float(sum(1 for region in case_spec.regions if region.kind == "solid"))
+    minmax_files = tuple(sorted(str(path.relative_to(run_dir)) for path in run_dir.glob("postProcessing/**/fieldMinMax.dat")))
     metrics = {
         "run_dir_exists": float(run_dir.exists()),
         "has_system": float((run_dir / "system").exists()),
@@ -291,7 +308,24 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
         "control_dict_count": float(len(inspection.control_dicts)),
         "region_properties_count": float(len(inspection.region_properties)),
         "latest_time_count": float(len(inspection.latest_time_dirs)),
+        "region_zero_dir_count": float(len(inspection.region_zero_dirs)),
+        "zero_field_file_count": float(len(inspection.zero_field_files)),
+        "processor_layout_count": float(len(inspection.processor_layout_dirs)),
+        "parallel_time_count": float(len(inspection.parallel_time_dirs)),
+        "has_potE_zero_field": float(any(path.endswith("/potE") for path in inspection.zero_field_files)),
+        "has_velocity_zero_field": float(any(path.endswith("/U") for path in inspection.zero_field_files)),
+        "expected_region_count": expected_region_count,
+        "expected_solid_region_count": expected_solid_count,
+        "field_minmax_file_count": float(len(minmax_files)),
     }
+    latest_u_record = latest_field_minmax_record(run_dir, field="mag(U)")
+    if latest_u_record is not None:
+        lmx_solution = solve_transient(case_spec)
+        lmx_u_max = float(jnp.max(jnp.abs(lmx_solution.state.u)))
+        metrics["freemhd_latest_time"] = latest_u_record.time
+        metrics["freemhd_u_max_latest"] = latest_u_record.max_value
+        metrics["lmx_u_max"] = lmx_u_max
+        metrics["u_max_abs_diff"] = abs(lmx_u_max - latest_u_record.max_value)
     artifacts = {
         "freemhd_run_dir": str(run_dir),
         "expected_command": freemhd_case_command(run_dir),
@@ -300,6 +334,11 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
         "block_mesh_dicts": json.dumps(inspection.block_mesh_dicts),
         "boundary_field_dirs": json.dumps(inspection.boundary_field_dirs),
         "latest_time_dirs": json.dumps(inspection.latest_time_dirs),
+        "region_zero_dirs": json.dumps(inspection.region_zero_dirs),
+        "zero_field_files": json.dumps(inspection.zero_field_files),
+        "processor_layout_dirs": json.dumps(inspection.processor_layout_dirs),
+        "parallel_time_dirs": json.dumps(inspection.parallel_time_dirs),
+        "field_minmax_files": json.dumps(minmax_files),
     }
     return ValidationReport(case_name=case_spec.name, metrics=metrics, artifacts=artifacts)
 
@@ -395,6 +434,46 @@ def docker_available() -> bool:
     return docker_daemon_available()
 
 
+def read_field_minmax(path: str | Path) -> tuple[FieldMinMaxRecord, ...]:
+    records: list[FieldMinMaxRecord] = []
+    for raw_line in Path(path).read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = re.match(
+            r"^(?P<time>\S+)\s+"
+            r"(?P<field>\S+)\s+"
+            r"(?P<min>\S+)\s+"
+            r"\([^)]+\)\s+\S+\s+"
+            r"(?P<max>\S+)\s+"
+            r"\([^)]+\)\s+\S+\s*$",
+            line,
+        )
+        if match is None:
+            continue
+        records.append(
+            FieldMinMaxRecord(
+                time=float(match.group("time")),
+                field=match.group("field"),
+                min_value=float(match.group("min")),
+                max_value=float(match.group("max")),
+            )
+        )
+    return tuple(records)
+
+
+def latest_field_minmax_record(run_dir: str | Path, field: str = "mag(U)") -> FieldMinMaxRecord | None:
+    root = Path(run_dir)
+    latest: FieldMinMaxRecord | None = None
+    for path in root.glob("postProcessing/**/fieldMinMax.dat"):
+        for record in read_field_minmax(path):
+            if record.field != field:
+                continue
+            if latest is None or record.time > latest.time:
+                latest = record
+    return latest
+
+
 def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
     root = Path(case_dir)
     if not root.exists():
@@ -407,6 +486,10 @@ def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
             block_mesh_dicts=(),
             boundary_field_dirs=(),
             latest_time_dirs=(),
+            region_zero_dirs=(),
+            zero_field_files=(),
+            processor_layout_dirs=(),
+            parallel_time_dirs=(),
         )
 
     def _relative_matches(pattern: str) -> tuple[str, ...]:
@@ -426,6 +509,43 @@ def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
             matches.append(str(path.relative_to(root)))
         return tuple(sorted(matches, key=float))
 
+    def _region_zero_dirs() -> tuple[str, ...]:
+        zero_root = root / "0"
+        if not zero_root.is_dir():
+            return ()
+        return tuple(sorted(str(path.relative_to(root)) for path in zero_root.iterdir() if path.is_dir()))
+
+    def _zero_field_files() -> tuple[str, ...]:
+        zero_root = root / "0"
+        if not zero_root.is_dir():
+            return ()
+        matches: list[str] = []
+        for region_dir in zero_root.iterdir():
+            if not region_dir.is_dir():
+                continue
+            for field_path in region_dir.iterdir():
+                if field_path.is_file():
+                    matches.append(str(field_path.relative_to(root)))
+        return tuple(sorted(matches))
+
+    def _processor_layout_dirs() -> tuple[str, ...]:
+        return tuple(sorted(str(path.relative_to(root)) for path in root.iterdir() if path.is_dir() and path.name.startswith("processors")))
+
+    def _parallel_time_dirs() -> tuple[str, ...]:
+        matches: list[str] = []
+        for processor_root in root.iterdir():
+            if not processor_root.is_dir() or not processor_root.name.startswith("processors"):
+                continue
+            for path in processor_root.iterdir():
+                if not path.is_dir():
+                    continue
+                try:
+                    float(path.name)
+                except ValueError:
+                    continue
+                matches.append(str(path.relative_to(root)))
+        return tuple(sorted(matches, key=lambda value: float(Path(value).name)))
+
     return FreeMHDCaseInspection(
         case_dir=str(root),
         control_dicts=_relative_matches("**/system/controlDict"),
@@ -436,6 +556,10 @@ def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
         boundary_field_dirs=_relative_matches("0")
         + _relative_matches("**/0"),
         latest_time_dirs=_numeric_time_dirs(),
+        region_zero_dirs=_region_zero_dirs(),
+        zero_field_files=_zero_field_files(),
+        processor_layout_dirs=_processor_layout_dirs(),
+        parallel_time_dirs=_parallel_time_dirs(),
     )
 
 

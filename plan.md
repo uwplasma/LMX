@@ -61,26 +61,23 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 
 ## Best Next Steps
 
-1. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
+1. Turn the current Shercliff `Ha20` FreeMHD smoke run into a repeatable parity workflow:
+   - keep the `linux/amd64` container path as the canonical FreeMHD execution route on this Apple-silicon host
+   - preserve the short-run `controlDict` override path for smoke and CI parity jobs
+   - add a checked-in script that emits an LMX-vs-FreeMHD report for the recovered Shercliff case
+2. Improve the first real FreeMHD comparison beyond the current coarse `max |U|` metric:
+   - sample comparable centerline or midplane profiles from reconstructed OpenFOAM output
+   - compare those against an LMX transient run with matched nonzero initial velocity
+   - keep the current min/max metric as a cheap regression guard while richer profile extraction is added
+3. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
    - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but Hunt still needs a real multi-region stability fix
-2. Extend analytical validation beyond the current Hartmann implementation:
-   - Shercliff and Hunt profile comparison hooks now exist
-   - Hartmann is now close enough that it can support stronger acceptance checks
-   - Shercliff and Hunt still need solver-fidelity improvements before they can become acceptance tests
-3. Tighten CI acceptance criteria once better parity is available:
+4. Tighten CI acceptance criteria once better parity is available:
    - convert Hartmann validation into a stronger pass/fail parity check
    - keep Shercliff and Hunt as informative reports until their fidelity improves
    - add benchmark threshold tracking with explicit tolerances
-4. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity now that both analytical and processed-slice metrics are emitted by the same CLI path.
-5. Acquire or reconstruct at least one standalone `epotMultiRegion*` laminar case locally, since the current local assets do not yet contain runnable FreeMHD paper cases.
-6. Prove the current FreeMHD container bundle end to end:
-   - resolve the now-narrowed base-image pull/build execution issue on this machine
-   - build a local `lmx-freemhd` image successfully
-   - run the recovered Shercliff `Ha20` case as the first actual FreeMHD smoke test
-7. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
-8. Implement mapped-operator support for the fringing-field pipe case.
+5. Implement mapped-operator support for the fringing-field pipe case.
 
 ## What Worked
 
@@ -117,6 +114,23 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The Docker daemon is reachable in the current environment.
 - A machine-readable container preflight now exists for the FreeMHD bundle and distinguishes local image absence, valid Docker Hub tag lookup, and timed local base-image pull stalls.
 - A reproducible Darwin-only patch helper now exists for the local OpenFOAM header-shadowing issue, and it moves the local `wmake` probe past the libc++ conflict to a new `fvMesh.H` include failure.
+- The Docker image now builds locally as `lmx-freemhd-smoke` and runs correctly on this Apple-silicon host when forced to `--platform linux/amd64`.
+- The recovered Shercliff `Ha20` `epotMultiRegionInterFoam` case now runs end to end in the container with:
+  - non-root execution so OpenFOAM dynamic code is allowed
+  - automatic multi-region preprocessing
+  - synchronized top-level and per-region `decomposeParDict` updates
+  - cleanup of stale `processor*` and `processors*` layouts before each run
+  - optional `controlDict` overrides for `deltaT`, `endTime`, and `writeInterval`
+- The recovered Shercliff `Ha20` smoke run now produces:
+  - reconstructed `0.0001/` output
+  - parallel `processors8/0.0001/` output
+  - `postProcessing/liquid/minMax/0/fieldMinMax.dat`
+- `compare_with_freemhd` now inspects multi-region `0/`, `processors*`, and `fieldMinMax.dat` layouts instead of only checking that the case directory exists.
+- LMX now supports explicit nonzero transient initialization through `CaseSpec.initial_velocity`, which is required to match FreeMHD cases that do not start from rest.
+- A first coarse transient parity check now exists for the recovered Shercliff `Ha20` smoke run:
+  - FreeMHD latest `max |U|` at `t = 1e-4` is `0.973457584`
+  - an LMX short transient with matched `initial_velocity = 0.9725`, `dt = 1e-5`, `t_final = 1e-4`, and `forcing = 0` gives `max |U| = 0.9721652865`
+  - the current absolute difference is about `1.29e-3`
 
 ## What Did Not Work
 
@@ -141,6 +155,12 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The corrected Docker bundle has not yet been proven through a full successful image build in this session.
 - The current Docker blocker has narrowed from daemon reachability and stale-image naming to local pull/build execution; `microfluidica/openfoam:2206` resolves as a valid Docker Hub tag, but timed pulls still stall on this machine.
 - The Darwin local-build path is no longer blocked by the original libc++ collision after the patch helper is applied, but it is still not runnable because the next failure is an OpenFOAM include-resolution regression (`fvMesh.H` not found).
+- The first attempt to rerun the recovered Shercliff `Ha20` case at a smaller core count failed because only the top-level `decomposeParDict` was rewritten; the per-region `system/<region>/decomposeParDict` files still retained the original `95`-way partitioning.
+- A later rerun still failed because stale `processors95/` data from an earlier decomposition survived; cleanup has to happen on every run, not only in the mesh-generation branch.
+- The current automated LMX-vs-FreeMHD comparison is intentionally coarse:
+  - it compares the latest FreeMHD `mag(U)` maximum from `fieldMinMax.dat`
+  - it does not yet compare full reconstructed profiles or full field data
+  - the current agreement depends on matching the nonzero FreeMHD initial state through `CaseSpec.initial_velocity`
 
 ## Chronological Log
 
@@ -500,6 +520,53 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. inspect local Docker Desktop / engine network or credential state to explain why timed pulls stall even though Hub tag lookup works
   2. keep the Darwin `wmake` path moving in parallel by inspecting the missing include directories behind the current `fvMesh.H` failure
   3. once either path actually executes FreeMHD, use the recovered Shercliff `Ha20` case as the first real smoke/parity target
+
+### 2026-03-28 12:15 America/Chicago
+
+- Proved the FreeMHD container path on this Apple-silicon host instead of continuing to treat it as a scaffold:
+  - `docker pull --platform linux/amd64 microfluidica/openfoam:2206` succeeds locally
+  - the Docker image now builds locally as `lmx-freemhd-smoke`
+  - the run helper now forces `--platform linux/amd64` and `--entrypoint /bin/bash`
+- Fixed the first real run blockers on the recovered Shercliff `Ha20` case:
+  - disabled `set -eu` around OpenFOAM `bashrc` sourcing to avoid shell aborts from the base image setup scripts
+  - switched container execution to non-root so dynamic coded OpenFOAM boundary conditions are allowed
+  - added automatic multi-region preprocessing (`blockMesh`, `topoSet`, `splitMeshRegions`, `changeDictionary`, `setExprFields`)
+  - added `--oversubscribe` to the MPI launch path so the case can run on this host
+- The first smaller-core rerun still failed for two concrete reasons that are now fixed on `main`:
+  - only the top-level `decomposeParDict` had been rewritten; the per-region dicts remained at `95` subdomains
+  - stale `processors95/` data survived and contaminated later runs
+
+### 2026-03-28 13:20 America/Chicago
+
+- Hardened the FreeMHD run harness for repeatable local parity work:
+  - synchronized all `system/**/decomposeParDict` files to the requested core count
+  - cleaned both `processor*` and `processors*` layouts on every run
+  - added optional `controlDict` overrides through `run_freemhd_case.py` for `deltaT`, `endTime`, and `writeInterval`
+  - added direct `runLog.<solver>` capture in the case directory
+- Verified the recovered Shercliff `Ha20` smoke run with:
+  - `cores = 8`
+  - `deltaT = 1e-5`
+  - `endTime = 1e-4`
+  - `writeInterval = 1e-4`
+- This run now reaches the requested short transient horizon and produces:
+  - reconstructed `0.0001/`
+  - parallel `processors8/0.0001/`
+  - `postProcessing/liquid/minMax/0/fieldMinMax.dat`
+  - latest FreeMHD `max |U| = 0.973457584` at `t = 1e-4`
+
+### 2026-03-28 13:35 America/Chicago
+
+- Extended the LMX parity side to match what the real FreeMHD case is doing:
+  - added `CaseSpec.initial_velocity`
+  - `solve_transient` now respects nonzero initial velocity while preserving no-slip walls
+  - `compare_with_freemhd` now inspects multi-region `0/`, `processors*`, and `fieldMinMax.dat` artifacts
+  - `compare_with_freemhd` now performs a first coarse transient comparison using the latest FreeMHD `mag(U)` maximum
+- Verified the first coarse transient parity metric with a matched LMX smoke setup:
+  - LMX case: Shercliff `Ha=20`, `ny = nz = 16`, `initial_velocity = 0.9725`, `forcing = 0`, `dt = 1e-5`, `t_final = 1e-4`
+  - FreeMHD latest `max |U| = 0.973457584`
+  - LMX `max |U| = 0.9721652865`
+  - absolute difference `= 0.0012922975`
+- Current best next step is now to replace this coarse min/max smoke comparison with profile extraction from reconstructed FreeMHD output while continuing the Hunt/Shercliff solver-fidelity work on the LMX side.
 
 ## Instruction For Future Agents
 

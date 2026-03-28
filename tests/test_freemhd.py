@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from lmx.freemhd import (
+    control_dict_application,
+    decompose_par_subdomains,
     discover_freemhd_cases,
     discover_freemhd_cases_in_roots,
     docker_hub_tag_report,
@@ -108,6 +110,20 @@ def test_dockerfile_base_image_parses_first_from(tmp_path: Path):
 def test_parse_docker_hub_image_handles_explicit_and_default_tags():
     assert parse_docker_hub_image("microfluidica/openfoam:2206") == ("microfluidica", "openfoam", "2206")
     assert parse_docker_hub_image("openfoam") == ("library", "openfoam", "latest")
+
+
+def test_control_dict_application_reads_application(tmp_path: Path):
+    case_dir = tmp_path / "case"
+    (case_dir / "system").mkdir(parents=True)
+    (case_dir / "system" / "controlDict").write_text("application     epotMultiRegionInterFoam;\n")
+    assert control_dict_application(case_dir) == "epotMultiRegionInterFoam"
+
+
+def test_decompose_par_subdomains_reads_count(tmp_path: Path):
+    case_dir = tmp_path / "case"
+    (case_dir / "system").mkdir(parents=True)
+    (case_dir / "system" / "decomposeParDict").write_text("numberOfSubdomains 95;\n")
+    assert decompose_par_subdomains(case_dir) == 95
 
 
 def test_docker_hub_tag_report_handles_404(monkeypatch: pytest.MonkeyPatch):

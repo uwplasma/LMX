@@ -13,6 +13,8 @@ This first implementation includes:
 - Explicit unit, regression, physics, validation, and benchmark entrypoints with GitHub Actions workflows.
 - Zenodo closed-channel analytical and processed-slice loaders for Shercliff and Hunt reference ingestion.
 - Recovered `StartingFiles` case materialization for Shercliff laminar paper cases, plus FreeMHD environment probes and fail-fast container harness checks.
+- Platform-aware FreeMHD container execution on Apple silicon via `linux/amd64`, plus short-run `controlDict` overrides for smoke/parity jobs.
+- A first coarse `LMX`-vs-`FreeMHD` comparison path based on FreeMHD `fieldMinMax.dat` output and matched nonzero LMX initial velocity.
 
 This repository does **not** yet include:
 
@@ -49,7 +51,9 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/materialize_starting_case.py --case-dir /tmp/startingfiles_ha20/StartingFiles/Shercliff/shercliff_Ha20_ConstantQ_OutletZeroGradientInletCodedUxBpotE
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --extra-case-root /tmp/startingfiles_ha20/StartingFiles/Shercliff --output ./artifacts/freemhd_setup.json
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_case.py --case-dir ./external/FreeMHD/OpenFOAM-v2206/tutorials/electromagnetics/mhdFoam/hartmann --output ./artifacts/freemhd_case_hartmann.json
-/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd --case-dir /absolute/path/to/freemhd_case --output ./artifacts/freemhd/run.json
+/Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-smoke --platform linux/amd64
+/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-smoke --case-dir /absolute/path/to/freemhd_case --platform linux/amd64 --output ./artifacts/freemhd/run.json
+/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-smoke --case-dir /absolute/path/to/freemhd_case --platform linux/amd64 --cores 8 --delta-t 1e-5 --end-time 1e-4 --write-interval 1e-4 --output ./artifacts/freemhd/run_smoke.json
 ```
 
 ## Layout

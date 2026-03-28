@@ -97,6 +97,7 @@ class CaseSpec:
     time_stepper: TimeStepperConfig
     output: OutputSpec = field(default_factory=OutputSpec)
     forcing: float = 1.0
+    initial_velocity: float = 0.0
     reference_pressure_gradient: float = -1.0
     reference_phi_cell: tuple[int, int] = (0, 0)
     notes: str = ""

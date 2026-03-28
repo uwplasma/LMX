@@ -1,9 +1,9 @@
 FROM microfluidica/openfoam:2206
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV WM_PROJECT_DIR=/opt/OpenFOAM/OpenFOAM-v2206
-ENV WM_THIRD_PARTY_DIR=/opt/OpenFOAM/ThirdParty-v2206
-ENV FOAM_INST_DIR=/opt/OpenFOAM
+ENV WM_PROJECT_DIR=/usr/lib/openfoam/openfoam2206
+ENV WM_THIRD_PARTY_DIR=/usr/lib/openfoam/openfoam2206/ThirdParty
+ENV FOAM_ETC=/usr/lib/openfoam/openfoam2206/etc
 
 RUN apt-get update && apt-get install -y \
     bash \
@@ -19,7 +19,7 @@ WORKDIR /opt
 
 RUN git clone --depth 1 https://github.com/PlasmaControl/FreeMHD.git /opt/FreeMHD
 
-RUN /bin/bash -lc "source /opt/OpenFOAM/OpenFOAM-v2206/etc/bashrc && cd /opt/FreeMHD && \
+RUN /bin/bash -lc "source ${WM_PROJECT_DIR}/etc/bashrc && cd /opt/FreeMHD && \
     if [ -x ./Allwmake ]; then ./Allwmake; fi && \
     wmake MHD_Solvers/solvers/epotMultiRegionFoam && \
     wmake MHD_Solvers/solvers/epotMultiRegionInterFoam"

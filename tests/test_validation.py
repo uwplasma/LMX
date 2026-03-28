@@ -14,7 +14,9 @@ from lmx.validation import (
     hartmann_analytic_profile,
     hartmann_validation,
     inspect_freemhd_case,
+    latest_field_minmax_record,
     processed_slice_validation,
+    read_field_minmax,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
@@ -37,28 +39,63 @@ def test_compare_with_freemhd_report(tmp_path: Path):
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
     (tmp_path / "0").mkdir()
+    (tmp_path / "0" / "fluid").mkdir()
+    (tmp_path / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
     (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
+    (tmp_path / "0" / "fluid" / "U").write_text("internalField uniform (0 0 0);")
+    (tmp_path / "0" / "fluid" / "potE").write_text("internalField uniform 0;")
+    (tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
+        "# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    )
     report = compare_with_freemhd(case, tmp_path)
     path = write_validation_report(report, tmp_path / "report.json")
     assert path.exists()
     assert report.metrics["control_dict_count"] == pytest.approx(1.0)
+    assert report.metrics["region_zero_dir_count"] == pytest.approx(1.0)
+    assert report.metrics["has_potE_zero_field"] == pytest.approx(1.0)
+    assert report.metrics["field_minmax_file_count"] == pytest.approx(1.0)
+    assert report.metrics["freemhd_u_max_latest"] == pytest.approx(0.25)
 
 
 def test_inspect_freemhd_case_collects_case_structure(tmp_path: Path):
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
     (tmp_path / "0").mkdir()
+    (tmp_path / "0" / "liquid").mkdir()
+    (tmp_path / "processors8").mkdir()
+    (tmp_path / "processors8" / "0.001").mkdir(parents=True)
     (tmp_path / "1.5").mkdir()
     (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
     (tmp_path / "system" / "fvSchemes").write_text("ddtSchemes {}")
     (tmp_path / "system" / "fvSolution").write_text("solvers {}")
     (tmp_path / "system" / "blockMeshDict").write_text("blocks ()")
     (tmp_path / "constant" / "regionProperties").write_text("regions ()")
+    (tmp_path / "0" / "liquid" / "U").write_text("internalField uniform (0 0 0);")
     inspection = inspect_freemhd_case(tmp_path)
     assert inspection.control_dicts == ("system/controlDict",)
     assert inspection.region_properties == ("constant/regionProperties",)
     assert inspection.block_mesh_dicts == ("system/blockMeshDict",)
     assert inspection.latest_time_dirs == ("1.5",)
+    assert inspection.region_zero_dirs == ("0/liquid",)
+    assert inspection.zero_field_files == ("0/liquid/U",)
+    assert inspection.processor_layout_dirs == ("processors8",)
+    assert inspection.parallel_time_dirs == ("processors8/0.001",)
+
+
+def test_field_minmax_reader_extracts_latest_mag_u(tmp_path: Path):
+    path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "# header\n"
+        "1.0e-05 mag(U) 0.0 (0 0 0) 0 0.8 (0 0 0) 0\n"
+        "2.0e-05 mag(U) 0.0 (0 0 0) 0 0.9 (0 0 0) 0\n"
+    )
+    records = read_field_minmax(path)
+    latest = latest_field_minmax_record(tmp_path, field="mag(U)")
+    assert len(records) == 2
+    assert latest is not None
+    assert latest.time == pytest.approx(2.0e-05)
+    assert latest.max_value == pytest.approx(0.9)
 
 
 def test_hartmann_validation_writer(tmp_path: Path):

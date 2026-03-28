@@ -129,6 +129,37 @@ def dockerfile_base_image(dockerfile_path: str | Path) -> str | None:
     return None
 
 
+def control_dict_application(case_dir: str | Path) -> str | None:
+    control_dict = Path(case_dir) / "system" / "controlDict"
+    if not control_dict.exists():
+        return None
+    for raw_line in control_dict.read_text().splitlines():
+        line = raw_line.split("//", 1)[0].strip()
+        if not line.startswith("application"):
+            continue
+        tokens = line.replace(";", " ").split()
+        if len(tokens) >= 2:
+            return tokens[1]
+    return None
+
+
+def decompose_par_subdomains(case_dir: str | Path) -> int | None:
+    decompose_dict = Path(case_dir) / "system" / "decomposeParDict"
+    if not decompose_dict.exists():
+        return None
+    for raw_line in decompose_dict.read_text().splitlines():
+        line = raw_line.split("//", 1)[0].strip()
+        if not line.startswith("numberOfSubdomains"):
+            continue
+        tokens = line.replace(";", " ").split()
+        if len(tokens) >= 2:
+            try:
+                return int(tokens[1])
+            except ValueError:
+                return None
+    return None
+
+
 def parse_docker_hub_image(image: str) -> tuple[str, str, str] | None:
     reference = image
     if "@" in reference:

@@ -25,6 +25,7 @@
 - Hartmann and Shercliff case factories now use smaller pseudo-time steps and a larger iteration budget because the current solver core is explicit in the diffusive update and otherwise clips on fine meshes.
 - The velocity update now treats the linear `-sigma |B|^2 u` portion of the Lorentz force semi-implicitly, which improves stability for Hartmann and Shercliff without changing the overall solver structure.
 - The solver also applies a global limiter on the per-step velocity increment. At the current project stage this acts as an adaptive pseudo-step controller and is what prevents the Hunt default path from blowing up while the multi-region update remains explicit.
+- `CaseSpec.initial_velocity` now exists because real FreeMHD cases do not necessarily start from rest; the current Shercliff `Ha20` smoke parity path uses this to match the recovered case initialization.
 
 ## Extension points
 
@@ -41,6 +42,7 @@
 - `python scripts/run_validation_suite.py --output artifacts/validation`: writes validation CSV, JSON, and VTK artifacts for Hartmann, Shercliff, and Hunt cases.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`: writes the current benchmark report.
 - `python -m lmx.cli validate shercliff --ha 20 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel --output ./artifacts/reference_compare`: compares the current solution against the ingested Zenodo analytical file.
+- `python scripts/run_freemhd_case.py --image lmx-freemhd-smoke --platform linux/amd64 --case-dir ... --cores 8 --delta-t 1e-5 --end-time 1e-4 --write-interval 1e-4`: executes the current short FreeMHD smoke/parity run on this Apple-silicon host.
 
 GitHub Actions now mirrors these entrypoints:
 

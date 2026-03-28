@@ -172,7 +172,8 @@ def solve_transient(case: CaseSpec) -> Solution:
     materials = build_material_fields(case, mesh)
     _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
 
-    initial_u = jnp.zeros(mesh.yz_shape)
+    initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
+    initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
     dt = case.time_stepper.dt
     steps = min(case.time_stepper.max_steps, max(1, int(round(case.time_stepper.t_final / dt))))
 
