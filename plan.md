@@ -157,10 +157,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - `hunt_exactBL_Ha20` can be extracted and materialized locally
   - the same container harness now runs that Hunt case to `t = 1e-4`, reconstructs `0.0001/`, and supports sampled parity extraction
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
-  - `u_max_abs_diff ≈ 1.17e-3`
+  - `u_max_abs_diff ≈ 1.26e-3` after the latest retained solver update
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
   - the original `freemhd_sample_z_l2_error ≈ 6.74e-1` was inflated by a comparison bug that included solid-wall cells on the LMX side
-  - after comparing fluid-only layered-duct cuts, the corrected Hunt `z` metric is `freemhd_sample_z_l2_error ≈ 1.39e-1`
+  - after comparing fluid-only layered-duct cuts and retaining the new outer-coupled pseudo-step, the corrected Hunt `z` metric is `freemhd_sample_z_l2_error ≈ 1.14e-1`
   - this sharpens the remaining Hunt task from “probably unstable/inaccurate” to a measured parity gap against the recovered FreeMHD case
 
 ## What Did Not Work
@@ -689,6 +689,25 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. treat the remaining Hunt error as a real solver-fidelity gap instead of a comparison artifact
   2. improve the short-time Hunt shape evolution in LMX while holding the now-correct fluid-only parity path fixed
   3. keep widening recovered FreeMHD parity to another higher-Ha closed-channel case once the next Hunt change lands
+
+### 2026-03-28 20:00 America/Chicago
+
+- Retained a solver-side improvement after the layered-profile comparison fix:
+  - `_step(...)` now uses `time_stepper.outer_iterations` as a real fixed-point coupling loop inside each pseudo-time step
+  - each outer iteration recomputes `phi`, `J`, and `J x B` from the latest velocity iterate before forming the next relaxed velocity update
+  - this is a real solver change, not just a reporting change, so the low-Ha Hartmann/Shercliff regression baselines were updated to the new stable centerlines
+- Verified the tradeoff before keeping it on `main`:
+  - regression snapshots changed, but physics and validation tests stayed green
+  - benchmark on the default CPU smoke path remained acceptable at about `cold ≈ 1.28 s`, `warm ≈ 0.29 s`
+  - Shercliff `Ha20` short-time FreeMHD parity remained good: `y_l2 ≈ 1.15e-3`, `z_l2 ≈ 3.29e-2`
+  - Hunt `Ha20` short-time FreeMHD parity improved again:
+    - `freemhd_sample_y_l2_error` improved from `≈ 6.02e-2` to `≈ 5.36e-2`
+    - `freemhd_sample_z_l2_error` improved from `≈ 1.39e-1` to `≈ 1.14e-1`
+    - `u_max_abs_diff` remained small at `≈ 1.26e-3`
+- Current best next step is now:
+  1. keep the new outer-coupled pseudo-step and use the real Hunt `Ha20` parity artifact to tune the next solver change
+  2. recover and run a higher-Ha closed-channel case next so the improved parity machinery is exercised in a harsher boundary-layer regime
+  3. continue tightening the Hunt case construction so the short-time parity runner mirrors the recovered FreeMHD setup more faithfully
 
 ## Instruction For Future Agents
 

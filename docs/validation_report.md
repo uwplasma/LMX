@@ -71,8 +71,9 @@
 - A second real recovered-case FreeMHD smoke/parity path now exists for Hunt `Ha20`:
   - the recovered `hunt_exactBL_Ha20` case runs to `t = 1e-4` in the same `linux/amd64` container path used for Shercliff
   - the short transient is materially more expensive than Shercliff on this machine, with `ExecutionTime ≈ 174 s` for the solver stage before reconstruction
-  - the current coarse `max |U|` parity is still good at short time: `u_max_abs_diff ≈ 1.17e-3`
+  - the current coarse `max |U|` parity is still good at short time: `u_max_abs_diff ≈ 1.26e-3`
   - the current sampled-profile parity is still not good, but the earlier reported `z` error was dominated by a comparison bug that included solid-wall cells on the LMX side
-  - after restricting layered-duct profile comparisons to the fluid region only, the current Hunt sampled-profile metrics are `freemhd_sample_y_l2_error ≈ 6.02e-2`, `freemhd_sample_z_l2_error ≈ 1.39e-1`
+  - after restricting layered-duct profile comparisons to the fluid region only, the current Hunt sampled-profile metrics are `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
+  - this latest improvement comes from using a real fixed-point outer coupling loop inside each pseudo-time step instead of a single `u -> phi -> JxB -> u` pass
   - this confirms that the repo now has a real Hunt FreeMHD reference path and that Hunt solver fidelity, not infrastructure, is the dominant remaining gap
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.

@@ -145,24 +145,40 @@ def _step(
     dt: float,
     forcing: float,
     anchor: tuple[int, int],
+    outer_iterations: int,
     potential_iterations: int,
     relaxation: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
-    phi = _solve_potential(mesh, sigma, fluid_mask, u, by, bz, anchor, potential_iterations)
-    phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
-    jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u, phi, by, bz)
-    lorentz = jnp.nan_to_num(lorentz, nan=0.0, posinf=0.0, neginf=0.0)
-    lap_u = laplacian_scalar(u, mesh, mask=fluid_mask)
-    lorentz_damping = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
-    lorentz_explicit = lorentz + lorentz_damping * u
-    rhs = nu * lap_u + (forcing + lorentz_explicit) / rho
-    implicit_scale = 1.0 + dt * lorentz_damping / rho
-    u_trial = jnp.where(fluid_mask, (u + dt * rhs) / implicit_scale, 0.0)
-    relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u + relaxation * u_trial, 0.0)
-    u_next = _limited_velocity_update(u, relaxed, fluid_mask)
-    u_next = _enforce_velocity_bc(u_next, fluid_mask)
-    u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
-    u_next = jnp.clip(u_next, -5.0, 5.0)
+    def outer_body(_, carry):
+        u_iter, _, _, _, _ = carry
+        phi = _solve_potential(mesh, sigma, fluid_mask, u_iter, by, bz, anchor, potential_iterations)
+        phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
+        jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
+        lorentz = jnp.nan_to_num(lorentz, nan=0.0, posinf=0.0, neginf=0.0)
+        lap_u = laplacian_scalar(u_iter, mesh, mask=fluid_mask)
+        lorentz_damping = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
+        lorentz_explicit = lorentz + lorentz_damping * u_iter
+        rhs = nu * lap_u + (forcing + lorentz_explicit) / rho
+        implicit_scale = 1.0 + dt * lorentz_damping / rho
+        u_trial = jnp.where(fluid_mask, (u + dt * rhs) / implicit_scale, 0.0)
+        relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u_iter + relaxation * u_trial, 0.0)
+        u_next = _limited_velocity_update(u_iter, relaxed, fluid_mask)
+        u_next = _enforce_velocity_bc(u_next, fluid_mask)
+        u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
+        u_next = jnp.clip(u_next, -5.0, 5.0)
+        return (u_next, phi, jy, jz, lorentz)
+
+    u_init = _enforce_velocity_bc(u, fluid_mask)
+    phi0 = jnp.zeros_like(u)
+    j0 = jnp.zeros_like(u)
+    l0 = jnp.zeros_like(u)
+    outer_count = max(1, outer_iterations)
+    u_next, phi, jy, jz, lorentz = jax.lax.fori_loop(
+        0,
+        outer_count,
+        outer_body,
+        (u_init, phi0, j0, j0, l0),
+    )
     residual = jnp.max(jnp.abs(u_next - u))
     return u_next, phi, jy, jz, lorentz, residual
 
@@ -191,6 +207,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             dt=dt,
             forcing=case.forcing,
             anchor=case.reference_phi_cell,
+            outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
             relaxation=case.time_stepper.relaxation,
         )
