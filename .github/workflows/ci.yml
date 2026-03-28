@@ -50,6 +50,13 @@ jobs:
       - name: Run validation artifact suite
         run: python scripts/run_validation_suite.py --output artifacts/validation
 
+      - name: Build validation summary
+        run: |
+          python scripts/summarize_ci_artifacts.py \
+            --validation-summary artifacts/validation/summary.json \
+            --output-json artifacts/validation/summary-report.json \
+            --output-md artifacts/validation/summary-report.md
+
       - name: Upload validation artifacts
         uses: actions/upload-artifact@v4
         with:

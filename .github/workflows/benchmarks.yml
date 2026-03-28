@@ -25,6 +25,13 @@ jobs:
       - name: Run benchmark suite
         run: python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json --repeats 2
 
+      - name: Build benchmark summary
+        run: |
+          python scripts/summarize_ci_artifacts.py \
+            --benchmark-report artifacts/benchmarks/benchmark.json \
+            --output-json artifacts/benchmarks/summary-report.json \
+            --output-md artifacts/benchmarks/summary-report.md
+
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@v4
         with:
