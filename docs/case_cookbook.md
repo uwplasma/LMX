@@ -30,9 +30,12 @@ This creates a duct with explicit conducting Hartmann-wall layers.
 python3 scripts/fetch_freemhd_assets.py --dest ./external
 python3 scripts/fetch_freemhd_assets.py --dest ./external --include-starting-files
 python3 scripts/write_freemhd_container_files.py
+/Users/rogerio/base_env/bin/python3 scripts/inspect_starting_files_archive.py --pattern shercliff_Ha0_refinedMesh
+/Users/rogerio/base_env/bin/python3 scripts/inspect_starting_files_archive.py --pattern shercliff_Ha0_refinedMesh --extract --output-dir /tmp/startingfiles_ha0
+/Users/rogerio/base_env/bin/python3 scripts/materialize_starting_case.py --case-dir /tmp/startingfiles_ha0/StartingFiles/Shercliff/shercliff_Ha0_refinedMesh
 ```
 
-The first command fetches the FreeMHD repository and the processed-figures archive. The `--include-starting-files` variant is optional and downloads the much larger case-input archive.
+The first command fetches the FreeMHD repository and the processed-figures archive. The `--include-starting-files` variant is optional and downloads the much larger case-input archive. If that archive is incomplete, `inspect_starting_files_archive.py` can still read recoverable entries directly from local ZIP headers and selectively extract early cases. `materialize_starting_case.py` then expands the recovered `0.tar.gz`, `constant.tar.gz`, and `system.tar.gz` files into a normal OpenFOAM case directory.
 
 ## Hartmann validation
 
@@ -64,7 +67,7 @@ docker build -t lmx-freemhd ./docker
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd --case-dir /absolute/path/to/freemhd_case --output ./artifacts/freemhd/run.json
 ```
 
-This path generates a local Docker build context with OpenFOAM v2206, FreeMHD, and a case runner script. The probe command records whether the local OpenFOAM tree is sourceable, whether `wmkdepend` exists for local `wmake` builds, whether the Docker daemon is reachable, and classifies a few common `wmake` failure modes such as missing `wmkdepend` or the macOS libc++ header conflict. The setup inspection command reports whether runnable FreeMHD cases exist locally and recommends the smallest smoke target when they do not. The case inspection command records the actual case structure that a parity run would consume. On the current local assets, the recommended target is the bundled OpenFOAM Hartmann tutorial only as an environment smoke test, because the standalone `epotMultiRegion*` paper cases are not present yet. The execution helper mounts the case directory, runs either serial or decomposed cases, and stores a machine-readable run report or a structured daemon-unavailable status.
+This path generates a local Docker build context with OpenFOAM v2206, FreeMHD, and a case runner script. The probe command records whether the local OpenFOAM tree is sourceable, whether `wmkdepend` exists for local `wmake` builds, whether the Docker daemon is reachable, and classifies a few common `wmake` failure modes such as missing `wmkdepend` or the macOS libc++ header conflict. The setup inspection command reports whether runnable FreeMHD cases exist locally and recommends the smallest smoke target when they do not. The case inspection command records the actual case structure that a parity run would consume. A partially recovered Shercliff `Ha0` paper case can now be materialized locally from the truncated `StartingFiles.zip`; the next more relevant parity target remains the `Ha20` Shercliff case once the archive download is resumed far enough. The execution helper mounts the case directory, runs either serial or decomposed cases, and stores a machine-readable run report or a structured daemon-unavailable status.
 
 ## Benchmark
 

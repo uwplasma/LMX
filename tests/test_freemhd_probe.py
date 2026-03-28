@@ -44,6 +44,7 @@ def test_probe_freemhd_environment_collects_expected_fields(tmp_path: Path, monk
     assert payload["foam_system_check_returncode"] == 0
     assert payload["solver_build_probe_returncode"] == 2
     assert payload["solver_build_issue"] == "unknown-build-failure"
+    assert payload["solver_build_recommendation"] == "Inspect the stderr tail and compare it to the darwin64Clang wmake rules."
     assert len(calls) == 2
 
 
@@ -54,3 +55,11 @@ def test_classify_build_probe_detects_expected_failures():
         == "macos-libcxx-header-conflict"
     )
     assert probe.classify_build_probe("", wmkdepend_exists=True) == "ok"
+
+
+def test_detect_shadowed_c_headers_and_recommendation():
+    stderr = "In file included from /tmp/x:\nIn file included from lnInclude/string.h:57:\nIn file included from lnInclude/time.h:44:\n"
+    assert probe.detect_shadowed_c_headers(stderr) == ["string.h", "time.h"]
+    recommendation = probe.build_issue_recommendation("macos-libcxx-header-conflict", stderr)
+    assert "src/OpenFOAM/lnInclude" in recommendation
+    assert "string.h, time.h" in recommendation

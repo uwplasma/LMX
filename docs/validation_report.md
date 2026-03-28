@@ -11,6 +11,7 @@
 - CSV and ParaView outputs for centerline and field inspection.
 - FreeMHD comparison harness metadata, container bundle generation, and a local container execution helper script.
 - FreeMHD environment/setup inspection scripts that report Docker CLI vs daemon availability and recommend the smallest current target case.
+- Partial `StartingFiles.zip` inspection and selective case materialization utilities for recovering early laminar paper cases before the full archive is complete.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -22,6 +23,7 @@
 - Fringing-field mapped-pipe operators.
 - Tighten the FreeMHD execution helper into solver-specific parity runners that extract matching LMX/FreeMHD metrics.
 - Acquire or reconstruct a standalone `epotMultiRegion*` laminar paper case locally, since the current local assets only include the solver sources and processed figures.
+- Resume the larger `StartingFiles.zip` archive far enough to recover `shercliff_Ha20_ConstantQ_OutletZeroGradientInletCodedUxBpotE` after the now-working partial-archive tooling.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
 
 ## Current limitation

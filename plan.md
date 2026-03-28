@@ -105,6 +105,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The local FreeMHD environment probe now classifies common build failures such as missing `wmkdepend` and the macOS libc++ header conflict.
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
 - FreeMHD-side inspection now reports that the current downloads contain no standalone runnable FreeMHD cases and recommends the bundled OpenFOAM Hartmann tutorial as the smallest local smoke target.
+- The current partial `StartingFiles.zip` is recoverable enough to extract and materialize the first Shercliff `Ha0` case shell into a normal case directory.
 
 ## What Did Not Work
 
@@ -121,14 +122,12 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
 - The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
 - The current local host-side `wmake` probe for `epotMultiRegionFoam` still fails, but the retained blocker has advanced from missing `wmkdepend` to a macOS libc++ header-path conflict.
-- Docker is installed but the daemon is not currently reachable from this environment, so container parity runs are blocked until that is fixed.
 - The current local assets still do not include standalone `epotMultiRegion*` paper case directories; only the solver sources, processed figures, and bundled OpenFOAM tutorials are present.
-- The current machine has the Docker CLI installed, but the Docker daemon is not reachable from the active environment.
 - The current local assets include the FreeMHD source tree and processed paper figures, but not the standalone `epotMultiRegion*` case directories needed for direct parity execution.
 - A direct local `wmake` probe still fails on this machine; after repairing `wmkdepend`, the next blocker is the Darwin/OpenFOAM compiler/header environment.
-- The Docker client is installed here, but the Docker daemon is not currently reachable, so containerized FreeMHD execution is blocked by the local runtime state rather than repo code.
 - The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
 - After manually building `wmkdepend`, the next local FreeMHD build blocker is a macOS libc++ header-path conflict during `wmake` of `epotMultiRegionFoam`.
+- The corrected Docker bundle has not yet been proven through a full successful image build in this session.
 
 ## Chronological Log
 
@@ -397,6 +396,24 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - runtime on this machine increased only modestly, from about `1.10s` to about `1.32s`
 - Kept that middle setting as the new `make_hunt_case()` default because it improves the user-facing validation path without the much larger runtime cost of the most aggressive sweep point.
 - Re-ran the Hunt reference-backed CLI validation and confirmed the new default emits the improved metrics while keeping the solution bounded.
+
+### 2026-03-28 01:20 America/Chicago
+
+- Moved the FreeMHD case-input path forward without waiting for the full 8.9 GB archive:
+  - confirmed the existing `external/StartingFiles.zip` is a real but incomplete ZIP, not an HTML error page
+  - added integrity-aware fetching so future downloads validate ZIPs instead of silently keeping corrupt artifacts
+  - added `scripts/inspect_starting_files_archive.py`, which can inspect and selectively extract recoverable entries directly from local ZIP headers even when the central directory is missing
+  - added `scripts/materialize_starting_case.py`, which expands recovered `0.tar.gz`, `constant.tar.gz`, and `system.tar.gz` into a normal OpenFOAM case tree
+- Verified this on the real partial archive:
+  - recovered `/tmp/startingfiles_ha0/StartingFiles/Shercliff/shercliff_Ha0_refinedMesh`
+  - materialized that case into real `0/`, `constant/`, and `system/` directories
+  - confirmed `system/controlDict` uses `epotMultiRegionInterFoam` and the case contains `liquid`, `solidWalls`, and `insulator` regions
+- Docker daemon is now reachable on this machine after starting Docker Desktop, so the external runtime blocker has advanced from daemon availability to actually proving the corrected image build and run path.
+- Corrected the FreeMHD Docker bundle generator to build the real solver paths under `MHD_Solvers/solvers/...` instead of the nonexistent `applications/solvers/...` path.
+- Best next step sharpened again:
+  1. prove the corrected Docker image build path with visible logs
+  2. use the recovered Shercliff `Ha0` case as the first run-structure smoke test
+  3. resume `StartingFiles.zip` in place until the `shercliff_Ha20_ConstantQ_OutletZeroGradientInletCodedUxBpotE` case can be extracted for the first real paper-parity run
 
 ## Instruction For Future Agents
 

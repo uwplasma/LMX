@@ -18,8 +18,8 @@ def test_write_container_bundle_creates_expected_files(tmp_path: Path):
     readme = paths["README.md"].read_text()
 
     assert "openfoam/openfoam2206-paraview:latest" in dockerfile
-    assert "epotMultiRegionFoam" in dockerfile
-    assert "epotMultiRegionInterFoam" in dockerfile
+    assert "wmake MHD_Solvers/solvers/epotMultiRegionFoam" in dockerfile
+    assert "wmake MHD_Solvers/solvers/epotMultiRegionInterFoam" in dockerfile
     assert "if [ -x ./Allwmake ]; then ./Allwmake; fi" in dockerfile
     assert "decomposePar -force" in runner
     assert "mpirun -np" in runner

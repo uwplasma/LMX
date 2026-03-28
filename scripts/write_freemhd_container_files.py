@@ -30,8 +30,8 @@ RUN git clone --depth 1 https://github.com/PlasmaControl/FreeMHD.git /opt/FreeMH
 
 RUN /bin/bash -lc "source /opt/OpenFOAM/OpenFOAM-v2206/etc/bashrc && cd /opt/FreeMHD && \\
     if [ -x ./Allwmake ]; then ./Allwmake; fi && \\
-    wmake applications/solvers/epotMultiRegionFoam && \\
-    wmake applications/solvers/epotMultiRegionInterFoam"
+    wmake MHD_Solvers/solvers/epotMultiRegionFoam && \\
+    wmake MHD_Solvers/solvers/epotMultiRegionInterFoam"
 
 RUN mkdir -p /opt/lmx
 COPY run_freemhd_case.sh /opt/lmx/run_freemhd_case.sh

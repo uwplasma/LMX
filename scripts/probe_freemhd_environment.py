@@ -28,9 +28,44 @@ def classify_build_probe(stderr: str, wmkdepend_exists: bool) -> str:
         return "missing-wmkdepend"
     if "<cstring> tried including <string.h>" in stderr or "<cwchar> tried including <wchar.h>" in stderr:
         return "macos-libcxx-header-conflict"
+    if "lnInclude/string.h" in stderr or "lnInclude/time.h" in stderr or "lnInclude/wchar.h" in stderr:
+        return "macos-libcxx-header-conflict"
     if not stderr.strip():
         return "ok"
     return "unknown-build-failure"
+
+
+def detect_shadowed_c_headers(stderr: str) -> list[str]:
+    hits: list[str] = []
+    for header in ("string.h", "time.h", "wchar.h"):
+        if f"lnInclude/{header}" in stderr:
+            hits.append(header)
+    return hits
+
+
+def build_issue_recommendation(issue: str, stderr: str) -> str:
+    if issue == "missing-wmkdepend":
+        return (
+            "Build OpenFOAM wmake tools first, for example under "
+            "OpenFOAM-v2206/wmake/src, before retrying the FreeMHD solver build."
+        )
+    if issue == "macos-libcxx-header-conflict":
+        shadowed = detect_shadowed_c_headers(stderr)
+        if shadowed:
+            joined = ", ".join(shadowed)
+            return (
+                "OpenFOAM lnInclude C-header shadowing is likely. On Darwin, test demoting "
+                "src/OpenFOAM/lnInclude and src/OSspecific/POSIX/lnInclude from -I to -idirafter "
+                "in wmake/rules/darwin64Clang/c++ and wmake/rules/darwin64Clang/c. "
+                f"Observed shadowed headers: {joined}."
+            )
+        return (
+            "The Darwin/libc++ header environment is inconsistent. Test the darwin64Clang wmake "
+            "include ordering and system header flags before retrying the build."
+        )
+    if issue == "ok":
+        return "No build blocker detected."
+    return "Inspect the stderr tail and compare it to the darwin64Clang wmake rules."
 
 
 def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
@@ -43,6 +78,7 @@ def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
     foam_check = _run_shell(f"source {bashrc} && foamSystemCheck")
     build_probe = _run_shell(f"source {bashrc} && cd {solver_dir} && wmake")
     build_issue = classify_build_probe(build_probe.stderr, wmkdepend.exists())
+    shadowed_headers = detect_shadowed_c_headers(build_probe.stderr)
 
     return {
         "repo_root": str(root),
@@ -57,6 +93,8 @@ def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
         "foam_system_check_stderr_tail": foam_check.stderr[-4000:],
         "solver_build_probe_returncode": build_probe.returncode,
         "solver_build_issue": build_issue,
+        "solver_build_shadowed_headers": shadowed_headers,
+        "solver_build_recommendation": build_issue_recommendation(build_issue, build_probe.stderr),
         "solver_build_probe_stdout_tail": build_probe.stdout[-4000:],
         "solver_build_probe_stderr_tail": build_probe.stderr[-4000:],
     }

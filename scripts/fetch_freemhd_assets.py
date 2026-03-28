@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import zipfile
 from pathlib import Path
 
 
@@ -11,10 +12,23 @@ ZENODO_STARTING = "https://zenodo.org/records/13964055/files/StartingFiles.zip"
 ZENODO_FIGURES = "https://zenodo.org/records/13964055/files/FreeMHDPaperAllFigures.zip"
 
 
-def _download(url: str, path: Path) -> None:
-    if path.exists():
+def _is_valid_zip(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        with zipfile.ZipFile(path) as archive:
+            archive.testzip()
+    except zipfile.BadZipFile:
+        return False
+    return True
+
+
+def _download(url: str, path: Path, *, validate_zip: bool = False) -> None:
+    if path.exists() and (not validate_zip or _is_valid_zip(path)):
         return
-    subprocess.run(["curl", "-L", url, "-o", str(path)], check=True)
+    subprocess.run(["curl", "-L", "-C", "-", url, "-o", str(path)], check=True)
+    if validate_zip and not _is_valid_zip(path):
+        raise RuntimeError(f"Downloaded archive is still invalid: {path}")
 
 
 def main() -> int:
@@ -33,9 +47,9 @@ def main() -> int:
     if not repo_dir.exists():
         subprocess.run(["git", "clone", FREE_MHD_REPO, str(repo_dir)], check=True)
 
-    _download(ZENODO_FIGURES, dest / Path(ZENODO_FIGURES).name)
+    _download(ZENODO_FIGURES, dest / Path(ZENODO_FIGURES).name, validate_zip=True)
     if args.include_starting_files:
-        _download(ZENODO_STARTING, dest / Path(ZENODO_STARTING).name)
+        _download(ZENODO_STARTING, dest / Path(ZENODO_STARTING).name, validate_zip=True)
     print(dest)
     return 0
 
