@@ -82,6 +82,7 @@
   - the geometry-aware inference now also keeps Hunt on the field-based cut (`x_position = 0.015`) instead of the geometric midpoint, which preserves those better conducting-wall metrics
   - this latest improvement comes from using a real fixed-point outer coupling loop inside each pseudo-time step instead of a single `u -> phi -> JxB -> u` pass
   - a retained Ha-aware Hunt control update now improves the same real artifact further to `u_max_abs_diff ≈ 2.29e-3`, `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 6.55e-3`
+  - the current parity-report builder now also infers a Hunt-only short-time drive `forcing = sigma * |B|^2 * U_inlet` when no explicit forcing is supplied, which brings the current Hunt `Ha20` metrics to `u_max_abs_diff ≈ 8.17e-4`, `freemhd_sample_y_l2_error ≈ 2.07e-3`, `freemhd_sample_z_l2_error ≈ 7.48e-3`
   - this confirms that the repo now has a real Hunt FreeMHD reference path and that Hunt solver fidelity, not infrastructure, is the dominant remaining gap
 - A first higher-Ha closed-channel FreeMHD parity artifact now exists for Shercliff `Ha100`:
   - the recovered `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE` case runs to `t = 1e-4` and reconstructs successfully through the same container harness
@@ -96,9 +97,13 @@
   - the retained Ha-aware Hunt control update improved the same real artifact to `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 1.36e-1`, `freemhd_sample_z_l2_error ≈ 7.63e-2`
   - a retained interior-offset conducting-wall sampling rule now clamps boundary-aligned `fieldMinMax` cuts to `1.5%` of the streamwise span, which moves this recovered case to `x_position = 0.015`
   - with that narrower slice rule, the same real artifact improves further to `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 6.23e-2`, `freemhd_sample_z_l2_error ≈ 7.58e-2`
+  - the current parity-report builder now also infers a Hunt-only short-time drive `forcing = sigma * |B|^2 * U_inlet` when no explicit forcing is supplied, which brings the current retained metrics to `u_max_abs_diff ≈ 5.25e-5`, `freemhd_sample_y_l2_error ≈ 5.72e-2`, `freemhd_sample_z_l2_error ≈ 5.69e-2`
   - this confirms that the higher-Ha conducting-wall regime is now represented by a real FreeMHD artifact and that the remaining Hunt gap is much more narrowly concentrated in amplitude and residual `y`-profile fidelity than before
 - The retained Hunt control update is explicit in the public LMX config surface now:
   - `TimeStepperConfig` includes `velocity_update_limit`
   - `make_hunt_case` uses a Ha-aware schedule for `outer_iterations`, `relaxation`, and `velocity_update_limit`
   - this keeps the retained `Ha20` improvement without globally loosening the bounded velocity update for `Ha100`
+- The Lorentz-balance Hunt parity drive is currently implemented in the parity builder, not yet in the core case semantics:
+  - `scripts/run_freemhd_parity_report.py` infers the Hunt short-time drive when `--forcing` is omitted
+  - the next clean-up step is to move that from the parity script into the main case/BC model so parity and native LMX runs share the same flow-rate-driven transient semantics
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.

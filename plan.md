@@ -343,6 +343,26 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   2. target the remaining Hunt `Ha100` amplitude / `y`-profile solver gap, which is now much less contaminated by the choice of comparison slice
   3. continue widening higher-Ha conducting-wall coverage only after the high-Ha solver update is justified by the existing `Ha100` artifact
 
+### 2026-03-28 20:05 America/Chicago
+
+- Investigated the remaining Hunt amplitude gap after the Ha-aware controls and slice fix:
+  - small exploratory body forces were too weak to matter over the `1e-4` short-transient window
+  - a physically scaled drive `forcing ~ sigma * |B|^2 * U_inlet` matches the observed short-time acceleration scale much better
+- Retained that forcing rule in the checked-in parity builder:
+  - `scripts/run_freemhd_parity_report.py` now infers `forcing` for Hunt cases when it is not explicitly supplied
+  - the retained rule is `forcing = sigma * (By^2 + Bz^2) * initial_velocity`
+  - Hartmann and Shercliff parity runs still default to `forcing = 0`
+- Added unit coverage for the new parity-drive inference:
+  - `test_infer_parity_forcing_uses_lorentz_balance_for_hunt`
+  - `test_main_infers_hunt_forcing_when_unspecified`
+- Verified the retained change against the real recovered FreeMHD artifacts:
+  - Hunt `Ha20` improved from `u_max_abs_diff ≈ 8.17e-4`, `y_l2 ≈ 2.07e-3`, `z_l2 ≈ 7.48e-3` to the same order with the retained forcing rule, keeping the already-good short-time parity
+  - Hunt `Ha100` improved from `u_max_abs_diff ≈ 1.40e-2`, `y_l2 ≈ 6.23e-2`, `z_l2 ≈ 7.58e-2` to `u_max_abs_diff ≈ 5.25e-5`, `y_l2 ≈ 5.72e-2`, `z_l2 ≈ 5.69e-2`
+- Best next step is now narrower and more architectural:
+  1. lift the current Hunt parity-drive heuristic out of the parity script and into proper case/BC semantics in the core solver
+  2. keep the retained real-artifact targets (`Hunt Ha20`, `Hunt Ha100`) fixed while doing that refactor
+  3. only after the drive model lives in the core API, decide whether similar flow-rate-driven short-transient handling is needed for other FreeMHD case families
+
 ### 2026-03-27 16:35 America/Chicago
 
 - Added richer validation/reporting support:
