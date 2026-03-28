@@ -100,6 +100,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - local case directories discovered
   - recommended smoke target when no standalone FreeMHD case is present
 - The bundled FreeMHD OpenFOAM tree passes `foamSystemCheck` on this machine.
+- The Hunt default case improved materially after reducing its pseudo-step and increasing its iteration budget; this kept the bounded default path but lowered the current `Ha=20` reference errors with only a modest runtime increase.
 - The repo now has explicit FreeMHD environment and case inspection scripts, and they correctly report the current local target as the bundled OpenFOAM Hartmann tutorial when no standalone FreeMHD cases are present.
 - The local FreeMHD environment probe now classifies common build failures such as missing `wmkdepend` and the macOS libc++ header conflict.
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
@@ -115,16 +116,16 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The Hunt validation path remains artifact-only for now because the current solver still clips and saturates on that case; it should not be treated as parity-complete.
 - The current Shercliff `Ha=20` reference comparison also shows large normalized error, confirming that solver-fidelity work is still the critical path after reference ingestion.
 - The earlier Hartmann/Shercliff defaults (`dt=0.01`, low iteration counts) were too aggressive for fine meshes because the current solver core uses an explicit diffusive update.
-- Hunt can be stabilized only with a much smaller pseudo-step than the current default, which confirms the next Hunt fix should be adaptive pseudo-stepping or a more implicit coupling rather than more validation plumbing.
+- The original Hunt defaults were too aggressive; the tuned default is better, but Hunt still needs solver-fidelity work beyond pseudo-step tuning.
 - Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; it needed the additional adaptive update limiter.
 - Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
 - The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
-- The local host-side `wmake` probe for `epotMultiRegionFoam` still fails because `wmkdepend` is missing in the bundled darwin tool path.
+- The current local host-side `wmake` probe for `epotMultiRegionFoam` still fails, but the retained blocker has advanced from missing `wmkdepend` to a macOS libc++ header-path conflict.
 - Docker is installed but the daemon is not currently reachable from this environment, so container parity runs are blocked until that is fixed.
 - The current local assets still do not include standalone `epotMultiRegion*` paper case directories; only the solver sources, processed figures, and bundled OpenFOAM tutorials are present.
 - The current machine has the Docker CLI installed, but the Docker daemon is not reachable from the active environment.
 - The current local assets include the FreeMHD source tree and processed paper figures, but not the standalone `epotMultiRegion*` case directories needed for direct parity execution.
-- A direct local `wmake` probe currently fails because `OpenFOAM-v2206/platforms/tools/darwin64Clang/wmkdepend` is missing in the vendored FreeMHD tree on this machine.
+- A direct local `wmake` probe still fails on this machine; after repairing `wmkdepend`, the next blocker is the Darwin/OpenFOAM compiler/header environment.
 - The Docker client is installed here, but the Docker daemon is not currently reachable, so containerized FreeMHD execution is blocked by the local runtime state rather than repo code.
 - The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
 - After manually building `wmkdepend`, the next local FreeMHD build blocker is a macOS libc++ header-path conflict during `wmake` of `epotMultiRegionFoam`.
@@ -386,6 +387,16 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - `scripts/inspect_freemhd_setup.py` reports zero discovered standalone FreeMHD case directories in the current local assets and recommends the bundled OpenFOAM Hartmann tutorial only as an environment smoke target
   - `scripts/run_freemhd_case.py` returns a structured `docker-daemon-unavailable` JSON status on this machine
 - Treat this entry as the current baseline for future work on `main`; the next blockers are the Darwin/OpenFOAM compiler environment, Docker daemon access, and obtaining at least one real `epotMultiRegion*` case directory locally.
+
+### 2026-03-28 00:55 America/Chicago
+
+- Used the now-automated Shercliff/Hunt reference path to do a controlled pseudo-time sweep instead of guessing at new defaults.
+- Result on the default Hunt mesh (`72x72`, `Ha=20`):
+  - earlier bounded default was about `y_l2_error ~ 0.334`, `slice_y_l2_error ~ 0.329`
+  - a tuned middle setting (`dt=0.002`, `max_steps=500`, `relaxation=0.1`, `potential_iterations=250`) reduced that to about `y_l2_error ~ 0.284`, `slice_y_l2_error ~ 0.279`
+  - runtime on this machine increased only modestly, from about `1.10s` to about `1.32s`
+- Kept that middle setting as the new `make_hunt_case()` default because it improves the user-facing validation path without the much larger runtime cost of the most aggressive sweep point.
+- Re-ran the Hunt reference-backed CLI validation and confirmed the new default emits the improved metrics while keeping the solution bounded.
 
 ## Instruction For Future Agents
 

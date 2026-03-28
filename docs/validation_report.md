@@ -29,7 +29,7 @@
 - Hartmann `Ha=20` is now stable on the default finer mesh and shows a low normalized error in the current analytical comparison.
 - Shercliff `Ha=20` no longer clips on the default finer mesh, but its normalized error is still too large to count as parity-complete.
 - Hunt no longer clips at the default pseudo-time settings after adding the adaptive velocity-update limiter, and the validation reports now emit finite Hunt comparison metrics.
-- Hunt still requires solver-fidelity work because the bounded default solution is not yet close enough to the ingested reference data to count as parity-complete.
+- Hunt still requires solver-fidelity work because the bounded default solution is not yet close enough to the ingested reference data to count as parity-complete, but the tuned default pseudo-step now improves the `Ha=20` Hunt errors materially relative to the earlier bounded baseline.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness further, but Hunt needed the additional adaptive update limiter on top of that.
 - The local machine currently has the Docker CLI installed but the Docker daemon is not reachable from the active environment.
 - The current local asset set does not contain any standalone `epotMultiRegionFoam` or `epotMultiRegionInterFoam` case directories, so the bundled OpenFOAM Hartmann tutorial is only an environment smoke target, not a FreeMHD parity case.
