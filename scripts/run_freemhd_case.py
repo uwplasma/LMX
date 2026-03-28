@@ -9,8 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.freemhd import docker_cli_available
-from lmx.validation import docker_available
+from lmx.freemhd import docker_cli_available, docker_daemon_available, docker_image_available
 
 
 def run_freemhd_case(
@@ -73,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(payload, indent=2))
         return 0
 
-    if not docker_available():
+    if not docker_daemon_available():
         payload = {
             "image": args.image,
             "case_dir": str(args.case_dir.resolve()),
@@ -83,6 +82,24 @@ def main(argv: list[str] | None = None) -> int:
             "docker_cli_available": True,
             "docker_available": False,
             "status": "docker-daemon-unavailable",
+        }
+        if args.output is not None:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(payload, indent=2))
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    if not docker_image_available(args.image):
+        payload = {
+            "image": args.image,
+            "case_dir": str(args.case_dir.resolve()),
+            "bundle_root": str(args.bundle_root.resolve()),
+            "cores": args.cores,
+            "solver": args.solver,
+            "docker_cli_available": True,
+            "docker_available": True,
+            "docker_image_available": False,
+            "status": "docker-image-unavailable",
         }
         if args.output is not None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -105,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
         "solver": args.solver,
         "docker_cli_available": True,
         "docker_available": True,
+        "docker_image_available": True,
         "status": "ok" if result.returncode == 0 else "failed",
         "returncode": result.returncode,
         "stdout_tail": result.stdout[-4000:],

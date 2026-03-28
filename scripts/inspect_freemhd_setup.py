@@ -23,10 +23,17 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path(__file__).resolve().parents[1] / "external" / "FreeMHDPaperAllFigures" / "FreeMHDPaperAllFigures" / "ClosedChannel",
     )
+    parser.add_argument(
+        "--extra-case-root",
+        type=Path,
+        action="append",
+        default=[],
+        help="Additional extracted case root to include in discovery, such as a recovered /tmp/StartingFiles case.",
+    )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    payload = freemhd_environment_report(args.repo_root, args.reference_root)
+    payload = freemhd_environment_report(args.repo_root, args.reference_root, extra_case_roots=args.extra_case_root)
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, indent=2))

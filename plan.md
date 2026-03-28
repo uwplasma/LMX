@@ -73,9 +73,12 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
    - add benchmark threshold tracking with explicit tolerances
 4. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity now that both analytical and processed-slice metrics are emitted by the same CLI path.
 5. Acquire or reconstruct at least one standalone `epotMultiRegion*` laminar case locally, since the current local assets do not yet contain runnable FreeMHD paper cases.
-6. Tighten the current FreeMHD container bundle into a verified build-and-run path with actual OpenFOAM solver compilation rather than documented placeholder commands.
-7. Implement mapped-operator support for the fringing-field pipe case.
-8. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
+6. Prove the current FreeMHD container bundle end to end:
+   - resolve the OpenFOAM base-image pull/build path on this machine
+   - build a local `lmx-freemhd` image successfully
+   - run the recovered Shercliff `Ha20` case as the first actual FreeMHD smoke test
+7. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
+8. Implement mapped-operator support for the fringing-field pipe case.
 
 ## What Worked
 
@@ -106,6 +109,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
 - FreeMHD-side inspection now reports that the current downloads contain no standalone runnable FreeMHD cases and recommends the bundled OpenFOAM Hartmann tutorial as the smallest local smoke target.
 - The current partial `StartingFiles.zip` is recoverable enough to extract and materialize the first Shercliff `Ha0` case shell into a normal case directory.
+- The current partial `StartingFiles.zip` is also recoverable enough to extract and materialize the Shercliff `Ha20` `epotMultiRegionInterFoam` paper case shell into a normal case directory.
+- `inspect_freemhd_setup.py` can now include recovered case directories outside `external/FreeMHD` via `--extra-case-root`, and it reports the recovered Shercliff `Ha20` case correctly.
+- `run_freemhd_case.py` now fails fast with a structured `docker-image-unavailable` status when the requested image tag does not exist locally, instead of stalling in `docker run`.
+- The Docker daemon is reachable in the current environment.
 
 ## What Did Not Work
 
@@ -128,6 +135,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
 - After manually building `wmkdepend`, the next local FreeMHD build blocker is a macOS libc++ header-path conflict during `wmake` of `epotMultiRegionFoam`.
 - The corrected Docker bundle has not yet been proven through a full successful image build in this session.
+- The current Docker blocker has narrowed from daemon reachability to image availability and OpenFOAM base-image resolution; no successful `lmx-freemhd` image build has completed yet in this session.
 
 ## Chronological Log
 
@@ -269,6 +277,18 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Did not overstate the outcome:
   - Hunt still clips at the default settings
   - this confirms that Hunt needs either adaptive pseudo-step sizing or a more implicit multi-region update, not just implicit treatment of the linear damping term
+
+### 2026-03-27 20:10 America/Chicago
+
+- Updated only the handoff docs and logs to reflect the current archive-recovery state.
+- Current recovered `StartingFiles` result:
+  - Shercliff `Ha0` can be materialized locally from the partial archive
+  - `Ha20` remains the next archive target
+- Current Docker/image blocker:
+  - the Docker CLI is available
+  - the daemon is not reachable from the active environment
+  - image build and container execution stay blocked until that changes
+- This entry is logging-only; no solver, test, or workflow code changed in this step.
 
 ### 2026-03-27 20:20 America/Chicago
 
@@ -414,6 +434,24 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. prove the corrected Docker image build path with visible logs
   2. use the recovered Shercliff `Ha0` case as the first run-structure smoke test
   3. resume `StartingFiles.zip` in place until the `shercliff_Ha20_ConstantQ_OutletZeroGradientInletCodedUxBpotE` case can be extracted for the first real paper-parity run
+
+### 2026-03-28 02:05 America/Chicago
+
+- Resumed the partial `StartingFiles.zip` download far enough to recover the full Shercliff `Ha20` paper case shell:
+  - extracted `/tmp/startingfiles_ha20/StartingFiles/Shercliff/shercliff_Ha20_ConstantQ_OutletZeroGradientInletCodedUxBpotE`
+  - materialized its `0/`, `constant/`, and `system/` trees successfully
+  - confirmed `system/controlDict` targets `epotMultiRegionInterFoam`
+  - confirmed `constant/regionProperties` and the expected multi-region layout are present
+- Tightened the FreeMHD harness around the now-real recovered case:
+  - `inspect_freemhd_setup.py` now accepts `--extra-case-root`, so setup inspection can include recovered `/tmp` case roots alongside the checked-in `external/FreeMHD` tree
+  - `run_freemhd_case.py` now checks whether the requested Docker image tag exists locally and returns a structured `docker-image-unavailable` JSON status instead of stalling
+- Verified the new behavior on the real recovered Shercliff `Ha20` path:
+  - setup inspection reports the recovered `Ha20` case as the recommended `freemhd_case` target with no blockers
+  - the run helper exits quickly with `docker-image-unavailable` for the still-missing `lmx-freemhd-smoke` image
+- Best next step tightened again:
+  1. resolve the OpenFOAM base-image pull/build path and produce a local `lmx-freemhd` image
+  2. run the recovered Shercliff `Ha20` case inside that image as the first real FreeMHD smoke test
+  3. once container execution is live, extend the current JSON harness into actual LMX-vs-FreeMHD parity extraction for this case
 
 ## Instruction For Future Agents
 

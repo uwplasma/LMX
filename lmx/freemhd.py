@@ -9,6 +9,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class FreeMHDCase:
     path: str
+    source_root: str
     has_allrun: bool
     has_zero_dir: bool
     has_region_properties: bool
@@ -37,7 +38,21 @@ def docker_daemon_available() -> bool:
     return completed.returncode == 0
 
 
-def discover_freemhd_cases(root: str | Path) -> list[FreeMHDCase]:
+def docker_image_available(image: str) -> bool:
+    if not docker_daemon_available():
+        return False
+    completed = subprocess.run(
+        ["docker", "image", "inspect", image],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return completed.returncode == 0
+
+
+def discover_freemhd_cases(root: str | Path | None) -> list[FreeMHDCase]:
+    if root is None:
+        return []
     root_path = Path(root)
     if not root_path.exists():
         return []
@@ -55,6 +70,7 @@ def discover_freemhd_cases(root: str | Path) -> list[FreeMHDCase]:
         cases.append(
             FreeMHDCase(
                 path=str(case_dir),
+                source_root=str(root_path),
                 has_allrun=has_allrun,
                 has_zero_dir=has_zero_dir,
                 has_region_properties=has_region_properties,
@@ -63,8 +79,17 @@ def discover_freemhd_cases(root: str | Path) -> list[FreeMHDCase]:
     return cases
 
 
-def recommended_freemhd_target(repo_root: str | Path) -> FreeMHDTarget | None:
-    cases = discover_freemhd_cases(repo_root)
+def discover_freemhd_cases_in_roots(roots: list[str | Path | None]) -> list[FreeMHDCase]:
+    discovered: dict[str, FreeMHDCase] = {}
+    for root in roots:
+        for case in discover_freemhd_cases(root):
+            discovered[case.path] = case
+    return [discovered[path] for path in sorted(discovered)]
+
+
+def recommended_freemhd_target(repo_root: str | Path, extra_case_roots: list[str | Path] | None = None) -> FreeMHDTarget | None:
+    search_roots: list[str | Path | None] = [repo_root, *(extra_case_roots or [])]
+    cases = discover_freemhd_cases_in_roots(search_roots)
     ready_cases = [case for case in cases if case.has_zero_dir]
     if ready_cases:
         ranked = sorted(
@@ -80,7 +105,7 @@ def recommended_freemhd_target(repo_root: str | Path) -> FreeMHDTarget | None:
         return FreeMHDTarget(
             path=target.path,
             kind="freemhd_case",
-            reason="Discovered runnable non-OpenFOAM case directory with system/constant and initial fields.",
+            reason=f"Discovered runnable non-OpenFOAM case directory with system/constant and initial fields under {target.source_root}.",
         )
 
     smoke = Path(repo_root) / "OpenFOAM-v2206" / "tutorials" / "electromagnetics" / "mhdFoam" / "hartmann"
@@ -96,11 +121,13 @@ def recommended_freemhd_target(repo_root: str | Path) -> FreeMHDTarget | None:
 def freemhd_environment_report(
     repo_root: str | Path,
     reference_root: str | Path | None = None,
+    extra_case_roots: list[str | Path] | None = None,
 ) -> dict[str, object]:
     repo_path = Path(repo_root)
     reference_path = Path(reference_root) if reference_root is not None else None
-    cases = discover_freemhd_cases(repo_path)
-    target = recommended_freemhd_target(repo_path)
+    extra_paths = [Path(root) for root in extra_case_roots or []]
+    cases = discover_freemhd_cases_in_roots([repo_path, *extra_paths])
+    target = recommended_freemhd_target(repo_path, extra_case_roots=extra_paths)
     blockers: list[str] = []
     docker_cli = docker_cli_available()
     docker_daemon = docker_daemon_available()
@@ -115,10 +142,13 @@ def freemhd_environment_report(
         "docker_daemon_available": docker_daemon,
         "freemhd_repo_exists": repo_path.exists(),
         "reference_root_exists": reference_path.exists() if reference_path is not None else False,
+        "searched_case_roots": [str(repo_path), *[str(path) for path in extra_paths]],
+        "extra_case_roots": [str(path) for path in extra_paths],
         "discovered_case_count": len(cases),
         "discovered_cases": [
             {
                 "path": case.path,
+                "source_root": case.source_root,
                 "has_allrun": case.has_allrun,
                 "has_zero_dir": case.has_zero_dir,
                 "has_region_properties": case.has_region_properties,

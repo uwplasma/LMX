@@ -12,6 +12,9 @@
 - FreeMHD comparison harness metadata, container bundle generation, and a local container execution helper script.
 - FreeMHD environment/setup inspection scripts that report Docker CLI vs daemon availability and recommend the smallest current target case.
 - Partial `StartingFiles.zip` inspection and selective case materialization utilities for recovering early laminar paper cases before the full archive is complete.
+- Recovered Shercliff `Ha0` and `Ha20` starting-case materialization from the partial archive.
+- FreeMHD setup inspection with `--extra-case-root` so recovered `/tmp` cases can be reported in the same setup JSON as the checked-in assets.
+- FreeMHD run-helper fail-fast classification for missing local Docker image tags.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -22,8 +25,8 @@
 - Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
 - Fringing-field mapped-pipe operators.
 - Tighten the FreeMHD execution helper into solver-specific parity runners that extract matching LMX/FreeMHD metrics.
-- Acquire or reconstruct a standalone `epotMultiRegion*` laminar paper case locally, since the current local assets only include the solver sources and processed figures.
-- Resume the larger `StartingFiles.zip` archive far enough to recover `shercliff_Ha20_ConstantQ_OutletZeroGradientInletCodedUxBpotE` after the now-working partial-archive tooling.
+- Prove the Docker image build path end to end and run the first recovered Shercliff `Ha20` case smoke test inside the container.
+- Extend the current setup and run reports into solver-specific parity runners that extract matching LMX/FreeMHD metrics once container execution is live.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
 
 ## Current limitation
@@ -33,5 +36,6 @@
 - Hunt no longer clips at the default pseudo-time settings after adding the adaptive velocity-update limiter, and the validation reports now emit finite Hunt comparison metrics.
 - Hunt still requires solver-fidelity work because the bounded default solution is not yet close enough to the ingested reference data to count as parity-complete, but the tuned default pseudo-step now improves the `Ha=20` Hunt errors materially relative to the earlier bounded baseline.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness further, but Hunt needed the additional adaptive update limiter on top of that.
-- The local machine currently has the Docker CLI installed but the Docker daemon is not reachable from the active environment.
-- The current local asset set does not contain any standalone `epotMultiRegionFoam` or `epotMultiRegionInterFoam` case directories, so the bundled OpenFOAM Hartmann tutorial is only an environment smoke target, not a FreeMHD parity case.
+- The Docker daemon is now reachable on the local machine, and recovered Shercliff `Ha20` case directories can be surfaced through `inspect_freemhd_setup.py --extra-case-root ...`.
+- The current Docker/image blocker has narrowed to image availability and base-image resolution: the helper now reports `docker-image-unavailable` cleanly when the requested tag does not exist locally.
+- The recovered Shercliff `Ha20` case is structurally inspectable, but the container image path is still not proven end to end in this session, so no actual FreeMHD run has completed yet.
