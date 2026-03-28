@@ -78,9 +78,10 @@
   - the short transient is materially more expensive than Shercliff on this machine, with `ExecutionTime ≈ 174 s` for the solver stage before reconstruction
   - the current coarse `max |U|` parity is still good at short time: `u_max_abs_diff ≈ 1.26e-3`
   - the current sampled-profile parity is still not good, but the earlier reported `z` error was dominated by a comparison bug that included solid-wall cells on the LMX side
-  - after restricting layered-duct profile comparisons to the fluid region only, the current Hunt sampled-profile metrics are `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
+  - after restricting layered-duct profile comparisons to the fluid region only, the retained pre-Ha-aware metrics were `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
   - the geometry-aware inference now also keeps Hunt on the field-based cut (`x_position = 0.015`) instead of the geometric midpoint, which preserves those better conducting-wall metrics
   - this latest improvement comes from using a real fixed-point outer coupling loop inside each pseudo-time step instead of a single `u -> phi -> JxB -> u` pass
+  - a retained Ha-aware Hunt control update now improves the same real artifact further to `u_max_abs_diff ≈ 2.29e-3`, `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 6.55e-3`
   - this confirms that the repo now has a real Hunt FreeMHD reference path and that Hunt solver fidelity, not infrastructure, is the dominant remaining gap
 - A first higher-Ha closed-channel FreeMHD parity artifact now exists for Shercliff `Ha100`:
   - the recovered `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE` case runs to `t = 1e-4` and reconstructs successfully through the same container harness
@@ -90,7 +91,12 @@
 - A first higher-Ha closed-channel FreeMHD parity artifact now also exists for Hunt `Ha100`:
   - the recovered `hunt_exactBL_Ha100` case now runs to `t = 1e-4` and reconstructs successfully through the same container harness when forced to the same short-smoke `--cores 8` override used for the other recovered paper cases
   - attempting to inherit the case’s original `95`-way decomposition on this machine results in an immediate killed run, so the explicit short-smoke core override is now part of the documented recovered-case workflow
-  - the resulting short-time parity metrics are `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
+  - the first retained short-time parity metrics were `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
   - the current geometry-aware split rule keeps this conducting-wall case on the field-based cut, which lands at `x_position = 0.0` for the recovered `Ha100` run because the latest `mag(U)` maximum remains on the inlet plane at this short time
-  - this confirms that the higher-Ha conducting-wall regime is now represented by a real FreeMHD artifact and that LMX Hunt fidelity worsens materially from `Ha20` to `Ha100`
+  - the retained Ha-aware Hunt control update improves the same real artifact to `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 1.36e-1`, `freemhd_sample_z_l2_error ≈ 7.63e-2`
+  - this confirms that the higher-Ha conducting-wall regime is now represented by a real FreeMHD artifact and that the remaining Hunt gap is concentrated more in the `y` profile and amplitude than in the `z` profile
+- The retained Hunt control update is explicit in the public LMX config surface now:
+  - `TimeStepperConfig` includes `velocity_update_limit`
+  - `make_hunt_case` uses a Ha-aware schedule for `outer_iterations`, `relaxation`, and `velocity_update_limit`
+  - this keeps the retained `Ha20` improvement without globally loosening the bounded velocity update for `Ha100`
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.

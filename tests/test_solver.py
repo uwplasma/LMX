@@ -23,6 +23,19 @@ def test_hunt_solver_keeps_solid_velocity_zero():
     assert jnp.allclose(solution.state.u[~solution.mesh.fluid_mask], 0.0)
 
 
+def test_hunt_case_uses_ha_aware_coupling_controls():
+    ha20 = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    ha100 = make_hunt_case(ha=100.0, ny=16, nz=16, wall_cells=2)
+    ha1000 = make_hunt_case(ha=1000.0, ny=16, nz=16, wall_cells=2)
+
+    assert ha20.time_stepper.outer_iterations == 6
+    assert ha20.time_stepper.velocity_update_limit == pytest.approx(2e-3)
+    assert ha100.time_stepper.outer_iterations == 4
+    assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
+    assert ha1000.time_stepper.outer_iterations == 3
+    assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
+
+
 def test_shercliff_solution_stays_finite_and_zero_at_walls():
     case = make_shercliff_case(ha=10.0, ny=24, nz=24)
     solution = solve_steady(case)

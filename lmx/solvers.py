@@ -148,6 +148,7 @@ def _step(
     outer_iterations: int,
     potential_iterations: int,
     relaxation: float,
+    velocity_update_limit: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
     def outer_body(_, carry):
         u_iter, _, _, _, _ = carry
@@ -162,7 +163,7 @@ def _step(
         implicit_scale = 1.0 + dt * lorentz_damping / rho
         u_trial = jnp.where(fluid_mask, (u + dt * rhs) / implicit_scale, 0.0)
         relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u_iter + relaxation * u_trial, 0.0)
-        u_next = _limited_velocity_update(u_iter, relaxed, fluid_mask)
+        u_next = _limited_velocity_update(u_iter, relaxed, fluid_mask, max_delta=velocity_update_limit)
         u_next = _enforce_velocity_bc(u_next, fluid_mask)
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
@@ -210,6 +211,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
             relaxation=case.time_stepper.relaxation,
+            velocity_update_limit=case.time_stepper.velocity_update_limit,
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
         ohmic = jnp.mean(jy**2 + jz**2)

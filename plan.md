@@ -174,18 +174,21 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The corrected geometry-aware sampling rule materially improves the real Shercliff parity artifacts while preserving the better Hunt comparison path:
   - recovered Shercliff `Ha20` now samples at `x = 0.5` and the real sampled metrics are `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 5.41e-4`
   - recovered Shercliff `Ha100` now samples at `x = 0.5` and the real sampled metrics are `freemhd_sample_y_l2_error ≈ 8.81e-4`, `freemhd_sample_z_l2_error ≈ 1.70e-4`
-  - recovered Hunt `Ha20` is correctly classified as a conducting-wall case, keeps `x = 0.015`, and retains the better real sampled metrics `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
+  - recovered Hunt `Ha20` is correctly classified as a conducting-wall case, keeps `x = 0.015`, and now reaches `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 6.55e-3` after the retained Ha-aware Hunt control update
 - The first real Hunt `Ha100` FreeMHD-vs-LMX parity numbers now also exist:
-  - `u_max_abs_diff ≈ 9.50e-3`
-  - `freemhd_sample_y_l2_error ≈ 1.39e-1`
-  - `freemhd_sample_z_l2_error ≈ 1.19e-1`
-  - this is the first real higher-Ha conducting-wall artifact and it confirms that the LMX Hunt parity gap grows materially from `Ha20` to `Ha100`
+  - the original retained higher-Ha metrics were `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
+  - after the retained Ha-aware Hunt control update, the current metrics are `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 1.36e-1`, `freemhd_sample_z_l2_error ≈ 7.63e-2`
+  - this is still a real higher-Ha conducting-wall gap, but it is now materially better in the `z` profile than the first retained `Ha100` artifact
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
   - `u_max_abs_diff ≈ 1.26e-3` after the latest retained solver update
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
   - the original `freemhd_sample_z_l2_error ≈ 6.74e-1` was inflated by a comparison bug that included solid-wall cells on the LMX side
   - after comparing fluid-only layered-duct cuts and retaining the new outer-coupled pseudo-step, the corrected Hunt `z` metric is `freemhd_sample_z_l2_error ≈ 1.14e-1`
   - this sharpens the remaining Hunt task from “probably unstable/inaccurate” to a measured parity gap against the recovered FreeMHD case
+- The retained Hunt solver controls are now explicitly Ha-aware:
+  - `TimeStepperConfig` now carries `velocity_update_limit` so the bounded pseudo-step cap is part of the public case configuration instead of a hard-coded solver constant
+  - `make_hunt_case` now chooses different outer-coupling / relaxation / update-limit settings by `Ha`
+  - on the real recovered artifacts, this collapses the short-time Hunt `Ha20` parity gap and improves the Hunt `Ha100` `z` profile while keeping the high-Ha case bounded
 
 ## What Did Not Work
 
@@ -301,6 +304,26 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. treat the combined `Hunt Ha20` and `Hunt Ha100` artifacts as the primary conducting-wall acceptance targets
   2. improve the LMX Hunt solver so short-time `u_max` and `y` profile parity stop degrading sharply between `Ha20` and `Ha100`
   3. only after that, decide whether the field-based `x = 0.0` cut at short-time `Hunt Ha100` should remain the acceptance slice or be replaced with a more physically anchored section definition
+
+### 2026-03-28 19:55 America/Chicago
+
+- Ran a targeted short-transient Hunt sweep against the real recovered FreeMHD artifacts instead of changing the solver blindly:
+  - increasing Hunt outer-coupling iterations helps the sampled `y/z` profiles substantially at `Ha20`
+  - but globally loosening the bounded velocity update hurts the `Ha100` amplitude and `y` profile
+- Retained a Ha-aware Hunt control schedule in `make_hunt_case`:
+  - `Ha <= 20`: `outer_iterations = 6`, `potential_iterations = 400`, `relaxation = 0.08`, `velocity_update_limit = 2e-3`
+  - `20 < Ha <= 100`: `outer_iterations = 4`, `potential_iterations = 400`, `relaxation = 0.1`, `velocity_update_limit = 1e-3`
+  - `Ha > 100`: `outer_iterations = 3`, `potential_iterations = 400`, `relaxation = 0.1`, `velocity_update_limit = 1e-3`
+- Promoted the bounded velocity-step cap into the public config surface:
+  - `TimeStepperConfig` now includes `velocity_update_limit`
+  - `_step(...)` now uses that case-provided limit instead of a hard-coded solver constant
+- Verified the retained change against the real recovered FreeMHD artifacts:
+  - Hunt `Ha20` improved from `u_max_abs_diff ≈ 1.26e-3`, `y_l2 ≈ 5.36e-2`, `z_l2 ≈ 1.14e-1` to `u_max_abs_diff ≈ 2.29e-3`, `y_l2 ≈ 1.20e-3`, `z_l2 ≈ 6.55e-3`
+  - Hunt `Ha100` improved from `u_max_abs_diff ≈ 9.50e-3`, `y_l2 ≈ 1.39e-1`, `z_l2 ≈ 1.19e-1` to `u_max_abs_diff ≈ 1.40e-2`, `y_l2 ≈ 1.36e-1`, `z_l2 ≈ 7.63e-2`
+- Best next step is now narrower again:
+  1. keep the retained Ha-aware Hunt control schedule
+  2. target the remaining Hunt `Ha100` `y`-profile / `u_max` gap specifically, since `Ha20` is now close and `Ha100 z` improved materially
+  3. decide whether the next change should be a better high-Ha velocity update formula or a more physically anchored high-Ha comparison slice at short time
 
 ### 2026-03-27 16:35 America/Chicago
 

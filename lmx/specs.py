@@ -58,6 +58,7 @@ class TimeStepperConfig:
     potential_iterations: int = 400
     steady_tolerance: float = 1e-8
     relaxation: float = 0.35
+    velocity_update_limit: float = 1e-3
     checkpoint_stride: int = 1
 
 

@@ -15,6 +15,38 @@ def _ha_to_b(ha: float, length_scale: float, conductivity: float, density: float
     return ha / (length_scale * ((conductivity / (density * viscosity)) ** 0.5))
 
 
+def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
+    if ha <= 20.0:
+        return TimeStepperConfig(
+            dt=0.002,
+            t_final=1.0,
+            max_steps=500,
+            outer_iterations=6,
+            potential_iterations=400,
+            relaxation=0.08,
+            velocity_update_limit=2e-3,
+        )
+    if ha <= 100.0:
+        return TimeStepperConfig(
+            dt=0.002,
+            t_final=1.0,
+            max_steps=500,
+            outer_iterations=4,
+            potential_iterations=400,
+            relaxation=0.1,
+            velocity_update_limit=1e-3,
+        )
+    return TimeStepperConfig(
+        dt=0.002,
+        t_final=1.0,
+        max_steps=500,
+        outer_iterations=3,
+        potential_iterations=400,
+        relaxation=0.1,
+        velocity_update_limit=1e-3,
+    )
+
+
 def make_hartmann_case(
     ha: float = 20.0,
     width: float = 2.0,
@@ -93,6 +125,7 @@ def make_hunt_case(
 ) -> CaseSpec:
     bmag = _ha_to_b(ha, 0.5 * width, fluid_conductivity, density, viscosity)
     anchor = ((ny + wall_cells * 0) // 2, (nz + 2 * wall_cells) // 2)
+    controls = _hunt_short_transient_controls(ha)
     return CaseSpec(
         name=f"hunt_ha{int(ha)}",
         geometry=GeometrySpec(
@@ -114,13 +147,7 @@ def make_hunt_case(
             BoundaryCondition("walls", "no_slip"),
             BoundaryCondition("conducting_hartmann_walls", "conducting_wall", region="conducting_wall"),
         ),
-        time_stepper=TimeStepperConfig(
-            dt=0.002,
-            t_final=1.0,
-            max_steps=500,
-            potential_iterations=250,
-            relaxation=0.1,
-        ),
+        time_stepper=controls,
         output=OutputSpec(directory=output_dir),
         forcing=1.0,
         reference_pressure_gradient=-1.0,
