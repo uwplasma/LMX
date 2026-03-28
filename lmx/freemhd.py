@@ -22,6 +22,40 @@ class FreeMHDTarget:
     reason: str
 
 
+def docker_command_result(command: list[str], timeout_seconds: int | float | None = None) -> dict[str, object]:
+    if not docker_cli_available():
+        return {
+            "command": command,
+            "status": "docker-cli-unavailable",
+            "returncode": None,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+    try:
+        completed = subprocess.run(
+            command,
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "command": command,
+            "status": "timeout",
+            "returncode": None,
+            "stdout_tail": (exc.stdout or "")[-4000:],
+            "stderr_tail": (exc.stderr or "")[-4000:],
+        }
+    return {
+        "command": command,
+        "status": "ok" if completed.returncode == 0 else "failed",
+        "returncode": completed.returncode,
+        "stdout_tail": completed.stdout[-4000:],
+        "stderr_tail": completed.stderr[-4000:],
+    }
+
+
 def docker_cli_available() -> bool:
     return shutil.which("docker") is not None
 
@@ -48,6 +82,37 @@ def docker_image_available(image: str) -> bool:
         check=False,
     )
     return completed.returncode == 0
+
+
+def docker_registry_image_report(image: str, timeout_seconds: int = 20) -> dict[str, object]:
+    return docker_command_result(["docker", "manifest", "inspect", image], timeout_seconds=timeout_seconds)
+
+
+def docker_local_image_report(image: str) -> dict[str, object]:
+    if not docker_daemon_available():
+        return {
+            "command": ["docker", "image", "inspect", image],
+            "status": "docker-daemon-unavailable",
+            "returncode": None,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+    return docker_command_result(["docker", "image", "inspect", image])
+
+
+def dockerfile_base_image(dockerfile_path: str | Path) -> str | None:
+    path = Path(dockerfile_path)
+    if not path.exists():
+        return None
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.upper().startswith("FROM "):
+            parts = line.split()
+            if len(parts) >= 2:
+                return parts[1]
+    return None
 
 
 def discover_freemhd_cases(root: str | Path | None) -> list[FreeMHDCase]:
@@ -162,5 +227,52 @@ def freemhd_environment_report(
             "kind": target.kind,
             "reason": target.reason,
         },
+        "blockers": blockers,
+    }
+
+
+def freemhd_container_report(
+    bundle_root: str | Path,
+    image: str,
+    timeout_seconds: int = 20,
+) -> dict[str, object]:
+    bundle_path = Path(bundle_root)
+    dockerfile_path = bundle_path / "Dockerfile"
+    base_image = dockerfile_base_image(dockerfile_path)
+
+    blockers: list[str] = []
+    docker_cli = docker_cli_available()
+    docker_daemon = docker_daemon_available()
+    if not docker_cli:
+        blockers.append("docker CLI not found on PATH")
+    elif not docker_daemon:
+        blockers.append("docker daemon is not reachable")
+    if not dockerfile_path.exists():
+        blockers.append("docker bundle Dockerfile is missing")
+    if base_image is None:
+        blockers.append("docker bundle base image could not be parsed")
+
+    local_image = docker_local_image_report(image)
+    base_image_local = None if base_image is None else docker_local_image_report(base_image)
+    base_image_registry = None if base_image is None else docker_registry_image_report(base_image, timeout_seconds=timeout_seconds)
+
+    if local_image["status"] not in {"ok", "docker-daemon-unavailable", "docker-cli-unavailable"}:
+        blockers.append(f"requested image is not available locally: {image}")
+    if base_image_registry is not None and base_image_registry["status"] == "timeout":
+        blockers.append(f"base image registry resolution timed out: {base_image}")
+    elif base_image_registry is not None and base_image_registry["status"] == "failed":
+        blockers.append(f"base image registry resolution failed: {base_image}")
+
+    return {
+        "bundle_root": str(bundle_path.resolve()),
+        "image": image,
+        "docker_cli_available": docker_cli,
+        "docker_daemon_available": docker_daemon,
+        "dockerfile_exists": dockerfile_path.exists(),
+        "dockerfile_path": str(dockerfile_path.resolve()),
+        "base_image": base_image,
+        "local_image_report": local_image,
+        "base_image_local_report": base_image_local,
+        "base_image_registry_report": base_image_registry,
         "blockers": blockers,
     }

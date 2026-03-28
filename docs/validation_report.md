@@ -15,6 +15,7 @@
 - Recovered Shercliff `Ha0` and `Ha20` starting-case materialization from the partial archive.
 - FreeMHD setup inspection with `--extra-case-root` so recovered `/tmp` cases can be reported in the same setup JSON as the checked-in assets.
 - FreeMHD run-helper fail-fast classification for missing local Docker image tags.
+- FreeMHD container preflight reporting for local image presence and bounded-time base-image registry resolution.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -38,4 +39,5 @@
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness further, but Hunt needed the additional adaptive update limiter on top of that.
 - The Docker daemon is now reachable on the local machine, and recovered Shercliff `Ha20` case directories can be surfaced through `inspect_freemhd_setup.py --extra-case-root ...`.
 - The current Docker/image blocker has narrowed to image availability and base-image resolution: the helper now reports `docker-image-unavailable` cleanly when the requested tag does not exist locally.
+- The current container preflight on this machine shows `openfoam/openfoam2206-paraview:latest` is not present locally and `docker manifest inspect` for that base image times out, so the unresolved part is now explicitly the base-image pull/resolve path rather than recovered-case discovery.
 - The recovered Shercliff `Ha20` case is structurally inspectable, but the container image path is still not proven end to end in this session, so no actual FreeMHD run has completed yet.

@@ -5,7 +5,9 @@ import pytest
 from lmx.freemhd import (
     discover_freemhd_cases,
     discover_freemhd_cases_in_roots,
+    dockerfile_base_image,
     freemhd_environment_report,
+    freemhd_container_report,
     recommended_freemhd_target,
 )
 
@@ -89,3 +91,53 @@ def test_freemhd_environment_report_includes_extra_case_roots(tmp_path: Path, mo
     assert report["recommended_target"]["path"] == str(case_dir)
     assert str(extra_root) in report["recommended_target"]["reason"]
     assert report["blockers"] == []
+
+
+def test_dockerfile_base_image_parses_first_from(tmp_path: Path):
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(
+        "# comment\n"
+        "FROM openfoam/openfoam2206-paraview:latest AS base\n"
+        "RUN echo ok\n"
+    )
+    assert dockerfile_base_image(dockerfile) == "openfoam/openfoam2206-paraview:latest"
+
+
+def test_freemhd_container_report_classifies_local_missing_and_registry_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    bundle_root = tmp_path / "docker"
+    bundle_root.mkdir()
+    (bundle_root / "Dockerfile").write_text("FROM openfoam/openfoam2206-paraview:latest\n")
+
+    monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: True)
+    monkeypatch.setattr("lmx.freemhd.docker_daemon_available", lambda: True)
+
+    def fake_local_report(image: str) -> dict[str, object]:
+        return {
+            "command": ["docker", "image", "inspect", image],
+            "status": "failed",
+            "returncode": 1,
+            "stdout_tail": "[]\n",
+            "stderr_tail": f"No such image: {image}\n",
+        }
+
+    monkeypatch.setattr("lmx.freemhd.docker_local_image_report", fake_local_report)
+    monkeypatch.setattr(
+        "lmx.freemhd.docker_registry_image_report",
+        lambda image, timeout_seconds=20: {
+            "command": ["docker", "manifest", "inspect", image],
+            "status": "timeout",
+            "returncode": None,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        },
+    )
+
+    report = freemhd_container_report(bundle_root=bundle_root, image="lmx-freemhd", timeout_seconds=5)
+
+    assert report["base_image"] == "openfoam/openfoam2206-paraview:latest"
+    assert report["local_image_report"]["status"] == "failed"
+    assert report["base_image_registry_report"]["status"] == "timeout"
+    assert "requested image is not available locally: lmx-freemhd" in report["blockers"]
+    assert "base image registry resolution timed out: openfoam/openfoam2206-paraview:latest" in report["blockers"]

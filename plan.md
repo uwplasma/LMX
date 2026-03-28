@@ -55,6 +55,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `scripts/write_freemhd_container_files.py`: writes the local FreeMHD/OpenFOAM container bundle.
 - `scripts/run_freemhd_case.py`: runs a mounted FreeMHD case in a prepared container image and records JSON metadata.
 - `scripts/probe_freemhd_environment.py`: probes the local FreeMHD/OpenFOAM and Docker environment and records JSON diagnostics.
+- `scripts/probe_freemhd_container.py`: probes the local Docker bundle, local image tags, and base-image registry resolution and records JSON diagnostics.
 - `scripts/inspect_freemhd_setup.py`: inspects the locally available FreeMHD assets, reports discovered case directories, and recommends the smallest smoke target.
 
 ## Best Next Steps
@@ -113,6 +114,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `inspect_freemhd_setup.py` can now include recovered case directories outside `external/FreeMHD` via `--extra-case-root`, and it reports the recovered Shercliff `Ha20` case correctly.
 - `run_freemhd_case.py` now fails fast with a structured `docker-image-unavailable` status when the requested image tag does not exist locally, instead of stalling in `docker run`.
 - The Docker daemon is reachable in the current environment.
+- A machine-readable container preflight now exists for the FreeMHD bundle and distinguishes local image absence from base-image registry-resolution timeout.
 
 ## What Did Not Work
 
@@ -452,6 +454,20 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. resolve the OpenFOAM base-image pull/build path and produce a local `lmx-freemhd` image
   2. run the recovered Shercliff `Ha20` case inside that image as the first real FreeMHD smoke test
   3. once container execution is live, extend the current JSON harness into actual LMX-vs-FreeMHD parity extraction for this case
+
+### 2026-03-28 02:20 America/Chicago
+
+- Added a separate FreeMHD container preflight report instead of continuing to diagnose Docker state manually:
+  - `scripts/probe_freemhd_container.py` now writes JSON for the checked-in Docker bundle
+  - `lmx.freemhd` now exposes container-report helpers for parsing the Dockerfile base image, checking local image presence, and attempting bounded-time registry resolution through `docker manifest inspect`
+- Verified the new preflight on the current machine against `docker/Dockerfile` and the expected runtime tag:
+  - `lmx-freemhd-smoke` is not present locally
+  - the bundle base image `openfoam/openfoam2206-paraview:latest` is also not present locally
+  - `docker manifest inspect openfoam/openfoam2206-paraview:latest` times out from this environment
+- This narrows the next real external blocker further:
+  1. either resolve registry access for the current base image or switch the bundle to a base image/tag that resolves cleanly here
+  2. once that image issue is resolved, build `lmx-freemhd` locally and retry the recovered Shercliff `Ha20` case run
+  3. after the first real FreeMHD run completes, promote the current harness JSON into parity extraction and comparison artifacts
 
 ## Instruction For Future Agents
 
