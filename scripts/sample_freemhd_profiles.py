@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.validation import latest_sampled_profiles
+from lmx.validation import infer_sampling_geometry, latest_sampled_profiles
 
 
 def sample_dict_text(
@@ -135,23 +135,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--region", type=str, default="liquid")
     parser.add_argument("--time", type=str, default="0.0001")
     parser.add_argument("--dict-name", type=str, default="lmxSampleDict")
-    parser.add_argument("--x-position", type=float, default=0.015)
-    parser.add_argument("--y-min", type=float, default=-0.1)
-    parser.add_argument("--y-max", type=float, default=0.1)
-    parser.add_argument("--z-min", type=float, default=-0.1)
-    parser.add_argument("--z-max", type=float, default=0.1)
+    parser.add_argument("--x-position", type=float, default=None)
+    parser.add_argument("--y-min", type=float, default=None)
+    parser.add_argument("--y-max", type=float, default=None)
+    parser.add_argument("--z-min", type=float, default=None)
+    parser.add_argument("--z-max", type=float, default=None)
     parser.add_argument("--n-points", type=int, default=201)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
+    if None in (args.x_position, args.y_min, args.y_max, args.z_min, args.z_max):
+        inferred = infer_sampling_geometry(args.case_dir)
+        x_position = inferred.x_position if args.x_position is None else args.x_position
+        y_min = inferred.y_min if args.y_min is None else args.y_min
+        y_max = inferred.y_max if args.y_max is None else args.y_max
+        z_min = inferred.z_min if args.z_min is None else args.z_min
+        z_max = inferred.z_max if args.z_max is None else args.z_max
+    else:
+        x_position = args.x_position
+        y_min = args.y_min
+        y_max = args.y_max
+        z_min = args.z_min
+        z_max = args.z_max
+
     dict_path = write_sample_dict(
         case_dir=args.case_dir,
         dict_name=args.dict_name,
-        x_position=args.x_position,
-        y_min=args.y_min,
-        y_max=args.y_max,
-        z_min=args.z_min,
-        z_max=args.z_max,
+        x_position=x_position,
+        y_min=y_min,
+        y_max=y_max,
+        z_min=z_min,
+        z_max=z_max,
         n_points=args.n_points,
     )
     result = run_postprocess_sampling(
@@ -170,6 +184,11 @@ def main(argv: list[str] | None = None) -> int:
         "platform": args.platform,
         "region": args.region,
         "time": args.time,
+        "x_position": x_position,
+        "y_min": y_min,
+        "y_max": y_max,
+        "z_min": z_min,
+        "z_max": z_max,
         "status": "ok" if result.returncode == 0 else "failed",
         "returncode": result.returncode,
         "stdout_tail": result.stdout[-4000:],

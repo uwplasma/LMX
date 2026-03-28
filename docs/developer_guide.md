@@ -44,6 +44,7 @@
 - `python -m lmx.cli validate shercliff --ha 20 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel --output ./artifacts/reference_compare`: compares the current solution against the ingested Zenodo analytical file.
 - `python scripts/run_freemhd_case.py --image lmx-freemhd-smoke --platform linux/amd64 --case-dir ... --cores 8 --delta-t 1e-5 --end-time 1e-4 --write-interval 1e-4`: executes the current short FreeMHD smoke/parity run on this Apple-silicon host.
 - `python scripts/sample_freemhd_profiles.py --case-dir ... --image microfluidica/openfoam:2206 --time 0.0001 --dict-name lmxSampleDict`: writes a sampling functionObject into `system/`, runs `postProcess`, and emits the sampled FreeMHD line cuts used by the newer parity metrics.
+- `python scripts/run_freemhd_parity_report.py --case-kind shercliff --ha 20 --freemhd-run-dir ... --output ...`: builds the matching LMX smoke case, infers the initial velocity from `0/liquid/U` when possible, and writes the current FreeMHD-vs-LMX parity JSON report.
 
 GitHub Actions now mirrors these entrypoints:
 

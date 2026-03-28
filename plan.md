@@ -61,14 +61,13 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 
 ## Best Next Steps
 
-1. Turn the current Shercliff `Ha20` FreeMHD smoke run into a repeatable parity workflow:
-   - keep the `linux/amd64` container path as the canonical FreeMHD execution route on this Apple-silicon host
-   - preserve the short-run `controlDict` override path for smoke and CI parity jobs
-   - add a checked-in script that emits an LMX-vs-FreeMHD report for the recovered Shercliff case
-2. Improve the first real FreeMHD comparison beyond the current coarse `max |U|` metric:
-   - sample comparable centerline or midplane profiles from reconstructed OpenFOAM output
-   - compare those against an LMX transient run with matched nonzero initial velocity
-   - keep the current min/max metric as a cheap regression guard while richer profile extraction is added
+1. Promote the current Shercliff `Ha20` parity path into an artifact-producing runner in CI:
+   - the container execution path is already real
+   - the sampled line-cut comparison path is already real
+   - the next step is to make these reports part of the repo’s normal automated outputs
+2. Generalize the current sampling-geometry inference:
+   - it now works well for the recovered duct case by using the latest `fieldMinMax.dat` locations
+   - extend or replace it for future FreeMHD geometries where min/max locations are not sufficient
 3. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
@@ -138,6 +137,11 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The current real sampled-line parity numbers on the recovered Shercliff `Ha20` smoke case are:
   - `freemhd_sample_y_l2_error ≈ 5.83e-4`
   - `freemhd_sample_z_l2_error ≈ 2.67e-4`
+- The sampling runner now infers the line-cut geometry automatically from the latest FreeMHD `fieldMinMax.dat` record when explicit `x/y/z` bounds are not supplied.
+- A checked-in parity-report runner now exists:
+  - `scripts/run_freemhd_parity_report.py` builds the matching LMX case
+  - it infers `initial_velocity` from `0/liquid/U` when available
+  - it writes the current combined parity JSON artifact in one step
 
 ## What Did Not Work
 
@@ -169,6 +173,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - it does not yet compare full reconstructed profiles or full field data
   - the current agreement depends on matching the nonzero FreeMHD initial state through `CaseSpec.initial_velocity`
 - The sampled-line parity path currently depends on explicit sampling geometry inputs (`x_position`, `y_min`, `y_max`, `z_min`, `z_max`) rather than inferring the right cut automatically from arbitrary FreeMHD cases.
+- The new geometry inference is still specific to runs that emit `fieldMinMax.dat` with useful location data; it is not yet a general geometry parser for arbitrary FreeMHD/OpenFOAM cases.
 
 ## Chronological Log
 
@@ -593,6 +598,20 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. remove the current need for manually chosen sampling extents by inferring them from the FreeMHD case geometry
   2. turn the sampled Shercliff parity path into a checked-in artifact/report runner
   3. extend the same path to other recovered FreeMHD cases as they become available
+
+### 2026-03-28 19:05 America/Chicago
+
+- Removed the manual sampling-extents requirement for the current Shercliff `Ha20` parity path:
+  - extended `read_field_minmax` so it now preserves min/max locations in addition to scalar extrema
+  - added `infer_sampling_geometry`, which derives `x/y/z` sampling limits from the latest `fieldMinMax.dat` record
+  - verified on the real recovered case that the inferred geometry is `x = 0.015`, `y = [-0.1, 0.1]`, `z = [-0.099995, 0.099995]`
+- Added the checked-in parity artifact runner that the previous step called for:
+  - `scripts/run_freemhd_parity_report.py` infers the initial FreeMHD streamwise velocity from `0/liquid/U` when possible
+  - it builds the matching LMX case and writes the combined parity JSON in one command
+- Best next step narrowed again:
+  1. add this new Shercliff parity runner to the repo’s validation artifact workflow
+  2. extend the same path to new recovered FreeMHD cases as they become available
+  3. keep pushing solver fidelity so the current good short-time parity extends to stronger laminar acceptance checks
 
 ## Instruction For Future Agents
 

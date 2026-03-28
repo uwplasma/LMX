@@ -11,6 +11,7 @@ from lmx.validation import (
     closed_channel_validation,
     compare_with_freemhd,
     duct_profile_metrics,
+    infer_sampling_geometry,
     latest_sampled_profiles,
     hartmann_analytic_profile,
     hartmann_validation,
@@ -105,6 +106,23 @@ def test_field_minmax_reader_extracts_latest_mag_u(tmp_path: Path):
     assert latest is not None
     assert latest.time == pytest.approx(2.0e-05)
     assert latest.max_value == pytest.approx(0.9)
+    assert latest.min_location == pytest.approx((0.0, 0.0, 0.0))
+    assert latest.max_location == pytest.approx((0.0, 0.0, 0.0))
+
+
+def test_infer_sampling_geometry_uses_latest_field_minmax_locations(tmp_path: Path):
+    path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "# header\n"
+        "1.0e-04 mag(U) 0.0 (0.005 -0.1 -0.099995) 0 0.9734 (0.015 0.0987 0.0987) 0\n"
+    )
+    geometry = infer_sampling_geometry(tmp_path)
+    assert geometry.x_position == pytest.approx(0.015)
+    assert geometry.y_min == pytest.approx(-0.1)
+    assert geometry.y_max == pytest.approx(0.1)
+    assert geometry.z_min == pytest.approx(-0.099995)
+    assert geometry.z_max == pytest.approx(0.099995)
 
 
 def test_sample_reader_and_latest_profile_detection(tmp_path: Path):

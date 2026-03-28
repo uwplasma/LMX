@@ -89,6 +89,8 @@ class FieldMinMaxRecord:
     field: str
     min_value: float
     max_value: float
+    min_location: tuple[float, float, float] | None = None
+    max_location: tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +101,15 @@ class FreeMHDLineSample:
     u_x: jnp.ndarray
     u_y: jnp.ndarray
     u_z: jnp.ndarray
+
+
+@dataclass(frozen=True)
+class SamplingGeometry:
+    x_position: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
 
 
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
@@ -484,19 +495,23 @@ def read_field_minmax(path: str | Path) -> tuple[FieldMinMaxRecord, ...]:
             r"^(?P<time>\S+)\s+"
             r"(?P<field>\S+)\s+"
             r"(?P<min>\S+)\s+"
-            r"\([^)]+\)\s+\S+\s+"
+            r"(?P<min_loc>\([^)]+\))\s+\S+\s+"
             r"(?P<max>\S+)\s+"
-            r"\([^)]+\)\s+\S+\s*$",
+            r"(?P<max_loc>\([^)]+\))\s+\S+\s*$",
             line,
         )
         if match is None:
             continue
+        min_location = parse_location_tuple(match.group("min_loc"))
+        max_location = parse_location_tuple(match.group("max_loc"))
         records.append(
             FieldMinMaxRecord(
                 time=float(match.group("time")),
                 field=match.group("field"),
                 min_value=float(match.group("min")),
                 max_value=float(match.group("max")),
+                min_location=min_location,
+                max_location=max_location,
             )
         )
     return tuple(records)
@@ -512,6 +527,29 @@ def latest_field_minmax_record(run_dir: str | Path, field: str = "mag(U)") -> Fi
             if latest is None or record.time > latest.time:
                 latest = record
     return latest
+
+
+def parse_location_tuple(text: str) -> tuple[float, float, float] | None:
+    match = re.match(r"^\(\s*(\S+)\s+(\S+)\s+(\S+)\s*\)$", text.strip())
+    if match is None:
+        return None
+    return (float(match.group(1)), float(match.group(2)), float(match.group(3)))
+
+
+def infer_sampling_geometry(run_dir: str | Path, field: str = "mag(U)") -> SamplingGeometry:
+    latest = latest_field_minmax_record(run_dir, field=field)
+    if latest is None or latest.min_location is None or latest.max_location is None:
+        raise ValueError(f"Unable to infer sampling geometry from {run_dir}")
+    x_position = latest.max_location[0]
+    y_extent = max(abs(latest.min_location[1]), abs(latest.max_location[1]))
+    z_extent = max(abs(latest.min_location[2]), abs(latest.max_location[2]))
+    return SamplingGeometry(
+        x_position=x_position,
+        y_min=-y_extent,
+        y_max=y_extent,
+        z_min=-z_extent,
+        z_max=z_extent,
+    )
 
 
 def read_freemhd_xy_sample(path: str | Path) -> FreeMHDLineSample:

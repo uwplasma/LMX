@@ -58,6 +58,11 @@ def test_run_postprocess_sampling_uses_expected_docker_command(tmp_path: Path, m
 def test_main_reports_sample_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
     case_dir = tmp_path / "case"
     (case_dir / "system").mkdir(parents=True)
+    minmax_root = case_dir / "postProcessing" / "liquid" / "minMax" / "0"
+    minmax_root.mkdir(parents=True)
+    (minmax_root / "fieldMinMax.dat").write_text(
+        "# header\n0.0001 mag(U) 0.0 (0.005 -0.1 -0.099995) 0 0.9734 (0.015 0.0987 0.0987) 0\n"
+    )
     sample_root = case_dir / "postProcessing" / "lmxSampleDict" / "liquid" / "0.0001"
     sample_root.mkdir(parents=True)
     sample_rows = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n"
@@ -83,3 +88,4 @@ def test_main_reports_sample_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert exit_code == 0
     assert '"status": "ok"' in capsys.readouterr().out
     assert "centerlineY_potE_U.xy" in payload
+    assert '"x_position": 0.015' in payload

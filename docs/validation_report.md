@@ -23,6 +23,8 @@
 - Coarse `LMX`-vs-`FreeMHD` transient comparison based on the latest FreeMHD `mag(U)` max entry.
 - FreeMHD sampled line-cut extraction through `postProcessing/lmxSampleDict/...` and profile-based `LMX`-vs-`FreeMHD` parity metrics.
 - Nonzero transient initialization in LMX through `CaseSpec.initial_velocity`.
+- Automatic line-cut geometry inference from the latest FreeMHD `fieldMinMax.dat` location data.
+- A checked-in parity report runner that wraps LMX case construction plus `compare_with_freemhd` into one JSON artifact.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -32,8 +34,8 @@
 
 - Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
 - Extend the current sampled line-cut parity path beyond the recovered Shercliff `Ha20` smoke case.
-- Promote the current sampled `y/z` profile comparison into a checked-in parity runner artifact job.
-- Extend the current FreeMHD run/controlDict override helpers into a checked-in parity runner script for the recovered Shercliff case.
+- Promote the current sampled `y/z` profile comparison into a checked-in CI artifact/report job.
+- Generalize the current geometry inference beyond `fieldMinMax`-driven duct cases when more FreeMHD geometries are added.
 - Fringing-field mapped-pipe operators.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
 
@@ -55,4 +57,8 @@
   - `freemhd_sample_y_l2_error ≈ 5.83e-4`
   - `freemhd_sample_z_l2_error ≈ 2.67e-4`
   - these are based on sampled `centerlineY` and `centerlineZ` cuts from reconstructed FreeMHD `0.0001/liquid/U`
+- The sampling runner now infers the current Shercliff `Ha20` cut geometry automatically from the latest FreeMHD `fieldMinMax.dat` record:
+  - `x_position = 0.015`
+  - `y = [-0.1, 0.1]`
+  - `z = [-0.099995, 0.099995]`
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.
