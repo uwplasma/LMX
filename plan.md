@@ -378,6 +378,15 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   2. decide whether to patch the local build environment or rely on Docker once the daemon is available
   3. in parallel, keep improving Shercliff/Hunt parity since LMX accuracy is still the main solver-side gap
 
+### 2026-03-28 00:40 America/Chicago
+
+- Re-checked the retained `main` state against the current local environment instead of trusting stale local assumptions.
+- Current source-of-truth probe outputs on `main` are:
+  - `scripts/probe_freemhd_environment.py` reports `foamSystemCheck` passes, `wmkdepend` now exists, Docker CLI exists, Docker daemon is unavailable, and the current retained build issue is `macos-libcxx-header-conflict`
+  - `scripts/inspect_freemhd_setup.py` reports zero discovered standalone FreeMHD case directories in the current local assets and recommends the bundled OpenFOAM Hartmann tutorial only as an environment smoke target
+  - `scripts/run_freemhd_case.py` returns a structured `docker-daemon-unavailable` JSON status on this machine
+- Treat this entry as the current baseline for future work on `main`; the next blockers are the Darwin/OpenFOAM compiler environment, Docker daemon access, and obtaining at least one real `epotMultiRegion*` case directory locally.
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
