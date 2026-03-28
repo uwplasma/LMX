@@ -21,6 +21,9 @@ def test_probe_freemhd_environment_collects_expected_fields(tmp_path: Path, monk
     (repo_root / "OpenFOAM-v2206" / "etc" / "bashrc").write_text("# bashrc\n")
     (repo_root / "OpenFOAM-v2206" / "platforms" / "tools" / "darwin64Clang").mkdir(parents=True)
     (repo_root / "OpenFOAM-v2206" / "platforms" / "tools" / "darwin64Clang" / "wmkdepend").write_text("")
+    (repo_root / "OpenFOAM-v2206" / "wmake" / "rules" / "darwin64Clang").mkdir(parents=True)
+    (repo_root / "OpenFOAM-v2206" / "wmake" / "rules" / "darwin64Clang" / "c++").write_text("DARWIN_LIB_HEADER_DIRS := x\n")
+    (repo_root / "OpenFOAM-v2206" / "wmake" / "rules" / "darwin64Clang" / "c").write_text("DARWIN_LIB_HEADER_DIRS := x\n")
     (repo_root / "MHD_Solvers" / "solvers" / "epotMultiRegionFoam").mkdir(parents=True)
 
     calls: list[str] = []
@@ -45,6 +48,7 @@ def test_probe_freemhd_environment_collects_expected_fields(tmp_path: Path, monk
     assert payload["solver_build_probe_returncode"] == 2
     assert payload["solver_build_issue"] == "unknown-build-failure"
     assert payload["solver_build_recommendation"] == "Inspect the stderr tail and compare it to the darwin64Clang wmake rules."
+    assert payload["darwin_header_patch_detected"] is True
     assert len(calls) == 2
 
 
@@ -53,6 +57,10 @@ def test_classify_build_probe_detects_expected_failures():
     assert (
         probe.classify_build_probe("<cstring> tried including <string.h> but didn't find libc++'s <string.h> header.", True)
         == "macos-libcxx-header-conflict"
+    )
+    assert (
+        probe.classify_build_probe("fatal error: 'fvMesh.H' file not found", wmkdepend_exists=True, darwin_header_patch_detected=True)
+        == "post-darwin-header-patch-include-regression"
     )
     assert probe.classify_build_probe("", wmkdepend_exists=True) == "ok"
 
@@ -63,3 +71,8 @@ def test_detect_shadowed_c_headers_and_recommendation():
     recommendation = probe.build_issue_recommendation("macos-libcxx-header-conflict", stderr)
     assert "src/OpenFOAM/lnInclude" in recommendation
     assert "string.h, time.h" in recommendation
+
+
+def test_build_issue_recommendation_for_post_patch_include_regression():
+    recommendation = probe.build_issue_recommendation("post-darwin-header-patch-include-regression", "")
+    assert "moved past the libc++ collision" in recommendation

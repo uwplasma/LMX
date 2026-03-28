@@ -23,13 +23,17 @@ def docker_daemon_available() -> bool:
     return result.returncode == 0
 
 
-def classify_build_probe(stderr: str, wmkdepend_exists: bool) -> str:
+def classify_build_probe(stderr: str, wmkdepend_exists: bool, darwin_header_patch_detected: bool = False) -> str:
     if not wmkdepend_exists and "wmkdepend" in stderr:
         return "missing-wmkdepend"
     if "<cstring> tried including <string.h>" in stderr or "<cwchar> tried including <wchar.h>" in stderr:
         return "macos-libcxx-header-conflict"
     if "lnInclude/string.h" in stderr or "lnInclude/time.h" in stderr or "lnInclude/wchar.h" in stderr:
         return "macos-libcxx-header-conflict"
+    if "fatal error: 'fvMesh.H' file not found" in stderr:
+        if darwin_header_patch_detected:
+            return "post-darwin-header-patch-include-regression"
+        return "missing-openfoam-lninclude"
     if not stderr.strip():
         return "ok"
     return "unknown-build-failure"
@@ -65,6 +69,17 @@ def build_issue_recommendation(issue: str, stderr: str) -> str:
         )
     if issue == "ok":
         return "No build blocker detected."
+    if issue == "post-darwin-header-patch-include-regression":
+        return (
+            "The Darwin header-shadowing workaround moved past the libc++ collision, but OpenFOAM include "
+            "resolution is now incomplete. Inspect the expanded compile line and compare LIB_HEADER_DIRS plus "
+            "EXE_INC before and after the Darwin patch."
+        )
+    if issue == "missing-openfoam-lninclude":
+        return (
+            "OpenFOAM lnInclude headers are not being found. Inspect the expanded compile line and verify that "
+            "the OpenFOAM library lnInclude directories are present."
+        )
     return "Inspect the stderr tail and compare it to the darwin64Clang wmake rules."
 
 
@@ -74,10 +89,15 @@ def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
     solver_dir = root / "MHD_Solvers" / "solvers" / "epotMultiRegionFoam"
     bashrc = foam_root / "etc" / "bashrc"
     wmkdepend = foam_root / "platforms" / "tools" / "darwin64Clang" / "wmkdepend"
+    darwin_cxx_rule = foam_root / "wmake" / "rules" / "darwin64Clang" / "c++"
+    darwin_c_rule = foam_root / "wmake" / "rules" / "darwin64Clang" / "c"
+    darwin_patch_detected = (
+        "DARWIN_LIB_HEADER_DIRS :=" in darwin_cxx_rule.read_text() if darwin_cxx_rule.exists() else False
+    ) and ("DARWIN_LIB_HEADER_DIRS :=" in darwin_c_rule.read_text() if darwin_c_rule.exists() else False)
 
     foam_check = _run_shell(f"source {bashrc} && foamSystemCheck")
     build_probe = _run_shell(f"source {bashrc} && cd {solver_dir} && wmake")
-    build_issue = classify_build_probe(build_probe.stderr, wmkdepend.exists())
+    build_issue = classify_build_probe(build_probe.stderr, wmkdepend.exists(), darwin_patch_detected)
     shadowed_headers = detect_shadowed_c_headers(build_probe.stderr)
 
     return {
@@ -95,6 +115,7 @@ def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
         "solver_build_issue": build_issue,
         "solver_build_shadowed_headers": shadowed_headers,
         "solver_build_recommendation": build_issue_recommendation(build_issue, build_probe.stderr),
+        "darwin_header_patch_detected": darwin_patch_detected,
         "solver_build_probe_stdout_tail": build_probe.stdout[-4000:],
         "solver_build_probe_stderr_tail": build_probe.stderr[-4000:],
     }

@@ -55,6 +55,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `scripts/write_freemhd_container_files.py`: writes the local FreeMHD/OpenFOAM container bundle.
 - `scripts/run_freemhd_case.py`: runs a mounted FreeMHD case in a prepared container image and records JSON metadata.
 - `scripts/probe_freemhd_environment.py`: probes the local FreeMHD/OpenFOAM and Docker environment and records JSON diagnostics.
+- `scripts/patch_freemhd_darwin_headers.py`: applies the current Darwin-specific local OpenFOAM `lnInclude` workaround to the vendored `external/FreeMHD` checkout for reproducible macOS `wmake` experiments.
 - `scripts/probe_freemhd_container.py`: probes the local Docker bundle, local image tags, and base-image registry resolution and records JSON diagnostics.
 - `scripts/inspect_freemhd_setup.py`: inspects the locally available FreeMHD assets, reports discovered case directories, and recommends the smallest smoke target.
 
@@ -115,6 +116,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `run_freemhd_case.py` now fails fast with a structured `docker-image-unavailable` status when the requested image tag does not exist locally, instead of stalling in `docker run`.
 - The Docker daemon is reachable in the current environment.
 - A machine-readable container preflight now exists for the FreeMHD bundle and distinguishes local image absence from base-image registry-resolution timeout.
+- A reproducible Darwin-only patch helper now exists for the local OpenFOAM header-shadowing issue, and it moves the local `wmake` probe past the libc++ conflict to a new `fvMesh.H` include failure.
 
 ## What Did Not Work
 
@@ -138,6 +140,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - After manually building `wmkdepend`, the next local FreeMHD build blocker is a macOS libc++ header-path conflict during `wmake` of `epotMultiRegionFoam`.
 - The corrected Docker bundle has not yet been proven through a full successful image build in this session.
 - The current Docker blocker has narrowed from daemon reachability to image availability and OpenFOAM base-image resolution; no successful `lmx-freemhd` image build has completed yet in this session.
+- The Darwin local-build path is no longer blocked by the original libc++ collision after the patch helper is applied, but it is still not runnable because the next failure is an OpenFOAM include-resolution regression (`fvMesh.H` not found).
 
 ## Chronological Log
 
@@ -468,6 +471,20 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. either resolve registry access for the current base image or switch the bundle to a base image/tag that resolves cleanly here
   2. once that image issue is resolved, build `lmx-freemhd` locally and retry the recovered Shercliff `Ha20` case run
   3. after the first real FreeMHD run completes, promote the current harness JSON into parity extraction and comparison artifacts
+
+### 2026-03-28 03:05 America/Chicago
+
+- Used the Darwin `wmake` investigation results to keep the non-Docker FreeMHD path moving in a reproducible way:
+  - added `scripts/patch_freemhd_darwin_headers.py`, which applies the current Darwin-only workaround by demoting the two problematic `lnInclude` directories from `-I` to `-idirafter`
+  - updated `scripts/probe_freemhd_environment.py` so it now detects whether that patch is present and classifies the new post-patch failure state separately
+- Verified the local macOS build progression on the real `external/FreeMHD` checkout:
+  - before the workaround, the probe classified `macos-libcxx-header-conflict`
+  - after applying the workaround, the probe no longer reports shadowed libc headers and now classifies `post-darwin-header-patch-include-regression`
+  - the current concrete next local-build error is `fatal error: 'fvMesh.H' file not found`
+- This means the local FreeMHD path advanced materially even though it is not yet runnable:
+  1. inspect the expanded `wmake` compile line so the missing OpenFOAM include directories can be restored without reintroducing the libc++ header collision
+  2. in parallel, replace or fix the stale Docker base image reference so the container path can advance too
+  3. keep the recovered Shercliff `Ha20` case as the first actual run target for whichever execution path lands first
 
 ## Instruction For Future Agents
 
