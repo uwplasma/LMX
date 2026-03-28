@@ -42,6 +42,13 @@ def test_hartmann_validation_writer(tmp_path: Path):
     assert path.exists()
 
 
+def test_hartmann_ha20_validation_error_is_bounded():
+    case = make_hartmann_case(ha=20.0, ny=16, nz=16)
+    solution = solve_steady(case)
+    comparison = hartmann_validation(solution, ha=20.0)
+    assert comparison.l2_error < 0.05
+
+
 def test_duct_profile_metrics_writer(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=16, nz=16)
     solution = solve_steady(case)

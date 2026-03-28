@@ -22,4 +22,6 @@
 
 ## Current limitation
 
-- Shercliff and Hunt reference comparisons are now wired, but the present solver still shows large error and clipping at `Ha=20`, so these reports are informative artifacts rather than passing parity gates.
+- Hartmann `Ha=20` is now stable on the default finer mesh and shows a low normalized error in the current analytical comparison.
+- Shercliff `Ha=20` no longer clips on the default finer mesh, but its normalized error is still too large to count as parity-complete.
+- Hunt remains clipping and is still the highest-priority solver-fidelity gap.

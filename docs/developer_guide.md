@@ -22,6 +22,7 @@
 - Solver stepping uses `jax.lax.scan` for stable fixed-step execution.
 - Linear solves use `lineax` when available and otherwise fall back to a pure-JAX Jacobi solver.
 - Keep shapes static when adding new operators or diagnostics.
+- Hartmann and Shercliff case factories now use smaller pseudo-time steps and a larger iteration budget because the current solver core is explicit in the diffusive update and otherwise clips on fine meshes.
 
 ## Extension points
 

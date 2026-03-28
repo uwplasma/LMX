@@ -27,3 +27,11 @@ def test_shercliff_profile_remains_symmetric_on_small_case():
     centerline_z = solution.state.u[solution.state.u.shape[0] // 2, :]
     assert jnp.allclose(centerline_y, jnp.flip(centerline_y), atol=3e-3)
     assert jnp.allclose(centerline_z, jnp.flip(centerline_z), atol=3e-3)
+
+
+def test_shercliff_ha20_default_case_stays_bounded():
+    case = make_shercliff_case(ha=20.0, ny=16, nz=16)
+    solution = solve_steady(case)
+    assert solution.state.residual < 1e-4
+    assert float(jnp.max(solution.state.u)) < 0.1
+    assert float(jnp.min(solution.state.u)) >= 0.0

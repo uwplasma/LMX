@@ -7,6 +7,7 @@ This first implementation includes:
 - Tensor-product and mapped-grid mesh builders for ducts and pipes.
 - JAX-native finite-volume style operators on structured cross-sections.
 - A laminar fully developed inductionless MHD duct solver with explicit fluid/solid conductivity regions.
+- Mesh-safe pseudo-transient defaults for Hartmann and Shercliff duct runs on finer meshes.
 - ParaView XML writers for structured and mapped grids.
 - Validation helpers, analytical Hartmann reference profiles, and a FreeMHD asset/container harness.
 - Explicit unit, regression, physics, validation, and benchmark entrypoints with GitHub Actions workflows.

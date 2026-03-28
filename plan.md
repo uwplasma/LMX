@@ -58,16 +58,19 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 1. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
-   - explicit acceptance checks for Shercliff and Hunt profile symmetry and monotonicity
+   - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but Hunt still needs a real multi-region stability fix
 2. Extend analytical validation beyond the current Hartmann implementation:
    - Shercliff and Hunt profile comparison hooks now exist
-   - remaining work is improving solver parity enough that the new reference reports can become acceptance tests
+   - Hartmann is now close enough that it can support stronger acceptance checks
+   - Shercliff and Hunt still need solver-fidelity improvements before they can become acceptance tests
 3. Tighten CI acceptance criteria once better parity is available:
-   - convert validation artifact generation into pass/fail parity checks
+   - convert Hartmann validation into a stronger pass/fail parity check
+   - keep Shercliff and Hunt as informative reports until their fidelity improves
    - add benchmark threshold tracking with explicit tolerances
 4. Use the newly ingested processed closed-channel CSV slices to add figure-level Shercliff/Hunt comparisons.
-5. Implement mapped-operator support for the fringing-field pipe case.
-6. Build and test the FreeMHD container workflow locally, then add parity runner automation.
+5. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity.
+6. Implement mapped-operator support for the fringing-field pipe case.
+7. Build and test the FreeMHD container workflow locally, then add parity runner automation.
 
 ## What Worked
 
@@ -78,6 +81,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Small Hartmann and Shercliff low-Ha cases are deterministic enough for regression snapshots.
 - GitHub Actions workflows now cover unit, regression, physics, validation, and benchmark paths.
 - The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.
+- Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 
 ## What Did Not Work
 
@@ -88,6 +92,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - A later attempt to replace the pseudo-transient steady path with a more directly coupled fixed-point steady solver was not robust enough and was rolled back instead of being left on `main`.
 - The Hunt validation path remains artifact-only for now because the current solver still clips and saturates on that case; it should not be treated as parity-complete.
 - The current Shercliff `Ha=20` reference comparison also shows large normalized error, confirming that solver-fidelity work is still the critical path after reference ingestion.
+- The earlier Hartmann/Shercliff defaults (`dt=0.01`, low iteration counts) were too aggressive for fine meshes because the current solver core uses an explicit diffusive update.
 
 ## Chronological Log
 
@@ -187,6 +192,22 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Current quantitative result is intentionally honest:
   - Shercliff `Ha=20` still has large normalized errors and the solver clips at this regime
   - this confirms the next best step is solver-fidelity work, not more validation plumbing
+
+### 2026-03-27 19:05 America/Chicago
+
+- Investigated the new reference comparisons instead of changing the solver blindly.
+- Found that Hartmann and Shercliff clipping on default fine meshes was primarily an explicit-step stability issue:
+  - coarse verification meshes were stable
+  - fine default meshes clipped unless the pseudo-time step and relaxation were reduced substantially
+- Updated the Hartmann and Shercliff case factories to use mesh-safe pseudo-transient defaults:
+  - `dt = 0.001`
+  - `relaxation = 0.1`
+  - `max_steps = 400`
+- Verified the new default CLI paths:
+  - Hartmann `Ha=20` now remains bounded on the default mesh and the analytical comparison dropped to about `l2_error = 0.0039`
+  - Shercliff `Ha=20` now remains bounded on the default mesh and the analytical comparison became finite instead of clipping, with roughly `y_l2_error = 0.434` and `z_l2_error = 0.187`
+- Hunt was not fixed by the same tuning and still clips; that keeps Hunt multi-region stability as the next solver target.
+- Updated regression snapshots and added tests so this new stable Hartmann/Shercliff baseline is preserved in CI.
 
 ## Instruction For Future Agents
 
