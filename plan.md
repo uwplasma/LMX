@@ -159,7 +159,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
   - `u_max_abs_diff ≈ 1.17e-3`
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
-  - `freemhd_sample_z_l2_error ≈ 6.74e-1`
+  - the original `freemhd_sample_z_l2_error ≈ 6.74e-1` was inflated by a comparison bug that included solid-wall cells on the LMX side
+  - after comparing fluid-only layered-duct cuts, the corrected Hunt `z` metric is `freemhd_sample_z_l2_error ≈ 1.39e-1`
   - this sharpens the remaining Hunt task from “probably unstable/inaccurate” to a measured parity gap against the recovered FreeMHD case
 
 ## What Did Not Work
@@ -673,6 +674,21 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. use the recovered Hunt `Ha20` FreeMHD parity artifact to guide the next Hunt solver iteration in LMX
   2. keep Shercliff parity in CI artifact form as the lower-error reference path
   3. recover one higher-Ha closed-channel case next so the same parity machinery is exercised on a harsher boundary-layer regime
+
+### 2026-03-28 19:45 America/Chicago
+
+- Fixed a comparison-layer bug for layered-duct FreeMHD parity:
+  - `extract_midplane_profile(..., fluid_only=True)` now excludes solid-wall cells when the mesh carries a layered `fluid_mask`
+  - `closed_channel_validation`, `processed_slice_validation`, and `compare_with_freemhd` now use fluid-only midplane cuts for parity work
+  - this keeps Hunt/Shercliff layered comparisons aligned with the FreeMHD `postProcess -region liquid` sampling path
+- Verified the effect on the real Hunt `Ha20` parity artifact:
+  - `u_max_abs_diff` stayed essentially unchanged at `≈ 1.17e-3`
+  - `freemhd_sample_y_l2_error` stayed at `≈ 6.02e-2`
+  - `freemhd_sample_z_l2_error` improved from `≈ 6.74e-1` to `≈ 1.39e-1`
+- Current best next step is now narrower:
+  1. treat the remaining Hunt error as a real solver-fidelity gap instead of a comparison artifact
+  2. improve the short-time Hunt shape evolution in LMX while holding the now-correct fluid-only parity path fixed
+  3. keep widening recovered FreeMHD parity to another higher-Ha closed-channel case once the next Hunt change lands
 
 ## Instruction For Future Agents
 

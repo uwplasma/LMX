@@ -4,7 +4,7 @@ from pathlib import Path
 import jax.numpy as jnp
 import pytest
 
-from lmx.cases import make_hartmann_case, make_shercliff_case
+from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.mesh import generate_rect_duct_mesh
 from lmx.solvers import solve_steady
@@ -13,6 +13,7 @@ from lmx.validation import (
     compare_with_freemhd,
     duct_profile_metrics,
     infer_sampling_geometry,
+    extract_midplane_profile,
     latest_sampled_profiles,
     hartmann_analytic_profile,
     hartmann_validation,
@@ -143,6 +144,19 @@ def test_sample_reader_and_latest_profile_detection(tmp_path: Path):
     normalized = normalize_sample_distance(sample.distance)
     assert float(normalized[0]) == pytest.approx(-1.0)
     assert float(normalized[-1]) == pytest.approx(1.0)
+
+
+def test_extract_midplane_profile_fluid_only_excludes_layer_walls():
+    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    solution = solve_steady(case)
+    full_profile = extract_midplane_profile(solution, axis="z", fluid_only=False)
+    fluid_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
+
+    assert fluid_profile["z"].shape[0] < full_profile["z"].shape[0]
+    assert float(full_profile["u"][0]) == pytest.approx(0.0)
+    assert float(full_profile["u"][-1]) == pytest.approx(0.0)
+    assert float(fluid_profile["z"][0]) > -0.5 * case.geometry.height
+    assert float(fluid_profile["z"][-1]) < 0.5 * case.geometry.height
 
 
 def test_latest_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: Path):

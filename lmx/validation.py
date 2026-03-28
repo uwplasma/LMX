@@ -127,15 +127,47 @@ def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
     }
 
 
-def extract_midplane_profile(solution: Solution, axis: str = "y") -> dict[str, jnp.ndarray]:
+def _profile_axis_mask(solution: Solution, axis: str, fixed_index: int) -> jnp.ndarray:
+    fluid_mask = solution.mesh.fluid_mask
+    if fluid_mask is None:
+        if axis == "y":
+            return jnp.ones(solution.state.u.shape[0], dtype=bool)
+        if axis == "z":
+            return jnp.ones(solution.state.u.shape[1], dtype=bool)
+        raise ValueError(f"Unsupported axis {axis}")
     if axis == "y":
-        return extract_centerline(solution)
+        return fluid_mask[:, fixed_index]
+    if axis == "z":
+        return fluid_mask[fixed_index, :]
+    raise ValueError(f"Unsupported axis {axis}")
+
+
+def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bool = False) -> dict[str, jnp.ndarray]:
+    if axis == "y":
+        profile = extract_centerline(solution)
+        if not fluid_only:
+            return profile
+        mid_z = solution.state.u.shape[1] // 2
+        mask = _profile_axis_mask(solution, axis="y", fixed_index=mid_z)
+        return {
+            "y": profile["y"][mask],
+            "u": profile["u"][mask],
+            "phi": profile["phi"][mask],
+        }
     if axis == "z":
         mid_y = solution.state.u.shape[0] // 2
-        return {
+        profile = {
             "z": solution.mesh.z_centers,
             "u": solution.state.u[mid_y, :],
             "phi": solution.state.phi[mid_y, :],
+        }
+        if not fluid_only:
+            return profile
+        mask = _profile_axis_mask(solution, axis="z", fixed_index=mid_y)
+        return {
+            "z": profile["z"][mask],
+            "u": profile["u"][mask],
+            "phi": profile["phi"][mask],
         }
     raise ValueError(f"Unsupported axis {axis}")
 
@@ -232,8 +264,8 @@ def closed_channel_validation(
     reference_root: str | Path | None = None,
 ) -> ClosedChannelValidation:
     reference: ClosedChannelAnalyticalReference = load_closed_channel_analytical(case_kind, ha, reference_root)
-    y_profile = extract_midplane_profile(solution, axis="y")
-    z_profile = extract_midplane_profile(solution, axis="z")
+    y_profile = extract_midplane_profile(solution, axis="y", fluid_only=True)
+    z_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
     y_comparison = compare_normalized_profiles(
         y_profile["y"],
         y_profile["u"],
@@ -269,8 +301,8 @@ def processed_slice_validation(
         x_slice=x_slice,
         reference_root=reference_root,
     )
-    y_profile = extract_midplane_profile(solution, axis="y")
-    z_profile = extract_midplane_profile(solution, axis="z")
+    y_profile = extract_midplane_profile(solution, axis="y", fluid_only=True)
+    z_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
     reference_y = extract_processed_midplane_profile(reference, axis="y")
     reference_z = extract_processed_midplane_profile(reference, axis="z")
     y_comparison = compare_normalized_profiles(
@@ -356,8 +388,8 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
         if lmx_solution is None:
             lmx_solution = solve_transient(case_spec)
         y_sample, z_sample = sampled_profiles
-        y_profile = extract_midplane_profile(lmx_solution, axis="y")
-        z_profile = extract_midplane_profile(lmx_solution, axis="z")
+        y_profile = extract_midplane_profile(lmx_solution, axis="y", fluid_only=True)
+        z_profile = extract_midplane_profile(lmx_solution, axis="z", fluid_only=True)
         y_comparison = compare_normalized_profiles(
             y_profile["y"],
             y_profile["u"],
