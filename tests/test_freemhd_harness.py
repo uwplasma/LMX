@@ -17,7 +17,7 @@ def test_write_container_bundle_creates_expected_files(tmp_path: Path):
     runner = paths["run_freemhd_case.sh"].read_text()
     readme = paths["README.md"].read_text()
 
-    assert "openfoam/openfoam2206-paraview:latest" in dockerfile
+    assert "microfluidica/openfoam:2206" in dockerfile
     assert "wmake MHD_Solvers/solvers/epotMultiRegionFoam" in dockerfile
     assert "wmake MHD_Solvers/solvers/epotMultiRegionInterFoam" in dockerfile
     assert "if [ -x ./Allwmake ]; then ./Allwmake; fi" in dockerfile

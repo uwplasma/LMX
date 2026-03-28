@@ -1,4 +1,4 @@
-FROM openfoam/openfoam2206-paraview:latest
+FROM microfluidica/openfoam:2206
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV WM_PROJECT_DIR=/opt/OpenFOAM/OpenFOAM-v2206

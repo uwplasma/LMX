@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,18 @@ def docker_local_image_report(image: str) -> dict[str, object]:
     return docker_command_result(["docker", "image", "inspect", image])
 
 
+def docker_pull_image_report(image: str, timeout_seconds: int = 20) -> dict[str, object]:
+    if not docker_daemon_available():
+        return {
+            "command": ["docker", "pull", image],
+            "status": "docker-daemon-unavailable",
+            "returncode": None,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+    return docker_command_result(["docker", "pull", image], timeout_seconds=timeout_seconds)
+
+
 def dockerfile_base_image(dockerfile_path: str | Path) -> str | None:
     path = Path(dockerfile_path)
     if not path.exists():
@@ -113,6 +127,66 @@ def dockerfile_base_image(dockerfile_path: str | Path) -> str | None:
             if len(parts) >= 2:
                 return parts[1]
     return None
+
+
+def parse_docker_hub_image(image: str) -> tuple[str, str, str] | None:
+    reference = image
+    if "@" in reference:
+        reference = reference.split("@", 1)[0]
+    if ":" in reference.rsplit("/", 1)[-1]:
+        repository, tag = reference.rsplit(":", 1)
+    else:
+        repository, tag = reference, "latest"
+    parts = repository.split("/")
+    if len(parts) == 1:
+        namespace = "library"
+        repo = parts[0]
+    elif len(parts) == 2:
+        namespace, repo = parts
+    else:
+        return None
+    return namespace, repo, tag
+
+
+def docker_hub_tag_report(image: str, timeout_seconds: int = 20) -> dict[str, object]:
+    parsed = parse_docker_hub_image(image)
+    if parsed is None:
+        return {
+            "image": image,
+            "status": "unsupported-image-reference",
+            "url": None,
+        }
+    namespace, repo, tag = parsed
+    url = f"https://hub.docker.com/v2/namespaces/{namespace}/repositories/{repo}/tags/{tag}"
+    try:
+        with urlopen(url, timeout=timeout_seconds) as response:
+            payload = response.read().decode("utf-8")
+    except HTTPError as exc:
+        return {
+            "image": image,
+            "status": "failed",
+            "http_status": exc.code,
+            "url": url,
+        }
+    except URLError as exc:
+        return {
+            "image": image,
+            "status": "network-error",
+            "reason": str(exc.reason),
+            "url": url,
+        }
+    except TimeoutError:
+        return {
+            "image": image,
+            "status": "timeout",
+            "url": url,
+        }
+    return {
+        "image": image,
+        "status": "ok",
+        "url": url,
+        "payload_excerpt": payload[:1000],
+    }
 
 
 def discover_freemhd_cases(root: str | Path | None) -> list[FreeMHDCase]:
@@ -235,6 +309,8 @@ def freemhd_container_report(
     bundle_root: str | Path,
     image: str,
     timeout_seconds: int = 20,
+    check_pull: bool = False,
+    pull_timeout_seconds: int = 20,
 ) -> dict[str, object]:
     bundle_path = Path(bundle_root)
     dockerfile_path = bundle_path / "Dockerfile"
@@ -254,18 +330,28 @@ def freemhd_container_report(
 
     local_image = docker_local_image_report(image)
     base_image_local = None if base_image is None else docker_local_image_report(base_image)
-    base_image_registry = None if base_image is None else docker_registry_image_report(base_image, timeout_seconds=timeout_seconds)
+    base_image_registry = None if base_image is None else docker_hub_tag_report(base_image, timeout_seconds=timeout_seconds)
+    base_image_pull = None if (base_image is None or not check_pull) else docker_pull_image_report(base_image, timeout_seconds=pull_timeout_seconds)
 
     if local_image["status"] not in {"ok", "docker-daemon-unavailable", "docker-cli-unavailable"}:
         blockers.append(f"requested image is not available locally: {image}")
     if base_image_registry is not None and base_image_registry["status"] == "timeout":
-        blockers.append(f"base image registry resolution timed out: {base_image}")
-    elif base_image_registry is not None and base_image_registry["status"] == "failed":
-        blockers.append(f"base image registry resolution failed: {base_image}")
+        blockers.append(f"base image tag lookup timed out: {base_image}")
+    elif base_image_registry is not None and base_image_registry["status"] not in {"ok", "unsupported-image-reference"}:
+        blockers.append(f"base image tag lookup failed: {base_image}")
+    if base_image_pull is not None and base_image_pull["status"] == "timeout":
+        blockers.append(f"base image pull timed out: {base_image}")
+    elif base_image_pull is not None and base_image_pull["status"] not in {
+        "ok",
+        "docker-daemon-unavailable",
+        "docker-cli-unavailable",
+    }:
+        blockers.append(f"base image pull failed: {base_image}")
 
     return {
         "bundle_root": str(bundle_path.resolve()),
         "image": image,
+        "check_pull": check_pull,
         "docker_cli_available": docker_cli,
         "docker_daemon_available": docker_daemon,
         "dockerfile_exists": dockerfile_path.exists(),
@@ -274,5 +360,6 @@ def freemhd_container_report(
         "local_image_report": local_image,
         "base_image_local_report": base_image_local,
         "base_image_registry_report": base_image_registry,
+        "base_image_pull_report": base_image_pull,
         "blockers": blockers,
     }

@@ -76,7 +76,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 4. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity now that both analytical and processed-slice metrics are emitted by the same CLI path.
 5. Acquire or reconstruct at least one standalone `epotMultiRegion*` laminar case locally, since the current local assets do not yet contain runnable FreeMHD paper cases.
 6. Prove the current FreeMHD container bundle end to end:
-   - resolve the OpenFOAM base-image pull/build path on this machine
+   - resolve the now-narrowed base-image pull/build execution issue on this machine
    - build a local `lmx-freemhd` image successfully
    - run the recovered Shercliff `Ha20` case as the first actual FreeMHD smoke test
 7. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
@@ -115,7 +115,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `inspect_freemhd_setup.py` can now include recovered case directories outside `external/FreeMHD` via `--extra-case-root`, and it reports the recovered Shercliff `Ha20` case correctly.
 - `run_freemhd_case.py` now fails fast with a structured `docker-image-unavailable` status when the requested image tag does not exist locally, instead of stalling in `docker run`.
 - The Docker daemon is reachable in the current environment.
-- A machine-readable container preflight now exists for the FreeMHD bundle and distinguishes local image absence from base-image registry-resolution timeout.
+- A machine-readable container preflight now exists for the FreeMHD bundle and distinguishes local image absence, valid Docker Hub tag lookup, and timed local base-image pull stalls.
 - A reproducible Darwin-only patch helper now exists for the local OpenFOAM header-shadowing issue, and it moves the local `wmake` probe past the libc++ conflict to a new `fvMesh.H` include failure.
 
 ## What Did Not Work
@@ -139,7 +139,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
 - After manually building `wmkdepend`, the next local FreeMHD build blocker is a macOS libc++ header-path conflict during `wmake` of `epotMultiRegionFoam`.
 - The corrected Docker bundle has not yet been proven through a full successful image build in this session.
-- The current Docker blocker has narrowed from daemon reachability to image availability and OpenFOAM base-image resolution; no successful `lmx-freemhd` image build has completed yet in this session.
+- The current Docker blocker has narrowed from daemon reachability and stale-image naming to local pull/build execution; `microfluidica/openfoam:2206` resolves as a valid Docker Hub tag, but timed pulls still stall on this machine.
 - The Darwin local-build path is no longer blocked by the original libc++ collision after the patch helper is applied, but it is still not runnable because the next failure is an OpenFOAM include-resolution regression (`fvMesh.H` not found).
 
 ## Chronological Log
@@ -485,6 +485,21 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. inspect the expanded `wmake` compile line so the missing OpenFOAM include directories can be restored without reintroducing the libc++ header collision
   2. in parallel, replace or fix the stale Docker base image reference so the container path can advance too
   3. keep the recovered Shercliff `Ha20` case as the first actual run target for whichever execution path lands first
+
+### 2026-03-28 04:20 America/Chicago
+
+- Replaced the stale Docker base image reference with a valid OpenFOAM.com `2206` base image:
+  - switched the checked-in and generated Dockerfile from `openfoam/openfoam2206-paraview:latest` to `microfluidica/openfoam:2206`
+  - updated the container preflight to use the Docker Hub tag API directly instead of relying on `docker manifest inspect`
+- Verified the new Docker-side picture on this machine:
+  - Docker Hub confirms `microfluidica/openfoam:2206` is a live tag
+  - the old `openfoam/openfoam2206-paraview:latest` name is not a live Hub tag
+  - the local runtime image `lmx-freemhd-smoke` still does not exist
+  - a timed `docker pull microfluidica/openfoam:2206` still stalls locally, so the remaining Docker-side blocker is pull/build execution rather than image-tag discovery
+- This sharpens the next steps again:
+  1. inspect local Docker Desktop / engine network or credential state to explain why timed pulls stall even though Hub tag lookup works
+  2. keep the Darwin `wmake` path moving in parallel by inspecting the missing include directories behind the current `fvMesh.H` failure
+  3. once either path actually executes FreeMHD, use the recovered Shercliff `Ha20` case as the first real smoke/parity target
 
 ## Instruction For Future Agents
 

@@ -40,6 +40,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/probe_freemhd_environment.py --output ./artifacts/freemhd_probe.json
 /Users/rogerio/base_env/bin/python3 scripts/patch_freemhd_darwin_headers.py --output ./artifacts/freemhd_darwin_patch.json
 /Users/rogerio/base_env/bin/python3 scripts/probe_freemhd_container.py --image lmx-freemhd --output ./artifacts/freemhd_container.json
+/Users/rogerio/base_env/bin/python3 scripts/probe_freemhd_container.py --image lmx-freemhd --check-pull --pull-timeout-seconds 20 --output ./artifacts/freemhd_container_pull.json
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
 /Users/rogerio/base_env/bin/python3 scripts/inspect_starting_files_archive.py --pattern shercliff_Ha0_refinedMesh
 /Users/rogerio/base_env/bin/python3 scripts/inspect_starting_files_archive.py --pattern shercliff_Ha0_refinedMesh --extract --output-dir /tmp/startingfiles_ha0

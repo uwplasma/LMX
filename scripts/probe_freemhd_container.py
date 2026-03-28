@@ -26,6 +26,17 @@ def main(argv: list[str] | None = None) -> int:
         default=20,
         help="Timeout for remote base-image manifest resolution.",
     )
+    parser.add_argument(
+        "--check-pull",
+        action="store_true",
+        help="Attempt a timed docker pull of the base image to detect stalled local pulls.",
+    )
+    parser.add_argument(
+        "--pull-timeout-seconds",
+        type=int,
+        default=20,
+        help="Timeout for the optional base-image pull probe.",
+    )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -33,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         bundle_root=args.bundle_root,
         image=args.image,
         timeout_seconds=args.timeout_seconds,
+        check_pull=args.check_pull,
+        pull_timeout_seconds=args.pull_timeout_seconds,
     )
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)

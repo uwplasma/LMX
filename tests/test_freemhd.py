@@ -5,7 +5,9 @@ import pytest
 from lmx.freemhd import (
     discover_freemhd_cases,
     discover_freemhd_cases_in_roots,
+    docker_hub_tag_report,
     dockerfile_base_image,
+    parse_docker_hub_image,
     freemhd_environment_report,
     freemhd_container_report,
     recommended_freemhd_target,
@@ -97,10 +99,44 @@ def test_dockerfile_base_image_parses_first_from(tmp_path: Path):
     dockerfile = tmp_path / "Dockerfile"
     dockerfile.write_text(
         "# comment\n"
-        "FROM openfoam/openfoam2206-paraview:latest AS base\n"
+        "FROM microfluidica/openfoam:2206 AS base\n"
         "RUN echo ok\n"
     )
-    assert dockerfile_base_image(dockerfile) == "openfoam/openfoam2206-paraview:latest"
+    assert dockerfile_base_image(dockerfile) == "microfluidica/openfoam:2206"
+
+
+def test_parse_docker_hub_image_handles_explicit_and_default_tags():
+    assert parse_docker_hub_image("microfluidica/openfoam:2206") == ("microfluidica", "openfoam", "2206")
+    assert parse_docker_hub_image("openfoam") == ("library", "openfoam", "latest")
+
+
+def test_docker_hub_tag_report_handles_404(monkeypatch: pytest.MonkeyPatch):
+    from urllib.error import HTTPError
+
+    def fake_urlopen(url: str, timeout: int = 20):
+        raise HTTPError(url, 404, "Not found", hdrs=None, fp=None)
+
+    monkeypatch.setattr("lmx.freemhd.urlopen", fake_urlopen)
+    report = docker_hub_tag_report("openfoam/openfoam2206-paraview:latest")
+    assert report["status"] == "failed"
+    assert report["http_status"] == 404
+
+
+def test_docker_hub_tag_report_handles_success(monkeypatch: pytest.MonkeyPatch):
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"name":"2206","last_updated":"2026-03-19T18:59:13Z"}'
+
+    monkeypatch.setattr("lmx.freemhd.urlopen", lambda url, timeout=20: _Response())
+    report = docker_hub_tag_report("microfluidica/openfoam:2206")
+    assert report["status"] == "ok"
+    assert '"name":"2206"' in report["payload_excerpt"]
 
 
 def test_freemhd_container_report_classifies_local_missing_and_registry_timeout(
@@ -108,7 +144,7 @@ def test_freemhd_container_report_classifies_local_missing_and_registry_timeout(
 ):
     bundle_root = tmp_path / "docker"
     bundle_root.mkdir()
-    (bundle_root / "Dockerfile").write_text("FROM openfoam/openfoam2206-paraview:latest\n")
+    (bundle_root / "Dockerfile").write_text("FROM microfluidica/openfoam:2206\n")
 
     monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: True)
     monkeypatch.setattr("lmx.freemhd.docker_daemon_available", lambda: True)
@@ -124,9 +160,50 @@ def test_freemhd_container_report_classifies_local_missing_and_registry_timeout(
 
     monkeypatch.setattr("lmx.freemhd.docker_local_image_report", fake_local_report)
     monkeypatch.setattr(
-        "lmx.freemhd.docker_registry_image_report",
+        "lmx.freemhd.docker_hub_tag_report",
         lambda image, timeout_seconds=20: {
-            "command": ["docker", "manifest", "inspect", image],
+            "image": image,
+            "status": "timeout",
+            "url": "https://hub.docker.com/example",
+        },
+    )
+
+    report = freemhd_container_report(bundle_root=bundle_root, image="lmx-freemhd", timeout_seconds=5)
+
+    assert report["base_image"] == "microfluidica/openfoam:2206"
+    assert report["local_image_report"]["status"] == "failed"
+    assert report["base_image_registry_report"]["status"] == "timeout"
+    assert "requested image is not available locally: lmx-freemhd" in report["blockers"]
+    assert "base image tag lookup timed out: microfluidica/openfoam:2206" in report["blockers"]
+
+
+def test_freemhd_container_report_can_classify_base_image_pull_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    bundle_root = tmp_path / "docker"
+    bundle_root.mkdir()
+    (bundle_root / "Dockerfile").write_text("FROM microfluidica/openfoam:2206\n")
+
+    monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: True)
+    monkeypatch.setattr("lmx.freemhd.docker_daemon_available", lambda: True)
+    monkeypatch.setattr(
+        "lmx.freemhd.docker_local_image_report",
+        lambda image: {
+            "command": ["docker", "image", "inspect", image],
+            "status": "failed",
+            "returncode": 1,
+            "stdout_tail": "[]\n",
+            "stderr_tail": f"No such image: {image}\n",
+        },
+    )
+    monkeypatch.setattr(
+        "lmx.freemhd.docker_hub_tag_report",
+        lambda image, timeout_seconds=20: {"image": image, "status": "ok", "url": "https://hub.docker.com/example"},
+    )
+    monkeypatch.setattr(
+        "lmx.freemhd.docker_pull_image_report",
+        lambda image, timeout_seconds=20: {
+            "command": ["docker", "pull", image],
             "status": "timeout",
             "returncode": None,
             "stdout_tail": "",
@@ -134,10 +211,12 @@ def test_freemhd_container_report_classifies_local_missing_and_registry_timeout(
         },
     )
 
-    report = freemhd_container_report(bundle_root=bundle_root, image="lmx-freemhd", timeout_seconds=5)
+    report = freemhd_container_report(
+        bundle_root=bundle_root,
+        image="lmx-freemhd",
+        check_pull=True,
+        pull_timeout_seconds=5,
+    )
 
-    assert report["base_image"] == "openfoam/openfoam2206-paraview:latest"
-    assert report["local_image_report"]["status"] == "failed"
-    assert report["base_image_registry_report"]["status"] == "timeout"
-    assert "requested image is not available locally: lmx-freemhd" in report["blockers"]
-    assert "base image registry resolution timed out: openfoam/openfoam2206-paraview:latest" in report["blockers"]
+    assert report["base_image_pull_report"]["status"] == "timeout"
+    assert "base image pull timed out: microfluidica/openfoam:2206" in report["blockers"]
