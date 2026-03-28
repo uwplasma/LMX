@@ -77,9 +77,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
    - keep Shercliff and Hunt as informative reports until their fidelity improves
    - add benchmark threshold tracking with explicit tolerances
 5. Extend the recovered-case FreeMHD parity path beyond Shercliff:
-   - Hunt `Ha20` now runs end to end and samples successfully
-   - use that new path to drive the next Hunt solver-fidelity iteration
-   - then recover additional cases such as Shercliff `Ha100` or Hunt `Ha100`
+  - Hunt `Ha20` now runs end to end and samples successfully
+  - use that new path to drive the next Hunt solver-fidelity iteration
+  - Shercliff `Ha100` now also runs end to end and emits a real sampled parity artifact
+  - next recover Hunt `Ha100` or another harsher conducting-wall case once the next solver change lands
 6. Implement mapped-operator support for the fringing-field pipe case.
 
 ## What Worked
@@ -156,6 +157,9 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The local `StartingFiles.zip` recovery path now extends beyond Shercliff:
   - `hunt_exactBL_Ha20` can be extracted and materialized locally
   - the same container harness now runs that Hunt case to `t = 1e-4`, reconstructs `0.0001/`, and supports sampled parity extraction
+- The recovered-case FreeMHD parity path now also includes a higher-Ha insulating-wall reference:
+  - `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE` is recoverable from `StartingFiles.zip`
+  - it now runs to `t = 1e-4`, reconstructs `0.0001/`, and emits sampled line-cut parity metrics through the same checked-in runner
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
   - `u_max_abs_diff ≈ 1.26e-3` after the latest retained solver update
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
@@ -708,6 +712,27 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. keep the new outer-coupled pseudo-step and use the real Hunt `Ha20` parity artifact to tune the next solver change
   2. recover and run a higher-Ha closed-channel case next so the improved parity machinery is exercised in a harsher boundary-layer regime
   3. continue tightening the Hunt case construction so the short-time parity runner mirrors the recovered FreeMHD setup more faithfully
+
+### 2026-03-28 20:20 America/Chicago
+
+- Recovered and ran the first higher-Ha closed-channel FreeMHD case after the Hunt/Shercliff `Ha20` work:
+  - extracted and materialized `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE`
+  - ran it through `scripts/run_freemhd_case.py` to `t = 1e-4`
+  - reconstructed the `0.0001/` state and sampled `centerlineY/centerlineZ` through the same parity-suite runner
+- Recorded the first real Shercliff `Ha100` short-time parity metrics:
+  - `freemhd_u_max_latest = 0.973592421`
+  - `lmx_u_max = 0.9718690515`
+  - `u_max_abs_diff ≈ 1.72e-3`
+  - `freemhd_sample_y_l2_error ≈ 2.36e-2`
+  - `freemhd_sample_z_l2_error ≈ 4.47e-2`
+- This is a useful new reference point:
+  - the higher-Ha insulating-wall Shercliff case remains markedly better than the current Hunt `Ha20` conducting-wall case
+  - higher-Ha runtime on the FreeMHD side is already significantly more expensive, so the next recovered conducting-wall case should be chosen intentionally
+  - the latest `fieldMinMax.dat` record for this case reports the `mag(U)` maximum at `x = 0.0`, so the current sampling-geometry inference now selects the inlet plane for this recovered case
+- Current best next step is now:
+  1. use the combined Hunt `Ha20` and Shercliff `Ha100` artifacts to decide whether the next solver change should target conducting-wall coupling or higher-Ha damping/resolution
+  2. recover Hunt `Ha100` next if we want the harsher conducting-wall benchmark, otherwise keep improving the LMX solver against the already recovered Hunt `Ha20` gap
+  3. generalize the current sampling-geometry inference beyond raw `fieldMinMax` maxima so future cases are not tied to whichever plane happens to host the instantaneous `mag(U)` maximum
 
 ## Instruction For Future Agents
 

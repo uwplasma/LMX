@@ -76,4 +76,9 @@
   - after restricting layered-duct profile comparisons to the fluid region only, the current Hunt sampled-profile metrics are `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
   - this latest improvement comes from using a real fixed-point outer coupling loop inside each pseudo-time step instead of a single `u -> phi -> JxB -> u` pass
   - this confirms that the repo now has a real Hunt FreeMHD reference path and that Hunt solver fidelity, not infrastructure, is the dominant remaining gap
+- A first higher-Ha closed-channel FreeMHD parity artifact now exists for Shercliff `Ha100`:
+  - the recovered `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE` case runs to `t = 1e-4` and reconstructs successfully through the same container harness
+  - on this machine, the short solver stage reaches `ExecutionTime ≈ 168 s` before reconstruction, which is much slower than `Ha20`
+  - the current short-time parity metrics are `u_max_abs_diff ≈ 1.72e-3`, `freemhd_sample_y_l2_error ≈ 2.36e-2`, `freemhd_sample_z_l2_error ≈ 4.47e-2`
+  - the inferred sampling geometry now shifts to `x_position = 0.0` for this recovered case because the latest `mag(U)` maximum is reported at the inlet plane in `fieldMinMax.dat`
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.
