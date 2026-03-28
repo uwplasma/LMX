@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.specs import BoundaryCondition
 from lmx.validation import ValidationReport, compare_with_freemhd, write_validation_report
 
 
@@ -56,15 +57,6 @@ def build_case(
     )
 
 
-def infer_parity_forcing(case_kind: str, ha: float, initial_velocity: float) -> float:
-    if case_kind != "hunt":
-        return 0.0
-    probe_case = make_hunt_case(ha=ha, ny=16, nz=16)
-    _, by, bz = probe_case.magnetic_field.value or (0.0, 0.0, 0.0)
-    fluid_sigma = probe_case.regions[0].conductivity
-    return fluid_sigma * (by * by + bz * bz) * initial_velocity
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build an LMX case, compare it with a FreeMHD run directory, and write a parity JSON report.")
     parser.add_argument("--case-kind", choices=("hartmann", "shercliff", "hunt"), required=True)
@@ -84,10 +76,6 @@ def main(argv: list[str] | None = None) -> int:
     if initial_velocity is None:
         initial_velocity = infer_initial_velocity_x(args.freemhd_run_dir) or 0.0
 
-    forcing = args.forcing
-    if forcing is None:
-        forcing = infer_parity_forcing(args.case_kind, args.ha, initial_velocity)
-
     case = build_case(
         case_kind=args.case_kind,
         ha=args.ha,
@@ -97,15 +85,23 @@ def main(argv: list[str] | None = None) -> int:
         dt=args.dt,
         t_final=args.t_final,
         max_steps=args.max_steps,
-        forcing=forcing,
+        forcing=0.0 if args.forcing is None else args.forcing,
     )
+    drive_mode = "explicit_forcing"
+    if args.forcing is None and args.case_kind == "hunt":
+        inlet_bc = BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x")
+        case = replace(case, boundary_conditions=case.boundary_conditions + (inlet_bc,))
+        drive_mode = "inlet_velocity"
+    elif args.forcing is None:
+        drive_mode = "none"
     report = compare_with_freemhd(case, args.freemhd_run_dir)
     write_validation_report(report, args.output)
     payload = {
         "case_kind": args.case_kind,
         "ha": args.ha,
         "initial_velocity": initial_velocity,
-        "forcing": forcing,
+        "forcing": case.forcing,
+        "drive_mode": drive_mode,
         "freemhd_run_dir": str(args.freemhd_run_dir.resolve()),
         "output": str(args.output.resolve()),
         "metrics": report.metrics,

@@ -363,6 +363,26 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   2. keep the retained real-artifact targets (`Hunt Ha20`, `Hunt Ha100`) fixed while doing that refactor
   3. only after the drive model lives in the core API, decide whether similar flow-rate-driven short-transient handling is needed for other FreeMHD case families
 
+### 2026-03-28 20:10 America/Chicago
+
+- Moved the Hunt short-time drive model out of the parity-script forcing heuristic and into core solver semantics:
+  - `lmx.solvers` now derives an effective body force from inlet boundary conditions when `case.forcing == 0`
+  - the retained rule is the same mean Lorentz-balance scale used previously in the parity layer: `mean[sigma * (By^2 + Bz^2)] * U_inlet`
+  - this currently supports `inlet_velocity` and `inlet_flow_rate` boundary conditions
+- Updated the Hunt parity builder to use core BC semantics instead of explicit forcing inference:
+  - `scripts/run_freemhd_parity_report.py` now appends an `inlet_velocity` BC for Hunt when `--forcing` is omitted
+  - reported payloads now show `drive_mode = "inlet_velocity"` and `forcing = 0.0`
+- Added focused coverage for the refactor:
+  - `test_hunt_inlet_velocity_boundary_drives_short_transient`
+  - updated parity-report tests to assert boundary-driven Hunt parity instead of inferred script forcing
+- Verified that the retained real-artifact metrics are preserved after the refactor:
+  - Hunt `Ha20`: `u_max_abs_diff ≈ 8.17e-4`, `y_l2 ≈ 2.07e-3`, `z_l2 ≈ 7.48e-3`
+  - Hunt `Ha100`: `u_max_abs_diff ≈ 5.25e-5`, `y_l2 ≈ 5.72e-2`, `z_l2 ≈ 5.69e-2`
+- Best next step is now the next real modeling step instead of cleanup:
+  1. decide whether the same inlet-driven short-transient semantics should become first-class in the public case factories, not just parity builders
+  2. extend that decision carefully so existing Hartmann/Shercliff defaults do not regress
+  3. then tighten Hunt acceptance thresholds in CI around the now-stable real `Ha20` and `Ha100` artifacts
+
 ### 2026-03-27 16:35 America/Chicago
 
 - Added richer validation/reporting support:

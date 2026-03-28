@@ -10,7 +10,7 @@ from .linear import solve_poisson_jacobi, solve_poisson_lineax
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
 from .operators import face_average_x, face_average_z, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
-from .specs import CaseSpec
+from .specs import BoundaryCondition, CaseSpec
 
 
 def _build_mesh(case: CaseSpec) -> StructuredMesh:
@@ -133,6 +133,43 @@ def _limited_velocity_update(
     return jnp.where(fluid_mask, current + scale * delta, 0.0)
 
 
+def _inlet_speed(boundary: BoundaryCondition, case: CaseSpec) -> float | None:
+    if boundary.kind == "inlet_velocity":
+        value = boundary.value
+        if isinstance(value, tuple):
+            axis = (boundary.axis or "x").lower()
+            component = {"x": 0, "y": 1, "z": 2}.get(axis, 0)
+            return float(value[component])
+        if isinstance(value, (int, float)):
+            return float(value)
+    if boundary.kind == "inlet_flow_rate" and isinstance(boundary.value, (int, float)):
+        area = case.geometry.width * case.geometry.height
+        if area > 0.0:
+            return float(boundary.value) / area
+    return None
+
+
+def _effective_forcing(
+    case: CaseSpec,
+    sigma: jnp.ndarray,
+    fluid_mask: jnp.ndarray,
+    by: jnp.ndarray,
+    bz: jnp.ndarray,
+) -> float:
+    if abs(case.forcing) > 0.0:
+        return case.forcing
+    inlet_velocity = next(
+        (speed for boundary in case.boundary_conditions if (speed := _inlet_speed(boundary, case)) is not None),
+        None,
+    )
+    if inlet_velocity is None:
+        return 0.0
+    magnetic_loading = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
+    fluid_count = jnp.maximum(jnp.sum(fluid_mask.astype(float)), 1.0)
+    mean_loading = float(jnp.sum(magnetic_loading) / fluid_count)
+    return mean_loading * inlet_velocity
+
+
 def _step(
     u: jnp.ndarray,
     mesh: StructuredMesh,
@@ -188,6 +225,7 @@ def solve_transient(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
     _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    forcing = _effective_forcing(case, materials.conductivity, materials.fluid_mask, by, bz)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
     initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
@@ -206,7 +244,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             by=by,
             bz=bz,
             dt=dt,
-            forcing=case.forcing,
+            forcing=forcing,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,

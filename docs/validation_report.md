@@ -104,6 +104,7 @@
   - `make_hunt_case` uses a Ha-aware schedule for `outer_iterations`, `relaxation`, and `velocity_update_limit`
   - this keeps the retained `Ha20` improvement without globally loosening the bounded velocity update for `Ha100`
 - The Lorentz-balance Hunt parity drive is currently implemented in the parity builder, not yet in the core case semantics:
-  - `scripts/run_freemhd_parity_report.py` infers the Hunt short-time drive when `--forcing` is omitted
-  - the next clean-up step is to move that from the parity script into the main case/BC model so parity and native LMX runs share the same flow-rate-driven transient semantics
+  - this has now been moved into the core solver semantics for cases that carry an inlet BC and `forcing = 0`
+  - `scripts/run_freemhd_parity_report.py` now expresses Hunt parity cases through `inlet_velocity` instead of explicit inferred forcing
+  - parity and native LMX runs can now share the same inlet-driven short-transient logic instead of relying on a script-only forcing heuristic
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.

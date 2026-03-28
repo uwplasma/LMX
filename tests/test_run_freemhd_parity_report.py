@@ -15,12 +15,6 @@ def test_infer_initial_velocity_x_reads_uniform_liquid_u(tmp_path: Path):
     assert parity.infer_initial_velocity_x(tmp_path) == pytest.approx(0.9725)
 
 
-def test_infer_parity_forcing_uses_lorentz_balance_for_hunt():
-    assert parity.infer_parity_forcing("hartmann", 20.0, 0.1175) == pytest.approx(0.0)
-    assert parity.infer_parity_forcing("hunt", 20.0, 0.1175) == pytest.approx(47.0)
-    assert parity.infer_parity_forcing("hunt", 100.0, 0.1175) == pytest.approx(1175.0)
-
-
 def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
@@ -57,7 +51,9 @@ def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture
     assert '"initial_velocity": 0.9725' in stdout
 
 
-def test_main_infers_hunt_forcing_when_unspecified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+def test_main_uses_hunt_inlet_drive_when_forcing_unspecified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
     (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
@@ -66,6 +62,7 @@ def test_main_infers_hunt_forcing_when_unspecified(tmp_path: Path, monkeypatch: 
 
     def fake_compare(case, freemhd_run_dir):
         recorded["forcing"] = case.forcing
+        recorded["boundary_conditions"] = case.boundary_conditions
         return parity.ValidationReport(case_name=case.name, metrics={"u_max_abs_diff": 0.1}, artifacts={})
 
     monkeypatch.setattr(parity, "compare_with_freemhd", fake_compare)
@@ -85,6 +82,8 @@ def test_main_infers_hunt_forcing_when_unspecified(tmp_path: Path, monkeypatch: 
     )
 
     assert exit_code == 0
-    assert recorded["forcing"] == pytest.approx(47.0)
+    assert recorded["forcing"] == pytest.approx(0.0)
+    assert any(boundary.kind == "inlet_velocity" for boundary in recorded["boundary_conditions"])
     stdout = capsys.readouterr().out
-    assert '"forcing": 47.0' in stdout
+    assert '"forcing": 0.0' in stdout
+    assert '"drive_mode": "inlet_velocity"' in stdout

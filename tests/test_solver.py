@@ -1,7 +1,10 @@
+from dataclasses import replace
+
 import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.specs import BoundaryCondition
 from lmx.solvers import solve_steady
 
 
@@ -34,6 +37,28 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha1000.time_stepper.outer_iterations == 3
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
+
+
+def test_hunt_inlet_velocity_boundary_drives_short_transient():
+    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    driven = replace(
+        case,
+        forcing=0.0,
+        initial_velocity=0.1175,
+        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.1175, 0.0, 0.0), axis="x"),),
+        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=1e-4, max_steps=10),
+    )
+    undriven = replace(
+        case,
+        forcing=0.0,
+        initial_velocity=0.1175,
+        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=1e-4, max_steps=10),
+    )
+
+    driven_solution = solve_steady(driven)
+    undriven_solution = solve_steady(undriven)
+
+    assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
 
 
 def test_shercliff_solution_stays_finite_and_zero_at_walls():
