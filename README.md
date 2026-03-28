@@ -54,6 +54,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-smoke --platform linux/amd64
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-smoke --case-dir /absolute/path/to/freemhd_case --platform linux/amd64 --output ./artifacts/freemhd/run.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-smoke --case-dir /absolute/path/to/freemhd_case --platform linux/amd64 --cores 8 --delta-t 1e-5 --end-time 1e-4 --write-interval 1e-4 --output ./artifacts/freemhd/run_smoke.json
+/Users/rogerio/base_env/bin/python3 scripts/sample_freemhd_profiles.py --case-dir /absolute/path/to/freemhd_case --image microfluidica/openfoam:2206 --time 0.0001 --dict-name lmxSampleDict --output ./artifacts/freemhd/sample_profiles.json
 ```
 
 ## Layout

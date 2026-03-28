@@ -11,11 +11,14 @@ from lmx.validation import (
     closed_channel_validation,
     compare_with_freemhd,
     duct_profile_metrics,
+    latest_sampled_profiles,
     hartmann_analytic_profile,
     hartmann_validation,
     inspect_freemhd_case,
     latest_field_minmax_record,
+    normalize_sample_distance,
     processed_slice_validation,
+    read_freemhd_xy_sample,
     read_field_minmax,
     write_analytic_comparison,
     write_closed_channel_validation,
@@ -41,12 +44,16 @@ def test_compare_with_freemhd_report(tmp_path: Path):
     (tmp_path / "0").mkdir()
     (tmp_path / "0" / "fluid").mkdir()
     (tmp_path / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
+    (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1").mkdir(parents=True)
     (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
     (tmp_path / "0" / "fluid" / "U").write_text("internalField uniform (0 0 0);")
     (tmp_path / "0" / "fluid" / "potE").write_text("internalField uniform 0;")
     (tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
         "# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
     )
+    sample_lines = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
+    (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1" / "centerlineY_potE_U.xy").write_text(sample_lines)
+    (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1" / "centerlineZ_potE_U.xy").write_text(sample_lines)
     report = compare_with_freemhd(case, tmp_path)
     path = write_validation_report(report, tmp_path / "report.json")
     assert path.exists()
@@ -55,6 +62,8 @@ def test_compare_with_freemhd_report(tmp_path: Path):
     assert report.metrics["has_potE_zero_field"] == pytest.approx(1.0)
     assert report.metrics["field_minmax_file_count"] == pytest.approx(1.0)
     assert report.metrics["freemhd_u_max_latest"] == pytest.approx(0.25)
+    assert report.metrics["sampled_profile_pair_available"] == pytest.approx(1.0)
+    assert "freemhd_sample_y_l2_error" in report.metrics
 
 
 def test_inspect_freemhd_case_collects_case_structure(tmp_path: Path):
@@ -96,6 +105,25 @@ def test_field_minmax_reader_extracts_latest_mag_u(tmp_path: Path):
     assert latest is not None
     assert latest.time == pytest.approx(2.0e-05)
     assert latest.max_value == pytest.approx(0.9)
+
+
+def test_sample_reader_and_latest_profile_detection(tmp_path: Path):
+    sample_root = tmp_path / "postProcessing" / "lmxSampleDict" / "liquid" / "0.0001"
+    sample_root.mkdir(parents=True)
+    rows = "0.0 0.1 1.0 2.0 3.0\n1.0 0.2 4.0 5.0 6.0\n"
+    y_path = sample_root / "centerlineY_potE_U.xy"
+    z_path = sample_root / "centerlineZ_potE_U.xy"
+    y_path.write_text(rows)
+    z_path.write_text(rows)
+    sample = read_freemhd_xy_sample(y_path)
+    latest = latest_sampled_profiles(tmp_path)
+    assert sample.distance.shape[0] == 2
+    assert float(sample.u_x[1]) == pytest.approx(4.0)
+    assert latest is not None
+    assert latest[0].path.endswith("centerlineY_potE_U.xy")
+    normalized = normalize_sample_distance(sample.distance)
+    assert float(normalized[0]) == pytest.approx(-1.0)
+    assert float(normalized[-1]) == pytest.approx(1.0)
 
 
 def test_hartmann_validation_writer(tmp_path: Path):

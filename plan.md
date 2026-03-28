@@ -131,6 +131,13 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - FreeMHD latest `max |U|` at `t = 1e-4` is `0.973457584`
   - an LMX short transient with matched `initial_velocity = 0.9725`, `dt = 1e-5`, `t_final = 1e-4`, and `forcing = 0` gives `max |U| = 0.9721652865`
   - the current absolute difference is about `1.29e-3`
+- FreeMHD sampled line cuts now work on the reconstructed Shercliff `Ha20` output through a checked-in sampling runner:
+  - `scripts/sample_freemhd_profiles.py` writes `system/lmxSampleDict`
+  - `postProcess -func lmxSampleDict -time 0.0001` writes sampled cuts under `postProcessing/lmxSampleDict/liquid/0.0001/`
+  - `compare_with_freemhd` now reports profile-based `y/z` errors when those sampled files exist
+- The current real sampled-line parity numbers on the recovered Shercliff `Ha20` smoke case are:
+  - `freemhd_sample_y_l2_error ≈ 5.83e-4`
+  - `freemhd_sample_z_l2_error ≈ 2.67e-4`
 
 ## What Did Not Work
 
@@ -161,6 +168,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - it compares the latest FreeMHD `mag(U)` maximum from `fieldMinMax.dat`
   - it does not yet compare full reconstructed profiles or full field data
   - the current agreement depends on matching the nonzero FreeMHD initial state through `CaseSpec.initial_velocity`
+- The sampled-line parity path currently depends on explicit sampling geometry inputs (`x_position`, `y_min`, `y_max`, `z_min`, `z_max`) rather than inferring the right cut automatically from arbitrary FreeMHD cases.
 
 ## Chronological Log
 
@@ -567,6 +575,24 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - LMX `max |U| = 0.9721652865`
   - absolute difference `= 0.0012922975`
 - Current best next step is now to replace this coarse min/max smoke comparison with profile extraction from reconstructed FreeMHD output while continuing the Hunt/Shercliff solver-fidelity work on the LMX side.
+
+### 2026-03-28 18:55 America/Chicago
+
+- Replaced the earlier “next step” with a working profile-extraction path from reconstructed FreeMHD output:
+  - confirmed that OpenFOAM `2206` in the container does not ship a standalone `sample` binary, so the correct route is `postProcess -func <dict-name>`
+  - confirmed that `postProcess` discovers user-defined sampling dictionaries when they are written under the case `system/` directory
+  - added `scripts/sample_freemhd_profiles.py`, which writes `system/lmxSampleDict`, runs `postProcess`, and records JSON output paths
+- Added new validation-side utilities:
+  - parse sampled `centerlineY_potE_U.xy` and `centerlineZ_potE_U.xy`
+  - detect the latest sampled pair automatically from `postProcessing/*/liquid/<time>/...`
+  - report sampled `y/z` line-cut parity metrics through `compare_with_freemhd`
+- Verified this on the real recovered Shercliff `Ha20` smoke run:
+  - sampled files are now written under `postProcessing/lmxSampleDict/liquid/0.0001/`
+  - the first sampled-line parity metrics are `freemhd_sample_y_l2_error ≈ 5.83e-4` and `freemhd_sample_z_l2_error ≈ 2.67e-4`
+- Best next step is now narrower again:
+  1. remove the current need for manually chosen sampling extents by inferring them from the FreeMHD case geometry
+  2. turn the sampled Shercliff parity path into a checked-in artifact/report runner
+  3. extend the same path to other recovered FreeMHD cases as they become available
 
 ## Instruction For Future Agents
 

@@ -91,6 +91,16 @@ class FieldMinMaxRecord:
     max_value: float
 
 
+@dataclass(frozen=True)
+class FreeMHDLineSample:
+    path: str
+    distance: jnp.ndarray
+    pot_e: jnp.ndarray
+    u_x: jnp.ndarray
+    u_y: jnp.ndarray
+    u_z: jnp.ndarray
+
+
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
     denom = jnp.cosh(ha) - 1.0
     denom = jnp.where(jnp.abs(denom) < 1e-12, 1.0, denom)
@@ -300,6 +310,9 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
     expected_region_count = float(len(case_spec.regions))
     expected_solid_count = float(sum(1 for region in case_spec.regions if region.kind == "solid"))
     minmax_files = tuple(sorted(str(path.relative_to(run_dir)) for path in run_dir.glob("postProcessing/**/fieldMinMax.dat")))
+    sampled_profiles = latest_sampled_profiles(run_dir)
+    y_sample_path = sampled_profiles[0].path if sampled_profiles is not None else ""
+    z_sample_path = sampled_profiles[1].path if sampled_profiles is not None else ""
     metrics = {
         "run_dir_exists": float(run_dir.exists()),
         "has_system": float((run_dir / "system").exists()),
@@ -317,8 +330,10 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
         "expected_region_count": expected_region_count,
         "expected_solid_region_count": expected_solid_count,
         "field_minmax_file_count": float(len(minmax_files)),
+        "sampled_profile_pair_available": float(sampled_profiles is not None),
     }
     latest_u_record = latest_field_minmax_record(run_dir, field="mag(U)")
+    lmx_solution: Solution | None = None
     if latest_u_record is not None:
         lmx_solution = solve_transient(case_spec)
         lmx_u_max = float(jnp.max(jnp.abs(lmx_solution.state.u)))
@@ -326,6 +341,29 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
         metrics["freemhd_u_max_latest"] = latest_u_record.max_value
         metrics["lmx_u_max"] = lmx_u_max
         metrics["u_max_abs_diff"] = abs(lmx_u_max - latest_u_record.max_value)
+    if sampled_profiles is not None:
+        if lmx_solution is None:
+            lmx_solution = solve_transient(case_spec)
+        y_sample, z_sample = sampled_profiles
+        y_profile = extract_midplane_profile(lmx_solution, axis="y")
+        z_profile = extract_midplane_profile(lmx_solution, axis="z")
+        y_comparison = compare_normalized_profiles(
+            y_profile["y"],
+            y_profile["u"],
+            normalize_sample_distance(y_sample.distance),
+            y_sample.u_x,
+        )
+        z_comparison = compare_normalized_profiles(
+            z_profile["z"],
+            z_profile["u"],
+            normalize_sample_distance(z_sample.distance),
+            z_sample.u_x,
+        )
+        metrics["freemhd_sample_time"] = infer_sample_time_from_path(y_sample.path)
+        metrics["freemhd_sample_y_l2_error"] = y_comparison.l2_error
+        metrics["freemhd_sample_y_linf_error"] = y_comparison.linf_error
+        metrics["freemhd_sample_z_l2_error"] = z_comparison.l2_error
+        metrics["freemhd_sample_z_linf_error"] = z_comparison.linf_error
     artifacts = {
         "freemhd_run_dir": str(run_dir),
         "expected_command": freemhd_case_command(run_dir),
@@ -339,6 +377,8 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
         "processor_layout_dirs": json.dumps(inspection.processor_layout_dirs),
         "parallel_time_dirs": json.dumps(inspection.parallel_time_dirs),
         "field_minmax_files": json.dumps(minmax_files),
+        "sampled_profile_y_path": y_sample_path,
+        "sampled_profile_z_path": z_sample_path,
     }
     return ValidationReport(case_name=case_spec.name, metrics=metrics, artifacts=artifacts)
 
@@ -472,6 +512,71 @@ def latest_field_minmax_record(run_dir: str | Path, field: str = "mag(U)") -> Fi
             if latest is None or record.time > latest.time:
                 latest = record
     return latest
+
+
+def read_freemhd_xy_sample(path: str | Path) -> FreeMHDLineSample:
+    distance = []
+    pot_e = []
+    u_x = []
+    u_y = []
+    u_z = []
+    for raw_line in Path(path).read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        distance.append(float(parts[0]))
+        pot_e.append(float(parts[1]))
+        u_x.append(float(parts[2]))
+        u_y.append(float(parts[3]))
+        u_z.append(float(parts[4]))
+    return FreeMHDLineSample(
+        path=str(Path(path)),
+        distance=jnp.asarray(distance, dtype=float),
+        pot_e=jnp.asarray(pot_e, dtype=float),
+        u_x=jnp.asarray(u_x, dtype=float),
+        u_y=jnp.asarray(u_y, dtype=float),
+        u_z=jnp.asarray(u_z, dtype=float),
+    )
+
+
+def infer_sample_time_from_path(path: str | Path) -> float:
+    sample_path = Path(path)
+    for parent in sample_path.parents:
+        try:
+            return float(parent.name)
+        except ValueError:
+            continue
+    raise ValueError(f"Unable to infer sample time from path {sample_path}")
+
+
+def normalize_sample_distance(distance: jnp.ndarray) -> jnp.ndarray:
+    max_distance = jnp.max(distance)
+    max_distance = jnp.where(max_distance > 0.0, max_distance, 1.0)
+    return 2.0 * distance / max_distance - 1.0
+
+
+def latest_sampled_profiles(run_dir: str | Path) -> tuple[FreeMHDLineSample, FreeMHDLineSample] | None:
+    root = Path(run_dir)
+    candidates = sorted(root.glob("postProcessing/*/liquid/*/centerlineY_potE_U.xy"))
+    latest_y_path: Path | None = None
+    latest_time: float | None = None
+    for path in candidates:
+        try:
+            sample_time = infer_sample_time_from_path(path)
+        except ValueError:
+            continue
+        if latest_time is None or sample_time > latest_time:
+            latest_time = sample_time
+            latest_y_path = path
+    if latest_y_path is None:
+        return None
+    z_path = latest_y_path.with_name("centerlineZ_potE_U.xy")
+    if not z_path.exists():
+        return None
+    return read_freemhd_xy_sample(latest_y_path), read_freemhd_xy_sample(z_path)
 
 
 def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:

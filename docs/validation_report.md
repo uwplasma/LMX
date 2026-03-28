@@ -21,6 +21,7 @@
 - FreeMHD run-control overrides for short smoke/parity runs (`deltaT`, `endTime`, `writeInterval`).
 - FreeMHD multi-region case inspection of `0/`, `processors*`, and `fieldMinMax.dat` artifacts.
 - Coarse `LMX`-vs-`FreeMHD` transient comparison based on the latest FreeMHD `mag(U)` max entry.
+- FreeMHD sampled line-cut extraction through `postProcessing/lmxSampleDict/...` and profile-based `LMX`-vs-`FreeMHD` parity metrics.
 - Nonzero transient initialization in LMX through `CaseSpec.initial_velocity`.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
@@ -30,7 +31,8 @@
 ## Planned next
 
 - Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
-- Replace the current coarse FreeMHD `max |U|` comparison with sampled profile extraction from reconstructed OpenFOAM output.
+- Extend the current sampled line-cut parity path beyond the recovered Shercliff `Ha20` smoke case.
+- Promote the current sampled `y/z` profile comparison into a checked-in parity runner artifact job.
 - Extend the current FreeMHD run/controlDict override helpers into a checked-in parity runner script for the recovered Shercliff case.
 - Fringing-field mapped-pipe operators.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
@@ -49,5 +51,8 @@
   - FreeMHD latest `max |U| = 0.973457584` at `t = 1e-4`
   - LMX short transient with matched `initial_velocity = 0.9725` gives `max |U| = 0.9721652865`
   - absolute difference is about `1.29e-3`
-- The current comparison is still intentionally coarse and does not yet compare full profiles or reconstructed fields.
+- The sampled-line profile comparison is now also available on the same recovered Shercliff `Ha20` smoke case:
+  - `freemhd_sample_y_l2_error ≈ 5.83e-4`
+  - `freemhd_sample_z_l2_error ≈ 2.67e-4`
+  - these are based on sampled `centerlineY` and `centerlineZ` cuts from reconstructed FreeMHD `0.0001/liquid/U`
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.
