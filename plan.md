@@ -55,6 +55,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `scripts/write_freemhd_container_files.py`: writes the local FreeMHD/OpenFOAM container bundle.
 - `scripts/run_freemhd_case.py`: runs a mounted FreeMHD case in a prepared container image and records JSON metadata.
 - `scripts/probe_freemhd_environment.py`: probes the local FreeMHD/OpenFOAM and Docker environment and records JSON diagnostics.
+- `scripts/inspect_freemhd_setup.py`: inspects the locally available FreeMHD assets, reports discovered case directories, and recommends the smallest smoke target.
 
 ## Best Next Steps
 
@@ -93,6 +94,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - CI artifact summaries now include processed-slice error columns.
 - A local FreeMHD container bundle generator and container execution helper now exist and are covered by unit tests.
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
+- FreeMHD-side inspection now reports that the current downloads contain no standalone runnable FreeMHD cases and recommends the bundled OpenFOAM Hartmann tutorial as the smallest local smoke target.
 
 ## What Did Not Work
 
@@ -110,6 +112,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
 - A direct local `wmake` probe currently fails because `OpenFOAM-v2206/platforms/tools/darwin64Clang/wmkdepend` is missing in the vendored FreeMHD tree on this machine.
 - The Docker client is installed here, but the Docker daemon is not currently reachable, so containerized FreeMHD execution is blocked by the local runtime state rather than repo code.
+- The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
 
 ## Chronological Log
 
@@ -306,6 +309,17 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. either repair the local OpenFOAM toolchain enough to produce `wmkdepend`, or start the Docker daemon and verify the container build path
   2. once one FreeMHD execution path is real, capture the first actual side-by-side case report
   3. keep solver-fidelity work moving in parallel because Hunt/Shercliff accuracy is still the main LMX-side blocker
+
+### 2026-03-28 00:10 America/Chicago
+
+- Added a second FreeMHD-side inspection layer on top of the low-level probe:
+  - `lmx.freemhd` now discovers locally available case directories and recommends a smallest smoke target
+  - `scripts/inspect_freemhd_setup.py` writes this higher-level report as JSON
+  - `scripts/run_freemhd_case.py` now degrades to a structured JSON status when the Docker daemon is unavailable instead of aborting with an exception
+- Verified the current local setup report:
+  - Docker CLI exists but daemon is still unavailable
+  - no standalone runnable FreeMHD cases are present in the currently downloaded assets
+  - the bundled OpenFOAM Hartmann tutorial is the current recommended smoke target if local toolchain repair succeeds before the larger FreeMHD case archive is downloaded
 
 ## Instruction For Future Agents
 

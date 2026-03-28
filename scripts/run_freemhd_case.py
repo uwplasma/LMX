@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lmx.freemhd import docker_cli_available
 from lmx.validation import docker_available
 
 
@@ -55,8 +56,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
 
+    if not docker_cli_available():
+        payload = {
+            "image": args.image,
+            "case_dir": str(args.case_dir.resolve()),
+            "bundle_root": str(args.bundle_root.resolve()),
+            "cores": args.cores,
+            "solver": args.solver,
+            "docker_cli_available": False,
+            "docker_available": False,
+            "status": "docker-cli-unavailable",
+        }
+        if args.output is not None:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(payload, indent=2))
+        print(json.dumps(payload, indent=2))
+        return 0
+
     if not docker_available():
-        raise SystemExit("docker is not available on PATH")
+        payload = {
+            "image": args.image,
+            "case_dir": str(args.case_dir.resolve()),
+            "bundle_root": str(args.bundle_root.resolve()),
+            "cores": args.cores,
+            "solver": args.solver,
+            "docker_cli_available": True,
+            "docker_available": False,
+            "status": "docker-daemon-unavailable",
+        }
+        if args.output is not None:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(payload, indent=2))
+        print(json.dumps(payload, indent=2))
+        return 0
 
     result = run_freemhd_case(
         image=args.image,
@@ -71,6 +103,9 @@ def main(argv: list[str] | None = None) -> int:
         "bundle_root": str(args.bundle_root.resolve()),
         "cores": args.cores,
         "solver": args.solver,
+        "docker_cli_available": True,
+        "docker_available": True,
+        "status": "ok" if result.returncode == 0 else "failed",
         "returncode": result.returncode,
         "stdout_tail": result.stdout[-4000:],
         "stderr_tail": result.stderr[-4000:],
