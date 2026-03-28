@@ -92,9 +92,11 @@
   - the recovered `hunt_exactBL_Ha100` case now runs to `t = 1e-4` and reconstructs successfully through the same container harness when forced to the same short-smoke `--cores 8` override used for the other recovered paper cases
   - attempting to inherit the case’s original `95`-way decomposition on this machine results in an immediate killed run, so the explicit short-smoke core override is now part of the documented recovered-case workflow
   - the first retained short-time parity metrics were `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
-  - the current geometry-aware split rule keeps this conducting-wall case on the field-based cut, which lands at `x_position = 0.0` for the recovered `Ha100` run because the latest `mag(U)` maximum remains on the inlet plane at this short time
-  - the retained Ha-aware Hunt control update improves the same real artifact to `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 1.36e-1`, `freemhd_sample_z_l2_error ≈ 7.63e-2`
-  - this confirms that the higher-Ha conducting-wall regime is now represented by a real FreeMHD artifact and that the remaining Hunt gap is concentrated more in the `y` profile and amplitude than in the `z` profile
+  - the initial conducting-wall geometry rule kept this case on the raw field-based cut at `x_position = 0.0` because the latest `mag(U)` maximum remains on the inlet plane at this short time
+  - the retained Ha-aware Hunt control update improved the same real artifact to `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 1.36e-1`, `freemhd_sample_z_l2_error ≈ 7.63e-2`
+  - a retained interior-offset conducting-wall sampling rule now clamps boundary-aligned `fieldMinMax` cuts to `1.5%` of the streamwise span, which moves this recovered case to `x_position = 0.015`
+  - with that narrower slice rule, the same real artifact improves further to `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 6.23e-2`, `freemhd_sample_z_l2_error ≈ 7.58e-2`
+  - this confirms that the higher-Ha conducting-wall regime is now represented by a real FreeMHD artifact and that the remaining Hunt gap is much more narrowly concentrated in amplitude and residual `y`-profile fidelity than before
 - The retained Hunt control update is explicit in the public LMX config surface now:
   - `TimeStepperConfig` includes `velocity_update_limit`
   - `make_hunt_case` uses a Ha-aware schedule for `outer_iterations`, `relaxation`, and `velocity_update_limit`

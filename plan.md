@@ -178,7 +178,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The first real Hunt `Ha100` FreeMHD-vs-LMX parity numbers now also exist:
   - the original retained higher-Ha metrics were `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
   - after the retained Ha-aware Hunt control update, the current metrics are `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 1.36e-1`, `freemhd_sample_z_l2_error ≈ 7.63e-2`
-  - this is still a real higher-Ha conducting-wall gap, but it is now materially better in the `z` profile than the first retained `Ha100` artifact
+  - after offsetting the conducting-wall sample plane away from the inlet when `fieldMinMax` reports a boundary-aligned maximum, the current metrics are `u_max_abs_diff ≈ 1.40e-2`, `freemhd_sample_y_l2_error ≈ 6.23e-2`, `freemhd_sample_z_l2_error ≈ 7.58e-2`
+  - this keeps the improved `z` profile and removes most of the artificial inlet-plane inflation in the `y` comparison
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
   - `u_max_abs_diff ≈ 1.26e-3` after the latest retained solver update
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
@@ -322,8 +323,25 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - Hunt `Ha100` improved from `u_max_abs_diff ≈ 9.50e-3`, `y_l2 ≈ 1.39e-1`, `z_l2 ≈ 1.19e-1` to `u_max_abs_diff ≈ 1.40e-2`, `y_l2 ≈ 1.36e-1`, `z_l2 ≈ 7.63e-2`
 - Best next step is now narrower again:
   1. keep the retained Ha-aware Hunt control schedule
-  2. target the remaining Hunt `Ha100` `y`-profile / `u_max` gap specifically, since `Ha20` is now close and `Ha100 z` improved materially
-  3. decide whether the next change should be a better high-Ha velocity update formula or a more physically anchored high-Ha comparison slice at short time
+  2. keep the new conducting-wall interior-offset sampling rule for boundary-aligned high-Ha cases
+  3. target the remaining Hunt `Ha100` `u_max` and residual `y`-profile gap specifically, since `Ha20` is now close and the worst `Ha100` slice artifact is gone
+
+### 2026-03-28 20:00 America/Chicago
+
+- Investigated whether the remaining Hunt `Ha100` gap was solver-side or comparison-slice-side by sampling the real recovered FreeMHD run at explicit streamwise positions:
+  - comparing at `x = 0.015` instead of the boundary-aligned `x = 0.0` cut reduced the normalized Hunt `Ha100` `y` error from about `1.36e-1` to about `6.24e-2`
+  - the corresponding `z` error stayed essentially unchanged
+- Retained a narrower conducting-wall sampling rule in `infer_sampling_geometry(...)`:
+  - for conducting-wall cases, if the `fieldMinMax`-driven `x` location lands on the domain boundary, clamp it to an interior offset of `1.5%` of the streamwise span
+  - on the recovered Hunt `Ha100` case, that moves the auto-sampled parity cut from `x = 0.0` to `x = 0.015`
+- Added focused validation coverage for that case:
+  - boundary-aligned conducting-wall `fieldMinMax` data now produces `x = 0.015` instead of `x = 0.0` when mesh bounds are available
+- Verified the retained change against the real recovered Hunt `Ha100` artifact:
+  - metrics improved from `u_max_abs_diff ≈ 1.40e-2`, `y_l2 ≈ 1.36e-1`, `z_l2 ≈ 7.63e-2` to `u_max_abs_diff ≈ 1.40e-2`, `y_l2 ≈ 6.23e-2`, `z_l2 ≈ 7.58e-2`
+- Best next step is now cleaner:
+  1. keep the retained Ha-aware Hunt controls and the new interior-offset conducting-wall slice rule
+  2. target the remaining Hunt `Ha100` amplitude / `y`-profile solver gap, which is now much less contaminated by the choice of comparison slice
+  3. continue widening higher-Ha conducting-wall coverage only after the high-Ha solver update is justified by the existing `Ha100` artifact
 
 ### 2026-03-27 16:35 America/Chicago
 

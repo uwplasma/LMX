@@ -637,6 +637,12 @@ def infer_sampling_geometry(run_dir: str | Path, field: str = "mag(U)") -> Sampl
     if latest is None or latest.min_location is None or latest.max_location is None:
         raise ValueError(f"Unable to infer sampling geometry from {run_dir}")
     x_position = latest.max_location[0]
+    if mesh_bounds is not None:
+        (x_min, x_max), _, _ = mesh_bounds
+        x_span = max(x_max - x_min, 0.0)
+        interior_offset = 0.015 * x_span
+        if interior_offset > 0.0:
+            x_position = min(max(x_position, x_min + interior_offset), x_max - interior_offset)
     y_extent = max(abs(latest.min_location[1]), abs(latest.max_location[1]))
     z_extent = max(abs(latest.min_location[2]), abs(latest.max_location[2]))
     return SamplingGeometry(
