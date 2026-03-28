@@ -83,6 +83,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
+- Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
 
 ## What Did Not Work
 
@@ -95,6 +96,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The current Shercliff `Ha=20` reference comparison also shows large normalized error, confirming that solver-fidelity work is still the critical path after reference ingestion.
 - The earlier Hartmann/Shercliff defaults (`dt=0.01`, low iteration counts) were too aggressive for fine meshes because the current solver core uses an explicit diffusive update.
 - Hunt can be stabilized only with a much smaller pseudo-step than the current default, which confirms the next Hunt fix should be adaptive pseudo-stepping or a more implicit coupling rather than more validation plumbing.
+- Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; the remaining issue is still the multi-region pseudo-time strategy.
 
 ## Chronological Log
 
@@ -224,6 +226,18 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Best next step is now more concrete:
   1. add adaptive pseudo-step sizing or a more implicit velocity update for the Hunt multi-region case
   2. only after that, tighten Hunt acceptance checks against the ingested reference data
+
+### 2026-03-27 19:55 America/Chicago
+
+- Continued the solver work instead of stopping at the Hunt diagnosis.
+- Added semi-implicit treatment of the linear `-sigma |B|^2 u` Lorentz damping contribution in the velocity update.
+- Kept this change because:
+  - Hartmann remained low-error on the fine mesh
+  - Shercliff improved on the smaller validation grids
+  - the full test suite remained green after updating the regression baselines
+- Did not overstate the outcome:
+  - Hunt still clips at the default settings
+  - this confirms that Hunt needs either adaptive pseudo-step sizing or a more implicit multi-region update, not just implicit treatment of the linear damping term
 
 ## Instruction For Future Agents
 

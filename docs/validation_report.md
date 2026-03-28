@@ -26,3 +26,4 @@
 - Shercliff `Ha=20` no longer clips on the default finer mesh, but its normalized error is still too large to count as parity-complete.
 - Hunt remains clipping at the current default pseudo-time settings and is still the highest-priority solver-fidelity gap.
 - Hunt can be stabilized only with a much smaller pseudo-step, which confirms the remaining issue is solver stability rather than missing reference-data plumbing.
+- Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness further, but it was not enough by itself to make Hunt stable at the default settings.

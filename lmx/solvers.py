@@ -141,9 +141,12 @@ def _step(
     jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u, phi, by, bz)
     lorentz = jnp.nan_to_num(lorentz, nan=0.0, posinf=0.0, neginf=0.0)
     lap_u = laplacian_scalar(u, mesh, mask=fluid_mask)
-    rhs = nu * lap_u + (forcing + lorentz) / rho
-    u_next = jnp.where(fluid_mask, u + dt * rhs, 0.0)
-    u_next = jnp.where(fluid_mask, (1.0 - relaxation) * u + relaxation * u_next, 0.0)
+    lorentz_damping = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
+    lorentz_explicit = lorentz + lorentz_damping * u
+    rhs = nu * lap_u + (forcing + lorentz_explicit) / rho
+    implicit_scale = 1.0 + dt * lorentz_damping / rho
+    u_trial = jnp.where(fluid_mask, (u + dt * rhs) / implicit_scale, 0.0)
+    u_next = jnp.where(fluid_mask, (1.0 - relaxation) * u + relaxation * u_trial, 0.0)
     u_next = _enforce_velocity_bc(u_next, fluid_mask)
     u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
     u_next = jnp.clip(u_next, -5.0, 5.0)

@@ -23,6 +23,7 @@
 - Linear solves use `lineax` when available and otherwise fall back to a pure-JAX Jacobi solver.
 - Keep shapes static when adding new operators or diagnostics.
 - Hartmann and Shercliff case factories now use smaller pseudo-time steps and a larger iteration budget because the current solver core is explicit in the diffusive update and otherwise clips on fine meshes.
+- The velocity update now treats the linear `-sigma |B|^2 u` portion of the Lorentz force semi-implicitly, which improves stability for Hartmann and Shercliff without changing the overall solver structure.
 
 ## Extension points
 
