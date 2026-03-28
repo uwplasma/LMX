@@ -15,10 +15,12 @@ from .validation import (
     extract_centerline,
     extract_midplane_profile,
     hartmann_validation,
+    processed_slice_validation,
     validation_summary,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
+    write_processed_slice_validation,
     write_profile_csv,
 )
 
@@ -54,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser.add_argument("--ha", type=float, default=20.0)
     validate_parser.add_argument("--output", type=str, default="./out")
     validate_parser.add_argument("--reference-root", type=str, default="")
+    validate_parser.add_argument("--x-slice", type=str, default="1m")
 
     args = parser.parse_args(argv)
 
@@ -84,6 +87,22 @@ def main(argv: list[str] | None = None) -> int:
             payload["y_linf_error"] = comparison.y_profile.linf_error
             payload["z_l2_error"] = comparison.z_profile.l2_error
             payload["z_linf_error"] = comparison.z_profile.linf_error
+            try:
+                slice_report = processed_slice_validation(
+                    solution,
+                    args.case,
+                    int(args.ha),
+                    x_slice=args.x_slice,
+                    reference_root=args.reference_root,
+                )
+            except FileNotFoundError:
+                slice_report = None
+            if slice_report is not None:
+                write_processed_slice_validation(slice_report, out_dir / f"{case.name}_slice.json")
+                payload["slice_y_l2_error"] = slice_report.y_profile.l2_error
+                payload["slice_y_linf_error"] = slice_report.y_profile.linf_error
+                payload["slice_z_l2_error"] = slice_report.z_profile.l2_error
+                payload["slice_z_linf_error"] = slice_report.z_profile.linf_error
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 0

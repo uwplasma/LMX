@@ -16,6 +16,8 @@ class ValidationCaseSummary:
     linf_error: float | None = None
     y_l2_error: float | None = None
     z_l2_error: float | None = None
+    slice_y_l2_error: float | None = None
+    slice_z_l2_error: float | None = None
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,8 @@ def _coerce_case_payload(case_name: str, payload: dict[str, Any]) -> ValidationC
         linf_error=float(payload["linf_error"]) if "linf_error" in payload else None,
         y_l2_error=float(payload["y_l2_error"]) if "y_l2_error" in payload else None,
         z_l2_error=float(payload["z_l2_error"]) if "z_l2_error" in payload else None,
+        slice_y_l2_error=float(payload["slice_y_l2_error"]) if "slice_y_l2_error" in payload else None,
+        slice_z_l2_error=float(payload["slice_z_l2_error"]) if "slice_z_l2_error" in payload else None,
     )
 
 
@@ -62,7 +66,14 @@ def summarize_benchmark_report(report_path: str | Path) -> BenchmarkSummary:
 def render_markdown(validation: list[ValidationCaseSummary], benchmark: BenchmarkSummary | None = None) -> str:
     lines = ["# LMX CI Summary", ""]
     if validation:
-        lines.extend(["## Validation", "", "| Case | Residual | U max | L2 error | Y L2 | Z L2 |", "| --- | --- | --- | --- | --- | --- |"])
+        lines.extend(
+            [
+                "## Validation",
+                "",
+                "| Case | Residual | U max | L2 error | Y L2 | Z L2 | Slice Y L2 | Slice Z L2 |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- |",
+            ]
+        )
         for item in validation:
             lines.append(
                 "| "
@@ -74,6 +85,8 @@ def render_markdown(validation: list[ValidationCaseSummary], benchmark: Benchmar
                         "-" if item.l2_error is None else f"{item.l2_error:.6g}",
                         "-" if item.y_l2_error is None else f"{item.y_l2_error:.6g}",
                         "-" if item.z_l2_error is None else f"{item.z_l2_error:.6g}",
+                        "-" if item.slice_y_l2_error is None else f"{item.slice_y_l2_error:.6g}",
+                        "-" if item.slice_z_l2_error is None else f"{item.slice_z_l2_error:.6g}",
                     ]
                 )
                 + " |"

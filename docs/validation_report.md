@@ -6,8 +6,10 @@
 - Laminar inductionless field solve with `u`, `phi`, `J`, and `JxB`.
 - Hartmann analytical profile helper.
 - Hartmann validation JSON generation from the CLI and the validation suite runner.
+- Shercliff and Hunt analytical comparison JSON generation from the CLI and the validation suite runner.
+- Shercliff and Hunt processed-slice `XSlice` comparison JSON generation when Zenodo CSV exports are available.
 - CSV and ParaView outputs for centerline and field inspection.
-- FreeMHD comparison harness metadata and expected container command generation.
+- FreeMHD comparison harness metadata, container bundle generation, and a local container execution helper script.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -15,9 +17,9 @@
 
 ## Planned next
 
-- Shercliff and Hunt analytical-profile ingestion from the paper and Zenodo assets.
+- Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
 - Fringing-field mapped-pipe operators.
-- Automated parity runners against local FreeMHD container executions.
+- Tighten the FreeMHD execution helper into solver-specific parity runners that extract matching LMX/FreeMHD metrics.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
 
 ## Current limitation

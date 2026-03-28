@@ -25,7 +25,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - current density and Lorentz-force reconstruction
   - explicit solid-conductivity regions for Hunt-style walls
 - ParaView XML output and CSV profile extraction.
-- Validation helpers and FreeMHD container/asset fetch stubs.
+- Validation helpers for analytical and processed-slice closed-channel comparisons.
+- FreeMHD container/asset fetch and local execution scaffolding.
 - Explicit unit, regression, physics, validation, and benchmark entrypoints.
 - GitHub Actions workflows for categorized pytest runs plus validation and benchmark artifact jobs.
 - Zenodo closed-channel analytical and processed-slice reference-data loaders.
@@ -51,7 +52,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `lmx/validation.py`: analytical and FreeMHD comparison helpers.
 - `lmx/cli.py`: command-line entrypoints.
 - `scripts/fetch_freemhd_assets.py`: fetch FreeMHD repo and Zenodo files.
-- `scripts/write_freemhd_container_files.py`: writes initial Dockerfile scaffold.
+- `scripts/write_freemhd_container_files.py`: writes the local FreeMHD/OpenFOAM container bundle.
+- `scripts/run_freemhd_case.py`: runs a mounted FreeMHD case in a prepared container image and records JSON metadata.
 
 ## Best Next Steps
 
@@ -67,10 +69,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
    - convert Hartmann validation into a stronger pass/fail parity check
    - keep Shercliff and Hunt as informative reports until their fidelity improves
    - add benchmark threshold tracking with explicit tolerances
-4. Use the newly ingested processed closed-channel CSV slices to add figure-level Shercliff/Hunt comparisons.
-5. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity.
+4. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity now that both analytical and processed-slice metrics are emitted by the same CLI path.
+5. Tighten the current FreeMHD container bundle into a verified build-and-run path with actual OpenFOAM solver compilation rather than documented placeholder commands.
 6. Implement mapped-operator support for the fringing-field pipe case.
-7. Build and test the FreeMHD container workflow locally, then add parity runner automation.
+7. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
 
 ## What Worked
 
@@ -81,10 +83,14 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Small Hartmann and Shercliff low-Ha cases are deterministic enough for regression snapshots.
 - GitHub Actions workflows now cover unit, regression, physics, validation, and benchmark paths.
 - The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.
+- CLI validation now emits both analytical and processed-slice comparison JSON when the matching Zenodo `XSlice` CSV exists.
+- The validation-suite script can now emit analytical and processed-slice reports in one run when a reference root is provided.
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
 - An adaptive per-step velocity-update limiter now keeps the default Hunt path bounded and produces finite Hunt validation metrics.
+- CI artifact summaries now include processed-slice error columns.
+- A local FreeMHD container bundle generator and container execution helper now exist and are covered by unit tests.
 
 ## What Did Not Work
 
@@ -99,6 +105,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Hunt can be stabilized only with a much smaller pseudo-step than the current default, which confirms the next Hunt fix should be adaptive pseudo-stepping or a more implicit coupling rather than more validation plumbing.
 - Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; it needed the additional adaptive update limiter.
 - Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
+- The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
 
 ## Chronological Log
 
@@ -256,6 +263,32 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. improve Hunt accuracy now that the default path is bounded
   2. add processed-slice figure-level comparisons for Shercliff and Hunt
   3. keep tightening acceptance thresholds case by case rather than all at once
+
+### 2026-03-27 23:20 America/Chicago
+
+- Extended the validation layer beyond analytical text references:
+  - `lmx.validation` now compares LMX midplane cuts against the processed Zenodo `XSlice` CSV exports
+  - `lmx.cli validate` now writes `*_slice.json` when a matching processed slice is available
+  - `scripts/run_validation_suite.py` now accepts `--reference-root` and `--x-slice` so the suite can emit both analytical and processed-slice reports in one pass
+- Updated the CI artifact summarizer and reporting tests so validation summaries now include slice-level errors alongside the analytical errors.
+- Replaced the earlier FreeMHD Dockerfile placeholder with a local bundle generator plus a `scripts/run_freemhd_case.py` helper that records JSON run metadata for mounted case directories.
+- Added unit coverage for processed-slice report writing and FreeMHD bundle generation.
+- Verified the new user-facing Shercliff reference path:
+  - `lmx.cli validate shercliff --ha 20 --reference-root ... --x-slice 1m` now writes both `shercliff_ha20_analytic.json` and `shercliff_ha20_slice.json`
+  - current Shercliff errors remain large (`y_l2_error ~ 0.431`, `z_l2_error ~ 0.187`, slice metrics at similar levels), so solver fidelity remains the critical path rather than more reporting work
+- Verified the full pytest suite remains green after these changes.
+
+### 2026-03-27 23:40 America/Chicago
+
+- Tightened the FreeMHD harness bundle after reviewing the generated files:
+  - the generated `run_freemhd_case.sh` now accepts positional `case_dir`, `cores`, and `solver` arguments instead of ignoring the CLI-provided values
+  - the generated Dockerfile now attempts the actual FreeMHD/OpenFOAM solver build commands instead of only echoing them
+  - the bundle generator now marks `run_freemhd_case.sh` executable
+- Re-ran the validation and reporting tests after the harness fix and kept the repo green.
+- Re-ran the reference-backed validation suite and confirmed the present quantitative state:
+  - Hartmann `Ha=20` remains the strongest case in the current implementation
+  - Shercliff and Hunt both now emit analytical and slice-level metrics from the same suite run
+  - Hunt is bounded and diagnosable, but solver fidelity is still the primary blocker for parity
 
 ## Instruction For Future Agents
 

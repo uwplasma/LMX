@@ -48,9 +48,20 @@ This writes a JSON summary with the normalized Hartmann-profile error against th
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli validate shercliff --ha 20 --output ./artifacts/reference_compare/shercliff --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 -m lmx.cli validate hunt --ha 20 --output ./artifacts/reference_compare/hunt --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+/Users/rogerio/base_env/bin/python3 scripts/run_validation_suite.py --output ./artifacts/validation --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel --x-slice 1m
 ```
 
-These commands write normalized midplane error reports against the ingested Zenodo analytical files for the corresponding closed-channel cases.
+These commands write normalized midplane error reports against the ingested Zenodo analytical files for the corresponding closed-channel cases. When the processed slice CSV exists, they also emit figure-level `*_slice.json` reports against the paper-exported `XSlice` cuts.
+
+## FreeMHD container harness
+
+```bash
+/Users/rogerio/base_env/bin/python3 scripts/write_freemhd_container_files.py
+docker build -t lmx-freemhd ./docker
+/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd --case-dir /absolute/path/to/freemhd_case --output ./artifacts/freemhd/run.json
+```
+
+This path generates a local Docker build context with OpenFOAM v2206, FreeMHD, and a case runner script. The execution helper mounts the case directory, runs either serial or decomposed cases, and stores a machine-readable run report.
 
 ## Benchmark
 

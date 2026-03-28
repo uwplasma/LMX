@@ -19,7 +19,15 @@ def test_summarize_validation_summary(tmp_path: Path):
         """
         {
           "hartmann": {"case": "hartmann", "residual": 1.0, "u_max": 2.0, "l2_error": 0.1},
-          "shercliff": {"case": "shercliff", "residual": 0.5, "u_max": 1.0, "y_l2_error": 0.2, "z_l2_error": 0.3}
+          "shercliff": {
+            "case": "shercliff",
+            "residual": 0.5,
+            "u_max": 1.0,
+            "y_l2_error": 0.2,
+            "z_l2_error": 0.3,
+            "slice_y_l2_error": 0.4,
+            "slice_z_l2_error": 0.5
+          }
         }
         """
     )
@@ -27,6 +35,7 @@ def test_summarize_validation_summary(tmp_path: Path):
     assert [item.case for item in summaries] == ["hartmann", "shercliff"]
     assert summaries[0].l2_error == pytest.approx(0.1)
     assert summaries[1].y_l2_error == pytest.approx(0.2)
+    assert summaries[1].slice_y_l2_error == pytest.approx(0.4)
 
 
 def test_summarize_benchmark_report(tmp_path: Path):
@@ -71,6 +80,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     summary = build_summary(validation, benchmark)
     assert "## Validation" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
+    assert "Slice Y L2" in summary["markdown"]
     out = tmp_path / "summary.json"
     md = tmp_path / "summary.md"
     md.write_text(render_markdown(summarize_validation_summary(validation), summarize_benchmark_report(benchmark)))

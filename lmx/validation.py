@@ -12,7 +12,13 @@ import jax.numpy as jnp
 from .core import Solution
 from .mesh import StructuredMesh
 from .operators import center_coordinates
-from .reference_data import ClosedChannelAnalyticalReference, load_closed_channel_analytical
+from .reference_data import (
+    ClosedChannelAnalyticalReference,
+    ProcessedSliceReference,
+    extract_processed_midplane_profile,
+    load_closed_channel_analytical,
+    load_processed_slice,
+)
 from .specs import CaseSpec
 
 
@@ -46,6 +52,16 @@ class ClosedChannelValidation:
     y_profile: AnalyticComparison
     z_profile: AnalyticComparison
     reference_pressure_drop: float | None
+    reference_path: str
+
+
+@dataclass(frozen=True)
+class ProcessedSliceValidation:
+    case_kind: str
+    ha: int
+    x_slice: str
+    y_profile: AnalyticComparison
+    z_profile: AnalyticComparison
     reference_path: str
 
 
@@ -193,6 +209,45 @@ def closed_channel_validation(
     )
 
 
+def processed_slice_validation(
+    solution: Solution,
+    case_kind: str,
+    ha: int,
+    x_slice: str = "1m",
+    reference_root: str | Path | None = None,
+) -> ProcessedSliceValidation:
+    reference: ProcessedSliceReference = load_processed_slice(
+        case_kind,
+        ha,
+        x_slice=x_slice,
+        reference_root=reference_root,
+    )
+    y_profile = extract_midplane_profile(solution, axis="y")
+    z_profile = extract_midplane_profile(solution, axis="z")
+    reference_y = extract_processed_midplane_profile(reference, axis="y")
+    reference_z = extract_processed_midplane_profile(reference, axis="z")
+    y_comparison = compare_normalized_profiles(
+        y_profile["y"],
+        y_profile["u"],
+        reference_y["y"],
+        reference_y["u"],
+    )
+    z_comparison = compare_normalized_profiles(
+        z_profile["z"],
+        z_profile["u"],
+        reference_z["z"],
+        reference_z["u"],
+    )
+    return ProcessedSliceValidation(
+        case_kind=case_kind,
+        ha=ha,
+        x_slice=x_slice,
+        y_profile=y_comparison,
+        z_profile=z_comparison,
+        reference_path=reference.path,
+    )
+
+
 def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -205,11 +260,11 @@ def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
     return path
 
 
-def freemhd_case_command(case_dir: str | Path, cores: int = 4) -> str:
+def freemhd_case_command(case_dir: str | Path, cores: int = 4, solver: str = "epotMultiRegionFoam") -> str:
     return (
         "bash -lc 'source /opt/OpenFOAM/OpenFOAM-v2206/etc/bashrc && "
         f"cd {Path(case_dir)} && "
-        f"mpirun -np {cores} epotMultiRegionFoam -parallel'"
+        f"mpirun -np {cores} {solver} -parallel'"
     )
 
 
@@ -281,6 +336,33 @@ def write_closed_channel_validation(report: ClosedChannelValidation, path: str |
     return path
 
 
+def write_processed_slice_validation(report: ProcessedSliceValidation, path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "case_kind": report.case_kind,
+        "ha": report.ha,
+        "x_slice": report.x_slice,
+        "reference_path": report.reference_path,
+        "y_profile": {
+            "coordinate": jnp.asarray(report.y_profile.coordinate).tolist(),
+            "simulated": jnp.asarray(report.y_profile.simulated).tolist(),
+            "reference": jnp.asarray(report.y_profile.reference).tolist(),
+            "l2_error": report.y_profile.l2_error,
+            "linf_error": report.y_profile.linf_error,
+        },
+        "z_profile": {
+            "coordinate": jnp.asarray(report.z_profile.coordinate).tolist(),
+            "simulated": jnp.asarray(report.z_profile.simulated).tolist(),
+            "reference": jnp.asarray(report.z_profile.reference).tolist(),
+            "l2_error": report.z_profile.l2_error,
+            "linf_error": report.z_profile.linf_error,
+        },
+    }
+    path.write_text(json.dumps(payload, indent=2))
+    return path
+
+
 def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -292,7 +374,12 @@ def docker_available() -> bool:
     return shutil.which("docker") is not None
 
 
-def run_freemhd_container(image: str, case_dir: str | Path, cores: int = 4) -> subprocess.CompletedProcess[str]:
+def run_freemhd_container(
+    image: str,
+    case_dir: str | Path,
+    cores: int = 4,
+    solver: str = "epotMultiRegionFoam",
+) -> subprocess.CompletedProcess[str]:
     command = [
         "docker",
         "run",
@@ -302,6 +389,6 @@ def run_freemhd_container(image: str, case_dir: str | Path, cores: int = 4) -> s
         image,
         "bash",
         "-lc",
-        freemhd_case_command("/workspace/case", cores=cores),
+        freemhd_case_command("/workspace/case", cores=cores, solver=solver),
     ]
     return subprocess.run(command, text=True, capture_output=True, check=False)
