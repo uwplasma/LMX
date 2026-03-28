@@ -13,6 +13,9 @@ from lmx.validation import (
     compare_with_freemhd,
     duct_profile_metrics,
     infer_sampling_geometry,
+    infer_mesh_bounds,
+    infer_region_conductivity,
+    has_conducting_wall_region,
     extract_midplane_profile,
     latest_sampled_profiles,
     hartmann_analytic_profile,
@@ -125,6 +128,69 @@ def test_infer_sampling_geometry_uses_latest_field_minmax_locations(tmp_path: Pa
     assert geometry.y_max == pytest.approx(0.1)
     assert geometry.z_min == pytest.approx(-0.099995)
     assert geometry.z_max == pytest.approx(0.099995)
+
+
+def test_infer_sampling_geometry_prefers_mesh_bounds_when_points_exist(tmp_path: Path):
+    points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
+    points_path.parent.mkdir(parents=True)
+    points_path.write_text(
+        "FoamFile\n{\n}\n4\n(\n"
+        "(0 -0.1 -0.2)\n"
+        "(1.2 -0.1 0.2)\n"
+        "(0 0.1 -0.2)\n"
+        "(1.2 0.1 0.2)\n"
+        ")\n"
+    )
+    minmax_path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    minmax_path.parent.mkdir(parents=True)
+    minmax_path.write_text(
+        "# header\n"
+        "1.0e-04 mag(U) 0.0 (0.005 -0.1 -0.099995) 0 0.9734 (0.015 0.0987 0.0987) 0\n"
+    )
+
+    bounds = infer_mesh_bounds(tmp_path)
+    geometry = infer_sampling_geometry(tmp_path)
+
+    assert bounds is not None
+    assert bounds[0] == pytest.approx((0.0, 1.2))
+    assert bounds[1] == pytest.approx((-0.1, 0.1))
+    assert bounds[2] == pytest.approx((-0.2, 0.2))
+    assert geometry.x_position == pytest.approx(0.6)
+    assert geometry.y_min == pytest.approx(-0.1)
+    assert geometry.y_max == pytest.approx(0.1)
+    assert geometry.z_min == pytest.approx(-0.2)
+    assert geometry.z_max == pytest.approx(0.2)
+
+
+def test_infer_sampling_geometry_keeps_field_based_x_for_conducting_wall_cases(tmp_path: Path):
+    points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
+    points_path.parent.mkdir(parents=True)
+    points_path.write_text(
+        "FoamFile\n{\n}\n4\n(\n"
+        "(0 -0.1 -0.1)\n"
+        "(1.0 -0.1 0.1)\n"
+        "(0 0.1 -0.1)\n"
+        "(1.0 0.1 0.1)\n"
+        ")\n"
+    )
+    liquid_props = tmp_path / "constant" / "liquid" / "thermophysicalProperties.liquidMetal"
+    liquid_props.parent.mkdir(parents=True, exist_ok=True)
+    liquid_props.write_text("elcond [-1 -3  3 0 0 2 0]1e6;\n")
+    wall_props = tmp_path / "constant" / "solidWalls" / "thermophysicalProperties"
+    wall_props.parent.mkdir(parents=True, exist_ok=True)
+    wall_props.write_text("elcond 5e6;\n")
+    minmax_path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    minmax_path.parent.mkdir(parents=True)
+    minmax_path.write_text(
+        "# header\n"
+        "1.0e-04 mag(U) 0.0 (0.005 -0.1 -0.099995) 0 0.9734 (0.015 0.0987 0.0987) 0\n"
+    )
+
+    assert infer_region_conductivity(tmp_path, "liquid") == pytest.approx(1e6)
+    assert infer_region_conductivity(tmp_path, "solidWalls") == pytest.approx(5e6)
+    assert has_conducting_wall_region(tmp_path) is True
+    geometry = infer_sampling_geometry(tmp_path)
+    assert geometry.x_position == pytest.approx(0.015)
 
 
 def test_sample_reader_and_latest_profile_detection(tmp_path: Path):

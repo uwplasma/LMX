@@ -65,9 +65,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
    - this is now implemented in a way that emits a real artifact on machines with `LMX_FREEMHD_CASE_DIR`
    - GitHub-hosted runners still emit a structured `skipped` summary because they do not have recovered case directories
    - the next step is to use the same runner on machines that do have recovered cases so the parity artifact becomes routinely populated
-2. Generalize the current sampling-geometry inference:
-   - it now works well for the recovered duct case by using the latest `fieldMinMax.dat` locations
-   - extend or replace it for future FreeMHD geometries where min/max locations are not sufficient
+2. Use the corrected geometry-aware sampling inference as the default closed-channel parity path:
+   - insulating-wall Shercliff cases now sample at the geometric streamwise midplane derived from `constant/<region>/polyMesh/points`
+   - conducting-wall Hunt cases keep the `fieldMinMax.dat`-driven `x` location because the geometric midpoint degrades the current recovered Hunt comparison
+   - the next step is to generalize or replace this split rule for future FreeMHD geometries beyond the recovered closed-channel duct cases
 3. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
@@ -142,7 +143,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The current real sampled-line parity numbers on the recovered Shercliff `Ha20` smoke case are:
   - `freemhd_sample_y_l2_error ≈ 5.83e-4`
   - `freemhd_sample_z_l2_error ≈ 3.29e-2`
-- The sampling runner now infers the line-cut geometry automatically from the latest FreeMHD `fieldMinMax.dat` record when explicit `x/y/z` bounds are not supplied.
+- The sampling runner now infers the line-cut geometry automatically when explicit `x/y/z` bounds are not supplied.
+- The current closed-channel rule is now geometry-aware instead of purely `fieldMinMax`-driven:
+  - if `constant/liquid/polyMesh/points` exists and the case does not look like a conducting-wall layered duct, it samples at the geometric `x` midpoint and uses the mesh `y/z` bounds
+  - if the case looks like a conducting-wall layered duct, it keeps the `fieldMinMax.dat`-driven `x` position while still using the FreeMHD liquid-region extents
 - A checked-in parity-report runner now exists:
   - `scripts/run_freemhd_parity_report.py` builds the matching LMX case
   - it infers `initial_velocity` from `0/liquid/U` when available
@@ -160,6 +164,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The recovered-case FreeMHD parity path now also includes a higher-Ha insulating-wall reference:
   - `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE` is recoverable from `StartingFiles.zip`
   - it now runs to `t = 1e-4`, reconstructs `0.0001/`, and emits sampled line-cut parity metrics through the same checked-in runner
+- The corrected geometry-aware sampling rule materially improves the real Shercliff parity artifacts while preserving the better Hunt comparison path:
+  - recovered Shercliff `Ha20` now samples at `x = 0.5` and the real sampled metrics are `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 5.41e-4`
+  - recovered Shercliff `Ha100` now samples at `x = 0.5` and the real sampled metrics are `freemhd_sample_y_l2_error ≈ 8.81e-4`, `freemhd_sample_z_l2_error ≈ 1.70e-4`
+  - recovered Hunt `Ha20` is correctly classified as a conducting-wall case, keeps `x = 0.015`, and retains the better real sampled metrics `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
   - `u_max_abs_diff ≈ 1.26e-3` after the latest retained solver update
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
@@ -196,8 +204,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - it compares the latest FreeMHD `mag(U)` maximum from `fieldMinMax.dat`
   - it does not yet compare full reconstructed profiles or full field data
   - the current agreement depends on matching the nonzero FreeMHD initial state through `CaseSpec.initial_velocity`
-- The sampled-line parity path currently depends on explicit sampling geometry inputs (`x_position`, `y_min`, `y_max`, `z_min`, `z_max`) rather than inferring the right cut automatically from arbitrary FreeMHD cases.
-- The new geometry inference is still specific to runs that emit `fieldMinMax.dat` with useful location data; it is not yet a general geometry parser for arbitrary FreeMHD/OpenFOAM cases.
+- The sampled-line parity path no longer depends on explicit sampling geometry inputs for the recovered closed-channel cases, but the inference is still specialized to those cases.
+- The new split-rule geometry inference is not yet a general geometry parser for arbitrary FreeMHD/OpenFOAM cases or future fringing-field geometries.
 - GitHub-hosted CI still cannot produce a real FreeMHD parity artifact by itself because it does not have the recovered Shercliff paper case tree mounted anywhere; the new parity-suite runner therefore reports `skipped` there by design.
 
 ## Chronological Log
@@ -243,6 +251,25 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Created the private GitHub repository `uwplasma/LMX`.
 - Pushed the initial codebase and this execution log to `origin/main`.
 - Current best next step remains solver-fidelity work for the laminar duct parity cases, starting with Shercliff/Hunt analytical comparisons and better coupled iteration stability.
+
+### 2026-03-28 19:45 America/Chicago
+
+- Reworked the automatic FreeMHD sampling-geometry inference so it is no longer purely tied to the latest `fieldMinMax.dat` maximum:
+  - added mesh-bound inference from `constant/<region>/polyMesh/points`
+  - added conductivity inference from region thermophysical files
+  - added a split rule that treats non-conducting Shercliff-style ducts and conducting-wall Hunt-style ducts differently
+- Verified the corrected rule against the real recovered FreeMHD cases:
+  - recovered Shercliff `Ha20` now samples at the geometric midplane `x = 0.5` and improves to `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 5.41e-4`
+  - recovered Shercliff `Ha100` now samples at the geometric midplane `x = 0.5` and improves to `freemhd_sample_y_l2_error ≈ 8.81e-4`, `freemhd_sample_z_l2_error ≈ 1.70e-4`
+  - recovered Hunt `Ha20` is now correctly kept on the field-based cut `x = 0.015`, preserving the better metrics `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
+- Added validation tests covering:
+  - mesh-bounds inference from OpenFOAM `points`
+  - conductivity parsing from liquid and solid thermophysical files
+  - the conducting-wall override that prevents Hunt cases from being sampled at the geometric midpoint
+- Best next step is now solver-side again:
+  1. use the corrected Hunt `Ha20` artifact as the main conducting-wall parity target
+  2. recover or run Hunt `Ha100` next so the same parity machinery is exercised at a harsher conducting-wall/Hartmann-layer regime
+  3. then tune the LMX Hunt solver against those real FreeMHD sampled cuts
 
 ### 2026-03-27 16:35 America/Chicago
 

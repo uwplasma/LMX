@@ -568,8 +568,72 @@ def parse_location_tuple(text: str) -> tuple[float, float, float] | None:
     return (float(match.group(1)), float(match.group(2)), float(match.group(3)))
 
 
+def infer_mesh_bounds(run_dir: str | Path, region: str = "liquid") -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]] | None:
+    root = Path(run_dir)
+    candidates = [
+        root / "constant" / region / "polyMesh" / "points",
+        root / "constant" / "polyMesh" / "points",
+    ]
+    points_path = next((path for path in candidates if path.exists()), None)
+    if points_path is None:
+        return None
+
+    mins = [float("inf"), float("inf"), float("inf")]
+    maxs = [float("-inf"), float("-inf"), float("-inf")]
+    found = False
+    pattern = re.compile(r"^\(\s*(\S+)\s+(\S+)\s+(\S+)\s*\)$")
+    with points_path.open() as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            match = pattern.match(line)
+            if match is None:
+                continue
+            coords = [float(match.group(1)), float(match.group(2)), float(match.group(3))]
+            for idx, value in enumerate(coords):
+                mins[idx] = min(mins[idx], value)
+                maxs[idx] = max(maxs[idx], value)
+            found = True
+    if not found:
+        return None
+    return ((mins[0], maxs[0]), (mins[1], maxs[1]), (mins[2], maxs[2]))
+
+
+def infer_region_conductivity(run_dir: str | Path, region: str) -> float | None:
+    root = Path(run_dir)
+    candidates = [
+        root / "constant" / region / "thermophysicalProperties",
+        root / "constant" / region / "thermophysicalProperties.liquidMetal",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        text = path.read_text()
+        match = re.search(r"\belcond\b(?:\s+\[[^\]]+\])?\s*([0-9eE+.\-]+)\s*;", text)
+        if match is not None:
+            return float(match.group(1))
+    return None
+
+
+def has_conducting_wall_region(run_dir: str | Path) -> bool:
+    liquid_sigma = infer_region_conductivity(run_dir, "liquid")
+    wall_sigma = infer_region_conductivity(run_dir, "solidWalls")
+    if liquid_sigma is None or wall_sigma is None:
+        return False
+    return wall_sigma > liquid_sigma * 1e-2
+
+
 def infer_sampling_geometry(run_dir: str | Path, field: str = "mag(U)") -> SamplingGeometry:
     latest = latest_field_minmax_record(run_dir, field=field)
+    mesh_bounds = infer_mesh_bounds(run_dir, region="liquid")
+    if mesh_bounds is not None and not has_conducting_wall_region(run_dir):
+        (x_min, x_max), (y_min, y_max), (z_min, z_max) = mesh_bounds
+        return SamplingGeometry(
+            x_position=0.5 * (x_min + x_max),
+            y_min=y_min,
+            y_max=y_max,
+            z_min=z_min,
+            z_max=z_max,
+        )
     if latest is None or latest.min_location is None or latest.max_location is None:
         raise ValueError(f"Unable to infer sampling geometry from {run_dir}")
     x_position = latest.max_location[0]
