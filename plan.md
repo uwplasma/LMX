@@ -72,9 +72,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
    - keep Shercliff and Hunt as informative reports until their fidelity improves
    - add benchmark threshold tracking with explicit tolerances
 4. Focus solver work on Hunt multi-region coupling and Shercliff profile fidelity now that both analytical and processed-slice metrics are emitted by the same CLI path.
-5. Tighten the current FreeMHD container bundle into a verified build-and-run path with actual OpenFOAM solver compilation rather than documented placeholder commands.
-6. Implement mapped-operator support for the fringing-field pipe case.
-7. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
+5. Acquire or reconstruct at least one standalone `epotMultiRegion*` laminar case locally, since the current local assets do not yet contain runnable FreeMHD paper cases.
+6. Tighten the current FreeMHD container bundle into a verified build-and-run path with actual OpenFOAM solver compilation rather than documented placeholder commands.
+7. Implement mapped-operator support for the fringing-field pipe case.
+8. Build parity runners that extract comparable LMX and FreeMHD metrics from the same cases.
 
 ## What Worked
 
@@ -93,6 +94,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - An adaptive per-step velocity-update limiter now keeps the default Hunt path bounded and produces finite Hunt validation metrics.
 - CI artifact summaries now include processed-slice error columns.
 - A local FreeMHD container bundle generator and container execution helper now exist and are covered by unit tests.
+- The repo now has explicit FreeMHD environment and case inspection scripts, and they correctly report the current local target as the bundled OpenFOAM Hartmann tutorial when no standalone FreeMHD cases are present.
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
 - FreeMHD-side inspection now reports that the current downloads contain no standalone runnable FreeMHD cases and recommends the bundled OpenFOAM Hartmann tutorial as the smallest local smoke target.
 
@@ -110,6 +112,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; it needed the additional adaptive update limiter.
 - Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
 - The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
+- The current machine has the Docker CLI installed, but the Docker daemon is not reachable from the active environment.
+- The current local assets include the FreeMHD source tree and processed paper figures, but not the standalone `epotMultiRegion*` case directories needed for direct parity execution.
 - A direct local `wmake` probe currently fails because `OpenFOAM-v2206/platforms/tools/darwin64Clang/wmkdepend` is missing in the vendored FreeMHD tree on this machine.
 - The Docker client is installed here, but the Docker daemon is not currently reachable, so containerized FreeMHD execution is blocked by the local runtime state rather than repo code.
 - The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
@@ -284,6 +288,27 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - `lmx.cli validate shercliff --ha 20 --reference-root ... --x-slice 1m` now writes both `shercliff_ha20_analytic.json` and `shercliff_ha20_slice.json`
   - current Shercliff errors remain large (`y_l2_error ~ 0.431`, `z_l2_error ~ 0.187`, slice metrics at similar levels), so solver fidelity remains the critical path rather than more reporting work
 - Verified the full pytest suite remains green after these changes.
+
+### 2026-03-27 23:50 America/Chicago
+
+- Audited the local FreeMHD assets before attempting a fake parity run.
+- Confirmed the current local state:
+  - FreeMHD source tree is present under `external/FreeMHD`
+  - processed paper figures are present under `external/FreeMHDPaperAllFigures/.../ClosedChannel`
+  - no standalone `epotMultiRegionFoam` or `epotMultiRegionInterFoam` case directories are present locally yet
+  - Docker CLI is installed, but the Docker daemon is not currently reachable from the active environment
+- Added explicit inspection helpers:
+  - `scripts/inspect_freemhd_setup.py` now reports the recommended current target case
+  - `scripts/inspect_freemhd_case.py` records the structural readiness of a specific case directory
+  - `lmx.validation.inspect_freemhd_case` and `lmx.compare_with_freemhd` now expose case-structure metadata such as `controlDict`, `regionProperties`, `blockMeshDict`, and latest-time directories
+  - `lmx.freemhd` now recommends the smallest current target automatically, falling back to the bundled OpenFOAM Hartmann tutorial as an environment smoke test when no standalone FreeMHD cases exist
+- Verified the current recommendation on this machine:
+  - `external/FreeMHD/OpenFOAM-v2206/tutorials/electromagnetics/mhdFoam/hartmann` is the smallest current smoke target
+  - it is only an OpenFOAM environment check, not a true FreeMHD parity case
+- Best next step is now even more concrete:
+  1. obtain or reconstruct one actual laminar `epotMultiRegion*` case directory locally
+  2. bring the Docker daemon up or switch to an alternative local container runner
+  3. only then wire the first real FreeMHD-vs-LMX parity execution
 
 ### 2026-03-27 23:40 America/Chicago
 

@@ -8,7 +8,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.validation import docker_available, inspect_freemhd_case
+from lmx.freemhd import docker_cli_available, docker_daemon_available
+from lmx.validation import inspect_freemhd_case
 
 
 def main() -> int:
@@ -19,7 +20,8 @@ def main() -> int:
 
     inspection = inspect_freemhd_case(args.case_dir)
     payload = {
-        "docker_available": docker_available(),
+        "docker_cli_available": docker_cli_available(),
+        "docker_daemon_available": docker_daemon_available(),
         "case_dir": inspection.case_dir,
         "control_dicts": list(inspection.control_dicts),
         "fv_schemes": list(inspection.fv_schemes),

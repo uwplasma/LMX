@@ -10,6 +10,7 @@
 - Shercliff and Hunt processed-slice `XSlice` comparison JSON generation when Zenodo CSV exports are available.
 - CSV and ParaView outputs for centerline and field inspection.
 - FreeMHD comparison harness metadata, container bundle generation, and a local container execution helper script.
+- FreeMHD environment/setup inspection scripts that report Docker CLI vs daemon availability and recommend the smallest current target case.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -20,6 +21,7 @@
 - Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
 - Fringing-field mapped-pipe operators.
 - Tighten the FreeMHD execution helper into solver-specific parity runners that extract matching LMX/FreeMHD metrics.
+- Acquire or reconstruct a standalone `epotMultiRegion*` laminar paper case locally, since the current local assets only include the solver sources and processed figures.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
 
 ## Current limitation
@@ -29,3 +31,5 @@
 - Hunt no longer clips at the default pseudo-time settings after adding the adaptive velocity-update limiter, and the validation reports now emit finite Hunt comparison metrics.
 - Hunt still requires solver-fidelity work because the bounded default solution is not yet close enough to the ingested reference data to count as parity-complete.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness further, but Hunt needed the additional adaptive update limiter on top of that.
+- The local machine currently has the Docker CLI installed but the Docker daemon is not reachable from the active environment.
+- The current local asset set does not contain any standalone `epotMultiRegionFoam` or `epotMultiRegionInterFoam` case directories, so the bundled OpenFOAM Hartmann tutorial is only an environment smoke target, not a FreeMHD parity case.

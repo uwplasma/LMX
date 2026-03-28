@@ -44,3 +44,4 @@ def test_freemhd_environment_report_includes_recommended_target(tmp_path: Path, 
     assert report["docker_cli_available"] is True
     assert report["docker_daemon_available"] is False
     assert report["recommended_target"]["kind"] == "openfoam_smoke_case"
+    assert "docker daemon is not reachable" in report["blockers"]
