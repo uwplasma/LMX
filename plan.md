@@ -101,6 +101,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - recommended smoke target when no standalone FreeMHD case is present
 - The bundled FreeMHD OpenFOAM tree passes `foamSystemCheck` on this machine.
 - The repo now has explicit FreeMHD environment and case inspection scripts, and they correctly report the current local target as the bundled OpenFOAM Hartmann tutorial when no standalone FreeMHD cases are present.
+- The local FreeMHD environment probe now classifies common build failures such as missing `wmkdepend` and the macOS libc++ header conflict.
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
 - FreeMHD-side inspection now reports that the current downloads contain no standalone runnable FreeMHD cases and recommends the bundled OpenFOAM Hartmann tutorial as the smallest local smoke target.
 
@@ -319,6 +320,15 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. obtain or reconstruct one actual laminar `epotMultiRegion*` case directory locally
   2. bring the Docker daemon up or switch to an alternative local container runner
   3. only then wire the first real FreeMHD-vs-LMX parity execution
+
+### 2026-03-28 00:05 America/Chicago
+
+- Tightened the local FreeMHD environment probe so it now classifies common build failures instead of emitting only raw `wmake` stderr.
+- The probe currently distinguishes at least:
+  - missing `wmkdepend`
+  - the macOS libc++ header conflict seen when the local compiler environment does not match OpenFOAM expectations
+  - generic unknown build failures
+- Added unit coverage for these classifications so future environment-debugging work starts from machine-readable diagnostics rather than ad hoc log reading.
 
 ### 2026-03-27 23:40 America/Chicago
 
