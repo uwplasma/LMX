@@ -54,6 +54,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `scripts/fetch_freemhd_assets.py`: fetch FreeMHD repo and Zenodo files.
 - `scripts/write_freemhd_container_files.py`: writes the local FreeMHD/OpenFOAM container bundle.
 - `scripts/run_freemhd_case.py`: runs a mounted FreeMHD case in a prepared container image and records JSON metadata.
+- `scripts/probe_freemhd_environment.py`: probes the local FreeMHD/OpenFOAM and Docker environment and records JSON diagnostics.
 
 ## Best Next Steps
 
@@ -91,6 +92,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - An adaptive per-step velocity-update limiter now keeps the default Hunt path bounded and produces finite Hunt validation metrics.
 - CI artifact summaries now include processed-slice error columns.
 - A local FreeMHD container bundle generator and container execution helper now exist and are covered by unit tests.
+- A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
 
 ## What Did Not Work
 
@@ -106,6 +108,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; it needed the additional adaptive update limiter.
 - Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
 - The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
+- A direct local `wmake` probe currently fails because `OpenFOAM-v2206/platforms/tools/darwin64Clang/wmkdepend` is missing in the vendored FreeMHD tree on this machine.
+- The Docker client is installed here, but the Docker daemon is not currently reachable, so containerized FreeMHD execution is blocked by the local runtime state rather than repo code.
 
 ## Chronological Log
 
@@ -289,6 +293,19 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - Hartmann `Ha=20` remains the strongest case in the current implementation
   - Shercliff and Hunt both now emit analytical and slice-level metrics from the same suite run
   - Hunt is bounded and diagnosable, but solver fidelity is still the primary blocker for parity
+
+### 2026-03-27 23:55 America/Chicago
+
+- Probed actual FreeMHD execution prerequisites on this machine instead of assuming the new harness would run:
+  - `docker --version` works, but `docker build ...` currently fails immediately because the Docker daemon socket is unavailable
+  - sourcing `external/FreeMHD/OpenFOAM-v2206/etc/bashrc` works and `foamSystemCheck` passes locally
+  - a direct local `wmake` of `MHD_Solvers/solvers/epotMultiRegionFoam` fails because `platforms/tools/darwin64Clang/wmkdepend` is missing
+- Added `scripts/probe_freemhd_environment.py` so future agents can reproduce these environment findings as JSON instead of rediscovering them manually.
+- Added unit coverage for the probe script.
+- Best next step narrowed further:
+  1. either repair the local OpenFOAM toolchain enough to produce `wmkdepend`, or start the Docker daemon and verify the container build path
+  2. once one FreeMHD execution path is real, capture the first actual side-by-side case report
+  3. keep solver-fidelity work moving in parallel because Hunt/Shercliff accuracy is still the main LMX-side blocker
 
 ## Instruction For Future Agents
 

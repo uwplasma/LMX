@@ -36,6 +36,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
 /Users/rogerio/base_env/bin/python3 scripts/fetch_freemhd_assets.py --dest ./external
 /Users/rogerio/base_env/bin/python3 scripts/write_freemhd_container_files.py
+/Users/rogerio/base_env/bin/python3 scripts/probe_freemhd_environment.py --output ./artifacts/freemhd_probe.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd --case-dir /absolute/path/to/freemhd_case --output ./artifacts/freemhd/run.json
 ```
 

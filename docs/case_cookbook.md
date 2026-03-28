@@ -57,11 +57,12 @@ These commands write normalized midplane error reports against the ingested Zeno
 
 ```bash
 /Users/rogerio/base_env/bin/python3 scripts/write_freemhd_container_files.py
+/Users/rogerio/base_env/bin/python3 scripts/probe_freemhd_environment.py --output ./artifacts/freemhd_probe.json
 docker build -t lmx-freemhd ./docker
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd --case-dir /absolute/path/to/freemhd_case --output ./artifacts/freemhd/run.json
 ```
 
-This path generates a local Docker build context with OpenFOAM v2206, FreeMHD, and a case runner script. The execution helper mounts the case directory, runs either serial or decomposed cases, and stores a machine-readable run report.
+This path generates a local Docker build context with OpenFOAM v2206, FreeMHD, and a case runner script. The probe command records whether the local OpenFOAM tree is sourceable, whether `wmkdepend` exists for local `wmake` builds, and whether the Docker daemon is reachable. The execution helper mounts the case directory, runs either serial or decomposed cases, and stores a machine-readable run report.
 
 ## Benchmark
 

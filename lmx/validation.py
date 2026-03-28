@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import json
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +9,7 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from .core import Solution
+from .freemhd import docker_cli_available, docker_daemon_available
 from .mesh import StructuredMesh
 from .operators import center_coordinates
 from .reference_data import (
@@ -63,6 +63,18 @@ class ProcessedSliceValidation:
     y_profile: AnalyticComparison
     z_profile: AnalyticComparison
     reference_path: str
+
+
+@dataclass(frozen=True)
+class FreeMHDCaseInspection:
+    case_dir: str
+    control_dicts: tuple[str, ...]
+    fv_schemes: tuple[str, ...]
+    fv_solutions: tuple[str, ...]
+    region_properties: tuple[str, ...]
+    block_mesh_dicts: tuple[str, ...]
+    boundary_field_dirs: tuple[str, ...]
+    latest_time_dirs: tuple[str, ...]
 
 
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
@@ -270,15 +282,24 @@ def freemhd_case_command(case_dir: str | Path, cores: int = 4, solver: str = "ep
 
 def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> ValidationReport:
     run_dir = Path(freemhd_run_dir)
+    inspection = inspect_freemhd_case(run_dir)
     metrics = {
         "run_dir_exists": float(run_dir.exists()),
         "has_system": float((run_dir / "system").exists()),
         "has_constant": float((run_dir / "constant").exists()),
         "has_zero_dir": float((run_dir / "0").exists()),
+        "control_dict_count": float(len(inspection.control_dicts)),
+        "region_properties_count": float(len(inspection.region_properties)),
+        "latest_time_count": float(len(inspection.latest_time_dirs)),
     }
     artifacts = {
         "freemhd_run_dir": str(run_dir),
         "expected_command": freemhd_case_command(run_dir),
+        "control_dicts": json.dumps(inspection.control_dicts),
+        "region_properties": json.dumps(inspection.region_properties),
+        "block_mesh_dicts": json.dumps(inspection.block_mesh_dicts),
+        "boundary_field_dirs": json.dumps(inspection.boundary_field_dirs),
+        "latest_time_dirs": json.dumps(inspection.latest_time_dirs),
     }
     return ValidationReport(case_name=case_spec.name, metrics=metrics, artifacts=artifacts)
 
@@ -371,7 +392,51 @@ def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Pat
 
 
 def docker_available() -> bool:
-    return shutil.which("docker") is not None
+    return docker_daemon_available()
+
+
+def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
+    root = Path(case_dir)
+    if not root.exists():
+        return FreeMHDCaseInspection(
+            case_dir=str(root),
+            control_dicts=(),
+            fv_schemes=(),
+            fv_solutions=(),
+            region_properties=(),
+            block_mesh_dicts=(),
+            boundary_field_dirs=(),
+            latest_time_dirs=(),
+        )
+
+    def _relative_matches(pattern: str) -> tuple[str, ...]:
+        return tuple(sorted(str(path.relative_to(root)) for path in root.glob(pattern)))
+
+    def _numeric_time_dirs() -> tuple[str, ...]:
+        matches: list[str] = []
+        for path in root.iterdir():
+            if not path.is_dir():
+                continue
+            if path.name in {"0", "constant", "system", "processor0"}:
+                continue
+            try:
+                float(path.name)
+            except ValueError:
+                continue
+            matches.append(str(path.relative_to(root)))
+        return tuple(sorted(matches, key=float))
+
+    return FreeMHDCaseInspection(
+        case_dir=str(root),
+        control_dicts=_relative_matches("**/system/controlDict"),
+        fv_schemes=_relative_matches("**/system/fvSchemes"),
+        fv_solutions=_relative_matches("**/system/fvSolution"),
+        region_properties=_relative_matches("**/constant/regionProperties"),
+        block_mesh_dicts=_relative_matches("**/system/blockMeshDict"),
+        boundary_field_dirs=_relative_matches("0")
+        + _relative_matches("**/0"),
+        latest_time_dirs=_numeric_time_dirs(),
+    )
 
 
 def run_freemhd_container(

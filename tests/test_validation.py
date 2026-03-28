@@ -13,6 +13,7 @@ from lmx.validation import (
     duct_profile_metrics,
     hartmann_analytic_profile,
     hartmann_validation,
+    inspect_freemhd_case,
     processed_slice_validation,
     write_analytic_comparison,
     write_closed_channel_validation,
@@ -33,9 +34,31 @@ def test_hartmann_profile_center_is_maximum():
 
 def test_compare_with_freemhd_report(tmp_path: Path):
     case = make_hartmann_case()
+    (tmp_path / "system").mkdir()
+    (tmp_path / "constant").mkdir()
+    (tmp_path / "0").mkdir()
+    (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
     report = compare_with_freemhd(case, tmp_path)
     path = write_validation_report(report, tmp_path / "report.json")
     assert path.exists()
+    assert report.metrics["control_dict_count"] == pytest.approx(1.0)
+
+
+def test_inspect_freemhd_case_collects_case_structure(tmp_path: Path):
+    (tmp_path / "system").mkdir()
+    (tmp_path / "constant").mkdir()
+    (tmp_path / "0").mkdir()
+    (tmp_path / "1.5").mkdir()
+    (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
+    (tmp_path / "system" / "fvSchemes").write_text("ddtSchemes {}")
+    (tmp_path / "system" / "fvSolution").write_text("solvers {}")
+    (tmp_path / "system" / "blockMeshDict").write_text("blocks ()")
+    (tmp_path / "constant" / "regionProperties").write_text("regions ()")
+    inspection = inspect_freemhd_case(tmp_path)
+    assert inspection.control_dicts == ("system/controlDict",)
+    assert inspection.region_properties == ("constant/regionProperties",)
+    assert inspection.block_mesh_dicts == ("system/blockMeshDict",)
+    assert inspection.latest_time_dirs == ("1.5",)
 
 
 def test_hartmann_validation_writer(tmp_path: Path):
