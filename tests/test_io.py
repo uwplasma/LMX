@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from lmx.core import zeros_state
 from lmx.cases import make_hartmann_case
 from lmx.io import write_paraview, write_vtu
 from lmx.mesh import generate_pipe_ogrid_mesh
@@ -22,3 +23,24 @@ def test_vtu_writer(tmp_path: Path):
     mesh = generate_pipe_ogrid_mesh(radius=1.0, nx=1, nr=4, ntheta=8)
     path = write_vtu(mesh, tmp_path)
     assert path.exists()
+
+
+def test_vtu_writer_requires_point_coordinates(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    solution = solve_steady(case)
+    mesh = solution.mesh
+    mesh_without_points = mesh.__class__(
+        **{**mesh.__dict__, "point_coordinates": None}
+    )
+
+    with pytest.raises(ValueError, match="Mapped mesh requires point_coordinates"):
+        write_vtu(mesh_without_points, tmp_path)
+
+
+def test_zeros_state_matches_mesh_shape():
+    mesh = generate_pipe_ogrid_mesh(radius=1.0, nx=1, nr=4, ntheta=8)
+    state = zeros_state(mesh)
+
+    assert state.u.shape == mesh.yz_shape
+    assert state.phi.shape == mesh.yz_shape
+    assert float(state.time) == 0.0

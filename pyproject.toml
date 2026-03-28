@@ -17,10 +17,17 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
+  "pytest-cov>=7.0",
 ]
 extras = [
   "lineax>=0.0.8",
   "interpax>=0.3.6",
+]
+docs = [
+  "sphinx>=8.0",
+  "myst-parser>=3.0",
+  "furo>=2024.1.29",
+  "sphinx-copybutton>=0.5",
 ]
 
 [project.scripts]

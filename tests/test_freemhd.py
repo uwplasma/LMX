@@ -1,4 +1,6 @@
 from pathlib import Path
+from subprocess import TimeoutExpired
+from urllib.error import URLError
 
 import pytest
 
@@ -13,6 +15,11 @@ from lmx.freemhd import (
     freemhd_environment_report,
     freemhd_container_report,
     recommended_freemhd_target,
+    docker_command_result,
+    docker_image_available,
+    docker_local_image_report,
+    docker_pull_image_report,
+    docker_registry_image_report,
 )
 
 
@@ -153,6 +160,58 @@ def test_docker_hub_tag_report_handles_success(monkeypatch: pytest.MonkeyPatch):
     report = docker_hub_tag_report("microfluidica/openfoam:2206")
     assert report["status"] == "ok"
     assert '"name":"2206"' in report["payload_excerpt"]
+
+
+def test_docker_command_result_handles_unavailable_and_timeout(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: False)
+    unavailable = docker_command_result(["docker", "version"])
+    assert unavailable["status"] == "docker-cli-unavailable"
+
+    monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: True)
+
+    def fake_run(*args, **kwargs):
+        raise TimeoutExpired(cmd=kwargs.get("args", args[0]), timeout=1, output="out", stderr="err")
+
+    monkeypatch.setattr("lmx.freemhd.subprocess.run", fake_run)
+    timed_out = docker_command_result(["docker", "version"], timeout_seconds=1)
+    assert timed_out["status"] == "timeout"
+    assert "out" in timed_out["stdout_tail"]
+
+
+def test_docker_image_helpers_cover_daemon_and_command_paths(monkeypatch: pytest.MonkeyPatch):
+    class _Result:
+        def __init__(self, returncode: int, stdout: str = "", stderr: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_run(command, text=True, capture_output=True, timeout=None, check=False):
+        if command[:2] == ["docker", "info"]:
+            return _Result(0)
+        if command[:2] == ["docker", "image"]:
+            return _Result(0, stdout="image\n")
+        if command[:2] == ["docker", "pull"]:
+            return _Result(1, stderr="pull failed\n")
+        if command[:2] == ["docker", "manifest"]:
+            return _Result(0, stdout="manifest ok\n")
+        return _Result(0)
+
+    monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: True)
+    monkeypatch.setattr("lmx.freemhd.subprocess.run", fake_run)
+
+    assert docker_image_available("microfluidica/openfoam:2206") is True
+    assert docker_local_image_report("microfluidica/openfoam:2206")["status"] == "ok"
+    assert docker_pull_image_report("microfluidica/openfoam:2206")["status"] == "failed"
+    assert docker_registry_image_report("microfluidica/openfoam:2206")["status"] == "ok"
+
+
+def test_docker_hub_tag_report_handles_unsupported_reference_and_network_error(monkeypatch: pytest.MonkeyPatch):
+    report = docker_hub_tag_report("a/b/c:tag")
+    assert report["status"] == "unsupported-image-reference"
+
+    monkeypatch.setattr("lmx.freemhd.urlopen", lambda url, timeout=20: (_ for _ in ()).throw(URLError("down")))
+    network = docker_hub_tag_report("microfluidica/openfoam:2206")
+    assert network["status"] == "network-error"
 
 
 def test_freemhd_container_report_classifies_local_missing_and_registry_timeout(

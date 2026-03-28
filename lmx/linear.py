@@ -52,9 +52,21 @@ def solve_poisson_lineax(
     north: jnp.ndarray,
     rhs: jnp.ndarray,
     anchor: tuple[int, int],
+    *,
+    fallback_iterations: int = 400,
+    max_steps: int = 500,
 ) -> tuple[jnp.ndarray, LinearSolveInfo]:
     if lx is None:
-        return solve_poisson_jacobi(diagonal, west, east, south, north, rhs, anchor, iterations=400)
+        return solve_poisson_jacobi(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            anchor,
+            iterations=fallback_iterations,
+        )
 
     ny, nz = rhs.shape
     size = ny * nz
@@ -71,6 +83,6 @@ def solve_poisson_lineax(
 
     op = lx.FunctionLinearOperator(mv, (size, size), tags=lx.positive_semidefinite_tag)
     rhs_vec = rhs.at[anchor].set(0.0).reshape((size,))
-    solver = lx.CG(rtol=1e-10, atol=1e-10, max_steps=500)
+    solver = lx.CG(rtol=1e-10, atol=1e-10, max_steps=max_steps)
     sol = lx.linear_solve(op, rhs_vec, solver=solver)
     return sol.value.reshape((ny, nz)), LinearSolveInfo(backend="lineax-cg", iterations=int(sol.stats["num_steps"]))

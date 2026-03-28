@@ -1,26 +1,44 @@
 # Theory
 
-LMX targets the inductionless electric-potential formulation used in FreeMHD for low magnetic Reynolds number flows.
+LMX targets low magnetic Reynolds number liquid-metal flows in the inductionless
+limit. The current solver scope is laminar duct-style flow with an electric-potential
+closure, explicit conductivity regions, and a JAX execution model that keeps the core
+operators vectorized and differentiable.
 
 ## Governing model
 
-- Ohm's law: `J = sigma (-grad(phi) + U x B)`.
-- Charge conservation: `div(J) = 0`.
-- Streamwise momentum for the current laminar parity implementation:
-  `du/dt = nu * Lap(u) + (dpdx + (J x B)_x) / rho`.
+The present solver advances a streamwise velocity field `U(y, z, t)` together with a
+cross-sectional electric potential `phi(y, z, t)`:
 
-The current implementation focuses on fully developed laminar duct flow on structured cross-sections, with explicit solid conductivity regions for conducting-wall cases.
+- `div(J) = 0`
+- `J = sigma (-grad(phi) + U x B)`
+- `rho dU/dt = -dp/dx + mu Lap(U) + (J x B)_x`
 
-## Discretization
+This is the inductionless electric-potential formulation typically used for laminar
+Hartmann, Shercliff, and Hunt-type liquid-metal flows.
 
-- Cell-centered tensor-product mesh in the `y-z` cross-section.
-- Conservative face-flux balance for electric potential.
-- Pseudo-transient implicit-Euler-style relaxation for streamwise velocity.
-- Explicit conductivity maps for fluid and solid cells.
-- JAX arrays and `jax.lax.scan` for fixed-shape time marching.
+## Physical assumptions
 
-## Mapping to FreeMHD
+- Magnetic Reynolds number is small, so the imposed field is not flow-evolved.
+- Material properties are piecewise constant by region in the current implementation.
+- The current milestone excludes temperature coupling, free surfaces, and turbulence.
 
-- The electric-potential solve mirrors the `epotMultiRegionFoam` formulation rather than the full OpenFOAM runtime stack.
-- Conducting walls are represented as explicit solid regions, aligned with the plan for Hunt-style cases.
-- Free-surface, temperature, and turbulence are deferred.
+## Discretization principles
+
+- Structured finite-volume style operators over logically rectangular control volumes.
+- Conservative electric-current closure across fluid-solid conductivity jumps.
+- Explicit wall regions for conducting liners rather than boundary-only shortcuts.
+- Semi-implicit treatment of linear Lorentz damping where it improves stability.
+
+## Numerical design rules
+
+- Derive controls from geometry, materials, and nondimensional scales where possible.
+- Keep native runs and validation runs on the same solver path.
+- Avoid embedding backend-specific assumptions in the governing solver.
+- Prefer mesh-derived interior sampling and geometry-derived scales over fixed offsets.
+
+## Validation context
+
+LMX is validated first against analytical liquid-metal benchmarks. Optional external
+case archives are used as secondary comparison targets and regression anchors, but
+they do not define the solver interface or solver design.

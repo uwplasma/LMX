@@ -2,7 +2,7 @@
 
 ## Project Goal
 
-LMX is a Python/JAX-native inductionless MHD code intended to reproduce the laminar electric-potential functionality of FreeMHD without carrying over the full OpenFOAM stack. The immediate parity target is the laminar subset used for closed-channel verification and then the fringing-field pipe validation. The code should remain differentiable, CPU/GPU-capable, and structured around JAX compilation.
+LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is being developed as a self-consistent solver in its own right, with optional external backend comparisons used only for validation and historical cross-checking. The immediate physics target remains the laminar electric-potential subset used for closed-channel verification and then the fringing-field pipe validation. The code should remain differentiable, CPU/GPU-capable, and structured around JAX compilation.
 
 ## Source Of Truth
 
@@ -29,8 +29,10 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - FreeMHD container/asset fetch and local execution scaffolding.
 - Explicit unit, regression, physics, validation, and benchmark entrypoints.
 - GitHub Actions workflows for categorized pytest runs plus validation and benchmark artifact jobs.
+- Read the Docs-compatible Sphinx/MyST documentation entrypoint plus CI docs build.
 - Zenodo closed-channel analytical and processed-slice reference-data loaders.
 - Unit and categorized tests passing in `/Users/rogerio/base_env/bin/python3`.
+- Combined local coverage across `lmx/` and `scripts/` is currently `89%`.
 
 ### Explicitly deferred
 
@@ -58,32 +60,29 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - `scripts/patch_freemhd_darwin_headers.py`: applies the current Darwin-specific local OpenFOAM `lnInclude` workaround to the vendored `external/FreeMHD` checkout for reproducible macOS `wmake` experiments.
 - `scripts/probe_freemhd_container.py`: probes the local Docker bundle, local image tags, and base-image registry resolution and records JSON diagnostics.
 - `scripts/inspect_freemhd_setup.py`: inspects the locally available FreeMHD assets, reports discovered case directories, and recommends the smallest smoke target.
+- `docs/index.md`, `docs/conf.py`, `.readthedocs.yaml`: documentation landing page and Read the Docs build configuration.
 
 ## Best Next Steps
 
-1. Promote the current Shercliff `Ha20` parity path into an artifact-producing runner in CI:
-   - this is now implemented in a way that emits a real artifact on machines with `LMX_FREEMHD_CASE_DIR`
-   - GitHub-hosted runners still emit a structured `skipped` summary because they do not have recovered case directories
-   - the next step is to use the same runner on machines that do have recovered cases so the parity artifact becomes routinely populated
-2. Use the corrected geometry-aware sampling inference as the default closed-channel parity path:
-   - insulating-wall Shercliff cases now sample at the geometric streamwise midplane derived from `constant/<region>/polyMesh/points`
-   - conducting-wall Hunt cases keep the `fieldMinMax.dat`-driven `x` location because the geometric midpoint degrades the current recovered Hunt comparison
-   - the next step is to generalize or replace this split rule for future FreeMHD geometries beyond the recovered closed-channel duct cases
-3. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
+1. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
-   - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but real FreeMHD Hunt `Ha20` parity now confirms Hunt still needs a real multi-region fidelity fix
-4. Tighten CI acceptance criteria once better parity is available:
-   - convert Hartmann validation into a stronger pass/fail parity check
-   - keep Shercliff and Hunt as informative reports until their fidelity improves
-   - add benchmark threshold tracking with explicit tolerances
-5. Extend the recovered-case FreeMHD parity path beyond Shercliff:
+   - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but real Hunt `Ha20` and `Ha100` comparisons confirm conducting-wall fidelity still needs a real multi-region solver fix
+2. Keep the public package and docs LMX-first:
+   - external backend references should remain confined to validation sections
+   - solver defaults should continue moving toward geometry-derived and nondimensional controls rather than case-specific constants
+   - the current conducting-wall sampling path now uses mesh-derived interior planes rather than a fixed offset; keep following that rule for future geometry work
+3. Tighten CI acceptance criteria and maintenance tooling:
+   - docs now build warning-free through Sphinx/MyST and should stay that way
+   - coverage is high enough to enforce and should continue moving up from the current `89%`
+   - convert Hartmann validation into a stronger pass/fail parity check once runtime noise and numerical tolerance are characterized
+4. Extend the recovered-case FreeMHD parity path beyond Shercliff:
   - Hunt `Ha20` now runs end to end and samples successfully
   - use that new path to drive the next Hunt solver-fidelity iteration
   - Shercliff `Ha100` now also runs end to end and emits a real sampled parity artifact
   - Hunt `Ha100` now also runs end to end and emits a real sampled parity artifact
   - next use the combined Hunt `Ha20` and `Ha100` artifacts to drive the next conducting-wall solver iteration
-6. Implement mapped-operator support for the fringing-field pipe case.
+5. Implement mapped-operator support for the fringing-field pipe case.
 
 ## What Worked
 
@@ -91,6 +90,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The local JAX environment at `/Users/rogerio/base_env/bin/python3` works for development and tests.
 - The current duct solver path produces fields, VTK output, CSV cuts, and benchmark timing.
 - Test suite is green after tightening the expectations to match current implementation state rather than full parity claims.
+- Docs now build warning-free through Sphinx/MyST, and the repo has a real Read the Docs configuration.
+- Coverage across `lmx/` and `scripts/` is now `89%`, with stronger wrapper and CLI coverage than before.
 - Small Hartmann and Shercliff low-Ha cases are deterministic enough for regression snapshots.
 - GitHub Actions workflows now cover unit, regression, physics, validation, and benchmark paths.
 - The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.

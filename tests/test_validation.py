@@ -12,10 +12,12 @@ from lmx.validation import (
     closed_channel_validation,
     compare_with_freemhd,
     duct_profile_metrics,
-    infer_sampling_geometry,
+    infer_mesh_axis_coordinates,
     infer_mesh_bounds,
     infer_region_conductivity,
+    infer_sampling_geometry,
     has_conducting_wall_region,
+    interior_sample_coordinate,
     extract_midplane_profile,
     latest_sampled_profiles,
     hartmann_analytic_profile,
@@ -193,14 +195,35 @@ def test_infer_sampling_geometry_keeps_field_based_x_for_conducting_wall_cases(t
     assert geometry.x_position == pytest.approx(0.015)
 
 
-def test_infer_sampling_geometry_offsets_boundary_aligned_conducting_wall_cut(tmp_path: Path):
+def test_infer_mesh_axis_coordinates_and_boundary_interior_selection(tmp_path: Path):
     points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
     points_path.parent.mkdir(parents=True)
     points_path.write_text(
-        "FoamFile\n{\n}\n4\n(\n"
+        "FoamFile\n{\n}\n6\n(\n"
         "(0 -0.1 -0.1)\n"
+        "(0.015 -0.1 -0.1)\n"
         "(1.0 -0.1 0.1)\n"
         "(0 0.1 -0.1)\n"
+        "(0.015 0.1 -0.1)\n"
+        "(1.0 0.1 0.1)\n"
+        ")\n"
+    )
+    coordinates = infer_mesh_axis_coordinates(tmp_path, axis="x")
+    assert coordinates == pytest.approx((0.0, 0.015, 1.0))
+    assert interior_sample_coordinate(coordinates, 0.0) == pytest.approx(0.015)
+    assert interior_sample_coordinate(coordinates, 1.0) == pytest.approx(0.015)
+
+
+def test_infer_sampling_geometry_uses_first_interior_streamwise_plane_for_boundary_cut(tmp_path: Path):
+    points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
+    points_path.parent.mkdir(parents=True)
+    points_path.write_text(
+        "FoamFile\n{\n}\n6\n(\n"
+        "(0 -0.1 -0.1)\n"
+        "(0.015 -0.1 0.1)\n"
+        "(1.0 -0.1 0.1)\n"
+        "(0 0.1 -0.1)\n"
+        "(0.015 0.1 0.1)\n"
         "(1.0 0.1 0.1)\n"
         ")\n"
     )
@@ -219,6 +242,11 @@ def test_infer_sampling_geometry_offsets_boundary_aligned_conducting_wall_cut(tm
 
     geometry = infer_sampling_geometry(tmp_path)
     assert geometry.x_position == pytest.approx(0.015)
+
+
+def test_interior_sample_coordinate_uses_midpoint_without_interior_vertices():
+    assert interior_sample_coordinate((0.0, 1.0), 0.0) == pytest.approx(0.5)
+    assert interior_sample_coordinate((0.0, 1.0), 1.0) == pytest.approx(0.5)
 
 
 def test_sample_reader_and_latest_profile_detection(tmp_path: Path):

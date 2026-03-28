@@ -4,6 +4,7 @@ import pytest
 
 from scripts.summarize_ci_artifacts import (
     build_summary,
+    main,
     render_markdown,
     summarize_benchmark_report,
     summarize_parity_report,
@@ -150,3 +151,61 @@ def test_summarize_parity_report(tmp_path: Path):
     summary = summarize_parity_report(path)
     assert summary.status == "skipped"
     assert summary.reason == "freemhd-case-unavailable"
+
+
+def test_main_writes_json_and_markdown(tmp_path: Path):
+    validation = tmp_path / "validation.json"
+    validation.write_text(
+        """
+        {
+          "hartmann": {"case": "hartmann", "residual": 1.0, "u_max": 2.0, "l2_error": 0.1}
+        }
+        """
+    )
+    benchmark = tmp_path / "benchmark.json"
+    benchmark.write_text(
+        """
+        {
+          "case": "hartmann_ha20",
+          "cold_seconds": 1.5,
+          "warm_seconds": 0.8,
+          "mean_seconds": 1.0,
+          "repeats": 2.0
+        }
+        """
+    )
+    parity = tmp_path / "parity.json"
+    parity.write_text(
+        """
+        {
+          "status": "ok",
+          "reason": "",
+          "case_dir": "/tmp/case",
+          "sample_output": "/tmp/sample.json",
+          "parity_output": "/tmp/parity_report.json"
+        }
+        """
+    )
+    out_json = tmp_path / "summary.json"
+    out_md = tmp_path / "summary.md"
+
+    exit_code = main(
+        [
+            "--validation-summary",
+            str(validation),
+            "--benchmark-report",
+            str(benchmark),
+            "--parity-summary",
+            str(parity),
+            "--output-json",
+            str(out_json),
+            "--output-md",
+            str(out_md),
+        ]
+    )
+
+    assert exit_code == 0
+    assert out_json.exists()
+    assert out_md.exists()
+    assert '"hartmann_ha20"' in out_json.read_text()
+    assert "## FreeMHD Parity" in out_md.read_text()

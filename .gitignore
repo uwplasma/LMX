@@ -1,8 +1,12 @@
 .pytest_cache/
 __pycache__/
 *.pyc
+.coverage
+coverage.json
+htmlcov/
 out/
 out_*/
 external/
 artifacts/
+docs/_build/
 .DS_Store

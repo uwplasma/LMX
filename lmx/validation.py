@@ -598,6 +598,49 @@ def infer_mesh_bounds(run_dir: str | Path, region: str = "liquid") -> tuple[tupl
     return ((mins[0], maxs[0]), (mins[1], maxs[1]), (mins[2], maxs[2]))
 
 
+def infer_mesh_axis_coordinates(run_dir: str | Path, region: str = "liquid", axis: str = "x") -> tuple[float, ...] | None:
+    axis_index = {"x": 0, "y": 1, "z": 2}.get(axis.lower())
+    if axis_index is None:
+        raise ValueError(f"Unsupported axis {axis}")
+    root = Path(run_dir)
+    candidates = [
+        root / "constant" / region / "polyMesh" / "points",
+        root / "constant" / "polyMesh" / "points",
+    ]
+    points_path = next((path for path in candidates if path.exists()), None)
+    if points_path is None:
+        return None
+
+    values: set[float] = set()
+    pattern = re.compile(r"^\(\s*(\S+)\s+(\S+)\s+(\S+)\s*\)$")
+    with points_path.open() as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            match = pattern.match(line)
+            if match is None:
+                continue
+            values.add(float(match.group(axis_index + 1)))
+    if not values:
+        return None
+    return tuple(sorted(values))
+
+
+def interior_sample_coordinate(coordinates: tuple[float, ...], preferred: float, tolerance: float = 1e-12) -> float:
+    if len(coordinates) == 1:
+        return coordinates[0]
+    lower = coordinates[0]
+    upper = coordinates[-1]
+    if preferred <= lower + tolerance:
+        if len(coordinates) >= 3:
+            return coordinates[1]
+        return 0.5 * (lower + upper)
+    if preferred >= upper - tolerance:
+        if len(coordinates) >= 3:
+            return coordinates[-2]
+        return 0.5 * (lower + upper)
+    return preferred
+
+
 def infer_region_conductivity(run_dir: str | Path, region: str) -> float | None:
     root = Path(run_dir)
     candidates = [
@@ -625,6 +668,7 @@ def has_conducting_wall_region(run_dir: str | Path) -> bool:
 def infer_sampling_geometry(run_dir: str | Path, field: str = "mag(U)") -> SamplingGeometry:
     latest = latest_field_minmax_record(run_dir, field=field)
     mesh_bounds = infer_mesh_bounds(run_dir, region="liquid")
+    x_coordinates = infer_mesh_axis_coordinates(run_dir, region="liquid", axis="x")
     if mesh_bounds is not None and not has_conducting_wall_region(run_dir):
         (x_min, x_max), (y_min, y_max), (z_min, z_max) = mesh_bounds
         return SamplingGeometry(
@@ -637,12 +681,8 @@ def infer_sampling_geometry(run_dir: str | Path, field: str = "mag(U)") -> Sampl
     if latest is None or latest.min_location is None or latest.max_location is None:
         raise ValueError(f"Unable to infer sampling geometry from {run_dir}")
     x_position = latest.max_location[0]
-    if mesh_bounds is not None:
-        (x_min, x_max), _, _ = mesh_bounds
-        x_span = max(x_max - x_min, 0.0)
-        interior_offset = 0.015 * x_span
-        if interior_offset > 0.0:
-            x_position = min(max(x_position, x_min + interior_offset), x_max - interior_offset)
+    if x_coordinates is not None:
+        x_position = interior_sample_coordinate(x_coordinates, x_position)
     y_extent = max(abs(latest.min_location[1]), abs(latest.max_location[1]))
     z_extent = max(abs(latest.min_location[2]), abs(latest.max_location[2]))
     return SamplingGeometry(
