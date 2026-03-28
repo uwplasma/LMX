@@ -81,7 +81,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - Hunt `Ha20` now runs end to end and samples successfully
   - use that new path to drive the next Hunt solver-fidelity iteration
   - Shercliff `Ha100` now also runs end to end and emits a real sampled parity artifact
-  - next recover Hunt `Ha100` or another harsher conducting-wall case once the next solver change lands
+  - Hunt `Ha100` now also runs end to end and emits a real sampled parity artifact
+  - next use the combined Hunt `Ha20` and `Ha100` artifacts to drive the next conducting-wall solver iteration
 6. Implement mapped-operator support for the fringing-field pipe case.
 
 ## What Worked
@@ -154,6 +155,9 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - A checked-in parity-suite runner now exists for CI and local artifact production:
   - `scripts/run_freemhd_parity_suite.py` writes a structured `skipped` summary when no recovered case directory is available
   - when `LMX_FREEMHD_CASE_DIR` or `--case-dir` is provided, it runs the FreeMHD sampling step and parity report end to end and emits a single summary JSON
+- The parity-suite runner can now also bootstrap a fresh recovered case:
+  - `--run-case-if-needed` runs the short FreeMHD smoke path first when the requested sampled time is not already present
+  - this removes the previous manual `run_freemhd_case.py` pre-step for newly recovered cases
 - CI artifact summaries now include the FreeMHD parity section in addition to the analytical validation section.
 - The sampled-profile selector is now more robust:
   - when multiple sampled profile directories exist at the same sample time, `latest_sampled_profiles` now chooses the newest files by modification time instead of the first path alphabetically
@@ -164,10 +168,18 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The recovered-case FreeMHD parity path now also includes a higher-Ha insulating-wall reference:
   - `shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE` is recoverable from `StartingFiles.zip`
   - it now runs to `t = 1e-4`, reconstructs `0.0001/`, and emits sampled line-cut parity metrics through the same checked-in runner
+- The recovered-case FreeMHD parity path now also includes a higher-Ha conducting-wall reference:
+  - `hunt_exactBL_Ha100` is recoverable from `StartingFiles.zip`
+  - it now runs to `t = 1e-4`, reconstructs `0.0001/`, and emits sampled line-cut parity metrics through the same checked-in runner
 - The corrected geometry-aware sampling rule materially improves the real Shercliff parity artifacts while preserving the better Hunt comparison path:
   - recovered Shercliff `Ha20` now samples at `x = 0.5` and the real sampled metrics are `freemhd_sample_y_l2_error ≈ 1.20e-3`, `freemhd_sample_z_l2_error ≈ 5.41e-4`
   - recovered Shercliff `Ha100` now samples at `x = 0.5` and the real sampled metrics are `freemhd_sample_y_l2_error ≈ 8.81e-4`, `freemhd_sample_z_l2_error ≈ 1.70e-4`
   - recovered Hunt `Ha20` is correctly classified as a conducting-wall case, keeps `x = 0.015`, and retains the better real sampled metrics `freemhd_sample_y_l2_error ≈ 5.36e-2`, `freemhd_sample_z_l2_error ≈ 1.14e-1`
+- The first real Hunt `Ha100` FreeMHD-vs-LMX parity numbers now also exist:
+  - `u_max_abs_diff ≈ 9.50e-3`
+  - `freemhd_sample_y_l2_error ≈ 1.39e-1`
+  - `freemhd_sample_z_l2_error ≈ 1.19e-1`
+  - this is the first real higher-Ha conducting-wall artifact and it confirms that the LMX Hunt parity gap grows materially from `Ha20` to `Ha100`
 - The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
   - `u_max_abs_diff ≈ 1.26e-3` after the latest retained solver update
   - `freemhd_sample_y_l2_error ≈ 6.02e-2`
@@ -270,6 +282,25 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. use the corrected Hunt `Ha20` artifact as the main conducting-wall parity target
   2. recover or run Hunt `Ha100` next so the same parity machinery is exercised at a harsher conducting-wall/Hartmann-layer regime
   3. then tune the LMX Hunt solver against those real FreeMHD sampled cuts
+
+### 2026-03-28 19:50 America/Chicago
+
+- Recovered and materialized `StartingFiles/Hunt/hunt_exactBL_Ha100` from the full local `external/StartingFiles.zip`.
+- Verified that the fresh recovered case does not run successfully with the original paper decomposition on this machine:
+  - the first smoke attempt inherited `95` subdomains from the case and was killed with exit code `137`
+  - rerunning the same short smoke setup with `--cores 8 --delta-t 1e-5 --end-time 1e-4 --write-interval 1e-4` completed successfully in about `129 s` solver time before reconstruction
+- Ran the first real higher-Ha conducting-wall FreeMHD parity artifact:
+  - recovered case: `hunt_exactBL_Ha100`
+  - current short-time metrics are `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
+  - the current geometry-aware split rule keeps this conducting-wall case on the field-based cut, which lands at `x = 0.0` for the recovered `Ha100` short-time run
+- Closed a fresh-case automation gap in the checked-in tooling:
+  - `scripts/run_freemhd_parity_suite.py` now supports `--run-case-if-needed`
+  - when the requested sampled time does not already exist, it can run the short FreeMHD smoke step itself before sampling and building the parity report
+  - added unit coverage for the successful auto-run path and the run-failure path
+- Best next step is now narrower and solver-specific:
+  1. treat the combined `Hunt Ha20` and `Hunt Ha100` artifacts as the primary conducting-wall acceptance targets
+  2. improve the LMX Hunt solver so short-time `u_max` and `y` profile parity stop degrading sharply between `Ha20` and `Ha100`
+  3. only after that, decide whether the field-based `x = 0.0` cut at short-time `Hunt Ha100` should remain the acceptance slice or be replaced with a more physically anchored section definition
 
 ### 2026-03-27 16:35 America/Chicago
 

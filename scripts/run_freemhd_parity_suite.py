@@ -9,8 +9,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lmx.validation import latest_field_minmax_record
+from scripts import run_freemhd_case as freemhd_case
 from scripts import run_freemhd_parity_report as parity_report
 from scripts import sample_freemhd_profiles as sample_profiles
+
+
+def case_needs_run(case_dir: Path, time_name: str) -> bool:
+    if latest_field_minmax_record(case_dir) is None:
+        return True
+    return not (case_dir / time_name).is_dir()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,6 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", type=str, default="linux/amd64")
     parser.add_argument("--time", type=str, default="0.0001")
     parser.add_argument("--dict-name", type=str, default="lmxCiSampleDict")
+    parser.add_argument("--run-case-if-needed", action="store_true")
+    parser.add_argument("--run-image", type=str, default="lmx-freemhd-smoke")
+    parser.add_argument("--run-cores", type=str, default="8")
+    parser.add_argument("--run-end-time", type=str, default="1e-4")
+    parser.add_argument("--run-write-interval", type=str, default="1e-4")
+    parser.add_argument("--run-delta-t", type=str, default="1e-5")
     args = parser.parse_args(argv)
 
     case_dir = args.case_dir
@@ -47,6 +61,41 @@ def main(argv: list[str] | None = None) -> int:
 
     sample_output = args.output / "sample_profiles.json"
     parity_output = args.output / "parity_report.json"
+    run_output = args.output / "run_case.json"
+
+    if args.run_case_if_needed and case_needs_run(case_dir, args.time):
+        run_exit = freemhd_case.main(
+            [
+                "--image",
+                args.run_image,
+                "--case-dir",
+                str(case_dir),
+                "--platform",
+                args.platform,
+                "--cores",
+                args.run_cores,
+                "--end-time",
+                args.run_end_time,
+                "--write-interval",
+                args.run_write_interval,
+                "--delta-t",
+                args.run_delta_t,
+                "--output",
+                str(run_output),
+            ]
+        )
+        if run_exit != 0:
+            payload = {
+                "status": "failed",
+                "reason": "run-failed",
+                "case_dir": str(case_dir.resolve()),
+                "run_output": str(run_output.resolve()),
+                "sample_output": "",
+                "parity_output": "",
+            }
+            summary_path.write_text(json.dumps(payload, indent=2))
+            print(summary_path.read_text())
+            return run_exit
 
     sample_exit = sample_profiles.main(
         [
@@ -69,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
             "status": "failed",
             "reason": "sample-failed",
             "case_dir": str(case_dir.resolve()),
+            "run_output": str(run_output.resolve()) if run_output.exists() else "",
             "sample_output": str(sample_output.resolve()),
             "parity_output": "",
         }
@@ -92,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": "ok" if parity_exit == 0 else "failed",
         "reason": "" if parity_exit == 0 else "parity-report-failed",
         "case_dir": str(case_dir.resolve()),
+        "run_output": str(run_output.resolve()) if run_output.exists() else "",
         "sample_output": str(sample_output.resolve()),
         "parity_output": str(parity_output.resolve()),
     }

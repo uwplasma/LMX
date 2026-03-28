@@ -27,6 +27,8 @@
 - Automatic geometry-aware line-cut inference for recovered closed-channel FreeMHD cases.
 - A checked-in parity report runner that wraps LMX case construction plus `compare_with_freemhd` into one JSON artifact.
 - A checked-in parity-suite runner for CI that emits either a real FreeMHD-vs-LMX artifact bundle or a structured `skipped` summary when no recovered case directory is available on the runner.
+- An optional one-command parity-suite path for fresh recovered cases:
+  - `scripts/run_freemhd_parity_suite.py --run-case-if-needed` now runs the short FreeMHD smoke step first when the recovered case has not yet produced the target sampled time.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -38,6 +40,7 @@
 - Extend the current sampled line-cut parity path beyond the recovered Shercliff `Ha20` smoke case.
 - Use `LMX_FREEMHD_CASE_DIR` on machines that have recovered paper cases so the new parity-suite runner produces real artifacts instead of `skipped` summaries.
 - Keep widening recovered-case parity beyond Shercliff now that Hunt `Ha20` also runs end to end in the same container harness.
+- Keep widening recovered-case parity beyond the current `Ha20` and `Ha100` set, and use the new `--run-case-if-needed` path so fresh cases do not require a separate manual smoke-run command.
 - Generalize the current split-rule geometry inference beyond recovered closed-channel duct cases when more FreeMHD geometries are added.
 - Fringing-field mapped-pipe operators.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
@@ -84,4 +87,10 @@
   - on this machine, the short solver stage reaches `ExecutionTime ≈ 168 s` before reconstruction, which is much slower than `Ha20`
   - with the corrected geometric-midplane sampling rule, the current short-time parity metrics are `u_max_abs_diff ≈ 1.72e-3`, `freemhd_sample_y_l2_error ≈ 8.81e-4`, `freemhd_sample_z_l2_error ≈ 1.70e-4`
   - this replaces the earlier inlet-plane artifact that had been driven by a raw `fieldMinMax.dat` maximum at `x_position = 0.0`
+- A first higher-Ha closed-channel FreeMHD parity artifact now also exists for Hunt `Ha100`:
+  - the recovered `hunt_exactBL_Ha100` case now runs to `t = 1e-4` and reconstructs successfully through the same container harness when forced to the same short-smoke `--cores 8` override used for the other recovered paper cases
+  - attempting to inherit the case’s original `95`-way decomposition on this machine results in an immediate killed run, so the explicit short-smoke core override is now part of the documented recovered-case workflow
+  - the resulting short-time parity metrics are `u_max_abs_diff ≈ 9.50e-3`, `freemhd_sample_y_l2_error ≈ 1.39e-1`, `freemhd_sample_z_l2_error ≈ 1.19e-1`
+  - the current geometry-aware split rule keeps this conducting-wall case on the field-based cut, which lands at `x_position = 0.0` for the recovered `Ha100` run because the latest `mag(U)` maximum remains on the inlet plane at this short time
+  - this confirms that the higher-Ha conducting-wall regime is now represented by a real FreeMHD artifact and that LMX Hunt fidelity worsens materially from `Ha20` to `Ha100`
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.
