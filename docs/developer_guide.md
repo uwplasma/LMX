@@ -24,6 +24,7 @@
 - Keep shapes static when adding new operators or diagnostics.
 - Hartmann and Shercliff case factories now use smaller pseudo-time steps and a larger iteration budget because the current solver core is explicit in the diffusive update and otherwise clips on fine meshes.
 - The velocity update now treats the linear `-sigma |B|^2 u` portion of the Lorentz force semi-implicitly, which improves stability for Hartmann and Shercliff without changing the overall solver structure.
+- The solver also applies a global limiter on the per-step velocity increment. At the current project stage this acts as an adaptive pseudo-step controller and is what prevents the Hunt default path from blowing up while the multi-region update remains explicit.
 
 ## Extension points
 

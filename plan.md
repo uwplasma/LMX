@@ -84,6 +84,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
+- An adaptive per-step velocity-update limiter now keeps the default Hunt path bounded and produces finite Hunt validation metrics.
 
 ## What Did Not Work
 
@@ -96,7 +97,8 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The current Shercliff `Ha=20` reference comparison also shows large normalized error, confirming that solver-fidelity work is still the critical path after reference ingestion.
 - The earlier Hartmann/Shercliff defaults (`dt=0.01`, low iteration counts) were too aggressive for fine meshes because the current solver core uses an explicit diffusive update.
 - Hunt can be stabilized only with a much smaller pseudo-step than the current default, which confirms the next Hunt fix should be adaptive pseudo-stepping or a more implicit coupling rather than more validation plumbing.
-- Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; the remaining issue is still the multi-region pseudo-time strategy.
+- Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; it needed the additional adaptive update limiter.
+- Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
 
 ## Chronological Log
 
@@ -238,6 +240,22 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Did not overstate the outcome:
   - Hunt still clips at the default settings
   - this confirms that Hunt needs either adaptive pseudo-step sizing or a more implicit multi-region update, not just implicit treatment of the linear damping term
+
+### 2026-03-27 20:20 America/Chicago
+
+- Added an adaptive limiter on the global per-step velocity increment.
+- This acts as the first solver-side pseudo-step controller that does not require changing the public case configuration.
+- Result:
+  - Hunt no longer blows up on the default path
+  - Hunt validation reports are now finite instead of saturating at the clip bounds
+  - the default Hunt comparison is still not parity-accurate, but it is now on a usable trajectory for further improvement
+- Kept the earlier Hunt small-pseudostep test and added a new default-Hunt boundedness test so CI preserves both facts:
+  - the current equations can remain bounded under very small pseudo-steps
+  - the default Hunt path is no longer catastrophically unstable
+- Best next step sharpened again:
+  1. improve Hunt accuracy now that the default path is bounded
+  2. add processed-slice figure-level comparisons for Shercliff and Hunt
+  3. keep tightening acceptance thresholds case by case rather than all at once
 
 ## Instruction For Future Agents
 

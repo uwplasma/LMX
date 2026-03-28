@@ -121,6 +121,18 @@ def _enforce_velocity_bc(u: jnp.ndarray, fluid_mask: jnp.ndarray) -> jnp.ndarray
     return u
 
 
+def _limited_velocity_update(
+    current: jnp.ndarray,
+    trial: jnp.ndarray,
+    fluid_mask: jnp.ndarray,
+    max_delta: float = 1e-3,
+) -> jnp.ndarray:
+    delta = jnp.where(fluid_mask, trial - current, 0.0)
+    peak_delta = jnp.max(jnp.abs(delta))
+    scale = jnp.minimum(1.0, max_delta / jnp.maximum(peak_delta, 1e-12))
+    return jnp.where(fluid_mask, current + scale * delta, 0.0)
+
+
 def _step(
     u: jnp.ndarray,
     mesh: StructuredMesh,
@@ -146,7 +158,8 @@ def _step(
     rhs = nu * lap_u + (forcing + lorentz_explicit) / rho
     implicit_scale = 1.0 + dt * lorentz_damping / rho
     u_trial = jnp.where(fluid_mask, (u + dt * rhs) / implicit_scale, 0.0)
-    u_next = jnp.where(fluid_mask, (1.0 - relaxation) * u + relaxation * u_trial, 0.0)
+    relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u + relaxation * u_trial, 0.0)
+    u_next = _limited_velocity_update(u, relaxed, fluid_mask)
     u_next = _enforce_velocity_bc(u_next, fluid_mask)
     u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
     u_next = jnp.clip(u_next, -5.0, 5.0)
