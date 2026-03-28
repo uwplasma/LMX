@@ -33,14 +33,14 @@ def _build_mesh(case: CaseSpec) -> StructuredMesh:
 
 
 def _face_conductivity_y(sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    sigma_face = 0.5 * (sigma[:-1, :] + sigma[1:, :])
+    sigma_face = 2.0 * sigma[:-1, :] * sigma[1:, :] / jnp.maximum(sigma[:-1, :] + sigma[1:, :], 1e-12)
     west = jnp.pad(sigma_face, ((1, 0), (0, 0)))
     east = jnp.pad(sigma_face, ((0, 1), (0, 0)))
     return west, east
 
 
 def _face_conductivity_z(sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    sigma_face = 0.5 * (sigma[:, :-1] + sigma[:, 1:])
+    sigma_face = 2.0 * sigma[:, :-1] * sigma[:, 1:] / jnp.maximum(sigma[:, :-1] + sigma[:, 1:], 1e-12)
     south = jnp.pad(sigma_face, ((0, 0), (1, 0)))
     north = jnp.pad(sigma_face, ((0, 0), (0, 1)))
     return south, north
@@ -73,8 +73,8 @@ def _solve_potential(
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
 
-    sigma_y = 0.5 * (sigma[:-1, :] + sigma[1:, :])
-    sigma_z = 0.5 * (sigma[:, :-1] + sigma[:, 1:])
+    sigma_y = 2.0 * sigma[:-1, :] * sigma[1:, :] / jnp.maximum(sigma[:-1, :] + sigma[1:, :], 1e-12)
+    sigma_z = 2.0 * sigma[:, :-1] * sigma[:, 1:] / jnp.maximum(sigma[:, :-1] + sigma[:, 1:], 1e-12)
     conv_y = sigma_y * face_average_x(uxb_y)
     conv_z = sigma_z * face_average_z(uxb_z)
     face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))

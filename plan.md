@@ -82,6 +82,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - GitHub Actions workflows now cover unit, regression, physics, validation, and benchmark paths.
 - The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
+- Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 
 ## What Did Not Work
 
@@ -93,6 +94,7 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The Hunt validation path remains artifact-only for now because the current solver still clips and saturates on that case; it should not be treated as parity-complete.
 - The current Shercliff `Ha=20` reference comparison also shows large normalized error, confirming that solver-fidelity work is still the critical path after reference ingestion.
 - The earlier Hartmann/Shercliff defaults (`dt=0.01`, low iteration counts) were too aggressive for fine meshes because the current solver core uses an explicit diffusive update.
+- Hunt can be stabilized only with a much smaller pseudo-step than the current default, which confirms the next Hunt fix should be adaptive pseudo-stepping or a more implicit coupling rather than more validation plumbing.
 
 ## Chronological Log
 
@@ -208,6 +210,20 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - Shercliff `Ha=20` now remains bounded on the default mesh and the analytical comparison became finite instead of clipping, with roughly `y_l2_error = 0.434` and `z_l2_error = 0.187`
 - Hunt was not fixed by the same tuning and still clips; that keeps Hunt multi-region stability as the next solver target.
 - Updated regression snapshots and added tests so this new stable Hartmann/Shercliff baseline is preserved in CI.
+
+### 2026-03-27 19:30 America/Chicago
+
+- Continued on the Hunt investigation instead of changing defaults blindly.
+- Switched face conductivity averaging in the electric-potential solve from arithmetic to harmonic:
+  - this is more appropriate across the fluid/solid conductivity jump
+  - it improved Shercliff on smaller validation grids without breaking the suite
+- Measured Hunt diagnostics and confirmed:
+  - huge interface-driven Lorentz forcing is still the immediate instability source at default settings
+  - Hunt becomes bounded if the pseudo-step is made much smaller (`dt ~ 1e-4`, `relaxation ~ 0.05` on the small diagnostic case)
+- Added a Hunt stability test that uses this tiny pseudo-step regime so the repo preserves the evidence that Hunt is solvable with the current equations but not yet with the current default pseudo-time strategy.
+- Best next step is now more concrete:
+  1. add adaptive pseudo-step sizing or a more implicit velocity update for the Hunt multi-region case
+  2. only after that, tighten Hunt acceptance checks against the ingested reference data
 
 ## Instruction For Future Agents
 

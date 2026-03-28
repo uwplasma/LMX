@@ -24,4 +24,5 @@
 
 - Hartmann `Ha=20` is now stable on the default finer mesh and shows a low normalized error in the current analytical comparison.
 - Shercliff `Ha=20` no longer clips on the default finer mesh, but its normalized error is still too large to count as parity-complete.
-- Hunt remains clipping and is still the highest-priority solver-fidelity gap.
+- Hunt remains clipping at the current default pseudo-time settings and is still the highest-priority solver-fidelity gap.
+- Hunt can be stabilized only with a much smaller pseudo-step, which confirms the remaining issue is solver stability rather than missing reference-data plumbing.

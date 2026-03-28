@@ -1,7 +1,9 @@
+from dataclasses import replace
+
 import jax.numpy as jnp
 import pytest
 
-from lmx.cases import make_hartmann_case, make_shercliff_case
+from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.solvers import solve_steady
 
 
@@ -35,3 +37,13 @@ def test_shercliff_ha20_default_case_stays_bounded():
     assert solution.state.residual < 1e-4
     assert float(jnp.max(solution.state.u)) < 0.1
     assert float(jnp.min(solution.state.u)) >= 0.0
+
+
+def test_hunt_case_can_be_stabilized_with_small_pseudostep():
+    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    case = replace(case, time_stepper=replace(case.time_stepper, dt=1e-4, relaxation=0.05, max_steps=400, potential_iterations=500))
+    solution = solve_steady(case)
+    fluid_u = solution.state.u[solution.mesh.fluid_mask]
+    assert solution.state.residual < 1e-4
+    assert float(jnp.min(fluid_u)) >= 0.0
+    assert float(jnp.max(fluid_u)) < 0.01
