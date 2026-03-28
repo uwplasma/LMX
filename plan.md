@@ -71,12 +71,16 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 3. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
-   - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but Hunt still needs a real multi-region stability fix
+   - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but real FreeMHD Hunt `Ha20` parity now confirms Hunt still needs a real multi-region fidelity fix
 4. Tighten CI acceptance criteria once better parity is available:
    - convert Hartmann validation into a stronger pass/fail parity check
    - keep Shercliff and Hunt as informative reports until their fidelity improves
    - add benchmark threshold tracking with explicit tolerances
-5. Implement mapped-operator support for the fringing-field pipe case.
+5. Extend the recovered-case FreeMHD parity path beyond Shercliff:
+   - Hunt `Ha20` now runs end to end and samples successfully
+   - use that new path to drive the next Hunt solver-fidelity iteration
+   - then recover additional cases such as Shercliff `Ha100` or Hunt `Ha100`
+6. Implement mapped-operator support for the fringing-field pipe case.
 
 ## What Worked
 
@@ -149,6 +153,14 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - The sampled-profile selector is now more robust:
   - when multiple sampled profile directories exist at the same sample time, `latest_sampled_profiles` now chooses the newest files by modification time instead of the first path alphabetically
   - this fixed a real Shercliff `Ha20` parity regression where stale `lmxAutoSampleDict` output was being compared instead of the just-generated CI sample set
+- The local `StartingFiles.zip` recovery path now extends beyond Shercliff:
+  - `hunt_exactBL_Ha20` can be extracted and materialized locally
+  - the same container harness now runs that Hunt case to `t = 1e-4`, reconstructs `0.0001/`, and supports sampled parity extraction
+- The first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers now exist:
+  - `u_max_abs_diff ≈ 1.17e-3`
+  - `freemhd_sample_y_l2_error ≈ 6.02e-2`
+  - `freemhd_sample_z_l2_error ≈ 6.74e-1`
+  - this sharpens the remaining Hunt task from “probably unstable/inaccurate” to a measured parity gap against the recovered FreeMHD case
 
 ## What Did Not Work
 
@@ -638,6 +650,29 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   1. run the same parity-suite artifact path on machines that set `LMX_FREEMHD_CASE_DIR` so real FreeMHD parity artifacts are produced routinely
   2. extend the recovered-case parity path beyond the current Shercliff `Ha20` smoke case
   3. continue solver-fidelity work, especially for Hunt, now that the parity artifact plumbing is in normal CI
+
+### 2026-03-28 19:30 America/Chicago
+
+- Extended the recovered-case FreeMHD path beyond Shercliff by using the now-complete local `external/StartingFiles.zip`:
+  - confirmed the archive contains recoverable Hunt cases including `hunt_exactBL_Ha20`, `hunt_exactBL_Ha100`, and `hunt_exactBL_Ha1000_0g`
+  - extracted and materialized `hunt_exactBL_Ha20` under `/tmp/startingfiles_hunt_ha20/StartingFiles/Hunt/hunt_exactBL_Ha20`
+- Verified that the existing container harness generalizes to the Hunt multi-region interFoam case without additional code changes:
+  - ran `epotMultiRegionInterFoam` to `t = 1e-4`
+  - reconstructed all regions at `0.0001`
+  - confirmed `fieldMinMax.dat` and sampled `centerlineY/centerlineZ` outputs exist
+- Recorded the first real Hunt `Ha20` FreeMHD-vs-LMX parity numbers:
+  - `freemhd_u_max_latest = 0.118594754`
+  - `lmx_u_max = 0.1174283996`
+  - `u_max_abs_diff ≈ 1.17e-3`
+  - `freemhd_sample_y_l2_error ≈ 6.02e-2`
+  - `freemhd_sample_z_l2_error ≈ 6.74e-1`
+- This materially changes the Hunt status:
+  - infrastructure is no longer the main blocker for Hunt parity
+  - the real blocker is LMX solver fidelity in the conducting-wall Hunt regime, especially the `z` profile
+- Current best next step is now:
+  1. use the recovered Hunt `Ha20` FreeMHD parity artifact to guide the next Hunt solver iteration in LMX
+  2. keep Shercliff parity in CI artifact form as the lower-error reference path
+  3. recover one higher-Ha closed-channel case next so the same parity machinery is exercised on a harsher boundary-layer regime
 
 ## Instruction For Future Agents
 

@@ -13,6 +13,7 @@
 - FreeMHD environment/setup inspection scripts that report Docker CLI vs daemon availability and recommend the smallest current target case.
 - Partial `StartingFiles.zip` inspection and selective case materialization utilities for recovering early laminar paper cases before the full archive is complete.
 - Recovered Shercliff `Ha0` and `Ha20` starting-case materialization from the partial archive.
+- Recovered Hunt `Ha20` starting-case materialization from the local `StartingFiles.zip` archive.
 - FreeMHD setup inspection with `--extra-case-root` so recovered `/tmp` cases can be reported in the same setup JSON as the checked-in assets.
 - FreeMHD run-helper fail-fast classification for missing local Docker image tags.
 - FreeMHD container preflight reporting for local image presence and bounded-time base-image registry resolution.
@@ -36,6 +37,7 @@
 - Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
 - Extend the current sampled line-cut parity path beyond the recovered Shercliff `Ha20` smoke case.
 - Use `LMX_FREEMHD_CASE_DIR` on machines that have recovered paper cases so the new parity-suite runner produces real artifacts instead of `skipped` summaries.
+- Keep widening recovered-case parity beyond Shercliff now that Hunt `Ha20` also runs end to end in the same container harness.
 - Generalize the current geometry inference beyond `fieldMinMax`-driven duct cases when more FreeMHD geometries are added.
 - Fringing-field mapped-pipe operators.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
@@ -66,4 +68,10 @@
   - `x_position = 0.015`
   - `y = [-0.1, 0.1]`
   - `z = [-0.099995, 0.099995]`
+- A second real recovered-case FreeMHD smoke/parity path now exists for Hunt `Ha20`:
+  - the recovered `hunt_exactBL_Ha20` case runs to `t = 1e-4` in the same `linux/amd64` container path used for Shercliff
+  - the short transient is materially more expensive than Shercliff on this machine, with `ExecutionTime ≈ 174 s` for the solver stage before reconstruction
+  - the current coarse `max |U|` parity is still good at short time: `u_max_abs_diff ≈ 1.17e-3`
+  - the current sampled-profile parity is not good: `freemhd_sample_y_l2_error ≈ 6.02e-2`, `freemhd_sample_z_l2_error ≈ 6.74e-1`
+  - this confirms that the repo now has a real Hunt FreeMHD reference path and that Hunt solver fidelity, not infrastructure, is the dominant remaining gap
 - The current local Darwin `wmake` path now moves past the libc++ header-shadowing failure when the patch helper is applied, but it then fails on a new `fvMesh.H` include regression. That means the repo now has a reproducible two-step local build diagnosis instead of a single opaque `wmake` failure.
