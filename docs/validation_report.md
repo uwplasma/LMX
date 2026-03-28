@@ -25,6 +25,7 @@
 - Nonzero transient initialization in LMX through `CaseSpec.initial_velocity`.
 - Automatic line-cut geometry inference from the latest FreeMHD `fieldMinMax.dat` location data.
 - A checked-in parity report runner that wraps LMX case construction plus `compare_with_freemhd` into one JSON artifact.
+- A checked-in parity-suite runner for CI that emits either a real FreeMHD-vs-LMX artifact bundle or a structured `skipped` summary when no recovered case directory is available on the runner.
 - GitHub Actions validation artifacts for Hartmann, Shercliff, and Hunt runs.
 - GitHub Actions benchmark artifacts for the current Hartmann timing path.
 - Zenodo closed-channel analytical text ingestion for Shercliff and Hunt.
@@ -34,7 +35,7 @@
 
 - Improve Hunt accuracy now that the default path is bounded and emits finite analytical and processed-slice metrics.
 - Extend the current sampled line-cut parity path beyond the recovered Shercliff `Ha20` smoke case.
-- Promote the current sampled `y/z` profile comparison into a checked-in CI artifact/report job.
+- Use `LMX_FREEMHD_CASE_DIR` on machines that have recovered paper cases so the new parity-suite runner produces real artifacts instead of `skipped` summaries.
 - Generalize the current geometry inference beyond `fieldMinMax`-driven duct cases when more FreeMHD geometries are added.
 - Fringing-field mapped-pipe operators.
 - Stronger acceptance thresholds that can fail CI on parity regressions rather than only emitting artifacts.
@@ -55,8 +56,12 @@
   - absolute difference is about `1.29e-3`
 - The sampled-line profile comparison is now also available on the same recovered Shercliff `Ha20` smoke case:
   - `freemhd_sample_y_l2_error ≈ 5.83e-4`
-  - `freemhd_sample_z_l2_error ≈ 2.67e-4`
+  - `freemhd_sample_z_l2_error ≈ 3.29e-2` on the current verified sampled-path comparison
   - these are based on sampled `centerlineY` and `centerlineZ` cuts from reconstructed FreeMHD `0.0001/liquid/U`
+- The first CI-oriented parity-suite runner exposed a real comparison bug:
+  - when several sampled profile directories existed at the same sample time, the selector chose the first path alphabetically instead of the newest profile set
+  - this could silently swap in stale `lmxAutoSampleDict` data and inflate the Shercliff `z` error
+  - the selector now breaks ties by file modification time, so the local parity-suite smoke run uses the intended newest sample set
 - The sampling runner now infers the current Shercliff `Ha20` cut geometry automatically from the latest FreeMHD `fieldMinMax.dat` record:
   - `x_position = 0.015`
   - `y = [-0.1, 0.1]`

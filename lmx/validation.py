@@ -600,14 +600,15 @@ def latest_sampled_profiles(run_dir: str | Path) -> tuple[FreeMHDLineSample, Fre
     root = Path(run_dir)
     candidates = sorted(root.glob("postProcessing/*/liquid/*/centerlineY_potE_U.xy"))
     latest_y_path: Path | None = None
-    latest_time: float | None = None
+    latest_key: tuple[float, int] | None = None
     for path in candidates:
         try:
             sample_time = infer_sample_time_from_path(path)
         except ValueError:
             continue
-        if latest_time is None or sample_time > latest_time:
-            latest_time = sample_time
+        ordering_key = (sample_time, int(path.stat().st_mtime_ns))
+        if latest_key is None or ordering_key > latest_key:
+            latest_key = ordering_key
             latest_y_path = path
     if latest_y_path is None:
         return None

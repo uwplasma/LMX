@@ -6,6 +6,7 @@ from scripts.summarize_ci_artifacts import (
     build_summary,
     render_markdown,
     summarize_benchmark_report,
+    summarize_parity_report,
     summarize_validation_summary,
 )
 
@@ -77,13 +78,39 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
         }
         """
     )
-    summary = build_summary(validation, benchmark)
+    parity = tmp_path / "parity.json"
+    parity.write_text(
+        """
+        {
+          "status": "ok",
+          "reason": "",
+          "case_dir": "/tmp/case",
+          "sample_output": "/tmp/sample.json",
+          "parity_output": "/tmp/parity_report.json",
+          "parity_report": {
+            "metrics": {
+              "u_max_abs_diff": 0.01,
+              "freemhd_sample_y_l2_error": 0.02,
+              "freemhd_sample_z_l2_error": 0.03
+            }
+          }
+        }
+        """
+    )
+    summary = build_summary(validation, benchmark, parity)
     assert "## Validation" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
+    assert "## FreeMHD Parity" in summary["markdown"]
     assert "Slice Y L2" in summary["markdown"]
     out = tmp_path / "summary.json"
     md = tmp_path / "summary.md"
-    md.write_text(render_markdown(summarize_validation_summary(validation), summarize_benchmark_report(benchmark)))
+    md.write_text(
+        render_markdown(
+            summarize_validation_summary(validation),
+            summarize_benchmark_report(benchmark),
+            summarize_parity_report(parity),
+        )
+    )
     out.write_text("placeholder")
     assert md.exists()
 
@@ -105,3 +132,21 @@ def test_build_summary_allows_benchmark_only(tmp_path: Path):
     assert summary["validation"] == []
     assert summary["benchmark"]["case"] == "hartmann_ha20"
     assert "## Benchmark" in summary["markdown"]
+
+
+def test_summarize_parity_report(tmp_path: Path):
+    path = tmp_path / "parity.json"
+    path.write_text(
+        """
+        {
+          "status": "skipped",
+          "reason": "freemhd-case-unavailable",
+          "case_dir": "",
+          "sample_output": "",
+          "parity_output": ""
+        }
+        """
+    )
+    summary = summarize_parity_report(path)
+    assert summary.status == "skipped"
+    assert summary.reason == "freemhd-case-unavailable"

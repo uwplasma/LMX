@@ -50,10 +50,14 @@ jobs:
       - name: Run validation artifact suite
         run: python scripts/run_validation_suite.py --output artifacts/validation
 
+      - name: Run FreeMHD parity artifact suite
+        run: python scripts/run_freemhd_parity_suite.py --output artifacts/freemhd_parity
+
       - name: Build validation summary
         run: |
           python scripts/summarize_ci_artifacts.py \
             --validation-summary artifacts/validation/summary.json \
+            --parity-summary artifacts/freemhd_parity/summary.json \
             --output-json artifacts/validation/summary-report.json \
             --output-md artifacts/validation/summary-report.md
 
@@ -61,4 +65,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: validation-artifacts
-          path: artifacts/validation
+          path: |
+            artifacts/validation
+            artifacts/freemhd_parity

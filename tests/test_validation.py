@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -142,6 +143,29 @@ def test_sample_reader_and_latest_profile_detection(tmp_path: Path):
     normalized = normalize_sample_distance(sample.distance)
     assert float(normalized[0]) == pytest.approx(-1.0)
     assert float(normalized[-1]) == pytest.approx(1.0)
+
+
+def test_latest_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: Path):
+    older_root = tmp_path / "postProcessing" / "lmxAutoSampleDict" / "liquid" / "0.0001"
+    newer_root = tmp_path / "postProcessing" / "lmxCiSampleDict" / "liquid" / "0.0001"
+    older_root.mkdir(parents=True)
+    newer_root.mkdir(parents=True)
+    older_rows = "0.0 0.0 1.0 0.0 0.0\n1.0 0.0 2.0 0.0 0.0\n"
+    newer_rows = "0.0 0.0 3.0 0.0 0.0\n1.0 0.0 4.0 0.0 0.0\n"
+    (older_root / "centerlineY_potE_U.xy").write_text(older_rows)
+    (older_root / "centerlineZ_potE_U.xy").write_text(older_rows)
+    (newer_root / "centerlineY_potE_U.xy").write_text(newer_rows)
+    (newer_root / "centerlineZ_potE_U.xy").write_text(newer_rows)
+    os.utime(older_root / "centerlineY_potE_U.xy", ns=(1_000_000_000, 1_000_000_000))
+    os.utime(older_root / "centerlineZ_potE_U.xy", ns=(1_000_000_000, 1_000_000_000))
+    os.utime(newer_root / "centerlineY_potE_U.xy", ns=(2_000_000_000, 2_000_000_000))
+    os.utime(newer_root / "centerlineZ_potE_U.xy", ns=(2_000_000_000, 2_000_000_000))
+
+    latest = latest_sampled_profiles(tmp_path)
+
+    assert latest is not None
+    assert "lmxCiSampleDict" in latest[0].path
+    assert float(latest[0].u_x[0]) == pytest.approx(3.0)
 
 
 def test_hartmann_validation_writer(tmp_path: Path):

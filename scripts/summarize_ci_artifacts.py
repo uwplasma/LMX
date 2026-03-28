@@ -29,6 +29,18 @@ class BenchmarkSummary:
     repeats: float
 
 
+@dataclass(frozen=True)
+class ParitySummary:
+    status: str
+    reason: str
+    case_dir: str
+    sample_output: str
+    parity_output: str
+    freemhd_sample_y_l2_error: float | None = None
+    freemhd_sample_z_l2_error: float | None = None
+    u_max_abs_diff: float | None = None
+
+
 def _load_json(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
 
@@ -63,7 +75,31 @@ def summarize_benchmark_report(report_path: str | Path) -> BenchmarkSummary:
     )
 
 
-def render_markdown(validation: list[ValidationCaseSummary], benchmark: BenchmarkSummary | None = None) -> str:
+def summarize_parity_report(report_path: str | Path) -> ParitySummary:
+    payload = _load_json(report_path)
+    parity_report = payload.get("parity_report", {})
+    metrics = parity_report.get("metrics", {})
+    return ParitySummary(
+        status=str(payload.get("status", "")),
+        reason=str(payload.get("reason", "")),
+        case_dir=str(payload.get("case_dir", "")),
+        sample_output=str(payload.get("sample_output", "")),
+        parity_output=str(payload.get("parity_output", "")),
+        freemhd_sample_y_l2_error=(
+            None if "freemhd_sample_y_l2_error" not in metrics else float(metrics["freemhd_sample_y_l2_error"])
+        ),
+        freemhd_sample_z_l2_error=(
+            None if "freemhd_sample_z_l2_error" not in metrics else float(metrics["freemhd_sample_z_l2_error"])
+        ),
+        u_max_abs_diff=None if "u_max_abs_diff" not in metrics else float(metrics["u_max_abs_diff"]),
+    )
+
+
+def render_markdown(
+    validation: list[ValidationCaseSummary],
+    benchmark: BenchmarkSummary | None = None,
+    parity: ParitySummary | None = None,
+) -> str:
     lines = ["# LMX CI Summary", ""]
     if validation:
         lines.extend(
@@ -105,19 +141,36 @@ def render_markdown(validation: list[ValidationCaseSummary], benchmark: Benchmar
                 "",
             ]
         )
+    if parity is not None:
+        lines.extend(
+            [
+                "## FreeMHD Parity",
+                "",
+                f"- Status: `{parity.status}`",
+                f"- Reason: `{'-' if not parity.reason else parity.reason}`",
+                f"- Case dir: `{'-' if not parity.case_dir else parity.case_dir}`",
+                f"- U max abs diff: `{'-' if parity.u_max_abs_diff is None else f'{parity.u_max_abs_diff:.6g}'}`",
+                f"- Sample Y L2: `{'-' if parity.freemhd_sample_y_l2_error is None else f'{parity.freemhd_sample_y_l2_error:.6g}'}`",
+                f"- Sample Z L2: `{'-' if parity.freemhd_sample_z_l2_error is None else f'{parity.freemhd_sample_z_l2_error:.6g}'}`",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
 def build_summary(
     validation_summary_path: str | Path | None = None,
     benchmark_report_path: str | Path | None = None,
+    parity_summary_path: str | Path | None = None,
 ) -> dict[str, Any]:
     validation = summarize_validation_summary(validation_summary_path) if validation_summary_path is not None else []
     benchmark = summarize_benchmark_report(benchmark_report_path) if benchmark_report_path is not None else None
+    parity = summarize_parity_report(parity_summary_path) if parity_summary_path is not None else None
     payload: dict[str, Any] = {
         "validation": [item.__dict__ for item in validation],
         "benchmark": None if benchmark is None else benchmark.__dict__,
-        "markdown": render_markdown(validation, benchmark),
+        "parity": None if parity is None else parity.__dict__,
+        "markdown": render_markdown(validation, benchmark, parity),
     }
     return payload
 
@@ -126,11 +179,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Summarize LMX CI validation and benchmark artifacts.")
     parser.add_argument("--validation-summary", type=Path, default=None)
     parser.add_argument("--benchmark-report", type=Path, default=None)
+    parser.add_argument("--parity-summary", type=Path, default=None)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    summary = build_summary(args.validation_summary, args.benchmark_report)
+    summary = build_summary(args.validation_summary, args.benchmark_report, args.parity_summary)
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(summary, indent=2))
     if args.output_md is not None:

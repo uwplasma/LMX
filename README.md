@@ -15,6 +15,8 @@ This first implementation includes:
 - Recovered `StartingFiles` case materialization for Shercliff laminar paper cases, plus FreeMHD environment probes and fail-fast container harness checks.
 - Platform-aware FreeMHD container execution on Apple silicon via `linux/amd64`, plus short-run `controlDict` overrides for smoke/parity jobs.
 - A first coarse `LMX`-vs-`FreeMHD` comparison path based on FreeMHD `fieldMinMax.dat` output and matched nonzero LMX initial velocity.
+- Profile-based FreeMHD parity extraction plus a parity-suite artifact path in GitHub Actions that emits either a real report or a structured `skipped` report when no recovered case is available.
+- A shared `LMX_FREEMHD_CASE_DIR` convention so the same parity-suite runner can produce real FreeMHD artifacts on machines that have recovered paper cases.
 
 This repository does **not** yet include:
 
