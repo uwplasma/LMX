@@ -43,4 +43,14 @@ def test_probe_freemhd_environment_collects_expected_fields(tmp_path: Path, monk
     assert payload["docker_daemon_available"] is False
     assert payload["foam_system_check_returncode"] == 0
     assert payload["solver_build_probe_returncode"] == 2
+    assert payload["solver_build_issue"] == "unknown-build-failure"
     assert len(calls) == 2
+
+
+def test_classify_build_probe_detects_expected_failures():
+    assert probe.classify_build_probe("wmkdepend: No such file or directory", wmkdepend_exists=False) == "missing-wmkdepend"
+    assert (
+        probe.classify_build_probe("<cstring> tried including <string.h> but didn't find libc++'s <string.h> header.", True)
+        == "macos-libcxx-header-conflict"
+    )
+    assert probe.classify_build_probe("", wmkdepend_exists=True) == "ok"

@@ -23,6 +23,16 @@ def docker_daemon_available() -> bool:
     return result.returncode == 0
 
 
+def classify_build_probe(stderr: str, wmkdepend_exists: bool) -> str:
+    if not wmkdepend_exists and "wmkdepend" in stderr:
+        return "missing-wmkdepend"
+    if "<cstring> tried including <string.h>" in stderr or "<cwchar> tried including <wchar.h>" in stderr:
+        return "macos-libcxx-header-conflict"
+    if not stderr.strip():
+        return "ok"
+    return "unknown-build-failure"
+
+
 def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
     root = Path(repo_root).resolve()
     foam_root = root / "OpenFOAM-v2206"
@@ -32,6 +42,7 @@ def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
 
     foam_check = _run_shell(f"source {bashrc} && foamSystemCheck")
     build_probe = _run_shell(f"source {bashrc} && cd {solver_dir} && wmake")
+    build_issue = classify_build_probe(build_probe.stderr, wmkdepend.exists())
 
     return {
         "repo_root": str(root),
@@ -45,6 +56,7 @@ def probe_freemhd_environment(repo_root: str | Path) -> dict[str, object]:
         "foam_system_check_stdout_tail": foam_check.stdout[-4000:],
         "foam_system_check_stderr_tail": foam_check.stderr[-4000:],
         "solver_build_probe_returncode": build_probe.returncode,
+        "solver_build_issue": build_issue,
         "solver_build_probe_stdout_tail": build_probe.stdout[-4000:],
         "solver_build_probe_stderr_tail": build_probe.stderr[-4000:],
     }

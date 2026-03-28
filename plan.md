@@ -94,6 +94,12 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - An adaptive per-step velocity-update limiter now keeps the default Hunt path bounded and produces finite Hunt validation metrics.
 - CI artifact summaries now include processed-slice error columns.
 - A local FreeMHD container bundle generator and container execution helper now exist and are covered by unit tests.
+- FreeMHD readiness is now split into distinct signals:
+  - Docker CLI available
+  - Docker daemon reachable
+  - local case directories discovered
+  - recommended smoke target when no standalone FreeMHD case is present
+- The bundled FreeMHD OpenFOAM tree passes `foamSystemCheck` on this machine.
 - The repo now has explicit FreeMHD environment and case inspection scripts, and they correctly report the current local target as the bundled OpenFOAM Hartmann tutorial when no standalone FreeMHD cases are present.
 - A local FreeMHD environment probe now captures Docker-daemon availability and the current `wmkdepend` local-build blocker in machine-readable form.
 - FreeMHD-side inspection now reports that the current downloads contain no standalone runnable FreeMHD cases and recommends the bundled OpenFOAM Hartmann tutorial as the smallest local smoke target.
@@ -112,11 +118,15 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
 - Semi-implicit Lorentz damping alone was not enough to fix Hunt at default settings; it needed the additional adaptive update limiter.
 - Hunt is now bounded by default, but the resulting bounded solution is still not accurate enough yet to be treated as parity-complete.
 - The current FreeMHD container bundle is still a scaffold for local iteration; it documents the expected build/run layout but has not yet been proven end to end against a real OpenFOAM build on this machine.
+- The local host-side `wmake` probe for `epotMultiRegionFoam` still fails because `wmkdepend` is missing in the bundled darwin tool path.
+- Docker is installed but the daemon is not currently reachable from this environment, so container parity runs are blocked until that is fixed.
+- The current local assets still do not include standalone `epotMultiRegion*` paper case directories; only the solver sources, processed figures, and bundled OpenFOAM tutorials are present.
 - The current machine has the Docker CLI installed, but the Docker daemon is not reachable from the active environment.
 - The current local assets include the FreeMHD source tree and processed paper figures, but not the standalone `epotMultiRegion*` case directories needed for direct parity execution.
 - A direct local `wmake` probe currently fails because `OpenFOAM-v2206/platforms/tools/darwin64Clang/wmkdepend` is missing in the vendored FreeMHD tree on this machine.
 - The Docker client is installed here, but the Docker daemon is not currently reachable, so containerized FreeMHD execution is blocked by the local runtime state rather than repo code.
 - The currently downloaded assets do not yet include standalone runnable FreeMHD case directories, so real parity runs still require either the larger starting-files archive or another case source.
+- After manually building `wmkdepend`, the next local FreeMHD build blocker is a macOS libc++ header-path conflict during `wmake` of `epotMultiRegionFoam`.
 
 ## Chronological Log
 
@@ -345,6 +355,18 @@ LMX is a Python/JAX-native inductionless MHD code intended to reproduce the lami
   - Docker CLI exists but daemon is still unavailable
   - no standalone runnable FreeMHD cases are present in the currently downloaded assets
   - the bundled OpenFOAM Hartmann tutorial is the current recommended smoke target if local toolchain repair succeeds before the larger FreeMHD case archive is downloaded
+
+### 2026-03-28 00:25 America/Chicago
+
+- Repaired the first local OpenFOAM build blocker by compiling `OpenFOAM-v2206/wmake/src`, which successfully produced `platforms/tools/darwin64Clang/wmkdepend`.
+- Re-ran the FreeMHD solver build probe after that repair:
+  - `wmake` now advances into real compilation of `epotMultiRegionFoam`
+  - the next failure is a macOS libc++/header-path conflict (`<cstring>` / `<cwchar>` include resolution) rather than missing OpenFOAM tooling
+- Updated `scripts/probe_freemhd_environment.py` so it now classifies the current build failure mode instead of only reporting the raw return code and stderr tail.
+- Best next step is now explicit:
+  1. inspect the OpenFOAM darwin compiler flags and include ordering that trigger the libc++ header conflict
+  2. decide whether to patch the local build environment or rely on Docker once the daemon is available
+  3. in parallel, keep improving Shercliff/Hunt parity since LMX accuracy is still the main solver-side gap
 
 ## Instruction For Future Agents
 
