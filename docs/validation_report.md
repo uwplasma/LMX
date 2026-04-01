@@ -109,6 +109,15 @@ The backend harness currently supports:
   This is now reflected in explicit sign-pathology metrics in the validation
   summaries, so oscillatory branches can be identified directly instead of only
   through aggregate L2 error.
+- A retained sensitivity result now sharpens the likely root cause:
+  - on the problematic Hartmann `Ha20`, `32^2` branch, the solution depends
+    strongly on `potential_iterations`
+  - `50` iterations is acceptable, `200` is strongly oscillatory, `400` is much
+    better but still outside the analytical target, and `800` is acceptable
+  - this points to the current electric-potential coupling budget as a central
+    part of the blocker, not just generic pseudo-time controls
+  - CI now runs this Hartmann `potential_iterations` sweep as a normal artifact
+    so the blocker stays visible during future solver work
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

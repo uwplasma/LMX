@@ -1236,6 +1236,39 @@ LMX should only be described as ship ready for the current milestone when all of
   - the next retained solver change should target the update formulation while
     using the new sign-pathology metrics as an additional guardrail
 
+### 2026-04-01 19:40 America/Chicago
+
+- Probed the Hartmann `Ha20`, `32^2` blocker against potential-solve depth:
+  - `potential_iterations=50` is acceptable
+    (`l2 ≈ 2.08e-2`, `linf ≈ 5.34e-2`)
+  - `100` is worse but still non-oscillatory
+    (`l2 ≈ 2.09e-1`)
+  - `200` is the clearly bad branch
+    (`l2 ≈ 1.38`, sign changes present, large negative fraction)
+  - `400` removes the sign pathology and drops the error substantially
+    (`l2 ≈ 3.13e-1`)
+  - `800` is acceptable again
+    (`l2 ≈ 3.76e-2`, `linf ≈ 6.23e-2`)
+- Important interpretation:
+  - this is not a simple monotone “more is always better” story at low budgets,
+    but it strongly implicates the electric-potential solve depth as a central
+    part of the Hartmann refinement blocker
+  - generic pseudo-time controls alone are not the main issue here
+- Also tried the existing `lineax` Poisson backend again as a more principled
+  replacement for fixed-count Jacobi:
+  - even with a large `max_steps` override, it still hit the solver-step limit
+    in the current configuration
+  - it was not retained for production use
+- Retained infrastructure change:
+  - CI now runs a dedicated Hartmann control sweep:
+    - case: `hartmann`
+    - `Ha=20`
+    - resolution: `32^2`
+    - parameter: `potential_iterations`
+    - values: `50,100,200,400,800`
+  - this uses the existing generic sweep runner and summary path, so the current
+    refinement blocker becomes a normal artifact on every CI run
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

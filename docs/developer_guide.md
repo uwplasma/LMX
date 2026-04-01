@@ -73,7 +73,8 @@
   sweep points and the best `y_l2` / `z_l2` points, because the retained Hunt
   sweeps are not monotone. It also reports acceptance counts when the underlying
   sweep data includes analytical pass/fail information, which is useful for the
-  current Hartmann refinement blocker.
+  current Hartmann refinement blocker. CI now runs a dedicated Hartmann
+  `potential_iterations` sweep at `Ha20`, `32^2` for that reason.
 - Validation summaries now also include simple profile-pathology diagnostics such
   as sign-change counts and negative-value fractions on the extracted duct
   midplane profiles. These are useful when a solver branch becomes oscillatory
