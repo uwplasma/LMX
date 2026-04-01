@@ -52,6 +52,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hunt_phi_backend --case hunt --ha 100 --resolution 32 --parameter potential_solver --values jacobi,cg_volume --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_velocity_limit --case hunt --ha 20 --resolution 32 --parameter velocity_update_limit --values 5e-4,1e-3,2e-3,4e-3 --value-type float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_grid_sweep.py --output ./artifacts/control_grid_hunt --case hunt --ha 20 --resolution 32 --parameter-a outer_iterations --values-a 4,6 --type-a int --parameter-b potential_relaxation --values-b 1.0,0.5 --type-b float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+/Users/rogerio/base_env/bin/python3 scripts/compare_hunt_trace_histories.py --freemhd-diag-json /tmp/lmx_hunt20_live_diag.json --lmx-report-json /tmp/lmx_hunt_auto_short_trace_force.json --output ./artifacts/hunt_trace_alignment.json
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
 ```
 

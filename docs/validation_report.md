@@ -449,6 +449,27 @@ The backend harness currently supports:
     - this is not the next real fix for the longer-horizon Hunt mismatch
     - keep the stable solver baseline and use the new force-history observables
       to target the pressure-response defect more directly
+- The new trace-alignment script now makes that pressure-response defect
+  explicit instead of qualitative:
+  - `python scripts/compare_hunt_trace_histories.py --freemhd-diag-json ... --lmx-report-json ...`
+    aligns the patched FreeMHD Hunt records and the LMX Hunt trace on the same
+    time axis, using:
+    - final pressure-correction `maxU` from FreeMHD
+    - `epot`-logged `maxJ` and `maxJxB` from FreeMHD
+    - `u_max_history`, `current_max_history`, and `lorentz_max_history` from
+      LMX
+  - retained `Ha20` short-time alignment against
+    `/tmp/lmx_hunt20_live_diag.json` and
+    `/tmp/lmx_hunt_auto_short_trace_force.json`:
+    - `u_max`: normalized `l2_error ≈ 3.55e-03`, `max_abs_diff ≈ 6.16e-03`
+    - `maxJ`: normalized `l2_error ≈ 3.58e-02`, `max_abs_diff ≈ 4.56e-02`
+    - `maxJxB`: normalized `l2_error ≈ 8.15e-02`, `max_abs_diff ≈ 1.31e-01`
+  - retained interpretation:
+    - short-time `maxU` already tracks FreeMHD well
+    - current magnitude drifts moderately
+    - Lorentz-force magnitude diverges first and fastest
+    - the next solver pass should target why LMX `JxB` decays too quickly on
+      the Hunt startup path, instead of changing the `phi` backend again
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and

@@ -1996,6 +1996,26 @@ LMX should only be described as ship ready for the current milestone when all of
   Retained short-time Hunt `Ha20` baseline on the stable solver now includes:
   - final `current_max_history[-1] ≈ 2.95`
   - final `lorentz_max_history[-1] ≈ 31.0`
+- `2026-04-02 23:05 America/Chicago`: Added
+  `scripts/compare_hunt_trace_histories.py` plus tests to align patched FreeMHD
+  Hunt records and LMX Hunt traces on a common time axis. The retained
+  alignment result for the current short-time Hunt `Ha20` baseline is:
+  - `u_max`:
+    - normalized `l2_error ≈ 3.55e-03`
+    - `max_abs_diff ≈ 6.16e-03`
+  - `maxJ`:
+    - normalized `l2_error ≈ 3.58e-02`
+    - `max_abs_diff ≈ 4.56e-02`
+  - `maxJxB`:
+    - normalized `l2_error ≈ 8.15e-02`
+    - `max_abs_diff ≈ 1.31e-01`
+  - retained interpretation:
+    - short-time `u_max` is already close enough that it is no longer the best
+      signal for the remaining Hunt mismatch
+    - `maxJ` drifts moderately
+    - `maxJxB` diverges first and fastest, so the next solver pass should
+      target why the Lorentz-force response decays too quickly on the Hunt
+      startup path
 - Best next step:
   - use the patched FreeMHD pressure/maxU/`maxJxB` trace together with the
     improved LMX `u_max`/`current_max`/`lorentz_max` histories to target the
