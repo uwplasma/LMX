@@ -23,11 +23,13 @@ from lmx.validation import (
     interior_sample_coordinate,
     extract_midplane_profile,
     latest_sampled_profiles,
+    negative_fraction,
     hartmann_analytic_profile,
     hartmann_validation,
     inspect_freemhd_case,
     latest_field_minmax_record,
     normalize_sample_distance,
+    profile_sign_changes,
     processed_slice_validation,
     read_freemhd_xy_sample,
     read_field_minmax,
@@ -47,6 +49,14 @@ def test_hartmann_profile_center_is_maximum():
     y = jnp.linspace(-1.0, 1.0, 101)
     profile = hartmann_analytic_profile(y, ha=10.0)
     assert float(profile[50]) >= float(profile[0])
+
+
+def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles():
+    profile = jnp.asarray([0.1, 0.05, -0.02, -0.01, 0.03, 0.02])
+
+    assert profile_sign_changes(profile) == 2
+    assert negative_fraction(profile) == pytest.approx(2.0 / 6.0)
+
 
 def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
     case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
@@ -87,6 +97,17 @@ def test_compare_with_freemhd_report(tmp_path: Path):
     assert report.metrics["freemhd_u_max_latest"] == pytest.approx(0.25)
     assert report.metrics["sampled_profile_pair_available"] == pytest.approx(1.0)
     assert "freemhd_sample_y_l2_error" in report.metrics
+
+
+def test_duct_profile_metrics_reports_sign_pathology():
+    case = make_hartmann_case(ha=20.0, ny=32, nz=32)
+    solution = solve_steady(case)
+    metrics = duct_profile_metrics(solution)
+
+    assert "centerline_y_sign_changes" in metrics
+    assert "centerline_z_sign_changes" in metrics
+    assert "centerline_y_negative_fraction" in metrics
+    assert metrics["centerline_y_sign_changes"] > 0.0 or metrics["centerline_y_negative_fraction"] > 0.0
 
 
 def test_inspect_freemhd_case_collects_case_structure(tmp_path: Path):

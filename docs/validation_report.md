@@ -101,6 +101,14 @@ The backend harness currently supports:
   the present Hartmann acceptance target at that refinement level. The failing
   test was not kept, but the CI summary now reports how many sweep levels pass
   acceptance so this blocker is visible in normal artifacts.
+- The Hartmann refinement failure is now characterized a bit more directly:
+  - `16^2` remains acceptable
+  - `32^2` develops a sign-changing centerline and fails badly
+  - `48^2` is positive again but still outside the current analytical target
+  - `96^2` returns to the previously good fine-mesh behavior
+  This is now reflected in explicit sign-pathology metrics in the validation
+  summaries, so oscillatory branches can be identified directly instead of only
+  through aggregate L2 error.
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

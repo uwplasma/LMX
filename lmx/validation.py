@@ -300,6 +300,22 @@ def symmetry_metrics(profile: jnp.ndarray, axis: str) -> ProfileSymmetry:
     )
 
 
+def profile_sign_changes(profile: jnp.ndarray, *, tolerance: float = 1e-12) -> int:
+    if profile.size <= 1:
+        return 0
+    signs = jnp.where(jnp.abs(profile) <= tolerance, 0.0, jnp.sign(profile))
+    left = signs[:-1]
+    right = signs[1:]
+    transitions = (left * right) < 0.0
+    return int(jnp.sum(transitions))
+
+
+def negative_fraction(profile: jnp.ndarray, *, tolerance: float = 1e-12) -> float:
+    if profile.size == 0:
+        return 0.0
+    return float(jnp.mean((profile < -tolerance).astype(float)))
+
+
 def duct_profile_metrics(solution: Solution) -> dict[str, float]:
     y_profile = extract_midplane_profile(solution, axis="y")["u"]
     z_profile = extract_midplane_profile(solution, axis="z")["u"]
@@ -310,6 +326,10 @@ def duct_profile_metrics(solution: Solution) -> dict[str, float]:
         "symmetry_y_max_abs_error": y_sym.max_abs_error,
         "symmetry_z_mean_abs_error": z_sym.mean_abs_error,
         "symmetry_z_max_abs_error": z_sym.max_abs_error,
+        "centerline_y_sign_changes": float(profile_sign_changes(y_profile)),
+        "centerline_z_sign_changes": float(profile_sign_changes(z_profile)),
+        "centerline_y_negative_fraction": negative_fraction(y_profile),
+        "centerline_z_negative_fraction": negative_fraction(z_profile),
         "u_max": float(jnp.max(solution.state.u)),
         "u_mean": float(jnp.mean(solution.state.u)),
     }

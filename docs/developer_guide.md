@@ -74,6 +74,10 @@
   sweeps are not monotone. It also reports acceptance counts when the underlying
   sweep data includes analytical pass/fail information, which is useful for the
   current Hartmann refinement blocker.
+- Validation summaries now also include simple profile-pathology diagnostics such
+  as sign-change counts and negative-value fractions on the extracted duct
+  midplane profiles. These are useful when a solver branch becomes oscillatory
+  even before its aggregate L2 error is inspected.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

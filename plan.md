@@ -1205,6 +1205,37 @@ LMX should only be described as ship ready for the current milestone when all of
     but the ship-ready plan must now treat Hartmann medium-resolution acceptance
     as an open blocker rather than as a solved guardrail
 
+### 2026-04-01 19:00 America/Chicago
+
+- Investigated the Hartmann refinement blocker more directly by sampling actual
+  centerlines at `Ha20` for `16^2`, `32^2`, `48^2`, and `96^2`:
+  - `16^2` remains acceptable (`l2 ≈ 1.96e-2`)
+  - `32^2` is the clearest failure branch right now:
+    - the centerline changes sign
+    - `l2 ≈ 1.20`, `linf ≈ 1.83`
+  - `48^2` is positive again but still not acceptable
+    (`l2 ≈ 7.86e-2`, `linf ≈ 1.28e-1`)
+  - `96^2` returns to the previously good fine-mesh behavior
+    (`l2 ≈ 3.87e-3`, `linf ≈ 1.01e-2`)
+- Probed a few obvious control-only explanations for the `32^2` Hartmann branch:
+  - more steps alone does not fix it
+  - smaller `dt`, smaller relaxation, and a smaller velocity-update cap reduce
+    the damage but do not restore analytical acceptance
+  - this makes the blocker look more like a discrete-update/control-law pathology
+    than a simple convergence-budget issue
+- Retained code/data improvement:
+  - added explicit validation metrics for profile sign pathologies:
+    - `centerline_y_sign_changes`
+    - `centerline_z_sign_changes`
+    - `centerline_y_negative_fraction`
+    - `centerline_z_negative_fraction`
+  - these now surface oscillatory/nonphysical branches directly in validation
+    artifacts instead of only through aggregate L2 errors
+- Next-step implication:
+  - the remaining solver work is not just “tune more controls”
+  - the next retained solver change should target the update formulation while
+    using the new sign-pathology metrics as an additional guardrail
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
