@@ -90,6 +90,10 @@
   latest electric-potential solve. Use it with `potential_residual` to tell the
   difference between “the solve stopped early” and “the solve hit its iteration
   ceiling without converging enough.”
+- Closed-channel validation, convergence, and control-sweep artifacts now also
+  report a combined profile error built from the `y` and `z` cuts. Use that when
+  a candidate improves one direction while degrading the other, which is exactly
+  the current Hunt tuning pattern.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

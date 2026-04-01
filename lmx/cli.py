@@ -12,6 +12,7 @@ from .io import write_paraview
 from .solvers import solve_steady
 from .validation import (
     closed_channel_validation,
+    combined_profile_error,
     extract_centerline,
     extract_midplane_profile,
     hartmann_acceptance,
@@ -101,6 +102,14 @@ def main(argv: list[str] | None = None) -> int:
             payload["y_linf_error"] = comparison.y_profile.linf_error
             payload["z_l2_error"] = comparison.z_profile.l2_error
             payload["z_linf_error"] = comparison.z_profile.linf_error
+            payload["combined_l2_error"] = combined_profile_error(
+                comparison.y_profile.l2_error,
+                comparison.z_profile.l2_error,
+            )
+            payload["combined_linf_error"] = combined_profile_error(
+                comparison.y_profile.linf_error,
+                comparison.z_profile.linf_error,
+            )
             try:
                 slice_report = processed_slice_validation(
                     solution,
@@ -117,6 +126,14 @@ def main(argv: list[str] | None = None) -> int:
                 payload["slice_y_linf_error"] = slice_report.y_profile.linf_error
                 payload["slice_z_l2_error"] = slice_report.z_profile.l2_error
                 payload["slice_z_linf_error"] = slice_report.z_profile.linf_error
+                payload["slice_combined_l2_error"] = combined_profile_error(
+                    slice_report.y_profile.l2_error,
+                    slice_report.z_profile.l2_error,
+                )
+                payload["slice_combined_linf_error"] = combined_profile_error(
+                    slice_report.y_profile.linf_error,
+                    slice_report.z_profile.linf_error,
+                )
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 0

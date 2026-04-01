@@ -108,4 +108,6 @@ def test_run_validation_suite_handles_reference_branch(tmp_path: Path, monkeypat
     summary = (output / "summary.json").read_text()
     assert exit_code == 0
     assert '"y_l2_error": 0.2' in summary
+    assert '"combined_l2_error"' in summary
     assert '"slice_y_l2_error": 0.2' in summary
+    assert '"slice_combined_l2_error"' in summary

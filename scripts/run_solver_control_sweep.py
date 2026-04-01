@@ -12,6 +12,7 @@ from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
+    combined_profile_error,
     duct_layer_resolution_metrics,
     hartmann_acceptance,
     hartmann_validation,
@@ -65,6 +66,14 @@ def _collect_metrics(solution, case_kind: str, ha: float, *, reference_root: Pat
         comparison = closed_channel_validation(solution, case_kind, int(ha), reference_root=reference_root)
         metrics["y_l2_error"] = comparison.y_profile.l2_error
         metrics["z_l2_error"] = comparison.z_profile.l2_error
+        metrics["combined_l2_error"] = combined_profile_error(
+            comparison.y_profile.l2_error,
+            comparison.z_profile.l2_error,
+        )
+        metrics["combined_linf_error"] = combined_profile_error(
+            comparison.y_profile.linf_error,
+            comparison.z_profile.linf_error,
+        )
         try:
             slice_report = processed_slice_validation(
                 solution,
@@ -78,6 +87,14 @@ def _collect_metrics(solution, case_kind: str, ha: float, *, reference_root: Pat
         if slice_report is not None:
             metrics["slice_y_l2_error"] = slice_report.y_profile.l2_error
             metrics["slice_z_l2_error"] = slice_report.z_profile.l2_error
+            metrics["slice_combined_l2_error"] = combined_profile_error(
+                slice_report.y_profile.l2_error,
+                slice_report.z_profile.l2_error,
+            )
+            metrics["slice_combined_linf_error"] = combined_profile_error(
+                slice_report.y_profile.linf_error,
+                slice_report.z_profile.linf_error,
+            )
     return metrics
 
 

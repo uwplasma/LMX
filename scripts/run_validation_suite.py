@@ -12,6 +12,7 @@ from lmx.io import write_paraview
 from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
+    combined_profile_error,
     extract_centerline,
     extract_midplane_profile,
     hartmann_acceptance,
@@ -82,6 +83,14 @@ def main() -> int:
             metrics["y_linf_error"] = comparison.y_profile.linf_error
             metrics["z_l2_error"] = comparison.z_profile.l2_error
             metrics["z_linf_error"] = comparison.z_profile.linf_error
+            metrics["combined_l2_error"] = combined_profile_error(
+                comparison.y_profile.l2_error,
+                comparison.z_profile.l2_error,
+            )
+            metrics["combined_linf_error"] = combined_profile_error(
+                comparison.y_profile.linf_error,
+                comparison.z_profile.linf_error,
+            )
             try:
                 slice_report = processed_slice_validation(
                     solution,
@@ -98,6 +107,14 @@ def main() -> int:
                 metrics["slice_y_linf_error"] = slice_report.y_profile.linf_error
                 metrics["slice_z_l2_error"] = slice_report.z_profile.l2_error
                 metrics["slice_z_linf_error"] = slice_report.z_profile.linf_error
+                metrics["slice_combined_l2_error"] = combined_profile_error(
+                    slice_report.y_profile.l2_error,
+                    slice_report.z_profile.l2_error,
+                )
+                metrics["slice_combined_linf_error"] = combined_profile_error(
+                    slice_report.y_profile.linf_error,
+                    slice_report.z_profile.linf_error,
+                )
             write_metrics_json(metrics, case_dir / "metrics.json")
         summary[case.name] = metrics
 

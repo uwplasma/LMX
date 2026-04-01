@@ -58,7 +58,9 @@ def test_run_time_convergence_suite_writes_summary(
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"l2_error": 0.04} if case_kind == "hartmann" else {"y_l2_error": 0.2},
+        lambda solution, case_kind, ha, **kwargs: (
+            {"l2_error": 0.04} if case_kind == "hartmann" else {"y_l2_error": 0.2, "z_l2_error": 0.1, "combined_l2_error": 0.158}
+        ),
     )
 
     exit_code = suite.main([])
@@ -68,5 +70,6 @@ def test_run_time_convergence_suite_writes_summary(
     assert '"hartmann"' in summary
     assert '"hunt"' in summary
     assert '"hartmann_layer_cells": 6.0' in summary
+    assert '"combined_l2_error": 0.158' in summary
     assert '"dt": 0.002' in summary
     assert '"cases"' in capsys.readouterr().out

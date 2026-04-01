@@ -144,6 +144,16 @@ The backend harness currently supports:
   - that means the retained infrastructure is useful, but the next default-solver
     change should be framed as a question of iteration budget and coupling law,
     not as “tolerance alone solved the Hartmann blocker”
+- Closed-channel validation artifacts now also report a combined profile error
+  from the `y` and `z` cuts. That metric already prevents one misleading solver
+  conclusion:
+  - a Hunt `Ha20`, `32^2` candidate with `outer_iterations = 4` and
+    `potential_iterations = 400` looks better than the current default on the
+    `y` profile alone (`0.038` vs `0.067`)
+  - but its combined profile error is actually worse than the current default
+    (`0.134` vs `0.127`)
+  - so the retained conclusion is to keep the current Hunt defaults and treat
+    that candidate as a documented tradeoff, not a real improvement
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

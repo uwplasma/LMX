@@ -115,8 +115,10 @@ def test_cli_validate_branches_into_reference_comparison(tmp_path: Path, monkeyp
 
     assert exit_code == 0
     assert "y_l2_error" in recorded["metrics"]
+    assert "combined_l2_error" in recorded["metrics"]
     assert recorded["closed"] == output_dir / "shercliff_ha5_analytic.json"
     assert recorded["slice"] == output_dir / "shercliff_ha5_slice.json"
+    assert recorded["metrics"]["combined_l2_error"] == pytest.approx(((0.2**2 + 0.4**2) / 2.0) ** 0.5)
     assert '"y_l2_error": 0.2' in capsys.readouterr().out
 
 
@@ -188,6 +190,7 @@ def test_cli_validate_reference_branch_handles_missing_slice_file(tmp_path: Path
     assert exit_code == 0
     assert recorded["closed"] == output_dir / "hunt_ha5_analytic.json"
     assert "slice_y_l2_error" not in recorded["metrics"]
+    assert "combined_l2_error" in recorded["metrics"]
     assert '"y_l2_error": 0.2' in capsys.readouterr().out
 
 

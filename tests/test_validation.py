@@ -11,6 +11,7 @@ from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
     compare_with_freemhd,
+    combined_profile_error,
     duct_layer_resolution_metrics,
     duct_profile_metrics,
     estimate_observed_order,
@@ -50,6 +51,10 @@ def test_hartmann_profile_center_is_maximum():
     y = jnp.linspace(-1.0, 1.0, 101)
     profile = hartmann_analytic_profile(y, ha=10.0)
     assert float(profile[50]) >= float(profile[0])
+
+
+def test_combined_profile_error_uses_root_mean_square():
+    assert combined_profile_error(3.0, 4.0) == pytest.approx((12.5) ** 0.5)
 
 
 def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles():

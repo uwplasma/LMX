@@ -30,8 +30,10 @@ def test_summarize_validation_summary(tmp_path: Path):
             "u_max": 1.0,
             "y_l2_error": 0.2,
             "z_l2_error": 0.3,
+            "combined_l2_error": 0.25,
             "slice_y_l2_error": 0.4,
-            "slice_z_l2_error": 0.5
+            "slice_z_l2_error": 0.5,
+            "slice_combined_l2_error": 0.45
           }
         }
         """
@@ -42,7 +44,9 @@ def test_summarize_validation_summary(tmp_path: Path):
     assert summaries[0].potential_residual == pytest.approx(0.01)
     assert summaries[0].potential_iterations_used == pytest.approx(50)
     assert summaries[1].y_l2_error == pytest.approx(0.2)
+    assert summaries[1].combined_l2_error == pytest.approx(0.25)
     assert summaries[1].slice_y_l2_error == pytest.approx(0.4)
+    assert summaries[1].slice_combined_l2_error == pytest.approx(0.45)
 
 
 def test_summarize_benchmark_report(tmp_path: Path):
@@ -133,6 +137,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     assert "## Validation" in summary["markdown"]
     assert "Potential residual" in summary["markdown"]
     assert "Potential iterations" in summary["markdown"]
+    assert "Combined L2" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
     assert "## FreeMHD Parity" in summary["markdown"]
     assert "## Time Convergence" in summary["markdown"]

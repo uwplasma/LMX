@@ -1341,6 +1341,42 @@ LMX should only be described as ship ready for the current milestone when all of
     - or should the coupled update be changed so the present ceiling is enough
       on the medium-resolution Hartmann/Hunt branches
 
+### 2026-04-01 22:45 America/Chicago
+
+- Probed the next obvious Hunt default-policy candidate before changing anything:
+  - increasing `potential_iterations` at `Ha20`, `32^2` improves Hunt `z_l2`
+    monotonically:
+    - `200 -> 400 -> 600 -> 800` gives about
+      `0.180 -> 0.167 -> 0.157 -> 0.150`
+  - but over the same sweep the Hunt `y_l2` degrades:
+    - `0.063 -> 0.067 -> 0.073 -> 0.077`
+  - a coupled sweep over `outer_iterations` and `potential_iterations` showed
+    the same tradeoff:
+    - `outer=4, pit=400` improved `y_l2` to about `0.038`
+    - but worsened `z_l2` to about `0.186`
+- Retained interpretation:
+  - no default Hunt control change should be kept yet based on one profile
+    direction alone
+  - a combined closed-channel profile metric is needed so these tradeoffs are
+    scored consistently instead of by visual inspection of separate `y/z` cuts
+- Retained code/data improvement:
+  - added a combined closed-channel profile error to the validation/reporting
+    path:
+    - CLI validation output
+    - validation suite summaries
+    - convergence summaries
+    - pseudo-time convergence summaries
+    - solver-control sweeps
+    - CI markdown summaries
+  - this immediately clarified the recent Hunt candidate:
+    - current default at `Ha20`, `32^2` has combined error ≈ `0.127`
+    - the tempting `outer=4, pit=400` candidate has combined error ≈ `0.134`
+    - so it is not a real retained improvement and the Hunt defaults stay
+      unchanged on `main`
+- Next-step implication:
+  - the next retained Hunt solver change should reduce the combined closed-channel
+    error, not just one of the directional profile errors
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

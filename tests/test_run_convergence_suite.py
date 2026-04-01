@@ -52,7 +52,7 @@ def test_run_convergence_suite_writes_summary(tmp_path: Path, monkeypatch: pytes
         lambda solution, case_kind, ha, **kwargs: (
             {"l2_error": 4.0e-2 if case_kind == "hartmann" and kwargs else 1.0e-2}
             if case_kind == "hartmann"
-            else {"y_l2_error": 0.2, "z_l2_error": 0.1}
+            else {"y_l2_error": 0.2, "z_l2_error": 0.1, "combined_l2_error": 0.158}
         ),
     )
 
@@ -63,4 +63,5 @@ def test_run_convergence_suite_writes_summary(tmp_path: Path, monkeypatch: pytes
     assert '"hartmann"' in summary
     assert '"shercliff"' in summary
     assert '"hartmann_layer_cells": 8.0' in summary
+    assert '"combined_l2_error": 0.158' in summary
     assert '"cases"' in capsys.readouterr().out

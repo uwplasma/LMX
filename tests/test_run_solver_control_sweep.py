@@ -99,7 +99,11 @@ def test_run_solver_control_sweep_writes_summary(
     )
     monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
     monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
-    monkeypatch.setattr(suite, "_collect_metrics", lambda solution, case_kind, ha, **kwargs: {"y_l2_error": 0.2, "z_l2_error": 0.3})
+    monkeypatch.setattr(
+        suite,
+        "_collect_metrics",
+        lambda solution, case_kind, ha, **kwargs: {"y_l2_error": 0.2, "z_l2_error": 0.3, "combined_l2_error": 0.255},
+    )
 
     exit_code = suite.main([])
 
@@ -108,4 +112,5 @@ def test_run_solver_control_sweep_writes_summary(
     assert '"parameter": "outer_iterations"' in summary
     assert '"parameter_value": 2' in summary
     assert '"hartmann_layer_cells": 6.0' in summary
+    assert '"combined_l2_error": 0.255' in summary
     assert '"levels"' in capsys.readouterr().out

@@ -125,6 +125,13 @@ class AcceptanceReport:
     passed: bool
 
 
+def combined_profile_error(*errors: float) -> float:
+    if not errors:
+        return 0.0
+    values = jnp.asarray(errors, dtype=float)
+    return float(jnp.sqrt(jnp.mean(values**2)))
+
+
 def _dominant_magnetic_axis(case: CaseSpec) -> str | None:
     if case.magnetic_field.kind != "constant" or case.magnetic_field.value is None:
         return None

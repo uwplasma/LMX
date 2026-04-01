@@ -18,6 +18,8 @@ staying focused on structured duct and simple pipe geometries.
 - Validation summaries now include a normalized electric-potential equation
   residual, so solver/control issues in the `phi` solve are visible in normal
   artifacts instead of only through profile errors.
+- Closed-channel validation artifacts now also include a combined profile error,
+  so Hunt/Shercliff tradeoffs are not judged from `y` and `z` cuts separately.
 
 ## Quick start
 
