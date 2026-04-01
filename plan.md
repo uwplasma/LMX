@@ -62,27 +62,95 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - `scripts/inspect_freemhd_setup.py`: inspects the locally available FreeMHD assets, reports discovered case directories, and recommends the smallest smoke target.
 - `docs/index.md`, `docs/conf.py`, `.readthedocs.yaml`: documentation landing page and Read the Docs build configuration.
 
+## Current Readiness Assessment
+
+### What LMX can credibly do today
+
+- Run native laminar inductionless Hartmann, Shercliff, and Hunt-style duct cases from a single Python/JAX codebase.
+- Generate fields, CSV cuts, ParaView output, validation reports, and benchmark artifacts.
+- Compare against analytical references for Hartmann and processed closed-channel references for Shercliff and Hunt.
+- Compare against recovered external cases through the checked-in backend harness when those assets are available locally.
+- Operate as a standalone solver for structured duct-style liquid-metal flows with insulating and conducting-wall regions.
+
+### What LMX cannot credibly claim yet
+
+- Full FreeMHD parity across equations, convergence behavior, and runtime for the laminar validation set.
+- A thorough convergence study showing mesh-independent and time-step-independent agreement across Hartmann, Shercliff, and Hunt.
+- General simple-pipe support beyond the current mapped-mesh scaffolding and output path.
+- Broad boundary-condition completeness for future liquid-metal applications.
+- Ship-ready robustness for new geometries without additional solver and validation work.
+
+### FreeMHD comparison status
+
+- Short-time recovered-case comparisons are real and useful, not speculative:
+  - Shercliff `Ha20` and `Ha100` sampled profile parity is already strong.
+  - Hunt `Ha20` is much better than before and is now useful as a real solver target.
+  - Hunt `Ha100` still shows a meaningful high-Ha conducting-wall fidelity gap.
+- These comparisons are still limited in scope:
+  - mostly short-time runs around recovered closed-channel cases
+  - no full convergence campaign yet
+  - no broad runtime-parity sweep yet
+  - no claim yet that LMX matches FreeMHD across all validation observables
+
+### Standalone-solver status
+
+- Yes, LMX is already a standalone code for the current duct-focused laminar inductionless scope.
+- No, it is not yet a ship-ready general liquid-metal solver for all simple pipes and boundary-condition combinations.
+- The current standalone boundary-condition story is still narrow: no-slip, insulating, conducting wall, inlet velocity, inlet flow rate, outlet pressure, and imposed current density exist at the spec level, but they are not all exercised across a sufficiently broad native case matrix yet.
+
+## Ship-Ready Exit Criteria
+
+LMX should only be described as ship ready for the current milestone when all of the following are true:
+
+1. Native solver quality
+   - Hartmann, Shercliff, and Hunt run stably on their intended mesh ranges without case-specific rescue tuning.
+   - High-Ha Hunt remains bounded and accurate enough to pass explicit acceptance thresholds.
+   - The solver no longer depends on parity-script-only behavior for physically meaningful setup choices.
+
+2. Validation quality
+   - Hartmann has analytical pass/fail thresholds.
+   - Shercliff and Hunt each have at least one documented mesh/time convergence study.
+   - Recovered external comparisons cover at least the main short-time duct cases with reproducible reports.
+
+3. Scope clarity
+   - The supported native problem classes and unsupported features are documented clearly.
+   - Pipe geometry support is either completed for the intended mapped cases or explicitly removed from the current ship scope.
+
+4. Performance and maintenance
+   - Benchmark thresholds are tracked in CI or a documented release workflow.
+   - Coverage remains high enough that solver and validation regressions are unlikely to slip through.
+   - Docs, tests, and validation runners remain synchronized with the actual supported feature set.
+
 ## Best Next Steps
 
-1. Replace the current pseudo-transient duct step with a more faithful laminar parity solver:
+1. Replace the current pseudo-transient duct step with a more faithful laminar solver for the native LMX scope:
    - better electric-potential gauge handling
    - stable iterative coupling between `u`, `phi`, and `J x B`
    - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but real Hunt `Ha20` and `Ha100` comparisons confirm conducting-wall fidelity still needs a real multi-region solver fix
-2. Keep the public package and docs LMX-first:
+   - the next retained solver milestone should be a materially better high-Ha Hunt shape match without adding new hardcoded case heuristics
+2. Convert the current comparison work into a proper validation campaign:
+   - define pass/fail thresholds for Hartmann
+   - add mesh-convergence and pseudo-time-convergence studies for Shercliff and Hunt
+   - keep recovered-case FreeMHD comparisons as secondary cross-checks rather than the sole definition of correctness
+3. Expand native standalone scope carefully rather than implicitly:
+   - decide whether the next supported geometry milestone is still mapped simple pipes or only ducts
+   - if simple pipes remain in scope, implement mapped operators and a native validation case before claiming support
+   - broaden the exercised boundary-condition matrix with native tests instead of only dataclass-level support
+4. Keep the public package and docs LMX-first:
    - external backend references should remain confined to validation sections
    - solver defaults should continue moving toward geometry-derived and nondimensional controls rather than case-specific constants
    - the current conducting-wall sampling path now uses mesh-derived interior planes rather than a fixed offset; keep following that rule for future geometry work
-3. Tighten CI acceptance criteria and maintenance tooling:
+5. Tighten CI acceptance criteria and maintenance tooling:
    - docs now build warning-free through Sphinx/MyST and should stay that way
    - coverage is high enough to enforce and should continue moving up from the current `89%`
    - convert Hartmann validation into a stronger pass/fail parity check once runtime noise and numerical tolerance are characterized
-4. Extend the recovered-case FreeMHD parity path beyond Shercliff:
+6. Extend the recovered-case FreeMHD parity path only where it improves confidence in the native solver:
   - Hunt `Ha20` now runs end to end and samples successfully
   - use that new path to drive the next Hunt solver-fidelity iteration
   - Shercliff `Ha100` now also runs end to end and emits a real sampled parity artifact
   - Hunt `Ha100` now also runs end to end and emits a real sampled parity artifact
   - next use the combined Hunt `Ha20` and `Ha100` artifacts to drive the next conducting-wall solver iteration
-5. Implement mapped-operator support for the fringing-field pipe case.
+7. Implement mapped-operator support for the fringing-field pipe case if that remains in the current release scope.
 
 ## What Worked
 
