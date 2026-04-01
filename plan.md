@@ -1909,6 +1909,44 @@ LMX should only be described as ship ready for the current milestone when all of
     selective layered `phi` backend policy
   - if not, keep the new trace tooling and use the FreeMHD pressure/maxU
     histories to target the layered velocity/coupling update law directly
+- `2026-04-02 21:50 America/Chicago`: Completed the full recovered Hunt backend
+  decision check and promoted the layered `auto` electric-potential backend
+  from `jacobi` to `cg_volume`. This is the first retained layered backend
+  change that improves the full Hunt parity path at both `Ha20` and `Ha100`,
+  not just the short-time residual trace. The retained comparison from
+  `/tmp/lmx_hunt_backend_compare` is:
+  - Hunt `Ha20`, old layered default:
+    - `potential_residual ≈ 9.67e-01`
+    - `u_max ≈ 1.86e-02`
+    - `u_max_abs_diff ≈ 9.95e-02`
+    - sampled `combined_l2_error ≈ 5.68e-01`
+  - Hunt `Ha20`, `cg_volume`:
+    - `potential_residual ≈ 2.68e-02`
+    - `u_max ≈ 1.03e-01`
+    - `u_max_abs_diff ≈ 1.51e-02`
+    - sampled `combined_l2_error ≈ 4.20e-01`
+  - Hunt `Ha100`, old layered default:
+    - `potential_residual ≈ 7.06e-03`
+    - `u_max ≈ 4.76e-04`
+    - `u_max_abs_diff ≈ 1.23e-01`
+    - sampled `combined_l2_error ≈ 6.39e-01`
+  - Hunt `Ha100`, `cg_volume`:
+    - `potential_residual ≈ 1.09e-02`
+    - `u_max ≈ 9.28e-02`
+    - `u_max_abs_diff ≈ 3.10e-02`
+    - sampled `combined_l2_error ≈ 2.15e-01`
+  - retained interpretation:
+    - the old layered `jacobi` default was a real blocker on the full Hunt path
+    - `cg_volume` is now the right layered baseline
+    - the remaining blocker has narrowed again to the layered
+      velocity/pressure coupling response on top of the improved multi-region
+      `phi` solve
+- Best next step:
+  - rerun the targeted Hunt validation/parity path on the new `auto ->
+    cg_volume` baseline and record the retained metrics in docs
+  - then compare the improved LMX Hunt traces against the patched FreeMHD
+    pressure/`maxU` records to target the remaining layered
+    velocity/pressure-coupling error directly
 
 ## Instruction For Future Agents
 

@@ -126,7 +126,7 @@ def test_hunt_case_supports_volume_scaled_cg_potential_backend():
     assert solution.diagnostics.potential_iterations_history.shape[0] > 0
 
 
-def test_auto_potential_backend_uses_cg_for_single_region_and_jacobi_for_layered_cases():
+def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():
     hartmann = make_hartmann_case(ha=5.0, ny=12, nz=12)
     hunt = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
 
@@ -136,7 +136,7 @@ def test_auto_potential_backend_uses_cg_for_single_region_and_jacobi_for_layered
     hunt_materials = build_material_fields(hunt, hunt_mesh)
 
     assert solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
-    assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "jacobi"
+    assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "cg_volume"
 
 
 def test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting():

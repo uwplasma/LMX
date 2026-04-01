@@ -22,13 +22,12 @@ staying focused on structured duct and simple pipe geometries.
   so Hunt/Shercliff tradeoffs are not judged from `y` and `z` cuts separately.
 - The electric-potential solve now supports `auto`, weighted-Jacobi, and CG
   control paths. The current default is a geometry-aware `auto` policy:
-  single-region ducts use CG, while multi-region layered ducts keep the more
-  damped Jacobi path until the coupled Hunt update is improved.
+  single-region ducts use CG, while multi-region layered ducts use
+  `cg_volume`, the cell-metric-scaled CG form of the layered `phi` system.
 - Layered conducting-wall cases also expose `potential_solver="cg_volume"`,
   which solves the same layered `phi` equation after cell-metric scaling into a
-  symmetric CG system. It is currently a diagnostic backend rather than the
-  default because it improves `Hunt Ha100` while worsening `Hunt Ha20`
-  combined error at the retained control point.
+  symmetric CG system. It is now the retained layered default because it
+  improves the full recovered Hunt parity path at both `Ha20` and `Ha100`.
 
 ## Quick start
 

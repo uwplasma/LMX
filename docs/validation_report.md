@@ -393,6 +393,34 @@ The backend harness currently supports:
     - but that still is not enough evidence to promote it as the default Hunt
       backend until the longer-horizon Hunt `Ha20` / `Ha100` profile metrics are
       rechecked on the current code state
+- That longer-horizon Hunt backend check is now retained and it changes the
+  solver baseline:
+  - Hunt `Ha20`, old layered default:
+    - `potential_residual ≈ 9.67e-01`
+    - `u_max ≈ 1.86e-02`
+    - `u_max_abs_diff ≈ 9.95e-02`
+    - sampled `combined_l2_error ≈ 5.68e-01`
+  - Hunt `Ha20`, `cg_volume`:
+    - `potential_residual ≈ 2.68e-02`
+    - `u_max ≈ 1.03e-01`
+    - `u_max_abs_diff ≈ 1.51e-02`
+    - sampled `combined_l2_error ≈ 4.20e-01`
+  - Hunt `Ha100`, old layered default:
+    - `potential_residual ≈ 7.06e-03`
+    - `u_max ≈ 4.76e-04`
+    - `u_max_abs_diff ≈ 1.23e-01`
+    - sampled `combined_l2_error ≈ 6.39e-01`
+  - Hunt `Ha100`, `cg_volume`:
+    - `potential_residual ≈ 1.09e-02`
+    - `u_max ≈ 9.28e-02`
+    - `u_max_abs_diff ≈ 3.10e-02`
+    - sampled `combined_l2_error ≈ 2.15e-01`
+  - retained interpretation:
+    - the old layered `jacobi` default was a real blocker on the full Hunt path
+    - layered `auto` now resolves to `cg_volume`
+    - the remaining Hunt gap is now the layered velocity/pressure coupling
+      response on top of the improved multi-region `phi` backend, not the
+      layered `phi` backend choice itself
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and

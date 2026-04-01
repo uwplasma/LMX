@@ -204,7 +204,7 @@ def _resolve_potential_solver(solver: str, fluid_mask: jnp.ndarray | None) -> st
         return solver
     if fluid_mask is None:
         return "cg"
-    return "cg" if bool(jnp.all(fluid_mask)) else "jacobi"
+    return "cg" if bool(jnp.all(fluid_mask)) else "cg_volume"
 
 
 def _compute_current_and_lorentz(
