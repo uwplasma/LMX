@@ -20,6 +20,7 @@ BoundaryKind = Literal[
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
+CurrentReconstructionKind = Literal["cell_centered", "face_averaged"]
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class TimeStepperConfig:
     potential_tolerance: float | None = None
     potential_relaxation: float = 1.0
     potential_solver: PotentialSolverKind = "auto"
+    current_reconstruction: CurrentReconstructionKind = "cell_centered"
     steady_tolerance: float = 1e-8
     steady_potential_tolerance: float | None = None
     relaxation: float = 0.35

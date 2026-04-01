@@ -215,10 +215,19 @@ def _compute_current_and_lorentz(
     phi: jnp.ndarray,
     by: jnp.ndarray,
     bz: jnp.ndarray,
+    use_face_currents: bool = False,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
-    jy = sigma * (-dphi_dy - u * bz)
-    jz = sigma * (-dphi_dz + u * by)
+    if use_face_currents:
+        uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
+        uxb_z = jnp.where(fluid_mask, u * by, 0.0)
+        face_jy = _interface_conductance_y(mesh, sigma) * (phi[:-1, :] - phi[1:, :]) + _face_emf_y(mesh, sigma, uxb_y)
+        face_jz = _interface_conductance_z(mesh, sigma) * (phi[:, :-1] - phi[:, 1:]) + _face_emf_z(mesh, sigma, uxb_z)
+        jy = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
+        jz = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
+    else:
+        dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
+        jy = sigma * (-dphi_dy - u * bz)
+        jz = sigma * (-dphi_dz + u * by)
     jy = jnp.where(fluid_mask, jy, 0.0)
     jz = jnp.where(fluid_mask, jz, 0.0)
     lorentz_x = jy * bz - jz * by
@@ -319,6 +328,7 @@ def _step(
     potential_solver: str,
     relaxation: float,
     velocity_update_limit: float,
+    current_reconstruction: str,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
     def outer_body(_, carry):
         u_iter, _, _, _, _, _, _, _, _ = carry
@@ -336,7 +346,16 @@ def _step(
             solver=potential_solver,
         )
         phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
-        jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
+        jy, jz, lorentz = _compute_current_and_lorentz(
+            mesh,
+            sigma,
+            fluid_mask,
+            u_iter,
+            phi,
+            by,
+            bz,
+            use_face_currents=current_reconstruction == "face_averaged",
+        )
         lorentz = jnp.nan_to_num(lorentz, nan=0.0, posinf=0.0, neginf=0.0)
         lap_u = laplacian_scalar(u_iter, mesh, mask=fluid_mask)
         lorentz_damping = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
@@ -409,6 +428,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             potential_solver=potential_solver,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
+            current_reconstruction=case.time_stepper.current_reconstruction,
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
         ohmic = jnp.mean(jy**2 + jz**2)
@@ -501,6 +521,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             potential_solver=potential_solver,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
+            current_reconstruction=case.time_stepper.current_reconstruction,
         )
 
     step_fn = jax.jit(compiled_step)

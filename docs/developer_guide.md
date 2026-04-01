@@ -31,6 +31,14 @@
   startup ramp law aligned with the backend controls. The current LMX ramp
   intentionally matches the recovered FreeMHD implementation:
   `(t - BtStartTime) / (BtDuration + 1e-6)`, clipped to `[0, 1]`.
+- The current reconstruction used for `J` and `JxB` is now an explicit solver
+  control:
+  - `current_reconstruction="cell_centered"` uses the gradient-based
+    cell-centered reconstruction
+  - `current_reconstruction="face_averaged"` reconstructs cell currents by
+    averaging the finite-volume face currents back onto cells
+  Keep `cell_centered` as the default until a face-based path improves the real
+  Hunt parity metrics, not just one traced quantity.
 - Clustered duct meshes should use actual center-to-center spacing in diffusion
   and potential operators; avoid reintroducing uniform-grid shortcuts in solver
   stencils.
@@ -188,6 +196,10 @@
   manually comparing separate profile columns after each run.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
+- `python scripts/run_hunt_solver_diagnostic_report.py --current-reconstruction face_averaged ...`:
+  replays the recovered Hunt startup path with the alternate current
+  reconstruction. Use that only as a targeted diagnosis tool unless it also
+  wins the corresponding parity metrics.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with
   the same entrypoint used by Read the Docs.
 

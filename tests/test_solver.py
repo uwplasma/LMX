@@ -38,14 +38,17 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha20.time_stepper.velocity_update_limit == pytest.approx(2e-3)
     assert ha20.time_stepper.potential_tolerance is None
     assert ha20.time_stepper.potential_solver == "auto"
+    assert ha20.time_stepper.current_reconstruction == "cell_centered"
     assert ha100.time_stepper.outer_iterations == 4
     assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha100.time_stepper.potential_tolerance is None
     assert ha100.time_stepper.potential_solver == "auto"
+    assert ha100.time_stepper.current_reconstruction == "cell_centered"
     assert ha1000.time_stepper.outer_iterations == 3
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha1000.time_stepper.potential_tolerance is None
     assert ha1000.time_stepper.potential_solver == "auto"
+    assert ha1000.time_stepper.current_reconstruction == "cell_centered"
 
 
 def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
@@ -158,6 +161,17 @@ def test_hunt_case_supports_volume_scaled_cg_potential_backend():
     assert solution.diagnostics.potential_iterations_history.shape[0] > 0
     assert solution.diagnostics.face_current_max_history.shape[0] > 0
     assert solution.diagnostics.emf_max_history.shape[0] > 0
+
+
+def test_hunt_case_supports_face_averaged_current_reconstruction():
+    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="face_averaged"))
+    solution = solve_steady(case)
+
+    assert jnp.isfinite(solution.state.u).all()
+    assert jnp.isfinite(solution.state.phi).all()
+    assert solution.diagnostics.current_max_history.shape[0] > 0
+    assert solution.diagnostics.face_current_max_history.shape[0] > 0
 
 
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():

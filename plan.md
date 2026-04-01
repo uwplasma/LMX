@@ -2176,13 +2176,40 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next remaining mismatch is narrower and later:
       cell-centered current magnitude interpretation and/or the later coupled
       response, not the startup ramp/source history itself
+- `2026-04-03 02:30 America/Chicago`: Tested the next targeted Hunt solver
+  candidate against the corrected density-log baseline:
+  - added `TimeStepperConfig.current_reconstruction` with
+    `cell_centered` and `face_averaged`
+  - threaded that through the real solver path and the Hunt diagnostic runner
+    so the current-distribution experiment is reproducible and testable instead
+    of living as an untracked local branch
+  - retained numerical result on the corrected short Hunt `Ha20` trace:
+    - `u_max` normalized `l2_error` stayed unchanged at `≈ 1.18e-3`
+    - `emf_max` and `emf_density_max` stayed unchanged at
+      `≈ 1.56e-3` and `≈ 1.93e-3`
+    - `lorentz_max` improved materially:
+      `≈ 3.26e-2 -> 5.12e-3`
+    - but `current_max` worsened:
+      `≈ 4.43e-2 -> 6.77e-2`
+    - `face_current_max` changed only slightly:
+      `≈ 1.75e-2 -> 1.76e-2`
+  - retained interpretation:
+    - a face-averaged cell-current reconstruction helps the normalized Hunt
+      `JxB` history substantially
+    - but it does not yet win the current-magnitude comparison and it does not
+      improve the short recovered `u_max` replay enough to justify a default
+      change
+    - keep it as an explicit experimental solver control on `main`, not the new
+      layered default
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
     ramp law on `main`
-  - then use the improved Hunt startup agreement to target the next narrower
-    mismatch:
-    either the interpretation/discretization of cell-centered current magnitude
-    or the later-time coupled momentum/pressure response
+  - use the new `current_reconstruction` control only as a diagnosis aid until
+    a better layered-current reduction is found
+  - next targeted solver task:
+    derive a more faithful cell-centered current from the layered face-current
+    system, or show from longer corrected Hunt traces that the remaining gap has
+    shifted mainly into the later coupled momentum/pressure response
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

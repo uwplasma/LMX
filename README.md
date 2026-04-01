@@ -28,6 +28,9 @@ staying focused on structured duct and simple pipe geometries.
   which solves the same layered `phi` equation after cell-metric scaling into a
   symmetric CG system. It is now the retained layered default because it
   improves the full recovered Hunt parity path at both `Ha20` and `Ha100`.
+- Hunt diagnostics also expose `current_reconstruction`, with the retained
+  default `cell_centered` and an experimental `face_averaged` mode for tracing
+  current-distribution effects without changing the public case API.
 
 ## Quick start
 
@@ -80,6 +83,7 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
+/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 3e-5 --max-steps 3 --current-reconstruction face_averaged --output ./artifacts/hunt_solver_diagnostics_faceavg.json
 /Users/rogerio/base_env/bin/python3 scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD
 /Users/rogerio/base_env/bin/python3 scripts/extract_freemhd_coupled_log.py ./artifacts/freemhd_hunt.log --output ./artifacts/freemhd_hunt_diag.json
 ```

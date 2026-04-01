@@ -37,6 +37,7 @@ def _build_case(
     potential_iterations: int | None,
     potential_relaxation: float | None,
     potential_solver: str | None,
+    current_reconstruction: str | None,
     velocity_update_limit: float | None,
     ramp_start: float,
     ramp_duration: float,
@@ -58,6 +59,8 @@ def _build_case(
         updates["potential_relaxation"] = potential_relaxation
     if potential_solver is not None:
         updates["potential_solver"] = potential_solver
+    if current_reconstruction is not None:
+        updates["current_reconstruction"] = current_reconstruction
     if velocity_update_limit is not None:
         updates["velocity_update_limit"] = velocity_update_limit
     return replace(
@@ -85,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--potential-iterations", type=int, default=None)
     parser.add_argument("--potential-relaxation", type=float, default=None)
     parser.add_argument("--potential-solver", choices=["auto", "jacobi", "cg", "cg_volume", "lineax_cg"], default=None)
+    parser.add_argument("--current-reconstruction", choices=["cell_centered", "face_averaged"], default=None)
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)
     parser.add_argument("--output", type=Path, required=True)
@@ -109,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         potential_iterations=args.potential_iterations,
         potential_relaxation=args.potential_relaxation,
         potential_solver=args.potential_solver,
+        current_reconstruction=args.current_reconstruction,
         velocity_update_limit=args.velocity_update_limit,
         ramp_start=ramp_start,
         ramp_duration=ramp_duration,

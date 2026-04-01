@@ -593,6 +593,26 @@ The backend harness currently supports:
       `U×B` source term
     - the next remaining mismatch is narrower: cell-centered current magnitude
       and later coupled response, not the startup source history itself
+- The next targeted solver experiment is now retained as an explicit control
+  rather than another hidden local branch:
+  - `TimeStepperConfig.current_reconstruction` supports
+    `cell_centered` and `face_averaged`
+  - on the corrected short Hunt `Ha20` density-log replay, `face_averaged`
+    changes the normalized trace errors as follows:
+    - `u_max`: unchanged at `≈ 1.18e-3`
+    - `emf_max`: unchanged at `≈ 1.56e-3`
+    - `emf_density_max`: unchanged at `≈ 1.93e-3`
+    - `lorentz_max`: `≈ 3.26e-2 -> 5.12e-3`
+    - `current_max`: `≈ 4.43e-2 -> 6.77e-2`
+    - `face_current_max`: `≈ 1.75e-2 -> 1.76e-2`
+  - retained interpretation:
+    - a face-averaged reconstruction helps the normalized Hunt `JxB` history
+      substantially
+    - but it does not yet improve the current-magnitude comparison or the short
+      recovered `u_max` replay enough to justify a default change
+    - it should stay available as a solver-control / diagnosis aid while the
+      next fix targets a better cell-centered current reduction or the later
+      coupled response
 
 ## Planned improvements
 
