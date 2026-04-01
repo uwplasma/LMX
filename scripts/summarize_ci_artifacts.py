@@ -56,6 +56,10 @@ class SweepSummary:
     best_y_l2_error: float | None
     best_z_value: float | None
     best_z_l2_error: float | None
+    accepted_levels: int | None
+    total_levels: int
+    first_accepted: bool | None
+    last_accepted: bool | None
 
 
 def _load_json(path: str | Path) -> Any:
@@ -121,6 +125,7 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
     z_levels = [level for level in levels if "z_l2_error" in level]
     best_y = min(y_levels, key=lambda level: float(level["y_l2_error"])) if y_levels else None
     best_z = min(z_levels, key=lambda level: float(level["z_l2_error"])) if z_levels else None
+    accepted_values = [bool(level["accepted"]) for level in levels if "accepted" in level]
     return SweepSummary(
         label=label,
         case=str(payload.get("case", "")),
@@ -135,6 +140,10 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
         best_y_l2_error=None if best_y is None else float(best_y["y_l2_error"]),
         best_z_value=None if best_z is None else float(best_z["parameter_value"]),
         best_z_l2_error=None if best_z is None else float(best_z["z_l2_error"]),
+        accepted_levels=None if not accepted_values else sum(1 for value in accepted_values if value),
+        total_levels=len(levels),
+        first_accepted=None if "accepted" not in first else bool(first["accepted"]),
+        last_accepted=None if "accepted" not in last else bool(last["accepted"]),
     )
 
 
@@ -224,6 +233,21 @@ def render_markdown(
                     "- Best Z L2: `-`"
                     if sweep.best_z_l2_error is None or sweep.best_z_value is None
                     else f"- Best Z L2: `{sweep.best_z_l2_error:.6g}` at `{sweep.best_z_value:.6g}`"
+                ),
+                (
+                    "- Accepted levels: `-`"
+                    if sweep.accepted_levels is None
+                    else f"- Accepted levels: `{sweep.accepted_levels}/{sweep.total_levels}`"
+                ),
+                (
+                    "- First accepted: `-`"
+                    if sweep.first_accepted is None
+                    else f"- First accepted: `{'yes' if sweep.first_accepted else 'no'}`"
+                ),
+                (
+                    "- Last accepted: `-`"
+                    if sweep.last_accepted is None
+                    else f"- Last accepted: `{'yes' if sweep.last_accepted else 'no'}`"
                 ),
                 "",
             ]

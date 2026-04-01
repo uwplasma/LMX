@@ -96,6 +96,11 @@ The backend harness currently supports:
   summary now also reports the best interior `y_l2` and `z_l2` points instead of
   only the first and last parameter values, which is important because the
   retained Hunt control sweeps are non-monotone.
+- An attempted direct Hartmann `Ha20`, `32^2` analytical guardrail exposed a
+  broader current limitation: the retained solver on `main` does not yet hold
+  the present Hartmann acceptance target at that refinement level. The failing
+  test was not kept, but the CI summary now reports how many sweep levels pass
+  acceptance so this blocker is visible in normal artifacts.
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

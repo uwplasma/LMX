@@ -48,7 +48,6 @@ def test_hartmann_profile_center_is_maximum():
     profile = hartmann_analytic_profile(y, ha=10.0)
     assert float(profile[50]) >= float(profile[0])
 
-
 def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
     case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
     solution = solve_steady(case)

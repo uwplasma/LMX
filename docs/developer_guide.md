@@ -71,7 +71,9 @@
   writes parameter sweeps for selected time-stepper controls when a case shows a
   nontrivial coupling tradeoff. The CI summary now reports both the first/last
   sweep points and the best `y_l2` / `z_l2` points, because the retained Hunt
-  sweeps are not monotone.
+  sweeps are not monotone. It also reports acceptance counts when the underlying
+  sweep data includes analytical pass/fail information, which is useful for the
+  current Hartmann refinement blocker.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

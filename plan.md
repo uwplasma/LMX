@@ -1180,6 +1180,31 @@ LMX should only be described as ship ready for the current milestone when all of
   - the next solver change should be judged against the best interior sweep
     point, not just against the last parameter value
 
+### 2026-04-01 18:10 America/Chicago
+
+- Tried another solver-side Hunt candidate and rejected it:
+  - advanced the outer-loop velocity trial from `u_iter` instead of the
+    step-entry state `u`
+  - this looked like a plausible fixed-point cleanup, but it again broke the
+    Hartmann `Ha20` medium-resolution guardrail while not yet earning a retained
+    Hunt improvement
+  - it was rolled back instead of being left on `main`
+- Converted that failure mode into a direct regression guardrail:
+  - first attempted to add a direct validation test requiring Hartmann `Ha20`,
+    `32^2` to pass the current analytical acceptance thresholds
+  - that test immediately exposed a broader current limitation: the retained
+    solver on `main` does not yet satisfy that medium-resolution Hartmann
+    acceptance target
+  - the failing test was not kept on `main`
+  - instead, the CI summary now reports how many sweep levels pass acceptance so
+    Hartmann refinement failures become visible in normal artifacts
+- Retained interpretation:
+  - future solver changes must preserve not only the coarse Hartmann smoke path
+    but also improve the current Hartmann refinement behavior
+  - the next Hunt update should still be assessed against Hartmann refinement,
+    but the ship-ready plan must now treat Hartmann medium-resolution acceptance
+    as an open blocker rather than as a solved guardrail
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
