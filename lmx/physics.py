@@ -17,18 +17,32 @@ class MaterialFields:
     fluid_mask: jnp.ndarray
 
 
-def magnetic_field_components(spec: MagneticFieldSpec, mesh: StructuredMesh) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+def magnetic_ramp_scale(spec: MagneticFieldSpec, time: float | jnp.ndarray | None = None) -> jnp.ndarray:
+    if time is None or spec.ramp_duration <= 0.0:
+        return jnp.asarray(1.0)
+    time_value = jnp.asarray(time, dtype=float)
+    return jnp.clip((time_value - spec.ramp_start) / spec.ramp_duration, 0.0, 1.0)
+
+
+def magnetic_field_components(
+    spec: MagneticFieldSpec,
+    mesh: StructuredMesh,
+    time: float | jnp.ndarray | None = None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     yc, zc = center_coordinates(mesh)
     if spec.kind == "constant":
         bx, by, bz = spec.value or (0.0, 0.0, 0.0)
         shape = yc.shape
-        return (jnp.full(shape, bx), jnp.full(shape, by), jnp.full(shape, bz))
-    if spec.kind == "analytic":
+        field = (jnp.full(shape, bx), jnp.full(shape, by), jnp.full(shape, bz))
+    elif spec.kind == "analytic":
         if spec.fn is None:
             raise ValueError("Analytic magnetic field requires fn")
         field = spec.fn(yc, zc)
-        return field[..., 0], field[..., 1], field[..., 2]
-    raise NotImplementedError("Tabulated magnetic fields are planned but not yet implemented.")
+        field = field[..., 0], field[..., 1], field[..., 2]
+    else:
+        raise NotImplementedError("Tabulated magnetic fields are planned but not yet implemented.")
+    scale = magnetic_ramp_scale(spec, time)
+    return field[0] * scale, field[1] * scale, field[2] * scale
 
 
 def region_lookup(regions: tuple[RegionSpec, ...]) -> dict[str, RegionSpec]:

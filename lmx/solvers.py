@@ -263,23 +263,20 @@ def _inlet_speed(boundary: BoundaryCondition, case: CaseSpec) -> float | None:
 
 
 def _effective_forcing(
-    case: CaseSpec,
+    explicit_forcing: float,
+    inlet_velocity: float | None,
     sigma: jnp.ndarray,
     fluid_mask: jnp.ndarray,
     by: jnp.ndarray,
     bz: jnp.ndarray,
-) -> float:
-    if abs(case.forcing) > 0.0:
-        return case.forcing
-    inlet_velocity = next(
-        (speed for boundary in case.boundary_conditions if (speed := _inlet_speed(boundary, case)) is not None),
-        None,
-    )
+) -> jnp.ndarray:
+    if abs(explicit_forcing) > 0.0:
+        return jnp.asarray(explicit_forcing, dtype=by.dtype)
     if inlet_velocity is None:
-        return 0.0
+        return jnp.asarray(0.0, dtype=by.dtype)
     magnetic_loading = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
     fluid_count = jnp.maximum(jnp.sum(fluid_mask.astype(float)), 1.0)
-    mean_loading = float(jnp.sum(magnetic_loading) / fluid_count)
+    mean_loading = jnp.sum(magnetic_loading) / fluid_count
     return mean_loading * inlet_velocity
 
 
@@ -354,8 +351,10 @@ def _step(
 def solve_transient(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
-    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
-    forcing = _effective_forcing(case, materials.conductivity, materials.fluid_mask, by, bz)
+    inlet_velocity = next(
+        (speed for boundary in case.boundary_conditions if (speed := _inlet_speed(boundary, case)) is not None),
+        None,
+    )
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
@@ -365,6 +364,9 @@ def solve_transient(case: CaseSpec) -> Solution:
 
     def scan_step(carry, _):
         u, time = carry
+        step_time = time + dt
+        _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
+        forcing = _effective_forcing(case.forcing, inlet_velocity, materials.conductivity, materials.fluid_mask, by, bz)
         u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count = _step(
             u=u,
             mesh=mesh,
@@ -391,7 +393,7 @@ def solve_transient(case: CaseSpec) -> Solution:
         max_lorentz = jnp.max(jnp.abs(lorentz))
         sample = jnp.asarray(
             [
-                time + dt,
+            step_time,
                 jnp.max(jnp.abs(u_next)),
                 residual,
                 courant_like,
@@ -403,7 +405,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             ],
             dtype=float,
         )
-        return (u_next, time + dt), (u_next, phi, jy, jz, lorentz, sample)
+        return (u_next, step_time), (u_next, phi, jy, jz, lorentz, sample)
 
     (u_final, time_final), history = jax.lax.scan(scan_step, (initial_u, 0.0), xs=None, length=steps)
     u_hist, phi_hist, jy_hist, jz_hist, lorentz_hist, samples = history
@@ -434,8 +436,10 @@ def solve_transient(case: CaseSpec) -> Solution:
 def solve_steady(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
-    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
-    forcing = _effective_forcing(case, materials.conductivity, materials.fluid_mask, by, bz)
+    inlet_velocity = next(
+        (speed for boundary in case.boundary_conditions if (speed := _inlet_speed(boundary, case)) is not None),
+        None,
+    )
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
@@ -447,7 +451,10 @@ def solve_steady(case: CaseSpec) -> Solution:
 
     def compiled_step(
         u: jnp.ndarray,
+        time: float,
     ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
+        _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=time)
+        forcing = _effective_forcing(case.forcing, inlet_velocity, materials.conductivity, materials.fluid_mask, by, bz)
         return _step(
             u=u,
             mesh=mesh,
@@ -489,14 +496,18 @@ def solve_steady(case: CaseSpec) -> Solution:
     step_count = 0
 
     for step_index in range(max_steps):
-        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count = step_fn(u)
+        step_time = float((step_index + 1) * dt)
+        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count = step_fn(
+            u,
+            step_time,
+        )
         residual_value = float(residual)
         u_max_value = float(jnp.max(jnp.abs(u)))
         courant_like = float(u_max_value * dt / jnp.min(mesh.dy))
         ohmic = float(jnp.mean(jy**2 + jz**2))
         max_current = float(jnp.max(jnp.sqrt(jy**2 + jz**2)))
         max_lorentz = float(jnp.max(jnp.abs(lorentz)))
-        time_history.append(float((step_index + 1) * dt))
+        time_history.append(step_time)
         u_max_history.append(u_max_value)
         residual_history.append(residual_value)
         courant_history.append(courant_like)

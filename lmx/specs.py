@@ -48,6 +48,8 @@ class MagneticFieldSpec:
     value: tuple[float, float, float] | None = None
     fn: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray] | None = None
     table_path: str | None = None
+    ramp_start: float = 0.0
+    ramp_duration: float = 0.0
 
 
 @dataclass(frozen=True)

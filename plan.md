@@ -2041,12 +2041,29 @@ LMX should only be described as ship ready for the current milestone when all of
   is around `u_max ≈ 2.63e-02` with `u_min ≈ -4.25e-04` and
   `potential_residual ≈ 2.04e-03`. Updated that gate to `u_max < 0.03` so it
   remains a boundedness check instead of a stale accuracy threshold.
+- `2026-04-02 23:55 America/Chicago`: Added magnetic-field ramp support to the
+  core `MagneticFieldSpec` and parity loaders. LMX now infers `BtStartTime` and
+  `BtDuration` from recovered FreeMHD `system/controlDict` files through
+  `scripts/run_freemhd_parity_report.py` and
+  `scripts/run_hunt_solver_diagnostic_report.py`, and applies the same ramp in
+  the transient solve when those controls are present.
+  - retained short-time Hunt `Ha20` result:
+    - sampled combined error stayed at about `9.825e-02`
+    - `u_max` trace error stayed at about `3.55e-03`
+    - `maxJ` trace error moved slightly from about `3.58e-02` to `3.58e-02`
+    - `maxJxB` trace error moved slightly from about `8.15e-02` to `8.13e-02`
+  - retained interpretation:
+    - the feature is correct and worth keeping because it mirrors recovered case
+      controls and is general for future transient problems
+    - for Hunt `Ha20`, it is not the missing fix by itself because the ramp
+      finishes by the first sampled diagnostic time
+    - the remaining startup mismatch is still in the Lorentz-response path
 - Best next step:
-  - rerun the exact previously failing physics and coverage suites locally and
-    push the CI repair first
-  - then continue using the patched FreeMHD pressure/maxU/`maxJxB` trace and
-    the LMX `u_max`/`current_max`/`lorentz_max` histories to target the
-    remaining longer-horizon Hunt momentum/pressure-coupling error directly
+  - push the magnetic-ramp parity feature after the targeted tests pass
+  - then use the patched FreeMHD `JConservativeForm` clue and the current
+    `maxJ` / `maxJxB` traces to target the remaining Lorentz-response mismatch
+    directly, likely through a more faithful conservative-form `JxB`
+    reconstruction for layered Hunt startup
 
 ## Instruction For Future Agents
 

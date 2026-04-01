@@ -32,6 +32,23 @@ def infer_initial_velocity_x(case_dir: str | Path) -> float | None:
     return None
 
 
+def _infer_control_dict_scalar(case_dir: str | Path, key: str) -> float | None:
+    path = Path(case_dir) / "system" / "controlDict"
+    if not path.exists():
+        return None
+    pattern = re.compile(rf"{re.escape(key)}\s+(\S+)\s*;")
+    match = pattern.search(path.read_text())
+    if match is None:
+        return None
+    return float(match.group(1))
+
+
+def infer_magnetic_ramp(case_dir: str | Path) -> tuple[float, float]:
+    start = _infer_control_dict_scalar(case_dir, "BtStartTime")
+    duration = _infer_control_dict_scalar(case_dir, "BtDuration")
+    return (0.0 if start is None else start, 0.0 if duration is None else duration)
+
+
 def build_case(
     case_kind: str,
     ha: float,
@@ -42,6 +59,8 @@ def build_case(
     t_final: float,
     max_steps: int,
     forcing: float,
+    ramp_start: float = 0.0,
+    ramp_duration: float = 0.0,
 ):
     factories = {
         "hartmann": make_hartmann_case,
@@ -51,6 +70,7 @@ def build_case(
     case = factories[case_kind](ha=ha, ny=ny, nz=nz)
     return replace(
         case,
+        magnetic_field=replace(case.magnetic_field, ramp_start=ramp_start, ramp_duration=ramp_duration),
         initial_velocity=initial_velocity,
         forcing=forcing,
         time_stepper=replace(case.time_stepper, dt=dt, t_final=t_final, max_steps=max_steps),
@@ -75,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     initial_velocity = args.initial_velocity
     if initial_velocity is None:
         initial_velocity = infer_initial_velocity_x(args.freemhd_run_dir) or 0.0
+    ramp_start, ramp_duration = infer_magnetic_ramp(args.freemhd_run_dir)
 
     case = build_case(
         case_kind=args.case_kind,
@@ -86,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         t_final=args.t_final,
         max_steps=args.max_steps,
         forcing=0.0 if args.forcing is None else args.forcing,
+        ramp_start=ramp_start,
+        ramp_duration=ramp_duration,
     )
     drive_mode = "explicit_forcing"
     if args.forcing is None and args.case_kind == "hunt":
@@ -102,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         "initial_velocity": initial_velocity,
         "forcing": case.forcing,
         "drive_mode": drive_mode,
+        "magnetic_ramp_start": ramp_start,
+        "magnetic_ramp_duration": ramp_duration,
         "freemhd_run_dir": str(args.freemhd_run_dir.resolve()),
         "output": str(args.output.resolve()),
         "metrics": report.metrics,

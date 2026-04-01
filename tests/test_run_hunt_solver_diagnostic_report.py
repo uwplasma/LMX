@@ -47,6 +47,7 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
         "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
     )
+    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
     sample_lines = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
     (run_dir / "postProcessing" / "sampleDict" / "liquid" / "0.0001" / "centerlineY_potE_U.xy").write_text(sample_lines)
     (run_dir / "postProcessing" / "sampleDict" / "liquid" / "0.0001" / "centerlineZ_potE_U.xy").write_text(sample_lines)
@@ -72,6 +73,7 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert "freemhd_run" in payload
     assert "comparison" in payload
     assert payload["lmx_solver"]["diagnostics"]["potential_residual"] == pytest.approx(0.001)
+    assert payload["lmx_solver"]["magnetic_field"]["ramp_duration"] == pytest.approx(2e-4)
     assert payload["lmx_solver"]["trace"]["time_history"] == []
     assert payload["lmx_solver"]["trace"]["u_max_history"] == []
     assert payload["lmx_solver"]["trace"]["current_max_history"] == [3.0]
@@ -90,6 +92,7 @@ def test_hunt_solver_diagnostic_report_accepts_cg_volume_backend(tmp_path: Path,
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
         "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
     )
+    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 

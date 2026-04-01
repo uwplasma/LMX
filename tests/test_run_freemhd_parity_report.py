@@ -15,6 +15,13 @@ def test_infer_initial_velocity_x_reads_uniform_liquid_u(tmp_path: Path):
     assert parity.infer_initial_velocity_x(tmp_path) == pytest.approx(0.9725)
 
 
+def test_infer_magnetic_ramp_reads_control_dict(tmp_path: Path):
+    system = tmp_path / "system"
+    system.mkdir()
+    (system / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
+    assert parity.infer_magnetic_ramp(tmp_path) == pytest.approx((1e-5, 2e-4))
+
+
 def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
@@ -27,7 +34,7 @@ def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
         "# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
     )
-    (run_dir / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
+    (run_dir / "system" / "controlDict").write_text("application epotMultiRegionFoam;\nBtStartTime 1e-5;\nBtDuration 2e-4;\n")
     (run_dir / "0" / "liquid" / "potE").write_text("internalField uniform 0;\n")
 
     output = tmp_path / "report.json"
@@ -49,6 +56,7 @@ def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture
     assert '"case_name": "hartmann_ha5"' in payload
     stdout = capsys.readouterr().out
     assert '"initial_velocity": 0.9725' in stdout
+    assert '"magnetic_ramp_duration": 0.0002' in stdout
 
 
 def test_main_uses_hunt_inlet_drive_when_forcing_unspecified(

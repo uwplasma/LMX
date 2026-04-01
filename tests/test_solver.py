@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.physics import build_material_fields
+from lmx.physics import build_material_fields, magnetic_ramp_scale
 import lmx.solvers as solvers
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.specs import BoundaryCondition
@@ -92,6 +92,29 @@ def test_hunt_inlet_velocity_boundary_drives_short_transient():
     undriven_solution = solve_steady(undriven)
 
     assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
+
+
+def test_magnetic_ramp_scale_disables_when_duration_is_zero():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)
+
+
+def test_magnetic_ramp_delays_short_transient_lorentz_response():
+    case = make_hartmann_case(ha=20.0, ny=12, nz=12)
+    base = replace(
+        case,
+        forcing=0.0,
+        initial_velocity=0.25,
+        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.25, 0.0, 0.0), axis="x"),),
+        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=2e-5, max_steps=2, relaxation=0.1),
+    )
+    ramped = replace(base, magnetic_field=replace(base.magnetic_field, ramp_start=0.0, ramp_duration=1e-3))
+
+    baseline = solve_steady(base)
+    delayed = solve_steady(ramped)
+
+    assert float(delayed.diagnostics.current_max_history[0]) < float(baseline.diagnostics.current_max_history[0])
+    assert float(delayed.diagnostics.lorentz_max_history[0]) < float(baseline.diagnostics.lorentz_max_history[0])
 
 
 def test_shercliff_solution_stays_finite_and_zero_at_walls():

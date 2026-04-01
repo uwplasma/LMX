@@ -86,6 +86,10 @@ Useful optional-backend commands:
 `build_freemhd_container.py` now uses a loadable `docker buildx build --load`
 path so locally patched validation-backend images are available to subsequent
 `docker run` smoke and parity scripts instead of staying only in builder output.
+The parity loaders also infer `BtStartTime` and `BtDuration` from
+`system/controlDict`, so short transient LMX replays now use the same magnetic
+field ramp settings as the recovered validation cases when those controls are
+present.
 
 ## Scope
 

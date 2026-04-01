@@ -512,6 +512,22 @@ The backend harness currently supports:
       or accuracy gate
     - detailed Hunt accuracy remains tracked through the recovered FreeMHD
       parity reports and dedicated diagnostic scripts
+- Added magnetic-field ramp support to the core `MagneticFieldSpec` and the
+  recovered-case parity loaders. `run_freemhd_parity_report.py` and
+  `run_hunt_solver_diagnostic_report.py` now infer `BtStartTime` and
+  `BtDuration` from `system/controlDict`, and LMX applies the same ramp during
+  the transient solve when those controls are present.
+  - retained short-time Hunt `Ha20` result:
+    - sampled combined error stayed at about `9.825e-02`
+    - `u_max` trace error stayed at about `3.55e-03`
+    - `maxJ` trace error moved slightly from about `3.58e-02` to `3.58e-02`
+    - `maxJxB` trace error moved slightly from about `8.15e-02` to `8.13e-02`
+  - retained interpretation:
+    - the feature is correct and worth keeping because it matches recovered case
+      controls and is general for future transient problems
+    - for Hunt `Ha20`, it is not the missing fix by itself because the ramp
+      finishes by the first sampled diagnostic time
+    - the remaining startup mismatch is still in the Lorentz-response path
 
 ## Planned improvements
 

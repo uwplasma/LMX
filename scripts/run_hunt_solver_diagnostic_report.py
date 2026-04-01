@@ -21,7 +21,7 @@ from lmx.validation import (
     compare_normalized_profiles,
     validation_summary,
 )
-from scripts.run_freemhd_parity_report import infer_initial_velocity_x
+from scripts.run_freemhd_parity_report import infer_initial_velocity_x, infer_magnetic_ramp
 
 
 def _build_case(
@@ -38,6 +38,8 @@ def _build_case(
     potential_relaxation: float | None,
     potential_solver: str | None,
     velocity_update_limit: float | None,
+    ramp_start: float,
+    ramp_duration: float,
 ) -> object:
     case = make_hunt_case(ha=ha, ny=ny, nz=nz)
     time_stepper = case.time_stepper
@@ -58,7 +60,13 @@ def _build_case(
         updates["potential_solver"] = potential_solver
     if velocity_update_limit is not None:
         updates["velocity_update_limit"] = velocity_update_limit
-    return replace(case, initial_velocity=initial_velocity, forcing=0.0, time_stepper=replace(time_stepper, **updates))
+    return replace(
+        case,
+        magnetic_field=replace(case.magnetic_field, ramp_start=ramp_start, ramp_duration=ramp_duration),
+        initial_velocity=initial_velocity,
+        forcing=0.0,
+        time_stepper=replace(time_stepper, **updates),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     initial_velocity = args.initial_velocity
     if initial_velocity is None:
         initial_velocity = infer_initial_velocity_x(run_dir) or 0.0
+    ramp_start, ramp_duration = infer_magnetic_ramp(run_dir)
 
     case = _build_case(
         ha=args.ha,
@@ -101,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         potential_relaxation=args.potential_relaxation,
         potential_solver=args.potential_solver,
         velocity_update_limit=args.velocity_update_limit,
+        ramp_start=ramp_start,
+        ramp_duration=ramp_duration,
     )
     solution = solve_steady(case)
 
@@ -111,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     lmx_solver = {
         "case_name": solution.case_name,
         "time_stepper": asdict(case.time_stepper),
+        "magnetic_field": asdict(case.magnetic_field),
         "diagnostics": validation_summary(solution, solution.case_name, ha=args.ha),
         "trace": {
             "time_history": solution.diagnostics.time_history.tolist(),
