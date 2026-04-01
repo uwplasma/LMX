@@ -654,6 +654,22 @@ The backend harness currently supports:
       current-magnitude history, and the default sits between those two errors
     - the next Hunt fix should target limiter policy or replace the global clamp
       with a less distorting stabilization path in the layered update
+- The FreeMHD source and log path now make the later coupling gap more explicit:
+  - `epotMultiRegionInterFoam/fluid/solveMhdFluid.H` runs
+    `ePotEqn.H`, `mhdUEqn.H`, and then the `pEqn.H` pressure-correction loop
+  - `mhdUEqn.H` only provides the momentum equation build/predictor; the actual
+    later `U` corrections come from `common/interFoam/fluid/pEqn.H`
+  - on the corrected Hunt `Ha20` window to `6e-05`, the final pressure-corrector
+    iteration counts are approximately `15, 82, 63, 100, 100, 20` while
+    `maxJxB` remains comparatively flat
+  - retained interpretation:
+    - the remaining Hunt blocker is now better described as a missing reduced
+      analogue of the later pressure-correction response, not as another
+      startup-source or `phi`-solve issue
+    - `compare_hunt_trace_histories.py` now includes
+      `freemhd_pressure_final_records` and `freemhd_epot_records` so that later
+      response can be inspected directly from the JSON artifact instead of
+      reopening raw FreeMHD logs
 
 ## Planned improvements
 

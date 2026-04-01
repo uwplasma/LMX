@@ -2266,15 +2266,36 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next real solver change should target limiter policy or remove this
       global clamp from the layered update path in favor of a less distorting
       stabilization strategy
+- `2026-04-03 03:45 America/Chicago`: Inspected the local FreeMHD pressure
+  coupling path and made the later pressure response explicit in the Hunt
+  comparison artifact:
+  - source inspection:
+    - `epotMultiRegionInterFoam/fluid/solveMhdFluid.H` runs
+      `ePotEqn.H`, then `mhdUEqn.H`, then the `pEqn.H` correction loop
+    - `mhdUEqn.H` builds and relaxes a full momentum equation with `JxB` on the
+      right-hand side
+    - `common/interFoam/fluid/pEqn.H` performs the actual PISO-style pressure
+      corrections and updates `U = HbyA + rAU*reconstruct(...)`
+  - retained diagnostic result on the corrected Hunt `Ha20` window:
+    - FreeMHD final pressure-correction iteration counts by time are
+      approximately `15, 82, 63, 100, 100, 20`
+    - over the same window `maxJxB` stays comparatively flat
+    - the new `compare_hunt_trace_histories.py` artifact now carries
+      `freemhd_pressure_final_records` and `freemhd_epot_records`, so later
+      pressure-response drift is visible without reopening raw logs
+  - retained interpretation:
+    - the remaining Hunt blocker is not just that LMX lacks a better startup
+      source term; it is missing the reduced analogue of FreeMHD’s later
+      pressure-correction response
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
     ramp law on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    change the layered stabilization / limiter policy so the later Hunt trace is
-    no longer globally clamp-controlled, then re-check the corrected `6e-05`
-    pressure and `JxB` histories against FreeMHD
+    use the new pressure-response artifact plus the limiter result to implement
+    a less distorting layered stabilization / correction path, then re-check the
+    corrected `6e-05` pressure and `JxB` histories against FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

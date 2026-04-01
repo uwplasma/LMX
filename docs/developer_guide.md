@@ -162,7 +162,10 @@
   and reports both normalized history error and raw relative error, which is
   necessary when only a partial live FreeMHD log is available. Treat the raw
   `maxJn` / `maxPsiub` comparisons cautiously unless the log semantics are
-  known to match the LMX diagnostic being compared.
+  known to match the LMX diagnostic being compared. The JSON payload now also
+  carries `freemhd_pressure_final_records` and `freemhd_epot_records`, so later
+  pressure-response tuning can use the extracted FreeMHD correction history
+  directly instead of reopening the raw solver log.
 - `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
   extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
   solver diagnostics.
