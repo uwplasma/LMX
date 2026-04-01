@@ -154,6 +154,18 @@ The backend harness currently supports:
     (`0.134` vs `0.127`)
   - so the retained conclusion is to keep the current Hunt defaults and treat
     that candidate as a documented tradeoff, not a real improvement
+- A follow-on probe tightened the same conclusion on the single-region side:
+  - at Hartmann `Ha20`, `48^2`, increasing `potential_iterations` from `200` to
+    `400` and `800` does not improve the branch monotonically
+  - the retained values were roughly:
+    - `200`: `l2 ≈ 7.9e-2`
+    - `400`: `l2 ≈ 1.51`
+    - `800`: `l2 ≈ 5.56e-1`
+  - that rules out a blanket “just raise the rect-duct `phi` budget” default
+    change at this stage
+  - the safer retained move is to use the sweep summaries, which now report the
+    best combined closed-channel error directly, as the decision surface for the
+    next solver iteration
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

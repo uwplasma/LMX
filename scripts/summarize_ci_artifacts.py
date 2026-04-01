@@ -52,10 +52,14 @@ class SweepSummary:
     parameter: str
     first_value: float
     last_value: float
+    first_combined_l2_error: float | None
+    last_combined_l2_error: float | None
     first_y_l2_error: float | None
     last_y_l2_error: float | None
     first_z_l2_error: float | None
     last_z_l2_error: float | None
+    best_combined_value: float | None
+    best_combined_l2_error: float | None
     best_y_value: float | None
     best_y_l2_error: float | None
     best_z_value: float | None
@@ -133,8 +137,10 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
     levels = payload.get("levels", [])
     first = levels[0] if levels else {}
     last = levels[-1] if levels else {}
+    combined_levels = [level for level in levels if "combined_l2_error" in level]
     y_levels = [level for level in levels if "y_l2_error" in level]
     z_levels = [level for level in levels if "z_l2_error" in level]
+    best_combined = min(combined_levels, key=lambda level: float(level["combined_l2_error"])) if combined_levels else None
     best_y = min(y_levels, key=lambda level: float(level["y_l2_error"])) if y_levels else None
     best_z = min(z_levels, key=lambda level: float(level["z_l2_error"])) if z_levels else None
     accepted_values = [bool(level["accepted"]) for level in levels if "accepted" in level]
@@ -144,10 +150,14 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
         parameter=str(payload.get("parameter", "")),
         first_value=float(first.get("parameter_value", 0.0)) if first else 0.0,
         last_value=float(last.get("parameter_value", 0.0)) if last else 0.0,
+        first_combined_l2_error=None if "combined_l2_error" not in first else float(first["combined_l2_error"]),
+        last_combined_l2_error=None if "combined_l2_error" not in last else float(last["combined_l2_error"]),
         first_y_l2_error=None if "y_l2_error" not in first else float(first["y_l2_error"]),
         last_y_l2_error=None if "y_l2_error" not in last else float(last["y_l2_error"]),
         first_z_l2_error=None if "z_l2_error" not in first else float(first["z_l2_error"]),
         last_z_l2_error=None if "z_l2_error" not in last else float(last["z_l2_error"]),
+        best_combined_value=None if best_combined is None else float(best_combined["parameter_value"]),
+        best_combined_l2_error=None if best_combined is None else float(best_combined["combined_l2_error"]),
         best_y_value=None if best_y is None else float(best_y["parameter_value"]),
         best_y_l2_error=None if best_y is None else float(best_y["y_l2_error"]),
         best_z_value=None if best_z is None else float(best_z["parameter_value"]),
@@ -236,10 +246,17 @@ def render_markdown(
                 f"- Parameter: `{sweep.parameter}`",
                 f"- First value: `{sweep.first_value:.6g}`",
                 f"- Last value: `{sweep.last_value:.6g}`",
+                f"- First combined L2: `{'-' if sweep.first_combined_l2_error is None else f'{sweep.first_combined_l2_error:.6g}'}`",
+                f"- Last combined L2: `{'-' if sweep.last_combined_l2_error is None else f'{sweep.last_combined_l2_error:.6g}'}`",
                 f"- First Y L2: `{'-' if sweep.first_y_l2_error is None else f'{sweep.first_y_l2_error:.6g}'}`",
                 f"- Last Y L2: `{'-' if sweep.last_y_l2_error is None else f'{sweep.last_y_l2_error:.6g}'}`",
                 f"- First Z L2: `{'-' if sweep.first_z_l2_error is None else f'{sweep.first_z_l2_error:.6g}'}`",
                 f"- Last Z L2: `{'-' if sweep.last_z_l2_error is None else f'{sweep.last_z_l2_error:.6g}'}`",
+                (
+                    "- Best combined L2: `-`"
+                    if sweep.best_combined_l2_error is None or sweep.best_combined_value is None
+                    else f"- Best combined L2: `{sweep.best_combined_l2_error:.6g}` at `{sweep.best_combined_value:.6g}`"
+                ),
                 (
                     "- Best Y L2: `-`"
                     if sweep.best_y_l2_error is None or sweep.best_y_value is None

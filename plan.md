@@ -1377,6 +1377,38 @@ LMX should only be described as ship ready for the current milestone when all of
   - the next retained Hunt solver change should reduce the combined closed-channel
     error, not just one of the directional profile errors
 
+### 2026-04-01 23:20 America/Chicago
+
+- Probed a broader default-policy idea and rejected it:
+  - hypothesis: raise the electric-potential iteration budget for all
+    single-region rectangular ducts
+  - Hartmann `Ha20`, `32^2` does improve strongly as `potential_iterations`
+    rises:
+    - `200 -> 400 -> 800` gives about
+      `l2: 1.20 -> 0.25 -> 3.0e-2`
+  - Shercliff `Ha20`, `32^2` also improves strongly under the same sweep:
+    - combined closed-channel error about
+      `0.944 -> 0.409 -> 0.223`
+  - but Hartmann `Ha20`, `48^2` invalidates a blanket default change:
+    - `potential_iterations = 200` gives about `l2 ≈ 7.9e-2`
+    - `400` jumps to a much worse branch (`l2 ≈ 1.51`)
+    - `800` is still worse than the current default (`l2 ≈ 5.56e-1`)
+- Retained interpretation:
+  - a larger rect-duct `phi` budget is not a generally safe default policy yet
+  - the medium-resolution Hartmann pathology is more structured than “more
+    potential iterations is always better”
+  - this reinforces the need to use sweep artifacts, not intuition, when
+    choosing the next retained solver/control change
+- Retained reporting improvement:
+  - CI sweep summaries now report the best combined closed-channel error in
+    addition to the best directional `y/z` errors
+  - that makes the current Hunt tuning tradeoffs visible in the normal CI summary
+    without hand-comparing separate profile columns
+- Next-step implication:
+  - the next retained solver change should target the coupled update law or the
+    non-monotone Hartmann branch mechanism itself, not a blanket increase in
+    potential-iteration defaults
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

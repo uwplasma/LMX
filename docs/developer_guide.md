@@ -94,6 +94,9 @@
   report a combined profile error built from the `y` and `z` cuts. Use that when
   a candidate improves one direction while degrading the other, which is exactly
   the current Hunt tuning pattern.
+- CI sweep summaries now track the best combined closed-channel error as well as
+  the best directional `y/z` errors, so solver-control decisions do not depend on
+  manually comparing separate profile columns after each run.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

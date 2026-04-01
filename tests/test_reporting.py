@@ -114,8 +114,8 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
           "case": "hunt",
           "parameter": "dt",
           "levels": [
-            {"parameter_value": 0.002, "y_l2_error": 0.1, "z_l2_error": 0.3, "accepted": 1.0},
-            {"parameter_value": 0.001, "y_l2_error": 0.2, "z_l2_error": 0.25, "accepted": 0.0}
+            {"parameter_value": 0.002, "combined_l2_error": 0.22, "y_l2_error": 0.1, "z_l2_error": 0.3, "accepted": 1.0},
+            {"parameter_value": 0.001, "combined_l2_error": 0.23, "y_l2_error": 0.2, "z_l2_error": 0.25, "accepted": 0.0}
           ]
         }
         """
@@ -127,8 +127,8 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
           "case": "hunt",
           "parameter": "outer_iterations",
           "levels": [
-            {"parameter_value": 2, "y_l2_error": 0.3, "z_l2_error": 0.4},
-            {"parameter_value": 6, "y_l2_error": 0.1, "z_l2_error": 0.2}
+            {"parameter_value": 2, "combined_l2_error": 0.35, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_value": 6, "combined_l2_error": 0.16, "y_l2_error": 0.1, "z_l2_error": 0.2}
           ]
         }
         """
@@ -144,6 +144,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     assert "## Control Sweep" in summary["markdown"]
     assert "Best Y L2" in summary["markdown"]
     assert "Best Z L2" in summary["markdown"]
+    assert "Best combined L2" in summary["markdown"]
     assert "Accepted levels" in summary["markdown"]
     assert "Slice Y L2" in summary["markdown"]
     out = tmp_path / "summary.json"
@@ -206,8 +207,8 @@ def test_summarize_sweep_report(tmp_path: Path):
           "case": "hunt",
           "parameter": "outer_iterations",
           "levels": [
-            {"parameter_value": 2, "y_l2_error": 0.3, "z_l2_error": 0.4, "accepted": 1.0},
-            {"parameter_value": 6, "y_l2_error": 0.1, "z_l2_error": 0.2, "accepted": 0.0}
+            {"parameter_value": 2, "combined_l2_error": 0.35, "y_l2_error": 0.3, "z_l2_error": 0.4, "accepted": 1.0},
+            {"parameter_value": 6, "combined_l2_error": 0.16, "y_l2_error": 0.1, "z_l2_error": 0.2, "accepted": 0.0}
           ]
         }
         """
@@ -216,6 +217,9 @@ def test_summarize_sweep_report(tmp_path: Path):
     assert summary.case == "hunt"
     assert summary.parameter == "outer_iterations"
     assert summary.first_value == pytest.approx(2.0)
+    assert summary.first_combined_l2_error == pytest.approx(0.35)
+    assert summary.best_combined_value == pytest.approx(6.0)
+    assert summary.best_combined_l2_error == pytest.approx(0.16)
     assert summary.best_y_value == pytest.approx(6.0)
     assert summary.best_y_l2_error == pytest.approx(0.1)
     assert summary.last_z_l2_error == pytest.approx(0.2)
@@ -267,8 +271,8 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
           "case": "hunt",
           "parameter": "dt",
           "levels": [
-            {"parameter_value": 0.002, "y_l2_error": 0.1, "z_l2_error": 0.3, "accepted": 1.0},
-            {"parameter_value": 0.001, "y_l2_error": 0.2, "z_l2_error": 0.25, "accepted": 0.0}
+            {"parameter_value": 0.002, "combined_l2_error": 0.22, "y_l2_error": 0.1, "z_l2_error": 0.3, "accepted": 1.0},
+            {"parameter_value": 0.001, "combined_l2_error": 0.23, "y_l2_error": 0.2, "z_l2_error": 0.25, "accepted": 0.0}
           ]
         }
         """
@@ -280,8 +284,8 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
           "case": "hunt",
           "parameter": "outer_iterations",
           "levels": [
-            {"parameter_value": 2, "y_l2_error": 0.3, "z_l2_error": 0.4},
-            {"parameter_value": 6, "y_l2_error": 0.1, "z_l2_error": 0.2}
+            {"parameter_value": 2, "combined_l2_error": 0.35, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_value": 6, "combined_l2_error": 0.16, "y_l2_error": 0.1, "z_l2_error": 0.2}
           ]
         }
         """
