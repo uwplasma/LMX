@@ -12,6 +12,7 @@ from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
+    duct_layer_resolution_metrics,
     estimate_observed_order,
     hartmann_acceptance,
     hartmann_validation,
@@ -170,6 +171,11 @@ def main(argv: list[str] | None = None) -> int:
                 "mesh_spacing": _mesh_spacing(case),
                 "dt": case.time_stepper.dt,
                 "max_steps": float(case.time_stepper.max_steps),
+                **(
+                    duct_layer_resolution_metrics(case, solution.mesh)
+                    if hasattr(solution, "mesh")
+                    else {}
+                ),
                 **metrics,
             }
             levels.append(level)

@@ -44,7 +44,8 @@ def test_run_convergence_suite_writes_summary(tmp_path: Path, monkeypatch: pytes
         geometry=SimpleNamespace(width=2.0, height=2.0, ny=resolution, nz=resolution),
         time_stepper=SimpleNamespace(dt=0.001, max_steps=100),
     ))
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace())
+    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
+    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 8.0})
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
@@ -61,4 +62,5 @@ def test_run_convergence_suite_writes_summary(tmp_path: Path, monkeypatch: pytes
     summary = (output / "summary.json").read_text()
     assert '"hartmann"' in summary
     assert '"shercliff"' in summary
+    assert '"hartmann_layer_cells": 8.0' in summary
     assert '"cases"' in capsys.readouterr().out

@@ -177,6 +177,7 @@ LMX should only be described as ship ready for the current milestone when all of
 - The validation workflow now includes:
   - explicit Hartmann acceptance reports with configurable `l2` and `linf` thresholds
   - a native `run_convergence_suite.py` runner that emits mesh-convergence summaries for Hartmann, Shercliff, and Hunt
+  - those convergence summaries now also report estimated Hartmann-layer and side-layer cell counts, so mesh adequacy is visible in the artifact itself
 - `solve_steady` no longer aliases the transient runner:
   - it now iterates until either the configured steady tolerance is reached or the configured maximum step budget is exhausted
   - targeted tests now cover early-stop and max-step behavior explicitly
@@ -192,6 +193,14 @@ LMX should only be described as ship ready for the current milestone when all of
   - native Hunt validation remained essentially unchanged after this correction,
     which is a useful negative result: the main gap is solver fidelity, not the
     naming or normalization of the Hunt wall parameter
+- The new layer-resolution metrics sharpen the current Hunt diagnosis:
+  - on the native Hunt `Ha20` convergence sweep, Hartmann-layer coverage increases
+    from about `3.2` to `9.7` cells and side-layer coverage from about `5.2` to
+    `15.8` cells between the `16^2` and `48^2` runs
+  - the corresponding Hunt validation errors barely move and the observed orders
+    stay near zero
+  - this is strong evidence that the current native Hunt gap is solver-dominant,
+    not only a missing boundary-layer mesh-resolution issue
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
@@ -997,6 +1006,29 @@ LMX should only be described as ship ready for the current milestone when all of
   2. keep using conductance ratio as the default Hunt public input
   3. prefer solver changes that can be justified geometrically or nondimensionally,
      not by case-specific rescue heuristics
+
+### 2026-04-01 12:30 America/Chicago
+
+- Added explicit duct-layer-resolution diagnostics to the native convergence
+  artifacts:
+  - `duct_layer_resolution_metrics(...)` now estimates Hartmann-layer thickness,
+    side-layer thickness, cells across each layer, and minimum fluid spacing along
+    those directions from the actual mesh and magnetic-field orientation
+  - `scripts/run_convergence_suite.py` now includes those metrics in every level
+    of the convergence summary
+- Added targeted unit coverage for the new diagnostics and convergence-summary
+  integration.
+- Verified the new diagnostics on the native Hunt `Ha20` convergence sweep:
+  - at `16^2`, `32^2`, and `48^2` fluid resolutions, the reported Hartmann-layer
+    coverage is about `3.2`, `6.4`, and `9.7` cells
+  - the reported side-layer coverage is about `5.2`, `10.5`, and `15.8` cells
+  - despite that, the Hunt validation errors barely improve and the observed
+    orders remain near zero
+- This is an important retained result for the next implementation step:
+  - the current native Hunt problem is not explained solely by missing layer
+    resolution
+  - the next solver work should focus on the update/coupling formulation rather
+    than assuming that more mesh clustering alone will fix the steady Hunt gap
 
 ## Instruction For Future Agents
 

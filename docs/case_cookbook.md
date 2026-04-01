@@ -54,7 +54,10 @@ python3 scripts/fetch_freemhd_assets.py --dest ./external
 ```
 
 These commands produce the analytical and sampled comparison reports that back the
-current regression and validation tests.
+current regression and validation tests. The convergence summary now also records
+estimated Hartmann-layer and side-layer cell counts for the duct cases so mesh
+adequacy is visible in the artifact rather than inferred indirectly from error
+trends.
 
 ## Benchmarking
 

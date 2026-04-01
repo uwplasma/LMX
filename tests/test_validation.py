@@ -11,6 +11,7 @@ from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
     compare_with_freemhd,
+    duct_layer_resolution_metrics,
     duct_profile_metrics,
     estimate_observed_order,
     hartmann_acceptance,
@@ -46,6 +47,18 @@ def test_hartmann_profile_center_is_maximum():
     y = jnp.linspace(-1.0, 1.0, 101)
     profile = hartmann_analytic_profile(y, ha=10.0)
     assert float(profile[50]) >= float(profile[0])
+
+
+def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
+    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    solution = solve_steady(case)
+
+    metrics = duct_layer_resolution_metrics(case, solution.mesh)
+
+    assert metrics["hartmann_layer_thickness"] > 0.0
+    assert metrics["side_layer_thickness"] > 0.0
+    assert metrics["hartmann_layer_cells"] > 0.0
+    assert metrics["side_layer_cells"] > 0.0
 
 
 def test_compare_with_freemhd_report(tmp_path: Path):

@@ -17,6 +17,8 @@
 - Sampled midplane and line-cut comparison JSON generation when processed slice data
   is present.
 - Native mesh-convergence study summaries for the currently supported duct cases.
+- Native mesh-convergence study summaries now include estimated Hartmann-layer and
+  side-layer cell counts for the duct cases.
 - CSV and ParaView outputs for centerline and field inspection.
 - Validation artifact generation in GitHub Actions.
 - Benchmark artifact generation in GitHub Actions.
@@ -46,6 +48,12 @@ The backend harness currently supports:
   instead of treating `0.05` as a raw wall conductivity. That corrects the case
   API, but the retained Hunt validation gap persists, which points back to solver
   fidelity rather than case normalization.
+- The convergence artifacts now make the mesh-side diagnosis sharper. On the
+  current Hunt `Ha20` sweep, the reported Hartmann-layer resolution grows from
+  about `3.2` to `9.7` cells and the side-layer resolution from about `5.2` to
+  `15.8` cells between `16^2` and `48^2` fluid resolutions, while the validation
+  errors barely improve. That points to solver/update fidelity as the dominant
+  remaining issue for native Hunt, not just missing boundary-layer clustering.
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 
