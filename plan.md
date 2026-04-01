@@ -1409,6 +1409,43 @@ LMX should only be described as ship ready for the current milestone when all of
     non-monotone Hartmann branch mechanism itself, not a blanket increase in
     potential-iteration defaults
 
+### 2026-04-02 00:05 America/Chicago
+
+- Probed a more direct solver-side change in the electric-potential iteration:
+  - added weighted Jacobi support through a new `potential_relaxation` control
+  - kept it as general solver infrastructure and made it sweepable in
+    `run_solver_control_sweep.py`
+- Retained probe results:
+  - Hartmann `Ha20`, `32^2`, `potential_iterations=200`:
+    - `potential_relaxation = 1.0` gives `l2 ≈ 1.20`
+    - `0.5` improves that to about `l2 ≈ 0.196`
+  - Hartmann `Ha20`, `48^2`, `potential_iterations=400`:
+    - `1.0` gives `l2 ≈ 1.51`
+    - `0.5` improves that to about `l2 ≈ 7.7e-2`
+  - Hunt `Ha20`, `32^2`:
+    - combined error worsens modestly as relaxation drops
+      (`0.127 -> 0.135` from `1.0 -> 0.5`)
+  - Hunt `Ha100`, `32^2`:
+    - combined error improves modestly as relaxation drops
+      (`0.343 -> 0.327` from `1.0 -> 0.5`)
+  - Shercliff `Ha20`, `32^2`:
+    - improves at the current default `225` potential iterations
+      (`combined ≈ 0.844 -> 0.484` from `1.0 -> 0.5`)
+    - but degrades at `400` potential iterations
+- Retained interpretation:
+  - weighted Jacobi is a real control lever for the non-monotone Hartmann branch
+  - but it is still not safe as a blanket new default across the currently
+    supported duct families
+  - the right status on `main` is:
+    - keep `potential_relaxation` as infrastructure
+    - expose it to solver-control sweeps
+    - do not change case defaults yet
+- Next-step implication:
+  - the next retained solver change should probably combine the current
+    `potential_iterations`, `potential_residual`, `potential_relaxation`, and
+    combined-error artifacts to identify a coupled update rule, not just another
+    single-parameter default tweak
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

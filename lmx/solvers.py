@@ -76,6 +76,7 @@ def _solve_potential(
     anchor: tuple[int, int],
     iterations: int,
     tolerance: float | None = None,
+    relaxation: float = 1.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
@@ -102,6 +103,7 @@ def _solve_potential(
         anchor,
         iterations,
         tolerance=tolerance,
+        relaxation=relaxation,
     )
     return phi, residual, iteration_count
 
@@ -197,6 +199,7 @@ def _step(
     outer_iterations: int,
     potential_iterations: int,
     potential_tolerance: float | None,
+    potential_relaxation: float,
     relaxation: float,
     velocity_update_limit: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
@@ -212,6 +215,7 @@ def _step(
             anchor,
             potential_iterations,
             tolerance=potential_tolerance,
+            relaxation=potential_relaxation,
         )
         phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
         jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
@@ -274,6 +278,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
             potential_tolerance=case.time_stepper.potential_tolerance,
+            potential_relaxation=case.time_stepper.potential_relaxation,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
         )
@@ -334,6 +339,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
             potential_tolerance=case.time_stepper.potential_tolerance,
+            potential_relaxation=case.time_stepper.potential_relaxation,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
         )

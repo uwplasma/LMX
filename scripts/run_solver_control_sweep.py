@@ -107,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--wall-cells", type=int, default=None)
     parser.add_argument(
         "--parameter",
-        choices=["outer_iterations", "potential_iterations", "potential_tolerance", "relaxation", "dt"],
+        choices=["outer_iterations", "potential_iterations", "potential_tolerance", "potential_relaxation", "relaxation", "dt"],
         required=True,
     )
     parser.add_argument("--values", type=str, required=True)

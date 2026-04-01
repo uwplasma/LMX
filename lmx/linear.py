@@ -30,9 +30,12 @@ def solve_poisson_jacobi_state(
     anchor: tuple[int, int],
     iterations: int,
     tolerance: float | None = None,
+    relaxation: float = 1.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     phi0 = jnp.zeros_like(rhs)
     rhs_masked = rhs.at[anchor].set(0.0)
+
+    omega = jnp.asarray(relaxation, dtype=rhs.dtype)
 
     def jacobi_update(phi: jnp.ndarray) -> jnp.ndarray:
         west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
@@ -40,8 +43,9 @@ def solve_poisson_jacobi_state(
         south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
         north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
         updated = (rhs + west * west_phi + east * east_phi + south * south_phi + north * north_phi) / diagonal
-        updated = updated.at[anchor].set(0.0)
-        return updated
+        blended = (1.0 - omega) * phi + omega * updated
+        blended = blended.at[anchor].set(0.0)
+        return blended
 
     def residual_norm(phi: jnp.ndarray) -> jnp.ndarray:
         west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
@@ -86,6 +90,7 @@ def solve_poisson_jacobi(
     anchor: tuple[int, int],
     iterations: int,
     tolerance: float | None = None,
+    relaxation: float = 1.0,
 ) -> tuple[jnp.ndarray, LinearSolveInfo]:
     phi, residual, iteration_count = solve_poisson_jacobi_state(
         diagonal,
@@ -97,6 +102,7 @@ def solve_poisson_jacobi(
         anchor,
         iterations,
         tolerance=tolerance,
+        relaxation=relaxation,
     )
     return phi, LinearSolveInfo(
         backend="jax-jacobi",

@@ -75,8 +75,9 @@
   sweep data includes analytical pass/fail information, which is useful for the
   current Hartmann refinement blocker. CI now runs a dedicated Hartmann
   `potential_iterations` sweep at `Ha20`, `32^2` for that reason. The same
-  runner can now sweep `potential_tolerance`, which is useful when separating an
-  insufficient `phi`-solve iteration ceiling from an early residual stop.
+  runner can now sweep `potential_tolerance` and `potential_relaxation`, which
+  is useful when separating an insufficient `phi`-solve iteration ceiling from
+  an early residual stop or from a brittle raw Jacobi update.
 - Validation summaries now also include simple profile-pathology diagnostics such
   as sign-change counts and negative-value fractions on the extracted duct
   midplane profiles. These are useful when a solver branch becomes oscillatory

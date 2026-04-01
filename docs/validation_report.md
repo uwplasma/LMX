@@ -166,6 +166,24 @@ The backend harness currently supports:
   - the safer retained move is to use the sweep summaries, which now report the
     best combined closed-channel error directly, as the decision surface for the
     next solver iteration
+- A later solver-control probe added one more retained tool without changing
+  defaults:
+  - the electric-potential solver now supports weighted Jacobi through
+    `potential_relaxation`
+  - the current retained probe results are mixed:
+    - Hartmann `Ha20`, `32^2`, `potential_iterations=200` improves strongly as
+      `potential_relaxation` drops to `0.5`
+      (`l2 ≈ 1.20 -> 0.20`)
+    - Hartmann `Ha20`, `48^2`, `potential_iterations=400` also improves strongly
+      at `0.5` (`l2 ≈ 1.51 -> 7.7e-2`)
+    - Hunt `Ha20`, `32^2` gets slightly worse in combined error
+      (`0.127 -> 0.135`)
+    - Hunt `Ha100`, `32^2` gets modestly better in combined error
+      (`0.343 -> 0.327`)
+    - Shercliff `Ha20`, `32^2` improves at the current default `225` iterations
+      but degrades at `400`
+  - that makes `potential_relaxation` worth keeping as a sweepable solver
+    control, but not yet safe as a new default policy
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh
