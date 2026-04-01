@@ -1740,6 +1740,66 @@ LMX should only be described as ship ready for the current milestone when all of
   - then change the layered Hunt velocity update law itself, not just the
     potential backend or scalar control defaults
 
+### 2026-04-02 05:05 America/Chicago
+
+- Closed the remaining infrastructure gap for patched FreeMHD runs:
+  - `docker/Dockerfile` now accepts a staged local `FreeMHD/` tree before
+    falling back to a fresh upstream clone
+  - `scripts/build_freemhd_container.py` now accepts
+    `--local-freemhd-root` and stages a minimal local FreeMHD tree into a
+    temporary build context
+  - this lets container builds consume local solver instrumentation patches
+    instead of ignoring them
+- Extended the FreeMHD logging patch:
+  - `patch_freemhd_coupled_logging.py` still logs:
+    - outer coupling loop
+    - fluid `epot` solve
+  - it now also patches the shared interFoam `pEqn.H` path so the next run can
+    emit structured pressure-correction / `maxU` diagnostics in addition to the
+    `epot` trace
+- Real retained logged-run evidence now exists from the patched local FreeMHD
+  Hunt `Ha20` case:
+  - container image `lmx-freemhd-localdiag` built successfully from the local
+    patched tree
+  - recovered `hunt_exactBL_Ha20` is running with `LMX_DIAG` enabled
+  - `extract_freemhd_coupled_log.py` already captures structured `outer` and
+    `epot` records from that live run
+  - first retained `epot` records:
+    - `t = 1.25e-05`:
+      - `potEInitialResidual = 1.0`
+      - `potEFinalResidual = 4.43e-08`
+      - `potEIterations = 11`
+      - `maxJxB ≈ 4.69e3`
+    - `t = 2.70833e-05`:
+      - `potEInitialResidual ≈ 2.86e-1`
+      - `potEFinalResidual ≈ 5.34e-08`
+      - `potEIterations = 7`
+      - `maxJxB ≈ 4.65e3`
+    - `t = 4.53125e-05`:
+      - `potEInitialResidual ≈ 1.90e-1`
+      - `potEFinalResidual ≈ 3.75e-08`
+      - `potEIterations = 7`
+      - `maxJxB ≈ 4.63e3`
+    - `t = 6.35417e-05`:
+      - `potEInitialResidual ≈ 1.44e-1`
+      - `potEFinalResidual ≈ 3.06e-08`
+      - `potEIterations = 7`
+      - `maxJxB ≈ 4.62e3`
+- Retained interpretation:
+  - this already shows the FreeMHD `phi` block is well converged on the real
+    Hunt case
+  - that strengthens the current hypothesis that the remaining LMX Hunt blocker
+    is in the coupled velocity/pressure response to `phi`, not just in the
+    absolute `phi` residual itself
+  - the missing piece is structured `pressure/maxU` logging from the same run
+    so the LMX coupling law can be compared against FreeMHD at the solver-step
+    level rather than only through end profiles
+- Best next step:
+  - finish the pressure-instrumented FreeMHD rerun using the updated logging
+    patch
+  - compare those `pressure/maxU` records against LMX short-time Hunt traces
+  - then change the layered Hunt velocity update law directly
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

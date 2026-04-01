@@ -17,9 +17,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /opt
 
-RUN git clone --depth 1 https://github.com/PlasmaControl/FreeMHD.git /opt/FreeMHD
+RUN mkdir -p /opt/FreeMHD
+COPY FreeMHD/ /opt/FreeMHD/
 
 RUN /bin/bash -lc "source ${WM_PROJECT_DIR}/etc/bashrc && cd /opt/FreeMHD && \
+    if [ ! -d ./MHD_Solvers ]; then rm -rf /opt/FreeMHD && git clone --depth 1 https://github.com/PlasmaControl/FreeMHD.git /opt/FreeMHD && cd /opt/FreeMHD; fi && \
     if [ -x ./Allwmake ]; then ./Allwmake; fi && \
     wmake MHD_Solvers/solvers/epotMultiRegionFoam && \
     wmake MHD_Solvers/solvers/epotMultiRegionInterFoam"

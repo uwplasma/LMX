@@ -110,10 +110,15 @@
     FreeMHD run when sample files are present
 - `python scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD`:
   patches the local `epotMultiRegionInterFoam` sources with opt-in `LMX_DIAG`
-  logging in the outer loop and fluid `epot` / momentum solves.
+  logging in the outer loop, fluid `epot` solve, momentum predictor, and
+  interFoam pressure-correction block.
 - `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
   extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
   solver diagnostics.
+- `python scripts/build_freemhd_container.py --local-freemhd-root ./external/FreeMHD`:
+  stages a minimal local FreeMHD tree into a temporary Docker build context so
+  container runs can use patched local solver sources instead of recloning
+  upstream.
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form

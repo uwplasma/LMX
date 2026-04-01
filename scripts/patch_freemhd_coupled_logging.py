@@ -7,6 +7,7 @@ from pathlib import Path
 MAIN_FILE = Path("MHD_Solvers/solvers/epotMultiRegionInterFoam/epotMultiRegionInterFoam.C")
 EPOT_FILE = Path("MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/ePotEqn.H")
 UEQN_FILE = Path("MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H")
+PEQN_FILE = Path("MHD_Solvers/solvers/common/interFoam/fluid/pEqn.H")
 
 
 def _inject_once(source: str, needle: str, insertion: str) -> str:
@@ -49,6 +50,9 @@ def patch_main_file(source: str) -> str:
 
 
 def patch_epot_file(source: str) -> str:
+    source = source.replace('<< " maxPotE=" << gMax(mag(potE))', '<< " maxPotE=" << max(mag(potE)).value()')
+    source = source.replace('<< " maxJ=" << gMax(mag(J))', '<< " maxJ=" << max(mag(J)).value()')
+    source = source.replace('<< " maxJxB=" << gMax(mag(JxB))', '<< " maxJxB=" << max(mag(JxB)).value()')
     solve_old = "\tPotEEqn.solve();\n"
     solve_new = """\tauto potEPerf = PotEEqn.solve();\n"""
     if "auto potEPerf = PotEEqn.solve();" not in source:
@@ -66,9 +70,9 @@ def patch_epot_file(source: str) -> str:
 \t\t\t<< " potEInitialResidual=" << potEPerf.initialResidual()
 \t\t\t<< " potEFinalResidual=" << potEPerf.finalResidual()
 \t\t\t<< " potEIterations=" << potEPerf.nIterations()
-\t\t\t<< " maxPotE=" << gMax(mag(potE))
-\t\t\t<< " maxJ=" << gMax(mag(J))
-\t\t\t<< " maxJxB=" << gMax(mag(JxB))
+\t\t\t<< " maxPotE=" << max(mag(potE)).value()
+\t\t\t<< " maxJ=" << max(mag(J)).value()
+\t\t\t<< " maxJxB=" << max(mag(JxB)).value()
 \t\t\t<< endl;
 \t}
 """
@@ -81,6 +85,8 @@ def patch_epot_file(source: str) -> str:
 
 
 def patch_ueqn_file(source: str) -> str:
+    source = source.replace('<< " maxU=" << gMax(mag(U))', '<< " maxU=" << max(mag(U)).value()')
+    source = source.replace('<< " maxJxB=" << gMax(mag(JxB))', '<< " maxJxB=" << max(mag(JxB)).value()')
     solve_old = """        solve
         (
             UEqn
@@ -124,8 +130,8 @@ def patch_ueqn_file(source: str) -> str:
                 << " UInitialResidual=" << UPerf.initialResidual()
                 << " UFinalResidual=" << UPerf.finalResidual()
                 << " UIterations=" << UPerf.nIterations()
-                << " maxU=" << gMax(mag(U))
-                << " maxJxB=" << gMax(mag(JxB))
+                << " maxU=" << max(mag(U)).value()
+                << " maxJxB=" << max(mag(JxB)).value()
                 << endl;
         }
 """
@@ -137,11 +143,75 @@ def patch_ueqn_file(source: str) -> str:
     return source
 
 
+def patch_peqn_file(source: str) -> str:
+    solve_old = """        solve
+        (
+            p_rghEqnComp1() + p_rghEqnComp2() + p_rghEqnIncomp,
+            mesh.solver
+            ( 
+              p_rgh.select
+              (
+                (                
+                  oCorr == nOuterCorr-1
+                  && corr == nCorr-1
+                  && nonOrth == nNonOrthCorr
+                )
+              )
+            )
+        );
+"""
+    solve_new = """        auto pPerf = solve
+        (
+            p_rghEqnComp1() + p_rghEqnComp2() + p_rghEqnIncomp,
+            mesh.solver
+            ( 
+              p_rgh.select
+              (
+                (                
+                  oCorr == nOuterCorr-1
+                  && corr == nCorr-1
+                  && nonOrth == nNonOrthCorr
+                )
+              )
+            )
+        );
+"""
+    if "auto pPerf = solve" not in source:
+        if solve_old not in source:
+            raise ValueError("Could not find pressure solve block")
+        source = source.replace(solve_old, solve_new, 1)
+
+    log_block = """
+            if (logCoupledMhdIterations)
+            {
+                Info<< "LMX_DIAG pressure"
+                    << " time=" << runTime.timeName()
+                    << " region=" << mesh.name()
+                    << " oCorr=" << oCorr
+                    << " corr=" << corr
+                    << " nonOrth=" << nonOrth
+                    << " pInitialResidual=" << pPerf.initialResidual()
+                    << " pFinalResidual=" << pPerf.finalResidual()
+                    << " pIterations=" << pPerf.nIterations()
+                    << " maxU=" << max(mag(U)).value()
+                    << " maxJxB=" << max(mag(JxB)).value()
+                    << endl;
+            }
+"""
+    source = _inject_once(
+        source,
+        "            fvOptions.correct(U);\n",
+        log_block,
+    )
+    return source
+
+
 def patch_freemhd_tree(root: Path) -> list[Path]:
     targets = {
         MAIN_FILE: patch_main_file,
         EPOT_FILE: patch_epot_file,
         UEQN_FILE: patch_ueqn_file,
+        PEQN_FILE: patch_peqn_file,
     }
     updated: list[Path] = []
     for relative_path, patcher in targets.items():

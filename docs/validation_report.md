@@ -311,10 +311,30 @@ The backend harness currently supports:
   logging route:
   - `patch_freemhd_coupled_logging.py` adds opt-in `LMX_DIAG` logging to the
     local `epotMultiRegionInterFoam` sources without changing physics
+  - `build_freemhd_container.py --local-freemhd-root ...` can now build a
+    container from that patched local tree instead of forcing a fresh upstream
+    clone, so the logging patch reaches real solver runs
   - `extract_freemhd_coupled_log.py` converts those lines into JSON records
   - the next Hunt solver step should use those FreeMHD iteration diagnostics
     together with LMX `potential_residual` / `potential_iterations_used`
     instead of relying only on sampled end profiles
+- First live retained Hunt `Ha20` solver-trace data from patched FreeMHD:
+  - case: recovered `hunt_exactBL_Ha20`, short run with `deltaT = 1e-5` start
+    and `endTime = 1e-4`
+  - first fluid `potE` solves:
+    - `t = 1.25e-05`: initial residual `1.0`, final residual
+      `4.43e-08`, iterations `11`, `maxJxB ≈ 4.69e3`
+    - `t = 2.70833e-05`: initial residual `2.86e-1`, final residual
+      `5.34e-08`, iterations `7`, `maxJxB ≈ 4.65e3`
+    - `t = 4.53125e-05`: initial residual `1.90e-1`, final residual
+      `3.75e-08`, iterations `7`, `maxJxB ≈ 4.63e3`
+    - `t = 6.35417e-05`: initial residual `1.44e-1`, final residual
+      `3.06e-08`, iterations `7`, `maxJxB ≈ 4.62e3`
+  - retained interpretation:
+    - FreeMHD’s electric-potential block is not marginal on this case
+    - the next useful comparison is therefore not “can LMX drive `phi`
+      residual down?” but “how does the coupled velocity/pressure response use
+      that `phi` state?”
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and

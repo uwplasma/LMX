@@ -18,6 +18,8 @@ def test_write_container_bundle_creates_expected_files(tmp_path: Path):
     readme = paths["README.md"].read_text()
 
     assert "microfluidica/openfoam:2206" in dockerfile
+    assert "COPY FreeMHD/ /opt/FreeMHD/" in dockerfile
+    assert "if [ ! -d ./MHD_Solvers ]" in dockerfile
     assert "wmake MHD_Solvers/solvers/epotMultiRegionFoam" in dockerfile
     assert "wmake MHD_Solvers/solvers/epotMultiRegionInterFoam" in dockerfile
     assert "if [ -x ./Allwmake ]; then ./Allwmake; fi" in dockerfile
@@ -46,3 +48,4 @@ def test_write_container_bundle_creates_expected_files(tmp_path: Path):
     assert "docker build --platform linux/amd64 -t lmx-freemhd ./docker" in readme
     assert "scripts/build_freemhd_container.py" in readme
     assert "scripts/run_freemhd_case.py" in readme
+    assert (tmp_path / "docker" / "FreeMHD" / ".gitkeep").exists()
