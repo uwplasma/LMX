@@ -428,11 +428,27 @@ The backend harness currently supports:
     - `u_max_abs_diff ≈ 6.21e-04`
     - `potential_residual ≈ 2.61e-03`
     - sampled `combined_l2_error ≈ 9.83e-02`
+    - final `maxJ ≈ 2.95`
+    - final `maxJxB ≈ 31.0`
   - retained interpretation:
     - the layered `phi` solve is no longer the dominant blocker on the Hunt
       startup path either
     - the remaining work should focus on longer-horizon momentum/pressure
       evolution instead of more layered `phi` backend tuning
+- A targeted layered-only coupling candidate was tested and rolled back:
+  - change:
+    - advance the layered velocity trial from the current outer iterate instead
+      of the step-entry state
+  - retained result:
+    - Hunt `Ha20` short-time combined error moved from about `9.83e-02` to
+      `9.75e-02`
+    - Hunt `Ha20` full-path combined error moved from about `4.203e-01` to
+      `4.204e-01`
+    - Hunt `Ha100` full-path combined error stayed at about `2.149e-01`
+  - retained interpretation:
+    - this is not the next real fix for the longer-horizon Hunt mismatch
+    - keep the stable solver baseline and use the new force-history observables
+      to target the pressure-response defect more directly
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and

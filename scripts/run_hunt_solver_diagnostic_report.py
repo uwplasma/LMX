@@ -115,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
         "trace": {
             "time_history": solution.diagnostics.time_history.tolist(),
             "u_max_history": solution.diagnostics.u_max_history.tolist(),
+            "current_max_history": solution.diagnostics.current_max_history.tolist(),
+            "lorentz_max_history": solution.diagnostics.lorentz_max_history.tolist(),
             "residual_history": solution.diagnostics.residual_history.tolist(),
             "potential_residual_history": solution.diagnostics.potential_residual_history.tolist(),
             "potential_iterations_history": solution.diagnostics.potential_iterations_history.tolist(),

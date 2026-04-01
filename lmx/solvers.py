@@ -387,6 +387,8 @@ def solve_transient(case: CaseSpec) -> Solution:
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
         ohmic = jnp.mean(jy**2 + jz**2)
+        max_current = jnp.max(jnp.sqrt(jy**2 + jz**2))
+        max_lorentz = jnp.max(jnp.abs(lorentz))
         sample = jnp.asarray(
             [
                 time + dt,
@@ -394,6 +396,8 @@ def solve_transient(case: CaseSpec) -> Solution:
                 residual,
                 courant_like,
                 ohmic,
+                max_current,
+                max_lorentz,
                 potential_residual,
                 potential_iteration_count,
             ],
@@ -419,8 +423,10 @@ def solve_transient(case: CaseSpec) -> Solution:
         residual_history=samples[:, 2],
         courant_like=samples[:, 3],
         ohmic_power=samples[:, 4],
-        potential_residual_history=samples[:, 5],
-        potential_iterations_history=samples[:, 6],
+        current_max_history=samples[:, 5],
+        lorentz_max_history=samples[:, 6],
+        potential_residual_history=samples[:, 7],
+        potential_iterations_history=samples[:, 8],
     )
     return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
 
@@ -476,6 +482,8 @@ def solve_steady(case: CaseSpec) -> Solution:
     ohmic_history: list[float] = []
     time_history: list[float] = []
     u_max_history: list[float] = []
+    current_max_history: list[float] = []
+    lorentz_max_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     step_count = 0
@@ -486,11 +494,15 @@ def solve_steady(case: CaseSpec) -> Solution:
         u_max_value = float(jnp.max(jnp.abs(u)))
         courant_like = float(u_max_value * dt / jnp.min(mesh.dy))
         ohmic = float(jnp.mean(jy**2 + jz**2))
+        max_current = float(jnp.max(jnp.sqrt(jy**2 + jz**2)))
+        max_lorentz = float(jnp.max(jnp.abs(lorentz)))
         time_history.append(float((step_index + 1) * dt))
         u_max_history.append(u_max_value)
         residual_history.append(residual_value)
         courant_history.append(courant_like)
         ohmic_history.append(ohmic)
+        current_max_history.append(max_current)
+        lorentz_max_history.append(max_lorentz)
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
         step_count = step_index + 1
@@ -514,6 +526,8 @@ def solve_steady(case: CaseSpec) -> Solution:
         residual_history=jnp.asarray(residual_history, dtype=float),
         courant_like=jnp.asarray(courant_history, dtype=float),
         ohmic_power=jnp.asarray(ohmic_history, dtype=float),
+        current_max_history=jnp.asarray(current_max_history, dtype=float),
+        lorentz_max_history=jnp.asarray(lorentz_max_history, dtype=float),
         potential_residual_history=jnp.asarray(potential_history, dtype=float),
         potential_iterations_history=jnp.asarray(potential_iteration_history, dtype=float),
     )

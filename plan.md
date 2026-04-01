@@ -1967,6 +1967,41 @@ LMX should only be described as ship ready for the current milestone when all of
     longer-horizon momentum/pressure-coupling error directly
   - avoid further `phi` backend churn unless a new layered trace proves that the
     remaining mismatch still originates there
+- `2026-04-02 22:35 America/Chicago`: Tested a targeted layered-only coupling
+  candidate where each outer iteration advanced velocity from the current outer
+  iterate instead of the step-entry state. This was retained as a negative
+  result and rolled back. It preserved Hartmann/Shercliff and stayed bounded,
+  but it did not improve the recovered Hunt parity path meaningfully:
+  - Hunt `Ha20` short-time:
+    - baseline combined error `≈ 9.83e-02`
+    - candidate combined error `≈ 9.75e-02`
+  - Hunt `Ha20` full-path:
+    - baseline combined error `≈ 4.203e-01`
+    - candidate combined error `≈ 4.204e-01`
+  - Hunt `Ha100` full-path:
+    - baseline combined error `≈ 2.149e-01`
+    - candidate combined error `≈ 2.149e-01`
+  - retained interpretation:
+    - advancing from the current outer iterate is not the next real fix for the
+      longer-horizon Hunt mismatch
+    - keep the stable solver baseline and target a different part of the
+      momentum/pressure evolution
+- `2026-04-02 22:45 America/Chicago`: Added matching force-history observables
+  to the LMX Hunt diagnostic path so the next pressure-response pass can compare
+  directly against FreeMHD `maxJ` and `maxJxB` traces instead of only `maxU`
+  and profile errors. `Diagnostics` and
+  `run_hunt_solver_diagnostic_report.py` now expose:
+  - `current_max_history`
+  - `lorentz_max_history`
+  Retained short-time Hunt `Ha20` baseline on the stable solver now includes:
+  - final `current_max_history[-1] ≈ 2.95`
+  - final `lorentz_max_history[-1] ≈ 31.0`
+- Best next step:
+  - use the patched FreeMHD pressure/maxU/`maxJxB` trace together with the
+    improved LMX `u_max`/`current_max`/`lorentz_max` histories to target the
+    remaining longer-horizon momentum/pressure-coupling error directly
+  - avoid further `phi` backend churn unless a new layered trace proves that the
+    remaining mismatch still originates there
 
 ## Instruction For Future Agents
 
