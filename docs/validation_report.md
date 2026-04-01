@@ -638,6 +638,22 @@ The backend harness currently supports:
   - on the recovered Hunt `Ha20` replay this leaves the retained trace
     essentially unchanged, which is useful negative evidence:
     the remaining gap is not dominated by the inlet-drive semantics either
+- The corrected `6e-05` Hunt `Ha20` window also exposed a sharper stabilizer
+  issue in the reduced solver:
+  - the retained default trace shows `residual_history ≈ 0.012` on every step,
+    which matches `outer_iterations * velocity_update_limit = 6 * 0.002`
+  - so the later Hunt response is being shaped strongly by the global velocity
+    limiter rather than only by the coupled MHD update
+  - a direct `velocity_update_limit` probe on the same corrected window gives:
+    - `1e-3`: `lorentz_max l2 ≈ 3.26e-2`, `current_max l2 ≈ 9.07e-2`
+    - `2e-3` retained default: `lorentz_max l2 ≈ 1.05e-1`,
+      `current_max l2 ≈ 6.44e-2`
+    - `4e-3`: `lorentz_max l2 ≈ 1.63e-1`, `current_max l2 ≈ 1.56e-2`
+  - retained interpretation:
+    - smaller caps help the normalized `JxB` history, larger caps help the
+      current-magnitude history, and the default sits between those two errors
+    - the next Hunt fix should target limiter policy or replace the global clamp
+      with a less distorting stabilization path in the layered update
 
 ## Planned improvements
 

@@ -2242,15 +2242,39 @@ LMX should only be described as ship ready for the current milestone when all of
       semantics
     - but the next Hunt fix still needs to target the later coupled response
       itself, not the inlet-drive semantics
+- `2026-04-03 03:30 America/Chicago`: Probed the later Hunt `Ha20` trace with
+  the corrected `6e-05` FreeMHD window and the existing velocity limiter:
+  - the retained default Hunt trace shows `residual_history ≈ 0.012` on every
+    step, which exactly matches
+    `outer_iterations * velocity_update_limit = 6 * 0.002`
+  - that means the later reduced-model Hunt response is clamp-controlled by the
+    global velocity limiter, not just evolving according to the coupled update
+  - retained sweep result on the corrected `6e-05` trace:
+    - `velocity_update_limit = 1e-3`
+      - improves `lorentz_max l2` to `≈ 3.26e-2`
+      - worsens `current_max l2` to `≈ 9.07e-2`
+    - retained default `2e-3`
+      - `lorentz_max l2 ≈ 1.05e-1`
+      - `current_max l2 ≈ 6.44e-2`
+    - `velocity_update_limit = 4e-3`
+      - improves `current_max l2` to `≈ 1.56e-2`
+      - worsens `lorentz_max l2` to `≈ 1.63e-1`
+  - retained interpretation:
+    - the next Hunt blocker is now narrower again:
+      the global per-outer-iteration limiter is shaping the later transient
+      response
+    - the next real solver change should target limiter policy or remove this
+      global clamp from the layered update path in favor of a less distorting
+      stabilization strategy
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
     ramp law on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    use the longer corrected Hunt trace to compare later pressure/momentum
-    response directly, then change the layered velocity/pressure coupling where
-    the drift starts to separate from FreeMHD
+    change the layered stabilization / limiter policy so the later Hunt trace is
+    no longer globally clamp-controlled, then re-check the corrected `6e-05`
+    pressure and `JxB` histories against FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

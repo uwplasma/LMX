@@ -44,6 +44,12 @@
   implicit velocity update. That is the retained core semantics for reduced
   inlet-driven runs; avoid reintroducing a fixed case-specific startup source
   heuristic in the solver.
+- When diagnosing layered Hunt transients, watch the interaction between
+  `_limited_velocity_update(...)` and `outer_iterations`. The retained Hunt
+  traces can become clamp-controlled, with `residual_history` effectively
+  tracking `outer_iterations * velocity_update_limit`. That is solver-control
+  behavior, not physics, and it should be treated as the next stabilization
+  target rather than papered over with more case-specific parameter tuning.
 - Clustered duct meshes should use actual center-to-center spacing in diffusion
   and potential operators; avoid reintroducing uniform-grid shortcuts in solver
   stencils.
