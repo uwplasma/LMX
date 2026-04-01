@@ -115,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
             "potential_tolerance",
             "potential_relaxation",
             "potential_solver",
+            "current_reconstruction",
             "velocity_update_limit",
             "relaxation",
             "dt",

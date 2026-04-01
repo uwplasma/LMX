@@ -97,6 +97,61 @@ def test_hunt_inlet_velocity_boundary_drives_short_transient():
     assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
 
 
+def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
+    zeros = jnp.zeros(mesh.yz_shape)
+    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
+
+    undriven = solvers._step(
+        u=zeros,
+        mesh=mesh,
+        sigma=jnp.zeros(mesh.yz_shape),
+        rho=jnp.ones(mesh.yz_shape),
+        nu=jnp.zeros(mesh.yz_shape),
+        fluid_mask=fluid_mask,
+        by=zeros,
+        bz=zeros,
+        dt=0.1,
+        forcing=0.0,
+        target_mean_velocity=None,
+        anchor=(0, 0),
+        outer_iterations=1,
+        potential_iterations=1,
+        potential_tolerance=None,
+        potential_relaxation=1.0,
+        potential_solver="jacobi",
+        relaxation=1.0,
+        velocity_update_limit=10.0,
+        current_reconstruction="cell_centered",
+    )[0]
+    driven = solvers._step(
+        u=zeros,
+        mesh=mesh,
+        sigma=jnp.zeros(mesh.yz_shape),
+        rho=jnp.ones(mesh.yz_shape),
+        nu=jnp.zeros(mesh.yz_shape),
+        fluid_mask=fluid_mask,
+        by=zeros,
+        bz=zeros,
+        dt=0.1,
+        forcing=0.0,
+        target_mean_velocity=0.25,
+        anchor=(0, 0),
+        outer_iterations=1,
+        potential_iterations=1,
+        potential_tolerance=None,
+        potential_relaxation=1.0,
+        potential_solver="jacobi",
+        relaxation=1.0,
+        velocity_update_limit=10.0,
+        current_reconstruction="cell_centered",
+    )[0]
+
+    assert float(jnp.mean(undriven)) == pytest.approx(0.0)
+    assert float(jnp.mean(driven)) > 0.0
+    assert float(jnp.max(driven[1:-1, 1:-1])) > 0.0
+
+
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)

@@ -613,6 +613,31 @@ The backend harness currently supports:
     - it should stay available as a solver-control / diagnosis aid while the
       next fix targets a better cell-centered current reduction or the later
       coupled response
+- The longer corrected Hunt `Ha20` trace now narrows that conclusion further.
+  A patched local FreeMHD rerun reached `t = 6e-05`, and the matching LMX
+  replays show:
+  - `u_max` normalized history error grows but stays small at
+    `≈ 2.62e-3`
+  - `cell_centered` remains the better overall current reconstruction on the
+    longer window:
+    - `current_max l2 ≈ 6.44e-2`
+    - `lorentz_max l2 ≈ 1.05e-1`
+  - `face_averaged` becomes worse later even though it helped the short startup
+    `JxB` history:
+    - `current_max l2 ≈ 1.17e-1`
+    - `lorentz_max l2 ≈ 3.44e-1`
+  - retained interpretation:
+    - the remaining Hunt blocker is now more clearly in the later coupled
+      response, not in startup-ramp semantics and not in a simple switch to a
+      face-averaged cell-current reconstruction
+- The inlet-driven reduced-model forcing is now also cleaner internally:
+  - LMX no longer relies on the old fixed Hunt source heuristic for
+    `forcing = 0` inlet-driven cases
+  - instead, it solves for the streamwise forcing needed to match the target
+    mean velocity inside the implicit velocity update
+  - on the recovered Hunt `Ha20` replay this leaves the retained trace
+    essentially unchanged, which is useful negative evidence:
+    the remaining gap is not dominated by the inlet-drive semantics either
 
 ## Planned improvements
 

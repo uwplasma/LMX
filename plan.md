@@ -2201,15 +2201,56 @@ LMX should only be described as ship ready for the current milestone when all of
       change
     - keep it as an explicit experimental solver control on `main`, not the new
       layered default
+- `2026-04-03 03:05 America/Chicago`: Extended the corrected Hunt `Ha20`
+  diagnostic window to the later transient response and used it to narrow the
+  next solver target:
+  - rebuilt and ran a patched local FreeMHD Hunt case to a live log that
+    reached `t = 6e-05`
+  - aligned that longer log against matching LMX runs for both
+    `current_reconstruction="cell_centered"` and `"face_averaged"`
+  - retained longer-trace result:
+    - `u_max` drift is still small but growing:
+      normalized `l2_error ≈ 2.62e-3`
+    - `cell_centered` remains the better overall Hunt choice on the longer
+      window:
+      - `current_max l2 ≈ 6.44e-2`
+      - `lorentz_max l2 ≈ 1.05e-1`
+    - `face_averaged` gets worse later in time even though it helped the short
+      `JxB` history:
+      - `current_max l2 ≈ 1.17e-1`
+      - `lorentz_max l2 ≈ 3.44e-1`
+  - retained interpretation:
+    - the face-averaged reconstruction is useful as a diagnosis control, but it
+      is not the next retained Hunt fix and should not become the default
+    - the remaining Hunt blocker is now more clearly in the later coupled
+      response, not in startup ramp semantics and not in a simple switch to
+      face-averaged cell currents
+- `2026-04-03 03:15 America/Chicago`: Replaced the old inlet-driven Hunt
+  source heuristic with a more physical mean-flow forcing path for reduced
+  cases:
+  - inlet-driven cases with `forcing = 0` now solve for the streamwise forcing
+    needed to hit the target mean velocity in the implicit velocity update
+  - this is a better model of a pressure-gradient / flow-rate constraint than a
+    fixed heuristic source and is future-proof for other inlet- or flow-rate-
+    driven liquid-metal cases
+  - retained numerical result on the recovered Hunt `Ha20` replay:
+    - it leaves the current retained trace essentially unchanged, because this
+      case already starts from a matched inlet velocity and the remaining drift
+      is not dominated by the streamwise forcing law
+  - retained interpretation:
+    - keep the dynamic mean-flow forcing because it is the cleaner core solver
+      semantics
+    - but the next Hunt fix still needs to target the later coupled response
+      itself, not the inlet-drive semantics
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
     ramp law on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    derive a more faithful cell-centered current from the layered face-current
-    system, or show from longer corrected Hunt traces that the remaining gap has
-    shifted mainly into the later coupled momentum/pressure response
+    use the longer corrected Hunt trace to compare later pressure/momentum
+    response directly, then change the layered velocity/pressure coupling where
+    the drift starts to separate from FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

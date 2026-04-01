@@ -291,22 +291,8 @@ def _inlet_speed(boundary: BoundaryCondition, case: CaseSpec) -> float | None:
     return None
 
 
-def _effective_forcing(
-    explicit_forcing: float,
-    inlet_velocity: float | None,
-    sigma: jnp.ndarray,
-    fluid_mask: jnp.ndarray,
-    by: jnp.ndarray,
-    bz: jnp.ndarray,
-) -> jnp.ndarray:
-    if abs(explicit_forcing) > 0.0:
-        return jnp.asarray(explicit_forcing, dtype=by.dtype)
-    if inlet_velocity is None:
-        return jnp.asarray(0.0, dtype=by.dtype)
-    magnetic_loading = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
-    fluid_count = jnp.maximum(jnp.sum(fluid_mask.astype(float)), 1.0)
-    mean_loading = jnp.sum(magnetic_loading) / fluid_count
-    return mean_loading * inlet_velocity
+def _explicit_forcing(explicit_forcing: float, dtype: jnp.dtype) -> jnp.ndarray:
+    return jnp.asarray(explicit_forcing, dtype=dtype)
 
 
 def _step(
@@ -320,6 +306,7 @@ def _step(
     bz: jnp.ndarray,
     dt: float,
     forcing: float,
+    target_mean_velocity: float | None,
     anchor: tuple[int, int],
     outer_iterations: int,
     potential_iterations: int,
@@ -360,9 +347,21 @@ def _step(
         lap_u = laplacian_scalar(u_iter, mesh, mask=fluid_mask)
         lorentz_damping = jnp.where(fluid_mask, sigma * (by**2 + bz**2), 0.0)
         lorentz_explicit = lorentz + lorentz_damping * u_iter
-        rhs = nu * lap_u + (forcing + lorentz_explicit) / rho
         implicit_scale = 1.0 + dt * lorentz_damping / rho
-        u_trial = jnp.where(fluid_mask, (u + dt * rhs) / implicit_scale, 0.0)
+        base_trial = jnp.where(fluid_mask, (u + dt * (nu * lap_u + lorentz_explicit / rho)) / implicit_scale, 0.0)
+        pressure_sensitivity = jnp.where(fluid_mask, (dt / rho) / implicit_scale, 0.0)
+        forcing_value = jnp.asarray(forcing, dtype=u.dtype)
+        if target_mean_velocity is not None:
+            fluid_count = jnp.maximum(jnp.sum(fluid_mask.astype(u.dtype)), 1.0)
+            target = jnp.asarray(target_mean_velocity, dtype=u.dtype)
+            mean_base = jnp.sum(jnp.where(fluid_mask, base_trial, 0.0)) / fluid_count
+            mean_sensitivity = jnp.sum(pressure_sensitivity) / fluid_count
+            forcing_value = jnp.where(
+                mean_sensitivity > 1e-20,
+                (target - mean_base) / mean_sensitivity,
+                forcing_value,
+            )
+        u_trial = jnp.where(fluid_mask, base_trial + pressure_sensitivity * forcing_value, 0.0)
         relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u_iter + relaxation * u_trial, 0.0)
         u_next = _limited_velocity_update(u_iter, relaxed, fluid_mask, max_delta=velocity_update_limit)
         u_next = _enforce_velocity_bc(u_next, fluid_mask)
@@ -408,7 +407,7 @@ def solve_transient(case: CaseSpec) -> Solution:
         u, time = carry
         step_time = time + dt
         _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
-        forcing = _effective_forcing(case.forcing, inlet_velocity, materials.conductivity, materials.fluid_mask, by, bz)
+        forcing = _explicit_forcing(case.forcing, by.dtype)
         u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max = _step(
             u=u,
             mesh=mesh,
@@ -420,6 +419,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             bz=bz,
             dt=dt,
             forcing=forcing,
+            target_mean_velocity=inlet_velocity if abs(case.forcing) == 0.0 else None,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
@@ -501,7 +501,7 @@ def solve_steady(case: CaseSpec) -> Solution:
         time: float,
     ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
         _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=time)
-        forcing = _effective_forcing(case.forcing, inlet_velocity, materials.conductivity, materials.fluid_mask, by, bz)
+        forcing = _explicit_forcing(case.forcing, by.dtype)
         return _step(
             u=u,
             mesh=mesh,
@@ -513,6 +513,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             bz=bz,
             dt=dt,
             forcing=forcing,
+            target_mean_velocity=inlet_velocity if abs(case.forcing) == 0.0 else None,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,

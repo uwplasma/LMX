@@ -207,6 +207,57 @@ def test_run_solver_control_sweep_accepts_potential_solver(
     assert '"parameter_value": "cg"' in summary
 
 
+def test_run_solver_control_sweep_accepts_current_reconstruction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    output = tmp_path / "control_sweep_current_reconstruction"
+
+    monkeypatch.setattr(
+        suite.argparse.ArgumentParser,
+        "parse_args",
+        lambda self, argv=None: SimpleNamespace(
+            output=output,
+            case="hunt",
+            ha=20.0,
+            resolution=24,
+            wall_cells=4,
+            parameter="current_reconstruction",
+            values="cell_centered,face_averaged",
+            value_type="str",
+            reference_root=None,
+            x_slice="1m",
+        ),
+    )
+    monkeypatch.setattr(
+        suite,
+        "_build_case",
+        lambda case_kind, ha, resolution, output_dir, wall_cells: SimpleNamespace(
+            time_stepper=SimpleNamespace(
+                dt=0.002,
+                t_final=1.0,
+                max_steps=500,
+                outer_iterations=6,
+                current_reconstruction="cell_centered",
+            ),
+        ),
+    )
+    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
+    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite,
+        "_collect_metrics",
+        lambda solution, case_kind, ha, **kwargs: {"y_l2_error": 0.2, "z_l2_error": 0.3, "combined_l2_error": 0.255},
+    )
+
+    exit_code = suite.main([])
+
+    assert exit_code == 0
+    summary = (output / "summary.json").read_text()
+    assert '"parameter": "current_reconstruction"' in summary
+    assert '"parameter_value": "face_averaged"' in summary
+
+
 def test_run_solver_control_sweep_accepts_velocity_update_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

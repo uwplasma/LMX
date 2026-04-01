@@ -39,6 +39,11 @@
     averaging the finite-volume face currents back onto cells
   Keep `cell_centered` as the default until a face-based path improves the real
   Hunt parity metrics, not just one traced quantity.
+- Inlet- or flow-rate-driven reduced cases with `forcing = 0` now solve for the
+  streamwise forcing required to hit the target mean velocity inside the
+  implicit velocity update. That is the retained core semantics for reduced
+  inlet-driven runs; avoid reintroducing a fixed case-specific startup source
+  heuristic in the solver.
 - Clustered duct meshes should use actual center-to-center spacing in diffusion
   and potential operators; avoid reintroducing uniform-grid shortcuts in solver
   stencils.
@@ -88,8 +93,9 @@
   remaining Hunt gap and for tracking the older Jacobi-only Hartmann branch that
   motivated the current backend work. CI still runs a dedicated Hartmann
   `potential_iterations` sweep at `Ha20`, `32^2` for that reason. The same
-  runner can now sweep `potential_tolerance`, `potential_relaxation`, and
-  `potential_solver`, and `velocity_update_limit`, which is useful when separating an insufficient
+  runner can now sweep `potential_tolerance`, `potential_relaxation`,
+  `potential_solver`, `current_reconstruction`, and `velocity_update_limit`,
+  which is useful when separating an insufficient
   `phi`-solve iteration ceiling from an early residual stop, a brittle raw
   Jacobi update, a backend choice, or an overly aggressive coupled velocity
   update.
