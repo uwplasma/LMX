@@ -1495,6 +1495,44 @@ LMX should only be described as ship ready for the current milestone when all of
   - target the remaining Hunt conducting-wall gap directly, now that the
     single-region `phi`-solve pathology is much better contained
 
+### 2026-04-02 01:05 America/Chicago
+
+- Probed another general Hunt control rather than changing defaults by hand:
+  - added `velocity_update_limit` to `run_solver_control_sweep.py`
+  - explicitly tested whether a different bounded-velocity update cap can close
+    the remaining conducting-wall gap
+- What did not work:
+  - replacing the current global bounded update with a local per-cell clipped
+    update
+  - it destabilized the retained Hunt `Ha20` branch badly:
+    - combined error jumped to about `0.326`
+    - sign-pathology metrics became strongly nonzero
+  - that experiment was rolled back immediately
+- Retained sweep results:
+  - Hunt `Ha20`, `32^2`, combined error versus `velocity_update_limit`:
+    - `5e-4`: `≈ 0.135`
+    - `1e-3`: `≈ 0.131`
+    - `2e-3`: `≈ 0.127`
+    - `4e-3`: `≈ 0.127`, but still slightly worse than `2e-3`
+  - Hunt `Ha100`, `32^2`, combined error versus `velocity_update_limit`:
+    - `1e-3`: `≈ 0.343`
+    - `2e-3`: `≈ 0.342`
+    - `4e-3`: `≈ 0.343`
+  - Hartmann `Ha20`, `32^2` stays accepted across the same sweep and is not the
+    limiting factor here
+- Retained interpretation:
+  - `velocity_update_limit` is worth keeping as part of the documented control
+    surface for future solver work
+  - but it does not produce a strong enough cross-case improvement to justify a
+    new retained default change
+  - the remaining Hunt problem is still in the coupled update law itself, not in
+    a missing sweep axis
+- Best next step:
+  - use the now-expanded control surface (`potential_solver`,
+    `potential_relaxation`, `potential_iterations`, `velocity_update_limit`,
+    combined error, and potential residual) to redesign the multi-region Hunt
+    update rather than trying more one-parameter default tuning
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

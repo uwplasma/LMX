@@ -207,6 +207,24 @@ The backend harness currently supports:
     - `main` now encodes that as a principled `potential_solver="auto"` policy:
       use CG when the solved cross-section is a single fluid region, and keep
       Jacobi when explicit solid layers are present
+- The next retained control pass widened the Hunt diagnosis without changing
+  defaults:
+  - `velocity_update_limit` is now a first-class control-sweep parameter
+  - retained Hunt `Ha20`, `32^2` results:
+    - `5e-4`: combined error `≈ 0.135`
+    - `1e-3`: combined error `≈ 0.131`
+    - `2e-3`: combined error `≈ 0.127`
+    - `4e-3`: combined error `≈ 0.127` but slightly worse than `2e-3`
+  - retained Hunt `Ha100`, `32^2` results:
+    - `1e-3`: combined error `≈ 0.343`
+    - `2e-3`: combined error `≈ 0.342`
+    - `4e-3`: combined error `≈ 0.343`
+  - retained interpretation:
+    - the velocity-update cap matters enough to keep as part of the documented
+      control surface
+    - but it does not create a strong new default change on its own
+    - the remaining Hunt discrepancy is still in the coupled update law, not in
+      a missing sweep parameter
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

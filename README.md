@@ -45,6 +45,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hartmann --case hartmann --ha 20 --resolution 32 --parameter potential_iterations --values 50,100,200,400,800 --value-type int
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_tol --case hartmann --ha 20 --resolution 32 --parameter potential_tolerance --values 1e-2,1e-3,1e-4 --value-type float
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_backend --case shercliff --ha 20 --resolution 32 --parameter potential_solver --values auto,jacobi,cg --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_velocity_limit --case hunt --ha 20 --resolution 32 --parameter velocity_update_limit --values 5e-4,1e-3,2e-3,4e-3 --value-type float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
 ```
 

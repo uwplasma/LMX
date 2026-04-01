@@ -77,9 +77,10 @@
   motivated the current backend work. CI still runs a dedicated Hartmann
   `potential_iterations` sweep at `Ha20`, `32^2` for that reason. The same
   runner can now sweep `potential_tolerance`, `potential_relaxation`, and
-  `potential_solver`, which is useful when separating an insufficient
+  `potential_solver`, and `velocity_update_limit`, which is useful when separating an insufficient
   `phi`-solve iteration ceiling from an early residual stop, a brittle raw
-  Jacobi update, or a backend choice.
+  Jacobi update, a backend choice, or an overly aggressive coupled velocity
+  update.
 - The electric-potential solve now exposes three explicit backends:
   - `jacobi`: weighted Jacobi with optional residual-based stopping
   - `cg`: matrix-free preconditioned conjugate gradient
