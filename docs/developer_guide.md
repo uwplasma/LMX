@@ -81,6 +81,11 @@
   `phi`-solve iteration ceiling from an early residual stop, a brittle raw
   Jacobi update, a backend choice, or an overly aggressive coupled velocity
   update.
+- `python scripts/run_solver_grid_sweep.py --output artifacts/control_grid`:
+  writes two-parameter control grids when one-parameter sweeps are not enough to
+  distinguish a real improvement from a cross-case tradeoff. The current Hunt
+  work uses this to compare `outer_iterations` against `potential_relaxation`
+  directly instead of inferring interactions from separate runs.
 - The electric-potential solve now exposes three explicit backends:
   - `jacobi`: weighted Jacobi with optional residual-based stopping
   - `cg`: matrix-free preconditioned conjugate gradient

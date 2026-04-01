@@ -225,6 +225,25 @@ The backend harness currently supports:
     - but it does not create a strong new default change on its own
     - the remaining Hunt discrepancy is still in the coupled update law, not in
       a missing sweep parameter
+- The next retained tooling step made that tradeoff easier to measure directly:
+  - LMX now has `scripts/run_solver_grid_sweep.py` for two-parameter solver
+    control grids
+  - the first retained Hunt grid used
+    `outer_iterations in {4, 6}` against
+    `potential_relaxation in {1.0, 0.5}`
+  - retained Hunt `Ha20`, `32^2` result:
+    - the current default-like point remains best in this grid at
+      combined error `≈ 0.127`
+    - lowering `potential_relaxation` helps the `y` profile for some points but
+      degrades the combined error overall
+  - retained Hunt `Ha100`, `32^2` result:
+    - `potential_relaxation = 0.5` improves the combined error from
+      `≈ 0.343` to `≈ 0.327`
+    - but changing `outer_iterations` from `4` to `6` is essentially neutral
+  - retained conclusion:
+    - there is still no cross-case Hunt default shift worth keeping
+    - the remaining gap is in the update law, not in an untried interaction
+      among the currently exposed controls
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

@@ -1533,6 +1533,48 @@ LMX should only be described as ship ready for the current milestone when all of
     combined error, and potential residual) to redesign the multi-region Hunt
     update rather than trying more one-parameter default tuning
 
+### 2026-04-02 01:25 America/Chicago
+
+- Added a new retained diagnosis tool:
+  - `scripts/run_solver_grid_sweep.py`
+  - purpose: run two-parameter control grids when separate one-parameter sweeps
+    still leave a cross-case tradeoff ambiguous
+- Verified the tool with unit coverage and used it immediately on the current
+  Hunt control question:
+  - `outer_iterations in {4, 6}`
+  - `potential_relaxation in {1.0, 0.5}`
+  - at `Ha20`, `32^2`, the current default-like point remains best in this grid:
+    - `outer=6`, `potential_relaxation=1.0` gives combined error `≈ 0.127`
+    - `outer=4`, `potential_relaxation=1.0` gives `≈ 0.134`
+    - `outer=6`, `potential_relaxation=0.5` gives `≈ 0.135`
+    - `outer=4`, `potential_relaxation=0.5` gives `≈ 0.142`
+  - at `Ha100`, `32^2`, the grid confirms the partial improvement already seen
+    in ad hoc probes:
+    - `potential_relaxation=0.5` improves combined error from about `0.343` to
+      about `0.327`
+    - changing `outer_iterations` from `4` to `6` is essentially neutral
+- Retained interpretation:
+  - there is still no honest Hunt default shift that improves both the lower-Ha
+    and higher-Ha conducting-wall cases together
+  - the current exposed control surface is now broad enough that continued
+    one-parameter tuning is unlikely to produce the next real improvement
+  - the next retained solver change should target the coupled update law or the
+    layered linearization itself, not another control default
+- What did not work:
+  - a multi-region predictor-corrector candidate with an extra potential pass
+    after the relaxed velocity update
+  - it drove the Hunt `Ha20` potential residual down to about `1.3e-4`, but the
+    solution itself blew up (`combined error ≈ 0.717`, strong sign pathologies,
+    `u_max ≈ 1.95`)
+  - that branch was rolled back immediately
+- Best next step:
+  - try a more principled multi-region coupling change that does not simply push
+    the potential residual down faster
+  - likely targets are:
+    - a layered-potential linearization change
+    - or a better coupling criterion that respects both velocity and potential
+      residuals without over-correcting the velocity update
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
