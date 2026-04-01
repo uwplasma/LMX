@@ -32,23 +32,31 @@ def _build_mesh(case: CaseSpec) -> StructuredMesh:
     raise NotImplementedError(f"Geometry {g.kind} is not supported by the laminar solver yet.")
 
 
-def _face_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+def _interface_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dy[:-1, None]
     right_distance = 0.5 * mesh.dy[1:, None]
     sigma_left = jnp.maximum(sigma[:-1, :], 1e-12)
     sigma_right = jnp.maximum(sigma[1:, :], 1e-12)
-    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    return 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+
+
+def _face_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    conductance = _interface_conductance_y(mesh, sigma)
     west = jnp.pad(conductance, ((1, 0), (0, 0))) / mesh.dy[:, None]
     east = jnp.pad(conductance, ((0, 1), (0, 0))) / mesh.dy[:, None]
     return west, east
 
 
-def _face_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+def _interface_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dz[None, :-1]
     right_distance = 0.5 * mesh.dz[None, 1:]
     sigma_left = jnp.maximum(sigma[:, :-1], 1e-12)
     sigma_right = jnp.maximum(sigma[:, 1:], 1e-12)
-    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    return 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+
+
+def _face_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    conductance = _interface_conductance_z(mesh, sigma)
     south = jnp.pad(conductance, ((0, 0), (1, 0))) / mesh.dz[None, :]
     north = jnp.pad(conductance, ((0, 0), (0, 1))) / mesh.dz[None, :]
     return south, north
@@ -57,18 +65,14 @@ def _face_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.n
 def _face_emf_y(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dy[:-1, None]
     right_distance = 0.5 * mesh.dy[1:, None]
-    sigma_left = jnp.maximum(sigma[:-1, :], 1e-12)
-    sigma_right = jnp.maximum(sigma[1:, :], 1e-12)
-    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    conductance = _interface_conductance_y(mesh, sigma)
     return conductance * (left_distance * source[:-1, :] + right_distance * source[1:, :])
 
 
 def _face_emf_z(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dz[None, :-1]
     right_distance = 0.5 * mesh.dz[None, 1:]
-    sigma_left = jnp.maximum(sigma[:, :-1], 1e-12)
-    sigma_right = jnp.maximum(sigma[:, 1:], 1e-12)
-    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    conductance = _interface_conductance_z(mesh, sigma)
     return conductance * (left_distance * source[:, :-1] + right_distance * source[:, 1:])
 
 

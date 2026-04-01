@@ -1630,6 +1630,35 @@ LMX should only be described as ship ready for the current milestone when all of
   - use the stricter steady semantics as a guardrail so future retained solver
     changes are not judged on prematurely stopped layered runs
 
+### 2026-04-02 02:25 America/Chicago
+
+- Improved the artifact/reporting path around the current Hunt diagnosis:
+  - `summarize_ci_artifacts.py` now accepts a two-parameter control-grid summary
+  - the markdown summary now reports the best combined, `y`, and `z` points from
+    that grid together with the parameter pair where they occur
+- This is worth keeping because:
+  - the Hunt control surface is now genuinely two-dimensional in the retained
+    workflow
+  - future solver iterations should not require hand-reading raw grid JSON to
+    understand whether a candidate is a real improvement
+- Also tried one more solver-side Hunt candidate and rejected it:
+  - reconstructed `J` and `J×B` from face-flux-consistent currents so the
+    momentum update would use the same flux form as the potential solve
+  - that modestly improved Hartmann but degraded Hunt badly:
+    - Hunt `Ha20`, `32^2`: combined error rose to about `0.130`
+    - Hunt `Ha100`, `32^2`: combined error rose to about `0.414`
+  - rolled back immediately
+- Retained interpretation:
+  - a more consistent face-current reconstruction alone is not the missing Hunt
+    fix
+  - the remaining Hunt issue still appears to be in the layered coupled update
+    law or layered linearization, not just in whether `J` is reconstructed from
+    face fluxes or center gradients
+- Best next step:
+  - keep the new grid-summary reporting
+  - continue the layered Hunt solver work with a stronger focus on the update
+    law itself rather than current postprocessing or one-parameter tuning
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

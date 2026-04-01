@@ -70,6 +70,24 @@ class SweepSummary:
     last_accepted: bool | None
 
 
+@dataclass(frozen=True)
+class GridSummary:
+    label: str
+    case: str
+    parameter_a: str
+    parameter_b: str
+    best_combined_a: float | str | None
+    best_combined_b: float | str | None
+    best_combined_l2_error: float | None
+    best_y_a: float | str | None
+    best_y_b: float | str | None
+    best_y_l2_error: float | None
+    best_z_a: float | str | None
+    best_z_b: float | str | None
+    best_z_l2_error: float | None
+    total_levels: int
+
+
 def _load_json(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
 
@@ -169,12 +187,40 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
     )
 
 
+def summarize_grid_report(report_path: str | Path, *, label: str) -> GridSummary:
+    payload = _load_json(report_path)
+    levels = payload.get("levels", [])
+    combined_levels = [level for level in levels if "combined_l2_error" in level]
+    y_levels = [level for level in levels if "y_l2_error" in level]
+    z_levels = [level for level in levels if "z_l2_error" in level]
+    best_combined = min(combined_levels, key=lambda level: float(level["combined_l2_error"])) if combined_levels else None
+    best_y = min(y_levels, key=lambda level: float(level["y_l2_error"])) if y_levels else None
+    best_z = min(z_levels, key=lambda level: float(level["z_l2_error"])) if z_levels else None
+    return GridSummary(
+        label=label,
+        case=str(payload.get("case", "")),
+        parameter_a=str(payload.get("parameter_a", "")),
+        parameter_b=str(payload.get("parameter_b", "")),
+        best_combined_a=None if best_combined is None else best_combined["parameter_a_value"],
+        best_combined_b=None if best_combined is None else best_combined["parameter_b_value"],
+        best_combined_l2_error=None if best_combined is None else float(best_combined["combined_l2_error"]),
+        best_y_a=None if best_y is None else best_y["parameter_a_value"],
+        best_y_b=None if best_y is None else best_y["parameter_b_value"],
+        best_y_l2_error=None if best_y is None else float(best_y["y_l2_error"]),
+        best_z_a=None if best_z is None else best_z["parameter_a_value"],
+        best_z_b=None if best_z is None else best_z["parameter_b_value"],
+        best_z_l2_error=None if best_z is None else float(best_z["z_l2_error"]),
+        total_levels=len(levels),
+    )
+
+
 def render_markdown(
     validation: list[ValidationCaseSummary],
     benchmark: BenchmarkSummary | None = None,
     parity: ParitySummary | None = None,
     time_convergence: SweepSummary | None = None,
     control_sweep: SweepSummary | None = None,
+    control_grid: GridSummary | None = None,
 ) -> str:
     lines = ["# LMX CI Summary", ""]
     if validation:
@@ -285,6 +331,42 @@ def render_markdown(
                 "",
             ]
         )
+    if control_grid is not None:
+        lines.extend(
+            [
+                f"## {control_grid.label}",
+                "",
+                f"- Case: `{control_grid.case}`",
+                f"- Parameter A: `{control_grid.parameter_a}`",
+                f"- Parameter B: `{control_grid.parameter_b}`",
+                (
+                    "- Best combined L2: `-`"
+                    if control_grid.best_combined_l2_error is None
+                    else (
+                        f"- Best combined L2: `{control_grid.best_combined_l2_error:.6g}`"
+                        f" at `({control_grid.best_combined_a}, {control_grid.best_combined_b})`"
+                    )
+                ),
+                (
+                    "- Best Y L2: `-`"
+                    if control_grid.best_y_l2_error is None
+                    else (
+                        f"- Best Y L2: `{control_grid.best_y_l2_error:.6g}`"
+                        f" at `({control_grid.best_y_a}, {control_grid.best_y_b})`"
+                    )
+                ),
+                (
+                    "- Best Z L2: `-`"
+                    if control_grid.best_z_l2_error is None
+                    else (
+                        f"- Best Z L2: `{control_grid.best_z_l2_error:.6g}`"
+                        f" at `({control_grid.best_z_a}, {control_grid.best_z_b})`"
+                    )
+                ),
+                f"- Total levels: `{control_grid.total_levels}`",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -294,6 +376,7 @@ def build_summary(
     parity_summary_path: str | Path | None = None,
     time_convergence_summary_path: str | Path | None = None,
     control_sweep_summary_path: str | Path | None = None,
+    control_grid_summary_path: str | Path | None = None,
 ) -> dict[str, Any]:
     validation = summarize_validation_summary(validation_summary_path) if validation_summary_path is not None else []
     benchmark = summarize_benchmark_report(benchmark_report_path) if benchmark_report_path is not None else None
@@ -308,13 +391,19 @@ def build_summary(
         if control_sweep_summary_path is not None
         else None
     )
+    control_grid = (
+        summarize_grid_report(control_grid_summary_path, label="Control Grid")
+        if control_grid_summary_path is not None
+        else None
+    )
     payload: dict[str, Any] = {
         "validation": [item.__dict__ for item in validation],
         "benchmark": None if benchmark is None else benchmark.__dict__,
         "parity": None if parity is None else parity.__dict__,
         "time_convergence": None if time_convergence is None else time_convergence.__dict__,
         "control_sweep": None if control_sweep is None else control_sweep.__dict__,
-        "markdown": render_markdown(validation, benchmark, parity, time_convergence, control_sweep),
+        "control_grid": None if control_grid is None else control_grid.__dict__,
+        "markdown": render_markdown(validation, benchmark, parity, time_convergence, control_sweep, control_grid),
     }
     return payload
 
@@ -326,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--parity-summary", type=Path, default=None)
     parser.add_argument("--time-convergence-summary", type=Path, default=None)
     parser.add_argument("--control-sweep-summary", type=Path, default=None)
+    parser.add_argument("--control-grid-summary", type=Path, default=None)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -336,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         args.parity_summary,
         args.time_convergence_summary,
         args.control_sweep_summary,
+        args.control_grid_summary,
     )
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(summary, indent=2))

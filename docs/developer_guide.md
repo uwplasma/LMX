@@ -86,6 +86,9 @@
   distinguish a real improvement from a cross-case tradeoff. The current Hunt
   work uses this to compare `outer_iterations` against `potential_relaxation`
   directly instead of inferring interactions from separate runs.
+- `python scripts/summarize_ci_artifacts.py` now also accepts
+  `--control-grid-summary`, so grid sweeps can show up in the same CI markdown
+  summary as validation, benchmarks, parity, and one-parameter sweeps.
 - The electric-potential solve now exposes three explicit backends:
   - `jacobi`: weighted Jacobi with optional residual-based stopping
   - `cg`: matrix-free preconditioned conjugate gradient

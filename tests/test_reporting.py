@@ -7,6 +7,7 @@ from scripts.summarize_ci_artifacts import (
     main,
     render_markdown,
     summarize_benchmark_report,
+    summarize_grid_report,
     summarize_parity_report,
     summarize_sweep_report,
     summarize_validation_summary,
@@ -133,7 +134,21 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
         }
         """
     )
-    summary = build_summary(validation, benchmark, parity, time_convergence, control_sweep)
+    control_grid = tmp_path / "control_grid.json"
+    control_grid.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter_a": "outer_iterations",
+          "parameter_b": "potential_relaxation",
+          "levels": [
+            {"parameter_a_value": 4, "parameter_b_value": 1.0, "combined_l2_error": 0.35, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_a_value": 6, "parameter_b_value": 0.5, "combined_l2_error": 0.16, "y_l2_error": 0.1, "z_l2_error": 0.2}
+          ]
+        }
+        """
+    )
+    summary = build_summary(validation, benchmark, parity, time_convergence, control_sweep, control_grid)
     assert "## Validation" in summary["markdown"]
     assert "Potential residual" in summary["markdown"]
     assert "Potential iterations" in summary["markdown"]
@@ -142,6 +157,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     assert "## FreeMHD Parity" in summary["markdown"]
     assert "## Time Convergence" in summary["markdown"]
     assert "## Control Sweep" in summary["markdown"]
+    assert "## Control Grid" in summary["markdown"]
     assert "Best Y L2" in summary["markdown"]
     assert "Best Z L2" in summary["markdown"]
     assert "Best combined L2" in summary["markdown"]
@@ -156,6 +172,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
             summarize_parity_report(parity),
             summarize_sweep_report(time_convergence, label="Time Convergence"),
             summarize_sweep_report(control_sweep, label="Control Sweep"),
+            summarize_grid_report(control_grid, label="Control Grid"),
         )
     )
     out.write_text("placeholder")
@@ -231,6 +248,33 @@ def test_summarize_sweep_report(tmp_path: Path):
     assert summary.last_accepted is False
 
 
+def test_summarize_grid_report(tmp_path: Path):
+    path = tmp_path / "grid.json"
+    path.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter_a": "outer_iterations",
+          "parameter_b": "potential_relaxation",
+          "levels": [
+            {"parameter_a_value": 4, "parameter_b_value": 1.0, "combined_l2_error": 0.35, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_a_value": 6, "parameter_b_value": 0.5, "combined_l2_error": 0.16, "y_l2_error": 0.1, "z_l2_error": 0.2}
+          ]
+        }
+        """
+    )
+    summary = summarize_grid_report(path, label="Control Grid")
+    assert summary.case == "hunt"
+    assert summary.parameter_a == "outer_iterations"
+    assert summary.parameter_b == "potential_relaxation"
+    assert summary.best_combined_a == pytest.approx(6.0)
+    assert summary.best_combined_b == pytest.approx(0.5)
+    assert summary.best_combined_l2_error == pytest.approx(0.16)
+    assert summary.best_y_a == pytest.approx(6.0)
+    assert summary.best_y_b == pytest.approx(0.5)
+    assert summary.best_z_l2_error == pytest.approx(0.2)
+
+
 def test_main_writes_json_and_markdown(tmp_path: Path):
     validation = tmp_path / "validation.json"
     validation.write_text(
@@ -290,6 +334,20 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
         }
         """
     )
+    control_grid = tmp_path / "control_grid.json"
+    control_grid.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter_a": "outer_iterations",
+          "parameter_b": "potential_relaxation",
+          "levels": [
+            {"parameter_a_value": 4, "parameter_b_value": 1.0, "combined_l2_error": 0.35, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_a_value": 6, "parameter_b_value": 0.5, "combined_l2_error": 0.16, "y_l2_error": 0.1, "z_l2_error": 0.2}
+          ]
+        }
+        """
+    )
     out_json = tmp_path / "summary.json"
     out_md = tmp_path / "summary.md"
 
@@ -305,6 +363,8 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
             str(time_convergence),
             "--control-sweep-summary",
             str(control_sweep),
+            "--control-grid-summary",
+            str(control_grid),
             "--output-json",
             str(out_json),
             "--output-md",
@@ -318,4 +378,5 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
     assert '"hartmann_ha20"' in out_json.read_text()
     assert "## FreeMHD Parity" in out_md.read_text()
     assert "## Time Convergence" in out_md.read_text()
+    assert "## Control Grid" in out_md.read_text()
     assert "Best Y L2" in out_md.read_text()

@@ -244,6 +244,12 @@ The backend harness currently supports:
     - there is still no cross-case Hunt default shift worth keeping
     - the remaining gap is in the update law, not in an untried interaction
       among the currently exposed controls
+- CI/reporting now supports those grids directly:
+  - `summarize_ci_artifacts.py` can ingest a two-parameter control-grid summary
+  - the markdown artifact now reports the best combined, `y`, and `z` points for
+    the grid, including the parameter pair where they occur
+  - this keeps the current Hunt tradeoff surface visible in normal artifacts
+    instead of requiring manual JSON inspection
 - A later solver change improved the nonuniform electric-potential discretization
   itself:
   - layered and clustered meshes now use resistance-weighted face conductance
@@ -261,6 +267,18 @@ The backend harness currently supports:
     - but it does not by itself solve the remaining higher-Ha Hunt gap
     - the Hunt control surface still needs a better coupled-update law on top of
       the improved discretization
+- Another attempted solver-side change was explicitly rejected:
+  - I tried reconstructing `J` and `J×B` from face-flux-consistent currents so
+    the Lorentz update would use the same flux form as the potential solve
+  - that improved Hartmann modestly, but it degraded Hunt badly:
+    - Hunt `Ha20`, `32^2`: combined error rose to about `0.130`
+    - Hunt `Ha100`, `32^2`: combined error rose to about `0.414`
+  - that branch was rolled back
+  - retained interpretation:
+    - a more consistent flux form alone is not enough
+    - the remaining Hunt issue is still in how the layered coupled update uses
+      the current reconstruction, not just in whether that reconstruction is
+      face-based or center-based
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and
