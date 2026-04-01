@@ -54,6 +54,8 @@
 - `pytest -m validation`: analytical and optional external comparison checks.
 - `python scripts/run_validation_suite.py --output artifacts/validation`: writes
   validation CSV, JSON, and VTK artifacts.
+- `python scripts/run_convergence_suite.py --output artifacts/convergence`: writes
+  native mesh-convergence study summaries for the currently supported duct cases.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

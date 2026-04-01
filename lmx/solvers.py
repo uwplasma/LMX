@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from .core import Diagnostics, MHDState, Solution
-from .linear import solve_poisson_lineax
+from .linear import solve_poisson_jacobi
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
 from .operators import face_average_x, face_average_z, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
@@ -85,17 +85,7 @@ def _solve_potential(
     )
 
     diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
-    phi, _ = solve_poisson_lineax(
-        diagonal,
-        west,
-        east,
-        south,
-        north,
-        rhs,
-        anchor,
-        fallback_iterations=iterations,
-        max_steps=max(iterations, 500),
-    )
+    phi, _ = solve_poisson_jacobi(diagonal, west, east, south, north, rhs, anchor, iterations)
     return phi
 
 

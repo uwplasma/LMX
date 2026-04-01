@@ -138,7 +138,17 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(tmp_path: Path, mon
         "hartmann_validation",
         lambda solved, ha: SimpleNamespace(y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3)),
     )
+    monkeypatch.setattr(
+        cli,
+        "hartmann_acceptance",
+        lambda solved, ha, l2_threshold, linf_threshold: SimpleNamespace(
+            passed=True,
+            l2_threshold=l2_threshold,
+            linf_threshold=linf_threshold,
+        ),
+    )
     monkeypatch.setattr(cli, "write_analytic_comparison", lambda report, path, axis_name: recorded.update(analytic=path, axis=axis_name) or path)
+    monkeypatch.setattr(cli, "write_acceptance_report", lambda report, path: recorded.update(acceptance=path) or path)
     monkeypatch.setattr(cli, "write_metrics_json", lambda payload, path: recorded.update(metrics=payload, metrics_path=path) or path)
 
     exit_code = cli.main(["validate", "hartmann", "--ha", "5", "--output", str(output_dir)])
@@ -146,6 +156,8 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(tmp_path: Path, mon
     assert exit_code == 0
     assert recorded["axis"] == "y"
     assert recorded["analytic"] == output_dir / "hartmann_ha5_analytic.json"
+    assert recorded["acceptance"] == output_dir / "hartmann_ha5_acceptance.json"
+    assert recorded["metrics"]["accepted"] == pytest.approx(1.0)
     assert '"y_l2_error": 0.2' not in capsys.readouterr().out
 
 

@@ -14,9 +14,11 @@ from .validation import (
     closed_channel_validation,
     extract_centerline,
     extract_midplane_profile,
+    hartmann_acceptance,
     hartmann_validation,
     processed_slice_validation,
     validation_summary,
+    write_acceptance_report,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
@@ -57,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser.add_argument("--output", type=str, default="./out")
     validate_parser.add_argument("--reference-root", type=str, default="")
     validate_parser.add_argument("--x-slice", type=str, default="1m")
+    validate_parser.add_argument("--hartmann-l2-threshold", type=float, default=0.05)
+    validate_parser.add_argument("--hartmann-linf-threshold", type=float, default=0.1)
 
     args = parser.parse_args(argv)
 
@@ -80,6 +84,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.case == "hartmann":
             comparison = hartmann_validation(solution, args.ha)
             write_analytic_comparison(comparison, out_dir / f"{case.name}_analytic.json", axis_name="y")
+            acceptance = hartmann_acceptance(
+                solution,
+                args.ha,
+                l2_threshold=args.hartmann_l2_threshold,
+                linf_threshold=args.hartmann_linf_threshold,
+            )
+            write_acceptance_report(acceptance, out_dir / f"{case.name}_acceptance.json")
+            payload["accepted"] = float(acceptance.passed)
+            payload["acceptance_l2_threshold"] = acceptance.l2_threshold
+            payload["acceptance_linf_threshold"] = acceptance.linf_threshold
         elif args.reference_root:
             comparison = closed_channel_validation(solution, args.case, int(args.ha), reference_root=args.reference_root)
             write_closed_channel_validation(comparison, out_dir / f"{case.name}_analytic.json")

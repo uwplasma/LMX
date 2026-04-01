@@ -12,6 +12,8 @@ from lmx.validation import (
     closed_channel_validation,
     compare_with_freemhd,
     duct_profile_metrics,
+    estimate_observed_order,
+    hartmann_acceptance,
     infer_mesh_axis_coordinates,
     infer_mesh_bounds,
     infer_region_conductivity,
@@ -28,6 +30,7 @@ from lmx.validation import (
     processed_slice_validation,
     read_freemhd_xy_sample,
     read_field_minmax,
+    write_acceptance_report,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
@@ -317,6 +320,26 @@ def test_hartmann_ha20_validation_error_is_bounded():
     solution = solve_steady(case)
     comparison = hartmann_validation(solution, ha=20.0)
     assert comparison.l2_error < 0.05
+
+
+def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
+    case = make_hartmann_case(ha=20.0, ny=16, nz=16)
+    solution = solve_steady(case)
+    acceptance = hartmann_acceptance(solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2)
+    path = write_acceptance_report(acceptance, tmp_path / "acceptance.json")
+    assert path.exists()
+    assert acceptance.passed is True
+    assert acceptance.passed_l2 is True
+
+
+def test_estimate_observed_order_returns_second_order_for_quadratic_drop():
+    order = estimate_observed_order(4.0e-2, 1.0e-2, 0.25, 0.125)
+    assert order == pytest.approx(2.0)
+
+
+def test_estimate_observed_order_returns_none_for_invalid_inputs():
+    assert estimate_observed_order(0.0, 1.0e-2, 0.25, 0.125) is None
+    assert estimate_observed_order(1.0e-2, 1.0e-3, 0.125, 0.25) is None
 
 
 def test_duct_profile_metrics_writer(tmp_path: Path):

@@ -13,8 +13,10 @@
 - Structured duct meshes with optional conducting-wall layers.
 - Laminar inductionless fields `U`, `phi`, `J`, and `J x B`.
 - Analytical comparison JSON generation from the CLI and the validation runner.
+- Hartmann acceptance reports with explicit `l2` and `linf` thresholds.
 - Sampled midplane and line-cut comparison JSON generation when processed slice data
   is present.
+- Native mesh-convergence study summaries for the currently supported duct cases.
 - CSV and ParaView outputs for centerline and field inspection.
 - Validation artifact generation in GitHub Actions.
 - Benchmark artifact generation in GitHub Actions.
@@ -43,6 +45,7 @@ The backend harness currently supports:
 ## Planned improvements
 
 - Add stronger parity thresholds once the solver is stable across more geometries.
+- Extend the current mesh-convergence tooling to pseudo-time convergence studies.
 - Expand native LMX validation to additional mapped-geometry cases.
 - Improve high-Ha Hunt fidelity without introducing case-specific hardcoded limits.
 - Keep the external backend checks optional and separate from the core LMX identity.

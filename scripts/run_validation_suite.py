@@ -14,9 +14,11 @@ from lmx.validation import (
     closed_channel_validation,
     extract_centerline,
     extract_midplane_profile,
+    hartmann_acceptance,
     hartmann_validation,
     processed_slice_validation,
     validation_summary,
+    write_acceptance_report,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
@@ -39,6 +41,8 @@ def main() -> int:
     parser.add_argument("--ha", type=float, default=5.0)
     parser.add_argument("--reference-root", type=Path, default=None)
     parser.add_argument("--x-slice", type=str, default="1m")
+    parser.add_argument("--hartmann-l2-threshold", type=float, default=0.05)
+    parser.add_argument("--hartmann-linf-threshold", type=float, default=0.1)
     args = parser.parse_args()
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -56,6 +60,16 @@ def main() -> int:
         if case.name.startswith("hartmann"):
             comparison = hartmann_validation(solution, args.ha)
             write_analytic_comparison(comparison, case_dir / "analytic.json", axis_name="y")
+            acceptance = hartmann_acceptance(
+                solution,
+                args.ha,
+                l2_threshold=args.hartmann_l2_threshold,
+                linf_threshold=args.hartmann_linf_threshold,
+            )
+            write_acceptance_report(acceptance, case_dir / "acceptance.json")
+            metrics["accepted"] = float(acceptance.passed)
+            metrics["acceptance_l2_threshold"] = acceptance.l2_threshold
+            metrics["acceptance_linf_threshold"] = acceptance.linf_threshold
         elif args.reference_root is not None:
             comparison = closed_channel_validation(
                 solution,

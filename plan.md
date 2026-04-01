@@ -33,6 +33,7 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - Zenodo closed-channel analytical and processed-slice reference-data loaders.
 - Unit and categorized tests passing in `/Users/rogerio/base_env/bin/python3`.
 - Combined local coverage across `lmx/` and `scripts/` is currently `89%`.
+- Native mesh-convergence study runner and Hartmann acceptance reports.
 
 ### Explicitly deferred
 
@@ -129,8 +130,9 @@ LMX should only be described as ship ready for the current milestone when all of
    - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but real Hunt `Ha20` and `Ha100` comparisons confirm conducting-wall fidelity still needs a real multi-region solver fix
    - the next retained solver milestone should be a materially better high-Ha Hunt shape match without adding new hardcoded case heuristics
 2. Convert the current comparison work into a proper validation campaign:
-   - define pass/fail thresholds for Hartmann
-   - add mesh-convergence and pseudo-time-convergence studies for Shercliff and Hunt
+   - Hartmann now has an explicit acceptance report with configurable `l2` and `linf` thresholds
+   - a native mesh-convergence runner now exists for Hartmann, Shercliff, and Hunt
+   - next add pseudo-time-convergence studies and tighten the meaning of the observed-order outputs
    - keep recovered-case FreeMHD comparisons as secondary cross-checks rather than the sole definition of correctness
 3. Expand native standalone scope carefully rather than implicitly:
    - decide whether the next supported geometry milestone is still mapped simple pipes or only ducts
@@ -165,6 +167,9 @@ LMX should only be described as ship ready for the current milestone when all of
 - The processed-figures Zenodo archive is sufficient for immediate closed-channel reference ingestion; the 8.9 GB `StartingFiles.zip` archive is not needed by default.
 - CLI validation now emits both analytical and processed-slice comparison JSON when the matching Zenodo `XSlice` CSV exists.
 - The validation-suite script can now emit analytical and processed-slice reports in one run when a reference root is provided.
+- The validation workflow now includes:
+  - explicit Hartmann acceptance reports with configurable `l2` and `linf` thresholds
+  - a native `run_convergence_suite.py` runner that emits mesh-convergence summaries for Hartmann, Shercliff, and Hunt
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.

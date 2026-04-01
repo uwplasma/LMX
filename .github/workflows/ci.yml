@@ -67,6 +67,9 @@ jobs:
       - name: Run validation artifact suite
         run: python scripts/run_validation_suite.py --output artifacts/validation
 
+      - name: Run convergence artifact suite
+        run: python scripts/run_convergence_suite.py --output artifacts/convergence --cases hartmann --ha 5 --resolutions 8,16,32
+
       - name: Run FreeMHD parity artifact suite
         run: python scripts/run_freemhd_parity_suite.py --output artifacts/freemhd_parity
 
@@ -84,6 +87,7 @@ jobs:
           name: validation-artifacts
           path: |
             artifacts/validation
+            artifacts/convergence
             artifacts/freemhd_parity
 
   coverage:

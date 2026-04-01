@@ -5,6 +5,7 @@ import json
 import re
 import subprocess
 from dataclasses import dataclass
+from math import log
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -110,6 +111,18 @@ class SamplingGeometry:
     y_max: float
     z_min: float
     z_max: float
+
+
+@dataclass(frozen=True)
+class AcceptanceReport:
+    case_name: str
+    l2_error: float
+    linf_error: float
+    l2_threshold: float
+    linf_threshold: float
+    passed_l2: bool
+    passed_linf: bool
+    passed: bool
 
 
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
@@ -255,6 +268,44 @@ def hartmann_validation(solution: Solution, ha: float) -> AnalyticComparison:
     normalized = u / scale
     reference = hartmann_analytic_profile(coordinate, ha)
     return compare_profile_to_reference(coordinate, normalized, reference)
+
+
+def hartmann_acceptance(
+    solution: Solution,
+    ha: float,
+    *,
+    l2_threshold: float,
+    linf_threshold: float,
+) -> AcceptanceReport:
+    comparison = hartmann_validation(solution, ha)
+    passed_l2 = comparison.l2_error <= l2_threshold
+    passed_linf = comparison.linf_error <= linf_threshold
+    return AcceptanceReport(
+        case_name=f"hartmann_ha{int(ha)}",
+        l2_error=comparison.l2_error,
+        linf_error=comparison.linf_error,
+        l2_threshold=float(l2_threshold),
+        linf_threshold=float(linf_threshold),
+        passed_l2=passed_l2,
+        passed_linf=passed_linf,
+        passed=passed_l2 and passed_linf,
+    )
+
+
+def estimate_observed_order(
+    coarse_error: float,
+    fine_error: float,
+    coarse_spacing: float,
+    fine_spacing: float,
+) -> float | None:
+    if coarse_error <= 0.0 or fine_error <= 0.0:
+        return None
+    if coarse_spacing <= 0.0 or fine_spacing <= 0.0:
+        return None
+    spacing_ratio = coarse_spacing / fine_spacing
+    if spacing_ratio <= 1.0:
+        return None
+    return log(coarse_error / fine_error) / log(spacing_ratio)
 
 
 def closed_channel_validation(
@@ -501,6 +552,23 @@ def write_processed_slice_validation(report: ProcessedSliceValidation, path: str
             "l2_error": report.z_profile.l2_error,
             "linf_error": report.z_profile.linf_error,
         },
+    }
+    path.write_text(json.dumps(payload, indent=2))
+    return path
+
+
+def write_acceptance_report(report: AcceptanceReport, path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "case_name": report.case_name,
+        "l2_error": report.l2_error,
+        "linf_error": report.linf_error,
+        "l2_threshold": report.l2_threshold,
+        "linf_threshold": report.linf_threshold,
+        "passed_l2": report.passed_l2,
+        "passed_linf": report.passed_linf,
+        "passed": report.passed,
     }
     path.write_text(json.dumps(payload, indent=2))
     return path

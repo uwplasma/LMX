@@ -81,8 +81,11 @@ def solve_poisson_lineax(
         out = out.at[anchor].set(field[anchor])
         return out.reshape((size,))
 
-    op = lx.FunctionLinearOperator(mv, (size, size), tags=lx.positive_semidefinite_tag)
+    input_structure = jax.ShapeDtypeStruct((size,), rhs.dtype)
+    op = lx.FunctionLinearOperator(mv, input_structure, tags=lx.positive_semidefinite_tag)
     rhs_vec = rhs.at[anchor].set(0.0).reshape((size,))
     solver = lx.CG(rtol=1e-10, atol=1e-10, max_steps=max_steps)
     sol = lx.linear_solve(op, rhs_vec, solver=solver)
-    return sol.value.reshape((ny, nz)), LinearSolveInfo(backend="lineax-cg", iterations=int(sol.stats["num_steps"]))
+    num_steps = sol.stats.get("num_steps", max_steps)
+    iterations = int(num_steps) if isinstance(num_steps, int) else max_steps
+    return sol.value.reshape((ny, nz)), LinearSolveInfo(backend="lineax-cg", iterations=iterations)
