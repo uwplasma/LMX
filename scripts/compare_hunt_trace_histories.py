@@ -63,6 +63,13 @@ def _epot_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
     return [grouped[key] for key in sorted(grouped)]
 
 
+def _compact_records(records: list[dict[str, object]], keys: list[str]) -> list[dict[str, object]]:
+    compact: list[dict[str, object]] = []
+    for record in records:
+        compact.append({key: record[key] for key in keys if key in record})
+    return compact
+
+
 def _build_alignment(
     freemhd_times: list[float],
     freemhd_values: list[float],
@@ -152,6 +159,26 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     payload = {
         "freemhd_diag_json": str(freemhd_diag_json.resolve()),
         "lmx_report_json": str(lmx_report_json.resolve()),
+        "freemhd_pressure_final_records": _compact_records(
+            pressure_records,
+            ["time", "corr", "maxU", "pInitialResidual", "pFinalResidual", "pIterations", "maxP", "maxPRgh", "maxJxB"],
+        ),
+        "freemhd_epot_records": _compact_records(
+            epot_records,
+            [
+                "time",
+                "oCorr",
+                "potEInitialResidual",
+                "potEFinalResidual",
+                "potEIterations",
+                "maxJ",
+                "maxJn",
+                "maxJnDensity",
+                "maxPsiub",
+                "maxPsiubDensity",
+                "maxJxB",
+            ],
+        ),
     }
     if u_times:
         payload["u_max"] = _build_alignment(u_times, u_values, lmx_times, u_history)

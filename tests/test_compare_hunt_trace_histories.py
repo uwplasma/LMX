@@ -22,8 +22,8 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "maxPsiubDensity": 3.0,
                 "maxJxB": 5.0,
             },
-            {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 2.0},
-            {"kind": "pressure", "time": 0.1, "corr": 2, "maxU": 1.0},
+            {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 2.0, "pIterations": 1},
+            {"kind": "pressure", "time": 0.1, "corr": 2, "maxU": 1.0, "pIterations": 2},
             {
                 "kind": "epot",
                 "time": 0.2,
@@ -34,7 +34,7 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "maxPsiubDensity": 2.4,
                 "maxJxB": 4.0,
             },
-            {"kind": "pressure", "time": 0.2, "corr": 2, "maxU": 0.5},
+            {"kind": "pressure", "time": 0.2, "corr": 2, "maxU": 0.5, "pIterations": 3},
         ]
     }
     lmx = {
@@ -69,6 +69,8 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     assert payload["current_max"]["mean_raw_relative_error"] == pytest.approx(0.6)
     assert payload["u_max"]["samples"][0]["freemhd_raw"] == pytest.approx(1.0)
     assert payload["u_max"]["samples"][1]["lmx_raw"] == pytest.approx(0.5)
+    assert payload["freemhd_pressure_final_records"][0]["maxU"] == pytest.approx(1.0)
+    assert payload["freemhd_epot_records"][1]["maxJnDensity"] == pytest.approx(5.6)
 
 
 def test_main_writes_alignment_json(tmp_path: Path):
@@ -110,6 +112,7 @@ def test_main_writes_alignment_json(tmp_path: Path):
     assert exit_code == 0
     payload = json.loads(output.read_text())
     assert payload["u_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["freemhd_pressure_final_records"][0]["time"] == pytest.approx(0.1)
 
 
 def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
@@ -162,3 +165,4 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["max_raw_relative_error"] == pytest.approx(0.0)
+    assert payload["freemhd_pressure_final_records"] == []

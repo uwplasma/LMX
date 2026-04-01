@@ -152,6 +152,17 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
     assert float(jnp.max(driven[1:-1, 1:-1])) > 0.0
 
 
+def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
+    fluid_mask = jnp.ones((5, 5), dtype=bool)
+    active = solvers._active_velocity_mask(fluid_mask)
+
+    assert not bool(active[0, 2])
+    assert not bool(active[-1, 2])
+    assert not bool(active[2, 0])
+    assert not bool(active[2, -1])
+    assert bool(active[2, 2])
+
+
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)

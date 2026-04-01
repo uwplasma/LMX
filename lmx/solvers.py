@@ -275,6 +275,15 @@ def _limited_velocity_update(
     return jnp.where(fluid_mask, current + scale * delta, 0.0)
 
 
+def _active_velocity_mask(fluid_mask: jnp.ndarray) -> jnp.ndarray:
+    active = jnp.array(fluid_mask, copy=True)
+    active = active.at[0, :].set(False)
+    active = active.at[-1, :].set(False)
+    active = active.at[:, 0].set(False)
+    active = active.at[:, -1].set(False)
+    return active
+
+
 def _inlet_speed(boundary: BoundaryCondition, case: CaseSpec) -> float | None:
     if boundary.kind == "inlet_velocity":
         value = boundary.value
@@ -352,10 +361,11 @@ def _step(
         pressure_sensitivity = jnp.where(fluid_mask, (dt / rho) / implicit_scale, 0.0)
         forcing_value = jnp.asarray(forcing, dtype=u.dtype)
         if target_mean_velocity is not None:
-            fluid_count = jnp.maximum(jnp.sum(fluid_mask.astype(u.dtype)), 1.0)
+            active_mask = _active_velocity_mask(fluid_mask)
+            fluid_count = jnp.maximum(jnp.sum(active_mask.astype(u.dtype)), 1.0)
             target = jnp.asarray(target_mean_velocity, dtype=u.dtype)
-            mean_base = jnp.sum(jnp.where(fluid_mask, base_trial, 0.0)) / fluid_count
-            mean_sensitivity = jnp.sum(pressure_sensitivity) / fluid_count
+            mean_base = jnp.sum(jnp.where(active_mask, base_trial, 0.0)) / fluid_count
+            mean_sensitivity = jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / fluid_count
             forcing_value = jnp.where(
                 mean_sensitivity > 1e-20,
                 (target - mean_base) / mean_sensitivity,
