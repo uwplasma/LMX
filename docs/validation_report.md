@@ -244,6 +244,23 @@ The backend harness currently supports:
     - there is still no cross-case Hunt default shift worth keeping
     - the remaining gap is in the update law, not in an untried interaction
       among the currently exposed controls
+- A later solver change improved the nonuniform electric-potential discretization
+  itself:
+  - layered and clustered meshes now use resistance-weighted face conductance
+    and face electromotive terms, rather than equal-spacing harmonic shortcuts
+  - retained numerical effect at the current Hunt controls:
+    - Hunt `Ha20`, `32^2` improved slightly:
+      combined error `≈ 0.12714 -> 0.12666`
+    - Hunt `Ha100`, `32^2` regressed slightly at the current default-like point:
+      combined error `≈ 0.34266 -> 0.34927`
+    - Hartmann `Ha20`, `32^2` remained accepted on the improved single-region
+      CG path
+  - retained interpretation:
+    - this is a principled finite-volume correction on nonuniform meshes, so it
+      is worth keeping
+    - but it does not by itself solve the remaining higher-Ha Hunt gap
+    - the Hunt control surface still needs a better coupled-update law on top of
+      the improved discretization
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

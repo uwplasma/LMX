@@ -1575,6 +1575,40 @@ LMX should only be described as ship ready for the current milestone when all of
     - or a better coupling criterion that respects both velocity and potential
       residuals without over-correcting the velocity update
 
+### 2026-04-02 01:50 America/Chicago
+
+- Implemented a more principled nonuniform electric-potential discretization:
+  - replaced the old equal-spacing harmonic face shortcut with
+    resistance-weighted face conductance
+  - replaced the old face-averaged electromotive source with the matching
+    resistance-weighted face electromotive term
+  - added unit coverage for:
+    - uniform-grid coefficient consistency
+    - nonuniform face-emf weighting
+- Retained numerical effect at the current Hunt control points:
+  - Hunt `Ha20`, `32^2`, current default-like point:
+    - combined error improved slightly from about `0.12714` to about `0.12666`
+  - Hunt `Ha100`, `32^2`, current default-like point:
+    - combined error worsened slightly from about `0.34266` to about `0.34927`
+  - Hartmann `Ha20`, `32^2` stayed accepted on the improved single-region path
+- Retained interpretation:
+  - this is still worth keeping because it is the finite-volume-consistent
+    nonuniform form, and the previous shortcut was only exact for equal adjacent
+    cell widths
+  - but it is not the missing Hunt fix by itself
+  - the remaining Hunt issue still appears to live in the layered coupled update
+    law and/or the layered linearization, not just the old face shortcut
+- What also happened this round:
+  - explicitly tried a multi-region predictor-corrector candidate with an extra
+    potential pass after the relaxed velocity update
+  - it drove `potential_residual` much lower, but the Hunt solution itself blew
+    up badly (`combined error ≈ 0.717`, nonzero sign-pathology metrics, large
+    `u_max`), so it was rolled back immediately
+- Best next step:
+  - keep the corrected nonuniform discretization
+  - next try a layered linearization or convergence criterion change that
+    improves Hunt without simply over-correcting the coupled update
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

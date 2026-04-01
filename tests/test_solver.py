@@ -6,6 +6,7 @@ import pytest
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.physics import build_material_fields
 import lmx.solvers as solvers
+from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.specs import BoundaryCondition
 from lmx.solvers import solve_steady
 
@@ -122,6 +123,43 @@ def test_auto_potential_backend_uses_cg_for_single_region_and_jacobi_for_layered
 
     assert solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
     assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "jacobi"
+
+
+def test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    sigma = jnp.ones((4, 4))
+    diagonal, west, east, south, north = solvers._potential_coefficients(mesh, sigma)
+
+    expected = 1.0 / (mesh.dy[1] * 0.5 * (mesh.dy[1] + mesh.dy[2]))
+    assert west[2, 2] == pytest.approx(expected)
+    assert east[1, 2] == pytest.approx(expected)
+    assert south[2, 2] == pytest.approx(expected)
+    assert north[2, 1] == pytest.approx(expected)
+    assert diagonal[2, 2] == pytest.approx(4.0 * expected)
+
+
+def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=6,
+        nz=10,
+        wall_thickness=(0.0, 0.0, 0.1, 0.1),
+        wall_cells=(0, 0, 2, 2),
+        target_ha=20.0,
+    )
+    sigma = jnp.ones(mesh.yz_shape)
+    source = jnp.zeros(mesh.yz_shape)
+    source = source.at[3, 4].set(2.0)
+    source = source.at[3, 5].set(-1.0)
+
+    emf_z = solvers._face_emf_z(mesh, sigma, source)
+    left_distance = 0.5 * mesh.dz[4]
+    right_distance = 0.5 * mesh.dz[5]
+    conductance = 1.0 / (left_distance + right_distance)
+    expected = conductance * (left_distance * 2.0 + right_distance * -1.0)
+
+    assert emf_z[3, 4] == pytest.approx(float(expected))
 
 
 def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):

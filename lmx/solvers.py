@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from .core import Diagnostics, MHDState, Solution
 from .linear import solve_poisson_cg_state, solve_poisson_jacobi_state, solve_poisson_lineax
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
-from .operators import center_spacing_y, center_spacing_z, face_average_x, face_average_z, gradient_scalar, laplacian_scalar
+from .operators import gradient_scalar, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
 from .specs import BoundaryCondition, CaseSpec
 
@@ -32,35 +32,49 @@ def _build_mesh(case: CaseSpec) -> StructuredMesh:
     raise NotImplementedError(f"Geometry {g.kind} is not supported by the laminar solver yet.")
 
 
-def _face_conductivity_y(sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    sigma_face = 2.0 * sigma[:-1, :] * sigma[1:, :] / jnp.maximum(sigma[:-1, :] + sigma[1:, :], 1e-12)
-    west = jnp.pad(sigma_face, ((1, 0), (0, 0)))
-    east = jnp.pad(sigma_face, ((0, 1), (0, 0)))
+def _face_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    left_distance = 0.5 * mesh.dy[:-1, None]
+    right_distance = 0.5 * mesh.dy[1:, None]
+    sigma_left = jnp.maximum(sigma[:-1, :], 1e-12)
+    sigma_right = jnp.maximum(sigma[1:, :], 1e-12)
+    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    west = jnp.pad(conductance, ((1, 0), (0, 0))) / mesh.dy[:, None]
+    east = jnp.pad(conductance, ((0, 1), (0, 0))) / mesh.dy[:, None]
     return west, east
 
 
-def _face_conductivity_z(sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    sigma_face = 2.0 * sigma[:, :-1] * sigma[:, 1:] / jnp.maximum(sigma[:, :-1] + sigma[:, 1:], 1e-12)
-    south = jnp.pad(sigma_face, ((0, 0), (1, 0)))
-    north = jnp.pad(sigma_face, ((0, 0), (0, 1)))
+def _face_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    left_distance = 0.5 * mesh.dz[None, :-1]
+    right_distance = 0.5 * mesh.dz[None, 1:]
+    sigma_left = jnp.maximum(sigma[:, :-1], 1e-12)
+    sigma_right = jnp.maximum(sigma[:, 1:], 1e-12)
+    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    south = jnp.pad(conductance, ((0, 0), (1, 0))) / mesh.dz[None, :]
+    north = jnp.pad(conductance, ((0, 0), (0, 1))) / mesh.dz[None, :]
     return south, north
 
 
+def _face_emf_y(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray) -> jnp.ndarray:
+    left_distance = 0.5 * mesh.dy[:-1, None]
+    right_distance = 0.5 * mesh.dy[1:, None]
+    sigma_left = jnp.maximum(sigma[:-1, :], 1e-12)
+    sigma_right = jnp.maximum(sigma[1:, :], 1e-12)
+    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    return conductance * (left_distance * source[:-1, :] + right_distance * source[1:, :])
+
+
+def _face_emf_z(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray) -> jnp.ndarray:
+    left_distance = 0.5 * mesh.dz[None, :-1]
+    right_distance = 0.5 * mesh.dz[None, 1:]
+    sigma_left = jnp.maximum(sigma[:, :-1], 1e-12)
+    sigma_right = jnp.maximum(sigma[:, 1:], 1e-12)
+    conductance = 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    return conductance * (left_distance * source[:, :-1] + right_distance * source[:, 1:])
+
+
 def _potential_coefficients(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, ...]:
-    dy = mesh.dy[:, None]
-    dz = mesh.dz[None, :]
-    delta_y = center_spacing_y(mesh)
-    delta_z = center_spacing_z(mesh)
-    west_sigma, east_sigma = _face_conductivity_y(sigma)
-    south_sigma, north_sigma = _face_conductivity_z(sigma)
-    west_distance = jnp.pad(delta_y[:, None], ((1, 0), (0, 0)), constant_values=1.0)
-    east_distance = jnp.pad(delta_y[:, None], ((0, 1), (0, 0)), constant_values=1.0)
-    south_distance = jnp.pad(delta_z[None, :], ((0, 0), (1, 0)), constant_values=1.0)
-    north_distance = jnp.pad(delta_z[None, :], ((0, 0), (0, 1)), constant_values=1.0)
-    west = west_sigma / jnp.maximum(dy * west_distance, 1e-12)
-    east = east_sigma / jnp.maximum(dy * east_distance, 1e-12)
-    south = south_sigma / jnp.maximum(dz * south_distance, 1e-12)
-    north = north_sigma / jnp.maximum(dz * north_distance, 1e-12)
+    west, east = _face_conductance_y(mesh, sigma)
+    south, north = _face_conductance_z(mesh, sigma)
     diagonal = west + east + south + north
     diagonal = jnp.where(diagonal > 0.0, diagonal, 1.0)
     return diagonal, west, east, south, north
@@ -81,11 +95,8 @@ def _solve_potential(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-
-    sigma_y = 2.0 * sigma[:-1, :] * sigma[1:, :] / jnp.maximum(sigma[:-1, :] + sigma[1:, :], 1e-12)
-    sigma_z = 2.0 * sigma[:, :-1] * sigma[:, 1:] / jnp.maximum(sigma[:, :-1] + sigma[:, 1:], 1e-12)
-    conv_y = sigma_y * face_average_x(uxb_y)
-    conv_z = sigma_z * face_average_z(uxb_z)
+    conv_y = _face_emf_y(mesh, sigma, uxb_y)
+    conv_z = _face_emf_z(mesh, sigma, uxb_z)
     face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
     face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
     rhs = -(

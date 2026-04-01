@@ -93,6 +93,11 @@
   The default `auto` policy resolves outside the traced JAX step:
   single-region duct solves use `cg`, while layered multi-region solves keep
   `jacobi`. That policy is based on region structure, not case-name heuristics.
+- The electric-potential discretization on nonuniform meshes now uses
+  resistance-weighted face conductance and face electromotive terms instead of
+  equal-spacing harmonic shortcuts. That is the finite-volume-consistent form
+  when adjacent cells have different widths, and it is especially relevant for
+  clustered layered Hunt meshes.
 - Validation summaries now also include simple profile-pathology diagnostics such
   as sign-change counts and negative-value fractions on the extracted duct
   midplane profiles. These are useful when a solver branch becomes oscillatory
