@@ -114,7 +114,14 @@
 - `python scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD`:
   patches the local `epotMultiRegionInterFoam` sources with opt-in `LMX_DIAG`
   logging in the outer loop, fluid `epot` solve, momentum predictor, and
-  interFoam pressure-correction block.
+  interFoam pressure-correction block. The patched `epot` log now includes:
+  - `maxJ`
+  - `maxJn`
+  - `maxPsiub`
+  - `maxCenteredJxB`
+  - the active `maxJxB`
+  so recovered Hunt runs can distinguish conservative-force effects from later
+  momentum/pressure response effects.
 - `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
   extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
   solver diagnostics.

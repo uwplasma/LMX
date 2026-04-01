@@ -528,6 +528,23 @@ The backend harness currently supports:
     - for Hunt `Ha20`, it is not the missing fix by itself because the ramp
       finishes by the first sampled diagnostic time
     - the remaining startup mismatch is still in the Lorentz-response path
+- Extended the FreeMHD diagnostic patcher so `LMX_DIAG epot` records now include
+  `maxJn`, `maxPsiub`, and `maxCenteredJxB` in addition to the active
+  `maxJxB`. On the first real rerun of recovered Hunt `Ha20`, the first patched
+  fluid `epot` record at `t = 1.25e-05` showed:
+  - `maxJ = 85382.119`
+  - `maxJn = 0.83266194`
+  - `maxPsiub = 1.173496`
+  - `maxCenteredJxB = 4689.7866`
+  - `maxJxB = 4689.7866`
+  - retained interpretation:
+    - at least on the first logged Hunt startup point, the conservative and
+      centered Lorentz-force magnitudes are identical in FreeMHD
+    - that makes it much less likely that the remaining LMX Hunt gap is caused
+      primarily by using `J ^ B` instead of the conservative `JxB` form
+    - the next solver target should stay on the momentum/pressure response path
+      or on the spatial distribution of `J`, not on conservative-vs-centered
+      force magnitude alone
 
 ## Planned improvements
 

@@ -53,6 +53,20 @@ def patch_epot_file(source: str) -> str:
     source = source.replace('<< " maxPotE=" << gMax(mag(potE))', '<< " maxPotE=" << max(mag(potE)).value()')
     source = source.replace('<< " maxJ=" << gMax(mag(J))', '<< " maxJ=" << max(mag(J)).value()')
     source = source.replace('<< " maxJxB=" << gMax(mag(JxB))', '<< " maxJxB=" << max(mag(JxB)).value()')
+    conservative_marker = "\tvolVectorField centeredJxB(J ^ B);\n"
+    if conservative_marker.strip() not in source:
+        if "\t//Update current density distribution and boundary condition\n\tJ.correctBoundaryConditions();\n" in source:
+            source = _inject_once(
+                source,
+                "\t//Update current density distribution and boundary condition\n\tJ.correctBoundaryConditions();\n",
+                conservative_marker,
+            )
+        else:
+            source = _inject_once(
+                source,
+                "\t\tJxB = (J ^ B);\n",
+                conservative_marker,
+            )
     solve_old = "\tPotEEqn.solve();\n"
     solve_new = """\tauto potEPerf = PotEEqn.solve();\n"""
     if "auto potEPerf = PotEEqn.solve();" not in source:
@@ -72,15 +86,25 @@ def patch_epot_file(source: str) -> str:
 \t\t\t<< " potEIterations=" << potEPerf.nIterations()
 \t\t\t<< " maxPotE=" << max(mag(potE)).value()
 \t\t\t<< " maxJ=" << max(mag(J)).value()
+\t\t\t<< " maxJn=" << max(mag(jn)).value()
+\t\t\t<< " maxPsiub=" << max(mag(psiub)).value()
+\t\t\t<< " maxCenteredJxB=" << max(mag(centeredJxB)).value()
 \t\t\t<< " maxJxB=" << max(mag(JxB)).value()
 \t\t\t<< endl;
 \t}
 """
-    source = _inject_once(
-        source,
-        "\t\tJxB = (J ^ B);\n\t}\n",
-        log_block,
-    )
+    if "\t\tJxB = (J ^ B);\n\t}\n" in source:
+        source = _inject_once(
+            source,
+            "\t\tJxB = (J ^ B);\n\t}\n",
+            log_block,
+        )
+    else:
+        source = _inject_once(
+            source,
+            "\t}\n",
+            log_block,
+        )
     return source
 
 

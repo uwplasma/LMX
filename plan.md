@@ -2058,12 +2058,30 @@ LMX should only be described as ship ready for the current milestone when all of
     - for Hunt `Ha20`, it is not the missing fix by itself because the ramp
       finishes by the first sampled diagnostic time
     - the remaining startup mismatch is still in the Lorentz-response path
+- `2026-04-03 00:20 America/Chicago`: Extended the patched FreeMHD `epot`
+  logging to include `maxJn`, `maxPsiub`, and `maxCenteredJxB` alongside the
+  active `maxJxB`, rebuilt the local diagnostic image, and reran the recovered
+  Hunt `Ha20` case far enough to capture the first patched fluid `epot` record.
+  The first real record at `t = 1.25e-05` shows:
+  - `maxJ = 85382.119`
+  - `maxJn = 0.83266194`
+  - `maxPsiub = 1.173496`
+  - `maxCenteredJxB = 4689.7866`
+  - `maxJxB = 4689.7866`
+  - retained interpretation:
+    - at least on the first logged Hunt startup point, the conservative and
+      centered Lorentz-force magnitudes are identical in FreeMHD
+    - this makes it much less likely that the remaining LMX Hunt gap is caused
+      primarily by conservative-vs-centered Lorentz-force magnitude
+    - the next solver target should remain on the momentum/pressure response
+      path or on the spatial distribution/orientation of `J`, not on force
+      magnitude form alone
 - Best next step:
-  - push the magnetic-ramp parity feature after the targeted tests pass
-  - then use the patched FreeMHD `JConservativeForm` clue and the current
-    `maxJ` / `maxJxB` traces to target the remaining Lorentz-response mismatch
-    directly, likely through a more faithful conservative-form `JxB`
-    reconstruction for layered Hunt startup
+  - push the expanded FreeMHD diagnostic patch once tests/docs are green
+  - then compare the new FreeMHD `maxJn` / `maxPsiub` / `maxJ` records against
+    LMX-side current diagnostics to target the remaining Hunt mismatch through
+    current distribution and momentum/pressure response, not by changing the
+    Lorentz-force magnitude form alone
 
 ## Instruction For Future Agents
 
