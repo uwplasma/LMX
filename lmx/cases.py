@@ -15,6 +15,20 @@ def _ha_to_b(ha: float, length_scale: float, conductivity: float, density: float
     return ha / (length_scale * ((conductivity / (density * viscosity)) ** 0.5))
 
 
+def _wall_conductivity_from_conductance_ratio(
+    *,
+    wall_conductance_ratio: float,
+    fluid_conductivity: float,
+    wall_thickness: float,
+    hartmann_half_spacing: float,
+) -> float:
+    if wall_thickness <= 0.0:
+        raise ValueError("wall_thickness must be positive when deriving wall conductivity from conductance ratio")
+    if hartmann_half_spacing <= 0.0:
+        raise ValueError("hartmann_half_spacing must be positive when deriving wall conductivity from conductance ratio")
+    return wall_conductance_ratio * fluid_conductivity * hartmann_half_spacing / wall_thickness
+
+
 def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
     if ha <= 20.0:
         return TimeStepperConfig(
@@ -118,12 +132,20 @@ def make_hunt_case(
     wall_cells: int = 8,
     wall_thickness: float = 0.1,
     fluid_conductivity: float = 1.0,
-    wall_conductivity: float = 0.05,
+    wall_conductance_ratio: float = 0.05,
+    wall_conductivity: float | None = None,
     density: float = 1.0,
     viscosity: float = 1.0,
     output_dir: str | None = None,
 ) -> CaseSpec:
     bmag = _ha_to_b(ha, 0.5 * width, fluid_conductivity, density, viscosity)
+    if wall_conductivity is None:
+        wall_conductivity = _wall_conductivity_from_conductance_ratio(
+            wall_conductance_ratio=wall_conductance_ratio,
+            fluid_conductivity=fluid_conductivity,
+            wall_thickness=wall_thickness,
+            hartmann_half_spacing=0.5 * height,
+        )
     anchor = ((ny + wall_cells * 0) // 2, (nz + 2 * wall_cells) // 2)
     controls = _hunt_short_transient_controls(ha)
     return CaseSpec(
@@ -152,5 +174,8 @@ def make_hunt_case(
         forcing=1.0,
         reference_pressure_gradient=-1.0,
         reference_phi_cell=anchor,
-        notes="Hunt-style duct with explicit conducting wall layers on Hartmann boundaries.",
+        notes=(
+            "Hunt-style duct with explicit conducting Hartmann-wall layers. "
+            f"Default wall conductance ratio c={wall_conductance_ratio:g}."
+        ),
     )

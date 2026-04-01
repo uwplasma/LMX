@@ -100,6 +100,10 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - Yes, LMX is already a standalone code for the current duct-focused laminar inductionless scope.
 - No, it is not yet a ship-ready general liquid-metal solver for all simple pipes and boundary-condition combinations.
 - The current standalone boundary-condition story is still narrow: no-slip, insulating, conducting wall, inlet velocity, inlet flow rate, outlet pressure, and imposed current density exist at the spec level, but they are not all exercised across a sufficiently broad native case matrix yet.
+- The native Hunt case construction now uses wall conductance ratio as the default
+  public parameter, which is the right nondimensional input for the archived
+  closed-channel references, but that correction alone does not close the
+  remaining Hunt solver gap.
 
 ## Ship-Ready Exit Criteria
 
@@ -180,6 +184,14 @@ LMX should only be described as ship ready for the current milestone when all of
   - Hunt `Ha20` remains around `y_l2 ≈ 0.211`, `z_l2 ≈ 0.373`
   - Hunt `Ha100` remains around `y_l2 ≈ 0.198`, `z_l2 ≈ 0.411`
   - this confirms the remaining native Hunt problem is not just premature stopping
+- The Hunt case factory now derives wall conductivity from wall conductance ratio
+  by default:
+  - `c = sigma_wall * t_wall / (sigma_fluid * a_H)` is now the primary public input
+  - explicit `wall_conductivity` remains available as an override for cases that
+    are specified directly in dimensional conductivity
+  - native Hunt validation remained essentially unchanged after this correction,
+    which is a useful negative result: the main gap is solver fidelity, not the
+    naming or normalization of the Hunt wall parameter
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
@@ -956,6 +968,35 @@ LMX should only be described as ship ready for the current milestone when all of
   1. use the combined Hunt `Ha20` and Shercliff `Ha100` artifacts to decide whether the next solver change should target conducting-wall coupling or higher-Ha damping/resolution
   2. recover Hunt `Ha100` next if we want the harsher conducting-wall benchmark, otherwise keep improving the LMX solver against the already recovered Hunt `Ha20` gap
   3. generalize the current sampling-geometry inference beyond raw `fieldMinMax` maxima so future cases are not tied to whichever plane happens to host the instantaneous `mag(U)` maximum
+
+### 2026-04-01 12:05 America/Chicago
+
+- Revisited the native Hunt case definition because the archived closed-channel
+  analytical filenames consistently encode `db0.05`, which indicates a wall
+  conductance-ratio input rather than a raw wall conductivity.
+- Retained a public-API correction in `make_hunt_case(...)`:
+  - the default Hunt input is now `wall_conductance_ratio=0.05`
+  - wall conductivity is derived from fluid conductivity, Hartmann-wall half-spacing,
+    and wall thickness
+  - explicit `wall_conductivity` remains available as an override for future
+    dimensional case definitions
+- Added targeted unit coverage so this stays stable:
+  - default Hunt cases now verify the derived conducting-wall conductivity
+  - explicit wall-conductivity override behavior is also covered
+- Verified the retained negative result before keeping it:
+  - native Hunt `Ha20` remained around `y_l2 ≈ 0.211`, `z_l2 ≈ 0.373`
+  - native Hunt `Ha100` remained around `y_l2 ≈ 0.198`, `z_l2 ≈ 0.411`
+  - this means the remaining Hunt gap is not coming from the conductance-ratio
+    normalization; it remains a solver/update-physics problem
+- Tried a more ambitious solver change and explicitly rejected it:
+  - implemented an implicit Helmholtz-like velocity solve inside the pseudo-step
+  - it improved Hunt somewhat, but it regressed Hartmann acceptance and Shercliff
+    quality badly enough that it was rolled back instead of being left on `main`
+- Current best next step is now even narrower:
+  1. improve the native Hunt update physics without degrading Hartmann/Shercliff
+  2. keep using conductance ratio as the default Hunt public input
+  3. prefer solver changes that can be justified geometrically or nondimensionally,
+     not by case-specific rescue heuristics
 
 ## Instruction For Future Agents
 

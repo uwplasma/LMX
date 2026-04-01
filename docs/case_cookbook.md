@@ -26,6 +26,10 @@ path as the other native cases while remaining a strong analytical comparison ta
 
 This is the conducting-wall duct case. It is useful for checking how the solver
 handles explicit solid conductivity layers and sharper boundary-layer physics.
+By default, the native Hunt factory uses wall conductance ratio `c = 0.05` and
+derives wall conductivity from the fluid conductivity, Hartmann-wall spacing, and
+wall thickness. Provide an explicit wall conductivity only when a case is defined
+that way.
 
 ## Optional external validation backends
 

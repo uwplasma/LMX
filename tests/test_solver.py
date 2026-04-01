@@ -40,6 +40,30 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
 
 
+def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
+    case = make_hunt_case(
+        ha=20.0,
+        width=2.0,
+        height=2.0,
+        wall_thickness=0.1,
+        fluid_conductivity=2.0,
+        wall_conductance_ratio=0.05,
+        ny=16,
+        nz=16,
+        wall_cells=2,
+    )
+
+    wall_region = next(region for region in case.regions if region.name == "conducting_wall")
+    expected = 0.05 * 2.0 * (0.5 * 2.0) / 0.1
+    assert wall_region.conductivity == pytest.approx(expected)
+
+
+def test_hunt_case_allows_explicit_wall_conductivity_override():
+    case = make_hunt_case(ha=20.0, wall_conductance_ratio=0.05, wall_conductivity=7.5, ny=16, nz=16, wall_cells=2)
+    wall_region = next(region for region in case.regions if region.name == "conducting_wall")
+    assert wall_region.conductivity == pytest.approx(7.5)
+
+
 def test_hunt_inlet_velocity_boundary_drives_short_transient():
     case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
     driven = replace(

@@ -42,6 +42,10 @@ The backend harness currently supports:
 - The current convergence-aware `solve_steady` implementation confirms that the
   native Hunt gap is not just a steady-stop criterion issue; the remaining work is
   in the update physics/control law, not only in iteration bookkeeping.
+- The native Hunt case now uses wall-conductance-ratio semantics by default
+  instead of treating `0.05` as a raw wall conductivity. That corrects the case
+  API, but the retained Hunt validation gap persists, which points back to solver
+  fidelity rather than case normalization.
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 
