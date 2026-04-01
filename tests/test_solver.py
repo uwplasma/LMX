@@ -240,7 +240,7 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
         residual = next(residuals)
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25
+        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
@@ -263,7 +263,7 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50
+        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
@@ -296,7 +296,7 @@ def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: py
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20
+        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)

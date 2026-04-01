@@ -101,3 +101,69 @@ def test_build_freemhd_container_uses_buildx_load(monkeypatch: pytest.MonkeyPatc
 
     assert result.returncode == 0
     assert calls["command"][:4] == ["docker", "buildx", "build", "--load"]
+
+
+def test_run_freemhd_case_auto_builds_missing_image(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    from scripts import run_freemhd_case as runner
+
+    case_dir = tmp_path / "case"
+    bundle_root = tmp_path / "docker"
+    local_root = tmp_path / "external" / "FreeMHD"
+    case_dir.mkdir(parents=True)
+    bundle_root.mkdir(parents=True)
+    local_root.mkdir(parents=True)
+    (case_dir / "system").mkdir()
+    (case_dir / "system" / "controlDict").write_text("application epotMultiRegionInterFoam;\n")
+
+    monkeypatch.setattr(runner, "docker_cli_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_daemon_available", lambda: True)
+
+    image_checks = iter([False, True])
+
+    def fake_image_available(image: str) -> bool:
+        return next(image_checks)
+
+    monkeypatch.setattr(runner, "docker_image_available", fake_image_available)
+    monkeypatch.setattr(runner, "patch_freemhd_tree", lambda root: [root / "patched.C"])
+
+    def fake_build(image: str, bundle_root: Path, platform: str, local_freemhd_root: Path | None = None):
+        assert image == "lmx-freemhd"
+        assert platform == "linux/amd64"
+        assert local_freemhd_root == local_root
+        return builder.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="built", stderr="")
+
+    def fake_run_case(**kwargs):
+        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="ran", stderr="")
+
+    monkeypatch.setattr(runner, "build_freemhd_container", fake_build)
+    monkeypatch.setattr(runner, "run_freemhd_case", fake_run_case)
+
+    output = tmp_path / "run.json"
+    exit_code = runner.main(
+        [
+            "--image",
+            "lmx-freemhd",
+            "--case-dir",
+            str(case_dir),
+            "--bundle-root",
+            str(bundle_root),
+            "--local-freemhd-root",
+            str(local_root),
+            "--patch-local-freemhd-logging",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = output.read_text()
+    assert '"status": "ok"' in payload
+    assert '"image_auto_built": true' in payload
+    assert '"patch_local_freemhd_logging": true' in payload
+    assert 'patched.C' in payload
+    assert '"local_freemhd_root": "' in payload
+    assert '"status": "ok"' in capsys.readouterr().out

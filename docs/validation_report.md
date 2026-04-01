@@ -528,6 +528,10 @@ The backend harness currently supports:
     - for Hunt `Ha20`, it is not the missing fix by itself because the ramp
       finishes by the first sampled diagnostic time
     - the remaining startup mismatch is still in the Lorentz-response path
+- `run_freemhd_case.py` can now auto-build a missing local diagnostic image
+  from `--local-freemhd-root`, and `--patch-local-freemhd-logging` applies the
+  current coupled-logging patch set before that build. That removes the last
+  manual image-management step from the local Hunt diagnostic loop.
 - Extended the FreeMHD diagnostic patcher so `LMX_DIAG epot` records now include
   `maxJn`, `maxPsiub`, and `maxCenteredJxB` in addition to the active
   `maxJxB`. On the first real rerun of recovered Hunt `Ha20`, the first patched
@@ -562,6 +566,16 @@ The backend harness currently supports:
       just in later momentum coupling
     - the next solver target should focus on matching FreeMHD’s `psiub` and
       face-current magnitudes on the layered startup path
+- That raw one-point interpretation is now intentionally softened. The patched
+  FreeMHD comparison path and local source patch now also support:
+  - `maxJnDensity`
+  - `maxPsiubDensity`
+  and `compare_hunt_trace_histories.py` can align those against the LMX
+  density-style Hunt diagnostics. This matters because `maxJn` and `maxPsiub`
+  are face-flux-style quantities in FreeMHD, while the current LMX Hunt startup
+  traces being compared are density-style maxima. Until the rerun with density
+  diagnostics is complete, the old raw `maxJn` / `maxPsiub` mismatch should not
+  be treated as decisive solver evidence by itself.
 
 ## Planned improvements
 

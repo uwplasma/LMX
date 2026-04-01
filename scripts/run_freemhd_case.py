@@ -10,6 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.build_freemhd_container import build_freemhd_container
+from scripts.patch_freemhd_coupled_logging import patch_freemhd_tree
 from lmx.freemhd import (
     control_dict_application,
     decompose_par_subdomains,
@@ -81,6 +83,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cores", type=str, default="auto")
     parser.add_argument("--solver", type=str, default="auto")
     parser.add_argument("--platform", type=str, default="linux/amd64")
+    parser.add_argument(
+        "--local-freemhd-root",
+        type=Path,
+        default=None,
+        help="Optional local FreeMHD checkout to auto-build the image if it is missing.",
+    )
+    parser.add_argument(
+        "--patch-local-freemhd-logging",
+        action="store_true",
+        help="Patch the local FreeMHD checkout with LMX coupled-logging diagnostics before auto-building.",
+    )
     parser.add_argument("--end-time", type=str, default=None)
     parser.add_argument("--write-interval", type=str, default=None)
     parser.add_argument("--delta-t", type=str, default=None)
@@ -140,6 +153,69 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if not docker_image_available(args.image):
+        auto_build_payload: dict[str, object] | None = None
+        if args.local_freemhd_root is not None:
+            patched_files: list[str] = []
+            if args.patch_local_freemhd_logging:
+                patched_files = [str(path) for path in patch_freemhd_tree(args.local_freemhd_root)]
+            build_result = build_freemhd_container(
+                args.image,
+                args.bundle_root,
+                platform=args.platform,
+                local_freemhd_root=args.local_freemhd_root,
+            )
+            auto_build_payload = {
+                "attempted": True,
+                "local_freemhd_root": str(args.local_freemhd_root.resolve()),
+                "patch_local_freemhd_logging": args.patch_local_freemhd_logging,
+                "patched_files": patched_files,
+                "status": "ok" if build_result.returncode == 0 else "failed",
+                "returncode": build_result.returncode,
+                "stdout_tail": build_result.stdout[-4000:],
+                "stderr_tail": build_result.stderr[-4000:],
+            }
+            if build_result.returncode == 0 and docker_image_available(args.image):
+                result = run_freemhd_case(
+                    image=args.image,
+                    case_dir=args.case_dir,
+                    bundle_root=args.bundle_root,
+                    cores=resolved_cores,
+                    solver=resolved_solver,
+                    platform=args.platform,
+                    end_time=args.end_time,
+                    write_interval=args.write_interval,
+                    delta_t=args.delta_t,
+                    start_from=args.start_from,
+                )
+                payload = {
+                    "image": args.image,
+                    "case_dir": str(args.case_dir.resolve()),
+                    "bundle_root": str(args.bundle_root.resolve()),
+                    "cores": resolved_cores,
+                    "solver": resolved_solver,
+                    "platform": args.platform,
+                    "local_freemhd_root": str(args.local_freemhd_root.resolve()),
+                    "patch_local_freemhd_logging": args.patch_local_freemhd_logging,
+                    "end_time": args.end_time,
+                    "write_interval": args.write_interval,
+                    "delta_t": args.delta_t,
+                    "start_from": args.start_from,
+                    "docker_cli_available": True,
+                    "docker_available": True,
+                    "docker_image_available": True,
+                    "image_auto_built": True,
+                    "auto_build": auto_build_payload,
+                    "status": "ok" if result.returncode == 0 else "failed",
+                    "returncode": result.returncode,
+                    "stdout_tail": result.stdout[-4000:],
+                    "stderr_tail": result.stderr[-4000:],
+                }
+                if args.output is not None:
+                    args.output.parent.mkdir(parents=True, exist_ok=True)
+                    args.output.write_text(json.dumps(payload, indent=2))
+                print(json.dumps(payload, indent=2))
+                return 0 if result.returncode == 0 else result.returncode
+
         payload = {
             "image": args.image,
             "case_dir": str(args.case_dir.resolve()),
@@ -147,6 +223,8 @@ def main(argv: list[str] | None = None) -> int:
             "cores": resolved_cores,
             "solver": resolved_solver,
             "platform": args.platform,
+            "local_freemhd_root": str(args.local_freemhd_root.resolve()) if args.local_freemhd_root is not None else None,
+            "patch_local_freemhd_logging": args.patch_local_freemhd_logging,
             "end_time": args.end_time,
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
@@ -154,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
             "docker_cli_available": True,
             "docker_available": True,
             "docker_image_available": False,
+            "image_auto_built": False,
+            "auto_build": auto_build_payload,
             "status": "docker-image-unavailable",
         }
         if args.output is not None:

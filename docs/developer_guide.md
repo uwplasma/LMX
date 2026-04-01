@@ -117,20 +117,28 @@
   interFoam pressure-correction block. The patched `epot` log now includes:
   - `maxJ`
   - `maxJn`
+  - `maxJnDensity`
   - `maxPsiub`
+  - `maxPsiubDensity`
   - `maxCenteredJxB`
   - the active `maxJxB`
   so recovered Hunt runs can distinguish conservative-force effects from later
-  momentum/pressure response effects.
+  momentum/pressure response effects. `maxJn` / `maxPsiub` are face-flux-style
+  quantities in FreeMHD, while `maxJnDensity` / `maxPsiubDensity` divide back
+  through `mesh.magSf()` so the log also exposes face-density-style quantities.
 - `python scripts/compare_hunt_trace_histories.py --freemhd-diag-json ...`:
   now compares:
   - `u_max`
   - cell-centered `current_max`
   - face-current `face_current_max` when `maxJn` is available
+  - face-current `face_current_density_max` when `maxJnDensity` is available
   - source-term `emf_max` when `maxPsiub` is available
+  - source-term `emf_density_max` when `maxPsiubDensity` is available
   - `lorentz_max`
   and reports both normalized history error and raw relative error, which is
-  necessary when only a partial live FreeMHD log is available.
+  necessary when only a partial live FreeMHD log is available. Treat the raw
+  `maxJn` / `maxPsiub` comparisons cautiously unless the log semantics are
+  known to match the LMX diagnostic being compared.
 - `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
   extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
   solver diagnostics.
@@ -139,6 +147,11 @@
   container runs can use patched local solver sources instead of recloning
   upstream. The build path now uses `docker buildx build --load` so the image is
   immediately visible to later `docker run` steps on the local Docker daemon.
+- `python scripts/run_freemhd_case.py --local-freemhd-root ./external/FreeMHD`:
+  can now auto-build a missing local image before launching the case, and
+  `--patch-local-freemhd-logging` applies the current diagnostic patch set to
+  that checkout before the build. Use that path for iterative Hunt trace work on
+  this machine so the patched image does not have to be managed manually.
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form

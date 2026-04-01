@@ -133,8 +133,12 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     j_values = [float(record["maxJ"]) for record in epot_records]
     jn_times = [float(record["time"]) for record in epot_records if "maxJn" in record]
     jn_values = [float(record["maxJn"]) for record in epot_records if "maxJn" in record]
+    jn_density_times = [float(record["time"]) for record in epot_records if "maxJnDensity" in record]
+    jn_density_values = [float(record["maxJnDensity"]) for record in epot_records if "maxJnDensity" in record]
     psiub_times = [float(record["time"]) for record in epot_records if "maxPsiub" in record]
     psiub_values = [float(record["maxPsiub"]) for record in epot_records if "maxPsiub" in record]
+    psiub_density_times = [float(record["time"]) for record in epot_records if "maxPsiubDensity" in record]
+    psiub_density_values = [float(record["maxPsiubDensity"]) for record in epot_records if "maxPsiubDensity" in record]
     lorentz_times = [float(record["time"]) for record in epot_records]
     lorentz_values = [float(record["maxJxB"]) for record in epot_records]
 
@@ -157,8 +161,22 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         payload["lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, lorentz_history)
     if jn_times and face_current_history:
         payload["face_current_max"] = _build_alignment(jn_times, jn_values, lmx_times, face_current_history)
+    if jn_density_times and face_current_history:
+        payload["face_current_density_max"] = _build_alignment(
+            jn_density_times,
+            jn_density_values,
+            lmx_times,
+            face_current_history,
+        )
     if psiub_times and emf_history:
         payload["emf_max"] = _build_alignment(psiub_times, psiub_values, lmx_times, emf_history)
+    if psiub_density_times and emf_history:
+        payload["emf_density_max"] = _build_alignment(
+            psiub_density_times,
+            psiub_density_values,
+            lmx_times,
+            emf_history,
+        )
     return payload
 
 

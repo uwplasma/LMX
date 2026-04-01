@@ -77,6 +77,7 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/fetch_freemhd_assets.py --dest ./external
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
 /Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-localdiag --local-freemhd-root ./external/FreeMHD
+/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
 /Users/rogerio/base_env/bin/python3 scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD
@@ -90,6 +91,10 @@ The parity loaders also infer `BtStartTime` and `BtDuration` from
 `system/controlDict`, so short transient LMX replays now use the same magnetic
 field ramp settings as the recovered validation cases when those controls are
 present.
+`run_freemhd_case.py` can now auto-build a missing local diagnostic image from a
+patched checkout when `--local-freemhd-root` is provided, and it can patch that
+checkout in place with `--patch-local-freemhd-logging` before the build. That is
+the recommended path for reproducing Hunt trace diagnostics on this machine.
 
 ## Scope
 

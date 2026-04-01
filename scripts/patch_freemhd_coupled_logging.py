@@ -53,6 +53,18 @@ def patch_epot_file(source: str) -> str:
     source = source.replace('<< " maxPotE=" << gMax(mag(potE))', '<< " maxPotE=" << max(mag(potE)).value()')
     source = source.replace('<< " maxJ=" << gMax(mag(J))', '<< " maxJ=" << max(mag(J)).value()')
     source = source.replace('<< " maxJxB=" << gMax(mag(JxB))', '<< " maxJxB=" << max(mag(JxB)).value()')
+    if '<< " maxJnDensity="' not in source:
+        source = source.replace(
+            '<< " maxJn=" << max(mag(jn)).value()',
+            '<< " maxJn=" << max(mag(jn)).value()\n'
+            '\t\t\t<< " maxJnDensity=" << max(mag(jn/(mesh.magSf() + SMALL))).value()',
+        )
+    if '<< " maxPsiubDensity="' not in source:
+        source = source.replace(
+            '<< " maxPsiub=" << max(mag(psiub)).value()',
+            '<< " maxPsiub=" << max(mag(psiub)).value()\n'
+            '\t\t\t<< " maxPsiubDensity=" << max(mag(psiub/(mesh.magSf() + SMALL))).value()',
+        )
     conservative_marker = "\tvolVectorField centeredJxB(J ^ B);\n"
     if conservative_marker.strip() not in source:
         if "\t//Update current density distribution and boundary condition\n\tJ.correctBoundaryConditions();\n" in source:
@@ -87,24 +99,27 @@ def patch_epot_file(source: str) -> str:
 \t\t\t<< " maxPotE=" << max(mag(potE)).value()
 \t\t\t<< " maxJ=" << max(mag(J)).value()
 \t\t\t<< " maxJn=" << max(mag(jn)).value()
+\t\t\t<< " maxJnDensity=" << max(mag(jn/(mesh.magSf() + SMALL))).value()
 \t\t\t<< " maxPsiub=" << max(mag(psiub)).value()
+\t\t\t<< " maxPsiubDensity=" << max(mag(psiub/(mesh.magSf() + SMALL))).value()
 \t\t\t<< " maxCenteredJxB=" << max(mag(centeredJxB)).value()
 \t\t\t<< " maxJxB=" << max(mag(JxB)).value()
 \t\t\t<< endl;
 \t}
 """
-    if "\t\tJxB = (J ^ B);\n\t}\n" in source:
-        source = _inject_once(
-            source,
-            "\t\tJxB = (J ^ B);\n\t}\n",
-            log_block,
-        )
-    else:
-        source = _inject_once(
-            source,
-            "\t}\n",
-            log_block,
-        )
+    if 'Info<< "LMX_DIAG epot"' not in source:
+        if "\t\tJxB = (J ^ B);\n\t}\n" in source:
+            source = _inject_once(
+                source,
+                "\t\tJxB = (J ^ B);\n\t}\n",
+                log_block,
+            )
+        else:
+            source = _inject_once(
+                source,
+                "\t}\n",
+                log_block,
+            )
     return source
 
 

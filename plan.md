@@ -2092,12 +2092,52 @@ LMX should only be described as ship ready for the current milestone when all of
       just in later momentum coupling
     - the next solver target should focus on matching FreeMHD `psiub` and
       face-current magnitudes on the layered startup path
+- `2026-04-03 01:05 America/Chicago`: Fixed the current CI breakage on `main`.
+  The retained steady-solver tests in `tests/test_solver.py` were still mocking
+  the old 8-value `_step(...)` return tuple, while `solve_steady(...)` now
+  consumes 10 values including `face_current_max` and `emf_max`. Updated those
+  tests to return the full tuple, which restores the failed `physics` and
+  `coverage` jobs from the latest GitHub Actions run.
+- `2026-04-03 01:15 America/Chicago`: Retained a targeted FreeMHD harness
+  improvement in `scripts/run_freemhd_case.py`:
+  - `--local-freemhd-root` can now auto-build a missing local image before the
+    case run, instead of failing with `docker-image-unavailable`
+  - `--patch-local-freemhd-logging` can patch the local checkout with the
+    current `LMX_DIAG` logging set before that build
+  - this removes the manual local image-management step from the Hunt
+    diagnostic loop and is the right path for repeated patched FreeMHD runs on
+    this machine
+- `2026-04-03 01:20 America/Chicago`: Promoted the current Hunt diagnostic
+  hypothesis into the code and tests:
+  - `patch_freemhd_coupled_logging.py` now supports logging
+    `maxJnDensity` and `maxPsiubDensity` in addition to the existing flux-style
+    `maxJn` and `maxPsiub`
+  - `compare_hunt_trace_histories.py` now aligns those density-style signals as
+    `face_current_density_max` and `emf_density_max` when they are present
+  - retained interpretation:
+    - the earlier one-point raw `maxJn` / `maxPsiub` mismatch is not yet
+      trustworthy enough to steer the solver by itself
+    - `maxJn` and `maxPsiub` in FreeMHD are face-flux-style quantities, while
+      the current LMX Hunt startup diagnostics are density-style maxima
+    - the next decisive check is a rerun of patched FreeMHD with the new
+      density diagnostics, not another solver-control tweak
+- `2026-04-03 01:30 America/Chicago`: Attempted a longer patched FreeMHD Hunt
+  rerun on the current local image. Two practical results were retained:
+  - the existing `lmx-freemhd-localdiag` image still reflects the older patch
+    set, which is why the first rerun continued to emit only
+    `maxJn` / `maxPsiub` and not the new density fields
+  - the 8-core container replay on this machine was killed with exit code 137
+    after the first time step, so the next density-log rerun should use a fresh
+    image tag plus the patch/build path above and a lower core count
 - Best next step:
-  - keep the new current/source diagnostics on `main` once targeted tests/docs
-    are green
-  - then revisit the layered startup source/current construction itself,
-    especially the `psiub` / face-current scaling and mapping, before making
-    another pressure-response change
+  - finish one patched FreeMHD Hunt rerun that actually emits
+    `maxJnDensity` / `maxPsiubDensity`, using the new auto-build/patch harness
+    and a smaller core count
+  - compare those density-style traces against the existing LMX
+    `face_current_max_history` / `emf_max_history`
+  - only then decide whether the remaining Hunt startup blocker is still in the
+    layered current/source construction or whether the next retained change
+    should move back to the longer-horizon momentum/pressure response
 
 ## Instruction For Future Agents
 

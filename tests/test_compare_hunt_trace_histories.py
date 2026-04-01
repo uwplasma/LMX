@@ -12,10 +12,28 @@ pytestmark = pytest.mark.unit
 def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path):
     freemhd = {
         "records": [
-            {"kind": "epot", "time": 0.1, "maxJ": 10.0, "maxJn": 7.0, "maxPsiub": 3.0, "maxJxB": 5.0},
+            {
+                "kind": "epot",
+                "time": 0.1,
+                "maxJ": 10.0,
+                "maxJn": 7.0,
+                "maxJnDensity": 7.0,
+                "maxPsiub": 3.0,
+                "maxPsiubDensity": 3.0,
+                "maxJxB": 5.0,
+            },
             {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 2.0},
             {"kind": "pressure", "time": 0.1, "corr": 2, "maxU": 1.0},
-            {"kind": "epot", "time": 0.2, "maxJ": 8.0, "maxJn": 5.6, "maxPsiub": 2.4, "maxJxB": 4.0},
+            {
+                "kind": "epot",
+                "time": 0.2,
+                "maxJ": 8.0,
+                "maxJn": 5.6,
+                "maxJnDensity": 5.6,
+                "maxPsiub": 2.4,
+                "maxPsiubDensity": 2.4,
+                "maxJxB": 4.0,
+            },
             {"kind": "pressure", "time": 0.2, "corr": 2, "maxU": 0.5},
         ]
     }
@@ -44,7 +62,9 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     assert payload["u_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["lorentz_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["current_max"]["mean_raw_relative_error"] == pytest.approx(0.6)
     assert payload["u_max"]["samples"][0]["freemhd_raw"] == pytest.approx(1.0)
@@ -98,7 +118,16 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
         json.dumps(
             {
                 "records": [
-                    {"kind": "epot", "time": 0.1, "maxJ": 10.0, "maxJn": 7.0, "maxPsiub": 3.0, "maxJxB": 5.0}
+                    {
+                        "kind": "epot",
+                        "time": 0.1,
+                        "maxJ": 10.0,
+                        "maxJn": 7.0,
+                        "maxJnDensity": 7.0,
+                        "maxPsiub": 3.0,
+                        "maxPsiubDensity": 3.0,
+                        "maxJxB": 5.0,
+                    }
                 ]
             }
         )
@@ -129,5 +158,7 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
     assert "u_max" not in payload
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["max_raw_relative_error"] == pytest.approx(0.0)

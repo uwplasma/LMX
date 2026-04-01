@@ -32,7 +32,9 @@ def test_patch_epot_file_wraps_solve_and_adds_diag_log():
     assert 'Info<< "LMX_DIAG epot"' in patched
     assert '<< " maxCenteredJxB=" << max(mag(centeredJxB)).value()' in patched
     assert '<< " maxJn=" << max(mag(jn)).value()' in patched
+    assert '<< " maxJnDensity=" << max(mag(jn/(mesh.magSf() + SMALL))).value()' in patched
     assert '<< " maxPsiub=" << max(mag(psiub)).value()' in patched
+    assert '<< " maxPsiubDensity=" << max(mag(psiub/(mesh.magSf() + SMALL))).value()' in patched
 
 
 def test_patch_ueqn_file_wraps_momentum_solve_and_adds_diag_log():
@@ -191,7 +193,11 @@ def test_patchers_raise_when_required_needles_are_missing():
 
 
 def test_parse_lmx_diag_line_extracts_numeric_fields():
-    line = "LMX_DIAG epot time=0.0001 region=liquid oCorr=0 potEInitialResidual=0.3 potEFinalResidual=1e-4 potEIterations=7 maxJn=1.2 maxPsiub=0.8 maxCenteredJxB=2.5"
+    line = (
+        "LMX_DIAG epot time=0.0001 region=liquid oCorr=0 "
+        "potEInitialResidual=0.3 potEFinalResidual=1e-4 potEIterations=7 "
+        "maxJn=1.2 maxJnDensity=2.4 maxPsiub=0.8 maxPsiubDensity=1.6 maxCenteredJxB=2.5"
+    )
     parsed = parse_lmx_diag_line(line)
 
     assert parsed == {
@@ -203,7 +209,9 @@ def test_parse_lmx_diag_line_extracts_numeric_fields():
         "potEFinalResidual": 1e-4,
         "potEIterations": 7,
         "maxJn": 1.2,
+        "maxJnDensity": 2.4,
         "maxPsiub": 0.8,
+        "maxPsiubDensity": 1.6,
         "maxCenteredJxB": 2.5,
     }
 
