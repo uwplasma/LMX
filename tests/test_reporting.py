@@ -131,6 +131,8 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     assert "## FreeMHD Parity" in summary["markdown"]
     assert "## Time Convergence" in summary["markdown"]
     assert "## Control Sweep" in summary["markdown"]
+    assert "Best Y L2" in summary["markdown"]
+    assert "Best Z L2" in summary["markdown"]
     assert "Slice Y L2" in summary["markdown"]
     out = tmp_path / "summary.json"
     md = tmp_path / "summary.md"
@@ -202,7 +204,11 @@ def test_summarize_sweep_report(tmp_path: Path):
     assert summary.case == "hunt"
     assert summary.parameter == "outer_iterations"
     assert summary.first_value == pytest.approx(2.0)
+    assert summary.best_y_value == pytest.approx(6.0)
+    assert summary.best_y_l2_error == pytest.approx(0.1)
     assert summary.last_z_l2_error == pytest.approx(0.2)
+    assert summary.best_z_value == pytest.approx(6.0)
+    assert summary.best_z_l2_error == pytest.approx(0.2)
 
 
 def test_main_writes_json_and_markdown(tmp_path: Path):
@@ -292,3 +298,4 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
     assert '"hartmann_ha20"' in out_json.read_text()
     assert "## FreeMHD Parity" in out_md.read_text()
     assert "## Time Convergence" in out_md.read_text()
+    assert "Best Y L2" in out_md.read_text()

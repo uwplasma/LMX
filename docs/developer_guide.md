@@ -69,7 +69,9 @@
   writes native pseudo-time convergence study summaries at fixed mesh resolution.
 - `python scripts/run_solver_control_sweep.py --output artifacts/control_sweep`:
   writes parameter sweeps for selected time-stepper controls when a case shows a
-  nontrivial coupling tradeoff.
+  nontrivial coupling tradeoff. The CI summary now reports both the first/last
+  sweep points and the best `y_l2` / `z_l2` points, because the retained Hunt
+  sweeps are not monotone.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

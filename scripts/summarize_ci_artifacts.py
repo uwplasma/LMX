@@ -52,6 +52,10 @@ class SweepSummary:
     last_y_l2_error: float | None
     first_z_l2_error: float | None
     last_z_l2_error: float | None
+    best_y_value: float | None
+    best_y_l2_error: float | None
+    best_z_value: float | None
+    best_z_l2_error: float | None
 
 
 def _load_json(path: str | Path) -> Any:
@@ -113,6 +117,10 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
     levels = payload.get("levels", [])
     first = levels[0] if levels else {}
     last = levels[-1] if levels else {}
+    y_levels = [level for level in levels if "y_l2_error" in level]
+    z_levels = [level for level in levels if "z_l2_error" in level]
+    best_y = min(y_levels, key=lambda level: float(level["y_l2_error"])) if y_levels else None
+    best_z = min(z_levels, key=lambda level: float(level["z_l2_error"])) if z_levels else None
     return SweepSummary(
         label=label,
         case=str(payload.get("case", "")),
@@ -123,6 +131,10 @@ def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSumma
         last_y_l2_error=None if "y_l2_error" not in last else float(last["y_l2_error"]),
         first_z_l2_error=None if "z_l2_error" not in first else float(first["z_l2_error"]),
         last_z_l2_error=None if "z_l2_error" not in last else float(last["z_l2_error"]),
+        best_y_value=None if best_y is None else float(best_y["parameter_value"]),
+        best_y_l2_error=None if best_y is None else float(best_y["y_l2_error"]),
+        best_z_value=None if best_z is None else float(best_z["parameter_value"]),
+        best_z_l2_error=None if best_z is None else float(best_z["z_l2_error"]),
     )
 
 
@@ -203,6 +215,16 @@ def render_markdown(
                 f"- Last Y L2: `{'-' if sweep.last_y_l2_error is None else f'{sweep.last_y_l2_error:.6g}'}`",
                 f"- First Z L2: `{'-' if sweep.first_z_l2_error is None else f'{sweep.first_z_l2_error:.6g}'}`",
                 f"- Last Z L2: `{'-' if sweep.last_z_l2_error is None else f'{sweep.last_z_l2_error:.6g}'}`",
+                (
+                    "- Best Y L2: `-`"
+                    if sweep.best_y_l2_error is None or sweep.best_y_value is None
+                    else f"- Best Y L2: `{sweep.best_y_l2_error:.6g}` at `{sweep.best_y_value:.6g}`"
+                ),
+                (
+                    "- Best Z L2: `-`"
+                    if sweep.best_z_l2_error is None or sweep.best_z_value is None
+                    else f"- Best Z L2: `{sweep.best_z_l2_error:.6g}` at `{sweep.best_z_value:.6g}`"
+                ),
                 "",
             ]
         )

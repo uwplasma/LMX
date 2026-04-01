@@ -83,9 +83,19 @@ The backend harness currently supports:
   - over the same sweep, `y_l2` improves strongly at first (`0.099 -> 0.023`
     by `6` outer iterations) and then degrades again (`0.042`, `0.062`)
   - this is a real coupled-control tradeoff, not a single-parameter monotone fix
+- A later local steady-momentum experiment narrows the diagnosis further:
+  - Hartmann `Ha20` at `96^2` stayed accepted (`l2 ≈ 3.87e-3`) when the
+    pseudo-time identity term was removed in a local experiment
+  - native Hunt `Ha20` at `48^2` stayed essentially unchanged
+    (`y_l2 ≈ 2.25e-2`, `z_l2 ≈ 2.09e-1`)
+  - that larger solver rewrite was not retained, which means the Hunt gap is
+    not fixed by changing only the linear stencil form of the momentum update
 - The CI artifact summary now surfaces both pseudo-time convergence and solver
   control sweeps directly, so these Hunt diagnostics appear in the normal
-  validation report bundle instead of only in raw per-run JSON files.
+  validation report bundle instead of only in raw per-run JSON files. The sweep
+  summary now also reports the best interior `y_l2` and `z_l2` points instead of
+  only the first and last parameter values, which is important because the
+  retained Hunt control sweeps are non-monotone.
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

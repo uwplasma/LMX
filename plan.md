@@ -1166,6 +1166,20 @@ LMX should only be described as ship ready for the current milestone when all of
   - make it easier to review solver-tradeoff runs without opening each raw JSON
     file by hand
 
+### 2026-04-01 16:40 America/Chicago
+
+- Tightened the CI summary again after the failed semi-implicit velocity pass:
+  - sweep summaries now report not only the first and last parameter values, but
+    also the best `y_l2` and best `z_l2` points
+  - this matters because the retained Hunt control sweeps are explicitly
+    non-monotone, so first/last-only reporting hides the real optimum
+- Added test coverage for the new sweep-summary fields.
+- Retained interpretation:
+  - the current Hunt control data should be read as a tradeoff surface, not a
+    monotone curve
+  - the next solver change should be judged against the best interior sweep
+    point, not just against the last parameter value
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
