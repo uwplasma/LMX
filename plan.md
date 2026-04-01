@@ -1133,6 +1133,27 @@ LMX should only be described as ship ready for the current milestone when all of
     than simply increasing `outer_iterations`, `potential_iterations`, or
     shrinking `dt`
 
+### 2026-04-01 14:30 America/Chicago
+
+- Tightened one remaining nonuniform-mesh operator detail:
+  - the boundary branches in `gradient_scalar(...)` now use center-to-center
+    spacing between the first two cell centers instead of the first cell width
+  - this is the correct one-sided stencil for the cell-centered gradient on a
+    clustered mesh
+- Added explicit unit coverage for linear-field gradients on a clustered layered
+  duct mesh so the fix stays locked in.
+- Verified the retained effect before keeping it:
+  - Hartmann, Shercliff, and the current Hunt validation metrics stayed
+    essentially unchanged
+  - this is therefore a correctness cleanup, not a major parity shift
+- Also tried a more ambitious Hunt-control change and rejected it:
+  - distributed `velocity_update_limit` across outer iterations so the total
+    allowed state change per pseudo-step stayed constant as `outer_iterations`
+    increased
+  - that did make the Hunt `Ha20` outer-iteration sweep more monotone, but it
+    degraded the retained default Hunt results, especially at `Ha100`
+  - it was rolled back instead of being left on `main`
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

@@ -17,6 +17,23 @@ def test_gradient_of_linear_field():
     assert jnp.allclose(gz[2:-2, 2:-2], -3.0, atol=5e-2)
 
 
+def test_gradient_of_linear_field_on_clustered_mesh_is_exact_near_boundaries():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=48,
+        nz=48,
+        wall_thickness=(0.0, 0.0, 0.1, 0.1),
+        wall_cells=(0, 0, 2, 2),
+        target_ha=100.0,
+    )
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    field = 2.0 * y - 3.0 * z
+    gy, gz = gradient_scalar(field, mesh)
+    assert jnp.allclose(gy[:, 2:-2], 2.0, atol=5e-2)
+    assert jnp.allclose(gz[2:-2, :], -3.0, atol=5e-2)
+
+
 def test_laplacian_of_quadratic_field():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=40, nz=40)
     y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")

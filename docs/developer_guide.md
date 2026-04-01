@@ -30,6 +30,9 @@
 - Clustered duct meshes should use actual center-to-center spacing in diffusion
   and potential operators; avoid reintroducing uniform-grid shortcuts in solver
   stencils.
+- Boundary gradients on clustered meshes should also use center-to-center spacing
+  between the first two cell centers, not the first cell width, so electric-field
+  reconstruction remains consistent near side layers.
 
 ## Case and boundary design
 

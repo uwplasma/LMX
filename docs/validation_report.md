@@ -83,6 +83,10 @@ The backend harness currently supports:
   - over the same sweep, `y_l2` improves strongly at first (`0.099 -> 0.023`
     by `6` outer iterations) and then degrades again (`0.042`, `0.062`)
   - this is a real coupled-control tradeoff, not a single-parameter monotone fix
+- The boundary gradient operator on clustered meshes is now also corrected to use
+  center-to-center spacing at the domain edges. This did not materially shift the
+  current retained duct validation metrics, but it removes a nonuniform-mesh
+  inconsistency in the electric-field reconstruction near side boundaries.
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 
