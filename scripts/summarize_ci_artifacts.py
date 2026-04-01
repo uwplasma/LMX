@@ -41,6 +41,19 @@ class ParitySummary:
     u_max_abs_diff: float | None = None
 
 
+@dataclass(frozen=True)
+class SweepSummary:
+    label: str
+    case: str
+    parameter: str
+    first_value: float
+    last_value: float
+    first_y_l2_error: float | None
+    last_y_l2_error: float | None
+    first_z_l2_error: float | None
+    last_z_l2_error: float | None
+
+
 def _load_json(path: str | Path) -> Any:
     return json.loads(Path(path).read_text())
 
@@ -95,10 +108,30 @@ def summarize_parity_report(report_path: str | Path) -> ParitySummary:
     )
 
 
+def summarize_sweep_report(report_path: str | Path, *, label: str) -> SweepSummary:
+    payload = _load_json(report_path)
+    levels = payload.get("levels", [])
+    first = levels[0] if levels else {}
+    last = levels[-1] if levels else {}
+    return SweepSummary(
+        label=label,
+        case=str(payload.get("case", "")),
+        parameter=str(payload.get("parameter", "")),
+        first_value=float(first.get("parameter_value", 0.0)) if first else 0.0,
+        last_value=float(last.get("parameter_value", 0.0)) if last else 0.0,
+        first_y_l2_error=None if "y_l2_error" not in first else float(first["y_l2_error"]),
+        last_y_l2_error=None if "y_l2_error" not in last else float(last["y_l2_error"]),
+        first_z_l2_error=None if "z_l2_error" not in first else float(first["z_l2_error"]),
+        last_z_l2_error=None if "z_l2_error" not in last else float(last["z_l2_error"]),
+    )
+
+
 def render_markdown(
     validation: list[ValidationCaseSummary],
     benchmark: BenchmarkSummary | None = None,
     parity: ParitySummary | None = None,
+    time_convergence: SweepSummary | None = None,
+    control_sweep: SweepSummary | None = None,
 ) -> str:
     lines = ["# LMX CI Summary", ""]
     if validation:
@@ -155,6 +188,24 @@ def render_markdown(
                 "",
             ]
         )
+    for sweep in [time_convergence, control_sweep]:
+        if sweep is None:
+            continue
+        lines.extend(
+            [
+                f"## {sweep.label}",
+                "",
+                f"- Case: `{sweep.case}`",
+                f"- Parameter: `{sweep.parameter}`",
+                f"- First value: `{sweep.first_value:.6g}`",
+                f"- Last value: `{sweep.last_value:.6g}`",
+                f"- First Y L2: `{'-' if sweep.first_y_l2_error is None else f'{sweep.first_y_l2_error:.6g}'}`",
+                f"- Last Y L2: `{'-' if sweep.last_y_l2_error is None else f'{sweep.last_y_l2_error:.6g}'}`",
+                f"- First Z L2: `{'-' if sweep.first_z_l2_error is None else f'{sweep.first_z_l2_error:.6g}'}`",
+                f"- Last Z L2: `{'-' if sweep.last_z_l2_error is None else f'{sweep.last_z_l2_error:.6g}'}`",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -162,15 +213,29 @@ def build_summary(
     validation_summary_path: str | Path | None = None,
     benchmark_report_path: str | Path | None = None,
     parity_summary_path: str | Path | None = None,
+    time_convergence_summary_path: str | Path | None = None,
+    control_sweep_summary_path: str | Path | None = None,
 ) -> dict[str, Any]:
     validation = summarize_validation_summary(validation_summary_path) if validation_summary_path is not None else []
     benchmark = summarize_benchmark_report(benchmark_report_path) if benchmark_report_path is not None else None
     parity = summarize_parity_report(parity_summary_path) if parity_summary_path is not None else None
+    time_convergence = (
+        summarize_sweep_report(time_convergence_summary_path, label="Time Convergence")
+        if time_convergence_summary_path is not None
+        else None
+    )
+    control_sweep = (
+        summarize_sweep_report(control_sweep_summary_path, label="Control Sweep")
+        if control_sweep_summary_path is not None
+        else None
+    )
     payload: dict[str, Any] = {
         "validation": [item.__dict__ for item in validation],
         "benchmark": None if benchmark is None else benchmark.__dict__,
         "parity": None if parity is None else parity.__dict__,
-        "markdown": render_markdown(validation, benchmark, parity),
+        "time_convergence": None if time_convergence is None else time_convergence.__dict__,
+        "control_sweep": None if control_sweep is None else control_sweep.__dict__,
+        "markdown": render_markdown(validation, benchmark, parity, time_convergence, control_sweep),
     }
     return payload
 
@@ -180,11 +245,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--validation-summary", type=Path, default=None)
     parser.add_argument("--benchmark-report", type=Path, default=None)
     parser.add_argument("--parity-summary", type=Path, default=None)
+    parser.add_argument("--time-convergence-summary", type=Path, default=None)
+    parser.add_argument("--control-sweep-summary", type=Path, default=None)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    summary = build_summary(args.validation_summary, args.benchmark_report, args.parity_summary)
+    summary = build_summary(
+        args.validation_summary,
+        args.benchmark_report,
+        args.parity_summary,
+        args.time_convergence_summary,
+        args.control_sweep_summary,
+    )
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(summary, indent=2))
     if args.output_md is not None:

@@ -83,6 +83,9 @@ The backend harness currently supports:
   - over the same sweep, `y_l2` improves strongly at first (`0.099 -> 0.023`
     by `6` outer iterations) and then degrades again (`0.042`, `0.062`)
   - this is a real coupled-control tradeoff, not a single-parameter monotone fix
+- The CI artifact summary now surfaces both pseudo-time convergence and solver
+  control sweeps directly, so these Hunt diagnostics appear in the normal
+  validation report bundle instead of only in raw per-run JSON files.
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

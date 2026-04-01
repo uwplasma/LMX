@@ -1154,6 +1154,18 @@ LMX should only be described as ship ready for the current milestone when all of
     degraded the retained default Hunt results, especially at `Ha100`
   - it was rolled back instead of being left on `main`
 
+### 2026-04-01 15:00 America/Chicago
+
+- Extended the CI artifact summarizer so the markdown/JSON report can now surface:
+  - native pseudo-time convergence summaries
+  - solver-control sweep summaries
+- Added test coverage for both summary paths and re-ran the full local suite plus
+  the Sphinx docs build before keeping the change.
+- Purpose of the change:
+  - keep the newly added Hunt diagnostics visible in normal CI artifacts
+  - make it easier to review solver-tradeoff runs without opening each raw JSON
+    file by hand
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

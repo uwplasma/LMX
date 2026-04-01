@@ -8,6 +8,7 @@ from scripts.summarize_ci_artifacts import (
     render_markdown,
     summarize_benchmark_report,
     summarize_parity_report,
+    summarize_sweep_report,
     summarize_validation_summary,
 )
 
@@ -98,10 +99,38 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
         }
         """
     )
-    summary = build_summary(validation, benchmark, parity)
+    time_convergence = tmp_path / "time_convergence.json"
+    time_convergence.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter": "dt",
+          "levels": [
+            {"parameter_value": 0.002, "y_l2_error": 0.1, "z_l2_error": 0.3},
+            {"parameter_value": 0.001, "y_l2_error": 0.2, "z_l2_error": 0.25}
+          ]
+        }
+        """
+    )
+    control_sweep = tmp_path / "control_sweep.json"
+    control_sweep.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter": "outer_iterations",
+          "levels": [
+            {"parameter_value": 2, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_value": 6, "y_l2_error": 0.1, "z_l2_error": 0.2}
+          ]
+        }
+        """
+    )
+    summary = build_summary(validation, benchmark, parity, time_convergence, control_sweep)
     assert "## Validation" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
     assert "## FreeMHD Parity" in summary["markdown"]
+    assert "## Time Convergence" in summary["markdown"]
+    assert "## Control Sweep" in summary["markdown"]
     assert "Slice Y L2" in summary["markdown"]
     out = tmp_path / "summary.json"
     md = tmp_path / "summary.md"
@@ -110,6 +139,8 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
             summarize_validation_summary(validation),
             summarize_benchmark_report(benchmark),
             summarize_parity_report(parity),
+            summarize_sweep_report(time_convergence, label="Time Convergence"),
+            summarize_sweep_report(control_sweep, label="Control Sweep"),
         )
     )
     out.write_text("placeholder")
@@ -153,6 +184,27 @@ def test_summarize_parity_report(tmp_path: Path):
     assert summary.reason == "freemhd-case-unavailable"
 
 
+def test_summarize_sweep_report(tmp_path: Path):
+    path = tmp_path / "sweep.json"
+    path.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter": "outer_iterations",
+          "levels": [
+            {"parameter_value": 2, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_value": 6, "y_l2_error": 0.1, "z_l2_error": 0.2}
+          ]
+        }
+        """
+    )
+    summary = summarize_sweep_report(path, label="Control Sweep")
+    assert summary.case == "hunt"
+    assert summary.parameter == "outer_iterations"
+    assert summary.first_value == pytest.approx(2.0)
+    assert summary.last_z_l2_error == pytest.approx(0.2)
+
+
 def test_main_writes_json_and_markdown(tmp_path: Path):
     validation = tmp_path / "validation.json"
     validation.write_text(
@@ -186,6 +238,32 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
         }
         """
     )
+    time_convergence = tmp_path / "time_convergence.json"
+    time_convergence.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter": "dt",
+          "levels": [
+            {"parameter_value": 0.002, "y_l2_error": 0.1, "z_l2_error": 0.3},
+            {"parameter_value": 0.001, "y_l2_error": 0.2, "z_l2_error": 0.25}
+          ]
+        }
+        """
+    )
+    control_sweep = tmp_path / "control_sweep.json"
+    control_sweep.write_text(
+        """
+        {
+          "case": "hunt",
+          "parameter": "outer_iterations",
+          "levels": [
+            {"parameter_value": 2, "y_l2_error": 0.3, "z_l2_error": 0.4},
+            {"parameter_value": 6, "y_l2_error": 0.1, "z_l2_error": 0.2}
+          ]
+        }
+        """
+    )
     out_json = tmp_path / "summary.json"
     out_md = tmp_path / "summary.md"
 
@@ -197,6 +275,10 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
             str(benchmark),
             "--parity-summary",
             str(parity),
+            "--time-convergence-summary",
+            str(time_convergence),
+            "--control-sweep-summary",
+            str(control_sweep),
             "--output-json",
             str(out_json),
             "--output-md",
@@ -209,3 +291,4 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
     assert out_md.exists()
     assert '"hartmann_ha20"' in out_json.read_text()
     assert "## FreeMHD Parity" in out_md.read_text()
+    assert "## Time Convergence" in out_md.read_text()
