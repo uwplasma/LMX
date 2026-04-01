@@ -1609,6 +1609,27 @@ LMX should only be described as ship ready for the current milestone when all of
   - next try a layered linearization or convergence criterion change that
     improves Hunt without simply over-correcting the coupled update
 
+### 2026-04-02 02:05 America/Chicago
+
+- Tightened the steady-solver semantics without changing the retained Hunt
+  accuracy claims:
+  - added `steady_potential_tolerance` to `TimeStepperConfig`
+  - `solve_steady(...)` can now require both velocity residual and
+    electric-potential residual convergence before stopping
+  - added focused solver tests covering the new stop condition
+- Retained interpretation:
+  - this is a solver-correctness and future-proofing change, not a new Hunt
+    accuracy improvement by itself
+  - it matters because layered cases can otherwise look “steady” on velocity
+    residual alone while the potential equation is still under-resolved
+  - the current Hunt parity/convergence numbers are unchanged in substance,
+    because the current reference runs are already exhausting their configured
+    step budgets
+- Best next step:
+  - continue targeting the layered Hunt update/linearization itself
+  - use the stricter steady semantics as a guardrail so future retained solver
+    changes are not judged on prematurely stopped layered runs
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

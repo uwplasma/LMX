@@ -111,6 +111,11 @@
   used by the latest solve. Use it with `potential_residual` to tell the
   difference between “the solve stopped early” and “the solve hit its iteration
   ceiling without converging enough.”
+- `solve_steady(...)` can now optionally require both velocity and
+  electric-potential convergence before stopping. Use
+  `steady_tolerance` together with `steady_potential_tolerance` when a layered
+  case should not be treated as steady while the potential equation is still
+  under-resolved.
 - Closed-channel validation, convergence, and control-sweep artifacts now also
   report a combined profile error built from the `y` and `z` cuts. Use that when
   a candidate improves one direction while degrading the other, which is exactly

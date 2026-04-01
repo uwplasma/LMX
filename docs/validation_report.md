@@ -261,6 +261,16 @@ The backend harness currently supports:
     - but it does not by itself solve the remaining higher-Ha Hunt gap
     - the Hunt control surface still needs a better coupled-update law on top of
       the improved discretization
+- The steady solver semantics are now slightly stricter and more honest for
+  layered cases:
+  - `solve_steady(...)` can optionally require both velocity residual and
+    electric-potential residual convergence
+  - this is exposed through `steady_potential_tolerance`
+  - retained interpretation:
+    - it does not change the current Hunt parity numbers by itself, because the
+      current reference sweeps are already running to their full step budgets
+    - but it prevents future layered runs from being classified as “steady” on
+      velocity residual alone while the potential solve is still loose
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

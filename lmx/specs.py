@@ -61,6 +61,7 @@ class TimeStepperConfig:
     potential_relaxation: float = 1.0
     potential_solver: PotentialSolverKind = "auto"
     steady_tolerance: float = 1e-8
+    steady_potential_tolerance: float | None = None
     relaxation: float = 0.35
     velocity_update_limit: float = 1e-3
     checkpoint_stride: int = 1

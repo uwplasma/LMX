@@ -204,3 +204,33 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     assert solution.diagnostics.potential_iterations_history.shape[0] == 2
     assert solution.state.time == pytest.approx(2 * case.time_stepper.dt)
     assert solution.state.residual == pytest.approx(1.0e-2)
+
+
+def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = replace(
+        case,
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=5,
+            steady_tolerance=1e-4,
+            steady_potential_tolerance=5e-4,
+        ),
+    )
+    residuals = iter([1.0e-3, 1.0e-5, 1.0e-5, 1.0e-6])
+    potential_residuals = iter([1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5])
+
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
+
+    def fake_step(**kwargs):
+        u = kwargs["u"]
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20
+
+    monkeypatch.setattr(solvers, "_step", fake_step)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.residual_history.shape[0] == 3
+    assert solution.diagnostics.potential_residual_history.shape[0] == 3
+    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
+    assert solution.state.residual == pytest.approx(1.0e-5)

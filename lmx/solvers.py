@@ -374,6 +374,7 @@ def solve_steady(case: CaseSpec) -> Solution:
     dt = case.time_stepper.dt
     max_steps = max(1, case.time_stepper.max_steps)
     tolerance = float(case.time_stepper.steady_tolerance)
+    potential_tolerance = case.time_stepper.steady_potential_tolerance
 
     def compiled_step(
         u: jnp.ndarray,
@@ -425,7 +426,9 @@ def solve_steady(case: CaseSpec) -> Solution:
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
         step_count = step_index + 1
-        if residual_value <= tolerance:
+        velocity_converged = residual_value <= tolerance
+        potential_converged = True if potential_tolerance is None else float(potential_residual) <= float(potential_tolerance)
+        if velocity_converged and potential_converged:
             break
 
     state = MHDState(
