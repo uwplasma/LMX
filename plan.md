@@ -2076,12 +2076,28 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next solver target should remain on the momentum/pressure response
       path or on the spatial distribution/orientation of `J`, not on force
       magnitude form alone
+- `2026-04-03 00:35 America/Chicago`: Added matching LMX face-current and
+  `U×B`-source diagnostics (`face_current_max_history`,
+  `emf_max_history`) and extended `compare_hunt_trace_histories.py` to report
+  raw relative error alongside normalized history error. Using the current real
+  partial Hunt `Ha20` live log and the matching LMX short-time replay, the
+  retained one-point raw comparison at `t = 1.25e-05` is:
+  - `current_max` raw relative error `≈ 0.99996`
+  - `face_current_max` raw relative error `≈ 1.48571`
+  - `emf_max` raw relative error `≈ 1.00256`
+  - `lorentz_max` raw relative error `≈ 0.99422`
+  - retained interpretation:
+    - the remaining Hunt startup mismatch is now much more likely to originate
+      in current/source scaling or distribution before pressure response, not
+      just in later momentum coupling
+    - the next solver target should focus on matching FreeMHD `psiub` and
+      face-current magnitudes on the layered startup path
 - Best next step:
-  - push the expanded FreeMHD diagnostic patch once tests/docs are green
-  - then compare the new FreeMHD `maxJn` / `maxPsiub` / `maxJ` records against
-    LMX-side current diagnostics to target the remaining Hunt mismatch through
-    current distribution and momentum/pressure response, not by changing the
-    Lorentz-force magnitude form alone
+  - keep the new current/source diagnostics on `main` once targeted tests/docs
+    are green
+  - then revisit the layered startup source/current construction itself,
+    especially the `psiub` / face-current scaling and mapping, before making
+    another pressure-response change
 
 ## Instruction For Future Agents
 

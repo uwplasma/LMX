@@ -545,6 +545,23 @@ The backend harness currently supports:
     - the next solver target should stay on the momentum/pressure response path
       or on the spatial distribution of `J`, not on conservative-vs-centered
       force magnitude alone
+- Added matching LMX face-current and `U×B`-source diagnostics:
+  - `face_current_max_history`
+  - `emf_max_history`
+  and extended `compare_hunt_trace_histories.py` to report raw relative error in
+  addition to normalized history error. On the current real partial Hunt `Ha20`
+  live log at `t = 1.25e-05`, the retained one-point raw comparison against
+  `/tmp/lmx_hunt_short_trace_with_faces.json` is:
+  - `current_max` raw relative error `≈ 0.99996`
+  - `face_current_max` raw relative error `≈ 1.48571`
+  - `emf_max` raw relative error `≈ 1.00256`
+  - `lorentz_max` raw relative error `≈ 0.99422`
+  - retained interpretation:
+    - the remaining Hunt startup mismatch is now much more likely to originate
+      in current/source scaling or distribution before pressure response, not
+      just in later momentum coupling
+    - the next solver target should focus on matching FreeMHD’s `psiub` and
+      face-current magnitudes on the layered startup path
 
 ## Planned improvements
 

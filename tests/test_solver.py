@@ -147,6 +147,8 @@ def test_hunt_case_supports_volume_scaled_cg_potential_backend():
     assert solution.diagnostics.time_history.shape[0] > 0
     assert solution.diagnostics.u_max_history.shape[0] > 0
     assert solution.diagnostics.potential_iterations_history.shape[0] > 0
+    assert solution.diagnostics.face_current_max_history.shape[0] > 0
+    assert solution.diagnostics.emf_max_history.shape[0] > 0
 
 
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():

@@ -29,6 +29,8 @@ def _fake_solution() -> Solution:
         courant_like=jnp.asarray([0.1]),
         ohmic_power=jnp.asarray([0.2]),
         current_max_history=jnp.asarray([3.0]),
+        face_current_max_history=jnp.asarray([5.0]),
+        emf_max_history=jnp.asarray([2.0]),
         lorentz_max_history=jnp.asarray([4.0]),
         potential_residual_history=jnp.asarray([1e-3]),
         potential_iterations_history=jnp.asarray([123.0]),
@@ -77,6 +79,8 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert payload["lmx_solver"]["trace"]["time_history"] == []
     assert payload["lmx_solver"]["trace"]["u_max_history"] == []
     assert payload["lmx_solver"]["trace"]["current_max_history"] == [3.0]
+    assert payload["lmx_solver"]["trace"]["face_current_max_history"] == [5.0]
+    assert payload["lmx_solver"]["trace"]["emf_max_history"] == [2.0]
     assert payload["lmx_solver"]["trace"]["lorentz_max_history"] == [4.0]
     assert payload["comparison"]["u_max_abs_diff"] == pytest.approx(0.75)
     assert payload["comparison"]["sample_combined_l2_error"] < 1e-6

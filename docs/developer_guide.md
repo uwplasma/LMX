@@ -122,6 +122,15 @@
   - the active `maxJxB`
   so recovered Hunt runs can distinguish conservative-force effects from later
   momentum/pressure response effects.
+- `python scripts/compare_hunt_trace_histories.py --freemhd-diag-json ...`:
+  now compares:
+  - `u_max`
+  - cell-centered `current_max`
+  - face-current `face_current_max` when `maxJn` is available
+  - source-term `emf_max` when `maxPsiub` is available
+  - `lorentz_max`
+  and reports both normalized history error and raw relative error, which is
+  necessary when only a partial live FreeMHD log is available.
 - `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
   extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
   solver diagnostics.

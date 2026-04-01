@@ -49,8 +49,18 @@ def _pressure_final_records(records: list[dict[str, object]]) -> list[dict[str, 
 
 
 def _epot_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
-    epot = [record for record in records if record.get("kind") == "epot"]
-    return sorted(epot, key=lambda record: float(record["time"]))
+    grouped: dict[tuple[float, str, int], dict[str, object]] = {}
+    for record in records:
+        if record.get("kind") != "epot":
+            continue
+        time = float(record["time"])
+        region = str(record.get("region", ""))
+        ocorr = int(record.get("oCorr", -1))
+        key = (time, region, ocorr)
+        existing = grouped.get(key)
+        if existing is None or len(record) > len(existing):
+            grouped[key] = record
+    return [grouped[key] for key in sorted(grouped)]
 
 
 def _build_alignment(
@@ -59,25 +69,39 @@ def _build_alignment(
     lmx_times: list[float],
     lmx_values: list[float],
 ) -> dict[str, object]:
+    if not freemhd_times:
+        return {
+            "l2_error": None,
+            "max_abs_diff": None,
+            "max_abs_diff_time": None,
+            "samples": [],
+        }
     lmx_aligned = [_interpolate(lmx_times, lmx_values, time) for time in freemhd_times]
+    raw_relative_errors = [
+        abs(freemhd_value - lmx_value) / max(abs(freemhd_value), 1e-20)
+        for freemhd_value, lmx_value in zip(freemhd_values, lmx_aligned)
+    ]
     freemhd_normalized = _normalize(freemhd_values)
     lmx_normalized = _normalize(lmx_aligned)
     abs_diffs = [abs(a - b) for a, b in zip(freemhd_normalized, lmx_normalized)]
     max_index = max(range(len(abs_diffs)), key=lambda idx: abs_diffs[idx])
     l2_error = sqrt(sum(diff * diff for diff in abs_diffs) / len(abs_diffs))
+    raw_max_index = max(range(len(raw_relative_errors)), key=lambda idx: raw_relative_errors[idx])
     samples = [
         {
             "time": time,
             "freemhd_raw": freemhd_value,
             "lmx_raw": lmx_value,
+            "raw_relative_error": raw_relative_error,
             "freemhd_normalized": freemhd_norm,
             "lmx_normalized": lmx_norm,
             "abs_diff": diff,
         }
-        for time, freemhd_value, lmx_value, freemhd_norm, lmx_norm, diff in zip(
+        for time, freemhd_value, lmx_value, raw_relative_error, freemhd_norm, lmx_norm, diff in zip(
             freemhd_times,
             freemhd_values,
             lmx_aligned,
+            raw_relative_errors,
             freemhd_normalized,
             lmx_normalized,
             abs_diffs,
@@ -87,6 +111,9 @@ def _build_alignment(
         "l2_error": l2_error,
         "max_abs_diff": abs_diffs[max_index],
         "max_abs_diff_time": freemhd_times[max_index],
+        "mean_raw_relative_error": sum(raw_relative_errors) / len(raw_relative_errors),
+        "max_raw_relative_error": raw_relative_errors[raw_max_index],
+        "max_raw_relative_error_time": freemhd_times[raw_max_index],
         "samples": samples,
     }
 
@@ -104,21 +131,35 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     u_values = [float(record["maxU"]) for record in pressure_records]
     j_times = [float(record["time"]) for record in epot_records]
     j_values = [float(record["maxJ"]) for record in epot_records]
+    jn_times = [float(record["time"]) for record in epot_records if "maxJn" in record]
+    jn_values = [float(record["maxJn"]) for record in epot_records if "maxJn" in record]
+    psiub_times = [float(record["time"]) for record in epot_records if "maxPsiub" in record]
+    psiub_values = [float(record["maxPsiub"]) for record in epot_records if "maxPsiub" in record]
     lorentz_times = [float(record["time"]) for record in epot_records]
     lorentz_values = [float(record["maxJxB"]) for record in epot_records]
 
     lmx_times = [float(value) for value in lmx_trace["time_history"]]
     u_history = [float(value) for value in lmx_trace["u_max_history"]]
     current_history = [float(value) for value in lmx_trace["current_max_history"]]
+    face_current_history = [float(value) for value in lmx_trace.get("face_current_max_history", [])]
+    emf_history = [float(value) for value in lmx_trace.get("emf_max_history", [])]
     lorentz_history = [float(value) for value in lmx_trace["lorentz_max_history"]]
 
-    return {
+    payload = {
         "freemhd_diag_json": str(freemhd_diag_json.resolve()),
         "lmx_report_json": str(lmx_report_json.resolve()),
-        "u_max": _build_alignment(u_times, u_values, lmx_times, u_history),
-        "current_max": _build_alignment(j_times, j_values, lmx_times, current_history),
-        "lorentz_max": _build_alignment(lorentz_times, lorentz_values, lmx_times, lorentz_history),
     }
+    if u_times:
+        payload["u_max"] = _build_alignment(u_times, u_values, lmx_times, u_history)
+    if j_times:
+        payload["current_max"] = _build_alignment(j_times, j_values, lmx_times, current_history)
+    if lorentz_times:
+        payload["lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, lorentz_history)
+    if jn_times and face_current_history:
+        payload["face_current_max"] = _build_alignment(jn_times, jn_values, lmx_times, face_current_history)
+    if psiub_times and emf_history:
+        payload["emf_max"] = _build_alignment(psiub_times, psiub_values, lmx_times, emf_history)
+    return payload
 
 
 def main(argv: list[str] | None = None) -> int:
