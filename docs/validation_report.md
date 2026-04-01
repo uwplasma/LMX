@@ -39,6 +39,9 @@ The backend harness currently supports:
 - Shercliff is stable and gives a strong insulating-wall validation path.
 - Hunt is bounded and now produces finite comparison metrics, but the remaining error
   shows that conducting-wall fidelity still needs solver work.
+- The current convergence-aware `solve_steady` implementation confirms that the
+  native Hunt gap is not just a steady-stop criterion issue; the remaining work is
+  in the update physics/control law, not only in iteration bookkeeping.
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 

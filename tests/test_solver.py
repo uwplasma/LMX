@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+import lmx.solvers as solvers
 from lmx.specs import BoundaryCondition
 from lmx.solvers import solve_steady
 
@@ -67,3 +68,43 @@ def test_shercliff_solution_stays_finite_and_zero_at_walls():
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.allclose(solution.state.u[0, :], 0.0)
     assert jnp.allclose(solution.state.u[-1, :], 0.0)
+
+
+def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4))
+    residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
+
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
+
+    def fake_step(**kwargs):
+        residual = next(residuals)
+        u = kwargs["u"]
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, residual
+
+    monkeypatch.setattr(solvers, "_step", fake_step)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.residual_history.shape[0] == 3
+    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
+    assert solution.state.residual == pytest.approx(1.0e-5)
+
+
+def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=2, steady_tolerance=1e-8))
+
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
+
+    def fake_step(**kwargs):
+        u = kwargs["u"]
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, 1.0e-2
+
+    monkeypatch.setattr(solvers, "_step", fake_step)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.residual_history.shape[0] == 2
+    assert solution.state.time == pytest.approx(2 * case.time_stepper.dt)
+    assert solution.state.residual == pytest.approx(1.0e-2)

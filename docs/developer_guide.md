@@ -45,6 +45,9 @@
   hardcoded limits.
 - When a new case family needs special handling, move the rule into the case
   specification layer instead of a parity script.
+- `solve_transient` is the fixed-step path for trajectory-like runs; `solve_steady`
+  now uses the configured steady tolerance and maximum step budget rather than
+  aliasing the transient path.
 
 ## Validation and benchmarking
 

@@ -277,5 +277,73 @@ def solve_transient(case: CaseSpec) -> Solution:
 
 
 def solve_steady(case: CaseSpec) -> Solution:
-    solution = solve_transient(case)
-    return solution
+    mesh = _build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    forcing = _effective_forcing(case, materials.conductivity, materials.fluid_mask, by, bz)
+
+    initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
+    initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
+    dt = case.time_stepper.dt
+    max_steps = max(1, case.time_stepper.max_steps)
+    tolerance = float(case.time_stepper.steady_tolerance)
+
+    def compiled_step(u: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
+        return _step(
+            u=u,
+            mesh=mesh,
+            sigma=materials.conductivity,
+            rho=materials.density,
+            nu=materials.viscosity,
+            fluid_mask=materials.fluid_mask,
+            by=by,
+            bz=bz,
+            dt=dt,
+            forcing=forcing,
+            anchor=case.reference_phi_cell,
+            outer_iterations=case.time_stepper.outer_iterations,
+            potential_iterations=case.time_stepper.potential_iterations,
+            relaxation=case.time_stepper.relaxation,
+            velocity_update_limit=case.time_stepper.velocity_update_limit,
+        )
+
+    step_fn = jax.jit(compiled_step)
+
+    u = initial_u
+    phi = jnp.zeros_like(u)
+    jy = jnp.zeros_like(u)
+    jz = jnp.zeros_like(u)
+    lorentz = jnp.zeros_like(u)
+    residual_value = float("inf")
+    residual_history: list[float] = []
+    courant_history: list[float] = []
+    ohmic_history: list[float] = []
+    step_count = 0
+
+    for step_index in range(max_steps):
+        u, phi, jy, jz, lorentz, residual = step_fn(u)
+        residual_value = float(residual)
+        courant_like = float(jnp.max(jnp.abs(u)) * dt / jnp.min(mesh.dy))
+        ohmic = float(jnp.mean(jy**2 + jz**2))
+        residual_history.append(residual_value)
+        courant_history.append(courant_like)
+        ohmic_history.append(ohmic)
+        step_count = step_index + 1
+        if residual_value <= tolerance:
+            break
+
+    state = MHDState(
+        u=u,
+        phi=phi,
+        jy=jy,
+        jz=jz,
+        lorentz_x=lorentz,
+        time=float(step_count * dt),
+        residual=residual_value,
+    )
+    diagnostics = Diagnostics(
+        residual_history=jnp.asarray(residual_history, dtype=float),
+        courant_like=jnp.asarray(courant_history, dtype=float),
+        ohmic_power=jnp.asarray(ohmic_history, dtype=float),
+    )
+    return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)

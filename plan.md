@@ -34,6 +34,8 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - Unit and categorized tests passing in `/Users/rogerio/base_env/bin/python3`.
 - Combined local coverage across `lmx/` and `scripts/` is currently `89%`.
 - Native mesh-convergence study runner and Hartmann acceptance reports.
+- `solve_steady` now uses the configured steady tolerance and step budget instead of
+  aliasing the fixed-step transient runner.
 
 ### Explicitly deferred
 
@@ -129,6 +131,7 @@ LMX should only be described as ship ready for the current milestone when all of
    - stable iterative coupling between `u`, `phi`, and `J x B`
    - the Hartmann/Shercliff fine-mesh clipping issue is mitigated by smaller pseudo-time defaults, but real Hunt `Ha20` and `Ha100` comparisons confirm conducting-wall fidelity still needs a real multi-region solver fix
    - the next retained solver milestone should be a materially better high-Ha Hunt shape match without adding new hardcoded case heuristics
+   - the new convergence-aware `solve_steady` path shows that native Hunt remains poor even when the steady API behaves correctly, so the next step is update-physics/control-law work rather than more stop-criterion changes
 2. Convert the current comparison work into a proper validation campaign:
    - Hartmann now has an explicit acceptance report with configurable `l2` and `linf` thresholds
    - a native mesh-convergence runner now exists for Hartmann, Shercliff, and Hunt
@@ -170,6 +173,13 @@ LMX should only be described as ship ready for the current milestone when all of
 - The validation workflow now includes:
   - explicit Hartmann acceptance reports with configurable `l2` and `linf` thresholds
   - a native `run_convergence_suite.py` runner that emits mesh-convergence summaries for Hartmann, Shercliff, and Hunt
+- `solve_steady` no longer aliases the transient runner:
+  - it now iterates until either the configured steady tolerance is reached or the configured maximum step budget is exhausted
+  - targeted tests now cover early-stop and max-step behavior explicitly
+- The retained native Hunt validation metrics did not improve after fixing `solve_steady` semantics:
+  - Hunt `Ha20` remains around `y_l2 ≈ 0.211`, `z_l2 ≈ 0.373`
+  - Hunt `Ha100` remains around `y_l2 ≈ 0.198`, `z_l2 ≈ 0.411`
+  - this confirms the remaining native Hunt problem is not just premature stopping
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
