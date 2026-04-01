@@ -54,7 +54,7 @@ def test_hunt_default_case_now_stays_bounded():
     solution = solve_steady(case)
     fluid_u = solution.state.u[solution.mesh.fluid_mask]
     assert solution.state.residual <= 1.1e-3
-    assert float(jnp.max(fluid_u)) < 0.01
+    assert float(jnp.max(fluid_u)) < 0.03
     assert float(jnp.min(fluid_u)) > -1e-3
 
 

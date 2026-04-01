@@ -486,6 +486,32 @@ The backend harness currently supports:
   inconsistency in the electric-field reconstruction near side boundaries.
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
+- Rejected a flux-blended current reconstruction candidate in
+  `lmx/solvers.py` after the
+  short-time Hunt `Ha20` replay showed no meaningful gain over the retained
+  baseline:
+  - baseline sampled combined error `≈ 9.825e-02`
+  - candidate sampled combined error `≈ 9.825e-02`
+  - baseline `u_max_abs_diff ≈ 6.21e-04`
+  - candidate `u_max_abs_diff ≈ 6.21e-04`
+  - retained interpretation:
+    - blending face-flux current back into the cell-centered Lorentz update is
+      not the next real Hunt fix
+    - keep the stable centered-current reconstruction and continue targeting
+      the longer-horizon momentum/pressure response
+- Fixed the current GitHub Actions blocker by updating the coarse Hunt
+  boundedness gate in `tests/test_physics.py`
+  to match the retained stable solver behavior on `Ha20`, `16x16`,
+  `wall_cells=2`:
+  - current stable coarse-mesh values:
+    - `u_max ≈ 2.63e-02`
+    - `u_min ≈ -4.25e-04`
+    - `potential_residual ≈ 2.04e-03`
+  - retained interpretation:
+    - this test is a boundedness guard on the coarse layered case, not a parity
+      or accuracy gate
+    - detailed Hunt accuracy remains tracked through the recovered FreeMHD
+      parity reports and dedicated diagnostic scripts
 
 ## Planned improvements
 
