@@ -19,7 +19,7 @@ BoundaryKind = Literal[
     "imposed_current_density",
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
-PotentialSolverKind = Literal["auto", "jacobi", "cg", "lineax_cg"]
+PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
 
 
 @dataclass(frozen=True)

@@ -96,6 +96,15 @@
   The default `auto` policy resolves outside the traced JAX step:
   single-region duct solves use `cg`, while layered multi-region solves keep
   `jacobi`. That policy is based on region structure, not case-name heuristics.
+- `python scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ...`:
+  writes a solver-diagnostic-first Hunt comparison report. The JSON artifact has
+  three top-level sections:
+  - `freemhd_run`: run-directory inspection counts and latest `mag(U)` metadata
+  - `lmx_solver`: the native case controls plus `validation_summary(...)`
+    metrics such as `residual`, `potential_residual`, and
+    `potential_iterations_used`
+  - `comparison`: `u_max` and sampled-profile comparisons against the recovered
+    FreeMHD run when sample files are present
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form

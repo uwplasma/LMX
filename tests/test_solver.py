@@ -112,6 +112,16 @@ def test_hartmann_case_supports_cg_potential_backend():
     assert solution.diagnostics.potential_iterations_history.shape[0] > 0
 
 
+def test_hunt_case_supports_volume_scaled_cg_potential_backend():
+    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg_volume", potential_iterations=50))
+    solution = solve_steady(case)
+
+    assert jnp.isfinite(solution.state.u).all()
+    assert jnp.isfinite(solution.state.phi).all()
+    assert solution.diagnostics.potential_iterations_history.shape[0] > 0
+
+
 def test_auto_potential_backend_uses_cg_for_single_region_and_jacobi_for_layered_cases():
     hartmann = make_hartmann_case(ha=5.0, ny=12, nz=12)
     hunt = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
@@ -123,6 +133,34 @@ def test_auto_potential_backend_uses_cg_for_single_region_and_jacobi_for_layered
 
     assert solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
     assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "jacobi"
+
+
+def test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=6,
+        nz=10,
+        wall_thickness=(0.05, 0.05, 0.05, 0.05),
+        wall_cells=(2, 2, 2, 2),
+        target_ha=20.0,
+    )
+    sigma = jnp.linspace(1.0, 3.0, mesh.ny * mesh.nz, dtype=float).reshape(mesh.yz_shape)
+    diagonal, west, east, south, north = solvers._potential_coefficients(mesh, sigma)
+    rhs = jnp.ones(mesh.yz_shape)
+    diagonal_s, west_s, east_s, south_s, north_s, rhs_s = solvers._volume_scaled_potential_system(
+        mesh,
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+    )
+
+    assert rhs_s.shape == rhs.shape
+    assert west_s[1:, :] == pytest.approx(east_s[:-1, :])
+    assert south_s[:, 1:] == pytest.approx(north_s[:, :-1])
 
 
 def test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid():

@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from .core import Diagnostics, MHDState, Solution
-from .linear import solve_poisson_cg_state, solve_poisson_jacobi_state, solve_poisson_lineax
+from .linear import poisson_residual_norm, solve_poisson_cg_state, solve_poisson_jacobi_state, solve_poisson_lineax
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
 from .operators import gradient_scalar, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
@@ -84,6 +84,30 @@ def _potential_coefficients(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[j
     return diagonal, west, east, south, north
 
 
+def _cell_metric(mesh: StructuredMesh) -> jnp.ndarray:
+    return mesh.dy[:, None] * mesh.dz[None, :]
+
+
+def _volume_scaled_potential_system(
+    mesh: StructuredMesh,
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    cell_metric = _cell_metric(mesh)
+    return (
+        diagonal * cell_metric,
+        west * cell_metric,
+        east * cell_metric,
+        south * cell_metric,
+        north * cell_metric,
+        rhs * cell_metric,
+    )
+
+
 def _solve_potential(
     mesh: StructuredMesh,
     sigma: jnp.ndarray,
@@ -134,6 +158,28 @@ def _solve_potential(
             iterations,
             tolerance=tolerance,
         )
+    elif solver == "cg_volume":
+        diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled, rhs_scaled = _volume_scaled_potential_system(
+            mesh,
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+        )
+        phi, _, iteration_count = solve_poisson_cg_state(
+            diagonal_scaled,
+            west_scaled,
+            east_scaled,
+            south_scaled,
+            north_scaled,
+            rhs_scaled,
+            anchor,
+            iterations,
+            tolerance=tolerance,
+        )
+        residual = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
     elif solver == "lineax_cg":
         phi, info = solve_poisson_lineax(
             diagonal,

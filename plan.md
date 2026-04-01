@@ -1659,6 +1659,38 @@ LMX should only be described as ship ready for the current milestone when all of
   - continue the layered Hunt solver work with a stronger focus on the update
     law itself rather than current postprocessing or one-parameter tuning
 
+### 2026-04-02 03:10 America/Chicago
+
+- Added a solver-diagnostic-first Hunt comparison script:
+  - `scripts/run_hunt_solver_diagnostic_report.py`
+  - it compares a recovered FreeMHD Hunt run with a native LMX Hunt solve and
+    writes one JSON artifact with three sections:
+    - `freemhd_run`
+    - `lmx_solver`
+    - `comparison`
+  - the new report keeps solver diagnostics first and profile comparisons
+    secondary, which is the right shape for the remaining Hunt work
+- Retained report content:
+  - `freemhd_run`: run-directory inspection counts plus latest `mag(U)` metadata
+  - `lmx_solver`: the native Hunt controls plus `validation_summary(...)`
+    diagnostics such as residual, potential residual, and potential-iteration
+    usage
+  - `comparison`: `u_max` difference and sampled-profile comparison metrics when
+    the recovered FreeMHD sample files are present
+- What worked:
+  - wiring the report through the existing validation utilities instead of adding
+    a parallel data model
+  - keeping the output format simple enough to be used immediately on the
+    current recovered Hunt cases
+- What to remember:
+  - this script is intentionally solver-diagnostic first
+  - it is a better target for Hunt analysis than the older profile-only parity
+    reports when deciding whether a candidate change is actually improving the
+    solver
+- Best next step:
+  - use the new solver-diagnostic report alongside the existing parity and
+    control-sweep artifacts when evaluating the next layered Hunt update
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

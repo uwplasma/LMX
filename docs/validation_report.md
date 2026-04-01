@@ -36,6 +36,8 @@ The backend harness currently supports:
 - optional short-smoke case execution
 - sampled line-cut comparison reports
 - structured skipped reports when the backend assets are not present on the runner
+- solver-diagnostic-first Hunt reports that pair FreeMHD run metadata with the
+  native LMX validation summary before profile errors are considered
 
 ## Current quality status
 
