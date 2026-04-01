@@ -88,7 +88,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ha", type=float, default=20.0)
     parser.add_argument("--resolution", type=int, default=32)
     parser.add_argument("--wall-cells", type=int, default=None)
-    parser.add_argument("--parameter", choices=["outer_iterations", "potential_iterations", "relaxation", "dt"], required=True)
+    parser.add_argument(
+        "--parameter",
+        choices=["outer_iterations", "potential_iterations", "potential_tolerance", "relaxation", "dt"],
+        required=True,
+    )
     parser.add_argument("--values", type=str, required=True)
     parser.add_argument("--value-type", choices=["float", "int"], default="float")
     parser.add_argument("--reference-root", type=Path, default=None)

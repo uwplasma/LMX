@@ -179,9 +179,12 @@ LMX should only be described as ship ready for the current milestone when all of
   - a native `run_convergence_suite.py` runner that emits mesh-convergence summaries for Hartmann, Shercliff, and Hunt
   - those convergence summaries now also report estimated Hartmann-layer and side-layer cell counts, so mesh adequacy is visible in the artifact itself
   - a native `run_time_convergence_suite.py` runner now exists for fixed-resolution pseudo-time studies
-  - native solution diagnostics and validation summaries now also expose a normalized
-    electric-potential equation residual, so `phi`-solve quality is visible in
-    normal artifacts instead of only through downstream profile errors
+- native solution diagnostics and validation summaries now also expose a normalized
+  electric-potential equation residual, so `phi`-solve quality is visible in
+  normal artifacts instead of only through downstream profile errors
+  - they now also expose the actual Jacobi iteration count used by the latest
+    potential solve, which matters for distinguishing a tolerance stop from a
+    max-iteration cap
 - `solve_steady` no longer aliases the transient runner:
   - it now iterates until either the configured steady tolerance is reached or the configured maximum step budget is exhausted
   - targeted tests now cover early-stop and max-step behavior explicitly
@@ -1297,6 +1300,46 @@ LMX should only be described as ship ready for the current milestone when all of
   - the next retained solver iteration should aim to reduce that normalized
     potential residual on the Hartmann/Hunt bad branches without regressing the
     accepted Hartmann fine-mesh path or the current bounded Hunt defaults
+
+### 2026-04-01 22:00 America/Chicago
+
+- Added convergence-control infrastructure for the electric-potential solve:
+  - `TimeStepperConfig` now accepts an optional `potential_tolerance`
+  - the Jacobi solve now supports residual-based stopping up to the configured
+    `potential_iterations` ceiling
+  - diagnostics and validation summaries now report the actual Jacobi iteration
+    count used by the latest solve step as `potential_iterations_used`
+  - the generic solver-control sweep runner now accepts `potential_tolerance`
+- Probed the new path on the Hartmann/Hunt blocker directly:
+  - Hartmann `Ha20`, `32^2`, baseline:
+    - `l2 ≈ 1.20`, `linf ≈ 1.83`
+    - `potential_residual ≈ 6.7e-2`
+    - `potential_iterations_used = 200`
+  - Hartmann `Ha20`, `32^2`, with `potential_iterations = 800` and
+    `potential_tolerance in {1e-2, 1e-3, 1e-4}`:
+    - all three runs collapsed to the same improved branch
+    - `l2 ≈ 3.0e-2`, `linf ≈ 5.0e-2`
+    - `potential_residual ≈ 3.2e-2`
+    - `potential_iterations_used = 800`
+  - Hunt `Ha20`, `32^2`, baseline:
+    - `y_l2 ≈ 6.70e-2`, `z_l2 ≈ 1.67e-1`
+    - `potential_residual ≈ 5.57e-1`
+    - `potential_iterations_used = 400`
+  - Hunt `Ha20`, `32^2`, with the same `800`-iteration ceiling and
+    `potential_tolerance` values:
+    - `y_l2 ≈ 7.74e-2`, `z_l2 ≈ 1.50e-1`
+    - `potential_residual ≈ 4.95e-1`
+    - `potential_iterations_used = 800`
+- Retained interpretation:
+  - the new tolerance-aware infrastructure is sound and worth keeping
+  - the observed Hartmann improvement in this probe came from the larger
+    iteration ceiling, not from a tolerance stop, because every tested run hit
+    the full `800`-iteration cap
+  - that makes the next solver question more specific:
+    - is the right default change a larger and perhaps geometry-aware
+      `potential_iterations` ceiling
+    - or should the coupled update be changed so the present ceiling is enough
+      on the medium-resolution Hartmann/Hunt branches
 
 ## Instruction For Future Agents
 

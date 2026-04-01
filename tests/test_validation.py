@@ -79,6 +79,8 @@ def test_validation_summary_includes_latest_potential_residual():
 
     assert "potential_residual" in metrics
     assert metrics["potential_residual"] >= 0.0
+    assert "potential_iterations_used" in metrics
+    assert metrics["potential_iterations_used"] >= 0.0
 
 
 def test_compare_with_freemhd_report(tmp_path: Path):

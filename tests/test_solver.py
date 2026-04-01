@@ -34,10 +34,13 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
 
     assert ha20.time_stepper.outer_iterations == 6
     assert ha20.time_stepper.velocity_update_limit == pytest.approx(2e-3)
+    assert ha20.time_stepper.potential_tolerance is None
     assert ha100.time_stepper.outer_iterations == 4
     assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
+    assert ha100.time_stepper.potential_tolerance is None
     assert ha1000.time_stepper.outer_iterations == 3
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
+    assert ha1000.time_stepper.potential_tolerance is None
 
 
 def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
@@ -105,13 +108,14 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
         residual = next(residuals)
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3
+        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 3
     assert solution.diagnostics.potential_residual_history.shape[0] == 3
+    assert solution.diagnostics.potential_iterations_history.shape[0] == 3
     assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
     assert solution.state.residual == pytest.approx(1.0e-5)
 
@@ -125,12 +129,13 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3
+        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 2
     assert solution.diagnostics.potential_residual_history.shape[0] == 2
+    assert solution.diagnostics.potential_iterations_history.shape[0] == 2
     assert solution.state.time == pytest.approx(2 * case.time_stepper.dt)
     assert solution.state.residual == pytest.approx(1.0e-2)

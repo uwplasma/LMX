@@ -74,7 +74,9 @@
   sweeps are not monotone. It also reports acceptance counts when the underlying
   sweep data includes analytical pass/fail information, which is useful for the
   current Hartmann refinement blocker. CI now runs a dedicated Hartmann
-  `potential_iterations` sweep at `Ha20`, `32^2` for that reason.
+  `potential_iterations` sweep at `Ha20`, `32^2` for that reason. The same
+  runner can now sweep `potential_tolerance`, which is useful when separating an
+  insufficient `phi`-solve iteration ceiling from an early residual stop.
 - Validation summaries now also include simple profile-pathology diagnostics such
   as sign-change counts and negative-value fractions on the extracted duct
   midplane profiles. These are useful when a solver branch becomes oscillatory
@@ -84,6 +86,10 @@
   profile errors when diagnosing whether a branch is failing because the
   electric-potential solve itself is under-resolved or because the larger
   coupled MHD update is unstable.
+- Validation summaries also report the actual Jacobi iteration count used by the
+  latest electric-potential solve. Use it with `potential_residual` to tell the
+  difference between “the solve stopped early” and “the solve hit its iteration
+  ceiling without converging enough.”
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

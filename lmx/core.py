@@ -24,6 +24,7 @@ class Diagnostics:
     courant_like: jnp.ndarray
     ohmic_power: jnp.ndarray
     potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    potential_iterations_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 
 
 @dataclass(frozen=True)

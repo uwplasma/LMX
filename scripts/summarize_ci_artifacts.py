@@ -13,6 +13,7 @@ class ValidationCaseSummary:
     residual: float
     u_max: float
     potential_residual: float | None = None
+    potential_iterations_used: float | None = None
     l2_error: float | None = None
     linf_error: float | None = None
     y_l2_error: float | None = None
@@ -72,6 +73,9 @@ def _coerce_case_payload(case_name: str, payload: dict[str, Any]) -> ValidationC
         case=case_name,
         residual=float(payload["residual"]),
         potential_residual=float(payload["potential_residual"]) if "potential_residual" in payload else None,
+        potential_iterations_used=(
+            float(payload["potential_iterations_used"]) if "potential_iterations_used" in payload else None
+        ),
         u_max=float(payload["u_max"]),
         l2_error=float(payload["l2_error"]) if "l2_error" in payload else None,
         linf_error=float(payload["linf_error"]) if "linf_error" in payload else None,
@@ -162,8 +166,8 @@ def render_markdown(
             [
                 "## Validation",
                 "",
-                "| Case | Residual | Potential residual | U max | L2 error | Y L2 | Z L2 | Slice Y L2 | Slice Z L2 |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+                "| Case | Residual | Potential residual | Potential iterations | U max | L2 error | Y L2 | Z L2 | Slice Y L2 | Slice Z L2 |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
             ]
         )
         for item in validation:
@@ -174,6 +178,7 @@ def render_markdown(
                         item.case,
                         f"{item.residual:.6g}",
                         "-" if item.potential_residual is None else f"{item.potential_residual:.6g}",
+                        "-" if item.potential_iterations_used is None else f"{item.potential_iterations_used:.6g}",
                         f"{item.u_max:.6g}",
                         "-" if item.l2_error is None else f"{item.l2_error:.6g}",
                         "-" if item.y_l2_error is None else f"{item.y_l2_error:.6g}",

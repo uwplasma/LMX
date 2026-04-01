@@ -56,6 +56,7 @@ class TimeStepperConfig:
     max_steps: int
     outer_iterations: int = 2
     potential_iterations: int = 400
+    potential_tolerance: float | None = None
     steady_tolerance: float = 1e-8
     relaxation: float = 0.35
     velocity_update_limit: float = 1e-3

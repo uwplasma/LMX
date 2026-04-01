@@ -128,6 +128,22 @@ The backend harness currently supports:
     electric-potential solve quality visible in the same artifact bundle as the
     profile/pathology metrics and gives the next solver iteration a more direct
     signal than profile L2 alone
+- The solver now also supports an optional residual-based stopping rule for the
+  electric-potential Jacobi solve, together with reporting of the actual Jacobi
+  iteration count used in the latest step:
+  - on a Hartmann `Ha20`, `32^2` probe, setting
+    `potential_tolerance in {1e-2, 1e-3, 1e-4}` while allowing
+    `potential_iterations = 800` improved the branch from
+    `l2 ≈ 1.20` to `l2 ≈ 3.0e-2`
+  - but the run used the full `800` iterations in every tested tolerance case,
+    so the improvement came from the larger iteration ceiling rather than early
+    convergence on the tolerance itself
+  - on the same probe family, native Hunt `Ha20`, `32^2` shifted from about
+    `y_l2 ≈ 6.7e-2`, `z_l2 ≈ 1.67e-1` to about
+    `y_l2 ≈ 7.7e-2`, `z_l2 ≈ 1.50e-1`, again using the full `800` iterations
+  - that means the retained infrastructure is useful, but the next default-solver
+    change should be framed as a question of iteration budget and coupling law,
+    not as “tolerance alone solved the Hartmann blocker”
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

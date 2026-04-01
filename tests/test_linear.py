@@ -27,6 +27,7 @@ def test_solve_poisson_lineax_falls_back_without_lineax(monkeypatch: pytest.Monk
     assert solution.shape == (2, 2)
     assert info.backend == "jax-jacobi"
     assert info.iterations == 400
+    assert info.residual == pytest.approx(0.0)
 
 
 def test_solve_poisson_lineax_uses_lineax_backend(monkeypatch: pytest.MonkeyPatch):
@@ -59,3 +60,23 @@ def test_solve_poisson_lineax_uses_lineax_backend(monkeypatch: pytest.MonkeyPatc
     assert solution.shape == (2, 2)
     assert info.backend == "lineax-cg"
     assert info.iterations == 7
+
+
+def test_solve_poisson_jacobi_can_stop_early_on_residual_tolerance():
+    diagonal, west, east, south, north, rhs = _poisson_coefficients()
+    solution, info = linear.solve_poisson_jacobi(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        anchor=(0, 0),
+        iterations=50,
+        tolerance=1e-6,
+    )
+
+    assert solution.shape == (2, 2)
+    assert info.backend == "jax-jacobi"
+    assert info.iterations < 50
+    assert info.residual <= 2e-6

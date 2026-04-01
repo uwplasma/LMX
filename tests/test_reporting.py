@@ -21,11 +21,12 @@ def test_summarize_validation_summary(tmp_path: Path):
     path.write_text(
         """
         {
-          "hartmann": {"case": "hartmann", "residual": 1.0, "potential_residual": 0.01, "u_max": 2.0, "l2_error": 0.1},
+          "hartmann": {"case": "hartmann", "residual": 1.0, "potential_residual": 0.01, "potential_iterations_used": 50, "u_max": 2.0, "l2_error": 0.1},
           "shercliff": {
             "case": "shercliff",
             "residual": 0.5,
             "potential_residual": 0.02,
+            "potential_iterations_used": 200,
             "u_max": 1.0,
             "y_l2_error": 0.2,
             "z_l2_error": 0.3,
@@ -39,6 +40,7 @@ def test_summarize_validation_summary(tmp_path: Path):
     assert [item.case for item in summaries] == ["hartmann", "shercliff"]
     assert summaries[0].l2_error == pytest.approx(0.1)
     assert summaries[0].potential_residual == pytest.approx(0.01)
+    assert summaries[0].potential_iterations_used == pytest.approx(50)
     assert summaries[1].y_l2_error == pytest.approx(0.2)
     assert summaries[1].slice_y_l2_error == pytest.approx(0.4)
 
@@ -66,7 +68,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     validation.write_text(
         """
         {
-          "hartmann": {"case": "hartmann", "residual": 1.0, "potential_residual": 0.01, "u_max": 2.0, "l2_error": 0.1}
+          "hartmann": {"case": "hartmann", "residual": 1.0, "potential_residual": 0.01, "potential_iterations_used": 50, "u_max": 2.0, "l2_error": 0.1}
         }
         """
     )
@@ -130,6 +132,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     summary = build_summary(validation, benchmark, parity, time_convergence, control_sweep)
     assert "## Validation" in summary["markdown"]
     assert "Potential residual" in summary["markdown"]
+    assert "Potential iterations" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
     assert "## FreeMHD Parity" in summary["markdown"]
     assert "## Time Convergence" in summary["markdown"]
