@@ -144,6 +144,13 @@ def patch_ueqn_file(source: str) -> str:
 
 
 def patch_peqn_file(source: str) -> str:
+    source = source.replace(
+        '<< " maxU=" << max(mag(U)).value()\n                    << " maxJxB=" << max(mag(JxB)).value()',
+        '<< " maxU=" << max(mag(U)).value()\n'
+        '                    << " maxP=" << max(mag(p)).value()\n'
+        '                    << " maxPRgh=" << max(mag(p_rgh)).value()\n'
+        '                    << " maxJxB=" << max(mag(JxB)).value()',
+    )
     solve_old = """        solve
         (
             p_rghEqnComp1() + p_rghEqnComp2() + p_rghEqnIncomp,
@@ -194,6 +201,8 @@ def patch_peqn_file(source: str) -> str:
                     << " pFinalResidual=" << pPerf.finalResidual()
                     << " pIterations=" << pPerf.nIterations()
                     << " maxU=" << max(mag(U)).value()
+                    << " maxP=" << max(mag(p)).value()
+                    << " maxPRgh=" << max(mag(p_rgh)).value()
                     << " maxJxB=" << max(mag(JxB)).value()
                     << endl;
             }

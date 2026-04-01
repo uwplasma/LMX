@@ -118,7 +118,8 @@
 - `python scripts/build_freemhd_container.py --local-freemhd-root ./external/FreeMHD`:
   stages a minimal local FreeMHD tree into a temporary Docker build context so
   container runs can use patched local solver sources instead of recloning
-  upstream.
+  upstream. The build path now uses `docker buildx build --load` so the image is
+  immediately visible to later `docker run` steps on the local Docker daemon.
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form

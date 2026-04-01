@@ -1800,6 +1800,40 @@ LMX should only be described as ship ready for the current milestone when all of
   - compare those `pressure/maxU` records against LMX short-time Hunt traces
   - then change the layered Hunt velocity update law directly
 
+### 2026-04-02 05:35 America/Chicago
+
+- Closed the immediate CI diagnosis loop with `gh`:
+  - the repeated `ci` workflow failure on `main` is the `coverage` job, not the
+    unit/regression/physics/validation/docs jobs
+  - exact failure on the latest run:
+    - total coverage was `82.63%`
+    - workflow threshold is `85%`
+  - so the correct retained fix is better test coverage, not a workflow or
+    environment workaround
+- Retained CI/CD fix work:
+  - `scripts/build_freemhd_container.py` now uses
+    `docker buildx build --load`
+  - this is the concrete fix for the earlier local state where a FreeMHD image
+    build reported success but the tag was not visible to
+    `docker image inspect` / `docker run`
+- Retained coverage-fix work:
+  - added targeted unit coverage for:
+    - `scripts/inspect_starting_files_archive.py`
+    - `scripts/probe_freemhd_environment.py`
+    - `scripts/build_freemhd_container.py`
+    - `scripts/patch_freemhd_coupled_logging.py`
+    - `scripts/run_convergence_suite.py`
+    - `scripts/run_time_convergence_suite.py`
+  - the targeted new/expanded tests pass locally
+  - the full local coverage rerun is slow on this machine, so the next
+    authoritative check is the pushed GitHub Actions `coverage` job
+- Best next step:
+  - push the retained Docker/coverage fixes
+  - confirm the `coverage` job turns green on GitHub Actions
+  - then use the now-loadable patched FreeMHD image path to complete the
+    pressure-instrumented Hunt rerun and move back to the layered Hunt update
+    law itself
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

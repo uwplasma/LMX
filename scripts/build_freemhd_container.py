@@ -56,7 +56,9 @@ def build_freemhd_container(
     bundle_path = Path(temp_context.name) if temp_context is not None else Path(bundle_root).resolve()
     command = [
         "docker",
+        "buildx",
         "build",
+        "--load",
         "--progress=plain",
         "--platform",
         platform,

@@ -75,6 +75,39 @@ def test_patch_peqn_file_wraps_pressure_solve_and_adds_diag_log():
 
     assert "auto pPerf = solve" in patched
     assert 'Info<< "LMX_DIAG pressure"' in patched
+    assert '<< " maxP=" << max(mag(p)).value()' in patched
+    assert '<< " maxPRgh=" << max(mag(p_rgh)).value()' in patched
+
+
+def test_patch_peqn_file_upgrades_existing_pressure_log():
+    source = """        auto pPerf = solve
+        (
+            p_rghEqnComp1() + p_rghEqnComp2() + p_rghEqnIncomp,
+            mesh.solver
+            ( 
+              p_rgh.select
+              (
+                (                
+                  oCorr == nOuterCorr-1
+                  && corr == nCorr-1
+                  && nonOrth == nNonOrthCorr
+                )
+              )
+            )
+        );
+            fvOptions.correct(U);
+            if (logCoupledMhdIterations)
+            {
+                Info<< "LMX_DIAG pressure"
+                    << " maxU=" << max(mag(U)).value()
+                    << " maxJxB=" << max(mag(JxB)).value()
+                    << endl;
+            }
+"""
+    patched = patch_peqn_file(source)
+
+    assert '<< " maxP=" << max(mag(p)).value()' in patched
+    assert '<< " maxPRgh=" << max(mag(p_rgh)).value()' in patched
 
 
 def test_patch_freemhd_tree_updates_expected_files(tmp_path: Path):
@@ -136,6 +169,23 @@ def test_patch_freemhd_tree_updates_expected_files(tmp_path: Path):
     assert peqn_path in updated
 
 
+def test_patchers_are_idempotent():
+    main_source = '   #include "createMhdFields.H"\n            const bool finalIter = (oCorr == nOuterCorr-1);\n'
+    epot_source = "\tPotEEqn.solve();\n\t\tJxB = (J ^ B);\n\t}\n"
+
+    assert patch_main_file(patch_main_file(main_source)) == patch_main_file(main_source)
+    assert patch_epot_file(patch_epot_file(epot_source)) == patch_epot_file(epot_source)
+
+
+def test_patchers_raise_when_required_needles_are_missing():
+    with pytest.raises(ValueError):
+        patch_epot_file("no solve here")
+    with pytest.raises(ValueError):
+        patch_ueqn_file("no momentum block")
+    with pytest.raises(ValueError):
+        patch_peqn_file("no pressure block")
+
+
 def test_parse_lmx_diag_line_extracts_numeric_fields():
     line = "LMX_DIAG epot time=0.0001 region=liquid oCorr=0 potEInitialResidual=0.3 potEFinalResidual=1e-4 potEIterations=7"
     parsed = parse_lmx_diag_line(line)
@@ -166,3 +216,28 @@ def test_extract_records_reads_only_lmx_diag_lines(tmp_path: Path):
     assert records[0]["kind"] == "outer"
     assert records[1]["kind"] == "momentum"
     assert records[2]["kind"] == "pressure"
+
+
+def test_parse_lmx_diag_line_rejects_noise_and_main_writes_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    assert parse_lmx_diag_line("noise") is None
+
+    from scripts import extract_freemhd_coupled_log as extractor
+
+    log_path = tmp_path / "solver.log"
+    output = tmp_path / "records.json"
+    log_path.write_text("LMX_DIAG outer time=0.0001 oCorr=0\n")
+    monkeypatch.setattr(
+        extractor.argparse.ArgumentParser,
+        "parse_args",
+        lambda self, argv=None: type("Args", (), {"log_path": log_path, "output": output})(),
+    )
+
+    exit_code = extractor.main([])
+
+    assert exit_code == 0
+    assert output.exists()
+    assert capsys.readouterr().out == ""

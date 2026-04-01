@@ -83,6 +83,10 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/extract_freemhd_coupled_log.py ./artifacts/freemhd_hunt.log --output ./artifacts/freemhd_hunt_diag.json
 ```
 
+`build_freemhd_container.py` now uses a loadable `docker buildx build --load`
+path so locally patched validation-backend images are available to subsequent
+`docker run` smoke and parity scripts instead of staying only in builder output.
+
 ## Scope
 
 LMX does not yet include:

@@ -314,6 +314,9 @@ The backend harness currently supports:
   - `build_freemhd_container.py --local-freemhd-root ...` can now build a
     container from that patched local tree instead of forcing a fresh upstream
     clone, so the logging patch reaches real solver runs
+  - the build path now uses `docker buildx build --load`, which is the retained
+    fix for the earlier local state where a build reported success but the image
+    was not visible to `docker image inspect` / `docker run`
   - `extract_freemhd_coupled_log.py` converts those lines into JSON records
   - the next Hunt solver step should use those FreeMHD iteration diagnostics
     together with LMX `potential_residual` / `potential_iterations_used`

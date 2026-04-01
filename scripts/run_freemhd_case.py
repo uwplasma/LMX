@@ -29,6 +29,7 @@ def run_freemhd_case(
     end_time: str | None = None,
     write_interval: str | None = None,
     delta_t: str | None = None,
+    start_from: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     case_path = Path(case_dir).resolve()
     bundle_path = Path(bundle_root).resolve()
@@ -50,6 +51,8 @@ def run_freemhd_case(
         f"LMX_WRITE_INTERVAL={write_interval or ''}",
         "-e",
         f"LMX_DELTA_T={delta_t or ''}",
+        "-e",
+        f"LMX_START_FROM={start_from or ''}",
         "--entrypoint",
         "/bin/bash",
         "-v",
@@ -81,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-time", type=str, default=None)
     parser.add_argument("--write-interval", type=str, default=None)
     parser.add_argument("--delta-t", type=str, default=None)
+    parser.add_argument("--start-from", type=str, default=None)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
     resolved_solver = control_dict_application(args.case_dir) if args.solver == "auto" else args.solver
@@ -102,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
             "end_time": args.end_time,
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
+            "start_from": args.start_from,
             "docker_cli_available": False,
             "docker_available": False,
             "status": "docker-cli-unavailable",
@@ -123,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
             "end_time": args.end_time,
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
+            "start_from": args.start_from,
             "docker_cli_available": True,
             "docker_available": False,
             "status": "docker-daemon-unavailable",
@@ -144,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             "end_time": args.end_time,
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
+            "start_from": args.start_from,
             "docker_cli_available": True,
             "docker_available": True,
             "docker_image_available": False,
@@ -165,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         end_time=args.end_time,
         write_interval=args.write_interval,
         delta_t=args.delta_t,
+        start_from=args.start_from,
     )
     payload = {
         "image": args.image,
@@ -176,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         "end_time": args.end_time,
         "write_interval": args.write_interval,
         "delta_t": args.delta_t,
+        "start_from": args.start_from,
         "docker_cli_available": True,
         "docker_available": True,
         "docker_image_available": True,

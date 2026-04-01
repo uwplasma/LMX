@@ -60,6 +60,7 @@ def test_main_runs_container_when_image_exists(
         assert kwargs["solver"] == "epotMultiRegionInterFoam"
         assert kwargs["platform"] == "linux/amd64"
         assert kwargs["cores"] == 95
+        assert kwargs["start_from"] is None
         return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
@@ -111,6 +112,7 @@ def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pyte
         end_time="1e-3",
         write_interval="1e-3",
         delta_t="1e-4",
+        start_from="startTime",
     )
 
     command = recorded["command"]
@@ -121,6 +123,7 @@ def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pyte
     assert "LMX_END_TIME=1e-3" in command
     assert "LMX_WRITE_INTERVAL=1e-3" in command
     assert "LMX_DELTA_T=1e-4" in command
+    assert "LMX_START_FROM=startTime" in command
     assert "--entrypoint" in command
     assert "/opt/lmx/run_freemhd_case.sh" in command
     assert "epotMultiRegionInterFoam" in command
@@ -147,6 +150,7 @@ def test_main_uses_explicit_cores_when_requested(
         assert kwargs["end_time"] == "1e-3"
         assert kwargs["write_interval"] == "5e-4"
         assert kwargs["delta_t"] == "1e-4"
+        assert kwargs["start_from"] == "startTime"
         return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
@@ -167,6 +171,8 @@ def test_main_uses_explicit_cores_when_requested(
             "5e-4",
             "--delta-t",
             "1e-4",
+            "--start-from",
+            "startTime",
         ]
     )
 
@@ -176,3 +182,4 @@ def test_main_uses_explicit_cores_when_requested(
     assert '"end_time": "1e-3"' in captured
     assert '"write_interval": "5e-4"' in captured
     assert '"delta_t": "1e-4"' in captured
+    assert '"start_from": "startTime"' in captured

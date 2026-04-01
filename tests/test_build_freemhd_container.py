@@ -46,6 +46,20 @@ def test_main_runs_build_with_platform(tmp_path: Path, monkeypatch: pytest.Monke
     assert '"platform": "linux/amd64"' in output.read_text()
 
 
+def test_main_reports_cli_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+    bundle_root = tmp_path / "docker"
+    bundle_root.mkdir()
+
+    monkeypatch.setattr(builder, "docker_cli_available", lambda: False)
+
+    output = tmp_path / "build.json"
+    exit_code = builder.main(["--bundle-root", str(bundle_root), "--output", str(output)])
+
+    assert exit_code == 0
+    assert '"status": "docker-cli-unavailable"' in capsys.readouterr().out
+    assert '"docker_available": false' in output.read_text()
+
+
 def test_prepare_build_context_stages_minimal_local_freemhd_tree(tmp_path: Path):
     bundle_root = tmp_path / "docker"
     bundle_root.mkdir()
@@ -67,3 +81,23 @@ def test_prepare_build_context_stages_minimal_local_freemhd_tree(tmp_path: Path)
         assert (context_root / "FreeMHD" / "README.md").read_text() == "local"
     finally:
         temp_context.cleanup()
+
+
+def test_copy_local_freemhd_minimal_requires_mhd_solvers(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="MHD_Solvers"):
+        builder._copy_local_freemhd_minimal(tmp_path / "missing", tmp_path / "out")
+
+
+def test_build_freemhd_container_uses_buildx_load(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    calls = {}
+
+    def fake_run(command, text, capture_output, check):
+        calls["command"] = command
+        return builder.subprocess.CompletedProcess(args=command, returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(builder.subprocess, "run", fake_run)
+
+    result = builder.build_freemhd_container("lmx-freemhd", tmp_path)
+
+    assert result.returncode == 0
+    assert calls["command"][:4] == ["docker", "buildx", "build", "--load"]
