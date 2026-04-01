@@ -52,6 +52,7 @@ python3 scripts/fetch_freemhd_assets.py --dest ./external
 /Users/rogerio/base_env/bin/python3 scripts/run_validation_suite.py --output ./artifacts/validation --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_convergence_suite.py --output ./artifacts/convergence --cases hartmann,shercliff,hunt --ha 20 --resolutions 16,32,48 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_time_convergence_suite.py --output ./artifacts/time_convergence --cases hartmann,shercliff,hunt --ha 20 --resolution 32 --dts 0.002,0.001,0.0005 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep --case hunt --ha 20 --resolution 48 --wall-cells 5 --parameter outer_iterations --values 2,4,6,8,10 --value-type int --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 ```
 
 These commands produce the analytical and sampled comparison reports that back the
@@ -59,7 +60,9 @@ current regression and validation tests. The convergence summary now also record
 estimated Hartmann-layer and side-layer cell counts for the duct cases so mesh
 adequacy is visible in the artifact rather than inferred indirectly from error
 trends. The time-convergence summary complements that by showing how much of the
-remaining error changes with pseudo-time refinement at fixed mesh resolution.
+remaining error changes with pseudo-time refinement at fixed mesh resolution. The
+control sweep is useful when a remaining error appears to depend on coupling
+controls rather than on mesh or pseudo-time alone.
 
 ## Benchmarking
 

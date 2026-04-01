@@ -64,6 +64,9 @@
   native mesh-convergence study summaries for the currently supported duct cases.
 - `python scripts/run_time_convergence_suite.py --output artifacts/time_convergence`:
   writes native pseudo-time convergence study summaries at fixed mesh resolution.
+- `python scripts/run_solver_control_sweep.py --output artifacts/control_sweep`:
+  writes parameter sweeps for selected time-stepper controls when a case shows a
+  nontrivial coupling tradeoff.
 - `python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json`:
   writes the current benchmark report.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with

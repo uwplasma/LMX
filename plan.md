@@ -1108,6 +1108,31 @@ LMX should only be described as ship ready for the current milestone when all of
     profile directions, which points back to the coupled update/control law rather
     than to a missing validation or meshing feature
 
+### 2026-04-01 14:05 America/Chicago
+
+- Converted the latest manual Hunt control probes into a reusable tool:
+  - added `scripts/run_solver_control_sweep.py`
+  - it sweeps a selected `TimeStepperConfig` parameter such as
+    `outer_iterations`, `potential_iterations`, `relaxation`, or `dt`
+  - it writes the same validation metrics plus the current layer-resolution
+    diagnostics into a single JSON summary
+- Added unit coverage for the new runner and documented it as part of the native
+  validation workflow.
+- Ran the first real retained control sweep on native Hunt `Ha20` at `48^2`:
+  - parameter: `outer_iterations`
+  - values: `2, 4, 6, 8, 10`
+  - result:
+    - `z_l2` improves monotonically from about `0.283` to `0.185`
+    - `y_l2` improves from about `0.099` to `0.023` by `6` iterations, then
+      degrades again to about `0.042` and `0.062`
+- This is the clearest retained control-law result so far:
+  - the current Hunt solver is not just under-iterated
+  - increasing outer coupling helps one profile direction while eventually
+    hurting the other
+  - the next solver change should target that coupled tradeoff directly rather
+    than simply increasing `outer_iterations`, `potential_iterations`, or
+    shrinking `dt`
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

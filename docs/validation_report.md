@@ -77,6 +77,12 @@ The backend harness currently supports:
   - this means the remaining Hunt discrepancy is not a simple “smaller dt is
     always better” problem; the current pseudo-time path still carries a genuine
     transient/control-law tradeoff that needs solver-side treatment
+- The new control-sweep runner makes the same point from the coupling side:
+  - for Hunt `Ha20` at `48^2`, increasing `outer_iterations` improves `z_l2`
+    from about `0.283` at `2` iterations to about `0.185` at `10`
+  - over the same sweep, `y_l2` improves strongly at first (`0.099 -> 0.023`
+    by `6` outer iterations) and then degrades again (`0.042`, `0.062`)
+  - this is a real coupled-control tradeoff, not a single-parameter monotone fix
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 
