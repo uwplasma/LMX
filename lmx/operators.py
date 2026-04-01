@@ -25,6 +25,20 @@ def face_average_z(field: jnp.ndarray) -> jnp.ndarray:
     return 0.5 * (field[:, :-1] + field[:, 1:])
 
 
+def center_spacing_y(mesh: StructuredMesh) -> jnp.ndarray:
+    centers = mesh.y_centers
+    if centers.size <= 1:
+        return jnp.ones((0,), dtype=centers.dtype)
+    return centers[1:] - centers[:-1]
+
+
+def center_spacing_z(mesh: StructuredMesh) -> jnp.ndarray:
+    centers = mesh.z_centers
+    if centers.size <= 1:
+        return jnp.ones((0,), dtype=centers.dtype)
+    return centers[1:] - centers[:-1]
+
+
 def gradient_scalar(field: jnp.ndarray, mesh: StructuredMesh) -> tuple[jnp.ndarray, jnp.ndarray]:
     dy = _broadcast_spacing_y(mesh)
     dz = _broadcast_spacing_z(mesh)
@@ -40,13 +54,30 @@ def gradient_scalar(field: jnp.ndarray, mesh: StructuredMesh) -> tuple[jnp.ndarr
 
 
 def laplacian_scalar(field: jnp.ndarray, mesh: StructuredMesh, mask: jnp.ndarray | None = None) -> jnp.ndarray:
-    west = jnp.pad(field[:-1, :], ((1, 0), (0, 0)))
-    east = jnp.pad(field[1:, :], ((0, 1), (0, 0)))
-    south = jnp.pad(field[:, :-1], ((0, 0), (1, 0)))
-    north = jnp.pad(field[:, 1:], ((0, 0), (0, 1)))
-    dy = _broadcast_spacing_y(mesh)
-    dz = _broadcast_spacing_z(mesh)
-    lap = (east - 2.0 * field + west) / (dy**2) + (north - 2.0 * field + south) / (dz**2)
+    fluid_mask = jnp.ones_like(field, dtype=bool) if mask is None else mask
+    dy = mesh.dy[:, None]
+    dz = mesh.dz[None, :]
+    delta_y = center_spacing_y(mesh)
+    delta_z = center_spacing_z(mesh)
+
+    west_connected = fluid_mask & jnp.pad(fluid_mask[:-1, :], ((1, 0), (0, 0)))
+    east_connected = fluid_mask & jnp.pad(fluid_mask[1:, :], ((0, 1), (0, 0)))
+    south_connected = fluid_mask & jnp.pad(fluid_mask[:, :-1], ((0, 0), (1, 0)))
+    north_connected = fluid_mask & jnp.pad(fluid_mask[:, 1:], ((0, 0), (0, 1)))
+
+    west_value = jnp.where(west_connected, jnp.pad(field[:-1, :], ((1, 0), (0, 0))), 0.0)
+    east_value = jnp.where(east_connected, jnp.pad(field[1:, :], ((0, 1), (0, 0))), 0.0)
+    south_value = jnp.where(south_connected, jnp.pad(field[:, :-1], ((0, 0), (1, 0))), 0.0)
+    north_value = jnp.where(north_connected, jnp.pad(field[:, 1:], ((0, 0), (0, 1))), 0.0)
+
+    west_distance = jnp.where(west_connected, jnp.pad(delta_y[:, None], ((1, 0), (0, 0))), 0.5 * dy)
+    east_distance = jnp.where(east_connected, jnp.pad(delta_y[:, None], ((0, 1), (0, 0))), 0.5 * dy)
+    south_distance = jnp.where(south_connected, jnp.pad(delta_z[None, :], ((0, 0), (1, 0))), 0.5 * dz)
+    north_distance = jnp.where(north_connected, jnp.pad(delta_z[None, :], ((0, 0), (0, 1))), 0.5 * dz)
+
+    flux_y = ((east_value - field) / jnp.maximum(east_distance, 1e-12) - (field - west_value) / jnp.maximum(west_distance, 1e-12)) / jnp.maximum(dy, 1e-12)
+    flux_z = ((north_value - field) / jnp.maximum(north_distance, 1e-12) - (field - south_value) / jnp.maximum(south_distance, 1e-12)) / jnp.maximum(dz, 1e-12)
+    lap = flux_y + flux_z
     if mask is not None:
         lap = jnp.where(mask, lap, 0.0)
     return lap

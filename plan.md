@@ -197,10 +197,7 @@ LMX should only be described as ship ready for the current milestone when all of
   - on the native Hunt `Ha20` convergence sweep, Hartmann-layer coverage increases
     from about `3.2` to `9.7` cells and side-layer coverage from about `5.2` to
     `15.8` cells between the `16^2` and `48^2` runs
-  - the corresponding Hunt validation errors barely move and the observed orders
-    stay near zero
-  - this is strong evidence that the current native Hunt gap is solver-dominant,
-    not only a missing boundary-layer mesh-resolution issue
+  - that result motivated the next retained operator change
 - Fine-mesh Hartmann and Shercliff stability improved materially after reducing the pseudo-time step and increasing the iteration budget in their case factories.
 - Harmonic face conductivity averaging improved the multi-material discretization and helped Shercliff on smaller validation grids.
 - Semi-implicit treatment of the linear Lorentz damping term improved Hartmann and Shercliff robustness without breaking the existing solver interface.
@@ -1026,9 +1023,43 @@ LMX should only be described as ship ready for the current milestone when all of
     orders remain near zero
 - This is an important retained result for the next implementation step:
   - the current native Hunt problem is not explained solely by missing layer
-    resolution
+  resolution
   - the next solver work should focus on the update/coupling formulation rather
-    than assuming that more mesh clustering alone will fix the steady Hunt gap
+  than assuming that more mesh clustering alone will fix the steady Hunt gap
+
+### 2026-04-01 13:05 America/Chicago
+
+- Retained a general solver/operator improvement aimed at the clustered-mesh duct
+  cases:
+  - the potential-equation coefficients now use actual center-to-center distances
+    on nonuniform meshes instead of dividing by local cell width squared
+  - the electric-field reconstruction now uses the existing nonuniform-aware
+    gradient operator
+  - the masked velocity Laplacian now treats no-slip-style boundaries through
+    half-cell wall distances rather than pretending the wall value is located at a
+    neighboring cell center
+- Added operator coverage for clustered meshes:
+  - the quadratic-field Laplacian is now tested on a layered/clustered duct mesh
+    away from the masked wall interfaces
+- Verified the retained numerical effect before keeping it:
+  - Hartmann `Ha20` remains strong and accepted at about
+    `l2_error ≈ 3.87e-3`, `linf_error ≈ 1.01e-2`
+  - Shercliff `Ha20` remains stable, with a slightly improved `z` profile
+  - native Hunt `Ha20` improves materially to about
+    `y_l2 ≈ 1.05e-1`, `z_l2 ≈ 2.90e-1`
+  - native Hunt `Ha100` also improves to about
+    `y_l2 ≈ 1.90e-1`, `z_l2 ≈ 3.62e-1`
+  - the native Hunt `Ha20` convergence sweep now shows strong `y`-profile
+    improvement under refinement:
+    - `y_l2`: about `0.151 -> 0.067 -> 0.023`
+    - `z_l2`: still problematic at about `0.127 -> 0.167 -> 0.209`
+    - observed order for `y_l2` is now positive and substantial, while `z_l2`
+      remains negative
+- This narrows the next solver target again:
+  - the nonuniform-mesh discretization was a real part of the problem and is now
+    improved
+  - the remaining native Hunt gap is increasingly concentrated in the `z`
+    profile / side-layer evolution rather than in the overall duct solve
 
 ## Instruction For Future Agents
 

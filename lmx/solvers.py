@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from .core import Diagnostics, MHDState, Solution
 from .linear import solve_poisson_jacobi
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
-from .operators import face_average_x, face_average_z, laplacian_scalar
+from .operators import center_spacing_y, center_spacing_z, face_average_x, face_average_z, gradient_scalar, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
 from .specs import BoundaryCondition, CaseSpec
 
@@ -49,12 +49,18 @@ def _face_conductivity_z(sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
 def _potential_coefficients(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, ...]:
     dy = mesh.dy[:, None]
     dz = mesh.dz[None, :]
+    delta_y = center_spacing_y(mesh)
+    delta_z = center_spacing_z(mesh)
     west_sigma, east_sigma = _face_conductivity_y(sigma)
     south_sigma, north_sigma = _face_conductivity_z(sigma)
-    west = west_sigma / (dy**2)
-    east = east_sigma / (dy**2)
-    south = south_sigma / (dz**2)
-    north = north_sigma / (dz**2)
+    west_distance = jnp.pad(delta_y[:, None], ((1, 0), (0, 0)), constant_values=1.0)
+    east_distance = jnp.pad(delta_y[:, None], ((0, 1), (0, 0)), constant_values=1.0)
+    south_distance = jnp.pad(delta_z[None, :], ((0, 0), (1, 0)), constant_values=1.0)
+    north_distance = jnp.pad(delta_z[None, :], ((0, 0), (0, 1)), constant_values=1.0)
+    west = west_sigma / jnp.maximum(dy * west_distance, 1e-12)
+    east = east_sigma / jnp.maximum(dy * east_distance, 1e-12)
+    south = south_sigma / jnp.maximum(dz * south_distance, 1e-12)
+    north = north_sigma / jnp.maximum(dz * north_distance, 1e-12)
     diagonal = west + east + south + north
     diagonal = jnp.where(diagonal > 0.0, diagonal, 1.0)
     return diagonal, west, east, south, north
@@ -98,12 +104,7 @@ def _compute_current_and_lorentz(
     by: jnp.ndarray,
     bz: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
-    east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
-    south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
-    north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
-    dphi_dy = (east_phi - west_phi) / (2.0 * mesh.dy[:, None])
-    dphi_dz = (north_phi - south_phi) / (2.0 * mesh.dz[None, :])
+    dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
     jy = sigma * (-dphi_dy - u * bz)
     jz = sigma * (-dphi_dz + u * by)
     jy = jnp.where(fluid_mask, jy, 0.0)

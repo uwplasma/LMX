@@ -27,6 +27,9 @@
 - Use `lineax` when the linear system formulation benefits from it.
 - Use `equinox` or `diffrax` only when they improve the solver or optimization
   workflow; do not add them as incidental dependencies.
+- Clustered duct meshes should use actual center-to-center spacing in diffusion
+  and potential operators; avoid reintroducing uniform-grid shortcuts in solver
+  stencils.
 
 ## Case and boundary design
 

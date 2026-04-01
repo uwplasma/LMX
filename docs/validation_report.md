@@ -54,6 +54,19 @@ The backend harness currently supports:
   `15.8` cells between `16^2` and `48^2` fluid resolutions, while the validation
   errors barely improve. That points to solver/update fidelity as the dominant
   remaining issue for native Hunt, not just missing boundary-layer clustering.
+- The current retained operator update improves that diagnosis and the solver at
+  the same time:
+  - diffusion and potential coefficients now use actual center-to-center spacing
+    on nonuniform meshes instead of uniform-spacing shortcuts
+  - the masked velocity Laplacian now uses half-cell wall distances for
+    no-slip-style boundaries instead of treating boundary values as if they lived
+    at neighboring cell centers
+  - Hartmann `Ha20` remains accepted with `l2_error ≈ 3.9e-3`
+  - native Hunt `Ha20` improves to about `y_l2 ≈ 1.05e-1`, `z_l2 ≈ 2.90e-1`
+  - native Hunt `Ha100` improves to about `y_l2 ≈ 1.90e-1`, `z_l2 ≈ 3.62e-1`
+  - the Hunt `Ha20` convergence sweep now shows strong improvement in the `y`
+    profile with refinement instead of the previous near-zero observed order,
+    although the `z` profile still lags
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 
