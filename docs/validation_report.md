@@ -118,6 +118,16 @@ The backend harness currently supports:
     part of the blocker, not just generic pseudo-time controls
   - CI now runs this Hartmann `potential_iterations` sweep as a normal artifact
     so the blocker stays visible during future solver work
+- Native validation summaries now also report a normalized electric-potential
+  equation residual from the latest solve step:
+  - the current bad Hartmann `Ha20`, `32^2` branch lands around
+    `potential_residual ≈ 6.7e-2`
+  - the current native Hunt `Ha20`, `32^2` branch lands around
+    `potential_residual ≈ 5.6e-1`
+  - that metric is not an acceptance threshold by itself, but it now makes the
+    electric-potential solve quality visible in the same artifact bundle as the
+    profile/pathology metrics and gives the next solver iteration a more direct
+    signal than profile L2 alone
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

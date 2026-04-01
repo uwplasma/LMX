@@ -39,6 +39,7 @@ from lmx.validation import (
     write_metrics_json,
     write_processed_slice_validation,
     write_validation_report,
+    validation_summary,
 )
 
 
@@ -68,6 +69,16 @@ def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
     assert metrics["side_layer_thickness"] > 0.0
     assert metrics["hartmann_layer_cells"] > 0.0
     assert metrics["side_layer_cells"] > 0.0
+
+
+def test_validation_summary_includes_latest_potential_residual():
+    case = make_hartmann_case(ha=5.0, ny=12, nz=12)
+    solution = solve_steady(case)
+
+    metrics = validation_summary(solution, case.name, ha=5.0)
+
+    assert "potential_residual" in metrics
+    assert metrics["potential_residual"] >= 0.0
 
 
 def test_compare_with_freemhd_report(tmp_path: Path):

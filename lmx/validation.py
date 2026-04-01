@@ -340,6 +340,9 @@ def validation_summary(solution: Solution, case_name: str, ha: float | None = No
         "case": case_name,
         "time": solution.state.time,
         "residual": solution.state.residual,
+        "potential_residual": float(solution.diagnostics.potential_residual_history[-1])
+        if solution.diagnostics.potential_residual_history.size
+        else 0.0,
     }
     payload.update(duct_profile_metrics(solution))
     if case_name.startswith("hartmann") and ha is not None:

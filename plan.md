@@ -179,6 +179,9 @@ LMX should only be described as ship ready for the current milestone when all of
   - a native `run_convergence_suite.py` runner that emits mesh-convergence summaries for Hartmann, Shercliff, and Hunt
   - those convergence summaries now also report estimated Hartmann-layer and side-layer cell counts, so mesh adequacy is visible in the artifact itself
   - a native `run_time_convergence_suite.py` runner now exists for fixed-resolution pseudo-time studies
+  - native solution diagnostics and validation summaries now also expose a normalized
+    electric-potential equation residual, so `phi`-solve quality is visible in
+    normal artifacts instead of only through downstream profile errors
 - `solve_steady` no longer aliases the transient runner:
   - it now iterates until either the configured steady tolerance is reached or the configured maximum step budget is exhausted
   - targeted tests now cover early-stop and max-step behavior explicitly
@@ -1268,6 +1271,32 @@ LMX should only be described as ship ready for the current milestone when all of
     - values: `50,100,200,400,800`
   - this uses the existing generic sweep runner and summary path, so the current
     refinement blocker becomes a normal artifact on every CI run
+
+### 2026-04-01 21:05 America/Chicago
+
+- Tried another solver-side fix first and explicitly rejected it:
+  - reusing the previous step's electric potential as a warm start for the next
+    pseudo-time step destabilized the retained Hunt default path
+  - on the existing `test_hunt_default_case_now_stays_bounded` gate, `max(U)`
+    rose to about `2.5e-2`, which is far outside the retained default bound
+  - that change was rolled back immediately and was not kept on `main`
+- Retained improvement instead:
+  - the solver now records a normalized electric-potential equation residual in
+    `Diagnostics.potential_residual_history`
+  - `validation_summary(...)` emits the latest value as `potential_residual`
+  - the CI markdown summary now shows that field in the validation table
+- Current quantitative interpretation with the new metric:
+  - the bad Hartmann `Ha20`, `32^2` branch currently lands around
+    `potential_residual ≈ 6.7e-2`
+  - the current native Hunt `Ha20`, `32^2` branch lands around
+    `potential_residual ≈ 5.6e-1`
+  - this is not yet an acceptance threshold, but it makes the `phi`-solve part
+    of the coupled defect directly visible in the same artifacts as the profile
+    errors and sign-pathology metrics
+- Next-step implication:
+  - the next retained solver iteration should aim to reduce that normalized
+    potential residual on the Hartmann/Hunt bad branches without regressing the
+    accepted Hartmann fine-mesh path or the current bounded Hunt defaults
 
 ## Instruction For Future Agents
 

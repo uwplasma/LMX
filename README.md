@@ -15,6 +15,9 @@ staying focused on structured duct and simple pipe geometries.
 - ParaView output, CSV/profile extraction, and benchmark reporting.
 - Analytical validation helpers and regression tests for reproducibility.
 - Optional external validation tooling for recovered FreeMHD/OpenFOAM cases.
+- Validation summaries now include a normalized electric-potential equation
+  residual, so solver/control issues in the `phi` solve are visible in normal
+  artifacts instead of only through profile errors.
 
 ## Quick start
 

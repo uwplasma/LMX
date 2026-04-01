@@ -75,7 +75,7 @@ def _solve_potential(
     bz: jnp.ndarray,
     anchor: tuple[int, int],
     iterations: int,
-) -> jnp.ndarray:
+) -> tuple[jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
 
@@ -92,7 +92,17 @@ def _solve_potential(
 
     diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
     phi, _ = solve_poisson_jacobi(diagonal, west, east, south, north, rhs, anchor, iterations)
-    return phi
+    west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
+    east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
+    south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
+    north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
+    matrix_phi = diagonal * phi - west * west_phi - east * east_phi - south * south_phi - north * north_phi
+    matrix_phi = matrix_phi.at[anchor].set(0.0)
+    rhs_masked = rhs.at[anchor].set(0.0)
+    residual_numerator = jnp.max(jnp.abs(matrix_phi - rhs_masked))
+    residual_scale = jnp.maximum(jnp.max(jnp.abs(matrix_phi)), jnp.max(jnp.abs(rhs_masked)))
+    residual = residual_numerator / jnp.maximum(residual_scale, 1e-12)
+    return phi, residual
 
 
 def _compute_current_and_lorentz(
@@ -187,10 +197,10 @@ def _step(
     potential_iterations: int,
     relaxation: float,
     velocity_update_limit: float,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray]:
     def outer_body(_, carry):
-        u_iter, _, _, _, _ = carry
-        phi = _solve_potential(mesh, sigma, fluid_mask, u_iter, by, bz, anchor, potential_iterations)
+        u_iter, _, _, _, _, _ = carry
+        phi, potential_residual = _solve_potential(mesh, sigma, fluid_mask, u_iter, by, bz, anchor, potential_iterations)
         phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
         jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
         lorentz = jnp.nan_to_num(lorentz, nan=0.0, posinf=0.0, neginf=0.0)
@@ -205,21 +215,22 @@ def _step(
         u_next = _enforce_velocity_bc(u_next, fluid_mask)
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
-        return (u_next, phi, jy, jz, lorentz)
+        return (u_next, phi, jy, jz, lorentz, potential_residual)
 
     u_init = _enforce_velocity_bc(u, fluid_mask)
     phi0 = jnp.zeros_like(u)
     j0 = jnp.zeros_like(u)
     l0 = jnp.zeros_like(u)
+    r0 = jnp.asarray(0.0, dtype=u.dtype)
     outer_count = max(1, outer_iterations)
-    u_next, phi, jy, jz, lorentz = jax.lax.fori_loop(
+    u_next, phi, jy, jz, lorentz, potential_residual = jax.lax.fori_loop(
         0,
         outer_count,
         outer_body,
-        (u_init, phi0, j0, j0, l0),
+        (u_init, phi0, j0, j0, l0, r0),
     )
     residual = jnp.max(jnp.abs(u_next - u))
-    return u_next, phi, jy, jz, lorentz, residual
+    return u_next, phi, jy, jz, lorentz, residual, potential_residual
 
 
 def solve_transient(case: CaseSpec) -> Solution:
@@ -235,7 +246,7 @@ def solve_transient(case: CaseSpec) -> Solution:
 
     def scan_step(carry, _):
         u, time = carry
-        u_next, phi, jy, jz, lorentz, residual = _step(
+        u_next, phi, jy, jz, lorentz, residual, potential_residual = _step(
             u=u,
             mesh=mesh,
             sigma=materials.conductivity,
@@ -254,7 +265,7 @@ def solve_transient(case: CaseSpec) -> Solution:
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
         ohmic = jnp.mean(jy**2 + jz**2)
-        sample = jnp.asarray([residual, courant_like, ohmic], dtype=float)
+        sample = jnp.asarray([residual, courant_like, ohmic, potential_residual], dtype=float)
         return (u_next, time + dt), (u_next, phi, jy, jz, lorentz, sample)
 
     (u_final, time_final), history = jax.lax.scan(scan_step, (initial_u, 0.0), xs=None, length=steps)
@@ -273,6 +284,7 @@ def solve_transient(case: CaseSpec) -> Solution:
         residual_history=samples[:, 0],
         courant_like=samples[:, 1],
         ohmic_power=samples[:, 2],
+        potential_residual_history=samples[:, 3],
     )
     return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
 
@@ -289,7 +301,9 @@ def solve_steady(case: CaseSpec) -> Solution:
     max_steps = max(1, case.time_stepper.max_steps)
     tolerance = float(case.time_stepper.steady_tolerance)
 
-    def compiled_step(u: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
+    def compiled_step(
+        u: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray]:
         return _step(
             u=u,
             mesh=mesh,
@@ -319,16 +333,18 @@ def solve_steady(case: CaseSpec) -> Solution:
     residual_history: list[float] = []
     courant_history: list[float] = []
     ohmic_history: list[float] = []
+    potential_history: list[float] = []
     step_count = 0
 
     for step_index in range(max_steps):
-        u, phi, jy, jz, lorentz, residual = step_fn(u)
+        u, phi, jy, jz, lorentz, residual, potential_residual = step_fn(u)
         residual_value = float(residual)
         courant_like = float(jnp.max(jnp.abs(u)) * dt / jnp.min(mesh.dy))
         ohmic = float(jnp.mean(jy**2 + jz**2))
         residual_history.append(residual_value)
         courant_history.append(courant_like)
         ohmic_history.append(ohmic)
+        potential_history.append(float(potential_residual))
         step_count = step_index + 1
         if residual_value <= tolerance:
             break
@@ -346,5 +362,6 @@ def solve_steady(case: CaseSpec) -> Solution:
         residual_history=jnp.asarray(residual_history, dtype=float),
         courant_like=jnp.asarray(courant_history, dtype=float),
         ohmic_power=jnp.asarray(ohmic_history, dtype=float),
+        potential_residual_history=jnp.asarray(potential_history, dtype=float),
     )
     return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import jax.numpy as jnp
 
@@ -23,6 +23,7 @@ class Diagnostics:
     residual_history: jnp.ndarray
     courant_like: jnp.ndarray
     ohmic_power: jnp.ndarray
+    potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 
 
 @dataclass(frozen=True)
