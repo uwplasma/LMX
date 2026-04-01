@@ -1947,6 +1947,26 @@ LMX should only be described as ship ready for the current milestone when all of
   - then compare the improved LMX Hunt traces against the patched FreeMHD
     pressure/`maxU` records to target the remaining layered
     velocity/pressure-coupling error directly
+- `2026-04-02 22:10 America/Chicago`: Verified the new layered default directly
+  on the short-time Hunt `Ha20` trace path. With `auto -> cg_volume`,
+  `dt = 1e-5`, `t_final = 1e-4`, and `10` steps against the recovered FreeMHD
+  case, the retained LMX short-time metrics are:
+  - `u_max ≈ 0.117499`
+  - `u_max_abs_diff ≈ 6.21e-04`
+  - `potential_residual ≈ 2.61e-03`
+  - sampled `combined_l2_error ≈ 9.83e-02`
+  - retained interpretation:
+    - the layered `phi` backend blocker is now substantially reduced on both
+      the short-time and full Hunt paths
+    - the remaining error is much more likely to sit in the longer-horizon
+      momentum/pressure evolution and coupling response than in the layered
+      `phi` solve itself
+- Best next step:
+  - use the patched FreeMHD pressure/maxU trace together with the improved LMX
+    short-time and full-path Hunt baselines to target the remaining
+    longer-horizon momentum/pressure-coupling error directly
+  - avoid further `phi` backend churn unless a new layered trace proves that the
+    remaining mismatch still originates there
 
 ## Instruction For Future Agents
 

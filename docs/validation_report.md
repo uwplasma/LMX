@@ -421,6 +421,18 @@ The backend harness currently supports:
     - the remaining Hunt gap is now the layered velocity/pressure coupling
       response on top of the improved multi-region `phi` backend, not the
       layered `phi` backend choice itself
+- The new layered default also materially improves the short-time Hunt trace:
+  - Hunt `Ha20`, `auto -> cg_volume`, `dt = 1e-5`, `t_final = 1e-4`,
+    `10` steps:
+    - `u_max ≈ 0.117499`
+    - `u_max_abs_diff ≈ 6.21e-04`
+    - `potential_residual ≈ 2.61e-03`
+    - sampled `combined_l2_error ≈ 9.83e-02`
+  - retained interpretation:
+    - the layered `phi` solve is no longer the dominant blocker on the Hunt
+      startup path either
+    - the remaining work should focus on longer-horizon momentum/pressure
+      evolution instead of more layered `phi` backend tuning
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and
