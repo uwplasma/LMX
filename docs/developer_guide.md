@@ -27,6 +27,10 @@
 - Use `lineax` when the linear system formulation benefits from it.
 - Use `equinox` or `diffrax` only when they improve the solver or optimization
   workflow; do not add them as incidental dependencies.
+- When mirroring recovered transient validation cases, keep the magnetic-field
+  startup ramp law aligned with the backend controls. The current LMX ramp
+  intentionally matches the recovered FreeMHD implementation:
+  `(t - BtStartTime) / (BtDuration + 1e-6)`, clipped to `[0, 1]`.
 - Clustered duct meshes should use actual center-to-center spacing in diffusion
   and potential operators; avoid reintroducing uniform-grid shortcuts in solver
   stencils.

@@ -576,6 +576,23 @@ The backend harness currently supports:
   traces being compared are density-style maxima. Until the rerun with density
   diagnostics is complete, the old raw `maxJn` / `maxPsiub` mismatch should not
   be treated as decisive solver evidence by itself.
+- That rerun is now complete enough to change the diagnosis again:
+  - the retained LMX magnetic ramp now matches the recovered FreeMHD startup
+    law exactly, including the `BtDuration + 1e-6` denominator
+  - on the short Hunt `Ha20` trace comparison, that reduced the normalized
+    history mismatch materially:
+    - `emf_max`: `≈ 8.32e-2 -> 1.56e-3`
+    - `emf_density_max`: `≈ 8.35e-2 -> 1.93e-3`
+    - `lorentz_max`: `≈ 1.95e-1 -> 3.26e-2`
+    - `face_current_max`: `≈ 9.66e-2 -> 1.75e-2`
+  - `u_max` remained already good at `≈ 1.18e-3`
+  - retained interpretation:
+    - the Hunt startup blocker was not primarily in conservative-vs-centered
+      force form and not primarily in the layered `phi` linear solve anymore
+    - a real part of it was the startup magnetic-ramp semantics feeding the
+      `U×B` source term
+    - the next remaining mismatch is narrower: cell-centered current magnitude
+      and later coupled response, not the startup source history itself
 
 ## Planned improvements
 

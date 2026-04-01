@@ -32,9 +32,27 @@ def test_patch_epot_file_wraps_solve_and_adds_diag_log():
     assert 'Info<< "LMX_DIAG epot"' in patched
     assert '<< " maxCenteredJxB=" << max(mag(centeredJxB)).value()' in patched
     assert '<< " maxJn=" << max(mag(jn)).value()' in patched
-    assert '<< " maxJnDensity=" << max(mag(jn/(mesh.magSf() + SMALL))).value()' in patched
+    assert '<< " maxJnDensity=" << max(mag(jn/mesh.magSf())).value()' in patched
     assert '<< " maxPsiub=" << max(mag(psiub)).value()' in patched
-    assert '<< " maxPsiubDensity=" << max(mag(psiub/(mesh.magSf() + SMALL))).value()' in patched
+    assert '<< " maxPsiubDensity=" << max(mag(psiub/mesh.magSf())).value()' in patched
+
+
+def test_patch_epot_file_rewrites_legacy_density_logging():
+    source = """
+\tPotEEqn.solve();
+\t\tJxB = (J ^ B);
+\t}
+\tInfo<< "LMX_DIAG epot"
+\t\t<< " maxJnDensity=" << max(mag(jn/(mesh.magSf() + SMALL))).value()
+\t\t<< " maxPsiubDensity=" << max(mag(psiub/(mesh.magSf() + SMALL))).value()
+\t\t<< endl;
+"""
+
+    patched = patch_epot_file(source)
+
+    assert 'mesh.magSf() + SMALL' not in patched
+    assert '<< " maxJnDensity=" << max(mag(jn/mesh.magSf())).value()' in patched
+    assert '<< " maxPsiubDensity=" << max(mag(psiub/mesh.magSf())).value()' in patched
 
 
 def test_patch_ueqn_file_wraps_momentum_solve_and_adds_diag_log():

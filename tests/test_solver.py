@@ -99,6 +99,15 @@ def test_magnetic_ramp_scale_disables_when_duration_is_zero():
     assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)
 
 
+def test_magnetic_ramp_scale_matches_freemhd_startup_formula():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    ramped = replace(case, magnetic_field=replace(case.magnetic_field, ramp_start=0.0, ramp_duration=1e-5))
+
+    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=0.0)) == pytest.approx(0.0)
+    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=1e-5)) == pytest.approx(10.0 / 11.0)
+    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=2e-5)) == pytest.approx(1.0)
+
+
 def test_magnetic_ramp_delays_short_transient_lorentz_response():
     case = make_hartmann_case(ha=20.0, ny=12, nz=12)
     base = replace(

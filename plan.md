@@ -2129,15 +2129,62 @@ LMX should only be described as ship ready for the current milestone when all of
   - the 8-core container replay on this machine was killed with exit code 137
     after the first time step, so the next density-log rerun should use a fresh
     image tag plus the patch/build path above and a lower core count
+- `2026-04-03 01:45 America/Chicago`: Fixed two remaining diagnostic-path bugs
+  while chasing the density-style Hunt startup traces:
+  - the new FreeMHD density log patch originally used
+    `mesh.magSf() + SMALL`, which fails in OpenFOAM because `mesh.magSf()` is a
+    dimensioned area field while `SMALL` is dimensionless
+  - fixed that to divide by `mesh.magSf()` directly
+  - then made `patch_freemhd_coupled_logging.py` idempotent for the density
+    fields, so an already-patched local checkout upgrades the old buggy
+    expression instead of silently leaving it in place
+  - retained result:
+    - the corrected fresh-image Hunt rerun now emits real
+      `maxJnDensity` / `maxPsiubDensity` records at `t = 1e-05`, `2e-05`,
+      `3e-05`
+- `2026-04-03 01:55 America/Chicago`: Used those corrected density diagnostics
+  to isolate the next actual solver-side mismatch. The first clean multi-time
+  FreeMHD density records showed:
+  - `maxPsiubDensity` rising from about `21363.636` at `1e-05` to
+    `23560.473` at `3e-05`
+  - but the matching LMX `emf_max_history` stayed nearly flat before the next
+    solver change
+  - inspecting recovered FreeMHD `ePotEqn.H` then exposed a concrete parity
+    difference:
+    - FreeMHD uses
+      `scale = max(min((t - BtStartTime)/(BtDuration + 1e-6), 1), 0)`
+    - LMX had been using
+      `(t - ramp_start)/ramp_duration`
+    - so at `t = BtDuration = 1e-5`, FreeMHD is still at `10/11`, while LMX was
+      already at `1.0`
+- `2026-04-03 02:05 America/Chicago`: Retained the first solver-side Hunt fix
+  from the new density-trace evidence:
+  - `lmx.physics.magnetic_ramp_scale(...)` now mirrors the recovered FreeMHD
+    ramp law, including the `+ 1e-6` denominator
+  - added a direct regression test for the exact `10/11` value at
+    `t = BtDuration`
+  - reran the short Hunt `Ha20` trace comparison against the corrected density
+    log
+  - retained numerical effect:
+    - `u_max` stayed good: normalized `l2_error ≈ 1.18e-3`
+    - `emf_max`: `≈ 8.32e-2 -> 1.56e-3`
+    - `emf_density_max`: `≈ 8.35e-2 -> 1.93e-3`
+    - `lorentz_max`: `≈ 1.95e-1 -> 3.26e-2`
+    - `face_current_max`: `≈ 9.66e-2 -> 1.75e-2`
+  - retained interpretation:
+    - the Hunt startup source-term mismatch was real and is now mostly removed
+    - the next remaining mismatch is narrower and later:
+      cell-centered current magnitude interpretation and/or the later coupled
+      response, not the startup ramp/source history itself
 - Best next step:
-  - finish one patched FreeMHD Hunt rerun that actually emits
-    `maxJnDensity` / `maxPsiubDensity`, using the new auto-build/patch harness
-    and a smaller core count
-  - compare those density-style traces against the existing LMX
-    `face_current_max_history` / `emf_max_history`
-  - only then decide whether the remaining Hunt startup blocker is still in the
-    layered current/source construction or whether the next retained change
-    should move back to the longer-horizon momentum/pressure response
+  - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
+    ramp law on `main`
+  - then use the improved Hunt startup agreement to target the next narrower
+    mismatch:
+    either the interpretation/discretization of cell-centered current magnitude
+    or the later-time coupled momentum/pressure response
+  - avoid further startup-ramp churn unless a new recovered case shows a
+    different control law
 
 ## Instruction For Future Agents
 

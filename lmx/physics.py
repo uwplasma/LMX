@@ -21,7 +21,9 @@ def magnetic_ramp_scale(spec: MagneticFieldSpec, time: float | jnp.ndarray | Non
     if time is None or spec.ramp_duration <= 0.0:
         return jnp.asarray(1.0)
     time_value = jnp.asarray(time, dtype=float)
-    return jnp.clip((time_value - spec.ramp_start) / spec.ramp_duration, 0.0, 1.0)
+    # Mirror the recovered FreeMHD controlDict startup ramp law:
+    # scale = max(min((t - BtStartTime)/(BtDuration + 1e-6), 1), 0)
+    return jnp.clip((time_value - spec.ramp_start) / (spec.ramp_duration + 1.0e-6), 0.0, 1.0)
 
 
 def magnetic_field_components(
