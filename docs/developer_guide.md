@@ -73,11 +73,20 @@
   sweep points and the best `y_l2` / `z_l2` points, because the retained Hunt
   sweeps are not monotone. It also reports acceptance counts when the underlying
   sweep data includes analytical pass/fail information, which is useful for the
-  current Hartmann refinement blocker. CI now runs a dedicated Hartmann
+  remaining Hunt gap and for tracking the older Jacobi-only Hartmann branch that
+  motivated the current backend work. CI still runs a dedicated Hartmann
   `potential_iterations` sweep at `Ha20`, `32^2` for that reason. The same
-  runner can now sweep `potential_tolerance` and `potential_relaxation`, which
-  is useful when separating an insufficient `phi`-solve iteration ceiling from
-  an early residual stop or from a brittle raw Jacobi update.
+  runner can now sweep `potential_tolerance`, `potential_relaxation`, and
+  `potential_solver`, which is useful when separating an insufficient
+  `phi`-solve iteration ceiling from an early residual stop, a brittle raw
+  Jacobi update, or a backend choice.
+- The electric-potential solve now exposes three explicit backends:
+  - `jacobi`: weighted Jacobi with optional residual-based stopping
+  - `cg`: matrix-free preconditioned conjugate gradient
+  - `lineax_cg`: optional external CG path
+  The default `auto` policy resolves outside the traced JAX step:
+  single-region duct solves use `cg`, while layered multi-region solves keep
+  `jacobi`. That policy is based on region structure, not case-name heuristics.
 - Validation summaries now also include simple profile-pathology diagnostics such
   as sign-change counts and negative-value fractions on the extracted duct
   midplane profiles. These are useful when a solver branch becomes oscillatory
@@ -87,8 +96,8 @@
   profile errors when diagnosing whether a branch is failing because the
   electric-potential solve itself is under-resolved or because the larger
   coupled MHD update is unstable.
-- Validation summaries also report the actual Jacobi iteration count used by the
-  latest electric-potential solve. Use it with `potential_residual` to tell the
+- Validation summaries also report the actual electric-potential iteration count
+  used by the latest solve. Use it with `potential_residual` to tell the
   difference between “the solve stopped early” and “the solve hit its iteration
   ceiling without converging enough.”
 - Closed-channel validation, convergence, and control-sweep artifacts now also

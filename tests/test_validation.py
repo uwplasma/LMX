@@ -1,4 +1,5 @@
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -119,6 +120,7 @@ def test_compare_with_freemhd_report(tmp_path: Path):
 
 def test_duct_profile_metrics_reports_sign_pathology():
     case = make_hartmann_case(ha=20.0, ny=32, nz=32)
+    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="jacobi"))
     solution = solve_steady(case)
     metrics = duct_profile_metrics(solution)
 

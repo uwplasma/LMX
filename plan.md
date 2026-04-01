@@ -1446,6 +1446,55 @@ LMX should only be described as ship ready for the current milestone when all of
     combined-error artifacts to identify a coupled update rule, not just another
     single-parameter default tweak
 
+### 2026-04-02 00:40 America/Chicago
+
+- Implemented a more structural electric-potential backend improvement:
+  - added a matrix-free preconditioned CG backend for the electric-potential
+    solve
+  - added `potential_solver` to `TimeStepperConfig`
+  - added `potential_solver` support to `run_solver_control_sweep.py`
+  - the first attempt resolved the backend inside the traced JAX step and failed
+    with a traced-boolean conversion; that was fixed by resolving the backend
+    once, outside the compiled step, from the material-region layout
+- Retained backend-probe results:
+  - Hartmann `Ha20`, `32^2`:
+    - Jacobi gives `l2 ≈ 1.20`, `potential_residual ≈ 6.7e-2`
+    - CG gives `l2 ≈ 1.4e-2`, `potential_residual ≈ 1.2e-4`
+  - Hartmann `Ha20`, `48^2`:
+    - Jacobi gives `l2 ≈ 7.9e-2`
+    - CG gives `l2 ≈ 7.0e-3`
+  - Shercliff `Ha20`, `32^2`:
+    - Jacobi gives combined error `≈ 0.844`
+    - CG gives combined error `≈ 0.162`
+  - Hunt `Ha20`, `32^2`:
+    - Jacobi gives combined error `≈ 0.127`
+    - CG degrades badly to `≈ 0.400`
+  - Hunt `Ha100`, `32^2`:
+    - Jacobi gives combined error `≈ 0.343`
+    - CG also degrades to `≈ 0.377`
+- Retained interpretation:
+  - the backend choice is not case-name specific; it is strongly correlated with
+    region structure
+  - CG is the right retained default for the current single-region duct path
+    because it sharply improves Hartmann and Shercliff and removes the worst
+    medium-resolution Hartmann branch pathology
+  - the current layered multi-region Hunt path should stay on the damped Jacobi
+    backend until the coupled conducting-wall update itself is improved
+  - `main` now encodes that as a principled `potential_solver="auto"` policy:
+    - use `cg` when the solved cross-section is a single fluid region
+    - use `jacobi` when explicit solid layers are present
+- What worked:
+  - adding the CG backend itself
+  - exposing backend choice to control sweeps
+  - resolving `auto` outside the JIT boundary from material structure
+- What did not work:
+  - using CG unconditionally across all supported duct families
+  - resolving `auto` inside the traced step
+- Best next step:
+  - keep the new `auto` backend policy for the single-region path
+  - target the remaining Hunt conducting-wall gap directly, now that the
+    single-region `phi`-solve pathology is much better contained
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

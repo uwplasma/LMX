@@ -80,3 +80,40 @@ def test_solve_poisson_jacobi_can_stop_early_on_residual_tolerance():
     assert info.backend == "jax-jacobi"
     assert info.iterations < 50
     assert info.residual <= 2e-6
+
+
+def test_solve_poisson_cg_converges_on_zero_rhs():
+    diagonal, west, east, south, north, rhs = _poisson_coefficients()
+
+    solution, info = linear.solve_poisson_cg(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        anchor=(0, 0),
+        iterations=20,
+        tolerance=1e-8,
+    )
+
+    assert solution.shape == (2, 2)
+    assert info.backend == "jax-cg"
+    assert info.iterations == 0
+    assert info.residual == pytest.approx(0.0)
+
+
+def test_poisson_residual_norm_is_zero_for_exact_zero_solution():
+    diagonal, west, east, south, north, rhs = _poisson_coefficients()
+    residual = linear.poisson_residual_norm(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        jnp.zeros_like(rhs),
+        anchor=(0, 0),
+    )
+
+    assert float(residual) == pytest.approx(0.0)

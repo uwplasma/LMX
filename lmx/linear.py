@@ -20,6 +20,40 @@ class LinearSolveInfo:
     residual: float
 
 
+def apply_poisson_operator(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    phi: jnp.ndarray,
+    anchor: tuple[int, int],
+) -> jnp.ndarray:
+    west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
+    east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
+    south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
+    north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
+    matrix_phi = diagonal * phi - west * west_phi - east * east_phi - south * south_phi - north * north_phi
+    return matrix_phi.at[anchor].set(phi[anchor])
+
+
+def poisson_residual_norm(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    phi: jnp.ndarray,
+    anchor: tuple[int, int],
+) -> jnp.ndarray:
+    rhs_masked = rhs.at[anchor].set(0.0)
+    matrix_phi = apply_poisson_operator(diagonal, west, east, south, north, phi, anchor)
+    numerator = jnp.max(jnp.abs(matrix_phi - rhs_masked))
+    scale = jnp.maximum(jnp.max(jnp.abs(matrix_phi)), jnp.max(jnp.abs(rhs_masked)))
+    return numerator / jnp.maximum(scale, 1e-12)
+
+
 def solve_poisson_jacobi_state(
     diagonal: jnp.ndarray,
     west: jnp.ndarray,
@@ -33,7 +67,6 @@ def solve_poisson_jacobi_state(
     relaxation: float = 1.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     phi0 = jnp.zeros_like(rhs)
-    rhs_masked = rhs.at[anchor].set(0.0)
 
     omega = jnp.asarray(relaxation, dtype=rhs.dtype)
 
@@ -48,15 +81,7 @@ def solve_poisson_jacobi_state(
         return blended
 
     def residual_norm(phi: jnp.ndarray) -> jnp.ndarray:
-        west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
-        east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
-        south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
-        north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
-        matrix_phi = diagonal * phi - west * west_phi - east * east_phi - south * south_phi - north * north_phi
-        matrix_phi = matrix_phi.at[anchor].set(0.0)
-        numerator = jnp.max(jnp.abs(matrix_phi - rhs_masked))
-        scale = jnp.maximum(jnp.max(jnp.abs(matrix_phi)), jnp.max(jnp.abs(rhs_masked)))
-        return numerator / jnp.maximum(scale, 1e-12)
+        return poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
 
     if tolerance is None or tolerance <= 0.0:
         phi = jax.lax.fori_loop(0, iterations, lambda i, p: jacobi_update(p), phi0)
@@ -106,6 +131,92 @@ def solve_poisson_jacobi(
     )
     return phi, LinearSolveInfo(
         backend="jax-jacobi",
+        iterations=int(iteration_count),
+        residual=float(residual),
+    )
+
+
+def solve_poisson_cg_state(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    anchor: tuple[int, int],
+    iterations: int,
+    tolerance: float | None = None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    phi0 = jnp.zeros_like(rhs)
+    rhs_masked = rhs.at[anchor].set(0.0)
+    inv_diagonal = 1.0 / jnp.maximum(diagonal, 1e-12)
+    tolerance_value = -jnp.ones((), dtype=rhs.dtype) if tolerance is None else jnp.asarray(tolerance, dtype=rhs.dtype)
+
+    residual0 = rhs_masked - apply_poisson_operator(diagonal, west, east, south, north, phi0, anchor)
+    z0 = inv_diagonal * residual0
+    p0 = z0
+    rz0 = jnp.sum(residual0 * z0)
+    norm0 = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi0, anchor)
+
+    def cond_fun(state):
+        count, _, residual, _, _, rz_old, active = state
+        return jnp.logical_and(count < iterations, jnp.logical_and(active, residual > tolerance_value))
+
+    def body_fun(state):
+        count, phi, residual, r, p, rz_old, _ = state
+        ap = apply_poisson_operator(diagonal, west, east, south, north, p, anchor)
+        denom = jnp.sum(p * ap)
+        safe_denom = jnp.where(jnp.abs(denom) > 1e-20, denom, 1.0)
+        alpha = rz_old / safe_denom
+        phi_next = phi + alpha * p
+        phi_next = phi_next.at[anchor].set(0.0)
+        r_next = r - alpha * ap
+        z_next = inv_diagonal * r_next
+        rz_next = jnp.sum(r_next * z_next)
+        safe_rz_old = jnp.where(jnp.abs(rz_old) > 1e-20, rz_old, 1.0)
+        beta = rz_next / safe_rz_old
+        p_next = z_next + beta * p
+        residual_next = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi_next, anchor)
+        active_next = jnp.logical_and(jnp.abs(denom) > 1e-20, rz_next > 1e-24)
+        return count + 1, phi_next, residual_next, r_next, p_next, rz_next, active_next
+
+    init_state = (
+        jnp.asarray(0, dtype=jnp.int32),
+        phi0,
+        norm0,
+        residual0,
+        p0,
+        rz0,
+        jnp.asarray(rz0 > 1e-24),
+    )
+    iteration_count, phi, residual, _, _, _, _ = jax.lax.while_loop(cond_fun, body_fun, init_state)
+    return phi, residual, iteration_count
+
+
+def solve_poisson_cg(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    anchor: tuple[int, int],
+    iterations: int,
+    tolerance: float | None = None,
+) -> tuple[jnp.ndarray, LinearSolveInfo]:
+    phi, residual, iteration_count = solve_poisson_cg_state(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        anchor,
+        iterations,
+        tolerance=tolerance,
+    )
+    return phi, LinearSolveInfo(
+        backend="jax-cg",
         iterations=int(iteration_count),
         residual=float(residual),
     )

@@ -117,7 +117,7 @@ The backend harness currently supports:
   - this points to the current electric-potential coupling budget as a central
     part of the blocker, not just generic pseudo-time controls
   - CI now runs this Hartmann `potential_iterations` sweep as a normal artifact
-    so the blocker stays visible during future solver work
+    so the older Jacobi-only branch remains visible during future solver work
 - Native validation summaries now also report a normalized electric-potential
   equation residual from the latest solve step:
   - the current bad Hartmann `Ha20`, `32^2` branch lands around
@@ -129,8 +129,8 @@ The backend harness currently supports:
     profile/pathology metrics and gives the next solver iteration a more direct
     signal than profile L2 alone
 - The solver now also supports an optional residual-based stopping rule for the
-  electric-potential Jacobi solve, together with reporting of the actual Jacobi
-  iteration count used in the latest step:
+  electric-potential solve, together with reporting of the actual iteration
+  count used in the latest step:
   - on a Hartmann `Ha20`, `32^2` probe, setting
     `potential_tolerance in {1e-2, 1e-3, 1e-4}` while allowing
     `potential_iterations = 800` improved the branch from
@@ -184,6 +184,29 @@ The backend harness currently supports:
       but degrades at `400`
   - that makes `potential_relaxation` worth keeping as a sweepable solver
     control, but not yet safe as a new default policy
+- The next retained solver step improved the electric-potential backend story in
+  a more structural way:
+  - LMX now supports a matrix-free CG backend for the electric-potential solve
+  - the current retained backend probe results are strongly split by region
+    structure rather than by case name
+  - single-region duct cases improved sharply:
+    - Hartmann `Ha20`, `32^2`: `l2 ≈ 1.20 -> 1.4e-2` and
+      `potential_residual ≈ 6.7e-2 -> 1.2e-4` when moving from Jacobi to CG
+    - Hartmann `Ha20`, `48^2`: `l2 ≈ 7.9e-2 -> 7.0e-3`
+    - Shercliff `Ha20`, `32^2`: combined error
+      `≈ 0.844 -> 0.162`
+  - multi-region Hunt cases moved in the opposite direction:
+    - Hunt `Ha20`, `32^2`: combined error
+      `≈ 0.127 -> 0.400`
+    - Hunt `Ha100`, `32^2`: combined error
+      `≈ 0.343 -> 0.377`
+  - retained conclusion:
+    - CG is the right default for the current single-region duct path
+    - Hunt-style layered ducts should stay on the damped Jacobi path until the
+      coupled conducting-wall update is improved
+    - `main` now encodes that as a principled `potential_solver="auto"` policy:
+      use CG when the solved cross-section is a single fluid region, and keep
+      Jacobi when explicit solid layers are present
 - The boundary gradient operator on clustered meshes is now also corrected to use
   center-to-center spacing at the domain edges. This did not materially shift the
   current retained duct validation metrics, but it removes a nonuniform-mesh

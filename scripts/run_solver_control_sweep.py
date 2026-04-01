@@ -30,10 +30,12 @@ def _replace_like(obj, **changes):
     raise TypeError(f"Unsupported object replacement for {type(obj)!r}")
 
 
-def _parse_values(raw: str, kind: str) -> list[float | int]:
+def _parse_values(raw: str, kind: str) -> list[float | int | str]:
     items = [item.strip() for item in raw.split(",") if item.strip()]
     if kind == "int":
         return [int(item) for item in items]
+    if kind == "str":
+        return items
     return [float(item) for item in items]
 
 
@@ -107,11 +109,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--wall-cells", type=int, default=None)
     parser.add_argument(
         "--parameter",
-        choices=["outer_iterations", "potential_iterations", "potential_tolerance", "potential_relaxation", "relaxation", "dt"],
+        choices=[
+            "outer_iterations",
+            "potential_iterations",
+            "potential_tolerance",
+            "potential_relaxation",
+            "potential_solver",
+            "relaxation",
+            "dt",
+        ],
         required=True,
     )
     parser.add_argument("--values", type=str, required=True)
-    parser.add_argument("--value-type", choices=["float", "int"], default="float")
+    parser.add_argument("--value-type", choices=["float", "int", "str"], default="float")
     parser.add_argument("--reference-root", type=Path, default=None)
     parser.add_argument("--x-slice", type=str, default="1m")
     args = parser.parse_args(argv)

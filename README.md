@@ -20,6 +20,10 @@ staying focused on structured duct and simple pipe geometries.
   artifacts instead of only through profile errors.
 - Closed-channel validation artifacts now also include a combined profile error,
   so Hunt/Shercliff tradeoffs are not judged from `y` and `z` cuts separately.
+- The electric-potential solve now supports `auto`, weighted-Jacobi, and CG
+  control paths. The current default is a geometry-aware `auto` policy:
+  single-region ducts use CG, while multi-region layered ducts keep the more
+  damped Jacobi path until the coupled Hunt update is improved.
 
 ## Quick start
 
@@ -40,6 +44,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep --case hunt --ha 20 --resolution 48 --wall-cells 5 --parameter outer_iterations --values 2,4,6,8,10 --value-type int --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hartmann --case hartmann --ha 20 --resolution 32 --parameter potential_iterations --values 50,100,200,400,800 --value-type int
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_tol --case hartmann --ha 20 --resolution 32 --parameter potential_tolerance --values 1e-2,1e-3,1e-4 --value-type float
+/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_backend --case shercliff --ha 20 --resolution 32 --parameter potential_solver --values auto,jacobi,cg --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
 ```
 

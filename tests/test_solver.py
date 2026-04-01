@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.physics import build_material_fields
 import lmx.solvers as solvers
 from lmx.specs import BoundaryCondition
 from lmx.solvers import solve_steady
@@ -35,12 +36,15 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha20.time_stepper.outer_iterations == 6
     assert ha20.time_stepper.velocity_update_limit == pytest.approx(2e-3)
     assert ha20.time_stepper.potential_tolerance is None
+    assert ha20.time_stepper.potential_solver == "auto"
     assert ha100.time_stepper.outer_iterations == 4
     assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha100.time_stepper.potential_tolerance is None
+    assert ha100.time_stepper.potential_solver == "auto"
     assert ha1000.time_stepper.outer_iterations == 3
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha1000.time_stepper.potential_tolerance is None
+    assert ha1000.time_stepper.potential_solver == "auto"
 
 
 def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
@@ -95,6 +99,29 @@ def test_shercliff_solution_stays_finite_and_zero_at_walls():
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.allclose(solution.state.u[0, :], 0.0)
     assert jnp.allclose(solution.state.u[-1, :], 0.0)
+
+
+def test_hartmann_case_supports_cg_potential_backend():
+    case = make_hartmann_case(ha=5.0, ny=12, nz=12)
+    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg", potential_iterations=50))
+    solution = solve_steady(case)
+
+    assert jnp.isfinite(solution.state.u).all()
+    assert jnp.isfinite(solution.state.phi).all()
+    assert solution.diagnostics.potential_iterations_history.shape[0] > 0
+
+
+def test_auto_potential_backend_uses_cg_for_single_region_and_jacobi_for_layered_cases():
+    hartmann = make_hartmann_case(ha=5.0, ny=12, nz=12)
+    hunt = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+
+    hartmann_mesh = solvers._build_mesh(hartmann)
+    hunt_mesh = solvers._build_mesh(hunt)
+    hartmann_materials = build_material_fields(hartmann, hartmann_mesh)
+    hunt_materials = build_material_fields(hunt, hunt_mesh)
+
+    assert solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
+    assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "jacobi"
 
 
 def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):

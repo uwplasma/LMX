@@ -19,6 +19,7 @@ BoundaryKind = Literal[
     "imposed_current_density",
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
+PotentialSolverKind = Literal["auto", "jacobi", "cg", "lineax_cg"]
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class TimeStepperConfig:
     potential_iterations: int = 400
     potential_tolerance: float | None = None
     potential_relaxation: float = 1.0
+    potential_solver: PotentialSolverKind = "auto"
     steady_tolerance: float = 1e-8
     relaxation: float = 0.35
     velocity_update_limit: float = 1e-3

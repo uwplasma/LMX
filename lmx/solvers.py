@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from .core import Diagnostics, MHDState, Solution
-from .linear import solve_poisson_jacobi_state
+from .linear import solve_poisson_cg_state, solve_poisson_jacobi_state, solve_poisson_lineax
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
 from .operators import center_spacing_y, center_spacing_z, face_average_x, face_average_z, gradient_scalar, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
@@ -77,6 +77,7 @@ def _solve_potential(
     iterations: int,
     tolerance: float | None = None,
     relaxation: float = 1.0,
+    solver: str = "jacobi",
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
@@ -93,19 +94,56 @@ def _solve_potential(
     )
 
     diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
-    phi, residual, iteration_count = solve_poisson_jacobi_state(
-        diagonal,
-        west,
-        east,
-        south,
-        north,
-        rhs,
-        anchor,
-        iterations,
-        tolerance=tolerance,
-        relaxation=relaxation,
-    )
+    if solver == "jacobi":
+        phi, residual, iteration_count = solve_poisson_jacobi_state(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            anchor,
+            iterations,
+            tolerance=tolerance,
+            relaxation=relaxation,
+        )
+    elif solver == "cg":
+        phi, residual, iteration_count = solve_poisson_cg_state(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            anchor,
+            iterations,
+            tolerance=tolerance,
+        )
+    elif solver == "lineax_cg":
+        phi, info = solve_poisson_lineax(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            anchor,
+            fallback_iterations=iterations,
+            max_steps=iterations,
+        )
+        residual = jnp.asarray(info.residual, dtype=rhs.dtype)
+        iteration_count = jnp.asarray(info.iterations, dtype=jnp.int32)
+    else:
+        raise ValueError(f"Unsupported potential solver backend {solver!r}")
     return phi, residual, iteration_count
+
+
+def _resolve_potential_solver(solver: str, fluid_mask: jnp.ndarray | None) -> str:
+    if solver != "auto":
+        return solver
+    if fluid_mask is None:
+        return "cg"
+    return "cg" if bool(jnp.all(fluid_mask)) else "jacobi"
 
 
 def _compute_current_and_lorentz(
@@ -200,6 +238,7 @@ def _step(
     potential_iterations: int,
     potential_tolerance: float | None,
     potential_relaxation: float,
+    potential_solver: str,
     relaxation: float,
     velocity_update_limit: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
@@ -216,6 +255,7 @@ def _step(
             potential_iterations,
             tolerance=potential_tolerance,
             relaxation=potential_relaxation,
+            solver=potential_solver,
         )
         phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
         jy, jz, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
@@ -255,6 +295,7 @@ def solve_transient(case: CaseSpec) -> Solution:
     materials = build_material_fields(case, mesh)
     _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
     forcing = _effective_forcing(case, materials.conductivity, materials.fluid_mask, by, bz)
+    potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
     initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
@@ -279,6 +320,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             potential_iterations=case.time_stepper.potential_iterations,
             potential_tolerance=case.time_stepper.potential_tolerance,
             potential_relaxation=case.time_stepper.potential_relaxation,
+            potential_solver=potential_solver,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
         )
@@ -314,6 +356,7 @@ def solve_steady(case: CaseSpec) -> Solution:
     materials = build_material_fields(case, mesh)
     _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
     forcing = _effective_forcing(case, materials.conductivity, materials.fluid_mask, by, bz)
+    potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
     initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
@@ -340,6 +383,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             potential_iterations=case.time_stepper.potential_iterations,
             potential_tolerance=case.time_stepper.potential_tolerance,
             potential_relaxation=case.time_stepper.potential_relaxation,
+            potential_solver=potential_solver,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
         )
