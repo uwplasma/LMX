@@ -109,6 +109,8 @@ def test_hartmann_case_supports_cg_potential_backend():
 
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.isfinite(solution.state.phi).all()
+    assert solution.diagnostics.time_history.shape[0] > 0
+    assert solution.diagnostics.u_max_history.shape[0] > 0
     assert solution.diagnostics.potential_iterations_history.shape[0] > 0
 
 
@@ -119,6 +121,8 @@ def test_hunt_case_supports_volume_scaled_cg_potential_backend():
 
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.isfinite(solution.state.phi).all()
+    assert solution.diagnostics.time_history.shape[0] > 0
+    assert solution.diagnostics.u_max_history.shape[0] > 0
     assert solution.diagnostics.potential_iterations_history.shape[0] > 0
 
 
@@ -216,6 +220,8 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
 
+    assert solution.diagnostics.time_history.shape[0] == 3
+    assert solution.diagnostics.u_max_history.shape[0] == 3
     assert solution.diagnostics.residual_history.shape[0] == 3
     assert solution.diagnostics.potential_residual_history.shape[0] == 3
     assert solution.diagnostics.potential_iterations_history.shape[0] == 3
@@ -237,6 +243,8 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
 
+    assert solution.diagnostics.time_history.shape[0] == 2
+    assert solution.diagnostics.u_max_history.shape[0] == 2
     assert solution.diagnostics.residual_history.shape[0] == 2
     assert solution.diagnostics.potential_residual_history.shape[0] == 2
     assert solution.diagnostics.potential_iterations_history.shape[0] == 2

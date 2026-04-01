@@ -338,6 +338,61 @@ The backend harness currently supports:
     - the next useful comparison is therefore not “can LMX drive `phi`
       residual down?” but “how does the coupled velocity/pressure response use
       that `phi` state?”
+- The missing FreeMHD pressure-correction trace is now also real:
+  - retained harness fix:
+    - the recovered-case container runner now supports `startFrom`
+    - this fixes the earlier no-op rerun where a case with existing `0.0001/`
+      output started from `latestTime` and immediately hit `endTime`
+  - retained pressure records from the live patched Hunt `Ha20` run:
+    - `t = 1.25e-05`, `corr = 0`:
+      - `pFinalResidual = 4.76e-05`
+      - `pIterations = 45`
+      - `maxU = 0.11803283`
+      - `maxP = maxPRgh = 111975.04`
+    - `t = 1.25e-05`, `corr = 2`:
+      - `pFinalResidual = 9.10e-08`
+      - `pIterations = 15`
+      - `maxU = 0.11774258`
+    - `t = 2.70833e-05`, `corr = 2`:
+      - `pFinalResidual = 9.03e-08`
+      - `pIterations = 15`
+      - `maxU = 0.11791814`
+  - retained interpretation:
+    - FreeMHD’s layered Hunt `phi` and pressure blocks both converge much more
+      tightly than the current LMX layered short-time trace
+    - the remaining question is now not whether LMX needs better diagnostics,
+      but which layered update/backend change actually closes that gap without
+      regressing the longer profile metrics
+- LMX now emits the matching short-time trace observables:
+  - `Diagnostics` includes `time_history` and `u_max_history`
+  - `run_hunt_solver_diagnostic_report.py` now writes an `lmx_solver.trace`
+    section with:
+    - `time_history`
+    - `u_max_history`
+    - `residual_history`
+    - `potential_residual_history`
+    - `potential_iterations_history`
+- First retained short-time LMX Hunt backend comparison against the FreeMHD
+  trace:
+  - default layered short-time trace (`Ha20`, `dt = 1e-5`, `10` steps):
+    - first-step `u_max ≈ 0.117496`
+    - final trace `potential_residual ≈ 4.12e-01`
+  - `potential_relaxation = 0.5` is worse:
+    - final trace `potential_residual ≈ 4.62e-01`
+    - worse `u_max` agreement as well
+  - `outer_iterations = 4` is mixed:
+    - final trace `potential_residual ≈ 3.24e-01`
+    - only a small `u_max` benefit and not enough evidence for a default shift
+  - `potential_solver = cg_volume`, `potential_iterations = 200` is the
+    strongest retained short-time candidate:
+    - final trace `potential_residual ≈ 1.39e-01`
+    - `u_max_abs_diff ≈ 4.12e-04`
+  - retained interpretation:
+    - `cg_volume` clearly improves the short-time layered `phi` convergence
+      signal
+    - but that still is not enough evidence to promote it as the default Hunt
+      backend until the longer-horizon Hunt `Ha20` / `Ha100` profile metrics are
+      rechecked on the current code state
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and

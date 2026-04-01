@@ -23,6 +23,8 @@ class Diagnostics:
     residual_history: jnp.ndarray
     courant_like: jnp.ndarray
     ohmic_power: jnp.ndarray
+    time_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    u_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     potential_iterations_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 

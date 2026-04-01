@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--relaxation", type=float, default=None)
     parser.add_argument("--potential-iterations", type=int, default=None)
     parser.add_argument("--potential-relaxation", type=float, default=None)
-    parser.add_argument("--potential-solver", choices=["auto", "jacobi", "cg", "lineax_cg"], default=None)
+    parser.add_argument("--potential-solver", choices=["auto", "jacobi", "cg", "cg_volume", "lineax_cg"], default=None)
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)
     parser.add_argument("--output", type=Path, required=True)
@@ -112,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
         "case_name": solution.case_name,
         "time_stepper": asdict(case.time_stepper),
         "diagnostics": validation_summary(solution, solution.case_name, ha=args.ha),
+        "trace": {
+            "time_history": solution.diagnostics.time_history.tolist(),
+            "u_max_history": solution.diagnostics.u_max_history.tolist(),
+            "residual_history": solution.diagnostics.residual_history.tolist(),
+            "potential_residual_history": solution.diagnostics.potential_residual_history.tolist(),
+            "potential_iterations_history": solution.diagnostics.potential_iterations_history.tolist(),
+        },
     }
 
     freemhd_run = {

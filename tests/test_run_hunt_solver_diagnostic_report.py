@@ -70,5 +70,44 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert "freemhd_run" in payload
     assert "comparison" in payload
     assert payload["lmx_solver"]["diagnostics"]["potential_residual"] == pytest.approx(0.001)
+    assert payload["lmx_solver"]["trace"]["time_history"] == []
+    assert payload["lmx_solver"]["trace"]["u_max_history"] == []
     assert payload["comparison"]["u_max_abs_diff"] == pytest.approx(0.75)
     assert payload["comparison"]["sample_combined_l2_error"] < 1e-6
+
+
+def test_hunt_solver_diagnostic_report_accepts_cg_volume_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    run_dir = tmp_path / "run"
+    (run_dir / "0" / "liquid").mkdir(parents=True)
+    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "system").mkdir()
+    (run_dir / "constant").mkdir()
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
+        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    )
+
+    captured = {}
+
+    def fake_solve(case):
+        captured["potential_solver"] = case.time_stepper.potential_solver
+        return _fake_solution()
+
+    monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
+
+    output = tmp_path / "diagnostics.json"
+    exit_code = huntdiag.main(
+        [
+            "--freemhd-run-dir",
+            str(run_dir),
+            "--ha",
+            "20",
+            "--potential-solver",
+            "cg_volume",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["potential_solver"] == "cg_volume"

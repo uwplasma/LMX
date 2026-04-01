@@ -387,7 +387,18 @@ def solve_transient(case: CaseSpec) -> Solution:
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
         ohmic = jnp.mean(jy**2 + jz**2)
-        sample = jnp.asarray([residual, courant_like, ohmic, potential_residual, potential_iteration_count], dtype=float)
+        sample = jnp.asarray(
+            [
+                time + dt,
+                jnp.max(jnp.abs(u_next)),
+                residual,
+                courant_like,
+                ohmic,
+                potential_residual,
+                potential_iteration_count,
+            ],
+            dtype=float,
+        )
         return (u_next, time + dt), (u_next, phi, jy, jz, lorentz, sample)
 
     (u_final, time_final), history = jax.lax.scan(scan_step, (initial_u, 0.0), xs=None, length=steps)
@@ -403,11 +414,13 @@ def solve_transient(case: CaseSpec) -> Solution:
         residual=float(samples[-1, 0]),
     )
     diagnostics = Diagnostics(
-        residual_history=samples[:, 0],
-        courant_like=samples[:, 1],
-        ohmic_power=samples[:, 2],
-        potential_residual_history=samples[:, 3],
-        potential_iterations_history=samples[:, 4],
+        time_history=samples[:, 0],
+        u_max_history=samples[:, 1],
+        residual_history=samples[:, 2],
+        courant_like=samples[:, 3],
+        ohmic_power=samples[:, 4],
+        potential_residual_history=samples[:, 5],
+        potential_iterations_history=samples[:, 6],
     )
     return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
 
@@ -461,6 +474,8 @@ def solve_steady(case: CaseSpec) -> Solution:
     residual_history: list[float] = []
     courant_history: list[float] = []
     ohmic_history: list[float] = []
+    time_history: list[float] = []
+    u_max_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     step_count = 0
@@ -468,8 +483,11 @@ def solve_steady(case: CaseSpec) -> Solution:
     for step_index in range(max_steps):
         u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count = step_fn(u)
         residual_value = float(residual)
-        courant_like = float(jnp.max(jnp.abs(u)) * dt / jnp.min(mesh.dy))
+        u_max_value = float(jnp.max(jnp.abs(u)))
+        courant_like = float(u_max_value * dt / jnp.min(mesh.dy))
         ohmic = float(jnp.mean(jy**2 + jz**2))
+        time_history.append(float((step_index + 1) * dt))
+        u_max_history.append(u_max_value)
         residual_history.append(residual_value)
         courant_history.append(courant_like)
         ohmic_history.append(ohmic)
@@ -491,6 +509,8 @@ def solve_steady(case: CaseSpec) -> Solution:
         residual=residual_value,
     )
     diagnostics = Diagnostics(
+        time_history=jnp.asarray(time_history, dtype=float),
+        u_max_history=jnp.asarray(u_max_history, dtype=float),
         residual_history=jnp.asarray(residual_history, dtype=float),
         courant_like=jnp.asarray(courant_history, dtype=float),
         ohmic_power=jnp.asarray(ohmic_history, dtype=float),

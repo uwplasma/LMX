@@ -1834,6 +1834,82 @@ LMX should only be described as ship ready for the current milestone when all of
     pressure-instrumented Hunt rerun and move back to the layered Hunt update
     law itself
 
+### 2026-04-02 09:40 America/Chicago
+
+- The `main` branch is now back on a clean green baseline after the CI/CD fix:
+  - local checkout is at `2ea01a7`
+  - GitHub Actions `ci` and `benchmarks` are both green on `main`
+  - retained CI fix:
+    - `scripts/build_freemhd_container.py` now uses
+      `docker buildx build --load`
+    - coverage was raised with targeted tests instead of lowering the gate
+- The patched FreeMHD Hunt `Ha20` rerun now produces the missing coupled
+  pressure trace when started from `startTime`:
+  - retained harness fix:
+    - `run_freemhd_case.py`, `docker/run_freemhd_case.sh`, and
+      `write_freemhd_container_files.py` now support `startFrom`
+    - this fixes the earlier failure mode where a recovered case with existing
+      `0.0001/` output started from `latestTime` and immediately ended without
+      emitting new solver diagnostics
+  - retained FreeMHD log records now saved in `/tmp/lmx_hunt20_live_diag.json`
+  - first coupled pressure-correction records:
+    - `t = 1.25e-05`, `corr = 0`:
+      - `pInitialResidual = 4.96e-03`
+      - `pFinalResidual = 4.76e-05`
+      - `pIterations = 45`
+      - `maxU = 0.11803283`
+      - `maxP = maxPRgh = 111975.04`
+    - `t = 1.25e-05`, `corr = 2`:
+      - `pFinalResidual = 9.10e-08`
+      - `pIterations = 15`
+      - `maxU = 0.11774258`
+    - `t = 2.70833e-05`, `corr = 2`:
+      - `pFinalResidual = 9.03e-08`
+      - `pIterations = 15`
+      - `maxU = 0.11791814`
+- LMX now records the matching short-time trace observables:
+  - `Diagnostics` now includes `time_history` and `u_max_history`
+  - `run_hunt_solver_diagnostic_report.py` now emits an `lmx_solver.trace`
+    section with:
+    - `time_history`
+    - `u_max_history`
+    - `residual_history`
+    - `potential_residual_history`
+    - `potential_iterations_history`
+- First retained short-time Hunt comparison using those traces:
+  - default layered Hunt short-time run (`Ha20`, `dt = 1e-5`, `10` steps):
+    - LMX first-step `u_max ≈ 0.117496`
+    - FreeMHD first-step final-correction `maxU ≈ 0.117743`
+    - LMX end-of-trace `potential_residual ≈ 4.12e-01`
+  - `potential_relaxation = 0.5` is a negative result:
+    - it worsens the short-time layered `phi` residual trajectory
+    - it also slightly worsens the short-time `u_max` comparison
+  - `outer_iterations = 4` is mixed:
+    - it lowers short-time `potential_residual` versus the current default
+    - but it does not clearly improve the short-time `u_max` comparison enough
+      to justify a default change on its own
+  - `potential_solver = cg_volume` is the strongest retained short-time solver
+    candidate so far:
+    - with `potential_iterations = 200`, the short-time layered Hunt trace
+      gives:
+      - `potential_residual ≈ 1.39e-01`
+      - `u_max_abs_diff ≈ 4.12e-04`
+    - compared with the default short-time trace:
+      - `potential_residual ≈ 4.12e-01`
+      - `u_max_abs_diff ≈ 3.66e-04` against the earlier first live record
+    - retained interpretation:
+      - `cg_volume` materially improves the multi-region short-time `phi`
+        convergence signal
+      - but this is still not enough evidence to change the global Hunt default
+        without rechecking the longer-profile validation metrics
+- Best next step:
+  - evaluate `cg_volume` against the retained longer-horizon Hunt `Ha20` and
+    `Ha100` profile artifacts using the current code state
+  - if the longer-profile metrics also improve or stay neutral, promote a more
+    selective layered `phi` backend policy
+  - if not, keep the new trace tooling and use the FreeMHD pressure/maxU
+    histories to target the layered velocity/coupling update law directly
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
