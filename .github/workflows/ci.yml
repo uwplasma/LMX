@@ -70,6 +70,9 @@ jobs:
       - name: Run convergence artifact suite
         run: python scripts/run_convergence_suite.py --output artifacts/convergence --cases hartmann --ha 5 --resolutions 8,16,32
 
+      - name: Run time-convergence artifact suite
+        run: python scripts/run_time_convergence_suite.py --output artifacts/time_convergence --cases hartmann --ha 5 --resolution 16 --dts 0.004,0.002,0.001
+
       - name: Run FreeMHD parity artifact suite
         run: python scripts/run_freemhd_parity_suite.py --output artifacts/freemhd_parity
 
@@ -88,6 +91,7 @@ jobs:
           path: |
             artifacts/validation
             artifacts/convergence
+            artifacts/time_convergence
             artifacts/freemhd_parity
 
   coverage:

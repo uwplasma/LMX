@@ -19,6 +19,8 @@
 - Native mesh-convergence study summaries for the currently supported duct cases.
 - Native mesh-convergence study summaries now include estimated Hartmann-layer and
   side-layer cell counts for the duct cases.
+- Native pseudo-time convergence summaries now exist for fixed-resolution duct
+  studies, so temporal sensitivity can be separated from mesh sensitivity.
 - CSV and ParaView outputs for centerline and field inspection.
 - Validation artifact generation in GitHub Actions.
 - Benchmark artifact generation in GitHub Actions.
@@ -67,6 +69,14 @@ The backend harness currently supports:
   - the Hunt `Ha20` convergence sweep now shows strong improvement in the `y`
     profile with refinement instead of the previous near-zero observed order,
     although the `z` profile still lags
+- The new fixed-resolution pseudo-time convergence runner clarifies the remaining
+  Hunt behavior further:
+  - at Hunt `Ha20` and fixed `48^2` resolution, reducing `dt` from `0.002` to
+    `0.0005` improves the `z` profile only modestly (`z_l2 ≈ 0.209 -> 0.175`)
+  - over the same sweep, the `y` profile degrades (`y_l2 ≈ 0.023 -> 0.108`)
+  - this means the remaining Hunt discrepancy is not a simple “smaller dt is
+    always better” problem; the current pseudo-time path still carries a genuine
+    transient/control-law tradeoff that needs solver-side treatment
 - The current short-time closed-channel validation reports are useful regression
   signals, but they are not yet final acceptance criteria for all case families.
 
@@ -74,6 +84,8 @@ The backend harness currently supports:
 
 - Add stronger parity thresholds once the solver is stable across more geometries.
 - Extend the current mesh-convergence tooling to pseudo-time convergence studies.
+- Use the new pseudo-time convergence runner to decide which remaining Hunt
+  discrepancies are temporal versus spatial before changing solver defaults.
 - Expand native LMX validation to additional mapped-geometry cases.
 - Improve high-Ha Hunt fidelity without introducing case-specific hardcoded limits.
 - Keep the external backend checks optional and separate from the core LMX identity.

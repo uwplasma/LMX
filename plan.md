@@ -178,6 +178,7 @@ LMX should only be described as ship ready for the current milestone when all of
   - explicit Hartmann acceptance reports with configurable `l2` and `linf` thresholds
   - a native `run_convergence_suite.py` runner that emits mesh-convergence summaries for Hartmann, Shercliff, and Hunt
   - those convergence summaries now also report estimated Hartmann-layer and side-layer cell counts, so mesh adequacy is visible in the artifact itself
+  - a native `run_time_convergence_suite.py` runner now exists for fixed-resolution pseudo-time studies
 - `solve_steady` no longer aliases the transient runner:
   - it now iterates until either the configured steady tolerance is reached or the configured maximum step budget is exhausted
   - targeted tests now cover early-stop and max-step behavior explicitly
@@ -1060,6 +1061,52 @@ LMX should only be described as ship ready for the current milestone when all of
     improved
   - the remaining native Hunt gap is increasingly concentrated in the `z`
     profile / side-layer evolution rather than in the overall duct solve
+
+### 2026-04-01 13:30 America/Chicago
+
+- Probed two more possible causes of the remaining native Hunt gap and kept the
+  results as validation guidance rather than forcing another solver change:
+  - increasing the explicit conducting-wall cell count at fixed fluid resolution
+    barely moved the Hunt errors for either `Ha20` or `Ha100`
+  - varying the pseudo-time step and step budget at fixed physical horizon moved
+    the Hunt profiles nontrivially, especially at `Ha20`
+- Those are useful negative/diagnostic results:
+  - the explicit solid-wall mesh is not the dominant remaining issue
+  - the remaining Hunt discrepancy is not purely spatial; temporal sensitivity is
+    still present and should be tracked explicitly
+- Implemented the planned native pseudo-time convergence runner:
+  - `scripts/run_time_convergence_suite.py` now runs fixed-resolution, varying-`dt`
+    studies for Hartmann, Shercliff, and Hunt
+  - it reuses the same validation metrics as the mesh-convergence runner and also
+    includes the current layer-resolution diagnostics in each level
+  - CI now produces `artifacts/time_convergence` alongside the existing validation
+    and mesh-convergence artifacts
+- Added unit coverage for the new runner and updated the docs so it is part of the
+  normal validation workflow.
+- Current best next step is now better constrained:
+  1. use the new time-convergence artifacts to separate the remaining Hunt error
+     into temporal and spatial/update components
+  2. keep improving the Hunt coupling formulation only where those artifacts show
+     a persistent solver defect, not where the result is just time-step sensitive
+
+### 2026-04-01 13:45 America/Chicago
+
+- Ran the first real local pseudo-time convergence artifact with the new runner:
+  - case: native Hunt `Ha20`
+  - fixed resolution: `48^2` fluid cells
+  - `dt` sweep: `0.002`, `0.001`, `0.0005`
+- The retained result is important for the next solver step:
+  - decreasing `dt` does not improve all observables together
+  - `y_l2` worsens from about `0.023` at `dt=0.002` to about `0.108` at
+    `dt=0.0005`
+  - `z_l2` improves only modestly from about `0.209` to about `0.175`
+  - the observed orders with respect to `dt` are negative for the `y` profile and
+    only weakly positive for the `z` profile
+- Interpretation:
+  - the remaining Hunt gap is not just “run longer” or “take a smaller step”
+  - the current pseudo-time update still contains a tradeoff between different
+    profile directions, which points back to the coupled update/control law rather
+    than to a missing validation or meshing feature
 
 ## Instruction For Future Agents
 
