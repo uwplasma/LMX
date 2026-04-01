@@ -24,6 +24,11 @@ staying focused on structured duct and simple pipe geometries.
   control paths. The current default is a geometry-aware `auto` policy:
   single-region ducts use CG, while multi-region layered ducts keep the more
   damped Jacobi path until the coupled Hunt update is improved.
+- Layered conducting-wall cases also expose `potential_solver="cg_volume"`,
+  which solves the same layered `phi` equation after cell-metric scaling into a
+  symmetric CG system. It is currently a diagnostic backend rather than the
+  default because it improves `Hunt Ha100` while worsening `Hunt Ha20`
+  combined error at the retained control point.
 
 ## Quick start
 
@@ -45,6 +50,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hartmann --case hartmann --ha 20 --resolution 32 --parameter potential_iterations --values 50,100,200,400,800 --value-type int
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_tol --case hartmann --ha 20 --resolution 32 --parameter potential_tolerance --values 1e-2,1e-3,1e-4 --value-type float
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_backend --case shercliff --ha 20 --resolution 32 --parameter potential_solver --values auto,jacobi,cg --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
+/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hunt_phi_backend --case hunt --ha 100 --resolution 32 --parameter potential_solver --values jacobi,cg_volume --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_velocity_limit --case hunt --ha 20 --resolution 32 --parameter velocity_update_limit --values 5e-4,1e-3,2e-3,4e-3 --value-type float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_grid_sweep.py --output ./artifacts/control_grid_hunt --case hunt --ha 20 --resolution 32 --parameter-a outer_iterations --values-a 4,6 --type-a int --parameter-b potential_relaxation --values-b 1.0,0.5 --type-b float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
@@ -72,6 +78,8 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
+/Users/rogerio/base_env/bin/python3 scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD
+/Users/rogerio/base_env/bin/python3 scripts/extract_freemhd_coupled_log.py ./artifacts/freemhd_hunt.log --output ./artifacts/freemhd_hunt_diag.json
 ```
 
 ## Scope

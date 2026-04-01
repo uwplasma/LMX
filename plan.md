@@ -1691,6 +1691,55 @@ LMX should only be described as ship ready for the current milestone when all of
   - use the new solver-diagnostic report alongside the existing parity and
     control-sweep artifacts when evaluating the next layered Hunt update
 
+### 2026-04-02 04:10 America/Chicago
+
+- Took a blocker-focused pass on the layered Hunt `phi` solve instead of adding
+  more scaffolding:
+  - added `potential_solver="cg_volume"` to LMX
+  - this backend solves the same discrete layered `phi` system after left
+    scaling by the cell metric, which is the symmetric form of the nonuniform
+    divergence-form operator
+  - kept `potential_solver="auto"` unchanged for now:
+    - single-region ducts still resolve to `cg`
+    - layered ducts still resolve to `jacobi`
+- Retained numerical result:
+  - Hartmann `Ha20`, `32^2`:
+    - `cg_volume` matches the good single-region CG path and remains accepted
+  - Shercliff `Ha20`, `32^2`:
+    - `cg_volume` matches the good single-region CG path
+      (`combined_l2 ≈ 0.162`)
+  - Hunt `Ha20`, `32^2`:
+    - `jacobi`: `combined_l2 ≈ 0.1267`, `potential_residual ≈ 5.0e-1`
+    - `cg_volume`: `combined_l2 ≈ 0.1510`, `potential_residual ≈ 9.4e-3`
+  - Hunt `Ha100`, `32^2`:
+    - `jacobi`: `combined_l2 ≈ 0.3493`, `potential_residual ≈ 1.7e-1`
+    - `cg_volume`: `combined_l2 ≈ 0.3014`, `potential_residual ≈ 1.0e-2`
+- Retained interpretation:
+  - the layered `phi` solve really was part of the blocker
+  - but it is not the only blocker
+  - once the layered `phi` residual is reduced by one to two orders of
+    magnitude, the remaining Hunt gap is still in the coupled velocity update
+    law, because `Ha20` gets a better `y` profile and a much better `phi`
+    residual while the combined error still worsens through the `z` profile
+  - this is the strongest retained evidence so far that the next real solver
+    change should target the multi-region velocity update / coupling law rather
+    than the `phi` backend alone
+- Added a direct FreeMHD diagnostic path for the next step:
+  - `scripts/patch_freemhd_coupled_logging.py`
+    - patches local `epotMultiRegionInterFoam` sources with opt-in `LMX_DIAG`
+      logging in the outer loop, fluid electric-potential solve, and fluid
+      momentum solve
+    - logging stays behind a `controlDict` flag
+  - `scripts/extract_freemhd_coupled_log.py`
+    - converts those `LMX_DIAG` lines into JSON records for analysis
+- Best next step:
+  - use the new FreeMHD logging patch on the recovered Hunt case
+  - collect coupled `epot` / momentum residual histories from FreeMHD
+  - compare them directly with LMX `potential_residual`, `potential_iterations`,
+    and outer-coupling behavior
+  - then change the layered Hunt velocity update law itself, not just the
+    potential backend or scalar control defaults
+
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.

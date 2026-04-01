@@ -281,6 +281,40 @@ The backend harness currently supports:
     - the remaining Hunt issue is still in how the layered coupled update uses
       the current reconstruction, not just in whether that reconstruction is
       face-based or center-based
+- The next blocker-focused retained change attacked the layered `phi` solve
+  directly:
+  - LMX now has `potential_solver="cg_volume"` for layered cases
+  - this solves the same discrete layered `phi` system after left-scaling by
+    the cell metric, which is the symmetric form of the nonuniform
+    divergence-form operator
+  - retained numerical effect:
+    - Shercliff `Ha20`, `32^2`: matches the good CG path at
+      combined error `≈ 0.162`
+    - Hunt `Ha20`, `32^2`:
+      - `jacobi`: combined error `≈ 0.1267`,
+        `potential_residual ≈ 5.0e-1`
+      - `cg_volume`: combined error `≈ 0.1510`,
+        `potential_residual ≈ 9.4e-3`
+    - Hunt `Ha100`, `32^2`:
+      - `jacobi`: combined error `≈ 0.3493`,
+        `potential_residual ≈ 1.7e-1`
+      - `cg_volume`: combined error `≈ 0.3014`,
+        `potential_residual ≈ 1.0e-2`
+  - retained interpretation:
+    - the multi-region `phi` block really was part of the blocker
+    - but the remaining Hunt problem is still not the `phi` block alone
+    - once the layered `phi` residual is reduced by one to two orders of
+      magnitude, `Hunt Ha20` still gets a worse combined profile, so the next
+      retained solver change should target the multi-region velocity update /
+      coupling law rather than only the `phi` backend
+- The FreeMHD-side comparison path now also has a direct coupled-iteration
+  logging route:
+  - `patch_freemhd_coupled_logging.py` adds opt-in `LMX_DIAG` logging to the
+    local `epotMultiRegionInterFoam` sources without changing physics
+  - `extract_freemhd_coupled_log.py` converts those lines into JSON records
+  - the next Hunt solver step should use those FreeMHD iteration diagnostics
+    together with LMX `potential_residual` / `potential_iterations_used`
+    instead of relying only on sampled end profiles
 - The steady solver semantics are now slightly stricter and more honest for
   layered cases:
   - `solve_steady(...)` can optionally require both velocity residual and

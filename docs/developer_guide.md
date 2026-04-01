@@ -92,6 +92,9 @@
 - The electric-potential solve now exposes three explicit backends:
   - `jacobi`: weighted Jacobi with optional residual-based stopping
   - `cg`: matrix-free preconditioned conjugate gradient
+  - `cg_volume`: CG on the same layered discrete system after left-scaling by
+    the cell metric, which is the symmetric form of the nonuniform divergence
+    operator
   - `lineax_cg`: optional external CG path
   The default `auto` policy resolves outside the traced JAX step:
   single-region duct solves use `cg`, while layered multi-region solves keep
@@ -105,6 +108,12 @@
     `potential_iterations_used`
   - `comparison`: `u_max` and sampled-profile comparisons against the recovered
     FreeMHD run when sample files are present
+- `python scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD`:
+  patches the local `epotMultiRegionInterFoam` sources with opt-in `LMX_DIAG`
+  logging in the outer loop and fluid `epot` / momentum solves.
+- `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
+  extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
+  solver diagnostics.
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form
