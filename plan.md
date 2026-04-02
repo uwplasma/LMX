@@ -2368,9 +2368,35 @@ LMX should only be described as ship ready for the current milestone when all of
       semantics more than by limiter policy
     - the remaining Hunt blocker is now narrower again:
       current/Lorentz distribution and later coupled pressure response
+- `2026-04-03 05:10 America/Chicago`: Re-checked the limiter landscape after
+  the reduced inlet-drive fix and tightened the retained conclusion:
+  - corrected Hunt `Ha20`, `t <= 6e-05` trace after the solver fix:
+    - retained default `velocity_update_limit = 2e-3`:
+      - `u_max l2 ≈ 2.62e-3`
+      - `current_max l2 ≈ 6.44e-2`
+      - `emf_max l2 ≈ 3.19e-3`
+      - `lorentz_max l2 ≈ 1.05e-1`
+    - smaller cap `velocity_update_limit = 1e-3`:
+      - `u_max l2 ≈ 9.00e-3`
+      - `current_max l2 ≈ 1.02e-1`
+      - `emf_max l2 ≈ 9.53e-3`
+      - `lorentz_max l2 ≈ 2.29e-2`
+    - larger cap `velocity_update_limit = 4e-3`:
+      - `u_max l2 ≈ 5.30e-2`
+      - `current_max l2 ≈ 6.38e-2`
+      - `emf_max l2 ≈ 5.81e-2`
+      - `lorentz_max l2 ≈ 1.92e-1`
+  - retained interpretation:
+    - after the inlet-drive correction, the default `2e-3` cap is again the
+      best balanced corrected-trace setting on `main`
+    - smaller caps now mostly trade better normalized `JxB` history for worse
+      `u_max`, current, and source-term alignment
+    - the remaining Hunt blocker is no longer best described as a limiter-size
+      problem; it is in current/Lorentz distribution and later pressure
+      response
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
-    ramp law plus the corrected reduced inlet-drive semantics on `main`
+  ramp law plus the corrected reduced inlet-drive semantics on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
