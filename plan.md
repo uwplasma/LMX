@@ -2404,11 +2404,13 @@ LMX should only be described as ship ready for the current milestone when all of
     - `sample_z_l2_error ≈ 3.84e-2`
     - `sample_combined_l2_error ≈ 1.31e-1`
   - retained interpretation:
-    - after the startup-drive fix, the remaining Hunt profile gap is much more
-      severe in the Hartmann-direction `y` cut than in the side-layer `z` cut
+    - for the retained Hunt setup, `B` is along `z`, so the conducting
+      Hartmann walls are the top/bottom `z` walls
+    - therefore the larger remaining late-time error is in the side-wall /
+      Shercliff-direction `y` cut, not in the Hartmann-direction `z` cut
     - that makes the next retained solver target more specific:
-      improve the layered Hartmann-direction pressure/velocity response before
-      spending more time on side-layer reconstruction
+      improve the side-wall / Shercliff-direction layered response before
+      spending more time on the already-better Hartmann-direction cut
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
@@ -2416,7 +2418,7 @@ LMX should only be described as ship ready for the current milestone when all of
     a better layered-current reduction is found
   - next targeted solver task:
     use the corrected Hunt replay plus the new `t = 3e-05` profile
-    localization to improve the Hartmann-direction layered pressure/velocity
+    localization to improve the side-wall / Shercliff-direction layered
     response, then re-check the corrected `u_max`, `J`, `JxB`, and sampled
     `y/z` profile errors against FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a

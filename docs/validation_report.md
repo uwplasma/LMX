@@ -751,12 +751,13 @@ The backend harness currently supports:
     - `sample_z_l2_error ≈ 3.84e-2`
     - `sample_combined_l2_error ≈ 1.31e-1`
   - retained interpretation:
-    - after the startup-drive correction, the remaining Hunt profile error is
-      much larger in the Hartmann-direction `y` cut than in the side-layer
-      `z` cut
+    - for the retained Hunt setup, `B` is along `z`, so the conducting
+      Hartmann walls are the top/bottom `z` walls
+    - that means the larger remaining late-time profile error is actually in
+      the side-wall / Shercliff-direction `y` cut, not in the
+      Hartmann-direction `z` cut
     - the next retained solver change should therefore target the layered
-      Hartmann-direction pressure/velocity response before more side-layer
-      reconstruction churn
+      side-wall response before more Hartmann-direction reconstruction churn
 
 ## Planned improvements
 
