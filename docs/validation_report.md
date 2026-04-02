@@ -743,6 +743,20 @@ The backend harness currently supports:
       `freemhd_pressure_final_records` and `freemhd_epot_records` so that later
       response can be inspected directly from the JSON artifact instead of
       reopening raw FreeMHD logs
+- A recovered late-time profile sample now sharpens that conclusion further:
+  - the current liquid-region sampling path for the corrected Hunt replay is
+    recoverable at `t = 3e-05`
+  - the matching LMX replay at that time gives:
+    - `sample_y_l2_error ≈ 1.81e-1`
+    - `sample_z_l2_error ≈ 3.84e-2`
+    - `sample_combined_l2_error ≈ 1.31e-1`
+  - retained interpretation:
+    - after the startup-drive correction, the remaining Hunt profile error is
+      much larger in the Hartmann-direction `y` cut than in the side-layer
+      `z` cut
+    - the next retained solver change should therefore target the layered
+      Hartmann-direction pressure/velocity response before more side-layer
+      reconstruction churn
 
 ## Planned improvements
 

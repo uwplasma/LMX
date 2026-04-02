@@ -2394,16 +2394,31 @@ LMX should only be described as ship ready for the current milestone when all of
     - the remaining Hunt blocker is no longer best described as a limiter-size
       problem; it is in current/Lorentz distribution and later pressure
       response
+- `2026-04-03 05:25 America/Chicago`: Added a real late-time profile
+  localization point for the corrected Hunt replay:
+  - sampled the recovered Hunt `Ha20` case with `sample_freemhd_profiles.py`
+  - the current recoverable liquid sample path for this run lands at
+    `t = 3e-05`
+  - matching LMX replay at `t = 3e-05` gives:
+    - `sample_y_l2_error ≈ 1.81e-1`
+    - `sample_z_l2_error ≈ 3.84e-2`
+    - `sample_combined_l2_error ≈ 1.31e-1`
+  - retained interpretation:
+    - after the startup-drive fix, the remaining Hunt profile gap is much more
+      severe in the Hartmann-direction `y` cut than in the side-layer `z` cut
+    - that makes the next retained solver target more specific:
+      improve the layered Hartmann-direction pressure/velocity response before
+      spending more time on side-layer reconstruction
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    use the corrected `6e-05` Hunt replay plus the pressure-response artifact
-    to improve layered current/Lorentz distribution and later coupled
-    velocity/pressure response, then re-check the corrected `u_max`, `J`, and
-    `JxB` histories against FreeMHD
+    use the corrected Hunt replay plus the new `t = 3e-05` profile
+    localization to improve the Hartmann-direction layered pressure/velocity
+    response, then re-check the corrected `u_max`, `J`, `JxB`, and sampled
+    `y/z` profile errors against FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 
