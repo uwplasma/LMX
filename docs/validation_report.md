@@ -832,6 +832,30 @@ The backend harness currently supports:
     wholesale to a reduced flow-rate-driven closure
   - that candidate overdrives the corrected trace and should remain a
     diagnostic option only
+- The next milder scalar family was also rejected locally:
+  - apply a direct partial fraction of `pressure_proxy` as reduced streamwise
+    forcing with gains `0.02`, `0.05`, and `0.1`
+  - representative result:
+    - baseline hybrid replay:
+      - `u_max l2 ≈ 1.18e-3`
+      - `current_max l2 ≈ 1.22e-2`
+      - `lorentz_max l2 ≈ 1.04e-2`
+    - gain `0.02`:
+      - `u_max l2 ≈ 9.92e-4`
+      - `current_max l2 ≈ 1.24e-2`
+      - `lorentz_max l2 ≈ 1.07e-2`
+    - gain `0.10`:
+      - `u_max l2 ≈ 2.22e-4`
+      - `current_max l2 ≈ 1.31e-2`
+      - `lorentz_max l2 ≈ 1.16e-2`
+- Retained interpretation:
+  - a raw gain on `pressure_proxy` is still too blunt
+  - it improves the late-time velocity trace only by degrading the
+    electromagnetic response that the retained hybrid current/Lorentz update
+    already fixed
+  - the next plausible solver step is a fixed-source post-predictor correction
+    on `u`, closer to the patched FreeMHD pressure loop, not another scalar
+    forcing-gain tweak
 
 ## Planned improvements
 

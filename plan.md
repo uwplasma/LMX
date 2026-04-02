@@ -2570,6 +2570,37 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next solver step should keep the new pressure/forcing diagnostics,
       but target a milder later-time response mechanism than the full
       `inlet_flow_rate` closure
+- `2026-04-02 13:20 America/Chicago`: Rejected the next obvious family of
+  milder pressure-response candidates on the corrected Hunt replay:
+  - candidate family tested locally against the same corrected
+    `Ha20`, `t <= 6e-05` window:
+    - apply a partial fraction of `pressure_proxy` directly as a reduced
+      streamwise forcing
+    - gains tested: `0.02`, `0.05`, `0.1`
+  - retained negative result:
+    - all three gains improve `u_max`, but they consistently worsen the
+      already-good current and Lorentz histories
+    - representative results:
+      - baseline hybrid replay:
+        - `u_max l2 ≈ 1.18e-3`
+        - `current_max l2 ≈ 1.22e-2`
+        - `lorentz_max l2 ≈ 1.04e-2`
+      - gain `0.02`:
+        - `u_max l2 ≈ 9.92e-4`
+        - `current_max l2 ≈ 1.24e-2`
+        - `lorentz_max l2 ≈ 1.07e-2`
+      - gain `0.10`:
+        - `u_max l2 ≈ 2.22e-4`
+        - `current_max l2 ≈ 1.31e-2`
+        - `lorentz_max l2 ≈ 1.16e-2`
+  - retained interpretation:
+    - direct partial application of `pressure_proxy` is still too crude; it
+      improves the late-time velocity trace by degrading the improved
+      electromagnetic response
+    - the next solver step should not be another scalar forcing-gain tweak
+    - the next plausible retained direction is closer to the patched FreeMHD
+      structure: a fixed-source post-predictor correction stage on `u` rather
+      than a raw gain on the proxy itself
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
@@ -2581,7 +2612,8 @@ LMX should only be described as ship ready for the current milestone when all of
     interpolation, the retained `hybrid_face_lorentz` default, and the new
     `pressure_proxy` / `applied_forcing` diagnostics on `main`, then target the
     remaining later-time `u_max` / pressure-response drift against the patched
-    FreeMHD logs with a milder response model than full `inlet_flow_rate`
+    FreeMHD logs with a fixed-source post-predictor correction stage on `u`,
+    not another direct forcing-gain tweak
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 
