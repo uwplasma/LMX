@@ -342,6 +342,7 @@ def _step(
     potential_solver: str,
     relaxation: float,
     velocity_update_limit: float,
+    velocity_update_limiter: str,
     current_reconstruction: str,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
     def outer_body(_, carry):
