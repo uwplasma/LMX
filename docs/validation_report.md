@@ -781,6 +781,16 @@ The backend harness currently supports:
     - the obvious remaining lagging signal is the cell-centered current
       magnitude, which points to layered current reduction and later coupled
       response rather than another wall-profile or startup-ramp issue
+- Re-checking `current_reconstruction` on top of that updated Hunt wall model
+  narrows the next solver target again:
+  - on the corrected `Ha20`, `t <= 6e-05` replay:
+    - `cell_centered`: `current_max l2 ≈ 1.68e-2`, `lorentz_max l2 ≈ 1.98e-1`
+    - `face_averaged`: `current_max l2 ≈ 1.23e-1`, `lorentz_max l2 ≈ 6.84e-2`
+  - retained interpretation:
+    - `face_averaged` still is not the right blanket replacement on `main`
+    - the next retained solver change should build a better cell-centered
+      reduction from the layered face-current system instead of flipping the
+      global current-reconstruction switch
 
 ## Planned improvements
 

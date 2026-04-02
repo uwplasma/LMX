@@ -2460,6 +2460,22 @@ LMX should only be described as ship ready for the current milestone when all of
     - the most obvious remaining drift is now the cell-centered current
       magnitude, which points back to layered current reduction rather than the
       already-corrected sampled-profile path
+- `2026-04-02 11:15 America/Chicago`: Re-checked `current_reconstruction`
+  after the retained Hunt wall-geometry update on the corrected `t <= 6e-05`
+  replay:
+  - `cell_centered` now gives:
+    - `u_max l2 ≈ 2.62e-3`
+    - `current_max l2 ≈ 1.68e-2`
+    - `lorentz_max l2 ≈ 1.98e-1`
+  - `face_averaged` now gives:
+    - `u_max l2 ≈ 2.62e-3`
+    - `current_max l2 ≈ 1.23e-1`
+    - `lorentz_max l2 ≈ 6.84e-2`
+  - retained interpretation:
+    - after the explicit insulating-side-wall update, `face_averaged` is still
+      not a valid blanket replacement for `cell_centered`
+    - the next useful solver target is a better cell-centered reduction from
+      the layered face-current system, not another global reconstruction toggle
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
