@@ -662,10 +662,10 @@ The backend harness currently supports:
 - A direct limiter probe on that corrected `t = 6e-05` Hunt replay now gives a
   narrower conclusion:
   - retained default `velocity_update_limit = 2e-3`:
-    - `u_max l2 ≈ 2.44e-2`
-    - `current_max l2 ≈ 8.86e-2`
-    - `emf_max l2 ≈ 2.62e-2`
-    - `lorentz_max l2 ≈ 8.44e-2`
+    - `u_max l2 ≈ 2.62e-3`
+    - `current_max l2 ≈ 6.44e-2`
+    - `emf_max l2 ≈ 3.19e-3`
+    - `lorentz_max l2 ≈ 1.05e-1`
   - smaller retained global cap `velocity_update_limit = 1e-3`:
     - `u_max l2 ≈ 9.00e-3`
     - `current_max l2 ≈ 1.02e-1`
@@ -683,7 +683,10 @@ The backend harness currently supports:
     - `emf_max l2 ≈ 1.29e-1`
     - `lorentz_max l2 ≈ 2.74e-1`
   - retained interpretation:
-    - a smaller global cap helps the corrected Hunt trace materially
+    - after the inlet-drive correction, the retained `2e-3` cap is again the
+      best balanced corrected-trace setting on `main`
+    - a smaller global cap now mostly trades better normalized `JxB` history
+      for worse `u_max`, current, and source-term alignment
     - but a local pointwise clamp is clearly worse and was not kept on `main`
     - limiter policy alone is still not the real missing layered-Hunt fix
 - `current_reconstruction="face_averaged"` remains useful only as a diagnosis
@@ -706,9 +709,8 @@ The backend harness currently supports:
   - so the later Hunt response is being shaped strongly by the global velocity
     limiter rather than only by the coupled MHD update
   - retained interpretation:
-    - smaller caps help the corrected Hunt `u_max`, `JxB`, and `psiub` traces
-      materially, but not enough to justify a blanket default change on their
-      own
+    - the cap still matters, but after the reduced drive fix it is no longer
+      the leading explanation for the corrected Hunt mismatch
     - the next Hunt fix should target the layered
       velocity/pressure-response formulation itself rather than more limiter
       churn
