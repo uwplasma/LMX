@@ -155,6 +155,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         velocity_update_limit=10.0,
         velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
+        interpolate_direct_fluid_walls=False,
     )[0]
     driven = solvers._step(
         u=zeros,
@@ -178,6 +179,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         velocity_update_limit=10.0,
         velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
+        interpolate_direct_fluid_walls=False,
     )[0]
 
     assert float(jnp.mean(undriven)) == pytest.approx(0.0)

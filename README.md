@@ -13,6 +13,8 @@ staying focused on structured duct and simple pipe geometries.
 - Hunt defaults expressed through wall conductance ratio, with optional direct
   wall-conductivity override when a case is specified that way.
 - ParaView output, CSV/profile extraction, and benchmark reporting.
+- Example scripts that generate polished, publication-style plots for Hartmann,
+  Shercliff, and Hunt cases.
 - Analytical validation helpers and regression tests for reproducibility.
 - Optional external validation tooling for recovered FreeMHD/OpenFOAM cases.
 - Validation summaries now include a normalized electric-potential equation
@@ -71,6 +73,7 @@ cd /Users/rogerio/local/tests/LMX
 - Theory: [`docs/theory.md`](docs/theory.md)
 - Developer guide: [`docs/developer_guide.md`](docs/developer_guide.md)
 - Case cookbook: [`docs/case_cookbook.md`](docs/case_cookbook.md)
+- Examples: [`examples/README.md`](examples/README.md)
 - Validation report: [`docs/validation_report.md`](docs/validation_report.md)
 
 ## Validation backends

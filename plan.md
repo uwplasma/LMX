@@ -2476,6 +2476,43 @@ LMX should only be described as ship ready for the current milestone when all of
       not a valid blanket replacement for `cell_centered`
     - the next useful solver target is a better cell-centered reduction from
       the layered face-current system, not another global reconstruction toggle
+- `2026-04-02 11:45 America/Chicago`: Fixed the live `main` CI failures from
+  the retained Hunt wall-geometry work and added the first polished native
+  example workflow:
+  - CI failures diagnosed with `gh`:
+    - `tests/test_solver.py::test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero`
+      was missing the new `_step(...)` argument
+      `interpolate_direct_fluid_walls`
+    - `tests/test_validation.py::test_processed_slice_validation_writer`
+      still expected exact-zero profile error even though the retained
+      wall-aware profile comparator now interpolates cell-centered simulated
+      data onto wall-normalized reference coordinates
+  - retained fixes:
+    - updated the solver test to pass
+      `interpolate_direct_fluid_walls=False` explicitly
+    - relaxed the processed-slice writer test to physically reasonable
+      tolerances that still catch real regressions
+  - retained user-facing addition:
+    - added `lmx.plotting` and `lmx.example_runner`
+    - added repo-level runnable examples:
+      `examples/hartmann_example.py`,
+      `examples/shercliff_example.py`,
+      `examples/hunt_example.py`
+    - examples now write:
+      - ParaView output
+      - CSV profile dumps
+      - `example_report.json`
+      - publication-style `overview.png/.pdf`
+      - publication-style `diagnostics.png/.pdf`
+    - the retained Hartmann smoke example at `Ha=5`, `12x12` wrote all
+      expected outputs and kept good analytical agreement:
+      `y_l2_error ≈ 1.04e-3`
+  - retained interpretation:
+    - `main` now has a direct, easy-to-run user path for visualizing native
+      Hartmann, Shercliff, and Hunt solutions without needing the validation
+      CLI plumbing
+    - the next solver blocker remains the layered current/Lorentz reduction,
+      not CI scaffolding or example usability
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`

@@ -16,8 +16,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "matplotlib>=3.9",
   "pytest>=8.0",
   "pytest-cov>=7.0",
+]
+plotting = [
+  "matplotlib>=3.9",
 ]
 extras = [
   "lineax>=0.0.8",

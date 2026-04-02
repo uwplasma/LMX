@@ -4,6 +4,7 @@
 
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run hartmann --ha 20 --output ./out/hartmann
+/Users/rogerio/base_env/bin/python3 examples/hartmann_example.py --ha 20 --output ./artifacts/examples/hartmann
 ```
 
 Use this as the simplest solver smoke test and as the default analytical-profile
@@ -13,6 +14,7 @@ validation case.
 
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run shercliff --ha 100 --output ./out/shercliff
+/Users/rogerio/base_env/bin/python3 examples/shercliff_example.py --ha 20 --output ./artifacts/examples/shercliff
 ```
 
 This is the insulating-wall duct case. It exercises the same self-consistent solver
@@ -22,6 +24,7 @@ path as the other native cases while remaining a strong analytical comparison ta
 
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run hunt --ha 100 --output ./out/hunt
+/Users/rogerio/base_env/bin/python3 examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
 ```
 
 This is the conducting-wall duct case. It is useful for checking how the solver
@@ -30,6 +33,21 @@ By default, the native Hunt factory uses wall conductance ratio `c = 0.05` and
 derives wall conductivity from the fluid conductivity, Hartmann-wall spacing, and
 wall thickness. Provide an explicit wall conductivity only when a case is defined
 that way.
+
+## Publication-ready plots
+
+Each example script writes:
+
+- ParaView output for the solved case
+- midplane CSV profiles
+- `example_report.json`
+- `overview.png/.pdf` with field maps and profile comparisons
+- `diagnostics.png/.pdf` with solver histories
+
+Shercliff and Hunt examples automatically use the default closed-channel
+analytical reference root under `./external/FreeMHDPaperAllFigures/...` when it
+exists, so in the common local setup you can run them without passing extra
+paths.
 
 ## Optional external validation backends
 

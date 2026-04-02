@@ -9,6 +9,10 @@
 - `lmx.solvers`: laminar inductionless solver entrypoints.
 - `lmx.io`: ParaView XML and CSV outputs.
 - `lmx.validation`: analytical validation and optional external comparison helpers.
+- `lmx.plotting`: publication-style static figures for field maps, profiles, and
+  solver histories.
+- `lmx.example_runner`: thin orchestration layer used by the repo-level
+  `examples/` scripts.
 - `lmx.reference_data`: processed paper-data loaders.
 
 ## Data layout
