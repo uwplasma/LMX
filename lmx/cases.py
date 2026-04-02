@@ -39,6 +39,7 @@ def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
             potential_iterations=400,
             relaxation=0.08,
             velocity_update_limit=2e-3,
+            current_reconstruction="hybrid_face_lorentz",
         )
     if ha <= 100.0:
         return TimeStepperConfig(
@@ -49,6 +50,7 @@ def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
             potential_iterations=400,
             relaxation=0.1,
             velocity_update_limit=1e-3,
+            current_reconstruction="hybrid_face_lorentz",
         )
     return TimeStepperConfig(
         dt=0.002,
@@ -58,6 +60,7 @@ def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
         potential_iterations=400,
         relaxation=0.1,
         velocity_update_limit=1e-3,
+        current_reconstruction="hybrid_face_lorentz",
     )
 
 

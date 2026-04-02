@@ -20,7 +20,7 @@ BoundaryKind = Literal[
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
-CurrentReconstructionKind = Literal["cell_centered", "face_averaged"]
+CurrentReconstructionKind = Literal["cell_centered", "face_averaged", "hybrid_face_lorentz"]
 VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
 
 

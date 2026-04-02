@@ -791,6 +791,22 @@ The backend harness currently supports:
     - the next retained solver change should build a better cell-centered
       reduction from the layered face-current system instead of flipping the
       global current-reconstruction switch
+- That retained solver change is now on `main`:
+  - added `current_reconstruction="hybrid_face_lorentz"`
+  - the mode keeps cell-centered `J` reduction for diagnostics and stored
+    fields, but reconstructs `JxB` from the layered face-current system before
+    the momentum update
+  - it is now the default Hunt short-transient control
+  - corrected `Ha20`, `t <= 6e-05` replay:
+    - `u_max l2 ≈ 1.18e-3`
+    - `current_max l2 ≈ 1.22e-2`
+    - `lorentz_max l2 ≈ 1.04e-2`
+  - retained interpretation:
+    - this is the first layered-current update that improves Hunt current and
+      Lorentz histories together instead of trading one off against the other
+    - the next Hunt gap is now later coupled momentum/pressure response, not
+      startup source law, sampled late-time profiles, or gross layered-current
+      construction
 
 ## Planned improvements
 

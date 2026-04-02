@@ -2513,17 +2513,44 @@ LMX should only be described as ship ready for the current milestone when all of
       CLI plumbing
     - the next solver blocker remains the layered current/Lorentz reduction,
       not CI scaffolding or example usability
+- `2026-04-02 12:20 America/Chicago`: Retained a targeted layered-current fix
+  for the corrected Hunt `Ha20`, `t <= 6e-05` replay:
+  - concrete solver change:
+    - added `current_reconstruction="hybrid_face_lorentz"`
+    - the mode keeps the better cell-centered `J` reduction for diagnostics and
+      sampled solution fields, but reconstructs `JxB` from the layered
+      face-current system before the momentum update
+    - promoted that mode to the default Hunt short-transient control in
+      `_hunt_short_transient_controls(...)`
+  - retained real diagnostic result against the patched FreeMHD density log:
+    - previous corrected `cell_centered` baseline:
+      - `u_max l2 ≈ 1.18e-3`
+      - `current_max l2 ≈ 6.44e-2`
+      - `lorentz_max l2 ≈ 1.05e-1`
+    - retained `hybrid_face_lorentz` result:
+      - `u_max l2 ≈ 1.18e-3`
+      - `current_max l2 ≈ 1.22e-2`
+      - `lorentz_max l2 ≈ 1.04e-2`
+  - retained interpretation:
+    - this is the first layered-current change on `main` that improves both
+      Hunt current and Lorentz histories together instead of trading one for
+      the other
+    - the Hunt blocker has narrowed again:
+      startup source/ramp law, sampled late-time profiles, and layered
+      current/Lorentz construction are now much healthier
+    - the next remaining gap is later coupled momentum/pressure response, to be
+      checked on the same corrected replay window before broadening scope
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
-    a better layered-current reduction is found
+    a materially better layered-current reduction is found
   - next targeted solver task:
-    keep the corrected Hunt replay and the corrected sampled-profile
-    comparator fixed, keep the explicit insulating/conducting Hunt wall split
-    and direct-wall interpolation on `main`, then target the remaining
-    trace-level drift in cell-centered current reduction, `u_max`, and the
-    later coupled pressure response against the patched FreeMHD logs
+    keep the corrected Hunt replay and sampled-profile comparator fixed, keep
+    the explicit insulating/conducting Hunt wall split, direct-wall
+    interpolation, and the retained `hybrid_face_lorentz` default on `main`,
+    then target the remaining later-time `u_max` / pressure-response drift
+    against the patched FreeMHD logs
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

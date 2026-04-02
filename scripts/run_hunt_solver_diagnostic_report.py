@@ -98,7 +98,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--potential-iterations", type=int, default=None)
     parser.add_argument("--potential-relaxation", type=float, default=None)
     parser.add_argument("--potential-solver", choices=["auto", "jacobi", "cg", "cg_volume", "lineax_cg"], default=None)
-    parser.add_argument("--current-reconstruction", choices=["cell_centered", "face_averaged"], default=None)
+    parser.add_argument(
+        "--current-reconstruction",
+        choices=["cell_centered", "face_averaged", "hybrid_face_lorentz"],
+        default=None,
+    )
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--velocity-update-limiter", choices=["global_scale", "local_clip"], default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)

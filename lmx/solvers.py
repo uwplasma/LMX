@@ -216,22 +216,30 @@ def _compute_current_and_lorentz(
     phi: jnp.ndarray,
     by: jnp.ndarray,
     bz: jnp.ndarray,
-    use_face_currents: bool = False,
+    reconstruction: str = "cell_centered",
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    use_face_currents = reconstruction in {"face_averaged", "hybrid_face_lorentz"}
     if use_face_currents:
         uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
         uxb_z = jnp.where(fluid_mask, u * by, 0.0)
         face_jy = _interface_conductance_y(mesh, sigma) * (phi[:-1, :] - phi[1:, :]) + _face_emf_y(mesh, sigma, uxb_y)
         face_jz = _interface_conductance_z(mesh, sigma) * (phi[:, :-1] - phi[:, 1:]) + _face_emf_z(mesh, sigma, uxb_z)
-        jy = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
-        jz = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
+        face_jy_centered = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
+        face_jz_centered = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
+    if reconstruction == "face_averaged":
+        jy = face_jy_centered
+        jz = face_jz_centered
+        lorentz_x = jy * bz - jz * by
     else:
         dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
         jy = sigma * (-dphi_dy - u * bz)
         jz = sigma * (-dphi_dz + u * by)
+        lorentz_x = jy * bz - jz * by
+        if reconstruction == "hybrid_face_lorentz":
+            lorentz_x = face_jy_centered * bz - face_jz_centered * by
     jy = jnp.where(fluid_mask, jy, 0.0)
     jz = jnp.where(fluid_mask, jz, 0.0)
-    lorentz_x = jy * bz - jz * by
+    lorentz_x = jnp.where(fluid_mask, lorentz_x, 0.0)
     return jy, jz, lorentz_x
 
 
@@ -413,7 +421,7 @@ def _step(
             phi,
             by,
             bz,
-            use_face_currents=current_reconstruction == "face_averaged",
+            reconstruction=current_reconstruction,
         )
         lorentz = jnp.nan_to_num(lorentz, nan=0.0, posinf=0.0, neginf=0.0)
         lap_u = laplacian_scalar(u_iter, mesh, mask=fluid_mask)
