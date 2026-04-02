@@ -306,6 +306,18 @@ def _inlet_speed(boundary: BoundaryCondition, case: CaseSpec) -> float | None:
     return None
 
 
+def _target_mean_velocity(case: CaseSpec) -> float | None:
+    if abs(case.forcing) != 0.0:
+        return None
+    for boundary in case.boundary_conditions:
+        if boundary.kind != "inlet_flow_rate":
+            continue
+        speed = _inlet_speed(boundary, case)
+        if speed is not None:
+            return speed
+    return None
+
+
 def _explicit_forcing(explicit_forcing: float, dtype: jnp.dtype) -> jnp.ndarray:
     return jnp.asarray(explicit_forcing, dtype=dtype)
 
@@ -415,10 +427,7 @@ def _step(
 def solve_transient(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
-    inlet_velocity = next(
-        (speed for boundary in case.boundary_conditions if (speed := _inlet_speed(boundary, case)) is not None),
-        None,
-    )
+    target_mean_velocity = _target_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
@@ -442,7 +451,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             bz=bz,
             dt=dt,
             forcing=forcing,
-            target_mean_velocity=inlet_velocity if abs(case.forcing) == 0.0 else None,
+            target_mean_velocity=target_mean_velocity,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
@@ -507,10 +516,7 @@ def solve_transient(case: CaseSpec) -> Solution:
 def solve_steady(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
-    inlet_velocity = next(
-        (speed for boundary in case.boundary_conditions if (speed := _inlet_speed(boundary, case)) is not None),
-        None,
-    )
+    target_mean_velocity = _target_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
@@ -537,7 +543,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             bz=bz,
             dt=dt,
             forcing=forcing,
-            target_mean_velocity=inlet_velocity if abs(case.forcing) == 0.0 else None,
+            target_mean_velocity=target_mean_velocity,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,

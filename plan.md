@@ -2308,26 +2308,37 @@ LMX should only be described as ship ready for the current milestone when all of
     - that makes the next solver target more specific:
       reduce the layered short-transient over-response, most likely in the
       global limiter / coupled velocity update path
-- `2026-04-03 04:35 America/Chicago`: Tested the current experimental local
-  limiter directly on the corrected Hunt `Ha20`, `t <= 6e-05` replay and ruled
-  it out as the next retained fix:
-  - retained default `velocity_update_limiter="global_scale"`:
+- `2026-04-03 04:35 America/Chicago`: Re-checked the layered velocity limiter
+  on the corrected Hunt `Ha20`, `t <= 6e-05` replay and ruled out both the
+  local-clamp branch and a blanket lower default:
+  - corrected retained baseline on `main` with `velocity_update_limit = 2e-3`:
     - `u_max l2 ≈ 2.44e-2`
     - `current_max l2 ≈ 8.86e-2`
     - `emf_max l2 ≈ 2.62e-2`
     - `lorentz_max l2 ≈ 8.44e-2`
-  - experimental `velocity_update_limiter="local_clip"`:
+  - experimental local pointwise clamp branch:
     - `u_max l2 ≈ 1.05e-1`
     - `current_max l2 ≈ 1.01e-1`
     - `emf_max l2 ≈ 1.29e-1`
     - `lorentz_max l2 ≈ 2.74e-1`
+    - rolled back immediately; not kept on `main`
+  - corrected global-cap probe at `velocity_update_limit = 1e-3`:
+    - corrected Hunt trace improves materially:
+      - `u_max l2 ≈ 9.00e-3`
+      - `current_max l2 ≈ 1.02e-1`
+      - `emf_max l2 ≈ 9.53e-3`
+      - `lorentz_max l2 ≈ 2.29e-2`
+    - but native closed-channel Hunt does not justify a default shift:
+      - `Ha20`, `32^2`: `combined_l2 ≈ 0.1490` at `1e-3` vs `≈ 0.1510` at
+        `2e-3`, so only a marginal improvement
+      - `Ha100`, `32^2`: `combined_l2 ≈ 0.3014` at `1e-3` vs `≈ 0.2991` at
+        `2e-3`, so the higher-Ha native profile gets slightly worse
   - retained interpretation:
-    - a pointwise local clamp makes the corrected Hunt over-response
-      materially worse
-    - the limiter is still useful as a diagnosis control, but it should not
-      replace the retained global limiter default
-    - the next Hunt implementation step should target the layered
-      velocity/pressure response itself instead of swapping limiter policy
+    - the remaining Hunt blocker is not solved by swapping limiter policy or by
+      a blanket smaller global cap
+    - the next retained Hunt fix should target the layered
+      velocity/pressure-response formulation itself, while keeping the current
+      limiter as a bounded stabilizer rather than the main tuning lever
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
     ramp law on `main`

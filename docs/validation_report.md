@@ -620,7 +620,7 @@ The backend harness currently supports:
   inlet-velocity boundary automatically when the recovered startup case has a
   nonzero internal velocity.
 - On that corrected `t = 6e-05` replay, a patched local FreeMHD rerun and the
-  matching LMX diagnostic report show:
+  first corrected LMX diagnostic report showed:
   - `u_max l2 ≈ 2.44e-2`
   - `current_max l2 ≈ 8.86e-2`
   - `emf_max l2 ≈ 2.62e-2`
@@ -637,23 +637,55 @@ The backend harness currently supports:
     - that shifts the next solver target away from startup forcing/ramp
       semantics and toward the layered stabilization / coupled velocity update
       itself
-- A direct limiter probe on that corrected `t = 6e-05` Hunt replay rules out
-  the current experimental local clamp as the next retained fix:
-  - retained default `velocity_update_limiter="global_scale"`:
+- The next retained solver change came directly from that corrected replay:
+  reduced mean-flow drive is now activated only by `inlet_flow_rate`, not by
+  `inlet_velocity`.
+  - treating recovered `inlet_velocity` metadata as a global target mean
+    velocity was the main reason the corrected Hunt replay became too
+    aggressive
+  - on the same corrected `t = 6e-05` Hunt `Ha20` window, the retained replay
+    now improves to:
+    - `u_max l2 ≈ 2.62e-3`
+    - `current_max l2 ≈ 6.44e-2`
+    - `emf_max l2 ≈ 3.19e-3`
+    - `lorentz_max l2 ≈ 1.05e-1`
+  - the retained `u_max_history` is now almost flat:
+    `0.117500, 0.117500, 0.117500, 0.117500, 0.117500, 0.117500`
+  - retained interpretation:
+    - the reduced solver should only infer a target mean velocity from a
+      flow-rate boundary, not from a nominal inlet velocity
+    - this removes most of the corrected Hunt startup over-response without
+      reintroducing the earlier under-driven runner bug
+    - the next remaining Hunt gap is narrower again:
+      current/Lorentz distribution and later coupled response, not startup
+      drive semantics
+- A direct limiter probe on that corrected `t = 6e-05` Hunt replay now gives a
+  narrower conclusion:
+  - retained default `velocity_update_limit = 2e-3`:
     - `u_max l2 ≈ 2.44e-2`
     - `current_max l2 ≈ 8.86e-2`
     - `emf_max l2 ≈ 2.62e-2`
     - `lorentz_max l2 ≈ 8.44e-2`
-  - experimental `velocity_update_limiter="local_clip"`:
+  - smaller retained global cap `velocity_update_limit = 1e-3`:
+    - `u_max l2 ≈ 9.00e-3`
+    - `current_max l2 ≈ 1.02e-1`
+    - `emf_max l2 ≈ 9.53e-3`
+    - `lorentz_max l2 ≈ 2.29e-2`
+  - larger global cap `velocity_update_limit = 4e-3`:
+    - `u_max l2 ≈ 5.30e-2`
+    - `current_max l2 ≈ 6.38e-2`
+    - `emf_max l2 ≈ 5.81e-2`
+    - `lorentz_max l2 ≈ 1.92e-1`
+  - an experimental pointwise local-clamp branch was also tried and rolled
+    back immediately:
     - `u_max l2 ≈ 1.05e-1`
     - `current_max l2 ≈ 1.01e-1`
     - `emf_max l2 ≈ 1.29e-1`
     - `lorentz_max l2 ≈ 2.74e-1`
   - retained interpretation:
-    - replacing the current global rescaling with a pointwise local clip makes
-      the corrected Hunt over-response materially worse
-    - the next retained Hunt fix should stay in the layered coupled
-      velocity/pressure response, not in a simple swap of limiter policy
+    - a smaller global cap helps the corrected Hunt trace materially
+    - but a local pointwise clamp is clearly worse and was not kept on `main`
+    - limiter policy alone is still not the real missing layered-Hunt fix
 - `current_reconstruction="face_averaged"` remains useful only as a diagnosis
   aid on that corrected replay:
   - it still improves the very short startup `lorentz_max` alignment
@@ -663,26 +695,36 @@ The backend harness currently supports:
   - LMX no longer relies on the old fixed Hunt source heuristic for
     `forcing = 0` inlet-driven cases
   - instead, it solves for the streamwise forcing needed to match the target
-    mean velocity inside the implicit velocity update
-  - on the recovered Hunt `Ha20` replay this leaves the retained trace
-    essentially unchanged, which is useful negative evidence:
-    the remaining gap is not dominated by the inlet-drive semantics either
+    mean velocity inside the implicit velocity update only when the case
+    actually specifies `inlet_flow_rate`
+  - `inlet_velocity` remains available for recovered-case metadata and startup
+    parity, but it is no longer converted into a reduced global mean target
 - The corrected `6e-05` Hunt `Ha20` window also exposed a sharper stabilizer
   issue in the reduced solver:
   - the retained default trace shows `residual_history ≈ 0.012` on every step,
     which matches `outer_iterations * velocity_update_limit = 6 * 0.002`
   - so the later Hunt response is being shaped strongly by the global velocity
     limiter rather than only by the coupled MHD update
-  - a direct `velocity_update_limit` probe on the same corrected window gives:
-    - `1e-3`: `lorentz_max l2 ≈ 3.26e-2`, `current_max l2 ≈ 9.07e-2`
-    - `2e-3` retained default: `lorentz_max l2 ≈ 1.05e-1`,
-      `current_max l2 ≈ 6.44e-2`
-    - `4e-3`: `lorentz_max l2 ≈ 1.63e-1`, `current_max l2 ≈ 1.56e-2`
   - retained interpretation:
-    - smaller caps help the normalized `JxB` history, larger caps help the
-      current-magnitude history, and the default sits between those two errors
-    - the next Hunt fix should target limiter policy or replace the global clamp
-      with a less distorting stabilization path in the layered update
+    - smaller caps help the corrected Hunt `u_max`, `JxB`, and `psiub` traces
+      materially, but not enough to justify a blanket default change on their
+      own
+    - the next Hunt fix should target the layered
+      velocity/pressure-response formulation itself rather than more limiter
+      churn
+- That corrected limiter picture also has to survive native closed-channel Hunt
+  validation before it can become a default:
+  - `Ha20`, `32^2`:
+    - `velocity_update_limit = 1e-3` gives `combined_l2 ≈ 0.1490`
+    - retained `2e-3` gives `combined_l2 ≈ 0.1510`
+    - so the native improvement is only marginal
+  - `Ha100`, `32^2`:
+    - `velocity_update_limit = 1e-3` gives `combined_l2 ≈ 0.3014`
+    - retained `2e-3` gives `combined_l2 ≈ 0.2991`
+    - so the higher-Ha native profile actually gets slightly worse
+  - retained interpretation:
+    - the limiter remains a bounded stabilizer and diagnosis aid, not the main
+      next physical correction
 - The FreeMHD source and log path now make the later coupling gap more explicit:
   - `epotMultiRegionInterFoam/fluid/solveMhdFluid.H` runs
     `ePotEqn.H`, `mhdUEqn.H`, and then the `pEqn.H` pressure-correction loop

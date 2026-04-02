@@ -75,13 +75,14 @@ def test_hunt_case_allows_explicit_wall_conductivity_override():
     assert wall_region.conductivity == pytest.approx(7.5)
 
 
-def test_hunt_inlet_velocity_boundary_drives_short_transient():
+def test_hunt_inlet_flow_rate_boundary_drives_short_transient():
     case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
     driven = replace(
         case,
         forcing=0.0,
         initial_velocity=0.1175,
-        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.1175, 0.0, 0.0), axis="x"),),
+        boundary_conditions=case.boundary_conditions
+        + (BoundaryCondition("inlet", "inlet_flow_rate", value=0.1175 * case.geometry.width * case.geometry.height, axis="x"),),
         time_stepper=replace(case.time_stepper, dt=1e-5, t_final=1e-4, max_steps=10),
     )
     undriven = replace(
@@ -95,6 +96,28 @@ def test_hunt_inlet_velocity_boundary_drives_short_transient():
     undriven_solution = solve_steady(undriven)
 
     assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
+
+
+def test_hunt_inlet_velocity_boundary_does_not_trigger_reduced_mean_drive():
+    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    inlet_only = replace(
+        case,
+        forcing=0.0,
+        initial_velocity=0.1175,
+        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.1175, 0.0, 0.0), axis="x"),),
+        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=5e-5, max_steps=5),
+    )
+    undriven = replace(
+        case,
+        forcing=0.0,
+        initial_velocity=0.1175,
+        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=5e-5, max_steps=5),
+    )
+
+    inlet_solution = solve_steady(inlet_only)
+    undriven_solution = solve_steady(undriven)
+
+    assert float(jnp.max(jnp.abs(inlet_solution.state.u - undriven_solution.state.u))) < 1e-6
 
 
 def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero():
@@ -122,6 +145,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         potential_solver="jacobi",
         relaxation=1.0,
         velocity_update_limit=10.0,
+        velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
     )[0]
     driven = solvers._step(
@@ -144,12 +168,31 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         potential_solver="jacobi",
         relaxation=1.0,
         velocity_update_limit=10.0,
+        velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
     )[0]
 
     assert float(jnp.mean(undriven)) == pytest.approx(0.0)
     assert float(jnp.mean(driven)) > 0.0
     assert float(jnp.max(driven[1:-1, 1:-1])) > 0.0
+
+
+def test_target_mean_velocity_only_uses_inlet_flow_rate():
+    case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
+    inlet_velocity_case = replace(
+        case,
+        forcing=0.0,
+        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.2, 0.0, 0.0), axis="x"),),
+    )
+    inlet_flow_rate_case = replace(
+        case,
+        forcing=0.0,
+        boundary_conditions=case.boundary_conditions
+        + (BoundaryCondition("inlet", "inlet_flow_rate", value=0.2 * case.geometry.width * case.geometry.height, axis="x"),),
+    )
+
+    assert solvers._target_mean_velocity(inlet_velocity_case) is None
+    assert solvers._target_mean_velocity(inlet_flow_rate_case) == pytest.approx(0.2)
 
 
 def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
@@ -161,25 +204,6 @@ def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
     assert not bool(active[2, 0])
     assert not bool(active[2, -1])
     assert bool(active[2, 2])
-
-
-def test_local_velocity_update_limiter_clips_per_cell_without_global_rescaling():
-    current = jnp.asarray([[0.0, 0.0], [0.0, 0.0]])
-    trial = jnp.asarray([[0.5, 0.01], [-0.5, -0.01]])
-    fluid_mask = jnp.ones((2, 2), dtype=bool)
-
-    limited = solvers._limited_velocity_update(
-        current,
-        trial,
-        fluid_mask,
-        max_delta=0.1,
-        limiter="local_clip",
-    )
-
-    assert float(limited[0, 0]) == pytest.approx(0.1)
-    assert float(limited[1, 0]) == pytest.approx(-0.1)
-    assert float(limited[0, 1]) == pytest.approx(0.01)
-    assert float(limited[1, 1]) == pytest.approx(-0.01)
 
 
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
