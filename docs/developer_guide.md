@@ -130,7 +130,8 @@
   - `freemhd_run`: run-directory inspection counts and latest `mag(U)` metadata
   - `lmx_solver`: the native case controls, including inferred magnetic-ramp
     settings from `BtStartTime` / `BtDuration` when they are present in the
-    recovered case, plus `validation_summary(...)`
+    recovered case and the recovered inlet-driven startup boundary when the
+    case has a nonzero initial velocity, plus `validation_summary(...)`
     metrics such as `residual`, `potential_residual`, and
     `potential_iterations_used`
   - `comparison`: `u_max` and sampled-profile comparisons against the recovered

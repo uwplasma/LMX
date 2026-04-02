@@ -21,6 +21,7 @@ BoundaryKind = Literal[
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
 CurrentReconstructionKind = Literal["cell_centered", "face_averaged"]
+VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ class TimeStepperConfig:
     steady_potential_tolerance: float | None = None
     relaxation: float = 0.35
     velocity_update_limit: float = 1e-3
+    velocity_update_limiter: VelocityUpdateLimiterKind = "global_scale"
     checkpoint_stride: int = 1
 
 

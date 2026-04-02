@@ -613,23 +613,52 @@ The backend harness currently supports:
     - it should stay available as a solver-control / diagnosis aid while the
       next fix targets a better cell-centered current reduction or the later
       coupled response
-- The longer corrected Hunt `Ha20` trace now narrows that conclusion further.
-  A patched local FreeMHD rerun reached `t = 6e-05`, and the matching LMX
-  replays show:
-  - `u_max` normalized history error grows but stays small at
-    `≈ 2.62e-3`
-  - `cell_centered` remains the better overall current reconstruction on the
-    longer window:
-    - `current_max l2 ≈ 6.44e-2`
-    - `lorentz_max l2 ≈ 1.05e-1`
-  - `face_averaged` becomes worse later even though it helped the short startup
-    `JxB` history:
-    - `current_max l2 ≈ 1.17e-1`
-    - `lorentz_max l2 ≈ 3.44e-1`
+- The longer corrected Hunt `Ha20` trace now has a more honest replay
+  baseline. The original `t = 6e-05` diagnostic runner had been creating
+  `forcing = 0` Hunt cases without the recovered inlet-velocity boundary, so
+  it was replaying the wrong drive semantics. The runner now adds that
+  inlet-velocity boundary automatically when the recovered startup case has a
+  nonzero internal velocity.
+- On that corrected `t = 6e-05` replay, a patched local FreeMHD rerun and the
+  matching LMX diagnostic report show:
+  - `u_max l2 ≈ 2.44e-2`
+  - `current_max l2 ≈ 8.86e-2`
+  - `emf_max l2 ≈ 2.62e-2`
+  - `lorentz_max l2 ≈ 8.44e-2`
+  - the retained LMX `u_max_history` is now:
+    `0.118335, 0.119233, 0.120211, 0.121298, 0.122547, 0.123869`
+  - the corresponding recovered FreeMHD final pressure-corrector `maxU` values
+    are:
+    `0.117692, 0.117804, 0.117905, 0.118003, 0.118099, 0.118191`
   - retained interpretation:
-    - the remaining Hunt blocker is now more clearly in the later coupled
-      response, not in startup-ramp semantics and not in a simple switch to a
-      face-averaged cell-current reconstruction
+    - the earlier flatter Hunt trace was partly a runner artifact
+    - once the replay is corrected, LMX is not under-accelerating the short
+      layered Hunt transient; it is over-responding relative to FreeMHD
+    - that shifts the next solver target away from startup forcing/ramp
+      semantics and toward the layered stabilization / coupled velocity update
+      itself
+- A direct limiter probe on that corrected `t = 6e-05` Hunt replay rules out
+  the current experimental local clamp as the next retained fix:
+  - retained default `velocity_update_limiter="global_scale"`:
+    - `u_max l2 ≈ 2.44e-2`
+    - `current_max l2 ≈ 8.86e-2`
+    - `emf_max l2 ≈ 2.62e-2`
+    - `lorentz_max l2 ≈ 8.44e-2`
+  - experimental `velocity_update_limiter="local_clip"`:
+    - `u_max l2 ≈ 1.05e-1`
+    - `current_max l2 ≈ 1.01e-1`
+    - `emf_max l2 ≈ 1.29e-1`
+    - `lorentz_max l2 ≈ 2.74e-1`
+  - retained interpretation:
+    - replacing the current global rescaling with a pointwise local clip makes
+      the corrected Hunt over-response materially worse
+    - the next retained Hunt fix should stay in the layered coupled
+      velocity/pressure response, not in a simple swap of limiter policy
+- `current_reconstruction="face_averaged"` remains useful only as a diagnosis
+  aid on that corrected replay:
+  - it still improves the very short startup `lorentz_max` alignment
+  - but it does not improve the corrected longer-window replay enough to become
+    the new default
 - The inlet-driven reduced-model forcing is now also cleaner internally:
   - LMX no longer relies on the old fixed Hunt source heuristic for
     `forcing = 0` inlet-driven cases

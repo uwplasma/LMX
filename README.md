@@ -31,6 +31,10 @@ staying focused on structured duct and simple pipe geometries.
 - Hunt diagnostics also expose `current_reconstruction`, with the retained
   default `cell_centered` and an experimental `face_averaged` mode for tracing
   current-distribution effects without changing the public case API.
+- Hunt diagnostic replays also expose `velocity_update_limiter`. The retained
+  default is `global_scale`; the experimental `local_clip` path is available
+  for targeted layered-update diagnosis, but it is currently worse on the
+  corrected `Ha20`, `t <= 6e-05` Hunt replay.
 
 ## Quick start
 
@@ -100,6 +104,11 @@ present.
 patched checkout when `--local-freemhd-root` is provided, and it can patch that
 checkout in place with `--patch-local-freemhd-logging` before the build. That is
 the recommended path for reproducing Hunt trace diagnostics on this machine.
+`run_hunt_solver_diagnostic_report.py` also mirrors recovered Hunt startup
+cases more faithfully now: when the recovered run has a nonzero startup
+velocity in `0/liquid/U`, the reduced replay automatically adds the matching
+`inlet_velocity` boundary instead of treating the case as an unforced
+`forcing = 0` transient.
 
 ## Scope
 

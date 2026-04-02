@@ -2287,15 +2287,58 @@ LMX should only be described as ship ready for the current milestone when all of
     - the remaining Hunt blocker is not just that LMX lacks a better startup
       source term; it is missing the reduced analogue of FreeMHD’s later
       pressure-correction response
+- `2026-04-03 04:00 America/Chicago`: Fixed a Hunt parity bug in the
+  diagnostic runner itself:
+  - `run_hunt_solver_diagnostic_report.py` had been creating `forcing = 0`
+    Hunt cases without adding the inlet-velocity boundary that actually drives
+    the recovered startup cases
+  - the runner now adds the inlet-velocity boundary automatically when the
+    recovered case has a nonzero startup velocity, so the diagnostic replay
+    matches the intended drive semantics
+  - retained numerical effect on the corrected Hunt `Ha20`, `t <= 6e-05` trace:
+    - `u_max l2 ≈ 2.44e-2`
+    - `current_max l2 ≈ 8.86e-2`
+    - `emf_max l2 ≈ 2.62e-2`
+    - `lorentz_max l2 ≈ 8.44e-2`
+  - retained interpretation:
+    - the earlier flatter Hunt trace was partly an artifact of the runner using
+      the wrong drive path
+    - once the replay is corrected, LMX is not under-accelerating this short
+      Hunt transient; it is over-responding relative to FreeMHD
+    - that makes the next solver target more specific:
+      reduce the layered short-transient over-response, most likely in the
+      global limiter / coupled velocity update path
+- `2026-04-03 04:35 America/Chicago`: Tested the current experimental local
+  limiter directly on the corrected Hunt `Ha20`, `t <= 6e-05` replay and ruled
+  it out as the next retained fix:
+  - retained default `velocity_update_limiter="global_scale"`:
+    - `u_max l2 ≈ 2.44e-2`
+    - `current_max l2 ≈ 8.86e-2`
+    - `emf_max l2 ≈ 2.62e-2`
+    - `lorentz_max l2 ≈ 8.44e-2`
+  - experimental `velocity_update_limiter="local_clip"`:
+    - `u_max l2 ≈ 1.05e-1`
+    - `current_max l2 ≈ 1.01e-1`
+    - `emf_max l2 ≈ 1.29e-1`
+    - `lorentz_max l2 ≈ 2.74e-1`
+  - retained interpretation:
+    - a pointwise local clamp makes the corrected Hunt over-response
+      materially worse
+    - the limiter is still useful as a diagnosis control, but it should not
+      replace the retained global limiter default
+    - the next Hunt implementation step should target the layered
+      velocity/pressure response itself instead of swapping limiter policy
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
     ramp law on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    use the new pressure-response artifact plus the limiter result to implement
-    a less distorting layered stabilization / correction path, then re-check the
-    corrected `6e-05` pressure and `JxB` histories against FreeMHD
+    use the corrected inlet-driven Hunt replay plus the pressure-response
+    artifact and the rejected local-clip result to implement a less distorting
+    layered correction path inside the coupled velocity/pressure response,
+    then re-check the corrected `6e-05` pressure and `JxB` histories against
+    FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

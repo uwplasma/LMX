@@ -268,8 +268,14 @@ def _limited_velocity_update(
     trial: jnp.ndarray,
     fluid_mask: jnp.ndarray,
     max_delta: float = 1e-3,
+    limiter: str = "global_scale",
 ) -> jnp.ndarray:
     delta = jnp.where(fluid_mask, trial - current, 0.0)
+    if limiter == "local_clip":
+        clipped_delta = jnp.clip(delta, -max_delta, max_delta)
+        return jnp.where(fluid_mask, current + clipped_delta, 0.0)
+    if limiter != "global_scale":
+        raise ValueError(f"Unsupported velocity update limiter {limiter!r}")
     peak_delta = jnp.max(jnp.abs(delta))
     scale = jnp.minimum(1.0, max_delta / jnp.maximum(peak_delta, 1e-12))
     return jnp.where(fluid_mask, current + scale * delta, 0.0)
@@ -324,6 +330,7 @@ def _step(
     potential_solver: str,
     relaxation: float,
     velocity_update_limit: float,
+    velocity_update_limiter: str,
     current_reconstruction: str,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
     def outer_body(_, carry):
@@ -373,7 +380,13 @@ def _step(
             )
         u_trial = jnp.where(fluid_mask, base_trial + pressure_sensitivity * forcing_value, 0.0)
         relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u_iter + relaxation * u_trial, 0.0)
-        u_next = _limited_velocity_update(u_iter, relaxed, fluid_mask, max_delta=velocity_update_limit)
+        u_next = _limited_velocity_update(
+            u_iter,
+            relaxed,
+            fluid_mask,
+            max_delta=velocity_update_limit,
+            limiter=velocity_update_limiter,
+        )
         u_next = _enforce_velocity_bc(u_next, fluid_mask)
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
@@ -438,6 +451,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             potential_solver=potential_solver,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
+            velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
@@ -532,6 +546,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             potential_solver=potential_solver,
             relaxation=case.time_stepper.relaxation,
             velocity_update_limit=case.time_stepper.velocity_update_limit,
+            velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
         )
 

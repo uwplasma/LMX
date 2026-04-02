@@ -163,6 +163,25 @@ def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
     assert bool(active[2, 2])
 
 
+def test_local_velocity_update_limiter_clips_per_cell_without_global_rescaling():
+    current = jnp.asarray([[0.0, 0.0], [0.0, 0.0]])
+    trial = jnp.asarray([[0.5, 0.01], [-0.5, -0.01]])
+    fluid_mask = jnp.ones((2, 2), dtype=bool)
+
+    limited = solvers._limited_velocity_update(
+        current,
+        trial,
+        fluid_mask,
+        max_delta=0.1,
+        limiter="local_clip",
+    )
+
+    assert float(limited[0, 0]) == pytest.approx(0.1)
+    assert float(limited[1, 0]) == pytest.approx(-0.1)
+    assert float(limited[0, 1]) == pytest.approx(0.01)
+    assert float(limited[1, 1]) == pytest.approx(-0.01)
+
+
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)

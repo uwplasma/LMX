@@ -160,3 +160,77 @@ def test_hunt_solver_diagnostic_report_accepts_current_reconstruction(tmp_path: 
 
     assert exit_code == 0
     assert captured["current_reconstruction"] == "face_averaged"
+
+
+def test_hunt_solver_diagnostic_report_accepts_velocity_update_limiter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    run_dir = tmp_path / "run"
+    (run_dir / "0" / "liquid").mkdir(parents=True)
+    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "system").mkdir()
+    (run_dir / "constant").mkdir()
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
+        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    )
+    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
+
+    captured = {}
+
+    def fake_solve(case):
+        captured["velocity_update_limiter"] = case.time_stepper.velocity_update_limiter
+        return _fake_solution()
+
+    monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
+
+    output = tmp_path / "diagnostics.json"
+    exit_code = huntdiag.main(
+        [
+            "--freemhd-run-dir",
+            str(run_dir),
+            "--ha",
+            "20",
+            "--velocity-update-limiter",
+            "local_clip",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["velocity_update_limiter"] == "local_clip"
+
+
+def test_hunt_solver_diagnostic_report_adds_inlet_velocity_boundary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    run_dir = tmp_path / "run"
+    (run_dir / "0" / "liquid").mkdir(parents=True)
+    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "system").mkdir()
+    (run_dir / "constant").mkdir()
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
+        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    )
+    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
+
+    captured = {}
+
+    def fake_solve(case):
+        captured["boundary_kinds"] = [bc.kind for bc in case.boundary_conditions]
+        return _fake_solution()
+
+    monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
+
+    output = tmp_path / "diagnostics.json"
+    exit_code = huntdiag.main(
+        [
+            "--freemhd-run-dir",
+            str(run_dir),
+            "--ha",
+            "20",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    assert "inlet_velocity" in captured["boundary_kinds"]

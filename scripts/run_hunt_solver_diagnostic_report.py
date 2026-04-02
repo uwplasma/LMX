@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.cases import make_hunt_case
+from lmx.specs import BoundaryCondition
 from lmx.solvers import solve_steady
 from lmx.validation import (
     combined_profile_error,
@@ -39,6 +40,7 @@ def _build_case(
     potential_solver: str | None,
     current_reconstruction: str | None,
     velocity_update_limit: float | None,
+    velocity_update_limiter: str | None,
     ramp_start: float,
     ramp_duration: float,
 ) -> object:
@@ -63,8 +65,16 @@ def _build_case(
         updates["current_reconstruction"] = current_reconstruction
     if velocity_update_limit is not None:
         updates["velocity_update_limit"] = velocity_update_limit
+    if velocity_update_limiter is not None:
+        updates["velocity_update_limiter"] = velocity_update_limiter
     return replace(
         case,
+        boundary_conditions=case.boundary_conditions
+        + (
+            (BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x"),)
+            if initial_velocity != 0.0
+            else ()
+        ),
         magnetic_field=replace(case.magnetic_field, ramp_start=ramp_start, ramp_duration=ramp_duration),
         initial_velocity=initial_velocity,
         forcing=0.0,
@@ -90,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--potential-solver", choices=["auto", "jacobi", "cg", "cg_volume", "lineax_cg"], default=None)
     parser.add_argument("--current-reconstruction", choices=["cell_centered", "face_averaged"], default=None)
     parser.add_argument("--velocity-update-limit", type=float, default=None)
+    parser.add_argument("--velocity-update-limiter", choices=["global_scale", "local_clip"], default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -115,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         potential_solver=args.potential_solver,
         current_reconstruction=args.current_reconstruction,
         velocity_update_limit=args.velocity_update_limit,
+        velocity_update_limiter=args.velocity_update_limiter,
         ramp_start=ramp_start,
         ramp_duration=ramp_duration,
     )
