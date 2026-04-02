@@ -30,6 +30,7 @@ def _build_case(
     ny: int,
     nz: int,
     initial_velocity: float,
+    drive_mode: str,
     dt: float,
     t_final: float,
     max_steps: int,
@@ -67,14 +68,16 @@ def _build_case(
         updates["velocity_update_limit"] = velocity_update_limit
     if velocity_update_limiter is not None:
         updates["velocity_update_limiter"] = velocity_update_limiter
+    inlet_boundary: tuple[BoundaryCondition, ...] = ()
+    if initial_velocity != 0.0:
+        if drive_mode == "inlet_flow_rate":
+            flow_rate = initial_velocity * case.geometry.width * case.geometry.height
+            inlet_boundary = (BoundaryCondition("inlet", "inlet_flow_rate", value=flow_rate, axis="x"),)
+        else:
+            inlet_boundary = (BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x"),)
     return replace(
         case,
-        boundary_conditions=case.boundary_conditions
-        + (
-            (BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x"),)
-            if initial_velocity != 0.0
-            else ()
-        ),
+        boundary_conditions=case.boundary_conditions + inlet_boundary,
         magnetic_field=replace(case.magnetic_field, ramp_start=ramp_start, ramp_duration=ramp_duration),
         initial_velocity=initial_velocity,
         forcing=0.0,
@@ -103,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=["cell_centered", "face_averaged", "hybrid_face_lorentz"],
         default=None,
     )
+    parser.add_argument("--drive-mode", choices=["inlet_velocity", "inlet_flow_rate"], default="inlet_velocity")
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--velocity-update-limiter", choices=["global_scale", "local_clip"], default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)
@@ -120,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         ny=args.ny,
         nz=args.nz,
         initial_velocity=initial_velocity,
+        drive_mode=args.drive_mode,
         dt=args.dt,
         t_final=args.t_final,
         max_steps=args.max_steps,
@@ -148,6 +153,9 @@ def main(argv: list[str] | None = None) -> int:
         "trace": {
             "time_history": solution.diagnostics.time_history.tolist(),
             "u_max_history": solution.diagnostics.u_max_history.tolist(),
+            "mean_velocity_history": solution.diagnostics.mean_velocity_history.tolist(),
+            "applied_forcing_history": solution.diagnostics.applied_forcing_history.tolist(),
+            "pressure_proxy_history": solution.diagnostics.pressure_proxy_history.tolist(),
             "current_max_history": solution.diagnostics.current_max_history.tolist(),
             "face_current_max_history": solution.diagnostics.face_current_max_history.tolist(),
             "emf_max_history": solution.diagnostics.emf_max_history.tolist(),

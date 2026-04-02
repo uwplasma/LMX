@@ -145,6 +145,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         dt=0.1,
         forcing=0.0,
         target_mean_velocity=None,
+        reference_mean_velocity=None,
         anchor=(0, 0),
         outer_iterations=1,
         potential_iterations=1,
@@ -169,6 +170,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         dt=0.1,
         forcing=0.0,
         target_mean_velocity=0.25,
+        reference_mean_velocity=0.25,
         anchor=(0, 0),
         outer_iterations=1,
         potential_iterations=1,
@@ -203,6 +205,19 @@ def test_target_mean_velocity_only_uses_inlet_flow_rate():
 
     assert solvers._target_mean_velocity(inlet_velocity_case) is None
     assert solvers._target_mean_velocity(inlet_flow_rate_case) == pytest.approx(0.2)
+
+
+def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
+    case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
+    inlet_velocity_case = replace(
+        case,
+        forcing=0.0,
+        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.2, 0.0, 0.0), axis="x"),),
+    )
+    initial_velocity_case = replace(case, initial_velocity=0.15)
+
+    assert solvers._reference_mean_velocity(inlet_velocity_case) == pytest.approx(0.2)
+    assert solvers._reference_mean_velocity(initial_velocity_case) == pytest.approx(0.15)
 
 
 def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
@@ -417,13 +432,16 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
         residual = next(residuals)
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25, 0.0, 0.0
+        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25, 0.0, 0.0, 0.0, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.time_history.shape[0] == 3
     assert solution.diagnostics.u_max_history.shape[0] == 3
+    assert solution.diagnostics.mean_velocity_history.shape[0] == 3
+    assert solution.diagnostics.applied_forcing_history.shape[0] == 3
+    assert solution.diagnostics.pressure_proxy_history.shape[0] == 3
     assert solution.diagnostics.residual_history.shape[0] == 3
     assert solution.diagnostics.potential_residual_history.shape[0] == 3
     assert solution.diagnostics.potential_iterations_history.shape[0] == 3
@@ -440,13 +458,16 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50, 0.0, 0.0
+        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50, 0.0, 0.0, 0.0, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.time_history.shape[0] == 2
     assert solution.diagnostics.u_max_history.shape[0] == 2
+    assert solution.diagnostics.mean_velocity_history.shape[0] == 2
+    assert solution.diagnostics.applied_forcing_history.shape[0] == 2
+    assert solution.diagnostics.pressure_proxy_history.shape[0] == 2
     assert solution.diagnostics.residual_history.shape[0] == 2
     assert solution.diagnostics.potential_residual_history.shape[0] == 2
     assert solution.diagnostics.potential_iterations_history.shape[0] == 2
@@ -473,7 +494,7 @@ def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: py
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0
+        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0, 0.0, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)

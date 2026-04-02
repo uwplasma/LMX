@@ -369,6 +369,16 @@ def _target_mean_velocity(case: CaseSpec) -> float | None:
     return None
 
 
+def _reference_mean_velocity(case: CaseSpec) -> float | None:
+    for boundary in case.boundary_conditions:
+        speed = _inlet_speed(boundary, case)
+        if speed is not None:
+            return speed
+    if abs(case.initial_velocity) > 0.0:
+        return float(case.initial_velocity)
+    return None
+
+
 def _explicit_forcing(explicit_forcing: float, dtype: jnp.dtype) -> jnp.ndarray:
     return jnp.asarray(explicit_forcing, dtype=dtype)
 
@@ -385,6 +395,7 @@ def _step(
     dt: float,
     forcing: float,
     target_mean_velocity: float | None,
+    reference_mean_velocity: float | None,
     anchor: tuple[int, int],
     outer_iterations: int,
     potential_iterations: int,
@@ -396,9 +407,9 @@ def _step(
     velocity_update_limiter: str,
     current_reconstruction: str,
     interpolate_direct_fluid_walls: bool,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     def outer_body(_, carry):
-        u_iter, _, _, _, _, _, _, _, _ = carry
+        u_iter = carry[0]
         phi, potential_residual, potential_iteration_count = _solve_potential(
             mesh,
             sigma,
@@ -430,13 +441,21 @@ def _step(
         implicit_scale = 1.0 + dt * lorentz_damping / rho
         base_trial = jnp.where(fluid_mask, (u + dt * (nu * lap_u + lorentz_explicit / rho)) / implicit_scale, 0.0)
         pressure_sensitivity = jnp.where(fluid_mask, (dt / rho) / implicit_scale, 0.0)
+        active_mask = _active_velocity_mask(fluid_mask)
+        fluid_count = jnp.maximum(jnp.sum(active_mask.astype(u.dtype)), 1.0)
+        mean_base = jnp.sum(jnp.where(active_mask, base_trial, 0.0)) / fluid_count
+        mean_sensitivity = jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / fluid_count
         forcing_value = jnp.asarray(forcing, dtype=u.dtype)
+        pressure_proxy = forcing_value
+        if reference_mean_velocity is not None:
+            reference_target = jnp.asarray(reference_mean_velocity, dtype=u.dtype)
+            pressure_proxy = jnp.where(
+                mean_sensitivity > 1e-20,
+                (reference_target - mean_base) / mean_sensitivity,
+                forcing_value,
+            )
         if target_mean_velocity is not None:
-            active_mask = _active_velocity_mask(fluid_mask)
-            fluid_count = jnp.maximum(jnp.sum(active_mask.astype(u.dtype)), 1.0)
             target = jnp.asarray(target_mean_velocity, dtype=u.dtype)
-            mean_base = jnp.sum(jnp.where(active_mask, base_trial, 0.0)) / fluid_count
-            mean_sensitivity = jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / fluid_count
             forcing_value = jnp.where(
                 mean_sensitivity > 1e-20,
                 (target - mean_base) / mean_sensitivity,
@@ -460,7 +479,21 @@ def _step(
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
         face_current_max, emf_max = _face_current_and_emf_max(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
-        return (u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max)
+        mean_velocity = jnp.sum(jnp.where(active_mask, u_next, 0.0)) / fluid_count
+        return (
+            u_next,
+            phi,
+            jy,
+            jz,
+            lorentz,
+            potential_residual,
+            potential_iteration_count,
+            face_current_max,
+            emf_max,
+            mean_velocity,
+            forcing_value,
+            pressure_proxy,
+        )
 
     u_init = _enforce_velocity_bc(
         u,
@@ -475,21 +508,39 @@ def _step(
     i0 = jnp.asarray(0, dtype=jnp.int32)
     f0 = jnp.asarray(0.0, dtype=u.dtype)
     e0 = jnp.asarray(0.0, dtype=u.dtype)
+    m0 = jnp.asarray(0.0, dtype=u.dtype)
+    g0 = jnp.asarray(0.0, dtype=u.dtype)
+    p0 = jnp.asarray(0.0, dtype=u.dtype)
     outer_count = max(1, outer_iterations)
-    u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max = jax.lax.fori_loop(
+    u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = jax.lax.fori_loop(
         0,
         outer_count,
         outer_body,
-        (u_init, phi0, j0, j0, l0, r0, i0, f0, e0),
+        (u_init, phi0, j0, j0, l0, r0, i0, f0, e0, m0, g0, p0),
     )
     residual = jnp.max(jnp.abs(u_next - u))
-    return u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max
+    return (
+        u_next,
+        phi,
+        jy,
+        jz,
+        lorentz,
+        residual,
+        potential_residual,
+        potential_iteration_count,
+        face_current_max,
+        emf_max,
+        mean_velocity,
+        applied_forcing,
+        pressure_proxy,
+    )
 
 
 def solve_transient(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
+    reference_mean_velocity = _reference_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     interpolate_direct_fluid_walls = not bool(jnp.all(materials.fluid_mask))
 
@@ -508,7 +559,7 @@ def solve_transient(case: CaseSpec) -> Solution:
         step_time = time + dt
         _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
         forcing = _explicit_forcing(case.forcing, by.dtype)
-        u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max = _step(
+        u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = _step(
             u=u,
             mesh=mesh,
             sigma=materials.conductivity,
@@ -520,6 +571,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             dt=dt,
             forcing=forcing,
             target_mean_velocity=target_mean_velocity,
+            reference_mean_velocity=reference_mean_velocity,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
@@ -540,6 +592,9 @@ def solve_transient(case: CaseSpec) -> Solution:
             [
                 step_time,
                 jnp.max(jnp.abs(u_next)),
+                mean_velocity,
+                applied_forcing,
+                pressure_proxy,
                 residual,
                 courant_like,
                 ohmic,
@@ -569,15 +624,18 @@ def solve_transient(case: CaseSpec) -> Solution:
     diagnostics = Diagnostics(
         time_history=samples[:, 0],
         u_max_history=samples[:, 1],
-        residual_history=samples[:, 2],
-        courant_like=samples[:, 3],
-        ohmic_power=samples[:, 4],
-        current_max_history=samples[:, 5],
-        face_current_max_history=samples[:, 6],
-        emf_max_history=samples[:, 7],
-        lorentz_max_history=samples[:, 8],
-        potential_residual_history=samples[:, 9],
-        potential_iterations_history=samples[:, 10],
+        mean_velocity_history=samples[:, 2],
+        applied_forcing_history=samples[:, 3],
+        pressure_proxy_history=samples[:, 4],
+        residual_history=samples[:, 5],
+        courant_like=samples[:, 6],
+        ohmic_power=samples[:, 7],
+        current_max_history=samples[:, 8],
+        face_current_max_history=samples[:, 9],
+        emf_max_history=samples[:, 10],
+        lorentz_max_history=samples[:, 11],
+        potential_residual_history=samples[:, 12],
+        potential_iterations_history=samples[:, 13],
     )
     return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
 
@@ -586,6 +644,7 @@ def solve_steady(case: CaseSpec) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
+    reference_mean_velocity = _reference_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     interpolate_direct_fluid_walls = not bool(jnp.all(materials.fluid_mask))
 
@@ -604,7 +663,7 @@ def solve_steady(case: CaseSpec) -> Solution:
     def compiled_step(
         u: jnp.ndarray,
         time: float,
-    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=time)
         forcing = _explicit_forcing(case.forcing, by.dtype)
         return _step(
@@ -619,6 +678,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             dt=dt,
             forcing=forcing,
             target_mean_velocity=target_mean_velocity,
+            reference_mean_velocity=reference_mean_velocity,
             anchor=case.reference_phi_cell,
             outer_iterations=case.time_stepper.outer_iterations,
             potential_iterations=case.time_stepper.potential_iterations,
@@ -645,6 +705,9 @@ def solve_steady(case: CaseSpec) -> Solution:
     ohmic_history: list[float] = []
     time_history: list[float] = []
     u_max_history: list[float] = []
+    mean_velocity_history: list[float] = []
+    applied_forcing_history: list[float] = []
+    pressure_proxy_history: list[float] = []
     current_max_history: list[float] = []
     face_current_max_history: list[float] = []
     emf_max_history: list[float] = []
@@ -655,7 +718,7 @@ def solve_steady(case: CaseSpec) -> Solution:
 
     for step_index in range(max_steps):
         step_time = float((step_index + 1) * dt)
-        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max = step_fn(
+        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = step_fn(
             u,
             step_time,
         )
@@ -667,6 +730,9 @@ def solve_steady(case: CaseSpec) -> Solution:
         max_lorentz = float(jnp.max(jnp.abs(lorentz)))
         time_history.append(step_time)
         u_max_history.append(u_max_value)
+        mean_velocity_history.append(float(mean_velocity))
+        applied_forcing_history.append(float(applied_forcing))
+        pressure_proxy_history.append(float(pressure_proxy))
         residual_history.append(residual_value)
         courant_history.append(courant_like)
         ohmic_history.append(ohmic)
@@ -694,6 +760,9 @@ def solve_steady(case: CaseSpec) -> Solution:
     diagnostics = Diagnostics(
         time_history=jnp.asarray(time_history, dtype=float),
         u_max_history=jnp.asarray(u_max_history, dtype=float),
+        mean_velocity_history=jnp.asarray(mean_velocity_history, dtype=float),
+        applied_forcing_history=jnp.asarray(applied_forcing_history, dtype=float),
+        pressure_proxy_history=jnp.asarray(pressure_proxy_history, dtype=float),
         residual_history=jnp.asarray(residual_history, dtype=float),
         courant_like=jnp.asarray(courant_history, dtype=float),
         ohmic_power=jnp.asarray(ohmic_history, dtype=float),

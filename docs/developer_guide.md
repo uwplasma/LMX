@@ -239,6 +239,17 @@
   replays the retained Hunt default, which combines cell-centered `J`
   diagnostics with face-current `JxB` forcing. Use this as the baseline before
   testing later-time Hunt pressure-response changes.
+- The Hunt diagnostic runner now also writes:
+  - `mean_velocity_history`
+  - `applied_forcing_history`
+  - `pressure_proxy_history`
+  Use those traces when comparing reduced-model pressure-response candidates
+  against the patched FreeMHD pressure loop.
+- `python scripts/run_hunt_solver_diagnostic_report.py --drive-mode inlet_flow_rate ...`:
+  replays the recovered Hunt metadata through the reduced flow-rate closure.
+  Keep it as a diagnosis path only; on the corrected `Ha20`, `t <= 6e-05`
+  window it overdrives `u_max`, current, and `JxB` relative to the retained
+  hybrid baseline.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with
   the same entrypoint used by Read the Docs.
 

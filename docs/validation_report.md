@@ -807,6 +807,31 @@ The backend harness currently supports:
     - the next Hunt gap is now later coupled momentum/pressure response, not
       startup source law, sampled late-time profiles, or gross layered-current
       construction
+- To make that later response measurable, the Hunt diagnostic path now also
+  records:
+  - `mean_velocity_history`
+  - `applied_forcing_history`
+  - `pressure_proxy_history`
+  and `compare_hunt_trace_histories.py` can align `pressure_proxy` /
+  `applied_forcing` against FreeMHD `maxP`.
+- First retained pressure-response probe:
+  - replay the corrected Hunt `Ha20`, `t <= 6e-05` case with
+    `drive_mode = inlet_flow_rate`
+  - result:
+    - baseline hybrid replay:
+      - `u_max l2 ≈ 1.18e-3`
+      - `current_max l2 ≈ 1.22e-2`
+      - `lorentz_max l2 ≈ 1.04e-2`
+    - `inlet_flow_rate` replay:
+      - `u_max l2 ≈ 8.96e-3`
+      - `current_max l2 ≈ 2.01e-2`
+      - `lorentz_max l2 ≈ 2.17e-2`
+      - `pressure_proxy l2 ≈ 8.10e-2`
+- Retained interpretation:
+  - the missing later-time Hunt response is not solved by switching the replay
+    wholesale to a reduced flow-rate-driven closure
+  - that candidate overdrives the corrected trace and should remain a
+    diagnostic option only
 
 ## Planned improvements
 

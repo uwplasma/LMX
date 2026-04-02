@@ -22,8 +22,8 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "maxPsiubDensity": 3.0,
                 "maxJxB": 5.0,
             },
-            {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 2.0, "pIterations": 1},
-            {"kind": "pressure", "time": 0.1, "corr": 2, "maxU": 1.0, "pIterations": 2},
+            {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 2.0, "pIterations": 1, "maxP": 9.0},
+            {"kind": "pressure", "time": 0.1, "corr": 2, "maxU": 1.0, "pIterations": 2, "maxP": 9.0},
             {
                 "kind": "epot",
                 "time": 0.2,
@@ -34,15 +34,18 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "maxPsiubDensity": 2.4,
                 "maxJxB": 4.0,
             },
-            {"kind": "pressure", "time": 0.2, "corr": 2, "maxU": 0.5, "pIterations": 3},
+            {"kind": "pressure", "time": 0.2, "corr": 2, "maxU": 0.5, "pIterations": 3, "maxP": 4.5},
         ]
     }
     lmx = {
-        "lmx_solver": {
-            "trace": {
-                "time_history": [0.1, 0.2],
-                "u_max_history": [1.0, 0.5],
-                "current_max_history": [4.0, 3.2],
+                "lmx_solver": {
+                    "trace": {
+                        "time_history": [0.1, 0.2],
+                        "u_max_history": [1.0, 0.5],
+                        "mean_velocity_history": [1.0, 0.5],
+                        "applied_forcing_history": [9.0, 4.5],
+                        "pressure_proxy_history": [9.0, 4.5],
+                        "current_max_history": [4.0, 3.2],
                 "face_current_max_history": [7.0, 5.6],
                 "emf_max_history": [3.0, 2.4],
                 "lorentz_max_history": [2.0, 1.6],
@@ -60,6 +63,9 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     payload = compare.compare_trace_histories(freemhd_path, lmx_path)
 
     assert payload["u_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["mean_velocity"]["l2_error"] == pytest.approx(0.0)
+    assert payload["applied_forcing"]["l2_error"] == pytest.approx(0.0)
+    assert payload["pressure_proxy"]["l2_error"] == pytest.approx(0.0)
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
@@ -75,7 +81,7 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
 
 def test_main_writes_alignment_json(tmp_path: Path):
     freemhd_path = tmp_path / "freemhd.json"
-    freemhd_path.write_text(json.dumps({"records": [{"kind": "epot", "time": 0.1, "maxJ": 1.0, "maxJxB": 2.0}, {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 3.0}]}))
+    freemhd_path.write_text(json.dumps({"records": [{"kind": "epot", "time": 0.1, "maxJ": 1.0, "maxJxB": 2.0}, {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 3.0, "maxP": 4.0}]}))
     lmx_path = tmp_path / "lmx.json"
     lmx_path.write_text(
         json.dumps(
@@ -84,6 +90,9 @@ def test_main_writes_alignment_json(tmp_path: Path):
                     "trace": {
                         "time_history": [0.1],
                         "u_max_history": [3.0],
+                        "mean_velocity_history": [3.0],
+                        "applied_forcing_history": [4.0],
+                        "pressure_proxy_history": [4.0],
                         "current_max_history": [1.0],
                         "face_current_max_history": [0.5],
                         "emf_max_history": [0.25],
@@ -112,6 +121,7 @@ def test_main_writes_alignment_json(tmp_path: Path):
     assert exit_code == 0
     payload = json.loads(output.read_text())
     assert payload["u_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["pressure_proxy"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["freemhd_pressure_final_records"][0]["time"] == pytest.approx(0.1)
 
 
@@ -143,6 +153,9 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
                     "trace": {
                         "time_history": [0.1],
                         "u_max_history": [3.0],
+                        "mean_velocity_history": [3.0],
+                        "applied_forcing_history": [4.0],
+                        "pressure_proxy_history": [4.0],
                         "current_max_history": [10.0],
                         "face_current_max_history": [7.0],
                         "emf_max_history": [3.0],

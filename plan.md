@@ -2540,6 +2540,36 @@ LMX should only be described as ship ready for the current milestone when all of
       current/Lorentz construction are now much healthier
     - the next remaining gap is later coupled momentum/pressure response, to be
       checked on the same corrected replay window before broadening scope
+- `2026-04-02 12:45 America/Chicago`: Added explicit reduced-model
+  pressure/forcing diagnostics to the Hunt comparison path and used them to
+  reject the first obvious pressure-response candidate:
+  - retained diagnostics added to `Diagnostics` and the Hunt diagnostic runner:
+    - `mean_velocity_history`
+    - `applied_forcing_history`
+    - `pressure_proxy_history`
+  - retained comparison extension:
+    - `compare_hunt_trace_histories.py` now aligns `pressure_proxy` and
+      `applied_forcing` against FreeMHD `maxP` when those traces are present
+  - targeted candidate tested:
+    - replay the recovered corrected Hunt `Ha20`, `t <= 6e-05` case with
+      `drive_mode = inlet_flow_rate` instead of `inlet_velocity`
+  - retained negative result:
+    - hybrid baseline:
+      - `u_max l2 ≈ 1.18e-3`
+      - `current_max l2 ≈ 1.22e-2`
+      - `lorentz_max l2 ≈ 1.04e-2`
+    - `inlet_flow_rate` replay:
+      - `u_max l2 ≈ 8.96e-3`
+      - `current_max l2 ≈ 2.01e-2`
+      - `lorentz_max l2 ≈ 2.17e-2`
+      - `pressure_proxy l2 ≈ 8.10e-2`
+  - retained interpretation:
+    - simply turning the replay into a reduced flow-rate-driven solve is not
+      the missing pressure-response analog; it overdrives the corrected Hunt
+      trace
+    - the next solver step should keep the new pressure/forcing diagnostics,
+      but target a milder later-time response mechanism than the full
+      `inlet_flow_rate` closure
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
@@ -2548,9 +2578,10 @@ LMX should only be described as ship ready for the current milestone when all of
   - next targeted solver task:
     keep the corrected Hunt replay and sampled-profile comparator fixed, keep
     the explicit insulating/conducting Hunt wall split, direct-wall
-    interpolation, and the retained `hybrid_face_lorentz` default on `main`,
-    then target the remaining later-time `u_max` / pressure-response drift
-    against the patched FreeMHD logs
+    interpolation, the retained `hybrid_face_lorentz` default, and the new
+    `pressure_proxy` / `applied_forcing` diagnostics on `main`, then target the
+    remaining later-time `u_max` / pressure-response drift against the patched
+    FreeMHD logs with a milder response model than full `inlet_flow_rate`
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

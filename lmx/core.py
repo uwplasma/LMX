@@ -25,6 +25,9 @@ class Diagnostics:
     ohmic_power: jnp.ndarray
     time_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     u_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    mean_velocity_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    applied_forcing_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    pressure_proxy_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     current_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     face_current_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     emf_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))

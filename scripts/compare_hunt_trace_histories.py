@@ -136,6 +136,8 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
 
     u_times = [float(record["time"]) for record in pressure_records]
     u_values = [float(record["maxU"]) for record in pressure_records]
+    p_times = [float(record["time"]) for record in pressure_records if "maxP" in record]
+    p_values = [float(record["maxP"]) for record in pressure_records if "maxP" in record]
     j_times = [float(record["time"]) for record in epot_records]
     j_values = [float(record["maxJ"]) for record in epot_records]
     jn_times = [float(record["time"]) for record in epot_records if "maxJn" in record]
@@ -151,6 +153,9 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
 
     lmx_times = [float(value) for value in lmx_trace["time_history"]]
     u_history = [float(value) for value in lmx_trace["u_max_history"]]
+    mean_velocity_history = [float(value) for value in lmx_trace.get("mean_velocity_history", [])]
+    applied_forcing_history = [float(value) for value in lmx_trace.get("applied_forcing_history", [])]
+    pressure_proxy_history = [float(value) for value in lmx_trace.get("pressure_proxy_history", [])]
     current_history = [float(value) for value in lmx_trace["current_max_history"]]
     face_current_history = [float(value) for value in lmx_trace.get("face_current_max_history", [])]
     emf_history = [float(value) for value in lmx_trace.get("emf_max_history", [])]
@@ -182,6 +187,12 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     }
     if u_times:
         payload["u_max"] = _build_alignment(u_times, u_values, lmx_times, u_history)
+    if p_times and pressure_proxy_history:
+        payload["pressure_proxy"] = _build_alignment(p_times, p_values, lmx_times, pressure_proxy_history)
+    if u_times and mean_velocity_history:
+        payload["mean_velocity"] = _build_alignment(u_times, u_values, lmx_times, mean_velocity_history)
+    if p_times and applied_forcing_history:
+        payload["applied_forcing"] = _build_alignment(p_times, p_values, lmx_times, applied_forcing_history)
     if j_times:
         payload["current_max"] = _build_alignment(j_times, j_values, lmx_times, current_history)
     if lorentz_times:

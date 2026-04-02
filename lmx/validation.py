@@ -376,6 +376,15 @@ def validation_summary(solution: Solution, case_name: str, ha: float | None = No
         "potential_iterations_used": float(solution.diagnostics.potential_iterations_history[-1])
         if solution.diagnostics.potential_iterations_history.size
         else 0.0,
+        "mean_velocity": float(solution.diagnostics.mean_velocity_history[-1])
+        if solution.diagnostics.mean_velocity_history.size
+        else 0.0,
+        "applied_forcing": float(solution.diagnostics.applied_forcing_history[-1])
+        if solution.diagnostics.applied_forcing_history.size
+        else 0.0,
+        "pressure_proxy": float(solution.diagnostics.pressure_proxy_history[-1])
+        if solution.diagnostics.pressure_proxy_history.size
+        else 0.0,
     }
     payload.update(duct_profile_metrics(solution))
     if case_name.startswith("hartmann") and ha is not None:
