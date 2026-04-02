@@ -2,7 +2,7 @@
 
 from .benchmarks import benchmark_solver
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from .example_runner import run_case_example
+from .example_runner import run_case_example, run_theory_meeting_demo
 from .io import write_paraview
 from .mesh import generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
 from .reference_data import load_closed_channel_analytical, load_processed_slice
@@ -21,6 +21,7 @@ __all__ = [
     "make_hunt_case",
     "make_shercliff_case",
     "run_case_example",
+    "run_theory_meeting_demo",
     "solve_steady",
     "solve_transient",
 ]

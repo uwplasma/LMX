@@ -49,6 +49,27 @@ analytical reference root under `./external/FreeMHDPaperAllFigures/...` when it
 exists, so in the common local setup you can run them without passing extra
 paths.
 
+For a single meeting-ready run that produces multiple figures and movies:
+
+```bash
+/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo --resolution 32 --hunt-resolution 24 --hunt-dt 5e-6 --hunt-t-final 8e-5 --hunt-frames 6
+```
+
+That example writes:
+
+- steady Hartmann, Shercliff, and Hunt overview/diagnostics plots
+- `meeting_demo_report.json`
+- Hunt startup 2D/3D movies and poster frames
+- `hunt/hunt_boundary_layers_2d.gif`
+- `hunt/hunt_boundary_layers_3d.gif`
+- `hunt/hunt_boundary_layers_2d_poster.png/.pdf`
+- `hunt/hunt_boundary_layers_3d_poster.png/.pdf`
+
+The Hunt movie view is intentionally based on `u - <u>_fluid` rather than raw
+`u`, because the early startup bulk flow is nearly uniform and the deviation
+field is the clearest way to show the boundary-layer development in a theory
+meeting or slide deck.
+
 ## Optional external validation backends
 
 Recovered external cases are optional. They are useful when you want to compare LMX

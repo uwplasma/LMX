@@ -76,6 +76,25 @@ cd /Users/rogerio/local/tests/LMX
 - Examples: [`examples/README.md`](examples/README.md)
 - Validation report: [`docs/validation_report.md`](docs/validation_report.md)
 
+## Meeting-ready example
+
+For a single demo run that produces steady comparison plots for Hartmann,
+Shercliff, and Hunt plus 2D/3D Hunt startup movies:
+
+```bash
+/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo --resolution 32 --hunt-resolution 24 --hunt-dt 5e-6 --hunt-t-final 8e-5 --hunt-frames 6
+```
+
+The Hunt movie assets are rendered from `u - <u>_fluid`, so the startup
+boundary layers remain visible even when the raw bulk velocity field is nearly
+uniform at early times. The checked-in meeting example writes stable GIF-based
+movie outputs plus PNG/PDF poster frames under the Hunt subdirectory:
+
+- `hunt/hunt_boundary_layers_2d.gif`
+- `hunt/hunt_boundary_layers_3d.gif`
+- `hunt/hunt_boundary_layers_2d_poster.png`
+- `hunt/hunt_boundary_layers_3d_poster.png`
+
 ## Validation backends
 
 External validation backends and archived case directories are optional. They are

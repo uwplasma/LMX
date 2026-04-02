@@ -2601,6 +2601,36 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next plausible retained direction is closer to the patched FreeMHD
       structure: a fixed-source post-predictor correction stage on `u` rather
       than a raw gain on the proxy itself
+- `2026-04-02 17:05 America/Chicago`: Finalized a meeting-ready native-example
+  path and QA'd the rendered outputs locally:
+  - retained code/docs changes:
+    - `examples/theory_meeting_demo.py` is now the single-command presentation
+      example for Hartmann, Shercliff, and Hunt
+    - the Hunt movie path uses `field_mode="bulk_deviation"` and writes stable
+      GIF posters/movies under:
+      - `hunt_boundary_layers_2d.gif`
+      - `hunt_boundary_layers_3d.gif`
+      - `hunt_boundary_layers_2d_poster.png/.pdf`
+      - `hunt_boundary_layers_3d_poster.png/.pdf`
+    - `solve_case_snapshots(...)` now carries `fluid_mask` into the stored
+      frames so the movie path can compute fluid-only `u - <u>_fluid`
+    - the default movie-writer path was tightened to the stable Pillow/GIF
+      backend on this machine; the prior `ffmpeg`/mp4 branch was not reliable
+      enough for a one-command demo workflow
+  - retained QA result:
+    - Hartmann and Shercliff steady overview figures are presentation-ready
+    - the Hunt raw-velocity movie view was too flat for a theory meeting, but
+      the fluid bulk-deviation view makes the developing boundary layers
+      visible in both the 2D and 3D posters and in the generated GIFs
+  - retained artifact run:
+    - command:
+      - `PYTHONPATH=/Users/rogerio/local/tests/LMX /Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output /Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release --resolution 40 --hunt-resolution 32 --hunt-dt 5e-6 --hunt-t-final 8e-5 --hunt-frames 10`
+    - checked outputs:
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/hartmann/overview.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/shercliff/overview.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/hunt/hunt_boundary_layers_2d_poster.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/hunt/hunt_boundary_layers_3d_poster.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/meeting_demo_report.json`
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
-from .plotting import write_case_overview_plots
+from .physics import build_material_fields, magnetic_field_components
+from .plotting import write_case_overview_plots, write_transient_movies
 from .reference_data import default_closed_channel_reference_root
 from .solvers import solve_steady
+import lmx.solvers as solvers
 from .validation import (
     closed_channel_validation,
     extract_centerline,
@@ -32,6 +35,100 @@ def _build_case(case_kind: str, ha: float, ny: int, nz: int):
     if case_kind == "hunt":
         return make_hunt_case(ha=ha, ny=ny, nz=nz)
     raise ValueError(f"Unsupported case kind {case_kind!r}")
+
+
+def solve_case_snapshots(
+    case,
+    *,
+    frame_count: int = 12,
+) -> list[dict[str, object]]:
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    target_mean_velocity = solvers._target_mean_velocity(case)
+    reference_mean_velocity = solvers._reference_mean_velocity(case)
+    potential_solver = solvers._resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
+    interpolate_direct_fluid_walls = not bool(materials.fluid_mask.all())
+
+    initial_u = materials.fluid_mask.astype(float) * case.initial_velocity
+    initial_u = solvers._enforce_velocity_bc(
+        initial_u,
+        mesh,
+        materials.fluid_mask,
+        interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+    )
+    dt = case.time_stepper.dt
+    steps = min(case.time_stepper.max_steps, max(1, int(round(case.time_stepper.t_final / dt))))
+    stride = max(1, steps // max(frame_count, 1))
+
+    frames: list[dict[str, object]] = []
+    u = initial_u
+    for step_index in range(steps):
+        step_time = float((step_index + 1) * dt)
+        _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
+        forcing = solvers._explicit_forcing(case.forcing, by.dtype)
+        (
+            u,
+            phi,
+            jy,
+            jz,
+            lorentz,
+            residual,
+            potential_residual,
+            potential_iteration_count,
+            face_current_max,
+            emf_max,
+            mean_velocity,
+            applied_forcing,
+            pressure_proxy,
+        ) = solvers._step(
+            u=u,
+            mesh=mesh,
+            sigma=materials.conductivity,
+            rho=materials.density,
+            nu=materials.viscosity,
+            fluid_mask=materials.fluid_mask,
+            by=by,
+            bz=bz,
+            dt=dt,
+            forcing=forcing,
+            target_mean_velocity=target_mean_velocity,
+            reference_mean_velocity=reference_mean_velocity,
+            anchor=case.reference_phi_cell,
+            outer_iterations=case.time_stepper.outer_iterations,
+            potential_iterations=case.time_stepper.potential_iterations,
+            potential_tolerance=case.time_stepper.potential_tolerance,
+            potential_relaxation=case.time_stepper.potential_relaxation,
+            potential_solver=potential_solver,
+            relaxation=case.time_stepper.relaxation,
+            velocity_update_limit=case.time_stepper.velocity_update_limit,
+            velocity_update_limiter=case.time_stepper.velocity_update_limiter,
+            current_reconstruction=case.time_stepper.current_reconstruction,
+            interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+        )
+        should_store = (step_index % stride == 0) or (step_index == steps - 1)
+        if should_store:
+            frames.append(
+                {
+                    "time": step_time,
+                    "u": u,
+                    "phi": phi,
+                    "jy": jy,
+                    "jz": jz,
+                    "lorentz_x": lorentz,
+                    "fluid_mask": materials.fluid_mask,
+                    "residual": float(residual),
+                    "potential_residual": float(potential_residual),
+                    "potential_iterations": float(potential_iteration_count),
+                    "face_current_max": float(face_current_max),
+                    "emf_max": float(emf_max),
+                    "mean_velocity": float(mean_velocity),
+                    "applied_forcing": float(applied_forcing),
+                    "pressure_proxy": float(pressure_proxy),
+                    "fluid_mask": materials.fluid_mask,
+                    "mesh": mesh,
+                }
+            )
+    return frames
 
 
 def run_case_example(
@@ -75,19 +172,23 @@ def run_case_example(
             "y_linf_error": comparison.linf_error,
         }
     elif reference_root is not None and reference_root.exists():
-        comparison = closed_channel_validation(solution, case_kind, int(ha), reference_root=reference_root)
-        y_reference_coordinate = comparison.y_profile.coordinate
-        y_reference_values = comparison.y_profile.reference
-        z_reference_coordinate = comparison.z_profile.coordinate
-        z_reference_values = comparison.z_profile.reference
-        reference_label = "Analytical"
-        reference_payload = {
-            "available": True,
-            "kind": "closed_channel_analytical",
-            "path": comparison.reference_path,
-            "y_l2_error": comparison.y_profile.l2_error,
-            "z_l2_error": comparison.z_profile.l2_error,
-        }
+        try:
+            comparison = closed_channel_validation(solution, case_kind, int(ha), reference_root=reference_root)
+        except FileNotFoundError:
+            comparison = None
+        if comparison is not None:
+            y_reference_coordinate = comparison.y_profile.coordinate
+            y_reference_values = comparison.y_profile.reference
+            z_reference_coordinate = comparison.z_profile.coordinate
+            z_reference_values = comparison.z_profile.reference
+            reference_label = "Analytical"
+            reference_payload = {
+                "available": True,
+                "kind": "closed_channel_analytical",
+                "path": comparison.reference_path,
+                "y_l2_error": comparison.y_profile.l2_error,
+                "z_l2_error": comparison.z_profile.l2_error,
+            }
 
     plot_paths = write_case_overview_plots(
         solution,
@@ -109,6 +210,146 @@ def run_case_example(
         "metrics": metrics,
     }
     write_metrics_json(report, out_dir / "example_report.json")
+    return report
+
+
+def run_theory_meeting_demo(
+    *,
+    out_dir: str | Path,
+    hartmann_ha: float = 20.0,
+    shercliff_ha: float = 20.0,
+    hunt_ha: float = 20.0,
+    resolution: int = 32,
+    movie_case: str = "shercliff",
+    movie_resolution: int = 24,
+    movie_dt: float = 5e-6,
+    movie_t_final: float = 6e-5,
+    movie_frames: int = 8,
+    reference_root: str | Path | None = None,
+) -> dict[str, object]:
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    reference_root = Path(reference_root) if reference_root else _default_reference_root()
+
+    hartmann_dir = out_dir / "hartmann"
+    shercliff_dir = out_dir / "shercliff"
+    hunt_dir = out_dir / "hunt"
+
+    hartmann_report = run_case_example(
+        case_kind="hartmann",
+        ha=hartmann_ha,
+        ny=resolution,
+        nz=resolution,
+        out_dir=hartmann_dir,
+        reference_root=reference_root,
+    )
+    shercliff_report = run_case_example(
+        case_kind="shercliff",
+        ha=shercliff_ha,
+        ny=resolution,
+        nz=resolution,
+        out_dir=shercliff_dir,
+        reference_root=reference_root,
+    )
+
+    hunt_case = make_hunt_case(ha=hunt_ha, ny=movie_resolution, nz=movie_resolution)
+    hunt_case = replace(
+        hunt_case,
+        time_stepper=replace(
+            hunt_case.time_stepper,
+            dt=movie_dt,
+            t_final=movie_t_final,
+            max_steps=max(1, int(round(movie_t_final / movie_dt))),
+        ),
+    )
+    hunt_solution = solve_steady(hunt_case)
+    write_paraview(hunt_solution, hunt_dir)
+    write_profile_csv(hunt_dir / f"{hunt_case.name}_centerline.csv", extract_centerline(hunt_solution))
+    write_profile_csv(hunt_dir / f"{hunt_case.name}_midplane_y.csv", extract_midplane_profile(hunt_solution, axis="y", fluid_only=True))
+    write_profile_csv(hunt_dir / f"{hunt_case.name}_midplane_z.csv", extract_midplane_profile(hunt_solution, axis="z", fluid_only=True))
+    hunt_metrics = validation_summary(hunt_solution, hunt_case.name, ha=hunt_ha)
+
+    y_reference_coordinate = None
+    y_reference_values = None
+    z_reference_coordinate = None
+    z_reference_values = None
+    hunt_reference: dict[str, object] = {"available": False}
+    if reference_root is not None and reference_root.exists():
+        try:
+            comparison = closed_channel_validation(hunt_solution, "hunt", int(hunt_ha), reference_root=reference_root)
+        except FileNotFoundError:
+            comparison = None
+        if comparison is not None:
+            y_reference_coordinate = comparison.y_profile.coordinate
+            y_reference_values = comparison.y_profile.reference
+            z_reference_coordinate = comparison.z_profile.coordinate
+            z_reference_values = comparison.z_profile.reference
+            hunt_reference = {
+                "available": True,
+                "kind": "closed_channel_analytical",
+                "path": comparison.reference_path,
+                "y_l2_error": comparison.y_profile.l2_error,
+                "z_l2_error": comparison.z_profile.l2_error,
+            }
+
+    hunt_plot_paths = write_case_overview_plots(
+        hunt_solution,
+        hunt_dir,
+        case_title=f"Hunt case (Ha={int(hunt_ha)})",
+        y_reference_coordinate=y_reference_coordinate,
+        y_reference_values=y_reference_values,
+        z_reference_coordinate=z_reference_coordinate,
+        z_reference_values=z_reference_values,
+        reference_label="Analytical",
+    )
+    movie_case_ha = {
+        "hartmann": hartmann_ha,
+        "shercliff": shercliff_ha,
+        "hunt": hunt_ha,
+    }.get(movie_case)
+    if movie_case_ha is None:
+        raise ValueError(f"Unsupported movie_case {movie_case!r}")
+    movie_case_spec = _build_case(movie_case, movie_case_ha, movie_resolution, movie_resolution)
+    movie_case_spec = replace(
+        movie_case_spec,
+        time_stepper=replace(
+            movie_case_spec.time_stepper,
+            dt=movie_dt,
+            t_final=movie_t_final,
+            max_steps=max(1, int(round(movie_t_final / movie_dt))),
+        ),
+    )
+    movie_frames_payload = solve_case_snapshots(movie_case_spec, frame_count=movie_frames)
+    movie_dir = {"hartmann": hartmann_dir, "shercliff": shercliff_dir, "hunt": hunt_dir}[movie_case]
+    movie_field_mode = "bulk_deviation" if movie_case == "hunt" else "raw"
+    movie_paths = write_transient_movies(
+        movie_frames_payload,
+        movie_dir,
+        case_title=f"{movie_case.capitalize()} startup (Ha={int(movie_case_ha)})",
+        field_mode=movie_field_mode,
+        output_stem=f"{movie_case}_startup",
+    )
+
+    hunt_report = {
+        "case": hunt_case.name,
+        "ha": hunt_ha,
+        "output_dir": str(hunt_dir.resolve()),
+        "plots": [str(path.resolve()) for path in hunt_plot_paths],
+        "reference": hunt_reference,
+        "metrics": hunt_metrics,
+    }
+    write_metrics_json(hunt_report, hunt_dir / "example_report.json")
+
+    report = {
+        "output_dir": str(out_dir.resolve()),
+        "movie_case": movie_case,
+        "movie_mode": movie_field_mode,
+        "movie_outputs": [str(path.resolve()) for path in movie_paths],
+        "hartmann": hartmann_report,
+        "shercliff": shercliff_report,
+        "hunt": hunt_report,
+    }
+    write_metrics_json(report, out_dir / "meeting_demo_report.json")
     return report
 
 
