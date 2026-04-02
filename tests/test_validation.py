@@ -11,6 +11,7 @@ from lmx.mesh import generate_rect_duct_mesh
 from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
+    compare_normalized_profiles,
     compare_with_freemhd,
     combined_profile_error,
     duct_layer_resolution_metrics,
@@ -56,6 +57,23 @@ def test_hartmann_profile_center_is_maximum():
 
 def test_combined_profile_error_uses_root_mean_square():
     assert combined_profile_error(3.0, 4.0) == pytest.approx((12.5) ** 0.5)
+
+
+def test_compare_normalized_profiles_handles_cell_centered_simulation_against_wall_sample():
+    simulated_coordinate = jnp.linspace(-0.99, 0.99, 65)
+    simulated = 1.0 - simulated_coordinate**2
+    reference_coordinate = jnp.linspace(-1.0, 1.0, 201)
+    reference = 1.0 - reference_coordinate**2
+
+    comparison = compare_normalized_profiles(
+        simulated_coordinate,
+        simulated,
+        reference_coordinate,
+        reference,
+    )
+
+    assert comparison.l2_error < 0.02
+    assert comparison.linf_error < 0.05
 
 
 def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles():

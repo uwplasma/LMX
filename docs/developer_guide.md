@@ -56,6 +56,11 @@
 - Boundary gradients on clustered meshes should also use center-to-center spacing
   between the first two cell centers, not the first cell width, so electric-field
   reconstruction remains consistent near side layers.
+- Layered duct materials can now assign different solid regions to different
+  wall pairs through `BoundaryCondition.region` plus `BoundaryCondition.side`.
+  Hunt cases use this to place insulating side walls on `left_right` and
+  conducting Hartmann walls on `top_bottom` while keeping one structured
+  cross-section.
 
 ## Case and boundary design
 

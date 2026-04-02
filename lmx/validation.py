@@ -279,22 +279,45 @@ def compare_profile_to_reference(
     )
 
 
+def _normalization_scale(coordinate: jnp.ndarray, *, infer_boundary_extent: bool) -> jnp.ndarray:
+    coordinate = jnp.asarray(coordinate, dtype=float)
+    abs_max = jnp.max(jnp.abs(coordinate))
+    abs_max = jnp.where(abs_max > 0.0, abs_max, 1.0)
+    if not infer_boundary_extent or coordinate.size <= 1:
+        return abs_max
+    lower_step = coordinate[1] - coordinate[0]
+    upper_step = coordinate[-1] - coordinate[-2]
+    lower_bound = coordinate[0] - 0.5 * lower_step
+    upper_bound = coordinate[-1] + 0.5 * upper_step
+    inferred_extent = jnp.max(jnp.abs(jnp.asarray([lower_bound, upper_bound], dtype=coordinate.dtype)))
+    return jnp.maximum(inferred_extent, abs_max)
+
+
+def _sorted_profile(coordinate: jnp.ndarray, values: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    order = jnp.argsort(coordinate)
+    return coordinate[order], values[order]
+
+
 def compare_normalized_profiles(
     simulated_coordinate: jnp.ndarray,
     simulated: jnp.ndarray,
     reference_coordinate: jnp.ndarray,
     reference: jnp.ndarray,
 ) -> AnalyticComparison:
-    sim_coord = simulated_coordinate / jnp.max(jnp.abs(simulated_coordinate))
-    ref_coord = reference_coordinate / jnp.max(jnp.abs(reference_coordinate))
+    sim_scale_coord = _normalization_scale(simulated_coordinate, infer_boundary_extent=True)
+    ref_scale_coord = _normalization_scale(reference_coordinate, infer_boundary_extent=False)
+    sim_coord = simulated_coordinate / sim_scale_coord
+    ref_coord = reference_coordinate / ref_scale_coord
     sim_scale = jnp.max(jnp.abs(simulated))
     ref_scale = jnp.max(jnp.abs(reference))
     sim_scale = jnp.where(sim_scale > 0.0, sim_scale, 1.0)
     ref_scale = jnp.where(ref_scale > 0.0, ref_scale, 1.0)
     normalized_simulated = simulated / sim_scale
     normalized_reference = reference / ref_scale
-    interpolated_reference = jnp.interp(sim_coord, ref_coord, normalized_reference)
-    return compare_profile_to_reference(sim_coord, normalized_simulated, interpolated_reference)
+    sim_coord, normalized_simulated = _sorted_profile(sim_coord, normalized_simulated)
+    ref_coord, normalized_reference = _sorted_profile(ref_coord, normalized_reference)
+    interpolated_simulated = jnp.interp(ref_coord, sim_coord, normalized_simulated)
+    return compare_profile_to_reference(ref_coord, interpolated_simulated, normalized_reference)
 
 
 def symmetry_metrics(profile: jnp.ndarray, axis: str) -> ProfileSymmetry:

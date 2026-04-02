@@ -204,11 +204,12 @@ The backend harness currently supports:
       `≈ 0.343 -> 0.377`
   - retained conclusion:
     - CG is the right default for the current single-region duct path
-    - Hunt-style layered ducts should stay on the damped Jacobi path until the
-      coupled conducting-wall update is improved
+    - Hunt-style layered ducts need their own multi-region treatment and should
+      not reuse the single-solid layered approximation when comparing against
+      recovered cases with both conducting and insulating wall regions
     - `main` now encodes that as a principled `potential_solver="auto"` policy:
-      use CG when the solved cross-section is a single fluid region, and keep
-      Jacobi when explicit solid layers are present
+      use CG when the solved cross-section is a single fluid region, and use
+      `cg_volume` when explicit solid layers are present
 - The next retained control pass widened the Hunt diagnosis without changing
   defaults:
   - `velocity_update_limit` is now a first-class control-sweep parameter
@@ -746,18 +747,40 @@ The backend harness currently supports:
 - A recovered late-time profile sample now sharpens that conclusion further:
   - the current liquid-region sampling path for the corrected Hunt replay is
     recoverable at `t = 3e-05`
-  - the matching LMX replay at that time gives:
-    - `sample_y_l2_error ≈ 1.81e-1`
-    - `sample_z_l2_error ≈ 3.84e-2`
-    - `sample_combined_l2_error ≈ 1.31e-1`
+  - the original retained comparison path overstated the `y` mismatch because
+    it normalized fluid-only cell-centered LMX coordinates as if they were wall
+    points and interpolated the reference profile onto those collapsed points
+  - after correcting `compare_normalized_profiles(...)` to infer the simulated
+    profile extent and interpolate LMX onto the sample coordinates, the matching
+    replay gives:
+    - `sample_y_l2_error ≈ 7.15e-4`
+    - `sample_z_l2_error ≈ 5.41e-3`
+    - `sample_combined_l2_error ≈ 3.86e-3`
   - retained interpretation:
-    - for the retained Hunt setup, `B` is along `z`, so the conducting
-      Hartmann walls are the top/bottom `z` walls
-    - that means the larger remaining late-time profile error is actually in
-      the side-wall / Shercliff-direction `y` cut, not in the
-      Hartmann-direction `z` cut
-    - the next retained solver change should therefore target the layered
-      side-wall response before more Hartmann-direction reconstruction churn
+    - the late-time sampled Hunt profile is already close on `main`
+    - the remaining Hunt blocker is therefore back in the trace-level drift of
+      `u_max`, current, and `JxB`, plus the later coupled pressure response
+    - the next retained solver changes should be judged primarily against the
+      patched FreeMHD history alignment, not this sampled-profile metric
+- The latest retained Hunt geometry/wall update keeps that conclusion but makes
+  the remaining trace problem narrower:
+  - Hunt cases now use explicit insulating side-wall layers together with
+    conducting Hartmann-wall layers, and layered no-slip is applied at wall
+    faces instead of zeroing the first fluid cell center
+  - on the corrected `Ha20`, `t <= 6e-05` replay, the current retained trace
+    metrics are:
+    - `u_max l2 ≈ 2.62e-3`
+    - `current_max l2 ≈ 8.81e-2`
+    - `face_current_max l2 ≈ 2.00e-2`
+    - `emf_max l2 ≈ 3.19e-3`
+    - `lorentz_max l2 ≈ 4.02e-2`
+  - retained interpretation:
+    - the geometry-faithful wall split plus direct-wall interpolation are worth
+      keeping because sampled profiles and normalized `JxB` history are now
+      both materially better
+    - the obvious remaining lagging signal is the cell-centered current
+      magnitude, which points to layered current reduction and later coupled
+      response rather than another wall-profile or startup-ramp issue
 
 ## Planned improvements
 

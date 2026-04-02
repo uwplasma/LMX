@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from .mesh import StructuredMesh
 from .operators import center_coordinates
-from .specs import CaseSpec, MagneticFieldSpec, RegionSpec
+from .specs import BoundaryCondition, CaseSpec, MagneticFieldSpec, RegionSpec
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,37 @@ def region_lookup(regions: tuple[RegionSpec, ...]) -> dict[str, RegionSpec]:
     return {region.name: region for region in regions}
 
 
+def _boundary_sides(boundary: BoundaryCondition) -> tuple[str, ...]:
+    if boundary.side is None:
+        return ()
+    side = boundary.side.lower()
+    if side == "left_right":
+        return ("left", "right")
+    if side == "top_bottom":
+        return ("bottom", "top")
+    return tuple(part.strip() for part in side.split(",") if part.strip())
+
+
+def _layered_side_distance_masks(
+    mesh: StructuredMesh,
+    case: CaseSpec,
+) -> dict[str, tuple[jnp.ndarray, jnp.ndarray]]:
+    yc, zc = center_coordinates(mesh)
+    half_width = 0.5 * case.geometry.width
+    half_height = 0.5 * case.geometry.height
+    inf = jnp.asarray(jnp.inf, dtype=yc.dtype)
+    left_distance = jnp.where(yc < -half_width, -half_width - yc, inf)
+    right_distance = jnp.where(yc > half_width, yc - half_width, inf)
+    bottom_distance = jnp.where(zc < -half_height, -half_height - zc, inf)
+    top_distance = jnp.where(zc > half_height, zc - half_height, inf)
+    return {
+        "left": (jnp.isfinite(left_distance), left_distance),
+        "right": (jnp.isfinite(right_distance), right_distance),
+        "bottom": (jnp.isfinite(bottom_distance), bottom_distance),
+        "top": (jnp.isfinite(top_distance), top_distance),
+    }
+
+
 def build_material_fields(case: CaseSpec, mesh: StructuredMesh) -> MaterialFields:
     region_map = region_lookup(case.regions)
     fluid = next(region for region in case.regions if region.kind == "fluid")
@@ -58,9 +89,45 @@ def build_material_fields(case: CaseSpec, mesh: StructuredMesh) -> MaterialField
     solid = solid_candidates[0] if solid_candidates else fluid
     fluid_mask = mesh.fluid_mask if mesh.fluid_mask is not None else jnp.ones(mesh.yz_shape, dtype=bool)
 
-    conductivity = jnp.where(fluid_mask, fluid.conductivity, solid.conductivity)
-    density = jnp.where(fluid_mask, fluid.density or 1.0, solid.density or fluid.density or 1.0)
-    viscosity = jnp.where(fluid_mask, fluid.viscosity or 1.0, solid.viscosity or fluid.viscosity or 1.0)
+    conductivity = jnp.full(mesh.yz_shape, fluid.conductivity, dtype=float)
+    density = jnp.full(mesh.yz_shape, fluid.density or 1.0, dtype=float)
+    viscosity = jnp.full(mesh.yz_shape, fluid.viscosity or 1.0, dtype=float)
+
+    if solid_candidates:
+        side_assignments: list[tuple[str, RegionSpec]] = []
+        for boundary in case.boundary_conditions:
+            if boundary.region is None:
+                continue
+            region = region_map.get(boundary.region)
+            if region is None or region.kind != "solid":
+                continue
+            for side in _boundary_sides(boundary):
+                side_assignments.append((side, region))
+
+        if case.geometry.kind == "layered_duct" and side_assignments:
+            distance_by_side = _layered_side_distance_masks(mesh, case)
+            best_distance = jnp.full(mesh.yz_shape, jnp.inf, dtype=float)
+            assigned = jnp.zeros(mesh.yz_shape, dtype=bool)
+            for side, region in side_assignments:
+                mask, distance = distance_by_side.get(
+                    side,
+                    (jnp.zeros(mesh.yz_shape, dtype=bool), jnp.full(mesh.yz_shape, jnp.inf, dtype=float)),
+                )
+                better = (~fluid_mask) & mask & (distance < best_distance)
+                conductivity = jnp.where(better, region.conductivity, conductivity)
+                density = jnp.where(better, region.density or fluid.density or 1.0, density)
+                viscosity = jnp.where(better, region.viscosity or fluid.viscosity or 1.0, viscosity)
+                best_distance = jnp.where(better, distance, best_distance)
+                assigned = assigned | better
+
+            fallback = (~fluid_mask) & (~assigned)
+            conductivity = jnp.where(fallback, solid.conductivity, conductivity)
+            density = jnp.where(fallback, solid.density or fluid.density or 1.0, density)
+            viscosity = jnp.where(fallback, solid.viscosity or fluid.viscosity or 1.0, viscosity)
+        else:
+            conductivity = jnp.where(fluid_mask, conductivity, solid.conductivity)
+            density = jnp.where(fluid_mask, density, solid.density or fluid.density or 1.0)
+            viscosity = jnp.where(fluid_mask, viscosity, solid.viscosity or fluid.viscosity or 1.0)
 
     return MaterialFields(
         conductivity=conductivity,

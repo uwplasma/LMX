@@ -2411,16 +2411,66 @@ LMX should only be described as ship ready for the current milestone when all of
     - that makes the next retained solver target more specific:
       improve the side-wall / Shercliff-direction layered response before
       spending more time on the already-better Hartmann-direction cut
+- `2026-04-02 10:41 America/Chicago`: Corrected a retained validation bug in
+  `compare_normalized_profiles(...)` before making more Hunt solver changes:
+  - the old comparison path normalized fluid-only cell-centered LMX coordinates
+    by `max(abs(center))`, then interpolated the reference profile onto those
+    coordinates
+  - on clustered meshes that collapses the first and last fluid cell centers
+    onto `±1`, which can inflate wall-adjacent profile errors even when the
+    sampled line shapes are already close
+  - retained code change:
+    - normalize the simulated profile with an inferred face extent instead of
+      the outer cell-center extent
+    - sort both profiles explicitly
+    - interpolate the simulated profile onto the reference/sample coordinates,
+      not the other way around
+  - corrected retained Hunt `Ha20`, `t = 3e-05` sampled metrics are now:
+    - `sample_y_l2_error ≈ 7.15e-4`
+    - `sample_z_l2_error ≈ 5.41e-3`
+    - `sample_combined_l2_error ≈ 3.86e-3`
+  - retained interpretation:
+    - the late-time sampled Hunt profile mismatch is not the main blocker on
+      `main`
+    - the remaining blocker moves back to the trace-level drift already seen in
+      `u_max`, current, and `JxB`, plus the later coupled pressure response
+- `2026-04-02 10:55 America/Chicago`: Retained a more geometry-faithful Hunt
+  layered-wall treatment on top of the corrected comparison path:
+  - `make_hunt_case(...)` now builds explicit insulating side-wall layers plus
+    conducting Hartmann-wall layers instead of approximating the whole solid as
+    one conducting region
+  - `build_material_fields(...)` now assigns layered solid properties by
+    boundary side, so `left/right` and `top/bottom` walls can carry different
+    conductivities on the same structured cross-section
+  - `_enforce_velocity_bc(...)` now interpolates direct fluid-wall boundary
+    cells in layered cases so no-slip is applied at the wall face instead of
+    zeroing the first fluid cell center outright
+  - retained corrected Hunt `Ha20`, `t <= 6e-05` trace against patched
+    FreeMHD on the current branch:
+    - `u_max l2 ≈ 2.62e-3`
+    - `current_max l2 ≈ 8.81e-2`
+    - `face_current_max l2 ≈ 2.00e-2`
+    - `emf_max l2 ≈ 3.19e-3`
+    - `lorentz_max l2 ≈ 4.02e-2`
+  - retained interpretation:
+    - the explicit insulating side-wall geometry plus direct-wall interpolation
+      are worth keeping because they make the recovered Hunt geometry closer to
+      the FreeMHD case and materially improve the sampled profile plus
+      normalized `JxB` history
+    - the most obvious remaining drift is now the cell-centered current
+      magnitude, which points back to layered current reduction rather than the
+      already-corrected sampled-profile path
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    use the corrected Hunt replay plus the new `t = 3e-05` profile
-    localization to improve the side-wall / Shercliff-direction layered
-    response, then re-check the corrected `u_max`, `J`, `JxB`, and sampled
-    `y/z` profile errors against FreeMHD
+    keep the corrected Hunt replay and the corrected sampled-profile
+    comparator fixed, keep the explicit insulating/conducting Hunt wall split
+    and direct-wall interpolation on `main`, then target the remaining
+    trace-level drift in cell-centered current reduction, `u_max`, and the
+    later coupled pressure response against the patched FreeMHD logs
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

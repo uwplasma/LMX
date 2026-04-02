@@ -9,7 +9,7 @@ staying focused on structured duct and simple pipe geometries.
 - Structured and mapped-structured mesh generation for ducts and pipes.
 - JAX-native finite-volume style operators and time stepping.
 - Laminar inductionless MHD for Hartmann, Shercliff, and Hunt-style cases.
-- Explicit fluid/solid conductivity regions for conducting-wall layers.
+- Explicit fluid/solid conductivity regions for conducting and insulating wall layers.
 - Hunt defaults expressed through wall conductance ratio, with optional direct
   wall-conductivity override when a case is specified that way.
 - ParaView output, CSV/profile extraction, and benchmark reporting.

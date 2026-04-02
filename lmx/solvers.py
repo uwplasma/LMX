@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import numpy as np
 
 import jax
 import jax.numpy as jnp
@@ -204,7 +205,7 @@ def _resolve_potential_solver(solver: str, fluid_mask: jnp.ndarray | None) -> st
         return solver
     if fluid_mask is None:
         return "cg"
-    return "cg" if bool(jnp.all(fluid_mask)) else "cg_volume"
+    return "cg" if bool(np.asarray(fluid_mask).all()) else "cg_volume"
 
 
 def _compute_current_and_lorentz(
@@ -254,12 +255,54 @@ def _face_current_and_emf_max(
     return max_face_current, max_emf
 
 
-def _enforce_velocity_bc(u: jnp.ndarray, fluid_mask: jnp.ndarray) -> jnp.ndarray:
+def _enforce_velocity_bc(
+    u: jnp.ndarray,
+    mesh: StructuredMesh,
+    fluid_mask: jnp.ndarray,
+    *,
+    interpolate_direct_fluid_walls: bool = False,
+) -> jnp.ndarray:
     u = jnp.where(fluid_mask, u, 0.0)
-    u = u.at[0, :].set(0.0)
-    u = u.at[-1, :].set(0.0)
-    u = u.at[:, 0].set(0.0)
-    u = u.at[:, -1].set(0.0)
+    if not interpolate_direct_fluid_walls:
+        u = u.at[0, :].set(0.0)
+        u = u.at[-1, :].set(0.0)
+        u = u.at[:, 0].set(0.0)
+        u = u.at[:, -1].set(0.0)
+        return u
+    direct_west = fluid_mask[0, :]
+    direct_east = fluid_mask[-1, :]
+    direct_south = fluid_mask[:, 0]
+    direct_north = fluid_mask[:, -1]
+    if u.shape[0] > 1:
+        west_ratio = (mesh.y_centers[0] - mesh.y_faces[0]) / jnp.maximum(mesh.y_centers[1] - mesh.y_faces[0], 1e-12)
+        east_ratio = (mesh.y_faces[-1] - mesh.y_centers[-1]) / jnp.maximum(mesh.y_faces[-1] - mesh.y_centers[-2], 1e-12)
+        west_scale = jnp.where(
+            direct_west,
+            west_ratio * fluid_mask[1, :].astype(u.dtype),
+            0.0,
+        )
+        east_scale = jnp.where(
+            direct_east,
+            east_ratio * fluid_mask[-2, :].astype(u.dtype),
+            0.0,
+        )
+        u = u.at[0, :].set(jnp.where(direct_west, west_scale * u[1, :], u[0, :]))
+        u = u.at[-1, :].set(jnp.where(direct_east, east_scale * u[-2, :], u[-1, :]))
+    if u.shape[1] > 1:
+        south_ratio = (mesh.z_centers[0] - mesh.z_faces[0]) / jnp.maximum(mesh.z_centers[1] - mesh.z_faces[0], 1e-12)
+        north_ratio = (mesh.z_faces[-1] - mesh.z_centers[-1]) / jnp.maximum(mesh.z_faces[-1] - mesh.z_centers[-2], 1e-12)
+        south_scale = jnp.where(
+            direct_south,
+            south_ratio * fluid_mask[:, 1].astype(u.dtype),
+            0.0,
+        )
+        north_scale = jnp.where(
+            direct_north,
+            north_ratio * fluid_mask[:, -2].astype(u.dtype),
+            0.0,
+        )
+        u = u.at[:, 0].set(jnp.where(direct_south, south_scale * u[:, 1], u[:, 0]))
+        u = u.at[:, -1].set(jnp.where(direct_north, north_scale * u[:, -2], u[:, -1]))
     return u
 
 
@@ -344,6 +387,7 @@ def _step(
     velocity_update_limit: float,
     velocity_update_limiter: str,
     current_reconstruction: str,
+    interpolate_direct_fluid_walls: bool,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray]:
     def outer_body(_, carry):
         u_iter, _, _, _, _, _, _, _, _ = carry
@@ -399,13 +443,23 @@ def _step(
             max_delta=velocity_update_limit,
             limiter=velocity_update_limiter,
         )
-        u_next = _enforce_velocity_bc(u_next, fluid_mask)
+        u_next = _enforce_velocity_bc(
+            u_next,
+            mesh,
+            fluid_mask,
+            interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+        )
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
         face_current_max, emf_max = _face_current_and_emf_max(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
         return (u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max)
 
-    u_init = _enforce_velocity_bc(u, fluid_mask)
+    u_init = _enforce_velocity_bc(
+        u,
+        mesh,
+        fluid_mask,
+        interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+    )
     phi0 = jnp.zeros_like(u)
     j0 = jnp.zeros_like(u)
     l0 = jnp.zeros_like(u)
@@ -429,9 +483,15 @@ def solve_transient(case: CaseSpec) -> Solution:
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
+    interpolate_direct_fluid_walls = not bool(jnp.all(materials.fluid_mask))
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
-    initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
+    initial_u = _enforce_velocity_bc(
+        initial_u,
+        mesh,
+        materials.fluid_mask,
+        interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+    )
     dt = case.time_stepper.dt
     steps = min(case.time_stepper.max_steps, max(1, int(round(case.time_stepper.t_final / dt))))
 
@@ -462,6 +522,7 @@ def solve_transient(case: CaseSpec) -> Solution:
             velocity_update_limit=case.time_stepper.velocity_update_limit,
             velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
+            interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
         )
         courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
         ohmic = jnp.mean(jy**2 + jz**2)
@@ -518,9 +579,15 @@ def solve_steady(case: CaseSpec) -> Solution:
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
+    interpolate_direct_fluid_walls = not bool(jnp.all(materials.fluid_mask))
 
     initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
-    initial_u = _enforce_velocity_bc(initial_u, materials.fluid_mask)
+    initial_u = _enforce_velocity_bc(
+        initial_u,
+        mesh,
+        materials.fluid_mask,
+        interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+    )
     dt = case.time_stepper.dt
     max_steps = max(1, case.time_stepper.max_steps)
     tolerance = float(case.time_stepper.steady_tolerance)
@@ -554,6 +621,7 @@ def solve_steady(case: CaseSpec) -> Solution:
             velocity_update_limit=case.time_stepper.velocity_update_limit,
             velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
+            interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
         )
 
     step_fn = jax.jit(compiled_step)

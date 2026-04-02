@@ -131,9 +131,13 @@ def make_hunt_case(
     nz: int = 72,
     wall_cells: int = 8,
     wall_thickness: float = 0.1,
+    insulator_cells: int | None = None,
+    insulator_thickness: float | None = None,
     fluid_conductivity: float = 1.0,
     wall_conductance_ratio: float = 0.05,
     wall_conductivity: float | None = None,
+    insulator_conductivity: float | None = None,
+    insulator_conductivity_ratio: float = 1e-12,
     density: float = 1.0,
     viscosity: float = 1.0,
     output_dir: str | None = None,
@@ -146,7 +150,13 @@ def make_hunt_case(
             wall_thickness=wall_thickness,
             hartmann_half_spacing=0.5 * height,
         )
-    anchor = ((ny + wall_cells * 0) // 2, (nz + 2 * wall_cells) // 2)
+    if insulator_cells is None:
+        insulator_cells = wall_cells
+    if insulator_thickness is None:
+        insulator_thickness = wall_thickness
+    if insulator_conductivity is None:
+        insulator_conductivity = fluid_conductivity * insulator_conductivity_ratio
+    anchor = ((ny + 2 * insulator_cells) // 2, (nz + 2 * wall_cells) // 2)
     controls = _hunt_short_transient_controls(ha)
     return CaseSpec(
         name=f"hunt_ha{int(ha)}",
@@ -156,18 +166,20 @@ def make_hunt_case(
             height=height,
             ny=ny,
             nz=nz,
-            wall_thickness=(0.0, 0.0, wall_thickness, wall_thickness),
-            wall_cells=(0, 0, wall_cells, wall_cells),
+            wall_thickness=(insulator_thickness, insulator_thickness, wall_thickness, wall_thickness),
+            wall_cells=(insulator_cells, insulator_cells, wall_cells, wall_cells),
             target_ha=ha,
         ),
         regions=(
             RegionSpec("fluid", "fluid", fluid_conductivity, density, viscosity),
             RegionSpec("conducting_wall", "solid", wall_conductivity, density, viscosity, wall_thickness),
+            RegionSpec("insulating_wall", "solid", insulator_conductivity, density, viscosity, insulator_thickness),
         ),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0 * bmag)),
         boundary_conditions=(
             BoundaryCondition("walls", "no_slip"),
-            BoundaryCondition("conducting_hartmann_walls", "conducting_wall", region="conducting_wall"),
+            BoundaryCondition("conducting_hartmann_walls", "conducting_wall", region="conducting_wall", side="top_bottom"),
+            BoundaryCondition("insulating_side_walls", "insulating", region="insulating_wall", side="left_right"),
         ),
         time_stepper=controls,
         output=OutputSpec(directory=output_dir),
@@ -175,7 +187,7 @@ def make_hunt_case(
         reference_pressure_gradient=-1.0,
         reference_phi_cell=anchor,
         notes=(
-            "Hunt-style duct with explicit conducting Hartmann-wall layers. "
+            "Hunt-style duct with explicit conducting Hartmann-wall layers and insulating side-wall layers. "
             f"Default wall conductance ratio c={wall_conductance_ratio:g}."
         ),
     )

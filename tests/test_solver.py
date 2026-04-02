@@ -69,6 +69,14 @@ def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
     assert wall_region.conductivity == pytest.approx(expected)
 
 
+def test_hunt_case_adds_explicit_insulating_side_wall_region():
+    case = make_hunt_case(ha=20.0, fluid_conductivity=2.0, ny=16, nz=16, wall_cells=2)
+    insulator_region = next(region for region in case.regions if region.name == "insulating_wall")
+    assert insulator_region.conductivity == pytest.approx(2.0e-12)
+    assert case.geometry.wall_cells == (2, 2, 2, 2)
+    assert case.geometry.wall_thickness == pytest.approx((0.1, 0.1, 0.1, 0.1))
+
+
 def test_hunt_case_allows_explicit_wall_conductivity_override():
     case = make_hunt_case(ha=20.0, wall_conductance_ratio=0.05, wall_conductivity=7.5, ny=16, nz=16, wall_cells=2)
     wall_region = next(region for region in case.regions if region.name == "conducting_wall")
@@ -294,6 +302,29 @@ def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_f
 
     assert solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
     assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "cg_volume"
+
+
+def test_build_material_fields_assigns_hunt_side_and_hartmann_wall_regions():
+    case = make_hunt_case(
+        ha=20.0,
+        ny=6,
+        nz=6,
+        wall_cells=1,
+        insulator_cells=1,
+        fluid_conductivity=3.0,
+        wall_conductivity=9.0,
+        insulator_conductivity=1.5,
+    )
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    mid_y = mesh.yz_shape[0] // 2
+    mid_z = mesh.yz_shape[1] // 2
+
+    assert materials.conductivity[0, mid_z] == pytest.approx(1.5)
+    assert materials.conductivity[-1, mid_z] == pytest.approx(1.5)
+    assert materials.conductivity[mid_y, 0] == pytest.approx(9.0)
+    assert materials.conductivity[mid_y, -1] == pytest.approx(9.0)
+    assert materials.conductivity[mid_y, mid_z] == pytest.approx(3.0)
 
 
 def test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting():
