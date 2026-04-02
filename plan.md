@@ -2339,17 +2339,45 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next retained Hunt fix should target the layered
       velocity/pressure-response formulation itself, while keeping the current
       limiter as a bounded stabilizer rather than the main tuning lever
+- `2026-04-03 04:55 America/Chicago`: Fixed the reduced inlet-drive semantics
+  that were still making the corrected Hunt replay too aggressive:
+  - retained solver change:
+    - only `inlet_flow_rate` now activates the reduced target-mean-velocity
+      closure when `forcing = 0`
+    - `inlet_velocity` is now treated as startup / recovered-case metadata
+      only, not as a reduced global mean target
+  - why this was needed:
+    - the corrected Hunt runner now adds the recovered `inlet_velocity`
+      boundary correctly
+    - but the reduced solver had still been converting that boundary into a
+      mean-flow drive on every step, which was the main reason `u_max` kept
+      climbing too quickly on the corrected replay
+  - retained numerical effect on Hunt `Ha20`, `t <= 6e-05`:
+    - previous corrected replay:
+      - `u_max l2 ≈ 2.44e-2`
+      - `current_max l2 ≈ 8.86e-2`
+      - `emf_max l2 ≈ 2.62e-2`
+      - `lorentz_max l2 ≈ 8.44e-2`
+    - after the solver fix:
+      - `u_max l2 ≈ 2.62e-3`
+      - `current_max l2 ≈ 6.44e-2`
+      - `emf_max l2 ≈ 3.19e-3`
+      - `lorentz_max l2 ≈ 1.05e-1`
+  - retained interpretation:
+    - the corrected Hunt startup mismatch was dominated by reduced drive
+      semantics more than by limiter policy
+    - the remaining Hunt blocker is now narrower again:
+      current/Lorentz distribution and later coupled pressure response
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
-    ramp law on `main`
+    ramp law plus the corrected reduced inlet-drive semantics on `main`
   - use the new `current_reconstruction` control only as a diagnosis aid until
     a better layered-current reduction is found
   - next targeted solver task:
-    use the corrected inlet-driven Hunt replay plus the pressure-response
-    artifact and the rejected local-clip result to implement a less distorting
-    layered correction path inside the coupled velocity/pressure response,
-    then re-check the corrected `6e-05` pressure and `JxB` histories against
-    FreeMHD
+    use the corrected `6e-05` Hunt replay plus the pressure-response artifact
+    to improve layered current/Lorentz distribution and later coupled
+    velocity/pressure response, then re-check the corrected `u_max`, `J`, and
+    `JxB` histories against FreeMHD
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
 

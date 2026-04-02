@@ -136,6 +136,12 @@
     `potential_iterations_used`
   - `comparison`: `u_max` and sampled-profile comparisons against the recovered
     FreeMHD run when sample files are present
+- Reduced mean-flow drive semantics are now stricter:
+  - `inlet_flow_rate` activates the internal target-mean-velocity closure when
+    `forcing = 0`
+  - `inlet_velocity` does not. It is kept for recovered-case metadata and
+    startup-state parity, because treating it as a global reduced mean target
+    makes the Hunt replay too aggressive.
 - `python scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD`:
   patches the local `epotMultiRegionInterFoam` sources with opt-in `LMX_DIAG`
   logging in the outer loop, fluid `epot` solve, momentum predictor, and

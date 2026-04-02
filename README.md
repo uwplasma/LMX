@@ -109,6 +109,10 @@ cases more faithfully now: when the recovered run has a nonzero startup
 velocity in `0/liquid/U`, the reduced replay automatically adds the matching
 `inlet_velocity` boundary instead of treating the case as an unforced
 `forcing = 0` transient.
+In the reduced duct solver itself, only `inlet_flow_rate` now activates the
+mean-flow drive closure. `inlet_velocity` remains available for recovered-case
+metadata and startup-state parity, but it no longer imposes a global target
+mean velocity across the reduced cross-section.
 
 ## Scope
 
