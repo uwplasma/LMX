@@ -145,7 +145,6 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         potential_solver="jacobi",
         relaxation=1.0,
         velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
     )[0]
     driven = solvers._step(
@@ -168,7 +167,6 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         potential_solver="jacobi",
         relaxation=1.0,
         velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
     )[0]
 
