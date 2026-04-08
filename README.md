@@ -211,11 +211,13 @@ currently `--disable-vtk-write`, which strips the heavy `vtkWrite` function
 object from `system/controlDict` before launch. That change lets the patched
 serial Hunt continuation complete through `t = 6e-05` and emit the full
 pressure/current/Lorentz diagnostic window needed for parity work.
-`run_hunt_solver_diagnostic_report.py` also mirrors recovered Hunt startup
-cases more faithfully now: when the recovered run has a nonzero startup
-velocity in `0/liquid/U`, the reduced replay automatically adds the matching
-`inlet_velocity` boundary instead of treating the case as an unforced
-`forcing = 0` transient.
+`run_hunt_solver_diagnostic_report.py` and `run_freemhd_parity_report.py` now
+also infer the recovered Hunt inlet type from `0/liquid/U`. When the recovered
+case uses `flowRateInletVelocity`, the reduced replay switches to the matching
+LMX `inlet_flow_rate` closure automatically. The scripts also record the raw
+recovered `volumetricFlowRate` in their JSON output as
+`recovered_inlet_flow_rate`, but they do not pass that dimensional value
+directly into the nondimensional reduced duct model.
 That diagnostic runner also supports restart/continuation directly from a prior
 LMX `.npz` state dump, so longer reduced Hunt replay windows can now be built
 incrementally without rerunning from `t = 0`.

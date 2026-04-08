@@ -1091,6 +1091,26 @@ The backend harness currently supports:
     setting for recovered Hunt continuations on this host
   - the next solver-side target is now the real later-time Hunt drift, with the
     largest retained gap still in the normalized Lorentz-force evolution
+- The recovered Hunt `Ha20` boundary data in `0/liquid/U` also shows that the
+  inlet is `flowRateInletVelocity`, not a simple fixed velocity.
+- The FreeMHD parity helpers now infer that inlet type automatically and replay
+  recovered Hunt cases through the reduced `inlet_flow_rate` closure by
+  default, while only recording the raw recovered `volumetricFlowRate` as
+  metadata (`recovered_inlet_flow_rate`) instead of injecting that dimensional
+  value directly into the nondimensional reduced solver.
+- On the same corrected `t <= 6e-05` Hunt replay, that retained boundary
+  semantic fix changes the trace metrics to:
+  - `u_max l2 ≈ 5.26e-04`
+  - `mean_velocity l2 ≈ 1.03e-03`
+  - `current_max l2 ≈ 2.28e-02`
+  - `lorentz_max l2 ≈ 8.42e-02`
+  - `pressure_proxy l2 ≈ 1.11e-01`
+- Retained interpretation:
+  - this is the more physically faithful Hunt replay baseline for recovered
+    cases
+  - it improves the flow/current side of the later-time replay modestly
+  - the remaining later-time Hunt blocker is still the Lorentz/pressure
+    response, not inlet-type inference
 
 ## Meeting demo artifact
 

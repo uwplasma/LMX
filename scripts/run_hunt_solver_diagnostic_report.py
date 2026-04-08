@@ -23,7 +23,12 @@ from lmx.validation import (
     compare_normalized_profiles,
     validation_summary,
 )
-from scripts.run_freemhd_parity_report import infer_initial_velocity_x, infer_magnetic_ramp
+from scripts.run_freemhd_parity_report import (
+    infer_initial_velocity_x,
+    infer_inlet_drive_mode,
+    infer_inlet_flow_rate,
+    infer_magnetic_ramp,
+)
 
 
 def _build_case(
@@ -32,6 +37,7 @@ def _build_case(
     nz: int,
     initial_velocity: float,
     drive_mode: str,
+    inlet_flow_rate: float | None,
     dt: float,
     t_final: float,
     max_steps: int,
@@ -72,7 +78,9 @@ def _build_case(
     inlet_boundary: tuple[BoundaryCondition, ...] = ()
     if initial_velocity != 0.0:
         if drive_mode == "inlet_flow_rate":
-            flow_rate = initial_velocity * case.geometry.width * case.geometry.height
+            flow_rate = inlet_flow_rate
+            if flow_rate is None:
+                flow_rate = initial_velocity * case.geometry.width * case.geometry.height
             inlet_boundary = (BoundaryCondition("inlet", "inlet_flow_rate", value=flow_rate, axis="x"),)
         else:
             inlet_boundary = (BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x"),)
@@ -107,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=["cell_centered", "face_averaged", "hybrid_face_lorentz"],
         default=None,
     )
-    parser.add_argument("--drive-mode", choices=["inlet_velocity", "inlet_flow_rate"], default="inlet_velocity")
+    parser.add_argument("--drive-mode", choices=["auto", "inlet_velocity", "inlet_flow_rate"], default="auto")
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--velocity-update-limiter", choices=["global_scale", "local_clip"], default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)
@@ -122,13 +130,17 @@ def main(argv: list[str] | None = None) -> int:
     if initial_velocity is None:
         initial_velocity = infer_initial_velocity_x(run_dir) or 0.0
     ramp_start, ramp_duration = infer_magnetic_ramp(run_dir)
+    inferred_drive_mode = infer_inlet_drive_mode(run_dir)
+    recovered_inlet_flow_rate = infer_inlet_flow_rate(run_dir)
+    drive_mode = (inferred_drive_mode or "inlet_velocity") if args.drive_mode == "auto" else args.drive_mode
 
     case = _build_case(
         ha=args.ha,
         ny=args.ny,
         nz=args.nz,
         initial_velocity=initial_velocity,
-        drive_mode=args.drive_mode,
+        drive_mode=drive_mode,
+        inlet_flow_rate=None,
         dt=args.dt,
         t_final=args.t_final,
         max_steps=args.max_steps,
@@ -253,6 +265,8 @@ def main(argv: list[str] | None = None) -> int:
         "case_kind": "hunt",
         "ha": args.ha,
         "initial_velocity": initial_velocity,
+        "drive_mode": drive_mode,
+        "recovered_inlet_flow_rate": recovered_inlet_flow_rate,
         "freemhd_run": freemhd_run,
         "lmx_solver": lmx_solver,
         "comparison": comparison,

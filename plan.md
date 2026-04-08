@@ -3377,6 +3377,31 @@ LMX does not need to implement all of that to finish the retained current plan.
    - make sure examples are polished and reproducible
    - recheck coverage/CI/benchmarks after the last solver change
 
+### Latest retained Hunt parity narrowing
+
+- The recovered Hunt `Ha20` case in `0/liquid/U` uses
+  `type flowRateInletVelocity`, not a simple fixed inlet velocity.
+- The FreeMHD parity helpers now infer that inlet type automatically from the
+  recovered case and switch the reduced replay to `inlet_flow_rate` by default
+  for Hunt when appropriate.
+- The raw recovered `volumetricFlowRate` is now recorded in the JSON artifacts
+  as `recovered_inlet_flow_rate`, but it is not injected directly into the
+  nondimensional reduced duct model.
+- On the retained corrected Hunt `t <= 6e-05` replay this new default changes
+  the later-time trace metrics to:
+  - `u_max l2 ≈ 5.26e-04` from `≈ 1.03e-03`
+  - `mean_velocity l2 ≈ 1.03e-03` from `≈ 1.54e-03`
+  - `current_max l2 ≈ 2.28e-02` from `≈ 2.31e-02`
+  - `lorentz_max l2 ≈ 8.42e-02` from `≈ 8.34e-02`
+  - `pressure_proxy l2 ≈ 1.11e-01` from `≈ 7.55e-02`
+- Retained interpretation:
+  - this is the more physically faithful recovered-case parity baseline for
+    Hunt because it mirrors the actual boundary-condition type
+  - it improves the flow/current replay slightly, but it does not close the
+    remaining later-time Lorentz/pressure-response gap
+  - the next solver-side change should still target the later-time Hunt
+    Lorentz/pressure evolution itself
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

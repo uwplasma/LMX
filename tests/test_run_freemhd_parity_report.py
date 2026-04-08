@@ -15,6 +15,27 @@ def test_infer_initial_velocity_x_reads_uniform_liquid_u(tmp_path: Path):
     assert parity.infer_initial_velocity_x(tmp_path) == pytest.approx(0.9725)
 
 
+def test_infer_inlet_drive_mode_and_flow_rate_reads_hunt_inlet_block(tmp_path: Path):
+    path = tmp_path / "0" / "liquid"
+    path.mkdir(parents=True)
+    (path / "U").write_text(
+        """internalField   uniform ( 0.1175 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type            flowRateInletVelocity;
+        value           uniform ( 0.1175 0 0 );
+        volumetricFlowRate 0.0047;
+    }
+}
+"""
+    )
+    assert parity.infer_inlet_drive_mode(tmp_path) == "inlet_flow_rate"
+    assert parity.infer_inlet_flow_rate(tmp_path) == pytest.approx(0.0047)
+
+
 def test_infer_magnetic_ramp_reads_control_dict(tmp_path: Path):
     system = tmp_path / "system"
     system.mkdir()
@@ -64,7 +85,20 @@ def test_main_uses_hunt_inlet_drive_when_forcing_unspecified(
 ):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        """internalField   uniform ( 0.1175 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type            flowRateInletVelocity;
+        value           uniform ( 0.1175 0 0 );
+        volumetricFlowRate 0.0047;
+    }
+}
+"""
+    )
 
     recorded = {}
 
@@ -91,7 +125,8 @@ def test_main_uses_hunt_inlet_drive_when_forcing_unspecified(
 
     assert exit_code == 0
     assert recorded["forcing"] == pytest.approx(0.0)
-    assert any(boundary.kind == "inlet_velocity" for boundary in recorded["boundary_conditions"])
+    assert any(boundary.kind == "inlet_flow_rate" for boundary in recorded["boundary_conditions"])
     stdout = capsys.readouterr().out
     assert '"forcing": 0.0' in stdout
-    assert '"drive_mode": "inlet_velocity"' in stdout
+    assert '"drive_mode": "inlet_flow_rate"' in stdout
+    assert '"recovered_inlet_flow_rate": 0.0047' in stdout
