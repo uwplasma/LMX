@@ -857,6 +857,33 @@ The backend harness currently supports:
     on `u`, closer to the patched FreeMHD pressure loop, not another scalar
     forcing-gain tweak
 
+## Meeting demo artifact
+
+- A checked-in meeting-ready example now exists in
+  `examples/theory_meeting_demo.py`.
+- Retained default run:
+
+```bash
+/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo --resolution 32 --movie-case shercliff --movie-resolution 24 --movie-dt 1e-3 --movie-t-final 1e-1 --movie-frames 8
+```
+
+- That run writes:
+  - verbose setup and solver progress tables
+  - `.npz` solution dumps for Hartmann, Shercliff, and Hunt
+  - steady Hartmann, Shercliff, and Hunt overview/diagnostics plots
+  - `meeting_demo_report.json`
+  - Shercliff startup 2D/3D GIF movies and PNG/PDF poster frames
+- The retained local QA run produced:
+  - `artifacts/examples/theory_meeting_demo_final/hartmann/hartmann_ha20_results.npz`
+  - `artifacts/examples/theory_meeting_demo_final/shercliff/shercliff_ha20_results.npz`
+  - `artifacts/examples/theory_meeting_demo_final/hunt/hunt_ha20_results.npz`
+  - `artifacts/examples/theory_meeting_demo_final/shercliff/shercliff_startup_snapshots.npz`
+  - `artifacts/examples/theory_meeting_demo_final/shercliff/movie/shercliff_startup_2d_poster.png`
+  - `artifacts/examples/theory_meeting_demo_final/shercliff/movie/shercliff_startup_3d_poster.png`
+- The retained default movie case is Shercliff because it gives the strongest
+  visible startup structure at modest runtime. Hunt remains available as a
+  movie case, but the current meeting-ready default is not Hunt.
+
 ## Planned improvements
 
 - Add stronger parity thresholds once the solver is stable across more geometries.

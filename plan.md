@@ -2605,13 +2605,18 @@ LMX should only be described as ship ready for the current milestone when all of
   path and QA'd the rendered outputs locally:
   - retained code/docs changes:
     - `examples/theory_meeting_demo.py` is now the single-command presentation
-      example for Hartmann, Shercliff, and Hunt
-    - the Hunt movie path uses `field_mode="bulk_deviation"` and writes stable
-      GIF posters/movies under:
-      - `hunt_boundary_layers_2d.gif`
-      - `hunt_boundary_layers_3d.gif`
-      - `hunt_boundary_layers_2d_poster.png/.pdf`
-      - `hunt_boundary_layers_3d_poster.png/.pdf`
+      example for Hartmann, Shercliff, and Hunt, with a separate `movie_case`
+      selector for the startup animation path
+    - the retained default movie case is now Shercliff because it produces the
+      clearest startup movie at modest runtime on this machine
+    - `--movie-case hunt` remains available and switches the movie path to the
+      Hunt bulk-deviation view (`u - <u>_fluid`) so the boundary-layer
+      evolution remains visible
+    - the default Shercliff movie path writes stable GIF posters/movies under:
+      - `shercliff_startup_2d.gif`
+      - `shercliff_startup_3d.gif`
+      - `hunt_startup_2d_poster.png/.pdf`
+      - `hunt_startup_3d_poster.png/.pdf`
     - `solve_case_snapshots(...)` now carries `fluid_mask` into the stored
       frames so the movie path can compute fluid-only `u - <u>_fluid`
     - the default movie-writer path was tightened to the stable Pillow/GIF
@@ -2620,17 +2625,22 @@ LMX should only be described as ship ready for the current milestone when all of
   - retained QA result:
     - Hartmann and Shercliff steady overview figures are presentation-ready
     - the Hunt raw-velocity movie view was too flat for a theory meeting, but
-      the fluid bulk-deviation view makes the developing boundary layers
-      visible in both the 2D and 3D posters and in the generated GIFs
+      the Hunt bulk-deviation movie view is presentation-worthy and became the
+      retained default
+    - selectable `--movie-case shercliff|hartmann` support remains available
+      for alternate startup visuals, but the strongest current meeting demo is
+      still Hunt
   - retained artifact run:
     - command:
-      - `PYTHONPATH=/Users/rogerio/local/tests/LMX /Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output /Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release --resolution 40 --hunt-resolution 32 --hunt-dt 5e-6 --hunt-t-final 8e-5 --hunt-frames 10`
+      - `PYTHONPATH=/Users/rogerio/local/tests/LMX /Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output /Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final`
     - checked outputs:
-      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/hartmann/overview.png`
-      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/shercliff/overview.png`
-      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/hunt/hunt_boundary_layers_2d_poster.png`
-      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/hunt/hunt_boundary_layers_3d_poster.png`
-      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_release/meeting_demo_report.json`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hartmann/overview.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/overview.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hunt/hunt_startup_2d_poster.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hunt/hunt_startup_3d_poster.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hunt/hunt_startup_2d.gif`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hunt/hunt_startup_3d.gif`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/meeting_demo_report.json`
 - Best next step:
   - keep the corrected FreeMHD density-log path and the FreeMHD-matched LMX
   ramp law plus the corrected reduced inlet-drive semantics on `main`
@@ -2646,6 +2656,79 @@ LMX should only be described as ship ready for the current milestone when all of
     not another direct forcing-gain tweak
   - avoid further startup-ramp churn unless a new recovered case shows a
     different control law
+- `2026-04-02 18:40 America/Chicago`: Reworked the meeting demo into a stable,
+  presentation-ready example with a clearer movie case and cleaner user-facing
+  API:
+  - retained code/docs changes:
+    - `examples/theory_meeting_demo.py` now exposes generic movie controls:
+      - `--movie-case`
+      - `--movie-resolution`
+      - `--movie-dt`
+      - `--movie-t-final`
+      - `--movie-frames`
+    - `run_theory_meeting_demo(...)` now always writes steady Hartmann,
+      Shercliff, and Hunt overview/diagnostics plots, while generating startup
+      movies for one selected case
+    - the retained default movie case is now Shercliff, not Hunt
+    - Hunt still remains available as a movie case, and when selected it uses
+      `u - <u>_fluid` automatically to make the startup boundary layers visible
+    - README, examples docs, and the case cookbook were updated to point users
+      at the new one-command meeting example
+  - retained QA result:
+    - the Shercliff startup posters are stronger and easier to read in a theory
+      meeting than the Hunt startup posters at the same modest runtime budget
+    - the full one-command demo now completes reliably with:
+      - `--resolution 32`
+      - `--movie-case shercliff`
+      - `--movie-resolution 24`
+      - `--movie-dt 1e-3`
+      - `--movie-t-final 1e-1`
+      - `--movie-frames 8`
+  - retained artifact run:
+    - command:
+      - `PYTHONPATH=/Users/rogerio/local/tests/LMX /Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output /Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final`
+    - checked outputs:
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hartmann/hartmann_ha20_results.npz`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/shercliff_ha20_results.npz`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/hunt/hunt_ha20_results.npz`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/shercliff_startup_snapshots.npz`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/plots/overview_from_npz.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/movie/shercliff_startup_2d_poster.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/movie/shercliff_startup_3d_poster.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/movie/shercliff_startup_2d.gif`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/shercliff/movie/shercliff_startup_3d.gif`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final/meeting_demo_report.json`
+- `2026-04-07 America/Chicago`: Reworked the examples again in response to
+  the request for FreeMHD/OpenFOAM-style verbosity and teachable user-facing
+  scripts:
+  - retained code changes:
+    - `examples/theory_meeting_demo.py` no longer hides the workflow behind
+      `run_theory_meeting_demo(...)`; it now defines explicit example-local
+      functions for:
+      - case construction and solver-control overrides
+      - pretty input/setup printing
+      - solver progress table printing
+      - steady case execution
+      - `.npz` solution output
+      - transient snapshot output
+      - movie generation
+    - added `examples/plot_npz_results.py`, a standalone Matplotlib reader for
+      the saved `.npz` result files
+    - steady `.npz` outputs include mesh, field, material, and diagnostic
+      arrays; transient `.npz` outputs include time history and field stacks
+      for 2D/3D GIF movies
+  - retained QA result:
+    - small smoke run passed:
+      `examples/theory_meeting_demo.py --output /tmp/lmx_verbose_demo_smoke --resolution 10 --movie-resolution 8 --movie-frames 2 --movie-t-final 2e-5 --movie-dt 1e-5 --hartmann-ha 5 --shercliff-ha 5 --hunt-ha 5`
+    - full meeting run passed:
+      `examples/theory_meeting_demo.py --output /Users/rogerio/local/tests/LMX/artifacts/examples/theory_meeting_demo_final`
+    - rendered Shercliff movie posters were visually checked and are now much
+      stronger after using the stable `dt=1e-3`, `t_final=1e-1` movie timescale
+  - best next step:
+    - keep this example workflow as the user-facing "how to build your own LMX
+      case" template
+    - next solver work should continue from the prior Hunt pressure-response
+      blocker, not from example/logging infrastructure
 
 ## Instruction For Future Agents
 

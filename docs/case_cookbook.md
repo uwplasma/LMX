@@ -49,26 +49,44 @@ analytical reference root under `./external/FreeMHDPaperAllFigures/...` when it
 exists, so in the common local setup you can run them without passing extra
 paths.
 
-For a single meeting-ready run that produces multiple figures and movies:
+For a single meeting-ready run that prints verbose solver logs, writes `.npz`
+result files, and produces multiple figures and movies:
 
 ```bash
-/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo --resolution 32 --hunt-resolution 24 --hunt-dt 5e-6 --hunt-t-final 8e-5 --hunt-frames 6
+/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 ```
 
 That example writes:
 
 - steady Hartmann, Shercliff, and Hunt overview/diagnostics plots
+- steady result dumps like `hartmann/hartmann_ha20_results.npz`
 - `meeting_demo_report.json`
-- Hunt startup 2D/3D movies and poster frames
-- `hunt/hunt_boundary_layers_2d.gif`
-- `hunt/hunt_boundary_layers_3d.gif`
-- `hunt/hunt_boundary_layers_2d_poster.png/.pdf`
-- `hunt/hunt_boundary_layers_3d_poster.png/.pdf`
+- startup 2D/3D movies and poster frames for the selected `--movie-case`
+- `shercliff/shercliff_startup_snapshots.npz`
+- `shercliff/movie/shercliff_startup_2d.gif`
+- `shercliff/movie/shercliff_startup_3d.gif`
+- `shercliff/movie/shercliff_startup_2d_poster.png`
+- `shercliff/movie/shercliff_startup_3d_poster.png`
 
-The Hunt movie view is intentionally based on `u - <u>_fluid` rather than raw
-`u`, because the early startup bulk flow is nearly uniform and the deviation
-field is the clearest way to show the boundary-layer development in a theory
-meeting or slide deck.
+The retained default movie case is Shercliff because it gives the clearest
+current meeting visual at modest runtime. If you switch to `--movie-case hunt`
+or `--movie-case hartmann`, the movie view follows that case instead. The Hunt
+movie path automatically uses `u - <u>_fluid` because the early Hunt bulk flow
+is nearly uniform and the deviation field is the clearest way to show the
+boundary-layer development.
+
+This example is also meant to be read, not just executed. It defines the local
+workflow functions directly in `examples/theory_meeting_demo.py`, so users can
+copy and adapt the case setup, solver controls, output rules, and logging
+format for their own studies.
+
+The NPZ files are intentionally first-class outputs. Replot a steady result or
+a transient movie without rerunning the solver:
+
+```bash
+/Users/rogerio/base_env/bin/python3 examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
+/Users/rogerio/base_env/bin/python3 examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_startup_snapshots.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot_movie --movies --stem shercliff_replot
+```
 
 ## Optional external validation backends
 

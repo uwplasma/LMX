@@ -78,22 +78,41 @@ cd /Users/rogerio/local/tests/LMX
 
 ## Meeting-ready example
 
-For a single demo run that produces steady comparison plots for Hartmann,
-Shercliff, and Hunt plus 2D/3D Hunt startup movies:
+For a single verbose demo run that prints OpenFOAM-style progress tables,
+writes `.npz` result dumps, and produces steady comparison plots for Hartmann,
+Shercliff, and Hunt plus 2D/3D startup movies for a selected case:
 
 ```bash
-/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo --resolution 32 --hunt-resolution 24 --hunt-dt 5e-6 --hunt-t-final 8e-5 --hunt-frames 6
+/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 ```
 
-The Hunt movie assets are rendered from `u - <u>_fluid`, so the startup
-boundary layers remain visible even when the raw bulk velocity field is nearly
-uniform at early times. The checked-in meeting example writes stable GIF-based
-movie outputs plus PNG/PDF poster frames under the Hunt subdirectory:
+The retained default is Shercliff because it gives the clearest startup
+structure at modest runtime. The checked-in meeting example writes steady NPZ
+dumps such as `hartmann/hartmann_ha20_results.npz`, reads those NPZ files back
+with `examples/plot_npz_results.py`, and writes stable GIF movie outputs under
+the selected case subdirectory:
 
-- `hunt/hunt_boundary_layers_2d.gif`
-- `hunt/hunt_boundary_layers_3d.gif`
-- `hunt/hunt_boundary_layers_2d_poster.png`
-- `hunt/hunt_boundary_layers_3d_poster.png`
+- `shercliff/plots/overview_from_npz.png`
+- `shercliff/shercliff_startup_snapshots.npz`
+- `shercliff/movie/shercliff_startup_2d.gif`
+- `shercliff/movie/shercliff_startup_3d.gif`
+- `shercliff/movie/shercliff_startup_2d_poster.png`
+- `shercliff/movie/shercliff_startup_3d_poster.png`
+
+Use `--movie-case hunt` or `--movie-case hartmann` when you want a different
+startup movie without changing the steady Hartmann/Shercliff/Hunt comparison
+plots.
+
+The example is intentionally explicit: it defines local functions for case
+construction, solver-control overrides, pretty progress logging, NPZ output,
+and Matplotlib replotting so users can treat it as a template for custom LMX
+workflows rather than a hidden wrapper.
+
+You can also replot any saved NPZ result directly:
+
+```bash
+/Users/rogerio/base_env/bin/python3 examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
+```
 
 ## Validation backends
 

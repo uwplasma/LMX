@@ -252,16 +252,7 @@ def run_theory_meeting_demo(
         reference_root=reference_root,
     )
 
-    hunt_case = make_hunt_case(ha=hunt_ha, ny=movie_resolution, nz=movie_resolution)
-    hunt_case = replace(
-        hunt_case,
-        time_stepper=replace(
-            hunt_case.time_stepper,
-            dt=movie_dt,
-            t_final=movie_t_final,
-            max_steps=max(1, int(round(movie_t_final / movie_dt))),
-        ),
-    )
+    hunt_case = make_hunt_case(ha=hunt_ha, ny=resolution, nz=resolution)
     hunt_solution = solve_steady(hunt_case)
     write_paraview(hunt_solution, hunt_dir)
     write_profile_csv(hunt_dir / f"{hunt_case.name}_centerline.csv", extract_centerline(hunt_solution))
