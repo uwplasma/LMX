@@ -1037,6 +1037,9 @@ The backend harness currently supports:
 - The harness now preserves this state as `status = "partial-failed"` and
   records the latest extracted diagnostic time in the JSON output instead of
   collapsing every nonzero return code into a generic unavailable/failed state.
+- That partial-progress reporting is now regression-tested in
+  `tests/test_run_freemhd_case.py`, so later failed-but-useful FreeMHD runs do
+  not silently lose their comparison value.
 - The current retained blocker is that this patched serial continuation still
   exits with `returncode = 137` inside the `3e-05` step before any patched
   pressure/maxU diagnostics are emitted. The retained `epot` record at
@@ -1052,6 +1055,8 @@ The backend harness currently supports:
 - Retained interpretation:
   - the external-backend blocker is now a runtime/continuation failure inside
     the `3e-05` step, not image lookup and not missing patched diagnostics
+  - repeated local runs confirm the image path is stable again from the Python
+    harness; the remaining failure is inside the OpenFOAM/FreeMHD runtime path
   - because the run dies before the pressure stage, the next solver-side
     pressure-response change should wait for a retained way to finish or slice
     that step cleanly

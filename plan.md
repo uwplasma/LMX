@@ -3121,6 +3121,42 @@ LMX should only be described as ship ready for the current milestone when all of
       without regressing the current harness
     - only then retarget the later-time reduced pressure/current response in
       `lmx/solvers.py`
+- `2026-04-08 America/Chicago`: Kept a second retained runtime pass after the
+  first partial FreeMHD continuation result:
+  - retained code changes:
+    - `scripts/run_freemhd_case.py` now records:
+      - `run_diag_last_time`
+      - `status = "partial-failed"` when a nonzero-return run still emits
+        usable `LMX_DIAG` records
+    - `tests/test_run_freemhd_case.py` now locks down that partial-progress
+      reporting behavior
+  - retained validation:
+    - targeted tests passed:
+      - `pytest tests/test_run_freemhd_case.py tests/test_freemhd_harness.py tests/test_run_hunt_solver_diagnostic_report.py -q`
+      - `python -m sphinx -W -b html docs docs/_build/html`
+    - Docker image lookup is stable again from the Python harness:
+      - `docker_image_available("lmx-freemhd-localdiag-density-fixed2:latest")`
+        now returns `True`
+    - the patched serial Hunt continuation still reaches only the `3e-05`
+      `epot` stage before being killed with `returncode = 137`
+    - repeated local attempts confirmed the kill is now a runtime/resource
+      issue inside the `3e-05` step, not an image-availability problem
+  - retained interpretation:
+    - the harness is now good enough to preserve and classify partial external
+      backend progress instead of losing it behind a generic failure label
+    - the next blocker is not Docker startup or image resolution anymore
+    - the next practical external-runtime target is a retained way to finish
+      the `3e-05` Hunt step cleanly enough to emit patched pressure records,
+      or otherwise to reduce that step into a slice that survives on this host
+  - best next step:
+    - keep the retained `partial-failed` FreeMHD Hunt output as the external
+      backend baseline for this host
+    - try the smallest runtime-side change that can let the `3e-05` step emit
+      `pressure/maxU` diagnostics:
+      - one-step continuation from `2e-05 -> 3e-05`
+      - or a lighter runtime configuration inside the same recovered case
+    - avoid changing the LMX solver again until that later-time external
+      pressure record is retained cleanly
 
 ## Instruction For Future Agents
 
