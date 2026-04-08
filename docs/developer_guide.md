@@ -50,9 +50,10 @@
   - `current_reconstruction="hybrid_face_lorentz"` keeps cell-centered current
     reduction for diagnostics and stored fields, while reconstructing `JxB`
     from the layered face-current system before the momentum update
-  `hybrid_face_lorentz` is now the retained Hunt default because it improves
-  the corrected Hunt current and Lorentz histories together without regressing
-  the short replay `u_max` trace.
+  `cell_centered` is the retained Hunt default again because it gives the best
+  overall balance on the corrected longer `t <= 6e-05` patched FreeMHD replay
+  and on the native Hunt analytical comparisons at `Ha20` and `Ha100`.
+  `hybrid_face_lorentz` remains available as an experimental diagnostics mode.
 - Inlet- or flow-rate-driven reduced cases with `forcing = 0` now solve for the
   streamwise forcing required to hit the target mean velocity inside the
   implicit velocity update. That is the retained core semantics for reduced
@@ -265,9 +266,8 @@
   reconstruction. Use that only as a targeted diagnosis tool unless it also
   wins the corresponding parity metrics.
 - `python scripts/run_hunt_solver_diagnostic_report.py --current-reconstruction hybrid_face_lorentz ...`:
-  replays the retained Hunt default, which combines cell-centered `J`
-  diagnostics with face-current `JxB` forcing. Use this as the baseline before
-  testing later-time Hunt pressure-response changes.
+  replays the experimental face-current-Lorentz branch against the retained
+  `cell_centered` Hunt baseline.
 - The Hunt diagnostic runner now also writes:
   - `mean_velocity_history`
   - `applied_forcing_history`
@@ -278,7 +278,7 @@
   replays the recovered Hunt metadata through the reduced flow-rate closure.
   Keep it as a diagnosis path only; on the corrected `Ha20`, `t <= 6e-05`
   window it overdrives `u_max`, current, and `JxB` relative to the retained
-  hybrid baseline.
+  `cell_centered` baseline.
 - `python -m sphinx -W -b html docs docs/_build/html`: builds the documentation with
   the same entrypoint used by Read the Docs.
 

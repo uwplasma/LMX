@@ -3203,6 +3203,41 @@ LMX should only be described as ship ready for the current milestone when all of
       as the new later-time external reference
     - retarget `lmx/solvers.py` at the remaining later-time Hunt drift,
       especially the Lorentz/current evolution after `t = 4e-05`
+- `2026-04-08 America/Chicago`: Re-checked Hunt current reconstruction on top
+  of the retained later-time `t <= 6e-05` patched FreeMHD replay and moved the
+  default back to `cell_centered`:
+  - retained code changes:
+    - `_hunt_short_transient_controls(...)` in `lmx/cases.py` now defaults
+      Hunt back to `current_reconstruction="cell_centered"`
+    - `examples/hunt_case.toml` now ships the same retained Hunt default
+    - `tests/test_solver.py` now locks down the reverted Hunt default
+  - retained validation:
+    - corrected later-time Hunt replay against patched FreeMHD:
+      - `cell_centered`: `u_max l2 ≈ 1.03e-3`, `current_max l2 ≈ 2.31e-2`,
+        `lorentz_max l2 ≈ 8.34e-2`
+      - `hybrid_face_lorentz`: `u_max l2 ≈ 1.03e-3`, `current_max l2 ≈ 2.29e-2`,
+        `lorentz_max l2 ≈ 1.07e-1`
+    - native Hunt analytical sweep at `32^2`:
+      - `Ha20` combined L2:
+        - `cell_centered ≈ 0.1002`
+        - `hybrid_face_lorentz ≈ 0.1015`
+      - `Ha100` combined L2:
+        - `cell_centered ≈ 0.3381`
+        - `hybrid_face_lorentz ≈ 0.3733`
+  - retained interpretation:
+    - `hybrid_face_lorentz` kept only a tiny edge on longer-window
+      `current_max`, while `cell_centered` clearly won later-time `JxB`
+      tracking and the native Hunt analytical path
+    - Hunt should keep `cell_centered` as the retained default and leave
+      `hybrid_face_lorentz` as an experimental diagnostics mode
+  - best next step:
+    - keep the corrected `t <= 6e-05` Hunt replay as the fixed later-time
+      target
+    - change the later-time pressure/current reduction path itself, not the
+      top-level current-reconstruction mode
+    - require any retained solver change to improve `lorentz_max` on the
+      longer replay without regressing `u_max` or the native Hunt analytical
+      combined error
 
 ## Instruction For Future Agents
 

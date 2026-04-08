@@ -31,8 +31,9 @@ staying focused on structured duct and simple pipe geometries.
   symmetric CG system. It is now the retained layered default because it
   improves the full recovered Hunt parity path at both `Ha20` and `Ha100`.
 - Hunt diagnostics also expose `current_reconstruction`, with the retained
-  default `cell_centered` and an experimental `face_averaged` mode for tracing
-  current-distribution effects without changing the public case API.
+  default `cell_centered` plus experimental `face_averaged` and
+  `hybrid_face_lorentz` modes for tracing current-distribution and `JxB`
+  reduction effects without changing the public case API.
 - Hunt diagnostic replays also expose `velocity_update_limiter`. The retained
   default is `global_scale`; the experimental `local_clip` path is available
   for targeted layered-update diagnosis, but it is currently worse on the

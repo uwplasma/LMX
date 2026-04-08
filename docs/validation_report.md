@@ -834,29 +834,29 @@ The backend harness currently supports:
 - Re-checking `current_reconstruction` on top of that updated Hunt wall model
   narrows the next solver target again:
   - on the corrected `Ha20`, `t <= 6e-05` replay:
-    - `cell_centered`: `current_max l2 ≈ 1.68e-2`, `lorentz_max l2 ≈ 1.98e-1`
-    - `face_averaged`: `current_max l2 ≈ 1.23e-1`, `lorentz_max l2 ≈ 6.84e-2`
+    - `cell_centered`: `current_max l2 ≈ 1.68e-2`, `lorentz_max l2 ≈ 8.34e-2`
+    - `face_averaged`: `current_max l2 ≈ 1.23e-1`, `lorentz_max l2 ≈ 1.07e-1`
   - retained interpretation:
     - `face_averaged` still is not the right blanket replacement on `main`
-    - the next retained solver change should build a better cell-centered
-      reduction from the layered face-current system instead of flipping the
-      global current-reconstruction switch
-- That retained solver change is now on `main`:
-  - added `current_reconstruction="hybrid_face_lorentz"`
-  - the mode keeps cell-centered `J` reduction for diagnostics and stored
-    fields, but reconstructs `JxB` from the layered face-current system before
-    the momentum update
-  - it is now the default Hunt short-transient control
+    - `cell_centered` remains the better retained Hunt default on the longer
+      replay, even after re-checking the face-based branches
+- Re-checking `hybrid_face_lorentz` against the corrected longer replay and the
+  native Hunt analytical path changes the retained default back:
   - corrected `Ha20`, `t <= 6e-05` replay:
-    - `u_max l2 ≈ 1.18e-3`
-    - `current_max l2 ≈ 1.22e-2`
-    - `lorentz_max l2 ≈ 1.04e-2`
+    - `cell_centered`: `u_max l2 ≈ 1.03e-3`, `current_max l2 ≈ 2.31e-2`,
+      `lorentz_max l2 ≈ 8.34e-2`
+    - `hybrid_face_lorentz`: `u_max l2 ≈ 1.03e-3`, `current_max l2 ≈ 2.29e-2`,
+      `lorentz_max l2 ≈ 1.07e-1`
+  - native Hunt analytical control sweep at `32^2`:
+    - `Ha20` combined L2: `cell_centered ≈ 0.1002`,
+      `hybrid_face_lorentz ≈ 0.1015`
+    - `Ha100` combined L2: `cell_centered ≈ 0.3381`,
+      `hybrid_face_lorentz ≈ 0.3733`
   - retained interpretation:
-    - this is the first layered-current update that improves Hunt current and
-      Lorentz histories together instead of trading one off against the other
-    - the next Hunt gap is now later coupled momentum/pressure response, not
-      startup source law, sampled late-time profiles, or gross layered-current
-      construction
+    - `hybrid_face_lorentz` only keeps a tiny current-history edge on the
+      longer replay
+    - it loses enough on later `JxB` drift and native Hunt analytical error
+      that Hunt now defaults back to `cell_centered`
 - To make that later response measurable, the Hunt diagnostic path now also
   records:
   - `mean_velocity_history`

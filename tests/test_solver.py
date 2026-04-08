@@ -40,17 +40,17 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha20.time_stepper.velocity_update_limit == pytest.approx(2e-3)
     assert ha20.time_stepper.potential_tolerance is None
     assert ha20.time_stepper.potential_solver == "auto"
-    assert ha20.time_stepper.current_reconstruction == "hybrid_face_lorentz"
+    assert ha20.time_stepper.current_reconstruction == "cell_centered"
     assert ha100.time_stepper.outer_iterations == 4
     assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha100.time_stepper.potential_tolerance is None
     assert ha100.time_stepper.potential_solver == "auto"
-    assert ha100.time_stepper.current_reconstruction == "hybrid_face_lorentz"
+    assert ha100.time_stepper.current_reconstruction == "cell_centered"
     assert ha1000.time_stepper.outer_iterations == 3
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha1000.time_stepper.potential_tolerance is None
     assert ha1000.time_stepper.potential_solver == "auto"
-    assert ha1000.time_stepper.current_reconstruction == "hybrid_face_lorentz"
+    assert ha1000.time_stepper.current_reconstruction == "cell_centered"
 
 
 def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
