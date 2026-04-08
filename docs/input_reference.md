@@ -93,6 +93,10 @@ The retained values in the shipped examples are the current known-good
 baselines. They are not intended to be universal defaults for all future
 geometries.
 
+When `forcing = 0` and the case uses reduced mean-flow closure through
+`inlet_flow_rate`, the solver now computes those cross-sectional means with
+cell-area weighting on clustered meshes rather than raw cell counts.
+
 ## `output`
 
 - `directory`

@@ -86,14 +86,14 @@ wall_thickness = 0.1
 
 [[boundary_conditions]]
 name = "left_wall"
-kind = "conducting_wall"
+kind = "insulating"
 axis = "y"
 side = "left"
 region = "insulating_wall"
 
 [[boundary_conditions]]
 name = "right_wall"
-kind = "conducting_wall"
+kind = "insulating"
 axis = "y"
 side = "right"
 region = "insulating_wall"

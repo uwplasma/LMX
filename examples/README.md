@@ -37,6 +37,13 @@ They show users how to set:
 - output bundle controls
 - live logging verbosity
 
+The shipped Hunt TOML explicitly models:
+
+- insulating side walls
+- conducting Hartmann walls
+
+so it reads the same way the native Hunt case is intended physically.
+
 Shercliff and Hunt automatically use the default closed-channel analytical
 reference root when it exists under `./external/FreeMHDPaperAllFigures/...`.
 Override that with `--reference-root` if needed.

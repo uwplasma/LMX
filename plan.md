@@ -2770,6 +2770,52 @@ LMX should only be described as ship ready for the current milestone when all of
       sampled-profile diagnostics
     - avoid more infrastructure-only work unless it directly helps the next
       solver iteration
+- `2026-04-07 America/Chicago`: Re-tested the next reduced Hunt
+  pressure-response family and kept only the parts that were actually worth
+  retaining:
+  - rejected solver candidate:
+    - implemented a fixed-source post-predictor velocity-corrector family
+      intended to mimic a reduced pressure-correction loop more closely
+    - swept `velocity_corrector_iterations in {1,2,3}` and
+      `velocity_corrector_relaxation in {0.1,0.2,0.35}` on the native
+      `Hunt Ha20`, `32 x 32`, `wall_cells=3` reference path
+    - every tested setting worsened the native combined closed-channel error
+      relative to the current retained baseline
+    - representative result:
+      - retained baseline (`iters=0`):
+        - `combined_l2_error ≈ 1.0148e-1`
+        - `y_l2_error ≈ 3.51e-2`
+        - `z_l2_error ≈ 1.39e-1`
+      - best tested corrector candidate (`iters=1`, `relax=0.1`):
+        - `combined_l2_error ≈ 1.0564e-1`
+        - `y_l2_error ≈ 7.29e-2`
+        - `z_l2_error ≈ 1.30e-1`
+      - heavier correctors only made that tradeoff worse
+    - retained conclusion:
+      - reject this family on `main`
+      - the remaining Hunt later-time blocker should not be attacked with a
+        blunt post-predictor `u` corrector
+  - retained code changes:
+    - the reduced mean-flow closure in `lmx/solvers.py` now uses
+      area-weighted cross-sectional averages on nonuniform clustered meshes
+      instead of simple cell counts
+    - this is the correct future-proof behavior for inlet-flow-rate closures
+      and pressure-proxy diagnostics on graded layered meshes
+    - corrected the shipped `examples/hunt_case.toml` so the side walls are
+      explicitly `insulating` and only the Hartmann walls are
+      `conducting_wall`
+  - retained QA result:
+    - targeted solver/config/example tests passed locally after the revert and
+      retained fixes
+    - the local Docker daemon is currently unavailable again, so a fresh
+      patched FreeMHD Hunt replay could not be rerun in this turn
+  - best next step:
+    - once Docker is reachable again, rerun the corrected patched Hunt
+      `Ha20`, `t <= 6e-05` replay and compare the later-time pressure/momentum
+      response against the current retained hybrid-layered baseline
+    - until then, keep solver-side work focused on physically justified
+      pressure/velocity coupling changes rather than new scalar gains or
+      post-predictor corrector sweeps
 
 ## Instruction For Future Agents
 

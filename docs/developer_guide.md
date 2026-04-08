@@ -54,6 +54,9 @@
   implicit velocity update. That is the retained core semantics for reduced
   inlet-driven runs; avoid reintroducing a fixed case-specific startup source
   heuristic in the solver.
+- Those reduced cross-sectional means should be area-weighted on clustered
+  meshes. Do not use raw cell counts for mean-velocity or pressure-sensitivity
+  calculations on graded Hartmann/side-layer meshes.
 - When diagnosing layered Hunt transients, watch the interaction between
   `_limited_velocity_update(...)` and `outer_iterations`. The retained Hunt
   traces can become clamp-controlled, with `residual_history` effectively

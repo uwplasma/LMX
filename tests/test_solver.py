@@ -189,6 +189,64 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
     assert float(jnp.max(driven[1:-1, 1:-1])) > 0.0
 
 
+def test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=4,
+        nz=4,
+        wall_thickness=(0.2, 0.2, 0.0, 0.0),
+        wall_cells=(1, 1, 0, 0),
+        target_ha=20.0,
+    )
+    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    sigma = jnp.zeros(mesh.yz_shape)
+    y_index = jnp.arange(mesh.yz_shape[0], dtype=jnp.float32)[:, None]
+    z_index = jnp.arange(mesh.yz_shape[1], dtype=jnp.float32)[None, :]
+    rho = 1.0 + 0.25 * y_index + 0.5 * z_index
+    nu = jnp.zeros(mesh.yz_shape)
+    zeros = jnp.zeros(mesh.yz_shape)
+    u = jnp.zeros(mesh.yz_shape)
+
+    _, _, _, _, _, _, _, _, _, _, mean_velocity, applied_forcing, _ = solvers._step(
+        u=u,
+        mesh=mesh,
+        sigma=sigma,
+        rho=rho,
+        nu=nu,
+        fluid_mask=fluid_mask,
+        by=zeros,
+        bz=zeros,
+        dt=0.1,
+        forcing=0.0,
+        target_mean_velocity=0.25,
+        reference_mean_velocity=0.25,
+        anchor=(0, 0),
+        outer_iterations=1,
+        potential_iterations=1,
+        potential_tolerance=None,
+        potential_relaxation=1.0,
+        potential_solver="jacobi",
+        relaxation=1.0,
+        velocity_update_limit=10.0,
+        velocity_update_limiter="global_scale",
+        current_reconstruction="cell_centered",
+        interpolate_direct_fluid_walls=False,
+    )
+
+    active_mask = solvers._active_velocity_mask(fluid_mask)
+    cell_metric = solvers._cell_metric(mesh)
+    weighted_area = float(jnp.sum(jnp.where(active_mask, cell_metric, 0.0)))
+    pressure_sensitivity = 0.1 / rho
+    weighted_sensitivity = float(jnp.sum(jnp.where(active_mask, cell_metric * pressure_sensitivity, 0.0)) / weighted_area)
+    active_count = float(jnp.sum(active_mask.astype(jnp.float32)))
+    simple_sensitivity = float(jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / active_count)
+
+    assert float(applied_forcing) == pytest.approx(0.25 / weighted_sensitivity)
+    assert float(applied_forcing) != pytest.approx(0.25 / simple_sensitivity)
+    assert float(mean_velocity) > 0.0
+
+
 def test_target_mean_velocity_only_uses_inlet_flow_rate():
     case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
     inlet_velocity_case = replace(

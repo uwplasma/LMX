@@ -162,3 +162,14 @@ def test_shipped_example_toml_files_parse():
         config = load_run_config(root / name)
         assert config.case.name
         assert config.case.regions
+
+
+def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann_walls():
+    root = Path(__file__).resolve().parents[1] / "examples"
+    config = load_run_config(root / "hunt_case.toml")
+
+    boundaries = {boundary.name: boundary for boundary in config.case.boundary_conditions}
+    assert boundaries["left_wall"].kind == "insulating"
+    assert boundaries["right_wall"].kind == "insulating"
+    assert boundaries["bottom_wall"].kind == "conducting_wall"
+    assert boundaries["top_wall"].kind == "conducting_wall"

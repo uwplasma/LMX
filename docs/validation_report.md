@@ -856,6 +856,31 @@ The backend harness currently supports:
   - the next plausible solver step is a fixed-source post-predictor correction
     on `u`, closer to the patched FreeMHD pressure loop, not another scalar
     forcing-gain tweak
+- That fixed-source post-predictor family was then tested and rejected too:
+  - native `Hunt Ha20`, `32 x 32`, `wall_cells=3`, with
+    `velocity_corrector_iterations in {1,2,3}` and
+    `velocity_corrector_relaxation in {0.1,0.2,0.35}`
+  - retained baseline:
+    - `combined_l2_error ≈ 1.0148e-1`
+    - `y_l2_error ≈ 3.51e-2`
+    - `z_l2_error ≈ 1.39e-1`
+  - best tested corrector point:
+    - `combined_l2_error ≈ 1.0564e-1`
+    - `y_l2_error ≈ 7.29e-2`
+    - `z_l2_error ≈ 1.30e-1`
+  - retained interpretation:
+    - this family is not the missing Hunt fix
+    - it improves one component only by degrading the more important combined
+      closed-channel error
+    - it should remain rejected unless a future patched FreeMHD replay shows a
+      materially different later-time pressure-response structure
+- One smaller retained correctness fix did land:
+  - reduced mean-flow closures and `pressure_proxy` diagnostics now use
+    area-weighted cross-sectional averages on clustered nonuniform meshes
+    instead of simple cell counts
+  - this does not solve the current Hunt later-time parity blocker by itself,
+    but it is the correct future-proof formulation for layered graded meshes
+    and inlet-flow-rate-driven reduced runs
 
 ## Meeting demo artifact
 

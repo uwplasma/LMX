@@ -443,9 +443,11 @@ def _step(
         base_trial = jnp.where(fluid_mask, (u + dt * (nu * lap_u + lorentz_explicit / rho)) / implicit_scale, 0.0)
         pressure_sensitivity = jnp.where(fluid_mask, (dt / rho) / implicit_scale, 0.0)
         active_mask = _active_velocity_mask(fluid_mask)
-        fluid_count = jnp.maximum(jnp.sum(active_mask.astype(u.dtype)), 1.0)
-        mean_base = jnp.sum(jnp.where(active_mask, base_trial, 0.0)) / fluid_count
-        mean_sensitivity = jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / fluid_count
+        cell_metric = _cell_metric(mesh).astype(u.dtype)
+        active_weight = jnp.where(active_mask, cell_metric, 0.0)
+        fluid_weight = jnp.maximum(jnp.sum(active_weight), 1e-20)
+        mean_base = jnp.sum(active_weight * base_trial) / fluid_weight
+        mean_sensitivity = jnp.sum(active_weight * pressure_sensitivity) / fluid_weight
         forcing_value = jnp.asarray(forcing, dtype=u.dtype)
         pressure_proxy = forcing_value
         if reference_mean_velocity is not None:
@@ -480,7 +482,7 @@ def _step(
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
         face_current_max, emf_max = _face_current_and_emf_max(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
-        mean_velocity = jnp.sum(jnp.where(active_mask, u_next, 0.0)) / fluid_count
+        mean_velocity = jnp.sum(active_weight * u_next) / fluid_weight
         return (
             u_next,
             phi,
