@@ -160,6 +160,7 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     face_current_history = [float(value) for value in lmx_trace.get("face_current_max_history", [])]
     emf_history = [float(value) for value in lmx_trace.get("emf_max_history", [])]
     lorentz_history = [float(value) for value in lmx_trace["lorentz_max_history"]]
+    face_lorentz_history = [float(value) for value in lmx_trace.get("face_lorentz_max_history", [])]
 
     payload = {
         "freemhd_diag_json": str(freemhd_diag_json.resolve()),
@@ -197,6 +198,8 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         payload["current_max"] = _build_alignment(j_times, j_values, lmx_times, current_history)
     if lorentz_times:
         payload["lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, lorentz_history)
+    if lorentz_times and face_lorentz_history:
+        payload["face_lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, face_lorentz_history)
     if jn_times and face_current_history:
         payload["face_current_max"] = _build_alignment(jn_times, jn_values, lmx_times, face_current_history)
     if jn_density_times and face_current_history:

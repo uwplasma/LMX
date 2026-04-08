@@ -164,6 +164,41 @@ LMX should only be described as ship ready for the current milestone when all of
   - next use the combined Hunt `Ha20` and `Ha100` artifacts to drive the next conducting-wall solver iteration
 7. Implement mapped-operator support for the fringing-field pipe case if that remains in the current release scope.
 
+### Latest rejected Hunt pressure-response family
+
+- A later-time Hunt replay sweep tested relaxed reduced-drive updates by introducing a
+  `drive_relaxation` family on the recovered `Ha20`, `t <= 6e-05` replay.
+- Retained baseline (`drive_relaxation = 1.0`) stayed:
+  - `u_max l2 ≈ 5.26e-04`
+  - `current_max l2 ≈ 2.28e-02`
+  - `lorentz_max l2 ≈ 8.42e-02`
+  - `pressure_proxy l2 ≈ 1.11e-01`
+- `drive_relaxation = 0.5` slightly improved the reduced pressure-trend metric but worsened
+  `u_max` and `lorentz_max`.
+- `drive_relaxation = 0.25` improved `lorentz_max` and pressure-trend alignment somewhat,
+  but degraded `u_max` more noticeably and did not improve the native Hunt analytical
+  validation path.
+- Retained conclusion:
+  - this family is not the missing later-time Hunt fix
+  - do not revisit it unless the reduced-model closure is redesigned more broadly
+
+### Latest retained Hunt long-replay diagnostic result
+
+- The corrected recovered Hunt `Ha20`, `t <= 6e-05` replay now reports both the existing
+  cell-centered `lorentz_max_history` and a new face-current-based
+  `face_lorentz_max_history`.
+- On the retained long replay:
+  - `u_max l2 ≈ 5.26e-04`
+  - `current_max l2 ≈ 2.28e-02`
+  - `lorentz_max l2 ≈ 8.42e-02`
+  - `face_lorentz_max l2 ≈ 3.68e-03`
+- Interpretation:
+  - a large fraction of the remaining later-time Hunt `JxB` mismatch is in the reduction
+    used for the comparison trace, not only in the solved reduced flow evolution
+  - the next solver/validation step should decide whether layered parity reports should
+    treat face-based Lorentz reduction as the primary force-scale diagnostic while keeping
+    the cell-centered field as the native state variable
+
 ## What Worked
 
 - The package structure and top-level API are in place and importable.
@@ -3401,6 +3436,37 @@ LMX does not need to implement all of that to finish the retained current plan.
     remaining later-time Lorentz/pressure-response gap
   - the next solver-side change should still target the later-time Hunt
     Lorentz/pressure evolution itself
+
+### Latest rejected Hunt pressure-response family
+
+- I tested a reduced mean-drive memory / `drive_relaxation` family on the
+  corrected recovered Hunt `t <= 6e-05` replay, treating the `inlet_flow_rate`
+  closure as a relaxed response instead of recomputing a fully new forcing each
+  step.
+- Retained replay results:
+  - baseline auto-inferred Hunt replay:
+    - `u_max l2 ≈ 5.26e-04`
+    - `current_max l2 ≈ 2.28e-02`
+    - `lorentz_max l2 ≈ 8.42e-02`
+    - `pressure_proxy l2 ≈ 1.11e-01`
+  - `drive_relaxation = 0.5`:
+    - `u_max l2 ≈ 5.93e-04`
+    - `current_max l2 ≈ 2.28e-02`
+    - `lorentz_max l2 ≈ 8.45e-02`
+    - `pressure_proxy l2 ≈ 1.06e-01`
+  - `drive_relaxation = 0.25`:
+    - `u_max l2 ≈ 7.11e-04`
+    - `current_max l2 ≈ 2.29e-02`
+    - `lorentz_max l2 ≈ 8.27e-02`
+    - `pressure_proxy l2 ≈ 9.71e-02`
+- Native Hunt processed-slice validation at `Ha20`, `32^2` stayed effectively
+  unchanged across `drive_relaxation = 1.0, 0.5, 0.25`:
+  - `combined_l2_error ≈ 1.708e-01`
+- Retained interpretation:
+  - this family only trades replay observables against each other
+  - it does not improve the native Hunt validation path
+  - it is not the missing later-time Hunt fix and should stay out of retained
+    defaults and public controls for now
 
 ### Expected number of focused iterations
 

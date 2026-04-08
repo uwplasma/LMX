@@ -202,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
             "face_current_max_history": solution.diagnostics.face_current_max_history.tolist(),
             "emf_max_history": solution.diagnostics.emf_max_history.tolist(),
             "lorentz_max_history": solution.diagnostics.lorentz_max_history.tolist(),
+            "face_lorentz_max_history": solution.diagnostics.face_lorentz_max_history.tolist(),
             "residual_history": solution.diagnostics.residual_history.tolist(),
             "potential_residual_history": solution.diagnostics.potential_residual_history.tolist(),
             "potential_iterations_history": solution.diagnostics.potential_iterations_history.tolist(),

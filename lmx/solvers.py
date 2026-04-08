@@ -244,7 +244,7 @@ def _compute_current_and_lorentz(
     return jy, jz, lorentz_x
 
 
-def _face_current_and_emf_max(
+def _face_current_emf_and_lorentz_max(
     mesh: StructuredMesh,
     sigma: jnp.ndarray,
     fluid_mask: jnp.ndarray,
@@ -252,7 +252,7 @@ def _face_current_and_emf_max(
     phi: jnp.ndarray,
     by: jnp.ndarray,
     bz: jnp.ndarray,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
     emf_y = _face_emf_y(mesh, sigma, uxb_y)
@@ -261,7 +261,13 @@ def _face_current_and_emf_max(
     face_jz = _interface_conductance_z(mesh, sigma) * (phi[:, :-1] - phi[:, 1:]) + emf_z
     max_face_current = jnp.maximum(jnp.max(jnp.abs(face_jy)), jnp.max(jnp.abs(face_jz)))
     max_emf = jnp.maximum(jnp.max(jnp.abs(emf_y)), jnp.max(jnp.abs(emf_z)))
-    return max_face_current, max_emf
+    face_bz = 0.5 * (bz[:-1, :] + bz[1:, :])
+    face_by = 0.5 * (by[:, :-1] + by[:, 1:])
+    max_face_lorentz = jnp.maximum(
+        jnp.max(jnp.abs(face_jy * face_bz)),
+        jnp.max(jnp.abs(face_jz * face_by)),
+    )
+    return max_face_current, max_emf, max_face_lorentz
 
 
 def _enforce_velocity_bc(
@@ -491,7 +497,15 @@ def _step(
             bz,
             reconstruction=current_reconstruction,
         )
-        face_current_max, emf_max = _face_current_and_emf_max(mesh, sigma, fluid_mask, u_next, phi, by, bz)
+        face_current_max, emf_max, face_lorentz_max = _face_current_emf_and_lorentz_max(
+            mesh,
+            sigma,
+            fluid_mask,
+            u_next,
+            phi,
+            by,
+            bz,
+        )
         mean_velocity = jnp.sum(active_weight * u_next) / fluid_weight
         return (
             u_next,
@@ -503,6 +517,7 @@ def _step(
             potential_iteration_count,
             face_current_max,
             emf_max,
+            face_lorentz_max,
             mean_velocity,
             forcing_value,
             pressure_proxy,
@@ -521,15 +536,16 @@ def _step(
     i0 = jnp.asarray(0, dtype=jnp.int32)
     f0 = jnp.asarray(0.0, dtype=u.dtype)
     e0 = jnp.asarray(0.0, dtype=u.dtype)
+    h0 = jnp.asarray(0.0, dtype=u.dtype)
     m0 = jnp.asarray(0.0, dtype=u.dtype)
     g0 = jnp.asarray(0.0, dtype=u.dtype)
     p0 = jnp.asarray(0.0, dtype=u.dtype)
     outer_count = max(1, outer_iterations)
-    u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = jax.lax.fori_loop(
+    u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = jax.lax.fori_loop(
         0,
         outer_count,
         outer_body,
-        (u_init, phi0, j0, j0, l0, r0, i0, f0, e0, m0, g0, p0),
+        (u_init, phi0, j0, j0, l0, r0, i0, f0, e0, h0, m0, g0, p0),
     )
     residual = jnp.max(jnp.abs(u_next - u))
     return (
@@ -543,6 +559,7 @@ def _step(
         potential_iteration_count,
         face_current_max,
         emf_max,
+        face_lorentz_max,
         mean_velocity,
         applied_forcing,
         pressure_proxy,
@@ -631,6 +648,7 @@ def _emit_solver_step(
     face_current_max: float,
     emf_max: float,
     max_lorentz: float,
+    face_lorentz_max: float,
     residual_value: float,
     potential_residual: float,
     potential_iteration_count: float,
@@ -652,6 +670,7 @@ def _emit_solver_step(
             face_current_max=face_current_max,
             emf_max=emf_max,
             lorentz_max=max_lorentz,
+            face_lorentz_max=face_lorentz_max,
             residual=residual_value,
             potential_residual=potential_residual,
             potential_iterations=potential_iteration_count,
@@ -728,7 +747,7 @@ def solve_transient(
             step_time = time + dt
             _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
             forcing = _explicit_forcing(case.forcing, by.dtype)
-            u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = _step(
+            u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = _step(
                 u=u,
                 mesh=mesh,
                 sigma=materials.conductivity,
@@ -771,6 +790,7 @@ def solve_transient(
                     face_current_max,
                     emf_max,
                     max_lorentz,
+                    face_lorentz_max,
                     potential_residual,
                     potential_iteration_count,
                 ],
@@ -851,14 +871,19 @@ def solve_transient(
                 samples[:, 11],
                 append=append_diagnostics,
             ),
+            face_lorentz_max_history=_concat_history(
+                initial_diagnostics.face_lorentz_max_history if initial_diagnostics is not None else None,
+                samples[:, 12],
+                append=append_diagnostics,
+            ),
             potential_residual_history=_concat_history(
                 initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None,
-                samples[:, 12],
+                samples[:, 13],
                 append=append_diagnostics,
             ),
             potential_iterations_history=_concat_history(
                 initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
-                samples[:, 13],
+                samples[:, 14],
                 append=append_diagnostics,
             ),
         )
@@ -913,13 +938,14 @@ def solve_transient(
     face_current_max_history: list[float] = []
     emf_max_history: list[float] = []
     lorentz_max_history: list[float] = []
+    face_lorentz_max_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     residual_value = float("inf")
 
     for step_index in range(steps):
         step_time = float(start_time + (step_index + 1) * dt)
-        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = compiled_step(u, step_time)
+        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = compiled_step(u, step_time)
         residual_value = float(residual)
         u_max_value = float(jnp.max(jnp.abs(u)))
         courant_like = float(u_max_value * dt / jnp.min(mesh.dy))
@@ -938,6 +964,7 @@ def solve_transient(
         face_current_max_history.append(float(face_current_max))
         emf_max_history.append(float(emf_max))
         lorentz_max_history.append(max_lorentz)
+        face_lorentz_max_history.append(float(face_lorentz_max))
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
         _emit_solver_step(
@@ -951,6 +978,7 @@ def solve_transient(
             face_current_max=float(face_current_max),
             emf_max=float(emf_max),
             max_lorentz=max_lorentz,
+            face_lorentz_max=float(face_lorentz_max),
             residual_value=residual_value,
             potential_residual=float(potential_residual),
             potential_iteration_count=float(potential_iteration_count),
@@ -1020,6 +1048,11 @@ def solve_transient(
         lorentz_max_history=_concat_history(
             initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
             jnp.asarray(lorentz_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        face_lorentz_max_history=_concat_history(
+            initial_diagnostics.face_lorentz_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(face_lorentz_max_history, dtype=float),
             append=append_diagnostics,
         ),
         potential_residual_history=_concat_history(
@@ -1130,13 +1163,14 @@ def solve_steady(
     face_current_max_history: list[float] = []
     emf_max_history: list[float] = []
     lorentz_max_history: list[float] = []
+    face_lorentz_max_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     step_count = 0
 
     for step_index in range(max_steps):
         step_time = float(start_time + (step_index + 1) * dt)
-        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = step_fn(
+        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = step_fn(
             u,
             step_time,
         )
@@ -1158,6 +1192,7 @@ def solve_steady(
         face_current_max_history.append(float(face_current_max))
         emf_max_history.append(float(emf_max))
         lorentz_max_history.append(max_lorentz)
+        face_lorentz_max_history.append(float(face_lorentz_max))
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
         _emit_solver_step(
@@ -1171,6 +1206,7 @@ def solve_steady(
             face_current_max=float(face_current_max),
             emf_max=float(emf_max),
             max_lorentz=max_lorentz,
+            face_lorentz_max=float(face_lorentz_max),
             residual_value=residual_value,
             potential_residual=float(potential_residual),
             potential_iteration_count=float(potential_iteration_count),
@@ -1253,6 +1289,11 @@ def solve_steady(
         lorentz_max_history=_concat_history(
             initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
             jnp.asarray(lorentz_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        face_lorentz_max_history=_concat_history(
+            initial_diagnostics.face_lorentz_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(face_lorentz_max_history, dtype=float),
             append=append_diagnostics,
         ),
         potential_residual_history=_concat_history(

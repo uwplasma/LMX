@@ -33,6 +33,7 @@ class SolverStepRecord:
     face_current_max: float
     emf_max: float
     lorentz_max: float
+    face_lorentz_max: float
     residual: float
     potential_residual: float
     potential_iterations: float
@@ -136,7 +137,8 @@ class StreamingSolverLogger:
         self._write(
             "MHD electromagnetics           "
             f"max|J| = {record.current_max:.6e}, max|J_face| = {record.face_current_max:.6e}, "
-            f"max|UxB| = {record.emf_max:.6e}, max|JxB| = {record.lorentz_max:.6e}"
+            f"max|UxB| = {record.emf_max:.6e}, max|JxB| = {record.lorentz_max:.6e}, "
+            f"max|JxB|_face = {record.face_lorentz_max:.6e}"
         )
         self._write(
             "MHD forcing                    "

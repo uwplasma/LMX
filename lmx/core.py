@@ -32,6 +32,7 @@ class Diagnostics:
     face_current_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     emf_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     lorentz_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    face_lorentz_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     potential_iterations_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 

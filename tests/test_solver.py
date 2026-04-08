@@ -253,7 +253,7 @@ def test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh
     zeros = jnp.zeros(mesh.yz_shape)
     u = jnp.zeros(mesh.yz_shape)
 
-    _, _, _, _, _, _, _, _, _, _, mean_velocity, applied_forcing, _ = solvers._step(
+    _, _, _, _, _, _, _, _, _, _, _, mean_velocity, applied_forcing, _ = solvers._step(
         u=u,
         mesh=mesh,
         sigma=sigma,
@@ -441,7 +441,7 @@ def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
         bz,
         reconstruction=case.time_stepper.current_reconstruction,
     )
-    face_current_max, emf_max = solvers._face_current_and_emf_max(
+    face_current_max, emf_max, face_lorentz_max = solvers._face_current_emf_and_lorentz_max(
         mesh,
         materials.conductivity,
         materials.fluid_mask,
@@ -455,6 +455,7 @@ def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
     assert float(solution.diagnostics.face_current_max_history[-1]) == pytest.approx(float(face_current_max), rel=1e-5)
     assert float(solution.diagnostics.emf_max_history[-1]) == pytest.approx(float(emf_max), rel=1e-5)
     assert float(solution.diagnostics.lorentz_max_history[-1]) == pytest.approx(float(jnp.max(jnp.abs(lorentz))), rel=1e-4)
+    assert float(solution.diagnostics.face_lorentz_max_history[-1]) == pytest.approx(float(face_lorentz_max), rel=1e-5)
 
 
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():
@@ -569,7 +570,7 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
         residual = next(residuals)
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25, 0.0, 0.0, 0.0, 0.0, 0.0
+        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
@@ -595,7 +596,7 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50, 0.0, 0.0, 0.0, 0.0, 0.0
+        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
@@ -631,7 +632,7 @@ def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: py
     def fake_step(**kwargs):
         u = kwargs["u"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0, 0.0, 0.0, 0.0
+        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)

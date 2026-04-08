@@ -186,6 +186,36 @@ The backend harness currently supports:
       but degrades at `400`
   - that makes `potential_relaxation` worth keeping as a sweepable solver
     control, but not yet safe as a new default policy
+- A later retained Hunt replay pass clarified that one important part of the
+  remaining long-time mismatch is in the force-scale reduction rather than only
+  in the solved velocity field:
+  - on the corrected recovered Hunt `Ha20`, `t <= 6e-05` replay, the retained
+    baseline remains strong in velocity and moderate in current magnitude:
+    - `u_max l2 ≈ 5.26e-4`
+    - `current_max l2 ≈ 2.28e-2`
+  - the existing cell-centered `lorentz_max_history` still shows a visibly larger
+    mismatch:
+    - `lorentz_max l2 ≈ 8.42e-2`
+  - a new face-current-based `face_lorentz_max_history` is much closer on the
+    same replay:
+    - `face_lorentz_max l2 ≈ 3.68e-3`
+  - retained interpretation:
+    - a large fraction of the later-time Hunt `JxB` trace gap is in how LMX
+      reduces layered current into a scalar force-history diagnostic
+    - this does not automatically mean the cell-centered state field should be
+      replaced, but it does mean future layered parity reports should treat the
+      face-based force scale as a first-class comparison signal
+- A separate reduced-drive family was tested and rejected on the same retained
+  Hunt replay:
+  - introducing a `drive_relaxation` factor into the inlet-flow-rate replay
+    family only traded observables against each other
+  - smaller `drive_relaxation` values reduced the normalized pressure-trend
+    mismatch and, for `0.25`, slightly improved `lorentz_max`
+  - but they degraded `u_max` and did not improve the native Hunt analytical
+    validation path
+  - retained conclusion:
+    - the later-time Hunt blocker is not solved by a simple forcing-memory
+      scalar in the current reduced closure
 - The next retained solver step improved the electric-potential backend story in
   a more structural way:
   - LMX now supports a matrix-free CG backend for the electric-potential solve

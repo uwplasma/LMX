@@ -49,6 +49,7 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "face_current_max_history": [7.0, 5.6],
                 "emf_max_history": [3.0, 2.4],
                 "lorentz_max_history": [2.0, 1.6],
+                "face_lorentz_max_history": [5.0, 4.0],
                 "residual_history": [],
                 "potential_residual_history": [],
                 "potential_iterations_history": [],
@@ -72,6 +73,7 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["lorentz_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["face_lorentz_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["current_max"]["mean_raw_relative_error"] == pytest.approx(0.6)
     assert payload["u_max"]["samples"][0]["freemhd_raw"] == pytest.approx(1.0)
     assert payload["u_max"]["samples"][1]["lmx_raw"] == pytest.approx(0.5)
@@ -97,6 +99,7 @@ def test_main_writes_alignment_json(tmp_path: Path):
                         "face_current_max_history": [0.5],
                         "emf_max_history": [0.25],
                         "lorentz_max_history": [2.0],
+                        "face_lorentz_max_history": [2.0],
                         "residual_history": [],
                         "potential_residual_history": [],
                         "potential_iterations_history": [],
@@ -160,6 +163,7 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
                         "face_current_max_history": [7.0],
                         "emf_max_history": [3.0],
                         "lorentz_max_history": [5.0],
+                        "face_lorentz_max_history": [5.0],
                         "residual_history": [],
                         "potential_residual_history": [],
                         "potential_iterations_history": [],
@@ -177,5 +181,6 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
     assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["face_lorentz_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["max_raw_relative_error"] == pytest.approx(0.0)
     assert payload["freemhd_pressure_final_records"] == []
