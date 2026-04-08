@@ -3242,3 +3242,116 @@ LMX should only be described as ship ready for the current milestone when all of
 ## Instruction For Future Agents
 
 Read this file first. Treat it as the live execution log and context handoff. Update it whenever you make a meaningful decision, add or remove scope, fix or discover a blocker, or identify a better next step. Keep entries chronological, concrete, and honest about what is implemented versus planned.
+
+## Current Completion Assessment
+
+This section is the current honest assessment of how close LMX is to the
+retained target after the latest Hunt replay/default work.
+
+- Retained ship target:
+  - standalone Python/JAX laminar inductionless liquid-metal MHD solver
+  - structured duct and layered-duct cases
+  - Hartmann, Shercliff, and Hunt validation
+  - executable TOML workflow, restart support, ParaView/CSV/NPZ outputs,
+    plots, examples, and CI/CD
+  - external parity and benchmarking against recovered FreeMHD/OpenFOAM
+    `epotMultiRegionFoam` / `epotMultiRegionInterFoam` cases
+- Explicitly deferred from the retained target:
+  - temperature equation / Joule-heating thermal coupling
+  - free-surface VoF / `interFoam` parity as a release requirement
+  - turbulence
+  - contact-angle / atmosphere-opening free-surface models
+  - general unstructured/polyhedral meshing
+  - full OpenFOAM feature parity beyond the laminar inductionless solver path
+
+### What FreeMHD currently has beyond the retained LMX scope
+
+From the local `external/FreeMHD/MHD_Solvers/solvers` tree, FreeMHD currently
+contains more than the retained LMX release target:
+
+- `epotMultiRegionFoam`
+  - multi-region MHD with full OpenFOAM PIMPLE-style fluid/solid structure
+  - includes energy/species/compressible pieces in the solver tree
+- `epotMultiRegionInterFoam`
+  - multiphase / free-surface path
+  - includes temperature equation and interFoam-derived fluid coupling pieces
+- `epotMultiRegionInterIsoFoam`
+  - additional interIsoFoam/free-surface path
+- `apot*` and `bScalarPotCht*` solvers
+  - vector-potential and thermal/CHT-oriented branches outside the retained
+    current LMX target
+
+LMX does not need to implement all of that to finish the retained current plan.
+
+### What is already done well enough for the retained target
+
+- Native solver/runtime:
+  - executable `lmx input.toml` path
+  - live OpenFOAM-style solver logging
+  - restart/continue from NPZ state bundles
+  - ParaView / CSV / NPZ / plot outputs
+- Validation/runtime infrastructure:
+  - unit / regression / physics / validation / benchmark suites in CI
+  - examples and plotting/movie scripts
+  - real Dockerized FreeMHD/OpenFOAM parity harness
+  - patched FreeMHD logging with retained later-time Hunt replay through
+    `t = 6e-05`
+- Physics status:
+  - Hartmann: strong retained path
+  - Shercliff: strong retained path
+  - Hunt: now materially improved and externally replay-backed, but still the
+    main remaining solver-fidelity gap
+
+### What still blocks “finished” for the retained target
+
+- Main solver blocker:
+  - later-time Hunt Lorentz/current/pressure-response drift against the
+    retained patched FreeMHD `t <= 6e-05` replay
+- Release-quality validation blocker:
+  - need one more retained solver pass that improves the later Hunt replay
+    without regressing Hartmann/Shercliff or native Hunt analytical metrics
+- Scope-closure blocker:
+  - decide whether mapped simple-pipe / fringing-field support is in the first
+    ship-ready release or explicitly deferred to the next milestone
+
+### Current honest completion estimate
+
+- Relative to the original very broad vision
+  - including broader FreeMHD/OpenFOAM parity, pipe/fringing-field release
+    support, and future extensibility:
+    about 60% complete
+- Relative to the retained near-term ship target
+  - standalone laminar inductionless duct solver with Hartmann/Shercliff/Hunt,
+    TOML workflow, restart, outputs, examples, CI/CD, and FreeMHD parity
+    harness:
+    about 80% complete
+
+### Remaining major steps
+
+1. Finish the retained Hunt solver-fidelity pass.
+   - Improve later-time Lorentz/current/pressure-response evolution on the
+     patched `t <= 6e-05` Hunt replay.
+   - Keep `u_max` parity and native Hunt analytical combined error at least as
+     good as the current retained baseline.
+2. Lock the validation story.
+   - Re-run Hartmann, Shercliff, Hunt native validation artifacts.
+   - Re-run retained FreeMHD parity artifacts after the solver change.
+   - Make sure examples and executable TOML cases still reflect the retained
+     default behavior.
+3. Freeze the first release scope.
+   - Either:
+     - ship ducts/layered ducts only, or
+     - finish one mapped simple-pipe/fringing-field validation path and include
+       it in the first release.
+4. Do ship-readiness cleanup.
+   - tighten docs around retained scope
+   - make sure examples are polished and reproducible
+   - recheck coverage/CI/benchmarks after the last solver change
+
+### Expected number of focused iterations
+
+- If we keep the retained first-release scope to duct/layered-duct laminar
+  inductionless MHD:
+  - about 4 to 6 focused solver/validation iterations
+- If mapped simple-pipe / fringing-field parity stays inside the first release:
+  - about 8 to 12 focused iterations
