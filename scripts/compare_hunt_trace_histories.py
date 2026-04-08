@@ -138,6 +138,8 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     u_values = [float(record["maxU"]) for record in pressure_records]
     p_times = [float(record["time"]) for record in pressure_records if "maxP" in record]
     p_values = [float(record["maxP"]) for record in pressure_records if "maxP" in record]
+    pspan_times = [float(record["time"]) for record in pressure_records if "pSpan" in record]
+    pspan_values = [float(record["pSpan"]) for record in pressure_records if "pSpan" in record]
     j_times = [float(record["time"]) for record in epot_records]
     j_values = [float(record["maxJ"]) for record in epot_records]
     jn_times = [float(record["time"]) for record in epot_records if "maxJn" in record]
@@ -167,7 +169,21 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         "lmx_report_json": str(lmx_report_json.resolve()),
         "freemhd_pressure_final_records": _compact_records(
             pressure_records,
-            ["time", "corr", "maxU", "pInitialResidual", "pFinalResidual", "pIterations", "maxP", "maxPRgh", "maxJxB"],
+            [
+                "time",
+                "corr",
+                "maxU",
+                "pInitialResidual",
+                "pFinalResidual",
+                "pIterations",
+                "maxP",
+                "minP",
+                "pSpan",
+                "maxPRgh",
+                "minPRgh",
+                "pRghSpan",
+                "maxJxB",
+            ],
         ),
         "freemhd_epot_records": _compact_records(
             epot_records,
@@ -188,8 +204,13 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     }
     if u_times:
         payload["u_max"] = _build_alignment(u_times, u_values, lmx_times, u_history)
-    if p_times and pressure_proxy_history:
-        payload["pressure_proxy"] = _build_alignment(p_times, p_values, lmx_times, pressure_proxy_history)
+    if pressure_proxy_history:
+        if pspan_times:
+            payload["primary_pressure_metric"] = "pSpan"
+            payload["pressure_proxy"] = _build_alignment(pspan_times, pspan_values, lmx_times, pressure_proxy_history)
+        elif p_times:
+            payload["primary_pressure_metric"] = "maxP"
+            payload["pressure_proxy"] = _build_alignment(p_times, p_values, lmx_times, pressure_proxy_history)
     if u_times and mean_velocity_history:
         payload["mean_velocity"] = _build_alignment(u_times, u_values, lmx_times, mean_velocity_history)
     if p_times and applied_forcing_history:

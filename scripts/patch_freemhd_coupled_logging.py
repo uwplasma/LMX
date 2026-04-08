@@ -195,7 +195,11 @@ def patch_peqn_file(source: str) -> str:
         '<< " maxU=" << max(mag(U)).value()\n                    << " maxJxB=" << max(mag(JxB)).value()',
         '<< " maxU=" << max(mag(U)).value()\n'
         '                    << " maxP=" << max(mag(p)).value()\n'
+        '                    << " minP=" << min(p).value()\n'
+        '                    << " pSpan=" << (max(p).value() - min(p).value())\n'
         '                    << " maxPRgh=" << max(mag(p_rgh)).value()\n'
+        '                    << " minPRgh=" << min(p_rgh).value()\n'
+        '                    << " pRghSpan=" << (max(p_rgh).value() - min(p_rgh).value())\n'
         '                    << " maxJxB=" << max(mag(JxB)).value()',
     )
     solve_old = """        solve
@@ -249,7 +253,11 @@ def patch_peqn_file(source: str) -> str:
                     << " pIterations=" << pPerf.nIterations()
                     << " maxU=" << max(mag(U)).value()
                     << " maxP=" << max(mag(p)).value()
+                    << " minP=" << min(p).value()
+                    << " pSpan=" << (max(p).value() - min(p).value())
                     << " maxPRgh=" << max(mag(p_rgh)).value()
+                    << " minPRgh=" << min(p_rgh).value()
+                    << " pRghSpan=" << (max(p_rgh).value() - min(p_rgh).value())
                     << " maxJxB=" << max(mag(JxB)).value()
                     << endl;
             }

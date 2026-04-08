@@ -100,7 +100,11 @@ def test_patch_peqn_file_wraps_pressure_solve_and_adds_diag_log():
     assert "auto pPerf = solve" in patched
     assert 'Info<< "LMX_DIAG pressure"' in patched
     assert '<< " maxP=" << max(mag(p)).value()' in patched
+    assert '<< " minP=" << min(p).value()' in patched
+    assert '<< " pSpan=" << (max(p).value() - min(p).value())' in patched
     assert '<< " maxPRgh=" << max(mag(p_rgh)).value()' in patched
+    assert '<< " minPRgh=" << min(p_rgh).value()' in patched
+    assert '<< " pRghSpan=" << (max(p_rgh).value() - min(p_rgh).value())' in patched
 
 
 def test_patch_peqn_file_upgrades_existing_pressure_log():
@@ -131,7 +135,11 @@ def test_patch_peqn_file_upgrades_existing_pressure_log():
     patched = patch_peqn_file(source)
 
     assert '<< " maxP=" << max(mag(p)).value()' in patched
+    assert '<< " minP=" << min(p).value()' in patched
+    assert '<< " pSpan=" << (max(p).value() - min(p).value())' in patched
     assert '<< " maxPRgh=" << max(mag(p_rgh)).value()' in patched
+    assert '<< " minPRgh=" << min(p_rgh).value()' in patched
+    assert '<< " pRghSpan=" << (max(p_rgh).value() - min(p_rgh).value())' in patched
 
 
 def test_patch_freemhd_tree_updates_expected_files(tmp_path: Path):

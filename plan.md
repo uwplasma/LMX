@@ -3522,6 +3522,33 @@ LMX does not need to implement all of that to finish the retained current plan.
   - the next retained solver change should continue to target the reduced
     pressure-response mechanism itself
 
+### Latest retained Hunt pressure-span correction
+
+- I patched the FreeMHD/OpenFOAM pressure logging path to emit:
+  - `minP`
+  - `pSpan = max(p) - min(p)`
+  - `minPRgh`
+  - `pRghSpan = max(p_rgh) - min(p_rgh)`
+- The Hunt trace comparator now promotes `pSpan` to
+  `primary_pressure_metric` when it is available, instead of comparing the
+  reduced `pressure_proxy` against the absolute-pressure `maxP` signal.
+- Retained corrected Hunt `Ha20`, `t <= 6e-05` replay against the current LMX
+  baseline:
+  - `u_max l2 ≈ 1.68e-03`
+  - `primary_pressure_metric = pSpan`
+  - `pressure_proxy l2 ≈ 6.23e-02`
+  - `primary_current_metric = face_current_max`
+  - `primary_current_max l2 ≈ 2.29e-02`
+  - `primary_lorentz_metric = face_lorentz_max`
+  - `primary_lorentz_max l2 ≈ 1.62e-02`
+  - `mean_velocity l2 ≈ 2.62e-03`
+- Retained interpretation:
+  - the old pressure mismatch was partly a parity-observable problem
+  - switching from `maxP` to `pSpan` cuts the long Hunt pressure mismatch
+    materially (`≈ 1.11e-01 -> ≈ 6.23e-02`)
+  - the remaining later-time Hunt blocker is now a smaller, genuinely
+    solver-side pressure/current response gap
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

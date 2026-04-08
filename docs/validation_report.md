@@ -1187,6 +1187,24 @@ The backend harness currently supports:
     flow-rate-control averaging geometry
   - the next retained solver changes should keep targeting the reduced
     pressure-response mechanism itself
+- The pressure-side parity metric is now also corrected at the source:
+  - the patched FreeMHD/OpenFOAM `pEqn` log now emits `minP`, `pSpan`,
+    `minPRgh`, and `pRghSpan`
+  - `compare_hunt_trace_histories.py` promotes `pSpan` to
+    `primary_pressure_metric` when it is available
+- On the retained corrected Hunt `Ha20`, `t <= 6e-05` replay against the
+  current LMX baseline:
+  - `u_max l2 ≈ 1.68e-03`
+  - `pressure_proxy l2 ≈ 6.23e-02` with `primary_pressure_metric = pSpan`
+  - `primary_current_max l2 ≈ 2.29e-02`
+  - `primary_lorentz_max l2 ≈ 1.62e-02`
+  - `mean_velocity l2 ≈ 2.62e-03`
+- Retained interpretation:
+  - the old pressure mismatch was partly a bad parity observable
+  - switching from absolute `maxP` to `pSpan` cuts the long Hunt
+    pressure-side error materially
+  - the remaining later-time Hunt mismatch is now smaller and genuinely
+    solver-side, not mainly a logging/reference-level artifact
 
 ## Meeting demo artifact
 
