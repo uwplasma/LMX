@@ -51,6 +51,7 @@ def build_freemhd_container(
     bundle_root: str | Path,
     platform: str = "linux/amd64",
     local_freemhd_root: str | Path | None = None,
+    no_cache: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     temp_context = prepare_build_context(bundle_root, local_freemhd_root)
     bundle_path = Path(temp_context.name) if temp_context is not None else Path(bundle_root).resolve()
@@ -58,6 +59,10 @@ def build_freemhd_container(
         "docker",
         "buildx",
         "build",
+    ]
+    if no_cache:
+        command.append("--no-cache")
+    command += [
         "--load",
         "--progress=plain",
         "--platform",
@@ -82,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(__file__).resolve().parents[1] / "docker",
     )
     parser.add_argument("--platform", type=str, default="linux/amd64")
+    parser.add_argument("--no-cache", action="store_true")
     parser.add_argument(
         "--local-freemhd-root",
         type=Path,
@@ -126,11 +132,13 @@ def main(argv: list[str] | None = None) -> int:
         args.bundle_root,
         platform=args.platform,
         local_freemhd_root=args.local_freemhd_root,
+        no_cache=args.no_cache,
     )
     payload = {
         "image": args.image,
         "bundle_root": str(args.bundle_root.resolve()),
         "platform": args.platform,
+        "no_cache": args.no_cache,
         "local_freemhd_root": str(args.local_freemhd_root.resolve()) if args.local_freemhd_root is not None else None,
         "docker_cli_available": True,
         "docker_available": True,
