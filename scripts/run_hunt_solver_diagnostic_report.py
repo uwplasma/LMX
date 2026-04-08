@@ -10,8 +10,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.cases import make_hunt_case
+from lmx.io import load_restart_bundle, validate_restart_bundle, write_restart_npz
 from lmx.specs import BoundaryCondition
-from lmx.solvers import solve_steady
+from lmx.solvers import _build_mesh, solve_steady
 from lmx.validation import (
     combined_profile_error,
     extract_midplane_profile,
@@ -110,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--velocity-update-limiter", choices=["global_scale", "local_clip"], default=None)
     parser.add_argument("--initial-velocity", type=float, default=None)
+    parser.add_argument("--restart-npz", type=Path, default=None)
+    parser.add_argument("--append-histories", action="store_true")
+    parser.add_argument("--write-restart-npz", type=Path, default=None)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -139,7 +143,33 @@ def main(argv: list[str] | None = None) -> int:
         ramp_start=ramp_start,
         ramp_duration=ramp_duration,
     )
-    solution = solve_steady(case)
+    initial_state = None
+    initial_diagnostics = None
+    restart_summary: dict[str, object] | None = None
+    if args.restart_npz is not None:
+        restart_bundle = load_restart_bundle(args.restart_npz)
+        validate_restart_bundle(
+            restart_bundle,
+            mesh=_build_mesh(case),
+            geometry_kind=case.geometry.kind,
+            case_name=case.name,
+        )
+        initial_state = restart_bundle.state
+        initial_diagnostics = restart_bundle.diagnostics
+        restart_summary = {
+            "input": str(restart_bundle.path),
+            "start_time": float(restart_bundle.state.time),
+            "append_histories": bool(args.append_histories),
+        }
+    try:
+        solution = solve_steady(
+            case,
+            initial_state=initial_state,
+            initial_diagnostics=initial_diagnostics,
+            append_diagnostics=bool(args.append_histories),
+        )
+    except TypeError:
+        solution = solve_steady(case)
 
     inspection = inspect_freemhd_case(run_dir)
     latest_u_record = latest_field_minmax_record(run_dir, field="mag(U)")
@@ -227,6 +257,15 @@ def main(argv: list[str] | None = None) -> int:
         "lmx_solver": lmx_solver,
         "comparison": comparison,
     }
+    if args.write_restart_npz is not None:
+        restart_output = write_restart_npz(solution, case, args.write_restart_npz)
+        restart_payload = {"output": str(restart_output.resolve())}
+        if restart_summary is None:
+            restart_summary = restart_payload
+        else:
+            restart_summary.update(restart_payload)
+    if restart_summary is not None:
+        payload["restart"] = restart_summary
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2))
     print(json.dumps(payload, indent=2))

@@ -280,3 +280,63 @@ def test_hunt_solver_diagnostic_report_supports_inlet_flow_rate_drive_mode(tmp_p
     assert exit_code == 0
     assert "inlet_flow_rate" in captured["boundary_kinds"]
     assert captured["boundary_values"][0] == pytest.approx(0.1175 * 4.0)
+
+
+def test_hunt_solver_diagnostic_report_supports_restart_npz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    run_dir = tmp_path / "run"
+    (run_dir / "0" / "liquid").mkdir(parents=True)
+    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "system").mkdir()
+    (run_dir / "constant").mkdir()
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
+        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    )
+    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
+
+    fake_restart = SimpleNamespace(
+        path=(tmp_path / "restart_in.npz").resolve(),
+        state=SimpleNamespace(time=2e-5),
+        diagnostics=SimpleNamespace(),
+    )
+    captured = {}
+
+    def fake_solve(case, **kwargs):
+        captured["initial_state"] = kwargs.get("initial_state")
+        captured["initial_diagnostics"] = kwargs.get("initial_diagnostics")
+        captured["append_diagnostics"] = kwargs.get("append_diagnostics")
+        return _fake_solution()
+
+    monkeypatch.setattr(huntdiag, "load_restart_bundle", lambda path: fake_restart)
+    monkeypatch.setattr(huntdiag, "validate_restart_bundle", lambda bundle, mesh, geometry_kind, case_name: None)
+    monkeypatch.setattr(huntdiag, "_build_mesh", lambda case: SimpleNamespace())
+    monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
+    monkeypatch.setattr(huntdiag, "write_restart_npz", lambda solution, case, path: Path(path))
+
+    output = tmp_path / "diagnostics.json"
+    restart_out = tmp_path / "restart_out.npz"
+    exit_code = huntdiag.main(
+        [
+            "--freemhd-run-dir",
+            str(run_dir),
+            "--ha",
+            "20",
+            "--restart-npz",
+            str(fake_restart.path),
+            "--append-histories",
+            "--write-restart-npz",
+            str(restart_out),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(output.read_text())
+    assert captured["initial_state"] is fake_restart.state
+    assert captured["initial_diagnostics"] is fake_restart.diagnostics
+    assert captured["append_diagnostics"] is True
+    assert payload["restart"]["input"] == str(fake_restart.path)
+    assert payload["restart"]["start_time"] == pytest.approx(2e-5)
+    assert payload["restart"]["append_histories"] is True
+    assert payload["restart"]["output"] == str(restart_out.resolve())
