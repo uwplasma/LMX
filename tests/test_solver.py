@@ -281,9 +281,9 @@ def test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh
 
     active_mask = solvers._active_velocity_mask(fluid_mask)
     cell_metric = solvers._cell_metric(mesh)
-    weighted_area = float(jnp.sum(jnp.where(active_mask, cell_metric, 0.0)))
+    weighted_area = float(jnp.sum(jnp.where(fluid_mask, cell_metric, 0.0)))
     pressure_sensitivity = 0.1 / rho
-    weighted_sensitivity = float(jnp.sum(jnp.where(active_mask, cell_metric * pressure_sensitivity, 0.0)) / weighted_area)
+    weighted_sensitivity = float(jnp.sum(jnp.where(fluid_mask, cell_metric * pressure_sensitivity, 0.0)) / weighted_area)
     active_count = float(jnp.sum(active_mask.astype(jnp.float32)))
     simple_sensitivity = float(jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / active_count)
 
