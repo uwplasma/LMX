@@ -83,7 +83,15 @@ def docker_image_available(image: str) -> bool:
         capture_output=True,
         check=False,
     )
-    return completed.returncode == 0
+    if completed.returncode == 0:
+        return True
+    fallback = subprocess.run(
+        ["docker", "image", "ls", image, "--format", "{{.ID}}"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return fallback.returncode == 0 and bool(fallback.stdout.strip())
 
 
 def docker_registry_image_report(image: str, timeout_seconds: int = 20) -> dict[str, object]:
@@ -99,7 +107,20 @@ def docker_local_image_report(image: str) -> dict[str, object]:
             "stdout_tail": "",
             "stderr_tail": "",
         }
-    return docker_command_result(["docker", "image", "inspect", image])
+    report = docker_command_result(["docker", "image", "inspect", image])
+    if report["status"] == "ok":
+        return report
+    fallback = docker_command_result(["docker", "image", "ls", image, "--format", "{{.ID}}"])
+    if fallback["status"] == "ok" and str(fallback["stdout_tail"]).strip():
+        return {
+            "command": ["docker", "image", "ls", image, "--format", "{{.ID}}"],
+            "status": "ok",
+            "returncode": 0,
+            "stdout_tail": fallback["stdout_tail"],
+            "stderr_tail": fallback["stderr_tail"],
+            "resolved_via": "image-ls-fallback",
+        }
+    return report
 
 
 def docker_pull_image_report(image: str, timeout_seconds: int = 20) -> dict[str, object]:

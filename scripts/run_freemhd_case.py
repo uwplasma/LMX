@@ -108,9 +108,15 @@ def write_diag_records(
         return None
     diag_path = output_path.with_suffix(f".{process_name}.diag.json")
     diag_path.write_text(json.dumps({"records": records}, indent=2))
+    last_diag_time = None
+    if records:
+        times = [float(record["time"]) for record in records if "time" in record]
+        if times:
+            last_diag_time = max(times)
     return {
         f"{process_name}_diag_json": str(diag_path),
         f"{process_name}_diag_record_count": len(records),
+        f"{process_name}_diag_last_time": last_diag_time,
     }
 
 
@@ -353,6 +359,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if run_diag_payload is not None:
         payload.update(run_diag_payload)
+        if result.returncode != 0 and int(run_diag_payload.get("run_diag_record_count", 0)) > 0:
+            payload["status"] = "partial-failed"
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, indent=2))

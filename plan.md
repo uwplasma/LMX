@@ -3055,6 +3055,72 @@ LMX should only be described as ship ready for the current milestone when all of
       without always rerunning from `t = 0`
     - then target the later-time reduced pressure/current response against the
       patched Hunt replay
+- `2026-04-08 America/Chicago`: Landed a retained Hunt replay/runtime follow-up
+  on top of the new restart path:
+  - retained code changes:
+    - `scripts/run_hunt_solver_diagnostic_report.py` now supports:
+      - `--restart-npz`
+      - `--append-histories`
+      - `--write-restart-npz`
+    - that script now validates restart bundles against the rebuilt reduced
+      Hunt mesh before resuming and can emit a fresh restart NPZ for the next
+      continuation window
+    - `lmx/freemhd.py` now treats `docker image ls <image> --format {{.ID}}`
+      as a fallback availability probe when Docker Desktop reports a false
+      negative for `docker image inspect <image>`
+    - `scripts/run_freemhd_case.py` now classifies nonzero-return runs with
+      extracted `LMX_DIAG` records as `partial-failed` and records the latest
+      diagnostic time in the output JSON
+  - retained validation:
+    - targeted tests passed:
+      - `pytest tests/test_run_hunt_solver_diagnostic_report.py tests/test_compare_hunt_trace_histories.py -q`
+      - `pytest tests/test_freemhd.py tests/test_run_freemhd_case.py tests/test_freemhd_harness.py -q`
+      - `python -m sphinx -W -b html docs docs/_build/html`
+    - retained reduced Hunt continuation artifacts:
+      - first chunk:
+        - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_2e05.json`
+        - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_2e05_restart.npz`
+      - resumed chunk:
+        - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05.json`
+        - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_restart.npz`
+      - retained resumed LMX trace through `t = 6e-05`:
+        - `u_max_history` stays near `0.1175`
+        - `pressure_proxy_history` decays from `≈ 201.2` to `≈ 152.2`
+        - `current_max_history` decays from `≈ 4.89` to `≈ 4.40`
+        - `lorentz_max_history` stays O(10) and ends at `≈ 14.86`
+    - retained patched FreeMHD continuation result:
+      - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05.json`
+      - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05.run.stdout.log`
+      - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05.run.diag.json`
+      - the run no longer fails at image lookup; it now launches correctly and
+        reaches `Time = 3e-05`
+      - it still exits with `returncode = 137` inside that `3e-05` step before
+        any patched pressure diagnostics are emitted
+      - retained patched `epot` record at `t = 3e-05`:
+        - `potEFinalResidual ≈ 1.63e-08`
+        - `potEIterations = 6`
+        - `maxJ ≈ 7.81e+04`
+        - `maxJn ≈ 8.29e-01`
+        - `maxJnDensity ≈ 8.29e+04`
+        - `maxPsiub ≈ 1.176`
+        - `maxPsiubDensity ≈ 2.36e+04`
+        - `maxJxB ≈ 4.64e+03`
+  - retained interpretation:
+    - the Docker/OpenFOAM/FreeMHD runtime path is now usable again on this
+      machine; the previous blocker was a brittle image-availability probe
+    - the next external-backend blocker is no longer image lookup but the
+      serial patched Hunt continuation being killed inside the `3e-05` step
+    - because that kill happens before the patched `pressure` log record, the
+      next solver-side pressure-response change should wait for a retained way
+      to finish or slice that step cleanly
+  - best next step:
+    - keep the retained LMX `t <= 6e-05` continuation artifacts as the reduced
+      baseline
+    - make the smallest runtime change that allows the patched FreeMHD Hunt
+      case to complete the `3e-05` step and emit `pressure/maxU` diagnostics
+      without regressing the current harness
+    - only then retarget the later-time reduced pressure/current response in
+      `lmx/solvers.py`
 
 ## Instruction For Future Agents
 

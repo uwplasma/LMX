@@ -248,3 +248,55 @@ def test_main_writes_empty_diag_json_when_forced_logging_has_no_records(
     diag_payload = (output.with_suffix(".run.diag.json")).read_text()
     assert '"records": []' in diag_payload
     assert '"status": "ok"' in capsys.readouterr().out
+
+
+def test_main_marks_failed_run_with_diag_records_as_partial_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    case_dir = tmp_path / "case"
+    bundle_root = tmp_path / "docker"
+    case_dir.mkdir()
+    bundle_root.mkdir()
+    (case_dir / "system").mkdir()
+    (case_dir / "system" / "controlDict").write_text("application epotMultiRegionInterFoam;\n")
+
+    monkeypatch.setattr(runner, "docker_cli_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_daemon_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_image_available", lambda image: True)
+
+    def fake_run(**kwargs):
+        return runner.subprocess.CompletedProcess(
+            args=["docker"],
+            returncode=137,
+            stdout=(
+                "LMX_DIAG outer time=3e-05 oCorr=0 nOuterCorr=1 finalIter=1\n"
+                "LMX_DIAG epot time=3e-05 region=liquid oCorr=0 potEInitialResidual=0.1 "
+                "potEFinalResidual=1e-8 potEIterations=6 maxPotE=0.001 maxJ=1 maxJxB=2\n"
+            ),
+            stderr="killed",
+        )
+
+    monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
+
+    output = tmp_path / "partial_failed.json"
+    exit_code = runner.main(
+        [
+            "--image",
+            "available-image:latest",
+            "--case-dir",
+            str(case_dir),
+            "--bundle-root",
+            str(bundle_root),
+            "--log-coupled-iterations",
+            "--output",
+            str(output),
+        ]
+    )
+
+    payload = output.read_text()
+    assert exit_code == 137
+    assert '"status": "partial-failed"' in payload
+    assert '"run_diag_record_count": 2' in payload
+    assert '"run_diag_last_time": 3e-05' in payload
+    assert '"returncode": 137' in payload
+    assert '"status": "partial-failed"' in capsys.readouterr().out

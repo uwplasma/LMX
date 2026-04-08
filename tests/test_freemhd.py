@@ -205,6 +205,31 @@ def test_docker_image_helpers_cover_daemon_and_command_paths(monkeypatch: pytest
     assert docker_registry_image_report("microfluidica/openfoam:2206")["status"] == "ok"
 
 
+def test_docker_image_helpers_fall_back_to_image_ls_when_inspect_is_broken(monkeypatch: pytest.MonkeyPatch):
+    class _Result:
+        def __init__(self, returncode: int, stdout: str = "", stderr: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake_run(command, text=True, capture_output=True, timeout=None, check=False):
+        if command[:2] == ["docker", "info"]:
+            return _Result(0)
+        if command[:3] == ["docker", "image", "inspect"]:
+            return _Result(1, stderr=f'Error response from daemon: {{"message":"No such image: {command[3]}"}}')
+        if command[:4] == ["docker", "image", "ls", "lmx-freemhd-localdiag-density-fixed2:latest"]:
+            return _Result(0, stdout="c4609ed04ae1\n")
+        return _Result(0)
+
+    monkeypatch.setattr("lmx.freemhd.docker_cli_available", lambda: True)
+    monkeypatch.setattr("lmx.freemhd.subprocess.run", fake_run)
+
+    assert docker_image_available("lmx-freemhd-localdiag-density-fixed2:latest") is True
+    report = docker_local_image_report("lmx-freemhd-localdiag-density-fixed2:latest")
+    assert report["status"] == "ok"
+    assert report["resolved_via"] == "image-ls-fallback"
+
+
 def test_docker_hub_tag_report_handles_unsupported_reference_and_network_error(monkeypatch: pytest.MonkeyPatch):
     report = docker_hub_tag_report("a/b/c:tag")
     assert report["status"] == "unsupported-image-reference"

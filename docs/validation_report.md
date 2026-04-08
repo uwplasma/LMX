@@ -1015,6 +1015,46 @@ The backend harness currently supports:
       model
     - it is worth keeping because it improves the clean short replay slightly
       without regressing the current Hartmann/Shercliff guard path
+- The reduced Hunt diagnostic runner now supports restart/continuation, and the
+  current retained longer reduced replay artifacts are:
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_2e05.json`
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_2e05_restart.npz`
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05.json`
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_restart.npz`
+- That resumed reduced replay now gives the retained `t <= 6e-05` LMX Hunt
+  baseline:
+  - `u_max_history`: nearly flat at `≈ 1.175e-01`
+  - `pressure_proxy_history`: `≈ 2.012e+02 -> 1.522e+02`
+  - `current_max_history`: `≈ 4.89 -> 4.40`
+  - `lorentz_max_history`: O(10), ending at `≈ 1.486e+01`
+- The FreeMHD/OpenFOAM runtime path is also retained again on this machine
+  after hardening the local Docker image lookup against false negatives from
+  `docker image inspect`. The patched serial Hunt continuation now launches and
+  reaches `Time = 3e-05`, with retained artifacts:
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05.json`
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05.run.stdout.log`
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05.run.diag.json`
+- The harness now preserves this state as `status = "partial-failed"` and
+  records the latest extracted diagnostic time in the JSON output instead of
+  collapsing every nonzero return code into a generic unavailable/failed state.
+- The current retained blocker is that this patched serial continuation still
+  exits with `returncode = 137` inside the `3e-05` step before any patched
+  pressure/maxU diagnostics are emitted. The retained `epot` record at
+  `t = 3e-05` is:
+  - `potEFinalResidual ≈ 1.63e-08`
+  - `potEIterations = 6`
+  - `maxJ ≈ 7.81e+04`
+  - `maxJn ≈ 8.29e-01`
+  - `maxJnDensity ≈ 8.29e+04`
+  - `maxPsiub ≈ 1.176`
+  - `maxPsiubDensity ≈ 2.36e+04`
+  - `maxJxB ≈ 4.64e+03`
+- Retained interpretation:
+  - the external-backend blocker is now a runtime/continuation failure inside
+    the `3e-05` step, not image lookup and not missing patched diagnostics
+  - because the run dies before the pressure stage, the next solver-side
+    pressure-response change should wait for a retained way to finish or slice
+    that step cleanly
 
 ## Meeting demo artifact
 

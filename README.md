@@ -176,6 +176,8 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 3e-5 --max-steps 3 --current-reconstruction face_averaged --output ./artifacts/hunt_solver_diagnostics_faceavg.json
+/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 2e-5 --max-steps 2 --output ./artifacts/hunt_solver_diagnostics_2e05.json --write-restart-npz ./artifacts/hunt_solver_diagnostics_2e05_restart.npz
+/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 6e-5 --max-steps 4 --restart-npz ./artifacts/hunt_solver_diagnostics_2e05_restart.npz --append-histories --output ./artifacts/hunt_solver_diagnostics_6e05.json --write-restart-npz ./artifacts/hunt_solver_diagnostics_6e05_restart.npz
 /Users/rogerio/base_env/bin/python3 scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD
 /Users/rogerio/base_env/bin/python3 scripts/extract_freemhd_coupled_log.py ./artifacts/freemhd_hunt.log --output ./artifacts/freemhd_hunt_diag.json
 ```
@@ -207,10 +209,17 @@ cases more faithfully now: when the recovered run has a nonzero startup
 velocity in `0/liquid/U`, the reduced replay automatically adds the matching
 `inlet_velocity` boundary instead of treating the case as an unforced
 `forcing = 0` transient.
+That diagnostic runner also supports restart/continuation directly from a prior
+LMX `.npz` state dump, so longer reduced Hunt replay windows can now be built
+incrementally without rerunning from `t = 0`.
 In the reduced duct solver itself, only `inlet_flow_rate` now activates the
 mean-flow drive closure. `inlet_velocity` remains available for recovered-case
 metadata and startup-state parity, but it no longer imposes a global target
 mean velocity across the reduced cross-section.
+On this Docker Desktop setup, locally built validation images may also require
+the retained `docker image ls` fallback in the harness because
+`docker image inspect <tag>` can report a false negative even though
+`docker run <tag>` works.
 
 ## Scope
 
