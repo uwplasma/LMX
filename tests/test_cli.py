@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from lmx import cli
+from lmx.config import LoggingSpec, RestartSpec, RunConfig
 
 
 pytestmark = pytest.mark.unit
@@ -83,6 +84,66 @@ def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
 
     assert exit_code == 0
     assert recorded["path"] == "/tmp/demo_case.toml"
+
+
+def test_run_config_uses_restart_bundle_and_writes_restart_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+    output_dir = tmp_path / "run"
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir)))
+    case = case.__class__(**{**case.__dict__, "output": case.output.__class__(**{**case.output.__dict__, "directory": str(output_dir)})})
+    config = RunConfig(
+        case=case,
+        solve_mode="steady",
+        logging=LoggingSpec(enabled=False),
+        restart=RestartSpec(enabled=True, path=tmp_path / "restart.npz", reset_histories=False, write_restart=True, restart_filename="resume_state.npz"),
+    )
+    bundle = SimpleNamespace(
+        path=(tmp_path / "restart.npz").resolve(),
+        state=SimpleNamespace(time=0.2),
+        diagnostics=SimpleNamespace(
+            time_history=[],
+            u_max_history=[],
+            mean_velocity_history=[],
+            applied_forcing_history=[],
+            pressure_proxy_history=[],
+            residual_history=[],
+            courant_like=[],
+            ohmic_power=[],
+            current_max_history=[],
+            face_current_max_history=[],
+            emf_max_history=[],
+            lorentz_max_history=[],
+            potential_residual_history=[],
+            potential_iterations_history=[],
+        ),
+    )
+    solution = SimpleNamespace(
+        state=SimpleNamespace(time=0.4, residual=1e-3, u=cli.jnp.asarray([[1.0]])),
+        diagnostics=SimpleNamespace(potential_residual_history=cli.jnp.asarray([1e-4]), potential_iterations_history=cli.jnp.asarray([12.0])),
+        mesh=SimpleNamespace(),
+        case_name=case.name,
+    )
+
+    monkeypatch.setattr(cli, "load_restart_bundle", lambda path: bundle)
+    monkeypatch.setattr(cli, "validate_restart_bundle", lambda bundle, mesh, geometry_kind, case_name: None)
+    monkeypatch.setattr(cli, "_build_mesh", lambda built_case: SimpleNamespace())
+    monkeypatch.setattr(
+        cli,
+        "_solve_case_with_optional_logger",
+        lambda built_case, **kwargs: solution,
+    )
+    monkeypatch.setattr(
+        cli,
+        "write_solution_outputs",
+        lambda solved, built_case, out_dir, write_npz, write_plots: {"paraview": [], "csv": [], "npz": [], "plots": []},
+    )
+    monkeypatch.setattr(cli, "write_restart_npz", lambda solved, built_case, path: Path(path))
+
+    summary = cli._run_config(config)
+
+    assert summary["restart"]["enabled"] is True
+    assert summary["restart"]["start_time"] == pytest.approx(0.2)
+    assert summary["restart"]["output"].endswith("resume_state.npz")
+    assert '"restart"' in capsys.readouterr().out
 
 
 def test_cli_validate_branches_into_reference_comparison(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):

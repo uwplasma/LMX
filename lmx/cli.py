@@ -11,9 +11,9 @@ import jax.numpy as jnp
 from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .config import RunConfig, load_run_config
-from .io import write_paraview, write_solution_outputs
-from .runtime_logging import StreamingSolverLogger, default_log_path
-from .solvers import solve_steady, solve_transient
+from .io import load_restart_bundle, validate_restart_bundle, write_paraview, write_restart_npz, write_solution_outputs
+from .runtime_logging import RestartLogInfo, StreamingSolverLogger, default_log_path
+from .solvers import _build_mesh, solve_steady, solve_transient
 from .validation import (
     closed_channel_validation,
     combined_profile_error,
@@ -47,23 +47,46 @@ def _build_case(args: argparse.Namespace):
     raise ValueError(args.case)
 
 
-def _solve_case_with_optional_logger(case, *, solve_mode: str, logger=None):
+def _solve_case_with_optional_logger(
+    case,
+    *,
+    solve_mode: str,
+    logger=None,
+    initial_state=None,
+    initial_diagnostics=None,
+    append_diagnostics: bool = False,
+    restart_info: RestartLogInfo | None = None,
+):
     if solve_mode == "transient":
         try:
-            return solve_transient(case, logger=logger)
+            return solve_transient(
+                case,
+                logger=logger,
+                initial_state=initial_state,
+                initial_diagnostics=initial_diagnostics,
+                append_diagnostics=append_diagnostics,
+                restart_info=restart_info,
+            )
         except TypeError:
             return solve_transient(case)
     try:
-        return solve_steady(case, logger=logger)
+        return solve_steady(
+            case,
+            logger=logger,
+            initial_state=initial_state,
+            initial_diagnostics=initial_diagnostics,
+            append_diagnostics=append_diagnostics,
+            restart_info=restart_info,
+        )
     except TypeError:
         return solve_steady(case)
 
 
-def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path]]) -> dict[str, object]:
+def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path]], *, restart_info: dict[str, object] | None = None) -> dict[str, object]:
     diag = getattr(solution, "diagnostics", _EmptyDiagnostics())
     geometry = getattr(getattr(case, "geometry", None), "kind", "unknown")
     u_field = getattr(solution.state, "u", jnp.asarray([0.0]))
-    return {
+    summary = {
         "case": case.name,
         "geometry": geometry,
         "time": float(solution.state.time),
@@ -78,6 +101,9 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
             if paths
         },
     }
+    if restart_info is not None:
+        summary["restart"] = restart_info
+    return summary
 
 
 def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path | None:
@@ -102,8 +128,39 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         log_path = default_log_path(out_dir, case.name)
         log_handle = open(log_path, "w", encoding="utf-8")
         logger.add_stream(log_handle)
+    initial_state = None
+    initial_diagnostics = None
+    restart_log_info = RestartLogInfo(enabled=False)
+    restart_summary: dict[str, object] | None = None
+    if config.restart.enabled:
+        if config.restart.path is None:
+            raise ValueError("Restart is enabled but no restart.path was provided")
+        restart_bundle = load_restart_bundle(config.restart.path)
+        validate_restart_bundle(restart_bundle, mesh=_build_mesh(case), geometry_kind=case.geometry.kind, case_name=case.name)
+        initial_state = restart_bundle.state
+        initial_diagnostics = restart_bundle.diagnostics
+        restart_log_info = RestartLogInfo(
+            enabled=True,
+            path=str(restart_bundle.path),
+            start_time=float(restart_bundle.state.time),
+            reset_histories=config.restart.reset_histories,
+        )
+        restart_summary = {
+            "enabled": True,
+            "input": str(restart_bundle.path),
+            "start_time": float(restart_bundle.state.time),
+            "reset_histories": bool(config.restart.reset_histories),
+        }
     try:
-        solution = _solve_case_with_optional_logger(case, solve_mode=config.solve_mode, logger=logger)
+        solution = _solve_case_with_optional_logger(
+            case,
+            solve_mode=config.solve_mode,
+            logger=logger,
+            initial_state=initial_state,
+            initial_diagnostics=initial_diagnostics,
+            append_diagnostics=bool(config.restart.enabled and not config.restart.reset_histories),
+            restart_info=restart_log_info,
+        )
     finally:
         if log_handle is not None:
             log_handle.close()
@@ -114,13 +171,20 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         write_npz=getattr(case.output, "write_npz", True),
         write_plots=getattr(case.output, "write_plots", False),
     )
+    if config.restart.write_restart:
+        restart_filename = config.restart.restart_filename or f"{case.name}_restart.npz"
+        restart_path = write_restart_npz(solution, case, out_dir / restart_filename)
+        outputs.setdefault("restart", []).append(restart_path)
+        if restart_summary is None:
+            restart_summary = {"enabled": False}
+        restart_summary["output"] = str(restart_path.resolve())
     if log_path is not None:
         outputs.setdefault("log", []).append(log_path)
     if config.input_path is not None and getattr(case.output, "copy_input_file", True):
         copied_input = out_dir / config.input_path.name
         shutil.copy2(config.input_path, copied_input)
         outputs.setdefault("input", []).append(copied_input)
-    summary = _runtime_summary(solution, case, out_dir, outputs)
+    summary = _runtime_summary(solution, case, out_dir, outputs, restart_info=restart_summary)
     summary_path = _write_run_summary(summary, case, out_dir)
     if summary_path is not None:
         outputs.setdefault("json", []).append(summary_path)

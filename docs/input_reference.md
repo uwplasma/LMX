@@ -19,6 +19,7 @@ When the input file enables the corresponding output options, LMX writes:
 - `case_name_midplane_y.csv`
 - `case_name_midplane_z.csv`
 - `case_name_results.npz`
+- `case_name_restart.npz` when restart output is enabled
 - `case_name_summary.json`
 - `case_name.log`
 - overview and diagnostics figures when `write_plots = true`
@@ -35,6 +36,7 @@ An input file is organized as:
 [time_stepper]
 [output]
 [logging]
+[restart]
 [[regions]]
 [[boundary_conditions]]
 ```
@@ -121,6 +123,37 @@ cell-area weighting on clustered meshes rather than raw cell counts.
 With `enabled = true`, the solver prints a live OpenFOAM-style stream and also
 writes the same text to `case_name.log` in the output directory.
 
+## `restart`
+
+- `enabled`
+- `path`
+- `reset_histories`
+- `write_restart`
+- `restart_filename`
+
+Restart is a runtime concern, so it lives in its own top-level table instead of
+inside the physical case definition.
+
+Current retained semantics:
+
+- the restart source is a previously written LMX `.npz` solution dump
+- the saved `u`, `phi`, `J`, `JxB`, `time`, and `residual` become the initial state
+- transient runs continue from the saved `time` to the absolute `t_final` in the new TOML
+- steady runs continue from the saved pseudo-time/state for up to the new `max_steps`
+- `reset_histories = true` starts fresh diagnostic histories at the restart point
+- `reset_histories = false` appends the new histories to the saved ones
+
+Minimal example:
+
+```toml
+[restart]
+enabled = true
+path = "../artifacts/examples/toml_hartmann/hartmann_ha20_toml_results.npz"
+reset_histories = false
+write_restart = true
+restart_filename = "hartmann_ha20_toml_restart.npz"
+```
+
 ## `regions`
 
 Each `[[regions]]` entry maps directly to `RegionSpec`:
@@ -159,6 +192,7 @@ Typical values:
 ## Shipped examples
 
 - `examples/hartmann_case.toml`
+- `examples/hartmann_restart_case.toml`
 - `examples/shercliff_case.toml`
 - `examples/hunt_case.toml`
 
@@ -168,3 +202,7 @@ The Hunt example is the most informative input file because it shows:
 - explicit insulating and conducting walls
 - layered geometry controls
 - the retained Hunt current/Lorentz reconstruction baseline
+
+`examples/hartmann_restart_case.toml` is the retained restart/continue example.
+Run `examples/hartmann_case.toml` first so the referenced NPZ exists, then run
+the restart file to continue from that saved state.

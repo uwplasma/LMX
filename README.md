@@ -66,6 +66,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/compare_hunt_trace_histories.py --freemhd-diag-json /tmp/lmx_hunt20_live_diag.json --lmx-report-json /tmp/lmx_hunt_auto_short_trace_force.json --output ./artifacts/hunt_trace_alignment.json
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
 ```
 
 ## Documentation
@@ -85,6 +86,7 @@ LMX can now be run directly as an executable against a complete TOML input file:
 
 ```bash
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/shercliff_case.toml
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hunt_case.toml
 ```
@@ -96,12 +98,26 @@ also writes:
 - ParaView files
 - CSV profile cuts
 - `.npz` field and diagnostics dump
+- dedicated restart `.npz` when restart output is enabled
 - `case_name_summary.json`
 - overview/diagnostics figures when `write_plots = true`
 - a copy of the input file when `copy_input_file = true`
 
 The full field-by-field TOML schema is documented in
 [`docs/input_reference.md`](docs/input_reference.md).
+
+Restart/continue is now part of the executable workflow. The retained teaching
+path is:
+
+```bash
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
+```
+
+The second input file resumes from the `.npz` state dump written by the first
+run, continues from the saved solver time to the new `t_final`, appends the
+diagnostic histories, and writes a dedicated restart output file for the next
+continuation.
 
 ## Meeting-ready example
 

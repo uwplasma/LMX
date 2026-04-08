@@ -1,13 +1,25 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
 
-from .core import Solution
+from .core import Diagnostics, MHDState, Solution
 from .mesh import StructuredMesh
+
+
+@dataclass(frozen=True)
+class RestartBundle:
+    path: Path
+    state: MHDState
+    diagnostics: Diagnostics
+    metadata: dict[str, object]
+    y_faces: np.ndarray
+    z_faces: np.ndarray
+    geometry_kind: str
 
 
 def _array_text(array: jnp.ndarray) -> str:
@@ -122,9 +134,11 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
     metadata = {
         "case": solution.case_name,
         "time": float(solution.state.time),
+        "residual": float(solution.state.residual),
         "description": "LMX solution dump",
         "geometry_kind": case.geometry.kind,
         "notes": case.notes,
+        "restart_capable": True,
     }
     diag = solution.diagnostics
     np.savez_compressed(
@@ -139,6 +153,8 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         jy=np.asarray(solution.state.jy),
         jz=np.asarray(solution.state.jz),
         lorentz_x=np.asarray(solution.state.lorentz_x),
+        state_time=np.asarray(float(solution.state.time)),
+        state_residual=np.asarray(float(solution.state.residual)),
         conductivity=np.asarray(materials.conductivity),
         density=np.asarray(materials.density),
         viscosity=np.asarray(materials.viscosity),
@@ -159,6 +175,82 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         ohmic_power=np.asarray(diag.ohmic_power),
     )
     return path
+
+
+def write_restart_npz(solution: Solution, case, path: str | Path) -> Path:
+    return write_solution_npz(solution, case, path)
+
+
+def _load_optional_array(data: np.lib.npyio.NpzFile, key: str) -> np.ndarray:
+    if key not in data:
+        return np.zeros((0,), dtype=float)
+    return np.asarray(data[key])
+
+
+def load_restart_bundle(path: str | Path) -> RestartBundle:
+    path = Path(path).resolve()
+    with np.load(path, allow_pickle=False) as data:
+        metadata = json.loads(str(data["metadata_json"])) if "metadata_json" in data else {}
+        state_time = float(data["state_time"]) if "state_time" in data else float(metadata.get("time", 0.0))
+        if "state_residual" in data:
+            state_residual = float(data["state_residual"])
+        else:
+            residual_history = _load_optional_array(data, "residual_history")
+            state_residual = float(residual_history[-1]) if residual_history.size else float(metadata.get("residual", 0.0))
+        state = MHDState(
+            u=jnp.asarray(data["u"]),
+            phi=jnp.asarray(data["phi"]),
+            jy=jnp.asarray(data["jy"]),
+            jz=jnp.asarray(data["jz"]),
+            lorentz_x=jnp.asarray(data["lorentz_x"]),
+            time=state_time,
+            residual=state_residual,
+        )
+        diagnostics = Diagnostics(
+            time_history=jnp.asarray(_load_optional_array(data, "time_history")),
+            u_max_history=jnp.asarray(_load_optional_array(data, "u_max_history")),
+            mean_velocity_history=jnp.asarray(_load_optional_array(data, "mean_velocity_history")),
+            applied_forcing_history=jnp.asarray(_load_optional_array(data, "applied_forcing_history")),
+            pressure_proxy_history=jnp.asarray(_load_optional_array(data, "pressure_proxy_history")),
+            residual_history=jnp.asarray(_load_optional_array(data, "residual_history")),
+            courant_like=jnp.asarray(_load_optional_array(data, "courant_like")),
+            ohmic_power=jnp.asarray(_load_optional_array(data, "ohmic_power")),
+            current_max_history=jnp.asarray(_load_optional_array(data, "current_max_history")),
+            face_current_max_history=jnp.asarray(_load_optional_array(data, "face_current_max_history")),
+            emf_max_history=jnp.asarray(_load_optional_array(data, "emf_max_history")),
+            lorentz_max_history=jnp.asarray(_load_optional_array(data, "lorentz_max_history")),
+            potential_residual_history=jnp.asarray(_load_optional_array(data, "potential_residual_history")),
+            potential_iterations_history=jnp.asarray(_load_optional_array(data, "potential_iterations_history")),
+        )
+        return RestartBundle(
+            path=path,
+            state=state,
+            diagnostics=diagnostics,
+            metadata=metadata,
+            y_faces=np.asarray(data["y_faces"]),
+            z_faces=np.asarray(data["z_faces"]),
+            geometry_kind=str(metadata.get("geometry_kind", "unknown")),
+        )
+
+
+def validate_restart_bundle(bundle: RestartBundle, *, mesh: StructuredMesh, geometry_kind: str, case_name: str) -> None:
+    if bundle.geometry_kind not in {"unknown", geometry_kind}:
+        raise ValueError(
+            f"Restart geometry_kind {bundle.geometry_kind!r} does not match current case geometry {geometry_kind!r}"
+        )
+    if bundle.state.u.shape != mesh.yz_shape:
+        raise ValueError(
+            f"Restart field shape {bundle.state.u.shape!r} does not match current mesh shape {mesh.yz_shape!r}"
+        )
+    if bundle.y_faces.shape != np.asarray(mesh.y_faces).shape or not np.allclose(bundle.y_faces, np.asarray(mesh.y_faces)):
+        raise ValueError("Restart y_faces do not match the current mesh")
+    if bundle.z_faces.shape != np.asarray(mesh.z_faces).shape or not np.allclose(bundle.z_faces, np.asarray(mesh.z_faces)):
+        raise ValueError("Restart z_faces do not match the current mesh")
+    restart_case = str(bundle.metadata.get("case", case_name))
+    if restart_case != case_name:
+        metadata_name = bundle.metadata.get("case")
+        if metadata_name is not None:
+            raise ValueError(f"Restart case {metadata_name!r} does not match current case name {case_name!r}")
 
 
 def write_solution_outputs(

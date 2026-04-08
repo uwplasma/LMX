@@ -1,14 +1,16 @@
 from dataclasses import replace
+from pathlib import Path
 
 import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.physics import build_material_fields, magnetic_field_components, magnetic_ramp_scale
 import lmx.solvers as solvers
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.specs import BoundaryCondition
-from lmx.solvers import solve_steady
+from lmx.solvers import solve_steady, solve_transient
 
 
 pytestmark = pytest.mark.physics
@@ -126,6 +128,49 @@ def test_hunt_inlet_velocity_boundary_does_not_trigger_reduced_mean_drive():
     undriven_solution = solve_steady(undriven)
 
     assert float(jnp.max(jnp.abs(inlet_solution.state.u - undriven_solution.state.u))) < 1e-6
+
+
+def test_transient_restart_matches_direct_run(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=12, nz=12)
+    direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))
+    partial_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2))
+
+    direct = solve_transient(direct_case)
+    partial = solve_transient(partial_case)
+    restart_path = write_solution_npz(partial, partial_case, tmp_path / "partial_restart.npz")
+    restart = load_restart_bundle(restart_path)
+    resumed = solve_transient(
+        direct_case,
+        initial_state=restart.state,
+        initial_diagnostics=restart.diagnostics,
+        append_diagnostics=False,
+    )
+
+    assert float(resumed.state.time) == pytest.approx(float(direct.state.time))
+    assert jnp.allclose(resumed.state.u, direct.state.u, atol=1e-6, rtol=1e-6)
+    assert jnp.allclose(resumed.state.phi, direct.state.phi, atol=1e-6, rtol=1e-6)
+    assert jnp.allclose(resumed.state.jy, direct.state.jy, atol=1e-6, rtol=1e-6)
+    assert jnp.allclose(resumed.state.jz, direct.state.jz, atol=1e-6, rtol=1e-6)
+    assert jnp.allclose(resumed.state.lorentz_x, direct.state.lorentz_x, atol=1e-6, rtol=1e-6)
+
+
+def test_transient_restart_can_append_diagnostics(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=10, nz=10)
+    direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))
+    partial_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2))
+    partial = solve_transient(partial_case)
+    restart = load_restart_bundle(write_solution_npz(partial, partial_case, tmp_path / "partial_append.npz"))
+
+    resumed = solve_transient(
+        direct_case,
+        initial_state=restart.state,
+        initial_diagnostics=restart.diagnostics,
+        append_diagnostics=True,
+    )
+
+    assert resumed.diagnostics.time_history.shape[0] == 4
+    assert float(resumed.diagnostics.time_history[0]) == pytest.approx(0.01)
+    assert float(resumed.diagnostics.time_history[-1]) == pytest.approx(0.04)
 
 
 def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero():

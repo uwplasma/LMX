@@ -31,10 +31,20 @@ class LoggingSpec:
 
 
 @dataclass(frozen=True)
+class RestartSpec:
+    enabled: bool = False
+    path: Path | None = None
+    reset_histories: bool = True
+    write_restart: bool = False
+    restart_filename: str | None = None
+
+
+@dataclass(frozen=True)
 class RunConfig:
     case: CaseSpec
     solve_mode: SolveMode = "steady"
     logging: LoggingSpec = field(default_factory=LoggingSpec)
+    restart: RestartSpec = field(default_factory=RestartSpec)
     input_path: Path | None = None
 
 
@@ -109,6 +119,7 @@ def load_run_config(path: str | Path) -> RunConfig:
     time_table = root.get("time_stepper", {})
     output_table = root.get("output", {})
     logging_table = root.get("logging", {})
+    restart_table = root.get("restart", {})
     regions_table = root.get("regions", [])
     boundaries_table = root.get("boundary_conditions", [])
 
@@ -202,9 +213,20 @@ def load_run_config(path: str | Path) -> RunConfig:
         flush=bool(logging_table.get("flush", True)),
         step_stride=int(logging_table.get("step_stride", 1)),
     )
+    restart_enabled = bool(restart_table.get("enabled", False))
+    restart_path = restart_table.get("path")
+    restart = RestartSpec(
+        enabled=restart_enabled,
+        path=None if restart_path is None else (input_path.parent / str(restart_path)).resolve(),
+        reset_histories=bool(restart_table.get("reset_histories", True)),
+        write_restart=bool(restart_table.get("write_restart", restart_enabled)),
+        restart_filename=None
+        if restart_table.get("restart_filename") is None
+        else str(restart_table["restart_filename"]),
+    )
 
     solve_mode = str(case_table.get("solve_mode", "steady"))
     if solve_mode not in {"steady", "transient"}:
         raise ValueError(f"Unsupported solve_mode {solve_mode!r}")
 
-    return RunConfig(case=case, solve_mode=solve_mode, logging=logging, input_path=input_path)
+    return RunConfig(case=case, solve_mode=solve_mode, logging=logging, restart=restart, input_path=input_path)

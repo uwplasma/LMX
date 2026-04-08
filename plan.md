@@ -3001,6 +3001,60 @@ LMX should only be described as ship ready for the current milestone when all of
     - keep the clean short Hunt replay fixed as the local benchmark
     - extend or recover the longer `t <= 6e-05` patched replay again
     - only then change the later pressure/current reduction path itself
+- `2026-04-08 America/Chicago`: Added a retained restart/continue vertical slice
+  for native `lmx input.toml` runs:
+  - retained code changes:
+    - `lmx/config.py` now parses a top-level `[restart]` table into
+      `RestartSpec`
+    - `lmx/io.py` now writes explicit `state_time` / `state_residual` into the
+      standard solution NPZ and can load/validate that NPZ as a restart bundle
+    - `lmx/solvers.py` now accepts optional `initial_state` /
+      `initial_diagnostics`, continues from the saved solver time, and can
+      append histories instead of always starting fresh
+    - `lmx/runtime_logging.py` now prints restart provenance and resume time in
+      the live solver banner
+    - `lmx/cli.py` now supports `lmx input.toml` continuation, writes restart
+      metadata into the summary JSON, and can emit a dedicated restart NPZ at
+      the end of the run
+  - retained user-facing examples:
+    - `examples/hartmann_restart_case.toml`
+    - updated `README.md`, `examples/README.md`, `docs/input_reference.md`, and
+      `docs/developer_guide.md`
+  - retained validation:
+    - targeted tests passed:
+      - `pytest tests/test_config.py tests/test_io.py tests/test_cli.py tests/test_solver.py -q`
+      - `python -m sphinx -W -b html docs docs/_build/html`
+    - real executable QA passed:
+      - base run:
+        - `lmx examples/hartmann_case.toml`
+      - continuation run:
+        - `lmx examples/hartmann_restart_case.toml`
+      - retained output artifacts:
+        - base summary:
+          - `artifacts/examples/toml_hartmann/hartmann_ha20_toml_summary.json`
+        - continued summary:
+          - `artifacts/examples/toml_hartmann_restart/hartmann_ha20_toml_summary.json`
+        - continued restart NPZ:
+          - `artifacts/examples/toml_hartmann_restart/hartmann_ha20_toml_restart.npz`
+      - retained restart semantics confirmed locally:
+        - restart banner reports source NPZ and `startTime = 4.0e-01`
+        - continued summary reports `time = 8.0e-01`
+        - continued restart NPZ contains `time_history_len = 400`,
+          `state_time = 0.8`, `state_residual ≈ 2.13e-05`
+  - retained interpretation:
+    - native `lmx input.toml` runs now support OpenFOAM-like continue/restart
+      from a saved state without a separate hidden format
+    - the standard solution NPZ is now the canonical restart source, while the
+      dedicated `*_restart.npz` output is the recommended handoff artifact for
+      further continuation
+    - CI/CD was clean at the time this work landed; no failing or queued `main`
+      workflow runs were present in the latest `gh run list`
+  - best next step:
+    - return to the Hunt plan with the runtime path stabilized
+    - use the new restart capability to extend recovered diagnostic windows
+      without always rerunning from `t = 0`
+    - then target the later-time reduced pressure/current response against the
+      patched Hunt replay
 
 ## Instruction For Future Agents
 

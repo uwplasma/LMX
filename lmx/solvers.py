@@ -11,7 +11,7 @@ from .linear import poisson_residual_norm, solve_poisson_cg_state, solve_poisson
 from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
 from .operators import gradient_scalar, laplacian_scalar
 from .physics import build_material_fields, magnetic_field_components
-from .runtime_logging import SolverStepRecord
+from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec
 
 
@@ -548,7 +548,18 @@ def _step(
         pressure_proxy,
     )
 
-def _emit_solver_header(logger, *, case, mesh, materials, mode, potential_solver, target_mean_velocity, reference_mean_velocity):
+def _emit_solver_header(
+    logger,
+    *,
+    case,
+    mesh,
+    materials,
+    mode,
+    potential_solver,
+    target_mean_velocity,
+    reference_mean_velocity,
+    restart: RestartLogInfo | None = None,
+):
     if logger is None:
         return
     logger.emit_header(
@@ -559,7 +570,53 @@ def _emit_solver_header(logger, *, case, mesh, materials, mode, potential_solver
         potential_solver=potential_solver,
         target_mean_velocity=target_mean_velocity,
         reference_mean_velocity=reference_mean_velocity,
+        restart=restart,
     )
+
+
+def _initial_solver_state(
+    *,
+    case: CaseSpec,
+    mesh: StructuredMesh,
+    fluid_mask: jnp.ndarray,
+    interpolate_direct_fluid_walls: bool,
+    initial_state: MHDState | None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
+    if initial_state is None:
+        initial_u = jnp.where(fluid_mask, case.initial_velocity, 0.0)
+        initial_u = _enforce_velocity_bc(
+            initial_u,
+            mesh,
+            fluid_mask,
+            interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+        )
+        zeros = jnp.zeros_like(initial_u)
+        return initial_u, zeros, zeros, zeros, zeros, 0.0
+    initial_u = _enforce_velocity_bc(
+        jnp.asarray(initial_state.u),
+        mesh,
+        fluid_mask,
+        interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+    )
+    return (
+        initial_u,
+        jnp.asarray(initial_state.phi),
+        jnp.asarray(initial_state.jy),
+        jnp.asarray(initial_state.jz),
+        jnp.asarray(initial_state.lorentz_x),
+        float(initial_state.time),
+    )
+
+
+def _concat_history(
+    previous: jnp.ndarray | None,
+    current: jnp.ndarray,
+    *,
+    append: bool,
+) -> jnp.ndarray:
+    if not append or previous is None or previous.size == 0:
+        return current
+    return jnp.concatenate((previous, current))
 
 
 def _emit_solver_step(
@@ -606,7 +663,15 @@ def _emit_solver_step(
     )
 
 
-def solve_transient(case: CaseSpec, logger=None) -> Solution:
+def solve_transient(
+    case: CaseSpec,
+    logger=None,
+    *,
+    initial_state: MHDState | None = None,
+    initial_diagnostics: Diagnostics | None = None,
+    append_diagnostics: bool = False,
+    restart_info: RestartLogInfo | None = None,
+) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
@@ -614,15 +679,17 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     interpolate_direct_fluid_walls = not bool(jnp.all(materials.fluid_mask))
 
-    initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
-    initial_u = _enforce_velocity_bc(
-        initial_u,
-        mesh,
-        materials.fluid_mask,
+    initial_u, initial_phi, initial_jy, initial_jz, initial_lorentz, start_time = _initial_solver_state(
+        case=case,
+        mesh=mesh,
+        fluid_mask=materials.fluid_mask,
         interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+        initial_state=initial_state,
     )
     dt = case.time_stepper.dt
-    steps = min(case.time_stepper.max_steps, max(1, int(round(case.time_stepper.t_final / dt))))
+    remaining_time = max(0.0, case.time_stepper.t_final - start_time)
+    requested_steps = int(round(remaining_time / dt)) if remaining_time > 0.0 else 0
+    steps = min(case.time_stepper.max_steps, requested_steps)
     _emit_solver_header(
         logger,
         case=case,
@@ -632,7 +699,28 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
         potential_solver=potential_solver,
         target_mean_velocity=target_mean_velocity,
         reference_mean_velocity=reference_mean_velocity,
+        restart=restart_info,
     )
+
+    if steps == 0:
+        state = MHDState(
+            u=initial_u,
+            phi=initial_phi,
+            jy=initial_jy,
+            jz=initial_jz,
+            lorentz_x=initial_lorentz,
+            time=float(start_time),
+            residual=float(initial_state.residual if initial_state is not None else 0.0),
+        )
+        diagnostics = initial_diagnostics if (append_diagnostics and initial_diagnostics is not None) else Diagnostics(
+            residual_history=jnp.zeros((0,)),
+            courant_like=jnp.zeros((0,)),
+            ohmic_power=jnp.zeros((0,)),
+        )
+        solution = Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
+        if logger is not None:
+            logger.emit_footer(solution)
+        return solution
 
     if logger is None:
         def scan_step(carry, _):
@@ -690,7 +778,7 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
             )
             return (u_next, step_time), (u_next, phi, jy, jz, lorentz, sample)
 
-        (u_final, time_final), history = jax.lax.scan(scan_step, (initial_u, 0.0), xs=None, length=steps)
+        (u_final, time_final), history = jax.lax.scan(scan_step, (initial_u, start_time), xs=None, length=steps)
         u_hist, phi_hist, jy_hist, jz_hist, lorentz_hist, samples = history
 
         state = MHDState(
@@ -703,20 +791,76 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
             residual=float(samples[-1, 5]),
         )
         diagnostics = Diagnostics(
-            time_history=samples[:, 0],
-            u_max_history=samples[:, 1],
-            mean_velocity_history=samples[:, 2],
-            applied_forcing_history=samples[:, 3],
-            pressure_proxy_history=samples[:, 4],
-            residual_history=samples[:, 5],
-            courant_like=samples[:, 6],
-            ohmic_power=samples[:, 7],
-            current_max_history=samples[:, 8],
-            face_current_max_history=samples[:, 9],
-            emf_max_history=samples[:, 10],
-            lorentz_max_history=samples[:, 11],
-            potential_residual_history=samples[:, 12],
-            potential_iterations_history=samples[:, 13],
+            time_history=_concat_history(
+                initial_diagnostics.time_history if initial_diagnostics is not None else None,
+                samples[:, 0],
+                append=append_diagnostics,
+            ),
+            u_max_history=_concat_history(
+                initial_diagnostics.u_max_history if initial_diagnostics is not None else None,
+                samples[:, 1],
+                append=append_diagnostics,
+            ),
+            mean_velocity_history=_concat_history(
+                initial_diagnostics.mean_velocity_history if initial_diagnostics is not None else None,
+                samples[:, 2],
+                append=append_diagnostics,
+            ),
+            applied_forcing_history=_concat_history(
+                initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None,
+                samples[:, 3],
+                append=append_diagnostics,
+            ),
+            pressure_proxy_history=_concat_history(
+                initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
+                samples[:, 4],
+                append=append_diagnostics,
+            ),
+            residual_history=_concat_history(
+                initial_diagnostics.residual_history if initial_diagnostics is not None else None,
+                samples[:, 5],
+                append=append_diagnostics,
+            ),
+            courant_like=_concat_history(
+                initial_diagnostics.courant_like if initial_diagnostics is not None else None,
+                samples[:, 6],
+                append=append_diagnostics,
+            ),
+            ohmic_power=_concat_history(
+                initial_diagnostics.ohmic_power if initial_diagnostics is not None else None,
+                samples[:, 7],
+                append=append_diagnostics,
+            ),
+            current_max_history=_concat_history(
+                initial_diagnostics.current_max_history if initial_diagnostics is not None else None,
+                samples[:, 8],
+                append=append_diagnostics,
+            ),
+            face_current_max_history=_concat_history(
+                initial_diagnostics.face_current_max_history if initial_diagnostics is not None else None,
+                samples[:, 9],
+                append=append_diagnostics,
+            ),
+            emf_max_history=_concat_history(
+                initial_diagnostics.emf_max_history if initial_diagnostics is not None else None,
+                samples[:, 10],
+                append=append_diagnostics,
+            ),
+            lorentz_max_history=_concat_history(
+                initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
+                samples[:, 11],
+                append=append_diagnostics,
+            ),
+            potential_residual_history=_concat_history(
+                initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None,
+                samples[:, 12],
+                append=append_diagnostics,
+            ),
+            potential_iterations_history=_concat_history(
+                initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
+                samples[:, 13],
+                append=append_diagnostics,
+            ),
         )
         solution = Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
         return solution
@@ -753,10 +897,10 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
     compiled_step = jax.jit(compiled_step)
 
     u = initial_u
-    phi = jnp.zeros_like(u)
-    jy = jnp.zeros_like(u)
-    jz = jnp.zeros_like(u)
-    lorentz = jnp.zeros_like(u)
+    phi = initial_phi
+    jy = initial_jy
+    jz = initial_jz
+    lorentz = initial_lorentz
     time_history: list[float] = []
     u_max_history: list[float] = []
     mean_velocity_history: list[float] = []
@@ -774,7 +918,7 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
     residual_value = float("inf")
 
     for step_index in range(steps):
-        step_time = float((step_index + 1) * dt)
+        step_time = float(start_time + (step_index + 1) * dt)
         u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = compiled_step(u, step_time)
         residual_value = float(residual)
         u_max_value = float(jnp.max(jnp.abs(u)))
@@ -816,29 +960,94 @@ def solve_transient(case: CaseSpec, logger=None) -> Solution:
             ohmic=ohmic,
         )
 
-    state = MHDState(u=u, phi=phi, jy=jy, jz=jz, lorentz_x=lorentz, time=float(steps * dt), residual=residual_value)
+    state = MHDState(u=u, phi=phi, jy=jy, jz=jz, lorentz_x=lorentz, time=float(start_time + steps * dt), residual=residual_value)
     diagnostics = Diagnostics(
-        time_history=jnp.asarray(time_history, dtype=float),
-        u_max_history=jnp.asarray(u_max_history, dtype=float),
-        mean_velocity_history=jnp.asarray(mean_velocity_history, dtype=float),
-        applied_forcing_history=jnp.asarray(applied_forcing_history, dtype=float),
-        pressure_proxy_history=jnp.asarray(pressure_proxy_history, dtype=float),
-        residual_history=jnp.asarray(residual_history, dtype=float),
-        courant_like=jnp.asarray(courant_history, dtype=float),
-        ohmic_power=jnp.asarray(ohmic_history, dtype=float),
-        current_max_history=jnp.asarray(current_max_history, dtype=float),
-        face_current_max_history=jnp.asarray(face_current_max_history, dtype=float),
-        emf_max_history=jnp.asarray(emf_max_history, dtype=float),
-        lorentz_max_history=jnp.asarray(lorentz_max_history, dtype=float),
-        potential_residual_history=jnp.asarray(potential_history, dtype=float),
-        potential_iterations_history=jnp.asarray(potential_iteration_history, dtype=float),
+        time_history=_concat_history(
+            initial_diagnostics.time_history if initial_diagnostics is not None else None,
+            jnp.asarray(time_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        u_max_history=_concat_history(
+            initial_diagnostics.u_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(u_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        mean_velocity_history=_concat_history(
+            initial_diagnostics.mean_velocity_history if initial_diagnostics is not None else None,
+            jnp.asarray(mean_velocity_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        applied_forcing_history=_concat_history(
+            initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None,
+            jnp.asarray(applied_forcing_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        pressure_proxy_history=_concat_history(
+            initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
+            jnp.asarray(pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        residual_history=_concat_history(
+            initial_diagnostics.residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        courant_like=_concat_history(
+            initial_diagnostics.courant_like if initial_diagnostics is not None else None,
+            jnp.asarray(courant_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        ohmic_power=_concat_history(
+            initial_diagnostics.ohmic_power if initial_diagnostics is not None else None,
+            jnp.asarray(ohmic_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        current_max_history=_concat_history(
+            initial_diagnostics.current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        face_current_max_history=_concat_history(
+            initial_diagnostics.face_current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(face_current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        emf_max_history=_concat_history(
+            initial_diagnostics.emf_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(emf_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        lorentz_max_history=_concat_history(
+            initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(lorentz_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        potential_residual_history=_concat_history(
+            initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(potential_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        potential_iterations_history=_concat_history(
+            initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
+            jnp.asarray(potential_iteration_history, dtype=float),
+            append=append_diagnostics,
+        ),
     )
     solution = Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
-    logger.emit_footer(solution)
+    if logger is not None:
+        logger.emit_footer(solution)
     return solution
 
 
-def solve_steady(case: CaseSpec, logger=None) -> Solution:
+def solve_steady(
+    case: CaseSpec,
+    logger=None,
+    *,
+    initial_state: MHDState | None = None,
+    initial_diagnostics: Diagnostics | None = None,
+    append_diagnostics: bool = False,
+    restart_info: RestartLogInfo | None = None,
+) -> Solution:
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
@@ -846,12 +1055,12 @@ def solve_steady(case: CaseSpec, logger=None) -> Solution:
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     interpolate_direct_fluid_walls = not bool(jnp.all(materials.fluid_mask))
 
-    initial_u = jnp.where(materials.fluid_mask, case.initial_velocity, 0.0)
-    initial_u = _enforce_velocity_bc(
-        initial_u,
-        mesh,
-        materials.fluid_mask,
+    initial_u, initial_phi, initial_jy, initial_jz, initial_lorentz, start_time = _initial_solver_state(
+        case=case,
+        mesh=mesh,
+        fluid_mask=materials.fluid_mask,
         interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+        initial_state=initial_state,
     )
     dt = case.time_stepper.dt
     max_steps = max(1, case.time_stepper.max_steps)
@@ -866,6 +1075,7 @@ def solve_steady(case: CaseSpec, logger=None) -> Solution:
         potential_solver=potential_solver,
         target_mean_velocity=target_mean_velocity,
         reference_mean_velocity=reference_mean_velocity,
+        restart=restart_info,
     )
 
     def compiled_step(
@@ -903,10 +1113,10 @@ def solve_steady(case: CaseSpec, logger=None) -> Solution:
     step_fn = jax.jit(compiled_step)
 
     u = initial_u
-    phi = jnp.zeros_like(u)
-    jy = jnp.zeros_like(u)
-    jz = jnp.zeros_like(u)
-    lorentz = jnp.zeros_like(u)
+    phi = initial_phi
+    jy = initial_jy
+    jz = initial_jz
+    lorentz = initial_lorentz
     residual_value = float("inf")
     residual_history: list[float] = []
     courant_history: list[float] = []
@@ -925,7 +1135,7 @@ def solve_steady(case: CaseSpec, logger=None) -> Solution:
     step_count = 0
 
     for step_index in range(max_steps):
-        step_time = float((step_index + 1) * dt)
+        step_time = float(start_time + (step_index + 1) * dt)
         u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, mean_velocity, applied_forcing, pressure_proxy = step_fn(
             u,
             step_time,
@@ -981,24 +1191,80 @@ def solve_steady(case: CaseSpec, logger=None) -> Solution:
         jy=jy,
         jz=jz,
         lorentz_x=lorentz,
-        time=float(step_count * dt),
+        time=float(start_time + step_count * dt),
         residual=residual_value,
     )
     diagnostics = Diagnostics(
-        time_history=jnp.asarray(time_history, dtype=float),
-        u_max_history=jnp.asarray(u_max_history, dtype=float),
-        mean_velocity_history=jnp.asarray(mean_velocity_history, dtype=float),
-        applied_forcing_history=jnp.asarray(applied_forcing_history, dtype=float),
-        pressure_proxy_history=jnp.asarray(pressure_proxy_history, dtype=float),
-        residual_history=jnp.asarray(residual_history, dtype=float),
-        courant_like=jnp.asarray(courant_history, dtype=float),
-        ohmic_power=jnp.asarray(ohmic_history, dtype=float),
-        current_max_history=jnp.asarray(current_max_history, dtype=float),
-        face_current_max_history=jnp.asarray(face_current_max_history, dtype=float),
-        emf_max_history=jnp.asarray(emf_max_history, dtype=float),
-        lorentz_max_history=jnp.asarray(lorentz_max_history, dtype=float),
-        potential_residual_history=jnp.asarray(potential_history, dtype=float),
-        potential_iterations_history=jnp.asarray(potential_iteration_history, dtype=float),
+        time_history=_concat_history(
+            initial_diagnostics.time_history if initial_diagnostics is not None else None,
+            jnp.asarray(time_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        u_max_history=_concat_history(
+            initial_diagnostics.u_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(u_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        mean_velocity_history=_concat_history(
+            initial_diagnostics.mean_velocity_history if initial_diagnostics is not None else None,
+            jnp.asarray(mean_velocity_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        applied_forcing_history=_concat_history(
+            initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None,
+            jnp.asarray(applied_forcing_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        pressure_proxy_history=_concat_history(
+            initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
+            jnp.asarray(pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        residual_history=_concat_history(
+            initial_diagnostics.residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        courant_like=_concat_history(
+            initial_diagnostics.courant_like if initial_diagnostics is not None else None,
+            jnp.asarray(courant_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        ohmic_power=_concat_history(
+            initial_diagnostics.ohmic_power if initial_diagnostics is not None else None,
+            jnp.asarray(ohmic_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        current_max_history=_concat_history(
+            initial_diagnostics.current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        face_current_max_history=_concat_history(
+            initial_diagnostics.face_current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(face_current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        emf_max_history=_concat_history(
+            initial_diagnostics.emf_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(emf_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        lorentz_max_history=_concat_history(
+            initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(lorentz_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        potential_residual_history=_concat_history(
+            initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(potential_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        potential_iterations_history=_concat_history(
+            initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
+            jnp.asarray(potential_iteration_history, dtype=float),
+            append=append_diagnostics,
+        ),
     )
     solution = Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
     if logger is not None:

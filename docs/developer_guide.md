@@ -23,6 +23,10 @@
 - Mapped geometries keep static shapes so JAX compilation remains effective.
 - Region masks, conductivity, and boundary metadata stay on the same cell-centered
   layout where possible.
+- The standard solution NPZ is now also the retained restart format. It carries
+  `u`, `phi`, `jy`, `jz`, `lorentz_x`, `state_time`, `state_residual`, mesh
+  faces, material fields, and diagnostic histories, so CLI restarts can resume
+  from a prior run without a separate serialization format.
 
 ## JAX strategy
 
@@ -98,6 +102,10 @@
 - The core solver now accepts an optional streaming logger. Keep runtime logging
   in the solver layer, not only in examples, so the Python API, CLI subcommands,
   and `lmx input.toml` runs all expose the same live diagnostics.
+- Restart/continue is also now a first-class runtime path. Keep restart controls
+  in the TOML/runtime layer (`RunConfig` / `[restart]`), not in `CaseSpec`,
+  because continuation is an execution concern rather than a physical model
+  parameter.
 
 ## Validation and benchmarking
 

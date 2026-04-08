@@ -15,6 +15,14 @@ from .specs import CaseSpec
 
 
 @dataclass(frozen=True)
+class RestartLogInfo:
+    enabled: bool = False
+    path: str | None = None
+    start_time: float = 0.0
+    reset_histories: bool = True
+
+
+@dataclass(frozen=True)
 class SolverStepRecord:
     step_index: int
     time: float
@@ -57,6 +65,7 @@ class StreamingSolverLogger:
         potential_solver: str,
         target_mean_velocity: float | None,
         reference_mean_velocity: float | None,
+        restart: RestartLogInfo | None = None,
     ) -> None:
         if not self.config.enabled:
             return
@@ -77,6 +86,11 @@ class StreamingSolverLogger:
         self._write(f"Current reconstruction      : {case.time_stepper.current_reconstruction}")
         self._write(f"Magnetic field              : kind={case.magnetic_field.kind}, value={case.magnetic_field.value}, rampStart={case.magnetic_field.ramp_start:.6e}, rampDuration={case.magnetic_field.ramp_duration:.6e}")
         self._write(f"Flow forcing                : explicit={case.forcing:.6e}, initialVelocity={case.initial_velocity:.6e}, targetMeanVelocity={target_mean_velocity}, referenceMeanVelocity={reference_mean_velocity}")
+        if restart is not None and restart.enabled:
+            self._write(
+                f"Restart controls            : source={restart.path}, startTime={restart.start_time:.6e}, "
+                f"resetHistories={restart.reset_histories}"
+            )
         if self.config.print_regions:
             self._write("Read region properties")
             for region in case.regions:

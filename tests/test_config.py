@@ -73,6 +73,13 @@ print_footer = true
 flush = true
 step_stride = 2
 
+[restart]
+enabled = true
+path = "./previous_results.npz"
+reset_histories = false
+write_restart = true
+restart_filename = "hartmann_restart.npz"
+
 [[regions]]
 name = "fluid"
 kind = "fluid"
@@ -114,6 +121,11 @@ side = "max"
     assert config.case.output.directory == str((tmp_path / "out").resolve())
     assert config.case.time_stepper.potential_solver == "cg"
     assert config.logging.step_stride == 2
+    assert config.restart.enabled is True
+    assert config.restart.path == (tmp_path / "previous_results.npz").resolve()
+    assert config.restart.reset_histories is False
+    assert config.restart.write_restart is True
+    assert config.restart.restart_filename == "hartmann_restart.npz"
     assert len(config.case.regions) == 1
     assert len(config.case.boundary_conditions) == 4
 
@@ -158,7 +170,7 @@ kind = "no_slip"
 def test_shipped_example_toml_files_parse():
     root = Path(__file__).resolve().parents[1] / "examples"
 
-    for name in ("hartmann_case.toml", "shercliff_case.toml", "hunt_case.toml"):
+    for name in ("hartmann_case.toml", "hartmann_restart_case.toml", "shercliff_case.toml", "hunt_case.toml"):
         config = load_run_config(root / name)
         assert config.case.name
         assert config.case.regions

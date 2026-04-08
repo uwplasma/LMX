@@ -1045,6 +1045,9 @@ The backend harness currently supports:
 
 ## Planned improvements
 
+- Keep the new restart/continue path stable and use it for longer transient
+  parity windows, so recovered external-backend traces do not always need to be
+  rerun from `t = 0`.
 - Add stronger parity thresholds once the solver is stable across more geometries.
 - Extend the current mesh-convergence tooling to pseudo-time convergence studies.
 - Use the new pseudo-time convergence runner to decide which remaining Hunt

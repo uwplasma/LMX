@@ -17,6 +17,7 @@ Run them directly from the repo root:
 /Users/rogerio/base_env/bin/python3 examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
 /Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/shercliff_case.toml
 /Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hunt_case.toml
 ```
@@ -24,6 +25,7 @@ Run them directly from the repo root:
 The shipped TOML files are fully explicit teaching inputs:
 
 - `/Users/rogerio/local/tests/LMX/examples/hartmann_case.toml`
+- `/Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml`
 - `/Users/rogerio/local/tests/LMX/examples/shercliff_case.toml`
 - `/Users/rogerio/local/tests/LMX/examples/hunt_case.toml`
 
@@ -36,6 +38,18 @@ They show users how to set:
 - current-reconstruction controls
 - output bundle controls
 - live logging verbosity
+- restart/continue controls against a saved `.npz` state dump
+
+The retained restart teaching path is:
+
+```bash
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
+```
+
+The second command continues from the saved state written by the first command,
+appends diagnostic histories, and writes a dedicated restart NPZ that can be
+used again for another continuation.
 
 The shipped Hunt TOML explicitly models:
 
