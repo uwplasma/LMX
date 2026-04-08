@@ -1143,13 +1143,19 @@ The backend harness currently supports:
   - on the same retained `t <= 6e-05` Hunt replay:
     - `primary_lorentz_max l2 ≈ 3.68e-03`
     - cell-centered `lorentz_max l2` remains `≈ 8.42e-02`
+- The same retained comparison path now also treats face-current parity as the
+  primary layered current metric:
+  - `primary_current_metric = face_current_max`
+  - on the same retained `t <= 6e-05` Hunt replay:
+    - `primary_current_max l2 ≈ 1.09e-02`
+    - cell-centered `current_max l2 ≈ 2.28e-02`
 - Retained interpretation:
   - this is the more physically faithful Hunt replay baseline for recovered
     cases
-  - it improves the flow/current side of the later-time replay modestly
-  - the remaining later-time Hunt blocker is now better described as
-    current/pressure-response drift plus scalar-reduction choice, not simply a
-    large layered Lorentz-force mismatch
+  - it improves the interpretation of the current/force side of the later-time
+    replay materially
+  - the remaining later-time Hunt blocker is now dominated by the reduced
+    pressure-response drift, with a smaller residual current-shape gap
 
 ## Meeting demo artifact
 

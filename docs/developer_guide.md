@@ -204,9 +204,13 @@
   carries `freemhd_pressure_final_records` and `freemhd_epot_records`, so later
   pressure-response tuning can use the extracted FreeMHD correction history
   directly instead of reopening the raw solver log. For layered Hunt replay
-  work, the helper also emits `primary_lorentz_metric` and
-  `primary_lorentz_max`; when the face-based trace is present it becomes the
-  retained force-scale parity metric automatically.
+  work, the helper also emits:
+  - `primary_current_metric`
+  - `primary_current_max`
+  - `primary_lorentz_metric`
+  - `primary_lorentz_max`
+  When face-based layered traces are present, they become the retained current
+  and force parity metrics automatically.
 - `python scripts/extract_freemhd_coupled_log.py log.txt --output diag.json`:
   extracts those `LMX_DIAG` lines into structured JSON for comparison with LMX
   solver diagnostics.

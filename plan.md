@@ -198,10 +198,14 @@ LMX should only be described as ship ready for the current milestone when all of
   - layered parity reports should now treat face-based Lorentz reduction as the
     primary force-scale diagnostic while keeping the cell-centered field as the
     native state variable
+  - a matching retained update now also promotes face-current reduction as the
+    primary layered current diagnostic:
+    - `primary_current_max l2 ≈ 1.09e-02`
+    - cell-centered `current_max l2 ≈ 2.28e-02`
   - the next solver-side Hunt target is therefore narrower:
-    - `current_max`
-    - `pressure_proxy`
-    - and any later-time drift that remains after using the face-based force trace
+    - the reduced `pressure_proxy` / pressure-response drift
+    - then any remaining residual current-shape drift after using the face-based
+      current and force traces
 
 ## What Worked
 

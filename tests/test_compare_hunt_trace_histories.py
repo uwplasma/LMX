@@ -70,6 +70,8 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["primary_current_metric"] == "face_current_max"
+    assert payload["primary_current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["lorentz_max"]["l2_error"] == pytest.approx(0.0)
@@ -127,6 +129,8 @@ def test_main_writes_alignment_json(tmp_path: Path):
     payload = json.loads(output.read_text())
     assert payload["u_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["pressure_proxy"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["primary_current_metric"] == "current_max"
+    assert payload["primary_current_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["primary_lorentz_metric"] == "face_lorentz_max"
     assert payload["primary_lorentz_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["freemhd_pressure_final_records"][0]["time"] == pytest.approx(0.1)
@@ -183,6 +187,7 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
+    assert payload["primary_current_metric"] == "face_current_max"
     assert payload["emf_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["emf_density_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_lorentz_max"]["l2_error"] == pytest.approx(0.0)
