@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.build_freemhd_container import build_freemhd_container
+from scripts.extract_freemhd_coupled_log import extract_records
 from scripts.patch_freemhd_coupled_logging import patch_freemhd_tree
 from lmx.freemhd import (
     control_dict_application,
@@ -88,6 +89,28 @@ def write_process_logs(
     return {
         f"{process_name}_stdout_log": str(stdout_path),
         f"{process_name}_stderr_log": str(stderr_path),
+    }
+
+
+def write_diag_records(
+    output_path: Path | None,
+    process_name: str,
+    stdout_log_path: str | None,
+    force_write: bool = False,
+) -> dict[str, object] | None:
+    if output_path is None or stdout_log_path is None:
+        return None
+    log_path = Path(stdout_log_path)
+    if not log_path.exists():
+        return None
+    records = extract_records(log_path)
+    if not records and not force_write:
+        return None
+    diag_path = output_path.with_suffix(f".{process_name}.diag.json")
+    diag_path.write_text(json.dumps({"records": records}, indent=2))
+    return {
+        f"{process_name}_diag_json": str(diag_path),
+        f"{process_name}_diag_record_count": len(records),
     }
 
 
@@ -245,6 +268,14 @@ def main(argv: list[str] | None = None) -> int:
                 }
                 if run_log_paths is not None:
                     payload.update(run_log_paths)
+                run_diag_payload = write_diag_records(
+                    args.output,
+                    "run",
+                    payload.get("run_stdout_log"),
+                    force_write=args.log_coupled_iterations,
+                )
+                if run_diag_payload is not None:
+                    payload.update(run_diag_payload)
                 if args.output is not None:
                     args.output.parent.mkdir(parents=True, exist_ok=True)
                     args.output.write_text(json.dumps(payload, indent=2))
@@ -314,6 +345,14 @@ def main(argv: list[str] | None = None) -> int:
     }
     if run_log_paths is not None:
         payload.update(run_log_paths)
+    run_diag_payload = write_diag_records(
+        args.output,
+        "run",
+        payload.get("run_stdout_log"),
+        force_write=args.log_coupled_iterations,
+    )
+    if run_diag_payload is not None:
+        payload.update(run_diag_payload)
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, indent=2))

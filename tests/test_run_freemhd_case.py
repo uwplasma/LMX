@@ -62,7 +62,12 @@ def test_main_runs_container_when_image_exists(
         assert kwargs["cores"] == 95
         assert kwargs["start_from"] is None
         assert kwargs["log_coupled_iterations"] is False
-        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="warn")
+        return runner.subprocess.CompletedProcess(
+            args=["docker"],
+            returncode=0,
+            stdout="LMX_DIAG outer time=1e-05 oCorr=0 nOuterCorr=1 finalIter=1\n",
+            stderr="warn",
+        )
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
 
@@ -90,8 +95,10 @@ def test_main_runs_container_when_image_exists(
     assert '"cores": 95' in payload
     assert '"run_stdout_log": "' in payload
     assert '"run_stderr_log": "' in payload
-    assert output.with_suffix(".run.stdout.log").read_text() == "done"
+    assert output.with_suffix(".run.stdout.log").read_text() == "LMX_DIAG outer time=1e-05 oCorr=0 nOuterCorr=1 finalIter=1\n"
     assert output.with_suffix(".run.stderr.log").read_text() == "warn"
+    assert '"run_diag_json": "' in payload
+    assert '"run_diag_record_count": 1' in payload
 
 
 def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -159,7 +166,12 @@ def test_main_uses_explicit_cores_when_requested(
         assert kwargs["delta_t"] == "1e-4"
         assert kwargs["start_from"] == "startTime"
         assert kwargs["log_coupled_iterations"] is True
-        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
+        return runner.subprocess.CompletedProcess(
+            args=["docker"],
+            returncode=0,
+            stdout="LMX_DIAG outer time=1e-05 oCorr=0 nOuterCorr=1 finalIter=1\n",
+            stderr="",
+        )
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
 
@@ -193,3 +205,46 @@ def test_main_uses_explicit_cores_when_requested(
     assert '"delta_t": "1e-4"' in captured
     assert '"start_from": "startTime"' in captured
     assert '"log_coupled_iterations": true' in captured
+
+
+def test_main_writes_empty_diag_json_when_forced_logging_has_no_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    case_dir = tmp_path / "case"
+    bundle_root = tmp_path / "docker"
+    case_dir.mkdir()
+    bundle_root.mkdir()
+    (case_dir / "system").mkdir()
+    (case_dir / "system" / "controlDict").write_text("application epotMultiRegionInterFoam;\n")
+
+    monkeypatch.setattr(runner, "docker_cli_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_daemon_available", lambda: True)
+    monkeypatch.setattr(runner, "docker_image_available", lambda image: True)
+
+    def fake_run(**kwargs):
+        assert kwargs["log_coupled_iterations"] is True
+        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="plain log\n", stderr="")
+
+    monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
+
+    output = tmp_path / "forced.json"
+    exit_code = runner.main(
+        [
+            "--image",
+            "available-image:latest",
+            "--case-dir",
+            str(case_dir),
+            "--bundle-root",
+            str(bundle_root),
+            "--log-coupled-iterations",
+            "--output",
+            str(output),
+        ]
+    )
+
+    payload = output.read_text()
+    assert exit_code == 0
+    assert '"run_diag_record_count": 0' in payload
+    diag_payload = (output.with_suffix(".run.diag.json")).read_text()
+    assert '"records": []' in diag_payload
+    assert '"status": "ok"' in capsys.readouterr().out
