@@ -3476,6 +3476,30 @@ LMX does not need to implement all of that to finish the retained current plan.
   - it is not the missing later-time Hunt fix and should stay out of retained
     defaults and public controls for now
 
+### Latest corrected layered-current replay check
+
+- After promoting `face_current_max` and `face_lorentz_max` to the retained
+  layered parity metrics, I rechecked the older
+  `hybrid_face_lorentz` current-reconstruction path on the corrected
+  recovered Hunt `t <= 6e-05` replay.
+- Retained replay comparison against the current `cell_centered` default:
+  - current retained default:
+    - `u_max l2 ≈ 5.26e-04`
+    - `primary_current_max l2 ≈ 1.09e-02`
+    - `primary_lorentz_max l2 ≈ 3.68e-03`
+    - `pressure_proxy l2 ≈ 1.11e-01`
+  - `hybrid_face_lorentz`:
+    - `u_max l2 ≈ 5.26e-04`
+    - `primary_current_max l2 ≈ 1.11e-02`
+    - `primary_lorentz_max l2 ≈ 3.68e-03`
+    - `pressure_proxy l2 ≈ 1.11e-01`
+- Retained interpretation:
+  - under the corrected layered parity metrics, `hybrid_face_lorentz` still
+    does not improve the dominant later-time Hunt mismatch
+  - it leaves `u_max` unchanged, slightly worsens the primary current metric,
+    and does not improve the reduced pressure-response trace
+  - it should remain an experimental mode, not the retained default
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

@@ -1153,9 +1153,26 @@ The backend harness currently supports:
   - this is the more physically faithful Hunt replay baseline for recovered
     cases
   - it improves the interpretation of the current/force side of the later-time
-    replay materially
+  replay materially
   - the remaining later-time Hunt blocker is now dominated by the reduced
     pressure-response drift, with a smaller residual current-shape gap
+- A follow-on replay rechecked the older `hybrid_face_lorentz` reconstruction
+  against these corrected layered parity metrics:
+  - retained `cell_centered` default:
+    - `u_max l2 ≈ 5.26e-04`
+    - `primary_current_max l2 ≈ 1.09e-02`
+    - `primary_lorentz_max l2 ≈ 3.68e-03`
+    - `pressure_proxy l2 ≈ 1.11e-01`
+  - `hybrid_face_lorentz`:
+    - `u_max l2 ≈ 5.26e-04`
+    - `primary_current_max l2 ≈ 1.11e-02`
+    - `primary_lorentz_max l2 ≈ 3.68e-03`
+    - `pressure_proxy l2 ≈ 1.11e-01`
+- Retained interpretation:
+  - once the layered parity metrics are corrected, `hybrid_face_lorentz`
+    still does not improve the remaining later-time Hunt blocker
+  - the next retained solver work should stay focused on the reduced
+    pressure-response path, not on global current-reconstruction mode changes
 
 ## Meeting demo artifact
 
