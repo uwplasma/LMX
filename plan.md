@@ -3500,6 +3500,28 @@ LMX does not need to implement all of that to finish the retained current plan.
     and does not improve the reduced pressure-response trace
   - it should remain an experimental mode, not the retained default
 
+### Latest retained flow-rate closure cleanup
+
+- I changed the reduced `inlet_flow_rate` control closure to compute
+  `mean_base` and `mean_sensitivity` on the full fluid area rather than on the
+  interior active-mask area, while keeping the reported `mean_velocity`
+  diagnostic unchanged.
+- This is a principled semantic cleanup:
+  - flow-rate control should act on the fluid cross-section, not on the
+    interior-only diagnostic subset
+  - the new behavior is covered by a dedicated unit test on a nonuniform
+    density field
+- Retained replay result on the corrected Hunt `t <= 6e-05` baseline:
+  - `u_max l2`: unchanged at `≈ 5.26e-04`
+  - `pressure_proxy l2`: unchanged at `≈ 1.11e-01`
+  - `primary_current_max l2`: unchanged at `≈ 1.09e-02`
+  - `primary_lorentz_max l2`: unchanged at `≈ 3.68e-03`
+- Retained interpretation:
+  - the remaining later-time Hunt blocker is downstream of the
+    flow-rate-control averaging geometry
+  - the next retained solver change should continue to target the reduced
+    pressure-response mechanism itself
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

@@ -451,9 +451,16 @@ def _step(
         active_mask = _active_velocity_mask(fluid_mask)
         cell_metric = _cell_metric(mesh).astype(u.dtype)
         active_weight = jnp.where(active_mask, cell_metric, 0.0)
-        fluid_weight = jnp.maximum(jnp.sum(active_weight), 1e-20)
-        mean_base = jnp.sum(active_weight * base_trial) / fluid_weight
-        mean_sensitivity = jnp.sum(active_weight * pressure_sensitivity) / fluid_weight
+        active_total_weight = jnp.maximum(jnp.sum(active_weight), 1e-20)
+        control_mask = jnp.where(
+            target_mean_velocity is None,
+            active_mask,
+            fluid_mask,
+        )
+        control_weight = jnp.where(control_mask, cell_metric, 0.0)
+        control_total_weight = jnp.maximum(jnp.sum(control_weight), 1e-20)
+        mean_base = jnp.sum(control_weight * base_trial) / control_total_weight
+        mean_sensitivity = jnp.sum(control_weight * pressure_sensitivity) / control_total_weight
         forcing_value = jnp.asarray(forcing, dtype=u.dtype)
         pressure_proxy = forcing_value
         if reference_mean_velocity is not None:
@@ -506,7 +513,7 @@ def _step(
             by,
             bz,
         )
-        mean_velocity = jnp.sum(active_weight * u_next) / fluid_weight
+        mean_velocity = jnp.sum(active_weight * u_next) / active_total_weight
         return (
             u_next,
             phi,

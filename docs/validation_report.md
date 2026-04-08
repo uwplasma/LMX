@@ -1173,6 +1173,20 @@ The backend harness currently supports:
     still does not improve the remaining later-time Hunt blocker
   - the next retained solver work should stay focused on the reduced
     pressure-response path, not on global current-reconstruction mode changes
+- A follow-on retained cleanup also corrected the reduced `inlet_flow_rate`
+  closure so the control solve uses the full fluid cross-section instead of
+  the interior-only active-mask area.
+- That semantic fix is now unit-tested, but it does not move the retained
+  corrected Hunt `t <= 6e-05` replay:
+  - `u_max l2` stays `≈ 5.26e-04`
+  - `pressure_proxy l2` stays `≈ 1.11e-01`
+  - `primary_current_max l2` stays `≈ 1.09e-02`
+  - `primary_lorentz_max l2` stays `≈ 3.68e-03`
+- Retained interpretation:
+  - the remaining later-time Hunt mismatch is downstream of the
+    flow-rate-control averaging geometry
+  - the next retained solver changes should keep targeting the reduced
+    pressure-response mechanism itself
 
 ## Meeting demo artifact
 
