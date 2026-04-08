@@ -3238,6 +3238,35 @@ LMX should only be described as ship ready for the current milestone when all of
     - require any retained solver change to improve `lorentz_max` on the
       longer replay without regressing `u_max` or the native Hunt analytical
       combined error
+- `2026-04-08 America/Chicago`: Ruled out two more tempting later-Hunt solver
+  changes before touching the retained baseline:
+  - rejected solver candidate:
+    - add one final electromagnetic consistency solve at the end of each
+      pseudo-time step, re-solving `phi` on `u_next` and recomputing
+      `J` / `JxB` for the retained state and trace output
+  - rejected solver-control candidate:
+    - raise the later Hunt replay `potential_iterations` ceiling from
+      `400` to `800`
+  - retained validation:
+    - final-consistency-solve candidate on corrected Hunt `Ha20`,
+      `t <= 6e-05` replay:
+      - `u_max l2`: unchanged at `≈ 1.03e-3`
+      - `current_max l2`: worsened from `≈ 2.31e-2` to `≈ 2.36e-2`
+      - `lorentz_max l2`: worsened from `≈ 8.34e-2` to `≈ 8.52e-2`
+      - native Hunt analytical combined error at `Ha20`, `32^2`: effectively
+        unchanged at `≈ 0.1002`
+    - larger `phi` ceiling (`potential_iterations = 800`) on the same replay:
+      - `u_max l2`: unchanged at `≈ 1.03e-3`
+      - `current_max l2`: worsened from `≈ 2.31e-2` to `≈ 2.32e-2`
+      - `lorentz_max l2`: worsened from `≈ 8.34e-2` to `≈ 8.73e-2`
+      - `potential_iterations_used` climbed into the `631-698` range without
+        producing a better later-time replay
+  - retained interpretation:
+    - the remaining Hunt blocker is not an end-of-step `phi` consistency issue
+      and is not solved by simply driving the layered `phi` solve deeper
+    - the next retained solver pass should move to the later-time
+      pressure/Lorentz response mechanism itself, not another scalar-potential
+      control tweak
 
 ## Instruction For Future Agents
 

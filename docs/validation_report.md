@@ -857,6 +857,26 @@ The backend harness currently supports:
       longer replay
     - it loses enough on later `JxB` drift and native Hunt analytical error
       that Hunt now defaults back to `cell_centered`
+- Two more plausible later-Hunt fixes were then ruled out on the corrected
+  `Ha20`, `t <= 6e-05` replay:
+  - final electromagnetic consistency solve:
+    - re-solving `phi` on `u_next` at the end of each pseudo-time step and
+      recomputing `J` / `JxB` for the retained state
+    - outcome:
+      - `u_max l2` unchanged at `≈ 1.03e-3`
+      - `current_max l2` worsened to `≈ 2.36e-2`
+      - `lorentz_max l2` worsened to `≈ 8.52e-2`
+  - larger layered `phi` ceiling (`potential_iterations = 800`):
+    - outcome:
+      - `u_max l2` unchanged at `≈ 1.03e-3`
+      - `current_max l2` worsened to `≈ 2.32e-2`
+      - `lorentz_max l2` worsened to `≈ 8.73e-2`
+      - `potential_iterations_used` climbed into the `631-698` range
+  - retained interpretation:
+    - the remaining later-Hunt gap is not fixed by a final `phi` refresh and
+      is not fixed by simply driving the layered `phi` solve harder
+    - the next retained solver pass must target the later-time
+      pressure/Lorentz response itself
 - To make that later response measurable, the Hunt diagnostic path now also
   records:
   - `mean_velocity_history`
