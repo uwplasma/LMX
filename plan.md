@@ -2942,6 +2942,40 @@ LMX should only be described as ship ready for the current milestone when all of
     - the next retained solver step should still be driven by the saved Hunt
       trace once this serial replay finishes and is compared cleanly against
       the current LMX baseline
+- `2026-04-08 America/Chicago`: Refreshed the short-window Hunt comparison
+  against a real current serial replay on this machine:
+  - retained real artifacts:
+    - FreeMHD run JSON:
+      - `/private/tmp/lmx_hunt_case_extract/run_hunt_ha20_2e05_1core_serial.json`
+    - saved solver log:
+      - `/private/tmp/lmx_hunt_case_extract/run_hunt_ha20_2e05_1core_serial.run.stdout.log`
+    - extracted diagnostics:
+      - `/private/tmp/lmx_hunt_case_extract/run_hunt_ha20_2e05_1core_serial.run.diag.json`
+    - matching reduced LMX report:
+      - `/private/tmp/lmx_hunt_case_extract/lmx_hunt_short_report_refresh.json`
+    - aligned comparison:
+      - `/private/tmp/lmx_hunt_case_extract/hunt_trace_compare_refresh.json`
+  - retained short-window `Hunt Ha20`, `t <= 2e-05` comparison result:
+    - normalized trace errors:
+      - `u_max l2 ≈ 6.75e-04`
+      - `mean_velocity l2 ≈ 8.59e-04`
+      - `emf_max l2 ≈ 9.51e-04`
+      - `current_max l2 ≈ 1.10e-02`
+      - `face_current_max l2 ≈ 7.50e-03`
+      - `lorentz_max l2 ≈ 7.78e-03`
+      - `pressure_proxy l2 ≈ 2.65e-02`
+    - FreeMHD pressure-correction records at the same times:
+      - `t = 1e-05`: `maxU ≈ 1.1769e-01`, `pFinalResidual ≈ 9.05e-08`
+      - `t = 2e-05`: `maxU ≈ 1.1780e-01`, `pFinalResidual ≈ 6.81e-08`
+  - retained interpretation:
+    - the refreshed current machine path confirms that the short Hunt startup
+      agreement is now genuinely good in normalized `u`, `emf`, `J`, and
+      `JxB` history
+    - the remaining obvious short-window outlier is the reduced
+      `pressure_proxy`
+    - the next efficient solver step is therefore back on reduced
+      pressure-response semantics, not on startup ramp/current construction and
+      not on more Docker/runtime scaffolding
 - `2026-04-08 America/Chicago`: Kept a small Hunt solver consistency fix on top
   of the clean short replay:
   - retained code changes:

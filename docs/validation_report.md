@@ -561,6 +561,28 @@ The backend harness currently supports:
       recovered case, but short serial diagnostic replays are now viable
     - that is enough to keep the Hunt parity loop moving without waiting for a
       different machine or a larger memory budget
+- Using that corrected serial path, the short-window recovered Hunt `Ha20`
+  comparison was refreshed on the current machine:
+  - FreeMHD artifacts:
+    - `/private/tmp/lmx_hunt_case_extract/run_hunt_ha20_2e05_1core_serial.json`
+    - `/private/tmp/lmx_hunt_case_extract/run_hunt_ha20_2e05_1core_serial.run.stdout.log`
+    - `/private/tmp/lmx_hunt_case_extract/run_hunt_ha20_2e05_1core_serial.run.diag.json`
+  - matching reduced LMX artifacts:
+    - `/private/tmp/lmx_hunt_case_extract/lmx_hunt_short_report_refresh.json`
+    - `/private/tmp/lmx_hunt_case_extract/hunt_trace_compare_refresh.json`
+  - retained normalized trace errors through `t = 2e-05`:
+    - `u_max l2 ≈ 6.75e-04`
+    - `mean_velocity l2 ≈ 8.59e-04`
+    - `emf_max l2 ≈ 9.51e-04`
+    - `current_max l2 ≈ 1.10e-02`
+    - `face_current_max l2 ≈ 7.50e-03`
+    - `lorentz_max l2 ≈ 7.78e-03`
+    - `pressure_proxy l2 ≈ 2.65e-02`
+  - retained interpretation:
+    - on the corrected short Hunt window, the startup/current/Lorentz histories
+      are no longer the main parity blocker
+    - the reduced-model pressure-like response remains the clearest next solver
+      target
 - Extended the FreeMHD diagnostic patcher so `LMX_DIAG epot` records now include
   `maxJn`, `maxPsiub`, and `maxCenteredJxB` in addition to the active
   `maxJxB`. On the first real rerun of recovered Hunt `Ha20`, the first patched
