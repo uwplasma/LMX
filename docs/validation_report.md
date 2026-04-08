@@ -1205,6 +1205,49 @@ The backend harness currently supports:
     pressure-side error materially
   - the remaining later-time Hunt mismatch is now smaller and genuinely
     solver-side, not mainly a logging/reference-level artifact
+- I also tested a general forcing-response relaxation family for reduced
+  `inlet_flow_rate` control after that correction and did not keep it:
+  - current corrected long-replay baseline:
+    - `u_max l2 ≈ 1.68e-03`
+    - `pressure_proxy l2 ≈ 6.23e-02`
+    - `primary_current_max l2 ≈ 2.29e-02`
+    - `primary_lorentz_max l2 ≈ 1.62e-02`
+  - `forcing_relaxation = 0.75`:
+    - `u_max l2 ≈ 1.68e-03`
+    - `pressure_proxy l2 ≈ 2.08e-01`
+    - `primary_current_max l2 ≈ 2.29e-02`
+    - `primary_lorentz_max l2 ≈ 1.62e-02`
+  - `forcing_relaxation = 0.5`:
+    - `u_max l2 ≈ 1.74e-03`
+    - `pressure_proxy l2 ≈ 6.31e-01`
+    - `primary_current_max l2 ≈ 2.30e-02`
+    - `primary_lorentz_max l2 ≈ 1.61e-02`
+- Retained interpretation:
+  - the corrected pressure-span parity observable is now strong enough to
+    reject that control family decisively
+  - the remaining Hunt mismatch is not fixed by smoothing the inferred reduced
+    forcing between steps
+  - the next retained Hunt work should stay focused on the later-time reduced
+    pressure/current response itself
+- I also rechecked the retained Hunt `Ha20` relaxation value against the same
+  corrected long replay before changing defaults:
+  - current retained default `relaxation = 0.08`:
+    - `u_max l2 ≈ 1.675e-03`
+    - `pressure_proxy l2 ≈ 6.229e-02`
+    - `primary_current_max l2 ≈ 2.295e-02`
+    - `primary_lorentz_max l2 ≈ 1.619e-02`
+  - candidate `relaxation = 0.10`:
+    - `u_max l2 ≈ 1.675e-03`
+    - `pressure_proxy l2 ≈ 6.229e-02`
+    - `primary_current_max l2 ≈ 2.295e-02`
+    - `primary_lorentz_max l2 ≈ 1.618e-02`
+- Native Hunt analytical check at `Ha20`, `32^2`:
+  - `relaxation = 0.08`: `combined_l2 ≈ 1.0023e-01`
+  - `relaxation = 0.10`: `combined_l2 ≈ 1.0052e-01`
+- Retained interpretation:
+  - the replay-side change is too small to justify a default shift
+  - the analytical combined error is slightly worse
+  - the retained Hunt `Ha20` default remains `relaxation = 0.08`
 
 ## Meeting demo artifact
 

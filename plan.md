@@ -3549,6 +3549,70 @@ LMX does not need to implement all of that to finish the retained current plan.
   - the remaining later-time Hunt blocker is now a smaller, genuinely
     solver-side pressure/current response gap
 
+### Latest rejected forcing-relaxation family
+
+- I tested a general forcing-response relaxation family for reduced
+  `inlet_flow_rate` closures on the corrected long Hunt replay, but did not
+  keep it on `main`.
+- The candidate was intentionally general rather than Hunt-specific:
+  - blend the newly inferred reduced forcing with the previous applied forcing
+    before advancing the next step
+  - compare against the same corrected FreeMHD `t <= 6e-05` replay using:
+    - `primary_pressure_metric = pSpan`
+    - `primary_current_metric = face_current_max`
+    - `primary_lorentz_metric = face_lorentz_max`
+- Retained replay results:
+  - current corrected baseline:
+    - `u_max l2 ≈ 1.68e-03`
+    - `pressure_proxy l2 ≈ 6.23e-02`
+    - `primary_current_max l2 ≈ 2.29e-02`
+    - `primary_lorentz_max l2 ≈ 1.62e-02`
+  - `forcing_relaxation = 0.75`:
+    - `u_max l2 ≈ 1.68e-03`
+    - `pressure_proxy l2 ≈ 2.08e-01`
+    - `primary_current_max l2 ≈ 2.29e-02`
+    - `primary_lorentz_max l2 ≈ 1.62e-02`
+  - `forcing_relaxation = 0.5`:
+    - `u_max l2 ≈ 1.74e-03`
+    - `pressure_proxy l2 ≈ 6.31e-01`
+    - `primary_current_max l2 ≈ 2.30e-02`
+    - `primary_lorentz_max l2 ≈ 1.61e-02`
+- Retained interpretation:
+  - forcing-response relaxation barely changes the current/Lorentz parity
+    metrics
+  - it makes the corrected pressure-span parity much worse
+  - it is not the right later-time Hunt control family and should stay out of
+    retained solver controls and public inputs
+
+### Latest rejected Hunt relaxation retune
+
+- I rechecked the retained Hunt `Ha20` relaxation value against the corrected
+  long replay and native analytical validation before changing defaults.
+- Retained replay results on the corrected `t <= 6e-05` FreeMHD comparison:
+  - current retained default `relaxation = 0.08`:
+    - `u_max l2 ≈ 1.675e-03`
+    - `pressure_proxy l2 ≈ 6.229e-02`
+    - `primary_current_max l2 ≈ 2.295e-02`
+    - `primary_lorentz_max l2 ≈ 1.619e-02`
+  - candidate `relaxation = 0.10`:
+    - `u_max l2 ≈ 1.675e-03`
+    - `pressure_proxy l2 ≈ 6.229e-02`
+    - `primary_current_max l2 ≈ 2.295e-02`
+    - `primary_lorentz_max l2 ≈ 1.618e-02`
+- Native Hunt analytical check at `Ha20`, `32^2`:
+  - current retained default `relaxation = 0.08`:
+    - `y_l2 ≈ 2.979e-02`
+    - `z_l2 ≈ 1.386e-01`
+    - `combined_l2 ≈ 1.0023e-01`
+  - candidate `relaxation = 0.10`:
+    - `y_l2 ≈ 2.824e-02`
+    - `z_l2 ≈ 1.393e-01`
+    - `combined_l2 ≈ 1.0052e-01`
+- Retained interpretation:
+  - the replay-side difference is too small to justify a default change
+  - the native analytical combined error gets slightly worse
+  - the retained Hunt `Ha20` default remains `relaxation = 0.08`
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar
