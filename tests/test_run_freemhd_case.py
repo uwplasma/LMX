@@ -62,6 +62,7 @@ def test_main_runs_container_when_image_exists(
         assert kwargs["cores"] == 95
         assert kwargs["start_from"] is None
         assert kwargs["log_coupled_iterations"] is False
+        assert kwargs["disable_vtk_write"] is False
         return runner.subprocess.CompletedProcess(
             args=["docker"],
             returncode=0,
@@ -126,6 +127,7 @@ def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pyte
         delta_t="1e-4",
         start_from="startTime",
         log_coupled_iterations=True,
+        disable_vtk_write=True,
     )
 
     command = recorded["command"]
@@ -138,6 +140,7 @@ def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pyte
     assert "LMX_DELTA_T=1e-4" in command
     assert "LMX_START_FROM=startTime" in command
     assert "LMX_LOG_COUPLED_ITERATIONS=true" in command
+    assert "LMX_DISABLE_VTK_WRITE=true" in command
     assert "--entrypoint" in command
     assert "/opt/lmx/run_freemhd_case.sh" in command
     assert "epotMultiRegionInterFoam" in command
@@ -166,6 +169,7 @@ def test_main_uses_explicit_cores_when_requested(
         assert kwargs["delta_t"] == "1e-4"
         assert kwargs["start_from"] == "startTime"
         assert kwargs["log_coupled_iterations"] is True
+        assert kwargs["disable_vtk_write"] is True
         return runner.subprocess.CompletedProcess(
             args=["docker"],
             returncode=0,
@@ -194,6 +198,7 @@ def test_main_uses_explicit_cores_when_requested(
             "--start-from",
             "startTime",
             "--log-coupled-iterations",
+            "--disable-vtk-write",
         ]
     )
 
@@ -205,6 +210,7 @@ def test_main_uses_explicit_cores_when_requested(
     assert '"delta_t": "1e-4"' in captured
     assert '"start_from": "startTime"' in captured
     assert '"log_coupled_iterations": true' in captured
+    assert '"disable_vtk_write": true' in captured
 
 
 def test_main_writes_empty_diag_json_when_forced_logging_has_no_records(

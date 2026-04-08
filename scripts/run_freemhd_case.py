@@ -34,6 +34,7 @@ def run_freemhd_case(
     delta_t: str | None = None,
     start_from: str | None = None,
     log_coupled_iterations: bool = False,
+    disable_vtk_write: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     case_path = Path(case_dir).resolve()
     bundle_path = Path(bundle_root).resolve()
@@ -59,6 +60,8 @@ def run_freemhd_case(
         f"LMX_START_FROM={start_from or ''}",
         "-e",
         f"LMX_LOG_COUPLED_ITERATIONS={'true' if log_coupled_iterations else ''}",
+        "-e",
+        f"LMX_DISABLE_VTK_WRITE={'true' if disable_vtk_write else ''}",
         "--entrypoint",
         "/bin/bash",
         "-v",
@@ -153,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Force logCoupledMhdIterations true in the case controlDict before running the solver.",
     )
+    parser.add_argument(
+        "--disable-vtk-write",
+        action="store_true",
+        help="Remove the vtkWrite function object from system/controlDict before running the case.",
+    )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
     resolved_solver = control_dict_application(args.case_dir) if args.solver == "auto" else args.solver
@@ -175,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
             "start_from": args.start_from,
+            "disable_vtk_write": args.disable_vtk_write,
             "docker_cli_available": False,
             "docker_available": False,
             "status": "docker-cli-unavailable",
@@ -197,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
             "start_from": args.start_from,
+            "disable_vtk_write": args.disable_vtk_write,
             "docker_cli_available": True,
             "docker_available": False,
             "status": "docker-daemon-unavailable",
@@ -246,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
                     delta_t=args.delta_t,
                     start_from=args.start_from,
                     log_coupled_iterations=args.log_coupled_iterations,
+                    disable_vtk_write=args.disable_vtk_write,
                 )
                 run_log_paths = write_process_logs(args.output, "run", result)
                 payload = {
@@ -262,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                     "delta_t": args.delta_t,
                     "start_from": args.start_from,
                     "log_coupled_iterations": args.log_coupled_iterations,
+                    "disable_vtk_write": args.disable_vtk_write,
                     "docker_cli_available": True,
                     "docker_available": True,
                     "docker_image_available": True,
@@ -302,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
             "delta_t": args.delta_t,
             "start_from": args.start_from,
             "log_coupled_iterations": args.log_coupled_iterations,
+            "disable_vtk_write": args.disable_vtk_write,
             "docker_cli_available": True,
             "docker_available": True,
             "docker_image_available": False,
@@ -327,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
         delta_t=args.delta_t,
         start_from=args.start_from,
         log_coupled_iterations=args.log_coupled_iterations,
+        disable_vtk_write=args.disable_vtk_write,
     )
     run_log_paths = write_process_logs(args.output, "run", result)
     payload = {
@@ -341,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
         "delta_t": args.delta_t,
         "start_from": args.start_from,
         "log_coupled_iterations": args.log_coupled_iterations,
+        "disable_vtk_write": args.disable_vtk_write,
         "docker_cli_available": True,
         "docker_available": True,
         "docker_image_available": True,

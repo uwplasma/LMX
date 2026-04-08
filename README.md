@@ -173,6 +173,7 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
 /Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-localdiag --local-freemhd-root ./external/FreeMHD --no-cache
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --log-coupled-iterations --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
+/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density-fixed2:latest --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --cores 1 --start-from latestTime --end-time 6e-05 --write-interval 1e-05 --log-coupled-iterations --disable-vtk-write --output ./artifacts/freemhd_hunt_6e05_novtk.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 3e-5 --max-steps 3 --current-reconstruction face_averaged --output ./artifacts/hunt_solver_diagnostics_faceavg.json
@@ -204,6 +205,11 @@ reconstruction.
 When that flag is active, the runner also extracts those `LMX_DIAG` lines into a
 sidecar `*.run.diag.json`, so the run output is immediately consumable by
 `compare_hunt_trace_histories.py` without a separate manual extraction step.
+For the recovered Hunt paper cases on this host, the retained runtime setting is
+currently `--disable-vtk-write`, which strips the heavy `vtkWrite` function
+object from `system/controlDict` before launch. That change lets the patched
+serial Hunt continuation complete through `t = 6e-05` and emit the full
+pressure/current/Lorentz diagnostic window needed for parity work.
 `run_hunt_solver_diagnostic_report.py` also mirrors recovered Hunt startup
 cases more faithfully now: when the recovered run has a nonzero startup
 velocity in `0/liquid/U`, the reduced replay automatically adds the matching

@@ -3157,6 +3157,52 @@ LMX should only be described as ship ready for the current milestone when all of
       - or a lighter runtime configuration inside the same recovered case
     - avoid changing the LMX solver again until that later-time external
       pressure record is retained cleanly
+- `2026-04-08 America/Chicago`: Broke the later-time FreeMHD runtime blocker
+  with a retained harness-side control:
+  - retained code changes:
+    - `scripts/run_freemhd_case.py` now supports `--disable-vtk-write`
+    - `docker/run_freemhd_case.sh` and
+      `scripts/write_freemhd_container_files.py` now strip the `vtkWrite`
+      function object from `system/controlDict` when that flag is enabled
+    - `tests/test_run_freemhd_case.py` and `tests/test_freemhd_harness.py`
+      now cover the new runtime flag and generated bundle behavior
+  - retained validation:
+    - targeted tests passed:
+      - `pytest tests/test_run_freemhd_case.py tests/test_freemhd_harness.py -q`
+      - `python -m sphinx -W -b html docs docs/_build/html`
+    - retained FreeMHD Hunt artifacts with `--disable-vtk-write`:
+      - `3e-05` continuation:
+        - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_3e05_novtk.json`
+        - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_3e05_novtk.run.diag.json`
+        - `/private/tmp/lmx_hunt_long_refresh/trace_compare_3e05_novtk.json`
+      - `6e-05` continuation:
+        - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_novtk.json`
+        - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_novtk.run.diag.json`
+        - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_novtk.json`
+    - the retained no-`vtkWrite` FreeMHD continuation now completes through
+      `t = 6e-05` on this host with `status = "ok"` and `run_diag_last_time = 6e-05`
+    - retained aligned later-time Hunt trace metrics against the resumed LMX
+      reduced replay:
+      - `u_max l2 ≈ 1.03e-03`
+      - `mean_velocity l2 ≈ 1.54e-03`
+      - `current_max l2 ≈ 2.29e-02`
+      - `lorentz_max l2 ≈ 1.07e-01`
+      - `face_current_max l2 ≈ 1.06e-02`
+  - retained interpretation:
+    - the main external-runtime blocker was the heavy `vtkWrite` function
+      object, not the patched solver logging or the Docker image/runtime path
+    - later-time patched Hunt FreeMHD traces are now available on this host
+      without special manual intervention beyond the runtime flag
+    - the next solver-side target is finally back where it should be:
+      later-time Hunt electromagnetic and reduced pressure-response drift
+      against a full retained `t <= 6e-05` FreeMHD trace
+  - best next step:
+    - keep `--disable-vtk-write` as the retained FreeMHD parity runtime
+      setting for recovered Hunt cases on this host
+    - use `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_novtk.json`
+      as the new later-time external reference
+    - retarget `lmx/solvers.py` at the remaining later-time Hunt drift,
+      especially the Lorentz/current evolution after `t = 4e-05`
 
 ## Instruction For Future Agents
 

@@ -34,8 +34,11 @@ def test_write_container_bundle_creates_expected_files(tmp_path: Path):
     assert 'LMX_DELTA_T="${LMX_DELTA_T:-}"' in runner
     assert 'LMX_START_FROM="${LMX_START_FROM:-}"' in runner
     assert 'LMX_LOG_COUPLED_ITERATIONS="${LMX_LOG_COUPLED_ITERATIONS:-}"' in runner
-    assert 'python3 - "$LMX_END_TIME" "$LMX_WRITE_INTERVAL" "$LMX_DELTA_T" "$LMX_START_FROM" "$LMX_LOG_COUPLED_ITERATIONS"' in runner
+    assert 'LMX_DISABLE_VTK_WRITE="${LMX_DISABLE_VTK_WRITE:-}"' in runner
+    assert 'python3 - "$LMX_END_TIME" "$LMX_WRITE_INTERVAL" "$LMX_DELTA_T" "$LMX_START_FROM" "$LMX_LOG_COUPLED_ITERATIONS" "$LMX_DISABLE_VTK_WRITE"' in runner
     assert '"logCoupledMhdIterations": sys.argv[5]' in runner
+    assert 'disable_vtk_write = sys.argv[6].lower()' in runner
+    assert 'r"(?ms)^\\s*vtkWrite\\s*\\n\\s*\\{.*?^\\s*\\}\\s*"' in runner
     assert "rm -rf processor* processors* postProcessing" in runner
     assert "rm -f log* runLog*" in runner
     assert "splitMeshRegions -cellZonesOnly -overwrite -fileHandler collated" in runner

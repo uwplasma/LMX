@@ -1040,26 +1040,37 @@ The backend harness currently supports:
 - That partial-progress reporting is now regression-tested in
   `tests/test_run_freemhd_case.py`, so later failed-but-useful FreeMHD runs do
   not silently lose their comparison value.
-- The current retained blocker is that this patched serial continuation still
-  exits with `returncode = 137` inside the `3e-05` step before any patched
-  pressure/maxU diagnostics are emitted. The retained `epot` record at
-  `t = 3e-05` is:
-  - `potEFinalResidual ≈ 1.63e-08`
-  - `potEIterations = 6`
-  - `maxJ ≈ 7.81e+04`
-  - `maxJn ≈ 8.29e-01`
-  - `maxJnDensity ≈ 8.29e+04`
-  - `maxPsiub ≈ 1.176`
-  - `maxPsiubDensity ≈ 2.36e+04`
-  - `maxJxB ≈ 4.64e+03`
+- The retained runtime fix for the recovered Hunt case on this host is now
+  `scripts/run_freemhd_case.py --disable-vtk-write`. That strips the heavy
+  `vtkWrite` function object from the recovered `controlDict` before launch and
+  lets the patched serial continuation complete cleanly through `t = 6e-05`.
+- Retained no-`vtkWrite` artifacts:
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_3e05_novtk.json`
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_3e05_novtk.run.diag.json`
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_novtk.json`
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_novtk.run.diag.json`
+  - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_novtk.json`
+- The retained patched FreeMHD pressure/current/Lorentz records now reach
+  `t = 6e-05`. At the final retained point:
+  - `maxU ≈ 1.181914e-01`
+  - `maxJ ≈ 7.2487113e+04`
+  - `maxJn ≈ 8.2360301e-01`
+  - `maxPsiub ≈ 1.1788792`
+  - `maxJxB ≈ 4.5999421e+03`
+- The retained aligned later-time Hunt trace errors against the resumed LMX
+  reduced replay are now:
+  - `u_max l2 ≈ 1.03e-03`
+  - `mean_velocity l2 ≈ 1.54e-03`
+  - `current_max l2 ≈ 2.29e-02`
+  - `lorentz_max l2 ≈ 1.07e-01`
+  - `face_current_max l2 ≈ 1.06e-02`
 - Retained interpretation:
-  - the external-backend blocker is now a runtime/continuation failure inside
-    the `3e-05` step, not image lookup and not missing patched diagnostics
-  - repeated local runs confirm the image path is stable again from the Python
-    harness; the remaining failure is inside the OpenFOAM/FreeMHD runtime path
-  - because the run dies before the pressure stage, the next solver-side
-    pressure-response change should wait for a retained way to finish or slice
-    that step cleanly
+  - the external-backend runtime blocker was the recovered case’s `vtkWrite`
+    load, not the patched logging and not Docker image lookup
+  - repeated local runs confirm the no-`vtkWrite` path is the retained parity
+    setting for recovered Hunt continuations on this host
+  - the next solver-side target is now the real later-time Hunt drift, with the
+    largest retained gap still in the normalized Lorentz-force evolution
 
 ## Meeting demo artifact
 
