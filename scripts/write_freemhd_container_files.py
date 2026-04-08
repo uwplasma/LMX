@@ -148,7 +148,7 @@ fi
 if [[ -x "./Allrun" ]]; then
   ./Allrun
 else
-  if [[ -f "system/decomposeParDict" ]]; then
+  if [[ -f "system/decomposeParDict" && "${CORES}" -gt 1 ]]; then
     sync_decompose_par_dict
     if [[ -f "constant/regionProperties" ]]; then
       decomposePar -allRegions -force -fileHandler collated
@@ -162,7 +162,7 @@ else
       reconstructPar || true
     fi
   else
-    "${SOLVER}"
+    "${SOLVER}" | tee "runLog.${SOLVER}"
   fi
 fi
 """

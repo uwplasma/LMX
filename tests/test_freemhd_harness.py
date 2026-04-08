@@ -42,6 +42,7 @@ def test_write_container_bundle_creates_expected_files(tmp_path: Path):
     assert 'changeDictionary -region "${region}" -fileHandler collated' in runner
     assert "decomposePar -allRegions -force -fileHandler collated" in runner
     assert "reconstructPar -allRegions || true" in runner
+    assert 'if [[ -f "system/decomposeParDict" && "${CORES}" -gt 1 ]]; then' in runner
     assert 'MPI_EXTRA_ARGS="${MPI_EXTRA_ARGS:---oversubscribe}"' in runner
     assert "mpirun ${MPI_EXTRA_ARGS} -np" in runner
     assert '| tee "runLog.${SOLVER}"' in runner

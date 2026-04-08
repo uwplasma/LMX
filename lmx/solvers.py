@@ -481,7 +481,17 @@ def _step(
         )
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
-        face_current_max, emf_max = _face_current_and_emf_max(mesh, sigma, fluid_mask, u_iter, phi, by, bz)
+        jy, jz, lorentz = _compute_current_and_lorentz(
+            mesh,
+            sigma,
+            fluid_mask,
+            u_next,
+            phi,
+            by,
+            bz,
+            reconstruction=current_reconstruction,
+        )
+        face_current_max, emf_max = _face_current_and_emf_max(mesh, sigma, fluid_mask, u_next, phi, by, bz)
         mean_velocity = jnp.sum(active_weight * u_next) / fluid_weight
         return (
             u_next,

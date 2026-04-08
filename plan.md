@@ -2902,6 +2902,71 @@ LMX should only be described as ship ready for the current milestone when all of
       refresh the same trace metrics
     - then change the reduced Hunt momentum/pressure response only where the
       longer-horizon trace actually diverges
+- `2026-04-08 America/Chicago`: Pushed the recovered-case runtime path one step
+  further on this machine:
+  - retained runtime findings:
+    - the new preserved-log harness works on real recovered Hunt runs even when
+      the run fails early:
+      - `8`-core and `4`-core runs were killed during `decomposePar -allRegions`
+        with `returncode = 137`
+      - both still preserved:
+        - `*.run.stdout.log`
+        - `*.run.stderr.log`
+        - `*.run.diag.json`
+    - the next concrete runtime blocker was then identified precisely:
+      - `cores = 1` on the old path still forced `mpirun -parallel`
+      - OpenFOAM aborted with:
+        - `FOAM FATAL ERROR: attempt to run parallel on 1 processor`
+  - retained code change:
+    - `docker/run_freemhd_case.sh` and
+      `scripts/write_freemhd_container_files.py` now treat
+      `cores <= 1` as a true serial mode:
+      - skip `decomposePar`
+      - skip `mpirun -parallel`
+      - run the solver directly while still writing `runLog.<solver>`
+  - retained QA result:
+    - focused harness tests still pass after the serial-path change:
+      - `pytest tests/test_freemhd_harness.py tests/test_run_freemhd_case.py tests/test_build_freemhd_container.py -q`
+    - a corrected recovered Hunt `Ha20` replay now reaches the actual coupled
+      solver loop locally at `cores = 1`
+    - live partial log confirms:
+      - `LMX_DIAG outer time=1e-05`
+      - `LMX_DIAG epot time=1e-05 ... potEFinalResidual ≈ 8.03e-08`
+      - `LMX_DIAG pressure time=1e-05 ... maxU ≈ 1.1769e-01`
+      - progression into `Time = 2e-05`
+  - retained interpretation:
+    - Docker/OpenFOAM/FreeMHD is now genuinely usable on this machine for
+      short recovered-case diagnostics
+    - the practical route here is currently the serial `cores = 1` path, not
+      higher-core decomposition
+    - the next retained solver step should still be driven by the saved Hunt
+      trace once this serial replay finishes and is compared cleanly against
+      the current LMX baseline
+- `2026-04-08 America/Chicago`: Kept a small Hunt solver consistency fix on top
+  of the clean short replay:
+  - retained code changes:
+    - `lmx/solvers.py` now returns the layered current/Lorentz reduction using
+      the updated `u_next` with the fixed outer-step `phi`, instead of
+      reporting the lagged pre-update velocity
+    - `tests/test_solver.py` now checks that the retained hybrid Hunt
+      diagnostics match the returned-state reduction to within solver tolerance
+  - retained QA result:
+    - targeted tests passed:
+      - `pytest tests/test_solver.py -k 'hunt_hybrid_diagnostics_match_returned_state_reduction or hartmann_solver_runs or hunt_case_supports_hybrid_face_lorentz_current_reconstruction or hunt_case_supports_volume_scaled_cg_potential_backend' -q`
+    - on the clean short Hunt `Ha20`, `t <= 2e-05` replay:
+      - `u_max l2` stayed at `≈ 1.89e-03`
+      - `pressure_proxy l2` stayed at `≈ 3.12e-02`
+      - `face_current_max l2` stayed at `≈ 7.50e-03`
+      - `current_max l2` improved from `≈ 1.104e-02` to `≈ 1.099e-02`
+      - `lorentz_max l2` improved from `≈ 8.36e-03` to `≈ 7.79e-03`
+  - retained interpretation:
+    - this is a real state-consistency improvement, not a new pressure model
+    - it is worth keeping because it improves the clean short replay slightly
+      without regressing the current Hartmann/Shercliff guard path
+  - best next step:
+    - keep the clean short Hunt replay fixed as the local benchmark
+    - extend or recover the longer `t <= 6e-05` patched replay again
+    - only then change the later pressure/current reduction path itself
 
 ## Instruction For Future Agents
 

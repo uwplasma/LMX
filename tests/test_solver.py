@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.physics import build_material_fields, magnetic_ramp_scale
+from lmx.physics import build_material_fields, magnetic_field_components, magnetic_ramp_scale
 import lmx.solvers as solvers
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.specs import BoundaryCondition
@@ -376,6 +376,40 @@ def test_hunt_case_supports_hybrid_face_lorentz_current_reconstruction():
     assert solution.diagnostics.current_max_history.shape[0] > 0
     assert solution.diagnostics.face_current_max_history.shape[0] > 0
     assert solution.diagnostics.lorentz_max_history.shape[0] > 0
+
+
+def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
+    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="hybrid_face_lorentz"))
+    solution = solve_steady(case)
+
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    bx, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    jy, jz, lorentz = solvers._compute_current_and_lorentz(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        solution.state.u,
+        solution.state.phi,
+        by,
+        bz,
+        reconstruction=case.time_stepper.current_reconstruction,
+    )
+    face_current_max, emf_max = solvers._face_current_and_emf_max(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        solution.state.u,
+        solution.state.phi,
+        by,
+        bz,
+    )
+
+    assert float(solution.diagnostics.current_max_history[-1]) == pytest.approx(float(jnp.max(jnp.abs(jy))), rel=1e-4)
+    assert float(solution.diagnostics.face_current_max_history[-1]) == pytest.approx(float(face_current_max), rel=1e-5)
+    assert float(solution.diagnostics.emf_max_history[-1]) == pytest.approx(float(emf_max), rel=1e-5)
+    assert float(solution.diagnostics.lorentz_max_history[-1]) == pytest.approx(float(jnp.max(jnp.abs(lorentz))), rel=1e-4)
 
 
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():

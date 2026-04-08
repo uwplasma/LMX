@@ -536,6 +536,31 @@ The backend harness currently supports:
 - `build_freemhd_container.py` now also supports `--no-cache`, which is the
   preferred mode when the local patched FreeMHD/OpenFOAM solver sources changed
   and the next diagnostic replay must not reuse an older cached image layer.
+- The next local runtime blocker on recovered Hunt cases was then identified and
+  fixed:
+  - `8`-core and `4`-core recovered-case runs on this machine were killed with
+    `returncode = 137` during `decomposePar -allRegions`
+  - the preserved-log harness still kept:
+    - `*.run.stdout.log`
+    - `*.run.stderr.log`
+    - `*.run.diag.json`
+  - a `1`-core run on the old path then failed with:
+    - `FOAM FATAL ERROR: attempt to run parallel on 1 processor`
+  - retained runtime fix:
+    - the container entrypoint now treats `cores <= 1` as a true serial mode
+      and skips `decomposePar` / `mpirun -parallel`
+  - retained live result:
+    - the corrected `1`-core recovered Hunt `Ha20` run now reaches the actual
+      coupled solver loop locally and emits `LMX_DIAG` records at `Time = 1e-05`
+      and into `Time = 2e-05`
+    - the first retained serial diagnostic point shows:
+      - `potEFinalResidual ≈ 8.03e-08`
+      - `maxU ≈ 1.1769e-01`
+  - retained interpretation:
+    - on this machine, higher-core decomposition is still too heavy for this
+      recovered case, but short serial diagnostic replays are now viable
+    - that is enough to keep the Hunt parity loop moving without waiting for a
+      different machine or a larger memory budget
 - Extended the FreeMHD diagnostic patcher so `LMX_DIAG epot` records now include
   `maxJn`, `maxPsiub`, and `maxCenteredJxB` in addition to the active
   `maxJxB`. On the first real rerun of recovered Hunt `Ha20`, the first patched
@@ -953,6 +978,21 @@ The backend harness currently supports:
       is no longer a generic startup-source failure
     - the most expensive remaining mismatch is later pressure/Lorentz response,
       not the `potE` solve itself
+- A small retained solver consistency fix landed after that clean short replay:
+  - the layered current/Lorentz reduction returned by the solver now uses the
+    updated `u_next` with the fixed outer-step `phi` instead of reporting the
+    lagged pre-update velocity
+  - retained short Hunt `Ha20`, `t <= 2e-05` effect:
+    - `u_max l2`: unchanged at `≈ 1.89e-03`
+    - `pressure_proxy l2`: unchanged at `≈ 3.12e-02`
+    - `face_current_max l2`: unchanged at `≈ 7.50e-03`
+    - `current_max l2`: `≈ 1.104e-02 -> 1.099e-02`
+    - `lorentz_max l2`: `≈ 8.36e-03 -> 7.79e-03`
+  - retained interpretation:
+    - this is a real state-consistency improvement, not a new pressure-response
+      model
+    - it is worth keeping because it improves the clean short replay slightly
+      without regressing the current Hartmann/Shercliff guard path
 
 ## Meeting demo artifact
 
