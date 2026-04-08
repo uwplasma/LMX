@@ -14,6 +14,8 @@
 - `lmx.example_runner`: thin orchestration layer used by the repo-level
   `examples/` scripts.
 - `lmx.reference_data`: processed paper-data loaders.
+- `lmx.config`: TOML input loader for executable `lmx input.toml` runs.
+- `lmx.runtime_logging`: live OpenFOAM-style solver logger used by the solver and CLI.
 
 ## Data layout
 
@@ -90,6 +92,9 @@
 - `solve_transient` is the fixed-step path for trajectory-like runs; `solve_steady`
   now uses the configured steady tolerance and maximum step budget rather than
   aliasing the transient path.
+- The core solver now accepts an optional streaming logger. Keep runtime logging
+  in the solver layer, not only in examples, so the Python API, CLI subcommands,
+  and `lmx input.toml` runs all expose the same live diagnostics.
 
 ## Validation and benchmarking
 

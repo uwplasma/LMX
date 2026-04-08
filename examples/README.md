@@ -16,7 +16,26 @@ Run them directly from the repo root:
 /Users/rogerio/base_env/bin/python3 examples/shercliff_example.py --ha 20 --output ./artifacts/examples/shercliff
 /Users/rogerio/base_env/bin/python3 examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
 /Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/shercliff_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hunt_case.toml
 ```
+
+The shipped TOML files are fully explicit teaching inputs:
+
+- `/Users/rogerio/local/tests/LMX/examples/hartmann_case.toml`
+- `/Users/rogerio/local/tests/LMX/examples/shercliff_case.toml`
+- `/Users/rogerio/local/tests/LMX/examples/hunt_case.toml`
+
+They show users how to set:
+
+- geometry and resolution
+- materials and wall regions
+- magnetic-field startup ramps
+- time-stepper controls
+- current-reconstruction controls
+- output bundle controls
+- live logging verbosity
 
 Shercliff and Hunt automatically use the default closed-channel analytical
 reference root when it exists under `./external/FreeMHDPaperAllFigures/...`.
@@ -46,6 +65,11 @@ wrapper. It defines local functions for:
 - verbose logging
 - NPZ serialization
 - replotting and movie generation
+
+The direct `lmx input.toml` path is the matching executable workflow. Use the
+TOML files when you want an input-file-driven run. Use
+`theory_meeting_demo.py` when you want an explicit Python workflow that users
+can copy and modify.
 
 `plot_npz_results.py` is a standalone reader/plotter for those saved files:
 

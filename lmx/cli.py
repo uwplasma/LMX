@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import sys
 from pathlib import Path
 
 import jax.numpy as jnp
 
 from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from .io import write_paraview
-from .solvers import solve_steady
+from .config import RunConfig, load_run_config
+from .io import write_paraview, write_solution_outputs
+from .runtime_logging import StreamingSolverLogger, default_log_path
+from .solvers import solve_steady, solve_transient
 from .validation import (
     closed_channel_validation,
     combined_profile_error,
@@ -28,6 +32,11 @@ from .validation import (
 )
 
 
+class _EmptyDiagnostics:
+    potential_residual_history = jnp.asarray([])
+    potential_iterations_history = jnp.asarray([])
+
+
 def _build_case(args: argparse.Namespace):
     if args.case == "hartmann":
         return make_hartmann_case(ha=args.ha, output_dir=args.output)
@@ -38,7 +47,99 @@ def _build_case(args: argparse.Namespace):
     raise ValueError(args.case)
 
 
+def _solve_case_with_optional_logger(case, *, solve_mode: str, logger=None):
+    if solve_mode == "transient":
+        try:
+            return solve_transient(case, logger=logger)
+        except TypeError:
+            return solve_transient(case)
+    try:
+        return solve_steady(case, logger=logger)
+    except TypeError:
+        return solve_steady(case)
+
+
+def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path]]) -> dict[str, object]:
+    diag = getattr(solution, "diagnostics", _EmptyDiagnostics())
+    geometry = getattr(getattr(case, "geometry", None), "kind", "unknown")
+    u_field = getattr(solution.state, "u", jnp.asarray([0.0]))
+    return {
+        "case": case.name,
+        "geometry": geometry,
+        "time": float(solution.state.time),
+        "residual": float(solution.state.residual),
+        "u_max": float(jnp.max(jnp.abs(u_field))),
+        "potential_residual": float(diag.potential_residual_history[-1]) if diag.potential_residual_history.size else None,
+        "potential_iterations_used": float(diag.potential_iterations_history[-1]) if diag.potential_iterations_history.size else None,
+        "output": str(out_dir.resolve()),
+        "generated_files": {
+            key: [str(path.resolve()) for path in paths]
+            for key, paths in outputs.items()
+            if paths
+        },
+    }
+
+
+def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path | None:
+    if not getattr(case.output, "write_json_summary", True):
+        return None
+    path = out_dir / f"{case.name}_summary.json"
+    path.write_text(json.dumps(summary, indent=2) + "\n")
+    return path
+
+
+def _run_config(config: RunConfig) -> dict[str, object]:
+    case = config.case
+    output_dir = getattr(case, "output_dir", None)
+    if output_dir is None and getattr(case, "output", None) is not None:
+        output_dir = getattr(case.output, "directory", None)
+    out_dir = Path(output_dir) if output_dir else Path.cwd() / "out" / case.name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    logger = StreamingSolverLogger(config.logging) if config.logging.enabled else None
+    log_handle = None
+    log_path: Path | None = None
+    if logger is not None:
+        log_path = default_log_path(out_dir, case.name)
+        log_handle = open(log_path, "w", encoding="utf-8")
+        logger.add_stream(log_handle)
+    try:
+        solution = _solve_case_with_optional_logger(case, solve_mode=config.solve_mode, logger=logger)
+    finally:
+        if log_handle is not None:
+            log_handle.close()
+    outputs = write_solution_outputs(
+        solution,
+        case,
+        out_dir,
+        write_npz=getattr(case.output, "write_npz", True),
+        write_plots=getattr(case.output, "write_plots", False),
+    )
+    if log_path is not None:
+        outputs.setdefault("log", []).append(log_path)
+    if config.input_path is not None and getattr(case.output, "copy_input_file", True):
+        copied_input = out_dir / config.input_path.name
+        shutil.copy2(config.input_path, copied_input)
+        outputs.setdefault("input", []).append(copied_input)
+    summary = _runtime_summary(solution, case, out_dir, outputs)
+    summary_path = _write_run_summary(summary, case, out_dir)
+    if summary_path is not None:
+        outputs.setdefault("json", []).append(summary_path)
+        summary["generated_files"]["json"] = [str(summary_path.resolve())]
+    print(json.dumps(summary, indent=2))
+    return summary
+
+
+def run_from_toml(path: str | Path) -> dict[str, object]:
+    config = load_run_config(path)
+    return _run_config(config)
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(argv) if argv is not None else sys.argv[1:]
+    if argv and Path(argv[0]).suffix == ".toml":
+        run_from_toml(argv[0])
+        return 0
+
     parser = argparse.ArgumentParser(prog="lmx")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -46,6 +147,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"])
     run_parser.add_argument("--ha", type=float, default=20.0)
     run_parser.add_argument("--output", type=str, default="./out")
+    run_parser.add_argument("--mode", choices=["steady", "transient"], default="steady")
+    run_parser.add_argument("--plots", action="store_true")
+    run_parser.add_argument("--quiet", action="store_true")
 
     bench_parser = subparsers.add_parser("benchmark")
     bench_parser.add_argument("--repeats", type=int, default=3)
@@ -74,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "validate":
         case = _build_case(args)
-        solution = solve_steady(case)
+        solution = _solve_case_with_optional_logger(case, solve_mode="steady", logger=None)
         out_dir = Path(args.output)
         out_dir.mkdir(parents=True, exist_ok=True)
         write_paraview(solution, out_dir)
@@ -139,21 +243,24 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     case = _build_case(args)
-    solution = solve_steady(case)
-    out_dir = Path(args.output)
-    write_paraview(solution, out_dir)
-    write_profile_csv(out_dir / f"{case.name}_centerline.csv", extract_centerline(solution))
-    print(
-        json.dumps(
-            {
-                "case": case.name,
-                "time": solution.state.time,
-                "residual": solution.state.residual,
-                "output": str(out_dir.resolve()),
-            },
-            indent=2,
-        )
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "output": case.output.__class__(
+                **{
+                    **case.output.__dict__,
+                    "directory": args.output,
+                    "write_npz": True,
+                    "write_json_summary": True,
+                    "write_plots": args.plots,
+                }
+            ),
+        }
     )
+    config = RunConfig(case=case, solve_mode=args.mode)
+    if args.quiet:
+        config = RunConfig(case=case, solve_mode=args.mode, logging=config.logging.__class__(enabled=False))
+    _run_config(config)
     return 0
 
 

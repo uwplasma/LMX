@@ -1,10 +1,11 @@
 from pathlib import Path
 
 import pytest
+import numpy as np
 
 from lmx.core import zeros_state
 from lmx.cases import make_hartmann_case
-from lmx.io import write_paraview, write_vtu
+from lmx.io import write_paraview, write_solution_npz, write_vtu
 from lmx.mesh import generate_pipe_ogrid_mesh
 from lmx.solvers import solve_steady
 
@@ -44,3 +45,16 @@ def test_zeros_state_matches_mesh_shape():
     assert state.u.shape == mesh.yz_shape
     assert state.phi.shape == mesh.yz_shape
     assert float(state.time) == 0.0
+
+
+def test_write_solution_npz(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    solution = solve_steady(case)
+
+    path = write_solution_npz(solution, case, tmp_path / "hartmann_results.npz")
+
+    assert path.exists()
+    with np.load(path, allow_pickle=False) as data:
+        assert "u" in data
+        assert "phi" in data
+        assert data["u"].shape == solution.state.u.shape

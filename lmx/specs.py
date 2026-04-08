@@ -78,6 +78,10 @@ class OutputSpec:
     directory: str | None = None
     write_paraview: bool = True
     write_csv_profiles: bool = True
+    write_npz: bool = True
+    write_json_summary: bool = True
+    write_plots: bool = False
+    copy_input_file: bool = True
     write_stride: int = 1
 
 

@@ -13,6 +13,7 @@ and external comparison assets kept separate.
 theory
 developer_guide
 case_cookbook
+input_reference
 validation_report
 ```
 

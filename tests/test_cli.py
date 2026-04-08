@@ -60,17 +60,29 @@ def test_cli_run_branch_uses_case_builder_and_solver(tmp_path: Path, monkeypatch
 
     monkeypatch.setattr(cli, "_build_case", lambda args: case)
     monkeypatch.setattr(cli, "solve_steady", lambda built_case: recorded.append(("solve", built_case)) or solution)
-    monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: recorded.append(("paraview", out_dir)) or [])
-    monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: recorded.append(("csv", path)) or path)
-    monkeypatch.setattr(cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(
+        cli,
+        "write_solution_outputs",
+        lambda solved, built_case, out_dir, write_npz, write_plots: recorded.append(("outputs", out_dir))
+        or {"paraview": [], "csv": [], "npz": [], "plots": []},
+    )
 
     exit_code = cli.main(["run", "hartmann", "--output", str(output_dir)])
 
     assert exit_code == 0
     assert recorded[0][0] == "solve"
-    assert recorded[1][0] == "paraview"
-    assert recorded[2][0] == "csv"
+    assert recorded[1][0] == "outputs"
     assert '"case": "demo_case"' in capsys.readouterr().out
+
+
+def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
+    recorded: dict[str, object] = {}
+    monkeypatch.setattr(cli, "run_from_toml", lambda path: recorded.update(path=path) or {"case": "demo"})
+
+    exit_code = cli.main(["/tmp/demo_case.toml"])
+
+    assert exit_code == 0
+    assert recorded["path"] == "/tmp/demo_case.toml"
 
 
 def test_cli_validate_branches_into_reference_comparison(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):

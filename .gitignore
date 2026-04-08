@@ -9,4 +9,5 @@ out_*/
 external/
 artifacts/
 docs/_build/
+*.egg-info/
 .DS_Store

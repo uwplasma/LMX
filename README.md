@@ -42,6 +42,7 @@ staying focused on structured duct and simple pipe geometries.
 
 ```bash
 cd /Users/rogerio/local/tests/LMX
+/Users/rogerio/base_env/bin/python3 -m pip install -e '.[dev,plotting,docs]'
 /Users/rogerio/base_env/bin/python3 -m pytest
 /Users/rogerio/base_env/bin/python3 -m pytest -m unit
 /Users/rogerio/base_env/bin/python3 -m pytest -m regression
@@ -64,6 +65,7 @@ cd /Users/rogerio/local/tests/LMX
 /Users/rogerio/base_env/bin/python3 scripts/run_solver_grid_sweep.py --output ./artifacts/control_grid_hunt --case hunt --ha 20 --resolution 32 --parameter-a outer_iterations --values-a 4,6 --type-a int --parameter-b potential_relaxation --values-b 1.0,0.5 --type-b float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
 /Users/rogerio/base_env/bin/python3 scripts/compare_hunt_trace_histories.py --freemhd-diag-json /tmp/lmx_hunt20_live_diag.json --lmx-report-json /tmp/lmx_hunt_auto_short_trace_force.json --output ./artifacts/hunt_trace_alignment.json
 /Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
 ```
 
 ## Documentation
@@ -73,8 +75,33 @@ cd /Users/rogerio/local/tests/LMX
 - Theory: [`docs/theory.md`](docs/theory.md)
 - Developer guide: [`docs/developer_guide.md`](docs/developer_guide.md)
 - Case cookbook: [`docs/case_cookbook.md`](docs/case_cookbook.md)
+- Input reference: [`docs/input_reference.md`](docs/input_reference.md)
 - Examples: [`examples/README.md`](examples/README.md)
 - Validation report: [`docs/validation_report.md`](docs/validation_report.md)
+
+## Executable TOML workflow
+
+LMX can now be run directly as an executable against a complete TOML input file:
+
+```bash
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/shercliff_case.toml
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hunt_case.toml
+```
+
+That path prints a live OpenFOAM-style solver log to the terminal and writes the
+same text to `case_name.log` inside the output directory. A standard TOML run
+also writes:
+
+- ParaView files
+- CSV profile cuts
+- `.npz` field and diagnostics dump
+- `case_name_summary.json`
+- overview/diagnostics figures when `write_plots = true`
+- a copy of the input file when `copy_input_file = true`
+
+The full field-by-field TOML schema is documented in
+[`docs/input_reference.md`](docs/input_reference.md).
 
 ## Meeting-ready example
 
@@ -107,6 +134,9 @@ The example is intentionally explicit: it defines local functions for case
 construction, solver-control overrides, pretty progress logging, NPZ output,
 and Matplotlib replotting so users can treat it as a template for custom LMX
 workflows rather than a hidden wrapper.
+
+For an input-file-first workflow, the shipped TOML examples under
+[`examples/`](examples/README.md) are the matching text-input templates.
 
 You can also replot any saved NPZ result directly:
 

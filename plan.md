@@ -30,6 +30,7 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - Explicit unit, regression, physics, validation, and benchmark entrypoints.
 - GitHub Actions workflows for categorized pytest runs plus validation and benchmark artifact jobs.
 - Read the Docs-compatible Sphinx/MyST documentation entrypoint plus CI docs build.
+- Executable `lmx input.toml` workflow with a complete TOML loader, live solver logging, and standard output bundle writing.
 - Zenodo closed-channel analytical and processed-slice reference-data loaders.
 - Unit and categorized tests passing in `/Users/rogerio/base_env/bin/python3`.
 - Combined local coverage across `lmx/` and `scripts/` is currently `89%`.
@@ -54,6 +55,8 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - `lmx/physics.py`: conductivity and magnetic-field field builders.
 - `lmx/solvers.py`: current laminar inductionless solver entrypoints.
 - `lmx/io.py`: ParaView writers.
+- `lmx/config.py`: TOML input loader and executable run configuration.
+- `lmx/runtime_logging.py`: live OpenFOAM-style solver logger.
 - `lmx/validation.py`: analytical and FreeMHD comparison helpers.
 - `lmx/cli.py`: command-line entrypoints.
 - `scripts/fetch_freemhd_assets.py`: fetch FreeMHD repo and Zenodo files.
@@ -164,6 +167,7 @@ LMX should only be described as ship ready for the current milestone when all of
 ## What Worked
 
 - The package structure and top-level API are in place and importable.
+- The executable `lmx input.toml` path now works on the current development machine after reinstalling the editable package into `/Users/rogerio/base_env`.
 - The local JAX environment at `/Users/rogerio/base_env/bin/python3` works for development and tests.
 - The current duct solver path produces fields, VTK output, CSV cuts, and benchmark timing.
 - Test suite is green after tightening the expectations to match current implementation state rather than full parity claims.
@@ -2729,6 +2733,43 @@ LMX should only be described as ship ready for the current milestone when all of
       case" template
     - next solver work should continue from the prior Hunt pressure-response
       blocker, not from example/logging infrastructure
+- `2026-04-07 America/Chicago`: Added the executable TOML run path and core
+  live solver logger:
+  - retained code changes:
+    - added `lmx/config.py` with complete TOML loading into `CaseSpec` plus
+      runtime logging controls
+    - added `lmx/runtime_logging.py` with a shared live OpenFOAM-style logger
+    - `solve_steady(...)` and `solve_transient(...)` now accept an optional
+      logger and emit live per-step diagnostics from the solver layer
+    - `lmx/cli.py` now supports direct `lmx input.toml` execution
+    - `lmx/io.py` now writes reusable `.npz` solution dumps for normal solver
+      runs, not only example scripts
+    - added shipped fully explicit examples:
+      - `examples/hartmann_case.toml`
+      - `examples/shercliff_case.toml`
+      - `examples/hunt_case.toml`
+    - added docs page `docs/input_reference.md`
+  - retained QA result:
+    - reinstalled the repo editable into `/Users/rogerio/base_env`
+    - real executable path passed:
+      - `/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml`
+    - verified output bundle:
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/hartmann_ha20_toml.log`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/hartmann_ha20_toml_results.npz`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/hartmann_ha20_toml_summary.json`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/overview.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/diagnostics.png`
+    - replotted the executable-produced NPZ successfully with:
+      - `examples/plot_npz_results.py --npz /Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/hartmann_ha20_toml_results.npz --output /Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/replot_cli`
+    - visually checked:
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/overview.png`
+      - `/Users/rogerio/local/tests/LMX/artifacts/examples/toml_hartmann/diagnostics.png`
+  - best next step:
+    - keep the new executable path stable
+    - then return to the retained Hunt parity blocker with the current trace and
+      sampled-profile diagnostics
+    - avoid more infrastructure-only work unless it directly helps the next
+      solver iteration
 
 ## Instruction For Future Agents
 

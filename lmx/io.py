@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 
 from .core import Solution
 from .mesh import StructuredMesh
@@ -109,3 +111,82 @@ def write_paraview(solution: Solution, out_dir: str | Path) -> list[Path]:
     paths.append(write_vtr(solution, out_dir))
     paths.append(write_pvd([(solution.state.time, paths[0].name)], out_dir, name=solution.case_name))
     return paths
+
+
+def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
+    from .physics import build_material_fields
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    materials = build_material_fields(case, solution.mesh)
+    metadata = {
+        "case": solution.case_name,
+        "time": float(solution.state.time),
+        "description": "LMX solution dump",
+        "geometry_kind": case.geometry.kind,
+        "notes": case.notes,
+    }
+    diag = solution.diagnostics
+    np.savez_compressed(
+        path,
+        metadata_json=json.dumps(metadata),
+        y_centers=np.asarray(solution.mesh.y_centers),
+        z_centers=np.asarray(solution.mesh.z_centers),
+        y_faces=np.asarray(solution.mesh.y_faces),
+        z_faces=np.asarray(solution.mesh.z_faces),
+        u=np.asarray(solution.state.u),
+        phi=np.asarray(solution.state.phi),
+        jy=np.asarray(solution.state.jy),
+        jz=np.asarray(solution.state.jz),
+        lorentz_x=np.asarray(solution.state.lorentz_x),
+        conductivity=np.asarray(materials.conductivity),
+        density=np.asarray(materials.density),
+        viscosity=np.asarray(materials.viscosity),
+        fluid_mask=np.asarray(materials.fluid_mask),
+        time_history=np.asarray(diag.time_history),
+        residual_history=np.asarray(diag.residual_history),
+        potential_residual_history=np.asarray(diag.potential_residual_history),
+        potential_iterations_history=np.asarray(diag.potential_iterations_history),
+        u_max_history=np.asarray(diag.u_max_history),
+        mean_velocity_history=np.asarray(diag.mean_velocity_history),
+        current_max_history=np.asarray(diag.current_max_history),
+        face_current_max_history=np.asarray(diag.face_current_max_history),
+        emf_max_history=np.asarray(diag.emf_max_history),
+        lorentz_max_history=np.asarray(diag.lorentz_max_history),
+        applied_forcing_history=np.asarray(diag.applied_forcing_history),
+        pressure_proxy_history=np.asarray(diag.pressure_proxy_history),
+        courant_like=np.asarray(diag.courant_like),
+        ohmic_power=np.asarray(diag.ohmic_power),
+    )
+    return path
+
+
+def write_solution_outputs(
+    solution: Solution,
+    case,
+    out_dir: str | Path,
+    *,
+    write_npz: bool = True,
+    write_plots: bool = False,
+) -> dict[str, list[Path]]:
+    from .validation import extract_centerline, extract_midplane_profile, write_profile_csv
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, list[Path]] = {"paraview": [], "csv": [], "npz": [], "plots": []}
+
+    if case.output.write_paraview:
+        payload["paraview"] = write_paraview(solution, out_dir)
+    if case.output.write_csv_profiles:
+        payload["csv"] = [
+            write_profile_csv(out_dir / f"{case.name}_centerline.csv", extract_centerline(solution)),
+            write_profile_csv(out_dir / f"{case.name}_midplane_y.csv", extract_midplane_profile(solution, axis="y", fluid_only=True)),
+            write_profile_csv(out_dir / f"{case.name}_midplane_z.csv", extract_midplane_profile(solution, axis="z", fluid_only=True)),
+        ]
+    if write_npz and case.output.write_npz:
+        payload["npz"] = [write_solution_npz(solution, case, out_dir / f"{case.name}_results.npz")]
+    if write_plots and case.output.write_plots:
+        from .plotting import write_case_overview_plots
+
+        payload["plots"] = write_case_overview_plots(solution, out_dir, case_title=case.name)
+    return payload

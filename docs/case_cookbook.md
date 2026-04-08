@@ -5,6 +5,7 @@
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run hartmann --ha 20 --output ./out/hartmann
 /Users/rogerio/base_env/bin/python3 examples/hartmann_example.py --ha 20 --output ./artifacts/examples/hartmann
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
 ```
 
 Use this as the simplest solver smoke test and as the default analytical-profile
@@ -15,6 +16,7 @@ validation case.
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run shercliff --ha 100 --output ./out/shercliff
 /Users/rogerio/base_env/bin/python3 examples/shercliff_example.py --ha 20 --output ./artifacts/examples/shercliff
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/shercliff_case.toml
 ```
 
 This is the insulating-wall duct case. It exercises the same self-consistent solver
@@ -25,6 +27,7 @@ path as the other native cases while remaining a strong analytical comparison ta
 ```bash
 /Users/rogerio/base_env/bin/python3 -m lmx.cli run hunt --ha 100 --output ./out/hunt
 /Users/rogerio/base_env/bin/python3 examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
+/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hunt_case.toml
 ```
 
 This is the conducting-wall duct case. It is useful for checking how the solver
@@ -79,6 +82,9 @@ This example is also meant to be read, not just executed. It defines the local
 workflow functions directly in `examples/theory_meeting_demo.py`, so users can
 copy and adapt the case setup, solver controls, output rules, and logging
 format for their own studies.
+
+For the text-input equivalent, use the shipped TOML examples and the executable
+path documented in [`docs/input_reference.md`](input_reference.md).
 
 The NPZ files are intentionally first-class outputs. Replot a steady result or
 a transient movie without rerunning the solver:
