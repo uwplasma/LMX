@@ -207,6 +207,13 @@
   `--patch-local-freemhd-logging` applies the current diagnostic patch set to
   that checkout before the build. Use that path for iterative Hunt trace work on
   this machine so the patched image does not have to be managed manually.
+  The runner also supports `--log-coupled-iterations`, which rewrites the
+  mounted `system/controlDict` to force `logCoupledMhdIterations true;`
+  immediately before launch. When `--output` is present, the runner persists the
+  full container stdout/stderr as sibling `*.run.stdout.log` /
+  `*.run.stderr.log` files. That is now the preferred diagnostic mode because
+  the solver log remains recoverable even when a patched OpenFOAM/FreeMHD run
+  fails late in reconstruction or post-processing.
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form

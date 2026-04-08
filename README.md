@@ -156,7 +156,7 @@ Useful optional-backend commands:
 /Users/rogerio/base_env/bin/python3 scripts/fetch_freemhd_assets.py --dest ./external
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
 /Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-localdiag --local-freemhd-root ./external/FreeMHD
-/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
+/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --log-coupled-iterations --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 3e-5 --max-steps 3 --current-reconstruction face_averaged --output ./artifacts/hunt_solver_diagnostics_faceavg.json
@@ -175,6 +175,12 @@ present.
 patched checkout when `--local-freemhd-root` is provided, and it can patch that
 checkout in place with `--patch-local-freemhd-logging` before the build. That is
 the recommended path for reproducing Hunt trace diagnostics on this machine.
+When `--output` is used, the runner now also saves the full container stdout and
+stderr next to the JSON metadata as `*.run.stdout.log` and `*.run.stderr.log`.
+Use `--log-coupled-iterations` for patched FreeMHD/OpenFOAM runs so the mounted
+case forces `logCoupledMhdIterations true;` before launch and the saved stdout
+log contains `LMX_DIAG` records even if the container later dies in cleanup or
+reconstruction.
 `run_hunt_solver_diagnostic_report.py` also mirrors recovered Hunt startup
 cases more faithfully now: when the recovered run has a nonzero startup
 velocity in `0/liquid/U`, the reduced replay automatically adds the matching

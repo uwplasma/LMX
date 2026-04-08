@@ -158,10 +158,17 @@ def test_run_freemhd_case_auto_builds_missing_image(
     monkeypatch.setattr(runner, "docker_image_available", fake_image_available)
     monkeypatch.setattr(runner, "patch_freemhd_tree", lambda root: [root / "patched.C"])
 
-    def fake_build(image: str, bundle_root: Path, platform: str, local_freemhd_root: Path | None = None):
+    def fake_build(
+        image: str,
+        bundle_root: Path,
+        platform: str,
+        local_freemhd_root: Path | None = None,
+        no_cache: bool = False,
+    ):
         assert image == "lmx-freemhd"
         assert platform == "linux/amd64"
         assert local_freemhd_root == local_root
+        assert no_cache is False
         return builder.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="built", stderr="")
 
     def fake_run_case(**kwargs):

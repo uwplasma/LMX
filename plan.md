@@ -2816,6 +2816,57 @@ LMX should only be described as ship ready for the current milestone when all of
     - until then, keep solver-side work focused on physically justified
       pressure/velocity coupling changes rather than new scalar gains or
       post-predictor corrector sweeps
+- `2026-04-08 America/Chicago`: Hardened the FreeMHD/OpenFOAM Docker harness
+  around the live Hunt parity workflow:
+  - retained code changes:
+    - `scripts/run_freemhd_case.py` now supports
+      `--log-coupled-iterations` and forwards that to the mounted case through
+      `LMX_LOG_COUPLED_ITERATIONS`
+    - `docker/run_freemhd_case.sh` and
+      `scripts/write_freemhd_container_files.py` now rewrite
+      `system/controlDict` to set `logCoupledMhdIterations true;` when that
+      flag is enabled, even if the key was absent in the recovered case
+    - when `--output` is provided, `run_freemhd_case.py` now also preserves
+      full container stdout/stderr as sibling
+      `*.run.stdout.log` / `*.run.stderr.log` files
+    - retained the already-landed `build_freemhd_container.py --no-cache`
+      support and aligned tests with the current builder signature
+  - retained QA result:
+    - targeted harness tests passed:
+      - `pytest tests/test_run_freemhd_case.py tests/test_freemhd_harness.py tests/test_build_freemhd_container.py -q`
+    - docs build passed:
+      - `python -m sphinx -W -b html docs docs/_build/html`
+    - latest GitHub Actions on `main` were green for `4bb0ca4`:
+      - `ci`: `24117195142`
+      - `benchmarks`: `24117195114`
+  - retained operational result:
+    - Docker/OpenFOAM is usable on this machine, but the daemon is still
+      intermittent between runs
+    - the saved live patched Hunt replay now contains enough structured
+      diagnostics to bound the next solver target:
+      - through `t = 2e-05`, aligned trace errors were approximately:
+        - `u_max l2 ≈ 1.83e-03`
+        - `mean_velocity l2 ≈ 2.31e-03`
+        - `pressure_proxy l2 ≈ 1.00e-01`
+        - `current_max l2 ≈ 7.94e-02`
+        - `face_current_max l2 ≈ 7.33e-02`
+        - `emf_max l2 ≈ 7.14e-02`
+        - `lorentz_max l2 ≈ 1.31e-01`
+      - FreeMHD itself remains very well converged on the `potE` block:
+        - `potEFinalResidual ≈ 4.43e-08` at `t = 1e-05`
+        - `potEFinalResidual ≈ 3.67e-08` at `t = 2e-05`
+  - retained conclusion:
+    - the next efficient LMX step is still later pressure/Lorentz response,
+      not more harness work
+    - but the harness is now finally robust enough that future patched FreeMHD
+      runs should not lose the comparison trace even if they fail after the
+      main solve
+  - best next step:
+    - once the Docker daemon is reachable again, rerun the corrected patched
+      Hunt `Ha20`, `t <= 6e-05` case with the new log-preserving harness and
+      refresh the same trace metrics
+    - then change the reduced Hunt momentum/pressure response only where the
+      longer-horizon trace actually diverges
 
 ## Instruction For Future Agents
 

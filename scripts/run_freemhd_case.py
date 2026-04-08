@@ -32,6 +32,7 @@ def run_freemhd_case(
     write_interval: str | None = None,
     delta_t: str | None = None,
     start_from: str | None = None,
+    log_coupled_iterations: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     case_path = Path(case_dir).resolve()
     bundle_path = Path(bundle_root).resolve()
@@ -55,6 +56,8 @@ def run_freemhd_case(
         f"LMX_DELTA_T={delta_t or ''}",
         "-e",
         f"LMX_START_FROM={start_from or ''}",
+        "-e",
+        f"LMX_LOG_COUPLED_ITERATIONS={'true' if log_coupled_iterations else ''}",
         "--entrypoint",
         "/bin/bash",
         "-v",
@@ -68,6 +71,24 @@ def run_freemhd_case(
         solver,
     ]
     return subprocess.run(command, text=True, capture_output=True, check=False)
+
+
+def write_process_logs(
+    output_path: Path | None,
+    process_name: str,
+    result: subprocess.CompletedProcess[str],
+) -> dict[str, str] | None:
+    if output_path is None:
+        return None
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    stdout_path = output_path.with_suffix(f".{process_name}.stdout.log")
+    stderr_path = output_path.with_suffix(f".{process_name}.stderr.log")
+    stdout_path.write_text(result.stdout)
+    stderr_path.write_text(result.stderr)
+    return {
+        f"{process_name}_stdout_log": str(stdout_path),
+        f"{process_name}_stderr_log": str(stderr_path),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -98,6 +119,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--write-interval", type=str, default=None)
     parser.add_argument("--delta-t", type=str, default=None)
     parser.add_argument("--start-from", type=str, default=None)
+    parser.add_argument(
+        "--log-coupled-iterations",
+        action="store_true",
+        help="Force logCoupledMhdIterations true in the case controlDict before running the solver.",
+    )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
     resolved_solver = control_dict_application(args.case_dir) if args.solver == "auto" else args.solver
@@ -163,7 +189,9 @@ def main(argv: list[str] | None = None) -> int:
                 args.bundle_root,
                 platform=args.platform,
                 local_freemhd_root=args.local_freemhd_root,
+                no_cache=False,
             )
+            build_log_paths = write_process_logs(args.output, "build", build_result)
             auto_build_payload = {
                 "attempted": True,
                 "local_freemhd_root": str(args.local_freemhd_root.resolve()),
@@ -174,6 +202,8 @@ def main(argv: list[str] | None = None) -> int:
                 "stdout_tail": build_result.stdout[-4000:],
                 "stderr_tail": build_result.stderr[-4000:],
             }
+            if build_log_paths is not None:
+                auto_build_payload.update(build_log_paths)
             if build_result.returncode == 0 and docker_image_available(args.image):
                 result = run_freemhd_case(
                     image=args.image,
@@ -186,7 +216,9 @@ def main(argv: list[str] | None = None) -> int:
                     write_interval=args.write_interval,
                     delta_t=args.delta_t,
                     start_from=args.start_from,
+                    log_coupled_iterations=args.log_coupled_iterations,
                 )
+                run_log_paths = write_process_logs(args.output, "run", result)
                 payload = {
                     "image": args.image,
                     "case_dir": str(args.case_dir.resolve()),
@@ -200,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
                     "write_interval": args.write_interval,
                     "delta_t": args.delta_t,
                     "start_from": args.start_from,
+                    "log_coupled_iterations": args.log_coupled_iterations,
                     "docker_cli_available": True,
                     "docker_available": True,
                     "docker_image_available": True,
@@ -210,6 +243,8 @@ def main(argv: list[str] | None = None) -> int:
                     "stdout_tail": result.stdout[-4000:],
                     "stderr_tail": result.stderr[-4000:],
                 }
+                if run_log_paths is not None:
+                    payload.update(run_log_paths)
                 if args.output is not None:
                     args.output.parent.mkdir(parents=True, exist_ok=True)
                     args.output.write_text(json.dumps(payload, indent=2))
@@ -229,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
             "write_interval": args.write_interval,
             "delta_t": args.delta_t,
             "start_from": args.start_from,
+            "log_coupled_iterations": args.log_coupled_iterations,
             "docker_cli_available": True,
             "docker_available": True,
             "docker_image_available": False,
@@ -253,7 +289,9 @@ def main(argv: list[str] | None = None) -> int:
         write_interval=args.write_interval,
         delta_t=args.delta_t,
         start_from=args.start_from,
+        log_coupled_iterations=args.log_coupled_iterations,
     )
+    run_log_paths = write_process_logs(args.output, "run", result)
     payload = {
         "image": args.image,
         "case_dir": str(args.case_dir.resolve()),
@@ -265,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
         "write_interval": args.write_interval,
         "delta_t": args.delta_t,
         "start_from": args.start_from,
+        "log_coupled_iterations": args.log_coupled_iterations,
         "docker_cli_available": True,
         "docker_available": True,
         "docker_image_available": True,
@@ -273,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
         "stdout_tail": result.stdout[-4000:],
         "stderr_tail": result.stderr[-4000:],
     }
+    if run_log_paths is not None:
+        payload.update(run_log_paths)
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, indent=2))

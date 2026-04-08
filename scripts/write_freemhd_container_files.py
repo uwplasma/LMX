@@ -56,6 +56,7 @@ LMX_END_TIME="${LMX_END_TIME:-}"
 LMX_WRITE_INTERVAL="${LMX_WRITE_INTERVAL:-}"
 LMX_DELTA_T="${LMX_DELTA_T:-}"
 LMX_START_FROM="${LMX_START_FROM:-}"
+LMX_LOG_COUPLED_ITERATIONS="${LMX_LOG_COUPLED_ITERATIONS:-}"
 
 set +eu
 source "${WM_PROJECT_DIR}/etc/bashrc"
@@ -92,7 +93,7 @@ sync_control_dict() {
   if [[ ! -f "system/controlDict" ]]; then
     return 0
   fi
-  python3 - "$LMX_END_TIME" "$LMX_WRITE_INTERVAL" "$LMX_DELTA_T" "$LMX_START_FROM" <<'PY'
+  python3 - "$LMX_END_TIME" "$LMX_WRITE_INTERVAL" "$LMX_DELTA_T" "$LMX_START_FROM" "$LMX_LOG_COUPLED_ITERATIONS" <<'PY'
 from pathlib import Path
 import re
 import sys
@@ -104,6 +105,7 @@ replacements = {
     "writeInterval": sys.argv[2],
     "deltaT": sys.argv[3],
     "startFrom": sys.argv[4],
+    "logCoupledMhdIterations": sys.argv[5],
 }
 updated = text
 for key, value in replacements.items():
@@ -116,6 +118,8 @@ for key, value in replacements.items():
         count=1,
         flags=re.MULTILINE,
     )
+    if count == 0:
+        updated = updated.rstrip() + f"\n{key} {value};\n"
 if updated != text:
     path.write_text(updated)
 PY

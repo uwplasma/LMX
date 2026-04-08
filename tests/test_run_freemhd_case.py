@@ -61,7 +61,8 @@ def test_main_runs_container_when_image_exists(
         assert kwargs["platform"] == "linux/amd64"
         assert kwargs["cores"] == 95
         assert kwargs["start_from"] is None
-        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
+        assert kwargs["log_coupled_iterations"] is False
+        return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="warn")
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
 
@@ -87,6 +88,10 @@ def test_main_runs_container_when_image_exists(
     assert '"solver": "epotMultiRegionInterFoam"' in payload
     assert '"platform": "linux/amd64"' in payload
     assert '"cores": 95' in payload
+    assert '"run_stdout_log": "' in payload
+    assert '"run_stderr_log": "' in payload
+    assert output.with_suffix(".run.stdout.log").read_text() == "done"
+    assert output.with_suffix(".run.stderr.log").read_text() == "warn"
 
 
 def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -113,6 +118,7 @@ def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pyte
         write_interval="1e-3",
         delta_t="1e-4",
         start_from="startTime",
+        log_coupled_iterations=True,
     )
 
     command = recorded["command"]
@@ -124,6 +130,7 @@ def test_run_freemhd_case_uses_bash_entrypoint(tmp_path: Path, monkeypatch: pyte
     assert "LMX_WRITE_INTERVAL=1e-3" in command
     assert "LMX_DELTA_T=1e-4" in command
     assert "LMX_START_FROM=startTime" in command
+    assert "LMX_LOG_COUPLED_ITERATIONS=true" in command
     assert "--entrypoint" in command
     assert "/opt/lmx/run_freemhd_case.sh" in command
     assert "epotMultiRegionInterFoam" in command
@@ -151,6 +158,7 @@ def test_main_uses_explicit_cores_when_requested(
         assert kwargs["write_interval"] == "5e-4"
         assert kwargs["delta_t"] == "1e-4"
         assert kwargs["start_from"] == "startTime"
+        assert kwargs["log_coupled_iterations"] is True
         return runner.subprocess.CompletedProcess(args=["docker"], returncode=0, stdout="done", stderr="")
 
     monkeypatch.setattr(runner, "run_freemhd_case", fake_run)
@@ -173,6 +181,7 @@ def test_main_uses_explicit_cores_when_requested(
             "1e-4",
             "--start-from",
             "startTime",
+            "--log-coupled-iterations",
         ]
     )
 
@@ -183,3 +192,4 @@ def test_main_uses_explicit_cores_when_requested(
     assert '"write_interval": "5e-4"' in captured
     assert '"delta_t": "1e-4"' in captured
     assert '"start_from": "startTime"' in captured
+    assert '"log_coupled_iterations": true' in captured

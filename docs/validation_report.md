@@ -881,6 +881,46 @@ The backend harness currently supports:
   - this does not solve the current Hunt later-time parity blocker by itself,
     but it is the correct future-proof formulation for layered graded meshes
     and inlet-flow-rate-driven reduced runs
+- The FreeMHD diagnostic harness is now more robust for live Hunt replay work:
+  - `scripts/run_freemhd_case.py` can force
+    `logCoupledMhdIterations true;` through `--log-coupled-iterations`
+  - when `--output` is used, the full container stdout/stderr is preserved as
+    sibling `*.run.stdout.log` / `*.run.stderr.log` files
+  - retained interpretation:
+    - this removes the earlier failure mode where a patched FreeMHD run could
+      emit the right `LMX_DIAG` lines and still lose them when the container
+      died during reconstruction or cleanup
+    - Docker/OpenFOAM on this machine is usable but still intermittent, so
+      preserving the full stdout log is now part of the validation baseline
+- Latest retained live Hunt `Ha20` short-trace snapshot from the saved patched
+  FreeMHD run and matching LMX replay:
+  - FreeMHD `t = 1e-05`:
+    - `potEFinalResidual ≈ 4.43e-08`
+    - `potEIterations = 11`
+    - `pFinalResidual ≈ 4.86e-05`
+    - `pIterations = 60`
+    - `maxU ≈ 1.1794e-01`
+    - `maxJxB ≈ 3.8759e+03`
+  - FreeMHD `t = 2e-05`:
+    - `potEFinalResidual ≈ 3.67e-08`
+    - `potEIterations = 10`
+    - `pFinalResidual ≈ 2.36e-05`
+    - `pIterations = 100`
+    - `maxU ≈ 1.1805e-01`
+    - `maxJxB ≈ 4.6525e+03`
+  - aligned LMX-vs-FreeMHD trace errors through `t = 2e-05`:
+    - `u_max l2 ≈ 1.83e-03`
+    - `mean_velocity l2 ≈ 2.31e-03`
+    - `pressure_proxy l2 ≈ 1.00e-01`
+    - `current_max l2 ≈ 7.94e-02`
+    - `face_current_max l2 ≈ 7.33e-02`
+    - `emf_max l2 ≈ 7.14e-02`
+    - `lorentz_max l2 ≈ 1.31e-01`
+  - retained interpretation:
+    - the patched Hunt startup path is now close enough that the remaining gap
+      is no longer a generic startup-source failure
+    - the most expensive remaining mismatch is later pressure/Lorentz response,
+      not the `potE` solve itself
 
 ## Meeting demo artifact
 
