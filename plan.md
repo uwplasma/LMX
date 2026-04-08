@@ -195,9 +195,13 @@ LMX should only be described as ship ready for the current milestone when all of
 - Interpretation:
   - a large fraction of the remaining later-time Hunt `JxB` mismatch is in the reduction
     used for the comparison trace, not only in the solved reduced flow evolution
-  - the next solver/validation step should decide whether layered parity reports should
-    treat face-based Lorentz reduction as the primary force-scale diagnostic while keeping
-    the cell-centered field as the native state variable
+  - layered parity reports should now treat face-based Lorentz reduction as the
+    primary force-scale diagnostic while keeping the cell-centered field as the
+    native state variable
+  - the next solver-side Hunt target is therefore narrower:
+    - `current_max`
+    - `pressure_proxy`
+    - and any later-time drift that remains after using the face-based force trace
 
 ## What Worked
 

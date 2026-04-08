@@ -200,6 +200,11 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         payload["lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, lorentz_history)
     if lorentz_times and face_lorentz_history:
         payload["face_lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, face_lorentz_history)
+        payload["primary_lorentz_metric"] = "face_lorentz_max"
+        payload["primary_lorentz_max"] = payload["face_lorentz_max"]
+    elif lorentz_times:
+        payload["primary_lorentz_metric"] = "lorentz_max"
+        payload["primary_lorentz_max"] = payload["lorentz_max"]
     if jn_times and face_current_history:
         payload["face_current_max"] = _build_alignment(jn_times, jn_values, lmx_times, face_current_history)
     if jn_density_times and face_current_history:

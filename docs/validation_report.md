@@ -1135,12 +1135,21 @@ The backend harness currently supports:
   - `current_max l2 ≈ 2.28e-02`
   - `lorentz_max l2 ≈ 8.42e-02`
   - `pressure_proxy l2 ≈ 1.11e-01`
+- A follow-on retained diagnostic pass makes the layered force-scale picture
+  more accurate:
+  - the replay now also records `face_lorentz_max_history`
+  - `compare_hunt_trace_histories.py` promotes that to
+    `primary_lorentz_metric = face_lorentz_max` when it is available
+  - on the same retained `t <= 6e-05` Hunt replay:
+    - `primary_lorentz_max l2 ≈ 3.68e-03`
+    - cell-centered `lorentz_max l2` remains `≈ 8.42e-02`
 - Retained interpretation:
   - this is the more physically faithful Hunt replay baseline for recovered
     cases
   - it improves the flow/current side of the later-time replay modestly
-  - the remaining later-time Hunt blocker is still the Lorentz/pressure
-    response, not inlet-type inference
+  - the remaining later-time Hunt blocker is now better described as
+    current/pressure-response drift plus scalar-reduction choice, not simply a
+    large layered Lorentz-force mismatch
 
 ## Meeting demo artifact
 

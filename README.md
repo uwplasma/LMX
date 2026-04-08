@@ -218,6 +218,13 @@ LMX `inlet_flow_rate` closure automatically. The scripts also record the raw
 recovered `volumetricFlowRate` in their JSON output as
 `recovered_inlet_flow_rate`, but they do not pass that dimensional value
 directly into the nondimensional reduced duct model.
+For layered Hunt replay work, `compare_hunt_trace_histories.py` now emits
+`primary_lorentz_metric` and `primary_lorentz_max`. When
+`face_lorentz_max_history` is present in the LMX trace, that face-based force
+history becomes the primary Lorentz parity metric automatically. This is the
+retained comparison path for the corrected `t <= 6e-05` Hunt replay because the
+face-based trace is materially closer to the patched external backend than the
+older cell-centered scalar reduction.
 That diagnostic runner also supports restart/continuation directly from a prior
 LMX `.npz` state dump, so longer reduced Hunt replay windows can now be built
 incrementally without rerunning from `t = 0`.
