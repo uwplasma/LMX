@@ -533,6 +533,9 @@ The backend harness currently supports:
   from `--local-freemhd-root`, and `--patch-local-freemhd-logging` applies the
   current coupled-logging patch set before that build. That removes the last
   manual image-management step from the local Hunt diagnostic loop.
+- `build_freemhd_container.py` now also supports `--no-cache`, which is the
+  preferred mode when the local patched FreeMHD/OpenFOAM solver sources changed
+  and the next diagnostic replay must not reuse an older cached image layer.
 - Extended the FreeMHD diagnostic patcher so `LMX_DIAG epot` records now include
   `maxJn`, `maxPsiub`, and `maxCenteredJxB` in addition to the active
   `maxJxB`. On the first real rerun of recovered Hunt `Ha20`, the first patched
@@ -886,6 +889,8 @@ The backend harness currently supports:
     `logCoupledMhdIterations true;` through `--log-coupled-iterations`
   - when `--output` is used, the full container stdout/stderr is preserved as
     sibling `*.run.stdout.log` / `*.run.stderr.log` files
+  - when `--log-coupled-iterations` is active, the runner also writes the
+    extracted `LMX_DIAG` payload as `*.run.diag.json`
   - retained interpretation:
     - this removes the earlier failure mode where a patched FreeMHD run could
       emit the right `LMX_DIAG` lines and still lose them when the container

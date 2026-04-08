@@ -202,6 +202,8 @@
   container runs can use patched local solver sources instead of recloning
   upstream. The build path now uses `docker buildx build --load` so the image is
   immediately visible to later `docker run` steps on the local Docker daemon.
+  Use `--no-cache` when a patched local solver file must be guaranteed to reach
+  the next image build instead of being masked by a cached Docker layer.
 - `python scripts/run_freemhd_case.py --local-freemhd-root ./external/FreeMHD`:
   can now auto-build a missing local image before launching the case, and
   `--patch-local-freemhd-logging` applies the current diagnostic patch set to
@@ -213,7 +215,11 @@
   full container stdout/stderr as sibling `*.run.stdout.log` /
   `*.run.stderr.log` files. That is now the preferred diagnostic mode because
   the solver log remains recoverable even when a patched OpenFOAM/FreeMHD run
-  fails late in reconstruction or post-processing.
+  fails late in reconstruction or post-processing. When
+  `--log-coupled-iterations` is enabled, the runner also writes a sidecar
+  `*.run.diag.json` extracted directly from the saved stdout log, so later Hunt
+  parity scripts do not need a separate manual `extract_freemhd_coupled_log.py`
+  call in the common case.
 - The electric-potential discretization on nonuniform meshes now uses
   resistance-weighted face conductance and face electromotive terms instead of
   equal-spacing harmonic shortcuts. That is the finite-volume-consistent form

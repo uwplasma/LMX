@@ -155,7 +155,7 @@ Useful optional-backend commands:
 ```bash
 /Users/rogerio/base_env/bin/python3 scripts/fetch_freemhd_assets.py --dest ./external
 /Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
-/Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-localdiag --local-freemhd-root ./external/FreeMHD
+/Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-localdiag --local-freemhd-root ./external/FreeMHD --no-cache
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --log-coupled-iterations --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
 /Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
 /Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
@@ -167,6 +167,8 @@ Useful optional-backend commands:
 `build_freemhd_container.py` now uses a loadable `docker buildx build --load`
 path so locally patched validation-backend images are available to subsequent
 `docker run` smoke and parity scripts instead of staying only in builder output.
+Use `--no-cache` when you need Docker to pick up local patched FreeMHD/OpenFOAM
+source changes immediately instead of reusing a stale cached layer.
 The parity loaders also infer `BtStartTime` and `BtDuration` from
 `system/controlDict`, so short transient LMX replays now use the same magnetic
 field ramp settings as the recovered validation cases when those controls are
@@ -181,6 +183,9 @@ Use `--log-coupled-iterations` for patched FreeMHD/OpenFOAM runs so the mounted
 case forces `logCoupledMhdIterations true;` before launch and the saved stdout
 log contains `LMX_DIAG` records even if the container later dies in cleanup or
 reconstruction.
+When that flag is active, the runner also extracts those `LMX_DIAG` lines into a
+sidecar `*.run.diag.json`, so the run output is immediately consumable by
+`compare_hunt_trace_histories.py` without a separate manual extraction step.
 `run_hunt_solver_diagnostic_report.py` also mirrors recovered Hunt startup
 cases more faithfully now: when the recovered run has a nonzero startup
 velocity in `0/liquid/U`, the reduced replay automatically adds the matching
