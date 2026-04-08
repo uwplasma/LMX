@@ -897,6 +897,33 @@ The backend harness currently supports:
       died during reconstruction or cleanup
     - Docker/OpenFOAM on this machine is usable but still intermittent, so
       preserving the full stdout log is now part of the validation baseline
+- The hardened runner is now validated on a fresh rematerialized recovered Hunt
+  case under `/private/tmp/lmx_hunt_refresh`:
+  - restarted Docker, rematerialized `hunt_exactBL_Ha20`, and launched a clean
+    short replay with
+    `scripts/run_freemhd_case.py --log-coupled-iterations --end-time 2e-05`
+  - live container logs showed patched `LMX_DIAG outer`, `epot`, and
+    `pressure` records at `t = 1e-05` and `t = 2e-05`
+  - saved those logs to
+    `/private/tmp/lmx_hunt_refresh/docker_logs_live_short.log`,
+    extracted
+    `/private/tmp/lmx_hunt_refresh/hunt_diag_live_short.json`,
+    and compared them against
+    `/private/tmp/lmx_hunt_refresh/lmx_hunt_short_report.json`
+  - retained short-window normalized history errors:
+    - `u_max l2_error ≈ 1.89e-03`
+    - `mean_velocity l2_error ≈ 2.08e-03`
+    - `emf_max l2_error ≈ 9.51e-04`
+    - `lorentz_max l2_error ≈ 8.36e-03`
+    - `current_max l2_error ≈ 1.10e-02`
+    - `face_current_max l2_error ≈ 7.50e-03`
+    - `pressure_proxy l2_error ≈ 3.12e-02`
+  - retained interpretation:
+    - on the corrected short Hunt window, startup source history is no longer
+      the dominant gap
+    - the remaining reduced-model mismatch is more concentrated in the
+      pressure-like response and layered current reduction than in normalized
+      `u_max` or normalized `JxB`
 - Latest retained live Hunt `Ha20` short-trace snapshot from the saved patched
   FreeMHD run and matching LMX replay:
   - FreeMHD `t = 1e-05`:

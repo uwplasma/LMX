@@ -2829,6 +2829,8 @@ LMX should only be described as ship ready for the current milestone when all of
     - when `--output` is provided, `run_freemhd_case.py` now also preserves
       full container stdout/stderr as sibling
       `*.run.stdout.log` / `*.run.stderr.log` files
+    - when `--log-coupled-iterations` is enabled, the runner also writes a
+      sibling `*.run.diag.json` extracted directly from the saved stdout log
     - retained the already-landed `build_freemhd_container.py --no-cache`
       support and aligned tests with the current builder signature
   - retained QA result:
@@ -2840,6 +2842,39 @@ LMX should only be described as ship ready for the current milestone when all of
       - `ci`: `24117195142`
       - `benchmarks`: `24117195114`
   - retained operational result:
+    - restarted Docker successfully on this machine and validated the hardened
+      FreeMHD/OpenFOAM runner on a freshly rematerialized
+      `hunt_exactBL_Ha20` case under `/private/tmp/lmx_hunt_refresh`
+    - the fixed runner now works end to end on a clean recovered case:
+      - a short `t <= 2e-05` replay launched with
+        `--log-coupled-iterations --output /private/tmp/lmx_hunt_refresh/run_short.json`
+      - live container logs showed the expected patched `LMX_DIAG outer`,
+        `LMX_DIAG epot`, and `LMX_DIAG pressure` records at `t = 1e-05` and
+        `t = 2e-05`
+      - the same live log was saved manually to
+        `/private/tmp/lmx_hunt_refresh/docker_logs_live_short.log`,
+        extracted to
+        `/private/tmp/lmx_hunt_refresh/hunt_diag_live_short.json`,
+        and compared against a matching reduced LMX replay in
+        `/private/tmp/lmx_hunt_refresh/lmx_hunt_short_report.json`
+    - retained short-window Hunt `Ha20` comparison result on the clean replay:
+      - `u_max l2_error ≈ 1.89e-03`
+      - `mean_velocity l2_error ≈ 2.08e-03`
+      - `emf_max l2_error ≈ 9.51e-04`
+      - `lorentz_max l2_error ≈ 8.36e-03`
+      - `current_max l2_error ≈ 1.10e-02`
+      - `face_current_max l2_error ≈ 7.50e-03`
+      - `pressure_proxy l2_error ≈ 3.12e-02`
+    - retained interpretation:
+      - the hardened harness is now good enough to support repeatable Hunt
+        parity work from a clean recovered case, even when Docker needs to be
+        restarted during the session
+      - on the short corrected Hunt window, the next solver target is not the
+        startup ramp/source law anymore
+      - the most likely remaining reduced-model blocker is the later pressure-
+        like response plus how the layered face-current system is reduced, not
+        the normalized `u_max` history and not the normalized `JxB` startup
+        shape
     - Docker/OpenFOAM is usable on this machine, but the daemon is still
       intermittent between runs
     - the saved live patched Hunt replay now contains enough structured
