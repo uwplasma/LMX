@@ -3690,6 +3690,50 @@ LMX does not need to implement all of that to finish the retained current plan.
     target the reduced pressure/current response with a different mechanism,
     not by carrying this scalar forcing state forward
 
+### Latest rejected relaxed-sensitivity flow-rate closure
+
+- I tested a more self-consistent reduced `inlet_flow_rate` control law in
+  `lmx/solvers.py`: solve the scalar forcing against the relaxed velocity
+  response inside `_step(...)` instead of the pre-relaxation response.
+- This is physically plausible because the actual update applies `relaxation`
+  before the limiter, so I checked it against both the native Hunt analytical
+  gate and a freshly rebuilt patched FreeMHD live run.
+- Native Hunt analytical check at `Ha20`, `32^2`:
+  - retained baseline:
+    - `y_l2 ≈ 6.806e-02`
+    - `z_l2 ≈ 1.911e-01`
+    - `combined_l2 ≈ 1.4342e-01`
+  - retained interpretation:
+    - this is materially worse than the current retained Hunt baseline near
+      `combined_l2 ≈ 1.0023e-01`
+    - the relaxed-sensitivity closure should not stay on `main`
+- Fresh live FreeMHD replay artifacts rebuilt from `external/StartingFiles.zip`
+  with `--disable-vtk-write`:
+  - run metadata:
+    - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_relaxed_sensitivity.json`
+  - solver replay:
+    - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_relaxed_sensitivity_valid.json`
+  - aligned comparison:
+    - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_relaxed_sensitivity.json`
+- Replay-side normalized parity on that rebuilt run:
+  - `u_max l2 ≈ 3.39e-03`
+  - `primary_pressure_proxy l2 ≈ 1.33e-02`
+  - `primary_current_max l2 ≈ 4.18e-03`
+  - `primary_lorentz_max l2 ≈ 1.04e-02`
+- Caveat:
+  - the local `lmx-freemhd-smoke` image used for this rebuild was still on the
+    older pressure logger, so the run records `maxP` rather than the newer
+    `pSpan`-based pressure metric
+  - that replay is useful as boundedness / trend evidence, but not strong
+    enough to override the native analytical regression
+- Retained interpretation:
+  - this control-law family is another tempting but wrong fix
+  - it can look reasonable on a live replay window, but it weakens the native
+    Hunt solver materially
+  - the retained baseline stays on the original pre-relaxation forcing closure,
+    and the next Hunt work should keep targeting the reduced later-time
+    pressure/current response with a different mechanism
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

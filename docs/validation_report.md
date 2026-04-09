@@ -1312,6 +1312,42 @@ The backend harness currently supports:
   - the next retained Hunt step should target the reduced later-time
     pressure/current response with a different mechanism rather than carrying
     this scalar forcing state forward
+- I then tested a second structurally plausible reduced control-law change:
+  solve the `inlet_flow_rate` forcing against the relaxed velocity response
+  inside `_step(...)` instead of the pre-relaxation response.
+- Native Hunt analytical check at `Ha20`, `32^2` rejected it decisively:
+  - candidate relaxed-sensitivity closure:
+    - `y_l2 ≈ 6.806e-02`
+    - `z_l2 ≈ 1.911e-01`
+    - `combined_l2 ≈ 1.4342e-01`
+  - that is materially worse than the retained Hunt baseline near
+    `combined_l2 ≈ 1.0023e-01`
+- I also rebuilt a fresh live FreeMHD Hunt run from
+  `external/StartingFiles.zip` with `--disable-vtk-write` and compared the same
+  candidate against the patched diagnostics:
+  - run metadata:
+    - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_relaxed_sensitivity.json`
+  - replay:
+    - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_relaxed_sensitivity_valid.json`
+  - aligned comparison:
+    - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_relaxed_sensitivity.json`
+  - normalized replay-side metrics on that run:
+    - `u_max l2 ≈ 3.39e-03`
+    - `primary_pressure_proxy l2 ≈ 1.33e-02`
+    - `primary_current_max l2 ≈ 4.18e-03`
+    - `primary_lorentz_max l2 ≈ 1.04e-02`
+- Important caveat:
+  - the local `lmx-freemhd-smoke` image used for that rebuilt live run still
+    emitted the older `maxP` pressure logger rather than the newer `pSpan`
+    diagnostic
+  - so that replay is useful as boundedness / trend evidence, but it is not a
+    strong enough parity signal to justify keeping a native analytical
+    regression on `main`
+- Retained conclusion:
+  - the relaxed-sensitivity control law is another tempting but wrong Hunt fix
+  - it should stay out of retained solver logic
+  - the remaining Hunt work still belongs in the later-time reduced
+    pressure/current response, but with a different mechanism
 
 ## Meeting demo artifact
 
