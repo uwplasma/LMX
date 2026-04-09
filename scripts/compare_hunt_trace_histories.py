@@ -169,6 +169,8 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     psiub_density_values = [float(record["maxPsiubDensity"]) for record in epot_records if "maxPsiubDensity" in record]
     lorentz_times = [float(record["time"]) for record in epot_records]
     lorentz_values = [float(record["maxJxB"]) for record in epot_records]
+    centered_lorentz_times = [float(record["time"]) for record in epot_records if "maxCenteredJxB" in record]
+    centered_lorentz_values = [float(record["maxCenteredJxB"]) for record in epot_records if "maxCenteredJxB" in record]
 
     lmx_times = [float(value) for value in lmx_trace["time_history"]]
     u_history = [float(value) for value in lmx_trace["u_max_history"]]
@@ -224,6 +226,7 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
                 "maxJnDensity",
                 "maxPsiub",
                 "maxPsiubDensity",
+                "maxCenteredJxB",
                 "maxJxB",
             ],
         ),
@@ -269,11 +272,6 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         payload["current_max"] = _build_alignment(j_times, j_values, lmx_times, current_history)
     if jn_times and face_current_history:
         payload["face_current_max"] = _build_alignment(jn_times, jn_values, lmx_times, face_current_history)
-        payload["primary_current_metric"] = "face_current_max"
-        payload["primary_current_max"] = payload["face_current_max"]
-    elif j_times:
-        payload["primary_current_metric"] = "current_max"
-        payload["primary_current_max"] = payload["current_max"]
     if jn_density_times and face_current_history:
         payload["face_current_density_max"] = _build_alignment(
             jn_density_times,
@@ -281,15 +279,30 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
             lmx_times,
             face_current_history,
         )
+        payload["primary_current_metric"] = "face_current_density_max"
+        payload["primary_current_max"] = payload["face_current_density_max"]
+    elif jn_times and face_current_history:
+        payload["primary_current_metric"] = "face_current_max"
+        payload["primary_current_max"] = payload["face_current_max"]
+    elif j_times:
+        payload["primary_current_metric"] = "current_max"
+        payload["primary_current_max"] = payload["current_max"]
     if lorentz_times:
         payload["lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, lorentz_history)
-    if lorentz_times and face_lorentz_history:
-        payload["face_lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, face_lorentz_history)
-        payload["primary_lorentz_metric"] = "face_lorentz_max"
-        payload["primary_lorentz_max"] = payload["face_lorentz_max"]
+    if centered_lorentz_times and lorentz_history:
+        payload["centered_lorentz_max"] = _build_alignment(
+            centered_lorentz_times,
+            centered_lorentz_values,
+            lmx_times,
+            lorentz_history,
+        )
+        payload["primary_lorentz_metric"] = "centered_lorentz_max"
+        payload["primary_lorentz_max"] = payload["centered_lorentz_max"]
     elif lorentz_times:
         payload["primary_lorentz_metric"] = "lorentz_max"
         payload["primary_lorentz_max"] = payload["lorentz_max"]
+    if lorentz_times and face_lorentz_history:
+        payload["face_lorentz_max"] = _build_alignment(lorentz_times, lorentz_values, lmx_times, face_lorentz_history)
     if psiub_times and emf_history:
         payload["emf_max"] = _build_alignment(psiub_times, psiub_values, lmx_times, emf_history)
     if psiub_density_times and emf_history:

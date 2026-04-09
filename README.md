@@ -214,32 +214,38 @@ pressure/current/Lorentz diagnostic window needed for parity work.
 `run_hunt_solver_diagnostic_report.py` and `run_freemhd_parity_report.py` now
 also infer the recovered Hunt inlet type from `0/liquid/U`. When the recovered
 case uses `flowRateInletVelocity`, the reduced replay switches to the matching
-LMX `inlet_flow_rate` closure automatically. The scripts also record the raw
-recovered `volumetricFlowRate` in their JSON output as
-`recovered_inlet_flow_rate`, but they do not pass that dimensional value
-directly into the nondimensional reduced duct model.
+LMX `inlet_flow_rate` closure automatically and now pass the recovered
+`volumetricFlowRate` into that replay path directly. The scripts also record
+that value in their JSON output as `recovered_inlet_flow_rate`.
 For corrected layered Hunt replay comparisons, the retained primary parity
 metrics are now:
 - `primary_pressure_metric = pSpan`
-- `primary_current_metric = face_current_max`
-- `primary_lorentz_metric = face_lorentz_max`
+- `primary_current_metric = face_current_density_max`
+- `primary_lorentz_metric = centered_lorentz_max`
 
 Those are the quantities to watch first when comparing LMX against patched
 FreeMHD/OpenFOAM long-trace artifacts.
 For layered Hunt replay work, `compare_hunt_trace_histories.py` now emits
 `primary_pressure_proxy_metric` / `primary_pressure_proxy`,
 `primary_current_metric` / `primary_current_max`, and
-`primary_lorentz_metric` / `primary_lorentz_max`. When
-`face_current_max_history` and `face_lorentz_max_history` are present in the
-LMX trace, those face-based layered diagnostics become the primary current and
-force parity metrics automatically. The same script now also derives a
-`current_scaled_pressure_proxy` from the reduced pressure trace and the
-layered current history; on the retained corrected Hunt `t <= 6e-05` replay
-that narrows the normalized `pSpan` mismatch from about `6.23e-02` to about
-`4.42e-02` without changing solver physics. This is the retained comparison
-path for the corrected `t <= 6e-05` Hunt replay because the face-based traces are
-materially closer to the patched external backend than the older cell-centered
-scalar reductions.
+`primary_lorentz_metric` / `primary_lorentz_max`. The current retained mapping
+is source-driven rather than “best looking”:
+- face current density is compared against FreeMHD `maxJnDensity`
+- cell-centered Lorentz force is compared against FreeMHD `maxCenteredJxB`
+- the existing face-based Lorentz trace remains available as a secondary
+  diagnostic, but it is no longer treated as the primary parity observable
+The same script now also derives a `current_scaled_pressure_proxy` from the
+reduced pressure trace and the layered current history. On the latest rebuilt
+patched Hunt `Ha20`, `t <= 6e-05` replay, the honest retained normalized
+metrics are roughly:
+- `u_max l2 ≈ 3.43e-02`
+- `pressure_proxy` vs `pSpan`: `l2 ≈ 8.41e-02`
+- `primary_current_max` (`face_current_density_max`): `l2 ≈ 9.09e-02`
+- `primary_lorentz_max` (`centered_lorentz_max`): `l2 ≈ 1.10e-01`
+That replay is the current Hunt baseline for solver work because it removes
+two earlier parity-script mismatches:
+- wrong replay inlet-flow-rate handling
+- wrong mapping between LMX layered observables and FreeMHD logged quantities
 That corrected pressure-side observable is now also part of the core LMX
 diagnostic/output path:
 - live solver logs print `currentScaledPressureProxy`

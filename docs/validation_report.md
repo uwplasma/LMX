@@ -1388,3 +1388,33 @@ The backend harness currently supports:
 - Expand native LMX validation to additional mapped-geometry cases.
 - Improve high-Ha Hunt fidelity without introducing case-specific hardcoded limits.
 - Keep the external backend checks optional and separate from the core LMX identity.
+
+## Latest Hunt parity correction
+
+- I reviewed the actual LMX and FreeMHD source instead of continuing to tune
+  against possibly wrong parity observables.
+- Two real Hunt replay mismatches were corrected:
+  - the recovered `flowRateInletVelocity` value from `0/liquid/U` is now
+    passed through to the LMX `inlet_flow_rate` replay path
+  - the trace comparator now uses source-matched observables:
+    - `current_max_history -> maxJ`
+    - `face_current_max_history -> maxJnDensity`
+    - `emf_max_history -> maxPsiubDensity`
+    - `lorentz_max_history -> maxCenteredJxB`
+- Fresh rebuilt patched Hunt `Ha20`, `t <= 6e-05` replay artifacts:
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_current.json`
+  - `/private/tmp/lmx_hunt_long_refresh/freemhd_hunt_6e05_current.run.diag.json`
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_current_short.json`
+  - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_current_fixed.json`
+- On that corrected replay, the retained normalized parity metrics are:
+  - `u_max l2 ≈ 3.43e-02`
+  - `pressure_proxy` vs `pSpan`: `l2 ≈ 8.41e-02`
+  - `primary_current_max` (`face_current_density_max`): `l2 ≈ 9.09e-02`
+  - `primary_lorentz_max` (`centered_lorentz_max`): `l2 ≈ 1.10e-01`
+- Interpretation:
+  - these are more conservative than the older face-based Hunt metrics because
+    the older mapping was not source-correct
+  - the current Hunt gap is now being measured against the right replay setup
+    and the right FreeMHD observables
+  - the next solver iteration should target this corrected baseline directly,
+    especially the later-time reduced pressure/current response

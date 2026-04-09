@@ -186,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         max_steps=args.max_steps,
         forcing=0.0 if args.forcing is None else args.forcing,
         drive_mode=drive_mode if args.forcing is None else None,
-        inlet_flow_rate=None,
+        inlet_flow_rate=recovered_inlet_flow_rate,
         ramp_start=ramp_start,
         ramp_duration=ramp_duration,
     )

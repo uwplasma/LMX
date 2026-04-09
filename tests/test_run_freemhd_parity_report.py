@@ -125,7 +125,9 @@ boundaryField
 
     assert exit_code == 0
     assert recorded["forcing"] == pytest.approx(0.0)
-    assert any(boundary.kind == "inlet_flow_rate" for boundary in recorded["boundary_conditions"])
+    flow_boundaries = [boundary for boundary in recorded["boundary_conditions"] if boundary.kind == "inlet_flow_rate"]
+    assert flow_boundaries
+    assert flow_boundaries[0].value == pytest.approx(0.0047)
     stdout = capsys.readouterr().out
     assert '"forcing": 0.0' in stdout
     assert '"drive_mode": "inlet_flow_rate"' in stdout
