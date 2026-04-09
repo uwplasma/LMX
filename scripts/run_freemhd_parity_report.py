@@ -74,6 +74,26 @@ def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
     return None
 
 
+def infer_reduced_inlet_flow_rate(
+    case_dir: str | Path,
+    *,
+    reduced_area: float,
+    initial_velocity: float | None = None,
+) -> float | None:
+    recovered_flow_rate = infer_inlet_flow_rate(case_dir)
+    if recovered_flow_rate is None:
+        return None
+    speed = initial_velocity
+    if speed is None:
+        speed = infer_initial_velocity_x(case_dir)
+    if speed is None or abs(speed) <= 1e-20:
+        return None
+    recovered_area = recovered_flow_rate / speed
+    if abs(recovered_area) <= 1e-20:
+        return None
+    return recovered_flow_rate * (reduced_area / recovered_area)
+
+
 def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
     type_pattern = re.compile(r"type\s+(\S+)\s*;")
     for path in _candidate_u_paths(case_dir):
@@ -171,7 +191,17 @@ def main(argv: list[str] | None = None) -> int:
     ramp_start, ramp_duration = infer_magnetic_ramp(args.freemhd_run_dir)
     inferred_drive_mode = infer_inlet_drive_mode(args.freemhd_run_dir) if args.case_kind == "hunt" else None
     recovered_inlet_flow_rate = infer_inlet_flow_rate(args.freemhd_run_dir) if args.case_kind == "hunt" else None
+    reduced_inlet_flow_rate = None
     drive_mode = "none"
+    case_factory = {"hartmann": make_hartmann_case, "shercliff": make_shercliff_case, "hunt": make_hunt_case}[args.case_kind]
+    geometry_case = case_factory(ha=args.ha, ny=args.ny, nz=args.nz)
+    reduced_area = geometry_case.geometry.width * geometry_case.geometry.height
+    if args.case_kind == "hunt":
+        reduced_inlet_flow_rate = infer_reduced_inlet_flow_rate(
+            args.freemhd_run_dir,
+            reduced_area=reduced_area,
+            initial_velocity=initial_velocity,
+        )
     if args.forcing is None and args.case_kind == "hunt":
         drive_mode = inferred_drive_mode or "inlet_velocity"
 
@@ -186,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         max_steps=args.max_steps,
         forcing=0.0 if args.forcing is None else args.forcing,
         drive_mode=drive_mode if args.forcing is None else None,
-        inlet_flow_rate=recovered_inlet_flow_rate,
+        inlet_flow_rate=reduced_inlet_flow_rate,
         ramp_start=ramp_start,
         ramp_duration=ramp_duration,
     )
@@ -203,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         "forcing": case.forcing,
         "drive_mode": drive_mode,
         "recovered_inlet_flow_rate": recovered_inlet_flow_rate,
+        "reduced_inlet_flow_rate": reduced_inlet_flow_rate,
         "magnetic_ramp_start": ramp_start,
         "magnetic_ramp_duration": ramp_duration,
         "freemhd_run_dir": str(args.freemhd_run_dir.resolve()),

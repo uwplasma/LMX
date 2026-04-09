@@ -3747,9 +3747,11 @@ LMX does not need to implement all of that to finish the retained current plan.
 - I stopped treating the Hunt replay mismatch as a pure solver problem and
   checked the actual source-level observables on both sides.
 - Two concrete parity-script mismatches were real and are now corrected:
-  - the recovered `flowRateInletVelocity` value from `0/liquid/U` is now
-    passed through to the LMX `inlet_flow_rate` replay path instead of being
-    inferred and then dropped
+  - the recovered `flowRateInletVelocity` value from `0/liquid/U` is now used
+    correctly in the replay path:
+    - raw OpenFOAM metadata is recorded as `recovered_inlet_flow_rate`
+    - the replay value is rescaled onto the reduced LMX duct area and recorded
+      as `reduced_inlet_flow_rate`
   - Hunt trace comparison now maps the layered observables to the physically
     matching patched FreeMHD diagnostics:
     - `current_max_history -> maxJ`
@@ -3766,19 +3768,19 @@ LMX does not need to implement all of that to finish the retained current plan.
   - aligned comparison:
     - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_current_fixed.json`
 - On that corrected source-matched replay, the retained normalized metrics are:
-  - `u_max l2 ≈ 3.43e-02`
+  - `u_max l2 ≈ 1.43e-03`
   - `primary_pressure_metric = pSpan`
-  - `pressure_proxy l2 ≈ 8.41e-02`
+  - `pressure_proxy l2 ≈ 1.94e-02`
+  - `current_scaled_pressure_proxy l2 ≈ 3.18e-02`
   - `primary_current_metric = face_current_density_max`
-  - `primary_current_max l2 ≈ 9.09e-02`
+  - `primary_current_max l2 ≈ 1.44e-01`
   - `primary_lorentz_metric = centered_lorentz_max`
-  - `primary_lorentz_max l2 ≈ 1.10e-01`
+  - `primary_lorentz_max l2 ≈ 8.29e-02`
 - Retained interpretation:
-  - these metrics are harsher than the earlier face-current / face-Lorentz
-    comparison because the old mapping was not source-correct
-  - this is still progress, not a setback: the remaining Hunt mismatch is now
-    being measured against the right replay inputs and the right FreeMHD
-    observables
-  - the next solver work should target this corrected baseline directly,
-    especially the later-time reduced pressure/current response, rather than
-    revisiting replay setup or observable selection again
+  - once the replay flow-rate is rescaled onto the reduced duct area, Hunt
+    `u_max` and the pressure-side parity recover to the strong range expected
+    from the older retained short-window runs
+  - the remaining mismatch is now more concentrated in the source-correct
+    layered current-density and centered-Lorentz observables
+  - the next solver work should target that current/Lorentz evolution directly,
+    not replay input plumbing

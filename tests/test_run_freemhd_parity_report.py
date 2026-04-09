@@ -34,6 +34,7 @@ boundaryField
     )
     assert parity.infer_inlet_drive_mode(tmp_path) == "inlet_flow_rate"
     assert parity.infer_inlet_flow_rate(tmp_path) == pytest.approx(0.0047)
+    assert parity.infer_reduced_inlet_flow_rate(tmp_path, reduced_area=4.0, initial_velocity=0.1175) == pytest.approx(0.47)
 
 
 def test_infer_magnetic_ramp_reads_control_dict(tmp_path: Path):
@@ -127,8 +128,9 @@ boundaryField
     assert recorded["forcing"] == pytest.approx(0.0)
     flow_boundaries = [boundary for boundary in recorded["boundary_conditions"] if boundary.kind == "inlet_flow_rate"]
     assert flow_boundaries
-    assert flow_boundaries[0].value == pytest.approx(0.0047)
+    assert flow_boundaries[0].value == pytest.approx(0.47)
     stdout = capsys.readouterr().out
     assert '"forcing": 0.0' in stdout
     assert '"drive_mode": "inlet_flow_rate"' in stdout
     assert '"recovered_inlet_flow_rate": 0.0047' in stdout
+    assert '"reduced_inlet_flow_rate": 0.47' in stdout

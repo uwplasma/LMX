@@ -214,9 +214,10 @@ pressure/current/Lorentz diagnostic window needed for parity work.
 `run_hunt_solver_diagnostic_report.py` and `run_freemhd_parity_report.py` now
 also infer the recovered Hunt inlet type from `0/liquid/U`. When the recovered
 case uses `flowRateInletVelocity`, the reduced replay switches to the matching
-LMX `inlet_flow_rate` closure automatically and now pass the recovered
-`volumetricFlowRate` into that replay path directly. The scripts also record
-that value in their JSON output as `recovered_inlet_flow_rate`.
+LMX `inlet_flow_rate` closure automatically. The scripts record the raw
+recovered OpenFOAM value as `recovered_inlet_flow_rate`, then rescale it onto
+the reduced LMX duct area and use that replay value as
+`reduced_inlet_flow_rate`.
 For corrected layered Hunt replay comparisons, the retained primary parity
 metrics are now:
 - `primary_pressure_metric = pSpan`
@@ -236,12 +237,13 @@ is source-driven rather than “best looking”:
   diagnostic, but it is no longer treated as the primary parity observable
 The same script now also derives a `current_scaled_pressure_proxy` from the
 reduced pressure trace and the layered current history. On the latest rebuilt
-patched Hunt `Ha20`, `t <= 6e-05` replay, the honest retained normalized
-metrics are roughly:
-- `u_max l2 ≈ 3.43e-02`
-- `pressure_proxy` vs `pSpan`: `l2 ≈ 8.41e-02`
-- `primary_current_max` (`face_current_density_max`): `l2 ≈ 9.09e-02`
-- `primary_lorentz_max` (`centered_lorentz_max`): `l2 ≈ 1.10e-01`
+patched Hunt `Ha20`, `t <= 6e-05` replay, the retained normalized metrics are
+roughly:
+- `u_max l2 ≈ 1.43e-03`
+- `pressure_proxy` vs `pSpan`: `l2 ≈ 1.94e-02`
+- `current_scaled_pressure_proxy` vs `pSpan`: `l2 ≈ 3.18e-02`
+- `primary_current_max` (`face_current_density_max`): `l2 ≈ 1.44e-01`
+- `primary_lorentz_max` (`centered_lorentz_max`): `l2 ≈ 8.29e-02`
 That replay is the current Hunt baseline for solver work because it removes
 two earlier parity-script mismatches:
 - wrong replay inlet-flow-rate handling

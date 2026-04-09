@@ -297,8 +297,9 @@ boundaryField
     payload = json.loads(output.read_text())
     assert payload["drive_mode"] == "inlet_flow_rate"
     assert payload["recovered_inlet_flow_rate"] == pytest.approx(0.0047)
+    assert payload["reduced_inlet_flow_rate"] == pytest.approx(0.47)
     assert "inlet_flow_rate" in captured["boundary_kinds"]
-    assert captured["boundary_values"][0] == pytest.approx(0.0047)
+    assert captured["boundary_values"][0] == pytest.approx(0.47)
 
 
 def test_hunt_solver_diagnostic_report_supports_inlet_flow_rate_drive_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

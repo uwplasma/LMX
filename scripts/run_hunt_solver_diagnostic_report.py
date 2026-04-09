@@ -27,6 +27,7 @@ from scripts.run_freemhd_parity_report import (
     infer_initial_velocity_x,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
+    infer_reduced_inlet_flow_rate,
     infer_magnetic_ramp,
 )
 
@@ -149,6 +150,13 @@ def main(argv: list[str] | None = None) -> int:
     ramp_start, ramp_duration = infer_magnetic_ramp(run_dir)
     inferred_drive_mode = infer_inlet_drive_mode(run_dir)
     recovered_inlet_flow_rate = infer_inlet_flow_rate(run_dir)
+    reduced_case_geometry = make_hunt_case(ha=args.ha, ny=args.ny, nz=args.nz).geometry
+    reduced_area = reduced_case_geometry.width * reduced_case_geometry.height
+    reduced_inlet_flow_rate = infer_reduced_inlet_flow_rate(
+        run_dir,
+        reduced_area=reduced_area,
+        initial_velocity=initial_velocity,
+    )
     drive_mode = (inferred_drive_mode or "inlet_velocity") if args.drive_mode == "auto" else args.drive_mode
 
     case = _build_case(
@@ -157,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         nz=args.nz,
         initial_velocity=initial_velocity,
         drive_mode=drive_mode,
-        inlet_flow_rate=recovered_inlet_flow_rate,
+        inlet_flow_rate=reduced_inlet_flow_rate,
         dt=args.dt,
         t_final=args.t_final,
         max_steps=args.max_steps,
@@ -292,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         "initial_velocity": initial_velocity,
         "drive_mode": drive_mode,
         "recovered_inlet_flow_rate": recovered_inlet_flow_rate,
+        "reduced_inlet_flow_rate": reduced_inlet_flow_rate,
         "freemhd_run": freemhd_run,
         "lmx_solver": lmx_solver,
         "comparison": comparison,
