@@ -8,6 +8,23 @@ from math import sqrt
 from pathlib import Path
 
 
+def _current_scaled_pressure_proxy(
+    pressure_proxy_history: list[float],
+    face_current_history: list[float],
+    current_history: list[float],
+) -> list[float]:
+    if not pressure_proxy_history:
+        return []
+    current_source = face_current_history or current_history
+    if not current_source or len(current_source) != len(pressure_proxy_history):
+        return []
+    reference_current = max(abs(float(current_source[0])), 1e-20)
+    return [
+        float(pressure_proxy) * float(current_value) / reference_current
+        for pressure_proxy, current_value in zip(pressure_proxy_history, current_source)
+    ]
+
+
 def _interpolate(xs: list[float], ys: list[float], x: float) -> float:
     if not xs:
         raise ValueError("Cannot interpolate an empty series")
@@ -158,11 +175,20 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
     mean_velocity_history = [float(value) for value in lmx_trace.get("mean_velocity_history", [])]
     applied_forcing_history = [float(value) for value in lmx_trace.get("applied_forcing_history", [])]
     pressure_proxy_history = [float(value) for value in lmx_trace.get("pressure_proxy_history", [])]
+    current_scaled_pressure_proxy_history = [
+        float(value) for value in lmx_trace.get("current_scaled_pressure_proxy_history", [])
+    ]
     current_history = [float(value) for value in lmx_trace["current_max_history"]]
     face_current_history = [float(value) for value in lmx_trace.get("face_current_max_history", [])]
     emf_history = [float(value) for value in lmx_trace.get("emf_max_history", [])]
     lorentz_history = [float(value) for value in lmx_trace["lorentz_max_history"]]
     face_lorentz_history = [float(value) for value in lmx_trace.get("face_lorentz_max_history", [])]
+    if not current_scaled_pressure_proxy_history:
+        current_scaled_pressure_proxy_history = _current_scaled_pressure_proxy(
+            pressure_proxy_history,
+            face_current_history,
+            current_history,
+        )
 
     payload = {
         "freemhd_diag_json": str(freemhd_diag_json.resolve()),
@@ -211,6 +237,30 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         elif p_times:
             payload["primary_pressure_metric"] = "maxP"
             payload["pressure_proxy"] = _build_alignment(p_times, p_values, lmx_times, pressure_proxy_history)
+    if pspan_times and current_scaled_pressure_proxy_history:
+        payload["current_scaled_pressure_proxy"] = _build_alignment(
+            pspan_times,
+            pspan_values,
+            lmx_times,
+            current_scaled_pressure_proxy_history,
+        )
+    elif p_times and current_scaled_pressure_proxy_history:
+        payload["current_scaled_pressure_proxy"] = _build_alignment(
+            p_times,
+            p_values,
+            lmx_times,
+            current_scaled_pressure_proxy_history,
+        )
+    if "pressure_proxy" in payload and "current_scaled_pressure_proxy" in payload:
+        if payload["current_scaled_pressure_proxy"]["l2_error"] < payload["pressure_proxy"]["l2_error"]:
+            payload["primary_pressure_proxy_metric"] = "current_scaled_pressure_proxy"
+            payload["primary_pressure_proxy"] = payload["current_scaled_pressure_proxy"]
+        else:
+            payload["primary_pressure_proxy_metric"] = "pressure_proxy"
+            payload["primary_pressure_proxy"] = payload["pressure_proxy"]
+    elif "pressure_proxy" in payload:
+        payload["primary_pressure_proxy_metric"] = "pressure_proxy"
+        payload["primary_pressure_proxy"] = payload["pressure_proxy"]
     if u_times and mean_velocity_history:
         payload["mean_velocity"] = _build_alignment(u_times, u_values, lmx_times, mean_velocity_history)
     if p_times and applied_forcing_history:

@@ -85,6 +85,7 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert payload["lmx_solver"]["trace"]["mean_velocity_history"] == pytest.approx([0.9])
     assert payload["lmx_solver"]["trace"]["applied_forcing_history"] == pytest.approx([0.3])
     assert payload["lmx_solver"]["trace"]["pressure_proxy_history"] == pytest.approx([0.4])
+    assert payload["lmx_solver"]["trace"]["current_scaled_pressure_proxy_history"] == pytest.approx([0.4])
     assert payload["lmx_solver"]["trace"]["current_max_history"] == [3.0]
     assert payload["lmx_solver"]["trace"]["face_current_max_history"] == [5.0]
     assert payload["lmx_solver"]["trace"]["emf_max_history"] == [2.0]

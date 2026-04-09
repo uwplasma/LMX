@@ -31,6 +31,25 @@ from scripts.run_freemhd_parity_report import (
 )
 
 
+def _current_scaled_pressure_proxy_history(
+    pressure_proxy_history: list[float],
+    face_current_max_history: list[float],
+    current_max_history: list[float],
+) -> list[float]:
+    if not pressure_proxy_history:
+        return []
+    current_history = face_current_max_history or current_max_history
+    if not current_history:
+        return []
+    if len(current_history) != len(pressure_proxy_history):
+        return []
+    reference_current = max(abs(float(current_history[0])), 1e-20)
+    return [
+        float(pressure_proxy) * float(current_value) / reference_current
+        for pressure_proxy, current_value in zip(pressure_proxy_history, current_history)
+    ]
+
+
 def _build_case(
     ha: float,
     ny: int,
@@ -261,6 +280,14 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             }
         )
+
+    current_scaled_pressure_proxy_history = _current_scaled_pressure_proxy_history(
+        lmx_solver["trace"]["pressure_proxy_history"],
+        lmx_solver["trace"]["face_current_max_history"],
+        lmx_solver["trace"]["current_max_history"],
+    )
+    if current_scaled_pressure_proxy_history:
+        lmx_solver["trace"]["current_scaled_pressure_proxy_history"] = current_scaled_pressure_proxy_history
 
     payload = {
         "case_kind": "hunt",

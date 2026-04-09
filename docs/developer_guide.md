@@ -280,6 +280,7 @@
   - `mean_velocity_history`
   - `applied_forcing_history`
   - `pressure_proxy_history`
+  - `current_scaled_pressure_proxy_history`
   Use those traces when comparing reduced-model pressure-response candidates
   against the patched FreeMHD pressure loop.
 - `python scripts/run_hunt_solver_diagnostic_report.py --drive-mode inlet_flow_rate ...`:

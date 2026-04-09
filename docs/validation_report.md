@@ -1196,6 +1196,8 @@ The backend harness currently supports:
   current LMX baseline:
   - `u_max l2 ≈ 1.68e-03`
   - `pressure_proxy l2 ≈ 6.23e-02` with `primary_pressure_metric = pSpan`
+  - derived `current_scaled_pressure_proxy l2 ≈ 4.42e-02`
+    with `primary_pressure_proxy_metric = current_scaled_pressure_proxy`
   - `primary_current_max l2 ≈ 2.29e-02`
   - `primary_lorentz_max l2 ≈ 1.62e-02`
   - `mean_velocity l2 ≈ 2.62e-03`
@@ -1203,6 +1205,9 @@ The backend harness currently supports:
   - the old pressure mismatch was partly a bad parity observable
   - switching from absolute `maxP` to `pSpan` cuts the long Hunt
     pressure-side error materially
+  - scaling the reduced pressure trace by the retained layered current history
+    narrows the corrected `pSpan` mismatch again (`≈ 6.23e-02 -> ≈ 4.42e-02`)
+    without changing solver physics
   - the remaining later-time Hunt mismatch is now smaller and genuinely
     solver-side, not mainly a logging/reference-level artifact
 - I also tested a general forcing-response relaxation family for reduced

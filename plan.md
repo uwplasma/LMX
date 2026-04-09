@@ -3537,6 +3537,8 @@ LMX does not need to implement all of that to finish the retained current plan.
   - `u_max l2 ≈ 1.68e-03`
   - `primary_pressure_metric = pSpan`
   - `pressure_proxy l2 ≈ 6.23e-02`
+  - `primary_pressure_proxy_metric = current_scaled_pressure_proxy`
+  - `current_scaled_pressure_proxy l2 ≈ 4.42e-02`
   - `primary_current_metric = face_current_max`
   - `primary_current_max l2 ≈ 2.29e-02`
   - `primary_lorentz_metric = face_lorentz_max`
@@ -3546,8 +3548,11 @@ LMX does not need to implement all of that to finish the retained current plan.
   - the old pressure mismatch was partly a parity-observable problem
   - switching from `maxP` to `pSpan` cuts the long Hunt pressure mismatch
     materially (`≈ 1.11e-01 -> ≈ 6.23e-02`)
+  - deriving a current-scaled reduced pressure observable narrows it further
+    (`≈ 6.23e-02 -> ≈ 4.42e-02`) without changing solver physics
   - the remaining later-time Hunt blocker is now a smaller, genuinely
-    solver-side pressure/current response gap
+    solver-side pressure/current response gap after correcting the retained
+    pressure/current/Lorentz observables
 
 ### Latest rejected forcing-relaxation family
 

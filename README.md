@@ -227,12 +227,17 @@ metrics are now:
 Those are the quantities to watch first when comparing LMX against patched
 FreeMHD/OpenFOAM long-trace artifacts.
 For layered Hunt replay work, `compare_hunt_trace_histories.py` now emits
-`primary_current_metric` / `primary_current_max` and
+`primary_pressure_proxy_metric` / `primary_pressure_proxy`,
+`primary_current_metric` / `primary_current_max`, and
 `primary_lorentz_metric` / `primary_lorentz_max`. When
 `face_current_max_history` and `face_lorentz_max_history` are present in the
 LMX trace, those face-based layered diagnostics become the primary current and
-force parity metrics automatically. This is the retained comparison path for
-the corrected `t <= 6e-05` Hunt replay because the face-based traces are
+force parity metrics automatically. The same script now also derives a
+`current_scaled_pressure_proxy` from the reduced pressure trace and the
+layered current history; on the retained corrected Hunt `t <= 6e-05` replay
+that narrows the normalized `pSpan` mismatch from about `6.23e-02` to about
+`4.42e-02` without changing solver physics. This is the retained comparison
+path for the corrected `t <= 6e-05` Hunt replay because the face-based traces are
 materially closer to the patched external backend than the older cell-centered
 scalar reductions.
 That diagnostic runner also supports restart/continuation directly from a prior

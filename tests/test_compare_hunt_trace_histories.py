@@ -45,6 +45,7 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                         "mean_velocity_history": [1.0, 0.5],
                         "applied_forcing_history": [9.0, 4.5],
                         "pressure_proxy_history": [8.0, 4.0],
+                        "current_scaled_pressure_proxy_history": [8.0, 4.0],
                         "current_max_history": [4.0, 3.2],
                 "face_current_max_history": [7.0, 5.6],
                 "emf_max_history": [3.0, 2.4],
@@ -67,7 +68,10 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     assert payload["mean_velocity"]["l2_error"] == pytest.approx(0.0)
     assert payload["applied_forcing"]["l2_error"] == pytest.approx(0.0)
     assert payload["pressure_proxy"]["l2_error"] == pytest.approx(0.0)
+    assert payload["current_scaled_pressure_proxy"]["l2_error"] == pytest.approx(0.0)
     assert payload["primary_pressure_metric"] == "pSpan"
+    assert payload["primary_pressure_proxy_metric"] == "pressure_proxy"
+    assert payload["primary_pressure_proxy"]["l2_error"] == pytest.approx(0.0)
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["face_current_density_max"]["l2_error"] == pytest.approx(0.0)
@@ -100,6 +104,7 @@ def test_main_writes_alignment_json(tmp_path: Path):
                         "mean_velocity_history": [3.0],
                         "applied_forcing_history": [4.0],
                         "pressure_proxy_history": [3.0],
+                        "current_scaled_pressure_proxy_history": [3.0],
                         "current_max_history": [1.0],
                         "face_current_max_history": [0.5],
                         "emf_max_history": [0.25],
@@ -130,7 +135,9 @@ def test_main_writes_alignment_json(tmp_path: Path):
     payload = json.loads(output.read_text())
     assert payload["u_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["pressure_proxy"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["current_scaled_pressure_proxy"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["primary_pressure_metric"] == "pSpan"
+    assert payload["primary_pressure_proxy_metric"] == "pressure_proxy"
     assert payload["primary_current_metric"] == "current_max"
     assert payload["primary_current_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["primary_lorentz_metric"] == "face_lorentz_max"
@@ -169,6 +176,7 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
                         "mean_velocity_history": [3.0],
                         "applied_forcing_history": [4.0],
                         "pressure_proxy_history": [4.0],
+                        "current_scaled_pressure_proxy_history": [4.0],
                         "current_max_history": [10.0],
                         "face_current_max_history": [7.0],
                         "emf_max_history": [3.0],
