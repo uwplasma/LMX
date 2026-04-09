@@ -107,6 +107,12 @@ def test_validation_summary_includes_latest_potential_residual():
     assert metrics["potential_iterations_used"] >= 0.0
     assert "current_scaled_pressure_proxy" in metrics
     assert metrics["current_scaled_pressure_proxy"] >= 0.0
+    assert "raw_update_max" in metrics
+    assert metrics["raw_update_max"] >= 0.0
+    assert "limiter_scale" in metrics
+    assert 0.0 <= metrics["limiter_scale"] <= 1.0
+    assert "limited_fraction" in metrics
+    assert 0.0 <= metrics["limited_fraction"] <= 1.0
 
 
 def test_compare_with_freemhd_report(tmp_path: Path):

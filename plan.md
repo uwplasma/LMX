@@ -3784,3 +3784,48 @@ LMX does not need to implement all of that to finish the retained current plan.
     layered current-density and centered-Lorentz observables
   - the next solver work should target that current/Lorentz evolution directly,
     not replay input plumbing
+
+### Latest retained Hunt limiter diagnosis
+
+- I added retained limiter telemetry to the core solver, restart/output path,
+  validation summary, runtime logger, and Hunt diagnostic report:
+  - `raw_update_max_history`
+  - `limiter_scale_history`
+  - `limited_fraction_history`
+- The live log now prints those as:
+  - `rawUpdateMax`
+  - `limiterScale`
+  - `limitedFraction`
+- The retained replay artifact is:
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_with_limiter_diag.json`
+- On the corrected Hunt `Ha20`, `t <= 6e-05` replay, the telemetry is:
+  - `raw_update_max_history ≈ [6.54e-02, 5.64e-02, 4.76e-02, 3.90e-02, 3.06e-02, 2.24e-02]`
+  - `limiter_scale_history ≈ [3.06e-02, 3.54e-02, 4.20e-02, 5.13e-02, 6.54e-02, 8.91e-02]`
+  - `limited_fraction_history ≈ [1.21e-01, 1.21e-01, 1.25e-01, 1.33e-01, 2.34e-01, 2.34e-01]`
+- Retained interpretation:
+  - the corrected Hunt replay is strongly limiter-dominated, not lightly
+    clipped
+  - the raw coupled update is much larger than the retained Hunt cap early in
+    the replay, and a nontrivial fraction of the fluid region is limited every
+    step
+  - this means the next solver-side Hunt fix should be driven by a better raw
+    update or a more faithful current/Lorentz reduction, not by pretending the
+    present limiter is only a small perturbation
+
+### Latest retained Hunt replay-side consistency check
+
+- I exposed the existing `post_update_potential_refresh` hook in
+  `scripts/run_hunt_solver_diagnostic_report.py` and re-checked it through the
+  public diagnostic CLI against the corrected replay.
+- Retained artifacts:
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_refresh_cli.json`
+  - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_refresh_cli.json`
+- Result:
+  - `u_max l2` stayed unchanged near `1.43e-03`
+  - `current_scaled_pressure_proxy l2` improved only trivially
+  - `primary_current_max l2` worsened slightly
+  - `primary_lorentz_max l2` worsened slightly
+- Retained interpretation:
+  - re-solving `phi` on `u_next` is not the missing Hunt fix
+  - it is worth keeping as an explicit parity/consistency control, but it
+    should remain off by default

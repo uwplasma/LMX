@@ -40,6 +40,9 @@ class SolverStepRecord:
     applied_forcing: float
     pressure_proxy: float
     current_scaled_pressure_proxy: float
+    raw_update_max: float
+    limiter_scale: float
+    limited_fraction: float
     courant_like: float
     ohmic_power: float
 
@@ -146,6 +149,11 @@ class StreamingSolverLogger:
             f"appliedForcing = {record.applied_forcing:.6e}, pressureProxy = {record.pressure_proxy:.6e}, "
             f"currentScaledPressureProxy = {record.current_scaled_pressure_proxy:.6e}, "
             f"OhmicPower = {record.ohmic_power:.6e}"
+        )
+        self._write(
+            "MHD limiter                    "
+            f"rawUpdateMax = {record.raw_update_max:.6e}, limiterScale = {record.limiter_scale:.6e}, "
+            f"limitedFraction = {record.limited_fraction:.6e}"
         )
         self._write(
             "steadySolver                   "

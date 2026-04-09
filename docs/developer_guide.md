@@ -140,6 +140,16 @@
   resolves `phi` again after `u_next` is formed and reports the refreshed
   electromagnetic state. It stays off by default because it changes solver
   semantics rather than just tuning a control parameter.
+- Hunt replay diagnostics now also expose limiter telemetry:
+  - `raw_update_max_history`
+  - `limiter_scale_history`
+  - `limited_fraction_history`
+  These are available in the runtime log, the solution/restart `.npz`, the
+  validation summary, and the Hunt diagnostic JSON. The retained interpretation
+  on the corrected `Ha20`, `t <= 6e-05` replay is that the layered update is
+  strongly limiter-dominated early in the run, so later solver work should be
+  judged against those histories instead of assuming the raw coupled update is
+  what reaches the next step.
 - `python scripts/run_solver_grid_sweep.py --output artifacts/control_grid`:
   writes two-parameter control grids when one-parameter sweeps are not enough to
   distinguish a real improvement from a cross-case tradeoff. The current Hunt

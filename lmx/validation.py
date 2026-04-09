@@ -388,6 +388,15 @@ def validation_summary(solution: Solution, case_name: str, ha: float | None = No
         "current_scaled_pressure_proxy": float(solution.diagnostics.current_scaled_pressure_proxy_history[-1])
         if solution.diagnostics.current_scaled_pressure_proxy_history.size
         else 0.0,
+        "raw_update_max": float(solution.diagnostics.raw_update_max_history[-1])
+        if solution.diagnostics.raw_update_max_history.size
+        else 0.0,
+        "limiter_scale": float(solution.diagnostics.limiter_scale_history[-1])
+        if solution.diagnostics.limiter_scale_history.size
+        else 1.0,
+        "limited_fraction": float(solution.diagnostics.limited_fraction_history[-1])
+        if solution.diagnostics.limited_fraction_history.size
+        else 0.0,
     }
     payload.update(duct_profile_metrics(solution))
     if case_name.startswith("hartmann") and ha is not None:

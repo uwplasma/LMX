@@ -67,6 +67,7 @@ def _build_case(
     current_reconstruction: str | None,
     velocity_update_limit: float | None,
     velocity_update_limiter: str | None,
+    post_update_potential_refresh: bool,
     ramp_start: float,
     ramp_duration: float,
 ) -> object:
@@ -93,6 +94,7 @@ def _build_case(
         updates["velocity_update_limit"] = velocity_update_limit
     if velocity_update_limiter is not None:
         updates["velocity_update_limiter"] = velocity_update_limiter
+    updates["post_update_potential_refresh"] = post_update_potential_refresh
     inlet_boundary: tuple[BoundaryCondition, ...] = ()
     if initial_velocity != 0.0:
         if drive_mode == "inlet_flow_rate":
@@ -136,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--drive-mode", choices=["auto", "inlet_velocity", "inlet_flow_rate"], default="auto")
     parser.add_argument("--velocity-update-limit", type=float, default=None)
     parser.add_argument("--velocity-update-limiter", choices=["global_scale", "local_clip"], default=None)
+    parser.add_argument("--post-update-potential-refresh", action="store_true")
     parser.add_argument("--initial-velocity", type=float, default=None)
     parser.add_argument("--restart-npz", type=Path, default=None)
     parser.add_argument("--append-histories", action="store_true")
@@ -177,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         current_reconstruction=args.current_reconstruction,
         velocity_update_limit=args.velocity_update_limit,
         velocity_update_limiter=args.velocity_update_limiter,
+        post_update_potential_refresh=bool(args.post_update_potential_refresh),
         ramp_start=ramp_start,
         ramp_duration=ramp_duration,
     )
@@ -224,6 +228,9 @@ def main(argv: list[str] | None = None) -> int:
             "applied_forcing_history": solution.diagnostics.applied_forcing_history.tolist(),
             "pressure_proxy_history": solution.diagnostics.pressure_proxy_history.tolist(),
             "current_scaled_pressure_proxy_history": solution.diagnostics.current_scaled_pressure_proxy_history.tolist(),
+            "raw_update_max_history": solution.diagnostics.raw_update_max_history.tolist(),
+            "limiter_scale_history": solution.diagnostics.limiter_scale_history.tolist(),
+            "limited_fraction_history": solution.diagnostics.limited_fraction_history.tolist(),
             "current_max_history": solution.diagnostics.current_max_history.tolist(),
             "face_current_max_history": solution.diagnostics.face_current_max_history.tolist(),
             "emf_max_history": solution.diagnostics.emf_max_history.tolist(),

@@ -36,6 +36,9 @@ def _fake_solution() -> Solution:
         emf_max_history=jnp.asarray([2.0]),
         lorentz_max_history=jnp.asarray([4.0]),
         face_lorentz_max_history=jnp.asarray([4.5]),
+        raw_update_max_history=jnp.asarray([0.6]),
+        limiter_scale_history=jnp.asarray([0.25]),
+        limited_fraction_history=jnp.asarray([0.125]),
         potential_residual_history=jnp.asarray([1e-3]),
         potential_iterations_history=jnp.asarray([123.0]),
     )
@@ -86,6 +89,9 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert payload["lmx_solver"]["trace"]["applied_forcing_history"] == pytest.approx([0.3])
     assert payload["lmx_solver"]["trace"]["pressure_proxy_history"] == pytest.approx([0.4])
     assert payload["lmx_solver"]["trace"]["current_scaled_pressure_proxy_history"] == pytest.approx([0.4])
+    assert payload["lmx_solver"]["trace"]["raw_update_max_history"] == pytest.approx([0.6])
+    assert payload["lmx_solver"]["trace"]["limiter_scale_history"] == pytest.approx([0.25])
+    assert payload["lmx_solver"]["trace"]["limited_fraction_history"] == pytest.approx([0.125])
     assert payload["lmx_solver"]["trace"]["current_max_history"] == [3.0]
     assert payload["lmx_solver"]["trace"]["face_current_max_history"] == [5.0]
     assert payload["lmx_solver"]["trace"]["emf_max_history"] == [2.0]
@@ -169,6 +175,43 @@ def test_hunt_solver_diagnostic_report_accepts_current_reconstruction(tmp_path: 
 
     assert exit_code == 0
     assert captured["current_reconstruction"] == "face_averaged"
+
+
+def test_hunt_solver_diagnostic_report_accepts_post_update_potential_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    run_dir = tmp_path / "run"
+    (run_dir / "0" / "liquid").mkdir(parents=True)
+    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "system").mkdir()
+    (run_dir / "constant").mkdir()
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
+    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
+        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    )
+    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
+
+    captured = {}
+
+    def fake_solve(case):
+        captured["post_update_potential_refresh"] = case.time_stepper.post_update_potential_refresh
+        return _fake_solution()
+
+    monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
+
+    output = tmp_path / "diagnostics.json"
+    exit_code = huntdiag.main(
+        [
+            "--freemhd-run-dir",
+            str(run_dir),
+            "--ha",
+            "20",
+            "--post-update-potential-refresh",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["post_update_potential_refresh"] is True
 
 
 def test_hunt_solver_diagnostic_report_accepts_hybrid_face_lorentz_reconstruction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

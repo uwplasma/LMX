@@ -1422,3 +1422,34 @@ The backend harness currently supports:
     source-correct layered current-density and centered-Lorentz observables
   - the next solver iteration should target that current/Lorentz evolution
     directly rather than revisiting replay plumbing
+
+## Latest Hunt limiter diagnosis
+
+- I then stopped treating the corrected replay mismatch as a generic solver
+  error and instrumented the layered update itself.
+- LMX now records, logs, and persists:
+  - `raw_update_max_history`
+  - `limiter_scale_history`
+  - `limited_fraction_history`
+- Those signals are exposed in:
+  - the live runtime log as `rawUpdateMax`, `limiterScale`,
+    `limitedFraction`
+  - the solution/restart `.npz`
+  - `validation_summary(...)`
+  - `scripts/run_hunt_solver_diagnostic_report.py`
+- On the corrected Hunt `Ha20`, `t <= 6e-05` replay, the retained LMX artifact
+  is:
+  - `/private/tmp/lmx_hunt_long_refresh/lmx_hunt_6e05_with_limiter_diag.json`
+- The recorded limiter telemetry is:
+  - `raw_update_max_history ≈ [6.54e-02, 5.64e-02, 4.76e-02, 3.90e-02, 3.06e-02, 2.24e-02]`
+  - `limiter_scale_history ≈ [3.06e-02, 3.54e-02, 4.20e-02, 5.13e-02, 6.54e-02, 8.91e-02]`
+  - `limited_fraction_history ≈ [1.21e-01, 1.21e-01, 1.25e-01, 1.33e-01, 2.34e-01, 2.34e-01]`
+- Retained interpretation:
+  - the corrected Hunt replay is not only mildly clipped
+  - the raw layered update is an order of magnitude larger than the retained
+    Hunt cap early in the replay
+  - and roughly 12% to 23% of fluid cells exceed the limit across the
+    corrected window
+  - so the next solver-side Hunt fix should either make the raw coupled update
+    physically smaller or adopt a more faithful update/reduction path, rather
+    than assuming the present limiter is a minor perturbation

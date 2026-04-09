@@ -339,6 +339,26 @@ def _limited_velocity_update(
     return jnp.where(fluid_mask, current + scale * delta, 0.0)
 
 
+def _velocity_update_statistics(
+    current: jnp.ndarray,
+    trial: jnp.ndarray,
+    fluid_mask: jnp.ndarray,
+    *,
+    max_delta: float,
+    limiter: str,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    delta = jnp.where(fluid_mask, trial - current, 0.0)
+    peak_delta = jnp.max(jnp.abs(delta))
+    active_count = jnp.maximum(jnp.sum(fluid_mask.astype(delta.dtype)), 1.0)
+    limited_fraction = jnp.sum(
+        jnp.where(fluid_mask, (jnp.abs(delta) > max_delta).astype(delta.dtype), 0.0)
+    ) / active_count
+    if limiter not in {"global_scale", "local_clip"}:
+        raise ValueError(f"Unsupported velocity update limiter {limiter!r}")
+    scale = jnp.minimum(1.0, max_delta / jnp.maximum(peak_delta, 1e-12))
+    return peak_delta, scale, limited_fraction
+
+
 def _active_velocity_mask(fluid_mask: jnp.ndarray) -> jnp.ndarray:
     active = jnp.array(fluid_mask, copy=True)
     active = active.at[0, :].set(False)
@@ -415,7 +435,17 @@ def _step(
     current_reconstruction: str,
     post_update_potential_refresh: bool,
     interpolate_direct_fluid_walls: bool,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    float,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+]:
     def outer_body(_, carry):
         u_iter = carry[0]
         phi, potential_residual, potential_iteration_count = _solve_potential(
@@ -480,6 +510,13 @@ def _step(
             )
         u_trial = jnp.where(fluid_mask, base_trial + pressure_sensitivity * forcing_value, 0.0)
         relaxed = jnp.where(fluid_mask, (1.0 - relaxation) * u_iter + relaxation * u_trial, 0.0)
+        raw_update_max, limiter_scale, limited_fraction = _velocity_update_statistics(
+            u_iter,
+            relaxed,
+            fluid_mask,
+            max_delta=velocity_update_limit,
+            limiter=velocity_update_limiter,
+        )
         u_next = _limited_velocity_update(
             u_iter,
             relaxed,
@@ -544,6 +581,9 @@ def _step(
             mean_velocity,
             forcing_value,
             pressure_proxy,
+            raw_update_max,
+            limiter_scale,
+            limited_fraction,
         )
 
     u_init = _enforce_velocity_bc(
@@ -563,12 +603,32 @@ def _step(
     m0 = jnp.asarray(0.0, dtype=u.dtype)
     g0 = jnp.asarray(0.0, dtype=u.dtype)
     p0 = jnp.asarray(0.0, dtype=u.dtype)
+    d0 = jnp.asarray(0.0, dtype=u.dtype)
+    s0 = jnp.asarray(1.0, dtype=u.dtype)
+    q0 = jnp.asarray(0.0, dtype=u.dtype)
     outer_count = max(1, outer_iterations)
-    u_next, phi, jy, jz, lorentz, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = jax.lax.fori_loop(
+    (
+        u_next,
+        phi,
+        jy,
+        jz,
+        lorentz,
+        potential_residual,
+        potential_iteration_count,
+        face_current_max,
+        emf_max,
+        face_lorentz_max,
+        mean_velocity,
+        applied_forcing,
+        pressure_proxy,
+        raw_update_max,
+        limiter_scale,
+        limited_fraction,
+    ) = jax.lax.fori_loop(
         0,
         outer_count,
         outer_body,
-        (u_init, phi0, j0, j0, l0, r0, i0, f0, e0, h0, m0, g0, p0),
+        (u_init, phi0, j0, j0, l0, r0, i0, f0, e0, h0, m0, g0, p0, d0, s0, q0),
     )
     residual = jnp.max(jnp.abs(u_next - u))
     return (
@@ -586,6 +646,9 @@ def _step(
         mean_velocity,
         applied_forcing,
         pressure_proxy,
+        raw_update_max,
+        limiter_scale,
+        limited_fraction,
     )
 
 def _emit_solver_header(
@@ -701,6 +764,9 @@ def _emit_solver_step(
     applied_forcing: float,
     pressure_proxy: float,
     current_scaled_pressure_proxy: float,
+    raw_update_max: float,
+    limiter_scale: float,
+    limited_fraction: float,
     courant_like: float,
     ohmic: float,
 ):
@@ -724,6 +790,9 @@ def _emit_solver_step(
             applied_forcing=applied_forcing,
             pressure_proxy=pressure_proxy,
             current_scaled_pressure_proxy=current_scaled_pressure_proxy,
+            raw_update_max=raw_update_max,
+            limiter_scale=limiter_scale,
+            limited_fraction=limited_fraction,
             courant_like=courant_like,
             ohmic_power=ohmic,
         )
@@ -795,7 +864,25 @@ def solve_transient(
             step_time = time + dt
             _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
             forcing = _explicit_forcing(case.forcing, by.dtype)
-            u_next, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = _step(
+            (
+                u_next,
+                phi,
+                jy,
+                jz,
+                lorentz,
+                residual,
+                potential_residual,
+                potential_iteration_count,
+                face_current_max,
+                emf_max,
+                face_lorentz_max,
+                mean_velocity,
+                applied_forcing,
+                pressure_proxy,
+                raw_update_max,
+                limiter_scale,
+                limited_fraction,
+            ) = _step(
                 u=u,
                 mesh=mesh,
                 sigma=materials.conductivity,
@@ -842,6 +929,9 @@ def solve_transient(
                     face_lorentz_max,
                     potential_residual,
                     potential_iteration_count,
+                    raw_update_max,
+                    limiter_scale,
+                    limited_fraction,
                 ],
                 dtype=float,
             )
@@ -949,6 +1039,21 @@ def solve_transient(
                 samples[:, 14],
                 append=append_diagnostics,
             ),
+            raw_update_max_history=_concat_history(
+                initial_diagnostics.raw_update_max_history if initial_diagnostics is not None else None,
+                samples[:, 15],
+                append=append_diagnostics,
+            ),
+            limiter_scale_history=_concat_history(
+                initial_diagnostics.limiter_scale_history if initial_diagnostics is not None else None,
+                samples[:, 16],
+                append=append_diagnostics,
+            ),
+            limited_fraction_history=_concat_history(
+                initial_diagnostics.limited_fraction_history if initial_diagnostics is not None else None,
+                samples[:, 17],
+                append=append_diagnostics,
+            ),
         )
         solution = Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
         return solution
@@ -1004,6 +1109,9 @@ def solve_transient(
     lorentz_max_history: list[float] = []
     face_lorentz_max_history: list[float] = []
     current_scaled_pressure_proxy_history: list[float] = []
+    raw_update_max_history: list[float] = []
+    limiter_scale_history: list[float] = []
+    limited_fraction_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     residual_value = float("inf")
@@ -1011,7 +1119,25 @@ def solve_transient(
 
     for step_index in range(steps):
         step_time = float(start_time + (step_index + 1) * dt)
-        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = compiled_step(u, step_time)
+        (
+            u,
+            phi,
+            jy,
+            jz,
+            lorentz,
+            residual,
+            potential_residual,
+            potential_iteration_count,
+            face_current_max,
+            emf_max,
+            face_lorentz_max,
+            mean_velocity,
+            applied_forcing,
+            pressure_proxy,
+            raw_update_max,
+            limiter_scale,
+            limited_fraction,
+        ) = compiled_step(u, step_time)
         residual_value = float(residual)
         u_max_value = float(jnp.max(jnp.abs(u)))
         courant_like = float(u_max_value * dt / jnp.min(mesh.dy))
@@ -1031,6 +1157,9 @@ def solve_transient(
         emf_max_history.append(float(emf_max))
         lorentz_max_history.append(max_lorentz)
         face_lorentz_max_history.append(float(face_lorentz_max))
+        raw_update_max_history.append(float(raw_update_max))
+        limiter_scale_history.append(float(limiter_scale))
+        limited_fraction_history.append(float(limited_fraction))
         current_scaled_pressure_proxy, pressure_proxy_reference_current = _scaled_pressure_proxy_value(
             float(pressure_proxy),
             max_current,
@@ -1058,6 +1187,9 @@ def solve_transient(
             applied_forcing=float(applied_forcing),
             pressure_proxy=float(pressure_proxy),
             current_scaled_pressure_proxy=float(current_scaled_pressure_proxy),
+            raw_update_max=float(raw_update_max),
+            limiter_scale=float(limiter_scale),
+            limited_fraction=float(limited_fraction),
             courant_like=courant_like,
             ohmic=ohmic,
         )
@@ -1100,6 +1232,21 @@ def solve_transient(
         current_scaled_pressure_proxy_history=_concat_history(
             initial_diagnostics.current_scaled_pressure_proxy_history if initial_diagnostics is not None else None,
             jnp.asarray(current_scaled_pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        raw_update_max_history=_concat_history(
+            initial_diagnostics.raw_update_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(raw_update_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        limiter_scale_history=_concat_history(
+            initial_diagnostics.limiter_scale_history if initial_diagnostics is not None else None,
+            jnp.asarray(limiter_scale_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        limited_fraction_history=_concat_history(
+            initial_diagnostics.limited_fraction_history if initial_diagnostics is not None else None,
+            jnp.asarray(limited_fraction_history, dtype=float),
             append=append_diagnostics,
         ),
         residual_history=_concat_history(
@@ -1253,6 +1400,9 @@ def solve_steady(
     lorentz_max_history: list[float] = []
     face_lorentz_max_history: list[float] = []
     current_scaled_pressure_proxy_history: list[float] = []
+    raw_update_max_history: list[float] = []
+    limiter_scale_history: list[float] = []
+    limited_fraction_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     step_count = 0
@@ -1260,7 +1410,25 @@ def solve_steady(
 
     for step_index in range(max_steps):
         step_time = float(start_time + (step_index + 1) * dt)
-        u, phi, jy, jz, lorentz, residual, potential_residual, potential_iteration_count, face_current_max, emf_max, face_lorentz_max, mean_velocity, applied_forcing, pressure_proxy = step_fn(
+        (
+            u,
+            phi,
+            jy,
+            jz,
+            lorentz,
+            residual,
+            potential_residual,
+            potential_iteration_count,
+            face_current_max,
+            emf_max,
+            face_lorentz_max,
+            mean_velocity,
+            applied_forcing,
+            pressure_proxy,
+            raw_update_max,
+            limiter_scale,
+            limited_fraction,
+        ) = step_fn(
             u,
             step_time,
         )
@@ -1283,6 +1451,9 @@ def solve_steady(
         emf_max_history.append(float(emf_max))
         lorentz_max_history.append(max_lorentz)
         face_lorentz_max_history.append(float(face_lorentz_max))
+        raw_update_max_history.append(float(raw_update_max))
+        limiter_scale_history.append(float(limiter_scale))
+        limited_fraction_history.append(float(limited_fraction))
         current_scaled_pressure_proxy, pressure_proxy_reference_current = _scaled_pressure_proxy_value(
             float(pressure_proxy),
             max_current,
@@ -1310,6 +1481,9 @@ def solve_steady(
             applied_forcing=float(applied_forcing),
             pressure_proxy=float(pressure_proxy),
             current_scaled_pressure_proxy=float(current_scaled_pressure_proxy),
+            raw_update_max=float(raw_update_max),
+            limiter_scale=float(limiter_scale),
+            limited_fraction=float(limited_fraction),
             courant_like=courant_like,
             ohmic=ohmic,
         )
@@ -1357,6 +1531,21 @@ def solve_steady(
         current_scaled_pressure_proxy_history=_concat_history(
             initial_diagnostics.current_scaled_pressure_proxy_history if initial_diagnostics is not None else None,
             jnp.asarray(current_scaled_pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        raw_update_max_history=_concat_history(
+            initial_diagnostics.raw_update_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(raw_update_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        limiter_scale_history=_concat_history(
+            initial_diagnostics.limiter_scale_history if initial_diagnostics is not None else None,
+            jnp.asarray(limiter_scale_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        limited_fraction_history=_concat_history(
+            initial_diagnostics.limited_fraction_history if initial_diagnostics is not None else None,
+            jnp.asarray(limited_fraction_history, dtype=float),
             append=append_diagnostics,
         ),
         residual_history=_concat_history(

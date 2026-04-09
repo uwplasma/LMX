@@ -41,6 +41,12 @@ staying focused on structured duct and simple pipe geometries.
   default is `global_scale`; the experimental `local_clip` path is available
   for targeted layered-update diagnosis, but it is currently worse on the
   corrected `Ha20`, `t <= 6e-05` Hunt replay.
+- Hunt runtime/restart artifacts now also retain limiter telemetry:
+  `raw_update_max_history`, `limiter_scale_history`, and
+  `limited_fraction_history`. Those same quantities are printed in the live
+  solver log as `rawUpdateMax`, `limiterScale`, and `limitedFraction`, which
+  makes it easier to tell whether a replay mismatch is coming from the coupled
+  update itself or from the velocity limiter dominating the step.
 
 ## Quick start
 

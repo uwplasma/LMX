@@ -172,6 +172,9 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         applied_forcing_history=np.asarray(diag.applied_forcing_history),
         pressure_proxy_history=np.asarray(diag.pressure_proxy_history),
         current_scaled_pressure_proxy_history=np.asarray(diag.current_scaled_pressure_proxy_history),
+        raw_update_max_history=np.asarray(diag.raw_update_max_history),
+        limiter_scale_history=np.asarray(diag.limiter_scale_history),
+        limited_fraction_history=np.asarray(diag.limited_fraction_history),
         courant_like=np.asarray(diag.courant_like),
         ohmic_power=np.asarray(diag.ohmic_power),
     )
@@ -216,6 +219,9 @@ def load_restart_bundle(path: str | Path) -> RestartBundle:
             current_scaled_pressure_proxy_history=jnp.asarray(
                 _load_optional_array(data, "current_scaled_pressure_proxy_history")
             ),
+            raw_update_max_history=jnp.asarray(_load_optional_array(data, "raw_update_max_history")),
+            limiter_scale_history=jnp.asarray(_load_optional_array(data, "limiter_scale_history")),
+            limited_fraction_history=jnp.asarray(_load_optional_array(data, "limited_fraction_history")),
             residual_history=jnp.asarray(_load_optional_array(data, "residual_history")),
             courant_like=jnp.asarray(_load_optional_array(data, "courant_like")),
             ohmic_power=jnp.asarray(_load_optional_array(data, "ohmic_power")),
