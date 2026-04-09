@@ -3613,6 +3613,39 @@ LMX does not need to implement all of that to finish the retained current plan.
   - the native analytical combined error gets slightly worse
   - the retained Hunt `Ha20` default remains `relaxation = 0.08`
 
+### Latest rejected outer-coupling retune
+
+- I rechecked Hunt `outer_iterations` against both the corrected long replay
+  and the native analytical gate before changing defaults.
+- Corrected retained Hunt `Ha20`, `t <= 6e-05` replay:
+  - retained default `outer_iterations = 6`:
+    - `u_max l2 ≈ 1.675e-03`
+    - `pressure_proxy l2 ≈ 6.229e-02`
+    - `primary_current_max l2 ≈ 2.295e-02`
+    - `primary_lorentz_max l2 ≈ 1.619e-02`
+  - candidate `outer_iterations = 4`:
+    - `u_max l2 ≈ 2.064e-03`
+    - `pressure_proxy l2 ≈ 1.587e-02`
+    - `primary_current_max l2 ≈ 1.902e-02`
+    - `primary_lorentz_max l2 ≈ 1.601e-02`
+  - candidate `outer_iterations = 8`:
+    - `u_max l2 ≈ 1.130e-03`
+    - `pressure_proxy l2 ≈ 1.586e-01`
+    - `primary_current_max l2 ≈ 2.047e-02`
+    - `primary_lorentz_max l2 ≈ 3.934e-02`
+- Native Hunt analytical check at `Ha20`, `32^2`:
+  - `outer_iterations = 4`: `combined_l2 ≈ 1.0519e-01`
+  - `outer_iterations = 6`: `combined_l2 ≈ 1.0023e-01`
+  - `outer_iterations = 8`: `combined_l2 ≈ 9.9136e-02`
+- Retained interpretation:
+  - `outer_iterations = 4` improves replay-side pressure/current metrics but
+    clearly worsens `u_max` and the native analytical combined error
+  - `outer_iterations = 8` improves `u_max` and the native analytical
+    combined error slightly, but it badly worsens the corrected replay
+    pressure and primary Lorentz metrics
+  - this is another control-tradeoff family, not the missing later-time Hunt
+    fix, so the retained default remains `outer_iterations = 6`
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

@@ -1248,6 +1248,33 @@ The backend harness currently supports:
   - the replay-side change is too small to justify a default shift
   - the analytical combined error is slightly worse
   - the retained Hunt `Ha20` default remains `relaxation = 0.08`
+- I also rechecked Hunt `outer_iterations` under the corrected long replay:
+  - retained default `outer_iterations = 6`:
+    - `u_max l2 ≈ 1.675e-03`
+    - `pressure_proxy l2 ≈ 6.229e-02`
+    - `primary_current_max l2 ≈ 2.295e-02`
+    - `primary_lorentz_max l2 ≈ 1.619e-02`
+  - `outer_iterations = 4`:
+    - `u_max l2 ≈ 2.064e-03`
+    - `pressure_proxy l2 ≈ 1.587e-02`
+    - `primary_current_max l2 ≈ 1.902e-02`
+    - `primary_lorentz_max l2 ≈ 1.601e-02`
+  - `outer_iterations = 8`:
+    - `u_max l2 ≈ 1.130e-03`
+    - `pressure_proxy l2 ≈ 1.586e-01`
+    - `primary_current_max l2 ≈ 2.047e-02`
+    - `primary_lorentz_max l2 ≈ 3.934e-02`
+- Native Hunt analytical check at `Ha20`, `32^2`:
+  - `outer_iterations = 4`: `combined_l2 ≈ 1.0519e-01`
+  - `outer_iterations = 6`: `combined_l2 ≈ 1.0023e-01`
+  - `outer_iterations = 8`: `combined_l2 ≈ 9.9136e-02`
+- Retained interpretation:
+  - `outer_iterations` is another tradeoff family under the corrected parity
+    metrics rather than the missing later-time Hunt fix
+  - `4` helps replay-side pressure/current but hurts `u_max` and native Hunt
+  - `8` helps `u_max` and native Hunt slightly but makes replay-side
+    pressure/Lorentz much worse
+  - the retained Hunt default remains `outer_iterations = 6`
 
 ## Meeting demo artifact
 

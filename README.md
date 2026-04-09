@@ -218,6 +218,14 @@ LMX `inlet_flow_rate` closure automatically. The scripts also record the raw
 recovered `volumetricFlowRate` in their JSON output as
 `recovered_inlet_flow_rate`, but they do not pass that dimensional value
 directly into the nondimensional reduced duct model.
+For corrected layered Hunt replay comparisons, the retained primary parity
+metrics are now:
+- `primary_pressure_metric = pSpan`
+- `primary_current_metric = face_current_max`
+- `primary_lorentz_metric = face_lorentz_max`
+
+Those are the quantities to watch first when comparing LMX against patched
+FreeMHD/OpenFOAM long-trace artifacts.
 For layered Hunt replay work, `compare_hunt_trace_histories.py` now emits
 `primary_current_metric` / `primary_current_max` and
 `primary_lorentz_metric` / `primary_lorentz_max`. When
