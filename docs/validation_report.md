@@ -1453,3 +1453,20 @@ The backend harness currently supports:
   - so the next solver-side Hunt fix should either make the raw coupled update
     physically smaller or adopt a more faithful update/reduction path, rather
     than assuming the present limiter is a minor perturbation
+
+## Latest rejected Hunt source-term interpolation trial
+
+- I tested the most direct source-level change suggested by the FreeMHD
+  `psiub` construction: replace the LMX face EMF source with a direct linear
+  interpolation of `(sigma * U) x B` at faces.
+- Retained result:
+  - that trial was not safe to keep in the reduced solver
+  - it drove the Hunt replay/diagnostic path into an obviously wrong regime
+    with runaway pressure and current magnitudes
+  - the change was reverted immediately
+- Retained interpretation:
+  - the remaining Hunt mismatch is not solved by copying the FreeMHD face EMF
+    interpolation literally into the current reduced model
+  - the next solver-side change should still target the later-time reduced
+    pressure/current response, but with a formulation that is internally
+    consistent with the reduced LMX update

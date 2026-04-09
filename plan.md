@@ -3829,3 +3829,20 @@ LMX does not need to implement all of that to finish the retained current plan.
   - re-solving `phi` on `u_next` is not the missing Hunt fix
   - it is worth keeping as an explicit parity/consistency control, but it
     should remain off by default
+
+### Latest rejected Hunt source-term reconstruction trial
+
+- I also tested the most direct source-level discretization change suggested by
+  the FreeMHD code: replace LMX's resistance-weighted face EMF construction
+  with a direct linear face interpolation of `(sigma * U) x B`, matching the
+  `psiub` interpolation pattern in `epotMultiRegionInterFoam`.
+- Retained result:
+  - that change was not stable enough to keep in the reduced solver
+  - it drove the Hunt replay/diagnostic path into an obviously wrong regime
+    with runaway pressure/current magnitudes
+  - the change was reverted immediately after the experiment
+- Retained interpretation:
+  - copying the FreeMHD face-source interpolation literally is not sufficient
+    inside the current reduced LMX formulation
+  - the next solver-side Hunt change still needs to respect the reduced-model
+    structure rather than transplanting one OpenFOAM face formula in isolation
