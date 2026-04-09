@@ -3646,6 +3646,42 @@ LMX does not need to implement all of that to finish the retained current plan.
   - this is another control-tradeoff family, not the missing later-time Hunt
     fix, so the retained default remains `outer_iterations = 6`
 
+### Latest rejected Hunt pressure-state family
+
+- I tested the first structural later-time Hunt response family directly in
+  `lmx/solvers.py`: a carried scalar streamwise-forcing / pressure-like state
+  with post-BC mean-velocity correction inside `_step(...)`, motivated by the
+  corrected long replay and the solver-code inspection.
+- The variant used:
+  - iterate-centered velocity prediction for reduced `inlet_flow_rate` control
+  - a scalar forcing state updated from the post-BC mean-velocity defect
+  - carry of that scalar across time steps and restart points
+- Replay artifact:
+  - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_pressure_state.json`
+- Retained baseline artifact after rollback:
+  - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_reverted.json`
+- On the corrected long Hunt `Ha20`, `t <= 6e-05` replay:
+  - retained baseline:
+    - `u_max l2 ≈ 1.6750e-03`
+    - `pressure_proxy l2 ≈ 6.2293e-02`
+    - `primary_current_max l2 ≈ 2.2946e-02`
+    - `primary_lorentz_max l2 ≈ 1.6186e-02`
+  - rejected pressure-state family:
+    - `u_max l2 ≈ 2.5619e-03`
+    - `pressure_proxy l2 ≈ 1.8692e+01`
+    - `primary_current_max l2 ≈ 2.3855e-02`
+    - `primary_lorentz_max l2 ≈ 1.5143e-02`
+- On the native Hunt `Ha20`, `32^2` analytical gate:
+  - `combined_l2 ≈ 1.0023e-01`, effectively unchanged
+- Retained interpretation:
+  - this family attacks the right conceptual mechanism, but the first variant
+    is not physically usable
+  - it does not improve the native analytical gate and it catastrophically
+    worsens the replay-side reduced pressure trace
+  - the remaining Hunt work should keep the corrected long replay fixed and
+    target the reduced pressure/current response with a different mechanism,
+    not by carrying this scalar forcing state forward
+
 ### Expected number of focused iterations
 
 - If we keep the retained first-release scope to duct/layered-duct laminar

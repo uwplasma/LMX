@@ -1275,6 +1275,35 @@ The backend harness currently supports:
   - `8` helps `u_max` and native Hunt slightly but makes replay-side
     pressure/Lorentz much worse
   - the retained Hunt default remains `outer_iterations = 6`
+- I then tested the first structural later-time Hunt response family directly
+  in `lmx/solvers.py`: a carried scalar streamwise-forcing / pressure-like
+  state with post-BC mean-velocity correction inside `_step(...)`.
+- Replay artifacts:
+  - rejected variant:
+    - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_pressure_state.json`
+  - retained baseline after rollback:
+    - `/private/tmp/lmx_hunt_long_refresh/trace_compare_6e05_reverted.json`
+- On the corrected long Hunt `Ha20`, `t <= 6e-05` replay:
+  - retained baseline:
+    - `u_max l2 ≈ 1.6750e-03`
+    - `pressure_proxy l2 ≈ 6.2293e-02`
+    - `primary_current_max l2 ≈ 2.2946e-02`
+    - `primary_lorentz_max l2 ≈ 1.6186e-02`
+  - rejected pressure-state family:
+    - `u_max l2 ≈ 2.5619e-03`
+    - `pressure_proxy l2 ≈ 1.8692e+01`
+    - `primary_current_max l2 ≈ 2.3855e-02`
+    - `primary_lorentz_max l2 ≈ 1.5143e-02`
+- On the native Hunt `Ha20`, `32^2` analytical gate:
+  - `combined_l2 ≈ 1.0023e-01`, effectively unchanged
+- Retained conclusion:
+  - this family targets the right conceptual part of the reduced model, but
+    the first variant is not usable
+  - it catastrophically worsens the replay-side pressure trace while leaving
+    the native analytical Hunt gate flat
+  - the next retained Hunt step should target the reduced later-time
+    pressure/current response with a different mechanism rather than carrying
+    this scalar forcing state forward
 
 ## Meeting demo artifact
 

@@ -995,7 +995,15 @@ def solve_transient(
             ohmic=ohmic,
         )
 
-    state = MHDState(u=u, phi=phi, jy=jy, jz=jz, lorentz_x=lorentz, time=float(start_time + steps * dt), residual=residual_value)
+    state = MHDState(
+        u=u,
+        phi=phi,
+        jy=jy,
+        jz=jz,
+        lorentz_x=lorentz,
+        time=float(start_time + steps * dt),
+        residual=residual_value,
+    )
     diagnostics = Diagnostics(
         time_history=_concat_history(
             initial_diagnostics.time_history if initial_diagnostics is not None else None,
