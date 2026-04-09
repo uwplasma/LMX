@@ -240,6 +240,11 @@ that narrows the normalized `pSpan` mismatch from about `6.23e-02` to about
 path for the corrected `t <= 6e-05` Hunt replay because the face-based traces are
 materially closer to the patched external backend than the older cell-centered
 scalar reductions.
+That corrected pressure-side observable is now also part of the core LMX
+diagnostic/output path:
+- live solver logs print `currentScaledPressureProxy`
+- solver diagnostics, restart bundles, and solution NPZ files now carry
+  `current_scaled_pressure_proxy_history`
 That diagnostic runner also supports restart/continuation directly from a prior
 LMX `.npz` state dump, so longer reduced Hunt replay windows can now be built
 incrementally without rerunning from `t = 0`.

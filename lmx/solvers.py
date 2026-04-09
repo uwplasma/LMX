@@ -643,6 +643,29 @@ def _concat_history(
     return jnp.concatenate((previous, current))
 
 
+def _pressure_proxy_reference_current(diagnostics: Diagnostics | None) -> float | None:
+    if diagnostics is None:
+        return None
+    if diagnostics.face_current_max_history.size:
+        return float(diagnostics.face_current_max_history[0])
+    if diagnostics.current_max_history.size:
+        return float(diagnostics.current_max_history[0])
+    return None
+
+
+def _scaled_pressure_proxy_value(
+    pressure_proxy: float,
+    current_max: float,
+    face_current_max: float,
+    reference_current: float | None,
+) -> tuple[float, float]:
+    current_source = float(face_current_max) if abs(float(face_current_max)) > 0.0 else float(current_max)
+    if reference_current is None or abs(reference_current) < 1e-20:
+        reference_current = current_source if abs(current_source) >= 1e-20 else 1.0
+    scaled = float(pressure_proxy) * current_source / reference_current
+    return scaled, reference_current
+
+
 def _emit_solver_step(
     logger,
     *,
@@ -661,6 +684,7 @@ def _emit_solver_step(
     potential_iteration_count: float,
     applied_forcing: float,
     pressure_proxy: float,
+    current_scaled_pressure_proxy: float,
     courant_like: float,
     ohmic: float,
 ):
@@ -683,6 +707,7 @@ def _emit_solver_step(
             potential_iterations=potential_iteration_count,
             applied_forcing=applied_forcing,
             pressure_proxy=pressure_proxy,
+            current_scaled_pressure_proxy=current_scaled_pressure_proxy,
             courant_like=courant_like,
             ohmic_power=ohmic,
         )
@@ -807,6 +832,15 @@ def solve_transient(
 
         (u_final, time_final), history = jax.lax.scan(scan_step, (initial_u, start_time), xs=None, length=steps)
         u_hist, phi_hist, jy_hist, jz_hist, lorentz_hist, samples = history
+        reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
+        face_current_column = samples[:, 9]
+        current_column = samples[:, 8]
+        if reference_current is None:
+            reference_current = float(face_current_column[0]) if abs(float(face_current_column[0])) > 0.0 else float(current_column[0])
+            if abs(reference_current) < 1e-20:
+                reference_current = 1.0
+        current_scale_column = face_current_column if float(jnp.max(jnp.abs(face_current_column))) > 0.0 else current_column
+        current_scaled_pressure_proxy = samples[:, 4] * current_scale_column / reference_current
 
         state = MHDState(
             u=u_final,
@@ -841,6 +875,11 @@ def solve_transient(
             pressure_proxy_history=_concat_history(
                 initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
                 samples[:, 4],
+                append=append_diagnostics,
+            ),
+            current_scaled_pressure_proxy_history=_concat_history(
+                initial_diagnostics.current_scaled_pressure_proxy_history if initial_diagnostics is not None else None,
+                current_scaled_pressure_proxy,
                 append=append_diagnostics,
             ),
             residual_history=_concat_history(
@@ -946,9 +985,11 @@ def solve_transient(
     emf_max_history: list[float] = []
     lorentz_max_history: list[float] = []
     face_lorentz_max_history: list[float] = []
+    current_scaled_pressure_proxy_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     residual_value = float("inf")
+    pressure_proxy_reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
 
     for step_index in range(steps):
         step_time = float(start_time + (step_index + 1) * dt)
@@ -972,6 +1013,13 @@ def solve_transient(
         emf_max_history.append(float(emf_max))
         lorentz_max_history.append(max_lorentz)
         face_lorentz_max_history.append(float(face_lorentz_max))
+        current_scaled_pressure_proxy, pressure_proxy_reference_current = _scaled_pressure_proxy_value(
+            float(pressure_proxy),
+            max_current,
+            float(face_current_max),
+            pressure_proxy_reference_current,
+        )
+        current_scaled_pressure_proxy_history.append(float(current_scaled_pressure_proxy))
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
         _emit_solver_step(
@@ -991,6 +1039,7 @@ def solve_transient(
             potential_iteration_count=float(potential_iteration_count),
             applied_forcing=float(applied_forcing),
             pressure_proxy=float(pressure_proxy),
+            current_scaled_pressure_proxy=float(current_scaled_pressure_proxy),
             courant_like=courant_like,
             ohmic=ohmic,
         )
@@ -1028,6 +1077,11 @@ def solve_transient(
         pressure_proxy_history=_concat_history(
             initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
             jnp.asarray(pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        current_scaled_pressure_proxy_history=_concat_history(
+            initial_diagnostics.current_scaled_pressure_proxy_history if initial_diagnostics is not None else None,
+            jnp.asarray(current_scaled_pressure_proxy_history, dtype=float),
             append=append_diagnostics,
         ),
         residual_history=_concat_history(
@@ -1179,9 +1233,11 @@ def solve_steady(
     emf_max_history: list[float] = []
     lorentz_max_history: list[float] = []
     face_lorentz_max_history: list[float] = []
+    current_scaled_pressure_proxy_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
     step_count = 0
+    pressure_proxy_reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
 
     for step_index in range(max_steps):
         step_time = float(start_time + (step_index + 1) * dt)
@@ -1208,6 +1264,13 @@ def solve_steady(
         emf_max_history.append(float(emf_max))
         lorentz_max_history.append(max_lorentz)
         face_lorentz_max_history.append(float(face_lorentz_max))
+        current_scaled_pressure_proxy, pressure_proxy_reference_current = _scaled_pressure_proxy_value(
+            float(pressure_proxy),
+            max_current,
+            float(face_current_max),
+            pressure_proxy_reference_current,
+        )
+        current_scaled_pressure_proxy_history.append(float(current_scaled_pressure_proxy))
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
         _emit_solver_step(
@@ -1227,6 +1290,7 @@ def solve_steady(
             potential_iteration_count=float(potential_iteration_count),
             applied_forcing=float(applied_forcing),
             pressure_proxy=float(pressure_proxy),
+            current_scaled_pressure_proxy=float(current_scaled_pressure_proxy),
             courant_like=courant_like,
             ohmic=ohmic,
         )
@@ -1269,6 +1333,11 @@ def solve_steady(
         pressure_proxy_history=_concat_history(
             initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
             jnp.asarray(pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        current_scaled_pressure_proxy_history=_concat_history(
+            initial_diagnostics.current_scaled_pressure_proxy_history if initial_diagnostics is not None else None,
+            jnp.asarray(current_scaled_pressure_proxy_history, dtype=float),
             append=append_diagnostics,
         ),
         residual_history=_concat_history(

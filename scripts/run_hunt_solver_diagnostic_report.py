@@ -31,7 +31,7 @@ from scripts.run_freemhd_parity_report import (
 )
 
 
-def _current_scaled_pressure_proxy_history(
+def _derive_current_scaled_pressure_proxy_history(
     pressure_proxy_history: list[float],
     face_current_max_history: list[float],
     current_max_history: list[float],
@@ -39,9 +39,7 @@ def _current_scaled_pressure_proxy_history(
     if not pressure_proxy_history:
         return []
     current_history = face_current_max_history or current_max_history
-    if not current_history:
-        return []
-    if len(current_history) != len(pressure_proxy_history):
+    if not current_history or len(current_history) != len(pressure_proxy_history):
         return []
     reference_current = max(abs(float(current_history[0])), 1e-20)
     return [
@@ -217,6 +215,7 @@ def main(argv: list[str] | None = None) -> int:
             "mean_velocity_history": solution.diagnostics.mean_velocity_history.tolist(),
             "applied_forcing_history": solution.diagnostics.applied_forcing_history.tolist(),
             "pressure_proxy_history": solution.diagnostics.pressure_proxy_history.tolist(),
+            "current_scaled_pressure_proxy_history": solution.diagnostics.current_scaled_pressure_proxy_history.tolist(),
             "current_max_history": solution.diagnostics.current_max_history.tolist(),
             "face_current_max_history": solution.diagnostics.face_current_max_history.tolist(),
             "emf_max_history": solution.diagnostics.emf_max_history.tolist(),
@@ -227,6 +226,12 @@ def main(argv: list[str] | None = None) -> int:
             "potential_iterations_history": solution.diagnostics.potential_iterations_history.tolist(),
         },
     }
+    if not lmx_solver["trace"]["current_scaled_pressure_proxy_history"]:
+        lmx_solver["trace"]["current_scaled_pressure_proxy_history"] = _derive_current_scaled_pressure_proxy_history(
+            lmx_solver["trace"]["pressure_proxy_history"],
+            lmx_solver["trace"]["face_current_max_history"],
+            lmx_solver["trace"]["current_max_history"],
+        )
 
     freemhd_run = {
         "case_dir": str(run_dir.resolve()),
@@ -280,14 +285,6 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             }
         )
-
-    current_scaled_pressure_proxy_history = _current_scaled_pressure_proxy_history(
-        lmx_solver["trace"]["pressure_proxy_history"],
-        lmx_solver["trace"]["face_current_max_history"],
-        lmx_solver["trace"]["current_max_history"],
-    )
-    if current_scaled_pressure_proxy_history:
-        lmx_solver["trace"]["current_scaled_pressure_proxy_history"] = current_scaled_pressure_proxy_history
 
     payload = {
         "case_kind": "hunt",

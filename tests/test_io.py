@@ -59,6 +59,7 @@ def test_write_solution_npz(tmp_path: Path):
         assert "phi" in data
         assert "state_time" in data
         assert "state_residual" in data
+        assert "current_scaled_pressure_proxy_history" in data
         assert data["u"].shape == solution.state.u.shape
 
 
@@ -75,3 +76,4 @@ def test_load_restart_bundle_round_trips_solution_npz(tmp_path: Path):
     assert bundle.state.u.shape == solution.state.u.shape
     assert float(bundle.state.time) == pytest.approx(float(solution.state.time))
     assert float(bundle.state.residual) == pytest.approx(float(solution.state.residual))
+    assert bundle.diagnostics.current_scaled_pressure_proxy_history.shape == solution.diagnostics.current_scaled_pressure_proxy_history.shape

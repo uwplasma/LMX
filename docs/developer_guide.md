@@ -283,6 +283,11 @@
   - `current_scaled_pressure_proxy_history`
   Use those traces when comparing reduced-model pressure-response candidates
   against the patched FreeMHD pressure loop.
+- The core runtime path now also carries that corrected pressure-side
+  observable:
+  - `StreamingSolverLogger` prints `currentScaledPressureProxy`
+  - `Diagnostics`, restart bundles, and solution NPZ files store
+    `current_scaled_pressure_proxy_history`
 - `python scripts/run_hunt_solver_diagnostic_report.py --drive-mode inlet_flow_rate ...`:
   replays the recovered Hunt metadata through the reduced flow-rate closure.
   Keep it as a diagnosis path only; on the corrected `Ha20`, `t <= 6e-05`

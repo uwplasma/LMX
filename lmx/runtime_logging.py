@@ -39,6 +39,7 @@ class SolverStepRecord:
     potential_iterations: float
     applied_forcing: float
     pressure_proxy: float
+    current_scaled_pressure_proxy: float
     courant_like: float
     ohmic_power: float
 
@@ -143,6 +144,7 @@ class StreamingSolverLogger:
         self._write(
             "MHD forcing                    "
             f"appliedForcing = {record.applied_forcing:.6e}, pressureProxy = {record.pressure_proxy:.6e}, "
+            f"currentScaledPressureProxy = {record.current_scaled_pressure_proxy:.6e}, "
             f"OhmicPower = {record.ohmic_power:.6e}"
         )
         self._write(

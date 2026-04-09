@@ -634,6 +634,7 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
     assert solution.diagnostics.mean_velocity_history.shape[0] == 3
     assert solution.diagnostics.applied_forcing_history.shape[0] == 3
     assert solution.diagnostics.pressure_proxy_history.shape[0] == 3
+    assert solution.diagnostics.current_scaled_pressure_proxy_history.shape[0] == 3
     assert solution.diagnostics.residual_history.shape[0] == 3
     assert solution.diagnostics.potential_residual_history.shape[0] == 3
     assert solution.diagnostics.potential_iterations_history.shape[0] == 3
@@ -660,6 +661,7 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     assert solution.diagnostics.mean_velocity_history.shape[0] == 2
     assert solution.diagnostics.applied_forcing_history.shape[0] == 2
     assert solution.diagnostics.pressure_proxy_history.shape[0] == 2
+    assert solution.diagnostics.current_scaled_pressure_proxy_history.shape[0] == 2
     assert solution.diagnostics.residual_history.shape[0] == 2
     assert solution.diagnostics.potential_residual_history.shape[0] == 2
     assert solution.diagnostics.potential_iterations_history.shape[0] == 2

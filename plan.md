@@ -3550,6 +3550,9 @@ LMX does not need to implement all of that to finish the retained current plan.
     materially (`≈ 1.11e-01 -> ≈ 6.23e-02`)
   - deriving a current-scaled reduced pressure observable narrows it further
     (`≈ 6.23e-02 -> ≈ 4.42e-02`) without changing solver physics
+  - that corrected pressure-side observable is now first-class in the runtime
+    path: live logs print `currentScaledPressureProxy`, and restart/NPZ
+    outputs persist `current_scaled_pressure_proxy_history`
   - the remaining later-time Hunt blocker is now a smaller, genuinely
     solver-side pressure/current response gap after correcting the retained
     pressure/current/Lorentz observables

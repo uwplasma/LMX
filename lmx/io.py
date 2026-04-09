@@ -171,6 +171,7 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         lorentz_max_history=np.asarray(diag.lorentz_max_history),
         applied_forcing_history=np.asarray(diag.applied_forcing_history),
         pressure_proxy_history=np.asarray(diag.pressure_proxy_history),
+        current_scaled_pressure_proxy_history=np.asarray(diag.current_scaled_pressure_proxy_history),
         courant_like=np.asarray(diag.courant_like),
         ohmic_power=np.asarray(diag.ohmic_power),
     )
@@ -212,6 +213,9 @@ def load_restart_bundle(path: str | Path) -> RestartBundle:
             mean_velocity_history=jnp.asarray(_load_optional_array(data, "mean_velocity_history")),
             applied_forcing_history=jnp.asarray(_load_optional_array(data, "applied_forcing_history")),
             pressure_proxy_history=jnp.asarray(_load_optional_array(data, "pressure_proxy_history")),
+            current_scaled_pressure_proxy_history=jnp.asarray(
+                _load_optional_array(data, "current_scaled_pressure_proxy_history")
+            ),
             residual_history=jnp.asarray(_load_optional_array(data, "residual_history")),
             courant_like=jnp.asarray(_load_optional_array(data, "courant_like")),
             ohmic_power=jnp.asarray(_load_optional_array(data, "ohmic_power")),

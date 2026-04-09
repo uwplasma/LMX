@@ -1208,6 +1208,9 @@ The backend harness currently supports:
   - scaling the reduced pressure trace by the retained layered current history
     narrows the corrected `pSpan` mismatch again (`≈ 6.23e-02 -> ≈ 4.42e-02`)
     without changing solver physics
+  - that corrected pressure-side observable is now part of the core LMX
+    runtime path too: live logs print `currentScaledPressureProxy`, and
+    restart/NPZ outputs persist `current_scaled_pressure_proxy_history`
   - the remaining later-time Hunt mismatch is now smaller and genuinely
     solver-side, not mainly a logging/reference-level artifact
 - I also tested a general forcing-response relaxation family for reduced
