@@ -135,6 +135,11 @@
   `phi`-solve iteration ceiling from an early residual stop, a brittle raw
   Jacobi update, a backend choice, or an overly aggressive coupled velocity
   update.
+- `TimeStepperConfig.post_update_potential_refresh` is an opt-in consistency
+  control for layered or parity-sensitive runs. When enabled, the solver
+  resolves `phi` again after `u_next` is formed and reports the refreshed
+  electromagnetic state. It stays off by default because it changes solver
+  semantics rather than just tuning a control parameter.
 - `python scripts/run_solver_grid_sweep.py --output artifacts/control_grid`:
   writes two-parameter control grids when one-parameter sweeps are not enough to
   distinguish a real improvement from a cross-case tradeoff. The current Hunt

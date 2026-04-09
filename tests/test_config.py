@@ -48,6 +48,7 @@ potential_iterations = 100
 potential_relaxation = 1.0
 potential_solver = "cg"
 current_reconstruction = "cell_centered"
+post_update_potential_refresh = true
 steady_tolerance = 1e-8
 relaxation = 0.35
 velocity_update_limit = 1e-3
@@ -120,6 +121,7 @@ side = "max"
     assert config.case.geometry.kind == "rect_duct"
     assert config.case.output.directory == str((tmp_path / "out").resolve())
     assert config.case.time_stepper.potential_solver == "cg"
+    assert config.case.time_stepper.post_update_potential_refresh is True
     assert config.logging.step_stride == 2
     assert config.restart.enabled is True
     assert config.restart.path == (tmp_path / "previous_results.npz").resolve()

@@ -84,6 +84,7 @@ cannot be serialized cleanly into TOML.
 - `potential_relaxation`
 - `potential_solver`
 - `current_reconstruction`
+- `post_update_potential_refresh`
 - `steady_tolerance`
 - `steady_potential_tolerance`
 - `relaxation`

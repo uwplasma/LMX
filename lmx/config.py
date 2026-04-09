@@ -164,6 +164,7 @@ def load_run_config(path: str | Path) -> RunConfig:
         potential_relaxation=float(time_table.get("potential_relaxation", 1.0)),
         potential_solver=str(time_table.get("potential_solver", "auto")),
         current_reconstruction=str(time_table.get("current_reconstruction", "cell_centered")),
+        post_update_potential_refresh=bool(time_table.get("post_update_potential_refresh", False)),
         steady_tolerance=float(time_table.get("steady_tolerance", 1e-8)),
         steady_potential_tolerance=None
         if time_table.get("steady_potential_tolerance") is None

@@ -104,6 +104,7 @@ def solve_case_snapshots(
             velocity_update_limit=case.time_stepper.velocity_update_limit,
             velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
+            post_update_potential_refresh=case.time_stepper.post_update_potential_refresh,
             interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
         )
         should_store = (step_index % stride == 0) or (step_index == steps - 1)

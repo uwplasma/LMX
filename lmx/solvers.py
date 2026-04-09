@@ -413,6 +413,7 @@ def _step(
     velocity_update_limit: float,
     velocity_update_limiter: str,
     current_reconstruction: str,
+    post_update_potential_refresh: bool,
     interpolate_direct_fluid_walls: bool,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     def outer_body(_, carry):
@@ -494,6 +495,21 @@ def _step(
         )
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
+        if post_update_potential_refresh:
+            phi, potential_residual, potential_iteration_count = _solve_potential(
+                mesh,
+                sigma,
+                fluid_mask,
+                u_next,
+                by,
+                bz,
+                anchor,
+                potential_iterations,
+                tolerance=potential_tolerance,
+                relaxation=potential_relaxation,
+                solver=potential_solver,
+            )
+            phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
         jy, jz, lorentz = _compute_current_and_lorentz(
             mesh,
             sigma,
@@ -802,6 +818,7 @@ def solve_transient(
                 velocity_update_limit=case.time_stepper.velocity_update_limit,
                 velocity_update_limiter=case.time_stepper.velocity_update_limiter,
                 current_reconstruction=case.time_stepper.current_reconstruction,
+                post_update_potential_refresh=case.time_stepper.post_update_potential_refresh,
                 interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
             )
             courant_like = jnp.max(jnp.abs(u_next)) * dt / jnp.min(mesh.dy)
@@ -962,6 +979,7 @@ def solve_transient(
             velocity_update_limit=case.time_stepper.velocity_update_limit,
             velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
+            post_update_potential_refresh=case.time_stepper.post_update_potential_refresh,
             interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
         )
 
@@ -1209,6 +1227,7 @@ def solve_steady(
             velocity_update_limit=case.time_stepper.velocity_update_limit,
             velocity_update_limiter=case.time_stepper.velocity_update_limiter,
             current_reconstruction=case.time_stepper.current_reconstruction,
+            post_update_potential_refresh=case.time_stepper.post_update_potential_refresh,
             interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
         )
 

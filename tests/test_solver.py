@@ -201,6 +201,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         velocity_update_limit=10.0,
         velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
+        post_update_potential_refresh=False,
         interpolate_direct_fluid_walls=False,
     )[0]
     driven = solvers._step(
@@ -226,6 +227,7 @@ def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zer
         velocity_update_limit=10.0,
         velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
+        post_update_potential_refresh=False,
         interpolate_direct_fluid_walls=False,
     )[0]
 
@@ -276,6 +278,7 @@ def test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh
         velocity_update_limit=10.0,
         velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
+        post_update_potential_refresh=False,
         interpolate_direct_fluid_walls=False,
     )
 
@@ -326,6 +329,7 @@ def test_dynamic_inlet_drive_uses_full_fluid_area_for_flow_rate_control():
         velocity_update_limit=10.0,
         velocity_update_limiter="global_scale",
         current_reconstruction="cell_centered",
+        post_update_potential_refresh=False,
         interpolate_direct_fluid_walls=False,
     )
 
@@ -510,6 +514,109 @@ def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
     assert float(solution.diagnostics.emf_max_history[-1]) == pytest.approx(float(emf_max), rel=1e-5)
     assert float(solution.diagnostics.lorentz_max_history[-1]) == pytest.approx(float(jnp.max(jnp.abs(lorentz))), rel=1e-4)
     assert float(solution.diagnostics.face_lorentz_max_history[-1]) == pytest.approx(float(face_lorentz_max), rel=1e-5)
+
+
+def test_post_update_potential_refresh_recomputes_electromagnetic_state(monkeypatch: pytest.MonkeyPatch):
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    sigma = jnp.ones(mesh.yz_shape)
+    rho = jnp.ones(mesh.yz_shape)
+    nu = jnp.zeros(mesh.yz_shape)
+    by = jnp.zeros(mesh.yz_shape)
+    bz = jnp.ones(mesh.yz_shape)
+    u = jnp.full(mesh.yz_shape, 0.25)
+
+    def fake_solve_potential(*args, **kwargs):
+        u_arg = args[3]
+        phi_value = jnp.mean(u_arg) + 1.0
+        return (
+            jnp.full_like(u_arg, phi_value),
+            jnp.asarray(phi_value * 0.1),
+            jnp.asarray(1, dtype=jnp.int32),
+        )
+
+    def fake_compute_current_and_lorentz(*args, **kwargs):
+        phi_arg = args[4]
+        phi_value = jnp.mean(phi_arg)
+        return (
+            jnp.full_like(phi_arg, phi_value + 10.0),
+            jnp.full_like(phi_arg, phi_value + 20.0),
+            jnp.full_like(phi_arg, phi_value + 30.0),
+        )
+
+    def fake_face_current_emf_and_lorentz_max(*args, **kwargs):
+        phi_arg = args[4]
+        phi_value = jnp.mean(phi_arg)
+        return (
+            jnp.asarray(phi_value + 40.0),
+            jnp.asarray(phi_value + 50.0),
+            jnp.asarray(phi_value + 60.0),
+        )
+
+    monkeypatch.setattr(solvers, "_solve_potential", fake_solve_potential)
+    monkeypatch.setattr(solvers, "_compute_current_and_lorentz", fake_compute_current_and_lorentz)
+    monkeypatch.setattr(solvers, "_face_current_emf_and_lorentz_max", fake_face_current_emf_and_lorentz_max)
+
+    disabled = solvers._step(
+        u=u,
+        mesh=mesh,
+        sigma=sigma,
+        rho=rho,
+        nu=nu,
+        fluid_mask=fluid_mask,
+        by=by,
+        bz=bz,
+        dt=0.1,
+        forcing=0.0,
+        target_mean_velocity=None,
+        reference_mean_velocity=None,
+        anchor=(0, 0),
+        outer_iterations=1,
+        potential_iterations=1,
+        potential_tolerance=None,
+        potential_relaxation=1.0,
+        potential_solver="jacobi",
+        relaxation=1.0,
+        velocity_update_limit=10.0,
+        velocity_update_limiter="global_scale",
+        current_reconstruction="cell_centered",
+        post_update_potential_refresh=False,
+        interpolate_direct_fluid_walls=False,
+    )
+
+    enabled = solvers._step(
+        u=u,
+        mesh=mesh,
+        sigma=sigma,
+        rho=rho,
+        nu=nu,
+        fluid_mask=fluid_mask,
+        by=by,
+        bz=bz,
+        dt=0.1,
+        forcing=0.0,
+        target_mean_velocity=None,
+        reference_mean_velocity=None,
+        anchor=(0, 0),
+        outer_iterations=1,
+        potential_iterations=1,
+        potential_tolerance=None,
+        potential_relaxation=1.0,
+        potential_solver="jacobi",
+        relaxation=1.0,
+        velocity_update_limit=10.0,
+        velocity_update_limiter="global_scale",
+        current_reconstruction="cell_centered",
+        post_update_potential_refresh=True,
+        interpolate_direct_fluid_walls=False,
+    )
+
+    assert float(jnp.max(jnp.abs(enabled[0] - u))) > 0.0
+    assert float(enabled[1][0, 0]) == pytest.approx(float(jnp.mean(enabled[0])) + 1.0)
+    assert float(disabled[2][0, 0]) == pytest.approx(float(disabled[1][0, 0]) + 10.0)
+    assert float(enabled[2][0, 0]) == pytest.approx(float(enabled[1][0, 0]) + 10.0)
+    assert float(disabled[4][0, 0]) == pytest.approx(float(disabled[1][0, 0]) + 30.0)
+    assert float(enabled[4][0, 0]) == pytest.approx(float(enabled[1][0, 0]) + 30.0)
 
 
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():

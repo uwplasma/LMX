@@ -65,6 +65,7 @@ class TimeStepperConfig:
     potential_relaxation: float = 1.0
     potential_solver: PotentialSolverKind = "auto"
     current_reconstruction: CurrentReconstructionKind = "cell_centered"
+    post_update_potential_refresh: bool = False
     steady_tolerance: float = 1e-8
     steady_potential_tolerance: float | None = None
     relaxation: float = 0.35

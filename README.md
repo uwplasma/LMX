@@ -26,6 +26,9 @@ staying focused on structured duct and simple pipe geometries.
   control paths. The current default is a geometry-aware `auto` policy:
   single-region ducts use CG, while multi-region layered ducts use
   `cg_volume`, the cell-metric-scaled CG form of the layered `phi` system.
+- `TimeStepperConfig.post_update_potential_refresh` is available as an
+  opt-in consistency control: when enabled, LMX re-solves `phi` on the updated
+  velocity before returning the step state and electromagnetic diagnostics.
 - Layered conducting-wall cases also expose `potential_solver="cg_volume"`,
   which solves the same layered `phi` equation after cell-metric scaling into a
   symmetric CG system. It is now the retained layered default because it
