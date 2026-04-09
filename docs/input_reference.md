@@ -33,6 +33,7 @@ An input file is organized as:
 [case]
 [geometry]
 [magnetic_field]
+[solver]
 [time_stepper]
 [output]
 [logging]
@@ -44,12 +45,14 @@ An input file is organized as:
 ## `case`
 
 - `name`: case name used for output file stems
-- `solve_mode`: `"steady"` or `"transient"`
 - `forcing`: explicit reduced-model streamwise forcing
 - `initial_velocity`: initial fluid velocity
 - `reference_pressure_gradient`: stored reference value for reduced-model comparisons
 - `reference_phi_cell`: two integers fixing the electric-potential gauge
 - `notes`: free-form string stored in metadata
+
+`solve_mode` is still accepted here for backward compatibility, but the public
+setting now lives in `[solver].mode`.
 
 ## `geometry`
 
@@ -73,6 +76,32 @@ An input file is organized as:
 Custom analytic magnetic fields still require the Python API, because a callable
 cannot be serialized cleanly into TOML.
 
+## `solver`
+
+- `kind`
+  - `"fully_developed_inductionless"`: default research path for duct problems
+  - `"legacy_reduced"`: retained pseudo-transient path for regression and comparison
+  - `"extruded_inductionless"`: planned fringing-field / 3D path, not yet implemented
+- `mode`: `"steady"` or `"transient"`
+- `linear_solver`: `"auto"`, `"cg"`, `"gmres"`, or `"bicgstab"`
+- `preconditioner`: `"none"`, `"jacobi"`, or `"block_jacobi"`
+- `time_scheme`: currently `"implicit_euler"` is implemented on the new solver path
+- `coupling_iterations`
+- `coupling_tolerance`
+
+The retained default for duct cases is now:
+
+```toml
+[solver]
+kind = "fully_developed_inductionless"
+mode = "steady"
+linear_solver = "auto"
+preconditioner = "jacobi"
+time_scheme = "implicit_euler"
+coupling_iterations = 16
+coupling_tolerance = 1.0e-8
+```
+
 ## `time_stepper`
 
 - `dt`
@@ -92,9 +121,31 @@ cannot be serialized cleanly into TOML.
 - `velocity_update_limiter`
 - `checkpoint_stride`
 
-The retained values in the shipped examples are the current known-good
-baselines. They are not intended to be universal defaults for all future
-geometries.
+These controls are now split conceptually:
+
+- temporal controls used by all solver families:
+  - `dt`
+  - `t_final`
+  - `max_steps`
+  - `checkpoint_stride`
+- electric-potential controls used by current solver families:
+  - `potential_iterations`
+  - `potential_tolerance`
+  - `potential_relaxation`
+  - `potential_solver`
+  - `steady_tolerance`
+  - `steady_potential_tolerance`
+- legacy reduced-solver controls:
+  - `outer_iterations`
+  - `current_reconstruction`
+  - `post_update_potential_refresh`
+  - `relaxation`
+  - `velocity_update_limit`
+  - `velocity_update_limiter`
+
+The shipped examples now use the new `[solver]` block and keep the legacy
+reduced controls only as compatibility fields while the solver reset is in
+progress.
 
 When `forcing = 0` and the case uses reduced mean-flow closure through
 `inlet_flow_rate`, the solver now computes those cross-sectional means with

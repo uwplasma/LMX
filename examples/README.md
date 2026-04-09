@@ -34,6 +34,7 @@ They show users how to set:
 - geometry and resolution
 - materials and wall regions
 - magnetic-field startup ramps
+- solver family and coupling controls
 - time-stepper controls
 - current-reconstruction controls
 - output bundle controls
@@ -57,6 +58,11 @@ The shipped Hunt TOML explicitly models:
 - conducting Hartmann walls
 
 so it reads the same way the native Hunt case is intended physically.
+
+The shipped TOMLs now use a first-class `[solver]` block. For duct cases the
+retained public path is `kind = "fully_developed_inductionless"`. The older
+reduced controls remain in `[time_stepper]` only for compatibility and
+legacy-regression use.
 
 Shercliff and Hunt automatically use the default closed-channel analytical
 reference root when it exists under `./external/FreeMHDPaperAllFigures/...`.

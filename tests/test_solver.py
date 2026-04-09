@@ -18,6 +18,7 @@ pytestmark = pytest.mark.physics
 
 def test_hartmann_solver_runs():
     case = make_hartmann_case(ha=10.0, ny=24, nz=24)
+    assert case.solver.kind == "fully_developed_inductionless"
     solution = solve_steady(case)
     assert solution.state.u.shape == (24, 24)
     assert float(jnp.max(solution.state.u)) > 0.0
@@ -26,6 +27,7 @@ def test_hartmann_solver_runs():
 
 def test_hunt_solver_keeps_solid_velocity_zero():
     case = make_hunt_case(ha=10.0, ny=20, nz=20, wall_cells=3)
+    assert case.solver.kind == "fully_developed_inductionless"
     solution = solve_steady(case)
     assert solution.mesh.fluid_mask is not None
     assert jnp.allclose(solution.state.u[~solution.mesh.fluid_mask], 0.0)
@@ -51,6 +53,18 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha1000.time_stepper.potential_tolerance is None
     assert ha1000.time_stepper.potential_solver == "auto"
     assert ha1000.time_stepper.current_reconstruction == "cell_centered"
+    assert ha20.solver.kind == "fully_developed_inductionless"
+    assert ha100.solver.kind == "fully_developed_inductionless"
+    assert ha1000.solver.kind == "fully_developed_inductionless"
+
+
+def test_legacy_reduced_solver_path_remains_selectable():
+    case = replace(
+        make_hartmann_case(ha=5.0, ny=12, nz=12),
+        solver=replace(make_hartmann_case(ha=5.0, ny=12, nz=12).solver, kind="legacy_reduced"),
+    )
+    solution = solve_steady(case)
+    assert float(jnp.max(solution.state.u)) > 0.0
 
 
 def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():

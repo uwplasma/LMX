@@ -81,14 +81,27 @@ class StreamingSolverLogger:
             self._write("=" * width)
         self._write(f"Create time")
         self._write(f"Create mesh for case        : {case.name}")
+        solver = getattr(case, "solver", None)
+        solver_kind = getattr(solver, "kind", "fully_developed_inductionless")
         self._write(f"Solve mode                  : {mode}")
+        self._write(f"Solver kind                 : {solver_kind}")
         self._write(f"Geometry                    : {case.geometry.kind}")
         self._write(f"Cells (nx, ny, nz)          : ({mesh.nx}, {mesh.ny}, {mesh.nz})")
         self._write(f"Domain (L, W, H)            : ({case.geometry.length:.6e}, {case.geometry.width:.6e}, {case.geometry.height:.6e})")
         self._write(f"Time controls               : dt={case.time_stepper.dt:.6e}, endTime={case.time_stepper.t_final:.6e}, maxSteps={case.time_stepper.max_steps}")
-        self._write(f"Velocity controls           : outerIterations={case.time_stepper.outer_iterations}, relaxation={case.time_stepper.relaxation:.6e}, limiter={case.time_stepper.velocity_update_limiter}, updateLimit={case.time_stepper.velocity_update_limit:.6e}")
+        if solver is not None:
+            self._write(
+                f"Solver controls             : linearSolver={solver.linear_solver}, preconditioner={solver.preconditioner}, "
+                f"timeScheme={solver.time_scheme}, couplingIterations={solver.coupling_iterations}, "
+                f"couplingTolerance={solver.coupling_tolerance:.6e}"
+            )
         self._write(f"Potential controls          : solver={potential_solver}, iterations={case.time_stepper.potential_iterations}, tolerance={case.time_stepper.potential_tolerance}, omega={case.time_stepper.potential_relaxation:.6e}")
-        self._write(f"Current reconstruction      : {case.time_stepper.current_reconstruction}")
+        if solver_kind == "legacy_reduced":
+            self._write(
+                f"Legacy velocity controls    : outerIterations={case.time_stepper.outer_iterations}, relaxation={case.time_stepper.relaxation:.6e}, "
+                f"limiter={case.time_stepper.velocity_update_limiter}, updateLimit={case.time_stepper.velocity_update_limit:.6e}"
+            )
+            self._write(f"Current reconstruction      : {case.time_stepper.current_reconstruction}")
         self._write(f"Magnetic field              : kind={case.magnetic_field.kind}, value={case.magnetic_field.value}, rampStart={case.magnetic_field.ramp_start:.6e}, rampDuration={case.magnetic_field.ramp_duration:.6e}")
         self._write(f"Flow forcing                : explicit={case.forcing:.6e}, initialVelocity={case.initial_velocity:.6e}, targetMeanVelocity={target_mean_velocity}, referenceMeanVelocity={reference_mean_velocity}")
         if restart is not None and restart.enabled:

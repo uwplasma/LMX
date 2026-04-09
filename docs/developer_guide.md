@@ -17,6 +17,18 @@
 - `lmx.config`: TOML input loader for executable `lmx input.toml` runs.
 - `lmx.runtime_logging`: live OpenFOAM-style solver logger used by the solver and CLI.
 
+## Solver families
+
+- `fully_developed_inductionless`
+  - current default research path for `rect_duct` and `layered_duct`
+  - coupled `u` / `phi` solve without the legacy velocity limiter
+- `legacy_reduced`
+  - retained pseudo-transient path
+  - kept for regression, historical parity studies, and fallback
+- `extruded_inductionless`
+  - reserved for the upcoming fringing-field / 3D solver
+  - not implemented yet
+
 ## Data layout
 
 - Cross-section fields use shape `(ny, nz)` for duct-style problems.
@@ -84,6 +96,9 @@
 
 - `CaseSpec` should describe physics, geometry, and initial conditions without
   assuming a specific backend.
+- Distinguish mesh support from solver support in docs and APIs. `pipe_ogrid`
+  mesh generation exists, but solver support for pipe/fringing-field cases is
+  not complete until `extruded_inductionless` lands.
 - Boundary conditions should remain declarative and reusable across analytical runs,
   validation runs, and future geometries.
 - Defaults should be derived from the case geometry and materials, not from

@@ -1,6 +1,5 @@
 [case]
 name = "shercliff_ha20_toml"
-solve_mode = "steady"
 forcing = 1.0
 initial_velocity = 0.0
 reference_pressure_gradient = -1.0
@@ -25,6 +24,15 @@ kind = "constant"
 value = [0.0, 0.0, 20.0]
 ramp_start = 0.0
 ramp_duration = 0.0
+
+[solver]
+kind = "fully_developed_inductionless"
+mode = "steady"
+linear_solver = "auto"
+preconditioner = "jacobi"
+time_scheme = "implicit_euler"
+coupling_iterations = 16
+coupling_tolerance = 1.0e-8
 
 [time_stepper]
 dt = 0.001

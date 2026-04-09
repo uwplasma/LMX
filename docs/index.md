@@ -14,6 +14,7 @@ theory
 developer_guide
 case_cookbook
 input_reference
+benchmark_matrix
 validation_report
 ```
 

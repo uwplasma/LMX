@@ -7,6 +7,7 @@ from .specs import (
     MagneticFieldSpec,
     OutputSpec,
     RegionSpec,
+    SolverConfig,
     TimeStepperConfig,
 )
 
@@ -64,6 +65,18 @@ def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
     )
 
 
+def _fully_developed_solver(mode: str = "steady") -> SolverConfig:
+    return SolverConfig(
+        kind="fully_developed_inductionless",
+        mode=mode,
+        linear_solver="auto",
+        preconditioner="jacobi",
+        time_scheme="implicit_euler",
+        coupling_iterations=16,
+        coupling_tolerance=1e-8,
+    )
+
+
 def make_hartmann_case(
     ha: float = 20.0,
     width: float = 2.0,
@@ -87,6 +100,7 @@ def make_hartmann_case(
             BoundaryCondition("electric", "insulating"),
         ),
         time_stepper=TimeStepperConfig(dt=0.001, t_final=1.0, max_steps=400, potential_iterations=200, relaxation=0.1),
+        solver=_fully_developed_solver(),
         output=OutputSpec(directory=output_dir),
         forcing=1.0,
         reference_pressure_gradient=-1.0,
@@ -118,6 +132,7 @@ def make_shercliff_case(
             BoundaryCondition("electric", "insulating"),
         ),
         time_stepper=TimeStepperConfig(dt=0.001, t_final=1.5, max_steps=400, potential_iterations=225, relaxation=0.1),
+        solver=_fully_developed_solver(),
         output=OutputSpec(directory=output_dir),
         forcing=1.0,
         reference_pressure_gradient=-1.0,
@@ -185,6 +200,7 @@ def make_hunt_case(
             BoundaryCondition("insulating_side_walls", "insulating", region="insulating_wall", side="left_right"),
         ),
         time_stepper=controls,
+        solver=_fully_developed_solver(),
         output=OutputSpec(directory=output_dir),
         forcing=1.0,
         reference_pressure_gradient=-1.0,

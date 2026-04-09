@@ -89,6 +89,8 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
     summary = {
         "case": case.name,
         "geometry": geometry,
+        "solver_kind": getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless"),
+        "solver_mode": getattr(getattr(case, "solver", None), "mode", "steady"),
         "time": float(solution.state.time),
         "residual": float(solution.state.residual),
         "u_max": float(jnp.max(jnp.abs(u_field))),

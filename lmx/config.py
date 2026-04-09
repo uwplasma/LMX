@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 import tomllib
 
 from .specs import (
@@ -12,11 +12,10 @@ from .specs import (
     MagneticFieldSpec,
     OutputSpec,
     RegionSpec,
+    SolveMode,
+    SolverConfig,
     TimeStepperConfig,
 )
-
-
-SolveMode = Literal["steady", "transient"]
 
 
 @dataclass(frozen=True)
@@ -116,6 +115,7 @@ def load_run_config(path: str | Path) -> RunConfig:
     case_table = root.get("case", {})
     geometry_table = root.get("geometry", {})
     field_table = root.get("magnetic_field", {})
+    solver_table = root.get("solver", {})
     time_table = root.get("time_stepper", {})
     output_table = root.get("output", {})
     logging_table = root.get("logging", {})
@@ -175,6 +175,23 @@ def load_run_config(path: str | Path) -> RunConfig:
         checkpoint_stride=int(time_table.get("checkpoint_stride", 1)),
     )
 
+    legacy_mode = case_table.get("solve_mode")
+    solver_mode = str(solver_table.get("mode", legacy_mode or "steady"))
+    if solver_mode not in {"steady", "transient"}:
+        raise ValueError(f"Unsupported solve mode {solver_mode!r}")
+    if legacy_mode is not None and str(legacy_mode) != solver_mode:
+        raise ValueError("case.solve_mode and solver.mode disagree; use solver.mode as the public setting")
+
+    solver = SolverConfig(
+        kind=str(solver_table.get("kind", "fully_developed_inductionless")),
+        mode=solver_mode,
+        linear_solver=str(solver_table.get("linear_solver", "auto")),
+        preconditioner=str(solver_table.get("preconditioner", "jacobi")),
+        time_scheme=str(solver_table.get("time_scheme", "implicit_euler")),
+        coupling_iterations=int(solver_table.get("coupling_iterations", 12)),
+        coupling_tolerance=float(solver_table.get("coupling_tolerance", 1e-8)),
+    )
+
     output_dir = output_table.get("directory")
     if output_dir is not None:
         output_dir = str((input_path.parent / str(output_dir)).resolve())
@@ -197,6 +214,7 @@ def load_run_config(path: str | Path) -> RunConfig:
         magnetic_field=magnetic_field,
         boundary_conditions=_parse_boundaries(boundaries_table),
         time_stepper=time_stepper,
+        solver=solver,
         output=output,
         forcing=float(case_table.get("forcing", 1.0)),
         initial_velocity=float(case_table.get("initial_velocity", 0.0)),
@@ -226,8 +244,4 @@ def load_run_config(path: str | Path) -> RunConfig:
         else str(restart_table["restart_filename"]),
     )
 
-    solve_mode = str(case_table.get("solve_mode", "steady"))
-    if solve_mode not in {"steady", "transient"}:
-        raise ValueError(f"Unsupported solve_mode {solve_mode!r}")
-
-    return RunConfig(case=case, solve_mode=solve_mode, logging=logging, restart=restart, input_path=input_path)
+    return RunConfig(case=case, solve_mode=solver.mode, logging=logging, restart=restart, input_path=input_path)

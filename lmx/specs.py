@@ -9,6 +9,8 @@ import jax.numpy as jnp
 
 RegionKind = Literal["fluid", "solid"]
 GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid"]
+SolverKind = Literal["fully_developed_inductionless", "legacy_reduced", "extruded_inductionless"]
+SolveMode = Literal["steady", "transient"]
 BoundaryKind = Literal[
     "no_slip",
     "insulating",
@@ -22,6 +24,9 @@ MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
 CurrentReconstructionKind = Literal["cell_centered", "face_averaged", "hybrid_face_lorentz"]
 VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
+LinearSolverKind = Literal["auto", "cg", "gmres", "bicgstab"]
+PreconditionerKind = Literal["none", "jacobi", "block_jacobi"]
+TimeSchemeKind = Literal["implicit_euler", "crank_nicolson"]
 
 
 @dataclass(frozen=True)
@@ -55,10 +60,22 @@ class MagneticFieldSpec:
 
 
 @dataclass(frozen=True)
+class SolverConfig:
+    kind: SolverKind = "fully_developed_inductionless"
+    mode: SolveMode = "steady"
+    linear_solver: LinearSolverKind = "auto"
+    preconditioner: PreconditionerKind = "jacobi"
+    time_scheme: TimeSchemeKind = "implicit_euler"
+    coupling_iterations: int = 12
+    coupling_tolerance: float = 1e-8
+
+
+@dataclass(frozen=True)
 class TimeStepperConfig:
     dt: float
     t_final: float
     max_steps: int
+    # Legacy reduced-solver controls kept for regression and fallback only.
     outer_iterations: int = 2
     potential_iterations: int = 400
     potential_tolerance: float | None = None
@@ -112,6 +129,7 @@ class CaseSpec:
     magnetic_field: MagneticFieldSpec
     boundary_conditions: tuple[BoundaryCondition, ...]
     time_stepper: TimeStepperConfig
+    solver: SolverConfig = field(default_factory=SolverConfig)
     output: OutputSpec = field(default_factory=OutputSpec)
     forcing: float = 1.0
     initial_velocity: float = 0.0

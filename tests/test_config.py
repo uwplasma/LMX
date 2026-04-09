@@ -39,6 +39,15 @@ value = [0.0, 0.0, 20.0]
 ramp_start = 0.0
 ramp_duration = 0.0
 
+[solver]
+kind = "fully_developed_inductionless"
+mode = "steady"
+linear_solver = "gmres"
+preconditioner = "block_jacobi"
+time_scheme = "implicit_euler"
+coupling_iterations = 9
+coupling_tolerance = 1.0e-7
+
 [time_stepper]
 dt = 0.001
 t_final = 0.01
@@ -120,6 +129,11 @@ side = "max"
     assert config.solve_mode == "steady"
     assert config.case.geometry.kind == "rect_duct"
     assert config.case.output.directory == str((tmp_path / "out").resolve())
+    assert config.case.solver.kind == "fully_developed_inductionless"
+    assert config.case.solver.mode == "steady"
+    assert config.case.solver.linear_solver == "gmres"
+    assert config.case.solver.preconditioner == "block_jacobi"
+    assert config.case.solver.coupling_iterations == 9
     assert config.case.time_stepper.potential_solver == "cg"
     assert config.case.time_stepper.post_update_potential_refresh is True
     assert config.logging.step_stride == 2
@@ -187,3 +201,43 @@ def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann
     assert boundaries["right_wall"].kind == "insulating"
     assert boundaries["bottom_wall"].kind == "conducting_wall"
     assert boundaries["top_wall"].kind == "conducting_wall"
+
+
+def test_legacy_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):
+    input_file = tmp_path / "legacy.toml"
+    input_file.write_text(
+        """
+[case]
+name = "legacy"
+solve_mode = "transient"
+
+[geometry]
+kind = "rect_duct"
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 1.0]
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+
+[[boundary_conditions]]
+name = "wall"
+kind = "no_slip"
+""".strip()
+    )
+
+    config = load_run_config(input_file)
+    assert config.solve_mode == "transient"
+    assert config.case.solver.mode == "transient"

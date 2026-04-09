@@ -2,12 +2,16 @@
 
 LMX is a Python/JAX solver for inductionless liquid-metal magnetohydrodynamics.
 It is designed to be self-consistent, differentiable, and fast on CPU and GPU while
-staying focused on structured duct and simple pipe geometries.
+staying focused on structured duct solvers today, with mapped-pipe and fringing-field
+support still under active development.
 
 ## What LMX provides
 
 - Structured and mapped-structured mesh generation for ducts and pipes.
 - JAX-native finite-volume style operators and time stepping.
+- Two solver families:
+  - `fully_developed_inductionless`: the new coupled duct solver path for Hartmann, Shercliff, and Hunt
+  - `legacy_reduced`: the retained pseudo-transient path kept for regression and historical comparison
 - Laminar inductionless MHD for Hartmann, Shercliff, and Hunt-style cases.
 - Explicit fluid/solid conductivity regions for conducting and insulating wall layers.
 - Hunt defaults expressed through wall conductance ratio, with optional direct
@@ -115,6 +119,14 @@ also writes:
 
 The full field-by-field TOML schema is documented in
 [`docs/input_reference.md`](docs/input_reference.md).
+
+The public executable layout is now:
+
+- `[solver]`: solver family, mode, linear solver, preconditioner, and coupling controls
+- `[time_stepper]`: temporal controls and legacy reduced-solver controls
+
+The legacy reduced controls under `[time_stepper]` still parse and remain usable
+with `solver.kind = "legacy_reduced"`, but they are no longer the main research path.
 
 Restart/continue is now part of the executable workflow. The retained teaching
 path is:

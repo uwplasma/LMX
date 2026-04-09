@@ -68,6 +68,39 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - `scripts/inspect_freemhd_setup.py`: inspects the locally available FreeMHD assets, reports discovered case directories, and recommends the smallest smoke target.
 - `docs/index.md`, `docs/conf.py`, `.readthedocs.yaml`: documentation landing page and Read the Docs build configuration.
 
+## Latest Retained Reset Work
+
+- Phase 1 of the research-grade reset is now started in code, not just in notes.
+- `CaseSpec` now carries a first-class `solver` block through `lmx/specs.py`,
+  `lmx/config.py`, the CLI/TOML path, and the shipped examples.
+- Two solver families now exist explicitly:
+  - `fully_developed_inductionless`
+  - `legacy_reduced`
+- The current public duct cases now construct with `solver.kind =
+  "fully_developed_inductionless"` by default, while the older reduced Hunt
+  path remains selectable for regression/fallback.
+- The new fully developed solver uses:
+  - a coupled `u` / `phi` iteration
+  - face-conservative current construction
+  - matrix-free five-point linear solves for the velocity subproblem
+  - no velocity limiter in the default path
+- The legacy reduced controls remain in `TimeStepperConfig`, but they are now
+  documented and treated as legacy controls rather than the main research path.
+- Documentation now distinguishes:
+  - implemented duct solver support
+  - mapped-pipe mesh scaffolding
+  - not-yet-implemented fringing-field solver support
+
+## Immediate Reset Priorities
+
+1. Improve the new `fully_developed_inductionless` parity and analytical quality
+   enough that Hartmann, Shercliff, and Hunt can move off the retained legacy
+   path completely.
+2. Reset parity tooling around model-consistent observables instead of raw
+   backend pressure-correction traces.
+3. Stage the next solver family, `extruded_inductionless`, for Benchmark B
+   fringing-field work while keeping current docs honest about its status.
+
 ## Current Readiness Assessment
 
 ### What LMX can credibly do today

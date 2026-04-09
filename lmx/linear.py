@@ -20,6 +20,36 @@ class LinearSolveInfo:
     residual: float
 
 
+def apply_five_point_operator(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    field: jnp.ndarray,
+) -> jnp.ndarray:
+    west_field = jnp.pad(field[:-1, :], ((1, 0), (0, 0)))
+    east_field = jnp.pad(field[1:, :], ((0, 1), (0, 0)))
+    south_field = jnp.pad(field[:, :-1], ((0, 0), (1, 0)))
+    north_field = jnp.pad(field[:, 1:], ((0, 0), (0, 1)))
+    return diagonal * field - west * west_field - east * east_field - south * south_field - north * north_field
+
+
+def five_point_residual_norm(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    field: jnp.ndarray,
+) -> jnp.ndarray:
+    applied = apply_five_point_operator(diagonal, west, east, south, north, field)
+    numerator = jnp.max(jnp.abs(applied - rhs))
+    scale = jnp.maximum(jnp.max(jnp.abs(applied)), jnp.max(jnp.abs(rhs)))
+    return numerator / jnp.maximum(scale, 1e-12)
+
+
 def apply_poisson_operator(
     diagonal: jnp.ndarray,
     west: jnp.ndarray,
@@ -103,6 +133,172 @@ def solve_poisson_jacobi_state(
     init_state = (jnp.asarray(0, dtype=jnp.int32), phi0, jnp.asarray(jnp.inf, dtype=rhs.dtype))
     iteration_count, phi, residual = jax.lax.while_loop(cond_fun, body_fun, init_state)
     return phi, residual, iteration_count
+
+
+def solve_five_point_cg_state(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    iterations: int,
+    tolerance: float | None = None,
+    preconditioner: str = "jacobi",
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    field0 = jnp.zeros_like(rhs)
+    tolerance_value = -jnp.ones((), dtype=rhs.dtype) if tolerance is None else jnp.asarray(tolerance, dtype=rhs.dtype)
+    inv_diagonal = 1.0 / jnp.maximum(diagonal, 1e-12)
+
+    def apply_preconditioner(residual: jnp.ndarray) -> jnp.ndarray:
+        if preconditioner in {"jacobi", "block_jacobi"}:
+            return inv_diagonal * residual
+        if preconditioner == "none":
+            return residual
+        raise ValueError(f"Unsupported preconditioner {preconditioner!r}")
+
+    residual0 = rhs - apply_five_point_operator(diagonal, west, east, south, north, field0)
+    z0 = apply_preconditioner(residual0)
+    p0 = z0
+    rz0 = jnp.sum(residual0 * z0)
+    norm0 = five_point_residual_norm(diagonal, west, east, south, north, rhs, field0)
+
+    def cond_fun(state):
+        count, _, residual_norm, _, _, rz_old, active = state
+        return jnp.logical_and(count < iterations, jnp.logical_and(active, residual_norm > tolerance_value))
+
+    def body_fun(state):
+        count, field, residual_norm, residual, direction, rz_old, _ = state
+        applied = apply_five_point_operator(diagonal, west, east, south, north, direction)
+        denom = jnp.sum(direction * applied)
+        safe_denom = jnp.where(jnp.abs(denom) > 1e-20, denom, 1.0)
+        alpha = rz_old / safe_denom
+        field_next = field + alpha * direction
+        residual_next = residual - alpha * applied
+        z_next = apply_preconditioner(residual_next)
+        rz_next = jnp.sum(residual_next * z_next)
+        safe_rz_old = jnp.where(jnp.abs(rz_old) > 1e-20, rz_old, 1.0)
+        beta = rz_next / safe_rz_old
+        direction_next = z_next + beta * direction
+        residual_norm_next = five_point_residual_norm(diagonal, west, east, south, north, rhs, field_next)
+        active_next = jnp.logical_and(jnp.abs(denom) > 1e-20, rz_next > 1e-24)
+        return count + 1, field_next, residual_norm_next, residual_next, direction_next, rz_next, active_next
+
+    init_state = (
+        jnp.asarray(0, dtype=jnp.int32),
+        field0,
+        norm0,
+        residual0,
+        p0,
+        rz0,
+        jnp.asarray(rz0 > 1e-24),
+    )
+    iteration_count, field, residual_norm, _, _, _, _ = jax.lax.while_loop(cond_fun, body_fun, init_state)
+    return field, residual_norm, iteration_count
+
+
+def solve_five_point_lineax(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    *,
+    linear_solver: str = "cg",
+    tolerance: float = 1e-10,
+    max_steps: int = 500,
+) -> tuple[jnp.ndarray, LinearSolveInfo]:
+    if lx is None:
+        field, residual, iteration_count = solve_five_point_cg_state(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            max_steps,
+            tolerance=tolerance,
+        )
+        return field, LinearSolveInfo(backend="jax-cg", iterations=int(iteration_count), residual=float(residual))
+
+    ny, nz = rhs.shape
+    size = ny * nz
+
+    def mv(vec: jnp.ndarray) -> jnp.ndarray:
+        return apply_five_point_operator(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            vec.reshape((ny, nz)),
+        ).reshape((size,))
+
+    input_structure = jax.ShapeDtypeStruct((size,), rhs.dtype)
+    op = lx.FunctionLinearOperator(mv, input_structure)
+    solver_name = linear_solver.lower()
+    if solver_name == "cg":
+        solver = lx.CG(rtol=tolerance, atol=tolerance, max_steps=max_steps)
+        backend = "lineax-cg"
+    elif solver_name == "gmres":
+        solver = lx.GMRES(rtol=tolerance, atol=tolerance, max_steps=max_steps)
+        backend = "lineax-gmres"
+    elif solver_name == "bicgstab":
+        solver = lx.BiCGStab(rtol=tolerance, atol=tolerance, max_steps=max_steps)
+        backend = "lineax-bicgstab"
+    else:
+        raise ValueError(f"Unsupported lineax solver {linear_solver!r}")
+    sol = lx.linear_solve(op, rhs.reshape((size,)), solver=solver)
+    field = sol.value.reshape((ny, nz))
+    residual = five_point_residual_norm(diagonal, west, east, south, north, rhs, field)
+    num_steps = sol.stats.get("num_steps", max_steps)
+    iterations = int(num_steps) if isinstance(num_steps, int) else max_steps
+    return field, LinearSolveInfo(backend=backend, iterations=iterations, residual=float(residual))
+
+
+def solve_five_point_system(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    *,
+    linear_solver: str = "auto",
+    preconditioner: str = "jacobi",
+    tolerance: float = 1e-10,
+    max_steps: int = 500,
+) -> tuple[jnp.ndarray, LinearSolveInfo]:
+    backend = linear_solver.lower()
+    if backend == "auto":
+        backend = "cg"
+    if backend == "cg":
+        field, residual, iteration_count = solve_five_point_cg_state(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            max_steps,
+            tolerance=tolerance,
+            preconditioner=preconditioner,
+        )
+        return field, LinearSolveInfo(backend="jax-cg", iterations=int(iteration_count), residual=float(residual))
+    if backend in {"gmres", "bicgstab"}:
+        return solve_five_point_lineax(
+            diagonal,
+            west,
+            east,
+            south,
+            north,
+            rhs,
+            linear_solver=backend,
+            tolerance=tolerance,
+            max_steps=max_steps,
+        )
+    raise ValueError(f"Unsupported linear solver {linear_solver!r}")
 
 
 def solve_poisson_jacobi(
