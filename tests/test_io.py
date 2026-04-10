@@ -60,6 +60,14 @@ def test_write_solution_npz(tmp_path: Path):
         assert "state_time" in data
         assert "state_residual" in data
         assert "current_scaled_pressure_proxy_history" in data
+        assert "linear_residual_history" in data
+        assert "linear_iterations_history" in data
+        assert "volumetric_flow_rate_history" in data
+        assert "mean_current_magnitude_history" in data
+        assert "lorentz_power_history" in data
+        assert "div_current_max_history" in data
+        assert "gauge_residual_history" in data
+        assert "interface_current_residual_history" in data
         assert "raw_update_max_history" in data
         assert "limiter_scale_history" in data
         assert "limited_fraction_history" in data
@@ -80,6 +88,14 @@ def test_load_restart_bundle_round_trips_solution_npz(tmp_path: Path):
     assert float(bundle.state.time) == pytest.approx(float(solution.state.time))
     assert float(bundle.state.residual) == pytest.approx(float(solution.state.residual))
     assert bundle.diagnostics.current_scaled_pressure_proxy_history.shape == solution.diagnostics.current_scaled_pressure_proxy_history.shape
+    assert bundle.diagnostics.linear_residual_history.shape == solution.diagnostics.linear_residual_history.shape
+    assert bundle.diagnostics.linear_iterations_history.shape == solution.diagnostics.linear_iterations_history.shape
+    assert bundle.diagnostics.volumetric_flow_rate_history.shape == solution.diagnostics.volumetric_flow_rate_history.shape
+    assert bundle.diagnostics.mean_current_magnitude_history.shape == solution.diagnostics.mean_current_magnitude_history.shape
+    assert bundle.diagnostics.lorentz_power_history.shape == solution.diagnostics.lorentz_power_history.shape
+    assert bundle.diagnostics.div_current_max_history.shape == solution.diagnostics.div_current_max_history.shape
+    assert bundle.diagnostics.gauge_residual_history.shape == solution.diagnostics.gauge_residual_history.shape
+    assert bundle.diagnostics.interface_current_residual_history.shape == solution.diagnostics.interface_current_residual_history.shape
     assert bundle.diagnostics.raw_update_max_history.shape == solution.diagnostics.raw_update_max_history.shape
     assert bundle.diagnostics.limiter_scale_history.shape == solution.diagnostics.limiter_scale_history.shape
     assert bundle.diagnostics.limited_fraction_history.shape == solution.diagnostics.limited_fraction_history.shape

@@ -175,6 +175,14 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         raw_update_max_history=np.asarray(diag.raw_update_max_history),
         limiter_scale_history=np.asarray(diag.limiter_scale_history),
         limited_fraction_history=np.asarray(diag.limited_fraction_history),
+        linear_residual_history=np.asarray(diag.linear_residual_history),
+        linear_iterations_history=np.asarray(diag.linear_iterations_history),
+        volumetric_flow_rate_history=np.asarray(diag.volumetric_flow_rate_history),
+        mean_current_magnitude_history=np.asarray(diag.mean_current_magnitude_history),
+        lorentz_power_history=np.asarray(diag.lorentz_power_history),
+        div_current_max_history=np.asarray(diag.div_current_max_history),
+        gauge_residual_history=np.asarray(diag.gauge_residual_history),
+        interface_current_residual_history=np.asarray(diag.interface_current_residual_history),
         courant_like=np.asarray(diag.courant_like),
         ohmic_power=np.asarray(diag.ohmic_power),
     )
@@ -231,6 +239,16 @@ def load_restart_bundle(path: str | Path) -> RestartBundle:
             lorentz_max_history=jnp.asarray(_load_optional_array(data, "lorentz_max_history")),
             potential_residual_history=jnp.asarray(_load_optional_array(data, "potential_residual_history")),
             potential_iterations_history=jnp.asarray(_load_optional_array(data, "potential_iterations_history")),
+            linear_residual_history=jnp.asarray(_load_optional_array(data, "linear_residual_history")),
+            linear_iterations_history=jnp.asarray(_load_optional_array(data, "linear_iterations_history")),
+            volumetric_flow_rate_history=jnp.asarray(_load_optional_array(data, "volumetric_flow_rate_history")),
+            mean_current_magnitude_history=jnp.asarray(_load_optional_array(data, "mean_current_magnitude_history")),
+            lorentz_power_history=jnp.asarray(_load_optional_array(data, "lorentz_power_history")),
+            div_current_max_history=jnp.asarray(_load_optional_array(data, "div_current_max_history")),
+            gauge_residual_history=jnp.asarray(_load_optional_array(data, "gauge_residual_history")),
+            interface_current_residual_history=jnp.asarray(
+                _load_optional_array(data, "interface_current_residual_history")
+            ),
         )
         return RestartBundle(
             path=path,

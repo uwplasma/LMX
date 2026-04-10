@@ -22,6 +22,7 @@
 - `fully_developed_inductionless`
   - current default research path for `rect_duct` and `layered_duct`
   - coupled `u` / `phi` solve without the legacy velocity limiter
+  - now reports linear-solve, flow-rate, Lorentz-power, and current-conservation diagnostics directly
 - `legacy_reduced`
   - retained pseudo-transient path
   - kept for regression, historical parity studies, and fallback

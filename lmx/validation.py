@@ -388,6 +388,30 @@ def validation_summary(solution: Solution, case_name: str, ha: float | None = No
         "current_scaled_pressure_proxy": float(solution.diagnostics.current_scaled_pressure_proxy_history[-1])
         if solution.diagnostics.current_scaled_pressure_proxy_history.size
         else 0.0,
+        "linear_residual": float(solution.diagnostics.linear_residual_history[-1])
+        if solution.diagnostics.linear_residual_history.size
+        else 0.0,
+        "linear_iterations_used": float(solution.diagnostics.linear_iterations_history[-1])
+        if solution.diagnostics.linear_iterations_history.size
+        else 0.0,
+        "volumetric_flow_rate": float(solution.diagnostics.volumetric_flow_rate_history[-1])
+        if solution.diagnostics.volumetric_flow_rate_history.size
+        else 0.0,
+        "mean_current_magnitude": float(solution.diagnostics.mean_current_magnitude_history[-1])
+        if solution.diagnostics.mean_current_magnitude_history.size
+        else 0.0,
+        "lorentz_power": float(solution.diagnostics.lorentz_power_history[-1])
+        if solution.diagnostics.lorentz_power_history.size
+        else 0.0,
+        "div_current_max": float(solution.diagnostics.div_current_max_history[-1])
+        if solution.diagnostics.div_current_max_history.size
+        else 0.0,
+        "gauge_residual": float(solution.diagnostics.gauge_residual_history[-1])
+        if solution.diagnostics.gauge_residual_history.size
+        else 0.0,
+        "interface_current_residual": float(solution.diagnostics.interface_current_residual_history[-1])
+        if solution.diagnostics.interface_current_residual_history.size
+        else 0.0,
         "raw_update_max": float(solution.diagnostics.raw_update_max_history[-1])
         if solution.diagnostics.raw_update_max_history.size
         else 0.0,

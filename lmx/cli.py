@@ -35,6 +35,14 @@ from .validation import (
 class _EmptyDiagnostics:
     potential_residual_history = jnp.asarray([])
     potential_iterations_history = jnp.asarray([])
+    linear_residual_history = jnp.asarray([])
+    linear_iterations_history = jnp.asarray([])
+    volumetric_flow_rate_history = jnp.asarray([])
+    mean_current_magnitude_history = jnp.asarray([])
+    lorentz_power_history = jnp.asarray([])
+    div_current_max_history = jnp.asarray([])
+    gauge_residual_history = jnp.asarray([])
+    interface_current_residual_history = jnp.asarray([])
 
 
 def _build_case(args: argparse.Namespace):
@@ -96,6 +104,14 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
         "u_max": float(jnp.max(jnp.abs(u_field))),
         "potential_residual": float(diag.potential_residual_history[-1]) if diag.potential_residual_history.size else None,
         "potential_iterations_used": float(diag.potential_iterations_history[-1]) if diag.potential_iterations_history.size else None,
+        "linear_residual": float(diag.linear_residual_history[-1]) if diag.linear_residual_history.size else None,
+        "linear_iterations_used": float(diag.linear_iterations_history[-1]) if diag.linear_iterations_history.size else None,
+        "volumetric_flow_rate": float(diag.volumetric_flow_rate_history[-1]) if diag.volumetric_flow_rate_history.size else None,
+        "mean_current_magnitude": float(diag.mean_current_magnitude_history[-1]) if diag.mean_current_magnitude_history.size else None,
+        "lorentz_power": float(diag.lorentz_power_history[-1]) if diag.lorentz_power_history.size else None,
+        "div_current_max": float(diag.div_current_max_history[-1]) if diag.div_current_max_history.size else None,
+        "gauge_residual": float(diag.gauge_residual_history[-1]) if diag.gauge_residual_history.size else None,
+        "interface_current_residual": float(diag.interface_current_residual_history[-1]) if diag.interface_current_residual_history.size else None,
         "output": str(out_dir.resolve()),
         "generated_files": {
             key: [str(path.resolve()) for path in paths]

@@ -36,7 +36,7 @@ They show users how to set:
 - magnetic-field startup ramps
 - solver family and coupling controls
 - time-stepper controls
-- current-reconstruction controls
+- legacy reduced-solver controls when you explicitly switch to `solver.kind = "legacy_reduced"`
 - output bundle controls
 - live logging verbosity
 - restart/continue controls against a saved `.npz` state dump

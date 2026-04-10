@@ -143,9 +143,11 @@ These controls are now split conceptually:
   - `velocity_update_limit`
   - `velocity_update_limiter`
 
-The shipped examples now use the new `[solver]` block and keep the legacy
-reduced controls only as compatibility fields while the solver reset is in
-progress.
+The shipped examples now use the new `[solver]` block and keep the default
+`fully_developed_inductionless` path focused on shared temporal and electric
+controls. The legacy reduced controls remain available for
+`solver.kind = "legacy_reduced"`, but they are no longer part of the teaching
+inputs for the default research path.
 
 When `forcing = 0` and the case uses reduced mean-flow closure through
 `inlet_flow_rate`, the solver now computes those cross-sectional means with

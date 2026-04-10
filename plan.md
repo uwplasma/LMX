@@ -90,6 +90,22 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
   - implemented duct solver support
   - mapped-pipe mesh scaffolding
   - not-yet-implemented fringing-field solver support
+- The first retained research-grade diagnostics are now wired through the new
+  fully developed solver path:
+  - linear residual / iteration histories for the velocity solve
+  - volumetric flow-rate history
+  - mean current-magnitude history
+  - integral Lorentz-power history
+  - max `|div J|` history
+  - gauge residual history
+  - interface current residual history
+- The new diagnostics are now present in:
+  - live runtime logs
+  - validation summaries
+  - solution / restart `.npz` files
+- CI was also hardened for GitHub-hosted runners by constraining JAX/XLA
+  resource use on the validation and coverage paths, which addresses the
+  recent validation-job memory failures without changing the benchmark jobs.
 
 ## Immediate Reset Priorities
 

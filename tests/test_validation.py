@@ -107,6 +107,19 @@ def test_validation_summary_includes_latest_potential_residual():
     assert metrics["potential_iterations_used"] >= 0.0
     assert "current_scaled_pressure_proxy" in metrics
     assert metrics["current_scaled_pressure_proxy"] >= 0.0
+    assert "linear_residual" in metrics
+    assert metrics["linear_residual"] >= 0.0
+    assert "linear_iterations_used" in metrics
+    assert metrics["linear_iterations_used"] >= 0.0
+    assert "volumetric_flow_rate" in metrics
+    assert "mean_current_magnitude" in metrics
+    assert "lorentz_power" in metrics
+    assert "div_current_max" in metrics
+    assert metrics["div_current_max"] >= 0.0
+    assert "gauge_residual" in metrics
+    assert metrics["gauge_residual"] >= 0.0
+    assert "interface_current_residual" in metrics
+    assert metrics["interface_current_residual"] >= 0.0
     assert "raw_update_max" in metrics
     assert metrics["raw_update_max"] >= 0.0
     assert "limiter_scale" in metrics

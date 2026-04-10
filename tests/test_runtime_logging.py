@@ -23,7 +23,10 @@ def test_streaming_solver_logger_prints_live_solver_sections():
     assert "Create mesh for case" in text
     assert "Time =" in text
     assert "smoothSolver: potE" in text
+    assert "smoothSolver: U" in text
     assert "currentScaledPressureProxy" in text
+    assert "MHD integrals" in text
+    assert "MHD conservation" in text
     assert "rawUpdateMax" in text
     assert "limitedFraction" in text
     assert "steadySolver" in text

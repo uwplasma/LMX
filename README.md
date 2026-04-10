@@ -9,9 +9,10 @@ support still under active development.
 
 - Structured and mapped-structured mesh generation for ducts and pipes.
 - JAX-native finite-volume style operators and time stepping.
-- Two solver families:
+- Two implemented solver families plus one reserved entry point:
   - `fully_developed_inductionless`: the new coupled duct solver path for Hartmann, Shercliff, and Hunt
   - `legacy_reduced`: the retained pseudo-transient path kept for regression and historical comparison
+  - `extruded_inductionless`: reserved for the upcoming fringing-field / 3D path and not implemented yet
 - Laminar inductionless MHD for Hartmann, Shercliff, and Hunt-style cases.
 - Explicit fluid/solid conductivity regions for conducting and insulating wall layers.
 - Hunt defaults expressed through wall conductance ratio, with optional direct
@@ -126,7 +127,8 @@ The public executable layout is now:
 - `[time_stepper]`: temporal controls and legacy reduced-solver controls
 
 The legacy reduced controls under `[time_stepper]` still parse and remain usable
-with `solver.kind = "legacy_reduced"`, but they are no longer the main research path.
+with `solver.kind = "legacy_reduced"`, but the shipped default examples no longer
+teach them on the `fully_developed_inductionless` path.
 
 Restart/continue is now part of the executable workflow. The retained teaching
 path is:

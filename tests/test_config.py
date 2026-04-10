@@ -14,7 +14,6 @@ def test_load_run_config_reads_complete_toml(tmp_path: Path):
         """
 [case]
 name = "hartmann_toml_demo"
-solve_mode = "steady"
 forcing = 1.0
 initial_velocity = 0.0
 reference_pressure_gradient = -1.0
@@ -52,16 +51,10 @@ coupling_tolerance = 1.0e-7
 dt = 0.001
 t_final = 0.01
 max_steps = 10
-outer_iterations = 2
 potential_iterations = 100
 potential_relaxation = 1.0
 potential_solver = "cg"
-current_reconstruction = "cell_centered"
-post_update_potential_refresh = true
 steady_tolerance = 1e-8
-relaxation = 0.35
-velocity_update_limit = 1e-3
-velocity_update_limiter = "global_scale"
 checkpoint_stride = 1
 
 [output]
@@ -135,7 +128,6 @@ side = "max"
     assert config.case.solver.preconditioner == "block_jacobi"
     assert config.case.solver.coupling_iterations == 9
     assert config.case.time_stepper.potential_solver == "cg"
-    assert config.case.time_stepper.post_update_potential_refresh is True
     assert config.logging.step_stride == 2
     assert config.restart.enabled is True
     assert config.restart.path == (tmp_path / "previous_results.npz").resolve()
@@ -241,3 +233,45 @@ kind = "no_slip"
     config = load_run_config(input_file)
     assert config.solve_mode == "transient"
     assert config.case.solver.mode == "transient"
+
+
+def test_conflicting_legacy_and_solver_modes_are_rejected(tmp_path: Path):
+    input_file = tmp_path / "conflict.toml"
+    input_file.write_text(
+        """
+[case]
+name = "conflict"
+solve_mode = "steady"
+
+[geometry]
+kind = "rect_duct"
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 1.0]
+
+[solver]
+mode = "transient"
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+
+[[boundary_conditions]]
+name = "wall"
+kind = "no_slip"
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="disagree"):
+        load_run_config(input_file)

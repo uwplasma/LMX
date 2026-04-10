@@ -37,6 +37,8 @@ class SolverStepRecord:
     residual: float
     potential_residual: float
     potential_iterations: float
+    linear_residual: float
+    linear_iterations: float
     applied_forcing: float
     pressure_proxy: float
     current_scaled_pressure_proxy: float
@@ -45,6 +47,12 @@ class SolverStepRecord:
     limited_fraction: float
     courant_like: float
     ohmic_power: float
+    volumetric_flow_rate: float
+    mean_current_magnitude: float
+    lorentz_power: float
+    div_current_max: float
+    gauge_residual: float
+    interface_current_residual: float
 
 
 class StreamingSolverLogger:
@@ -147,6 +155,10 @@ class StreamingSolverLogger:
             f"Final residual = {record.potential_residual:.6e}, No Iterations {int(record.potential_iterations)}"
         )
         self._write(
+            "smoothSolver: U                "
+            f"Final residual = {record.linear_residual:.6e}, No Iterations {int(record.linear_iterations)}"
+        )
+        self._write(
             "MHD predictor                  "
             f"max|U| = {record.u_max:.6e}, mean(U) = {record.mean_velocity:.6e}, "
             f"CourantLike = {record.courant_like:.6e}"
@@ -162,6 +174,16 @@ class StreamingSolverLogger:
             f"appliedForcing = {record.applied_forcing:.6e}, pressureProxy = {record.pressure_proxy:.6e}, "
             f"currentScaledPressureProxy = {record.current_scaled_pressure_proxy:.6e}, "
             f"OhmicPower = {record.ohmic_power:.6e}"
+        )
+        self._write(
+            "MHD integrals                  "
+            f"Q = {record.volumetric_flow_rate:.6e}, mean|J| = {record.mean_current_magnitude:.6e}, "
+            f"LorentzPower = {record.lorentz_power:.6e}"
+        )
+        self._write(
+            "MHD conservation               "
+            f"max|divJ| = {record.div_current_max:.6e}, gaugeResidual = {record.gauge_residual:.6e}, "
+            f"interfaceCurrentResidual = {record.interface_current_residual:.6e}"
         )
         self._write(
             "MHD limiter                    "

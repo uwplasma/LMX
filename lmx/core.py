@@ -39,6 +39,14 @@ class Diagnostics:
     face_lorentz_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     potential_iterations_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    linear_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    linear_iterations_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    volumetric_flow_rate_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    mean_current_magnitude_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    lorentz_power_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    div_current_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    gauge_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    interface_current_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 
 
 @dataclass(frozen=True)
