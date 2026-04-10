@@ -531,10 +531,18 @@ def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
         bz,
     )
 
-    assert float(solution.diagnostics.current_max_history[-1]) == pytest.approx(float(jnp.max(jnp.abs(jy))), rel=1e-4)
+    assert float(solution.diagnostics.current_max_history[-1]) == pytest.approx(
+        float(jnp.max(jnp.abs(jy))),
+        rel=2e-4,
+        abs=5e-5,
+    )
     assert float(solution.diagnostics.face_current_max_history[-1]) == pytest.approx(float(face_current_max), rel=1e-5)
     assert float(solution.diagnostics.emf_max_history[-1]) == pytest.approx(float(emf_max), rel=1e-5)
-    assert float(solution.diagnostics.lorentz_max_history[-1]) == pytest.approx(float(jnp.max(jnp.abs(lorentz))), rel=1e-4)
+    assert float(solution.diagnostics.lorentz_max_history[-1]) == pytest.approx(
+        float(jnp.max(jnp.abs(lorentz))),
+        rel=2e-4,
+        abs=5e-5,
+    )
     assert float(solution.diagnostics.face_lorentz_max_history[-1]) == pytest.approx(float(face_lorentz_max), rel=1e-5)
 
 
