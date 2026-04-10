@@ -119,6 +119,11 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
 - CI was also hardened for GitHub-hosted runners by constraining JAX/XLA
   resource use on the validation and coverage paths, which addresses the
   recent validation-job memory failures without changing the benchmark jobs.
+- The benchmark workflow now needs the same constrained JAX/XLA runner settings
+  as validation and coverage. The fully developed steady macro-iteration fix
+  increases compile/runtime pressure enough that unconstrained benchmark runs
+  on GitHub-hosted CPUs can hit LLVM `Cannot allocate memory` even when the
+  solver behavior itself is correct.
 
 ## Immediate Reset Priorities
 

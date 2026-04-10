@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.solvers import solve_steady
+from lmx.solvers import solve_steady, solve_transient
 
 
 pytestmark = pytest.mark.physics
@@ -66,7 +66,7 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity():
         initial_velocity=0.5,
         time_stepper=replace(case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0),
     )
-    solution = solve_steady(case)
+    solution = solve_transient(case)
     center_value = float(solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2])
     assert center_value > 0.0
     assert float(solution.state.u[0, 0]) == pytest.approx(0.0)
