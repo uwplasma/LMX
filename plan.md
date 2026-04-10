@@ -58,6 +58,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
   report/schema behavior rather than analytical acceptance.
 - CI coverage no longer forces `JAX_DISABLE_JIT=1`, because that setting was
   inflating runtime on solver-heavy tests without improving release confidence.
+- Default CI is now being narrowed to a fast ship gate, with benchmark and
+  validation-artifact workflows moved to manual `workflow_dispatch` runs so
+  routine pushes do not consume research-artifact runtime on every change.
 
 ## Release checklist
 

@@ -78,6 +78,21 @@ python -m pytest
 python -m sphinx -W -b html docs docs/_build/html
 ```
 
+### CI modes
+
+The repository now uses two lanes:
+
+- fast default CI on pushes and pull requests
+  - unit, regression, physics, and validation tests
+  - docs
+- manual research-artifact workflows via GitHub Actions `workflow_dispatch`
+  - heavy validation artifact generation
+  - benchmark artifact generation
+  - extended coverage collection
+
+This keeps the default gate practical while preserving reproducible benchmark
+and reporting workflows for release work and paper figures.
+
 ## Typical outputs
 
 An LMX run can produce:
