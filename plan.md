@@ -50,6 +50,14 @@ Ship a research-grade `1.0` inductionless MHD code with:
   evidence, not as implementation guidance.
 - Public JSON/example/report outputs have been scrubbed to avoid leaking
   workstation-specific absolute paths.
+- The remaining `1.0` gate is now dominated by solver-heavy physics and
+  validation tests rather than benchmark/example/I/O harness overhead.
+- Benchmark, I/O, and example tests have been rewritten to use synthetic or
+  monkeypatched orchestration paths where full solves were unnecessary.
+- Validation report tests now stub solver execution where they are asserting
+  report/schema behavior rather than analytical acceptance.
+- CI coverage no longer forces `JAX_DISABLE_JIT=1`, because that setting was
+  inflating runtime on solver-heavy tests without improving release confidence.
 
 ## Release checklist
 

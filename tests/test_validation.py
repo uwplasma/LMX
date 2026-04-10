@@ -5,10 +5,11 @@ from pathlib import Path
 import jax.numpy as jnp
 import pytest
 
+import lmx.validation as validation
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.mesh import generate_rect_duct_mesh
-from lmx.solvers import solve_steady
+from lmx.solvers import _build_mesh, solve_steady
 from lmx.validation import (
     closed_channel_validation,
     compare_normalized_profiles,
@@ -49,6 +50,59 @@ from lmx.validation import (
 pytestmark = pytest.mark.validation
 
 
+def _synthetic_solution(case, *, oscillatory: bool = False) -> Solution:
+    mesh = _build_mesh(case)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    profile = 1.0 - 0.25 * y**2 - 0.15 * z**2
+    if oscillatory:
+        profile = profile * jnp.cos(6.0 * y)
+    if mesh.fluid_mask is not None:
+        profile = jnp.where(mesh.fluid_mask, profile, 0.0)
+    zeros = jnp.zeros_like(profile)
+    diagnostics = Diagnostics(
+        residual_history=jnp.asarray([1.0e-2, 1.0e-4, 1.0e-6]),
+        courant_like=jnp.asarray([0.1, 0.08, 0.06]),
+        ohmic_power=jnp.asarray([0.2, 0.15, 0.1]),
+        time_history=jnp.asarray([0.0, 0.5, 1.0]),
+        u_max_history=jnp.asarray([float(jnp.max(profile))] * 3),
+        mean_velocity_history=jnp.asarray([0.5, 0.55, 0.6]),
+        applied_forcing_history=jnp.asarray([1.0, 1.0, 1.0]),
+        pressure_proxy_history=jnp.asarray([0.2, 0.18, 0.16]),
+        current_scaled_pressure_proxy_history=jnp.asarray([0.15, 0.14, 0.13]),
+        raw_update_max_history=jnp.asarray([0.05, 0.02, 0.01]),
+        limiter_scale_history=jnp.asarray([1.0, 1.0, 1.0]),
+        limited_fraction_history=jnp.asarray([0.0, 0.0, 0.0]),
+        current_max_history=jnp.asarray([0.3, 0.25, 0.2]),
+        face_current_max_history=jnp.asarray([0.28, 0.24, 0.19]),
+        emf_max_history=jnp.asarray([0.2, 0.18, 0.15]),
+        lorentz_max_history=jnp.asarray([0.12, 0.10, 0.08]),
+        potential_residual_history=jnp.asarray([1.0e-3, 1.0e-4, 1.0e-5]),
+        potential_iterations_history=jnp.asarray([12.0, 10.0, 8.0]),
+        linear_residual_history=jnp.asarray([1.0e-2, 1.0e-4, 1.0e-6]),
+        linear_iterations_history=jnp.asarray([8.0, 6.0, 4.0]),
+        volumetric_flow_rate_history=jnp.asarray([0.7, 0.75, 0.8]),
+        mean_current_magnitude_history=jnp.asarray([0.1, 0.09, 0.08]),
+        lorentz_power_history=jnp.asarray([0.05, 0.045, 0.04]),
+        div_current_max_history=jnp.asarray([1.0e-6, 8.0e-7, 5.0e-7]),
+        gauge_residual_history=jnp.asarray([1.0e-8, 7.0e-9, 5.0e-9]),
+        interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7, 6.0e-7]),
+    )
+    return Solution(
+        mesh=mesh,
+        state=MHDState(
+            u=profile,
+            phi=0.1 * profile,
+            jy=0.05 * profile,
+            jz=0.02 * profile,
+            lorentz_x=0.03 * profile,
+            time=1.0,
+            residual=1.0e-6,
+        ),
+        diagnostics=diagnostics,
+        case_name=case.name,
+    )
+
+
 def test_hartmann_profile_center_is_maximum():
     y = jnp.linspace(-1.0, 1.0, 101)
     profile = hartmann_analytic_profile(y, ha=10.0)
@@ -85,7 +139,7 @@ def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles(
 
 def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
     case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case)
 
     metrics = duct_layer_resolution_metrics(case, solution.mesh)
 
@@ -97,7 +151,7 @@ def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
 
 def test_validation_summary_includes_latest_potential_residual():
     case = make_hartmann_case(ha=5.0, ny=12, nz=12)
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case)
 
     metrics = validation_summary(solution, case.name, ha=5.0)
 
@@ -128,8 +182,9 @@ def test_validation_summary_includes_latest_potential_residual():
     assert 0.0 <= metrics["limited_fraction"] <= 1.0
 
 
-def test_compare_with_reference_outputs_report(tmp_path: Path):
+def test_compare_with_reference_outputs_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case()
+    monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
     (tmp_path / "0").mkdir()
@@ -159,8 +214,7 @@ def test_compare_with_reference_outputs_report(tmp_path: Path):
 
 def test_duct_profile_metrics_reports_sign_pathology():
     case = make_hartmann_case(ha=20.0, ny=32, nz=32)
-    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="jacobi"))
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case, oscillatory=True)
     metrics = duct_profile_metrics(solution)
 
     assert "centerline_y_sign_changes" in metrics
@@ -365,7 +419,7 @@ def test_sample_reader_and_latest_profile_detection(tmp_path: Path):
 
 def test_extract_midplane_profile_fluid_only_excludes_layer_walls():
     case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case)
     full_profile = extract_midplane_profile(solution, axis="z", fluid_only=False)
     fluid_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
 
@@ -401,7 +455,7 @@ def test_latest_reference_sampled_profiles_prefers_newest_file_when_times_match(
 
 def test_hartmann_validation_writer(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=16, nz=16)
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case)
     comparison = hartmann_validation(solution, ha=5.0)
     path = write_analytic_comparison(comparison, tmp_path / "analytic.json", axis_name="y")
     assert path.exists()
@@ -436,7 +490,7 @@ def test_estimate_observed_order_returns_none_for_invalid_inputs():
 
 def test_duct_profile_metrics_writer(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=16, nz=16)
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case, oscillatory=True)
     metrics = duct_profile_metrics(solution)
     path = write_metrics_json(metrics, tmp_path / "metrics.json")
     assert path.exists()
@@ -449,7 +503,7 @@ def test_closed_channel_validation_writer(tmp_path: Path):
         "r\tu1\tu2\n-1.0\t0.0\t0.0\n0.0\t1.0\t1.0\n1.0\t0.0\t0.0\n"
     )
     case = make_shercliff_case(ha=2.0, ny=12, nz=12)
-    solution = solve_steady(case)
+    solution = _synthetic_solution(case)
     comparison = closed_channel_validation(solution, "shercliff", 2, reference_root=tmp_path / "ClosedChannel")
     path = write_closed_channel_validation(comparison, tmp_path / "closed_channel_validation.json")
     assert path.exists()

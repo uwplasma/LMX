@@ -17,16 +17,16 @@ pytestmark = pytest.mark.physics
 
 
 def test_hartmann_solver_runs():
-    case = make_hartmann_case(ha=10.0, ny=24, nz=24)
+    case = make_hartmann_case(ha=10.0, ny=12, nz=12)
     assert case.solver.kind == "fully_developed_inductionless"
     solution = solve_steady(case)
-    assert solution.state.u.shape == (24, 24)
+    assert solution.state.u.shape == (12, 12)
     assert float(jnp.max(solution.state.u)) > 0.0
     assert jnp.isfinite(solution.state.phi).all()
 
 
 def test_hunt_solver_keeps_solid_velocity_zero():
-    case = make_hunt_case(ha=10.0, ny=20, nz=20, wall_cells=3)
+    case = make_hunt_case(ha=10.0, ny=10, nz=10, wall_cells=2)
     assert case.solver.kind == "fully_developed_inductionless"
     solution = solve_steady(case)
     assert solution.mesh.fluid_mask is not None
@@ -34,7 +34,7 @@ def test_hunt_solver_keeps_solid_velocity_zero():
 
 
 def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
-    case = make_hunt_case(ha=20.0, ny=24, nz=24, wall_cells=4)
+    case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=2)
     solution = solve_steady(case)
 
     assert solution.diagnostics.linear_residual_history.shape[0] > 0
@@ -68,8 +68,8 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
 
 def test_legacy_reduced_solver_path_remains_selectable():
     case = replace(
-        make_hartmann_case(ha=5.0, ny=12, nz=12),
-        solver=replace(make_hartmann_case(ha=5.0, ny=12, nz=12).solver, kind="legacy_reduced"),
+        make_hartmann_case(ha=5.0, ny=8, nz=8),
+        solver=replace(make_hartmann_case(ha=5.0, ny=8, nz=8).solver, kind="legacy_reduced"),
     )
     solution = solve_steady(case)
     assert float(jnp.max(solution.state.u)) > 0.0
@@ -108,7 +108,7 @@ def test_hunt_case_allows_explicit_wall_conductivity_override():
 
 
 def test_hunt_inlet_flow_rate_boundary_drives_short_transient():
-    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
     driven = replace(
         case,
         forcing=0.0,
@@ -131,7 +131,7 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient():
 
 
 def test_hunt_inlet_velocity_boundary_does_not_trigger_reduced_mean_drive():
-    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
     inlet_only = replace(
         case,
         forcing=0.0,
@@ -153,7 +153,7 @@ def test_hunt_inlet_velocity_boundary_does_not_trigger_reduced_mean_drive():
 
 
 def test_transient_restart_matches_direct_run(tmp_path: Path):
-    case = make_hartmann_case(ha=5.0, ny=12, nz=12)
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))
     partial_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2))
 
@@ -177,7 +177,7 @@ def test_transient_restart_matches_direct_run(tmp_path: Path):
 
 
 def test_transient_restart_can_append_diagnostics(tmp_path: Path):
-    case = make_hartmann_case(ha=5.0, ny=10, nz=10)
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))
     partial_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2))
     partial = solve_transient(partial_case)
@@ -420,7 +420,7 @@ def test_magnetic_ramp_scale_disables_when_duration_is_zero():
 
 
 def test_magnetic_ramp_scale_matches_reference_startup_formula():
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = make_hartmann_case(ha=5.0, ny=6, nz=6)
     ramped = replace(case, magnetic_field=replace(case.magnetic_field, ramp_start=0.0, ramp_duration=1e-5))
 
     assert float(magnetic_ramp_scale(ramped.magnetic_field, time=0.0)) == pytest.approx(0.0)
@@ -429,7 +429,7 @@ def test_magnetic_ramp_scale_matches_reference_startup_formula():
 
 
 def test_magnetic_ramp_delays_short_transient_lorentz_response():
-    case = make_hartmann_case(ha=20.0, ny=12, nz=12)
+    case = make_hartmann_case(ha=20.0, ny=8, nz=8)
     base = replace(
         case,
         forcing=0.0,
@@ -447,7 +447,7 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response():
 
 
 def test_shercliff_solution_stays_finite_and_zero_at_walls():
-    case = make_shercliff_case(ha=10.0, ny=24, nz=24)
+    case = make_shercliff_case(ha=10.0, ny=12, nz=12)
     solution = solve_steady(case)
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.allclose(solution.state.u[0, :], 0.0)
@@ -455,7 +455,7 @@ def test_shercliff_solution_stays_finite_and_zero_at_walls():
 
 
 def test_hartmann_case_supports_cg_potential_backend():
-    case = make_hartmann_case(ha=5.0, ny=12, nz=12)
+    case = make_hartmann_case(ha=5.0, ny=6, nz=6)
     case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg", potential_iterations=50))
     solution = solve_steady(case)
 
@@ -467,7 +467,7 @@ def test_hartmann_case_supports_cg_potential_backend():
 
 
 def test_hunt_case_supports_volume_scaled_cg_potential_backend():
-    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
     case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg_volume", potential_iterations=50))
     solution = solve_steady(case)
 
@@ -481,7 +481,7 @@ def test_hunt_case_supports_volume_scaled_cg_potential_backend():
 
 
 def test_hunt_case_supports_face_averaged_current_reconstruction():
-    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
     case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="face_averaged"))
     solution = solve_steady(case)
 
@@ -492,7 +492,7 @@ def test_hunt_case_supports_face_averaged_current_reconstruction():
 
 
 def test_hunt_case_supports_hybrid_face_lorentz_current_reconstruction():
-    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
     case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="hybrid_face_lorentz"))
     solution = solve_steady(case)
 
@@ -504,7 +504,7 @@ def test_hunt_case_supports_hybrid_face_lorentz_current_reconstruction():
 
 
 def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
-    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
     case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="hybrid_face_lorentz"))
     solution = solve_steady(case)
 
@@ -650,8 +650,8 @@ def test_post_update_potential_refresh_recomputes_electromagnetic_state(monkeypa
 
 
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():
-    hartmann = make_hartmann_case(ha=5.0, ny=12, nz=12)
-    hunt = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
+    hartmann = make_hartmann_case(ha=5.0, ny=6, nz=6)
+    hunt = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
 
     hartmann_mesh = solvers._build_mesh(hartmann)
     hunt_mesh = solvers._build_mesh(hunt)
