@@ -54,6 +54,12 @@ lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 ```
 
+The module entrypoint works as well:
+
+```bash
+python -m lmx examples/hartmann_case.toml
+```
+
 ### Run from Python
 
 ```python

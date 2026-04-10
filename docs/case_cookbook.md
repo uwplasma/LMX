@@ -7,6 +7,7 @@
 ```bash
 python -m lmx.cli run hartmann --ha 20 --output ./out/hartmann
 lmx examples/hartmann_case.toml
+python -m lmx examples/hartmann_case.toml
 ```
 
 ### Python

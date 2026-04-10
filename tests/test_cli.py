@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import runpy
 
 import pytest
 
@@ -84,6 +85,17 @@ def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
 
     assert exit_code == 0
     assert recorded["path"] == "/tmp/demo_case.toml"
+
+
+def test_python_module_entrypoint_delegates_to_cli_main(monkeypatch: pytest.MonkeyPatch):
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr("lmx.cli.main", lambda argv=None: recorded.update(argv=argv) or 0)
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_module("lmx", run_name="__main__")
+
+    assert excinfo.value.code == 0
+    assert recorded["argv"] is None
 
 
 def test_run_config_uses_restart_bundle_and_writes_restart_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
