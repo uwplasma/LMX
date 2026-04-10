@@ -33,6 +33,14 @@ def test_hunt_solver_keeps_solid_velocity_zero():
     assert jnp.allclose(solution.state.u[~solution.mesh.fluid_mask], 0.0)
 
 
+def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
+    case = make_hunt_case(ha=20.0, ny=24, nz=24, wall_cells=4)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.linear_residual_history.shape[0] > 0
+    assert float(solution.diagnostics.linear_residual_history[-1]) < 1e-4
+
+
 def test_hunt_case_uses_ha_aware_coupling_controls():
     ha20 = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
     ha100 = make_hunt_case(ha=100.0, ny=16, nz=16, wall_cells=2)
@@ -736,7 +744,11 @@ def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
 
 def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4))
+    case = replace(
+        case,
+        solver=replace(case.solver, kind="legacy_reduced"),
+        time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4),
+    )
     residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
 
     monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
@@ -765,7 +777,11 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
 
 def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=2, steady_tolerance=1e-8))
+    case = replace(
+        case,
+        solver=replace(case.solver, kind="legacy_reduced"),
+        time_stepper=replace(case.time_stepper, max_steps=2, steady_tolerance=1e-8),
+    )
 
     monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
 
@@ -794,6 +810,7 @@ def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: py
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(
         case,
+        solver=replace(case.solver, kind="legacy_reduced"),
         time_stepper=replace(
             case.time_stepper,
             max_steps=5,
@@ -812,6 +829,54 @@ def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: py
         return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0
 
     monkeypatch.setattr(solvers, "_step", fake_step)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.residual_history.shape[0] == 3
+    assert solution.diagnostics.potential_residual_history.shape[0] == 3
+    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
+    assert solution.state.residual == pytest.approx(1.0e-5)
+
+
+def test_fully_developed_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4))
+    residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
+
+    def fake_fully_developed_case_step(**kwargs):
+        u = kwargs["u_previous"]
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, next(residuals), 1.0e-2, 25, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.residual_history.shape[0] == 3
+    assert solution.diagnostics.potential_residual_history.shape[0] == 3
+    assert solution.diagnostics.linear_residual_history.shape[0] == 3
+    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
+    assert solution.state.residual == pytest.approx(1.0e-5)
+
+
+def test_fully_developed_steady_can_require_potential_residual_when_requested(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = replace(
+        case,
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=6,
+            steady_tolerance=1e-4,
+            steady_potential_tolerance=5e-4,
+        ),
+    )
+    residuals = iter([1.0e-3, 1.0e-5, 1.0e-5, 1.0e-6])
+    potential_residuals = iter([1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5])
+
+    def fake_fully_developed_case_step(**kwargs):
+        u = kwargs["u_previous"]
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 3

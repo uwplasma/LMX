@@ -182,13 +182,14 @@ def _solve_velocity_system(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     diagonal, west, east, south, north = _velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
     rhs_masked = jnp.where(active_mask, rhs, 0.0)
+    cell_metric = _cell_metric(mesh).astype(rhs_masked.dtype)
     field, info = solve_five_point_system(
-        diagonal,
-        west,
-        east,
-        south,
-        north,
-        rhs_masked,
+        diagonal * cell_metric,
+        west * cell_metric,
+        east * cell_metric,
+        south * cell_metric,
+        north * cell_metric,
+        rhs_masked * cell_metric,
         linear_solver=linear_solver,
         preconditioner=preconditioner,
         tolerance=tolerance,
@@ -1235,7 +1236,7 @@ def _solve_fully_developed(
     dt = case.time_stepper.dt
     steady_mode = case.solver.mode == "steady"
     if steady_mode:
-        steps = 1
+        steps = max(1, case.time_stepper.max_steps)
         step_coupling_iterations = case.solver.coupling_iterations
         step_coupling_tolerance = float(case.time_stepper.steady_tolerance)
     else:
@@ -1416,11 +1417,15 @@ def _solve_fully_developed(
             interface_current_residual=float(interface_current_residual),
         )
         step_count = step_index + 1
+        potential_gate = case.time_stepper.steady_potential_tolerance
         if (
             steady_mode
             and residual_value <= float(case.time_stepper.steady_tolerance)
-            and float(potential_residual) <= float(case.time_stepper.steady_potential_tolerance or case.time_stepper.steady_tolerance)
             and float(linear_residual) <= float(case.time_stepper.steady_tolerance)
+            and (
+                potential_gate is None
+                or float(potential_residual) <= float(potential_gate)
+            )
         ):
             break
 

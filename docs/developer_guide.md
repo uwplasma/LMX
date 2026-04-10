@@ -84,6 +84,11 @@
 - Clustered duct meshes should use actual center-to-center spacing in diffusion
   and potential operators; avoid reintroducing uniform-grid shortcuts in solver
   stencils.
+- The fully developed velocity subproblem should follow the same rule on
+  layered meshes: solve the cell-metric-scaled system rather than the raw
+  unscaled operator. The retained Hunt fix does this before the Krylov solve,
+  which removes the spurious large velocity linear residual seen on the
+  unscaled layered operator.
 - Boundary gradients on clustered meshes should also use center-to-center spacing
   between the first two cell centers, not the first cell width, so electric-field
   reconstruction remains consistent near side layers.
@@ -115,7 +120,13 @@
   specification layer instead of a parity script.
 - `solve_transient` is the fixed-step path for trajectory-like runs; `solve_steady`
   now uses the configured steady tolerance and maximum step budget rather than
-  aliasing the transient path.
+  aliasing the transient path. On the `fully_developed_inductionless` family,
+  that now means real macro steady iterations up to `time_stepper.max_steps`
+  rather than a single one-shot solve.
+- `steady_potential_tolerance` is an opt-in gate. If it is unset, the fully
+  developed steady solver stops on velocity and velocity-linear residuals; if it
+  is set, potential residual must also satisfy that threshold before the solver
+  stops.
 - The core solver now accepts an optional streaming logger. Keep runtime logging
   in the solver layer, not only in examples, so the Python API, CLI subcommands,
   and `lmx input.toml` runs all expose the same live diagnostics.

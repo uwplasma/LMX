@@ -103,6 +103,19 @@ LMX is a Python/JAX-native inductionless MHD code for liquid-metal flows. It is 
   - live runtime logs
   - validation summaries
   - solution / restart `.npz` files
+- The next retained structural fix on the new fully developed path is now in
+  the velocity solve itself: layered Hunt ducts solve the cell-metric-scaled
+  velocity system instead of the raw unscaled nonuniform operator. This removes
+  the large spurious velocity linear residual that previously made the new Hunt
+  path look far worse than its actual field/parity state.
+- The next retained steady-solver correction is also now clear: the new fully
+  developed path should use real macro steady iterations up to
+  `time_stepper.max_steps`, not a one-shot step, and `steady_potential_tolerance`
+  should only gate termination when it is explicitly set. Local probes on the
+  retained code path show this is enough to drive default Shercliff `Ha20`,
+  `16^2` from `residual ≈ 3.52e-4` to `≈ 4.32e-7` in four macro steps, and
+  Hunt `Ha20`, `16^2` from `≈ 6.10e-4` to `≈ 1.24e-6` in five macro steps,
+  without changing the new solver family structure.
 - CI was also hardened for GitHub-hosted runners by constraining JAX/XLA
   resource use on the validation and coverage paths, which addresses the
   recent validation-job memory failures without changing the benchmark jobs.
