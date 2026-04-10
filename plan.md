@@ -61,6 +61,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - Default CI is now being narrowed to a fast ship gate, with benchmark and
   validation-artifact workflows moved to manual `workflow_dispatch` runs so
   routine pushes do not consume research-artifact runtime on every change.
+- The default push/PR gate now excludes the heaviest `physics` marker tests;
+  those remain available in a manual workflow-dispatch lane together with
+  benchmark, artifact, and extended coverage runs.
 
 ## Release checklist
 

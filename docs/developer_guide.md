@@ -93,11 +93,11 @@ The repository uses a split CI model:
 
 - fast default CI
   - runs on pushes and pull requests
-  - covers the main pytest suite and documentation build
+  - covers unit, regression, and validation tests plus the documentation build
 - manual research-artifact workflows
   - run only through GitHub Actions `workflow_dispatch`
-  - generate heavier benchmark, validation-artifact, and extended coverage
-    outputs
+  - run the heavier physics suite
+  - generate benchmark, validation-artifact, and extended coverage outputs
 
 This separation is intentional. The fast lane protects the `1.0` public
 surface, while the manual lane preserves reproducible research artifacts
