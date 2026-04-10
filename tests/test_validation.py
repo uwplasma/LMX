@@ -12,7 +12,7 @@ from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
     compare_normalized_profiles,
-    compare_with_freemhd,
+    compare_with_reference_outputs,
     combined_profile_error,
     duct_layer_resolution_metrics,
     duct_profile_metrics,
@@ -25,16 +25,16 @@ from lmx.validation import (
     has_conducting_wall_region,
     interior_sample_coordinate,
     extract_midplane_profile,
-    latest_sampled_profiles,
+    latest_reference_sampled_profiles,
     negative_fraction,
     hartmann_analytic_profile,
     hartmann_validation,
-    inspect_freemhd_case,
+    inspect_reference_case,
     latest_field_minmax_record,
     normalize_sample_distance,
     profile_sign_changes,
     processed_slice_validation,
-    read_freemhd_xy_sample,
+    read_reference_xy_sample,
     read_field_minmax,
     write_acceptance_report,
     write_analytic_comparison,
@@ -128,7 +128,7 @@ def test_validation_summary_includes_latest_potential_residual():
     assert 0.0 <= metrics["limited_fraction"] <= 1.0
 
 
-def test_compare_with_freemhd_report(tmp_path: Path):
+def test_compare_with_reference_outputs_report(tmp_path: Path):
     case = make_hartmann_case()
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
@@ -145,16 +145,16 @@ def test_compare_with_freemhd_report(tmp_path: Path):
     sample_lines = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
     (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1" / "centerlineY_potE_U.xy").write_text(sample_lines)
     (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1" / "centerlineZ_potE_U.xy").write_text(sample_lines)
-    report = compare_with_freemhd(case, tmp_path)
+    report = compare_with_reference_outputs(case, tmp_path)
     path = write_validation_report(report, tmp_path / "report.json")
     assert path.exists()
     assert report.metrics["control_dict_count"] == pytest.approx(1.0)
     assert report.metrics["region_zero_dir_count"] == pytest.approx(1.0)
     assert report.metrics["has_potE_zero_field"] == pytest.approx(1.0)
     assert report.metrics["field_minmax_file_count"] == pytest.approx(1.0)
-    assert report.metrics["freemhd_u_max_latest"] == pytest.approx(0.25)
+    assert report.metrics["reference_u_max_latest"] == pytest.approx(0.25)
     assert report.metrics["sampled_profile_pair_available"] == pytest.approx(1.0)
-    assert "freemhd_sample_y_l2_error" in report.metrics
+    assert "reference_sample_y_l2_error" in report.metrics
 
 
 def test_duct_profile_metrics_reports_sign_pathology():
@@ -169,7 +169,7 @@ def test_duct_profile_metrics_reports_sign_pathology():
     assert metrics["centerline_y_sign_changes"] > 0.0 or metrics["centerline_y_negative_fraction"] > 0.0
 
 
-def test_inspect_freemhd_case_collects_case_structure(tmp_path: Path):
+def test_inspect_reference_case_collects_case_structure(tmp_path: Path):
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
     (tmp_path / "0").mkdir()
@@ -183,7 +183,7 @@ def test_inspect_freemhd_case_collects_case_structure(tmp_path: Path):
     (tmp_path / "system" / "blockMeshDict").write_text("blocks ()")
     (tmp_path / "constant" / "regionProperties").write_text("regions ()")
     (tmp_path / "0" / "liquid" / "U").write_text("internalField uniform (0 0 0);")
-    inspection = inspect_freemhd_case(tmp_path)
+    inspection = inspect_reference_case(tmp_path)
     assert inspection.control_dicts == ("system/controlDict",)
     assert inspection.region_properties == ("constant/regionProperties",)
     assert inspection.block_mesh_dicts == ("system/blockMeshDict",)
@@ -352,8 +352,8 @@ def test_sample_reader_and_latest_profile_detection(tmp_path: Path):
     z_path = sample_root / "centerlineZ_potE_U.xy"
     y_path.write_text(rows)
     z_path.write_text(rows)
-    sample = read_freemhd_xy_sample(y_path)
-    latest = latest_sampled_profiles(tmp_path)
+    sample = read_reference_xy_sample(y_path)
+    latest = latest_reference_sampled_profiles(tmp_path)
     assert sample.distance.shape[0] == 2
     assert float(sample.u_x[1]) == pytest.approx(4.0)
     assert latest is not None
@@ -376,7 +376,7 @@ def test_extract_midplane_profile_fluid_only_excludes_layer_walls():
     assert float(fluid_profile["z"][-1]) < 0.5 * case.geometry.height
 
 
-def test_latest_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: Path):
+def test_latest_reference_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: Path):
     older_root = tmp_path / "postProcessing" / "lmxAutoSampleDict" / "liquid" / "0.0001"
     newer_root = tmp_path / "postProcessing" / "lmxCiSampleDict" / "liquid" / "0.0001"
     older_root.mkdir(parents=True)
@@ -392,7 +392,7 @@ def test_latest_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: 
     os.utime(newer_root / "centerlineY_potE_U.xy", ns=(2_000_000_000, 2_000_000_000))
     os.utime(newer_root / "centerlineZ_potE_U.xy", ns=(2_000_000_000, 2_000_000_000))
 
-    latest = latest_sampled_profiles(tmp_path)
+    latest = latest_reference_sampled_profiles(tmp_path)
 
     assert latest is not None
     assert "lmxCiSampleDict" in latest[0].path

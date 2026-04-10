@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import run_freemhd_parity_report as parity
+from scripts import run_reference_parity_report as parity
 
 
 pytestmark = pytest.mark.unit
@@ -49,7 +49,7 @@ def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture
     (run_dir / "0" / "liquid").mkdir(parents=True)
     (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.9725 0 0 );\n")
 
-    # Minimal structure that keeps compare_with_freemhd happy.
+    # Minimal structure that keeps compare_with_reference_outputs happy.
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
@@ -66,7 +66,7 @@ def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture
             "hartmann",
             "--ha",
             "5",
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--output",
             str(output),
@@ -103,12 +103,12 @@ boundaryField
 
     recorded = {}
 
-    def fake_compare(case, freemhd_run_dir):
+    def fake_compare(case, reference_run_dir):
         recorded["forcing"] = case.forcing
         recorded["boundary_conditions"] = case.boundary_conditions
         return parity.ValidationReport(case_name=case.name, metrics={"u_max_abs_diff": 0.1}, artifacts={})
 
-    monkeypatch.setattr(parity, "compare_with_freemhd", fake_compare)
+    monkeypatch.setattr(parity, "compare_with_reference_outputs", fake_compare)
 
     output = tmp_path / "report.json"
     exit_code = parity.main(
@@ -117,7 +117,7 @@ boundaryField
             "hunt",
             "--ha",
             "20",
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--output",
             str(output),

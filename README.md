@@ -1,307 +1,162 @@
 # LMX
 
-LMX is a Python/JAX solver for inductionless liquid-metal magnetohydrodynamics.
-It is designed to be self-consistent, differentiable, and fast on CPU and GPU while
-staying focused on structured duct solvers today, with mapped-pipe and fringing-field
-support still under active development.
+LMX is a JAX-native toolkit for laminar inductionless magnetohydrodynamics on
+structured meshes. Version `1.0` targets a research-grade core for fully
+developed duct flows, benchmark-quality validation, explicit runtime
+diagnostics, restartable CLI workflows, and a clean differentiable lane for
+inverse problems and design studies.
 
-## What LMX provides
+## What LMX is for
 
-- Structured and mapped-structured mesh generation for ducts and pipes.
-- JAX-native finite-volume style operators and time stepping.
-- Two implemented solver families plus one reserved entry point:
-  - `fully_developed_inductionless`: the new coupled duct solver path for Hartmann, Shercliff, and Hunt
-  - `legacy_reduced`: the retained pseudo-transient path kept for regression and historical comparison
-  - `extruded_inductionless`: reserved for the upcoming fringing-field / 3D path and not implemented yet
-- Laminar inductionless MHD for Hartmann, Shercliff, and Hunt-style cases.
-- Explicit fluid/solid conductivity regions for conducting and insulating wall layers.
-- Hunt defaults expressed through wall conductance ratio, with optional direct
-  wall-conductivity override when a case is specified that way.
-- ParaView output, CSV/profile extraction, and benchmark reporting.
-- Example scripts that generate polished, publication-style plots for Hartmann,
-  Shercliff, and Hunt cases.
-- Analytical validation helpers and regression tests for reproducibility.
-- Optional external validation tooling for recovered FreeMHD/OpenFOAM cases.
-- Validation summaries now include a normalized electric-potential equation
-  residual, so solver/control issues in the `phi` solve are visible in normal
-  artifacts instead of only through profile errors.
-- Closed-channel validation artifacts now also include a combined profile error,
-  so Hunt/Shercliff tradeoffs are not judged from `y` and `z` cuts separately.
-- The electric-potential solve now supports `auto`, weighted-Jacobi, and CG
-  control paths. The current default is a geometry-aware `auto` policy:
-  single-region ducts use CG, while multi-region layered ducts use
-  `cg_volume`, the cell-metric-scaled CG form of the layered `phi` system.
-- `TimeStepperConfig.post_update_potential_refresh` is available as an
-  opt-in consistency control: when enabled, LMX re-solves `phi` on the updated
-  velocity before returning the step state and electromagnetic diagnostics.
-- Layered conducting-wall cases also expose `potential_solver="cg_volume"`,
-  which solves the same layered `phi` equation after cell-metric scaling into a
-  symmetric CG system. It is now the retained layered default because it
-  improves the full recovered Hunt parity path at both `Ha20` and `Ha100`.
-- Hunt diagnostics also expose `current_reconstruction`, with the retained
-  default `cell_centered` plus experimental `face_averaged` and
-  `hybrid_face_lorentz` modes for tracing current-distribution and `JxB`
-  reduction effects without changing the public case API.
-- Hunt diagnostic replays also expose `velocity_update_limiter`. The retained
-  default is `global_scale`; the experimental `local_clip` path is available
-  for targeted layered-update diagnosis, but it is currently worse on the
-  corrected `Ha20`, `t <= 6e-05` Hunt replay.
-- Hunt runtime/restart artifacts now also retain limiter telemetry:
-  `raw_update_max_history`, `limiter_scale_history`, and
-  `limited_fraction_history`. Those same quantities are printed in the live
-  solver log as `rawUpdateMax`, `limiterScale`, and `limitedFraction`, which
-  makes it easier to tell whether a replay mismatch is coming from the coupled
-  update itself or from the velocity limiter dominating the step.
+- Hartmann, Shercliff, and Hunt benchmark problems
+- layered conducting and insulating wall models
+- scripted and input-file-driven studies
+- publication-ready plots, movies, and benchmark reports
+- differentiable steady and transient workflows in JAX
+
+## Current solver status
+
+- `fully_developed_inductionless`
+  - default solver for `rect_duct` and `layered_duct`
+  - steady and transient streamwise-velocity / electric-potential solves
+  - research path for Hartmann, Shercliff, and Hunt cases
+- `legacy_reduced`
+  - retained only for regression and historical comparison
+- `extruded_inductionless`
+  - planned 3D/fringing-field solver family
+  - not implemented yet
+
+## Installation
+
+### Minimal install
+
+```bash
+git clone <YOUR_FORK_OR_REMOTE_URL>
+cd LMX
+python -m pip install -e .
+```
+
+### Development install
+
+```bash
+git clone <YOUR_FORK_OR_REMOTE_URL>
+cd LMX
+python -m pip install -e '.[dev,plotting,docs,extras]'
+```
 
 ## Quick start
 
+### Run from the CLI
+
 ```bash
-cd /Users/rogerio/local/tests/LMX
-/Users/rogerio/base_env/bin/python3 -m pip install -e '.[dev,plotting,docs]'
-/Users/rogerio/base_env/bin/python3 -m pytest
-/Users/rogerio/base_env/bin/python3 -m pytest -m unit
-/Users/rogerio/base_env/bin/python3 -m pytest -m regression
-/Users/rogerio/base_env/bin/python3 -m pytest -m physics
-/Users/rogerio/base_env/bin/python3 -m pytest -m validation
-/Users/rogerio/base_env/bin/python3 -m lmx.cli run hartmann --ha 20 --output ./out/hartmann
-/Users/rogerio/base_env/bin/python3 -m lmx.cli run shercliff --ha 20 --output ./out/shercliff
-/Users/rogerio/base_env/bin/python3 -m lmx.cli validate hartmann --ha 20 --output ./out/validation/hartmann
-/Users/rogerio/base_env/bin/python3 -m lmx.cli validate shercliff --ha 20 --output ./out/validation/shercliff --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_validation_suite.py --output ./artifacts/validation --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_convergence_suite.py --output ./artifacts/convergence --cases hartmann,shercliff,hunt --ha 20 --resolutions 16,32,48 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_time_convergence_suite.py --output ./artifacts/time_convergence --cases hartmann,shercliff,hunt --ha 20 --resolution 32 --dts 0.002,0.001,0.0005 --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep --case hunt --ha 20 --resolution 48 --wall-cells 5 --parameter outer_iterations --values 2,4,6,8,10 --value-type int --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hartmann --case hartmann --ha 20 --resolution 32 --parameter potential_iterations --values 50,100,200,400,800 --value-type int
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_tol --case hartmann --ha 20 --resolution 32 --parameter potential_tolerance --values 1e-2,1e-3,1e-4 --value-type float
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_phi_backend --case shercliff --ha 20 --resolution 32 --parameter potential_solver --values auto,jacobi,cg --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hunt_phi_backend --case hunt --ha 100 --resolution 32 --parameter potential_solver --values jacobi,cg_volume --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_hunt_current_reconstruction --case hunt --ha 20 --resolution 32 --parameter current_reconstruction --values cell_centered,face_averaged --value-type str --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_control_sweep.py --output ./artifacts/control_sweep_velocity_limit --case hunt --ha 20 --resolution 32 --parameter velocity_update_limit --values 5e-4,1e-3,2e-3,4e-3 --value-type float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/run_solver_grid_sweep.py --output ./artifacts/control_grid_hunt --case hunt --ha 20 --resolution 32 --parameter-a outer_iterations --values-a 4,6 --type-a int --parameter-b potential_relaxation --values-b 1.0,0.5 --type-b float --reference-root ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel
-/Users/rogerio/base_env/bin/python3 scripts/compare_hunt_trace_histories.py --freemhd-diag-json /tmp/lmx_hunt20_live_diag.json --lmx-report-json /tmp/lmx_hunt_auto_short_trace_force.json --output ./artifacts/hunt_trace_alignment.json
-/Users/rogerio/base_env/bin/python3 scripts/run_benchmark_suite.py --output ./artifacts/benchmarks/benchmark.json
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
+lmx examples/hartmann_case.toml
+lmx examples/shercliff_case.toml
+lmx examples/hunt_case.toml
 ```
+
+### Run from Python
+
+```python
+from lmx.cases import make_hartmann_case
+from lmx.solvers import solve_steady
+
+case = make_hartmann_case(ha=20.0, ny=48, nz=48)
+solution = solve_steady(case)
+print(solution.diagnostics.velocity_residual_history[-1])
+```
+
+### Run tests and docs
+
+```bash
+python -m pytest
+python -m sphinx -W -b html docs docs/_build/html
+```
+
+## Typical outputs
+
+An LMX run can produce:
+
+- live solver logs with verbosity control
+- JSON summaries
+- restartable `.npz` state bundles
+- ParaView VTK output
+- CSV centerline and midplane profiles
+- publication-style plots and GIF movies from the examples
+
+The runtime logger is intentionally detailed. It reports solver-family
+information, linear-solve residuals, integral MHD diagnostics, conservation
+checks, and transient progress in a format intended for long research runs.
+
+## User workflows
+
+### Input-file workflow
+
+The primary executable path is:
+
+```bash
+lmx examples/hartmann_case.toml
+```
+
+The TOML schema is documented in
+[docs/input_reference.md](docs/input_reference.md). The important high-level
+blocks are:
+
+- `[case]`
+- `[geometry]`
+- `[materials]`
+- `[magnetic_field]`
+- `[solver]`
+- `[time_stepper]`
+- `[output]`
+- `[logging]`
+- `[restart]`
+
+### Example workflow
+
+Examples live in [examples/README.md](examples/README.md). They are meant to be
+teachable, explicit templates rather than black-box wrappers. Each example shows
+how to:
+
+- define geometry and resolution
+- choose a solver family
+- configure time stepping and logging
+- save fields and diagnostics
+- generate 2D and 3D visualizations
 
 ## Documentation
 
-- Online docs: `https://lmx.readthedocs.io`
-- Local docs entrypoint: [`docs/index.md`](docs/index.md)
-- Theory: [`docs/theory.md`](docs/theory.md)
-- Developer guide: [`docs/developer_guide.md`](docs/developer_guide.md)
-- Case cookbook: [`docs/case_cookbook.md`](docs/case_cookbook.md)
-- Input reference: [`docs/input_reference.md`](docs/input_reference.md)
-- Examples: [`examples/README.md`](examples/README.md)
-- Validation report: [`docs/validation_report.md`](docs/validation_report.md)
+- [User and theory docs](docs/index.md)
+- [Theory and equations](docs/theory.md)
+- [Input reference](docs/input_reference.md)
+- [Case cookbook](docs/case_cookbook.md)
+- [Benchmark matrix](docs/benchmark_matrix.md)
+- [Developer guide](docs/developer_guide.md)
+- [Validation report](docs/validation_report.md)
 
-## Executable TOML workflow
+## Research directions and references
 
-LMX can now be run directly as an executable against a complete TOML input file:
+LMX is being positioned around the benchmark ladder used in liquid-metal MHD
+verification and validation:
 
-```bash
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/shercliff_case.toml
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hunt_case.toml
-```
+- [Samper et al., benchmark review for MHD validation and verification](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf)
+- [JAX gradient checkpointing](https://docs.jax.dev/en/latest/gradient-checkpointing.html)
+- [Lineax linear solvers](https://docs.kidger.site/lineax/api/solvers/)
+- [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/)
+- [Φ-Flow differentiable PDE tooling](https://proceedings.mlr.press/v235/holl24a.html)
 
-That path prints a live OpenFOAM-style solver log to the terminal and writes the
-same text to `case_name.log` inside the output directory. A standard TOML run
-also writes:
+The near-term research targets are:
 
-- ParaView files
-- CSV profile cuts
-- `.npz` field and diagnostics dump
-- dedicated restart `.npz` when restart output is enabled
-- `case_name_summary.json`
-- overview/diagnostics figures when `write_plots = true`
-- a copy of the input file when `copy_input_file = true`
+- benchmark-grade fully developed Hartmann, Shercliff, and Hunt cases
+- laminar fringing-field benchmarks in square ducts and pipes
+- differentiable inverse studies over magnetic field, geometry, and wall
+  conductance parameters
 
-The full field-by-field TOML schema is documented in
-[`docs/input_reference.md`](docs/input_reference.md).
+## Security and reproducibility notes
 
-The public executable layout is now:
-
-- `[solver]`: solver family, mode, linear solver, preconditioner, and coupling controls
-- `[time_stepper]`: temporal controls and legacy reduced-solver controls
-
-The legacy reduced controls under `[time_stepper]` still parse and remain usable
-with `solver.kind = "legacy_reduced"`, but the shipped default examples no longer
-teach them on the `fully_developed_inductionless` path.
-
-Restart/continue is now part of the executable workflow. The retained teaching
-path is:
-
-```bash
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
-/Users/rogerio/base_env/bin/lmx /Users/rogerio/local/tests/LMX/examples/hartmann_restart_case.toml
-```
-
-The second input file resumes from the `.npz` state dump written by the first
-run, continues from the saved solver time to the new `t_final`, appends the
-diagnostic histories, and writes a dedicated restart output file for the next
-continuation.
-
-## Meeting-ready example
-
-For a single verbose demo run that prints OpenFOAM-style progress tables,
-writes `.npz` result dumps, and produces steady comparison plots for Hartmann,
-Shercliff, and Hunt plus 2D/3D startup movies for a selected case:
-
-```bash
-/Users/rogerio/base_env/bin/python3 examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
-```
-
-The retained default is Shercliff because it gives the clearest startup
-structure at modest runtime. The checked-in meeting example writes steady NPZ
-dumps such as `hartmann/hartmann_ha20_results.npz`, reads those NPZ files back
-with `examples/plot_npz_results.py`, and writes stable GIF movie outputs under
-the selected case subdirectory:
-
-- `shercliff/plots/overview_from_npz.png`
-- `shercliff/shercliff_startup_snapshots.npz`
-- `shercliff/movie/shercliff_startup_2d.gif`
-- `shercliff/movie/shercliff_startup_3d.gif`
-- `shercliff/movie/shercliff_startup_2d_poster.png`
-- `shercliff/movie/shercliff_startup_3d_poster.png`
-
-Use `--movie-case hunt` or `--movie-case hartmann` when you want a different
-startup movie without changing the steady Hartmann/Shercliff/Hunt comparison
-plots.
-
-The example is intentionally explicit: it defines local functions for case
-construction, solver-control overrides, pretty progress logging, NPZ output,
-and Matplotlib replotting so users can treat it as a template for custom LMX
-workflows rather than a hidden wrapper.
-
-For an input-file-first workflow, the shipped TOML examples under
-[`examples/`](examples/README.md) are the matching text-input templates.
-
-You can also replot any saved NPZ result directly:
-
-```bash
-/Users/rogerio/base_env/bin/python3 examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
-```
-
-## Validation backends
-
-External validation backends and archived case directories are optional. They are
-useful for regression, historical comparison, and solver cross-checks, but they do
-not define the public interface or the governing formulation implemented by LMX.
-
-Useful optional-backend commands:
-
-```bash
-/Users/rogerio/base_env/bin/python3 scripts/fetch_freemhd_assets.py --dest ./external
-/Users/rogerio/base_env/bin/python3 scripts/inspect_freemhd_setup.py --output ./artifacts/freemhd_setup.json
-/Users/rogerio/base_env/bin/python3 scripts/build_freemhd_container.py --image lmx-freemhd-localdiag --local-freemhd-root ./external/FreeMHD --no-cache
-/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --local-freemhd-root ./external/FreeMHD --patch-local-freemhd-logging --log-coupled-iterations --cores 4 --end-time 3e-05 --write-interval 1e-05 --output ./artifacts/freemhd_hunt_density_run.json
-/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_case.py --image lmx-freemhd-localdiag-density-fixed2:latest --case-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --cores 1 --start-from latestTime --end-time 6e-05 --write-interval 1e-05 --log-coupled-iterations --disable-vtk-write --output ./artifacts/freemhd_hunt_6e05_novtk.json
-/Users/rogerio/base_env/bin/python3 scripts/run_freemhd_parity_suite.py --output ./artifacts/freemhd_parity
-/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir ./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/Hunt/ha20 --ha 20 --output ./artifacts/hunt_solver_diagnostics.json
-/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 3e-5 --max-steps 3 --current-reconstruction face_averaged --output ./artifacts/hunt_solver_diagnostics_faceavg.json
-/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 2e-5 --max-steps 2 --output ./artifacts/hunt_solver_diagnostics_2e05.json --write-restart-npz ./artifacts/hunt_solver_diagnostics_2e05_restart.npz
-/Users/rogerio/base_env/bin/python3 scripts/run_hunt_solver_diagnostic_report.py --freemhd-run-dir /tmp/lmx_hunt_case_extract/StartingFiles/Hunt/hunt_exactBL_Ha20 --ha 20 --dt 1e-5 --t-final 6e-5 --max-steps 4 --restart-npz ./artifacts/hunt_solver_diagnostics_2e05_restart.npz --append-histories --output ./artifacts/hunt_solver_diagnostics_6e05.json --write-restart-npz ./artifacts/hunt_solver_diagnostics_6e05_restart.npz
-/Users/rogerio/base_env/bin/python3 scripts/patch_freemhd_coupled_logging.py --root ./external/FreeMHD
-/Users/rogerio/base_env/bin/python3 scripts/extract_freemhd_coupled_log.py ./artifacts/freemhd_hunt.log --output ./artifacts/freemhd_hunt_diag.json
-```
-
-`build_freemhd_container.py` now uses a loadable `docker buildx build --load`
-path so locally patched validation-backend images are available to subsequent
-`docker run` smoke and parity scripts instead of staying only in builder output.
-Use `--no-cache` when you need Docker to pick up local patched FreeMHD/OpenFOAM
-source changes immediately instead of reusing a stale cached layer.
-The parity loaders also infer `BtStartTime` and `BtDuration` from
-`system/controlDict`, so short transient LMX replays now use the same magnetic
-field ramp settings as the recovered validation cases when those controls are
-present.
-`run_freemhd_case.py` can now auto-build a missing local diagnostic image from a
-patched checkout when `--local-freemhd-root` is provided, and it can patch that
-checkout in place with `--patch-local-freemhd-logging` before the build. That is
-the recommended path for reproducing Hunt trace diagnostics on this machine.
-When `--output` is used, the runner now also saves the full container stdout and
-stderr next to the JSON metadata as `*.run.stdout.log` and `*.run.stderr.log`.
-Use `--log-coupled-iterations` for patched FreeMHD/OpenFOAM runs so the mounted
-case forces `logCoupledMhdIterations true;` before launch and the saved stdout
-log contains `LMX_DIAG` records even if the container later dies in cleanup or
-reconstruction.
-When that flag is active, the runner also extracts those `LMX_DIAG` lines into a
-sidecar `*.run.diag.json`, so the run output is immediately consumable by
-`compare_hunt_trace_histories.py` without a separate manual extraction step.
-For the recovered Hunt paper cases on this host, the retained runtime setting is
-currently `--disable-vtk-write`, which strips the heavy `vtkWrite` function
-object from `system/controlDict` before launch. That change lets the patched
-serial Hunt continuation complete through `t = 6e-05` and emit the full
-pressure/current/Lorentz diagnostic window needed for parity work.
-`run_hunt_solver_diagnostic_report.py` and `run_freemhd_parity_report.py` now
-also infer the recovered Hunt inlet type from `0/liquid/U`. When the recovered
-case uses `flowRateInletVelocity`, the reduced replay switches to the matching
-LMX `inlet_flow_rate` closure automatically. The scripts record the raw
-recovered OpenFOAM value as `recovered_inlet_flow_rate`, then rescale it onto
-the reduced LMX duct area and use that replay value as
-`reduced_inlet_flow_rate`.
-For corrected layered Hunt replay comparisons, the retained primary parity
-metrics are now:
-- `primary_pressure_metric = pSpan`
-- `primary_current_metric = face_current_density_max`
-- `primary_lorentz_metric = centered_lorentz_max`
-
-Those are the quantities to watch first when comparing LMX against patched
-FreeMHD/OpenFOAM long-trace artifacts.
-For layered Hunt replay work, `compare_hunt_trace_histories.py` now emits
-`primary_pressure_proxy_metric` / `primary_pressure_proxy`,
-`primary_current_metric` / `primary_current_max`, and
-`primary_lorentz_metric` / `primary_lorentz_max`. The current retained mapping
-is source-driven rather than “best looking”:
-- face current density is compared against FreeMHD `maxJnDensity`
-- cell-centered Lorentz force is compared against FreeMHD `maxCenteredJxB`
-- the existing face-based Lorentz trace remains available as a secondary
-  diagnostic, but it is no longer treated as the primary parity observable
-The same script now also derives a `current_scaled_pressure_proxy` from the
-reduced pressure trace and the layered current history. On the latest rebuilt
-patched Hunt `Ha20`, `t <= 6e-05` replay, the retained normalized metrics are
-roughly:
-- `u_max l2 ≈ 1.43e-03`
-- `pressure_proxy` vs `pSpan`: `l2 ≈ 1.94e-02`
-- `current_scaled_pressure_proxy` vs `pSpan`: `l2 ≈ 3.18e-02`
-- `primary_current_max` (`face_current_density_max`): `l2 ≈ 1.44e-01`
-- `primary_lorentz_max` (`centered_lorentz_max`): `l2 ≈ 8.29e-02`
-That replay is the current Hunt baseline for solver work because it removes
-two earlier parity-script mismatches:
-- wrong replay inlet-flow-rate handling
-- wrong mapping between LMX layered observables and FreeMHD logged quantities
-That corrected pressure-side observable is now also part of the core LMX
-diagnostic/output path:
-- live solver logs print `currentScaledPressureProxy`
-- solver diagnostics, restart bundles, and solution NPZ files now carry
-  `current_scaled_pressure_proxy_history`
-That diagnostic runner also supports restart/continuation directly from a prior
-LMX `.npz` state dump, so longer reduced Hunt replay windows can now be built
-incrementally without rerunning from `t = 0`.
-In the reduced duct solver itself, only `inlet_flow_rate` now activates the
-mean-flow drive closure. `inlet_velocity` remains available for recovered-case
-metadata and startup-state parity, but it no longer imposes a global target
-mean velocity across the reduced cross-section.
-On this Docker Desktop setup, locally built validation images may also require
-the retained `docker image ls` fallback in the harness because
-`docker image inspect <tag>` can report a false negative even though
-`docker run <tag>` works.
-
-## Scope
-
-LMX does not yet include:
-
-- Free-surface VoF.
-- Temperature coupling.
-- Turbulence models.
-- General unstructured polyhedral numerics.
-
-## Repository Layout
-
-- `lmx/`: package code.
-- `tests/`: unit, regression, physics, validation, and benchmark tests.
-- `docs/`: Read the Docs source pages.
-- `.github/workflows/`: CI and benchmark workflows.
-- `scripts/`: validation and benchmarking helpers.
-- `docker/`: optional validation container bundle.
+- The repository avoids hard-coded machine-local absolute paths in public docs
+  and examples.
+- CLI and plotting utilities are allowed to use pragmatic non-differentiable
+  utilities where that improves robustness, while the solver core remains JAX
+  based.
+- External benchmark comparisons are treated as secondary validation assets and
+  are kept separate from the governing solver implementation.

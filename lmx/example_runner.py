@@ -22,6 +22,18 @@ from .validation import (
 )
 
 
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
+
+
 def _default_reference_root() -> Path | None:
     root = default_closed_channel_reference_root()
     return root if root.exists() else None
@@ -242,8 +254,8 @@ def run_case_example(
     report = {
         "case": case.name,
         "ha": ha,
-        "output_dir": str(out_dir.resolve()),
-        "plots": [str(path.resolve()) for path in plot_paths],
+        "output_dir": _portable_path(out_dir),
+        "plots": [_portable_path(path) for path in plot_paths],
         "reference": reference_payload,
         "metrics": metrics,
     }
@@ -362,18 +374,18 @@ def run_theory_meeting_demo(
     hunt_report = {
         "case": hunt_case.name,
         "ha": hunt_ha,
-        "output_dir": str(hunt_dir.resolve()),
-        "plots": [str(path.resolve()) for path in hunt_plot_paths],
+        "output_dir": _portable_path(hunt_dir),
+        "plots": [_portable_path(path) for path in hunt_plot_paths],
         "reference": hunt_reference,
         "metrics": hunt_metrics,
     }
     write_metrics_json(hunt_report, hunt_dir / "example_report.json")
 
     report = {
-        "output_dir": str(out_dir.resolve()),
+        "output_dir": _portable_path(out_dir),
         "movie_case": movie_case,
         "movie_mode": movie_field_mode,
-        "movie_outputs": [str(path.resolve()) for path in movie_paths],
+        "movie_outputs": [_portable_path(path) for path in movie_paths],
         "hartmann": hartmann_report,
         "shercliff": shercliff_report,
         "hunt": hunt_report,

@@ -142,7 +142,7 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(tmp_path: Path
 
     assert summary["restart"]["enabled"] is True
     assert summary["restart"]["start_time"] == pytest.approx(0.2)
-    assert summary["restart"]["output"].endswith("resume_state.npz")
+    assert summary["restart"]["output"] == "resume_state.npz"
     assert '"restart"' in capsys.readouterr().out
 
 

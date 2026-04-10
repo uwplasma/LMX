@@ -50,6 +50,18 @@ def _normalize(values: list[float]) -> list[float]:
     return [value / baseline for value in values]
 
 
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
+
+
 def _pressure_final_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
     grouped: dict[tuple[float, str], dict[str, object]] = {}
     for record in records:
@@ -88,45 +100,45 @@ def _compact_records(records: list[dict[str, object]], keys: list[str]) -> list[
 
 
 def _build_alignment(
-    freemhd_times: list[float],
-    freemhd_values: list[float],
+    reference_times: list[float],
+    reference_values: list[float],
     lmx_times: list[float],
     lmx_values: list[float],
 ) -> dict[str, object]:
-    if not freemhd_times:
+    if not reference_times:
         return {
             "l2_error": None,
             "max_abs_diff": None,
             "max_abs_diff_time": None,
             "samples": [],
         }
-    lmx_aligned = [_interpolate(lmx_times, lmx_values, time) for time in freemhd_times]
+    lmx_aligned = [_interpolate(lmx_times, lmx_values, time) for time in reference_times]
     raw_relative_errors = [
-        abs(freemhd_value - lmx_value) / max(abs(freemhd_value), 1e-20)
-        for freemhd_value, lmx_value in zip(freemhd_values, lmx_aligned)
+        abs(reference_value - lmx_value) / max(abs(reference_value), 1e-20)
+        for reference_value, lmx_value in zip(reference_values, lmx_aligned)
     ]
-    freemhd_normalized = _normalize(freemhd_values)
+    reference_normalized = _normalize(reference_values)
     lmx_normalized = _normalize(lmx_aligned)
-    abs_diffs = [abs(a - b) for a, b in zip(freemhd_normalized, lmx_normalized)]
+    abs_diffs = [abs(a - b) for a, b in zip(reference_normalized, lmx_normalized)]
     max_index = max(range(len(abs_diffs)), key=lambda idx: abs_diffs[idx])
     l2_error = sqrt(sum(diff * diff for diff in abs_diffs) / len(abs_diffs))
     raw_max_index = max(range(len(raw_relative_errors)), key=lambda idx: raw_relative_errors[idx])
     samples = [
         {
             "time": time,
-            "freemhd_raw": freemhd_value,
+            "reference_raw": reference_value,
             "lmx_raw": lmx_value,
             "raw_relative_error": raw_relative_error,
-            "freemhd_normalized": freemhd_norm,
+            "reference_normalized": reference_norm,
             "lmx_normalized": lmx_norm,
             "abs_diff": diff,
         }
-        for time, freemhd_value, lmx_value, raw_relative_error, freemhd_norm, lmx_norm, diff in zip(
-            freemhd_times,
-            freemhd_values,
+        for time, reference_value, lmx_value, raw_relative_error, reference_norm, lmx_norm, diff in zip(
+            reference_times,
+            reference_values,
             lmx_aligned,
             raw_relative_errors,
-            freemhd_normalized,
+            reference_normalized,
             lmx_normalized,
             abs_diffs,
         )
@@ -134,19 +146,19 @@ def _build_alignment(
     return {
         "l2_error": l2_error,
         "max_abs_diff": abs_diffs[max_index],
-        "max_abs_diff_time": freemhd_times[max_index],
+        "max_abs_diff_time": reference_times[max_index],
         "mean_raw_relative_error": sum(raw_relative_errors) / len(raw_relative_errors),
         "max_raw_relative_error": raw_relative_errors[raw_max_index],
-        "max_raw_relative_error_time": freemhd_times[raw_max_index],
+        "max_raw_relative_error_time": reference_times[raw_max_index],
         "samples": samples,
     }
 
 
-def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> dict[str, object]:
-    freemhd_payload = json.loads(freemhd_diag_json.read_text())
+def compare_trace_histories(reference_diag_json: Path, lmx_report_json: Path) -> dict[str, object]:
+    reference_payload = json.loads(reference_diag_json.read_text())
     lmx_payload = json.loads(lmx_report_json.read_text())
 
-    records = freemhd_payload["records"]
+    records = reference_payload["records"]
     pressure_records = _pressure_final_records(records)
     epot_records = _epot_records(records)
     lmx_trace = lmx_payload["lmx_solver"]["trace"]
@@ -193,9 +205,9 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
         )
 
     payload = {
-        "freemhd_diag_json": str(freemhd_diag_json.resolve()),
-        "lmx_report_json": str(lmx_report_json.resolve()),
-        "freemhd_pressure_final_records": _compact_records(
+        "reference_diag_json": _portable_path(reference_diag_json),
+        "lmx_report_json": _portable_path(lmx_report_json),
+        "reference_pressure_final_records": _compact_records(
             pressure_records,
             [
                 "time",
@@ -213,7 +225,7 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
                 "maxJxB",
             ],
         ),
-        "freemhd_epot_records": _compact_records(
+        "reference_epot_records": _compact_records(
             epot_records,
             [
                 "time",
@@ -316,13 +328,13 @@ def compare_trace_histories(freemhd_diag_json: Path, lmx_report_json: Path) -> d
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Align normalized FreeMHD and LMX Hunt trace histories on the same time axis.")
-    parser.add_argument("--freemhd-diag-json", type=Path, required=True)
+    parser = argparse.ArgumentParser(description="Align normalized reference-case and LMX Hunt trace histories on the same time axis.")
+    parser.add_argument("--reference-diag-json", type=Path, required=True)
     parser.add_argument("--lmx-report-json", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    payload = compare_trace_histories(args.freemhd_diag_json, args.lmx_report_json)
+    payload = compare_trace_histories(args.reference_diag_json, args.lmx_report_json)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2))
     print(json.dumps(payload, indent=2))

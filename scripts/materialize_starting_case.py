@@ -23,7 +23,7 @@ def materialize_case(case_dir: str | Path) -> dict[str, object]:
             tar.extractall(root, filter="data")
         extracted.append(name)
     return {
-        "case_dir": str(root.resolve()),
+        "case_dir": str(root),
         "extracted_archives": extracted,
         "missing_archives": missing,
         "has_zero_dir": (root / "0").is_dir(),
@@ -33,7 +33,7 @@ def materialize_case(case_dir: str | Path) -> dict[str, object]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Expand a recovered FreeMHD StartingFiles case shell into 0/, constant/, and system/.")
+    parser = argparse.ArgumentParser(description="Expand a recovered benchmark StartingFiles case shell into 0/, constant/, and system/.")
     parser.add_argument("--case-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()

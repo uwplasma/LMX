@@ -1,47 +1,59 @@
 # Benchmark Matrix
 
-LMX is being reset around a research-grade inductionless benchmark ladder.
+This page defines the benchmark ladder for the first LMX paper and `1.0`
+release.
 
-## Mandatory for the first paper
+## Mandatory now: Benchmark A
 
-### Benchmark A: fully developed laminar duct flow
+### A1. Hartmann / insulating-duct style validation
 
-- A1: insulating duct / Shercliff-type
-- A2: conducting Hartmann walls / Hunt-type
+- solver family: `fully_developed_inductionless`
+- geometry: `rect_duct`
+- observables:
+  - velocity profiles
+  - potential profiles
+  - flow-rate and pressure-gradient surrogates
 
-Current solver target:
+### A2. Shercliff and Hunt conducting/insulating wall validation
 
-- `solver.kind = "fully_developed_inductionless"`
+- solver family: `fully_developed_inductionless`
 - geometries:
   - `rect_duct`
   - `layered_duct`
+- observables:
+  - matched `y` and `z` profiles
+  - current-density profiles
+  - Lorentz-force profiles
+  - integral flow-rate and conservation diagnostics
 
-Primary validation observables:
+## Mandatory next: Benchmark B
 
-- velocity profiles
-- electric-potential profiles
-- current-density profiles
-- flow-rate / mean-velocity observables
-- Lorentz-force observables on matched cuts
+These are the first nontrivial 3D inductionless targets from the benchmark
+ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf).
 
-### Benchmark B: laminar fringing-field flow
+### B1. Conducting pipe in a fringing magnetic field
 
-- B1: conducting pipe in a fringing magnetic field
-- B2: conducting square duct in a fringing magnetic field
+- planned solver family: `extruded_inductionless`
+- required geometry support: mapped pipe O-grid
+- required observables:
+  - pressure drop
+  - velocity distortion
+  - electric-potential redistribution
 
-Current implementation status:
+### B2. Conducting square duct in a fringing magnetic field
 
-- mesh scaffolding exists for mapped pipes
-- solver support is not complete yet
-- these cases will land under `solver.kind = "extruded_inductionless"`
+- planned solver family: `extruded_inductionless`
+- required observables:
+  - cross-sectional velocity structure
+  - current-density redistribution
+  - Lorentz-force localization
 
-## Staged but deferred beyond the first paper
+## Staged but deferred
 
 - Benchmark C: Q2D turbulent duct flow
 - Benchmark D: turbulent duct flow / magnetic obstacle
 - Benchmark E: natural convection / heat transfer
 - sudden expansion
-- HCLL / blanket mock-up / Madarame-type coupled-duct effects
+- blanket mock-up / coupled-duct effects
 
-These are in scope for benchmark manifests, data loaders, and skipped tests,
-but not for the first inductionless release.
+These remain part of the research roadmap, but not the `1.0` solver promise.

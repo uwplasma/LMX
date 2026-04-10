@@ -1,262 +1,178 @@
 # Input Reference
 
-LMX can now run directly from a TOML input file:
+LMX runs from a single TOML file:
 
 ```bash
-lmx /Users/rogerio/local/tests/LMX/examples/hartmann_case.toml
+lmx examples/hartmann_case.toml
 ```
 
-That path is intended to be the main executable workflow for users who want an
-OpenFOAM-like run experience with a text input file, live solver logs, and a
-structured output directory.
+## Top-level blocks
 
-## What a TOML run writes
+- `[case]`
+- `[geometry]`
+- `[materials]`
+- `[magnetic_field]`
+- `[solver]`
+- `[time_stepper]`
+- `[output]`
+- `[logging]`
+- `[restart]`
 
-When the input file enables the corresponding output options, LMX writes:
-
-- `case_name.vtr` and `case_name.pvd` for ParaView
-- `case_name_centerline.csv`
-- `case_name_midplane_y.csv`
-- `case_name_midplane_z.csv`
-- `case_name_results.npz`
-- `case_name_restart.npz` when restart output is enabled
-- `case_name_summary.json`
-- `case_name.log`
-- overview and diagnostics figures when `write_plots = true`
-- a copy of the input TOML when `copy_input_file = true`
-
-## Input sections
-
-An input file is organized as:
+## Minimal example
 
 ```toml
 [case]
+name = "hartmann_ha20"
+kind = "hartmann"
+
 [geometry]
+kind = "rect_duct"
+width = 2.0
+height = 2.0
+ny = 48
+nz = 48
+target_ha = 20.0
+
+[materials]
+fluid_density = 1.0
+fluid_viscosity = 1.0
+fluid_conductivity = 1.0
+
 [magnetic_field]
-[solver]
-[time_stepper]
-[output]
-[logging]
-[restart]
-[[regions]]
-[[boundary_conditions]]
-```
+kind = "constant"
+value = [0.0, 0.0, 1.0]
 
-## `case`
-
-- `name`: case name used for output file stems
-- `forcing`: explicit reduced-model streamwise forcing
-- `initial_velocity`: initial fluid velocity
-- `reference_pressure_gradient`: stored reference value for reduced-model comparisons
-- `reference_phi_cell`: two integers fixing the electric-potential gauge
-- `notes`: free-form string stored in metadata
-
-`solve_mode` is still accepted here for backward compatibility, but the public
-setting now lives in `[solver].mode`.
-
-## `geometry`
-
-- `kind`: `"rect_duct"`, `"layered_duct"`, or `"pipe_ogrid"`
-- `width`, `height`, `length`
-- `nx`, `ny`, `nz`
-- `radius`, `nr`, `ntheta` for mapped-pipe cases
-- `wall_thickness`: four values `[left, right, bottom, top]`
-- `wall_cells`: four integers `[left, right, bottom, top]`
-- `target_ha`
-- `target_side_layer`
-
-## `magnetic_field`
-
-- `kind`: currently practical TOML modes are `"constant"` and `"tabulated"`
-- `value`: three-vector for constant fields
-- `table_path`: path to a tabulated field file
-- `ramp_start`
-- `ramp_duration`
-
-Custom analytic magnetic fields still require the Python API, because a callable
-cannot be serialized cleanly into TOML.
-
-## `solver`
-
-- `kind`
-  - `"fully_developed_inductionless"`: default research path for duct problems
-  - `"legacy_reduced"`: retained pseudo-transient path for regression and comparison
-  - `"extruded_inductionless"`: planned fringing-field / 3D path, not yet implemented
-- `mode`: `"steady"` or `"transient"`
-- `linear_solver`: `"auto"`, `"cg"`, `"gmres"`, or `"bicgstab"`
-- `preconditioner`: `"none"`, `"jacobi"`, or `"block_jacobi"`
-- `time_scheme`: currently `"implicit_euler"` is implemented on the new solver path
-- `coupling_iterations`
-- `coupling_tolerance`
-
-The retained default for duct cases is now:
-
-```toml
 [solver]
 kind = "fully_developed_inductionless"
 mode = "steady"
 linear_solver = "auto"
 preconditioner = "jacobi"
 time_scheme = "implicit_euler"
-coupling_iterations = 16
-coupling_tolerance = 1.0e-8
+
+[time_stepper]
+dt = 1e-3
+t_final = 0.1
+max_steps = 500
+steady_tolerance = 1e-8
+
+[output]
+directory = "artifacts/hartmann"
+write_npz = true
+write_vtk = true
+write_plots = true
+write_restart = true
+
+[logging]
+verbosity = "detailed"
+write_log_file = true
 ```
 
-## `time_stepper`
+## `[case]`
+
+- `name`
+  - case identifier used in output files
+- `kind`
+  - `hartmann`
+  - `shercliff`
+  - `hunt`
+
+## `[geometry]`
+
+- `kind`
+  - `rect_duct`
+  - `layered_duct`
+- `width`, `height`
+  - fluid duct dimensions
+- `ny`, `nz`
+  - cross-sectional resolution
+- `target_ha`
+  - Hartmann number used by the benchmark constructors
+- layered-duct inputs
+  - wall thicknesses
+  - wall conductivity or conductance-ratio controls
+
+## `[materials]`
+
+- `fluid_density`
+- `fluid_viscosity`
+- `fluid_conductivity`
+- layered-region properties when solids are present
+
+## `[magnetic_field]`
+
+- `kind`
+  - `constant`
+  - `analytic`
+- `value`
+  - constant field components
+- `ramp_start`
+- `ramp_duration`
+
+## `[solver]`
+
+- `kind`
+  - `fully_developed_inductionless`
+  - `legacy_reduced`
+  - `extruded_inductionless` (reserved)
+- `mode`
+  - `steady`
+  - `transient`
+- `linear_solver`
+  - `auto`
+  - `cg`
+  - `gmres`
+  - `bicgstab`
+- `preconditioner`
+  - `none`
+  - `jacobi`
+  - `block_jacobi`
+- `time_scheme`
+  - `implicit_euler`
+  - `crank_nicolson` reserved for future transient families
+
+## `[time_stepper]`
 
 - `dt`
 - `t_final`
 - `max_steps`
-- `outer_iterations`
-- `potential_iterations`
-- `potential_tolerance`
-- `potential_relaxation`
-- `potential_solver`
-- `current_reconstruction`
-- `post_update_potential_refresh`
 - `steady_tolerance`
 - `steady_potential_tolerance`
-- `relaxation`
-- `velocity_update_limit`
-- `velocity_update_limiter`
-- `checkpoint_stride`
+- legacy-only controls
+  - retained for `solver.kind = "legacy_reduced"`
+  - intentionally not part of the default research path
 
-These controls are now split conceptually:
-
-- temporal controls used by all solver families:
-  - `dt`
-  - `t_final`
-  - `max_steps`
-  - `checkpoint_stride`
-- electric-potential controls used by current solver families:
-  - `potential_iterations`
-  - `potential_tolerance`
-  - `potential_relaxation`
-  - `potential_solver`
-  - `steady_tolerance`
-  - `steady_potential_tolerance`
-- legacy reduced-solver controls:
-  - `outer_iterations`
-  - `current_reconstruction`
-  - `post_update_potential_refresh`
-  - `relaxation`
-  - `velocity_update_limit`
-  - `velocity_update_limiter`
-
-The shipped examples now use the new `[solver]` block and keep the default
-`fully_developed_inductionless` path focused on shared temporal and electric
-controls. The legacy reduced controls remain available for
-`solver.kind = "legacy_reduced"`, but they are no longer part of the teaching
-inputs for the default research path.
-
-When `forcing = 0` and the case uses reduced mean-flow closure through
-`inlet_flow_rate`, the solver now computes those cross-sectional means with
-cell-area weighting on clustered meshes rather than raw cell counts.
-
-## `output`
+## `[output]`
 
 - `directory`
-- `write_paraview`
-- `write_csv_profiles`
 - `write_npz`
-- `write_json_summary`
+- `write_restart`
+- `write_vtk`
 - `write_plots`
 - `copy_input_file`
-- `write_stride`
+- `field_stride`
+- `probe_stride`
+- `slice_stride`
 
-## `logging`
+## `[logging]`
 
-- `enabled`
-- `banner`
-- `print_regions`
-- `print_boundaries`
-- `print_footer`
-- `flush`
-- `step_stride`
+- `verbosity`
+  - `quiet`
+  - `normal`
+  - `detailed`
+  - `debug`
+- `write_log_file`
 
-With `enabled = true`, the solver prints a live OpenFOAM-style stream and also
-writes the same text to `case_name.log` in the output directory.
-
-## `restart`
+## `[restart]`
 
 - `enabled`
-- `path`
-- `reset_histories`
-- `write_restart`
-- `restart_filename`
+- `input_npz`
+- `append_histories`
+- `write_restart_npz`
 
-Restart is a runtime concern, so it lives in its own top-level table instead of
-inside the physical case definition.
+## Where each block is implemented
 
-Current retained semantics:
-
-- the restart source is a previously written LMX `.npz` solution dump
-- the saved `u`, `phi`, `J`, `JxB`, `time`, and `residual` become the initial state
-- transient runs continue from the saved `time` to the absolute `t_final` in the new TOML
-- steady runs continue from the saved pseudo-time/state for up to the new `max_steps`
-- `reset_histories = true` starts fresh diagnostic histories at the restart point
-- `reset_histories = false` appends the new histories to the saved ones
-
-Minimal example:
-
-```toml
-[restart]
-enabled = true
-path = "../artifacts/examples/toml_hartmann/hartmann_ha20_toml_results.npz"
-reset_histories = false
-write_restart = true
-restart_filename = "hartmann_ha20_toml_restart.npz"
-```
-
-## `regions`
-
-Each `[[regions]]` entry maps directly to `RegionSpec`:
-
-- `name`
-- `kind`: `"fluid"` or `"solid"`
-- `conductivity`
-- `density`
-- `viscosity`
-- `wall_thickness`
-
-## `boundary_conditions`
-
-Each `[[boundary_conditions]]` entry maps directly to `BoundaryCondition`:
-
-- `name`
-- `kind`
-- `value`
-- `region`
-- `axis`
-- `side`
-
-Typical values:
-
-- no-slip walls:
-  `kind = "no_slip"`
-- insulating walls:
-  `kind = "insulating"`
-- conducting walls via explicit solid regions:
-  `kind = "conducting_wall"` with `region = "..."` and the appropriate `side`
-- reduced-model flow-rate drive:
-  `kind = "inlet_flow_rate"`
-- startup-state metadata only:
-  `kind = "inlet_velocity"`
-
-## Shipped examples
-
-- `examples/hartmann_case.toml`
-- `examples/hartmann_restart_case.toml`
-- `examples/shercliff_case.toml`
-- `examples/hunt_case.toml`
-
-The Hunt example is the most informative input file because it shows:
-
-- multiple regions
-- explicit insulating and conducting walls
-- layered geometry controls
-- the retained Hunt current/Lorentz reconstruction baseline
-
-`examples/hartmann_restart_case.toml` is the retained restart/continue example.
-Run `examples/hartmann_case.toml` first so the referenced NPZ exists, then run
-the restart file to continue from that saved state.
+- parsing and validation: `lmx/config.py`
+- data models: `lmx/specs.py`
+- runtime logger: `lmx/runtime_logging.py`
+- restart and output bundles: `lmx/io.py`
+- solver dispatch: `lmx/solvers.py`

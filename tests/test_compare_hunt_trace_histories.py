@@ -10,7 +10,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path):
-    freemhd = {
+    reference_trace = {
         "records": [
             {
                 "kind": "epot",
@@ -59,12 +59,12 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
             }
         }
     }
-    freemhd_path = tmp_path / "freemhd.json"
+    reference_path = tmp_path / "reference_trace.json"
     lmx_path = tmp_path / "lmx.json"
-    freemhd_path.write_text(json.dumps(freemhd))
+    reference_path.write_text(json.dumps(reference_trace))
     lmx_path.write_text(json.dumps(lmx))
 
-    payload = compare.compare_trace_histories(freemhd_path, lmx_path)
+    payload = compare.compare_trace_histories(reference_path, lmx_path)
 
     assert payload["u_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["mean_velocity"]["l2_error"] == pytest.approx(0.0)
@@ -87,15 +87,15 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
     assert payload["primary_lorentz_metric"] == "centered_lorentz_max"
     assert payload["primary_lorentz_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["current_max"]["mean_raw_relative_error"] == pytest.approx(0.6)
-    assert payload["u_max"]["samples"][0]["freemhd_raw"] == pytest.approx(1.0)
+    assert payload["u_max"]["samples"][0]["reference_raw"] == pytest.approx(1.0)
     assert payload["u_max"]["samples"][1]["lmx_raw"] == pytest.approx(0.5)
-    assert payload["freemhd_pressure_final_records"][0]["maxU"] == pytest.approx(1.0)
-    assert payload["freemhd_epot_records"][1]["maxJnDensity"] == pytest.approx(5.6)
+    assert payload["reference_pressure_final_records"][0]["maxU"] == pytest.approx(1.0)
+    assert payload["reference_epot_records"][1]["maxJnDensity"] == pytest.approx(5.6)
 
 
 def test_main_writes_alignment_json(tmp_path: Path):
-    freemhd_path = tmp_path / "freemhd.json"
-    freemhd_path.write_text(json.dumps({"records": [{"kind": "epot", "time": 0.1, "maxJ": 1.0, "maxCenteredJxB": 2.0, "maxJxB": 2.0}, {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 3.0, "maxP": 4.0, "minP": 1.0, "pSpan": 3.0}]}))
+    reference_path = tmp_path / "reference_trace.json"
+    reference_path.write_text(json.dumps({"records": [{"kind": "epot", "time": 0.1, "maxJ": 1.0, "maxCenteredJxB": 2.0, "maxJxB": 2.0}, {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 3.0, "maxP": 4.0, "minP": 1.0, "pSpan": 3.0}]}))
     lmx_path = tmp_path / "lmx.json"
     lmx_path.write_text(
         json.dumps(
@@ -125,8 +125,8 @@ def test_main_writes_alignment_json(tmp_path: Path):
 
     exit_code = compare.main(
         [
-            "--freemhd-diag-json",
-            str(freemhd_path),
+            "--reference-diag-json",
+            str(reference_path),
             "--lmx-report-json",
             str(lmx_path),
             "--output",
@@ -145,12 +145,12 @@ def test_main_writes_alignment_json(tmp_path: Path):
     assert payload["primary_current_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["primary_lorentz_metric"] == "centered_lorentz_max"
     assert payload["primary_lorentz_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
-    assert payload["freemhd_pressure_final_records"][0]["time"] == pytest.approx(0.1)
+    assert payload["reference_pressure_final_records"][0]["time"] == pytest.approx(0.1)
 
 
 def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
-    freemhd_path = tmp_path / "freemhd.json"
-    freemhd_path.write_text(
+    reference_path = tmp_path / "reference_trace.json"
+    reference_path.write_text(
         json.dumps(
             {
                 "records": [
@@ -195,7 +195,7 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
         )
     )
 
-    payload = compare.compare_trace_histories(freemhd_path, lmx_path)
+    payload = compare.compare_trace_histories(reference_path, lmx_path)
 
     assert "u_max" not in payload
     assert payload["current_max"]["l2_error"] == pytest.approx(0.0)
@@ -208,4 +208,4 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
     assert payload["centered_lorentz_max"]["l2_error"] == pytest.approx(0.0)
     assert payload["primary_lorentz_metric"] == "centered_lorentz_max"
     assert payload["face_current_max"]["max_raw_relative_error"] == pytest.approx(0.0)
-    assert payload["freemhd_pressure_final_records"] == []
+    assert payload["reference_pressure_final_records"] == []

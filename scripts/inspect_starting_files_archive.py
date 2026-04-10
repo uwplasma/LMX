@@ -69,7 +69,7 @@ def _read_partial_entries(path: Path) -> list[PartialZipEntry]:
 def inspect_archive(archive_path: str | Path, pattern: str = "") -> dict[str, object]:
     path = Path(archive_path)
     payload: dict[str, object] = {
-        "archive_path": str(path.resolve()),
+        "archive_path": str(path),
         "exists": path.exists(),
         "pattern": pattern,
     }
@@ -126,9 +126,9 @@ def extract_matching(archive_path: str | Path, pattern: str, output_dir: str | P
             for name in names:
                 archive.extract(name, out)
             return {
-                "archive_path": str(path.resolve()),
+                "archive_path": str(path),
                 "pattern": pattern,
-                "output_dir": str(out.resolve()),
+                "output_dir": str(out),
                 "status": "ok",
                 "extracted_count": len(names),
                 "extracted_entries": names[:500],
@@ -137,9 +137,9 @@ def extract_matching(archive_path: str | Path, pattern: str, output_dir: str | P
         entries = [entry for entry in _read_partial_entries(path) if pattern.lower() in entry.name.lower()]
         extracted = [_extract_partial_entry(path, entry, out) for entry in entries]
         return {
-            "archive_path": str(path.resolve()),
+            "archive_path": str(path),
             "pattern": pattern,
-            "output_dir": str(out.resolve()),
+            "output_dir": str(out),
             "status": "partial-ok",
             "extracted_count": len(extracted),
             "extracted_entries": [str(item.relative_to(out)) for item in extracted[:500]],
@@ -147,7 +147,7 @@ def extract_matching(archive_path: str | Path, pattern: str, output_dir: str | P
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Inspect or selectively extract the large FreeMHD StartingFiles archive.")
+    parser = argparse.ArgumentParser(description="Inspect or selectively extract a recovered benchmark StartingFiles archive.")
     parser.add_argument(
         "--archive",
         type=Path,

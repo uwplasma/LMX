@@ -66,7 +66,7 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -79,7 +79,7 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     payload = json.loads(output.read_text())
     assert payload["case_kind"] == "hunt"
     assert "lmx_solver" in payload
-    assert "freemhd_run" in payload
+    assert "reference_run" in payload
     assert "comparison" in payload
     assert payload["lmx_solver"]["diagnostics"]["potential_residual"] == pytest.approx(0.001)
     assert payload["lmx_solver"]["magnetic_field"]["ramp_duration"] == pytest.approx(2e-4)
@@ -124,7 +124,7 @@ def test_hunt_solver_diagnostic_report_accepts_cg_volume_backend(tmp_path: Path,
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -162,7 +162,7 @@ def test_hunt_solver_diagnostic_report_accepts_current_reconstruction(tmp_path: 
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -200,7 +200,7 @@ def test_hunt_solver_diagnostic_report_accepts_post_update_potential_refresh(tmp
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -237,7 +237,7 @@ def test_hunt_solver_diagnostic_report_accepts_hybrid_face_lorentz_reconstructio
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -275,7 +275,7 @@ def test_hunt_solver_diagnostic_report_adds_inlet_velocity_boundary(tmp_path: Pa
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -327,7 +327,7 @@ boundaryField
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -369,7 +369,7 @@ def test_hunt_solver_diagnostic_report_supports_inlet_flow_rate_drive_mode(tmp_p
     output = tmp_path / "diagnostics.json"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -420,7 +420,7 @@ def test_hunt_solver_diagnostic_report_supports_restart_npz(tmp_path: Path, monk
     restart_out = tmp_path / "restart_out.npz"
     exit_code = huntdiag.main(
         [
-            "--freemhd-run-dir",
+            "--reference-run-dir",
             str(run_dir),
             "--ha",
             "20",
@@ -442,4 +442,4 @@ def test_hunt_solver_diagnostic_report_supports_restart_npz(tmp_path: Path, monk
     assert payload["restart"]["input"] == str(fake_restart.path)
     assert payload["restart"]["start_time"] == pytest.approx(2e-5)
     assert payload["restart"]["append_histories"] is True
-    assert payload["restart"]["output"] == str(restart_out.resolve())
+    assert payload["restart"]["output"] == "restart_out.npz"

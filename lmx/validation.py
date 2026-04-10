@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import json
 import re
-import subprocess
 from dataclasses import dataclass
 from math import log
 from pathlib import Path
@@ -11,7 +10,6 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from .core import Solution
-from .freemhd import docker_cli_available, docker_daemon_available
 from .mesh import StructuredMesh
 from .operators import center_coordinates
 from .reference_data import (
@@ -69,7 +67,7 @@ class ProcessedSliceValidation:
 
 
 @dataclass(frozen=True)
-class FreeMHDCaseInspection:
+class ReferenceCaseInspection:
     case_dir: str
     control_dicts: tuple[str, ...]
     fv_schemes: tuple[str, ...]
@@ -95,7 +93,7 @@ class FieldMinMaxRecord:
 
 
 @dataclass(frozen=True)
-class FreeMHDLineSample:
+class ReferenceLineSample:
     path: str
     distance: jnp.ndarray
     pot_e: jnp.ndarray
@@ -561,21 +559,13 @@ def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
     return path
 
 
-def freemhd_case_command(case_dir: str | Path, cores: int = 4, solver: str = "epotMultiRegionFoam") -> str:
-    return (
-        "bash -lc 'source /opt/OpenFOAM/OpenFOAM-v2206/etc/bashrc && "
-        f"cd {Path(case_dir)} && "
-        f"mpirun -np {cores} {solver} -parallel'"
-    )
-
-
-def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> ValidationReport:
-    run_dir = Path(freemhd_run_dir)
-    inspection = inspect_freemhd_case(run_dir)
+def compare_with_reference_outputs(case_spec: CaseSpec, reference_run_dir: str | Path) -> ValidationReport:
+    run_dir = Path(reference_run_dir)
+    inspection = inspect_reference_case(run_dir)
     expected_region_count = float(len(case_spec.regions))
     expected_solid_count = float(sum(1 for region in case_spec.regions if region.kind == "solid"))
     minmax_files = tuple(sorted(str(path.relative_to(run_dir)) for path in run_dir.glob("postProcessing/**/fieldMinMax.dat")))
-    sampled_profiles = latest_sampled_profiles(run_dir)
+    sampled_profiles = latest_reference_sampled_profiles(run_dir)
     y_sample_path = sampled_profiles[0].path if sampled_profiles is not None else ""
     z_sample_path = sampled_profiles[1].path if sampled_profiles is not None else ""
     metrics = {
@@ -602,8 +592,8 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
     if latest_u_record is not None:
         lmx_solution = solve_transient(case_spec)
         lmx_u_max = float(jnp.max(jnp.abs(lmx_solution.state.u)))
-        metrics["freemhd_latest_time"] = latest_u_record.time
-        metrics["freemhd_u_max_latest"] = latest_u_record.max_value
+        metrics["reference_latest_time"] = latest_u_record.time
+        metrics["reference_u_max_latest"] = latest_u_record.max_value
         metrics["lmx_u_max"] = lmx_u_max
         metrics["u_max_abs_diff"] = abs(lmx_u_max - latest_u_record.max_value)
     if sampled_profiles is not None:
@@ -624,14 +614,13 @@ def compare_with_freemhd(case_spec: CaseSpec, freemhd_run_dir: str | Path) -> Va
             normalize_sample_distance(z_sample.distance),
             z_sample.u_x,
         )
-        metrics["freemhd_sample_time"] = infer_sample_time_from_path(y_sample.path)
-        metrics["freemhd_sample_y_l2_error"] = y_comparison.l2_error
-        metrics["freemhd_sample_y_linf_error"] = y_comparison.linf_error
-        metrics["freemhd_sample_z_l2_error"] = z_comparison.l2_error
-        metrics["freemhd_sample_z_linf_error"] = z_comparison.linf_error
+        metrics["reference_sample_time"] = infer_sample_time_from_path(y_sample.path)
+        metrics["reference_sample_y_l2_error"] = y_comparison.l2_error
+        metrics["reference_sample_y_linf_error"] = y_comparison.linf_error
+        metrics["reference_sample_z_l2_error"] = z_comparison.l2_error
+        metrics["reference_sample_z_linf_error"] = z_comparison.linf_error
     artifacts = {
-        "freemhd_run_dir": str(run_dir),
-        "expected_command": freemhd_case_command(run_dir),
+        "reference_run_dir": str(run_dir),
         "control_dicts": json.dumps(inspection.control_dicts),
         "region_properties": json.dumps(inspection.region_properties),
         "block_mesh_dicts": json.dumps(inspection.block_mesh_dicts),
@@ -750,10 +739,6 @@ def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Pat
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metrics, indent=2))
     return path
-
-
-def docker_available() -> bool:
-    return docker_daemon_available()
 
 
 def read_field_minmax(path: str | Path) -> tuple[FieldMinMaxRecord, ...]:
@@ -933,7 +918,7 @@ def infer_sampling_geometry(run_dir: str | Path, field: str = "mag(U)") -> Sampl
     )
 
 
-def read_freemhd_xy_sample(path: str | Path) -> FreeMHDLineSample:
+def read_reference_xy_sample(path: str | Path) -> ReferenceLineSample:
     distance = []
     pot_e = []
     u_x = []
@@ -951,7 +936,7 @@ def read_freemhd_xy_sample(path: str | Path) -> FreeMHDLineSample:
         u_x.append(float(parts[2]))
         u_y.append(float(parts[3]))
         u_z.append(float(parts[4]))
-    return FreeMHDLineSample(
+    return ReferenceLineSample(
         path=str(Path(path)),
         distance=jnp.asarray(distance, dtype=float),
         pot_e=jnp.asarray(pot_e, dtype=float),
@@ -977,7 +962,7 @@ def normalize_sample_distance(distance: jnp.ndarray) -> jnp.ndarray:
     return 2.0 * distance / max_distance - 1.0
 
 
-def latest_sampled_profiles(run_dir: str | Path) -> tuple[FreeMHDLineSample, FreeMHDLineSample] | None:
+def latest_reference_sampled_profiles(run_dir: str | Path) -> tuple[ReferenceLineSample, ReferenceLineSample] | None:
     root = Path(run_dir)
     candidates = sorted(root.glob("postProcessing/*/liquid/*/centerlineY_potE_U.xy"))
     latest_y_path: Path | None = None
@@ -996,13 +981,13 @@ def latest_sampled_profiles(run_dir: str | Path) -> tuple[FreeMHDLineSample, Fre
     z_path = latest_y_path.with_name("centerlineZ_potE_U.xy")
     if not z_path.exists():
         return None
-    return read_freemhd_xy_sample(latest_y_path), read_freemhd_xy_sample(z_path)
+    return read_reference_xy_sample(latest_y_path), read_reference_xy_sample(z_path)
 
 
-def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
+def inspect_reference_case(case_dir: str | Path) -> ReferenceCaseInspection:
     root = Path(case_dir)
     if not root.exists():
-        return FreeMHDCaseInspection(
+        return ReferenceCaseInspection(
             case_dir=str(root),
             control_dicts=(),
             fv_schemes=(),
@@ -1071,7 +1056,7 @@ def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
                 matches.append(str(path.relative_to(root)))
         return tuple(sorted(matches, key=lambda value: float(Path(value).name)))
 
-    return FreeMHDCaseInspection(
+    return ReferenceCaseInspection(
         case_dir=str(root),
         control_dicts=_relative_matches("**/system/controlDict"),
         fv_schemes=_relative_matches("**/system/fvSchemes"),
@@ -1086,23 +1071,3 @@ def inspect_freemhd_case(case_dir: str | Path) -> FreeMHDCaseInspection:
         processor_layout_dirs=_processor_layout_dirs(),
         parallel_time_dirs=_parallel_time_dirs(),
     )
-
-
-def run_freemhd_container(
-    image: str,
-    case_dir: str | Path,
-    cores: int = 4,
-    solver: str = "epotMultiRegionFoam",
-) -> subprocess.CompletedProcess[str]:
-    command = [
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        f"{Path(case_dir).resolve()}:/workspace/case",
-        image,
-        "bash",
-        "-lc",
-        freemhd_case_command("/workspace/case", cores=cores, solver=solver),
-    ]
-    return subprocess.run(command, text=True, capture_output=True, check=False)

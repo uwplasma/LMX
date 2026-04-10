@@ -12,7 +12,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.specs import BoundaryCondition
-from lmx.validation import ValidationReport, compare_with_freemhd, write_validation_report
+from lmx.validation import ValidationReport, compare_with_reference_outputs, write_validation_report
+
+
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
 
 
 def _candidate_u_paths(case_dir: str | Path) -> list[Path]:
@@ -171,10 +183,10 @@ def build_case(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build an LMX case, compare it with a FreeMHD run directory, and write a parity JSON report.")
+    parser = argparse.ArgumentParser(description="Build an LMX case, compare it with a reference case output directory, and write a parity JSON report.")
     parser.add_argument("--case-kind", choices=("hartmann", "shercliff", "hunt"), required=True)
     parser.add_argument("--ha", type=float, required=True)
-    parser.add_argument("--freemhd-run-dir", type=Path, required=True)
+    parser.add_argument("--reference-run-dir", type=Path, required=True)
     parser.add_argument("--ny", type=int, default=16)
     parser.add_argument("--nz", type=int, default=16)
     parser.add_argument("--dt", type=float, default=1e-5)
@@ -187,10 +199,10 @@ def main(argv: list[str] | None = None) -> int:
 
     initial_velocity = args.initial_velocity
     if initial_velocity is None:
-        initial_velocity = infer_initial_velocity_x(args.freemhd_run_dir) or 0.0
-    ramp_start, ramp_duration = infer_magnetic_ramp(args.freemhd_run_dir)
-    inferred_drive_mode = infer_inlet_drive_mode(args.freemhd_run_dir) if args.case_kind == "hunt" else None
-    recovered_inlet_flow_rate = infer_inlet_flow_rate(args.freemhd_run_dir) if args.case_kind == "hunt" else None
+        initial_velocity = infer_initial_velocity_x(args.reference_run_dir) or 0.0
+    ramp_start, ramp_duration = infer_magnetic_ramp(args.reference_run_dir)
+    inferred_drive_mode = infer_inlet_drive_mode(args.reference_run_dir) if args.case_kind == "hunt" else None
+    recovered_inlet_flow_rate = infer_inlet_flow_rate(args.reference_run_dir) if args.case_kind == "hunt" else None
     reduced_inlet_flow_rate = None
     drive_mode = "none"
     case_factory = {"hartmann": make_hartmann_case, "shercliff": make_shercliff_case, "hunt": make_hunt_case}[args.case_kind]
@@ -198,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     reduced_area = geometry_case.geometry.width * geometry_case.geometry.height
     if args.case_kind == "hunt":
         reduced_inlet_flow_rate = infer_reduced_inlet_flow_rate(
-            args.freemhd_run_dir,
+            args.reference_run_dir,
             reduced_area=reduced_area,
             initial_velocity=initial_velocity,
         )
@@ -224,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         drive_mode = "none"
     elif args.forcing is not None:
         drive_mode = "explicit_forcing"
-    report = compare_with_freemhd(case, args.freemhd_run_dir)
+    report = compare_with_reference_outputs(case, args.reference_run_dir)
     write_validation_report(report, args.output)
     payload = {
         "case_kind": args.case_kind,
@@ -236,8 +248,8 @@ def main(argv: list[str] | None = None) -> int:
         "reduced_inlet_flow_rate": reduced_inlet_flow_rate,
         "magnetic_ramp_start": ramp_start,
         "magnetic_ramp_duration": ramp_duration,
-        "freemhd_run_dir": str(args.freemhd_run_dir.resolve()),
-        "output": str(args.output.resolve()),
+        "reference_run_dir": _portable_path(args.reference_run_dir),
+        "output": _portable_path(args.output),
         "metrics": report.metrics,
     }
     print(json.dumps(payload, indent=2))

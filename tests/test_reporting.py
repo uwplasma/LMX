@@ -101,8 +101,8 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
           "parity_report": {
             "metrics": {
               "u_max_abs_diff": 0.01,
-              "freemhd_sample_y_l2_error": 0.02,
-              "freemhd_sample_z_l2_error": 0.03
+              "reference_sample_y_l2_error": 0.02,
+              "reference_sample_z_l2_error": 0.03
             }
           }
         }
@@ -154,7 +154,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     assert "Potential iterations" in summary["markdown"]
     assert "Combined L2" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
-    assert "## FreeMHD Parity" in summary["markdown"]
+    assert "## External Reference Parity" in summary["markdown"]
     assert "## Time Convergence" in summary["markdown"]
     assert "## Control Sweep" in summary["markdown"]
     assert "## Control Grid" in summary["markdown"]
@@ -204,7 +204,7 @@ def test_summarize_parity_report(tmp_path: Path):
         """
         {
           "status": "skipped",
-          "reason": "freemhd-case-unavailable",
+          "reason": "reference-case-unavailable",
           "case_dir": "",
           "sample_output": "",
           "parity_output": ""
@@ -213,7 +213,7 @@ def test_summarize_parity_report(tmp_path: Path):
     )
     summary = summarize_parity_report(path)
     assert summary.status == "skipped"
-    assert summary.reason == "freemhd-case-unavailable"
+    assert summary.reason == "reference-case-unavailable"
 
 
 def test_summarize_sweep_report(tmp_path: Path):
@@ -376,7 +376,7 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
     assert out_json.exists()
     assert out_md.exists()
     assert '"hartmann_ha20"' in out_json.read_text()
-    assert "## FreeMHD Parity" in out_md.read_text()
+    assert "## External Reference Parity" in out_md.read_text()
     assert "## Time Convergence" in out_md.read_text()
     assert "## Control Grid" in out_md.read_text()
     assert "Best Y L2" in out_md.read_text()

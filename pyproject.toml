@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmx"
-version = "0.1.0"
-description = "JAX-native laminar inductionless MHD toolkit inspired by FreeMHD"
+version = "1.0.0"
+description = "JAX-native inductionless MHD toolkit for research, benchmarking, and differentiable simulation"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

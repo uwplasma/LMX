@@ -16,20 +16,32 @@ from lmx.solvers import _build_mesh, solve_steady
 from lmx.validation import (
     combined_profile_error,
     extract_midplane_profile,
-    inspect_freemhd_case,
+    inspect_reference_case,
     latest_field_minmax_record,
-    latest_sampled_profiles,
+    latest_reference_sampled_profiles,
     normalize_sample_distance,
     compare_normalized_profiles,
     validation_summary,
 )
-from scripts.run_freemhd_parity_report import (
+from scripts.run_reference_parity_report import (
     infer_initial_velocity_x,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
     infer_reduced_inlet_flow_rate,
     infer_magnetic_ramp,
 )
+
+
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
 
 
 def _derive_current_scaled_pressure_proxy_history(
@@ -116,9 +128,9 @@ def _build_case(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Compare a Hunt LMX run against a recovered FreeMHD case using solver diagnostics first."
+        description="Compare a Hunt LMX run against a recovered reference case using solver diagnostics first."
     )
-    parser.add_argument("--freemhd-run-dir", type=Path, required=True)
+    parser.add_argument("--reference-run-dir", type=Path, required=True)
     parser.add_argument("--ha", type=float, required=True)
     parser.add_argument("--ny", type=int, default=32)
     parser.add_argument("--nz", type=int, default=32)
@@ -146,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    run_dir = args.freemhd_run_dir
+    run_dir = args.reference_run_dir
     initial_velocity = args.initial_velocity
     if initial_velocity is None:
         initial_velocity = infer_initial_velocity_x(run_dir) or 0.0
@@ -212,9 +224,9 @@ def main(argv: list[str] | None = None) -> int:
     except TypeError:
         solution = solve_steady(case)
 
-    inspection = inspect_freemhd_case(run_dir)
+    inspection = inspect_reference_case(run_dir)
     latest_u_record = latest_field_minmax_record(run_dir, field="mag(U)")
-    sampled_profiles = latest_sampled_profiles(run_dir)
+    sampled_profiles = latest_reference_sampled_profiles(run_dir)
 
     lmx_solver = {
         "case_name": solution.case_name,
@@ -248,8 +260,8 @@ def main(argv: list[str] | None = None) -> int:
             lmx_solver["trace"]["current_max_history"],
         )
 
-    freemhd_run = {
-        "case_dir": str(run_dir.resolve()),
+    reference_run = {
+        "case_dir": _portable_path(run_dir),
         "inspection": {
             "control_dicts": len(inspection.control_dicts),
             "region_properties": len(inspection.region_properties),
@@ -308,13 +320,13 @@ def main(argv: list[str] | None = None) -> int:
         "drive_mode": drive_mode,
         "recovered_inlet_flow_rate": recovered_inlet_flow_rate,
         "reduced_inlet_flow_rate": reduced_inlet_flow_rate,
-        "freemhd_run": freemhd_run,
+        "reference_run": reference_run,
         "lmx_solver": lmx_solver,
         "comparison": comparison,
     }
     if args.write_restart_npz is not None:
         restart_output = write_restart_npz(solution, case, args.write_restart_npz)
-        restart_payload = {"output": str(restart_output.resolve())}
+        restart_payload = {"output": _portable_path(restart_output)}
         if restart_summary is None:
             restart_summary = restart_payload
         else:

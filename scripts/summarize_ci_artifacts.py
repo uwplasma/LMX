@@ -40,8 +40,8 @@ class ParitySummary:
     case_dir: str
     sample_output: str
     parity_output: str
-    freemhd_sample_y_l2_error: float | None = None
-    freemhd_sample_z_l2_error: float | None = None
+    reference_sample_y_l2_error: float | None = None
+    reference_sample_z_l2_error: float | None = None
     u_max_abs_diff: float | None = None
 
 
@@ -140,11 +140,11 @@ def summarize_parity_report(report_path: str | Path) -> ParitySummary:
         case_dir=str(payload.get("case_dir", "")),
         sample_output=str(payload.get("sample_output", "")),
         parity_output=str(payload.get("parity_output", "")),
-        freemhd_sample_y_l2_error=(
-            None if "freemhd_sample_y_l2_error" not in metrics else float(metrics["freemhd_sample_y_l2_error"])
+        reference_sample_y_l2_error=(
+            None if "reference_sample_y_l2_error" not in metrics else float(metrics["reference_sample_y_l2_error"])
         ),
-        freemhd_sample_z_l2_error=(
-            None if "freemhd_sample_z_l2_error" not in metrics else float(metrics["freemhd_sample_z_l2_error"])
+        reference_sample_z_l2_error=(
+            None if "reference_sample_z_l2_error" not in metrics else float(metrics["reference_sample_z_l2_error"])
         ),
         u_max_abs_diff=None if "u_max_abs_diff" not in metrics else float(metrics["u_max_abs_diff"]),
     )
@@ -270,14 +270,14 @@ def render_markdown(
     if parity is not None:
         lines.extend(
             [
-                "## FreeMHD Parity",
+                "## External Reference Parity",
                 "",
                 f"- Status: `{parity.status}`",
                 f"- Reason: `{'-' if not parity.reason else parity.reason}`",
                 f"- Case dir: `{'-' if not parity.case_dir else parity.case_dir}`",
                 f"- U max abs diff: `{'-' if parity.u_max_abs_diff is None else f'{parity.u_max_abs_diff:.6g}'}`",
-                f"- Sample Y L2: `{'-' if parity.freemhd_sample_y_l2_error is None else f'{parity.freemhd_sample_y_l2_error:.6g}'}`",
-                f"- Sample Z L2: `{'-' if parity.freemhd_sample_z_l2_error is None else f'{parity.freemhd_sample_z_l2_error:.6g}'}`",
+                f"- Sample Y L2: `{'-' if parity.reference_sample_y_l2_error is None else f'{parity.reference_sample_y_l2_error:.6g}'}`",
+                f"- Sample Z L2: `{'-' if parity.reference_sample_z_l2_error is None else f'{parity.reference_sample_z_l2_error:.6g}'}`",
                 "",
             ]
         )

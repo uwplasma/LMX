@@ -45,6 +45,18 @@ class _EmptyDiagnostics:
     interface_current_residual_history = jnp.asarray([])
 
 
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
+
+
 def _build_case(args: argparse.Namespace):
     if args.case == "hartmann":
         return make_hartmann_case(ha=args.ha, output_dir=args.output)
@@ -94,6 +106,9 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
     diag = getattr(solution, "diagnostics", _EmptyDiagnostics())
     geometry = getattr(getattr(case, "geometry", None), "kind", "unknown")
     u_field = getattr(solution.state, "u", jnp.asarray([0.0]))
+    def _latest(name: str) -> float | None:
+        history = getattr(diag, name, jnp.asarray([]))
+        return float(history[-1]) if getattr(history, "size", 0) else None
     summary = {
         "case": case.name,
         "geometry": geometry,
@@ -102,19 +117,19 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
         "time": float(solution.state.time),
         "residual": float(solution.state.residual),
         "u_max": float(jnp.max(jnp.abs(u_field))),
-        "potential_residual": float(diag.potential_residual_history[-1]) if diag.potential_residual_history.size else None,
-        "potential_iterations_used": float(diag.potential_iterations_history[-1]) if diag.potential_iterations_history.size else None,
-        "linear_residual": float(diag.linear_residual_history[-1]) if diag.linear_residual_history.size else None,
-        "linear_iterations_used": float(diag.linear_iterations_history[-1]) if diag.linear_iterations_history.size else None,
-        "volumetric_flow_rate": float(diag.volumetric_flow_rate_history[-1]) if diag.volumetric_flow_rate_history.size else None,
-        "mean_current_magnitude": float(diag.mean_current_magnitude_history[-1]) if diag.mean_current_magnitude_history.size else None,
-        "lorentz_power": float(diag.lorentz_power_history[-1]) if diag.lorentz_power_history.size else None,
-        "div_current_max": float(diag.div_current_max_history[-1]) if diag.div_current_max_history.size else None,
-        "gauge_residual": float(diag.gauge_residual_history[-1]) if diag.gauge_residual_history.size else None,
-        "interface_current_residual": float(diag.interface_current_residual_history[-1]) if diag.interface_current_residual_history.size else None,
-        "output": str(out_dir.resolve()),
+        "potential_residual": _latest("potential_residual_history"),
+        "potential_iterations_used": _latest("potential_iterations_history"),
+        "linear_residual": _latest("linear_residual_history"),
+        "linear_iterations_used": _latest("linear_iterations_history"),
+        "volumetric_flow_rate": _latest("volumetric_flow_rate_history"),
+        "mean_current_magnitude": _latest("mean_current_magnitude_history"),
+        "lorentz_power": _latest("lorentz_power_history"),
+        "div_current_max": _latest("div_current_max_history"),
+        "gauge_residual": _latest("gauge_residual_history"),
+        "interface_current_residual": _latest("interface_current_residual_history"),
+        "output": _portable_path(out_dir),
         "generated_files": {
-            key: [str(path.resolve()) for path in paths]
+            key: [_portable_path(path) for path in paths]
             for key, paths in outputs.items()
             if paths
         },
@@ -195,7 +210,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         outputs.setdefault("restart", []).append(restart_path)
         if restart_summary is None:
             restart_summary = {"enabled": False}
-        restart_summary["output"] = str(restart_path.resolve())
+        restart_summary["output"] = _portable_path(restart_path)
     if log_path is not None:
         outputs.setdefault("log", []).append(log_path)
     if config.input_path is not None and getattr(case.output, "copy_input_file", True):
@@ -206,7 +221,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
     summary_path = _write_run_summary(summary, case, out_dir)
     if summary_path is not None:
         outputs.setdefault("json", []).append(summary_path)
-        summary["generated_files"]["json"] = [str(summary_path.resolve())]
+        summary["generated_files"]["json"] = [_portable_path(summary_path)]
     print(json.dumps(summary, indent=2))
     return summary
 

@@ -30,7 +30,7 @@ class ProcessedSliceReference:
 def default_closed_channel_reference_root(reference_root: str | Path | None = None) -> Path:
     if reference_root is not None:
         return Path(reference_root)
-    return Path(__file__).resolve().parents[1] / "external" / "FreeMHDPaperAllFigures" / "FreeMHDPaperAllFigures" / "ClosedChannel"
+    return Path(__file__).resolve().parents[1] / "external" / "reference_data" / "ClosedChannel"
 
 
 def _match_single(patterns: list[str], reference_root: Path) -> Path:

@@ -36,6 +36,18 @@ from lmx.validation import (
 from plot_npz_results import plot_movie_npz, plot_solution_npz
 
 
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
+
+
 def print_banner(title: str) -> None:
     width = 88
     print("\n" + "=" * width)
@@ -243,9 +255,9 @@ def run_steady_case(case_kind: str, *, ha: float, resolution: int, out_dir: Path
         "case": case.name,
         "case_kind": case_kind,
         "ha": ha,
-        "output_dir": str(case_dir.resolve()),
-        "npz": str(npz_path.resolve()),
-        "plots": [str(path.resolve()) for path in plot_paths],
+        "output_dir": _portable_path(case_dir),
+        "npz": _portable_path(npz_path),
+        "plots": [_portable_path(path) for path in plot_paths],
         "reference": reference,
         "metrics": metrics,
     }
@@ -275,13 +287,13 @@ def run_movie_case(case_kind: str, *, ha: float, resolution: int, dt: float, t_f
     return {
         "case_kind": case_kind,
         "ha": ha,
-        "npz": str(snapshot_npz.resolve()),
-        "movies": [str(path.resolve()) for path in movie_paths],
+        "npz": _portable_path(snapshot_npz),
+        "movies": [_portable_path(path) for path in movie_paths],
     }
 
 
 def default_reference_root() -> Path | None:
-    root = Path("./external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel")
+    root = Path("./external/reference_data/ClosedChannel")
     return root if root.exists() else None
 
 
@@ -307,14 +319,14 @@ def main(argv: list[str] | None = None) -> int:
     print_block(
         "Input dictionary",
         {
-            "output": args.output.resolve(),
+            "output": _portable_path(args.output),
             "resolution": args.resolution,
             "movie_case": args.movie_case,
             "movie_resolution": args.movie_resolution,
             "movie_dt": args.movie_dt,
             "movie_t_final": args.movie_t_final,
             "movie_frames": args.movie_frames,
-            "reference_root": reference_root,
+            "reference_root": None if reference_root is None else _portable_path(reference_root),
         },
     )
 
@@ -335,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     report = {
-        "output_dir": str(args.output.resolve()),
+        "output_dir": _portable_path(args.output),
         "movie_case": args.movie_case,
         "steady_cases": reports,
         "movie": movie_report,
@@ -345,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     print_block(
         "Written outputs",
         {
-            "report": report_path.resolve(),
+            "report": _portable_path(report_path),
             "hartmann_npz": reports["hartmann"]["npz"],
             "shercliff_npz": reports["shercliff"]["npz"],
             "hunt_npz": reports["hunt"]["npz"],

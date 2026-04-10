@@ -17,6 +17,18 @@ from matplotlib import animation, colors
 import numpy as np
 
 
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
+
+
 def _style() -> None:
     plt.style.use("default")
     plt.rcParams.update(
@@ -208,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
         outputs = plot_movie_npz(args.npz, args.output, stem=args.stem, fps=args.fps)
     else:
         outputs = plot_solution_npz(args.npz, args.output, title=args.title)
-    print(json.dumps({"npz": str(args.npz.resolve()), "outputs": [str(path.resolve()) for path in outputs]}, indent=2))
+    print(json.dumps({"npz": _portable_path(args.npz), "outputs": [_portable_path(path) for path in outputs]}, indent=2))
     return 0
 
 
