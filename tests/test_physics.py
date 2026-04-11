@@ -4,10 +4,16 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+import lmx.solvers as solvers
 from lmx.solvers import solve_steady, solve_transient
 
 
 pytestmark = pytest.mark.physics
+
+
+@pytest.fixture(autouse=True)
+def disable_jit(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
 
 
 def test_hartmann_profile_is_wall_bounded_and_center_peaked():

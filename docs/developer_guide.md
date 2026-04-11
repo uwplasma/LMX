@@ -93,10 +93,10 @@ The repository uses a split CI model:
 
 - fast default CI
   - runs on pushes and pull requests
-  - covers unit, regression, and validation tests plus the documentation build
+  - covers unit and validation tests plus the documentation build
 - manual research-artifact workflows
   - run only through GitHub Actions `workflow_dispatch`
-  - run the heavier physics suite
+  - run the heavier regression and physics suites
   - generate benchmark, validation-artifact, and extended coverage outputs
 
 This separation is intentional. The fast lane protects the `1.0` public

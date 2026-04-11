@@ -2,10 +2,16 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_shercliff_case
+import lmx.solvers as solvers
 from lmx.solvers import solve_steady
 
 
 pytestmark = pytest.mark.regression
+
+
+@pytest.fixture(autouse=True)
+def disable_jit(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
 
 
 _EXPECTED_HARTMANN_CENTERLINE = jnp.asarray(

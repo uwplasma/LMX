@@ -5,6 +5,7 @@ from pathlib import Path
 import jax.numpy as jnp
 import pytest
 
+import lmx.solvers as solvers
 import lmx.validation as validation
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
@@ -48,6 +49,11 @@ from lmx.validation import (
 
 
 pytestmark = pytest.mark.validation
+
+
+@pytest.fixture(autouse=True)
+def disable_jit(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
 
 
 def _synthetic_solution(case, *, oscillatory: bool = False) -> Solution:

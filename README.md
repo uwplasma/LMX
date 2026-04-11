@@ -83,10 +83,10 @@ python -m sphinx -W -b html docs docs/_build/html
 The repository now uses two lanes:
 
 - fast default CI on pushes and pull requests
-  - unit, regression, and validation tests
+  - unit and validation tests
   - docs
 - manual research-artifact workflows via GitHub Actions `workflow_dispatch`
-  - physics suite
+  - regression and physics suites
   - heavy validation artifact generation
   - benchmark artifact generation
   - extended coverage collection

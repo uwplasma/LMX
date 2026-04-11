@@ -64,6 +64,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The default push/PR gate now excludes the heaviest `physics` marker tests;
   those remain available in a manual workflow-dispatch lane together with
   benchmark, artifact, and extended coverage runs.
+- The default push/PR gate also excludes the heavier `regression` marker
+  tests, which are now part of the manual release-validation lane together
+  with physics.
 
 ## Release checklist
 
