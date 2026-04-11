@@ -6,6 +6,9 @@ import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
+from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
+from lmx.physics import _boundary_sides, build_material_fields, magnetic_field_components
+from lmx.specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, RegionSpec, TimeStepperConfig
 from lmx.solvers import _build_mesh, solve_steady, solve_transient
 import lmx.solvers as solvers
 from lmx.validation import hartmann_acceptance, hartmann_analytic_profile, write_acceptance_report
@@ -120,3 +123,70 @@ def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
     assert path.exists()
     assert acceptance.passed is True
     assert acceptance.passed_l2 is True
+
+
+@pytest.mark.unit
+def test_magnetic_field_components_support_analytic_and_reject_tabulated_without_loader():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    analytic = MagneticFieldSpec(
+        kind="analytic",
+        fn=lambda y, z: jnp.stack((jnp.zeros_like(y), y + z, y - z), axis=-1),
+    )
+    bx, by, bz = magnetic_field_components(analytic, mesh, time=0.0)
+
+    assert jnp.allclose(bx, 0.0)
+    assert by.shape == mesh.yz_shape
+    assert bz.shape == mesh.yz_shape
+
+    with pytest.raises(NotImplementedError, match="Tabulated magnetic fields"):
+        magnetic_field_components(MagneticFieldSpec(kind="tabulated", table_path="field.csv"), mesh, time=0.0)
+
+    with pytest.raises(ValueError, match="requires fn"):
+        magnetic_field_components(MagneticFieldSpec(kind="analytic"), mesh, time=0.0)
+
+
+@pytest.mark.unit
+def test_boundary_sides_support_aliases_and_csv_lists():
+    assert _boundary_sides(BoundaryCondition("lr", "insulating", side="left_right")) == ("left", "right")
+    assert _boundary_sides(BoundaryCondition("tb", "insulating", side="top_bottom")) == ("bottom", "top")
+    assert _boundary_sides(BoundaryCondition("mix", "insulating", side="left, top")) == ("left", "top")
+    assert _boundary_sides(BoundaryCondition("none", "insulating")) == ()
+
+
+@pytest.mark.unit
+def test_build_material_fields_handles_missing_solid_region_assignment_with_layered_fallback():
+    case = CaseSpec(
+        name="layered_material_fallback",
+        geometry=GeometrySpec(
+            kind="layered_duct",
+            width=2.0,
+            height=2.0,
+            ny=4,
+            nz=4,
+            wall_thickness=(0.1, 0.1, 0.1, 0.1),
+            wall_cells=(1, 1, 1, 1),
+            target_ha=5.0,
+        ),
+        regions=(
+            RegionSpec(name="fluid", kind="fluid", conductivity=2.0, density=3.0, viscosity=4.0),
+            RegionSpec(name="wall", kind="solid", conductivity=5.0, density=6.0, viscosity=7.0),
+        ),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0)),
+        boundary_conditions=(BoundaryCondition("bogus", "conducting_wall", region="missing", side="left"),),
+        time_stepper=TimeStepperConfig(dt=0.1, t_final=0.1, max_steps=1),
+    )
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=4,
+        nz=4,
+        wall_thickness=(0.1, 0.1, 0.1, 0.1),
+        wall_cells=(1, 1, 1, 1),
+        target_ha=5.0,
+    )
+
+    fields = build_material_fields(case, mesh)
+
+    assert jnp.allclose(fields.conductivity[~fields.fluid_mask], 5.0)
+    assert jnp.allclose(fields.density[~fields.fluid_mask], 6.0)
+    assert jnp.allclose(fields.viscosity[~fields.fluid_mask], 7.0)

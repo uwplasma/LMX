@@ -1,12 +1,13 @@
 from pathlib import Path
 
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case
 from lmx.core import Diagnostics, MHDState, Solution
-from lmx.plotting import _movie_field_stack, write_case_overview_plots, write_transient_movies
+from lmx.plotting import _movie_field_stack, _plot_field, write_case_overview_plots, write_transient_movies
 from lmx.solvers import _build_mesh
 
 
@@ -115,6 +116,34 @@ def test_write_case_overview_plots_writes_overview_and_diagnostics(tmp_path: Pat
     assert len(outputs) == 4
 
 
+def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(tmp_path: Path):
+    solution = _sample_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
+    solution = Solution(
+        mesh=solution.mesh,
+        state=solution.state,
+        diagnostics=Diagnostics(
+            residual_history=jnp.asarray([]),
+            courant_like=jnp.asarray([]),
+            ohmic_power=jnp.asarray([]),
+            time_history=jnp.asarray([]),
+        ),
+        case_name=solution.case_name,
+    )
+    outputs = write_case_overview_plots(solution, tmp_path, case_title="No diagnostics")
+    assert outputs == [tmp_path / "overview.png", tmp_path / "overview.pdf"]
+    assert not (tmp_path / "diagnostics.png").exists()
+
+
+def test_plot_field_handles_negative_only_field():
+    solution = _sample_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
+    fig, ax = plt.subplots()
+    try:
+        _plot_field(ax, solution, -jnp.abs(solution.state.u), title="Negative field", cmap="RdBu_r")
+        assert ax.get_title() == "Negative field"
+    finally:
+        plt.close(fig)
+
+
 def test_movie_field_stack_supports_raw_and_bulk_deviation():
     frames = _sample_frames(make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=False)
     raw_fields, raw_peaks, raw_label, raw_colorbar = _movie_field_stack(frames, field_mode="raw")
@@ -134,6 +163,10 @@ def test_movie_field_stack_rejects_unknown_mode():
     frames = _sample_frames(make_hartmann_case(ha=5.0, ny=4, nz=4), signed=True)
     with pytest.raises(ValueError, match="Unsupported field_mode"):
         _movie_field_stack(frames, field_mode="nope")
+
+
+def test_write_transient_movies_returns_empty_list_for_empty_frames(tmp_path: Path):
+    assert write_transient_movies([], tmp_path, case_title="empty") == []
 
 
 @pytest.mark.filterwarnings("ignore:Animation was deleted without rendering anything:UserWarning")
@@ -165,3 +198,29 @@ def test_write_transient_movies_writes_posters_and_stubbed_gifs(tmp_path: Path, 
     assert expected.issubset(set(outputs))
     for path in expected:
         assert path.exists()
+
+
+@pytest.mark.filterwarnings("ignore:Animation was deleted without rendering anything:UserWarning")
+def test_write_transient_movies_handles_positive_only_normalized_path_and_contour_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    frames = _sample_frames(make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=False)
+
+    def fake_save(self, filename, *args, **kwargs):
+        self._func(0)
+        self._func(1)
+        Path(filename).write_bytes(b"gif")
+
+    monkeypatch.setattr("matplotlib.animation.FuncAnimation.save", fake_save)
+
+    outputs = write_transient_movies(
+        frames,
+        tmp_path,
+        case_title="Positive startup",
+        fps=4,
+        field_mode="raw",
+        output_stem="positive_demo",
+    )
+
+    assert (tmp_path / "positive_demo_2d.gif") in outputs
+    assert (tmp_path / "positive_demo_3d.gif") in outputs

@@ -933,6 +933,137 @@ def test_fully_developed_steady_can_require_potential_residual_when_requested(mo
     assert solution.state.residual == pytest.approx(1.0e-5)
 
 
+def test_potential_solver_supports_lineax_and_rejects_unknown_backend(monkeypatch: pytest.MonkeyPatch):
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    sigma = jnp.ones(mesh.yz_shape)
+    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    u = jnp.ones(mesh.yz_shape) * 0.05
+    by = jnp.zeros(mesh.yz_shape)
+    bz = jnp.ones(mesh.yz_shape)
+
+    def fake_lineax(*args, **kwargs):
+        return jnp.zeros(mesh.yz_shape), type("Info", (), {"residual": 1.0e-9, "iterations": 7})()
+
+    monkeypatch.setattr(solvers, "solve_poisson_lineax", fake_lineax)
+
+    phi, residual, iterations = solvers._solve_potential(
+        mesh,
+        sigma,
+        fluid_mask,
+        u,
+        by,
+        bz,
+        anchor=(0, 0),
+        iterations=25,
+        tolerance=1e-8,
+        solver="lineax_cg",
+    )
+
+    assert jnp.isfinite(phi).all()
+    assert float(residual) >= 0.0
+    assert int(iterations) >= 0
+
+    with pytest.raises(ValueError, match="Unsupported potential solver backend"):
+        solvers._solve_potential(
+            mesh,
+            sigma,
+            fluid_mask,
+            u,
+            by,
+            bz,
+            anchor=(0, 0),
+            iterations=5,
+            solver="bad_backend",
+        )
+
+
+def test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask():
+    full_mask = jnp.ones((2, 2), dtype=bool)
+    assert solvers._resolve_potential_solver("auto", None) == "cg"
+    assert solvers._resolve_potential_solver("auto", full_mask) == "cg"
+
+
+def test_enforce_velocity_bc_supports_direct_wall_interpolation():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    u = jnp.arange(16.0).reshape(4, 4)
+    fluid_mask = jnp.ones((4, 4), dtype=bool)
+
+    zeroed = solvers._enforce_velocity_bc(u, mesh, fluid_mask, interpolate_direct_fluid_walls=False)
+    enforced = solvers._enforce_velocity_bc(u, mesh, fluid_mask, interpolate_direct_fluid_walls=True)
+
+    assert enforced.shape == u.shape
+    assert jnp.isfinite(enforced).all()
+    assert not jnp.allclose(enforced, zeroed)
+    assert float(enforced[0, 0]) > 0.0
+    assert float(enforced[-1, -1]) > 0.0
+
+
+def test_velocity_update_limiters_cover_local_clip_and_validation_errors():
+    current = jnp.zeros((2, 2))
+    trial = jnp.asarray([[2.0, -2.0], [0.25, -0.25]])
+    fluid_mask = jnp.asarray([[True, True], [True, False]])
+
+    clipped = solvers._limited_velocity_update(current, trial, fluid_mask, max_delta=0.5, limiter="local_clip")
+    assert float(clipped[0, 0]) == pytest.approx(0.5)
+    assert float(clipped[0, 1]) == pytest.approx(-0.5)
+
+    peak, scale, limited_fraction = solvers._velocity_update_statistics(
+        current,
+        trial,
+        fluid_mask,
+        max_delta=0.5,
+        limiter="local_clip",
+    )
+    assert float(peak) == pytest.approx(2.0)
+    assert 0.0 < float(scale) <= 1.0
+    assert 0.0 < float(limited_fraction) <= 1.0
+
+    with pytest.raises(ValueError, match="Unsupported velocity update limiter"):
+        solvers._limited_velocity_update(current, trial, fluid_mask, limiter="bad")
+    with pytest.raises(ValueError, match="Unsupported velocity update limiter"):
+        solvers._velocity_update_statistics(current, trial, fluid_mask, max_delta=0.5, limiter="bad")
+
+
+def test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    tuple_bc = BoundaryCondition("tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="z")
+    scalar_bc = BoundaryCondition("scalar", "inlet_velocity", value=1.5, axis="x")
+    flow_bc = BoundaryCondition(
+        "flow",
+        "inlet_flow_rate",
+        value=case.geometry.width * case.geometry.height * 0.25,
+        axis="x",
+    )
+
+    assert solvers._inlet_speed(tuple_bc, case) == pytest.approx(3.0)
+    assert solvers._inlet_speed(scalar_bc, case) == pytest.approx(1.5)
+    assert solvers._inlet_speed(flow_bc, case) == pytest.approx(0.25)
+
+
+def test_fully_developed_case_step_rejects_crank_nicolson_in_transient_mode():
+    case = replace(
+        make_hartmann_case(ha=5.0, ny=6, nz=6),
+        solver=replace(make_hartmann_case(ha=5.0, ny=6, nz=6).solver, mode="transient", time_scheme="crank_nicolson"),
+    )
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+
+    with pytest.raises(NotImplementedError, match="implicit_euler only"):
+        solvers._fully_developed_case_step(
+            case=case,
+            mesh=mesh,
+            materials=materials,
+            u_previous=jnp.zeros(mesh.yz_shape),
+            step_time=0.0,
+            potential_solver="cg",
+            target_mean_velocity=None,
+            linear_solver="cg",
+            preconditioner="jacobi",
+            coupling_iterations=1,
+            coupling_tolerance=1e-8,
+        )
+
+
 for _unit_test_name in (
     "test_hartmann_solver_runs",
     "test_hunt_solver_keeps_solid_velocity_zero",
@@ -968,5 +1099,11 @@ for _unit_test_name in (
     "test_solve_steady_can_require_potential_residual_convergence",
     "test_fully_developed_steady_stops_once_residual_reaches_tolerance",
     "test_fully_developed_steady_can_require_potential_residual_when_requested",
+    "test_potential_solver_supports_lineax_and_rejects_unknown_backend",
+    "test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask",
+    "test_enforce_velocity_bc_supports_direct_wall_interpolation",
+    "test_velocity_update_limiters_cover_local_clip_and_validation_errors",
+    "test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries",
+    "test_fully_developed_case_step_rejects_crank_nicolson_in_transient_mode",
 ):
     globals()[_unit_test_name] = pytest.mark.unit(globals()[_unit_test_name])

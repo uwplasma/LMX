@@ -70,13 +70,16 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The default push/PR gate also excludes the heavier `regression` marker
   tests, which are now part of the manual release-validation lane together
   with physics.
-- The full local fast suite now completes in about `31 s`, and the full
-  local coverage lane completes in about `37 s`, both within the hard
+- The full local fast suite now completes in about `35 s`, and the full
+  local coverage lane completes in about `45 s`, both within the hard
   five-minute limit for routine validation.
-- Current combined coverage for `lmx/` and `scripts/` is about `87%`.
+- Current combined coverage for `lmx/` and `scripts/` is about `89%`.
 - Manufactured-solution and direct-kernel tests now cover the low-cost
   numerical core well: `lmx/linear.py` is about `99%`, and
   `lmx/operators.py` is about `98%`.
+- A direct branch-coverage pass now closes most of the cheap remaining misses
+  in `lmx/physics.py` and `lmx/plotting.py`; the remaining release-coverage
+  gap is even more concentrated in `lmx/solvers.py`.
 - The biggest remaining coverage gap is now overwhelmingly
   `lmx/solvers.py`, so the remaining work is no longer suite runtime but
   targeted solver-family branch coverage.
@@ -91,4 +94,4 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - [ ] restart examples clean
 - [x] fast test-runtime budget enforced
 - [ ] coverage and QA pass reviewed
-- [ ] performance and differentiability notes documented
+- [x] performance and differentiability notes documented
