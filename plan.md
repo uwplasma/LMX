@@ -70,10 +70,13 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The full local fast suite now completes in about `31 s`, and the full
   local coverage lane completes in about `37 s`, both within the hard
   five-minute limit for routine validation.
-- Current combined coverage for `lmx/` and `scripts/` is about `86%`.
-- The biggest remaining coverage gaps are solver-kernel and operator internals
-  (`lmx/solvers.py`, `lmx/linear.py`, `lmx/operators.py`), so the remaining
-  work is no longer test runtime but targeted deep-kernel coverage.
+- Current combined coverage for `lmx/` and `scripts/` is about `87%`.
+- Manufactured-solution and direct-kernel tests now cover the low-cost
+  numerical core well: `lmx/linear.py` is about `99%`, and
+  `lmx/operators.py` is about `98%`.
+- The biggest remaining coverage gap is now overwhelmingly
+  `lmx/solvers.py`, so the remaining work is no longer suite runtime but
+  targeted solver-family branch coverage.
 
 ## Release checklist
 
