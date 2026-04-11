@@ -13,6 +13,7 @@ inverse problems and design studies.
 - scripted and input-file-driven studies
 - publication-ready plots, movies, and benchmark reports
 - differentiable steady and transient workflows in JAX
+- CPU and multi-GPU strong-scaling benchmark tooling
 
 ## Current solver status
 
@@ -121,6 +122,59 @@ The runtime logger is intentionally detailed. It reports solver-family
 information, linear-solve residuals, integral MHD diagnostics, conservation
 checks, and transient progress in a format intended for long research runs.
 
+## Performance and autodiff examples
+
+### Strong scaling
+
+The repository ships a publication-oriented strong-scaling example for the
+dominant stencil/linear-solve kernel:
+
+```bash
+python examples/strong_scaling_demo.py --output artifacts/examples/strong_scaling_cpu
+python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output artifacts/examples/strong_scaling_full
+```
+
+This writes raw timing JSON plus polished `PNG`/`PDF` scaling plots suitable for
+docs and paper drafts.
+
+![LMX strong scaling](docs/_static/generated/strong_scaling.png)
+
+Current publication artifact highlights:
+
+- local CPU warm-runtime sweep on a `1024 x 1024` cross-section:
+  - `1` device: `0.0898 s`
+  - `4` devices: `0.0563 s`
+  - `8` devices: `0.0549 s`
+- remote GPU warm-runtime sweep on a `2048 x 2048` cross-section:
+  - `1` GPU: `0.0524 s`
+  - `2` GPUs: `0.0392 s`
+
+The remote GPU workflow automatically prefers the highest-index single GPU for
+the one-device baseline, which avoids workstation display contention on desktop
+GPU hosts.
+
+### Autodiff sensitivity and inverse design
+
+The repository also ships a differentiable Hartmann example:
+
+```bash
+python examples/autodiff_design_demo.py --output artifacts/examples/autodiff_design
+```
+
+That example demonstrates:
+
+- `jax.grad` sensitivity of mean velocity with respect to Hartmann number
+- inverse recovery of a synthetic forcing parameter from a target velocity profile
+- polished `PNG`/`PDF` summary figures for publication use
+
+![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
+
+Current publication artifact highlight:
+
+- synthetic target forcing: `1.0`
+- recovered forcing after `24` gradient steps: `0.999863`
+- final profile loss: `2.9e-12`
+
 ## User workflows
 
 ### Input-file workflow
@@ -171,6 +225,8 @@ how to:
 - [Input reference](docs/input_reference.md)
 - [Case cookbook](docs/case_cookbook.md)
 - [Benchmark matrix](docs/benchmark_matrix.md)
+- [Performance and scaling](docs/performance.md)
+- [Autodiff and inverse design](docs/autodiff.md)
 - [Developer guide](docs/developer_guide.md)
 - [Validation report](docs/validation_report.md)
 

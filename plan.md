@@ -74,6 +74,15 @@ Ship a research-grade `1.0` inductionless MHD code with:
   local coverage lane completes in about `45 s`, both within the hard
   five-minute limit for routine validation.
 - Current combined coverage for `lmx/` and `scripts/` is about `89%`.
+- Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
+  the release gate uses short-budget generated TOMLs rather than full
+  long-horizon example runs so the interface is verified without violating the
+  five-minute rule.
+- CPU and GPU strong-scaling artifacts now exist for the dominant stencil kernel,
+  with a committed publication figure under `docs/_static/generated/strong_scaling.png`.
+- The differentiable Hartmann example now has a committed publication figure under
+  `docs/_static/generated/autodiff_summary.png`, showing both Hartmann-number
+  sensitivity and inverse recovery of a forcing parameter.
 - Manufactured-solution and direct-kernel tests now cover the low-cost
   numerical core well: `lmx/linear.py` is about `99%`, and
   `lmx/operators.py` is about `98%`.
@@ -90,8 +99,8 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - [ ] Shercliff analytical acceptance locked
 - [ ] Hunt benchmark acceptance locked
 - [x] docs build clean
-- [ ] CLI examples clean
-- [ ] restart examples clean
+- [x] CLI examples clean
+- [x] restart examples clean
 - [x] fast test-runtime budget enforced
-- [ ] coverage and QA pass reviewed
+- [x] coverage and QA pass reviewed
 - [x] performance and differentiability notes documented

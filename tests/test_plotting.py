@@ -7,7 +7,14 @@ import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case
 from lmx.core import Diagnostics, MHDState, Solution
-from lmx.plotting import _movie_field_stack, _plot_field, write_case_overview_plots, write_transient_movies
+from lmx.plotting import (
+    _movie_field_stack,
+    _plot_field,
+    write_autodiff_plots,
+    write_case_overview_plots,
+    write_strong_scaling_plots,
+    write_transient_movies,
+)
 from lmx.solvers import _build_mesh
 
 
@@ -224,3 +231,39 @@ def test_write_transient_movies_handles_positive_only_normalized_path_and_contou
 
     assert (tmp_path / "positive_demo_2d.gif") in outputs
     assert (tmp_path / "positive_demo_3d.gif") in outputs
+
+
+def test_write_strong_scaling_plots_writes_png_and_pdf(tmp_path: Path):
+    records = [
+        {"platform": "CPU", "num_devices": 1, "mean_seconds": 4.0},
+        {"platform": "CPU", "num_devices": 2, "mean_seconds": 2.4},
+        {"platform": "GPU", "num_devices": 1, "mean_seconds": 1.8},
+        {"platform": "GPU", "num_devices": 2, "mean_seconds": 1.0},
+    ]
+    outputs = write_strong_scaling_plots(records, tmp_path, case_title="Scaling")
+
+    assert outputs == [tmp_path / "strong_scaling.png", tmp_path / "strong_scaling.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
+    sensitivity_scan = [
+        {"hartmann_number": 2.0, "mean_velocity": 0.4, "d_mean_velocity_d_ha": -0.03},
+        {"hartmann_number": 10.0, "mean_velocity": 0.2, "d_mean_velocity_d_ha": -0.01},
+    ]
+    optimization_history = [
+        {"iteration": 0.0, "hartmann_number": 4.0, "loss": 1.0e-1, "gradient": -0.02},
+        {"iteration": 1.0, "hartmann_number": 6.0, "loss": 2.0e-2, "gradient": -0.01},
+    ]
+    outputs = write_autodiff_plots(
+        sensitivity_scan,
+        optimization_history,
+        tmp_path,
+        case_title="Autodiff",
+        target_parameter=8.0,
+    )
+
+    assert outputs == [tmp_path / "autodiff_summary.png", tmp_path / "autodiff_summary.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()

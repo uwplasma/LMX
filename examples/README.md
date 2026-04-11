@@ -7,6 +7,8 @@ The examples are explicit templates for research workflows. They show how to:
 - generate plots and movies
 - save `.npz` state bundles
 - resume runs from restart files
+- benchmark strong scaling
+- run autodiff sensitivity and inverse-design studies
 
 ## Quick examples
 
@@ -15,6 +17,8 @@ python examples/hartmann_example.py --ha 20 --output ./artifacts/examples/hartma
 python examples/shercliff_example.py --ha 20 --output ./artifacts/examples/shercliff
 python examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
+python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
+python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
 ```
 
 ## Input-file examples
@@ -37,6 +41,27 @@ block, so they double as templates for both batch and interactive runs.
 ```bash
 python examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
 ```
+
+## Publication-facing demos
+
+Strong scaling:
+
+```bash
+python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
+python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output ./artifacts/examples/strong_scaling_full
+```
+
+Autodiff:
+
+```bash
+python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
+```
+
+The default autodiff demo now combines:
+
+- a Hartmann-number sensitivity scan of mean velocity
+- inverse recovery of a synthetic forcing parameter from a target profile
+- publication-style `PNG`/`PDF` summary figures
 
 ## Teaching goal
 

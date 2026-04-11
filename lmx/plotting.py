@@ -10,6 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib import colors
+from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
 
@@ -354,3 +355,124 @@ def write_transient_movies(
     plt.close(fig2d)
     plt.close(fig3d)
     return outputs
+
+
+def write_strong_scaling_plots(
+    records: list[dict[str, object]],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_publication_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    groups: dict[str, list[dict[str, object]]] = {}
+    for record in records:
+        groups.setdefault(str(record["platform"]), []).append(record)
+    for values in groups.values():
+        values.sort(key=lambda item: int(item["num_devices"]))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+    palette = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed"]
+
+    for color, (platform_name, values) in zip(palette, groups.items(), strict=False):
+        device_counts = np.asarray([int(item["num_devices"]) for item in values], dtype=float)
+        runtimes = np.asarray([float(item.get("warm_seconds", item["mean_seconds"])) for item in values], dtype=float)
+        compile_times = np.asarray(
+            [float(item.get("cold_seconds", item.get("warm_seconds", item["mean_seconds"]))) for item in values],
+            dtype=float,
+        )
+        baseline = runtimes[0]
+        speedup = baseline / np.maximum(runtimes, 1.0e-12)
+
+        axes[0].plot(device_counts, runtimes, marker="o", color=color, label=f"{platform_name} steady-state")
+        axes[0].plot(
+            device_counts,
+            compile_times,
+            marker="s",
+            linestyle="--",
+            color=color,
+            alpha=0.35,
+            label=f"{platform_name} first-run",
+        )
+        axes[1].plot(device_counts, speedup, marker="o", color=color, label=platform_name)
+        axes[1].plot(device_counts, device_counts / device_counts[0], linestyle="--", color=color, alpha=0.28)
+
+    axes[0].set_title("Runtime")
+    axes[0].set_xlabel("Device count")
+    axes[0].set_ylabel("Runtime [s]")
+    axes[0].set_xscale("log", base=2)
+    axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
+    axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
+    axes[0].legend()
+
+    axes[1].set_title("Strong-scaling speedup")
+    axes[1].set_xlabel("Device count")
+    axes[1].set_ylabel("Warm-runtime speedup")
+    axes[1].set_xscale("log", base=2)
+    axes[1].set_xticks(sorted({int(item["num_devices"]) for item in records}))
+    axes[1].get_xaxis().set_major_formatter(ScalarFormatter())
+    axes[1].legend()
+
+    png_path = out_dir / "strong_scaling.png"
+    pdf_path = out_dir / "strong_scaling.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
+def write_autodiff_plots(
+    sensitivity_scan: list[dict[str, float]],
+    optimization_history: list[dict[str, float]],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+    target_parameter: float,
+    parameter_key: str = "hartmann_number",
+    parameter_label: str = "Recovered parameter",
+    target_label: str = "Target parameter",
+) -> list[Path]:
+    _set_publication_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    ha_values = np.asarray([item["hartmann_number"] for item in sensitivity_scan], dtype=float)
+    mean_velocity = np.asarray([item["mean_velocity"] for item in sensitivity_scan], dtype=float)
+    d_mean_velocity = np.asarray([item["d_mean_velocity_d_ha"] for item in sensitivity_scan], dtype=float)
+
+    axes[0].plot(ha_values, mean_velocity, color="#0f766e", label=r"$\bar{u}(Ha)$")
+    axes[0].plot(ha_values, d_mean_velocity, color="#b45309", linestyle="--", label=r"$d\bar{u}/dHa$")
+    axes[0].set_title("Sensitivity scan")
+    axes[0].set_xlabel("Hartmann number")
+    axes[0].set_ylabel("Response")
+    axes[0].legend()
+
+    iteration = np.asarray([item["iteration"] for item in optimization_history], dtype=float)
+    objective = np.asarray([item["loss"] for item in optimization_history], dtype=float)
+    parameter = np.asarray([item[parameter_key] for item in optimization_history], dtype=float)
+
+    axes[1].plot(iteration, objective, color="#1d4ed8", label="Loss")
+    axes[1].set_yscale("log")
+    axes[1].set_xlabel("Gradient step")
+    axes[1].set_ylabel("Profile misfit")
+    twin = axes[1].twinx()
+    twin.plot(iteration, parameter, color="#7c3aed", linestyle="--", label=parameter_label)
+    twin.axhline(target_parameter, color="#111827", linestyle=":", linewidth=1.2, label=target_label)
+    axes[1].set_title("Inverse design")
+
+    lines_left, labels_left = axes[1].get_legend_handles_labels()
+    lines_right, labels_right = twin.get_legend_handles_labels()
+    axes[1].legend(lines_left + lines_right, labels_left + labels_right, loc="upper right")
+
+    png_path = out_dir / "autodiff_summary.png"
+    pdf_path = out_dir / "autodiff_summary.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]

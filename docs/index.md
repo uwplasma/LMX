@@ -15,6 +15,8 @@ theory
 input_reference
 case_cookbook
 benchmark_matrix
+performance
+autodiff
 validation_report
 external_benchmarks
 research_directions
@@ -27,6 +29,8 @@ developer_guide
 - Hartmann, Shercliff, and Hunt benchmark families
 - layered conducting and insulating wall models
 - CLI, TOML, restart, plotting, movie generation, and benchmark reporting
+- strong-scaling benchmark scripts for CPU and multi-GPU stencil kernels
+- differentiable Hartmann sensitivity and inverse-design examples
 
 ## What is planned next
 

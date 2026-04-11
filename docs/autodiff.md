@@ -1,0 +1,75 @@
+# Autodiff and Inverse Design
+
+LMX `1.0` now includes an explicit differentiable duct lane for
+parameter-sensitivity and inverse-design studies. The shipped example focuses on
+Hartmann flow because it is fast, well understood, and a clean starting point
+for publication figures.
+
+## What is included
+
+- a differentiable fixed-iteration fully developed Hartmann solve
+- sensitivity analysis with `jax.grad`
+- inverse forcing identification from synthetic target profiles
+- publication-style summary plots and JSON outputs
+
+The differentiable lane is intentionally explicit:
+
+- it uses fixed-iteration Jacobi relaxations to preserve reverse-mode
+  differentiation
+- it is scoped to benchmark and inverse-study workflows
+- the production CLI/reporting path remains free to use pragmatic
+  non-differentiable tooling where that improves robustness
+
+## Run the example
+
+```bash
+python examples/autodiff_design_demo.py \
+  --output artifacts/examples/autodiff_design
+```
+
+The example writes:
+
+- `autodiff_summary.json`
+- `autodiff_summary.png`
+- `autodiff_summary.pdf`
+
+## Publication artifact
+
+The current `1.0` publication artifact is committed under
+`docs/_static/generated/autodiff_summary.png`.
+
+![LMX autodiff summary](_static/generated/autodiff_summary.png)
+
+The shipped run demonstrates:
+
+- a Hartmann-number sensitivity scan of mean velocity and `d(mean velocity)/dHa`
+- inverse recovery of a synthetic forcing parameter at fixed Hartmann number
+- convergence from forcing `0.2` to `0.999863` for a target forcing of `1.0`
+- final profile misfit `2.9e-12`
+
+## Source map
+
+- `lmx/autodiff.py`
+  - differentiable Hartmann problem construction and fixed-iteration solve
+- `examples/autodiff_design_demo.py`
+  - sensitivity scan and inverse-design loop
+- `lmx/plotting.py`
+  - polished sensitivity/inverse summary figure
+
+## Typical publication figures
+
+The default example produces two common autodiff figures:
+
+1. a sensitivity scan of mean velocity and `d(mean velocity)/dHa`
+2. an inverse-design history showing loss decay and the recovered forcing
+   approaching a synthetic target
+
+These are the standard ingredients for a first differentiable-solver section in
+an MHD code paper: local sensitivities plus a small inverse problem.
+
+## References
+
+- [JAX advanced autodiff](https://docs.jax.dev/en/latest/advanced-autodiff.html)
+- [JAX gradient checkpointing](https://docs.jax.dev/en/latest/gradient-checkpointing.html)
+- [Lineax solvers](https://docs.kidger.site/lineax/api/solvers/)
+- [Φ-Flow differentiable PDE workflows](https://proceedings.mlr.press/v235/holl24a.html)
