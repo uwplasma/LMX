@@ -21,10 +21,14 @@ __all__ = [
     "solve_steady",
     "solve_transient",
     "build_hartmann_autodiff_problem",
+    "hartmann_mean_velocity_gradients",
+    "hartmann_mean_velocity_finite_difference_gradients",
     "solve_differentiable_hartmann",
     "benchmark_sharded_stencil",
     "write_benchmark_report",
     "write_scaling_report",
+    "build_square_duct_fringing_benchmark",
+    "run_fringing_station_sweep",
 ]
 
 
@@ -45,9 +49,13 @@ _EXPORTS = {
     "solve_transient": ("lmx.solvers", "solve_transient"),
     "compare_with_reference_outputs": ("lmx.validation", "compare_with_reference_outputs"),
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
+    "hartmann_mean_velocity_gradients": ("lmx.autodiff", "hartmann_mean_velocity_gradients"),
+    "hartmann_mean_velocity_finite_difference_gradients": ("lmx.autodiff", "hartmann_mean_velocity_finite_difference_gradients"),
     "solve_differentiable_hartmann": ("lmx.autodiff", "solve_differentiable_hartmann"),
     "benchmark_sharded_stencil": ("lmx.scaling", "benchmark_sharded_stencil"),
     "write_scaling_report": ("lmx.scaling", "write_scaling_report"),
+    "build_square_duct_fringing_benchmark": ("lmx.fringing", "build_square_duct_fringing_benchmark"),
+    "run_fringing_station_sweep": ("lmx.fringing", "run_fringing_station_sweep"),
 }
 
 

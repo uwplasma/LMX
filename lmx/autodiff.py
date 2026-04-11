@@ -186,6 +186,46 @@ def hartmann_mean_velocity(
     return jnp.mean(u)
 
 
+def hartmann_mean_velocity_gradients(
+    problem: HartmannAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    hartmann_number: float | jnp.ndarray,
+) -> dict[str, jnp.ndarray]:
+    objective = lambda force_value, ha_value: hartmann_mean_velocity(
+        problem,
+        forcing=force_value,
+        hartmann_number=ha_value,
+    )
+    mean_velocity = objective(forcing, hartmann_number)
+    d_mean_velocity_d_forcing, d_mean_velocity_d_ha = jax.grad(objective, argnums=(0, 1))(forcing, hartmann_number)
+    return {
+        "mean_velocity": mean_velocity,
+        "d_mean_velocity_d_forcing": d_mean_velocity_d_forcing,
+        "d_mean_velocity_d_ha": d_mean_velocity_d_ha,
+    }
+
+
+def hartmann_mean_velocity_finite_difference_gradients(
+    problem: HartmannAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    hartmann_number: float | jnp.ndarray,
+    delta_forcing: float = 1.0e-3,
+    delta_ha: float = 1.0e-3,
+) -> dict[str, jnp.ndarray]:
+    mean_velocity = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=hartmann_number)
+    plus_forcing = hartmann_mean_velocity(problem, forcing=jnp.asarray(forcing) + delta_forcing, hartmann_number=hartmann_number)
+    minus_forcing = hartmann_mean_velocity(problem, forcing=jnp.asarray(forcing) - delta_forcing, hartmann_number=hartmann_number)
+    plus_ha = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=jnp.asarray(hartmann_number) + delta_ha)
+    minus_ha = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=jnp.asarray(hartmann_number) - delta_ha)
+    return {
+        "mean_velocity": mean_velocity,
+        "d_mean_velocity_d_forcing": (plus_forcing - minus_forcing) / (2.0 * delta_forcing),
+        "d_mean_velocity_d_ha": (plus_ha - minus_ha) / (2.0 * delta_ha),
+    }
+
+
 def hartmann_profile_loss(
     problem: HartmannAutodiffProblem,
     *,

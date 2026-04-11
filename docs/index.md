@@ -17,6 +17,7 @@ case_cookbook
 benchmark_matrix
 performance
 autodiff
+fringing
 validation_report
 external_benchmarks
 research_directions
@@ -31,6 +32,7 @@ developer_guide
 - CLI, TOML, restart, plotting, movie generation, and benchmark reporting
 - strong-scaling benchmark scripts for CPU and multi-GPU stencil kernels
 - differentiable Hartmann sensitivity and inverse-design examples
+- executable fringing-field benchmark scaffolds
 
 ## What is planned next
 

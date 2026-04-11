@@ -9,6 +9,7 @@ The examples are explicit templates for research workflows. They show how to:
 - resume runs from restart files
 - benchmark strong scaling
 - run autodiff sensitivity and inverse-design studies
+- stage fringing-field benchmark workflows for the next solver family
 
 ## Quick examples
 
@@ -19,6 +20,8 @@ python examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
+python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
+python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 ```
 
 ## Input-file examples
@@ -55,13 +58,25 @@ Autodiff:
 
 ```bash
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
+python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
 ```
 
-The default autodiff demo now combines:
+The shipped autodiff examples now cover:
 
 - a Hartmann-number sensitivity scan of mean velocity
+- a finite-difference cross-check of autodiff gradients
 - inverse recovery of a synthetic forcing parameter from a target profile
 - publication-style `PNG`/`PDF` summary figures
+
+Fringing-field scaffold:
+
+```bash
+python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
+```
+
+That example stages a stationwise fringing benchmark on top of the current
+fully developed solver family. It is explicit about being a research scaffold,
+not the final `extruded_inductionless` solver.
 
 ## Teaching goal
 

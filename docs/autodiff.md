@@ -33,6 +33,20 @@ The example writes:
 - `autodiff_summary.png`
 - `autodiff_summary.pdf`
 
+The repository also ships a second autodiff example focused on derivative
+verification:
+
+```bash
+python examples/autodiff_sensitivity_demo.py \
+  --output artifacts/examples/autodiff_sensitivity
+```
+
+That companion example writes:
+
+- `autodiff_sensitivity_summary.json`
+- `autodiff_sensitivity_validation.png`
+- `autodiff_sensitivity_validation.pdf`
+
 ## Publication artifact
 
 The current `1.0` publication artifact is committed under
@@ -65,7 +79,19 @@ The default example produces two common autodiff figures:
    approaching a synthetic target
 
 These are the standard ingredients for a first differentiable-solver section in
-an MHD code paper: local sensitivities plus a small inverse problem.
+an MHD code paper: local sensitivities, explicit gradient verification, and a
+small inverse problem.
+
+## Additional shipped workflow
+
+The sensitivity-validation example compares autodiff gradients against central
+finite differences for:
+
+- `d(mean velocity)/dHa`
+- `d(mean velocity)/dF`
+
+This is the fast, publication-friendly gradient-verification figure that should
+accompany broader inverse-design claims.
 
 ## References
 

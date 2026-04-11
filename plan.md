@@ -35,9 +35,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 1. Keep hardening the default fully developed solver family in the manual
    release-validation lane.
 2. Expand benchmark and physics depth for publication datasets.
-3. Stage `extruded_inductionless` interfaces and benchmark manifests for the
-   next paper.
-4. Extend the differentiable lane beyond the shipped Hartmann example.
+3. Replace the current fringing scaffold with the first true
+   `extruded_inductionless` solver slice.
+4. Extend the differentiable lane beyond the shipped Hartmann example set.
 
 ## Current status
 
@@ -83,6 +83,13 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The differentiable Hartmann example now has a committed publication figure under
   `docs/_static/generated/autodiff_summary.png`, showing both Hartmann-number
   sensitivity and inverse recovery of a forcing parameter.
+- A second autodiff example now validates Hartmann and forcing sensitivities
+  against finite differences for a publication-friendly derivative-verification
+  figure.
+- An executable fringing-field benchmark scaffold now exists in `lmx/fringing.py`
+  and `examples/fringing_benchmark_demo.py`, so axial field profiles and
+  stationwise response metrics are now part of the post-1.0 research lane
+  before the full `extruded_inductionless` solver lands.
 - Manufactured-solution and direct-kernel tests now cover the low-cost
   numerical core well: `lmx/linear.py` is about `99%`, and
   `lmx/operators.py` is about `98%`.

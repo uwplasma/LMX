@@ -2,7 +2,14 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from lmx.autodiff import build_hartmann_autodiff_problem, hartmann_mean_velocity, hartmann_profile_loss, solve_differentiable_hartmann
+from lmx.autodiff import (
+    build_hartmann_autodiff_problem,
+    hartmann_mean_velocity,
+    hartmann_mean_velocity_finite_difference_gradients,
+    hartmann_mean_velocity_gradients,
+    hartmann_profile_loss,
+    solve_differentiable_hartmann,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -38,3 +45,14 @@ def test_profile_loss_gradient_step_reduces_objective():
     assert jnp.isfinite(loss0)
     assert jnp.isfinite(grad0)
     assert float(loss1) <= float(loss0)
+
+
+def test_mean_velocity_gradients_match_finite_difference():
+    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
+    autodiff = hartmann_mean_velocity_gradients(problem, forcing=1.1, hartmann_number=5.0)
+    finite_diff = hartmann_mean_velocity_finite_difference_gradients(problem, forcing=1.1, hartmann_number=5.0)
+
+    assert jnp.isfinite(autodiff["d_mean_velocity_d_forcing"])
+    assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
+    assert float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_diff["d_mean_velocity_d_forcing"])) < 5.0e-2
+    assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_diff["d_mean_velocity_d_ha"])) < 5.0e-2

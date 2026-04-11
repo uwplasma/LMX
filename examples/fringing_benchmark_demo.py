@@ -1,0 +1,107 @@
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from lmx.fringing import build_square_duct_fringing_benchmark, run_fringing_station_sweep
+
+
+def _set_style() -> None:
+    plt.style.use("default")
+    plt.rcParams.update(
+        {
+            "figure.figsize": (12, 5.0),
+            "axes.grid": True,
+            "grid.alpha": 0.25,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "font.size": 11,
+        }
+    )
+
+
+def run_fringing_benchmark_demo(
+    *,
+    out_dir: Path,
+    ha_peak: float = 20.0,
+    ny: int = 12,
+    nz: int = 12,
+    nx_stations: int = 7,
+) -> dict[str, object]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    base_case, profile = build_square_duct_fringing_benchmark(
+        ha_peak=ha_peak,
+        ny=ny,
+        nz=nz,
+        nx_stations=nx_stations,
+    )
+    history = run_fringing_station_sweep(base_case, profile)
+
+    _set_style()
+    fig, axes = plt.subplots(1, 3, constrained_layout=True)
+    fig.suptitle("LMX fringing-field benchmark scaffold", fontsize=16)
+    x = np.asarray([item["x"] for item in history])
+    field_scale = np.asarray([item["field_scale"] for item in history])
+    mean_velocity = np.asarray([item["mean_velocity"] for item in history])
+    pressure_proxy = np.asarray([item["current_scaled_pressure_proxy"] for item in history])
+
+    axes[0].plot(x, field_scale, color="#1d4ed8")
+    axes[0].set_title("Axial field profile")
+    axes[0].set_xlabel("x")
+    axes[0].set_ylabel(r"$B/B_{max}$")
+
+    axes[1].plot(x, mean_velocity, color="#0f766e")
+    axes[1].set_title("Cross-sectional mean velocity")
+    axes[1].set_xlabel("x")
+    axes[1].set_ylabel(r"$\bar{u}$")
+
+    axes[2].plot(x, pressure_proxy, color="#b45309")
+    axes[2].set_title("Pressure surrogate")
+    axes[2].set_xlabel("x")
+    axes[2].set_ylabel("Current-scaled proxy")
+
+    png_path = out_dir / "fringing_benchmark.png"
+    pdf_path = out_dir / "fringing_benchmark.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+
+    summary = {
+        "case": base_case.name,
+        "solver_kind": base_case.solver.kind,
+        "history": history,
+        "plots": [png_path.name, pdf_path.name],
+        "notes": (
+            "This example is a stationwise fringing-field scaffold built on the "
+            "fully developed solver family. It is the executable bridge toward "
+            "the future extruded_inductionless research solver."
+        ),
+    }
+    (out_dir / "fringing_benchmark_summary.json").write_text(json.dumps(summary, indent=2))
+    return summary
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run the LMX fringing-field benchmark scaffold.")
+    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/fringing_benchmark"))
+    parser.add_argument("--ha-peak", type=float, default=20.0)
+    parser.add_argument("--ny", type=int, default=12)
+    parser.add_argument("--nz", type=int, default=12)
+    parser.add_argument("--nx-stations", type=int, default=7)
+    args = parser.parse_args(argv)
+    run_fringing_benchmark_demo(
+        out_dir=args.output,
+        ha_peak=args.ha_peak,
+        ny=args.ny,
+        nz=args.nz,
+        nx_stations=args.nx_stations,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

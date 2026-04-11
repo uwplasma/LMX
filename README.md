@@ -22,6 +22,7 @@ The `1.0` ship gate is now closed on the fast release lane:
 - publication-ready plots, movies, and benchmark reports
 - differentiable steady and transient workflows in JAX
 - CPU and multi-GPU strong-scaling benchmark tooling
+- executable fringing-field benchmark scaffolds for the next solver phase
 
 ## Current solver status
 
@@ -32,8 +33,8 @@ The `1.0` ship gate is now closed on the fast release lane:
 - `legacy_reduced`
   - retained only for regression and historical comparison
 - `extruded_inductionless`
-  - planned 3D/fringing-field solver family
-  - not implemented yet
+  - staged next solver family for 3D/fringing-field work
+  - current repo ships executable fringing benchmark scaffolds, not the full solver yet
 
 ## Installation
 
@@ -167,11 +168,14 @@ The repository also ships a differentiable Hartmann example:
 
 ```bash
 python examples/autodiff_design_demo.py --output artifacts/examples/autodiff_design
+python examples/autodiff_sensitivity_demo.py --output artifacts/examples/autodiff_sensitivity
 ```
 
-That example demonstrates:
+Together, those examples demonstrate:
 
 - `jax.grad` sensitivity of mean velocity with respect to Hartmann number
+- finite-difference cross-checks for autodiff sensitivities with respect to
+  Hartmann number and forcing
 - inverse recovery of a synthetic forcing parameter from a target velocity profile
 - polished `PNG`/`PDF` summary figures for publication use
 
@@ -182,6 +186,19 @@ Current publication artifact highlight:
 - synthetic target forcing: `1.0`
 - recovered forcing after `24` gradient steps: `0.999863`
 - final profile loss: `2.9e-12`
+
+### Fringing-field scaffold
+
+The repository now also ships a publication-facing fringing benchmark scaffold:
+
+```bash
+python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_benchmark
+```
+
+That workflow generates a smooth axial fringing profile together with stationwise
+cross-sectional response metrics. It is the executable bridge from the current
+fully developed solver family to the future `extruded_inductionless` research
+solver.
 
 ## User workflows
 
