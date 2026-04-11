@@ -1,6 +1,7 @@
 from pathlib import Path
 import importlib.util
 from types import SimpleNamespace
+import json
 
 import numpy as np
 import pytest
@@ -259,19 +260,172 @@ def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path):
     assert (tmp_path / "plots" / "diagnostics_from_npz.png").exists()
     assert len(plot_outputs) == 4
 
-    movie_npz = tmp_path / "movie.npz"
-    np.savez_compressed(
-        movie_npz,
-        metadata_json='{"case": "test_movie", "title": "Test movie"}',
-        y_centers=y_centers,
-        z_centers=z_centers,
-        y_faces=y_faces,
-        z_faces=z_faces,
-        time=np.array([0.0, 1.0]),
-        u_stack=np.stack([u, 1.1 * u]),
+
+def test_build_case_rejects_unknown_kind():
+    with pytest.raises(ValueError, match="Unsupported case kind"):
+        example_runner._build_case("bad", 5.0, 8, 8)
+
+
+def test_portable_path_prefers_relative_and_falls_back_to_name(tmp_path: Path):
+    nested = tmp_path / "nested" / "file.json"
+    nested.parent.mkdir()
+    nested.write_text("{}")
+
+    assert example_runner._portable_path(nested, relative_to=tmp_path) == "nested/file.json"
+    assert example_runner._portable_path("/outside/path/file.json", relative_to=tmp_path) == "file.json"
+
+
+def test_solve_case_snapshots_records_fully_developed_frames(monkeypatch: pytest.MonkeyPatch):
+    case = example_runner._build_case("hartmann", 5.0, 6, 6)
+
+    def fake_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        updated = np.asarray(u_prev) + 0.1
+        zeros = np.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 2, 3, 0.2, 0.1, 0.05, float(np.mean(updated)), 0.3
+
+    monkeypatch.setattr(example_runner.solvers, "_fully_developed_case_step", fake_step)
+    frames = example_runner.solve_case_snapshots(case, frame_count=3)
+    assert len(frames) >= 3
+    assert frames[-1]["time"] > frames[0]["time"]
+    assert "pressure_proxy" in frames[0]
+    assert "face_lorentz_max" in frames[0]
+
+
+def test_solve_case_snapshots_records_legacy_frames(monkeypatch: pytest.MonkeyPatch):
+    case = example_runner._build_case("hartmann", 5.0, 6, 6)
+    case = case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "legacy_reduced"})})
+
+    def fake_step(**kwargs):
+        u_prev = kwargs["u"]
+        updated = np.asarray(u_prev) + 0.05
+        zeros = np.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-4, 1.0e-5, 3, 0.2, 0.1, 0.05, float(np.mean(updated)), 0.3, 0.25, 0.02, 1.0, 0.0
+
+    monkeypatch.setattr(example_runner.solvers, "_step", fake_step)
+    frames = example_runner.solve_case_snapshots(case, frame_count=2)
+    assert len(frames) >= 2
+    assert frames[0]["pressure_proxy"] == pytest.approx(0.25)
+    assert frames[0]["applied_forcing"] == pytest.approx(0.3)
+
+
+def test_run_case_example_cli_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path):
+    monkeypatch.setattr(
+        example_runner,
+        "run_case_example",
+        lambda **kwargs: {"case": "hartmann_ha5", "plots": [], "metrics": {"u_max": 1.0}, "output_dir": str(tmp_path)},
     )
-    movie_outputs = plot_module.plot_movie_npz(movie_npz, tmp_path / "movie", stem="test_movie", fps=2)
-    assert (tmp_path / "movie" / "test_movie_2d.gif").exists()
-    assert (tmp_path / "movie" / "test_movie_3d.gif").exists()
-    assert len(save_calls) == 2
-    assert len(movie_outputs) == 4
+    exit_code = example_runner.run_case_example_cli(
+        case_kind="hartmann",
+        ha=5.0,
+        ny=8,
+        nz=8,
+        out_dir=tmp_path,
+        reference_root=None,
+    )
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["case"] == "hartmann_ha5"
+
+
+def test_run_case_example_uses_reference_data_when_available(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    fake_solution = SimpleNamespace(
+        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        mesh=SimpleNamespace(),
+        case_name="shercliff_ha5",
+    )
+    reference_root = tmp_path / "refs"
+    reference_root.mkdir()
+
+    monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
+    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
+    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
+    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]})
+    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(
+        example_runner,
+        "closed_channel_validation",
+        lambda solution, case_name, ha, reference_root: SimpleNamespace(
+            y_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.1),
+            z_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([0.9]), l2_error=0.2),
+            reference_path=Path("analytical.csv"),
+        ),
+    )
+    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda solution, out_dir, **kwargs: [out_dir / "overview.png"])
+    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+
+    report = run_case_example(
+        case_kind="shercliff",
+        ha=5.0,
+        ny=8,
+        nz=8,
+        out_dir=tmp_path,
+        reference_root=reference_root,
+    )
+
+    assert report["reference"]["available"] is True
+    assert report["reference"]["kind"] == "closed_channel_analytical"
+
+
+def test_run_case_example_handles_missing_reference_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    fake_solution = SimpleNamespace(
+        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        mesh=SimpleNamespace(),
+        case_name="hunt_ha5",
+    )
+    reference_root = tmp_path / "refs"
+    reference_root.mkdir()
+
+    monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
+    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
+    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
+    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]})
+    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(
+        example_runner,
+        "closed_channel_validation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
+    )
+    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda solution, out_dir, **kwargs: [out_dir / "overview.png"])
+    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+
+    report = run_case_example(
+        case_kind="hunt",
+        ha=5.0,
+        ny=8,
+        nz=8,
+        out_dir=tmp_path,
+        reference_root=reference_root,
+    )
+
+    assert report["reference"]["available"] is False
+
+
+def test_run_theory_meeting_demo_rejects_unknown_movie_case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(example_runner, "run_case_example", lambda **kwargs: {"case": "demo", "plots": [], "metrics": {}})
+    monkeypatch.setattr(example_runner, "make_hunt_case", lambda **kwargs: SimpleNamespace(name="hunt_ha5"))
+    monkeypatch.setattr(
+        example_runner,
+        "solve_steady",
+        lambda case: SimpleNamespace(
+            state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+            mesh=SimpleNamespace(),
+            case_name="hunt_ha5",
+        ),
+    )
+    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
+    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
+    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
+    )
+    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda solution, out_dir, **kwargs: [])
+    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path)
+
+    with pytest.raises(ValueError, match="Unsupported movie_case"):
+        run_theory_meeting_demo(out_dir=tmp_path, movie_case="bad")

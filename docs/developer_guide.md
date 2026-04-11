@@ -102,3 +102,20 @@ The repository uses a split CI model:
 This separation is intentional. The fast lane protects the `1.0` public
 surface, while the manual lane preserves reproducible research artifacts
 without exhausting routine CI runtime.
+
+## Test runtime baseline
+
+The current local baseline is:
+
+- full fast `pytest -q`: about `31 s`
+- full coverage lane over `lmx/` and `scripts/`: about `37 s`
+
+The hard rule for routine validation is that these lanes must stay under five
+minutes. When a new test exceeds that budget, prefer:
+
+- synthetic or manufactured-solution fixtures
+- monkeypatched orchestration tests for CLI/reporting/example paths
+- direct operator/kernel tests instead of full solver runs
+
+Do not use the default test suite as a vehicle for long benchmark or artifact
+generation. Those belong in the manual research-artifact workflows.

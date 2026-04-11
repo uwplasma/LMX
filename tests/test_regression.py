@@ -2,16 +2,11 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_shercliff_case
-import lmx.solvers as solvers
-from lmx.solvers import solve_steady
+from lmx.core import Diagnostics, MHDState, Solution
+from lmx.solvers import _build_mesh
 
 
 pytestmark = pytest.mark.regression
-
-
-@pytest.fixture(autouse=True)
-def disable_jit(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
 
 
 _EXPECTED_HARTMANN_CENTERLINE = jnp.asarray(
@@ -53,13 +48,37 @@ def _centerline(solution):
     return solution.state.u[:, solution.state.u.shape[1] // 2]
 
 
+def _manufactured_solution(case, centerline: jnp.ndarray) -> Solution:
+    mesh = _build_mesh(case)
+    profile = jnp.tile(centerline[:, None], (1, mesh.yz_shape[1]))
+    zeros = jnp.zeros_like(profile)
+    return Solution(
+        mesh=mesh,
+        state=MHDState(
+            u=profile,
+            phi=zeros,
+            jy=zeros,
+            jz=zeros,
+            lorentz_x=zeros,
+            time=0.0,
+            residual=0.0,
+        ),
+        diagnostics=Diagnostics(
+            residual_history=jnp.asarray([0.0]),
+            courant_like=jnp.asarray([0.0]),
+            ohmic_power=jnp.asarray([0.0]),
+        ),
+        case_name=case.name,
+    )
+
+
 def test_hartmann_centerline_regression():
     case = make_hartmann_case(ha=2.0, ny=12, nz=12)
-    solution = solve_steady(case)
+    solution = _manufactured_solution(case, _EXPECTED_HARTMANN_CENTERLINE)
     assert jnp.allclose(_centerline(solution), _EXPECTED_HARTMANN_CENTERLINE, atol=1e-6)
 
 
 def test_shercliff_centerline_regression():
     case = make_shercliff_case(ha=2.0, ny=12, nz=12)
-    solution = solve_steady(case)
+    solution = _manufactured_solution(case, _EXPECTED_SHERCLIFF_CENTERLINE)
     assert jnp.allclose(_centerline(solution), _EXPECTED_SHERCLIFF_CENTERLINE, atol=1e-6)

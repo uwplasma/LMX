@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from lmx.config import load_run_config
+from lmx.config import _parse_boundary_value, load_run_config
 
 
 pytestmark = pytest.mark.unit
@@ -274,4 +274,106 @@ kind = "no_slip"
     )
 
     with pytest.raises(ValueError, match="disagree"):
+        load_run_config(input_file)
+
+
+def test_load_run_config_rejects_missing_required_key(tmp_path: Path):
+    input_file = tmp_path / "missing.toml"
+    input_file.write_text(
+        """
+[case]
+name = "missing"
+
+[geometry]
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 1.0]
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="Missing required TOML key 'kind'"):
+        load_run_config(input_file)
+
+
+def test_load_run_config_rejects_invalid_tuple_length(tmp_path: Path):
+    input_file = tmp_path / "bad_length.toml"
+    input_file.write_text(
+        """
+[case]
+name = "bad_length"
+
+[geometry]
+kind = "rect_duct"
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+wall_thickness = [0.1, 0.2]
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 1.0]
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="must have length 4"):
+        load_run_config(input_file)
+
+
+def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs():
+    assert _parse_boundary_value(None) is None
+    assert _parse_boundary_value(1.25) == pytest.approx(1.25)
+    assert _parse_boundary_value([1, 2, 3]) == pytest.approx((1.0, 2.0, 3.0))
+
+    with pytest.raises(ValueError, match="length 3"):
+        _parse_boundary_value([1, 2])
+
+    with pytest.raises(ValueError, match="Unsupported boundary-condition value"):
+        _parse_boundary_value({"bad": True})
+
+
+def test_load_run_config_rejects_unsupported_solver_mode(tmp_path: Path):
+    input_file = tmp_path / "bad_mode.toml"
+    input_file.write_text(
+        """
+[case]
+name = "bad_mode"
+
+[geometry]
+kind = "rect_duct"
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 1.0]
+
+[solver]
+mode = "invalid"
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="Unsupported solve mode"):
         load_run_config(input_file)

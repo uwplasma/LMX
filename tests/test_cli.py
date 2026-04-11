@@ -282,3 +282,58 @@ def test_cli_validate_reference_branch_handles_missing_slice_file(tmp_path: Path
 def test_build_case_rejects_unknown_case():
     with pytest.raises(ValueError, match="mystery"):
         cli._build_case(SimpleNamespace(case="mystery", ha=1.0, output="./out"))
+
+
+def test_solve_case_with_optional_logger_falls_back_on_typeerror(monkeypatch: pytest.MonkeyPatch):
+    case = SimpleNamespace(name="demo")
+    calls: list[tuple[str, object]] = []
+
+    def fake_transient(case, **kwargs):
+        if kwargs:
+            raise TypeError("old signature")
+        calls.append(("transient", case))
+        return "transient-ok"
+
+    def fake_steady(case, **kwargs):
+        if kwargs:
+            raise TypeError("old signature")
+        calls.append(("steady", case))
+        return "steady-ok"
+
+    monkeypatch.setattr(cli, "solve_transient", fake_transient)
+    monkeypatch.setattr(cli, "solve_steady", fake_steady)
+
+    assert cli._solve_case_with_optional_logger(case, solve_mode="transient", logger=object()) == "transient-ok"
+    assert cli._solve_case_with_optional_logger(case, solve_mode="steady", logger=object()) == "steady-ok"
+    assert calls == [("transient", case), ("steady", case)]
+
+
+def test_write_run_summary_respects_disabled_json_summary(tmp_path: Path):
+    case = SimpleNamespace(name="demo", output=SimpleNamespace(write_json_summary=False))
+    assert cli._write_run_summary({"case": "demo"}, case, tmp_path) is None
+
+
+def test_run_config_requires_restart_path(tmp_path: Path):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
+    config = RunConfig(
+        case=case,
+        solve_mode="steady",
+        logging=LoggingSpec(enabled=False),
+        restart=RestartSpec(enabled=True, path=None),
+    )
+
+    with pytest.raises(ValueError, match="restart.path"):
+        cli._run_config(config)
+
+
+def test_run_branch_quiet_disables_logging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "_build_case", lambda args: case)
+    monkeypatch.setattr(cli, "_run_config", lambda config: recorded.update(enabled=config.logging.enabled) or {"case": case.name})
+
+    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), "--quiet"])
+
+    assert exit_code == 0
+    assert recorded["enabled"] is False

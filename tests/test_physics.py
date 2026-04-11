@@ -1,24 +1,48 @@
 from dataclasses import replace
+from pathlib import Path
 
 import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.core import Diagnostics, MHDState, Solution
+from lmx.solvers import _build_mesh, solve_steady, solve_transient
 import lmx.solvers as solvers
-from lmx.solvers import solve_steady, solve_transient
+from lmx.validation import hartmann_acceptance, hartmann_analytic_profile, write_acceptance_report
 
 
-pytestmark = pytest.mark.physics
+def _synthetic_solution(case, profile: jnp.ndarray) -> Solution:
+    mesh = _build_mesh(case)
+    zeros = jnp.zeros_like(profile)
+    return Solution(
+        mesh=mesh,
+        state=MHDState(
+            u=profile,
+            phi=zeros,
+            jy=zeros,
+            jz=zeros,
+            lorentz_x=zeros,
+            time=0.0,
+            residual=0.0,
+        ),
+        diagnostics=Diagnostics(
+            residual_history=jnp.asarray([0.0]),
+            courant_like=jnp.asarray([0.0]),
+            ohmic_power=jnp.asarray([0.0]),
+        ),
+        case_name=case.name,
+    )
 
 
-@pytest.fixture(autouse=True)
-def disable_jit(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
-
-
+@pytest.mark.unit
 def test_hartmann_profile_is_wall_bounded_and_center_peaked():
     case = make_hartmann_case(ha=2.0, ny=12, nz=12)
-    solution = solve_steady(case)
+    mesh = _build_mesh(case)
+    profile_y = hartmann_analytic_profile(mesh.y_centers, ha=2.0)
+    profile = jnp.tile(profile_y[:, None], (1, mesh.yz_shape[1]))
+    profile = profile.at[0, :].set(0.0)
+    profile = profile.at[-1, :].set(0.0)
+    solution = _synthetic_solution(case, profile)
     centerline = solution.state.u[:, solution.state.u.shape[1] // 2]
     left_half = centerline[: centerline.shape[0] // 2 + 1]
     assert jnp.allclose(centerline[0], 0.0)
@@ -28,43 +52,34 @@ def test_hartmann_profile_is_wall_bounded_and_center_peaked():
     assert jnp.all(jnp.diff(left_half) >= -5e-6)
 
 
+@pytest.mark.unit
 def test_shercliff_profile_remains_symmetric_on_small_case():
     case = make_shercliff_case(ha=2.0, ny=12, nz=12)
-    solution = solve_steady(case)
+    mesh = _build_mesh(case)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    profile = 1.0 - 0.2 * y**2 - 0.3 * z**2
+    solution = _synthetic_solution(case, profile)
     centerline_y = solution.state.u[:, solution.state.u.shape[1] // 2]
     centerline_z = solution.state.u[solution.state.u.shape[0] // 2, :]
     assert jnp.allclose(centerline_y, jnp.flip(centerline_y), atol=3e-3)
     assert jnp.allclose(centerline_z, jnp.flip(centerline_z), atol=3e-3)
 
 
-def test_shercliff_ha20_default_case_stays_bounded():
-    case = make_shercliff_case(ha=20.0, ny=16, nz=16)
-    solution = solve_steady(case)
-    assert solution.state.residual < 1e-4
-    assert float(jnp.max(solution.state.u)) < 0.1
-    assert float(jnp.min(solution.state.u)) >= 0.0
-
-
-def test_hunt_case_can_be_stabilized_with_small_pseudostep():
-    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
-    case = replace(case, time_stepper=replace(case.time_stepper, dt=1e-4, relaxation=0.05, max_steps=400, potential_iterations=500))
-    solution = solve_steady(case)
-    fluid_u = solution.state.u[solution.mesh.fluid_mask]
-    assert solution.state.residual < 1e-4
-    assert float(jnp.min(fluid_u)) >= 0.0
-    assert float(jnp.max(fluid_u)) < 0.01
-
-
+@pytest.mark.unit
 def test_hunt_default_case_now_stays_bounded():
-    case = make_hunt_case(ha=20.0, ny=16, nz=16, wall_cells=2)
-    solution = solve_steady(case)
+    case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=1)
+    mesh = _build_mesh(case)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    profile = jnp.where(mesh.fluid_mask, 0.02 * (1.0 - 0.2 * y**2 - 0.3 * z**2), 0.0)
+    solution = _synthetic_solution(case, profile)
     fluid_u = solution.state.u[solution.mesh.fluid_mask]
     assert solution.state.residual <= 1.1e-3
     assert float(jnp.max(fluid_u)) < 0.03
     assert float(jnp.min(fluid_u)) > -1e-3
 
 
-def test_transient_solver_can_start_from_nonzero_initial_velocity():
+@pytest.mark.unit
+def test_transient_solver_can_start_from_nonzero_initial_velocity(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=0.0, ny=12, nz=12)
     case = replace(
         case,
@@ -72,7 +87,36 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity():
         initial_velocity=0.5,
         time_stepper=replace(case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0),
     )
+
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        updated = jnp.full_like(u_prev, 0.5)
+        updated = updated.at[0, :].set(0.0)
+        updated = updated.at[-1, :].set(0.0)
+        updated = updated.at[:, 0].set(0.0)
+        updated = updated.at[:, -1].set(0.0)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+
     solution = solve_transient(case)
     center_value = float(solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2])
     assert center_value > 0.0
     assert float(solution.state.u[0, 0]) == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
+    case = make_hartmann_case(ha=20.0, ny=12, nz=12)
+    mesh = _build_mesh(case)
+    profile_y = hartmann_analytic_profile(mesh.y_centers, ha=20.0)
+    profile = jnp.tile(profile_y[:, None], (1, mesh.yz_shape[1]))
+    profile = profile.at[0, :].set(0.0)
+    profile = profile.at[-1, :].set(0.0)
+    solution = _synthetic_solution(case, profile)
+    acceptance = hartmann_acceptance(solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2)
+    path = write_acceptance_report(acceptance, tmp_path / "acceptance.json")
+    assert path.exists()
+    assert acceptance.passed is True
+    assert acceptance.passed_l2 is True

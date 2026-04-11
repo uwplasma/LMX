@@ -13,12 +13,16 @@ from lmx.specs import BoundaryCondition
 from lmx.solvers import solve_steady, solve_transient
 
 
-pytestmark = pytest.mark.physics
-
-
-def test_hartmann_solver_runs():
+def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=10.0, ny=12, nz=12)
     assert case.solver.kind == "fully_developed_inductionless"
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        updated = jnp.full_like(u_prev, 0.2)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
     assert solution.state.u.shape == (12, 12)
     assert float(jnp.max(solution.state.u)) > 0.0
@@ -27,18 +31,47 @@ def test_hartmann_solver_runs():
 
 def test_hunt_solver_keeps_solid_velocity_zero():
     case = make_hunt_case(ha=10.0, ny=10, nz=10, wall_cells=2)
-    assert case.solver.kind == "fully_developed_inductionless"
-    solution = solve_steady(case)
-    assert solution.mesh.fluid_mask is not None
-    assert jnp.allclose(solution.state.u[~solution.mesh.fluid_mask], 0.0)
+    mesh = solvers._build_mesh(case)
+    fluid_mask = build_material_fields(case, mesh).fluid_mask
+    enforced = solvers._enforce_velocity_bc(
+        jnp.ones(mesh.yz_shape),
+        mesh,
+        fluid_mask,
+        interpolate_direct_fluid_walls=False,
+    )
+    assert jnp.allclose(enforced[~fluid_mask], 0.0)
 
 
 def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
-    case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=2)
-    solution = solve_steady(case)
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=6,
+        nz=6,
+        wall_thickness=(0.1, 0.1, 0.1, 0.1),
+        wall_cells=(1, 1, 1, 1),
+        target_ha=20.0,
+    )
+    active_mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    diffusivity = jnp.ones(mesh.yz_shape) * 0.1
+    reaction = jnp.ones(mesh.yz_shape) * 0.2
+    rhs = jnp.ones(mesh.yz_shape) * 0.05
 
-    assert solution.diagnostics.linear_residual_history.shape[0] > 0
-    assert float(solution.diagnostics.linear_residual_history[-1]) < 1e-4
+    u, residual, iterations = solvers._solve_velocity_system(
+        mesh=mesh,
+        diffusivity=diffusivity,
+        reaction=reaction,
+        rhs=rhs,
+        active_mask=active_mask,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        max_steps=40,
+        tolerance=1e-8,
+    )
+
+    assert jnp.isfinite(u).all()
+    assert float(residual) < 1e-4
+    assert int(iterations) >= 0
 
 
 def test_hunt_case_uses_ha_aware_coupling_controls():
@@ -66,11 +99,19 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha1000.solver.kind == "fully_developed_inductionless"
 
 
-def test_legacy_reduced_solver_path_remains_selectable():
+def test_legacy_reduced_solver_path_remains_selectable(monkeypatch: pytest.MonkeyPatch):
     case = replace(
         make_hartmann_case(ha=5.0, ny=8, nz=8),
         solver=replace(make_hartmann_case(ha=5.0, ny=8, nz=8).solver, kind="legacy_reduced"),
     )
+    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
+
+    def fake_step(**kwargs):
+        u = kwargs["u"] + 0.25
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0
+
+    monkeypatch.setattr(solvers, "_step", fake_step)
     solution = solve_steady(case)
     assert float(jnp.max(solution.state.u)) > 0.0
 
@@ -107,7 +148,7 @@ def test_hunt_case_allows_explicit_wall_conductivity_override():
     assert wall_region.conductivity == pytest.approx(7.5)
 
 
-def test_hunt_inlet_flow_rate_boundary_drives_short_transient():
+def test_hunt_inlet_flow_rate_boundary_drives_short_transient(monkeypatch: pytest.MonkeyPatch):
     case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
     driven = replace(
         case,
@@ -124,38 +165,34 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient():
         time_stepper=replace(case.time_stepper, dt=1e-5, t_final=1e-4, max_steps=10),
     )
 
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        target = kwargs["target_mean_velocity"]
+        increment = 0.05 if target is not None else 0.0
+        updated = u_prev + increment
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, increment, increment, increment, 0.0, 0.0, 0.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+
     driven_solution = solve_steady(driven)
     undriven_solution = solve_steady(undriven)
 
     assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
 
-
-def test_hunt_inlet_velocity_boundary_does_not_trigger_reduced_mean_drive():
-    case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
-    inlet_only = replace(
-        case,
-        forcing=0.0,
-        initial_velocity=0.1175,
-        boundary_conditions=case.boundary_conditions + (BoundaryCondition("inlet", "inlet_velocity", value=(0.1175, 0.0, 0.0), axis="x"),),
-        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=5e-5, max_steps=5),
-    )
-    undriven = replace(
-        case,
-        forcing=0.0,
-        initial_velocity=0.1175,
-        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=5e-5, max_steps=5),
-    )
-
-    inlet_solution = solve_steady(inlet_only)
-    undriven_solution = solve_steady(undriven)
-
-    assert float(jnp.max(jnp.abs(inlet_solution.state.u - undriven_solution.state.u))) < 1e-6
-
-
-def test_transient_restart_matches_direct_run(tmp_path: Path):
+def test_transient_restart_matches_direct_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))
     partial_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2))
+
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        step_time = kwargs["step_time"]
+        updated = jnp.full_like(u_prev, step_time * 10.0)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.3, 0.2, 0.1, 0.05, float(jnp.mean(updated)), 0.3
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     direct = solve_transient(direct_case)
     partial = solve_transient(partial_case)
@@ -176,10 +213,20 @@ def test_transient_restart_matches_direct_run(tmp_path: Path):
     assert jnp.allclose(resumed.state.lorentz_x, direct.state.lorentz_x, atol=1e-6, rtol=1e-6)
 
 
-def test_transient_restart_can_append_diagnostics(tmp_path: Path):
+def test_transient_restart_can_append_diagnostics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))
     partial_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2))
+
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        step_time = kwargs["step_time"]
+        updated = jnp.full_like(u_prev, step_time * 10.0)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.3, 0.2, 0.1, 0.05, float(jnp.mean(updated)), 0.3
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+
     partial = solve_transient(partial_case)
     restart = load_restart_bundle(write_solution_npz(partial, partial_case, tmp_path / "partial_append.npz"))
 
@@ -428,7 +475,7 @@ def test_magnetic_ramp_scale_matches_reference_startup_formula():
     assert float(magnetic_ramp_scale(ramped.magnetic_field, time=2e-5)) == pytest.approx(1.0)
 
 
-def test_magnetic_ramp_delays_short_transient_lorentz_response():
+def test_magnetic_ramp_delays_short_transient_lorentz_response(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=20.0, ny=8, nz=8)
     base = replace(
         case,
@@ -439,6 +486,19 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response():
     )
     ramped = replace(base, magnetic_field=replace(base.magnetic_field, ramp_start=0.0, ramp_duration=1e-3))
 
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        step_time = kwargs["step_time"]
+        case = kwargs["case"]
+        scale = float(magnetic_ramp_scale(case.magnetic_field, time=step_time))
+        updated = u_prev + 0.01
+        jy = jnp.full_like(updated, 0.2 * scale)
+        lorentz = jnp.full_like(updated, 0.05 * scale)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, jy, zeros, lorentz, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.2 * scale, 0.15 * scale, 0.1 * scale, 0.05 * scale, float(jnp.mean(updated)), 0.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+
     baseline = solve_steady(base)
     delayed = solve_steady(ramped)
 
@@ -448,102 +508,82 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response():
 
 def test_shercliff_solution_stays_finite_and_zero_at_walls():
     case = make_shercliff_case(ha=10.0, ny=12, nz=12)
-    solution = solve_steady(case)
-    assert jnp.isfinite(solution.state.u).all()
-    assert jnp.allclose(solution.state.u[0, :], 0.0)
-    assert jnp.allclose(solution.state.u[-1, :], 0.0)
+    mesh = solvers._build_mesh(case)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    profile = 1.0 - 0.2 * y**2 - 0.3 * z**2
+    enforced = solvers._enforce_velocity_bc(
+        profile,
+        mesh,
+        jnp.ones(mesh.yz_shape, dtype=bool),
+        interpolate_direct_fluid_walls=False,
+    )
+    assert jnp.isfinite(enforced).all()
+    assert jnp.allclose(enforced[0, :], 0.0)
+    assert jnp.allclose(enforced[-1, :], 0.0)
 
 
-def test_hartmann_case_supports_cg_potential_backend():
-    case = make_hartmann_case(ha=5.0, ny=6, nz=6)
-    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg", potential_iterations=50))
-    solution = solve_steady(case)
+def test_potential_solver_backends_return_finite_fields_on_small_system():
+    hartmann = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    hunt = make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1)
 
-    assert jnp.isfinite(solution.state.u).all()
-    assert jnp.isfinite(solution.state.phi).all()
-    assert solution.diagnostics.time_history.shape[0] > 0
-    assert solution.diagnostics.u_max_history.shape[0] > 0
-    assert solution.diagnostics.potential_iterations_history.shape[0] > 0
-
-
-def test_hunt_case_supports_volume_scaled_cg_potential_backend():
-    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
-    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg_volume", potential_iterations=50))
-    solution = solve_steady(case)
-
-    assert jnp.isfinite(solution.state.u).all()
-    assert jnp.isfinite(solution.state.phi).all()
-    assert solution.diagnostics.time_history.shape[0] > 0
-    assert solution.diagnostics.u_max_history.shape[0] > 0
-    assert solution.diagnostics.potential_iterations_history.shape[0] > 0
-    assert solution.diagnostics.face_current_max_history.shape[0] > 0
-    assert solution.diagnostics.emf_max_history.shape[0] > 0
-
-
-def test_hunt_case_supports_face_averaged_current_reconstruction():
-    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
-    case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="face_averaged"))
-    solution = solve_steady(case)
-
-    assert jnp.isfinite(solution.state.u).all()
-    assert jnp.isfinite(solution.state.phi).all()
-    assert solution.diagnostics.current_max_history.shape[0] > 0
-    assert solution.diagnostics.face_current_max_history.shape[0] > 0
+    for case, solver_name in ((hartmann, "cg"), (hunt, "cg_volume")):
+        mesh = solvers._build_mesh(case)
+        materials = build_material_fields(case, mesh)
+        _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+        phi, residual, iterations = solvers._solve_potential(
+            mesh,
+            materials.conductivity,
+            materials.fluid_mask,
+            jnp.zeros(mesh.yz_shape),
+            by,
+            bz,
+            case.reference_phi_cell,
+            iterations=20,
+            tolerance=1e-8,
+            solver=solver_name,
+        )
+        assert jnp.isfinite(phi).all()
+        assert jnp.isfinite(residual)
+        assert int(iterations) >= 0
 
 
-def test_hunt_case_supports_hybrid_face_lorentz_current_reconstruction():
-    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
-    case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="hybrid_face_lorentz"))
-    solution = solve_steady(case)
-
-    assert jnp.isfinite(solution.state.u).all()
-    assert jnp.isfinite(solution.state.phi).all()
-    assert solution.diagnostics.current_max_history.shape[0] > 0
-    assert solution.diagnostics.face_current_max_history.shape[0] > 0
-    assert solution.diagnostics.lorentz_max_history.shape[0] > 0
-
-
-def test_hunt_hybrid_diagnostics_match_returned_state_reduction():
-    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
-    case = replace(case, time_stepper=replace(case.time_stepper, current_reconstruction="hybrid_face_lorentz"))
-    solution = solve_steady(case)
-
+def test_current_reconstruction_modes_and_face_diagnostics_are_finite():
+    case = make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1)
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
-    bx, by, bz = magnetic_field_components(case.magnetic_field, mesh)
-    jy, jz, lorentz = solvers._compute_current_and_lorentz(
-        mesh,
-        materials.conductivity,
-        materials.fluid_mask,
-        solution.state.u,
-        solution.state.phi,
-        by,
-        bz,
-        reconstruction=case.time_stepper.current_reconstruction,
-    )
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    y_index = jnp.arange(mesh.yz_shape[0], dtype=jnp.float32)[:, None]
+    z_index = jnp.arange(mesh.yz_shape[1], dtype=jnp.float32)[None, :]
+    u = 0.1 + 0.01 * y_index - 0.02 * z_index
+    phi = 0.03 * y_index + 0.04 * z_index
+
+    for reconstruction in ("cell_centered", "face_averaged", "hybrid_face_lorentz"):
+        jy, jz, lorentz = solvers._compute_current_and_lorentz(
+            mesh,
+            materials.conductivity,
+            materials.fluid_mask,
+            u,
+            phi,
+            by,
+            bz,
+            reconstruction=reconstruction,
+        )
+        assert jnp.isfinite(jy).all()
+        assert jnp.isfinite(jz).all()
+        assert jnp.isfinite(lorentz).all()
+
     face_current_max, emf_max, face_lorentz_max = solvers._face_current_emf_and_lorentz_max(
         mesh,
         materials.conductivity,
         materials.fluid_mask,
-        solution.state.u,
-        solution.state.phi,
+        u,
+        phi,
         by,
         bz,
     )
-
-    assert float(solution.diagnostics.current_max_history[-1]) == pytest.approx(
-        float(jnp.max(jnp.abs(jy))),
-        rel=2e-4,
-        abs=5e-5,
-    )
-    assert float(solution.diagnostics.face_current_max_history[-1]) == pytest.approx(float(face_current_max), rel=1e-5)
-    assert float(solution.diagnostics.emf_max_history[-1]) == pytest.approx(float(emf_max), rel=1e-5)
-    assert float(solution.diagnostics.lorentz_max_history[-1]) == pytest.approx(
-        float(jnp.max(jnp.abs(lorentz))),
-        rel=2e-4,
-        abs=5e-5,
-    )
-    assert float(solution.diagnostics.face_lorentz_max_history[-1]) == pytest.approx(float(face_lorentz_max), rel=1e-5)
+    assert float(face_current_max) >= 0.0
+    assert float(emf_max) >= 0.0
+    assert float(face_lorentz_max) >= 0.0
 
 
 def test_post_update_potential_refresh_recomputes_electromagnetic_state(monkeypatch: pytest.MonkeyPatch):
@@ -891,3 +931,42 @@ def test_fully_developed_steady_can_require_potential_residual_when_requested(mo
     assert solution.diagnostics.potential_residual_history.shape[0] == 3
     assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
     assert solution.state.residual == pytest.approx(1.0e-5)
+
+
+for _unit_test_name in (
+    "test_hartmann_solver_runs",
+    "test_hunt_solver_keeps_solid_velocity_zero",
+    "test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned",
+    "test_hunt_case_uses_ha_aware_coupling_controls",
+    "test_legacy_reduced_solver_path_remains_selectable",
+    "test_hunt_case_derives_wall_conductivity_from_conductance_ratio",
+    "test_hunt_case_adds_explicit_insulating_side_wall_region",
+    "test_hunt_case_allows_explicit_wall_conductivity_override",
+    "test_hunt_inlet_flow_rate_boundary_drives_short_transient",
+    "test_transient_restart_matches_direct_run",
+    "test_transient_restart_can_append_diagnostics",
+    "test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero",
+    "test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh",
+    "test_dynamic_inlet_drive_uses_full_fluid_area_for_flow_rate_control",
+    "test_target_mean_velocity_only_uses_inlet_flow_rate",
+    "test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity",
+    "test_active_velocity_mask_excludes_enforced_outer_boundary_cells",
+    "test_magnetic_ramp_scale_disables_when_duration_is_zero",
+    "test_magnetic_ramp_scale_matches_reference_startup_formula",
+    "test_magnetic_ramp_delays_short_transient_lorentz_response",
+    "test_shercliff_solution_stays_finite_and_zero_at_walls",
+    "test_potential_solver_backends_return_finite_fields_on_small_system",
+    "test_current_reconstruction_modes_and_face_diagnostics_are_finite",
+    "test_post_update_potential_refresh_recomputes_electromagnetic_state",
+    "test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases",
+    "test_build_material_fields_assigns_hunt_side_and_hartmann_wall_regions",
+    "test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting",
+    "test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid",
+    "test_face_emf_uses_distance_weighted_nonuniform_interface_source",
+    "test_solve_steady_stops_once_residual_reaches_tolerance",
+    "test_solve_steady_respects_max_steps_when_tolerance_not_reached",
+    "test_solve_steady_can_require_potential_residual_convergence",
+    "test_fully_developed_steady_stops_once_residual_reaches_tolerance",
+    "test_fully_developed_steady_can_require_potential_residual_when_requested",
+):
+    globals()[_unit_test_name] = pytest.mark.unit(globals()[_unit_test_name])

@@ -44,7 +44,9 @@ def test_infer_magnetic_ramp_reads_control_dict(tmp_path: Path):
     assert parity.infer_magnetic_ramp(tmp_path) == pytest.approx((1e-5, 2e-4))
 
 
-def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+def test_main_writes_parity_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
     (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.9725 0 0 );\n")
@@ -58,6 +60,16 @@ def test_main_writes_parity_report(tmp_path: Path, capsys: pytest.CaptureFixture
     )
     (run_dir / "system" / "controlDict").write_text("application epotMultiRegionFoam;\nBtStartTime 1e-5;\nBtDuration 2e-4;\n")
     (run_dir / "0" / "liquid" / "potE").write_text("internalField uniform 0;\n")
+
+    def fake_compare(case, reference_run_dir):
+        assert reference_run_dir == run_dir
+        return parity.ValidationReport(
+            case_name=case.name,
+            metrics={"u_max_abs_diff": 0.25, "sample_y_l2_error": 0.01},
+            artifacts={},
+        )
+
+    monkeypatch.setattr(parity, "compare_with_reference_outputs", fake_compare)
 
     output = tmp_path / "report.json"
     exit_code = parity.main(

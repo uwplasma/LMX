@@ -94,6 +94,13 @@ The repository now uses two lanes:
 This keeps the default gate practical while preserving reproducible benchmark
 and reporting workflows for release work and paper figures.
 
+Current local baseline:
+
+- full fast test suite: about `31 s`
+- full coverage lane: about `37 s`
+
+Both are intentionally kept below a five-minute routine validation budget.
+
 ## Typical outputs
 
 An LMX run can produce:

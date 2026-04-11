@@ -6,7 +6,14 @@ import jax.numpy as jnp
 
 from lmx.core import Diagnostics, MHDState, Solution, zeros_state
 from lmx.cases import make_hartmann_case
-from lmx.io import load_restart_bundle, validate_restart_bundle, write_paraview, write_solution_npz, write_vtu
+from lmx.io import (
+    load_restart_bundle,
+    validate_restart_bundle,
+    write_paraview,
+    write_solution_npz,
+    write_solution_outputs,
+    write_vtu,
+)
 from lmx.mesh import generate_pipe_ogrid_mesh
 from lmx.solvers import _build_mesh
 
@@ -143,3 +150,80 @@ def test_load_restart_bundle_round_trips_solution_npz(tmp_path: Path):
     assert bundle.diagnostics.raw_update_max_history.shape == solution.diagnostics.raw_update_max_history.shape
     assert bundle.diagnostics.limiter_scale_history.shape == solution.diagnostics.limiter_scale_history.shape
     assert bundle.diagnostics.limited_fraction_history.shape == solution.diagnostics.limited_fraction_history.shape
+
+
+def test_load_restart_bundle_falls_back_to_metadata_and_residual_history(tmp_path: Path):
+    path = tmp_path / "restart_minimal.npz"
+    np.savez_compressed(
+        path,
+        metadata_json='{"case": "demo", "time": 0.75, "geometry_kind": "rect_duct"}',
+        y_faces=np.array([-1.0, 1.0]),
+        z_faces=np.array([-1.0, 1.0]),
+        u=np.array([[1.0]]),
+        phi=np.array([[0.0]]),
+        jy=np.array([[0.0]]),
+        jz=np.array([[0.0]]),
+        lorentz_x=np.array([[0.0]]),
+        residual_history=np.array([1.0e-2, 1.0e-3]),
+    )
+
+    bundle = load_restart_bundle(path)
+
+    assert float(bundle.state.time) == pytest.approx(0.75)
+    assert float(bundle.state.residual) == pytest.approx(1.0e-3)
+    assert bundle.diagnostics.time_history.shape == (0,)
+
+
+def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    solution = _sample_solution(case)
+    path = write_solution_npz(solution, case, tmp_path / "hartmann_results.npz")
+    bundle = load_restart_bundle(path)
+    mesh = _build_mesh(case)
+
+    with pytest.raises(ValueError, match="geometry_kind"):
+        validate_restart_bundle(bundle, mesh=mesh, geometry_kind="pipe", case_name=case.name)
+
+    wrong_shape_bundle = bundle.__class__(
+        **{**bundle.__dict__, "state": bundle.state.__class__(**{**bundle.state.__dict__, "u": jnp.zeros((1, 1))})}
+    )
+    with pytest.raises(ValueError, match="field shape"):
+        validate_restart_bundle(wrong_shape_bundle, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+
+    wrong_y_faces = bundle.__class__(**{**bundle.__dict__, "y_faces": np.array([0.0, 1.0])})
+    with pytest.raises(ValueError, match="y_faces"):
+        validate_restart_bundle(wrong_y_faces, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+
+    wrong_z_faces = bundle.__class__(**{**bundle.__dict__, "z_faces": np.array([0.0, 1.0])})
+    with pytest.raises(ValueError, match="z_faces"):
+        validate_restart_bundle(wrong_z_faces, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+
+    wrong_case = bundle.__class__(**{**bundle.__dict__, "metadata": {**bundle.metadata, "case": "other_case"}})
+    with pytest.raises(ValueError, match="Restart case"):
+        validate_restart_bundle(wrong_case, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+
+
+def test_write_solution_outputs_respects_output_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "output": case.output.__class__(
+                **{
+                    **case.output.__dict__,
+                    "write_paraview": False,
+                    "write_csv_profiles": False,
+                    "write_npz": False,
+                    "write_plots": False,
+                }
+            ),
+        }
+    )
+    solution = _sample_solution(case)
+
+    monkeypatch.setattr("lmx.io.write_paraview", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected paraview")))
+    monkeypatch.setattr("lmx.io.write_solution_npz", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected npz")))
+
+    outputs = write_solution_outputs(solution, case, tmp_path, write_npz=True, write_plots=True)
+
+    assert outputs == {"paraview": [], "csv": [], "npz": [], "plots": []}

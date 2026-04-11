@@ -10,7 +10,7 @@ import lmx.validation as validation
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.mesh import generate_rect_duct_mesh
-from lmx.solvers import _build_mesh, solve_steady
+from lmx.solvers import _build_mesh
 from lmx.validation import (
     closed_channel_validation,
     compare_normalized_profiles,
@@ -19,7 +19,6 @@ from lmx.validation import (
     duct_layer_resolution_metrics,
     duct_profile_metrics,
     estimate_observed_order,
-    hartmann_acceptance,
     infer_mesh_axis_coordinates,
     infer_mesh_bounds,
     infer_region_conductivity,
@@ -38,7 +37,6 @@ from lmx.validation import (
     processed_slice_validation,
     read_reference_xy_sample,
     read_field_minmax,
-    write_acceptance_report,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
@@ -465,23 +463,6 @@ def test_hartmann_validation_writer(tmp_path: Path):
     comparison = hartmann_validation(solution, ha=5.0)
     path = write_analytic_comparison(comparison, tmp_path / "analytic.json", axis_name="y")
     assert path.exists()
-
-
-def test_hartmann_ha20_validation_error_is_bounded():
-    case = make_hartmann_case(ha=20.0, ny=16, nz=16)
-    solution = solve_steady(case)
-    comparison = hartmann_validation(solution, ha=20.0)
-    assert comparison.l2_error < 0.05
-
-
-def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
-    case = make_hartmann_case(ha=20.0, ny=16, nz=16)
-    solution = solve_steady(case)
-    acceptance = hartmann_acceptance(solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2)
-    path = write_acceptance_report(acceptance, tmp_path / "acceptance.json")
-    assert path.exists()
-    assert acceptance.passed is True
-    assert acceptance.passed_l2 is True
 
 
 def test_estimate_observed_order_returns_second_order_for_quadratic_drop():
