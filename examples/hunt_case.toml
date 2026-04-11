@@ -57,6 +57,8 @@ write_stride = 1
 
 [logging]
 enabled = true
+verbose = true
+verbosity = "detailed"
 banner = true
 print_regions = true
 print_boundaries = true

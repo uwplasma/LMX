@@ -52,6 +52,8 @@ python -m pip install -e '.[dev,plotting,docs,extras]'
 lmx examples/hartmann_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
+lmx run hartmann --ha 20 --verbose
+lmx run hunt --ha 20 --verbosity debug
 ```
 
 The module entrypoint works as well:
@@ -64,11 +66,14 @@ python -m lmx examples/hartmann_case.toml
 
 ```python
 from lmx.cases import make_hartmann_case
+from lmx.config import LoggingSpec
+from lmx.runtime_logging import StreamingSolverLogger
 from lmx.solvers import solve_steady
 
 case = make_hartmann_case(ha=20.0, ny=48, nz=48)
-solution = solve_steady(case)
-print(solution.diagnostics.velocity_residual_history[-1])
+logger = StreamingSolverLogger(LoggingSpec.from_user_controls(verbose=True, verbosity="debug"))
+solution = solve_steady(case, logger=logger)
+print(solution.diagnostics.residual_history[-1])
 ```
 
 ### Run tests and docs
@@ -132,13 +137,20 @@ blocks are:
 
 - `[case]`
 - `[geometry]`
-- `[materials]`
 - `[magnetic_field]`
 - `[solver]`
 - `[time_stepper]`
 - `[output]`
 - `[logging]`
 - `[restart]`
+
+The `[logging]` block supports both:
+
+- `verbose = true|false`
+- `verbosity = "quiet" | "normal" | "detailed" | "debug"`
+
+Use `verbose = false` for quiet batch runs and `verbosity = "debug"` when you
+need the most detailed live runtime output.
 
 ### Example workflow
 

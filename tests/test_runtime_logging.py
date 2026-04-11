@@ -221,3 +221,42 @@ def test_streaming_solver_logger_respects_disable_stride_and_legacy_sections():
 
 def test_default_log_path_appends_case_log_name(tmp_path: Path):
     assert default_log_path(tmp_path, "demo_case") == tmp_path / "demo_case.log"
+
+
+def test_streaming_solver_logger_normal_verbosity_suppresses_detailed_sections():
+    stream = StringIO()
+    logger = StreamingSolverLogger(LoggingSpec(verbosity="normal"), stream=stream)
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    mesh = _build_mesh(case)
+    materials = build_material_fields(case, mesh)
+
+    logger.emit_header(
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        mode="steady",
+        potential_solver=case.time_stepper.potential_solver,
+        target_mean_velocity=None,
+        reference_mean_velocity=None,
+        restart=RestartLogInfo(enabled=False),
+    )
+    logger.emit_step(_sample_record())
+
+    text = stream.getvalue()
+    assert "LMX Solver Run" in text
+    assert "Read region properties" not in text
+    assert "Read boundary conditions" not in text
+    assert "MHD integrals" not in text
+    assert "MHD conservation" not in text
+    assert "MHD limiter" not in text
+    assert "steadySolver" in text
+
+
+def test_streaming_solver_logger_debug_verbosity_prints_debug_line():
+    stream = StringIO()
+    logger = StreamingSolverLogger(LoggingSpec(verbosity="debug"), stream=stream)
+    logger.emit_step(_sample_record())
+    text = stream.getvalue()
+    assert "MHD debug" in text
+    assert "faceCurrentRatio" in text
+    assert "faceLorentzRatio" in text

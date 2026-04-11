@@ -24,7 +24,13 @@ lmx examples/hartmann_case.toml
 lmx examples/hartmann_restart_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
+lmx run hartmann --ha 20 --verbose
+lmx run hunt --ha 20 --verbosity debug
 ```
+
+The example TOML files expose both `verbose = true|false` and
+`verbosity = "quiet" | "normal" | "detailed" | "debug"` in their `[logging]`
+block, so they double as templates for both batch and interactive runs.
 
 ## Replot saved NPZ outputs
 

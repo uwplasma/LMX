@@ -21,12 +21,54 @@ from .specs import (
 @dataclass(frozen=True)
 class LoggingSpec:
     enabled: bool = True
+    verbosity: str = "detailed"
     banner: bool = True
     print_regions: bool = True
     print_boundaries: bool = True
     print_footer: bool = True
     flush: bool = True
     step_stride: int = 1
+
+    @classmethod
+    def from_user_controls(
+        cls,
+        *,
+        enabled: bool = True,
+        verbose: bool | None = None,
+        verbosity: str | None = None,
+        banner: bool = True,
+        print_regions: bool = True,
+        print_boundaries: bool = True,
+        print_footer: bool = True,
+        flush: bool = True,
+        step_stride: int = 1,
+    ) -> "LoggingSpec":
+        if verbose is not None:
+            enabled = enabled and bool(verbose)
+            if verbosity is None:
+                verbosity = "detailed" if verbose else "quiet"
+        normalized = str(verbosity or "detailed").lower()
+        if normalized not in {"quiet", "normal", "detailed", "debug"}:
+            raise ValueError(f"Unsupported logging verbosity {normalized!r}")
+        if normalized == "quiet":
+            enabled = False
+        return cls(
+            enabled=enabled,
+            verbosity=normalized,
+            banner=banner,
+            print_regions=print_regions,
+            print_boundaries=print_boundaries,
+            print_footer=print_footer,
+            flush=flush,
+            step_stride=step_stride,
+        )
+
+    def verbosity_rank(self) -> int:
+        levels = {"quiet": 0, "normal": 1, "detailed": 2, "debug": 3}
+        return levels.get(self.verbosity, 2)
+
+    def is_enabled(self) -> bool:
+        return bool(self.enabled) and self.verbosity_rank() > 0
 
 
 @dataclass(frozen=True)
@@ -223,8 +265,10 @@ def load_run_config(path: str | Path) -> RunConfig:
         notes=str(case_table.get("notes", "")),
     )
 
-    logging = LoggingSpec(
+    logging = LoggingSpec.from_user_controls(
         enabled=bool(logging_table.get("enabled", True)),
+        verbose=None if logging_table.get("verbose") is None else bool(logging_table.get("verbose")),
+        verbosity=None if logging_table.get("verbosity") is None else str(logging_table.get("verbosity")),
         banner=bool(logging_table.get("banner", True)),
         print_regions=bool(logging_table.get("print_regions", True)),
         print_boundaries=bool(logging_table.get("print_boundaries", True)),

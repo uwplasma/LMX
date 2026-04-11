@@ -337,3 +337,39 @@ def test_run_branch_quiet_disables_logging(monkeypatch: pytest.MonkeyPatch, tmp_
 
     assert exit_code == 0
     assert recorded["enabled"] is False
+
+
+def test_run_branch_verbose_enables_debug_logging(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "_build_case", lambda args: case)
+    monkeypatch.setattr(
+        cli,
+        "_run_config",
+        lambda config: recorded.update(enabled=config.logging.enabled, verbosity=config.logging.verbosity) or {"case": case.name},
+    )
+
+    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), "--verbose"])
+
+    assert exit_code == 0
+    assert recorded["enabled"] is True
+    assert recorded["verbosity"] == "debug"
+
+
+def test_run_branch_explicit_verbosity_overrides_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "_build_case", lambda args: case)
+    monkeypatch.setattr(
+        cli,
+        "_run_config",
+        lambda config: recorded.update(enabled=config.logging.enabled, verbosity=config.logging.verbosity) or {"case": case.name},
+    )
+
+    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), "--verbosity", "normal"])
+
+    assert exit_code == 0
+    assert recorded["enabled"] is True
+    assert recorded["verbosity"] == "normal"

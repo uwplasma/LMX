@@ -45,6 +45,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The historical reduced solver is retained only for regression.
 - Runtime diagnostics now include linear residuals, flow rate, current,
   Lorentz power, and conservation signals.
+- The logging surface now has a documented boolean `verbose` alias and explicit
+  `verbosity = quiet|normal|detailed|debug` controls in TOML, CLI, and Python
+  driver usage.
 - Public docs and examples now present a clean `1.0` release surface.
 - External executable comparisons are documented only as secondary benchmark
   evidence, not as implementation guidance.

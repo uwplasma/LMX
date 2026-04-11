@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from lmx.config import _parse_boundary_value, load_run_config
+from lmx.config import LoggingSpec, _parse_boundary_value, load_run_config
 
 
 pytestmark = pytest.mark.unit
@@ -69,6 +69,8 @@ write_stride = 1
 
 [logging]
 enabled = true
+verbose = true
+verbosity = "debug"
 banner = true
 print_regions = true
 print_boundaries = true
@@ -128,6 +130,7 @@ side = "max"
     assert config.case.solver.preconditioner == "block_jacobi"
     assert config.case.solver.coupling_iterations == 9
     assert config.case.time_stepper.potential_solver == "cg"
+    assert config.logging.verbosity == "debug"
     assert config.logging.step_stride == 2
     assert config.restart.enabled is True
     assert config.restart.path == (tmp_path / "previous_results.npz").resolve()
@@ -377,3 +380,24 @@ max_steps = 1
 
     with pytest.raises(ValueError, match="Unsupported solve mode"):
         load_run_config(input_file)
+
+
+def test_logging_spec_from_user_controls_supports_verbose_alias_and_quiet():
+    detailed = LoggingSpec.from_user_controls(verbose=True)
+    assert detailed.enabled is True
+    assert detailed.verbosity == "detailed"
+
+    quiet = LoggingSpec.from_user_controls(verbose=False)
+    assert quiet.enabled is False
+    assert quiet.verbosity == "quiet"
+
+    debug = LoggingSpec.from_user_controls(enabled=True, verbosity="debug")
+    assert debug.enabled is True
+    assert debug.verbosity == "debug"
+    assert debug.verbosity_rank() == 3
+    assert debug.is_enabled() is True
+
+
+def test_logging_spec_rejects_invalid_verbosity():
+    with pytest.raises(ValueError, match="Unsupported logging verbosity"):
+        LoggingSpec.from_user_controls(verbosity="loud")

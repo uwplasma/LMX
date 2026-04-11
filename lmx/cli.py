@@ -10,7 +10,7 @@ import jax.numpy as jnp
 
 from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from .config import RunConfig, load_run_config
+from .config import LoggingSpec, RunConfig, load_run_config
 from .io import load_restart_bundle, validate_restart_bundle, write_paraview, write_restart_npz, write_solution_outputs
 from .runtime_logging import RestartLogInfo, StreamingSolverLogger, default_log_path
 from .solvers import _build_mesh, solve_steady, solve_transient
@@ -247,6 +247,8 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--mode", choices=["steady", "transient"], default="steady")
     run_parser.add_argument("--plots", action="store_true")
     run_parser.add_argument("--quiet", action="store_true")
+    run_parser.add_argument("--verbose", action="store_true")
+    run_parser.add_argument("--verbosity", choices=["quiet", "normal", "detailed", "debug"], default=None)
 
     bench_parser = subparsers.add_parser("benchmark")
     bench_parser.add_argument("--repeats", type=int, default=3)
@@ -355,8 +357,32 @@ def main(argv: list[str] | None = None) -> int:
         }
     )
     config = RunConfig(case=case, solve_mode=args.mode)
+    logging = config.logging
     if args.quiet:
-        config = RunConfig(case=case, solve_mode=args.mode, logging=config.logging.__class__(enabled=False))
+        logging = LoggingSpec.from_user_controls(
+            enabled=False,
+            verbosity="quiet",
+            banner=logging.banner,
+            print_regions=logging.print_regions,
+            print_boundaries=logging.print_boundaries,
+            print_footer=logging.print_footer,
+            flush=logging.flush,
+            step_stride=logging.step_stride,
+        )
+    elif args.verbose or args.verbosity is not None:
+        logging = LoggingSpec.from_user_controls(
+            enabled=True,
+            verbose=True if args.verbose else None,
+            verbosity=args.verbosity or ("debug" if args.verbose else logging.verbosity),
+            banner=logging.banner,
+            print_regions=logging.print_regions,
+            print_boundaries=logging.print_boundaries,
+            print_footer=logging.print_footer,
+            flush=logging.flush,
+            step_stride=logging.step_stride,
+        )
+    if logging is not config.logging:
+        config = RunConfig(case=case, solve_mode=args.mode, logging=logging)
     _run_config(config)
     return 0
 

@@ -125,3 +125,16 @@ families are covered through a smaller number of focused acceptance tests.
 
 Do not use the default test suite as a vehicle for long benchmark or artifact
 generation. Those belong in the manual research-artifact workflows.
+
+## Logging surface
+
+LMX now exposes the same runtime logging controls through all public entry
+points:
+
+- TOML: `[logging] verbose = true|false`, `verbosity = "quiet"|"normal"|"detailed"|"debug"`
+- CLI: `--quiet`, `--verbose`, `--verbosity ...`
+- Python: `LoggingSpec.from_user_controls(...)`
+
+Use `verbosity="debug"` only for active solver investigation; it is intentionally
+the noisiest path and prints extra runtime ratios for current and Lorentz
+diagnostics.

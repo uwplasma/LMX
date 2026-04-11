@@ -68,6 +68,9 @@ class StreamingSolverLogger:
         for stream in self.streams:
             print(line, file=stream, flush=self.config.flush)
 
+    def _verbosity_rank(self) -> int:
+        return self.config.verbosity_rank() if hasattr(self.config, "verbosity_rank") else 2
+
     def emit_header(
         self,
         *,
@@ -80,7 +83,7 @@ class StreamingSolverLogger:
         reference_mean_velocity: float | None,
         restart: RestartLogInfo | None = None,
     ) -> None:
-        if not self.config.enabled:
+        if not self.config.is_enabled():
             return
         width = 92
         if self.config.banner:
@@ -117,7 +120,7 @@ class StreamingSolverLogger:
                 f"Restart controls            : source={restart.path}, startTime={restart.start_time:.6e}, "
                 f"resetHistories={restart.reset_histories}"
             )
-        if self.config.print_regions:
+        if self._verbosity_rank() >= 2 and self.config.print_regions:
             self._write("Read region properties")
             for region in case.regions:
                 self._write(
@@ -133,7 +136,7 @@ class StreamingSolverLogger:
                 f"nu=[{float(jnp.min(materials.viscosity)):.6e}, {float(jnp.max(materials.viscosity)):.6e}] "
                 f"fluidFraction={fluid_fraction:.6f}"
             )
-        if self.config.print_boundaries:
+        if self._verbosity_rank() >= 2 and self.config.print_boundaries:
             self._write("Read boundary conditions")
             for boundary in case.boundary_conditions:
                 self._write(
@@ -144,7 +147,7 @@ class StreamingSolverLogger:
         self._write("-" * width)
 
     def emit_step(self, record: SolverStepRecord) -> None:
-        if not self.config.enabled:
+        if not self.config.is_enabled():
             return
         if record.step_index > 1 and (record.step_index - 1) % max(self.config.step_stride, 1) != 0:
             return
@@ -163,33 +166,42 @@ class StreamingSolverLogger:
             f"max|U| = {record.u_max:.6e}, mean(U) = {record.mean_velocity:.6e}, "
             f"CourantLike = {record.courant_like:.6e}"
         )
-        self._write(
-            "MHD electromagnetics           "
-            f"max|J| = {record.current_max:.6e}, max|J_face| = {record.face_current_max:.6e}, "
-            f"max|UxB| = {record.emf_max:.6e}, max|JxB| = {record.lorentz_max:.6e}, "
-            f"max|JxB|_face = {record.face_lorentz_max:.6e}"
-        )
-        self._write(
-            "MHD forcing                    "
-            f"appliedForcing = {record.applied_forcing:.6e}, pressureProxy = {record.pressure_proxy:.6e}, "
-            f"currentScaledPressureProxy = {record.current_scaled_pressure_proxy:.6e}, "
-            f"OhmicPower = {record.ohmic_power:.6e}"
-        )
-        self._write(
-            "MHD integrals                  "
-            f"Q = {record.volumetric_flow_rate:.6e}, mean|J| = {record.mean_current_magnitude:.6e}, "
-            f"LorentzPower = {record.lorentz_power:.6e}"
-        )
-        self._write(
-            "MHD conservation               "
-            f"max|divJ| = {record.div_current_max:.6e}, gaugeResidual = {record.gauge_residual:.6e}, "
-            f"interfaceCurrentResidual = {record.interface_current_residual:.6e}"
-        )
-        self._write(
-            "MHD limiter                    "
-            f"rawUpdateMax = {record.raw_update_max:.6e}, limiterScale = {record.limiter_scale:.6e}, "
-            f"limitedFraction = {record.limited_fraction:.6e}"
-        )
+        if self._verbosity_rank() >= 2:
+            self._write(
+                "MHD electromagnetics           "
+                f"max|J| = {record.current_max:.6e}, max|J_face| = {record.face_current_max:.6e}, "
+                f"max|UxB| = {record.emf_max:.6e}, max|JxB| = {record.lorentz_max:.6e}, "
+                f"max|JxB|_face = {record.face_lorentz_max:.6e}"
+            )
+            self._write(
+                "MHD forcing                    "
+                f"appliedForcing = {record.applied_forcing:.6e}, pressureProxy = {record.pressure_proxy:.6e}, "
+                f"currentScaledPressureProxy = {record.current_scaled_pressure_proxy:.6e}, "
+                f"OhmicPower = {record.ohmic_power:.6e}"
+            )
+            self._write(
+                "MHD integrals                  "
+                f"Q = {record.volumetric_flow_rate:.6e}, mean|J| = {record.mean_current_magnitude:.6e}, "
+                f"LorentzPower = {record.lorentz_power:.6e}"
+            )
+            self._write(
+                "MHD conservation               "
+                f"max|divJ| = {record.div_current_max:.6e}, gaugeResidual = {record.gauge_residual:.6e}, "
+                f"interfaceCurrentResidual = {record.interface_current_residual:.6e}"
+            )
+            self._write(
+                "MHD limiter                    "
+                f"rawUpdateMax = {record.raw_update_max:.6e}, limiterScale = {record.limiter_scale:.6e}, "
+                f"limitedFraction = {record.limited_fraction:.6e}"
+            )
+        if self._verbosity_rank() >= 3:
+            face_current_ratio = record.face_current_max / max(record.current_max, 1e-12)
+            face_lorentz_ratio = record.face_lorentz_max / max(record.lorentz_max, 1e-12)
+            self._write(
+                "MHD debug                      "
+                f"step = {record.step_index:d}, dt = {record.dt:.6e}, "
+                f"faceCurrentRatio = {face_current_ratio:.6e}, faceLorentzRatio = {face_lorentz_ratio:.6e}"
+            )
         self._write(
             "steadySolver                   "
             f"velocity residual = {record.residual:.6e}"
@@ -198,7 +210,7 @@ class StreamingSolverLogger:
         self._write("")
 
     def emit_footer(self, solution: Solution) -> None:
-        if not self.config.enabled or not self.config.print_footer:
+        if not self.config.is_enabled() or not self.config.print_footer:
             return
         elapsed = time.perf_counter() - self._start_time
         self._write("-" * 92)

@@ -10,37 +10,42 @@ lmx examples/hartmann_case.toml
 
 - `[case]`
 - `[geometry]`
-- `[materials]`
 - `[magnetic_field]`
 - `[solver]`
 - `[time_stepper]`
 - `[output]`
 - `[logging]`
 - `[restart]`
+- `[[regions]]`
+- `[[boundary_conditions]]`
 
-## Minimal example
+## Minimal complete example
 
 ```toml
 [case]
 name = "hartmann_ha20"
-kind = "hartmann"
+forcing = 1.0
+initial_velocity = 0.0
+reference_pressure_gradient = -1.0
+reference_phi_cell = [0, 0]
 
 [geometry]
 kind = "rect_duct"
 width = 2.0
 height = 2.0
+length = 1.0
+nx = 1
 ny = 48
 nz = 48
+wall_thickness = [0.0, 0.0, 0.0, 0.0]
+wall_cells = [0, 0, 0, 0]
 target_ha = 20.0
-
-[materials]
-fluid_density = 1.0
-fluid_viscosity = 1.0
-fluid_conductivity = 1.0
 
 [magnetic_field]
 kind = "constant"
-value = [0.0, 0.0, 1.0]
+value = [0.0, 0.0, 20.0]
+ramp_start = 0.0
+ramp_duration = 0.0
 
 [solver]
 kind = "fully_developed_inductionless"
@@ -48,63 +53,122 @@ mode = "steady"
 linear_solver = "auto"
 preconditioner = "jacobi"
 time_scheme = "implicit_euler"
+coupling_iterations = 12
+coupling_tolerance = 1.0e-8
 
 [time_stepper]
-dt = 1e-3
+dt = 1.0e-3
 t_final = 0.1
-max_steps = 500
-steady_tolerance = 1e-8
+max_steps = 200
+potential_iterations = 400
+potential_tolerance = 1.0e-6
+potential_relaxation = 1.0
+potential_solver = "cg"
+steady_tolerance = 1.0e-8
+steady_potential_tolerance = 1.0e-6
+checkpoint_stride = 1
 
 [output]
 directory = "artifacts/hartmann"
+write_paraview = true
+write_csv_profiles = true
 write_npz = true
-write_vtk = true
+write_json_summary = true
 write_plots = true
-write_restart = true
+copy_input_file = true
+write_stride = 1
 
 [logging]
+enabled = true
+verbose = true
 verbosity = "detailed"
-write_log_file = true
+banner = true
+print_regions = true
+print_boundaries = true
+print_footer = true
+flush = true
+step_stride = 1
+
+[restart]
+enabled = false
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+density = 1.0
+viscosity = 0.01
+
+[[boundary_conditions]]
+name = "y_min_wall"
+kind = "no_slip"
+axis = "y"
+side = "min"
+
+[[boundary_conditions]]
+name = "y_max_wall"
+kind = "no_slip"
+axis = "y"
+side = "max"
+
+[[boundary_conditions]]
+name = "z_min_wall"
+kind = "insulating"
+axis = "z"
+side = "min"
+
+[[boundary_conditions]]
+name = "z_max_wall"
+kind = "insulating"
+axis = "z"
+side = "max"
 ```
 
 ## `[case]`
 
 - `name`
   - case identifier used in output files
-- `kind`
-  - `hartmann`
-  - `shercliff`
-  - `hunt`
+- `forcing`
+  - explicit streamwise forcing used by the reduced duct problems
+- `initial_velocity`
+  - initial streamwise velocity used for transient and steady starts
+- `reference_pressure_gradient`
+  - reference forcing scale used in benchmark constructors
+- `reference_phi_cell`
+  - gauge anchor index for `phi`
+- `notes`
+  - free-form case description copied into output metadata
 
 ## `[geometry]`
 
 - `kind`
   - `rect_duct`
   - `layered_duct`
-- `width`, `height`
-  - fluid duct dimensions
-- `ny`, `nz`
-  - cross-sectional resolution
+- `width`, `height`, `length`
+  - domain dimensions
+- `nx`, `ny`, `nz`
+  - grid counts
+- `radius`, `nr`, `ntheta`
+  - reserved for future pipe / mapped-geometry paths
+- `wall_thickness`
+  - four wall thickness values for layered ducts
+- `wall_cells`
+  - four wall-cell counts for layered ducts
 - `target_ha`
-  - Hartmann number used by the benchmark constructors
-- layered-duct inputs
-  - wall thicknesses
-  - wall conductivity or conductance-ratio controls
-
-## `[materials]`
-
-- `fluid_density`
-- `fluid_viscosity`
-- `fluid_conductivity`
-- layered-region properties when solids are present
+  - benchmark Hartmann number used by the case constructors
+- `target_side_layer`
+  - optional side-layer tuning input for layered benchmarks
 
 ## `[magnetic_field]`
 
 - `kind`
   - `constant`
-  - `analytic`
+  - `table`
+  - analytic callables are Python-only, not TOML inputs
 - `value`
   - constant field components
+- `table_path`
+  - optional table-backed field input path
 - `ramp_start`
 - `ramp_duration`
 
@@ -129,45 +193,113 @@ write_log_file = true
 - `time_scheme`
   - `implicit_euler`
   - `crank_nicolson` reserved for future transient families
+- `coupling_iterations`
+- `coupling_tolerance`
 
 ## `[time_stepper]`
 
 - `dt`
 - `t_final`
 - `max_steps`
+- `potential_iterations`
+- `potential_tolerance`
+- `potential_relaxation`
+- `potential_solver`
 - `steady_tolerance`
 - `steady_potential_tolerance`
-- legacy-only controls
-  - retained for `solver.kind = "legacy_reduced"`
-  - intentionally not part of the default research path
+- `checkpoint_stride`
+- legacy-only controls:
+  - `outer_iterations`
+  - `current_reconstruction`
+  - `post_update_potential_refresh`
+  - `relaxation`
+  - `velocity_update_limit`
+  - `velocity_update_limiter`
 
 ## `[output]`
 
 - `directory`
+- `write_paraview`
+- `write_csv_profiles`
 - `write_npz`
-- `write_restart`
-- `write_vtk`
+- `write_json_summary`
 - `write_plots`
 - `copy_input_file`
-- `field_stride`
-- `probe_stride`
-- `slice_stride`
+- `write_stride`
 
 ## `[logging]`
 
+- `enabled`
+  - master on/off switch for the live runtime logger
+- `verbose`
+  - simple boolean alias for common usage
+  - `true` enables live logging
+  - `false` disables it
 - `verbosity`
   - `quiet`
   - `normal`
   - `detailed`
   - `debug`
-- `write_log_file`
+- `banner`
+- `print_regions`
+- `print_boundaries`
+- `print_footer`
+- `flush`
+- `step_stride`
+
+Recommended usage:
+
+- `verbose = false` for large parameter sweeps
+- `verbosity = "normal"` for routine local runs
+- `verbosity = "detailed"` for validation runs
+- `verbosity = "debug"` for solver investigations
 
 ## `[restart]`
 
 - `enabled`
-- `input_npz`
-- `append_histories`
-- `write_restart_npz`
+- `path`
+- `reset_histories`
+- `write_restart`
+- `restart_filename`
+
+## `[[regions]]`
+
+- `name`
+- `kind`
+  - `fluid`
+  - solid-region tags used in layered ducts
+- `conductivity`
+- `density`
+- `viscosity`
+- `wall_thickness`
+
+## `[[boundary_conditions]]`
+
+- `name`
+- `kind`
+  - `no_slip`
+  - `insulating`
+  - `conducting_wall`
+  - `inlet_velocity`
+  - `inlet_flow_rate`
+- `axis`
+- `side`
+- `region`
+- `value`
+  - scalar or 3-vector depending on the boundary type
+
+## Python driver usage
+
+In Python driver scripts, use the same runtime controls through
+`lmx.config.LoggingSpec.from_user_controls(...)`. For example:
+
+```python
+from lmx.config import LoggingSpec
+from lmx.runtime_logging import StreamingSolverLogger
+
+logging = LoggingSpec.from_user_controls(verbose=True, verbosity="debug")
+logger = StreamingSolverLogger(logging)
+```
 
 ## Where each block is implemented
 
