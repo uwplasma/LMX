@@ -6,6 +6,14 @@ developed duct flows, benchmark-quality validation, explicit runtime
 diagnostics, restartable CLI workflows, and a clean differentiable lane for
 inverse problems and design studies.
 
+The `1.0` ship gate is now closed on the fast release lane:
+
+- fast validation suite passes within the five-minute budget
+- docs build cleanly
+- combined `lmx/` + `scripts/` coverage is at `90%`
+- CLI and restart smokes pass on the shipped TOML workflow
+- publication-facing strong-scaling and autodiff artifacts are committed
+
 ## What LMX is for
 
 - Hartmann, Shercliff, and Hunt benchmark problems

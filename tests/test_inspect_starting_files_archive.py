@@ -154,3 +154,31 @@ def test_main_writes_json_for_inspection(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert payload["status"] == "ok"
     assert payload["entry_count"] == 1
 
+
+def test_main_writes_json_for_extract(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    archive_path = tmp_path / "cases.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("Hunt/caseB.txt", "b")
+
+    monkeypatch.setattr(
+        archive_tools.argparse.ArgumentParser,
+        "parse_args",
+        lambda self: type(
+            "Args",
+            (),
+            {
+                "archive": archive_path,
+                "pattern": "hunt",
+                "extract": True,
+                "output_dir": tmp_path / "extract",
+            },
+        )(),
+    )
+
+    exit_code = archive_tools.main()
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["extracted_count"] == 1
+    assert (tmp_path / "extract" / "Hunt" / "caseB.txt").read_text() == "b"

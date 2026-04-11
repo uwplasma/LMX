@@ -209,3 +209,66 @@ def test_compare_trace_histories_tolerates_partial_live_logs(tmp_path: Path):
     assert payload["primary_lorentz_metric"] == "centered_lorentz_max"
     assert payload["face_current_max"]["max_raw_relative_error"] == pytest.approx(0.0)
     assert payload["reference_pressure_final_records"] == []
+
+
+def test_compare_helpers_cover_empty_and_error_paths():
+    assert compare._current_scaled_pressure_proxy([], [], []) == []
+    assert compare._current_scaled_pressure_proxy([1.0], [], []) == []
+    assert compare._current_scaled_pressure_proxy([2.0], [0.0], []) == [0.0]
+    assert compare._normalize([]) == []
+    assert compare._normalize([0.0, 1.0]) == [0.0, 0.0]
+
+    with pytest.raises(ValueError, match="empty series"):
+        compare._interpolate([], [], 0.5)
+    with pytest.raises(ValueError, match="same length"):
+        compare._interpolate([0.0], [1.0, 2.0], 0.5)
+
+    assert compare._interpolate([0.0, 1.0], [2.0, 4.0], -1.0) == pytest.approx(2.0)
+    assert compare._interpolate([0.0, 1.0], [2.0, 4.0], 2.0) == pytest.approx(4.0)
+    assert compare._interpolate([0.0, 1.0], [2.0, 4.0], 0.5) == pytest.approx(3.0)
+
+
+def test_compare_trace_histories_prefers_current_scaled_pressure_proxy(tmp_path: Path):
+    reference_path = tmp_path / "reference.json"
+    lmx_path = tmp_path / "lmx.json"
+    reference_path.write_text(
+        json.dumps(
+            {
+                "records": [
+                    {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 1.0, "maxP": 3.0, "minP": 1.0, "pSpan": 2.0},
+                    {"kind": "pressure", "time": 0.2, "corr": 0, "maxU": 0.5, "maxP": 1.5, "minP": 0.5, "pSpan": 1.0},
+                    {"kind": "epot", "time": 0.1, "maxJ": 2.0, "maxCenteredJxB": 1.0, "maxJxB": 1.0},
+                    {"kind": "epot", "time": 0.2, "maxJ": 1.0, "maxCenteredJxB": 0.5, "maxJxB": 0.5},
+                ]
+            }
+        )
+    )
+    lmx_path.write_text(
+        json.dumps(
+            {
+                "lmx_solver": {
+                    "trace": {
+                        "time_history": [0.1, 0.2],
+                        "u_max_history": [1.0, 0.5],
+                        "mean_velocity_history": [1.0, 0.5],
+                        "applied_forcing_history": [3.0, 1.5],
+                        "pressure_proxy_history": [3.0, 2.0],
+                        "current_scaled_pressure_proxy_history": [2.0, 1.0],
+                        "current_max_history": [2.0, 1.0],
+                        "face_current_max_history": [],
+                        "emf_max_history": [],
+                        "lorentz_max_history": [1.0, 0.5],
+                        "face_lorentz_max_history": [],
+                        "residual_history": [],
+                        "potential_residual_history": [],
+                        "potential_iterations_history": [],
+                    }
+                }
+            }
+        )
+    )
+
+    payload = compare.compare_trace_histories(reference_path, lmx_path)
+
+    assert payload["pressure_proxy"]["l2_error"] > payload["current_scaled_pressure_proxy"]["l2_error"]
+    assert payload["primary_pressure_proxy_metric"] == "current_scaled_pressure_proxy"

@@ -32,12 +32,12 @@ Ship a research-grade `1.0` inductionless MHD code with:
 
 ## Open items
 
-1. Finish solver-family hardening for the default fully developed path.
-2. Push benchmark and physics tests toward release quality.
-3. Complete the documentation and API cleanup for the `1.0` public surface.
-4. Audit performance and preserve the differentiable core path.
-5. Stage `extruded_inductionless` interfaces and benchmark manifests for the
+1. Keep hardening the default fully developed solver family in the manual
+   release-validation lane.
+2. Expand benchmark and physics depth for publication datasets.
+3. Stage `extruded_inductionless` interfaces and benchmark manifests for the
    next paper.
+4. Extend the differentiable lane beyond the shipped Hartmann example.
 
 ## Current status
 
@@ -73,7 +73,7 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The full local fast suite now completes in about `35 s`, and the full
   local coverage lane completes in about `45 s`, both within the hard
   five-minute limit for routine validation.
-- Current combined coverage for `lmx/` and `scripts/` is about `89%`.
+- Current combined coverage for `lmx/` and `scripts/` is `90%`.
 - Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
   the release gate uses short-budget generated TOMLs rather than full
   long-horizon example runs so the interface is verified without violating the
@@ -90,14 +90,17 @@ Ship a research-grade `1.0` inductionless MHD code with:
   in `lmx/physics.py` and `lmx/plotting.py`; the remaining release-coverage
   gap is even more concentrated in `lmx/solvers.py`.
 - The biggest remaining coverage gap is now overwhelmingly
-  `lmx/solvers.py`, so the remaining work is no longer suite runtime but
-  targeted solver-family branch coverage.
+  `lmx/solvers.py`, so post-1.0 test work is targeted solver-family branch
+  coverage rather than suite-runtime cleanup.
+- The fast ship gate, docs build, budgeted CLI/restart smokes, performance
+  figures, autodiff figures, and release coverage threshold are all now in
+  place for `1.0`.
 
 ## Release checklist
 
-- [ ] Hartmann analytical acceptance locked
-- [ ] Shercliff analytical acceptance locked
-- [ ] Hunt benchmark acceptance locked
+- [x] Hartmann analytical acceptance locked
+- [x] Shercliff analytical acceptance locked
+- [x] Hunt benchmark acceptance locked
 - [x] docs build clean
 - [x] CLI examples clean
 - [x] restart examples clean
