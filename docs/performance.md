@@ -52,6 +52,7 @@ CPU:
 
 ```bash
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
+XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
 ```
 
 Single GPU:
@@ -63,7 +64,12 @@ JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
 Those commands select the execution device for the normal CLI solver run. The
 publication strong-scaling figures use `examples/strong_scaling_demo.py`,
 because that benchmark intentionally exercises the sharded stencil kernel across
-multiple CPU or GPU devices.
+multiple CPU or GPU devices. For remote GPU runs on the `office` host, the same
+pattern works over SSH:
+
+```bash
+ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/hunt_case.toml'
+```
 
 ## Publication artifact
 
@@ -115,6 +121,19 @@ Recent small validation run on `office`:
 Those numbers are not the publication artifact; they are the current
 post-`1.0` smoke validation that the remote-GPU orchestration still works on a
 live two-GPU host.
+
+Recent matched one-device comparison used to confirm the expected CPU/GPU
+direction of travel for the current tree:
+
+- local CPU `512 x 512`, `32` iterations:
+  - `warm_seconds ≈ 4.31e-3`
+- office GPU `512 x 512`, `32` iterations:
+  - `warm_seconds ≈ 6.65e-4`
+
+At that problem size the remote single-GPU warm runtime is faster than the
+local one-device CPU warm runtime. Small two-GPU runs are still dominated by
+overhead, so multi-GPU strong scaling should be judged on the larger committed
+publication artifact, not on these smoke runs.
 
 ## Design notes
 

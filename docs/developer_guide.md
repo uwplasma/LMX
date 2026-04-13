@@ -109,7 +109,7 @@ The current local baseline is:
 
 - full fast `pytest -q`: about `31 s`
 - full coverage lane over `lmx/` and `scripts/`: about `37 s`
-- current combined coverage over `lmx/` and `scripts/`: about `87%`
+- current combined coverage over `lmx/` and `scripts/`: about `90%`
 
 The hard rule for routine validation is that these lanes must stay under five
 minutes. When a new test exceeds that budget, prefer:

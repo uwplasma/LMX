@@ -200,7 +200,10 @@ side = "max"
 
 - `dt`
 - `t_final`
+- `t_final` is a hard stop horizon; the solver does not round it up into an
+  extra step when `t_final / dt` is fractional
 - `max_steps`
+- `max_steps` is a hard upper bound on executed steps
 - `potential_iterations`
 - `potential_tolerance`
 - `potential_relaxation`
@@ -246,6 +249,9 @@ side = "max"
 - `print_footer`
 - `flush`
 - `step_stride`
+- at `detailed` and `debug`, the live log prints both initial and final
+  residuals for the potential and velocity solves together with conservation
+  diagnostics
 
 Recommended usage:
 

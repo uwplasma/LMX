@@ -49,6 +49,7 @@ The default solver writes or reports:
 - `mean_current_magnitude_history`
 - `lorentz_power_history`
 - `div_current_max_history`
+- `charge_balance_residual_history`
 - `gauge_residual_history`
 - `interface_current_residual_history`
 

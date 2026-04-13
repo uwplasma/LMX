@@ -74,7 +74,9 @@ lmx examples/hunt_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
+XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
 JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
+ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/hunt_case.toml'
 ```
 
 The module entrypoint works as well:
@@ -165,6 +167,15 @@ information, linear-solve residuals, integral MHD diagnostics, conservation
 checks, initial and final linear/potential residuals, and transient progress in
 a format intended for long research runs.
 
+At `verbosity = "detailed"` or `verbosity = "debug"`, each step reports:
+
+- initial and final residuals for the potential and velocity solves
+- linear iteration counts
+- `max|div J|`
+- charge-balance residual
+- interface-current continuity residual
+- volumetric flow rate, mean current magnitude, and Lorentz power
+
 ## Performance and autodiff examples
 
 ### Strong scaling
@@ -199,12 +210,22 @@ GPU hosts.
 Standard CLI runs are not themselves a multi-device scaling benchmark, but they
 inherit the active JAX backend from the shell. Use `examples/strong_scaling_demo.py`
 for publication scaling studies and use `JAX_PLATFORMS` / `CUDA_VISIBLE_DEVICES`
-to steer normal CLI runs to CPU or GPU backends.
+to steer normal CLI runs to CPU or GPU backends. If you want multiple logical
+CPU devices visible to JAX from the CLI, also set
+`XLA_FLAGS=--xla_force_host_platform_device_count=<N>`.
 
 The recent remote smoke validation on `office` confirmed that a `512 x 512`
-GPU kernel run is faster than the small local CPU benchmark on the current
-post-`1.0` tree, which is the expected direction of travel for the performance
-lane.
+GPU kernel run is faster than the matching local one-device CPU run on the
+current post-`1.0` tree:
+
+- local CPU, `512 x 512`, `32` iterations:
+  - `warm_seconds ≈ 4.31e-3`
+- remote office GPU, `512 x 512`, `32` iterations:
+  - `warm_seconds ≈ 6.65e-4`
+
+Very small multi-GPU problems can still scale poorly. Use the dedicated scaling
+example, not routine CLI runs, when you need publication-quality strong-scaling
+data.
 
 ### Autodiff sensitivity and inverse design
 
@@ -274,6 +295,12 @@ The `[logging]` block supports both:
 
 Use `verbose = false` for quiet batch runs and `verbosity = "debug"` when you
 need the most detailed live runtime output.
+
+The `[time_stepper]` block also now uses bounded step-count logic:
+
+- `t_final` is a stop horizon, not a target that is rounded up
+- `max_steps` is treated as a hard ceiling
+- fractional `t_final / dt` ratios do not trigger a spurious extra step
 
 ### Example workflow
 

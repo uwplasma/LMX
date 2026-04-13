@@ -106,9 +106,19 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - Runtime logs now expose both initial and final residuals for the velocity and
   potential linear solves, which makes the CLI output closer to a long-form
   research solver log.
+- The solver/runtime/IO/validation path now carries `charge_balance_residual`
+  end to end: live logs, validation summaries, CLI JSON summaries, and
+  restartable `.npz` bundles all expose it.
 - The CPU and remote-GPU scaling workflow has now been revalidated on the live
   `office` host after the post-`1.0` compatibility changes, including Python
   `3.10` and a different installed JAX version.
+- A fresh matched one-device smoke comparison now confirms the expected device
+  direction of travel on the current tree: local CPU `512 x 512`, `32`
+  iterations gives `warm_seconds ≈ 4.31e-3`, while a single office GPU gives
+  `warm_seconds ≈ 6.65e-4`.
+- Small two-GPU smoke runs on `256 x 256` remain overhead-dominated, so the
+  strong-scaling narrative continues to rely on the larger committed artifact
+  rather than those tiny validation points.
 - Manufactured-solution and direct-kernel tests now cover the low-cost
   numerical core well: `lmx/linear.py` is about `99%`, and
   `lmx/operators.py` is about `98%`.
