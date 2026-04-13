@@ -99,7 +99,25 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity(monkeypatch: p
         updated = updated.at[:, 0].set(0.0)
         updated = updated.at[:, -1].set(0.0)
         zeros = jnp.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0
+        return (
+            updated,
+            zeros,
+            zeros,
+            zeros,
+            zeros,
+            1.0e-6,
+            1.0e-6,
+            1.0,
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            float(jnp.mean(updated)),
+            0.0,
+            1.0e-3,
+            1.0e-2,
+        )
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
