@@ -35,7 +35,7 @@ coupling_tolerance = 1.0e-8
 
 [time_stepper]
 dt = 0.002
-t_final = 0.4
+t_final = 0.02
 max_steps = 200
 potential_iterations = 400
 potential_tolerance = 1.0e-6

@@ -854,6 +854,32 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     assert solution.state.residual == pytest.approx(1.0e-2)
 
 
+def test_solve_steady_respects_t_final_when_tolerance_not_reached(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, dt=0.002, t_final=0.01, max_steps=200, steady_tolerance=0.0),
+    )
+
+    def fake_fully_developed_case_step(**kwargs):
+        u = kwargs["u_previous"]
+        zeros = jnp.zeros_like(u)
+        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-2, 25, 1.0e-2, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    solution = solve_steady(case)
+
+    assert solution.diagnostics.time_history.shape[0] == 5
+    assert float(solution.diagnostics.time_history[-1]) == pytest.approx(0.01)
+    assert solution.state.time == pytest.approx(0.01)
+
+
+def test_bounded_time_step_count_does_not_round_up_fractional_end_times():
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.002, t_final=0.011, max_steps=200) == 5
+    assert solvers._bounded_time_step_count(start_time=0.004, dt=0.002, t_final=0.011, max_steps=200) == 3
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.02, t_final=0.01, max_steps=200) == 0
+
+
 def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(

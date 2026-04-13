@@ -8,14 +8,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.run_solver_control_sweep import _build_case, _collect_metrics, _parse_values, _replace_like
-from lmx.solvers import solve_steady
+from lmx.solvers import _bounded_time_step_count, solve_steady
 from lmx.validation import duct_layer_resolution_metrics
 
 
 def _apply_parameter(case, parameter: str, value):
     time_stepper = _replace_like(case.time_stepper, **{parameter: value})
     if parameter == "dt":
-        max_steps = max(1, int(round(case.time_stepper.t_final / float(value))))
+        max_steps = _bounded_time_step_count(
+            start_time=0.0,
+            dt=float(value),
+            t_final=case.time_stepper.t_final,
+            max_steps=case.time_stepper.max_steps,
+        )
         time_stepper = _replace_like(time_stepper, max_steps=max_steps)
     return _replace_like(case, time_stepper=time_stepper)
 

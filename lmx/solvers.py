@@ -40,6 +40,20 @@ def _build_mesh(case: CaseSpec) -> StructuredMesh:
     raise NotImplementedError(f"Geometry {g.kind} is not supported by the laminar solver yet.")
 
 
+def _bounded_time_step_count(*, start_time: float, dt: float, t_final: float, max_steps: int) -> int:
+    if dt <= 0.0:
+        raise ValueError("Time-step size dt must be positive")
+    if max_steps <= 0:
+        return 0
+    remaining_time = max(0.0, float(t_final) - float(start_time))
+    if remaining_time <= 0.0:
+        return 0
+    ratio = remaining_time / float(dt)
+    tolerance = 16.0 * np.finfo(float).eps * max(1.0, abs(ratio))
+    allowed_steps = int(np.floor(ratio + tolerance))
+    return min(int(max_steps), max(0, allowed_steps))
+
+
 def _interface_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dy[:-1, None]
     right_distance = 0.5 * mesh.dy[1:, None]
@@ -1235,14 +1249,16 @@ def _solve_fully_developed(
     )
     dt = case.time_stepper.dt
     steady_mode = case.solver.mode == "steady"
+    steps = _bounded_time_step_count(
+        start_time=start_time,
+        dt=dt,
+        t_final=case.time_stepper.t_final,
+        max_steps=case.time_stepper.max_steps,
+    )
     if steady_mode:
-        steps = max(1, case.time_stepper.max_steps)
         step_coupling_iterations = case.solver.coupling_iterations
         step_coupling_tolerance = float(case.time_stepper.steady_tolerance)
     else:
-        remaining_time = max(0.0, case.time_stepper.t_final - start_time)
-        requested_steps = int(round(remaining_time / dt)) if remaining_time > 0.0 else 0
-        steps = min(case.time_stepper.max_steps, requested_steps)
         step_coupling_iterations = case.solver.coupling_iterations
         step_coupling_tolerance = case.solver.coupling_tolerance
     _emit_solver_header(
@@ -1497,9 +1513,12 @@ def _solve_transient_legacy(
         initial_state=initial_state,
     )
     dt = case.time_stepper.dt
-    remaining_time = max(0.0, case.time_stepper.t_final - start_time)
-    requested_steps = int(round(remaining_time / dt)) if remaining_time > 0.0 else 0
-    steps = min(case.time_stepper.max_steps, requested_steps)
+    steps = _bounded_time_step_count(
+        start_time=start_time,
+        dt=dt,
+        t_final=case.time_stepper.t_final,
+        max_steps=case.time_stepper.max_steps,
+    )
     _emit_solver_header(
         logger,
         case=case,
@@ -2033,7 +2052,12 @@ def _solve_steady_legacy(
         initial_state=initial_state,
     )
     dt = case.time_stepper.dt
-    max_steps = max(1, case.time_stepper.max_steps)
+    steps = _bounded_time_step_count(
+        start_time=start_time,
+        dt=dt,
+        t_final=case.time_stepper.t_final,
+        max_steps=case.time_stepper.max_steps,
+    )
     tolerance = float(case.time_stepper.steady_tolerance)
     potential_tolerance = case.time_stepper.steady_potential_tolerance
     _emit_solver_header(
@@ -2111,7 +2135,7 @@ def _solve_steady_legacy(
     step_count = 0
     pressure_proxy_reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
 
-    for step_index in range(max_steps):
+    for step_index in range(steps):
         step_time = float(start_time + (step_index + 1) * dt)
         (
             u,

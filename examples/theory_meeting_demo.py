@@ -23,6 +23,7 @@ from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.example_runner import solve_case_snapshots
 from lmx.io import write_paraview
 from lmx.physics import build_material_fields
+from lmx.solvers import _bounded_time_step_count
 from lmx.solvers import solve_steady
 from lmx.validation import (
     closed_channel_validation,
@@ -81,7 +82,12 @@ def make_demo_case(case_kind: str, *, ha: float, resolution: int, dt: float | No
                 case.time_stepper,
                 dt=dt,
                 t_final=t_final,
-                max_steps=max(1, int(round(t_final / dt))),
+                max_steps=_bounded_time_step_count(
+                    start_time=0.0,
+                    dt=dt,
+                    t_final=t_final,
+                    max_steps=case.time_stepper.max_steps,
+                ),
             ),
         )
     return case

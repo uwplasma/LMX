@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.solvers import solve_steady
+from lmx.solvers import _bounded_time_step_count, solve_steady
 from lmx.validation import (
     closed_channel_validation,
     combined_profile_error,
@@ -144,7 +144,12 @@ def main(argv: list[str] | None = None) -> int:
         case = _build_case(args.case, args.ha, args.resolution, case_dir, args.wall_cells)
         time_stepper = _replace_like(case.time_stepper, **{args.parameter: value})
         if args.parameter == "dt":
-            max_steps = max(1, int(round(case.time_stepper.t_final / float(value))))
+            max_steps = _bounded_time_step_count(
+                start_time=0.0,
+                dt=float(value),
+                t_final=case.time_stepper.t_final,
+                max_steps=case.time_stepper.max_steps,
+            )
             time_stepper = _replace_like(time_stepper, max_steps=max_steps)
         case = _replace_like(case, time_stepper=time_stepper)
         solution = solve_steady(case)

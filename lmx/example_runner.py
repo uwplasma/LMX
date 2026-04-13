@@ -69,7 +69,12 @@ def solve_case_snapshots(
         interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
     )
     dt = case.time_stepper.dt
-    steps = min(case.time_stepper.max_steps, max(1, int(round(case.time_stepper.t_final / dt))))
+    steps = solvers._bounded_time_step_count(
+        start_time=0.0,
+        dt=dt,
+        t_final=case.time_stepper.t_final,
+        max_steps=case.time_stepper.max_steps,
+    )
     stride = max(1, steps // max(frame_count, 1))
 
     frames: list[dict[str, object]] = []
@@ -357,7 +362,12 @@ def run_theory_meeting_demo(
             movie_case_spec.time_stepper,
             dt=movie_dt,
             t_final=movie_t_final,
-            max_steps=max(1, int(round(movie_t_final / movie_dt))),
+            max_steps=solvers._bounded_time_step_count(
+                start_time=0.0,
+                dt=movie_dt,
+                t_final=movie_t_final,
+                max_steps=movie_case_spec.time_stepper.max_steps,
+            ),
         ),
     )
     movie_frames_payload = solve_case_snapshots(movie_case_spec, frame_count=movie_frames)

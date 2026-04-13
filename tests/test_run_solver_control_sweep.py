@@ -400,3 +400,47 @@ def test_run_solver_control_sweep_dt_updates_max_steps(
     summary = (output / "summary.json").read_text()
     assert '"dt": 0.01' in summary
     assert '"max_steps": 10.0' in summary
+
+
+def test_run_solver_control_sweep_dt_does_not_round_up_max_steps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    output = tmp_path / "control_sweep_dt_floor"
+
+    monkeypatch.setattr(
+        suite.argparse.ArgumentParser,
+        "parse_args",
+        lambda self, argv=None: SimpleNamespace(
+            output=output,
+            case="hartmann",
+            ha=20.0,
+            resolution=24,
+            wall_cells=None,
+            parameter="dt",
+            values="0.06",
+            value_type="float",
+            reference_root=None,
+            x_slice="1m",
+        ),
+    )
+    monkeypatch.setattr(
+        suite,
+        "_build_case",
+        lambda case_kind, ha, resolution, output_dir, wall_cells: SimpleNamespace(
+            time_stepper=SimpleNamespace(
+                dt=0.001,
+                t_final=0.1,
+                max_steps=400,
+                outer_iterations=2,
+            ),
+        ),
+    )
+    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
+    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {})
+    monkeypatch.setattr(suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.2})
+
+    assert suite.main([]) == 0
+    summary = (output / "summary.json").read_text()
+    assert '"dt": 0.06' in summary
+    assert '"max_steps": 1.0' in summary
