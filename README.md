@@ -41,7 +41,7 @@ The `1.0` ship gate is now closed on the fast release lane:
 ### Minimal install
 
 ```bash
-git clone <YOUR_FORK_OR_REMOTE_URL>
+git clone https://github.com/uwplasma/lmx
 cd LMX
 python -m pip install -e .
 ```
@@ -49,7 +49,7 @@ python -m pip install -e .
 ### Development install
 
 ```bash
-git clone <YOUR_FORK_OR_REMOTE_URL>
+git clone https://github.com/uwplasma/lmx
 cd LMX
 python -m pip install -e '.[dev,plotting,docs,extras]'
 ```

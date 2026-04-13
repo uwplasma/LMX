@@ -11,3 +11,4 @@ artifacts/
 docs/_build/
 *.egg-info/
 .DS_Store
+.vscode/settings.json

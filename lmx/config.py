@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - only used on Python < 3.11
+    import tomli as tomllib
 
 from .specs import (
     BoundaryCondition,
