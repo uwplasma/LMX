@@ -1,120 +1,263 @@
 # Theory
 
-LMX targets low magnetic Reynolds number liquid-metal flows in the
-inductionless limit. The current public solver scope is laminar single-phase
-flow on structured cross-sections, with explicit conductivity regions and a JAX
-implementation that keeps the core operators vectorized, JIT-safe, and suitable
-for differentiation.
+LMX solves low-magnetic-Reynolds-number liquid-metal magnetohydrodynamics in the
+inductionless limit on structured meshes. This page documents the governing
+equations, the reductions used by the currently shipped solver families, and
+where those equations are assembled in the source tree.
+
+## Scope
+
+The current public solver scope is:
+
+- incompressible single-phase liquid-metal flow
+- prescribed magnetic fields
+- electrically conducting multi-region cross-sections
+- laminar duct benchmarks
+- differentiable benchmark/inverse-design workflows on the JAX core
+
+The current public scope does **not** yet include:
+
+- turbulence
+- thermal coupling
+- free surfaces
+- full magnetic induction
+- the final 3D `extruded_inductionless` pressure-velocity-potential solver
 
 ## Governing equations
 
-The fully developed duct solver advances a streamwise velocity field
-`u(y, z, t)` and an electric potential field `phi(y, z, t)` over the
-cross-section:
+In the inductionless limit, the current solver family uses:
 
-- `div(J) = 0`
-- `J = sigma (-grad(phi) + u x B)`
-- `rho * du/dt = -dp/dx + mu * Lap(u) + (J x B)_x`
+$$
+\nabla \cdot \mathbf{u} = 0
+$$
 
-For the current duct solvers, the imposed magnetic field is prescribed and is
-not flow-evolved.
+$$
+\rho\left(\frac{\partial \mathbf{u}}{\partial t} + \mathbf{u}\cdot\nabla\mathbf{u}\right)
+= -\nabla p + \mu \nabla^2 \mathbf{u} + \mathbf{J}\times\mathbf{B}
+$$
 
-## Assumptions
+$$
+\mathbf{J} = \sigma\left(-\nabla \phi + \mathbf{u}\times\mathbf{B}\right)
+$$
 
-- low magnetic Reynolds number
-- incompressible single-phase liquid metal
-- piecewise-constant material properties by region
-- no temperature coupling
-- no turbulence model
-- no free surface
+$$
+\nabla \cdot \mathbf{J} = 0
+$$
 
-## Nondimensional benchmark families
+where:
 
-LMX uses the classical duct benchmark families as primary validation anchors:
+- $\mathbf{u}$ is velocity
+- $p$ is pressure
+- $\phi$ is electric potential
+- $\mathbf{J}$ is current density
+- $\mathbf{B}$ is the prescribed magnetic field
+- $\rho$, $\mu$, and $\sigma$ are density, dynamic viscosity, and electrical conductivity
 
-- Hartmann flow: conducting walls normal to the magnetic field
-- Shercliff flow: insulating walls
-- Hunt flow: conducting Hartmann walls with insulating side walls
-
-These are the mandatory Benchmark A cases in the verification and validation
-ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf).
-
-## Numerical formulation
-
-### Default solver family
-
-The default research path is `solver.kind = "fully_developed_inductionless"`.
-
-That path:
-
-- solves the duct problem in terms of `u` and `phi`
-- uses conservative face-current fluxes
-- handles layered solid walls explicitly through region conductivity fields
-- exposes steady and transient modes
-- avoids the legacy velocity-limiter-driven pseudo-transient closure
-
-### Charge conservation handling
-
-The fully developed solver enforces charge conservation in two complementary
-ways:
-
-- the electric-potential right-hand side is projected onto a zero-net-charge
-  compatibility space before the Poisson solve
-- conservative face-current diagnostics are tracked through:
-  - `max|div J|`
-  - charge-balance residual
-  - interface current continuity residual
-
-This is the correct `1.0` treatment for the cross-sectional fully developed
-model. True inlet/outlet current closure for non-fully-developed 3D ducts
-belongs to the planned `extruded_inductionless` solver family, where axial
-velocity, pressure, and potential must be solved together.
-
-### Legacy solver family
-
-`solver.kind = "legacy_reduced"` is retained only for regression and historical
-comparison. It is not the recommended path for new research results.
-
-## Physical diagnostics
-
-LMX exposes both solution fields and integral diagnostics. The research-grade
-diagnostics currently include:
-
-- volumetric flow rate
-- mean current magnitude
-- Lorentz power
-- electric-current divergence residual
-- charge-balance residual
-- gauge residual
-- interface current continuity residual
-- linear-solve residual and iteration history
-
-## File map
-
-The main physics and numerics live in:
+These equations are represented in the current source tree by:
 
 - `lmx/physics.py`
-  - magnetic field specification and material-field assembly
+  - material fields and prescribed magnetic-field components
 - `lmx/operators.py`
-  - finite-volume style gradient, divergence, and Laplacian operators
-- `lmx/linear.py`
-  - linear solver helpers and iterative backends
+  - structured differential operators
 - `lmx/solvers.py`
-  - steady/transient solver families and time-integration control
+  - assembled momentum and potential solves
+
+## Fully developed duct reduction
+
+The default shipped solver family is
+`solver.kind = "fully_developed_inductionless"`.
+
+For this family, LMX assumes a streamwise velocity field
+$\mathbf{u} = (u(y,z,t), 0, 0)$ and a cross-sectional electric potential
+$\phi(y,z,t)$. The imposed magnetic field may contain transverse components
+$B_y(y,z,t)$ and $B_z(y,z,t)$.
+
+Under this reduction:
+
+$$
+\mathbf{u}\times\mathbf{B} = \left(0,\,-uB_z,\,uB_y\right)
+$$
+
+and the cross-sectional current becomes
+
+$$
+J_y = \sigma\left(-\frac{\partial \phi}{\partial y} - u B_z\right), \qquad
+J_z = \sigma\left(-\frac{\partial \phi}{\partial z} + u B_y\right)
+$$
+
+Charge conservation gives the potential equation
+
+$$
+\frac{\partial J_y}{\partial y} + \frac{\partial J_z}{\partial z} = 0
+$$
+
+or, equivalently,
+
+$$
+\nabla_{\perp}\cdot\left(\sigma \nabla_{\perp}\phi\right)
+= \nabla_{\perp}\cdot\left(\sigma(\mathbf{u}\times\mathbf{B})_{\perp}\right)
+$$
+
+The streamwise momentum equation becomes
+
+$$
+\rho\frac{\partial u}{\partial t}
+= -\frac{\partial p}{\partial x}
+  + \mu \nabla_{\perp}^2 u
+  + (\mathbf{J}\times\mathbf{B})_x
+$$
+
+with
+
+$$
+(\mathbf{J}\times\mathbf{B})_x = J_y B_z - J_z B_y
+$$
+
+These are the two fields actually advanced by the current default solver.
+
+## Boundary and interface conditions
+
+The currently shipped boundary-condition vocabulary is declared in
+`lmx/specs.py` and interpreted by `lmx/physics.py` and `lmx/solvers.py`.
+
+The main physical conditions are:
+
+- `no_slip`
+  - streamwise velocity vanishes at the wall
+- `insulating`
+  - no normal current leaves the domain
+- `conducting_wall`
+  - the wall region carries its own conductivity and is solved as part of the
+    multi-region potential problem
+- `imposed_current_density`
+  - reserved for current-driven studies
+- `inlet_velocity`, `inlet_flow_rate`, `outlet_pressure`
+  - currently interpreted in the reduced/fully-developed sense used by the
+    present solver family
+
+Across fluid-solid interfaces, the multi-region formulation enforces
+conductivity-weighted continuity through conservative face conductances. That
+is why LMX tracks:
+
+- `div_current_max_history`
+- `charge_balance_residual_history`
+- `interface_current_residual_history`
+
+as first-class diagnostics.
+
+## Charge conservation and compatibility projection
+
+The discrete potential equation must satisfy a zero-net-source compatibility
+condition. In practice, this means the right-hand side of the Poisson-like
+potential solve cannot contain a net source over the connected domain.
+
+LMX enforces this through a compatibility projection before the solve and then
+measures the remaining charge/current mismatch through diagnostics.
+
+This treatment lives in `lmx/solvers.py` and is exposed in the runtime outputs
+by:
+
+- `lmx/runtime_logging.py`
+- `lmx/io.py`
 - `lmx/validation.py`
-  - analytical benchmark comparison and validation summaries
 
-## Differentiable lane
+## Magnetic-field models
 
-The core JAX solver path is intended to remain differentiable end to end for
-steady and short transient studies. The current research references for that
-direction are:
+LMX currently supports:
 
-- [JAX gradient checkpointing](https://docs.jax.dev/en/latest/gradient-checkpointing.html)
-- [Lineax matrix-free linear solvers](https://docs.kidger.site/lineax/api/solvers/)
+- constant magnetic fields
+- analytic magnetic fields specified as a Python callback
+- affine startup ramps applied to either of the above
+
+The magnetic-field specification is declared in `lmx/specs.py` and evaluated in
+`lmx/physics.py`.
+
+The ramp law is:
+
+$$
+\alpha_B(t) = \mathrm{clip}\left(
+\frac{t - t_{\mathrm{start}}}{t_{\mathrm{duration}} + 10^{-6}},
+0, 1\right)
+$$
+
+so the actual field used by the solver is $\alpha_B(t)\mathbf{B}(y,z)$.
+
+## Geometry models
+
+The current geometry dataclasses are declared in `lmx/specs.py` and meshed by
+`lmx/mesh.py`.
+
+Implemented today:
+
+- `rect_duct`
+- `layered_duct`
+- `pipe_ogrid` mesh generation and preview utilities
+
+The current production solver families operate on rectangular and layered
+cross-sections. The mapped pipe mesh is presently available for geometry and
+workflow staging while the full 3D solver family is being developed.
+
+## Solver-family interpretation
+
+### `fully_developed_inductionless`
+
+This is the main research solver. It solves the coupled cross-sectional
+streamwise velocity/potential problem directly and exposes steady and transient
+modes.
+
+### `reduced_inductionless`
+
+This is the reduced-model alternative retained for reduced-model studies and
+comparative testing. It is still useful, but it is not the primary path for
+new benchmark-quality results.
+
+### `extruded_inductionless`
+
+This name is already part of the public API, but the final 3D pressure,
+velocity, and potential solver is not yet implemented. The current fringing
+workflow is an explicit vertical slice toward that family, not the final
+algorithm.
+
+## JAX and differentiability
+
+LMX uses JAX in three layers:
+
+1. vectorized PDE operators and array programs
+2. the differentiable Hartmann lane in `lmx/autodiff.py`
+3. strong-scaling experiments on the dominant stencil kernels in `lmx/scaling.py`
+
+The current differentiable lane uses fixed-iteration solves so the reverse-mode
+path remains explicit and stable for benchmark-sized inverse problems.
+
+## Literature anchors
+
+LMX’s documentation and validation ladder follow the standard low-magnetic-
+Reynolds-number duct benchmark literature and the benchmark hierarchy used in
+fusion liquid-metal verification and validation studies.
+
+Useful references:
+
+- [Samper et al., verification and validation benchmark ladder for MHD codes](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf)
+- [arXiv:2409.08950, multi-region electrically conductive flow solver validation study](https://arxiv.org/abs/2409.08950)
+- [JAX advanced autodiff](https://docs.jax.dev/en/latest/advanced-autodiff.html)
+- [Lineax solvers](https://docs.kidger.site/lineax/api/solvers/)
 - [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/)
-- [Φ-Flow and differentiable PDE workflows](https://proceedings.mlr.press/v235/holl24a.html)
 
-The CLI, plotting, reporting, and postprocessing layers are allowed to use
-pragmatic non-differentiable utilities where that improves usability and
-performance.
+## Source map
+
+- `lmx/specs.py`
+  - public dataclasses and enumerations
+- `lmx/mesh.py`
+  - geometry discretization
+- `lmx/physics.py`
+  - magnetic fields and material properties
+- `lmx/operators.py`
+  - discrete operators
+- `lmx/linear.py`
+  - iterative solves and residual norms
+- `lmx/solvers.py`
+  - solver-family implementations
+- `lmx/autodiff.py`
+  - differentiable lane
+- `lmx/fringing.py`
+  - fringing-field research slice

@@ -176,7 +176,7 @@ side = "max"
 
 - `kind`
   - `fully_developed_inductionless`
-  - `legacy_reduced`
+  - `reduced_inductionless`
   - `extruded_inductionless` (reserved)
 - `mode`
   - `steady`
@@ -211,7 +211,7 @@ side = "max"
 - `steady_tolerance`
 - `steady_potential_tolerance`
 - `checkpoint_stride`
-- legacy-only controls:
+- reduced-solver-only controls:
   - `outer_iterations`
   - `current_reconstruction`
   - `post_update_potential_refresh`

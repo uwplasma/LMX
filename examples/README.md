@@ -11,6 +11,8 @@ The examples are explicit templates for research workflows. They show how to:
 - run autodiff sensitivity and inverse-design studies
 - preview geometries and meshes before launching a solve
 - stage fringing-field benchmark workflows for the next solver family
+- prescribe variable magnetic fields directly from Python
+- customize geometry objects before a solve and preview them in 3D
 
 ## Quick examples
 
@@ -26,6 +28,7 @@ python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/au
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
+python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
 ```
 
 ## Input-file examples
@@ -104,6 +107,20 @@ python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --
 The default path is intentionally preview-only so it stays fast. Add
 `--with-post-run` to append a short steady solve and matching postprocessing
 figures in the same output tree.
+
+Variable field and custom geometry driver:
+
+```bash
+python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
+```
+
+That example is the clearest Python-native template for users who want to:
+
+- define a custom analytic magnetic field callable
+- modify the benchmark constructors with `dataclasses.replace(...)`
+- preview the resulting geometry before running
+- run a short solve and emit the same plots and JSON summaries used elsewhere
+- use LMX as a programmable research driver instead of only through TOML files
 
 ## Teaching goal
 

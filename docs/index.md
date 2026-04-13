@@ -1,56 +1,80 @@
 # LMX Documentation
 
-LMX is a research-facing, JAX-native code for inductionless liquid-metal MHD on
-structured meshes. These pages are organized so that a new user can get started
-quickly while an advanced user can trace every physical model and numerical
-choice back to the implementation files.
+LMX is a JAX-native code for inductionless liquid-metal magnetohydrodynamics on
+structured meshes. The project is organized so that:
 
-## Start here
+- a new user can install it quickly, run a benchmark case, and inspect output
+- an advanced user can trace every equation and numerical choice back to the
+  source files
+- a researcher can reproduce figures, scaling studies, validation reports, and
+  differentiable inverse-design workflows from the repository directly
+
+## Highlights
+
+- fully developed laminar duct solvers for Hartmann, Shercliff, and Hunt flows
+- explicit multi-region conductivity treatment for layered duct walls
+- restartable CLI and TOML workflows
+- detailed runtime logging with initial/final residuals and conservation checks
+- strong-scaling benchmark tooling for CPU and GPU kernels
+- differentiable benchmark and inverse-design workflows in JAX
+- geometry preview and postprocessing utilities
+- a retained fringing-field research slice that stages the path to the next 3D
+  solver family
+
+## Read this first
 
 ```{toctree}
 :maxdepth: 2
-:caption: User Guides
+:caption: Core Guides
 
+getting_started
 theory
+numerics
 geometry
 input_reference
 case_cookbook
+testing
+```
+
+## Validation, performance, and research workflows
+
+```{toctree}
+:maxdepth: 2
+:caption: Validation and Research
+
 benchmark_matrix
+validation_report
 performance
 autodiff
 fringing
-validation_report
 external_benchmarks
 research_directions
+```
+
+## Developer and maintenance notes
+
+```{toctree}
+:maxdepth: 2
+:caption: Developer Material
+
 developer_guide
 ```
 
 ## What is implemented today
 
-- fully developed laminar duct solvers
-- Hartmann, Shercliff, and Hunt benchmark families
-- layered conducting and insulating wall models
-- CLI, TOML, restart, plotting, movie generation, and benchmark reporting
-- strong-scaling benchmark scripts for CPU and multi-GPU stencil kernels
-- differentiable Hartmann sensitivity and inverse-design examples
-- geometry preview and mesh-inspection tooling for ducts and mapped pipe meshes
-- executable fringing-field benchmark scaffolds
+- `fully_developed_inductionless`
+  - the default duct solver family
+- `reduced_inductionless`
+  - the reduced-model alternative retained for comparative studies
+- structured `rect_duct` and `layered_duct` cross-sections
+- mapped `pipe_ogrid` geometry/preview tooling
+- strong-scaling kernel benchmarks
+- differentiable Hartmann sensitivity and inverse-design workflows
+- fringing-field benchmark staging through stacked axial field bundles
 
-## What is planned next
+## What is next
 
-- `extruded_inductionless` for laminar fringing-field benchmarks
-- broader benchmark manifests for turbulence, heat transfer, and industrial
-  blanket-style configurations
-- more inverse and optimization workflows on the differentiable JAX core
-
-## Documentation philosophy
-
-The documentation distinguishes between:
-
-- equations and assumptions
-- user-facing inputs and outputs
-- developer-facing architecture and file layout
-- benchmark evidence and acceptance criteria
-
-External executable comparisons are treated as secondary benchmark evidence, not
-as the definition of the governing equations.
+- the first true `extruded_inductionless` 3D pressure-velocity-potential slice
+- deeper heavy-lane solver hardening on larger validation sets
+- differentiable workflows on Hunt/fringing objectives
+- broader variable-field and variable-geometry research studies driven from Python

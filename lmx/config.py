@@ -220,11 +220,11 @@ def load_run_config(path: str | Path) -> RunConfig:
         checkpoint_stride=int(time_table.get("checkpoint_stride", 1)),
     )
 
-    legacy_mode = case_table.get("solve_mode")
-    solver_mode = str(solver_table.get("mode", legacy_mode or "steady"))
+    compatibility_mode = case_table.get("solve_mode")
+    solver_mode = str(solver_table.get("mode", compatibility_mode or "steady"))
     if solver_mode not in {"steady", "transient"}:
         raise ValueError(f"Unsupported solve mode {solver_mode!r}")
-    if legacy_mode is not None and str(legacy_mode) != solver_mode:
+    if compatibility_mode is not None and str(compatibility_mode) != solver_mode:
         raise ValueError("case.solve_mode and solver.mode disagree; use solver.mode as the public setting")
 
     solver = SolverConfig(

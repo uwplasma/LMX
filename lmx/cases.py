@@ -137,7 +137,7 @@ def make_shercliff_case(
         forcing=1.0,
         reference_pressure_gradient=-1.0,
         reference_phi_cell=anchor,
-        notes="All-insulating Shercliff-style duct. Analytical parity hooks are staged through validation utilities.",
+        notes="All-insulating Shercliff-style duct. Analytical validation hooks are staged through the benchmark and validation utilities.",
     )
 
 

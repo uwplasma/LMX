@@ -353,6 +353,37 @@ def test_autodiff_profile_design_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "autodiff_profile_design_summary.json").exists()
 
 
+def test_variable_field_geometry_demo_writes_preview_and_run_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _load_example_module("variable_field_geometry_demo.py")
+
+    monkeypatch.setattr(module, "_build_mesh", lambda case: SimpleNamespace(geometry=case.geometry.kind))
+    def fake_write_geometry_preview_plots(mesh, out_dir: Path, case_title: str):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outputs = [out_dir / "geometry_preview.png", out_dir / "geometry_preview.pdf"]
+        for path in outputs:
+            path.write_bytes(b"preview")
+        return outputs
+
+    monkeypatch.setattr(module, "write_geometry_preview_plots", fake_write_geometry_preview_plots)
+    monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace(case_name=case.name))
+    def fake_write_case_overview_plots(solution, out_dir: Path, case_title: str):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outputs = [out_dir / "overview.png", out_dir / "overview.pdf"]
+        for path in outputs:
+            path.write_bytes(b"plot")
+        return outputs
+
+    monkeypatch.setattr(module, "write_case_overview_plots", fake_write_case_overview_plots)
+    monkeypatch.setattr(module, "validation_summary", lambda solution, case_name, ha=None: {"u_max": 1.0})
+
+    summary = module.run_variable_field_geometry_demo(out_dir=tmp_path)
+    assert summary["rectangular_case"]["magnetic_field_kind"] == "analytic"
+    assert summary["layered_case"]["geometry_kind"] == "layered_duct"
+    assert (tmp_path / "variable_field_geometry_summary.json").exists()
+
+
 def test_build_case_rejects_unknown_kind():
     with pytest.raises(ValueError, match="Unsupported case kind"):
         example_runner._build_case("bad", 5.0, 8, 8)
@@ -384,9 +415,9 @@ def test_solve_case_snapshots_records_fully_developed_frames(monkeypatch: pytest
     assert "face_lorentz_max" in frames[0]
 
 
-def test_solve_case_snapshots_records_legacy_frames(monkeypatch: pytest.MonkeyPatch):
+def test_solve_case_snapshots_records_reduced_frames(monkeypatch: pytest.MonkeyPatch):
     case = example_runner._build_case("hartmann", 5.0, 6, 6)
-    case = case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "legacy_reduced"})})
+    case = case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "reduced_inductionless"})})
 
     def fake_step(**kwargs):
         u_prev = kwargs["u"]

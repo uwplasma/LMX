@@ -30,8 +30,9 @@ The `1.0` ship gate is now closed on the fast release lane:
   - default solver for `rect_duct` and `layered_duct`
   - steady and transient streamwise-velocity / electric-potential solves
   - research path for Hartmann, Shercliff, and Hunt cases
-- `legacy_reduced`
-  - retained only for regression and historical comparison
+- `reduced_inductionless`
+  - reduced-model alternative for lightweight sweeps, regression checks, and
+    side-by-side method studies
 - `extruded_inductionless`
   - staged next solver family for 3D/fringing-field work
   - current repo ships executable fringing benchmark scaffolds, not the full solver yet
@@ -150,6 +151,20 @@ the same output tree.
 
 This is the intended preprocessing/postprocessing bridge for users who want to
 inspect the geometry and mesh before launching longer runs.
+
+For Python-native variable fields and custom geometry edits, use:
+
+```bash
+python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
+```
+
+That driver shows how to:
+
+- start from a benchmark constructor
+- modify geometry fields with `dataclasses.replace(...)`
+- define an analytic magnetic-field callable
+- preview the mesh and material layout
+- run a short solve and emit the same summary/plot artifacts as the other examples
 
 ## Typical outputs
 
@@ -324,9 +339,13 @@ how to:
 ## Documentation
 
 - [User and theory docs](docs/index.md)
+- [Getting started](docs/getting_started.md)
 - [Theory and equations](docs/theory.md)
+- [Numerics and implementation](docs/numerics.md)
+- [Geometry and mesh workflows](docs/geometry.md)
 - [Input reference](docs/input_reference.md)
 - [Case cookbook](docs/case_cookbook.md)
+- [Testing and validation strategy](docs/testing.md)
 - [Benchmark matrix](docs/benchmark_matrix.md)
 - [Performance and scaling](docs/performance.md)
 - [Autodiff and inverse design](docs/autodiff.md)

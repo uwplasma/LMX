@@ -5,7 +5,7 @@ LMX is intended to support both benchmark-quality verification and new research
 
 ## Immediate directions
 
-- fully developed conducting-wall duct parity and sensitivity studies
+- fully developed conducting-wall duct benchmark and sensitivity studies
 - laminar fringing-field benchmarks in ducts and pipes
 - differentiable inverse problems over magnetic field strength, geometry, and
   wall conductance ratio

@@ -1543,7 +1543,7 @@ def _solve_fully_developed(
     return solution
 
 
-def _solve_transient_legacy(
+def _solve_transient_reduced(
     case: CaseSpec,
     logger=None,
     *,
@@ -2135,7 +2135,7 @@ def _solve_transient_legacy(
     return solution
 
 
-def _solve_steady_legacy(
+def _solve_steady_reduced(
     case: CaseSpec,
     logger=None,
     *,
@@ -2531,8 +2531,8 @@ def solve_transient(
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
-    if solver_kind == "legacy_reduced":
-        return _solve_transient_legacy(
+    if solver_kind == "reduced_inductionless":
+        return _solve_transient_reduced(
             case,
             logger=logger,
             initial_state=initial_state,
@@ -2563,8 +2563,8 @@ def solve_steady(
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
-    if solver_kind == "legacy_reduced":
-        return _solve_steady_legacy(
+    if solver_kind == "reduced_inductionless":
+        return _solve_steady_reduced(
             case,
             logger=logger,
             initial_state=initial_state,

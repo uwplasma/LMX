@@ -40,9 +40,11 @@ This is the default research path.
   - Shercliff
   - Hunt
 
-### `legacy_reduced`
+### `reduced_inductionless`
 
-Retained for regression only.
+Retained for lightweight comparative studies and regression support. It remains
+part of the public surface, but it is not the primary path for new benchmark
+results.
 
 ### `extruded_inductionless`
 

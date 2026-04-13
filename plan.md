@@ -53,6 +53,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - Time integration now uses bounded step-count logic so `t_final` is not
   rounded up spuriously on fractional `dt` ratios.
 - Public docs and examples now present a clean `1.0` release surface.
+- The documentation surface has now been expanded into a fuller standalone
+  manual: landing page, getting-started guide, numerics page, geometry and
+  mesh workflows, testing strategy, richer theory notes, and Python-native
+  variable-field/custom-geometry examples are all part of the shipped tree.
 - External executable comparisons are documented only as secondary benchmark
   evidence, not as implementation guidance.
 - Public JSON/example/report outputs have been scrubbed to avoid leaking
@@ -108,6 +112,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.
+- A separate variable-field/custom-geometry example now shows how to drive
+  geometry changes and analytic magnetic fields directly from Python without
+  relying on TOML-only workflows.
 - The geometry preview example now defaults to a fast preview-only mode and
   exposes an explicit `--with-post-run` flag for short follow-on solves, so
   preprocessing visualization does not accidentally become a long-running task.

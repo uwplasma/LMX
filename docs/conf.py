@@ -10,6 +10,7 @@ release = "1.0.0"
 extensions = [
     "myst_parser",
     "sphinx_copybutton",
+    "sphinx.ext.mathjax",
 ]
 
 source_suffix = {
@@ -22,8 +23,16 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 myst_enable_extensions = [
     "colon_fence",
     "deflist",
+    "dollarmath",
+    "amsmath",
 ]
 
 html_theme = "furo"
 html_title = "LMX"
 html_static_path = ["_static"]
+html_theme_options = {
+    "source_repository": "https://github.com/uwplasma/LMX/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+    "navigation_with_keys": True,
+}

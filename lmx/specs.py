@@ -9,7 +9,7 @@ import jax.numpy as jnp
 
 RegionKind = Literal["fluid", "solid"]
 GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid"]
-SolverKind = Literal["fully_developed_inductionless", "legacy_reduced", "extruded_inductionless"]
+SolverKind = Literal["fully_developed_inductionless", "reduced_inductionless", "extruded_inductionless"]
 SolveMode = Literal["steady", "transient"]
 BoundaryKind = Literal[
     "no_slip",

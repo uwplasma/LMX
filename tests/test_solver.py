@@ -100,10 +100,10 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha1000.solver.kind == "fully_developed_inductionless"
 
 
-def test_legacy_reduced_solver_path_remains_selectable(monkeypatch: pytest.MonkeyPatch):
+def test_reduced_inductionless_solver_path_remains_selectable(monkeypatch: pytest.MonkeyPatch):
     case = replace(
         make_hartmann_case(ha=5.0, ny=8, nz=8),
-        solver=replace(make_hartmann_case(ha=5.0, ny=8, nz=8).solver, kind="legacy_reduced"),
+        solver=replace(make_hartmann_case(ha=5.0, ny=8, nz=8).solver, kind="reduced_inductionless"),
     )
     monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
 
@@ -797,7 +797,7 @@ def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(
         case,
-        solver=replace(case.solver, kind="legacy_reduced"),
+        solver=replace(case.solver, kind="reduced_inductionless"),
         time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4),
     )
     residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
@@ -830,7 +830,7 @@ def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch:
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(
         case,
-        solver=replace(case.solver, kind="legacy_reduced"),
+        solver=replace(case.solver, kind="reduced_inductionless"),
         time_stepper=replace(case.time_stepper, max_steps=2, steady_tolerance=1e-8),
     )
 
@@ -887,7 +887,7 @@ def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: py
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(
         case,
-        solver=replace(case.solver, kind="legacy_reduced"),
+        solver=replace(case.solver, kind="reduced_inductionless"),
         time_stepper=replace(
             case.time_stepper,
             max_steps=5,
@@ -1099,7 +1099,7 @@ for _unit_test_name in (
     "test_hunt_solver_keeps_solid_velocity_zero",
     "test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned",
     "test_hunt_case_uses_ha_aware_coupling_controls",
-    "test_legacy_reduced_solver_path_remains_selectable",
+    "test_reduced_inductionless_solver_path_remains_selectable",
     "test_hunt_case_derives_wall_conductivity_from_conductance_ratio",
     "test_hunt_case_adds_explicit_insulating_side_wall_region",
     "test_hunt_case_allows_explicit_wall_conductivity_override",

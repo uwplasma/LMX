@@ -168,7 +168,7 @@ def _sample_record(step_index: int = 1) -> SolverStepRecord:
     )
 
 
-def test_streaming_solver_logger_respects_disable_stride_and_legacy_sections():
+def test_streaming_solver_logger_respects_disable_stride_and_reduced_sections():
     disabled_stream = StringIO()
     disabled_logger = StreamingSolverLogger(LoggingSpec(enabled=False), stream=disabled_stream)
     disabled_logger.emit_step(_sample_record())
@@ -182,7 +182,7 @@ def test_streaming_solver_logger_respects_disable_stride_and_legacy_sections():
     case = case.__class__(
         **{
             **case.__dict__,
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "legacy_reduced"}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "reduced_inductionless"}),
         }
     )
     mesh = _build_mesh(case)
@@ -220,7 +220,7 @@ def test_streaming_solver_logger_respects_disable_stride_and_legacy_sections():
         )
 
     text = step_stream.getvalue()
-    assert "Legacy velocity controls" in text
+    assert "Reduced velocity controls" in text
     assert "Current reconstruction" in text
     assert "Restart controls" in text
     assert "Time =" not in text

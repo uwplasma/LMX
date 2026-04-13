@@ -198,12 +198,12 @@ def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann
     assert boundaries["top_wall"].kind == "conducting_wall"
 
 
-def test_legacy_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):
-    input_file = tmp_path / "legacy.toml"
+def test_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):
+    input_file = tmp_path / "compatibility.toml"
     input_file.write_text(
         """
 [case]
-name = "legacy"
+name = "compatibility"
 solve_mode = "transient"
 
 [geometry]
@@ -238,7 +238,7 @@ kind = "no_slip"
     assert config.case.solver.mode == "transient"
 
 
-def test_conflicting_legacy_and_solver_modes_are_rejected(tmp_path: Path):
+def test_conflicting_case_and_solver_modes_are_rejected(tmp_path: Path):
     input_file = tmp_path / "conflict.toml"
     input_file.write_text(
         """
