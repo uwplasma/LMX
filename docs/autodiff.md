@@ -10,6 +10,7 @@ for publication figures.
 - a differentiable fixed-iteration fully developed Hartmann solve
 - sensitivity analysis with `jax.grad`
 - inverse forcing identification from synthetic target profiles
+- full-profile inverse design that recovers both forcing and Hartmann number
 - publication-style summary plots and JSON outputs
 
 The differentiable lane is intentionally explicit:
@@ -47,6 +48,20 @@ That companion example writes:
 - `autodiff_sensitivity_validation.png`
 - `autodiff_sensitivity_validation.pdf`
 
+The repository now also ships a third autodiff example focused on joint
+profile-matching recovery:
+
+```bash
+python examples/autodiff_profile_design_demo.py \
+  --output artifacts/examples/autodiff_profile_design
+```
+
+That workflow writes:
+
+- `autodiff_profile_design_summary.json`
+- `autodiff_profile_design.png`
+- `autodiff_profile_design.pdf`
+
 ## Publication artifact
 
 The current `1.0` publication artifact is committed under
@@ -64,9 +79,12 @@ The shipped run demonstrates:
 ## Source map
 
 - `lmx/autodiff.py`
-  - differentiable Hartmann problem construction and fixed-iteration solve
+  - differentiable Hartmann problem construction, fixed-iteration solve, and
+    inverse-design utilities
 - `examples/autodiff_design_demo.py`
   - sensitivity scan and inverse-design loop
+- `examples/autodiff_profile_design_demo.py`
+  - full-profile inverse design over forcing and Hartmann number
 - `lmx/plotting.py`
   - polished sensitivity/inverse summary figure
 
@@ -92,6 +110,16 @@ finite differences for:
 
 This is the fast, publication-friendly gradient-verification figure that should
 accompany broader inverse-design claims.
+
+The profile-design example broadens the differentiable lane from scalar
+objective matching to field-level inverse design. It optimizes two parameters
+simultaneously:
+
+- forcing
+- Hartmann number
+
+against a full target centerline profile, which is the right next step before
+moving the differentiable lane into Hunt or fringing research studies.
 
 ## References
 

@@ -23,11 +23,14 @@ __all__ = [
     "build_hartmann_autodiff_problem",
     "hartmann_mean_velocity_gradients",
     "hartmann_mean_velocity_finite_difference_gradients",
+    "hartmann_profile_loss_gradients",
+    "run_hartmann_profile_inverse_design",
     "solve_differentiable_hartmann",
     "benchmark_sharded_stencil",
     "write_benchmark_report",
     "write_scaling_report",
     "build_square_duct_fringing_benchmark",
+    "run_extruded_inductionless_slice",
     "run_fringing_station_sweep",
 ]
 
@@ -51,10 +54,13 @@ _EXPORTS = {
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
     "hartmann_mean_velocity_gradients": ("lmx.autodiff", "hartmann_mean_velocity_gradients"),
     "hartmann_mean_velocity_finite_difference_gradients": ("lmx.autodiff", "hartmann_mean_velocity_finite_difference_gradients"),
+    "hartmann_profile_loss_gradients": ("lmx.autodiff", "hartmann_profile_loss_gradients"),
+    "run_hartmann_profile_inverse_design": ("lmx.autodiff", "run_hartmann_profile_inverse_design"),
     "solve_differentiable_hartmann": ("lmx.autodiff", "solve_differentiable_hartmann"),
     "benchmark_sharded_stencil": ("lmx.scaling", "benchmark_sharded_stencil"),
     "write_scaling_report": ("lmx.scaling", "write_scaling_report"),
     "build_square_duct_fringing_benchmark": ("lmx.fringing", "build_square_duct_fringing_benchmark"),
+    "run_extruded_inductionless_slice": ("lmx.fringing", "run_extruded_inductionless_slice"),
     "run_fringing_station_sweep": ("lmx.fringing", "run_fringing_station_sweep"),
 }
 

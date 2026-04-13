@@ -22,6 +22,7 @@ python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meet
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
 python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
+python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
@@ -71,6 +72,7 @@ Autodiff:
 ```bash
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
 python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
+python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
 ```
 
 The shipped autodiff examples now cover:
@@ -78,6 +80,7 @@ The shipped autodiff examples now cover:
 - a Hartmann-number sensitivity scan of mean velocity
 - a finite-difference cross-check of autodiff gradients
 - inverse recovery of a synthetic forcing parameter from a target profile
+- full-profile inverse design that recovers both forcing and Hartmann number
 - publication-style `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
@@ -86,9 +89,10 @@ Fringing-field scaffold:
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 ```
 
-That example stages a stationwise fringing benchmark on top of the current
-fully developed solver family. It is explicit about being a research scaffold,
-not the final `extruded_inductionless` solver.
+That example now writes a stacked axial field bundle `u(x, y, z)` on top of the
+current fully developed solver family. It is still explicit about being the
+first retained `extruded_inductionless` research slice, not the final 3D
+pressure-velocity solver.
 
 Geometry and mesh preview:
 

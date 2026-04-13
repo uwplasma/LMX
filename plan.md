@@ -90,6 +90,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - A second autodiff example now validates Hartmann and forcing sensitivities
   against finite differences for a publication-friendly derivative-verification
   figure.
+- A third autodiff example now performs full-profile inverse design over both
+  forcing and Hartmann number, broadening the differentiable lane from scalar
+  matching to small field-level inverse problems.
 - The fully developed potential solve now projects its right-hand side onto a
   charge-neutral compatibility space and tracks an explicit
   `charge_balance_residual` diagnostic alongside `max|div J|`.
@@ -97,6 +100,11 @@ Ship a research-grade `1.0` inductionless MHD code with:
   and `examples/fringing_benchmark_demo.py`, so axial field profiles and
   stationwise response metrics are now part of the post-1.0 research lane
   before the full `extruded_inductionless` solver lands.
+- That fringing path now writes a retained stacked axial field bundle
+  `u(x, y, z)` / `phi(x, y, z)` / `J(x, y, z)` assembled from stationwise fully
+  developed solves, plus stationwise charge-balance residuals. This is the
+  first explicit vertical slice toward `extruded_inductionless`, even though it
+  is still not a full 3D pressure-velocity solve.
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.

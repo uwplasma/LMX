@@ -296,6 +296,63 @@ def test_geometry_preview_demo_writes_preview_and_optional_post_outputs(
     assert (tmp_path / "geometry_preview_summary.json").exists()
 
 
+def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("fringing_benchmark_demo.py")
+
+    monkeypatch.setattr(
+        module,
+        "build_square_duct_fringing_benchmark",
+        lambda **kwargs: (
+            SimpleNamespace(name="fringing_case", solver=SimpleNamespace(kind="fully_developed_inductionless")),
+            SimpleNamespace(x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "run_fringing_station_sweep",
+        lambda *args, **kwargs: [
+            {"x": 0.0, "field_scale": 0.0, "mean_velocity": 1.0, "current_scaled_pressure_proxy": 0.2},
+            {"x": 1.0, "field_scale": 1.0, "mean_velocity": 0.8, "current_scaled_pressure_proxy": 0.25},
+        ],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_extruded_inductionless_slice",
+        lambda *args, **kwargs: SimpleNamespace(
+            x=np.array([0.0, 1.0]),
+            y=np.array([-1.0, 1.0]),
+            z=np.array([-1.0, 1.0]),
+            field_scale=np.array([0.0, 1.0]),
+            u=np.ones((2, 2, 2)),
+            charge_balance_residual=np.array([1.0e-7, 2.0e-7]),
+        ),
+    )
+
+    summary = module.run_fringing_benchmark_demo(out_dir=tmp_path, nx_stations=2, ny=4, nz=4)
+    assert summary["case"] == "fringing_case"
+    assert "extruded_bundle" in summary
+    assert (tmp_path / "fringing_benchmark.png").exists()
+    assert (tmp_path / "fringing_benchmark_summary.json").exists()
+
+
+def test_autodiff_profile_design_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("autodiff_profile_design_demo.py")
+    summary = module.run_autodiff_profile_design_demo(
+        out_dir=tmp_path,
+        target_forcing=1.0,
+        target_hartmann_number=10.0,
+        forcing_init=0.5,
+        hartmann_init=5.0,
+        learning_rate_forcing=5.0,
+        learning_rate_ha=1.0,
+        steps=4,
+    )
+    assert "recovered_forcing" in summary
+    assert "recovered_hartmann_number" in summary
+    assert (tmp_path / "autodiff_profile_design.png").exists()
+    assert (tmp_path / "autodiff_profile_design_summary.json").exists()
+
+
 def test_build_case_rejects_unknown_kind():
     with pytest.raises(ValueError, match="Unsupported case kind"):
         example_runner._build_case("bad", 5.0, 8, 8)

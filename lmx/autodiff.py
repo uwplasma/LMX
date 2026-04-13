@@ -238,3 +238,73 @@ def hartmann_profile_loss(
     centerline_scale = jnp.maximum(jnp.max(jnp.abs(centerline)), 1.0e-12)
     target_scale = jnp.maximum(jnp.max(jnp.abs(target_profile)), 1.0e-12)
     return jnp.mean((centerline / centerline_scale - target_profile / target_scale) ** 2)
+
+
+def hartmann_profile_loss_gradients(
+    problem: HartmannAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    hartmann_number: float | jnp.ndarray,
+    target_profile: jnp.ndarray,
+) -> dict[str, jnp.ndarray]:
+    objective = lambda force_value, ha_value: hartmann_profile_loss(
+        problem,
+        forcing=force_value,
+        hartmann_number=ha_value,
+        target_profile=target_profile,
+    )
+    loss = objective(forcing, hartmann_number)
+    d_loss_d_forcing, d_loss_d_ha = jax.grad(objective, argnums=(0, 1))(forcing, hartmann_number)
+    return {
+        "loss": loss,
+        "d_loss_d_forcing": d_loss_d_forcing,
+        "d_loss_d_ha": d_loss_d_ha,
+    }
+
+
+def run_hartmann_profile_inverse_design(
+    problem: HartmannAutodiffProblem,
+    *,
+    target_profile: jnp.ndarray,
+    forcing_init: float,
+    hartmann_init: float,
+    learning_rate_forcing: float = 20.0,
+    learning_rate_ha: float = 5.0,
+    steps: int = 24,
+) -> dict[str, object]:
+    forcing = jnp.asarray(forcing_init, dtype=jnp.float32)
+    hartmann_number = jnp.asarray(hartmann_init, dtype=jnp.float32)
+    history: list[dict[str, float]] = []
+    for step in range(steps):
+        gradients = hartmann_profile_loss_gradients(
+            problem,
+            forcing=forcing,
+            hartmann_number=hartmann_number,
+            target_profile=target_profile,
+        )
+        history.append(
+            {
+                "iteration": float(step),
+                "forcing": float(forcing),
+                "hartmann_number": float(hartmann_number),
+                "loss": float(gradients["loss"]),
+                "d_loss_d_forcing": float(gradients["d_loss_d_forcing"]),
+                "d_loss_d_ha": float(gradients["d_loss_d_ha"]),
+            }
+        )
+        forcing = jnp.clip(forcing - learning_rate_forcing * gradients["d_loss_d_forcing"], 0.05, 5.0)
+        hartmann_number = jnp.clip(hartmann_number - learning_rate_ha * gradients["d_loss_d_ha"], 0.5, 40.0)
+
+    recovered_u, recovered_phi = solve_differentiable_hartmann(
+        problem,
+        forcing=forcing,
+        hartmann_number=hartmann_number,
+    )
+    recovered_profile = recovered_u[:, recovered_u.shape[1] // 2]
+    return {
+        "forcing": float(forcing),
+        "hartmann_number": float(hartmann_number),
+        "history": history,
+        "recovered_profile": recovered_profile,
+        "recovered_phi_max": float(jnp.max(jnp.abs(recovered_phi))),
+    }

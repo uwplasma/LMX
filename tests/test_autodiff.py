@@ -8,6 +8,8 @@ from lmx.autodiff import (
     hartmann_mean_velocity_finite_difference_gradients,
     hartmann_mean_velocity_gradients,
     hartmann_profile_loss,
+    hartmann_profile_loss_gradients,
+    run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
 )
 
@@ -56,3 +58,40 @@ def test_mean_velocity_gradients_match_finite_difference():
     assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
     assert float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_diff["d_mean_velocity_d_forcing"])) < 5.0e-2
     assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_diff["d_mean_velocity_d_ha"])) < 5.0e-2
+
+
+def test_profile_loss_gradients_are_finite():
+    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
+    target_u, _ = solve_differentiable_hartmann(problem, forcing=1.0, hartmann_number=8.0)
+    target_profile = target_u[:, target_u.shape[1] // 2]
+
+    gradients = hartmann_profile_loss_gradients(
+        problem,
+        forcing=0.7,
+        hartmann_number=4.5,
+        target_profile=target_profile,
+    )
+
+    assert jnp.isfinite(gradients["loss"])
+    assert jnp.isfinite(gradients["d_loss_d_forcing"])
+    assert jnp.isfinite(gradients["d_loss_d_ha"])
+
+
+def test_profile_inverse_design_reduces_loss():
+    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
+    target_u, _ = solve_differentiable_hartmann(problem, forcing=1.0, hartmann_number=10.0)
+    target_profile = target_u[:, target_u.shape[1] // 2]
+
+    result = run_hartmann_profile_inverse_design(
+        problem,
+        target_profile=target_profile,
+        forcing_init=0.4,
+        hartmann_init=4.0,
+        learning_rate_forcing=10.0,
+        learning_rate_ha=2.0,
+        steps=8,
+    )
+
+    assert len(result["history"]) == 8
+    assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
+    assert jnp.isfinite(result["recovered_profile"]).all()
