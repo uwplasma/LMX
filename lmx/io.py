@@ -181,6 +181,7 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         mean_current_magnitude_history=np.asarray(diag.mean_current_magnitude_history),
         lorentz_power_history=np.asarray(diag.lorentz_power_history),
         div_current_max_history=np.asarray(diag.div_current_max_history),
+        charge_balance_residual_history=np.asarray(diag.charge_balance_residual_history),
         gauge_residual_history=np.asarray(diag.gauge_residual_history),
         interface_current_residual_history=np.asarray(diag.interface_current_residual_history),
         courant_like=np.asarray(diag.courant_like),
@@ -245,6 +246,7 @@ def load_restart_bundle(path: str | Path) -> RestartBundle:
             mean_current_magnitude_history=jnp.asarray(_load_optional_array(data, "mean_current_magnitude_history")),
             lorentz_power_history=jnp.asarray(_load_optional_array(data, "lorentz_power_history")),
             div_current_max_history=jnp.asarray(_load_optional_array(data, "div_current_max_history")),
+            charge_balance_residual_history=jnp.asarray(_load_optional_array(data, "charge_balance_residual_history")),
             gauge_residual_history=jnp.asarray(_load_optional_array(data, "gauge_residual_history")),
             interface_current_residual_history=jnp.asarray(
                 _load_optional_array(data, "interface_current_residual_history")

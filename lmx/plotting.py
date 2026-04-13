@@ -15,6 +15,7 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
 
 from .core import Solution
+from .mesh import StructuredMesh
 from .validation import extract_midplane_profile
 
 
@@ -355,6 +356,128 @@ def write_transient_movies(
     plt.close(fig2d)
     plt.close(fig3d)
     return outputs
+
+
+def write_geometry_preview_plots(
+    mesh: StructuredMesh,
+    out_dir: str | Path,
+    *,
+    case_title: str,
+    fluid_mask: jnp.ndarray | None = None,
+) -> list[Path]:
+    _set_publication_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    mask_source = fluid_mask if fluid_mask is not None else mesh.fluid_mask
+    mask = jnp.asarray(mask_source) if mask_source is not None else jnp.ones(mesh.yz_shape, dtype=bool)
+    if mask.size == 0:
+        mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    mask_image = np.asarray(mask.astype(float))
+
+    fig = plt.figure(figsize=(12, 5.8), constrained_layout=True)
+    grid = fig.add_gridspec(1, 2, width_ratios=(1.0, 1.15))
+    ax2d = fig.add_subplot(grid[0, 0])
+    ax3d = fig.add_subplot(grid[0, 1], projection="3d")
+    fig.suptitle(case_title, fontsize=16)
+
+    cmap = colors.ListedColormap(["#d1d5db", "#0f766e"])
+    ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, mask_image, shading="auto", cmap=cmap, vmin=0.0, vmax=1.0)
+    ax2d.set_title("Cross-section material map")
+    ax2d.set_xlabel("z")
+    ax2d.set_ylabel("y")
+    ax2d.set_aspect("equal")
+
+    if mesh.point_coordinates is not None:
+        points = np.asarray(mesh.point_coordinates)
+        for slice_index, color in ((0, "#1d4ed8"), (-1, "#b45309")):
+            section = points[slice_index]
+            ax3d.plot_wireframe(
+                section[:, :, 1],
+                section[:, :, 2],
+                section[:, :, 0],
+                rstride=max(section.shape[0] // 12, 1),
+                cstride=max(section.shape[1] // 18, 1),
+                color=color,
+                linewidth=0.65,
+                alpha=0.9,
+            )
+        centerline_y = points[:, 0, 0, 1]
+        centerline_z = points[:, 0, 0, 2]
+        centerline_x = points[:, 0, 0, 0]
+        ax3d.plot(centerline_y, centerline_z, centerline_x, color="#111827", linewidth=2.0)
+        ax3d.set_title("Mapped pipe O-grid preview")
+    else:
+        x0, x1 = float(mesh.x_faces[0]), float(mesh.x_faces[-1])
+        y0, y1 = float(mesh.y_faces[0]), float(mesh.y_faces[-1])
+        z0, z1 = float(mesh.z_faces[0]), float(mesh.z_faces[-1])
+        corners = np.asarray(
+            [
+                [x0, y0, z0],
+                [x0, y0, z1],
+                [x0, y1, z0],
+                [x0, y1, z1],
+                [x1, y0, z0],
+                [x1, y0, z1],
+                [x1, y1, z0],
+                [x1, y1, z1],
+            ]
+        )
+        edges = (
+            (0, 1), (0, 2), (1, 3), (2, 3),
+            (4, 5), (4, 6), (5, 7), (6, 7),
+            (0, 4), (1, 5), (2, 6), (3, 7),
+        )
+        for start, end in edges:
+            ax3d.plot(
+                [corners[start, 1], corners[end, 1]],
+                [corners[start, 2], corners[end, 2]],
+                [corners[start, 0], corners[end, 0]],
+                color="#1d4ed8",
+                linewidth=1.2,
+            )
+        if np.any(mask_image > 0.5):
+            fluid_rows = np.where(np.any(mask_image > 0.5, axis=1))[0]
+            fluid_cols = np.where(np.any(mask_image > 0.5, axis=0))[0]
+            fy0 = float(mesh.y_faces[fluid_rows[0]])
+            fy1 = float(mesh.y_faces[fluid_rows[-1] + 1])
+            fz0 = float(mesh.z_faces[fluid_cols[0]])
+            fz1 = float(mesh.z_faces[fluid_cols[-1] + 1])
+            fluid_corners = np.asarray(
+                [
+                    [x0, fy0, fz0],
+                    [x0, fy0, fz1],
+                    [x0, fy1, fz0],
+                    [x0, fy1, fz1],
+                    [x1, fy0, fz0],
+                    [x1, fy0, fz1],
+                    [x1, fy1, fz0],
+                    [x1, fy1, fz1],
+                ]
+            )
+            for start, end in edges:
+                ax3d.plot(
+                    [fluid_corners[start, 1], fluid_corners[end, 1]],
+                    [fluid_corners[start, 2], fluid_corners[end, 2]],
+                    [fluid_corners[start, 0], fluid_corners[end, 0]],
+                    color="#b45309",
+                    linewidth=1.0,
+                    alpha=0.85,
+                )
+        ax3d.set_title("Extruded duct preview")
+
+    ax3d.set_xlabel("y")
+    ax3d.set_ylabel("z")
+    ax3d.set_zlabel("x")
+    ax3d.view_init(elev=22, azim=34)
+    ax3d.set_box_aspect((float(mesh.y_faces[-1] - mesh.y_faces[0]), float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.x_faces[-1] - mesh.x_faces[0])))
+
+    png_path = out_dir / "geometry_preview.png"
+    pdf_path = out_dir / "geometry_preview.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
 
 
 def write_strong_scaling_plots(

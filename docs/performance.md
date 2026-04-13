@@ -32,7 +32,7 @@ Local CPU plus a remote GPU host reachable over SSH:
 
 ```bash
 python examples/strong_scaling_demo.py \
-  --remote-host <your_gpu_host> \
+  --remote-host office \
   --output artifacts/examples/strong_scaling_full
 ```
 
@@ -42,6 +42,28 @@ The example writes:
 - `strong_scaling_summary.json`
 - publication-style `strong_scaling.png`
 - publication-style `strong_scaling.pdf`
+
+## Backend selection for CLI runs
+
+Standard `lmx input.toml` runs inherit the active JAX backend from the shell
+environment. Typical launch patterns are:
+
+CPU:
+
+```bash
+JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
+```
+
+Single GPU:
+
+```bash
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
+```
+
+Those commands select the execution device for the normal CLI solver run. The
+publication strong-scaling figures use `examples/strong_scaling_demo.py`,
+because that benchmark intentionally exercises the sharded stencil kernel across
+multiple CPU or GPU devices.
 
 ## Publication artifact
 
@@ -70,6 +92,29 @@ contention, so the figure is useful as a reproducible performance baseline, not
 as a claim of perfect monotone scaling. The remote GPU path uses the highest
 available single GPU index for the one-device baseline so the measurement is
 not distorted by workstation display load.
+
+## Recent compatibility and platform validation
+
+The current tree has also been validated on:
+
+- local Python `3.13` with JAX `0.9.2`
+- remote Python `3.10.12` on the `office` host with JAX `0.6.2`
+
+That remote run confirms both the broad JAX-version compatibility work and the
+Python `3.10` TOML fallback path on a real two-GPU machine.
+
+Recent small validation run on `office`:
+
+- CPU `256 x 256`, `32` iterations:
+  - `1` device warm runtime: `1.46e-3 s`
+  - `2` devices warm runtime: `2.00e-3 s`
+- GPU `512 x 512`, `32` iterations:
+  - `1` GPU warm runtime: `6.11e-4 s`
+  - `2` GPUs warm runtime: `3.91e-3 s`
+
+Those numbers are not the publication artifact; they are the current
+post-`1.0` smoke validation that the remote-GPU orchestration still works on a
+live two-GPU host.
 
 ## Design notes
 

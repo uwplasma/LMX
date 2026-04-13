@@ -12,6 +12,7 @@ choice back to the implementation files.
 :caption: User Guides
 
 theory
+geometry
 input_reference
 case_cookbook
 benchmark_matrix
@@ -32,6 +33,7 @@ developer_guide
 - CLI, TOML, restart, plotting, movie generation, and benchmark reporting
 - strong-scaling benchmark scripts for CPU and multi-GPU stencil kernels
 - differentiable Hartmann sensitivity and inverse-design examples
+- geometry preview and mesh-inspection tooling for ducts and mapped pipe meshes
 - executable fringing-field benchmark scaffolds
 
 ## What is planned next

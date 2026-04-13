@@ -59,6 +59,7 @@ def _sample_solution(case) -> Solution:
         mean_current_magnitude_history=jnp.asarray([0.5, 0.45, 0.4]),
         lorentz_power_history=jnp.asarray([0.3, 0.25, 0.2]),
         div_current_max_history=jnp.asarray([1.0e-6, 5.0e-7, 2.5e-7]),
+        charge_balance_residual_history=jnp.asarray([1.0e-7, 8.0e-8, 6.0e-8]),
         gauge_residual_history=jnp.asarray([1.0e-8, 5.0e-9, 2.5e-9]),
         interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7, 6.0e-7]),
     )
@@ -117,6 +118,7 @@ def test_write_solution_npz(tmp_path: Path):
         assert "mean_current_magnitude_history" in data
         assert "lorentz_power_history" in data
         assert "div_current_max_history" in data
+        assert "charge_balance_residual_history" in data
         assert "gauge_residual_history" in data
         assert "interface_current_residual_history" in data
         assert "raw_update_max_history" in data
@@ -145,6 +147,7 @@ def test_load_restart_bundle_round_trips_solution_npz(tmp_path: Path):
     assert bundle.diagnostics.mean_current_magnitude_history.shape == solution.diagnostics.mean_current_magnitude_history.shape
     assert bundle.diagnostics.lorentz_power_history.shape == solution.diagnostics.lorentz_power_history.shape
     assert bundle.diagnostics.div_current_max_history.shape == solution.diagnostics.div_current_max_history.shape
+    assert bundle.diagnostics.charge_balance_residual_history.shape == solution.diagnostics.charge_balance_residual_history.shape
     assert bundle.diagnostics.gauge_residual_history.shape == solution.diagnostics.gauge_residual_history.shape
     assert bundle.diagnostics.interface_current_residual_history.shape == solution.diagnostics.interface_current_residual_history.shape
     assert bundle.diagnostics.raw_update_max_history.shape == solution.diagnostics.raw_update_max_history.shape

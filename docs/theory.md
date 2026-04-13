@@ -53,6 +53,23 @@ That path:
 - exposes steady and transient modes
 - avoids the legacy velocity-limiter-driven pseudo-transient closure
 
+### Charge conservation handling
+
+The fully developed solver enforces charge conservation in two complementary
+ways:
+
+- the electric-potential right-hand side is projected onto a zero-net-charge
+  compatibility space before the Poisson solve
+- conservative face-current diagnostics are tracked through:
+  - `max|div J|`
+  - charge-balance residual
+  - interface current continuity residual
+
+This is the correct `1.0` treatment for the cross-sectional fully developed
+model. True inlet/outlet current closure for non-fully-developed 3D ducts
+belongs to the planned `extruded_inductionless` solver family, where axial
+velocity, pressure, and potential must be solved together.
+
 ### Legacy solver family
 
 `solver.kind = "legacy_reduced"` is retained only for regression and historical
@@ -67,6 +84,7 @@ diagnostics currently include:
 - mean current magnitude
 - Lorentz power
 - electric-current divergence residual
+- charge-balance residual
 - gauge residual
 - interface current continuity residual
 - linear-solve residual and iteration history

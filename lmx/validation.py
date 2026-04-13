@@ -404,6 +404,9 @@ def validation_summary(solution: Solution, case_name: str, ha: float | None = No
         "div_current_max": float(solution.diagnostics.div_current_max_history[-1])
         if solution.diagnostics.div_current_max_history.size
         else 0.0,
+        "charge_balance_residual": float(solution.diagnostics.charge_balance_residual_history[-1])
+        if solution.diagnostics.charge_balance_residual_history.size
+        else 0.0,
         "gauge_residual": float(solution.diagnostics.gauge_residual_history[-1])
         if solution.diagnostics.gauge_residual_history.size
         else 0.0,

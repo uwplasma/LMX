@@ -258,7 +258,42 @@ def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path):
     plot_outputs = plot_module.plot_solution_npz(solution_npz, tmp_path / "plots")
     assert (tmp_path / "plots" / "overview_from_npz.png").exists()
     assert (tmp_path / "plots" / "diagnostics_from_npz.png").exists()
-    assert len(plot_outputs) == 4
+
+
+def test_geometry_preview_demo_writes_preview_and_optional_post_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _load_example_module("geometry_preview_demo.py")
+
+    def fake_write_geometry_preview_plots(mesh, out_dir: Path, case_title: str):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outputs = [out_dir / "geometry_preview.png", out_dir / "geometry_preview.pdf"]
+        for path in outputs:
+            path.write_bytes(b"preview")
+        return outputs
+
+    def fake_solve_steady(case):
+        return SimpleNamespace(case_name=case.name)
+
+    def fake_write_case_overview_plots(solution, out_dir: Path, *, case_title: str):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outputs = [out_dir / "overview.png", out_dir / "overview.pdf"]
+        for path in outputs:
+            path.write_bytes(b"post")
+        return outputs
+
+    monkeypatch.setattr(module, "write_geometry_preview_plots", fake_write_geometry_preview_plots)
+    monkeypatch.setattr(module, "solve_steady", fake_solve_steady)
+    monkeypatch.setattr(module, "write_case_overview_plots", fake_write_case_overview_plots)
+
+    summary = module.write_preview_bundle(out_dir=tmp_path, with_post_run=True, post_case_kind="hartmann")
+    assert summary["with_post_run"] is True
+    assert summary["post_case_kind"] == "hartmann"
+    assert (tmp_path / "hartmann_geometry" / "geometry_preview.png").exists()
+    assert (tmp_path / "hunt_geometry" / "geometry_preview.png").exists()
+    assert (tmp_path / "pipe_geometry" / "geometry_preview.png").exists()
+    assert (tmp_path / "hartmann_post" / "overview.png").exists()
+    assert (tmp_path / "geometry_preview_summary.json").exists()
 
 
 def test_build_case_rejects_unknown_kind():

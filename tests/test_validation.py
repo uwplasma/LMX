@@ -88,6 +88,7 @@ def _synthetic_solution(case, *, oscillatory: bool = False) -> Solution:
         mean_current_magnitude_history=jnp.asarray([0.1, 0.09, 0.08]),
         lorentz_power_history=jnp.asarray([0.05, 0.045, 0.04]),
         div_current_max_history=jnp.asarray([1.0e-6, 8.0e-7, 5.0e-7]),
+        charge_balance_residual_history=jnp.asarray([4.0e-8, 3.0e-8, 2.0e-8]),
         gauge_residual_history=jnp.asarray([1.0e-8, 7.0e-9, 5.0e-9]),
         interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7, 6.0e-7]),
     )
@@ -174,6 +175,8 @@ def test_validation_summary_includes_latest_potential_residual():
     assert "lorentz_power" in metrics
     assert "div_current_max" in metrics
     assert metrics["div_current_max"] >= 0.0
+    assert "charge_balance_residual" in metrics
+    assert metrics["charge_balance_residual"] >= 0.0
     assert "gauge_residual" in metrics
     assert metrics["gauge_residual"] >= 0.0
     assert "interface_current_residual" in metrics

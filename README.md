@@ -46,6 +46,15 @@ cd LMX
 python -m pip install -e .
 ```
 
+LMX supports Python `3.10+`. On Python `3.10`, TOML parsing falls back
+automatically to `tomli`, and the package now accepts the installed `jax`
+family directly rather than pinning a narrow version window.
+
+Recent compatibility checks were run on:
+
+- local Python `3.13` with JAX `0.9.2`
+- remote Python `3.10.12` on `office` with JAX `0.6.2` and two RTX A4000 GPUs
+
 ### Development install
 
 ```bash
@@ -64,6 +73,8 @@ lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
+JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
 ```
 
 The module entrypoint works as well:
@@ -116,6 +127,28 @@ Current local baseline:
 
 Both are intentionally kept below a five-minute routine validation budget.
 
+## Geometry and mesh preview
+
+LMX now ships a dedicated geometry preview workflow:
+
+```bash
+python examples/geometry_preview_demo.py --output artifacts/examples/geometry_preview
+python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
+```
+
+That example shows:
+
+- a rectangular Hartmann duct
+- a layered Hunt duct with explicit wall regions
+- a mapped pipe O-grid
+
+The default invocation is preview-only so it stays fast. Add `--with-post-run`
+to append a short steady Hartmann or Hunt solve and matching overview plots in
+the same output tree.
+
+This is the intended preprocessing/postprocessing bridge for users who want to
+inspect the geometry and mesh before launching longer runs.
+
 ## Typical outputs
 
 An LMX run can produce:
@@ -129,7 +162,8 @@ An LMX run can produce:
 
 The runtime logger is intentionally detailed. It reports solver-family
 information, linear-solve residuals, integral MHD diagnostics, conservation
-checks, and transient progress in a format intended for long research runs.
+checks, initial and final linear/potential residuals, and transient progress in
+a format intended for long research runs.
 
 ## Performance and autodiff examples
 
@@ -140,7 +174,7 @@ dominant stencil/linear-solve kernel:
 
 ```bash
 python examples/strong_scaling_demo.py --output artifacts/examples/strong_scaling_cpu
-python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output artifacts/examples/strong_scaling_full
+python examples/strong_scaling_demo.py --remote-host office --output artifacts/examples/strong_scaling_full
 ```
 
 This writes raw timing JSON plus polished `PNG`/`PDF` scaling plots suitable for
@@ -161,6 +195,16 @@ Current publication artifact highlights:
 The remote GPU workflow automatically prefers the highest-index single GPU for
 the one-device baseline, which avoids workstation display contention on desktop
 GPU hosts.
+
+Standard CLI runs are not themselves a multi-device scaling benchmark, but they
+inherit the active JAX backend from the shell. Use `examples/strong_scaling_demo.py`
+for publication scaling studies and use `JAX_PLATFORMS` / `CUDA_VISIBLE_DEVICES`
+to steer normal CLI runs to CPU or GPU backends.
+
+The recent remote smoke validation on `office` confirmed that a `512 x 512`
+GPU kernel run is faster than the small local CPU benchmark on the current
+post-`1.0` tree, which is the expected direction of travel for the performance
+lane.
 
 ### Autodiff sensitivity and inverse design
 

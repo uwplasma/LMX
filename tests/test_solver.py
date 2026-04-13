@@ -20,7 +20,7 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.2)
         zeros = jnp.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0, 1.0e-3, 1.0e-3
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
@@ -57,7 +57,7 @@ def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
     reaction = jnp.ones(mesh.yz_shape) * 0.2
     rhs = jnp.ones(mesh.yz_shape) * 0.05
 
-    u, residual, iterations = solvers._solve_velocity_system(
+    u, residual, iterations, initial_residual = solvers._solve_velocity_system(
         mesh=mesh,
         diffusivity=diffusivity,
         reaction=reaction,
@@ -70,6 +70,7 @@ def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
     )
 
     assert jnp.isfinite(u).all()
+    assert float(initial_residual) >= float(residual)
     assert float(residual) < 1e-4
     assert int(iterations) >= 0
 
@@ -171,7 +172,7 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient(monkeypatch: pytes
         increment = 0.05 if target is not None else 0.0
         updated = u_prev + increment
         zeros = jnp.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, increment, increment, increment, 0.0, 0.0, 0.0
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, increment, increment, increment, 0.0, 0.0, 0.0, 1.0e-3, 1.0e-3
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
@@ -190,7 +191,7 @@ def test_transient_restart_matches_direct_run(tmp_path: Path, monkeypatch: pytes
         step_time = kwargs["step_time"]
         updated = jnp.full_like(u_prev, step_time * 10.0)
         zeros = jnp.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.3, 0.2, 0.1, 0.05, float(jnp.mean(updated)), 0.3
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.3, 0.2, 0.1, 0.05, float(jnp.mean(updated)), 0.3, 1.0e-3, 1.0e-3
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
@@ -223,7 +224,7 @@ def test_transient_restart_can_append_diagnostics(tmp_path: Path, monkeypatch: p
         step_time = kwargs["step_time"]
         updated = jnp.full_like(u_prev, step_time * 10.0)
         zeros = jnp.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.3, 0.2, 0.1, 0.05, float(jnp.mean(updated)), 0.3
+        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.3, 0.2, 0.1, 0.05, float(jnp.mean(updated)), 0.3, 1.0e-3, 1.0e-3
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
@@ -495,7 +496,7 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response(monkeypatch: pyte
         jy = jnp.full_like(updated, 0.2 * scale)
         lorentz = jnp.full_like(updated, 0.05 * scale)
         zeros = jnp.zeros_like(updated)
-        return updated, zeros, jy, zeros, lorentz, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.2 * scale, 0.15 * scale, 0.1 * scale, 0.05 * scale, float(jnp.mean(updated)), 0.0
+        return updated, zeros, jy, zeros, lorentz, 1.0e-6, 1.0e-6, 1.0, 2.0, 0.2 * scale, 0.15 * scale, 0.1 * scale, 0.05 * scale, float(jnp.mean(updated)), 0.0, 1.0e-3, 1.0e-3
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
@@ -530,7 +531,7 @@ def test_potential_solver_backends_return_finite_fields_on_small_system():
         mesh = solvers._build_mesh(case)
         materials = build_material_fields(case, mesh)
         _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
-        phi, residual, iterations = solvers._solve_potential(
+        phi, residual, iterations, initial_residual = solvers._solve_potential(
             mesh,
             materials.conductivity,
             materials.fluid_mask,
@@ -543,6 +544,7 @@ def test_potential_solver_backends_return_finite_fields_on_small_system():
             solver=solver_name,
         )
         assert jnp.isfinite(phi).all()
+        assert float(initial_residual) >= 0.0
         assert jnp.isfinite(residual)
         assert int(iterations) >= 0
 
@@ -603,6 +605,7 @@ def test_post_update_potential_refresh_recomputes_electromagnetic_state(monkeypa
             jnp.full_like(u_arg, phi_value),
             jnp.asarray(phi_value * 0.1),
             jnp.asarray(1, dtype=jnp.int32),
+            jnp.asarray(phi_value * 0.2),
         )
 
     def fake_compute_current_and_lorentz(*args, **kwargs):
@@ -864,7 +867,7 @@ def test_solve_steady_respects_t_final_when_tolerance_not_reached(monkeypatch: p
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-2, 25, 1.0e-2, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0
+        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-2, 25, 1.0e-2, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0e-2, 1.0e-2
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
@@ -919,7 +922,7 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(monkeypatc
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, next(residuals), 1.0e-2, 25, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0
+        return u, zeros, zeros, zeros, zeros, next(residuals), 1.0e-2, 25, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0e-2, 1.0e-2
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
@@ -948,7 +951,7 @@ def test_fully_developed_steady_can_require_potential_residual_when_requested(mo
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
         zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0
+        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0e-2, 1.0e-2
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
@@ -972,7 +975,7 @@ def test_potential_solver_supports_lineax_and_rejects_unknown_backend(monkeypatc
 
     monkeypatch.setattr(solvers, "solve_poisson_lineax", fake_lineax)
 
-    phi, residual, iterations = solvers._solve_potential(
+    phi, residual, iterations, initial_residual = solvers._solve_potential(
         mesh,
         sigma,
         fluid_mask,
@@ -986,6 +989,7 @@ def test_potential_solver_supports_lineax_and_rejects_unknown_backend(monkeypatc
     )
 
     assert jnp.isfinite(phi).all()
+    assert float(initial_residual) >= 0.0
     assert float(residual) >= 0.0
     assert int(iterations) >= 0
 

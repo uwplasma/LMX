@@ -8,6 +8,7 @@ import jax.numpy as jnp
 
 from .core import Diagnostics, MHDState, Solution
 from .linear import (
+    five_point_residual_norm,
     poisson_residual_norm,
     solve_five_point_system,
     solve_poisson_cg_state,
@@ -193,10 +194,19 @@ def _solve_velocity_system(
     preconditioner: str,
     max_steps: int,
     tolerance: float,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     diagonal, west, east, south, north = _velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
     rhs_masked = jnp.where(active_mask, rhs, 0.0)
     cell_metric = _cell_metric(mesh).astype(rhs_masked.dtype)
+    initial_residual = five_point_residual_norm(
+        diagonal * cell_metric,
+        west * cell_metric,
+        east * cell_metric,
+        south * cell_metric,
+        north * cell_metric,
+        rhs_masked * cell_metric,
+        jnp.zeros_like(rhs_masked),
+    )
     field, info = solve_five_point_system(
         diagonal * cell_metric,
         west * cell_metric,
@@ -210,7 +220,12 @@ def _solve_velocity_system(
         max_steps=max_steps,
     )
     field = jnp.where(active_mask, field, 0.0)
-    return field, jnp.asarray(info.residual, dtype=rhs.dtype), jnp.asarray(info.iterations, dtype=jnp.int32)
+    return (
+        field,
+        jnp.asarray(info.residual, dtype=rhs.dtype),
+        jnp.asarray(info.iterations, dtype=jnp.int32),
+        jnp.asarray(initial_residual, dtype=rhs.dtype),
+    )
 
 
 def _fully_developed_rhs(
@@ -238,7 +253,7 @@ def _volume_scaled_potential_system(
     south: jnp.ndarray,
     north: jnp.ndarray,
     rhs: jnp.ndarray,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     cell_metric = _cell_metric(mesh)
     return (
         diagonal * cell_metric,
@@ -262,7 +277,7 @@ def _solve_potential(
     tolerance: float | None = None,
     relaxation: float = 1.0,
     solver: str = "jacobi",
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
     conv_y = _face_emf_y(mesh, sigma, uxb_y)
@@ -273,8 +288,23 @@ def _solve_potential(
         (face_conv_y[1:, :] - face_conv_y[:-1, :]) / mesh.dy[:, None]
         + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
     )
+    cell_metric = _cell_metric(mesh).astype(rhs.dtype)
+    fluid_weight = jnp.where(fluid_mask, cell_metric, 0.0)
+    fluid_total_weight = jnp.maximum(jnp.sum(fluid_weight), 1.0e-20)
+    rhs_mean = jnp.sum(fluid_weight * rhs) / fluid_total_weight
+    rhs = jnp.where(fluid_mask, rhs - rhs_mean, rhs)
 
     diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
+    initial_residual = poisson_residual_norm(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        jnp.zeros_like(rhs),
+        anchor,
+    )
     if solver == "jacobi":
         phi, residual, iteration_count = solve_poisson_jacobi_state(
             diagonal,
@@ -338,7 +368,7 @@ def _solve_potential(
         iteration_count = jnp.asarray(info.iterations, dtype=jnp.int32)
     else:
         raise ValueError(f"Unsupported potential solver backend {solver!r}")
-    return phi, residual, iteration_count
+    return phi, residual, iteration_count, initial_residual
 
 
 def _resolve_potential_solver(solver: str, fluid_mask: jnp.ndarray | None) -> str:
@@ -436,7 +466,7 @@ def _integral_diagnostics(
     by: jnp.ndarray,
     bz: jnp.ndarray,
     anchor: tuple[int, int],
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     cell_metric = _cell_metric(mesh).astype(u.dtype)
     fluid_weight = jnp.where(fluid_mask, cell_metric, 0.0)
     fluid_total_weight = jnp.maximum(jnp.sum(fluid_weight), 1e-20)
@@ -451,6 +481,7 @@ def _integral_diagnostics(
         + (padded_face_jz[:, 1:] - padded_face_jz[:, :-1]) / mesh.dz[None, :]
     )
     div_current_max = jnp.max(jnp.where(fluid_mask, jnp.abs(div_current), 0.0))
+    charge_balance_residual = jnp.abs(jnp.sum(fluid_weight * div_current)) / fluid_total_weight
     gauge_residual = jnp.abs(phi[anchor])
     conductivity_jump_y = jnp.abs(sigma[:-1, :] - sigma[1:, :]) > 1e-12
     conductivity_jump_z = jnp.abs(sigma[:, :-1] - sigma[:, 1:]) > 1e-12
@@ -475,6 +506,7 @@ def _integral_diagnostics(
         mean_current_magnitude,
         lorentz_power,
         div_current_max,
+        charge_balance_residual,
         gauge_residual,
         interface_current_residual,
     )
@@ -658,7 +690,7 @@ def _step(
 ]:
     def outer_body(_, carry):
         u_iter = carry[0]
-        phi, potential_residual, potential_iteration_count = _solve_potential(
+        phi, potential_residual, potential_iteration_count, _potential_initial_residual = _solve_potential(
             mesh,
             sigma,
             fluid_mask,
@@ -743,7 +775,7 @@ def _step(
         u_next = jnp.nan_to_num(u_next, nan=0.0, posinf=5.0, neginf=-5.0)
         u_next = jnp.clip(u_next, -5.0, 5.0)
         if post_update_potential_refresh:
-            phi, potential_residual, potential_iteration_count = _solve_potential(
+            phi, potential_residual, potential_iteration_count, _potential_initial_residual = _solve_potential(
                 mesh,
                 sigma,
                 fluid_mask,
@@ -985,8 +1017,11 @@ def _emit_solver_step(
     mean_current_magnitude: float,
     lorentz_power: float,
     div_current_max: float,
+    charge_balance_residual: float,
     gauge_residual: float,
     interface_current_residual: float,
+    potential_initial_residual: float = 0.0,
+    linear_initial_residual: float = 0.0,
 ):
     if logger is None:
         return
@@ -1007,6 +1042,8 @@ def _emit_solver_step(
             potential_iterations=potential_iteration_count,
             linear_residual=linear_residual,
             linear_iterations=linear_iteration_count,
+            potential_initial_residual=potential_initial_residual,
+            linear_initial_residual=linear_initial_residual,
             applied_forcing=applied_forcing,
             pressure_proxy=pressure_proxy,
             current_scaled_pressure_proxy=current_scaled_pressure_proxy,
@@ -1019,10 +1056,11 @@ def _emit_solver_step(
             mean_current_magnitude=mean_current_magnitude,
             lorentz_power=lorentz_power,
             div_current_max=div_current_max,
+            charge_balance_residual=charge_balance_residual,
             gauge_residual=gauge_residual,
             interface_current_residual=interface_current_residual,
         )
-        )
+    )
 
 
 def _fully_developed_case_step(
@@ -1054,6 +1092,8 @@ def _fully_developed_case_step(
     jnp.ndarray,
     jnp.ndarray,
     jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
 ]:
     _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
     forcing = _explicit_forcing(case.forcing, by.dtype)
@@ -1066,8 +1106,10 @@ def _fully_developed_case_step(
     velocity_residual = jnp.asarray(jnp.inf, dtype=u_previous.dtype)
     potential_residual = jnp.asarray(jnp.inf, dtype=u_previous.dtype)
     potential_iteration_count = jnp.asarray(0, dtype=jnp.int32)
+    potential_initial_residual = jnp.asarray(0.0, dtype=u_previous.dtype)
     linear_iteration_count = jnp.asarray(0, dtype=jnp.int32)
     linear_residual = jnp.asarray(jnp.inf, dtype=u_previous.dtype)
+    linear_initial_residual = jnp.asarray(0.0, dtype=u_previous.dtype)
     applied_forcing = forcing
     steady_mode = case.solver.mode == "steady"
 
@@ -1075,7 +1117,7 @@ def _fully_developed_case_step(
         raise NotImplementedError("fully_developed_inductionless currently supports implicit_euler only")
 
     for _ in range(max(1, coupling_iterations)):
-        phi, potential_residual, potential_iteration_count = _solve_potential(
+        phi, potential_residual, potential_iteration_count, potential_initial_residual = _solve_potential(
             mesh,
             materials.conductivity,
             fluid_mask,
@@ -1110,7 +1152,7 @@ def _fully_developed_case_step(
             rhs_base = rhs_base + jnp.where(active_mask, u_previous / dt, 0.0)
         if target_mean_velocity is None:
             rhs = rhs_base + jnp.where(active_mask, forcing / materials.density, 0.0)
-            u_next, velocity_linear_residual, linear_iteration_count = _solve_velocity_system(
+            u_next, velocity_linear_residual, linear_iteration_count, linear_initial_residual = _solve_velocity_system(
                 mesh=mesh,
                 diffusivity=materials.viscosity,
                 reaction=reaction,
@@ -1124,7 +1166,7 @@ def _fully_developed_case_step(
             applied_forcing = forcing
         else:
             unit_rhs = jnp.where(active_mask, 1.0 / materials.density, 0.0)
-            u_base, velocity_linear_residual, linear_iteration_count = _solve_velocity_system(
+            u_base, velocity_linear_residual, linear_iteration_count, linear_initial_residual = _solve_velocity_system(
                 mesh=mesh,
                 diffusivity=materials.viscosity,
                 reaction=reaction,
@@ -1135,7 +1177,7 @@ def _fully_developed_case_step(
                 max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
                 tolerance=min(coupling_tolerance, 1e-10),
             )
-            u_sensitivity, _, _ = _solve_velocity_system(
+            u_sensitivity, _, _, sensitivity_initial_residual = _solve_velocity_system(
                 mesh=mesh,
                 diffusivity=materials.viscosity,
                 reaction=reaction,
@@ -1146,6 +1188,7 @@ def _fully_developed_case_step(
                 max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
                 tolerance=min(coupling_tolerance, 1e-10),
             )
+            linear_initial_residual = jnp.maximum(linear_initial_residual, sensitivity_initial_residual)
             mean_base = jnp.sum(fluid_weight * u_base) / fluid_total_weight
             mean_sensitivity = jnp.sum(fluid_weight * u_sensitivity) / fluid_total_weight
             applied_forcing = jnp.where(
@@ -1170,7 +1213,7 @@ def _fully_developed_case_step(
         ):
             break
 
-    phi, potential_residual, potential_iteration_count = _solve_potential(
+    phi, potential_residual, potential_iteration_count, potential_initial_residual = _solve_potential(
         mesh,
         materials.conductivity,
         fluid_mask,
@@ -1219,6 +1262,8 @@ def _fully_developed_case_step(
         face_lorentz_max,
         mean_velocity,
         applied_forcing,
+        potential_initial_residual,
+        linear_initial_residual,
     )
 
 
@@ -1300,6 +1345,7 @@ def _solve_fully_developed(
     mean_current_magnitude_history: list[float] = []
     lorentz_power_history: list[float] = []
     div_current_max_history: list[float] = []
+    charge_balance_residual_history: list[float] = []
     gauge_residual_history: list[float] = []
     interface_current_residual_history: list[float] = []
     raw_update_max_history: list[float] = []
@@ -1327,6 +1373,8 @@ def _solve_fully_developed(
             face_lorentz_max,
             mean_velocity,
             applied_forcing,
+            potential_initial_residual,
+            linear_initial_residual,
         ) = _fully_developed_case_step(
             case=case,
             mesh=mesh,
@@ -1352,6 +1400,7 @@ def _solve_fully_developed(
             mean_current_magnitude,
             lorentz_power,
             div_current_max,
+            charge_balance_residual,
             gauge_residual,
             interface_current_residual,
         ) = _integral_diagnostics(
@@ -1388,6 +1437,7 @@ def _solve_fully_developed(
         mean_current_magnitude_history.append(float(mean_current_magnitude))
         lorentz_power_history.append(float(lorentz_power))
         div_current_max_history.append(float(div_current_max))
+        charge_balance_residual_history.append(float(charge_balance_residual))
         gauge_residual_history.append(float(gauge_residual))
         interface_current_residual_history.append(float(interface_current_residual))
         raw_update_max_history.append(residual_value)
@@ -1429,8 +1479,11 @@ def _solve_fully_developed(
             mean_current_magnitude=float(mean_current_magnitude),
             lorentz_power=float(lorentz_power),
             div_current_max=float(div_current_max),
+            charge_balance_residual=float(charge_balance_residual),
             gauge_residual=float(gauge_residual),
             interface_current_residual=float(interface_current_residual),
+            potential_initial_residual=float(potential_initial_residual),
+            linear_initial_residual=float(linear_initial_residual),
         )
         step_count = step_index + 1
         potential_gate = case.time_stepper.steady_potential_tolerance
@@ -1480,6 +1533,7 @@ def _solve_fully_developed(
         mean_current_magnitude_history=_concat_history(initial_diagnostics.mean_current_magnitude_history if initial_diagnostics is not None else None, jnp.asarray(mean_current_magnitude_history, dtype=float), append=append_diagnostics),
         lorentz_power_history=_concat_history(initial_diagnostics.lorentz_power_history if initial_diagnostics is not None else None, jnp.asarray(lorentz_power_history, dtype=float), append=append_diagnostics),
         div_current_max_history=_concat_history(initial_diagnostics.div_current_max_history if initial_diagnostics is not None else None, jnp.asarray(div_current_max_history, dtype=float), append=append_diagnostics),
+        charge_balance_residual_history=_concat_history(initial_diagnostics.charge_balance_residual_history if initial_diagnostics is not None else None, jnp.asarray(charge_balance_residual_history, dtype=float), append=append_diagnostics),
         gauge_residual_history=_concat_history(initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None, jnp.asarray(gauge_residual_history, dtype=float), append=append_diagnostics),
         interface_current_residual_history=_concat_history(initial_diagnostics.interface_current_residual_history if initial_diagnostics is not None else None, jnp.asarray(interface_current_residual_history, dtype=float), append=append_diagnostics),
     )
@@ -1807,6 +1861,13 @@ def _solve_transient_legacy(
     limited_fraction_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
+    volumetric_flow_rate_history: list[float] = []
+    mean_current_magnitude_history: list[float] = []
+    lorentz_power_history: list[float] = []
+    div_current_max_history: list[float] = []
+    charge_balance_residual_history: list[float] = []
+    gauge_residual_history: list[float] = []
+    interface_current_residual_history: list[float] = []
     residual_value = float("inf")
     pressure_proxy_reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
 
@@ -1843,6 +1904,7 @@ def _solve_transient_legacy(
             mean_current_magnitude,
             lorentz_power,
             div_current_max,
+            charge_balance_residual,
             gauge_residual,
             interface_current_residual,
         ) = _integral_diagnostics(
@@ -1883,6 +1945,13 @@ def _solve_transient_legacy(
         current_scaled_pressure_proxy_history.append(float(current_scaled_pressure_proxy))
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
+        volumetric_flow_rate_history.append(float(volumetric_flow_rate))
+        mean_current_magnitude_history.append(float(mean_current_magnitude))
+        lorentz_power_history.append(float(lorentz_power))
+        div_current_max_history.append(float(div_current_max))
+        charge_balance_residual_history.append(float(charge_balance_residual))
+        gauge_residual_history.append(float(gauge_residual))
+        interface_current_residual_history.append(float(interface_current_residual))
         _emit_solver_step(
             logger,
             step_index=step_index + 1,
@@ -1912,8 +1981,11 @@ def _solve_transient_legacy(
             mean_current_magnitude=float(mean_current_magnitude),
             lorentz_power=float(lorentz_power),
             div_current_max=float(div_current_max),
+            charge_balance_residual=float(charge_balance_residual),
             gauge_residual=float(gauge_residual),
             interface_current_residual=float(interface_current_residual),
+            potential_initial_residual=float(potential_residual),
+            linear_initial_residual=0.0,
         )
 
     state = MHDState(
@@ -2019,6 +2091,41 @@ def _solve_transient_legacy(
         potential_iterations_history=_concat_history(
             initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
             jnp.asarray(potential_iteration_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        volumetric_flow_rate_history=_concat_history(
+            initial_diagnostics.volumetric_flow_rate_history if initial_diagnostics is not None else None,
+            jnp.asarray(volumetric_flow_rate_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        mean_current_magnitude_history=_concat_history(
+            initial_diagnostics.mean_current_magnitude_history if initial_diagnostics is not None else None,
+            jnp.asarray(mean_current_magnitude_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        lorentz_power_history=_concat_history(
+            initial_diagnostics.lorentz_power_history if initial_diagnostics is not None else None,
+            jnp.asarray(lorentz_power_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        div_current_max_history=_concat_history(
+            initial_diagnostics.div_current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(div_current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        charge_balance_residual_history=_concat_history(
+            initial_diagnostics.charge_balance_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(charge_balance_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        gauge_residual_history=_concat_history(
+            initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(gauge_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        interface_current_residual_history=_concat_history(
+            initial_diagnostics.interface_current_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(interface_current_residual_history, dtype=float),
             append=append_diagnostics,
         ),
     )
@@ -2132,6 +2239,13 @@ def _solve_steady_legacy(
     limited_fraction_history: list[float] = []
     potential_history: list[float] = []
     potential_iteration_history: list[float] = []
+    volumetric_flow_rate_history: list[float] = []
+    mean_current_magnitude_history: list[float] = []
+    lorentz_power_history: list[float] = []
+    div_current_max_history: list[float] = []
+    charge_balance_residual_history: list[float] = []
+    gauge_residual_history: list[float] = []
+    interface_current_residual_history: list[float] = []
     step_count = 0
     pressure_proxy_reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
 
@@ -2171,6 +2285,7 @@ def _solve_steady_legacy(
             mean_current_magnitude,
             lorentz_power,
             div_current_max,
+            charge_balance_residual,
             gauge_residual,
             interface_current_residual,
         ) = _integral_diagnostics(
@@ -2211,6 +2326,13 @@ def _solve_steady_legacy(
         current_scaled_pressure_proxy_history.append(float(current_scaled_pressure_proxy))
         potential_history.append(float(potential_residual))
         potential_iteration_history.append(float(potential_iteration_count))
+        volumetric_flow_rate_history.append(float(volumetric_flow_rate))
+        mean_current_magnitude_history.append(float(mean_current_magnitude))
+        lorentz_power_history.append(float(lorentz_power))
+        div_current_max_history.append(float(div_current_max))
+        charge_balance_residual_history.append(float(charge_balance_residual))
+        gauge_residual_history.append(float(gauge_residual))
+        interface_current_residual_history.append(float(interface_current_residual))
         _emit_solver_step(
             logger,
             step_index=step_index + 1,
@@ -2240,8 +2362,11 @@ def _solve_steady_legacy(
             mean_current_magnitude=float(mean_current_magnitude),
             lorentz_power=float(lorentz_power),
             div_current_max=float(div_current_max),
+            charge_balance_residual=float(charge_balance_residual),
             gauge_residual=float(gauge_residual),
             interface_current_residual=float(interface_current_residual),
+            potential_initial_residual=float(potential_residual),
+            linear_initial_residual=0.0,
         )
         step_count = step_index + 1
         velocity_converged = residual_value <= tolerance
@@ -2352,6 +2477,41 @@ def _solve_steady_legacy(
         potential_iterations_history=_concat_history(
             initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
             jnp.asarray(potential_iteration_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        volumetric_flow_rate_history=_concat_history(
+            initial_diagnostics.volumetric_flow_rate_history if initial_diagnostics is not None else None,
+            jnp.asarray(volumetric_flow_rate_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        mean_current_magnitude_history=_concat_history(
+            initial_diagnostics.mean_current_magnitude_history if initial_diagnostics is not None else None,
+            jnp.asarray(mean_current_magnitude_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        lorentz_power_history=_concat_history(
+            initial_diagnostics.lorentz_power_history if initial_diagnostics is not None else None,
+            jnp.asarray(lorentz_power_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        div_current_max_history=_concat_history(
+            initial_diagnostics.div_current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(div_current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        charge_balance_residual_history=_concat_history(
+            initial_diagnostics.charge_balance_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(charge_balance_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        gauge_residual_history=_concat_history(
+            initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(gauge_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        interface_current_residual_history=_concat_history(
+            initial_diagnostics.interface_current_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(interface_current_residual_history, dtype=float),
             append=append_diagnostics,
         ),
     )

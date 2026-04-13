@@ -12,6 +12,7 @@ from lmx.plotting import (
     _plot_field,
     write_autodiff_plots,
     write_case_overview_plots,
+    write_geometry_preview_plots,
     write_strong_scaling_plots,
     write_transient_movies,
 )
@@ -53,6 +54,7 @@ def _sample_solution(case) -> Solution:
         mean_current_magnitude_history=jnp.asarray([0.2, 0.18]),
         lorentz_power_history=jnp.asarray([0.1, 0.09]),
         div_current_max_history=jnp.asarray([1.0e-6, 5.0e-7]),
+        charge_balance_residual_history=jnp.asarray([1.0e-7, 8.0e-8]),
         gauge_residual_history=jnp.asarray([1.0e-8, 5.0e-9]),
         interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7]),
     )
@@ -139,6 +141,30 @@ def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(tmp_pa
     outputs = write_case_overview_plots(solution, tmp_path, case_title="No diagnostics")
     assert outputs == [tmp_path / "overview.png", tmp_path / "overview.pdf"]
     assert not (tmp_path / "diagnostics.png").exists()
+
+
+def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(tmp_path: Path):
+    rect_mesh = _build_mesh(make_hartmann_case(ha=5.0, ny=8, nz=8))
+    rect_outputs = write_geometry_preview_plots(rect_mesh, tmp_path / "rect", case_title="Rectangular geometry")
+    assert rect_outputs == [tmp_path / "rect" / "geometry_preview.png", tmp_path / "rect" / "geometry_preview.pdf"]
+    assert rect_outputs[0].exists()
+    assert rect_outputs[1].exists()
+
+    pipe_mesh = rect_mesh.__class__(
+        **{
+            **rect_mesh.__dict__,
+            "geometry": "pipe_ogrid",
+            "point_coordinates": jnp.asarray(
+                [
+                    [[[0.0, -0.5, -0.5], [0.0, -0.5, 0.5]], [[0.0, 0.5, -0.5], [0.0, 0.5, 0.5]]],
+                    [[[1.0, -0.5, -0.5], [1.0, -0.5, 0.5]], [[1.0, 0.5, -0.5], [1.0, 0.5, 0.5]]],
+                ]
+            ),
+        }
+    )
+    pipe_outputs = write_geometry_preview_plots(pipe_mesh, tmp_path / "pipe", case_title="Pipe preview")
+    assert pipe_outputs[0].exists()
+    assert pipe_outputs[1].exists()
 
 
 def test_plot_field_handles_negative_only_field():

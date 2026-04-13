@@ -48,6 +48,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The logging surface now has a documented boolean `verbose` alias and explicit
   `verbosity = quiet|normal|detailed|debug` controls in TOML, CLI, and Python
   driver usage.
+- Python `3.10` support is now explicit through the `tomli` fallback and the
+  broader JAX dependency acceptance in packaging.
+- Time integration now uses bounded step-count logic so `t_final` is not
+  rounded up spuriously on fractional `dt` ratios.
 - Public docs and examples now present a clean `1.0` release surface.
 - External executable comparisons are documented only as secondary benchmark
   evidence, not as implementation guidance.
@@ -86,10 +90,25 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - A second autodiff example now validates Hartmann and forcing sensitivities
   against finite differences for a publication-friendly derivative-verification
   figure.
+- The fully developed potential solve now projects its right-hand side onto a
+  charge-neutral compatibility space and tracks an explicit
+  `charge_balance_residual` diagnostic alongside `max|div J|`.
 - An executable fringing-field benchmark scaffold now exists in `lmx/fringing.py`
   and `examples/fringing_benchmark_demo.py`, so axial field profiles and
   stationwise response metrics are now part of the post-1.0 research lane
   before the full `extruded_inductionless` solver lands.
+- Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
+  mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
+  preprocessing/postprocessing geometry inspection.
+- The geometry preview example now defaults to a fast preview-only mode and
+  exposes an explicit `--with-post-run` flag for short follow-on solves, so
+  preprocessing visualization does not accidentally become a long-running task.
+- Runtime logs now expose both initial and final residuals for the velocity and
+  potential linear solves, which makes the CLI output closer to a long-form
+  research solver log.
+- The CPU and remote-GPU scaling workflow has now been revalidated on the live
+  `office` host after the post-`1.0` compatibility changes, including Python
+  `3.10` and a different installed JAX version.
 - Manufactured-solution and direct-kernel tests now cover the low-cost
   numerical core well: `lmx/linear.py` is about `99%`, and
   `lmx/operators.py` is about `98%`.

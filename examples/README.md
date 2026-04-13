@@ -9,6 +9,7 @@ The examples are explicit templates for research workflows. They show how to:
 - resume runs from restart files
 - benchmark strong scaling
 - run autodiff sensitivity and inverse-design studies
+- preview geometries and meshes before launching a solve
 - stage fringing-field benchmark workflows for the next solver family
 
 ## Quick examples
@@ -22,6 +23,8 @@ python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scal
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
 python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
+python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
+python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
 ```
 
 ## Input-file examples
@@ -54,6 +57,13 @@ python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scal
 python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output ./artifacts/examples/strong_scaling_full
 ```
 
+Standard CLI runs can also select the execution backend directly:
+
+```bash
+JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
+```
+
 Autodiff:
 
 ```bash
@@ -77,6 +87,17 @@ python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringin
 That example stages a stationwise fringing benchmark on top of the current
 fully developed solver family. It is explicit about being a research scaffold,
 not the final `extruded_inductionless` solver.
+
+Geometry and mesh preview:
+
+```bash
+python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
+python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
+```
+
+The default path is intentionally preview-only so it stays fast. Add
+`--with-post-run` to append a short steady solve and matching postprocessing
+figures in the same output tree.
 
 ## Teaching goal
 

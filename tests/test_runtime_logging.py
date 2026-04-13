@@ -61,8 +61,11 @@ def test_streaming_solver_logger_prints_live_solver_sections():
             mean_current_magnitude=0.11,
             lorentz_power=0.02,
             div_current_max=1e-8,
+            charge_balance_residual=2e-9,
             gauge_residual=1e-10,
             interface_current_residual=1e-8,
+            potential_initial_residual=2e-5,
+            linear_initial_residual=3e-6,
         )
     )
     logger.emit_footer(
@@ -103,6 +106,7 @@ def test_streaming_solver_logger_prints_live_solver_sections():
                 mean_current_magnitude_history=jnp.asarray([0.11]),
                 lorentz_power_history=jnp.asarray([0.02]),
                 div_current_max_history=jnp.asarray([1e-8]),
+                charge_balance_residual_history=jnp.asarray([2e-9]),
                 gauge_residual_history=jnp.asarray([1e-10]),
                 interface_current_residual_history=jnp.asarray([1e-8]),
             ),
@@ -116,7 +120,9 @@ def test_streaming_solver_logger_prints_live_solver_sections():
     assert "Time =" in text
     assert "smoothSolver: potE" in text
     assert "smoothSolver: U" in text
+    assert "Initial residual" in text
     assert "currentScaledPressureProxy" in text
+    assert "chargeBalanceResidual" in text
     assert "MHD integrals" in text
     assert "MHD conservation" in text
     assert "rawUpdateMax" in text
@@ -154,8 +160,11 @@ def _sample_record(step_index: int = 1) -> SolverStepRecord:
         mean_current_magnitude=0.11,
         lorentz_power=0.02,
         div_current_max=1e-8,
+        charge_balance_residual=2e-9,
         gauge_residual=1e-10,
         interface_current_residual=1e-8,
+        potential_initial_residual=2e-5,
+        linear_initial_residual=3e-6,
     )
 
 

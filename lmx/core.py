@@ -45,6 +45,7 @@ class Diagnostics:
     mean_current_magnitude_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     lorentz_power_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     div_current_max_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    charge_balance_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     gauge_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     interface_current_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 

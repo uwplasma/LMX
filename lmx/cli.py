@@ -41,6 +41,7 @@ class _EmptyDiagnostics:
     mean_current_magnitude_history = jnp.asarray([])
     lorentz_power_history = jnp.asarray([])
     div_current_max_history = jnp.asarray([])
+    charge_balance_residual_history = jnp.asarray([])
     gauge_residual_history = jnp.asarray([])
     interface_current_residual_history = jnp.asarray([])
 
@@ -125,6 +126,7 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
         "mean_current_magnitude": _latest("mean_current_magnitude_history"),
         "lorentz_power": _latest("lorentz_power_history"),
         "div_current_max": _latest("div_current_max_history"),
+        "charge_balance_residual": _latest("charge_balance_residual_history"),
         "gauge_residual": _latest("gauge_residual_history"),
         "interface_current_residual": _latest("interface_current_residual_history"),
         "output": _portable_path(out_dir),

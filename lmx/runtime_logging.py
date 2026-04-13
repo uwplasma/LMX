@@ -53,6 +53,9 @@ class SolverStepRecord:
     div_current_max: float
     gauge_residual: float
     interface_current_residual: float
+    charge_balance_residual: float = 0.0
+    potential_initial_residual: float = 0.0
+    linear_initial_residual: float = 0.0
 
 
 class StreamingSolverLogger:
@@ -155,10 +158,12 @@ class StreamingSolverLogger:
         self._write(f"Time = {record.time:.6e}")
         self._write(
             "smoothSolver: potE             "
+            f"Initial residual = {record.potential_initial_residual:.6e}, "
             f"Final residual = {record.potential_residual:.6e}, No Iterations {int(record.potential_iterations)}"
         )
         self._write(
             "smoothSolver: U                "
+            f"Initial residual = {record.linear_initial_residual:.6e}, "
             f"Final residual = {record.linear_residual:.6e}, No Iterations {int(record.linear_iterations)}"
         )
         self._write(
@@ -187,6 +192,7 @@ class StreamingSolverLogger:
             self._write(
                 "MHD conservation               "
                 f"max|divJ| = {record.div_current_max:.6e}, gaugeResidual = {record.gauge_residual:.6e}, "
+                f"chargeBalanceResidual = {record.charge_balance_residual:.6e}, "
                 f"interfaceCurrentResidual = {record.interface_current_residual:.6e}"
             )
             self._write(
