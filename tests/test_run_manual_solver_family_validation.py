@@ -42,6 +42,28 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
             },
         )(),
     )
+    monkeypatch.setattr(
+        manual_validation,
+        "solve_extruded_inductionless",
+        lambda problem: type(
+            "ExtrudedSolution",
+            (),
+            {
+                "validation": type(
+                    "Validation",
+                    (),
+                    {
+                        "station_count": 5,
+                        "max_residual": 1.0e-4,
+                        "max_charge_balance_residual": 2.0e-6,
+                        "mean_velocity_span": 0.1,
+                        "volumetric_flow_rate_span": 0.2,
+                        "field_mean_velocity_correlation": -0.8,
+                    },
+                )(),
+            },
+        )(),
+    )
 
     output = tmp_path / "manual_summary.json"
     exit_code = manual_validation.main(
@@ -54,6 +76,7 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
             "8",
             "--reference-root",
             str(tmp_path / "refs"),
+            "--include-fringing",
         ]
     )
 
@@ -62,3 +85,4 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
     assert "hartmann_ha10" in payload
     assert "shercliff_ha10" in payload
     assert "hunt_ha10" in payload
+    assert "fringing_ha10" in payload

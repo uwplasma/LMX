@@ -35,7 +35,9 @@ The `1.0` ship gate is now closed on the fast release lane:
     side-by-side method studies
 - `extruded_inductionless`
   - staged next solver family for 3D/fringing-field work
-  - current repo ships executable fringing benchmark scaffolds, not the full solver yet
+  - current repo ships a first rectangular-duct low-Re 3D projection slice
+  - full CLI/TOML support, mapped-pipe support, and production-grade 3D
+    validation remain post-`1.0` work
 
 ## Installation
 
@@ -279,16 +281,19 @@ The repository now also ships a publication-facing fringing benchmark scaffold:
 python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_benchmark
 ```
 
-That example now writes a retained first `extruded_inductionless` research
-slice through the explicit `solve_extruded_inductionless(...)` entry point: a
-stacked axial field bundle assembled from stationwise fully developed solves,
-with contour plots for `u(x, y, zmid)` and `u(x, ymid, z)`, stationwise
-charge-balance residuals, and a compact validation summary for the slice.
+That example now writes the first retained rectangular-duct
+`extruded_inductionless` 3D projection slice through the explicit
+`solve_extruded_inductionless(...)` Python entry point: a stacked axial field
+bundle with `u`, `v`, `w`, `p`, `phi`, current, Lorentz, charge-balance
+diagnostics, contour plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a
+compact validation summary for the slice.
 
-That workflow generates a smooth axial fringing profile together with stationwise
-cross-sectional response metrics. It is the executable bridge from the current
-fully developed solver family to the future `extruded_inductionless` research
-solver.
+That workflow generates a smooth axial fringing profile together with
+cross-sectional response metrics. Rectangular ducts now go through a real
+low-Re pressure-velocity-potential iteration. Layered ducts still fall back to
+the cheaper stacked-station scaffold, so the workflow remains an executable
+bridge from the stable 2D solver family to the broader
+`extruded_inductionless` research solver.
 
 ## User workflows
 

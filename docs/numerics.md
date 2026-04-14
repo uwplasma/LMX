@@ -13,7 +13,10 @@ LMX currently exposes three solver-family names:
 - `reduced_inductionless`
   - a reduced-model alternative retained for comparative studies
 - `extruded_inductionless`
-  - reserved for the next 3D/fringing-field solver family
+  - first rectangular-duct low-Re 3D pressure-velocity-potential slice now
+    exists in `lmx/fringing.py`
+  - layered ducts still use the cheaper stacked-station scaffold
+  - full production 3D family hardening remains post-`1.0`
 
 The active implementation today is the fully developed cross-sectional solver
 in `lmx/solvers.py`.

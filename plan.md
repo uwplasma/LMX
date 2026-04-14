@@ -35,8 +35,8 @@ Ship a research-grade `1.0` inductionless MHD code with:
 1. Keep hardening the default fully developed solver family in the manual
    release-validation lane.
 2. Expand benchmark and physics depth for publication datasets.
-3. Replace the current fringing scaffold with the first true
-   `extruded_inductionless` solver slice.
+3. Harden and extend the first true `extruded_inductionless` solver slice into
+   a broader production 3D family.
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
 
 ## Current status
@@ -101,6 +101,17 @@ Ship a research-grade `1.0` inductionless MHD code with:
   peak Hartmann number and axial field-profile shape parameters, which is the
   first retained bridge from Hartmann-only autodiff into fringing-oriented
   research objectives.
+- Rectangular fringing cases now have a first true low-Re
+  `extruded_inductionless` 3D projection slice, exposing `u`, `v`, `w`, `p`,
+  `phi`, current, Lorentz, and charge-balance fields through the explicit
+  `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` Python API.
+- Layered fringing cases still fall back to the cheaper stacked-station
+  scaffold, so the remaining `extruded_inductionless` work is now solver-family
+  hardening and scope expansion rather than landing the first slice at all.
+- The heavy manual validation lane can now include a bounded fringing summary
+  through `scripts/run_manual_solver_family_validation.py --include-fringing`,
+  so solver-family hardening is no longer limited to fully developed Hartmann /
+  Shercliff / Hunt datasets.
 - The fully developed potential solve now projects its right-hand side onto a
   charge-neutral compatibility space and tracks an explicit
   `charge_balance_residual` diagnostic alongside `max|div J|`.
@@ -108,16 +119,17 @@ Ship a research-grade `1.0` inductionless MHD code with:
   and `examples/fringing_benchmark_demo.py`, so axial field profiles and
   stationwise response metrics are now part of the post-1.0 research lane
   before the full `extruded_inductionless` solver lands.
-- That fringing path now writes a retained stacked axial field bundle
-  `u(x, y, z)` / `phi(x, y, z)` / `J(x, y, z)` assembled from stationwise fully
-  developed solves, plus stationwise charge-balance residuals. This is the
-  first explicit vertical slice toward `extruded_inductionless`, even though it
-  is still not a full 3D pressure-velocity solve.
-- That fringing path is now wrapped in an explicit
+- That fringing path now writes retained axial field bundles for
+  `u(x, y, z)`, `v(x, y, z)`, `w(x, y, z)`, `p(x, y, z)`, `phi(x, y, z)`,
+  `J(x, y, z)`, and Lorentz force, together with charge-balance residuals.
+- For rectangular ducts, `solve_extruded_inductionless(...)` now runs a first
+  true low-Re 3D pressure-velocity-potential iteration. Layered ducts still use
+  the stacked-station fallback.
+- That fringing path remains wrapped in an explicit
   `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` public entry
   point, with validation metrics for residual size, charge balance, and
-  field/response correlation. This is still a vertical slice, not yet the
-  final 3D pressure-velocity-potential solver.
+  field/response correlation. The remaining gap is now production hardening and
+  geometry/scope expansion, not the total absence of a 3D slice.
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.

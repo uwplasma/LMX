@@ -213,10 +213,13 @@ new benchmark-quality results.
 
 ### `extruded_inductionless`
 
-This name is already part of the public API, but the final 3D pressure,
-velocity, and potential solver is not yet implemented. The current fringing
-workflow is an explicit vertical slice toward that family, not the final
-algorithm.
+This solver family now has a first retained rectangular-duct low-Re 3D
+pressure-velocity-potential slice in `lmx/fringing.py`. It advances `u`, `v`,
+`w`, and `p` with a simple projection loop, solves a 3D electric potential
+problem for `phi`, and reports current, Lorentz, and charge-balance fields.
+That is a real 3D research slice, but it is still not the final production
+family: mapped pipes, CLI/TOML wiring, larger validation sets, and broader
+geometry/material coverage remain future work.
 
 ## JAX and differentiability
 

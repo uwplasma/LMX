@@ -31,6 +31,23 @@ Heavier validation remains available for manual or release-time execution:
 - benchmark artifact generation
 - extended coverage collection
 
+The main post-`1.0` manual entry point is:
+
+```bash
+python scripts/run_manual_solver_family_validation.py \
+  --output artifacts/manual_validation/solver_family_summary.json \
+  --ha-values 10,20 \
+  --resolution 24 \
+  --include-fringing \
+  --max-steps 20 \
+  --potential-iterations 80 \
+  --coupling-iterations 8
+```
+
+That command keeps the fast lane clean while still exercising the heavier
+Hartmann / Shercliff / Hunt acceptance path together with the bounded
+rectangular-duct fringing slice.
+
 This split avoids exhausting CI runtime on every routine push while still
 preserving reproducible research checks.
 

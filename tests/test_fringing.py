@@ -114,6 +114,10 @@ def test_run_extruded_inductionless_slice_stacks_station_fields():
 
     assert bundle.u.shape == (4, 6, 6)
     assert bundle.phi.shape == (4, 6, 6)
+    assert bundle.v.shape == (4, 6, 6)
+    assert bundle.w.shape == (4, 6, 6)
+    assert bundle.p.shape == (4, 6, 6)
+    assert bundle.jx.shape == (4, 6, 6)
     assert bundle.x.shape == (4,)
     assert bundle.y.shape == (6,)
     assert bundle.z.shape == (6,)
@@ -175,10 +179,6 @@ def test_validate_extruded_inductionless_solution_reports_metrics():
 
 def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkeypatch: pytest.MonkeyPatch):
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=6, nz=6)
-    monkeypatch.setattr(
-        "lmx.fringing.run_fringing_station_sweep",
-        lambda case, profile, solver=None: [{"x": 0.0}, {"x": 0.5}, {"x": 1.0}],
-    )
     fake_bundle = type(
         "Bundle",
         (),
@@ -192,18 +192,39 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
             "y": jnp.asarray([0.0]),
             "z": jnp.asarray([0.0]),
             "u": jnp.ones((3, 1, 1)),
+            "v": jnp.zeros((3, 1, 1)),
+            "w": jnp.zeros((3, 1, 1)),
+            "p": jnp.zeros((3, 1, 1)),
             "phi": jnp.zeros((3, 1, 1)),
+            "jx": jnp.zeros((3, 1, 1)),
             "jy": jnp.zeros((3, 1, 1)),
             "jz": jnp.zeros((3, 1, 1)),
             "lorentz_x": jnp.zeros((3, 1, 1)),
+            "lorentz_y": jnp.zeros((3, 1, 1)),
+            "lorentz_z": jnp.zeros((3, 1, 1)),
             "current_scaled_pressure_proxy": jnp.asarray([0.1, 0.15, 0.1]),
             "geometry_kind": "rect_duct",
             "solver_kind": "extruded_inductionless",
         },
     )()
-    monkeypatch.setattr("lmx.fringing.run_extruded_inductionless_slice", lambda case, profile, solver=None: fake_bundle)
+    monkeypatch.setattr("lmx.fringing._solve_rectangular_extruded_projection", lambda problem: fake_bundle)
 
     solution = solve_extruded_inductionless(problem)
     assert len(solution.station_history) == 3
     assert solution.validation.station_count == 3
     assert solution.bundle.solver_kind == "extruded_inductionless"
+
+
+def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():
+    problem = build_square_duct_extruded_problem(ha_peak=8.0, nx_stations=4, ny=4, nz=4)
+
+    solution = solve_extruded_inductionless(problem)
+
+    assert solution.bundle.u.shape == (4, 4, 4)
+    assert solution.bundle.p.shape == (4, 4, 4)
+    assert solution.bundle.v.shape == (4, 4, 4)
+    assert solution.bundle.w.shape == (4, 4, 4)
+    assert solution.bundle.jx.shape == (4, 4, 4)
+    assert jnp.isfinite(solution.bundle.u).all()
+    assert jnp.isfinite(solution.bundle.p).all()
+    assert solution.validation.station_count == 4

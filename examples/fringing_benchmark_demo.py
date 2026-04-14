@@ -118,8 +118,9 @@ def run_fringing_benchmark_demo(
         "notes": (
             "This example now runs through the explicit extruded_inductionless "
             "slice entry point, writing both station history and stacked axial "
-            "field bundles. It remains a vertical slice toward the future full "
-            "3D pressure-velocity-potential solver."
+            "field bundles for u, v, w, p, phi, current, and Lorentz force. "
+            "Rectangular ducts use a true low-Re 3D projection slice here; "
+            "broader production hardening remains future work."
         ),
     }
     (out_dir / "fringing_benchmark_summary.json").write_text(json.dumps(summary, indent=2))
