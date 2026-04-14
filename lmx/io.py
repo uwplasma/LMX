@@ -190,6 +190,56 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
     return path
 
 
+def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    bundle = solution.bundle
+    validation = solution.validation
+    metadata = {
+        "case": case.name,
+        "geometry_kind": case.geometry.kind,
+        "solver_kind": case.solver.kind,
+        "station_count": int(bundle.x.shape[0]),
+        "description": "LMX extruded inductionless solution dump",
+    }
+    np.savez_compressed(
+        path,
+        metadata_json=json.dumps(metadata),
+        x=np.asarray(bundle.x),
+        y=np.asarray(bundle.y),
+        z=np.asarray(bundle.z),
+        field_scale=np.asarray(bundle.field_scale),
+        u=np.asarray(bundle.u),
+        v=np.asarray(bundle.v),
+        w=np.asarray(bundle.w),
+        p=np.asarray(bundle.p),
+        phi=np.asarray(bundle.phi),
+        jx=np.asarray(bundle.jx),
+        jy=np.asarray(bundle.jy),
+        jz=np.asarray(bundle.jz),
+        lorentz_x=np.asarray(bundle.lorentz_x),
+        lorentz_y=np.asarray(bundle.lorentz_y),
+        lorentz_z=np.asarray(bundle.lorentz_z),
+        residual=np.asarray(bundle.residual),
+        volumetric_flow_rate=np.asarray(bundle.volumetric_flow_rate),
+        mean_velocity=np.asarray(bundle.mean_velocity),
+        axial_current=np.asarray(bundle.axial_current),
+        wall_current_leakage=np.asarray(bundle.wall_current_leakage),
+        current_scaled_pressure_proxy=np.asarray(bundle.current_scaled_pressure_proxy),
+        charge_balance_residual=np.asarray(bundle.charge_balance_residual),
+        validation_station_count=np.asarray(validation.station_count),
+        validation_max_residual=np.asarray(validation.max_residual),
+        validation_max_charge_balance_residual=np.asarray(validation.max_charge_balance_residual),
+        validation_mean_velocity_span=np.asarray(validation.mean_velocity_span),
+        validation_volumetric_flow_rate_span=np.asarray(validation.volumetric_flow_rate_span),
+        validation_axial_current_span=np.asarray(validation.axial_current_span),
+        validation_max_wall_current_leakage=np.asarray(validation.max_wall_current_leakage),
+        validation_net_boundary_current_residual=np.asarray(validation.net_boundary_current_residual),
+        validation_field_mean_velocity_correlation=np.asarray(validation.field_mean_velocity_correlation),
+    )
+    return path
+
+
 def write_restart_npz(solution: Solution, case, path: str | Path) -> Path:
     return write_solution_npz(solution, case, path)
 
@@ -311,4 +361,43 @@ def write_solution_outputs(
         from .plotting import write_case_overview_plots
 
         payload["plots"] = write_case_overview_plots(solution, out_dir, case_title=case.name)
+    return payload
+
+
+def write_extruded_solution_outputs(
+    solution,
+    case,
+    out_dir: str | Path,
+    *,
+    write_npz: bool = True,
+) -> dict[str, list[Path]]:
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, list[Path]] = {"csv": [], "npz": [], "plots": []}
+    station_csv = out_dir / f"{case.name}_station_history.csv"
+    station_csv.write_text(
+        "x,field_scale,u_max,mean_velocity,volumetric_flow_rate,axial_current,wall_current_leakage,current_scaled_pressure_proxy,residual,charge_balance_residual\n"
+        + "\n".join(
+            ",".join(
+                [
+                    f"{float(record['x']):.12e}",
+                    f"{float(record['field_scale']):.12e}",
+                    f"{float(record['u_max']):.12e}",
+                    f"{float(record['mean_velocity']):.12e}",
+                    f"{float(record['volumetric_flow_rate']):.12e}",
+                    f"{float(record['axial_current']):.12e}",
+                    f"{float(record['wall_current_leakage']):.12e}",
+                    f"{float(record['current_scaled_pressure_proxy']):.12e}",
+                    f"{float(record['residual']):.12e}",
+                    f"{float(record['charge_balance_residual']):.12e}",
+                ]
+            )
+            for record in solution.station_history
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    payload["csv"].append(station_csv)
+    if write_npz and case.output.write_npz:
+        payload["npz"] = [write_extruded_solution_npz(solution, case, out_dir / f"{case.name}_extruded_results.npz")]
     return payload

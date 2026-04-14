@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import numpy as np
@@ -9,6 +10,8 @@ from lmx.cases import make_hartmann_case
 from lmx.io import (
     load_restart_bundle,
     validate_restart_bundle,
+    write_extruded_solution_npz,
+    write_extruded_solution_outputs,
     write_paraview,
     write_solution_npz,
     write_solution_outputs,
@@ -230,3 +233,89 @@ def test_write_solution_outputs_respects_output_flags(tmp_path: Path, monkeypatc
     outputs = write_solution_outputs(solution, case, tmp_path, write_npz=True, write_plots=True)
 
     assert outputs == {"paraview": [], "csv": [], "npz": [], "plots": []}
+
+
+def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+        }
+    )
+    bundle = SimpleNamespace(
+        x=jnp.asarray([0.0, 1.0, 2.0]),
+        y=jnp.asarray([-0.5, 0.5]),
+        z=jnp.asarray([-0.5, 0.5]),
+        field_scale=jnp.asarray([0.0, 1.0, 0.0]),
+        u=jnp.ones((3, 2, 2)),
+        v=jnp.zeros((3, 2, 2)),
+        w=jnp.zeros((3, 2, 2)),
+        p=jnp.zeros((3, 2, 2)),
+        phi=jnp.zeros((3, 2, 2)),
+        jx=jnp.zeros((3, 2, 2)),
+        jy=jnp.zeros((3, 2, 2)),
+        jz=jnp.zeros((3, 2, 2)),
+        lorentz_x=jnp.zeros((3, 2, 2)),
+        lorentz_y=jnp.zeros((3, 2, 2)),
+        lorentz_z=jnp.zeros((3, 2, 2)),
+        residual=jnp.asarray([1.0e-3, 2.0e-4, 3.0e-5]),
+        volumetric_flow_rate=jnp.asarray([1.0, 1.1, 1.2]),
+        mean_velocity=jnp.asarray([0.5, 0.55, 0.6]),
+        axial_current=jnp.asarray([0.0, 0.1, 0.0]),
+        wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
+        current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
+        charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
+    )
+    validation = SimpleNamespace(
+        station_count=3,
+        max_residual=1.0e-3,
+        max_charge_balance_residual=2.0e-7,
+        mean_velocity_span=0.1,
+        volumetric_flow_rate_span=0.2,
+        axial_current_span=0.1,
+        max_wall_current_leakage=2.0e-6,
+        net_boundary_current_residual=3.0e-6,
+        field_mean_velocity_correlation=-0.9,
+    )
+    solution = SimpleNamespace(
+        bundle=bundle,
+        validation=validation,
+        station_history=(
+            {
+                "x": 0.0,
+                "field_scale": 0.0,
+                "u_max": 1.0,
+                "mean_velocity": 0.5,
+                "volumetric_flow_rate": 1.0,
+                "axial_current": 0.0,
+                "wall_current_leakage": 1.0e-6,
+                "current_scaled_pressure_proxy": 0.1,
+                "residual": 1.0e-3,
+                "charge_balance_residual": 1.0e-7,
+            },
+            {
+                "x": 1.0,
+                "field_scale": 1.0,
+                "u_max": 1.0,
+                "mean_velocity": 0.55,
+                "volumetric_flow_rate": 1.1,
+                "axial_current": 0.1,
+                "wall_current_leakage": 2.0e-6,
+                "current_scaled_pressure_proxy": 0.2,
+                "residual": 2.0e-4,
+                "charge_balance_residual": 2.0e-7,
+            },
+        ),
+    )
+
+    npz_path = write_extruded_solution_npz(solution, case, tmp_path / "fringing_results.npz")
+    outputs = write_extruded_solution_outputs(solution, case, tmp_path)
+
+    assert npz_path.exists()
+    assert outputs["csv"][0].exists()
+    assert outputs["npz"][0].exists()
+    with np.load(npz_path, allow_pickle=False) as data:
+        assert data["u"].shape == (3, 2, 2)
+        assert data["validation_station_count"] == pytest.approx(3)

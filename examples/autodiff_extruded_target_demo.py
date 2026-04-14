@@ -118,6 +118,7 @@ def run_autodiff_extruded_target_demo(
             "axial_current": np.asarray(target["axial_current"]).tolist(),
         },
         "recovered": {
+            "model": recovered.get("model", "unknown"),
             "peak_hartmann_number": recovered["peak_hartmann_number"],
             "entry_center": recovered["entry_center"],
             "exit_center": recovered["exit_center"],

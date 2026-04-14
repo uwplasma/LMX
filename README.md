@@ -40,8 +40,10 @@ The `1.0` ship gate is now closed on the fast release lane:
     API
   - mapped `pipe_ogrid` fringing cases now use the same explicit 3D slice
     through the Python API
-  - full CLI/TOML support and production-grade 3D
-    validation remain post-`1.0` work
+  - executable TOML/CLI front-end now exists for rectangular and mapped-pipe
+    fringing runs
+  - broader production-grade 3D validation and solver hardening remain
+    post-`1.0` work
 
 ## Installation
 
@@ -78,6 +80,8 @@ python -m pip install -e '.[dev,plotting,docs,extras]'
 lmx examples/hartmann_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
+lmx examples/fringing_rect_case.toml
+lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
@@ -272,8 +276,8 @@ Together, those examples demonstrate:
 - fringing multi-observable inverse design recovering axial field-profile
   parameters against both mean-velocity and current-response histories
 - inverse design against targets generated directly from the first
-  `extruded_inductionless` 3D slice, so the differentiable lane is no longer
-  limited to the lightweight response model
+  `extruded_inductionless` 3D slice, using a direct differentiable
+  rectangular extruded response model in the default rectangular workflow
 - polished `PNG`/`PDF` summary figures for publication use
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
@@ -292,6 +296,8 @@ The repository now also ships a publication-facing fringing benchmark scaffold:
 python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output artifacts/examples/fringing_benchmark_layered
 python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output artifacts/examples/fringing_benchmark_pipe
+lmx examples/fringing_rect_case.toml
+lmx examples/fringing_pipe_case.toml
 ```
 
 That example now writes the first retained rectangular-duct

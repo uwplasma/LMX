@@ -60,6 +60,20 @@ charge-balance diagnostics. The fringing 3D slice now also carries axial
 current and wall-leakage diagnostics, and the manual validation lane now
 supports turning those metrics into hard pass/fail gates.
 
+The current retained larger-dataset hard gate is:
+
+- Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
+- fringing `rect_duct` and `pipe_ogrid` at the same `Ha` values with
+  `nx_stations = 5`
+- hard thresholds:
+  - `charge_balance <= 8e-1`
+  - `interface_current <= 7e-2`
+  - `wall_current_leakage <= 1e-1`
+  - `boundary_current <= 1e-5`
+
+That retained gate now passes. Layered 3D fringing remains outside the
+retained passing gate and stays on the open hardening list.
+
 ## Current status
 
 - The default duct solver family is now `fully_developed_inductionless`.
@@ -135,6 +149,9 @@ supports turning those metrics into hard pass/fail gates.
   3D projection slice, so the remaining `extruded_inductionless` work is
   concentrated on production hardening, broader validation, and stronger
   front-end support rather than on geometry-family coverage gaps.
+- The first executable TOML/CLI front-end for `extruded_inductionless` now
+  exists through a dedicated `[fringing]` block plus shipped rectangular and
+  mapped-pipe fringing input files.
 - The heavy manual validation lane can now include a bounded fringing summary
   through `scripts/run_manual_solver_family_validation.py --include-fringing`,
   so solver-family hardening is no longer limited to fully developed Hartmann /
@@ -168,6 +185,10 @@ supports turning those metrics into hard pass/fail gates.
 - The autodiff lane now includes a bridge from the retained 3D slice back into
   the differentiable fringing model: `extruded_inductionless` histories can be
   used directly as inverse-design targets for axial field-shape recovery.
+- The default rectangular extruded-target inverse-design path now goes one
+  step further: it uses a direct differentiable rectangular
+  `extruded_inductionless` response model instead of the older lightweight
+  fringing-response surrogate.
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.

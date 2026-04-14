@@ -11,6 +11,7 @@ except ModuleNotFoundError:  # pragma: no cover - only used on Python < 3.11
 from .specs import (
     BoundaryCondition,
     CaseSpec,
+    FringingSpec,
     GeometrySpec,
     MagneticFieldSpec,
     OutputSpec,
@@ -89,6 +90,7 @@ class RunConfig:
     solve_mode: SolveMode = "steady"
     logging: LoggingSpec = field(default_factory=LoggingSpec)
     restart: RestartSpec = field(default_factory=RestartSpec)
+    fringing: FringingSpec = field(default_factory=FringingSpec)
     input_path: Path | None = None
 
 
@@ -165,6 +167,7 @@ def load_run_config(path: str | Path) -> RunConfig:
     output_table = root.get("output", {})
     logging_table = root.get("logging", {})
     restart_table = root.get("restart", {})
+    fringing_table = root.get("fringing", {})
     regions_table = root.get("regions", [])
     boundaries_table = root.get("boundary_conditions", [])
 
@@ -290,5 +293,19 @@ def load_run_config(path: str | Path) -> RunConfig:
         if restart_table.get("restart_filename") is None
         else str(restart_table["restart_filename"]),
     )
+    fringing = FringingSpec(
+        enabled=bool(fringing_table.get("enabled", solver.kind == "extruded_inductionless")),
+        entry_center=float(fringing_table.get("entry_center", 0.25 * geometry.length)),
+        exit_center=float(fringing_table.get("exit_center", 0.75 * geometry.length)),
+        transition_width=float(fringing_table.get("transition_width", max(0.05, 0.1 * geometry.length))),
+        axis=str(fringing_table.get("axis", "z")),
+    )
 
-    return RunConfig(case=case, solve_mode=solver.mode, logging=logging, restart=restart, input_path=input_path)
+    return RunConfig(
+        case=case,
+        solve_mode=solver.mode,
+        logging=logging,
+        restart=restart,
+        fringing=fringing,
+        input_path=input_path,
+    )

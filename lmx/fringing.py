@@ -757,6 +757,26 @@ def build_pipe_ogrid_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
+def build_extruded_problem_from_case(
+    case: CaseSpec,
+    *,
+    entry_center: float,
+    exit_center: float,
+    transition_width: float,
+    axis: str = "z",
+) -> ExtrudedInductionlessProblem:
+    profile = smooth_fringing_profile(
+        length=case.geometry.length,
+        nx=case.geometry.nx,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis=axis,
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
 def _station_case(base_case: CaseSpec, *, axis: str, magnitude: float, suffix: str) -> CaseSpec:
     station_case = clone_case_with_field(base_case, axis=axis, magnitude=magnitude, suffix=suffix)
     return replace(station_case, solver=replace(station_case.solver, kind="fully_developed_inductionless"))

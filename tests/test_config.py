@@ -137,8 +137,68 @@ side = "max"
     assert config.restart.reset_histories is False
     assert config.restart.write_restart is True
     assert config.restart.restart_filename == "hartmann_restart.npz"
+    assert config.fringing.enabled is False
     assert len(config.case.regions) == 1
     assert len(config.case.boundary_conditions) == 4
+
+
+def test_load_run_config_reads_extruded_fringing_controls(tmp_path: Path):
+    input_file = tmp_path / "fringing.toml"
+    input_file.write_text(
+        """
+[case]
+name = "fringing_rect_demo"
+
+[geometry]
+kind = "rect_duct"
+width = 2.0
+height = 2.0
+length = 6.0
+nx = 7
+ny = 6
+nz = 6
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 8.0]
+
+[solver]
+kind = "extruded_inductionless"
+mode = "steady"
+
+[fringing]
+enabled = true
+entry_center = 1.0
+exit_center = 4.0
+transition_width = 0.5
+axis = "z"
+
+[time_stepper]
+dt = 0.01
+t_final = 0.1
+max_steps = 8
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+density = 1.0
+viscosity = 0.05
+
+[[boundary_conditions]]
+name = "wall"
+kind = "no_slip"
+""".strip()
+    )
+
+    config = load_run_config(input_file)
+
+    assert config.case.solver.kind == "extruded_inductionless"
+    assert config.fringing.enabled is True
+    assert config.fringing.entry_center == pytest.approx(1.0)
+    assert config.fringing.exit_center == pytest.approx(4.0)
+    assert config.fringing.transition_width == pytest.approx(0.5)
+    assert config.fringing.axis == "z"
 
 
 def test_load_run_config_rejects_analytic_callable_fields(tmp_path: Path):
@@ -181,7 +241,14 @@ kind = "no_slip"
 def test_shipped_example_toml_files_parse():
     root = Path(__file__).resolve().parents[1] / "examples"
 
-    for name in ("hartmann_case.toml", "hartmann_restart_case.toml", "shercliff_case.toml", "hunt_case.toml"):
+    for name in (
+        "hartmann_case.toml",
+        "hartmann_restart_case.toml",
+        "shercliff_case.toml",
+        "hunt_case.toml",
+        "fringing_rect_case.toml",
+        "fringing_pipe_case.toml",
+    ):
         config = load_run_config(root / name)
         assert config.case.name
         assert config.case.regions

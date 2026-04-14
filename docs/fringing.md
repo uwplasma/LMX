@@ -1,8 +1,8 @@
 # Fringing-Field Research Slice
 
-LMX `1.0` does not yet ship the full production `extruded_inductionless`
-solver family. What it does ship now is the first explicit 3D solver-family
-entry point that the next paper phase can build on.
+LMX now ships the first executable `extruded_inductionless` solver-family
+front-end together with the retained 3D research slice that the next paper
+phase can build on.
 
 The intended model distinction is:
 
@@ -34,14 +34,16 @@ The current retained 3D slice includes:
 - a publication-style example in `examples/fringing_benchmark_demo.py`
 
 This is explicit by design. The current slice is a real 3D
-pressure-velocity-potential iteration, but it is still a research slice rather
-than the final production family. It is the bridge that lets users stage field
-profiles, benchmark manifests, and axial response figures while the broader
-`extruded_inductionless` solver family is hardened.
+pressure-velocity-potential iteration and is now available through both Python
+and TOML/CLI workflows. It is still a research slice rather than the final
+production family, but it is now a real executable part of LMX rather than a
+Python-only staging path.
 
 ## Run the scaffold
 
 ```bash
+lmx examples/fringing_rect_case.toml
+lmx examples/fringing_pipe_case.toml
 python examples/fringing_benchmark_demo.py \
   --output artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py \
@@ -60,6 +62,8 @@ The example writes:
 - an `extruded_bundle` section in the JSON summary with axial field-bundle shape
   and charge-balance histories
 - a `validation` section with residual and field/response consistency metrics
+- for TOML/CLI runs, `*_station_history.csv`, `*_extruded_results.npz`, and a
+  JSON summary with conservation metrics
 
 Current publication-style artifact:
 
@@ -129,6 +133,22 @@ into pass/fail gates with:
 - `--max-fringing-wall-current-leakage`
 - `--max-fringing-boundary-current`
 - `--fail-on-threshold`
+
+Current retained hard-gate dataset:
+
+- fully developed Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
+- fringing `rect_duct` and `pipe_ogrid` at the same `Ha` values with
+  `nx_stations = 5`
+- hard thresholds:
+  - `max_charge_balance <= 8e-1`
+  - `max_interface_current <= 7e-2`
+  - `max_fringing_wall_current_leakage <= 1e-1`
+  - `max_fringing_boundary_current <= 1e-5`
+
+That retained gate currently passes. Layered 3D fringing remains an
+exploratory geometry in the current slice; it is still tracked, but not part of
+the retained passing gate until its leakage and local charge balance are
+tightened materially.
 
 ## What the example shows
 

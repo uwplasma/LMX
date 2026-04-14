@@ -5,7 +5,7 @@ import runpy
 import pytest
 
 from lmx import cli
-from lmx.config import LoggingSpec, RestartSpec, RunConfig
+from lmx.config import FringingSpec, LoggingSpec, RestartSpec, RunConfig
 
 
 pytestmark = pytest.mark.unit
@@ -156,6 +156,61 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(tmp_path: Path
     assert summary["restart"]["start_time"] == pytest.approx(0.2)
     assert summary["restart"]["output"] == "resume_state.npz"
     assert '"restart"' in capsys.readouterr().out
+
+
+def test_run_config_dispatches_extruded_solver_kind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "output": case.output.__class__(**{**case.output.__dict__, "directory": str(tmp_path / "run")}),
+        }
+    )
+    config = RunConfig(
+        case=case,
+        solve_mode="steady",
+        logging=LoggingSpec(enabled=False),
+        fringing=FringingSpec(enabled=True, entry_center=1.0, exit_center=4.0, transition_width=0.5, axis="z"),
+    )
+    recorded: dict[str, object] = {}
+    solution = SimpleNamespace(
+        bundle=SimpleNamespace(
+            x=cli.jnp.asarray([0.0, 1.0]),
+            u=cli.jnp.asarray([[[1.0]], [[0.5]]]),
+        ),
+        validation=SimpleNamespace(
+            max_residual=1.0e-4,
+            max_charge_balance_residual=1.0e-6,
+            max_wall_current_leakage=2.0e-6,
+            net_boundary_current_residual=3.0e-6,
+            field_mean_velocity_correlation=-0.8,
+        ),
+        station_history=(),
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "build_extruded_problem_from_case",
+        lambda built_case, **kwargs: recorded.update(problem_kwargs=kwargs) or SimpleNamespace(case=built_case),
+    )
+    monkeypatch.setattr(cli, "solve_extruded_inductionless", lambda problem: solution)
+    monkeypatch.setattr(
+        cli,
+        "write_extruded_solution_outputs",
+        lambda solved, built_case, out_dir, write_npz: recorded.update(out_dir=Path(out_dir), write_npz=write_npz)
+        or {"csv": [Path(out_dir) / "stations.csv"], "npz": [Path(out_dir) / "bundle.npz"], "plots": []},
+    )
+
+    summary = cli._run_config(config)
+
+    assert recorded["problem_kwargs"]["entry_center"] == pytest.approx(1.0)
+    assert recorded["problem_kwargs"]["exit_center"] == pytest.approx(4.0)
+    assert summary["solver_kind"] == "extruded_inductionless"
+    assert summary["station_count"] == 2
+    assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
 
 
 def test_cli_validate_branches_into_reference_comparison(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):

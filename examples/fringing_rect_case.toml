@@ -1,0 +1,101 @@
+[case]
+name = "fringing_rect_toml"
+forcing = 1.0
+initial_velocity = 0.0
+reference_pressure_gradient = -1.0
+reference_phi_cell = [0, 0]
+notes = "Explicit 3D rectangular fringing-field example for `lmx input.toml`."
+
+[geometry]
+kind = "rect_duct"
+width = 2.0
+height = 2.0
+length = 6.0
+nx = 7
+ny = 8
+nz = 8
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 8.0]
+ramp_start = 0.0
+ramp_duration = 0.0
+
+[solver]
+kind = "extruded_inductionless"
+mode = "steady"
+linear_solver = "auto"
+preconditioner = "jacobi"
+time_scheme = "implicit_euler"
+coupling_iterations = 6
+coupling_tolerance = 1.0e-6
+
+[fringing]
+enabled = true
+entry_center = 1.5
+exit_center = 4.5
+transition_width = 0.4
+axis = "z"
+
+[time_stepper]
+dt = 0.002
+t_final = 0.02
+max_steps = 12
+potential_iterations = 48
+potential_tolerance = 1.0e-6
+potential_relaxation = 1.0
+potential_solver = "jacobi"
+steady_tolerance = 1.0e-6
+checkpoint_stride = 1
+
+[output]
+directory = "../artifacts/examples/toml_fringing_rect"
+write_paraview = false
+write_csv_profiles = true
+write_npz = true
+write_json_summary = true
+write_plots = false
+copy_input_file = true
+write_stride = 1
+
+[logging]
+enabled = true
+verbose = true
+verbosity = "detailed"
+banner = true
+print_regions = true
+print_boundaries = true
+print_footer = true
+flush = true
+step_stride = 1
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+density = 1.0
+viscosity = 0.05
+
+[[boundary_conditions]]
+name = "y_min_wall"
+kind = "no_slip"
+axis = "y"
+side = "min"
+
+[[boundary_conditions]]
+name = "y_max_wall"
+kind = "no_slip"
+axis = "y"
+side = "max"
+
+[[boundary_conditions]]
+name = "z_min_wall"
+kind = "insulating"
+axis = "z"
+side = "min"
+
+[[boundary_conditions]]
+name = "z_max_wall"
+kind = "insulating"
+axis = "z"
+side = "max"

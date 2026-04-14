@@ -16,6 +16,7 @@ lmx examples/hartmann_case.toml
 - `[output]`
 - `[logging]`
 - `[restart]`
+- `[fringing]`
 - `[[regions]]`
 - `[[boundary_conditions]]`
 
@@ -144,12 +145,13 @@ side = "max"
 - `kind`
   - `rect_duct`
   - `layered_duct`
+  - `pipe_ogrid`
 - `width`, `height`, `length`
   - domain dimensions
 - `nx`, `ny`, `nz`
   - grid counts
 - `radius`, `nr`, `ntheta`
-  - reserved for future pipe / mapped-geometry paths
+  - mapped-pipe controls for `pipe_ogrid`
 - `wall_thickness`
   - four wall thickness values for layered ducts
 - `wall_cells`
@@ -178,9 +180,9 @@ side = "max"
   - `fully_developed_inductionless`
   - `reduced_inductionless`
   - `extruded_inductionless`
-    - current Python research API uses it for rectangular and layered-duct
-      fringing slices
-    - TOML/CLI support for full 3D runs is still staged post-`1.0`
+    - executable 3D fringing-field path for `rect_duct`, `layered_duct`, and
+      `pipe_ogrid`
+    - requires a `[fringing]` block in TOML inputs
 - `mode`
   - `steady`
   - `transient`
@@ -221,6 +223,20 @@ side = "max"
   - `relaxation`
   - `velocity_update_limit`
   - `velocity_update_limiter`
+
+## `[fringing]`
+
+- `enabled`
+  - required for `extruded_inductionless`
+- `entry_center`
+  - center of the entrance field transition along the axial direction
+- `exit_center`
+  - center of the exit field transition along the axial direction
+- `transition_width`
+  - smooth transition width used in the hyperbolic-tangent field profile
+- `axis`
+  - magnetic-field axis for the staged fringing profile
+  - allowed values: `x`, `y`, `z`
 
 ## `[output]`
 

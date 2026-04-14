@@ -11,7 +11,15 @@ import jax.numpy as jnp
 from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .config import LoggingSpec, RunConfig, load_run_config
-from .io import load_restart_bundle, validate_restart_bundle, write_paraview, write_restart_npz, write_solution_outputs
+from .fringing import build_extruded_problem_from_case, solve_extruded_inductionless
+from .io import (
+    load_restart_bundle,
+    validate_restart_bundle,
+    write_extruded_solution_outputs,
+    write_paraview,
+    write_restart_npz,
+    write_solution_outputs,
+)
 from .runtime_logging import RestartLogInfo, StreamingSolverLogger, default_log_path
 from .solvers import _build_mesh, solve_steady, solve_transient
 from .validation import (
@@ -141,6 +149,30 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
     return summary
 
 
+def _runtime_summary_extruded(solution, case, out_dir: Path, outputs: dict[str, list[Path]]) -> dict[str, object]:
+    bundle = solution.bundle
+    validation = solution.validation
+    return {
+        "case": case.name,
+        "geometry": case.geometry.kind,
+        "solver_kind": case.solver.kind,
+        "solver_mode": case.solver.mode,
+        "station_count": int(bundle.x.shape[0]),
+        "u_max": float(jnp.max(jnp.abs(bundle.u))),
+        "max_residual": float(validation.max_residual),
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "field_mean_velocity_correlation": float(validation.field_mean_velocity_correlation),
+        "output": _portable_path(out_dir),
+        "generated_files": {
+            key: [_portable_path(path) for path in paths]
+            for key, paths in outputs.items()
+            if paths
+        },
+    }
+
+
 def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path | None:
     if not getattr(case.output, "write_json_summary", True):
         return None
@@ -151,6 +183,7 @@ def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path 
 
 def _run_config(config: RunConfig) -> dict[str, object]:
     case = config.case
+    solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     output_dir = getattr(case, "output_dir", None)
     if output_dir is None and getattr(case, "output", None) is not None:
         output_dir = getattr(case.output, "directory", None)
@@ -163,6 +196,45 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         log_path = default_log_path(out_dir, case.name)
         log_handle = open(log_path, "w", encoding="utf-8")
         logger.add_stream(log_handle)
+    if solver_kind == "extruded_inductionless":
+        if config.restart.enabled:
+            raise ValueError("Restart is not yet supported for extruded_inductionless runs")
+        try:
+            if not config.fringing.enabled:
+                raise ValueError(
+                    "extruded_inductionless TOML runs require a [fringing] block or fringing.enabled = true"
+                )
+            problem = build_extruded_problem_from_case(
+                case,
+                entry_center=config.fringing.entry_center,
+                exit_center=config.fringing.exit_center,
+                transition_width=config.fringing.transition_width,
+                axis=config.fringing.axis,
+            )
+            solution = solve_extruded_inductionless(problem)
+        finally:
+            if log_handle is not None:
+                log_handle.close()
+        outputs = write_extruded_solution_outputs(
+            solution,
+            case,
+            out_dir,
+            write_npz=getattr(case.output, "write_npz", True),
+        )
+        if log_path is not None:
+            outputs.setdefault("log", []).append(log_path)
+        if config.input_path is not None and getattr(case.output, "copy_input_file", True):
+            copied_input = out_dir / config.input_path.name
+            shutil.copy2(config.input_path, copied_input)
+            outputs.setdefault("input", []).append(copied_input)
+        summary = _runtime_summary_extruded(solution, case, out_dir, outputs)
+        summary_path = _write_run_summary(summary, case, out_dir)
+        if summary_path is not None:
+            outputs.setdefault("json", []).append(summary_path)
+            summary["generated_files"]["json"] = [_portable_path(summary_path)]
+        print(json.dumps(summary, indent=2))
+        return summary
+
     initial_state = None
     initial_diagnostics = None
     restart_log_info = RestartLogInfo(enabled=False)

@@ -27,6 +27,7 @@ VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
 LinearSolverKind = Literal["auto", "cg", "gmres", "bicgstab"]
 PreconditionerKind = Literal["none", "jacobi", "block_jacobi"]
 TimeSchemeKind = Literal["implicit_euler", "crank_nicolson"]
+MagneticAxisKind = Literal["x", "y", "z"]
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,15 @@ class OutputSpec:
     write_plots: bool = False
     copy_input_file: bool = True
     write_stride: int = 1
+
+
+@dataclass(frozen=True)
+class FringingSpec:
+    enabled: bool = False
+    entry_center: float = 1.5
+    exit_center: float = 4.5
+    transition_width: float = 0.35
+    axis: MagneticAxisKind = "z"
 
 
 @dataclass(frozen=True)

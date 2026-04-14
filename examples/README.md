@@ -41,6 +41,8 @@ lmx examples/hartmann_case.toml
 lmx examples/hartmann_restart_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
+lmx examples/fringing_rect_case.toml
+lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
 ```
@@ -94,9 +96,9 @@ The shipped autodiff examples now cover:
 - fringing multi-observable inverse design over axial field-profile parameters
   using both velocity and current-response targets
 - inverse design against targets generated directly from
-  `solve_extruded_inductionless(...)`, which is the current bridge from the
-  lightweight fringing-response model into the first 3D
-  `extruded_inductionless` solver slice
+  `solve_extruded_inductionless(...)`, using a direct differentiable
+  rectangular `extruded_inductionless` response model for the default
+  rectangular target workflow
 - publication-style `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
