@@ -259,6 +259,7 @@ def test_build_extruded_response_targets_returns_finite_histories():
     assert targets["mean_velocity"].shape == (4,)
     assert targets["current_proxy"].shape == (4,)
     assert targets["charge_balance_residual"].shape == (4,)
+    assert targets["boundary_current_residual"].shape == (4,)
     assert targets["wall_current_leakage"].shape == (4,)
     assert targets["axial_current"].shape == (4,)
     assert jnp.isfinite(targets["mean_velocity"]).all()
@@ -284,6 +285,7 @@ def test_extruded_rect_response_history_returns_finite_trace():
     assert payload["mean_velocity"].shape == (5,)
     assert payload["current_proxy"].shape == (5,)
     assert payload["charge_balance_residual"].shape == (5,)
+    assert payload["boundary_current_residual"].shape == (5,)
     assert jnp.isfinite(payload["mean_velocity"]).all()
 
 
@@ -314,8 +316,10 @@ def test_extruded_rect_response_loss_gradients_are_finite():
         target_mean_velocity=target["mean_velocity"],
         target_current_proxy=target["current_proxy"],
         target_charge_balance=target["charge_balance_residual"],
+        target_boundary_current=target["boundary_current_residual"],
         current_weight=0.5,
         charge_balance_weight=0.1,
+        boundary_current_weight=0.1,
     )
     assert jnp.isfinite(gradients["loss"])
     assert jnp.isfinite(gradients["d_peak_hartmann_number"])
@@ -343,12 +347,14 @@ def test_extruded_rect_inverse_design_reduces_loss():
         target_mean_velocity=target["mean_velocity"],
         target_current_proxy=target["current_proxy"],
         target_charge_balance=target["charge_balance_residual"],
+        target_boundary_current=target["boundary_current_residual"],
         forcing=1.0,
         peak_hartmann_init=6.0,
         entry_center_init=0.8,
         exit_center_init=4.8,
         transition_width_init=0.7,
         current_weight=0.5,
+        boundary_current_weight=0.1,
         steps=4,
     )
     assert result["model"] == "direct_extruded_rect"

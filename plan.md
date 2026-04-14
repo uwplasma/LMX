@@ -154,6 +154,9 @@ retained passing gate and stays on the open hardening list.
 - The first executable TOML/CLI front-end for `extruded_inductionless` now
   exists through a dedicated `[fringing]` block plus shipped rectangular and
   mapped-pipe fringing input files.
+- The executable surface now also includes direct `lmx run fringing_rect`,
+  `lmx run fringing_pipe`, and `lmx run fringing_layered` shortcuts for quick
+  3D/fringing launches without authoring TOML first.
 - The heavy manual validation lane can now include a bounded fringing summary
   through `scripts/run_manual_solver_family_validation.py --include-fringing`,
   so solver-family hardening is no longer limited to fully developed Hartmann /
@@ -191,6 +194,9 @@ retained passing gate and stays on the open hardening list.
   step further: it uses a direct differentiable rectangular
   `extruded_inductionless` response model instead of the older lightweight
   fringing-response surrogate.
+- That direct rectangular differentiable 3D response now uses the same
+  conservative electric source assembly and boundary-current residual target as
+  the retained executable rectangular 3D fringing slice.
 - The retained rectangular/layered 3D conservation audit is now aligned with
   the discrete electric operator: the source term, `div J` check, and boundary
   current residual are all assembled from conservative face fluxes instead of

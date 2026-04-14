@@ -11,7 +11,13 @@ import jax.numpy as jnp
 from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .config import LoggingSpec, RunConfig, load_run_config
-from .fringing import build_extruded_problem_from_case, solve_extruded_inductionless
+from .fringing import (
+    build_extruded_problem_from_case,
+    build_layered_duct_extruded_problem,
+    build_pipe_ogrid_extruded_problem,
+    build_square_duct_extruded_problem,
+    solve_extruded_inductionless,
+)
 from .io import (
     load_restart_bundle,
     validate_restart_bundle,
@@ -73,6 +79,50 @@ def _build_case(args: argparse.Namespace):
         return make_shercliff_case(ha=args.ha, output_dir=args.output)
     if args.case == "hunt":
         return make_hunt_case(ha=args.ha, output_dir=args.output)
+    raise ValueError(args.case)
+
+
+def _build_extruded_problem(args: argparse.Namespace):
+    if args.case == "fringing_rect":
+        return build_square_duct_extruded_problem(
+            ha_peak=args.ha,
+            width=args.width,
+            height=args.height,
+            ny=args.ny,
+            nz=args.nz,
+            length=args.length,
+            nx_stations=args.nx_stations,
+            entry_center=args.entry_center,
+            exit_center=args.exit_center,
+            transition_width=args.transition_width,
+        )
+    if args.case == "fringing_layered":
+        return build_layered_duct_extruded_problem(
+            ha_peak=args.ha,
+            width=args.width,
+            height=args.height,
+            ny=args.ny,
+            nz=args.nz,
+            wall_cells=args.wall_cells,
+            insulator_cells=args.insulator_cells,
+            length=args.length,
+            nx_stations=args.nx_stations,
+            entry_center=args.entry_center,
+            exit_center=args.exit_center,
+            transition_width=args.transition_width,
+        )
+    if args.case == "fringing_pipe":
+        return build_pipe_ogrid_extruded_problem(
+            ha_peak=args.ha,
+            radius=args.radius,
+            nr=args.nr,
+            ntheta=args.ntheta,
+            length=args.length,
+            nx_stations=args.nx_stations,
+            entry_center=args.entry_center,
+            exit_center=args.exit_center,
+            transition_width=args.transition_width,
+        )
     raise ValueError(args.case)
 
 
@@ -315,7 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run")
-    run_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"])
+    run_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt", "fringing_rect", "fringing_layered", "fringing_pipe"])
     run_parser.add_argument("--ha", type=float, default=20.0)
     run_parser.add_argument("--output", type=str, default="./out")
     run_parser.add_argument("--mode", choices=["steady", "transient"], default="steady")
@@ -323,6 +373,20 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--quiet", action="store_true")
     run_parser.add_argument("--verbose", action="store_true")
     run_parser.add_argument("--verbosity", choices=["quiet", "normal", "detailed", "debug"], default=None)
+    run_parser.add_argument("--width", type=float, default=2.0)
+    run_parser.add_argument("--height", type=float, default=2.0)
+    run_parser.add_argument("--ny", type=int, default=48)
+    run_parser.add_argument("--nz", type=int, default=48)
+    run_parser.add_argument("--length", type=float, default=6.0)
+    run_parser.add_argument("--nx-stations", type=int, default=21)
+    run_parser.add_argument("--entry-center", type=float, default=1.5)
+    run_parser.add_argument("--exit-center", type=float, default=4.5)
+    run_parser.add_argument("--transition-width", type=float, default=0.35)
+    run_parser.add_argument("--wall-cells", type=int, default=4)
+    run_parser.add_argument("--insulator-cells", type=int, default=4)
+    run_parser.add_argument("--radius", type=float, default=0.5)
+    run_parser.add_argument("--nr", type=int, default=24)
+    run_parser.add_argument("--ntheta", type=int, default=48)
 
     bench_parser = subparsers.add_parser("benchmark")
     bench_parser.add_argument("--repeats", type=int, default=3)
@@ -413,6 +477,41 @@ def main(argv: list[str] | None = None) -> int:
                 )
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
+        return 0
+
+    if args.case.startswith("fringing_"):
+        problem = _build_extruded_problem(args)
+        case = problem.case
+        case = case.__class__(
+            **{
+                **case.__dict__,
+                "output": case.output.__class__(
+                    **{
+                        **case.output.__dict__,
+                        "directory": args.output,
+                        "write_npz": True,
+                        "write_json_summary": True,
+                        "write_plots": args.plots,
+                    }
+                ),
+            }
+        )
+        problem = problem.__class__(case=case, profile=problem.profile)
+        solution = solve_extruded_inductionless(problem)
+        out_dir = Path(args.output)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outputs = write_extruded_solution_outputs(
+            solution,
+            case,
+            out_dir,
+            write_npz=getattr(case.output, "write_npz", True),
+        )
+        summary = _runtime_summary_extruded(solution, case, out_dir, outputs)
+        summary_path = _write_run_summary(summary, case, out_dir)
+        if summary_path is not None:
+            outputs.setdefault("json", []).append(summary_path)
+            summary["generated_files"]["json"] = [_portable_path(summary_path)]
+        print(json.dumps(summary, indent=2))
         return 0
 
     case = _build_case(args)

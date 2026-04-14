@@ -35,7 +35,9 @@ The current retained 3D slice includes:
 
 This is explicit by design. The current slice is a real 3D
 pressure-velocity-potential iteration and is now available through both Python
-and TOML/CLI workflows. It is still a research slice rather than the final
+and TOML/CLI workflows, including direct `lmx run fringing_*` entry points for
+quick rectangular, layered, and mapped-pipe launches. It is still a research
+slice rather than the final
 production family, but it is now a real executable part of LMX rather than a
 Python-only staging path.
 
@@ -44,6 +46,8 @@ Python-only staging path.
 ```bash
 lmx examples/fringing_rect_case.toml
 lmx examples/fringing_pipe_case.toml
+lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
+lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
 python examples/fringing_benchmark_demo.py \
   --output artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py \

@@ -147,6 +147,72 @@ def _extruded_poisson_jacobi(rhs: jnp.ndarray, *, dx: float, dy: float, dz: floa
     return jax.lax.fori_loop(0, iterations, body_fun, jnp.zeros_like(rhs_compatible))
 
 
+def _extruded_harmonic_mean(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+    denom = jnp.maximum(a + b, 1.0e-20)
+    return 2.0 * a * b / denom
+
+
+def _extruded_conservative_current_fluxes(
+    sigma: jnp.ndarray,
+    phi: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_y: jnp.ndarray,
+    uxb_z: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    nx, ny, nz = phi.shape
+    fx = jnp.zeros((nx + 1, ny, nz), dtype=phi.dtype)
+    fy = jnp.zeros((nx, ny + 1, nz), dtype=phi.dtype)
+    fz = jnp.zeros((nx, ny, nz + 1), dtype=phi.dtype)
+
+    sigma_x = _extruded_harmonic_mean(sigma[1:], sigma[:-1])
+    phi_grad_x = (phi[1:] - phi[:-1]) / max(dx, 1.0e-12)
+    uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
+    fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
+
+    sigma_y = _extruded_harmonic_mean(sigma[:, 1:, :], sigma[:, :-1, :])
+    phi_grad_y = (phi[:, 1:, :] - phi[:, :-1, :]) / max(dy, 1.0e-12)
+    uxb_face_y = 0.5 * (uxb_y[:, 1:, :] + uxb_y[:, :-1, :])
+    fy = fy.at[:, 1:-1, :].set(sigma_y * (-phi_grad_y + uxb_face_y))
+
+    sigma_z = _extruded_harmonic_mean(sigma[:, :, 1:], sigma[:, :, :-1])
+    phi_grad_z = (phi[:, :, 1:] - phi[:, :, :-1]) / max(dz, 1.0e-12)
+    uxb_face_z = 0.5 * (uxb_z[:, :, 1:] + uxb_z[:, :, :-1])
+    fz = fz.at[:, :, 1:-1].set(sigma_z * (-phi_grad_z + uxb_face_z))
+    return fx, fy, fz
+
+
+def _extruded_conservative_emf_rhs(
+    sigma: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_y: jnp.ndarray,
+    uxb_z: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> jnp.ndarray:
+    zeros = jnp.zeros_like(uxb_x)
+    fx, fy, fz = _extruded_conservative_current_fluxes(
+        sigma,
+        zeros,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
+    return (
+        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
+        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
+    )
+
+
 def _solve_extruded_velocity_jacobi(
     *,
     rhs: jnp.ndarray,
@@ -411,7 +477,18 @@ def extruded_rect_response_history(
     forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
 
     def macro_body(_, u_iter):
-        rhs_phi = -_extruded_gradient(-sigma * u_iter * bz, dx=dx, dy=dy, dz=dz)[1]
+        uxb_x = jnp.zeros_like(u_iter)
+        uxb_y = -u_iter * bz
+        uxb_z = jnp.zeros_like(u_iter)
+        rhs_phi = _extruded_conservative_emf_rhs(
+            sigma,
+            uxb_x,
+            uxb_y,
+            uxb_z,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+        )
         phi = _extruded_poisson_jacobi(
             rhs_phi,
             dx=dx,
@@ -419,7 +496,8 @@ def extruded_rect_response_history(
             dz=dz,
             iterations=problem.base_problem.potential_iterations,
         )
-        _, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
+        dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
+        jx = -dphi_dx
         jy = -dphi_dy - u_iter * bz
         jz = -dphi_dz
         lorentz_x = jy * bz
@@ -442,7 +520,18 @@ def extruded_rect_response_history(
         macro_body,
         jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
     )
-    rhs_phi = -_extruded_gradient(-sigma * u * bz, dx=dx, dy=dy, dz=dz)[1]
+    uxb_x = jnp.zeros_like(u)
+    uxb_y = -u * bz
+    uxb_z = jnp.zeros_like(u)
+    rhs_phi = _extruded_conservative_emf_rhs(
+        sigma,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
     phi = _extruded_poisson_jacobi(
         rhs_phi,
         dx=dx,
@@ -454,10 +543,28 @@ def extruded_rect_response_history(
     jx = -dphi_dx
     jy = -dphi_dy - u * bz
     jz = -dphi_dz
+    fx, fy, fz = _extruded_conservative_current_fluxes(
+        sigma,
+        phi,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
     div_j = (
-        _extruded_gradient(jx, dx=dx, dy=dy, dz=dz)[0]
-        + _extruded_gradient(jy, dx=dx, dy=dy, dz=dz)[1]
-        + _extruded_gradient(jz, dx=dx, dy=dy, dz=dz)[2]
+        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
+        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
+    )
+    boundary_current_residual = jnp.abs(
+        -jnp.sum(fx[0], axis=(0, 1)) * dy * dz
+        + jnp.sum(fx[-1], axis=(0, 1)) * dy * dz
+        - jnp.sum(fy[:, 0, :], axis=1) * dx * dz
+        + jnp.sum(fy[:, -1, :], axis=1) * dx * dz
+        - jnp.sum(fz[:, :, 0], axis=1) * dx * dy
+        + jnp.sum(fz[:, :, -1], axis=1) * dx * dy
     )
     return {
         "x": problem.x,
@@ -465,6 +572,7 @@ def extruded_rect_response_history(
         "mean_velocity": jnp.mean(u, axis=(1, 2)),
         "current_proxy": jnp.mean(jnp.abs(jy), axis=(1, 2)),
         "charge_balance_residual": jnp.max(jnp.abs(div_j), axis=(1, 2)),
+        "boundary_current_residual": boundary_current_residual,
     }
 
 
@@ -592,8 +700,10 @@ def extruded_rect_response_loss(
     target_mean_velocity: jnp.ndarray,
     target_current_proxy: jnp.ndarray,
     target_charge_balance: jnp.ndarray,
+    target_boundary_current: jnp.ndarray,
     current_weight: float = 1.0,
     charge_balance_weight: float = 0.1,
+    boundary_current_weight: float = 0.1,
 ) -> jnp.ndarray:
     response = extruded_rect_response_history(
         problem,
@@ -606,10 +716,12 @@ def extruded_rect_response_loss(
     velocity_scale = jnp.maximum(jnp.max(jnp.abs(target_mean_velocity)), 1.0e-12)
     current_scale = jnp.maximum(jnp.max(jnp.abs(target_current_proxy)), 1.0e-12)
     charge_scale = jnp.maximum(jnp.max(jnp.abs(target_charge_balance)), 1.0e-12)
+    boundary_scale = jnp.maximum(jnp.max(jnp.abs(target_boundary_current)), 1.0e-12)
     velocity_loss = jnp.mean(((response["mean_velocity"] - target_mean_velocity) / velocity_scale) ** 2)
     current_loss = jnp.mean(((response["current_proxy"] - target_current_proxy) / current_scale) ** 2)
     charge_loss = jnp.mean(((response["charge_balance_residual"] - target_charge_balance) / charge_scale) ** 2)
-    return velocity_loss + current_weight * current_loss + charge_balance_weight * charge_loss
+    boundary_loss = jnp.mean(((response["boundary_current_residual"] - target_boundary_current) / boundary_scale) ** 2)
+    return velocity_loss + current_weight * current_loss + charge_balance_weight * charge_loss + boundary_current_weight * boundary_loss
 
 
 def hartmann_profile_loss_gradients(
@@ -719,8 +831,10 @@ def extruded_rect_response_loss_gradients(
     target_mean_velocity: jnp.ndarray,
     target_current_proxy: jnp.ndarray,
     target_charge_balance: jnp.ndarray,
+    target_boundary_current: jnp.ndarray,
     current_weight: float = 1.0,
     charge_balance_weight: float = 0.1,
+    boundary_current_weight: float = 0.1,
 ) -> dict[str, jnp.ndarray]:
     objective = lambda peak_ha, entry, exit_, width: extruded_rect_response_loss(
         problem,
@@ -732,8 +846,10 @@ def extruded_rect_response_loss_gradients(
         target_mean_velocity=target_mean_velocity,
         target_current_proxy=target_current_proxy,
         target_charge_balance=target_charge_balance,
+        target_boundary_current=target_boundary_current,
         current_weight=current_weight,
         charge_balance_weight=charge_balance_weight,
+        boundary_current_weight=boundary_current_weight,
     )
     loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
     d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
@@ -952,6 +1068,7 @@ def run_extruded_rect_inverse_design(
     target_mean_velocity: jnp.ndarray,
     target_current_proxy: jnp.ndarray,
     target_charge_balance: jnp.ndarray,
+    target_boundary_current: jnp.ndarray,
     forcing: float,
     peak_hartmann_init: float,
     entry_center_init: float,
@@ -959,6 +1076,7 @@ def run_extruded_rect_inverse_design(
     transition_width_init: float,
     current_weight: float = 1.0,
     charge_balance_weight: float = 0.1,
+    boundary_current_weight: float = 0.1,
     learning_rate_peak_ha: float = 0.8,
     learning_rate_entry: float = 0.15,
     learning_rate_exit: float = 0.15,
@@ -981,8 +1099,10 @@ def run_extruded_rect_inverse_design(
             target_mean_velocity=target_mean_velocity,
             target_current_proxy=target_current_proxy,
             target_charge_balance=target_charge_balance,
+            target_boundary_current=target_boundary_current,
             current_weight=current_weight,
             charge_balance_weight=charge_balance_weight,
+            boundary_current_weight=boundary_current_weight,
         )
         history.append(
             {
@@ -1020,6 +1140,7 @@ def run_extruded_rect_inverse_design(
         "recovered_mean_velocity": recovered["mean_velocity"],
         "recovered_current_proxy": recovered["current_proxy"],
         "recovered_charge_balance": recovered["charge_balance_residual"],
+        "recovered_boundary_current": recovered["boundary_current_residual"],
         "recovered_field_scale": recovered["field_scale"],
         "x": recovered["x"],
         "model": "direct_extruded_rect",
@@ -1034,6 +1155,7 @@ def build_extruded_response_targets(extruded_solution) -> dict[str, jnp.ndarray]
         "mean_velocity": jnp.asarray(bundle.mean_velocity, dtype=jnp.float32),
         "current_proxy": jnp.asarray(bundle.current_scaled_pressure_proxy, dtype=jnp.float32),
         "charge_balance_residual": jnp.asarray(bundle.charge_balance_residual, dtype=jnp.float32),
+        "boundary_current_residual": jnp.asarray(bundle.boundary_current_residual, dtype=jnp.float32),
         "wall_current_leakage": jnp.asarray(bundle.wall_current_leakage, dtype=jnp.float32),
         "axial_current": jnp.asarray(bundle.axial_current, dtype=jnp.float32),
     }
@@ -1071,6 +1193,7 @@ def run_extruded_target_inverse_design(
             target_mean_velocity=targets["mean_velocity"],
             target_current_proxy=targets["current_proxy"],
             target_charge_balance=targets["charge_balance_residual"],
+            target_boundary_current=targets["boundary_current_residual"],
             forcing=float(extruded_solution.problem.case.forcing),
             peak_hartmann_init=peak_hartmann_init,
             entry_center_init=entry_center_init,

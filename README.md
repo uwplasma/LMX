@@ -42,6 +42,8 @@ The `1.0` ship gate is now closed on the fast release lane:
     through the Python API
   - executable TOML/CLI front-end now exists for rectangular and mapped-pipe
     fringing runs
+  - direct `lmx run fringing_rect|fringing_pipe|fringing_layered` entry points
+    now exist for quick 3D/fringing launches without authoring TOML first
   - retained hard-gate validation currently passes for rectangular ducts and
     mapped pipes; layered 3D fringing remains an explicit hardening target
   - broader production-grade 3D validation and solver hardening remain
@@ -86,6 +88,8 @@ lmx examples/fringing_rect_case.toml
 lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
+lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
+lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
 XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
 JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml

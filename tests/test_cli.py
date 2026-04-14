@@ -77,6 +77,46 @@ def test_cli_run_branch_uses_case_builder_and_solver(tmp_path: Path, monkeypatch
     assert '"case": "demo_case"' in capsys.readouterr().out
 
 
+def test_cli_run_branch_dispatches_extruded_case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+    output_dir = tmp_path / "fringing"
+    case = SimpleNamespace(
+        name="fringing_rect_demo",
+        forcing=1.0,
+        geometry=SimpleNamespace(kind="rect_duct"),
+        solver=SimpleNamespace(kind="extruded_inductionless", mode="steady"),
+        output=SimpleNamespace(directory=str(output_dir), write_npz=True, write_json_summary=True, write_plots=False),
+    )
+    problem = SimpleNamespace(case=case, profile=SimpleNamespace())
+    solution = SimpleNamespace(
+        bundle=SimpleNamespace(x=cli.jnp.asarray([0.0, 1.0]), u=cli.jnp.asarray([[[1.0]], [[0.5]]])),
+        validation=SimpleNamespace(
+            max_residual=1.0e-4,
+            max_charge_balance_residual=1.0e-6,
+            max_wall_current_leakage=2.0e-6,
+            net_boundary_current_residual=3.0e-6,
+            field_mean_velocity_correlation=-0.8,
+        ),
+        station_history=(),
+    )
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "_build_extruded_problem", lambda args: problem)
+    monkeypatch.setattr(cli, "solve_extruded_inductionless", lambda built_problem: solution)
+    monkeypatch.setattr(
+        cli,
+        "write_extruded_solution_outputs",
+        lambda solved, built_case, out_dir, write_npz: recorded.update(out_dir=Path(out_dir), write_npz=write_npz)
+        or {"csv": [Path(out_dir) / "stations.csv"], "npz": [Path(out_dir) / "bundle.npz"], "plots": []},
+    )
+
+    exit_code = cli.main(["run", "fringing_rect", "--output", str(output_dir), "--nx-stations", "5"])
+
+    assert exit_code == 0
+    assert recorded["out_dir"] == output_dir
+    assert recorded["write_npz"] is True
+    assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
+
+
 def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
     recorded: dict[str, object] = {}
     monkeypatch.setattr(cli, "run_from_toml", lambda path: recorded.update(path=path) or {"case": "demo"})
