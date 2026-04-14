@@ -369,27 +369,86 @@ def write_geometry_preview_plots(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    fig = plt.figure(figsize=(12, 5.8), constrained_layout=True)
+    grid = fig.add_gridspec(1, 2, width_ratios=(1.0, 1.15))
+    ax2d = fig.add_subplot(grid[0, 0])
+    ax3d = fig.add_subplot(grid[0, 1], projection="3d")
+    fig.suptitle(case_title, fontsize=16)
+    _draw_geometry_preview(ax2d, ax3d, mesh, case_title=case_title, fluid_mask=fluid_mask)
+
+    png_path = out_dir / "geometry_preview.png"
+    pdf_path = out_dir / "geometry_preview.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
+def write_geometry_gallery_plots(
+    items: list[tuple[str, StructuredMesh, jnp.ndarray | None]],
+    out_dir: str | Path,
+    *,
+    title: str,
+) -> list[Path]:
+    _set_publication_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig = plt.figure(figsize=(13.5, 12.5), constrained_layout=True)
+    grid = fig.add_gridspec(len(items), 2, width_ratios=(1.0, 1.1))
+    fig.suptitle(title, fontsize=18)
+
+    for row, (item_title, mesh, fluid_mask) in enumerate(items):
+        ax2d = fig.add_subplot(grid[row, 0])
+        ax3d = fig.add_subplot(grid[row, 1], projection="3d")
+        _draw_geometry_preview(ax2d, ax3d, mesh, case_title=item_title, fluid_mask=fluid_mask)
+
+    png_path = out_dir / "geometry_gallery.png"
+    pdf_path = out_dir / "geometry_gallery.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
+def _centers_to_edges(values: np.ndarray) -> np.ndarray:
+    if values.size <= 1:
+        delta = 0.5
+        return np.asarray([values[0] - delta, values[0] + delta], dtype=float)
+    midpoints = 0.5 * (values[1:] + values[:-1])
+    first = values[0] - 0.5 * (values[1] - values[0])
+    last = values[-1] + 0.5 * (values[-1] - values[-2])
+    return np.concatenate([[first], midpoints, [last]])
+
+
+def _draw_geometry_preview(
+    ax2d: plt.Axes,
+    ax3d: plt.Axes,
+    mesh: StructuredMesh,
+    *,
+    case_title: str,
+    fluid_mask: jnp.ndarray | None = None,
+) -> None:
     mask_source = fluid_mask if fluid_mask is not None else mesh.fluid_mask
     mask = jnp.asarray(mask_source) if mask_source is not None else jnp.ones(mesh.yz_shape, dtype=bool)
     if mask.size == 0:
         mask = jnp.ones(mesh.yz_shape, dtype=bool)
     mask_image = np.asarray(mask.astype(float))
 
-    fig = plt.figure(figsize=(12, 5.8), constrained_layout=True)
-    grid = fig.add_gridspec(1, 2, width_ratios=(1.0, 1.15))
-    ax2d = fig.add_subplot(grid[0, 0])
-    ax3d = fig.add_subplot(grid[0, 1], projection="3d")
-    fig.suptitle(case_title, fontsize=16)
-
-    cmap = colors.ListedColormap(["#d1d5db", "#0f766e"])
-    ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, mask_image, shading="auto", cmap=cmap, vmin=0.0, vmax=1.0)
-    ax2d.set_title("Cross-section material map")
-    ax2d.set_xlabel("z")
-    ax2d.set_ylabel("y")
-    ax2d.set_aspect("equal")
-
     if mesh.point_coordinates is not None:
         points = np.asarray(mesh.point_coordinates)
+        section = points[0]
+        stride_r = max(section.shape[0] // 12, 1)
+        stride_theta = max(section.shape[1] // 18, 1)
+        for radial_index in range(0, section.shape[0], stride_r):
+            ax2d.plot(section[radial_index, :, 1], section[radial_index, :, 2], color="#1d4ed8", linewidth=0.8, alpha=0.9)
+        for theta_index in range(0, section.shape[1], stride_theta):
+            ax2d.plot(section[:, theta_index, 1], section[:, theta_index, 2], color="#b45309", linewidth=0.7, alpha=0.8)
+        ax2d.set_title(f"{case_title}\nMapped pipe cross-section")
+        ax2d.set_xlabel("y")
+        ax2d.set_ylabel("z")
+        ax2d.set_aspect("equal")
+
         for slice_index, color in ((0, "#1d4ed8"), (-1, "#b45309")):
             section = points[slice_index]
             ax3d.plot_wireframe(
@@ -406,8 +465,14 @@ def write_geometry_preview_plots(
         centerline_z = points[:, 0, 0, 2]
         centerline_x = points[:, 0, 0, 0]
         ax3d.plot(centerline_y, centerline_z, centerline_x, color="#111827", linewidth=2.0)
-        ax3d.set_title("Mapped pipe O-grid preview")
+        ax3d.set_title(f"{case_title}\nMapped pipe O-grid preview")
     else:
+        cmap = colors.ListedColormap(["#d1d5db", "#0f766e"])
+        ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, mask_image, shading="auto", cmap=cmap, vmin=0.0, vmax=1.0)
+        ax2d.set_title(f"{case_title}\nCross-section material map")
+        ax2d.set_xlabel("z")
+        ax2d.set_ylabel("y")
+        ax2d.set_aspect("equal")
         x0, x1 = float(mesh.x_faces[0]), float(mesh.x_faces[-1])
         y0, y1 = float(mesh.y_faces[0]), float(mesh.y_faces[-1])
         z0, z1 = float(mesh.z_faces[0]), float(mesh.z_faces[-1])
@@ -464,30 +529,19 @@ def write_geometry_preview_plots(
                     linewidth=1.0,
                     alpha=0.85,
                 )
-        ax3d.set_title("Extruded duct preview")
+        ax3d.set_title(f"{case_title}\nExtruded duct preview")
 
     ax3d.set_xlabel("y")
     ax3d.set_ylabel("z")
     ax3d.set_zlabel("x")
     ax3d.view_init(elev=22, azim=34)
-    ax3d.set_box_aspect((float(mesh.y_faces[-1] - mesh.y_faces[0]), float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.x_faces[-1] - mesh.x_faces[0])))
-
-    png_path = out_dir / "geometry_preview.png"
-    pdf_path = out_dir / "geometry_preview.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
-
-
-def _centers_to_edges(values: np.ndarray) -> np.ndarray:
-    if values.size <= 1:
-        delta = 0.5
-        return np.asarray([values[0] - delta, values[0] + delta], dtype=float)
-    midpoints = 0.5 * (values[1:] + values[:-1])
-    first = values[0] - 0.5 * (values[1] - values[0])
-    last = values[-1] + 0.5 * (values[-1] - values[-2])
-    return np.concatenate([[first], midpoints, [last]])
+    ax3d.set_box_aspect(
+        (
+            float(mesh.y_faces[-1] - mesh.y_faces[0]),
+            float(mesh.z_faces[-1] - mesh.z_faces[0]),
+            float(mesh.x_faces[-1] - mesh.x_faces[0]),
+        )
+    )
 
 
 def write_extruded_overview_plots(

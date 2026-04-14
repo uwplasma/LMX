@@ -12,6 +12,7 @@ from lmx.plotting import (
     _plot_field,
     write_autodiff_plots,
     write_case_overview_plots,
+    write_geometry_gallery_plots,
     write_geometry_preview_plots,
     write_strong_scaling_plots,
     write_transient_movies,
@@ -165,6 +166,35 @@ def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(tmp_pa
     pipe_outputs = write_geometry_preview_plots(pipe_mesh, tmp_path / "pipe", case_title="Pipe preview")
     assert pipe_outputs[0].exists()
     assert pipe_outputs[1].exists()
+
+
+def test_write_geometry_gallery_plots_writes_panel_outputs(tmp_path: Path):
+    rect_mesh = _build_mesh(make_hartmann_case(ha=5.0, ny=8, nz=8))
+    layered_mesh = _build_mesh(make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1))
+    pipe_mesh = rect_mesh.__class__(
+        **{
+            **rect_mesh.__dict__,
+            "geometry": "pipe_ogrid",
+            "point_coordinates": jnp.asarray(
+                [
+                    [[[0.0, -0.5, -0.5], [0.0, -0.5, 0.5]], [[0.0, 0.5, -0.5], [0.0, 0.5, 0.5]]],
+                    [[[1.0, -0.5, -0.5], [1.0, -0.5, 0.5]], [[1.0, 0.5, -0.5], [1.0, 0.5, 0.5]]],
+                ]
+            ),
+        }
+    )
+    outputs = write_geometry_gallery_plots(
+        [
+            ("Rectangular duct", rect_mesh, rect_mesh.fluid_mask),
+            ("Layered duct", layered_mesh, layered_mesh.fluid_mask),
+            ("Mapped pipe O-grid", pipe_mesh, pipe_mesh.fluid_mask),
+        ],
+        tmp_path,
+        title="Geometry gallery",
+    )
+    assert outputs == [tmp_path / "geometry_gallery.png", tmp_path / "geometry_gallery.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
 
 
 def test_plot_field_handles_negative_only_field():

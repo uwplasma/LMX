@@ -101,6 +101,10 @@ The mapped-pipe example remains useful for exploratory research and solver
 development, but on the heavier retained validation campaign it is currently
 kept outside the locked publication set.
 
+Current exploratory mapped-pipe comparison artifact:
+
+![LMX mapped-pipe exploratory comparison](_static/generated/pipe_reference_comparison.png)
+
 Restart / resume reproducibility artifact:
 
 ![LMX extruded restart reproducibility](_static/generated/extruded_restart_demo.png)
@@ -221,14 +225,14 @@ Current reviewer-facing retained paper figures:
 ![LMX fringing reviewer summary](_static/generated/paper_reviewer_summary.png)
 
 Its default larger retained dataset is intentionally `rect_duct,layered_duct`.
-The mapped-pipe slice still belongs to the retained smaller hard gate, but it
-is not yet promoted into the larger publication campaign because the heavier
-mesh set still needs more operator hardening there.
+The mapped-pipe slice is still executable and useful for research development,
+but it is not yet promoted into the retained publication campaign because the
+heavier mesh set still needs more operator hardening there.
 
 Current retained hard-gate dataset:
 
 - fully developed Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
-- fringing `rect_duct`, `layered_duct`, and `pipe_ogrid` at the same `Ha` values with
+- fringing `rect_duct` and `layered_duct` at the same `Ha` values with
   `nx_stations = 5`
 - hard thresholds:
   - `max_charge_balance <= 8e-1`
@@ -236,10 +240,28 @@ Current retained hard-gate dataset:
   - `max_fringing_wall_current_leakage <= 1e-1`
   - `max_fringing_boundary_current <= 1e-5`
 
-That retained gate now passes for `rect_duct`, `layered_duct`, and
-`pipe_ogrid`. The layered case joined the retained gate after the multi-region
-electric subproblem was switched to a sparse direct solve of the conservative
-variable-coefficient potential operator.
+That retained gate now passes for `rect_duct` and `layered_duct`. The layered
+case joined the retained gate after the multi-region electric subproblem was
+switched to a sparse direct solve of the conservative variable-coefficient
+potential operator.
+
+Current exploratory mapped-pipe hardening signals on the heavier bounded
+dataset:
+
+- `max_charge_balance_residual ≈ 9.16e-1` at `Ha=10`, `resolution=8`
+- `max_charge_balance_residual ≈ 1.19e0` at `Ha=20`, `resolution=8`
+- `max_wall_current_leakage ≈ 1.09e-1` at `Ha=20`, `resolution=8`
+
+The shipped qualitative comparison against the external high-`Ha`, high-`Re`
+fringing-pipe profile data gives normalized axial-velocity shape errors of:
+
+- center line: `≈ 1.02`
+- negative-offset line: `≈ 3.84e-1`
+- positive-offset line: `≈ 3.33e-1`
+
+So the reviewer-facing conclusion is deliberately conservative: mapped pipe is a
+useful exploratory 3D lane, but it is not yet part of the retained publication
+set.
 
 ## What the example shows
 

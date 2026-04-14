@@ -239,8 +239,7 @@ That retained gate now passes for all three retained fringing geometries.
   post-1.0 release-validation lane so larger Hartmann/Shercliff/Hunt cases can
   be rerun without polluting the fast ship gate.
 - The retained hard-gate dataset now passes for fully developed Hartmann /
-  Shercliff / Hunt plus fringing `rect_duct`, `layered_duct`, and
-  `pipe_ogrid`.
+  Shercliff / Hunt plus fringing `rect_duct` and `layered_duct`.
 - The publication QA pass tightened several post-`1.0` figures:
   - the strong-scaling artifact now plots warm runtime only
   - the extruded restart figure now compares split-and-resumed solves against a
@@ -248,9 +247,9 @@ That retained gate now passes for all three retained fringing geometries.
   - the fringing benchmark and larger validation figures now emphasize peak
     axial velocity, pressure span, axial-current span, and charge-balance
     metrics instead of the weaker mean-velocity-correlation view
-  - the mapped-pipe slice remains inside the smaller retained hard gate, but it
-    is still outside the larger retained publication campaign pending heavier
-    mesh hardening
+  - the mapped-pipe slice is fully executable, but the heavier bounded
+    validation and external-profile comparison both keep it outside the
+    retained publication campaign for now
 - A dedicated reviewer-facing paper-figure workflow now ships in
   `examples/extruded_paper_figures.py`, with committed 3D retained rectangular
   and layered fringing figures plus a compact reviewer summary panel under
@@ -263,6 +262,17 @@ That retained gate now passes for all three retained fringing geometries.
   gate decision: `pipe_ogrid` still fails the larger retained fringing campaign
   on the heavier dataset, so the retained publication set remains
   `rect_duct,layered_duct` while mapped pipes stay exploratory.
+- A new reviewer-facing geometry panel now ships all three current geometries
+  in a single figure, and a dedicated exploratory mapped-pipe comparison script
+  now writes a bounded qualitative comparison against the shipped external
+  fringing-pipe profiles.
+- The current exploratory mapped-pipe hardening numbers are still too weak for
+  promotion:
+  - `max_charge_balance_residual ≈ 9.16e-1` at `Ha=10`, `resolution=8`
+  - `max_charge_balance_residual ≈ 1.19e0` at `Ha=20`, `resolution=8`
+  - `max_wall_current_leakage ≈ 1.09e-1` at `Ha=20`, `resolution=8`
+  - normalized external-profile shape errors are about `1.02`, `3.84e-1`, and
+    `3.33e-1` on the center, negative-offset, and positive-offset lines
 - The key layered 3D hardening step was replacing the stiff multi-region
   electric Jacobi iteration with a sparse direct solve of the conservative
   variable-coefficient potential operator.

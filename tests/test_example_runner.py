@@ -491,6 +491,31 @@ def test_extruded_paper_figures_writes_summary(tmp_path: Path):
     assert (tmp_path / "extruded_paper_figures_summary.json").exists()
 
 
+def test_geometry_panel_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("geometry_panel_demo.py")
+    summary = module.run_geometry_panel_demo(out_dir=tmp_path)
+    assert summary["case"] == "geometry_panel_demo"
+    assert (tmp_path / "geometry_gallery.png").exists()
+    assert (tmp_path / "geometry_panel_summary.json").exists()
+
+
+def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("pipe_reference_comparison_demo.py")
+    summary = module.run_pipe_reference_comparison_demo(
+        out_dir=tmp_path,
+        nr=4,
+        ntheta=16,
+        nx_stations=4,
+        max_steps=4,
+        coupling_iterations=4,
+        potential_iterations=16,
+    )
+    assert summary["geometry_kind"] == "pipe_ogrid"
+    assert summary["qualitative_only"] is True
+    assert (tmp_path / "pipe_reference_comparison.png").exists()
+    assert (tmp_path / "pipe_reference_comparison_summary.json").exists()
+
+
 def test_autodiff_fringing_design_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("autodiff_fringing_design_demo.py")
     summary = module.run_autodiff_fringing_design_demo(out_dir=tmp_path, steps=4)

@@ -43,8 +43,8 @@ The `1.0` ship gate is now closed on the fast release lane:
     fringing runs
   - direct `lmx run fringing_rect|fringing_pipe|fringing_layered` entry points
     now exist for quick 3D/fringing launches without authoring TOML first
-  - retained hard-gate validation now passes for rectangular ducts, layered
-    ducts, and mapped pipes
+  - retained hard-gate validation now passes for rectangular ducts and layered
+    ducts; mapped pipes remain exploratory on the current larger dataset
   - broader production-grade 3D validation and solver hardening remain
     post-`1.0` work
 
@@ -169,6 +169,14 @@ the same output tree.
 
 This is the intended preprocessing/postprocessing bridge for users who want to
 inspect the geometry and mesh before launching longer runs.
+
+For a single reviewer-facing panel with all shipped geometries, use:
+
+```bash
+python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
+```
+
+![LMX geometry panel](docs/_static/generated/geometry_gallery.png)
 
 For Python-native variable fields and custom geometry edits, use:
 
@@ -403,9 +411,18 @@ python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples
 ```
 
 The larger retained 3D validation campaign currently defaults to
-`rect_duct,layered_duct`. The mapped-pipe slice still passes the smaller hard
-gate, but it remains outside the larger retained campaign until the heavier
-pipe dataset is hardened further.
+`rect_duct,layered_duct`. The mapped-pipe slice is executable and useful for
+research/development, but it currently fails the heavier conservation gate and
+stays outside the retained publication set.
+
+For the current exploratory mapped-pipe comparison against the shipped external
+fringing-pipe profiles, use:
+
+```bash
+python examples/pipe_reference_comparison_demo.py --output artifacts/examples/pipe_reference_comparison
+```
+
+![LMX mapped-pipe exploratory comparison](docs/_static/generated/pipe_reference_comparison.png)
 
 ## User workflows
 

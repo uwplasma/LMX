@@ -36,6 +36,8 @@ python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_
 python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
 python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
+python examples/geometry_panel_demo.py --output ./artifacts/examples/geometry_panel
+python examples/pipe_reference_comparison_demo.py --output ./artifacts/examples/pipe_reference_comparison
 python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
 ```
 
@@ -134,7 +136,8 @@ That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
 `solve_extruded_inductionless(...)` entry point. Rectangular ducts, layered
 ducts, and mapped pipes all now use the same public path. The mapped-pipe lane
 is still best treated as exploratory on the larger retained validation set,
-even though the example surface is fully executable.
+even though the example surface is fully executable and now has a dedicated
+qualitative external-profile comparison script.
 
 The restart and validation campaign examples extend that same 3D lane:
 

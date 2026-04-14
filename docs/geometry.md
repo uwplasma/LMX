@@ -94,11 +94,13 @@ drivers in:
 
 - `examples/geometry_preview_demo.py`
 - `examples/variable_field_geometry_demo.py`
+- `examples/geometry_panel_demo.py`
 
 ```bash
 python examples/geometry_preview_demo.py --output artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
 python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
+python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
 ```
 
 Those drivers write:
@@ -110,6 +112,10 @@ Those drivers write:
 
 The preview path is intentionally cheap so it can be used as a preprocessing
 step before longer studies.
+
+Current shipped geometry panel:
+
+![LMX geometry panel](_static/generated/geometry_gallery.png)
 
 ## Mesh-resolution guidance
 
