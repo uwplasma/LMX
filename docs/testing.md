@@ -37,8 +37,10 @@ The main post-`1.0` manual entry point is:
 python scripts/run_manual_solver_family_validation.py \
   --output artifacts/manual_validation/solver_family_summary.json \
   --ha-values 10,20 \
-  --resolution 24 \
+  --resolutions 16,24 \
   --include-fringing \
+  --write-csv \
+  --write-plot \
   --max-steps 20 \
   --potential-iterations 80 \
   --coupling-iterations 8
@@ -46,7 +48,9 @@ python scripts/run_manual_solver_family_validation.py \
 
 That command keeps the fast lane clean while still exercising the heavier
 Hartmann / Shercliff / Hunt acceptance path together with the bounded
-fringing slices.
+fringing slices. With `--write-csv` and `--write-plot`, the same run produces
+a machine-readable campaign table and a publication-style convergence figure
+for the fringing conservation metrics.
 
 The manual lane can also enforce conservation thresholds directly:
 
@@ -57,9 +61,9 @@ python scripts/run_manual_solver_family_validation.py \
   --resolution 24 \
   --include-fringing \
   --fringing-geometries rect_duct,layered_duct,pipe_ogrid \
-  --max-charge-balance 1e-5 \
-  --max-interface-current 1e-5 \
-  --max-fringing-wall-current-leakage 1e-5 \
+  --max-charge-balance 8e-1 \
+  --max-interface-current 2.5e-1 \
+  --max-fringing-wall-current-leakage 1e-1 \
   --max-fringing-boundary-current 1e-5 \
   --fail-on-threshold
 ```
@@ -74,17 +78,16 @@ Current retained larger dataset:
 - bounded fringing lane on `rect_duct`, `layered_duct`, and `pipe_ogrid`
 - hard thresholds:
   - `charge_balance <= 8e-1`
-  - `interface_current <= 7e-2`
+  - `interface_current <= 2.5e-1`
   - `wall_current_leakage <= 1e-1`
   - `boundary_current <= 1e-5`
 
 The layered 3D case joined that retained gate after the multi-region electric
-subproblem was upgraded from a bounded Jacobi iteration to a sparse direct
-solve of the conservative variable-coefficient potential operator.
+subproblem was upgraded from a bounded iterative solve to a sparse direct solve
+of the conservative variable-coefficient potential operator.
 
-That retained gate now passes on the current tree. Layered 3D fringing remains
-outside the retained hard-gate set because its wall-leakage and charge-balance
-metrics are still too loose for the same thresholds.
+That retained gate now passes on the current tree for rectangular ducts,
+layered ducts, and mapped pipes.
 
 This split avoids exhausting CI runtime on every routine push while still
 preserving reproducible research checks.

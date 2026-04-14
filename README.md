@@ -87,10 +87,12 @@ lmx examples/hartmann_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx examples/fringing_rect_case.toml
+lmx examples/fringing_layered_case.toml
 lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
 lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
+lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
 lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
 XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
@@ -305,6 +307,7 @@ python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output artifacts/examples/fringing_benchmark_layered
 python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output artifacts/examples/fringing_benchmark_pipe
 lmx examples/fringing_rect_case.toml
+lmx examples/fringing_layered_case.toml
 lmx examples/fringing_pipe_case.toml
 ```
 
@@ -327,6 +330,11 @@ cross-sectional response metrics. Rectangular ducts, layered ducts, and mapped
 pipe O-grids now all go through the low-Re pressure-velocity-potential
 projection slice in the Python API, so the workflow is no longer limited to a
 single duct-only cross-section.
+
+The shipped 3D TOML inputs are now publication-scale templates rather than
+minimal smoke cases: they write station-history CSV files, NPZ bundles, JSON
+summaries, copied input files, and overview/conservation figures directly from
+`lmx input.toml`.
 
 ## User workflows
 

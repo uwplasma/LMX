@@ -92,8 +92,8 @@ def run_autodiff_extruded_target_demo(
 
     axes[1, 1].semilogy(x, np.maximum(np.asarray(target["charge_balance_residual"]), 1.0e-16), label="Charge balance", color="#7c3aed")
     axes[1, 1].semilogy(x, np.maximum(np.asarray(target["wall_current_leakage"]), 1.0e-16), label="Wall leakage", color="#dc2626", linestyle="--")
-    axes[1, 1].plot(x, np.asarray(target["axial_current"]), label="Axial current", color="#0891b2")
-    axes[1, 1].set_title("Extruded conservation observables")
+    axes[1, 1].plot(x, np.asarray(target["pressure_span"]), label="Pressure span", color="#0891b2")
+    axes[1, 1].set_title("Extruded conservation and pressure")
     axes[1, 1].set_xlabel("x")
     axes[1, 1].legend(frameon=False)
 
@@ -116,6 +116,8 @@ def run_autodiff_extruded_target_demo(
             "charge_balance_residual": np.asarray(target["charge_balance_residual"]).tolist(),
             "wall_current_leakage": np.asarray(target["wall_current_leakage"]).tolist(),
             "axial_current": np.asarray(target["axial_current"]).tolist(),
+            "pressure_span": np.asarray(target["pressure_span"]).tolist(),
+            "transverse_kinetic_energy": np.asarray(target["transverse_kinetic_energy"]).tolist(),
         },
         "recovered": {
             "model": recovered.get("model", "unknown"),
@@ -124,6 +126,8 @@ def run_autodiff_extruded_target_demo(
             "exit_center": recovered["exit_center"],
             "transition_width": recovered["transition_width"],
             "history": recovered["history"],
+            "pressure_span": np.asarray(recovered.get("recovered_pressure_span", [])).tolist(),
+            "transverse_kinetic_energy": np.asarray(recovered.get("recovered_transverse_kinetic_energy", [])).tolist(),
         },
         "plots": [png_path.name, pdf_path.name],
     }

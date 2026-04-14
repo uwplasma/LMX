@@ -370,6 +370,7 @@ def write_extruded_solution_outputs(
     out_dir: str | Path,
     *,
     write_npz: bool = True,
+    write_plots: bool = False,
 ) -> dict[str, list[Path]]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -400,4 +401,8 @@ def write_extruded_solution_outputs(
     payload["csv"].append(station_csv)
     if write_npz and case.output.write_npz:
         payload["npz"] = [write_extruded_solution_npz(solution, case, out_dir / f"{case.name}_extruded_results.npz")]
+    if write_plots and case.output.write_plots:
+        from .plotting import write_extruded_overview_plots
+
+        payload["plots"] = write_extruded_overview_plots(solution, out_dir, case_title=case.name)
     return payload

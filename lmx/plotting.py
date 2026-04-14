@@ -480,6 +480,89 @@ def write_geometry_preview_plots(
     return [png_path, pdf_path]
 
 
+def _centers_to_edges(values: np.ndarray) -> np.ndarray:
+    if values.size <= 1:
+        delta = 0.5
+        return np.asarray([values[0] - delta, values[0] + delta], dtype=float)
+    midpoints = 0.5 * (values[1:] + values[:-1])
+    first = values[0] - 0.5 * (values[1] - values[0])
+    last = values[-1] + 0.5 * (values[-1] - values[-2])
+    return np.concatenate([[first], midpoints, [last]])
+
+
+def write_extruded_overview_plots(
+    solution,
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_publication_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    bundle = solution.bundle
+    validation = solution.validation
+    x = np.asarray(bundle.x, dtype=float)
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    charge_balance = np.maximum(np.asarray(bundle.charge_balance_residual, dtype=float), 1.0e-16)
+    boundary_current = np.maximum(np.asarray(bundle.boundary_current_residual, dtype=float), 1.0e-16)
+    wall_leakage = np.maximum(np.asarray(bundle.wall_current_leakage, dtype=float), 1.0e-16)
+    axial_current = np.asarray(bundle.axial_current, dtype=float)
+
+    peak_index = int(np.argmax(np.abs(field_scale))) if field_scale.size else 0
+    y = np.asarray(bundle.y, dtype=float)
+    z = np.asarray(bundle.z, dtype=float)
+    y_edges = _centers_to_edges(y)
+    z_edges = _centers_to_edges(z)
+    coord_x_label = "r" if bundle.geometry_kind == "pipe_ogrid" else "y"
+    coord_y_label = r"$\\theta$" if bundle.geometry_kind == "pipe_ogrid" else "z"
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 8.5), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    axes[0, 0].plot(x, mean_velocity, color="#0f766e", label="Mean velocity")
+    axes[0, 0].plot(x, current_proxy, color="#b45309", linestyle="--", label="Current proxy")
+    axes[0, 0].plot(x, field_scale, color="#1d4ed8", alpha=0.7, label="Field scale")
+    axes[0, 0].set_title("Station response")
+    axes[0, 0].set_xlabel("x")
+    axes[0, 0].legend()
+
+    axes[0, 1].semilogy(x, charge_balance, color="#7c3aed", label="Charge balance")
+    axes[0, 1].semilogy(x, wall_leakage, color="#dc2626", linestyle="--", label="Wall leakage")
+    axes[0, 1].semilogy(x, boundary_current, color="#0891b2", linestyle=":", label="Boundary residual")
+    axes[0, 1].plot(x, np.maximum(np.abs(axial_current), 1.0e-16), color="#111827", alpha=0.6, label="|Axial current|")
+    axes[0, 1].set_title(
+        "Conservation audit\n"
+        f"max|div J|={validation.max_charge_balance_residual:.2e}, "
+        f"net boundary={validation.net_boundary_current_residual:.2e}"
+    )
+    axes[0, 1].set_xlabel("x")
+    axes[0, 1].legend()
+
+    u_station = np.asarray(bundle.u[peak_index], dtype=float)
+    phi_station = np.asarray(bundle.phi[peak_index], dtype=float)
+    u_im = axes[1, 0].pcolormesh(z_edges, y_edges, u_station, shading="auto", cmap="RdBu_r")
+    plt.colorbar(u_im, ax=axes[1, 0], fraction=0.046, pad=0.04)
+    axes[1, 0].set_title(f"u at peak field station (x={x[peak_index]:.2f})")
+    axes[1, 0].set_xlabel(coord_y_label)
+    axes[1, 0].set_ylabel(coord_x_label)
+
+    phi_im = axes[1, 1].pcolormesh(z_edges, y_edges, phi_station, shading="auto", cmap="PuOr_r")
+    plt.colorbar(phi_im, ax=axes[1, 1], fraction=0.046, pad=0.04)
+    axes[1, 1].set_title("Electric potential at peak field station")
+    axes[1, 1].set_xlabel(coord_y_label)
+    axes[1, 1].set_ylabel(coord_x_label)
+
+    png_path = out_dir / "extruded_overview.png"
+    pdf_path = out_dir / "extruded_overview.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
 def write_strong_scaling_plots(
     records: list[dict[str, object]],
     out_dir: str | Path,

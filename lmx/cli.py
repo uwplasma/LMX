@@ -270,6 +270,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
             case,
             out_dir,
             write_npz=getattr(case.output, "write_npz", True),
+            write_plots=getattr(case.output, "write_plots", False),
         )
         if log_path is not None:
             outputs.setdefault("log", []).append(log_path)
@@ -505,6 +506,7 @@ def main(argv: list[str] | None = None) -> int:
             case,
             out_dir,
             write_npz=getattr(case.output, "write_npz", True),
+            write_plots=getattr(case.output, "write_plots", False),
         )
         summary = _runtime_summary_extruded(solution, case, out_dir, outputs)
         summary_path = _write_run_summary(summary, case, out_dir)

@@ -242,6 +242,7 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
             **case.__dict__,
             "name": "fringing_rect_demo",
             "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "output": case.output.__class__(**{**case.output.__dict__, "write_plots": True}),
         }
     )
     bundle = SimpleNamespace(
@@ -267,6 +268,9 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
         current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
+        boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
+        geometry_kind="rect_duct",
+        solver_kind="extruded_inductionless",
     )
     validation = SimpleNamespace(
         station_count=3,
@@ -311,11 +315,12 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
     )
 
     npz_path = write_extruded_solution_npz(solution, case, tmp_path / "fringing_results.npz")
-    outputs = write_extruded_solution_outputs(solution, case, tmp_path)
+    outputs = write_extruded_solution_outputs(solution, case, tmp_path, write_plots=True)
 
     assert npz_path.exists()
     assert outputs["csv"][0].exists()
     assert outputs["npz"][0].exists()
+    assert outputs["plots"][0].exists()
     with np.load(npz_path, allow_pickle=False) as data:
         assert data["u"].shape == (3, 2, 2)
         assert data["validation_station_count"] == pytest.approx(3)

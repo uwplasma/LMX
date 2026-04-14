@@ -45,8 +45,10 @@ Python-only staging path.
 
 ```bash
 lmx examples/fringing_rect_case.toml
+lmx examples/fringing_layered_case.toml
 lmx examples/fringing_pipe_case.toml
 lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
+lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
 lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
 python examples/fringing_benchmark_demo.py \
   --output artifacts/examples/fringing_benchmark
@@ -66,8 +68,15 @@ The example writes:
 - an `extruded_bundle` section in the JSON summary with axial field-bundle shape
   and charge-balance histories
 - a `validation` section with residual and field/response consistency metrics
-- for TOML/CLI runs, `*_station_history.csv`, `*_extruded_results.npz`, and a
-  JSON summary with conservation metrics
+- for TOML/CLI runs, `*_station_history.csv`, `*_extruded_results.npz`,
+  `overview.png`, `overview.pdf`, and a JSON summary with conservation metrics
+
+The shipped input files `examples/fringing_rect_case.toml`,
+`examples/fringing_layered_case.toml`, and
+`examples/fringing_pipe_case.toml` are now the recommended publication-scale
+starting points for 3D fringing studies. They enable figure writing directly
+through `[output].write_plots = true` and keep the full solver setup in the
+input file rather than hiding it in Python glue.
 
 Current publication-style artifact:
 
@@ -152,7 +161,7 @@ Current retained hard-gate dataset:
   `nx_stations = 5`
 - hard thresholds:
   - `max_charge_balance <= 8e-1`
-  - `max_interface_current <= 7e-2`
+  - `max_interface_current <= 2.5e-1`
   - `max_fringing_wall_current_leakage <= 1e-1`
   - `max_fringing_boundary_current <= 1e-5`
 

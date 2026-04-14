@@ -57,7 +57,7 @@ write_paraview = false
 write_csv_profiles = true
 write_npz = true
 write_json_summary = true
-write_plots = false
+write_plots = true
 copy_input_file = true
 write_stride = 1
 

@@ -42,16 +42,21 @@ lmx examples/hartmann_restart_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx examples/fringing_rect_case.toml
+lmx examples/fringing_layered_case.toml
 lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
 lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
+lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
 lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
 ```
 
 The example TOML files expose both `verbose = true|false` and
 `verbosity = "quiet" | "normal" | "detailed" | "debug"` in their `[logging]`
 block, so they double as templates for both batch and interactive runs.
+The fringing TOML files now also enable `write_plots = true`, so a plain
+`lmx input.toml` run produces the station-history CSV, NPZ bundle, JSON
+summary, and publication-style overview plots without any Python wrapper.
 
 ## Replot saved NPZ outputs
 

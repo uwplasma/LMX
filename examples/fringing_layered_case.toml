@@ -1,23 +1,27 @@
 [case]
-name = "fringing_rect_toml"
+name = "fringing_layered_toml"
 forcing = 1.0
 initial_velocity = 0.0
 reference_pressure_gradient = -1.0
-reference_phi_cell = [0, 0]
-notes = "Explicit 3D rectangular fringing-field example for `lmx input.toml`."
+reference_phi_cell = [1, 1]
+notes = "Explicit 3D layered-duct fringing-field example for `lmx input.toml`."
 
 [geometry]
-kind = "rect_duct"
+kind = "layered_duct"
 width = 2.0
 height = 2.0
 length = 6.0
 nx = 7
 ny = 8
 nz = 8
+wall_thickness = [0.1, 0.1, 0.1, 0.1]
+wall_cells = [1, 1, 1, 1]
+target_ha = 10.0
+target_side_layer = 4.47213595499958
 
 [magnetic_field]
 kind = "constant"
-value = [0.0, 0.0, 8.0]
+value = [0.0, 0.0, 10.0]
 ramp_start = 0.0
 ramp_duration = 0.0
 
@@ -49,7 +53,7 @@ steady_tolerance = 1.0e-6
 checkpoint_stride = 1
 
 [output]
-directory = "../artifacts/examples/toml_fringing_rect"
+directory = "../artifacts/examples/toml_fringing_layered"
 write_paraview = false
 write_csv_profiles = true
 write_npz = true
@@ -76,26 +80,46 @@ conductivity = 1.0
 density = 1.0
 viscosity = 0.05
 
-[[boundary_conditions]]
-name = "y_min_wall"
-kind = "no_slip"
-axis = "y"
-side = "min"
+[[regions]]
+name = "conducting_wall"
+kind = "solid"
+conductivity = 0.5
+density = 1.0
+viscosity = 0.05
+wall_thickness = 0.1
+
+[[regions]]
+name = "insulating_wall"
+kind = "solid"
+conductivity = 1.0e-12
+density = 1.0
+viscosity = 0.05
+wall_thickness = 0.1
 
 [[boundary_conditions]]
-name = "y_max_wall"
-kind = "no_slip"
-axis = "y"
-side = "max"
-
-[[boundary_conditions]]
-name = "z_min_wall"
+name = "left_wall"
 kind = "insulating"
-axis = "z"
-side = "min"
+axis = "y"
+side = "left"
+region = "insulating_wall"
 
 [[boundary_conditions]]
-name = "z_max_wall"
+name = "right_wall"
 kind = "insulating"
+axis = "y"
+side = "right"
+region = "insulating_wall"
+
+[[boundary_conditions]]
+name = "bottom_wall"
+kind = "conducting_wall"
 axis = "z"
-side = "max"
+side = "bottom"
+region = "conducting_wall"
+
+[[boundary_conditions]]
+name = "top_wall"
+kind = "conducting_wall"
+axis = "z"
+side = "top"
+region = "conducting_wall"

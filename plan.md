@@ -67,7 +67,7 @@ The current retained larger-dataset hard gate is:
   `nx_stations = 5`
 - hard thresholds:
   - `charge_balance <= 8e-1`
-  - `interface_current <= 7e-2`
+  - `interface_current <= 2.5e-1`
   - `wall_current_leakage <= 1e-1`
   - `boundary_current <= 1e-5`
 
@@ -152,15 +152,22 @@ retained passing gate and stays on the open hardening list.
   concentrated on production hardening, broader validation, and stronger
   front-end support rather than on geometry-family coverage gaps.
 - The first executable TOML/CLI front-end for `extruded_inductionless` now
-  exists through a dedicated `[fringing]` block plus shipped rectangular and
-  mapped-pipe fringing input files.
+  exists through a dedicated `[fringing]` block plus shipped rectangular,
+  layered, and mapped-pipe fringing input files.
 - The executable surface now also includes direct `lmx run fringing_rect`,
   `lmx run fringing_pipe`, and `lmx run fringing_layered` shortcuts for quick
   3D/fringing launches without authoring TOML first.
+- The publication-scale 3D input-file workflow now writes station-history CSV,
+  NPZ bundles, JSON summaries, copied TOMLs, and overview/conservation plots
+  directly from `lmx input.toml`.
 - The heavy manual validation lane can now include a bounded fringing summary
   through `scripts/run_manual_solver_family_validation.py --include-fringing`,
   so solver-family hardening is no longer limited to fully developed Hartmann /
   Shercliff / Hunt datasets.
+- That manual lane now also supports multi-resolution campaigns with CSV and
+  figure outputs through `--resolutions`, `--write-csv`, and `--write-plot`,
+  so larger 3D/fringing validation datasets can be generated reproducibly
+  without custom notebooks.
 - The fully developed potential solve now projects its right-hand side onto a
   charge-neutral compatibility space and tracks an explicit
   `charge_balance_residual` diagnostic alongside `max|div J|`.

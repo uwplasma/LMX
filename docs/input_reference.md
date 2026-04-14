@@ -246,6 +246,9 @@ side = "max"
 - `write_npz`
 - `write_json_summary`
 - `write_plots`
+  - for `extruded_inductionless`, writes `overview.png` / `overview.pdf`
+    summarizing station response, conservation histories, and peak-field
+    cross-sections
 - `copy_input_file`
 - `write_stride`
 

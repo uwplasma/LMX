@@ -105,15 +105,16 @@ def test_cli_run_branch_dispatches_extruded_case(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(
         cli,
         "write_extruded_solution_outputs",
-        lambda solved, built_case, out_dir, write_npz: recorded.update(out_dir=Path(out_dir), write_npz=write_npz)
+        lambda solved, built_case, out_dir, write_npz, write_plots=False: recorded.update(out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots)
         or {"csv": [Path(out_dir) / "stations.csv"], "npz": [Path(out_dir) / "bundle.npz"], "plots": []},
     )
 
-    exit_code = cli.main(["run", "fringing_rect", "--output", str(output_dir), "--nx-stations", "5"])
+    exit_code = cli.main(["run", "fringing_rect", "--output", str(output_dir), "--nx-stations", "5", "--plots"])
 
     assert exit_code == 0
     assert recorded["out_dir"] == output_dir
     assert recorded["write_npz"] is True
+    assert recorded["write_plots"] is True
     assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
 
 
@@ -240,7 +241,7 @@ def test_run_config_dispatches_extruded_solver_kind(tmp_path: Path, monkeypatch:
     monkeypatch.setattr(
         cli,
         "write_extruded_solution_outputs",
-        lambda solved, built_case, out_dir, write_npz: recorded.update(out_dir=Path(out_dir), write_npz=write_npz)
+        lambda solved, built_case, out_dir, write_npz, write_plots=False: recorded.update(out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots)
         or {"csv": [Path(out_dir) / "stations.csv"], "npz": [Path(out_dir) / "bundle.npz"], "plots": []},
     )
 
