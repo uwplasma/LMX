@@ -239,6 +239,11 @@ def load_run_config(path: str | Path) -> RunConfig:
         coupling_iterations=int(solver_table.get("coupling_iterations", 12)),
         coupling_tolerance=float(solver_table.get("coupling_tolerance", 1e-8)),
     )
+    if solver.kind == "reduced_inductionless":
+        raise ValueError(
+            "solver.kind='reduced_inductionless' is no longer supported; "
+            "use 'fully_developed_inductionless' or 'extruded_inductionless'"
+        )
 
     output_dir = output_table.get("directory")
     if output_dir is not None:

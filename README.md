@@ -30,9 +30,6 @@ The `1.0` ship gate is now closed on the fast release lane:
   - default solver for `rect_duct` and `layered_duct`
   - steady and transient streamwise-velocity / electric-potential solves
   - research path for Hartmann, Shercliff, and Hunt cases
-- `reduced_inductionless`
-  - reduced-model alternative for lightweight sweeps, regression checks, and
-    side-by-side method studies
 - `extruded_inductionless`
   - staged next solver family for 3D/fringing-field work
   - current repo ships a first rectangular-duct low-Re 3D projection slice

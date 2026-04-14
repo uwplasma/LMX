@@ -76,7 +76,7 @@ That retained gate now passes for all three retained fringing geometries.
 ## Current status
 
 - The default duct solver family is now `fully_developed_inductionless`.
-- The historical reduced solver is retained only for regression.
+- The historical reduced solver has been removed from the shipped codebase.
 - Runtime diagnostics now include linear residuals, flow rate, current,
   Lorentz power, and conservation signals.
 - The logging surface now has a documented boolean `verbose` alias and explicit

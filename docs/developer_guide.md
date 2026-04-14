@@ -40,12 +40,6 @@ This is the default research path.
   - Shercliff
   - Hunt
 
-### `reduced_inductionless`
-
-Retained for lightweight comparative studies and regression support. It remains
-part of the public surface, but it is not the primary path for new benchmark
-results.
-
 ### `extruded_inductionless`
 
 Planned 3D/fringing-field solver family.

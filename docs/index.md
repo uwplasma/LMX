@@ -64,8 +64,6 @@ developer_guide
 
 - `fully_developed_inductionless`
   - the default duct solver family
-- `reduced_inductionless`
-  - the reduced-model alternative retained for comparative studies
 - structured `rect_duct` and `layered_duct` cross-sections
 - mapped `pipe_ogrid` geometry/preview tooling
 - strong-scaling kernel benchmarks

@@ -100,23 +100,6 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     assert ha1000.solver.kind == "fully_developed_inductionless"
 
 
-def test_reduced_inductionless_solver_path_remains_selectable(monkeypatch: pytest.MonkeyPatch):
-    case = replace(
-        make_hartmann_case(ha=5.0, ny=8, nz=8),
-        solver=replace(make_hartmann_case(ha=5.0, ny=8, nz=8).solver, kind="reduced_inductionless"),
-    )
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
-
-    def fake_step(**kwargs):
-        u = kwargs["u"] + 0.25
-        zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0
-
-    monkeypatch.setattr(solvers, "_step", fake_step)
-    solution = solve_steady(case)
-    assert float(jnp.max(solution.state.u)) > 0.0
-
-
 def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
     case = make_hunt_case(
         ha=20.0,
@@ -241,183 +224,6 @@ def test_transient_restart_can_append_diagnostics(tmp_path: Path, monkeypatch: p
     assert resumed.diagnostics.time_history.shape[0] == 4
     assert float(resumed.diagnostics.time_history[0]) == pytest.approx(0.01)
     assert float(resumed.diagnostics.time_history[-1]) == pytest.approx(0.04)
-
-
-def test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
-    zeros = jnp.zeros(mesh.yz_shape)
-    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
-
-    undriven = solvers._step(
-        u=zeros,
-        mesh=mesh,
-        sigma=jnp.zeros(mesh.yz_shape),
-        rho=jnp.ones(mesh.yz_shape),
-        nu=jnp.zeros(mesh.yz_shape),
-        fluid_mask=fluid_mask,
-        by=zeros,
-        bz=zeros,
-        dt=0.1,
-        forcing=0.0,
-        target_mean_velocity=None,
-        reference_mean_velocity=None,
-        anchor=(0, 0),
-        outer_iterations=1,
-        potential_iterations=1,
-        potential_tolerance=None,
-        potential_relaxation=1.0,
-        potential_solver="jacobi",
-        relaxation=1.0,
-        velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
-        current_reconstruction="cell_centered",
-        post_update_potential_refresh=False,
-        interpolate_direct_fluid_walls=False,
-    )[0]
-    driven = solvers._step(
-        u=zeros,
-        mesh=mesh,
-        sigma=jnp.zeros(mesh.yz_shape),
-        rho=jnp.ones(mesh.yz_shape),
-        nu=jnp.zeros(mesh.yz_shape),
-        fluid_mask=fluid_mask,
-        by=zeros,
-        bz=zeros,
-        dt=0.1,
-        forcing=0.0,
-        target_mean_velocity=0.25,
-        reference_mean_velocity=0.25,
-        anchor=(0, 0),
-        outer_iterations=1,
-        potential_iterations=1,
-        potential_tolerance=None,
-        potential_relaxation=1.0,
-        potential_solver="jacobi",
-        relaxation=1.0,
-        velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
-        current_reconstruction="cell_centered",
-        post_update_potential_refresh=False,
-        interpolate_direct_fluid_walls=False,
-    )[0]
-
-    assert float(jnp.mean(undriven)) == pytest.approx(0.0)
-    assert float(jnp.mean(driven)) > 0.0
-    assert float(jnp.max(driven[1:-1, 1:-1])) > 0.0
-
-
-def test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh():
-    mesh = generate_layered_duct_mesh(
-        width=2.0,
-        height=2.0,
-        ny=4,
-        nz=4,
-        wall_thickness=(0.2, 0.2, 0.0, 0.0),
-        wall_cells=(1, 1, 0, 0),
-        target_ha=20.0,
-    )
-    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
-    sigma = jnp.zeros(mesh.yz_shape)
-    y_index = jnp.arange(mesh.yz_shape[0], dtype=jnp.float32)[:, None]
-    z_index = jnp.arange(mesh.yz_shape[1], dtype=jnp.float32)[None, :]
-    rho = 1.0 + 0.25 * y_index + 0.5 * z_index
-    nu = jnp.zeros(mesh.yz_shape)
-    zeros = jnp.zeros(mesh.yz_shape)
-    u = jnp.zeros(mesh.yz_shape)
-
-    _, _, _, _, _, _, _, _, _, _, _, mean_velocity, applied_forcing, _, _, _, _ = solvers._step(
-        u=u,
-        mesh=mesh,
-        sigma=sigma,
-        rho=rho,
-        nu=nu,
-        fluid_mask=fluid_mask,
-        by=zeros,
-        bz=zeros,
-        dt=0.1,
-        forcing=0.0,
-        target_mean_velocity=0.25,
-        reference_mean_velocity=0.25,
-        anchor=(0, 0),
-        outer_iterations=1,
-        potential_iterations=1,
-        potential_tolerance=None,
-        potential_relaxation=1.0,
-        potential_solver="jacobi",
-        relaxation=1.0,
-        velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
-        current_reconstruction="cell_centered",
-        post_update_potential_refresh=False,
-        interpolate_direct_fluid_walls=False,
-    )
-
-    active_mask = solvers._active_velocity_mask(fluid_mask)
-    cell_metric = solvers._cell_metric(mesh)
-    weighted_area = float(jnp.sum(jnp.where(fluid_mask, cell_metric, 0.0)))
-    pressure_sensitivity = 0.1 / rho
-    weighted_sensitivity = float(jnp.sum(jnp.where(fluid_mask, cell_metric * pressure_sensitivity, 0.0)) / weighted_area)
-    active_count = float(jnp.sum(active_mask.astype(jnp.float32)))
-    simple_sensitivity = float(jnp.sum(jnp.where(active_mask, pressure_sensitivity, 0.0)) / active_count)
-
-    assert float(applied_forcing) == pytest.approx(0.25 / weighted_sensitivity)
-    assert float(applied_forcing) != pytest.approx(0.25 / simple_sensitivity)
-    assert float(mean_velocity) > 0.0
-
-
-def test_dynamic_inlet_drive_uses_full_fluid_area_for_flow_rate_control():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
-    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
-    sigma = jnp.zeros(mesh.yz_shape)
-    y_index = jnp.arange(mesh.yz_shape[0], dtype=jnp.float32)[:, None]
-    z_index = jnp.arange(mesh.yz_shape[1], dtype=jnp.float32)[None, :]
-    rho = 1.0 + 0.2 * y_index + 0.1 * z_index
-    nu = jnp.zeros(mesh.yz_shape)
-    zeros = jnp.zeros(mesh.yz_shape)
-    u = jnp.zeros(mesh.yz_shape)
-
-    _, _, _, _, _, _, _, _, _, _, _, mean_velocity, applied_forcing, _, _, _, _ = solvers._step(
-        u=u,
-        mesh=mesh,
-        sigma=sigma,
-        rho=rho,
-        nu=nu,
-        fluid_mask=fluid_mask,
-        by=zeros,
-        bz=zeros,
-        dt=0.1,
-        forcing=0.0,
-        target_mean_velocity=0.25,
-        reference_mean_velocity=0.25,
-        anchor=(0, 0),
-        outer_iterations=1,
-        potential_iterations=1,
-        potential_tolerance=None,
-        potential_relaxation=1.0,
-        potential_solver="jacobi",
-        relaxation=1.0,
-        velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
-        current_reconstruction="cell_centered",
-        post_update_potential_refresh=False,
-        interpolate_direct_fluid_walls=False,
-    )
-
-    active_mask = solvers._active_velocity_mask(fluid_mask)
-    cell_metric = solvers._cell_metric(mesh)
-    pressure_sensitivity = 0.1 / rho
-    fluid_weighted_sensitivity = float(
-        jnp.sum(jnp.where(fluid_mask, cell_metric * pressure_sensitivity, 0.0))
-        / jnp.sum(jnp.where(fluid_mask, cell_metric, 0.0))
-    )
-    active_weighted_sensitivity = float(
-        jnp.sum(jnp.where(active_mask, cell_metric * pressure_sensitivity, 0.0))
-        / jnp.sum(jnp.where(active_mask, cell_metric, 0.0))
-    )
-
-    assert float(applied_forcing) == pytest.approx(0.25 / fluid_weighted_sensitivity)
-    assert float(applied_forcing) != pytest.approx(0.25 / active_weighted_sensitivity)
-    assert float(mean_velocity) > 0.0
 
 
 def test_target_mean_velocity_only_uses_inlet_flow_rate():
@@ -588,110 +394,6 @@ def test_current_reconstruction_modes_and_face_diagnostics_are_finite():
     assert float(face_lorentz_max) >= 0.0
 
 
-def test_post_update_potential_refresh_recomputes_electromagnetic_state(monkeypatch: pytest.MonkeyPatch):
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
-    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
-    sigma = jnp.ones(mesh.yz_shape)
-    rho = jnp.ones(mesh.yz_shape)
-    nu = jnp.zeros(mesh.yz_shape)
-    by = jnp.zeros(mesh.yz_shape)
-    bz = jnp.ones(mesh.yz_shape)
-    u = jnp.full(mesh.yz_shape, 0.25)
-
-    def fake_solve_potential(*args, **kwargs):
-        u_arg = args[3]
-        phi_value = jnp.mean(u_arg) + 1.0
-        return (
-            jnp.full_like(u_arg, phi_value),
-            jnp.asarray(phi_value * 0.1),
-            jnp.asarray(1, dtype=jnp.int32),
-            jnp.asarray(phi_value * 0.2),
-        )
-
-    def fake_compute_current_and_lorentz(*args, **kwargs):
-        phi_arg = args[4]
-        phi_value = jnp.mean(phi_arg)
-        return (
-            jnp.full_like(phi_arg, phi_value + 10.0),
-            jnp.full_like(phi_arg, phi_value + 20.0),
-            jnp.full_like(phi_arg, phi_value + 30.0),
-        )
-
-    def fake_face_current_emf_and_lorentz_max(*args, **kwargs):
-        phi_arg = args[4]
-        phi_value = jnp.mean(phi_arg)
-        return (
-            jnp.asarray(phi_value + 40.0),
-            jnp.asarray(phi_value + 50.0),
-            jnp.asarray(phi_value + 60.0),
-        )
-
-    monkeypatch.setattr(solvers, "_solve_potential", fake_solve_potential)
-    monkeypatch.setattr(solvers, "_compute_current_and_lorentz", fake_compute_current_and_lorentz)
-    monkeypatch.setattr(solvers, "_face_current_emf_and_lorentz_max", fake_face_current_emf_and_lorentz_max)
-
-    disabled = solvers._step(
-        u=u,
-        mesh=mesh,
-        sigma=sigma,
-        rho=rho,
-        nu=nu,
-        fluid_mask=fluid_mask,
-        by=by,
-        bz=bz,
-        dt=0.1,
-        forcing=0.0,
-        target_mean_velocity=None,
-        reference_mean_velocity=None,
-        anchor=(0, 0),
-        outer_iterations=1,
-        potential_iterations=1,
-        potential_tolerance=None,
-        potential_relaxation=1.0,
-        potential_solver="jacobi",
-        relaxation=1.0,
-        velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
-        current_reconstruction="cell_centered",
-        post_update_potential_refresh=False,
-        interpolate_direct_fluid_walls=False,
-    )
-
-    enabled = solvers._step(
-        u=u,
-        mesh=mesh,
-        sigma=sigma,
-        rho=rho,
-        nu=nu,
-        fluid_mask=fluid_mask,
-        by=by,
-        bz=bz,
-        dt=0.1,
-        forcing=0.0,
-        target_mean_velocity=None,
-        reference_mean_velocity=None,
-        anchor=(0, 0),
-        outer_iterations=1,
-        potential_iterations=1,
-        potential_tolerance=None,
-        potential_relaxation=1.0,
-        potential_solver="jacobi",
-        relaxation=1.0,
-        velocity_update_limit=10.0,
-        velocity_update_limiter="global_scale",
-        current_reconstruction="cell_centered",
-        post_update_potential_refresh=True,
-        interpolate_direct_fluid_walls=False,
-    )
-
-    assert float(jnp.max(jnp.abs(enabled[0] - u))) > 0.0
-    assert float(enabled[1][0, 0]) == pytest.approx(float(jnp.mean(enabled[0])) + 1.0)
-    assert float(disabled[2][0, 0]) == pytest.approx(float(disabled[1][0, 0]) + 10.0)
-    assert float(enabled[2][0, 0]) == pytest.approx(float(enabled[1][0, 0]) + 10.0)
-    assert float(disabled[4][0, 0]) == pytest.approx(float(disabled[1][0, 0]) + 30.0)
-    assert float(enabled[4][0, 0]) == pytest.approx(float(enabled[1][0, 0]) + 30.0)
-
-
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():
     hartmann = make_hartmann_case(ha=5.0, ny=6, nz=6)
     hunt = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
@@ -793,70 +495,6 @@ def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
     assert emf_z[3, 4] == pytest.approx(float(expected))
 
 
-def test_solve_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        solver=replace(case.solver, kind="reduced_inductionless"),
-        time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4),
-    )
-    residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
-
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
-
-    def fake_step(**kwargs):
-        residual = next(residuals)
-        u = kwargs["u"]
-        zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, residual, 1.0e-3, 25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0
-
-    monkeypatch.setattr(solvers, "_step", fake_step)
-    solution = solve_steady(case)
-
-    assert solution.diagnostics.time_history.shape[0] == 3
-    assert solution.diagnostics.u_max_history.shape[0] == 3
-    assert solution.diagnostics.mean_velocity_history.shape[0] == 3
-    assert solution.diagnostics.applied_forcing_history.shape[0] == 3
-    assert solution.diagnostics.pressure_proxy_history.shape[0] == 3
-    assert solution.diagnostics.current_scaled_pressure_proxy_history.shape[0] == 3
-    assert solution.diagnostics.residual_history.shape[0] == 3
-    assert solution.diagnostics.potential_residual_history.shape[0] == 3
-    assert solution.diagnostics.potential_iterations_history.shape[0] == 3
-    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
-    assert solution.state.residual == pytest.approx(1.0e-5)
-
-
-def test_solve_steady_respects_max_steps_when_tolerance_not_reached(monkeypatch: pytest.MonkeyPatch):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        solver=replace(case.solver, kind="reduced_inductionless"),
-        time_stepper=replace(case.time_stepper, max_steps=2, steady_tolerance=1e-8),
-    )
-
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
-
-    def fake_step(**kwargs):
-        u = kwargs["u"]
-        zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, 1.0e-2, 1.0e-3, 50, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0
-
-    monkeypatch.setattr(solvers, "_step", fake_step)
-    solution = solve_steady(case)
-
-    assert solution.diagnostics.time_history.shape[0] == 2
-    assert solution.diagnostics.u_max_history.shape[0] == 2
-    assert solution.diagnostics.mean_velocity_history.shape[0] == 2
-    assert solution.diagnostics.applied_forcing_history.shape[0] == 2
-    assert solution.diagnostics.pressure_proxy_history.shape[0] == 2
-    assert solution.diagnostics.current_scaled_pressure_proxy_history.shape[0] == 2
-    assert solution.diagnostics.residual_history.shape[0] == 2
-    assert solution.diagnostics.potential_residual_history.shape[0] == 2
-    assert solution.diagnostics.potential_iterations_history.shape[0] == 2
-    assert solution.state.time == pytest.approx(2 * case.time_stepper.dt)
-    assert solution.state.residual == pytest.approx(1.0e-2)
-
-
 def test_solve_steady_respects_t_final_when_tolerance_not_reached(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(
@@ -881,37 +519,6 @@ def test_bounded_time_step_count_does_not_round_up_fractional_end_times():
     assert solvers._bounded_time_step_count(start_time=0.0, dt=0.002, t_final=0.011, max_steps=200) == 5
     assert solvers._bounded_time_step_count(start_time=0.004, dt=0.002, t_final=0.011, max_steps=200) == 3
     assert solvers._bounded_time_step_count(start_time=0.0, dt=0.02, t_final=0.01, max_steps=200) == 0
-
-
-def test_solve_steady_can_require_potential_residual_convergence(monkeypatch: pytest.MonkeyPatch):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        solver=replace(case.solver, kind="reduced_inductionless"),
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=5,
-            steady_tolerance=1e-4,
-            steady_potential_tolerance=5e-4,
-        ),
-    )
-    residuals = iter([1.0e-3, 1.0e-5, 1.0e-5, 1.0e-6])
-    potential_residuals = iter([1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5])
-
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
-
-    def fake_step(**kwargs):
-        u = kwargs["u"]
-        zeros = jnp.zeros_like(u)
-        return u, zeros, zeros, zeros, zeros, next(residuals), next(potential_residuals), 20, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0
-
-    monkeypatch.setattr(solvers, "_step", fake_step)
-    solution = solve_steady(case)
-
-    assert solution.diagnostics.residual_history.shape[0] == 3
-    assert solution.diagnostics.potential_residual_history.shape[0] == 3
-    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
-    assert solution.state.residual == pytest.approx(1.0e-5)
 
 
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
@@ -1099,16 +706,12 @@ for _unit_test_name in (
     "test_hunt_solver_keeps_solid_velocity_zero",
     "test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned",
     "test_hunt_case_uses_ha_aware_coupling_controls",
-    "test_reduced_inductionless_solver_path_remains_selectable",
     "test_hunt_case_derives_wall_conductivity_from_conductance_ratio",
     "test_hunt_case_adds_explicit_insulating_side_wall_region",
     "test_hunt_case_allows_explicit_wall_conductivity_override",
     "test_hunt_inlet_flow_rate_boundary_drives_short_transient",
     "test_transient_restart_matches_direct_run",
     "test_transient_restart_can_append_diagnostics",
-    "test_dynamic_inlet_drive_adds_pressure_gradient_when_explicit_forcing_is_zero",
-    "test_dynamic_inlet_drive_uses_area_weighted_mean_velocity_on_nonuniform_mesh",
-    "test_dynamic_inlet_drive_uses_full_fluid_area_for_flow_rate_control",
     "test_target_mean_velocity_only_uses_inlet_flow_rate",
     "test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity",
     "test_active_velocity_mask_excludes_enforced_outer_boundary_cells",
@@ -1118,15 +721,11 @@ for _unit_test_name in (
     "test_shercliff_solution_stays_finite_and_zero_at_walls",
     "test_potential_solver_backends_return_finite_fields_on_small_system",
     "test_current_reconstruction_modes_and_face_diagnostics_are_finite",
-    "test_post_update_potential_refresh_recomputes_electromagnetic_state",
     "test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases",
     "test_build_material_fields_assigns_hunt_side_and_hartmann_wall_regions",
     "test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting",
     "test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid",
     "test_face_emf_uses_distance_weighted_nonuniform_interface_source",
-    "test_solve_steady_stops_once_residual_reaches_tolerance",
-    "test_solve_steady_respects_max_steps_when_tolerance_not_reached",
-    "test_solve_steady_can_require_potential_residual_convergence",
     "test_fully_developed_steady_stops_once_residual_reaches_tolerance",
     "test_fully_developed_steady_can_require_potential_residual_when_requested",
     "test_potential_solver_supports_lineax_and_rejects_unknown_backend",

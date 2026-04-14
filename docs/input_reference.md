@@ -178,7 +178,6 @@ side = "max"
 
 - `kind`
   - `fully_developed_inductionless`
-  - `reduced_inductionless`
   - `extruded_inductionless`
     - executable 3D fringing-field path for `rect_duct`, `layered_duct`, and
       `pipe_ogrid`

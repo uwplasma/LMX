@@ -349,6 +349,47 @@ kind = "no_slip"
         load_run_config(input_file)
 
 
+def test_removed_reduced_solver_kind_is_rejected(tmp_path: Path):
+    input_file = tmp_path / "removed_reduced_solver.toml"
+    input_file.write_text(
+        """
+[case]
+name = "removed_reduced_solver"
+
+[geometry]
+kind = "rect_duct"
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+
+[magnetic_field]
+kind = "constant"
+value = [0.0, 0.0, 1.0]
+
+[solver]
+kind = "reduced_inductionless"
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+
+[[boundary_conditions]]
+name = "wall"
+kind = "no_slip"
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="no longer supported"):
+        load_run_config(input_file)
+
+
 def test_load_run_config_rejects_missing_required_key(tmp_path: Path):
     input_file = tmp_path / "missing.toml"
     input_file.write_text(

@@ -9,7 +9,7 @@ import jax.numpy as jnp
 
 RegionKind = Literal["fluid", "solid"]
 GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid"]
-SolverKind = Literal["fully_developed_inductionless", "reduced_inductionless", "extruded_inductionless"]
+SolverKind = Literal["fully_developed_inductionless", "extruded_inductionless"]
 SolveMode = Literal["steady", "transient"]
 BoundaryKind = Literal[
     "no_slip",
@@ -76,7 +76,6 @@ class TimeStepperConfig:
     dt: float
     t_final: float
     max_steps: int
-    # Legacy reduced-solver controls kept for regression and fallback only.
     outer_iterations: int = 2
     potential_iterations: int = 400
     potential_tolerance: float | None = None

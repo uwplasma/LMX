@@ -577,23 +577,6 @@ def test_solve_case_snapshots_records_fully_developed_frames(monkeypatch: pytest
     assert "face_lorentz_max" in frames[0]
 
 
-def test_solve_case_snapshots_records_reduced_frames(monkeypatch: pytest.MonkeyPatch):
-    case = example_runner._build_case("hartmann", 5.0, 6, 6)
-    case = case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "reduced_inductionless"})})
-
-    def fake_step(**kwargs):
-        u_prev = kwargs["u"]
-        updated = np.asarray(u_prev) + 0.05
-        zeros = np.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-4, 1.0e-5, 3, 0.2, 0.1, 0.05, float(np.mean(updated)), 0.3, 0.25, 0.02, 1.0, 0.0
-
-    monkeypatch.setattr(example_runner.solvers, "_step", fake_step)
-    frames = example_runner.solve_case_snapshots(case, frame_count=2)
-    assert len(frames) >= 2
-    assert frames[0]["pressure_proxy"] == pytest.approx(0.25)
-    assert frames[0]["applied_forcing"] == pytest.approx(0.3)
-
-
 def test_run_case_example_cli_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path):
     monkeypatch.setattr(
         example_runner,

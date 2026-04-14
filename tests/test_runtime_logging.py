@@ -168,7 +168,7 @@ def _sample_record(step_index: int = 1) -> SolverStepRecord:
     )
 
 
-def test_streaming_solver_logger_respects_disable_stride_and_reduced_sections():
+def test_streaming_solver_logger_respects_disable_stride_and_restart_sections():
     disabled_stream = StringIO()
     disabled_logger = StreamingSolverLogger(LoggingSpec(enabled=False), stream=disabled_stream)
     disabled_logger.emit_step(_sample_record())
@@ -179,12 +179,6 @@ def test_streaming_solver_logger_respects_disable_stride_and_reduced_sections():
     logger = StreamingSolverLogger(LoggingSpec(step_stride=2, print_footer=False), stream=step_stream)
     logger.add_stream(extra_stream)
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "reduced_inductionless"}),
-        }
-    )
     mesh = _build_mesh(case)
     materials = build_material_fields(case, mesh)
     logger.emit_header(
@@ -220,8 +214,7 @@ def test_streaming_solver_logger_respects_disable_stride_and_reduced_sections():
         )
 
     text = step_stream.getvalue()
-    assert "Reduced velocity controls" in text
-    assert "Current reconstruction" in text
+    assert "Solver controls" in text
     assert "Restart controls" in text
     assert "Time =" not in text
     assert "Final time" not in text

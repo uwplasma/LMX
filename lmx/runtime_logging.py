@@ -110,12 +110,6 @@ class StreamingSolverLogger:
                 f"couplingTolerance={solver.coupling_tolerance:.6e}"
             )
         self._write(f"Potential controls          : solver={potential_solver}, iterations={case.time_stepper.potential_iterations}, tolerance={case.time_stepper.potential_tolerance}, omega={case.time_stepper.potential_relaxation:.6e}")
-        if solver_kind == "reduced_inductionless":
-            self._write(
-                f"Reduced velocity controls   : outerIterations={case.time_stepper.outer_iterations}, relaxation={case.time_stepper.relaxation:.6e}, "
-                f"limiter={case.time_stepper.velocity_update_limiter}, updateLimit={case.time_stepper.velocity_update_limit:.6e}"
-            )
-            self._write(f"Current reconstruction      : {case.time_stepper.current_reconstruction}")
         self._write(f"Magnetic field              : kind={case.magnetic_field.kind}, value={case.magnetic_field.value}, rampStart={case.magnetic_field.ramp_start:.6e}, rampDuration={case.magnetic_field.ramp_duration:.6e}")
         self._write(f"Flow forcing                : explicit={case.forcing:.6e}, initialVelocity={case.initial_velocity:.6e}, targetMeanVelocity={target_mean_velocity}, referenceMeanVelocity={reference_mean_velocity}")
         if restart is not None and restart.enabled:

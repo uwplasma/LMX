@@ -272,12 +272,6 @@ This is the main research solver. It solves the coupled cross-sectional
 streamwise velocity/potential problem directly and exposes steady and transient
 modes.
 
-### `reduced_inductionless`
-
-This is the reduced-model alternative retained for reduced-model studies and
-comparative testing. It is still useful, but it is not the primary path for
-new benchmark-quality results.
-
 ### `extruded_inductionless`
 
 This solver family now has the first retained low-Re 3D

@@ -6,12 +6,10 @@ operators used by the code, and where each step lives in the source tree.
 
 ## Solver families
 
-LMX currently exposes three solver-family names:
+LMX currently exposes two solver-family names:
 
 - `fully_developed_inductionless`
   - the default research solver for duct benchmarks
-- `reduced_inductionless`
-  - a reduced-model alternative retained for comparative studies
 - `extruded_inductionless`
   - first low-Re 3D pressure-velocity-potential slices for rectangular ducts,
     layered ducts, and mapped pipes now exist in `lmx/fringing.py`
