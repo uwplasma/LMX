@@ -63,7 +63,7 @@ supports turning those metrics into hard pass/fail gates.
 The current retained larger-dataset hard gate is:
 
 - Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
-- fringing `rect_duct` and `pipe_ogrid` at the same `Ha` values with
+- fringing `rect_duct`, `layered_duct`, and `pipe_ogrid` at the same `Ha` values with
   `nx_stations = 5`
 - hard thresholds:
   - `charge_balance <= 8e-1`
@@ -71,8 +71,7 @@ The current retained larger-dataset hard gate is:
   - `wall_current_leakage <= 1e-1`
   - `boundary_current <= 1e-5`
 
-That retained gate now passes. Layered 3D fringing remains outside the
-retained passing gate and stays on the open hardening list.
+That retained gate now passes for all three retained fringing geometries.
 
 ## Current status
 
@@ -118,6 +117,13 @@ retained passing gate and stays on the open hardening list.
   five-minute limit for routine validation.
 - Current combined coverage for `lmx/` and `scripts/` is `90%`.
 - Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
+- the executable `extruded_inductionless` path now also supports restart and a
+  structured `system/fields/postProcessing/restart/logs` output tree through
+  both Python and TOML/CLI workflows
+- the differentiable lane now includes field-level inverse design over
+  selected extruded `u`, `phi`, `J_y`, and `p` slices
+- the heavier manual validation lane now has a larger bounded 3D campaign with
+  JSON/CSV outputs and publication-style figures
   the release gate uses short-budget generated TOMLs rather than full
   long-horizon example runs so the interface is verified without violating the
   five-minute rule.

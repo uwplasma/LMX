@@ -88,6 +88,7 @@ lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx examples/fringing_rect_case.toml
 lmx examples/fringing_layered_case.toml
+lmx examples/fringing_layered_restart_case.toml
 lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
@@ -273,6 +274,9 @@ python examples/autodiff_profile_design_demo.py --output artifacts/examples/auto
 python examples/autodiff_fringing_design_demo.py --output artifacts/examples/autodiff_fringing_design
 python examples/autodiff_fringing_response_demo.py --output artifacts/examples/autodiff_fringing_response
 python examples/autodiff_extruded_target_demo.py --output artifacts/examples/autodiff_extruded_target
+python examples/autodiff_extruded_field_design_demo.py --output artifacts/examples/autodiff_extruded_field_design
+python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
+python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
 ```
 
 Together, those examples demonstrate:
@@ -288,6 +292,8 @@ Together, those examples demonstrate:
 - inverse design against targets generated directly from the first
   `extruded_inductionless` 3D slice, using a direct differentiable
   rectangular extruded response model in the default rectangular workflow
+- field-level inverse design against selected `u`, `phi`, `J_y`, and `p`
+  slices from the retained extruded projection loop
 - polished `PNG`/`PDF` summary figures for publication use
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
@@ -335,6 +341,30 @@ The shipped 3D TOML inputs are now publication-scale templates rather than
 minimal smoke cases: they write station-history CSV files, NPZ bundles, JSON
 summaries, copied input files, and overview/conservation figures directly from
 `lmx input.toml`.
+
+The 3D lane is now restartable on the executable TOML path as well. Extruded
+runs write a structured output tree:
+
+- `system/`
+- `fields/`
+- `postProcessing/`
+- `restart/`
+- `logs/`
+
+Use the paired layered templates to exercise that workflow directly:
+
+```bash
+lmx examples/fringing_layered_case.toml
+lmx examples/fringing_layered_restart_case.toml
+```
+
+And use the publication-facing scripts when you want restart reproducibility or
+larger validation datasets:
+
+```bash
+python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
+python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
+```
 
 ## User workflows
 

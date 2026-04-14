@@ -1,0 +1,104 @@
+[case]
+name = "fringing_layered_toml"
+notes = "Resume the publication-scale layered fringing run from a prior extruded restart bundle."
+
+[geometry]
+kind = "layered_duct"
+width = 2.0
+height = 2.0
+length = 6.0
+ny = 8
+nz = 8
+nx = 7
+wall_cells = [1, 1, 1, 1]
+insulator_cells = [1, 1, 1, 1]
+
+[magnetic_field]
+kind = "uniform"
+vector = [0.0, 0.0, 10.0]
+
+[solver]
+kind = "extruded_inductionless"
+mode = "steady"
+coupling_iterations = 6
+coupling_tolerance = 1e-5
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 8
+potential_iterations = 40
+steady_tolerance = 1e-5
+
+[fringing]
+enabled = true
+entry_center = 1.5
+exit_center = 4.5
+transition_width = 0.35
+axis = "z"
+
+[output]
+directory = "../artifacts/examples/toml_fringing_layered_restart"
+write_npz = true
+write_json_summary = true
+write_plots = true
+copy_input_file = true
+
+[logging]
+enabled = true
+verbose = true
+verbosity = "detailed"
+
+[restart]
+enabled = true
+path = "../artifacts/examples/toml_fringing_layered/restart/fringing_layered_toml_extruded_restart.npz"
+reset_histories = false
+write_restart = true
+restart_filename = "fringing_layered_toml_extruded_restart.npz"
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+density = 1.0
+viscosity = 0.01
+
+[[regions]]
+name = "hartmann_wall"
+kind = "conducting_wall"
+conductivity = 5.0
+density = 1.0
+viscosity = 0.01
+wall_thickness = 0.05
+
+[[regions]]
+name = "side_wall"
+kind = "insulating_wall"
+conductivity = 1e-8
+density = 1.0
+viscosity = 0.01
+wall_thickness = 0.05
+
+[[boundary_conditions]]
+name = "left_wall"
+kind = "insulating"
+axis = "y"
+side = "min"
+
+[[boundary_conditions]]
+name = "right_wall"
+kind = "insulating"
+axis = "y"
+side = "max"
+
+[[boundary_conditions]]
+name = "bottom_wall"
+kind = "conducting_wall"
+axis = "z"
+side = "min"
+
+[[boundary_conditions]]
+name = "top_wall"
+kind = "conducting_wall"
+axis = "z"
+side = "max"

@@ -18,6 +18,8 @@ for publication figures.
   `extruded_inductionless` 3D slice
 - a first direct differentiable rectangular `extruded_inductionless` response
   model used for inverse design against 3D-solver-generated targets
+- a field-level inverse-design workflow over selected extruded `u`, `\phi`,
+  `J_y`, and `p` slices
 - publication-style summary plots and JSON outputs
 
 The differentiable lane is intentionally explicit:
@@ -81,6 +83,9 @@ python examples/autodiff_fringing_response_demo.py \
 
 python examples/autodiff_extruded_target_demo.py \
   --output artifacts/examples/autodiff_extruded_target
+
+python examples/autodiff_extruded_field_design_demo.py \
+  --output artifacts/examples/autodiff_extruded_field_design
 ```
 
 That workflow writes:
@@ -114,6 +119,8 @@ The shipped run demonstrates:
   - full-profile inverse design over forcing and Hartmann number
 - `examples/autodiff_fringing_design_demo.py`
   - inverse design over fringing-profile parameters and axial response history
+- `examples/autodiff_extruded_field_design_demo.py`
+  - field-level inverse design over selected extruded 3D slices
 - `lmx/plotting.py`
   - polished sensitivity/inverse summary figure
 
@@ -194,6 +201,26 @@ cell-gradient-only version.
 Current extruded-target publication artifact:
 
 ![LMX extruded-target autodiff summary](_static/generated/autodiff_extruded_target.png)
+
+The new field-level extruded example pushes the objective deeper into the
+retained projection loop. It matches selected-station fields instead of only
+station histories:
+
+- `u(x_i, y, z)`
+- `\phi(x_i, y, z)`
+- `J_y(x_i, y, z)`
+- `p(x_i, y, z)`
+
+Run it with:
+
+```bash
+python examples/autodiff_extruded_field_design_demo.py \
+  --output artifacts/examples/autodiff_extruded_field_design
+```
+
+Current field-level publication artifact:
+
+![LMX extruded field autodiff summary](_static/generated/autodiff_extruded_field_design.png)
 
 ## References
 

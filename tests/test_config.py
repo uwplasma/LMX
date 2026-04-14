@@ -248,6 +248,7 @@ def test_shipped_example_toml_files_parse():
         "hunt_case.toml",
         "fringing_rect_case.toml",
         "fringing_layered_case.toml",
+        "fringing_layered_restart_case.toml",
         "fringing_pipe_case.toml",
     ):
         config = load_run_config(root / name)

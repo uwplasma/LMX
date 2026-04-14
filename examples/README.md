@@ -28,7 +28,10 @@ python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/au
 python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
 python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
 python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
+python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
+python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_restart_demo
+python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
 python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
 python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
@@ -43,6 +46,7 @@ lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx examples/fringing_rect_case.toml
 lmx examples/fringing_layered_case.toml
+lmx examples/fringing_layered_restart_case.toml
 lmx examples/fringing_pipe_case.toml
 lmx run hartmann --ha 20 --verbose
 lmx run hunt --ha 20 --verbosity debug
@@ -91,6 +95,7 @@ python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/au
 python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
 python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
 python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
+python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 ```
 
 The shipped autodiff examples now cover:
@@ -106,6 +111,8 @@ The shipped autodiff examples now cover:
   `solve_extruded_inductionless(...)`, using a direct differentiable
   rectangular `extruded_inductionless` response model for the default
   rectangular target workflow
+- field-level inverse design against selected `u`, `phi`, `jy`, and `p`
+  slices from the retained extruded projection loop
 - publication-style `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
@@ -114,12 +121,23 @@ Fringing-field scaffold:
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output ./artifacts/examples/fringing_benchmark_layered
 python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe
+python examples/extruded_restart_demo.py --geometry-kind layered_duct --output ./artifacts/examples/extruded_restart_demo
+python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
 ```
 
 That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
 `phi`, current, Lorentz, and charge-balance fields through the explicit
 `solve_extruded_inductionless(...)` entry point. Rectangular ducts, layered
 ducts, and mapped pipes all now use the same public path.
+
+The restart and validation campaign examples extend that same 3D lane:
+
+- `extruded_restart_demo.py`
+  - writes a restart bundle, resumes from it, and plots restart-to-direct
+    differences
+- `extruded_validation_campaign.py`
+  - runs the bounded larger-dataset fringing campaign, writes JSON/CSV, and
+    emits a publication-style figure
 
 Geometry and mesh preview:
 

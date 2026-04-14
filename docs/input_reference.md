@@ -290,6 +290,17 @@ Recommended usage:
 - `write_restart`
 - `restart_filename`
 
+For `extruded_inductionless` runs, restart bundles now store the full retained
+3D field bundle (`u`, `v`, `w`, `p`, `\phi`, current, Lorentz, and stationwise
+conservation histories). The executable TOML path writes those bundles into
+`restart/` and uses the structured 3D output layout:
+
+- `system/`
+- `fields/`
+- `postProcessing/`
+- `restart/`
+- `logs/`
+
 ## `[[regions]]`
 
 - `name`

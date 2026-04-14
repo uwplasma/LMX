@@ -78,9 +78,21 @@ starting points for 3D fringing studies. They enable figure writing directly
 through `[output].write_plots = true` and keep the full solver setup in the
 input file rather than hiding it in Python glue.
 
+The paired restart template is `examples/fringing_layered_restart_case.toml`.
+Use it after a base layered run has written its extruded restart bundle under
+`artifacts/examples/toml_fringing_layered/restart/`.
+
 Current publication-style artifact:
 
 ![LMX fringing pipe slice](_static/generated/fringing_benchmark_pipe.png)
+
+Restart / resume reproducibility artifact:
+
+![LMX extruded restart reproducibility](_static/generated/extruded_restart_demo.png)
+
+Larger 3D validation campaign artifact:
+
+![LMX extruded validation campaign](_static/generated/extruded_validation_campaign.png)
 
 ## Governing equations for the retained 3D slice
 
@@ -153,6 +165,17 @@ into pass/fail gates with:
 - `--max-fringing-wall-current-leakage`
 - `--max-fringing-boundary-current`
 - `--fail-on-threshold`
+
+The repository now also ships a bounded larger-dataset wrapper:
+
+```bash
+python examples/extruded_validation_campaign.py \
+  --output artifacts/examples/extruded_validation_campaign
+```
+
+That example runs the hard-gate fringing campaign on a retained larger
+resolution set, writes JSON/CSV summaries, and produces a publication-style
+summary figure.
 
 Current retained hard-gate dataset:
 

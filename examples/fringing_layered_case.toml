@@ -73,6 +73,11 @@ print_footer = true
 flush = true
 step_stride = 1
 
+[restart]
+enabled = false
+write_restart = true
+restart_filename = "fringing_layered_toml_extruded_restart.npz"
+
 [[regions]]
 name = "fluid"
 kind = "fluid"

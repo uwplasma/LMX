@@ -444,6 +444,8 @@ def validate_restart_bundle(bundle: RestartBundle, *, mesh: StructuredMesh, geom
 
 
 def validate_extruded_restart_bundle(bundle: ExtrudedRestartBundle, *, case) -> None:
+    from .fringing import _cross_section_mesh
+
     if bundle.geometry_kind not in {"unknown", case.geometry.kind}:
         raise ValueError(
             f"Extruded restart geometry_kind {bundle.geometry_kind!r} does not match current case geometry {case.geometry.kind!r}"
@@ -458,11 +460,12 @@ def validate_extruded_restart_bundle(bundle: ExtrudedRestartBundle, *, case) -> 
             raise ValueError(f"Extruded restart case {metadata_name!r} does not match current case name {case.name!r}")
     if int(bundle.bundle.x.shape[0]) != int(case.geometry.nx):
         raise ValueError("Extruded restart station count does not match current geometry.nx")
-    if int(bundle.bundle.y.shape[0]) != int(case.geometry.ny):
-        raise ValueError("Extruded restart y resolution does not match current geometry.ny")
-    expected_z = int(case.geometry.nz if case.geometry.kind != "pipe_ogrid" else (case.geometry.ntheta or case.geometry.nz))
-    if int(bundle.bundle.z.shape[0]) != expected_z:
-        raise ValueError("Extruded restart z/theta resolution does not match current geometry")
+    mesh = _cross_section_mesh(case)
+    expected_y, expected_z = mesh.yz_shape
+    if int(bundle.bundle.y.shape[0]) != int(expected_y):
+        raise ValueError("Extruded restart y resolution does not match the current extruded cross-section")
+    if int(bundle.bundle.z.shape[0]) != int(expected_z):
+        raise ValueError("Extruded restart z/theta resolution does not match the current extruded cross-section")
 
 
 def prepare_extruded_output_layout(out_dir: str | Path) -> ExtrudedOutputLayout:
