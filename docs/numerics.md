@@ -124,6 +124,10 @@ integrals are all assembled from the same face conductances. This matters at
 conductivity jumps: a cell-centered gradient check can report large spurious
 `div J` across fluid/solid interfaces even when the face fluxes are locally
 balanced, so the retained hard gate uses the conservative face form instead.
+For layered 3D cases, the electric potential subproblem is also solved with a
+sparse direct variable-coefficient solve, which is what brings the retained
+layered fringing datasets inside the same conservation gate as the rectangular
+and mapped-pipe cases.
 
 ## Extruded 3D rectangular/pipe numerics
 

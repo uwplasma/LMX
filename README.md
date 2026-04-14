@@ -38,14 +38,16 @@ The `1.0` ship gate is now closed on the fast release lane:
   - current repo ships a first rectangular-duct low-Re 3D projection slice
   - layered fringing ducts now use the same projection path and conservative
     face-current audit through the Python API
+  - layered multi-region fringing now uses a sparse direct electric solve for
+    the variable-coefficient potential equation
   - mapped `pipe_ogrid` fringing cases now use the same explicit 3D slice
     through the Python API
   - executable TOML/CLI front-end now exists for rectangular and mapped-pipe
     fringing runs
   - direct `lmx run fringing_rect|fringing_pipe|fringing_layered` entry points
     now exist for quick 3D/fringing launches without authoring TOML first
-  - retained hard-gate validation currently passes for rectangular ducts and
-    mapped pipes; layered 3D fringing remains an explicit hardening target
+  - retained hard-gate validation now passes for rectangular ducts, layered
+    ducts, and mapped pipes
   - broader production-grade 3D validation and solver hardening remain
     post-`1.0` work
 

@@ -10,6 +10,7 @@ from lmx.fringing import (
     _cross_section_mesh,
     _poisson_jacobi_3d,
     _variable_coefficient_poisson_jacobi_3d,
+    _variable_coefficient_poisson_sparse_3d,
     clone_case_with_field,
     run_extruded_inductionless_slice,
     run_fringing_station_sweep,
@@ -339,6 +340,8 @@ def test_solve_extruded_inductionless_projection_returns_finite_layered_bundle()
     assert solution.bundle.geometry_kind == "layered_duct"
     assert jnp.isfinite(solution.bundle.u).all()
     assert jnp.isfinite(solution.bundle.phi).all()
+    assert solution.validation.max_charge_balance_residual < 1.0e-4
+    assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
@@ -370,8 +373,20 @@ def test_poisson_helpers_can_stop_early():
     )
     assert iterations_var == 1
     assert residual_var <= initial_var
+    field_sparse, residual_sparse, iterations_sparse, initial_sparse = _variable_coefficient_poisson_sparse_3d(
+        rhs,
+        conductivity,
+        dx=1.0,
+        dy=1.0,
+        dz=1.0,
+        iterations=4,
+        tolerance=1.0,
+    )
+    assert iterations_sparse >= 1
+    assert residual_sparse <= initial_sparse
     assert jnp.isfinite(field).all()
     assert jnp.isfinite(field_var).all()
+    assert jnp.isfinite(field_sparse).all()
 
 
 def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(monkeypatch: pytest.MonkeyPatch):

@@ -3,6 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 import jax.numpy as jnp
+import numpy as np
+
+try:
+    from scipy import sparse
+    from scipy.sparse.linalg import spsolve as sparse_spsolve
+except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
+    sparse = None
+    sparse_spsolve = None
 
 from .cases import _ha_to_b, make_shercliff_case
 from .core import Solution
@@ -220,6 +228,7 @@ def _variable_coefficient_poisson_jacobi_3d(
     dz: float,
     iterations: int,
     tolerance: float,
+    initial_field: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, float, int, float]:
     weights = jnp.maximum(conductivity, 1.0e-20)
     rhs_compatible = rhs - jnp.sum(rhs * weights) / jnp.sum(weights)
@@ -237,7 +246,11 @@ def _variable_coefficient_poisson_jacobi_3d(
     coef_z_t = sigma_z_t / max(dz**2, 1.0e-12)
     diagonal = coef_x_w + coef_x_e + coef_y_s + coef_y_n + coef_z_b + coef_z_t
     diagonal = jnp.maximum(diagonal, 1.0e-12)
-    field = jnp.zeros_like(rhs_compatible)
+    if initial_field is None:
+        field = jnp.zeros_like(rhs_compatible)
+    else:
+        field = jnp.nan_to_num(jnp.asarray(initial_field, dtype=rhs_compatible.dtype))
+        field = field - jnp.sum(field * weights) / jnp.sum(weights)
     initial_residual = float(jnp.max(jnp.abs(_variable_coefficient_residual_3d(field, rhs_compatible, conductivity, dx=dx, dy=dy, dz=dz))))
     residual = initial_residual
     iteration_count = 0
@@ -308,6 +321,154 @@ def _variable_coefficient_residual_3d(
         + sigma_z_t * (z_top - field) / max(dz**2, 1.0e-12)
     )
     return operator - rhs
+
+
+def _variable_coefficient_poisson_sparse_3d(
+    rhs: jnp.ndarray,
+    conductivity: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+    iterations: int,
+    tolerance: float,
+    initial_field: jnp.ndarray | None = None,
+) -> tuple[jnp.ndarray, float, int, float]:
+    if sparse is None or sparse_spsolve is None:
+        return _variable_coefficient_poisson_jacobi_3d(
+            rhs,
+            conductivity,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=iterations,
+            tolerance=tolerance,
+            initial_field=initial_field,
+        )
+
+    conductivity_np = np.asarray(conductivity, dtype=float)
+    rhs_np = np.asarray(rhs, dtype=float)
+    weights = np.maximum(conductivity_np, 1.0e-20)
+    rhs_compatible = rhs_np - np.sum(rhs_np * weights) / np.sum(weights)
+    nx, ny, nz = conductivity_np.shape
+    size = nx * ny * nz
+
+    def flat_index(i: int, j: int, k: int) -> int:
+        return (i * ny + j) * nz + k
+
+    rows: list[int] = []
+    cols: list[int] = []
+    data: list[float] = []
+    rhs_vector = (-rhs_compatible).reshape(-1)
+
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                idx = flat_index(i, j, k)
+                if idx == 0:
+                    rows.append(idx)
+                    cols.append(idx)
+                    data.append(1.0)
+                    rhs_vector[idx] = 0.0
+                    continue
+
+                diag = 0.0
+                if i > 0:
+                    coef = float(_harmonic_mean(conductivity_np[i, j, k], conductivity_np[i - 1, j, k]) / max(dx**2, 1.0e-12))
+                    diag += coef
+                    rows.append(idx)
+                    cols.append(flat_index(i - 1, j, k))
+                    data.append(-coef)
+                if i + 1 < nx:
+                    coef = float(_harmonic_mean(conductivity_np[i, j, k], conductivity_np[i + 1, j, k]) / max(dx**2, 1.0e-12))
+                    diag += coef
+                    rows.append(idx)
+                    cols.append(flat_index(i + 1, j, k))
+                    data.append(-coef)
+                if j > 0:
+                    coef = float(_harmonic_mean(conductivity_np[i, j, k], conductivity_np[i, j - 1, k]) / max(dy**2, 1.0e-12))
+                    diag += coef
+                    rows.append(idx)
+                    cols.append(flat_index(i, j - 1, k))
+                    data.append(-coef)
+                if j + 1 < ny:
+                    coef = float(_harmonic_mean(conductivity_np[i, j, k], conductivity_np[i, j + 1, k]) / max(dy**2, 1.0e-12))
+                    diag += coef
+                    rows.append(idx)
+                    cols.append(flat_index(i, j + 1, k))
+                    data.append(-coef)
+                if k > 0:
+                    coef = float(_harmonic_mean(conductivity_np[i, j, k], conductivity_np[i, j, k - 1]) / max(dz**2, 1.0e-12))
+                    diag += coef
+                    rows.append(idx)
+                    cols.append(flat_index(i, j, k - 1))
+                    data.append(-coef)
+                if k + 1 < nz:
+                    coef = float(_harmonic_mean(conductivity_np[i, j, k], conductivity_np[i, j, k + 1]) / max(dz**2, 1.0e-12))
+                    diag += coef
+                    rows.append(idx)
+                    cols.append(flat_index(i, j, k + 1))
+                    data.append(-coef)
+                rows.append(idx)
+                cols.append(idx)
+                data.append(max(diag, 1.0e-12))
+
+    matrix = sparse.csr_matrix((data, (rows, cols)), shape=(size, size))
+    x0 = np.zeros(size, dtype=float)
+    if initial_field is not None:
+        initial_np = np.asarray(initial_field, dtype=float).reshape(-1)
+        x0 = initial_np - np.sum(initial_np.reshape(rhs_compatible.shape) * weights) / np.sum(weights)
+        x0 = np.asarray(x0, dtype=float).reshape(-1)
+        x0[0] = 0.0
+    initial_residual = float(
+        np.max(
+            np.abs(
+                np.asarray(
+                    _variable_coefficient_residual_3d(
+                        jnp.asarray(x0.reshape(rhs_compatible.shape)),
+                        jnp.asarray(rhs_compatible),
+                        conductivity,
+                        dx=dx,
+                        dy=dy,
+                        dz=dz,
+                    )
+                )
+            )
+        )
+    )
+    try:
+        solution = sparse_spsolve(matrix, rhs_vector)
+    except Exception:
+        return _variable_coefficient_poisson_jacobi_3d(
+            rhs,
+            conductivity,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=iterations,
+            tolerance=tolerance,
+            initial_field=initial_field,
+        )
+    field = solution.reshape(rhs_compatible.shape)
+    weights_sum = np.sum(weights)
+    field = field - np.sum(field * weights) / weights_sum
+    residual = float(
+        np.max(
+            np.abs(
+                np.asarray(
+                    _variable_coefficient_residual_3d(
+                        jnp.asarray(field),
+                        jnp.asarray(rhs_compatible),
+                        conductivity,
+                        dx=dx,
+                        dy=dy,
+                        dz=dz,
+                    )
+                )
+            )
+        )
+    )
+    return jnp.asarray(field, dtype=float), residual, 1, initial_residual
 
 
 def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
@@ -1278,7 +1439,8 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
             dy=dy,
             dz=dz,
         )
-        phi, _, _, _ = _variable_coefficient_poisson_jacobi_3d(
+        electric_solver = _variable_coefficient_poisson_sparse_3d if case.geometry.kind == "layered_duct" else _variable_coefficient_poisson_jacobi_3d
+        phi, _, _, _ = electric_solver(
             emf_rhs,
             sigma,
             dx=dx,
@@ -1286,6 +1448,7 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
             dz=dz,
             iterations=poisson_iterations,
             tolerance=poisson_tolerance,
+            initial_field=phi,
         )
         phi = _clip_state(phi, scalar_limit)
 

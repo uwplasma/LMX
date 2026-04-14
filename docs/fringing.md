@@ -148,7 +148,7 @@ into pass/fail gates with:
 Current retained hard-gate dataset:
 
 - fully developed Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
-- fringing `rect_duct` and `pipe_ogrid` at the same `Ha` values with
+- fringing `rect_duct`, `layered_duct`, and `pipe_ogrid` at the same `Ha` values with
   `nx_stations = 5`
 - hard thresholds:
   - `max_charge_balance <= 8e-1`
@@ -156,12 +156,10 @@ Current retained hard-gate dataset:
   - `max_fringing_wall_current_leakage <= 1e-1`
   - `max_fringing_boundary_current <= 1e-5`
 
-That retained gate currently passes for `rect_duct` and `pipe_ogrid`.
-Layered 3D fringing now uses the same conservative face-flux audit and closed
-axial current treatment, which materially improved its boundary-current and
-external-wall leakage behavior, but it is still not part of the retained
-passing gate because its local charge-balance residual remains too large on the
-current bounded datasets.
+That retained gate now passes for `rect_duct`, `layered_duct`, and
+`pipe_ogrid`. The layered case joined the retained gate after the multi-region
+electric subproblem was switched to a sparse direct solve of the conservative
+variable-coefficient potential operator.
 
 ## What the example shows
 

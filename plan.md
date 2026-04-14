@@ -223,10 +223,11 @@ retained passing gate and stays on the open hardening list.
   post-1.0 release-validation lane so larger Hartmann/Shercliff/Hunt cases can
   be rerun without polluting the fast ship gate.
 - The retained hard-gate dataset now passes for fully developed Hartmann /
-  Shercliff / Hunt plus fringing `rect_duct` and `pipe_ogrid`; layered 3D
-  fringing remains explicitly tracked but still outside the retained passing
-  gate because its local charge-balance residual is not yet tight enough on the
-  bounded larger-dataset runs.
+  Shercliff / Hunt plus fringing `rect_duct`, `layered_duct`, and
+  `pipe_ogrid`.
+- The key layered 3D hardening step was replacing the stiff multi-region
+  electric Jacobi iteration with a sparse direct solve of the conservative
+  variable-coefficient potential operator.
 - A fresh matched one-device smoke comparison now confirms the expected device
   direction of travel on the current tree: local CPU `512 x 512`, `32`
   iterations gives `warm_seconds ≈ 4.31e-3`, while a single office GPU gives

@@ -71,12 +71,16 @@ Current retained larger dataset:
 
 - `Ha = 10, 20`
 - `resolution = 10`
-- bounded fringing lane on `rect_duct` and `pipe_ogrid`
+- bounded fringing lane on `rect_duct`, `layered_duct`, and `pipe_ogrid`
 - hard thresholds:
   - `charge_balance <= 8e-1`
   - `interface_current <= 7e-2`
   - `wall_current_leakage <= 1e-1`
   - `boundary_current <= 1e-5`
+
+The layered 3D case joined that retained gate after the multi-region electric
+subproblem was upgraded from a bounded Jacobi iteration to a sparse direct
+solve of the conservative variable-coefficient potential operator.
 
 That retained gate now passes on the current tree. Layered 3D fringing remains
 outside the retained hard-gate set because its wall-leakage and charge-balance

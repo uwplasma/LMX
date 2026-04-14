@@ -195,8 +195,11 @@ by:
 
 The 3D fringing slice in `lmx/fringing.py` uses the same principle for its
 variable-coefficient electric solve: the right-hand side is projected onto the
-conductivity-weighted compatibility space before the Jacobi iteration, and the
+conductivity-weighted compatibility space before the electric solve, and the
 result is then audited through both `div J` and boundary-current integrals.
+For layered ducts, the multi-region potential equation is solved with a sparse
+direct solve of the conservative variable-coefficient operator rather than the
+bounded Jacobi path used in the cheaper rectangular slice.
 For rectangular and layered extruded cases, the retained face-flux audit also
 enforces a closed-current condition on the axial inlet/outlet faces in the
 conservative current reconstruction used for validation. This is the discrete
