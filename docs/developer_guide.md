@@ -42,7 +42,8 @@ This is the default research path.
 
 ### `extruded_inductionless`
 
-Planned 3D/fringing-field solver family.
+Current 3D/fringing-field solver family for rectangular ducts, layered ducts,
+and mapped-pipe research slices.
 
 ## Differentiable lane
 
