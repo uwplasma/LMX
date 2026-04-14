@@ -7,7 +7,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lmx.fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
+from lmx.fringing import (
+    build_layered_duct_extruded_problem,
+    build_square_duct_extruded_problem,
+    solve_extruded_inductionless,
+)
 
 
 def _set_style() -> None:
@@ -27,18 +31,31 @@ def _set_style() -> None:
 def run_fringing_benchmark_demo(
     *,
     out_dir: Path,
+    geometry_kind: str = "rect_duct",
     ha_peak: float = 20.0,
     ny: int = 12,
     nz: int = 12,
     nx_stations: int = 7,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    problem = build_square_duct_extruded_problem(
-        ha_peak=ha_peak,
-        ny=ny,
-        nz=nz,
-        nx_stations=nx_stations,
-    )
+    if geometry_kind == "rect_duct":
+        problem = build_square_duct_extruded_problem(
+            ha_peak=ha_peak,
+            ny=ny,
+            nz=nz,
+            nx_stations=nx_stations,
+        )
+    elif geometry_kind == "layered_duct":
+        problem = build_layered_duct_extruded_problem(
+            ha_peak=ha_peak,
+            ny=ny,
+            nz=nz,
+            nx_stations=nx_stations,
+            wall_cells=max(1, min(4, ny // 6)),
+            insulator_cells=max(1, min(3, ny // 8)),
+        )
+    else:
+        raise ValueError(f"Unsupported geometry_kind {geometry_kind!r}")
     solution = solve_extruded_inductionless(problem)
     history = solution.station_history
     extruded = solution.bundle
@@ -96,6 +113,7 @@ def run_fringing_benchmark_demo(
 
     summary = {
         "case": problem.case.name,
+        "geometry_kind": geometry_kind,
         "solver_kind": problem.case.solver.kind,
         "history": list(history),
         "extruded_bundle": {
@@ -119,8 +137,10 @@ def run_fringing_benchmark_demo(
             "This example now runs through the explicit extruded_inductionless "
             "slice entry point, writing both station history and stacked axial "
             "field bundles for u, v, w, p, phi, current, and Lorentz force. "
-            "Rectangular ducts use a true low-Re 3D projection slice here; "
-            "broader production hardening remains future work."
+            f"{geometry_kind} now runs through the explicit extruded slice "
+            "entry point. Rectangular and layered ducts both use the low-Re "
+            "3D projection path here; broader production hardening remains "
+            "future work."
         ),
     }
     (out_dir / "fringing_benchmark_summary.json").write_text(json.dumps(summary, indent=2))
@@ -130,6 +150,7 @@ def run_fringing_benchmark_demo(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the LMX fringing-field benchmark scaffold.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/fringing_benchmark"))
+    parser.add_argument("--geometry-kind", choices=("rect_duct", "layered_duct"), default="rect_duct")
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=12)
     parser.add_argument("--nz", type=int, default=12)
@@ -137,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     run_fringing_benchmark_demo(
         out_dir=args.output,
+        geometry_kind=args.geometry_kind,
         ha_peak=args.ha_peak,
         ny=args.ny,
         nz=args.nz,

@@ -309,6 +309,14 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
     )
     monkeypatch.setattr(
         module,
+        "build_layered_duct_extruded_problem",
+        lambda **kwargs: SimpleNamespace(
+            case=SimpleNamespace(name="fringing_case_layered", solver=SimpleNamespace(kind="extruded_inductionless")),
+            profile=SimpleNamespace(x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
         "solve_extruded_inductionless",
         lambda *args, **kwargs: SimpleNamespace(
             station_history=(
@@ -340,6 +348,16 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
     assert "validation" in summary
     assert (tmp_path / "fringing_benchmark.png").exists()
     assert (tmp_path / "fringing_benchmark_summary.json").exists()
+
+    summary_layered = module.run_fringing_benchmark_demo(
+        out_dir=tmp_path / "layered",
+        geometry_kind="layered_duct",
+        nx_stations=2,
+        ny=4,
+        nz=4,
+    )
+    assert summary_layered["case"] == "fringing_case_layered"
+    assert summary_layered["geometry_kind"] == "layered_duct"
 
 
 def test_autodiff_profile_design_demo_writes_summary(tmp_path: Path):

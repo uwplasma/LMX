@@ -36,6 +36,8 @@ The `1.0` ship gate is now closed on the fast release lane:
 - `extruded_inductionless`
   - staged next solver family for 3D/fringing-field work
   - current repo ships a first rectangular-duct low-Re 3D projection slice
+  - layered fringing ducts now use the same projection path through the Python
+    API
   - full CLI/TOML support, mapped-pipe support, and production-grade 3D
     validation remain post-`1.0` work
 
@@ -279,6 +281,7 @@ The repository now also ships a publication-facing fringing benchmark scaffold:
 
 ```bash
 python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_benchmark
+python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output artifacts/examples/fringing_benchmark_layered
 ```
 
 That example now writes the first retained rectangular-duct
@@ -289,11 +292,9 @@ diagnostics, contour plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a
 compact validation summary for the slice.
 
 That workflow generates a smooth axial fringing profile together with
-cross-sectional response metrics. Rectangular ducts now go through a real
-low-Re pressure-velocity-potential iteration. Layered ducts still fall back to
-the cheaper stacked-station scaffold, so the workflow remains an executable
-bridge from the stable 2D solver family to the broader
-`extruded_inductionless` research solver.
+cross-sectional response metrics. Rectangular and layered ducts now both go
+through the low-Re pressure-velocity-potential projection slice in the Python
+API, so the workflow is no longer limited to a single fluid-only cross-section.
 
 ## User workflows
 

@@ -9,8 +9,7 @@ entry point that the next paper phase can build on:
   research scaffold
 - an `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` workflow
   that now runs a true low-Re rectangular-duct `u, v, w, p, phi` projection
-  slice and still retains the stacked-station path as a fallback scaffold for
-  layered ducts
+  slice and now supports layered ducts through the same projection path
 - a stacked axial field-bundle builder that exposes `u(x, y, z)`,
   `v(x, y, z)`, `w(x, y, z)`, `p(x, y, z)`, `phi(x, y, z)`, current,
   Lorentz, and charge-balance histories
@@ -28,6 +27,9 @@ profiles, benchmark manifests, and axial response figures while the broader
 ```bash
 python examples/fringing_benchmark_demo.py \
   --output artifacts/examples/fringing_benchmark
+python examples/fringing_benchmark_demo.py \
+  --geometry-kind layered_duct \
+  --output artifacts/examples/fringing_benchmark_layered
 ```
 
 The example writes:
@@ -47,6 +49,7 @@ The example writes:
 - contour views of the stacked velocity bundle in `x-y` and `x-z`
 - the stationwise charge-balance residual along the fringing region
 - a first true 3D pressure field `p(x, y, z)` inside the research slice
+- layered conducting/insulating wall fringing responses through the same API
 
 These are the quantities we need immediately for benchmark design and for
 planning the first `extruded_inductionless` acceptance set.

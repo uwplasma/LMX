@@ -105,9 +105,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
   `extruded_inductionless` 3D projection slice, exposing `u`, `v`, `w`, `p`,
   `phi`, current, Lorentz, and charge-balance fields through the explicit
   `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` Python API.
-- Layered fringing cases still fall back to the cheaper stacked-station
-  scaffold, so the remaining `extruded_inductionless` work is now solver-family
-  hardening and scope expansion rather than landing the first slice at all.
+- Layered fringing ducts now use the same first low-Re 3D projection slice,
+  so the remaining `extruded_inductionless` work is concentrated on mapped
+  pipes, stronger validation, and broader production hardening rather than on
+  duct-family coverage gaps.
 - The heavy manual validation lane can now include a bounded fringing summary
   through `scripts/run_manual_solver_family_validation.py --include-fringing`,
   so solver-family hardening is no longer limited to fully developed Hartmann /

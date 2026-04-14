@@ -8,6 +8,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.hartmann_profile_loss_gradients)
     assert callable(lmx.run_hartmann_profile_inverse_design)
     assert callable(lmx.build_square_duct_fringing_benchmark)
+    assert callable(lmx.build_layered_duct_extruded_problem)
     assert callable(lmx.run_extruded_inductionless_slice)
     assert callable(lmx.solve_extruded_inductionless)
     assert callable(lmx.build_square_duct_extruded_problem)

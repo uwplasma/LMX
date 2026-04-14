@@ -178,8 +178,8 @@ side = "max"
   - `fully_developed_inductionless`
   - `reduced_inductionless`
   - `extruded_inductionless`
-    - current Python research API uses it for the rectangular-duct fringing
-      slice
+    - current Python research API uses it for rectangular and layered-duct
+      fringing slices
     - TOML/CLI support for full 3D runs is still staged post-`1.0`
 - `mode`
   - `steady`

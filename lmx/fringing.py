@@ -6,7 +6,8 @@ import jax.numpy as jnp
 
 from .cases import make_shercliff_case
 from .core import Solution
-from .mesh import generate_rect_duct_mesh
+from .mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
+from .physics import build_material_fields
 from .specs import CaseSpec, MagneticFieldSpec
 from .solvers import solve_steady
 from .validation import validation_summary
@@ -73,6 +74,15 @@ def _broadcast_station_profile(values: jnp.ndarray, ny: int, nz: int) -> jnp.nda
     return jnp.broadcast_to(jnp.asarray(values, dtype=float)[:, None, None], (values.shape[0], ny, nz))
 
 
+def _broadcast_cross_section(values: jnp.ndarray, nx: int) -> jnp.ndarray:
+    return jnp.broadcast_to(jnp.asarray(values, dtype=float)[None, :, :], (nx,) + tuple(values.shape))
+
+
+def _harmonic_mean(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+    denom = jnp.maximum(a + b, 1.0e-20)
+    return 2.0 * a * b / denom
+
+
 def _neighbor_fields(field: jnp.ndarray, *, mode_x: str, mode_y: str, mode_z: str) -> tuple[jnp.ndarray, ...]:
     x_west = jnp.concatenate([field[:1], field[:-1]], axis=0) if mode_x == "neumann" else jnp.concatenate(
         [jnp.zeros_like(field[:1]), field[:-1]], axis=0
@@ -131,7 +141,7 @@ def _gradient_3d(field: jnp.ndarray, *, dx: float, dy: float, dz: float) -> tupl
     return d_dx, d_dy, d_dz
 
 
-def _enforce_velocity_bc_3d(field: jnp.ndarray) -> jnp.ndarray:
+def _enforce_velocity_bc_3d(field: jnp.ndarray, active_mask: jnp.ndarray | None = None) -> jnp.ndarray:
     bounded = field.at[:, 0, :].set(0.0)
     bounded = bounded.at[:, -1, :].set(0.0)
     bounded = bounded.at[:, :, 0].set(0.0)
@@ -139,6 +149,8 @@ def _enforce_velocity_bc_3d(field: jnp.ndarray) -> jnp.ndarray:
     if bounded.shape[0] > 1:
         bounded = bounded.at[0, :, :].set(bounded[1, :, :])
         bounded = bounded.at[-1, :, :].set(bounded[-2, :, :])
+    if active_mask is not None:
+        bounded = jnp.where(active_mask, bounded, 0.0)
     return bounded
 
 
@@ -170,7 +182,7 @@ def _poisson_jacobi_3d(
             + (z_bottom + z_top) / max(dz**2, 1.0e-12)
             - rhs_compatible
         ) / diagonal
-        field = updated - jnp.mean(updated)
+        field = jnp.nan_to_num(updated - jnp.mean(updated))
         residual = float(
             jnp.max(
                 jnp.abs(
@@ -193,11 +205,140 @@ def _poisson_jacobi_3d(
     return field, residual, iteration_count, initial_residual
 
 
+def _variable_coefficient_poisson_jacobi_3d(
+    rhs: jnp.ndarray,
+    conductivity: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+    iterations: int,
+    tolerance: float,
+) -> tuple[jnp.ndarray, float, int, float]:
+    weights = jnp.maximum(conductivity, 1.0e-20)
+    rhs_compatible = rhs - jnp.sum(rhs * weights) / jnp.sum(weights)
+    sigma_x_w = jnp.concatenate([conductivity[:1], _harmonic_mean(conductivity[1:], conductivity[:-1])], axis=0)
+    sigma_x_e = jnp.concatenate([_harmonic_mean(conductivity[1:], conductivity[:-1]), conductivity[-1:]], axis=0)
+    sigma_y_s = jnp.concatenate([conductivity[:, :1, :], _harmonic_mean(conductivity[:, 1:, :], conductivity[:, :-1, :])], axis=1)
+    sigma_y_n = jnp.concatenate([_harmonic_mean(conductivity[:, 1:, :], conductivity[:, :-1, :]), conductivity[:, -1:, :]], axis=1)
+    sigma_z_b = jnp.concatenate([conductivity[:, :, :1], _harmonic_mean(conductivity[:, :, 1:], conductivity[:, :, :-1])], axis=2)
+    sigma_z_t = jnp.concatenate([_harmonic_mean(conductivity[:, :, 1:], conductivity[:, :, :-1]), conductivity[:, :, -1:]], axis=2)
+    coef_x_w = sigma_x_w / max(dx**2, 1.0e-12)
+    coef_x_e = sigma_x_e / max(dx**2, 1.0e-12)
+    coef_y_s = sigma_y_s / max(dy**2, 1.0e-12)
+    coef_y_n = sigma_y_n / max(dy**2, 1.0e-12)
+    coef_z_b = sigma_z_b / max(dz**2, 1.0e-12)
+    coef_z_t = sigma_z_t / max(dz**2, 1.0e-12)
+    diagonal = coef_x_w + coef_x_e + coef_y_s + coef_y_n + coef_z_b + coef_z_t
+    diagonal = jnp.maximum(diagonal, 1.0e-12)
+    field = jnp.zeros_like(rhs_compatible)
+    initial_residual = float(jnp.max(jnp.abs(_variable_coefficient_residual_3d(field, rhs_compatible, conductivity, dx=dx, dy=dy, dz=dz))))
+    residual = initial_residual
+    iteration_count = 0
+    for iteration in range(iterations):
+        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+            field,
+            mode_x="neumann",
+            mode_y="neumann",
+            mode_z="neumann",
+        )
+        updated = (
+            rhs_compatible
+            + coef_x_w * x_west
+            + coef_x_e * x_east
+            + coef_y_s * y_south
+            + coef_y_n * y_north
+            + coef_z_b * z_bottom
+            + coef_z_t * z_top
+        ) / diagonal
+        field = jnp.nan_to_num(updated - jnp.sum(updated * weights) / jnp.sum(weights))
+        residual = float(
+            jnp.max(
+                jnp.abs(
+                    _variable_coefficient_residual_3d(
+                        field,
+                        rhs_compatible,
+                        conductivity,
+                        dx=dx,
+                        dy=dy,
+                        dz=dz,
+                    )
+                )
+            )
+        )
+        iteration_count = iteration + 1
+        if residual <= tolerance:
+            break
+    return field, residual, iteration_count, initial_residual
+
+
+def _variable_coefficient_residual_3d(
+    field: jnp.ndarray,
+    rhs: jnp.ndarray,
+    conductivity: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> jnp.ndarray:
+    x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+        field,
+        mode_x="neumann",
+        mode_y="neumann",
+        mode_z="neumann",
+    )
+    sigma_x_w = jnp.concatenate([conductivity[:1], _harmonic_mean(conductivity[1:], conductivity[:-1])], axis=0)
+    sigma_x_e = jnp.concatenate([_harmonic_mean(conductivity[1:], conductivity[:-1]), conductivity[-1:]], axis=0)
+    sigma_y_s = jnp.concatenate([conductivity[:, :1, :], _harmonic_mean(conductivity[:, 1:, :], conductivity[:, :-1, :])], axis=1)
+    sigma_y_n = jnp.concatenate([_harmonic_mean(conductivity[:, 1:, :], conductivity[:, :-1, :]), conductivity[:, -1:, :]], axis=1)
+    sigma_z_b = jnp.concatenate([conductivity[:, :, :1], _harmonic_mean(conductivity[:, :, 1:], conductivity[:, :, :-1])], axis=2)
+    sigma_z_t = jnp.concatenate([_harmonic_mean(conductivity[:, :, 1:], conductivity[:, :, :-1]), conductivity[:, :, -1:]], axis=2)
+    operator = (
+        sigma_x_w * (x_west - field) / max(dx**2, 1.0e-12)
+        + sigma_x_e * (x_east - field) / max(dx**2, 1.0e-12)
+        + sigma_y_s * (y_south - field) / max(dy**2, 1.0e-12)
+        + sigma_y_n * (y_north - field) / max(dy**2, 1.0e-12)
+        + sigma_z_b * (z_bottom - field) / max(dz**2, 1.0e-12)
+        + sigma_z_t * (z_top - field) / max(dz**2, 1.0e-12)
+    )
+    return operator - rhs
+
+
 def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
     centered_x = x - jnp.mean(x)
     centered_y = y - jnp.mean(y)
     denom = jnp.sqrt(jnp.sum(centered_x**2) * jnp.sum(centered_y**2))
     return float(jnp.where(denom > 0.0, jnp.sum(centered_x * centered_y) / denom, 0.0))
+
+
+def _clip_state(field: jnp.ndarray, limit: float) -> jnp.ndarray:
+    return jnp.clip(jnp.nan_to_num(field), -limit, limit)
+
+
+def _cross_section_mesh(case: CaseSpec):
+    geometry = case.geometry
+    if geometry.kind == "rect_duct":
+        return generate_rect_duct_mesh(
+            width=geometry.width,
+            height=geometry.height,
+            length=geometry.length,
+            nx=geometry.nx,
+            ny=geometry.ny,
+            nz=geometry.nz,
+        )
+    if geometry.kind == "layered_duct":
+        return generate_layered_duct_mesh(
+            width=geometry.width,
+            height=geometry.height,
+            length=geometry.length,
+            nx=geometry.nx,
+            ny=geometry.ny,
+            nz=geometry.nz,
+            wall_thickness=geometry.wall_thickness,
+            wall_cells=geometry.wall_cells,
+            target_ha=geometry.target_ha,
+        )
+    raise ValueError(f"Unsupported extruded geometry {geometry.kind!r}")
 
 
 def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, float], ...]:
@@ -317,6 +458,64 @@ def build_square_duct_extruded_problem(
         entry_center=entry_center,
         exit_center=exit_center,
         transition_width=transition_width,
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
+def build_layered_duct_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    width: float = 2.0,
+    height: float = 2.0,
+    ny: int = 32,
+    nz: int = 32,
+    wall_cells: int = 4,
+    wall_thickness: float = 0.1,
+    insulator_cells: int | None = None,
+    insulator_thickness: float | None = None,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+) -> ExtrudedInductionlessProblem:
+    from .cases import make_hunt_case
+
+    case = make_hunt_case(
+        ha=ha_peak,
+        width=width,
+        height=height,
+        ny=ny,
+        nz=nz,
+        wall_cells=wall_cells,
+        wall_thickness=wall_thickness,
+        insulator_cells=insulator_cells,
+        insulator_thickness=insulator_thickness,
+    )
+    case = replace(
+        case,
+        geometry=replace(case.geometry, length=length, nx=nx_stations),
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=min(case.time_stepper.max_steps, 80),
+            potential_iterations=min(case.time_stepper.potential_iterations, 80),
+            steady_tolerance=1.0e-6,
+        ),
+        solver=replace(
+            case.solver,
+            kind="extruded_inductionless",
+            coupling_iterations=min(case.solver.coupling_iterations, 8),
+            coupling_tolerance=1.0e-7,
+        ),
+    )
+    profile = smooth_fringing_profile(
+        length=length,
+        nx=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
     )
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
@@ -458,16 +657,10 @@ def run_extruded_inductionless_slice(
     )
 
 
-def _solve_rectangular_extruded_projection(problem: ExtrudedInductionlessProblem) -> ExtrudedFieldBundle:
+def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> ExtrudedFieldBundle:
     case = problem.case
-    mesh = generate_rect_duct_mesh(
-        width=case.geometry.width,
-        height=case.geometry.height,
-        length=case.geometry.length,
-        nx=case.geometry.nx,
-        ny=case.geometry.ny,
-        nz=case.geometry.nz,
-    )
+    mesh = _cross_section_mesh(case)
+    materials = build_material_fields(case, mesh)
     x = jnp.asarray(mesh.x_centers, dtype=float)
     y = jnp.asarray(mesh.y_centers, dtype=float)
     z = jnp.asarray(mesh.z_centers, dtype=float)
@@ -475,12 +668,16 @@ def _solve_rectangular_extruded_projection(problem: ExtrudedInductionlessProblem
     dx = float(jnp.mean(mesh.dx))
     dy = float(jnp.mean(mesh.dy))
     dz = float(jnp.mean(mesh.dz))
-    rho = 1.0
-    nu = 1.0e-2
-    sigma = 1.0
+    sigma = _broadcast_cross_section(materials.conductivity, nx)
+    rho = _broadcast_cross_section(materials.density, nx)
+    nu = _broadcast_cross_section(materials.viscosity, nx)
+    fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
     forcing = float(case.forcing)
     field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
-    bz = _broadcast_station_profile(field_scale, ny, nz)
+    base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
+    bx = _broadcast_station_profile(field_scale * float(base_field[0]), ny, nz)
+    by = _broadcast_station_profile(field_scale * float(base_field[1]), ny, nz)
+    bz = _broadcast_station_profile(field_scale * float(base_field[2]), ny, nz)
 
     u = jnp.zeros((nx, ny, nz), dtype=float)
     v = jnp.zeros_like(u)
@@ -488,54 +685,91 @@ def _solve_rectangular_extruded_projection(problem: ExtrudedInductionlessProblem
     p = jnp.zeros_like(u)
     phi = jnp.zeros_like(u)
 
-    inverse_diffusive_scale = nu * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12))
+    inverse_diffusive_scale = float(jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12)))
     stable_dt = 0.2 / max(inverse_diffusive_scale, 1.0e-12)
     dt = min(float(case.time_stepper.dt), stable_dt)
     outer_steps = max(2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2)))
     poisson_iterations = min(case.time_stepper.potential_iterations, 80)
     poisson_tolerance = case.solver.coupling_tolerance
+    velocity_limit = 5.0
+    scalar_limit = 20.0
     residual_by_step: list[float] = []
-    charge_balance_by_step: list[float] = []
 
     for _ in range(outer_steps):
         dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
-        jx = -dphi_dx + v * bz
-        jy = -dphi_dy - u * bz
-        jz = -dphi_dz
-        lorentz_x = jy * bz
-        lorentz_y = -jx * bz
-        lorentz_z = jnp.zeros_like(u)
+        uxb_x = v * bz - w * by
+        uxb_y = w * bx - u * bz
+        uxb_z = u * by - v * bx
+        jx = sigma * (-dphi_dx + uxb_x)
+        jy = sigma * (-dphi_dy + uxb_y)
+        jz = sigma * (-dphi_dz + uxb_z)
+        lorentz_x = jy * bz - jz * by
+        lorentz_y = jz * bx - jx * bz
+        lorentz_z = jx * by - jy * bx
 
         dp_dx, dp_dy, dp_dz = _gradient_3d(p, dx=dx, dy=dy, dz=dz)
         u_star = u + dt * (nu * _laplacian_3d(u, dx=dx, dy=dy, dz=dz) + forcing / rho + lorentz_x / rho - dp_dx / rho)
         v_star = v + dt * (nu * _laplacian_3d(v, dx=dx, dy=dy, dz=dz) + lorentz_y / rho - dp_dy / rho)
         w_star = w + dt * (nu * _laplacian_3d(w, dx=dx, dy=dy, dz=dz) + lorentz_z / rho - dp_dz / rho)
-        u_star = _enforce_velocity_bc_3d(u_star)
-        v_star = _enforce_velocity_bc_3d(v_star)
-        w_star = _enforce_velocity_bc_3d(w_star)
+        u_star = _clip_state(u_star, velocity_limit)
+        v_star = _clip_state(v_star, velocity_limit)
+        w_star = _clip_state(w_star, velocity_limit)
+        u_star = _enforce_velocity_bc_3d(u_star, fluid_mask)
+        v_star = _enforce_velocity_bc_3d(v_star, fluid_mask)
+        w_star = _enforce_velocity_bc_3d(w_star, fluid_mask)
 
         du_dx, du_dy, du_dz = _gradient_3d(u_star, dx=dx, dy=dy, dz=dz)
         dv_dx, dv_dy, dv_dz = _gradient_3d(v_star, dx=dx, dy=dy, dz=dz)
         dw_dx, dw_dy, dw_dz = _gradient_3d(w_star, dx=dx, dy=dy, dz=dz)
-        divergence = du_dx + dv_dy + dw_dz
-        p_corr, _, _, _ = _poisson_jacobi_3d((rho / max(dt, 1.0e-12)) * divergence, dx=dx, dy=dy, dz=dz, iterations=poisson_iterations, tolerance=poisson_tolerance)
+        divergence = jnp.where(fluid_mask, du_dx + dv_dy + dw_dz, 0.0)
+        p_corr, _, _, _ = _poisson_jacobi_3d(
+            (rho / max(dt, 1.0e-12)) * divergence,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=poisson_iterations,
+            tolerance=poisson_tolerance,
+        )
+        p_corr = _clip_state(jnp.where(fluid_mask, p_corr, 0.0), scalar_limit)
         dpc_dx, dpc_dy, dpc_dz = _gradient_3d(p_corr, dx=dx, dy=dy, dz=dz)
-        u_next = _enforce_velocity_bc_3d(u_star - (dt / rho) * dpc_dx)
-        v_next = _enforce_velocity_bc_3d(v_star - (dt / rho) * dpc_dy)
-        w_next = _enforce_velocity_bc_3d(w_star - (dt / rho) * dpc_dz)
-        p = p + p_corr
+        u_next = _enforce_velocity_bc_3d(u_star - (dt / rho) * dpc_dx, fluid_mask)
+        v_next = _enforce_velocity_bc_3d(v_star - (dt / rho) * dpc_dy, fluid_mask)
+        w_next = _enforce_velocity_bc_3d(w_star - (dt / rho) * dpc_dz, fluid_mask)
+        u_next = _clip_state(u_next, velocity_limit)
+        v_next = _clip_state(v_next, velocity_limit)
+        w_next = _clip_state(w_next, velocity_limit)
+        p = _clip_state(jnp.where(fluid_mask, p + p_corr, 0.0), scalar_limit)
 
-        emf_rhs = _gradient_3d(v_next * bz, dx=dx, dy=dy, dz=dz)[0] + _gradient_3d(-u_next * bz, dx=dx, dy=dy, dz=dz)[1]
-        phi, _, _, _ = _poisson_jacobi_3d(emf_rhs, dx=dx, dy=dy, dz=dz, iterations=poisson_iterations, tolerance=poisson_tolerance)
+        uxb_x = v_next * bz - w_next * by
+        uxb_y = w_next * bx - u_next * bz
+        uxb_z = u_next * by - v_next * bx
+        source_x = sigma * uxb_x
+        source_y = sigma * uxb_y
+        source_z = sigma * uxb_z
+        emf_rhs = (
+            _gradient_3d(source_x, dx=dx, dy=dy, dz=dz)[0]
+            + _gradient_3d(source_y, dx=dx, dy=dy, dz=dz)[1]
+            + _gradient_3d(source_z, dx=dx, dy=dy, dz=dz)[2]
+        )
+        phi, _, _, _ = _variable_coefficient_poisson_jacobi_3d(
+            emf_rhs,
+            sigma,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=poisson_iterations,
+            tolerance=poisson_tolerance,
+        )
+        phi = _clip_state(phi, scalar_limit)
 
         dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
-        jx = -dphi_dx + v_next * bz
-        jy = -dphi_dy - u_next * bz
-        jz = -dphi_dz
+        jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
+        jy = _clip_state(sigma * (-dphi_dy + uxb_y), scalar_limit)
+        jz = _clip_state(sigma * (-dphi_dz + uxb_z), scalar_limit)
         div_j = _gradient_3d(jx, dx=dx, dy=dy, dz=dz)[0] + _gradient_3d(jy, dx=dx, dy=dy, dz=dz)[1] + _gradient_3d(jz, dx=dx, dy=dy, dz=dz)[2]
-        lorentz_x = jy * bz
-        lorentz_y = -jx * bz
-        lorentz_z = jnp.zeros_like(u_next)
+        lorentz_x = jy * bz - jz * by
+        lorentz_y = jz * bx - jx * bz
+        lorentz_z = jx * by - jy * bx
 
         update_residual = max(
             float(jnp.max(jnp.abs(u_next - u))),
@@ -545,17 +779,23 @@ def _solve_rectangular_extruded_projection(problem: ExtrudedInductionlessProblem
         )
         charge_balance = float(jnp.max(jnp.abs(div_j)))
         residual_by_step.append(update_residual)
-        charge_balance_by_step.append(charge_balance)
         u, v, w = u_next, v_next, w_next
         if update_residual <= case.solver.coupling_tolerance and charge_balance <= max(1.0e-6, case.solver.coupling_tolerance):
             break
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
     residual = jnp.full((nx,), final_step_residual, dtype=float)
-    volumetric_flow_rate = jnp.sum(u, axis=(1, 2)) * dy * dz
-    mean_velocity = jnp.mean(u, axis=(1, 2))
-    current_scaled_pressure_proxy = sigma * jnp.max(jnp.abs(jy), axis=(1, 2)) * jnp.maximum(jnp.abs(field_scale), 1.0e-12)
+    cell_area = _broadcast_cross_section(mesh.dy[:, None] * mesh.dz[None, :], nx)
+    fluid_area = jnp.maximum(jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
+    volumetric_flow_rate = jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
+    mean_velocity = volumetric_flow_rate / fluid_area
+    current_scaled_pressure_proxy = jnp.max(jnp.abs(jy), axis=(1, 2)) * jnp.maximum(jnp.max(jnp.abs(bx) + jnp.abs(by) + jnp.abs(bz), axis=(1, 2)), 1.0e-12)
     charge_balance_residual = jnp.max(jnp.abs(_gradient_3d(jx, dx=dx, dy=dy, dz=dz)[0] + _gradient_3d(jy, dx=dx, dy=dy, dz=dz)[1] + _gradient_3d(jz, dx=dx, dy=dy, dz=dz)[2]), axis=(1, 2))
+    residual = jnp.nan_to_num(residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
+    volumetric_flow_rate = jnp.nan_to_num(volumetric_flow_rate)
+    mean_velocity = jnp.nan_to_num(mean_velocity)
+    current_scaled_pressure_proxy = jnp.nan_to_num(current_scaled_pressure_proxy, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
+    charge_balance_residual = jnp.nan_to_num(charge_balance_residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     return ExtrudedFieldBundle(
         x=x,
         y=y,
@@ -612,8 +852,8 @@ def solve_extruded_inductionless(
     *,
     solver=solve_steady,
 ) -> ExtrudedInductionlessSolution:
-    if problem.case.geometry.kind == "rect_duct":
-        bundle = _solve_rectangular_extruded_projection(problem)
+    if problem.case.geometry.kind in {"rect_duct", "layered_duct"}:
+        bundle = _solve_extruded_projection(problem)
         station_history = _bundle_station_history(bundle)
     else:
         station_history = run_fringing_station_sweep(problem.case, problem.profile, solver=solver)

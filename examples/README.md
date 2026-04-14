@@ -93,13 +93,14 @@ Fringing-field scaffold:
 
 ```bash
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
+python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output ./artifacts/examples/fringing_benchmark_layered
 ```
 
 That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
 `phi`, current, Lorentz, and charge-balance fields through the explicit
 `solve_extruded_inductionless(...)` entry point. Rectangular ducts now use a
-real low-Re 3D pressure-velocity-potential slice there; layered ducts still
-fall back to the cheaper stacked-station scaffold.
+real low-Re 3D pressure-velocity-potential slice there, and layered ducts now
+use the same public path.
 
 Geometry and mesh preview:
 
