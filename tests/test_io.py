@@ -410,3 +410,112 @@ def test_validate_extruded_restart_bundle_rejects_mismatch():
 
     with pytest.raises(ValueError, match="geometry_kind"):
         validate_extruded_restart_bundle(bad_bundle, case=case)
+
+
+def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mismatch():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "kind": "rect_duct", "length": 6.0, "nx": 3, "ny": 2, "nz": 2}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+        }
+    )
+    bundle = SimpleNamespace(
+        geometry_kind="rect_duct",
+        solver_kind="fully_developed_inductionless",
+        metadata={"case": "other_case"},
+        bundle=SimpleNamespace(x=jnp.zeros((2,)), y=jnp.zeros((3,)), z=jnp.zeros((2,))),
+    )
+
+    with pytest.raises(ValueError, match="solver_kind"):
+        validate_extruded_restart_bundle(bundle, case=case)
+
+    good_solver = SimpleNamespace(**{**bundle.__dict__, "solver_kind": "extruded_inductionless"})
+    with pytest.raises(ValueError, match="Extruded restart case"):
+        validate_extruded_restart_bundle(good_solver, case=case)
+
+    good_case = SimpleNamespace(**{**good_solver.__dict__, "metadata": {"case": case.name}})
+    with pytest.raises(ValueError, match="station count"):
+        validate_extruded_restart_bundle(good_case, case=case)
+
+    good_x = SimpleNamespace(**{**good_case.__dict__, "bundle": SimpleNamespace(x=jnp.zeros((3,)), y=jnp.zeros((3,)), z=jnp.zeros((2,)))})
+    with pytest.raises(ValueError, match="y resolution"):
+        validate_extruded_restart_bundle(good_x, case=case)
+
+    good_y = SimpleNamespace(**{**good_x.__dict__, "bundle": SimpleNamespace(x=jnp.zeros((3,)), y=jnp.zeros((2,)), z=jnp.zeros((3,)))})
+    with pytest.raises(ValueError, match="z/theta resolution"):
+        validate_extruded_restart_bundle(good_y, case=case)
+
+
+def test_write_extruded_solution_outputs_archives_last_station_with_stride(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "output": case.output.__class__(**{**case.output.__dict__, "write_plots": False, "write_stride": 2}),
+        }
+    )
+    bundle = SimpleNamespace(
+        x=jnp.asarray([0.0, 1.0, 2.0, 3.0]),
+        y=jnp.asarray([-0.5, 0.5]),
+        z=jnp.asarray([-0.5, 0.5]),
+        field_scale=jnp.asarray([0.0, 1.0, 0.5, 0.0]),
+        u=jnp.ones((4, 2, 2)),
+        v=jnp.zeros((4, 2, 2)),
+        w=jnp.zeros((4, 2, 2)),
+        p=jnp.zeros((4, 2, 2)),
+        phi=jnp.zeros((4, 2, 2)),
+        jx=jnp.zeros((4, 2, 2)),
+        jy=jnp.zeros((4, 2, 2)),
+        jz=jnp.zeros((4, 2, 2)),
+        lorentz_x=jnp.zeros((4, 2, 2)),
+        lorentz_y=jnp.zeros((4, 2, 2)),
+        lorentz_z=jnp.zeros((4, 2, 2)),
+        residual=jnp.asarray([1.0e-3, 2.0e-4, 3.0e-5, 4.0e-6]),
+        volumetric_flow_rate=jnp.asarray([1.0, 1.1, 1.2, 1.3]),
+        mean_velocity=jnp.asarray([0.5, 0.55, 0.6, 0.65]),
+        axial_current=jnp.asarray([0.0, 0.1, 0.05, 0.0]),
+        wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.5e-6, 1.0e-6]),
+        current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.15, 0.1]),
+        charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.5e-7, 1.0e-7]),
+        boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8, 3.0e-8]),
+        geometry_kind="rect_duct",
+        solver_kind="extruded_inductionless",
+    )
+    validation = SimpleNamespace(
+        station_count=4,
+        max_residual=1.0e-3,
+        max_charge_balance_residual=2.0e-7,
+        mean_velocity_span=0.15,
+        volumetric_flow_rate_span=0.3,
+        axial_current_span=0.1,
+        max_wall_current_leakage=2.0e-6,
+        net_boundary_current_residual=3.0e-6,
+        field_mean_velocity_correlation=-0.9,
+    )
+    station_history = tuple(
+        {
+            "x": float(i),
+            "field_scale": float(bundle.field_scale[i]),
+            "u_max": 1.0,
+            "mean_velocity": float(bundle.mean_velocity[i]),
+            "volumetric_flow_rate": float(bundle.volumetric_flow_rate[i]),
+            "axial_current": float(bundle.axial_current[i]),
+            "wall_current_leakage": float(bundle.wall_current_leakage[i]),
+            "current_scaled_pressure_proxy": float(bundle.current_scaled_pressure_proxy[i]),
+            "residual": float(bundle.residual[i]),
+            "charge_balance_residual": float(bundle.charge_balance_residual[i]),
+            "boundary_current_residual": float(bundle.boundary_current_residual[i]),
+        }
+        for i in range(4)
+    )
+    solution = SimpleNamespace(bundle=bundle, validation=validation, station_history=station_history)
+
+    outputs = write_extruded_solution_outputs(solution, case, tmp_path, write_plots=False)
+
+    archived = [path.name for path in outputs["archive"] if path.suffix == ".npz"]
+    assert archived == ["station_0000.npz", "station_0002.npz", "station_0003.npz"]

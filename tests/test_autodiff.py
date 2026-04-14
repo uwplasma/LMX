@@ -32,7 +32,11 @@ from lmx.autodiff import (
     run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
 )
-from lmx.fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
+from lmx.fringing import (
+    build_pipe_ogrid_extruded_problem,
+    build_square_duct_extruded_problem,
+    solve_extruded_inductionless,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -484,6 +488,16 @@ def test_extruded_target_inverse_design_returns_finite_payload():
     assert len(result["recovered"]["history"]) == 4
     assert result["recovered"]["model"] == "direct_extruded_projection"
     assert jnp.isfinite(result["target"]["mean_velocity"]).all()
+
+
+def test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry():
+    problem = build_pipe_ogrid_extruded_problem(ha_peak=6.0, nx_stations=4, nr=4, ntheta=8)
+    solution = solve_extruded_inductionless(problem)
+
+    result = run_extruded_target_inverse_design(solution, ny=6, nz=6, steps=4)
+
+    assert result["geometry_kind"] == "pipe_ogrid"
+    assert result["recovered"]["model"] == "fringing_response_surrogate"
 
 
 def test_extruded_rect_projection_inverse_design_reduces_loss():

@@ -115,7 +115,7 @@ That retained gate now passes for all three retained fringing geometries.
 - The full local fast suite now completes in about `35 s`, and the full
   local coverage lane completes in about `45 s`, both within the hard
   five-minute limit for routine validation.
-- Current combined coverage for `lmx/` and `scripts/` is `90%`.
+- Current combined coverage for `lmx/` and `scripts/` is `94%`.
 - Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
 - the executable `extruded_inductionless` path now also supports restart and a
   structured `system/fields/postProcessing/restart/logs` output tree through
@@ -251,6 +251,10 @@ That retained gate now passes for all three retained fringing geometries.
   - the mapped-pipe slice remains inside the smaller retained hard gate, but it
     is still outside the larger retained publication campaign pending heavier
     mesh hardening
+- A dedicated reviewer-facing paper-figure workflow now ships in
+  `examples/extruded_paper_figures.py`, with committed 3D retained rectangular
+  and layered fringing figures plus a compact reviewer summary panel under
+  `docs/_static/generated/`.
 - The autodiff lane now reaches deeper into the retained extruded projection
   loop itself through a trajectory-level objective that matches selected-station
   `u`, `phi`, `J_y`, `p`, charge-balance, and boundary-current histories across

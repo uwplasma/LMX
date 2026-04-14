@@ -209,6 +209,62 @@ def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monke
     assert (tmp_path / "shercliff" / "shercliff_startup_3d_poster.pdf").exists()
 
 
+def test_run_theory_meeting_demo_records_hunt_reference_when_available(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    fake_solution = SimpleNamespace(
+        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        mesh=SimpleNamespace(),
+        case_name="hunt_ha5",
+    )
+
+    monkeypatch.setattr(
+        example_runner,
+        "run_case_example",
+        lambda **kwargs: {"case": "demo", "ha": kwargs["ha"], "output_dir": str(kwargs["out_dir"]), "plots": [], "reference": {"available": False}, "metrics": {}},
+    )
+    monkeypatch.setattr(example_runner, "solve_case_snapshots", lambda case, frame_count=12: [])
+    monkeypatch.setattr(example_runner, "write_transient_movies", lambda *args, **kwargs: [])
+    monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
+    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [out_dir / "hunt_ha5.vtr"])
+    def fake_write_profile_csv(path: Path, profile):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("coord,u\n0,1\n")
+        return path
+
+    monkeypatch.setattr(example_runner, "write_profile_csv", fake_write_profile_csv)
+    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"y" if axis == "y" else "z": [0.0], "u": [1.0]})
+    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda *args, **kwargs: [])
+    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+    monkeypatch.setattr(
+        example_runner,
+        "closed_channel_validation",
+        lambda solution, case_kind, ha, reference_root: SimpleNamespace(
+            y_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.1),
+            z_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.2),
+            reference_path="reference/hunt.json",
+        ),
+    )
+
+    report = run_theory_meeting_demo(
+        out_dir=tmp_path,
+        hartmann_ha=5.0,
+        shercliff_ha=5.0,
+        hunt_ha=5.0,
+        resolution=8,
+        movie_case="hunt",
+        movie_resolution=8,
+        movie_dt=1e-5,
+        movie_t_final=2e-5,
+        movie_frames=2,
+        reference_root=tmp_path,
+    )
+
+    assert report["hunt"]["reference"]["available"] is True
+    assert report["hunt"]["reference"]["kind"] == "closed_channel_analytical"
+    assert report["hunt"]["reference"]["path"] == "reference/hunt.json"
+
+
 def _load_example_module(filename: str):
     module_path = Path(__file__).resolve().parents[1] / "examples" / filename
     spec = importlib.util.spec_from_file_location(module_path.stem, module_path)

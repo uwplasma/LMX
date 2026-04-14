@@ -128,6 +128,32 @@ def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
     assert recorded["path"] == "/tmp/demo_case.toml"
 
 
+def test_cli_case_builders_reject_unknown_case():
+    with pytest.raises(ValueError):
+        cli._build_case(SimpleNamespace(case="unknown", ha=5.0, output="out"))
+    with pytest.raises(ValueError):
+        cli._build_extruded_problem(
+            SimpleNamespace(
+                case="unknown",
+                ha=5.0,
+                width=2.0,
+                height=2.0,
+                ny=4,
+                nz=4,
+                length=6.0,
+                nx_stations=5,
+                entry_center=1.0,
+                exit_center=4.0,
+                transition_width=0.5,
+                wall_cells=1,
+                insulator_cells=1,
+                radius=0.5,
+                nr=4,
+                ntheta=8,
+            )
+        )
+
+
 def test_python_module_entrypoint_delegates_to_cli_main(monkeypatch: pytest.MonkeyPatch):
     recorded: dict[str, object] = {}
 
@@ -252,6 +278,42 @@ def test_run_config_dispatches_extruded_solver_kind(tmp_path: Path, monkeypatch:
     assert summary["solver_kind"] == "extruded_inductionless"
     assert summary["station_count"] == 2
     assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
+
+
+def test_run_config_extruded_requires_restart_path_when_restart_enabled(tmp_path: Path):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+        }
+    )
+    config = RunConfig(
+        case=case,
+        solve_mode="steady",
+        logging=LoggingSpec(enabled=False),
+        fringing=FringingSpec(enabled=True, entry_center=1.0, exit_center=4.0, transition_width=0.5, axis="z"),
+        restart=RestartSpec(enabled=True),
+    )
+    with pytest.raises(ValueError, match="restart.path"):
+        cli._run_config(config)
+
+
+def test_run_config_extruded_requires_fringing_block(tmp_path: Path):
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+        }
+    )
+    config = RunConfig(case=case, solve_mode="steady", logging=LoggingSpec(enabled=False))
+    with pytest.raises(ValueError, match="\\[fringing\\] block"):
+        cli._run_config(config)
 
 
 def test_run_config_supports_extruded_restart_and_structured_output_layout(

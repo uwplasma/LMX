@@ -10,7 +10,7 @@ The `1.0` ship gate is now closed on the fast release lane:
 
 - fast validation suite passes within the five-minute budget
 - docs build cleanly
-- combined `lmx/` + `scripts/` coverage is at `90%`
+- combined `lmx/` + `scripts/` coverage is at `94%`
 - CLI and restart smokes pass on the shipped TOML workflow
 - publication-facing strong-scaling and autodiff artifacts are committed
 
