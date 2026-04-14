@@ -265,6 +265,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
             "volumetric_flow_rate": jnp.asarray([0.2, 0.4, 0.25]),
             "axial_current": jnp.asarray([0.01, 0.02, 0.015]),
             "wall_current_leakage": jnp.asarray([1.0e-6, 2.0e-6, 1.5e-6]),
+            "boundary_current_residual": jnp.asarray([1.0e-7, 2.0e-7, 1.5e-7]),
             "residual": jnp.asarray([1.0e-4, 1.0e-5, 1.0e-5]),
             "charge_balance_residual": jnp.asarray([1.0e-8, 2.0e-8, 1.5e-8]),
             "y": jnp.asarray([0.0]),
@@ -293,6 +294,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
     assert solution.bundle.solver_kind == "extruded_inductionless"
     assert "axial_current" in solution.station_history[0]
     assert "wall_current_leakage" in solution.station_history[0]
+    assert "boundary_current_residual" in solution.station_history[0]
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():
@@ -388,6 +390,7 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(monkeypa
                 "volumetric_flow_rate": jnp.asarray([0.2]),
                 "axial_current": jnp.asarray([0.0]),
                 "wall_current_leakage": jnp.asarray([0.0]),
+                "boundary_current_residual": jnp.asarray([0.0]),
                 "residual": jnp.asarray([1.0e-4]),
                 "charge_balance_residual": jnp.asarray([1.0e-6]),
                 "y": jnp.asarray([0.0]),

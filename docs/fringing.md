@@ -124,6 +124,13 @@ $$
 and the extruded validation lane now checks that condition directly instead of
 relying only on local `\nabla\cdot J` norms.
 
+For rectangular and layered extruded cases, the retained audit now assembles
+that boundary-flux check from conservative face currents with closed-current
+axial boundary treatment. This aligns the reported `div J` and boundary-current
+metrics with the actual discrete operator used in the electric solve instead of
+mixing a face-based solve with a cell-gradient diagnostic at conductivity
+jumps.
+
 The heavier validation driver
 `scripts/run_manual_solver_family_validation.py` can now turn these metrics
 into pass/fail gates with:
@@ -145,10 +152,12 @@ Current retained hard-gate dataset:
   - `max_fringing_wall_current_leakage <= 1e-1`
   - `max_fringing_boundary_current <= 1e-5`
 
-That retained gate currently passes. Layered 3D fringing remains an
-exploratory geometry in the current slice; it is still tracked, but not part of
-the retained passing gate until its leakage and local charge balance are
-tightened materially.
+That retained gate currently passes for `rect_duct` and `pipe_ogrid`.
+Layered 3D fringing now uses the same conservative face-flux audit and closed
+axial current treatment, which materially improved its boundary-current and
+external-wall leakage behavior, but it is still not part of the retained
+passing gate because its local charge-balance residual remains too large on the
+current bounded datasets.
 
 ## What the example shows
 

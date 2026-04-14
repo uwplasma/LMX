@@ -145,6 +145,8 @@ retained passing gate and stays on the open hardening list.
   `phi`, current, Lorentz, and charge-balance fields through the explicit
   `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` Python API.
 - Layered fringing ducts now use the same first low-Re 3D projection slice.
+- Layered fringing ducts now also use the same conservative face-current audit
+  and closed-current axial boundary treatment as the rectangular 3D slice.
 - Mapped `pipe_ogrid` fringing cases now also use the same explicit low-Re
   3D projection slice, so the remaining `extruded_inductionless` work is
   concentrated on production hardening, broader validation, and stronger
@@ -189,6 +191,10 @@ retained passing gate and stays on the open hardening list.
   step further: it uses a direct differentiable rectangular
   `extruded_inductionless` response model instead of the older lightweight
   fringing-response surrogate.
+- The retained rectangular/layered 3D conservation audit is now aligned with
+  the discrete electric operator: the source term, `div J` check, and boundary
+  current residual are all assembled from conservative face fluxes instead of
+  mixed cell-gradient diagnostics.
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.
@@ -210,6 +216,11 @@ retained passing gate and stays on the open hardening list.
 - A manual solver-family hardening script now exists for the heavier
   post-1.0 release-validation lane so larger Hartmann/Shercliff/Hunt cases can
   be rerun without polluting the fast ship gate.
+- The retained hard-gate dataset now passes for fully developed Hartmann /
+  Shercliff / Hunt plus fringing `rect_duct` and `pipe_ogrid`; layered 3D
+  fringing remains explicitly tracked but still outside the retained passing
+  gate because its local charge-balance residual is not yet tight enough on the
+  bounded larger-dataset runs.
 - A fresh matched one-device smoke comparison now confirms the expected device
   direction of travel on the current tree: local CPU `512 x 512`, `32`
   iterations gives `warm_seconds ≈ 4.31e-3`, while a single office GPU gives

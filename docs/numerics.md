@@ -117,6 +117,14 @@ driver `scripts/run_manual_solver_family_validation.py` can reject a run when:
 That moves the conservation checks from “reported” to “enforced” for the heavy
 validation path.
 
+For rectangular and layered extruded runs, the retained conservation audit is
+face-conservative rather than cell-gradient-based. The electric source term
+`∇·(σ u×B)`, the post-solve `div J` diagnostic, and the boundary-current
+integrals are all assembled from the same face conductances. This matters at
+conductivity jumps: a cell-centered gradient check can report large spurious
+`div J` across fluid/solid interfaces even when the face fluxes are locally
+balanced, so the retained hard gate uses the conservative face form instead.
+
 ## Extruded 3D rectangular/pipe numerics
 
 The retained `extruded_inductionless` slice in `lmx/fringing.py` uses:

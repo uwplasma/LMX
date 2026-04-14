@@ -44,6 +44,7 @@ class ExtrudedFieldBundle:
     wall_current_leakage: jnp.ndarray
     current_scaled_pressure_proxy: jnp.ndarray
     charge_balance_residual: jnp.ndarray
+    boundary_current_residual: jnp.ndarray
     geometry_kind: str
     solver_kind: str
 
@@ -367,6 +368,7 @@ def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, floa
             "current_scaled_pressure_proxy": float(bundle.current_scaled_pressure_proxy[index]),
             "residual": float(bundle.residual[index]),
             "charge_balance_residual": float(bundle.charge_balance_residual[index]),
+            "boundary_current_residual": float(bundle.boundary_current_residual[index]),
         }
         for index in range(bundle.x.shape[0])
     )
@@ -391,6 +393,110 @@ def _net_boundary_current_residual(
     bottom_flux = -jnp.sum(jz[:, :, 0]) * xy_area
     top_flux = jnp.sum(jz[:, :, -1]) * xy_area
     return float(jnp.abs(inlet_flux + outlet_flux + south_flux + north_flux + bottom_flux + top_flux))
+
+
+def _conservative_current_fluxes_3d(
+    sigma: jnp.ndarray,
+    phi: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_y: jnp.ndarray,
+    uxb_z: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    nx, ny, nz = phi.shape
+    fx = jnp.zeros((nx + 1, ny, nz), dtype=phi.dtype)
+    fy = jnp.zeros((nx, ny + 1, nz), dtype=phi.dtype)
+    fz = jnp.zeros((nx, ny, nz + 1), dtype=phi.dtype)
+
+    sigma_x = _harmonic_mean(sigma[1:], sigma[:-1])
+    phi_grad_x = (phi[1:] - phi[:-1]) / max(dx, 1.0e-12)
+    uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
+    fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
+
+    sigma_y = _harmonic_mean(sigma[:, 1:, :], sigma[:, :-1, :])
+    phi_grad_y = (phi[:, 1:, :] - phi[:, :-1, :]) / max(dy, 1.0e-12)
+    uxb_face_y = 0.5 * (uxb_y[:, 1:, :] + uxb_y[:, :-1, :])
+    fy = fy.at[:, 1:-1, :].set(sigma_y * (-phi_grad_y + uxb_face_y))
+
+    sigma_z = _harmonic_mean(sigma[:, :, 1:], sigma[:, :, :-1])
+    phi_grad_z = (phi[:, :, 1:] - phi[:, :, :-1]) / max(dz, 1.0e-12)
+    uxb_face_z = 0.5 * (uxb_z[:, :, 1:] + uxb_z[:, :, :-1])
+    fz = fz.at[:, :, 1:-1].set(sigma_z * (-phi_grad_z + uxb_face_z))
+    return fx, fy, fz
+
+
+def _conservative_current_diagnostics_3d(
+    sigma: jnp.ndarray,
+    phi: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_y: jnp.ndarray,
+    uxb_z: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    fx, fy, fz = _conservative_current_fluxes_3d(
+        sigma,
+        phi,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
+    div_j = (
+        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
+        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
+    )
+    wall_leakage = (
+        jnp.sum(jnp.abs(fy[:, 0, :]), axis=1) * dx * dz
+        + jnp.sum(jnp.abs(fy[:, -1, :]), axis=1) * dx * dz
+        + jnp.sum(jnp.abs(fz[:, :, 0]), axis=1) * dx * dy
+        + jnp.sum(jnp.abs(fz[:, :, -1]), axis=1) * dx * dy
+    )
+    boundary_residual = jnp.abs(
+        -jnp.sum(fx[0], axis=(0, 1)) * dy * dz
+        + jnp.sum(fx[-1], axis=(0, 1)) * dy * dz
+        - jnp.sum(fy[:, 0, :], axis=1) * dx * dz
+        + jnp.sum(fy[:, -1, :], axis=1) * dx * dz
+        - jnp.sum(fz[:, :, 0], axis=1) * dx * dy
+        + jnp.sum(fz[:, :, -1], axis=1) * dx * dy
+    )
+    return div_j, wall_leakage, boundary_residual
+
+
+def _conservative_emf_rhs_3d(
+    sigma: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_y: jnp.ndarray,
+    uxb_z: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> jnp.ndarray:
+    zeros = jnp.zeros_like(uxb_x)
+    fx, fy, fz = _conservative_current_fluxes_3d(
+        sigma,
+        zeros,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
+    return (
+        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
+        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
+    )
 
 
 def _pipe_theta_neighbors(field: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
@@ -911,6 +1017,7 @@ def run_extruded_inductionless_slice(
         wall_current_leakage=jnp.zeros_like(mean_velocity),
         current_scaled_pressure_proxy=current_scaled_pressure_proxy,
         charge_balance_residual=charge_balance_residual,
+        boundary_current_residual=jnp.zeros_like(mean_velocity),
         geometry_kind=base_case.geometry.kind,
         solver_kind=base_case.solver.kind,
     )
@@ -1042,6 +1149,11 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
         mean_velocity = volumetric_flow_rate / cross_section_area
         axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
         wall_current_leakage = jnp.sum(jnp.abs(jr[:, -1, :]) * (float(r[-1] + 0.5 * dr) * dx * dtheta), axis=1)
+        boundary_current_residual = jnp.abs(
+            -jnp.sum(jx[0] * cell_area[0])
+            + jnp.sum(jx[-1] * cell_area[-1])
+            + jnp.sum(jr[:, -1, :] * (float(r[-1] + 0.5 * dr) * dx * dtheta), axis=1)
+        )
         current_scaled_pressure_proxy = jnp.max(jnp.abs(jr), axis=(1, 2)) * jnp.maximum(
             jnp.max(jnp.abs(bx) + jnp.abs(br) + jnp.abs(btheta), axis=(1, 2)),
             1.0e-12,
@@ -1070,6 +1182,7 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
             wall_current_leakage=jnp.nan_to_num(wall_current_leakage),
             current_scaled_pressure_proxy=jnp.nan_to_num(current_scaled_pressure_proxy),
             charge_balance_residual=jnp.nan_to_num(charge_balance_residual),
+            boundary_current_residual=jnp.nan_to_num(boundary_current_residual),
             geometry_kind=case.geometry.kind,
             solver_kind=case.solver.kind,
         )
@@ -1156,13 +1269,14 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
         uxb_x = v_next * bz - w_next * by
         uxb_y = w_next * bx - u_next * bz
         uxb_z = u_next * by - v_next * bx
-        source_x = sigma * uxb_x
-        source_y = sigma * uxb_y
-        source_z = sigma * uxb_z
-        emf_rhs = (
-            _gradient_3d(source_x, dx=dx, dy=dy, dz=dz)[0]
-            + _gradient_3d(source_y, dx=dx, dy=dy, dz=dz)[1]
-            + _gradient_3d(source_z, dx=dx, dy=dy, dz=dz)[2]
+        emf_rhs = _conservative_emf_rhs_3d(
+            sigma,
+            uxb_x,
+            uxb_y,
+            uxb_z,
+            dx=dx,
+            dy=dy,
+            dz=dz,
         )
         phi, _, _, _ = _variable_coefficient_poisson_jacobi_3d(
             emf_rhs,
@@ -1179,7 +1293,16 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
         jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
         jy = _clip_state(sigma * (-dphi_dy + uxb_y), scalar_limit)
         jz = _clip_state(sigma * (-dphi_dz + uxb_z), scalar_limit)
-        div_j = _gradient_3d(jx, dx=dx, dy=dy, dz=dz)[0] + _gradient_3d(jy, dx=dx, dy=dy, dz=dz)[1] + _gradient_3d(jz, dx=dx, dy=dy, dz=dz)[2]
+        div_j, _, _ = _conservative_current_diagnostics_3d(
+            sigma,
+            phi,
+            uxb_x,
+            uxb_y,
+            uxb_z,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+        )
         lorentz_x = jy * bz - jz * by
         lorentz_y = jz * bx - jx * bz
         lorentz_z = jx * by - jy * bx
@@ -1203,14 +1326,18 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
     volumetric_flow_rate = jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
     mean_velocity = volumetric_flow_rate / fluid_area
     axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
-    wall_current_leakage = (
-        jnp.sum(jnp.abs(jy[:, 0, :]), axis=1) * dx * dz
-        + jnp.sum(jnp.abs(jy[:, -1, :]), axis=1) * dx * dz
-        + jnp.sum(jnp.abs(jz[:, :, 0]), axis=1) * dx * dy
-        + jnp.sum(jnp.abs(jz[:, :, -1]), axis=1) * dx * dy
+    div_j, wall_current_leakage, boundary_current_residual = _conservative_current_diagnostics_3d(
+        sigma,
+        phi,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
     )
     current_scaled_pressure_proxy = jnp.max(jnp.abs(jy), axis=(1, 2)) * jnp.maximum(jnp.max(jnp.abs(bx) + jnp.abs(by) + jnp.abs(bz), axis=(1, 2)), 1.0e-12)
-    charge_balance_residual = jnp.max(jnp.abs(_gradient_3d(jx, dx=dx, dy=dy, dz=dz)[0] + _gradient_3d(jy, dx=dx, dy=dy, dz=dz)[1] + _gradient_3d(jz, dx=dx, dy=dy, dz=dz)[2]), axis=(1, 2))
+    charge_balance_residual = jnp.max(jnp.abs(div_j), axis=(1, 2))
     residual = jnp.nan_to_num(residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     volumetric_flow_rate = jnp.nan_to_num(volumetric_flow_rate)
     mean_velocity = jnp.nan_to_num(mean_velocity)
@@ -1218,6 +1345,7 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
     wall_current_leakage = jnp.nan_to_num(wall_current_leakage, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     current_scaled_pressure_proxy = jnp.nan_to_num(current_scaled_pressure_proxy, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     charge_balance_residual = jnp.nan_to_num(charge_balance_residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
+    boundary_current_residual = jnp.nan_to_num(boundary_current_residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     return ExtrudedFieldBundle(
         x=x,
         y=y,
@@ -1241,6 +1369,7 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
         wall_current_leakage=jnp.asarray(wall_current_leakage, dtype=float),
         current_scaled_pressure_proxy=jnp.asarray(current_scaled_pressure_proxy, dtype=float),
         charge_balance_residual=jnp.asarray(charge_balance_residual, dtype=float),
+        boundary_current_residual=jnp.asarray(boundary_current_residual, dtype=float),
         geometry_kind=case.geometry.kind,
         solver_kind=case.solver.kind,
     )
@@ -1258,37 +1387,8 @@ def validate_extruded_inductionless_solution(
     wall_current_leakage = jnp.asarray(bundle.wall_current_leakage, dtype=float)
     residual = jnp.asarray(bundle.residual, dtype=float)
     charge_balance_residual = jnp.asarray(bundle.charge_balance_residual, dtype=float)
+    boundary_current_residual = jnp.asarray(bundle.boundary_current_residual, dtype=float)
     correlation = _safe_correlation(field_scale, mean_velocity)
-    if bundle.x.size > 1:
-        dx = float(jnp.mean(jnp.diff(bundle.x)))
-    else:
-        dx = 1.0
-    if bundle.y.size > 1:
-        dy = float(jnp.mean(jnp.diff(bundle.y)))
-    else:
-        dy = 1.0
-    if bundle.z.size > 1:
-        dz = float(jnp.mean(jnp.diff(bundle.z)))
-    else:
-        dz = 1.0
-    if bundle.geometry_kind == "pipe_ogrid":
-        r = jnp.broadcast_to(jnp.maximum(bundle.y[None, :, None], 0.5 * dy), jnp.asarray(bundle.jx).shape)
-        boundary_current_residual = float(
-            jnp.abs(
-                -jnp.sum(jnp.asarray(bundle.jx, dtype=float)[0, :, :] * r[0, :, :]) * dy * dz
-                + jnp.sum(jnp.asarray(bundle.jx, dtype=float)[-1, :, :] * r[-1, :, :]) * dy * dz
-                + jnp.sum(jnp.asarray(bundle.jy, dtype=float)[:, -1, :] * (float(bundle.y[-1] + 0.5 * dy))) * dx * dz
-            )
-        )
-    else:
-        boundary_current_residual = _net_boundary_current_residual(
-            jnp.asarray(bundle.jx, dtype=float),
-            jnp.asarray(bundle.jy, dtype=float),
-            jnp.asarray(bundle.jz, dtype=float),
-            dx=dx,
-            dy=dy,
-            dz=dz,
-        )
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
         max_residual=float(jnp.max(jnp.abs(residual))) if residual.size else 0.0,
@@ -1301,7 +1401,7 @@ def validate_extruded_inductionless_solution(
         else 0.0,
         axial_current_span=float(jnp.max(axial_current) - jnp.min(axial_current)) if axial_current.size else 0.0,
         max_wall_current_leakage=float(jnp.max(jnp.abs(wall_current_leakage))) if wall_current_leakage.size else 0.0,
-        net_boundary_current_residual=boundary_current_residual,
+        net_boundary_current_residual=float(jnp.max(jnp.abs(boundary_current_residual))) if boundary_current_residual.size else 0.0,
         field_mean_velocity_correlation=correlation,
     )
 

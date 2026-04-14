@@ -36,12 +36,14 @@ The `1.0` ship gate is now closed on the fast release lane:
 - `extruded_inductionless`
   - staged next solver family for 3D/fringing-field work
   - current repo ships a first rectangular-duct low-Re 3D projection slice
-  - layered fringing ducts now use the same projection path through the Python
-    API
+  - layered fringing ducts now use the same projection path and conservative
+    face-current audit through the Python API
   - mapped `pipe_ogrid` fringing cases now use the same explicit 3D slice
     through the Python API
   - executable TOML/CLI front-end now exists for rectangular and mapped-pipe
     fringing runs
+  - retained hard-gate validation currently passes for rectangular ducts and
+    mapped pipes; layered 3D fringing remains an explicit hardening target
   - broader production-grade 3D validation and solver hardening remain
     post-`1.0` work
 
@@ -307,6 +309,12 @@ bundle with `u`, `v`, `w`, `p`, `phi`, current, Lorentz, charge-balance
 diagnostics, axial-current histories, wall-current leakage audits, contour
 plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a compact validation
 summary for the slice.
+
+For rectangular and layered extruded cases, those conservation diagnostics are
+now assembled from conservative face-current fluxes with closed-current axial
+boundary treatment, so the reported `div J` and boundary-current metrics are
+aligned with the discrete electric operator rather than cell-gradient checks at
+conductivity jumps.
 
 That workflow generates a smooth axial fringing profile together with
 cross-sectional response metrics. Rectangular ducts, layered ducts, and mapped
