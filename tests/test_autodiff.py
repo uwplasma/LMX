@@ -7,8 +7,10 @@ from lmx.autodiff import (
     build_fringing_autodiff_problem,
     build_hartmann_autodiff_problem,
     extruded_rect_projection_history,
+    extruded_rect_projection_iteration_history,
     extruded_rect_projection_field_loss_gradients,
     extruded_rect_projection_loss_gradients,
+    extruded_rect_projection_trajectory_loss_gradients,
     extruded_rect_response_history,
     extruded_rect_response_loss_gradients,
     fringing_history_loss_gradients,
@@ -23,6 +25,7 @@ from lmx.autodiff import (
     run_extruded_rect_inverse_design,
     run_extruded_rect_projection_field_inverse_design,
     run_extruded_rect_projection_inverse_design,
+    run_extruded_rect_projection_trajectory_inverse_design,
     run_fringing_response_inverse_design,
     run_extruded_target_inverse_design,
     run_fringing_history_inverse_design,
@@ -552,4 +555,83 @@ def test_extruded_rect_projection_field_inverse_design_reduces_loss():
         steps=4,
     )
     assert result["model"] == "direct_extruded_projection_fields"
+    assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
+
+
+def test_extruded_rect_projection_iteration_history_and_gradients_are_finite():
+    problem = build_fringing_autodiff_problem(
+        nx_stations=5,
+        ny=6,
+        nz=6,
+        macro_iterations=3,
+        potential_iterations=8,
+        velocity_iterations=10,
+    )
+    station_indices = jnp.asarray([1, 3])
+    target = extruded_rect_projection_iteration_history(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=9.0,
+        entry_center=1.2,
+        exit_center=4.0,
+        transition_width=0.4,
+        station_indices=station_indices,
+    )
+    assert target["u_field"].shape[0] == 3
+    assert target["u_field"].shape[1] == 2
+    gradients = extruded_rect_projection_trajectory_loss_gradients(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=7.0,
+        entry_center=0.8,
+        exit_center=4.8,
+        transition_width=0.7,
+        target_u_history=target["u_field"],
+        target_phi_history=target["phi_field"],
+        target_jy_history=target["jy_field"],
+        target_pressure_history=target["pressure_field"],
+        target_charge_balance_history=target["charge_balance_residual"],
+        target_boundary_current_history=target["boundary_current_residual"],
+        station_indices=station_indices,
+    )
+    assert jnp.isfinite(gradients["loss"])
+    assert jnp.isfinite(gradients["d_peak_hartmann_number"])
+
+
+def test_extruded_rect_projection_trajectory_inverse_design_reduces_loss():
+    problem = build_fringing_autodiff_problem(
+        nx_stations=5,
+        ny=6,
+        nz=6,
+        macro_iterations=3,
+        potential_iterations=8,
+        velocity_iterations=10,
+    )
+    station_indices = jnp.asarray([1, 3])
+    target = extruded_rect_projection_iteration_history(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=9.0,
+        entry_center=1.2,
+        exit_center=4.0,
+        transition_width=0.4,
+        station_indices=station_indices,
+    )
+    result = run_extruded_rect_projection_trajectory_inverse_design(
+        problem,
+        target_u_history=target["u_field"],
+        target_phi_history=target["phi_field"],
+        target_jy_history=target["jy_field"],
+        target_pressure_history=target["pressure_field"],
+        target_charge_balance_history=target["charge_balance_residual"],
+        target_boundary_current_history=target["boundary_current_residual"],
+        station_indices=station_indices,
+        forcing=1.0,
+        peak_hartmann_init=6.0,
+        entry_center_init=0.8,
+        exit_center_init=4.8,
+        transition_width_init=0.7,
+        steps=4,
+    )
+    assert result["model"] == "direct_extruded_projection_trajectory"
     assert result["history"][-1]["loss"] <= result["history"][0]["loss"]

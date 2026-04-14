@@ -77,7 +77,8 @@ The example writes:
   and charge-balance histories
 - a `validation` section with residual and field/response consistency metrics
 - for TOML/CLI runs, `*_station_history.csv`, `*_extruded_results.npz`,
-  `overview.png`, `overview.pdf`, and a JSON summary with conservation metrics
+  `overview.png`, `overview.pdf`, a station-archive manifest, per-station
+  `station_XXXX.npz` field bundles, and a JSON summary with conservation metrics
 
 The shipped input files `examples/fringing_rect_case.toml`,
 `examples/fringing_layered_case.toml`, and
@@ -111,6 +112,12 @@ that every coarse layered case is already publication-grade. In particular, the
 coarsest layered high-field point remains visibly underresolved, so the figure
 is used to show convergence behavior and screening logic rather than as a final
 table of locked publication values.
+
+The heavier exploratory campaign that reintroduces mapped pipes shows that
+`pipe_ogrid` still falls outside the larger retained gate on the current
+post-`1.0` tree. Its charge-balance residual exceeds the retained threshold on
+the heavier `Ha=20` and finer-mesh runs, so the mapped-pipe slice remains a
+research/development lane rather than a locked publication benchmark.
 
 ## Governing equations for the retained 3D slice
 

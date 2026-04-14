@@ -166,6 +166,9 @@ That retained gate now passes for all three retained fringing geometries.
 - The publication-scale 3D input-file workflow now writes station-history CSV,
   NPZ bundles, JSON summaries, copied TOMLs, and overview/conservation plots
   directly from `lmx input.toml`.
+- The `extruded_inductionless` output tree now also writes a richer archive
+  surface for larger runs: `system/<case>_extruded_manifest.json` plus
+  `fields/stations/station_XXXX.npz` bundles controlled by `write_stride`.
 - The heavy manual validation lane can now include a bounded fringing summary
   through `scripts/run_manual_solver_family_validation.py --include-fringing`,
   so solver-family hardening is no longer limited to fully developed Hartmann /
@@ -248,6 +251,14 @@ That retained gate now passes for all three retained fringing geometries.
   - the mapped-pipe slice remains inside the smaller retained hard gate, but it
     is still outside the larger retained publication campaign pending heavier
     mesh hardening
+- The autodiff lane now reaches deeper into the retained extruded projection
+  loop itself through a trajectory-level objective that matches selected-station
+  `u`, `phi`, `J_y`, `p`, charge-balance, and boundary-current histories across
+  the retained projection iterations.
+- The heavier exploratory 3D campaign with mapped pipes revalidated the current
+  gate decision: `pipe_ogrid` still fails the larger retained fringing campaign
+  on the heavier dataset, so the retained publication set remains
+  `rect_duct,layered_duct` while mapped pipes stay exploratory.
 - The key layered 3D hardening step was replacing the stiff multi-region
   electric Jacobi iteration with a sparse direct solve of the conservative
   variable-coefficient potential operator.

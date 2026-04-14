@@ -405,6 +405,20 @@ def test_autodiff_profile_design_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "autodiff_profile_design_summary.json").exists()
 
 
+def test_autodiff_extruded_trajectory_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("autodiff_extruded_trajectory_demo.py")
+    summary = module.run_autodiff_extruded_trajectory_demo(
+        out_dir=tmp_path,
+        nx_stations=5,
+        ny=4,
+        nz=4,
+        steps=2,
+    )
+    assert summary["case"] == "extruded_rect_projection_trajectory_design"
+    assert (tmp_path / "autodiff_extruded_trajectory.png").exists()
+    assert (tmp_path / "autodiff_extruded_trajectory_summary.json").exists()
+
+
 def test_autodiff_fringing_design_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("autodiff_fringing_design_demo.py")
     summary = module.run_autodiff_fringing_design_demo(out_dir=tmp_path, steps=4)

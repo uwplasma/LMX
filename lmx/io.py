@@ -492,6 +492,72 @@ def prepare_extruded_output_layout(out_dir: str | Path) -> ExtrudedOutputLayout:
     return layout
 
 
+def _write_extruded_station_archives(solution, case, layout: ExtrudedOutputLayout) -> list[Path]:
+    stations_dir = layout.fields_dir / "stations"
+    stations_dir.mkdir(parents=True, exist_ok=True)
+    stride = max(int(getattr(case.output, "write_stride", 1)), 1)
+    bundle = solution.bundle
+    files: list[Path] = []
+    station_indices = list(range(0, int(bundle.x.shape[0]), stride))
+    if station_indices[-1] != int(bundle.x.shape[0]) - 1:
+        station_indices.append(int(bundle.x.shape[0]) - 1)
+    for index in station_indices:
+        target = stations_dir / f"station_{index:04d}.npz"
+        np.savez_compressed(
+            target,
+            station_index=int(index),
+            x=float(bundle.x[index]),
+            field_scale=float(bundle.field_scale[index]),
+            y=np.asarray(bundle.y),
+            z=np.asarray(bundle.z),
+            u=np.asarray(bundle.u[index]),
+            v=np.asarray(bundle.v[index]),
+            w=np.asarray(bundle.w[index]),
+            p=np.asarray(bundle.p[index]),
+            phi=np.asarray(bundle.phi[index]),
+            jx=np.asarray(bundle.jx[index]),
+            jy=np.asarray(bundle.jy[index]),
+            jz=np.asarray(bundle.jz[index]),
+            lorentz_x=np.asarray(bundle.lorentz_x[index]),
+            lorentz_y=np.asarray(bundle.lorentz_y[index]),
+            lorentz_z=np.asarray(bundle.lorentz_z[index]),
+            residual=float(bundle.residual[index]),
+            volumetric_flow_rate=float(bundle.volumetric_flow_rate[index]),
+            mean_velocity=float(bundle.mean_velocity[index]),
+            axial_current=float(bundle.axial_current[index]),
+            wall_current_leakage=float(bundle.wall_current_leakage[index]),
+            current_scaled_pressure_proxy=float(bundle.current_scaled_pressure_proxy[index]),
+            charge_balance_residual=float(bundle.charge_balance_residual[index]),
+            boundary_current_residual=float(bundle.boundary_current_residual[index]),
+        )
+        files.append(target)
+    manifest = {
+        "case": case.name,
+        "geometry_kind": case.geometry.kind,
+        "solver_kind": case.solver.kind,
+        "station_stride": stride,
+        "station_count": int(bundle.x.shape[0]),
+        "archived_station_indices": station_indices,
+        "archived_files": [path.relative_to(layout.root).as_posix() for path in files],
+        "fields": [
+            "u",
+            "v",
+            "w",
+            "p",
+            "phi",
+            "jx",
+            "jy",
+            "jz",
+            "lorentz_x",
+            "lorentz_y",
+            "lorentz_z",
+        ],
+    }
+    manifest_path = layout.system_dir / f"{case.name}_extruded_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return [manifest_path, *files]
+
+
 def write_solution_outputs(
     solution: Solution,
     case,
@@ -532,7 +598,7 @@ def write_extruded_solution_outputs(
     write_plots: bool = False,
 ) -> dict[str, list[Path]]:
     layout = prepare_extruded_output_layout(out_dir)
-    payload: dict[str, list[Path]] = {"csv": [], "npz": [], "plots": []}
+    payload: dict[str, list[Path]] = {"csv": [], "npz": [], "plots": [], "archive": []}
     station_csv = layout.post_dir / f"{case.name}_station_history.csv"
     station_csv.write_text(
         "x,field_scale,u_max,mean_velocity,volumetric_flow_rate,axial_current,wall_current_leakage,current_scaled_pressure_proxy,residual,charge_balance_residual,boundary_current_residual\n"
@@ -560,6 +626,7 @@ def write_extruded_solution_outputs(
     payload["csv"].append(station_csv)
     if write_npz and case.output.write_npz:
         payload["npz"] = [write_extruded_solution_npz(solution, case, layout.fields_dir / f"{case.name}_extruded_results.npz")]
+        payload["archive"] = _write_extruded_station_archives(solution, case, layout)
     if write_plots and case.output.write_plots:
         from .plotting import write_extruded_overview_plots
 

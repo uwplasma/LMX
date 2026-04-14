@@ -86,6 +86,9 @@ python examples/autodiff_extruded_target_demo.py \
 
 python examples/autodiff_extruded_field_design_demo.py \
   --output artifacts/examples/autodiff_extruded_field_design
+
+python examples/autodiff_extruded_trajectory_demo.py \
+  --output artifacts/examples/autodiff_extruded_trajectory
 ```
 
 That workflow writes:
@@ -222,12 +225,28 @@ Current field-level exploratory artifact:
 
 ![LMX extruded field autodiff summary](_static/generated/autodiff_extruded_field_design.png)
 
-These two extruded autodiff figures should currently be read as research-lane
+The new projection-trajectory example goes one step deeper still. It matches
+selected-station fields and conservation diagnostics across the retained
+projection iterations themselves:
+
+- `u_k(x_i, y, z)`
+- `\phi_k(x_i, y, z)`
+- `J_{y,k}(x_i, y, z)`
+- `p_k(x_i, y, z)`
+- `\max |\nabla \cdot J|_k(x_i)`
+- boundary-current residual history at the sampled stations
+
+Current trajectory-level exploratory artifact:
+
+![LMX extruded trajectory autodiff summary](_static/generated/autodiff_extruded_trajectory.png)
+
+These three extruded autodiff figures should currently be read as research-lane
 evidence of loss reduction, not as the same level of publication-locked
 parameter recovery already achieved by the Hartmann analytical examples. The
 current retained publication autodiff figure remains the Hartmann sensitivity
-and inverse-design summary above; the extruded-target and field-level examples
-are the next differentiable-solver steps and remain explicitly exploratory.
+and inverse-design summary above; the extruded-target, field-level, and
+trajectory-level examples are the next differentiable-solver steps and remain
+explicitly exploratory.
 
 ## References
 

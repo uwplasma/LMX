@@ -275,6 +275,7 @@ python examples/autodiff_fringing_design_demo.py --output artifacts/examples/aut
 python examples/autodiff_fringing_response_demo.py --output artifacts/examples/autodiff_fringing_response
 python examples/autodiff_extruded_target_demo.py --output artifacts/examples/autodiff_extruded_target
 python examples/autodiff_extruded_field_design_demo.py --output artifacts/examples/autodiff_extruded_field_design
+python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples/autodiff_extruded_trajectory
 python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
 ```
@@ -294,6 +295,9 @@ Together, those examples demonstrate:
   rectangular extruded response model in the default rectangular workflow
 - field-level inverse design against selected `u`, `phi`, `J_y`, and `p`
   slices from the retained extruded projection loop
+- projection-trajectory inverse design against selected-station `u`, `phi`,
+  `J_y`, `p`, and charge-balance histories taken across the retained
+  projection iterations themselves
 - polished `PNG`/`PDF` summary figures for publication use
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
@@ -356,6 +360,16 @@ minimal smoke cases: they write station-history CSV files, NPZ bundles, JSON
 summaries, copied input files, and overview/conservation figures directly from
 `lmx input.toml`.
 
+Extruded runs now also write a richer archive surface for larger campaigns:
+
+- `system/<case>_extruded_manifest.json`
+- `fields/stations/station_XXXX.npz`
+
+The manifest records the archived station indices and field list, and the
+station bundles store the retained `u`, `v`, `w`, `p`, `phi`, current, Lorentz,
+and conservation fields at the selected axial stations. The existing
+`write_stride` knob controls the station archive stride.
+
 The 3D lane is now restartable on the executable TOML path as well. Extruded
 runs write a structured output tree:
 
@@ -378,6 +392,7 @@ larger validation datasets:
 ```bash
 python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
+python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples/autodiff_extruded_trajectory
 ```
 
 The larger retained 3D validation campaign currently defaults to

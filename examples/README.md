@@ -29,6 +29,7 @@ python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/a
 python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
 python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
 python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
+python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
@@ -113,6 +114,8 @@ The shipped autodiff examples now cover:
   rectangular target workflow
 - field-level inverse design against selected `u`, `phi`, `jy`, and `p`
   slices from the retained extruded projection loop
+- projection-trajectory inverse design against selected-station fields and
+  charge-balance histories from the retained projection iterations
 - publication-style `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
@@ -141,6 +144,9 @@ The restart and validation campaign examples extend that same 3D lane:
   - runs the bounded larger-dataset fringing campaign on the retained
     `rect_duct,layered_duct` set, writes JSON/CSV, and emits a publication-style
     figure
+- `autodiff_extruded_trajectory_demo.py`
+  - matches selected-station fields and conservation histories across the
+    retained projection iterations themselves, not just the final extruded state
 
 Geometry and mesh preview:
 

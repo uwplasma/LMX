@@ -328,6 +328,8 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
     assert outputs["csv"][0].parent.name == "postProcessing"
     assert outputs["npz"][0].parent.name == "fields"
     assert outputs["plots"][0].parent.name == "plots"
+    assert outputs["archive"][0].name.endswith("_extruded_manifest.json")
+    assert outputs["archive"][1].parent.name == "stations"
     with np.load(npz_path, allow_pickle=False) as data:
         assert data["u"].shape == (3, 2, 2)
         assert data["validation_station_count"] == pytest.approx(3)

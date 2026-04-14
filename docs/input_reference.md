@@ -244,6 +244,9 @@ side = "max"
 - `write_paraview`
 - `write_csv_profiles`
 - `write_npz`
+  - for `extruded_inductionless`, also writes
+    `system/<case>_extruded_manifest.json` plus `fields/stations/station_XXXX.npz`
+    bundles for the selected axial stations
 - `write_json_summary`
 - `write_plots`
   - for `extruded_inductionless`, writes `overview.png` / `overview.pdf`
@@ -251,6 +254,8 @@ side = "max"
     cross-sections
 - `copy_input_file`
 - `write_stride`
+  - for `extruded_inductionless`, controls the archived station stride used for
+    `fields/stations/station_XXXX.npz`
 
 ## `[logging]`
 
