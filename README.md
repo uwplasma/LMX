@@ -250,6 +250,7 @@ The repository also ships a differentiable Hartmann example:
 python examples/autodiff_design_demo.py --output artifacts/examples/autodiff_design
 python examples/autodiff_sensitivity_demo.py --output artifacts/examples/autodiff_sensitivity
 python examples/autodiff_profile_design_demo.py --output artifacts/examples/autodiff_profile_design
+python examples/autodiff_fringing_design_demo.py --output artifacts/examples/autodiff_fringing_design
 ```
 
 Together, those examples demonstrate:
@@ -259,6 +260,7 @@ Together, those examples demonstrate:
   Hartmann number and forcing
 - inverse recovery of a synthetic forcing parameter from a target velocity profile
 - full-profile inverse design recovering both forcing and Hartmann number
+- fringing-history inverse design recovering axial field-profile parameters
 - polished `PNG`/`PDF` summary figures for publication use
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
@@ -278,9 +280,10 @@ python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_
 ```
 
 That example now writes a retained first `extruded_inductionless` research
-slice: a stacked axial field bundle assembled from stationwise fully developed
-solves, with contour plots for `u(x, y, zmid)` and `u(x, ymid, z)` plus
-stationwise charge-balance residuals.
+slice through the explicit `solve_extruded_inductionless(...)` entry point: a
+stacked axial field bundle assembled from stationwise fully developed solves,
+with contour plots for `u(x, y, zmid)` and `u(x, ymid, z)`, stationwise
+charge-balance residuals, and a compact validation summary for the slice.
 
 That workflow generates a smooth axial fringing profile together with stationwise
 cross-sectional response metrics. It is the executable bridge from the current

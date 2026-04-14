@@ -7,11 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lmx.fringing import (
-    build_square_duct_fringing_benchmark,
-    run_extruded_inductionless_slice,
-    run_fringing_station_sweep,
-)
+from lmx.fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
 
 
 def _set_style() -> None:
@@ -37,14 +33,15 @@ def run_fringing_benchmark_demo(
     nx_stations: int = 7,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    base_case, profile = build_square_duct_fringing_benchmark(
+    problem = build_square_duct_extruded_problem(
         ha_peak=ha_peak,
         ny=ny,
         nz=nz,
         nx_stations=nx_stations,
     )
-    history = run_fringing_station_sweep(base_case, profile)
-    extruded = run_extruded_inductionless_slice(base_case, profile)
+    solution = solve_extruded_inductionless(problem)
+    history = solution.station_history
+    extruded = solution.bundle
 
     _set_style()
     fig, axes = plt.subplots(2, 3, constrained_layout=True)
@@ -98,9 +95,9 @@ def run_fringing_benchmark_demo(
     plt.close(fig)
 
     summary = {
-        "case": base_case.name,
-        "solver_kind": base_case.solver.kind,
-        "history": history,
+        "case": problem.case.name,
+        "solver_kind": problem.case.solver.kind,
+        "history": list(history),
         "extruded_bundle": {
             "x": np.asarray(extruded.x).tolist(),
             "y": np.asarray(extruded.y).tolist(),
@@ -109,11 +106,20 @@ def run_fringing_benchmark_demo(
             "u_shape": list(np.asarray(extruded.u).shape),
             "charge_balance_residual": np.asarray(extruded.charge_balance_residual).tolist(),
         },
+        "validation": {
+            "station_count": solution.validation.station_count,
+            "max_residual": solution.validation.max_residual,
+            "max_charge_balance_residual": solution.validation.max_charge_balance_residual,
+            "mean_velocity_span": solution.validation.mean_velocity_span,
+            "volumetric_flow_rate_span": solution.validation.volumetric_flow_rate_span,
+            "field_mean_velocity_correlation": solution.validation.field_mean_velocity_correlation,
+        },
         "plots": [png_path.name, pdf_path.name],
         "notes": (
-            "This example now writes a stacked axial field bundle from stationwise "
-            "fully developed solves. It is the first retained extruded_inductionless "
-            "research slice, but it is still not a full 3D pressure-velocity solve."
+            "This example now runs through the explicit extruded_inductionless "
+            "slice entry point, writing both station history and stacked axial "
+            "field bundles. It remains a vertical slice toward the future full "
+            "3D pressure-velocity-potential solver."
         ),
     }
     (out_dir / "fringing_benchmark_summary.json").write_text(json.dumps(summary, indent=2))

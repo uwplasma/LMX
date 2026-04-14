@@ -11,6 +11,7 @@ for publication figures.
 - sensitivity analysis with `jax.grad`
 - inverse forcing identification from synthetic target profiles
 - full-profile inverse design that recovers both forcing and Hartmann number
+- fringing-history inverse design over axial field-profile parameters
 - publication-style summary plots and JSON outputs
 
 The differentiable lane is intentionally explicit:
@@ -62,6 +63,20 @@ That workflow writes:
 - `autodiff_profile_design.png`
 - `autodiff_profile_design.pdf`
 
+The repository now also ships a fourth autodiff example focused on fringing
+history matching:
+
+```bash
+python examples/autodiff_fringing_design_demo.py \
+  --output artifacts/examples/autodiff_fringing_design
+```
+
+That workflow writes:
+
+- `autodiff_fringing_design_summary.json`
+- `autodiff_fringing_design.png`
+- `autodiff_fringing_design.pdf`
+
 ## Publication artifact
 
 The current `1.0` publication artifact is committed under
@@ -85,6 +100,8 @@ The shipped run demonstrates:
   - sensitivity scan and inverse-design loop
 - `examples/autodiff_profile_design_demo.py`
   - full-profile inverse design over forcing and Hartmann number
+- `examples/autodiff_fringing_design_demo.py`
+  - inverse design over fringing-profile parameters and axial response history
 - `lmx/plotting.py`
   - polished sensitivity/inverse summary figure
 
@@ -120,6 +137,16 @@ simultaneously:
 
 against a full target centerline profile, which is the right next step before
 moving the differentiable lane into Hunt or fringing research studies.
+
+The fringing-design example takes that next step. It optimizes:
+
+- peak Hartmann number
+- fringing entry location
+- fringing exit location
+- fringing transition width
+
+against a target axial mean-velocity history, which is the current bridge from
+Hartmann-only autodiff to fringing-oriented inverse design.
 
 ## References
 

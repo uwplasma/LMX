@@ -2,11 +2,14 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.fringing import (
+    build_square_duct_extruded_problem,
     build_square_duct_fringing_benchmark,
     clone_case_with_field,
     run_extruded_inductionless_slice,
     run_fringing_station_sweep,
+    solve_extruded_inductionless,
     smooth_fringing_profile,
+    validate_extruded_inductionless_solution,
 )
 
 
@@ -118,3 +121,89 @@ def test_run_extruded_inductionless_slice_stacks_station_fields():
     assert bundle.solver_kind == base_case.solver.kind
     assert jnp.isfinite(bundle.u).all()
     assert jnp.isfinite(bundle.charge_balance_residual).all()
+
+
+def test_build_square_duct_extruded_problem_marks_solver_family():
+    problem = build_square_duct_extruded_problem(nx_stations=5, ny=8, nz=8)
+
+    assert problem.case.solver.kind == "extruded_inductionless"
+    assert problem.profile.x.shape == (5,)
+
+
+def test_validate_extruded_inductionless_solution_reports_metrics():
+    base_case, profile = build_square_duct_fringing_benchmark(nx_stations=4, ny=6, nz=6)
+    bundle = run_extruded_inductionless_slice(
+        base_case,
+        profile,
+        solver=lambda case, initial_state=None: type(
+            "Solution",
+            (),
+            {
+                "mesh": type("Mesh", (), {"y_centers": jnp.linspace(-1.0, 1.0, 6), "z_centers": jnp.linspace(-1.0, 1.0, 6)})(),
+                "state": type(
+                    "State",
+                    (),
+                    {
+                        "u": jnp.ones((6, 6)),
+                        "phi": jnp.zeros((6, 6)),
+                        "jy": jnp.zeros((6, 6)),
+                        "jz": jnp.zeros((6, 6)),
+                        "lorentz_x": jnp.zeros((6, 6)),
+                        "time": 0.0,
+                        "residual": 1.0e-6,
+                    },
+                )(),
+                "diagnostics": type(
+                    "Diagnostics",
+                    (),
+                    {
+                        "volumetric_flow_rate_history": jnp.asarray([1.0]),
+                        "mean_velocity_history": jnp.asarray([0.5]),
+                        "current_scaled_pressure_proxy_history": jnp.asarray([0.2]),
+                        "charge_balance_residual_history": jnp.asarray([1.0e-7]),
+                    },
+                )(),
+            },
+        )(),
+    )
+
+    report = validate_extruded_inductionless_solution(bundle)
+    assert report.station_count == 4
+    assert report.max_charge_balance_residual >= 0.0
+    assert jnp.isfinite(report.field_mean_velocity_correlation)
+
+
+def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkeypatch: pytest.MonkeyPatch):
+    problem = build_square_duct_extruded_problem(nx_stations=3, ny=6, nz=6)
+    monkeypatch.setattr(
+        "lmx.fringing.run_fringing_station_sweep",
+        lambda case, profile, solver=None: [{"x": 0.0}, {"x": 0.5}, {"x": 1.0}],
+    )
+    fake_bundle = type(
+        "Bundle",
+        (),
+        {
+            "x": jnp.asarray([0.0, 0.5, 1.0]),
+            "field_scale": jnp.asarray([0.0, 1.0, 0.0]),
+            "mean_velocity": jnp.asarray([0.1, 0.3, 0.12]),
+            "volumetric_flow_rate": jnp.asarray([0.2, 0.4, 0.25]),
+            "residual": jnp.asarray([1.0e-4, 1.0e-5, 1.0e-5]),
+            "charge_balance_residual": jnp.asarray([1.0e-8, 2.0e-8, 1.5e-8]),
+            "y": jnp.asarray([0.0]),
+            "z": jnp.asarray([0.0]),
+            "u": jnp.ones((3, 1, 1)),
+            "phi": jnp.zeros((3, 1, 1)),
+            "jy": jnp.zeros((3, 1, 1)),
+            "jz": jnp.zeros((3, 1, 1)),
+            "lorentz_x": jnp.zeros((3, 1, 1)),
+            "current_scaled_pressure_proxy": jnp.asarray([0.1, 0.15, 0.1]),
+            "geometry_kind": "rect_duct",
+            "solver_kind": "extruded_inductionless",
+        },
+    )()
+    monkeypatch.setattr("lmx.fringing.run_extruded_inductionless_slice", lambda case, profile, solver=None: fake_bundle)
+
+    solution = solve_extruded_inductionless(problem)
+    assert len(solution.station_history) == 3
+    assert solution.validation.station_count == 3
+    assert solution.bundle.solver_kind == "extruded_inductionless"

@@ -3,12 +3,16 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.autodiff import (
+    build_fringing_autodiff_problem,
     build_hartmann_autodiff_problem,
+    fringing_history_loss_gradients,
+    fringing_mean_velocity_history,
     hartmann_mean_velocity,
     hartmann_mean_velocity_finite_difference_gradients,
     hartmann_mean_velocity_gradients,
     hartmann_profile_loss,
     hartmann_profile_loss_gradients,
+    run_fringing_history_inverse_design,
     run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
 )
@@ -95,3 +99,73 @@ def test_profile_inverse_design_reduces_loss():
     assert len(result["history"]) == 8
     assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
     assert jnp.isfinite(result["recovered_profile"]).all()
+
+
+def test_fringing_mean_velocity_history_returns_finite_trace():
+    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    payload = fringing_mean_velocity_history(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=12.0,
+        entry_center=1.0,
+        exit_center=4.0,
+        transition_width=0.4,
+    )
+
+    assert payload["x"].shape == (9,)
+    assert payload["field_scale"].shape == (9,)
+    assert payload["mean_velocity"].shape == (9,)
+    assert jnp.isfinite(payload["mean_velocity"]).all()
+
+
+def test_fringing_history_loss_gradients_are_finite():
+    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    target = fringing_mean_velocity_history(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=14.0,
+        entry_center=1.2,
+        exit_center=4.1,
+        transition_width=0.35,
+    )
+    gradients = fringing_history_loss_gradients(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=10.0,
+        entry_center=0.8,
+        exit_center=4.8,
+        transition_width=0.6,
+        target_mean_velocity=target["mean_velocity"],
+    )
+
+    assert jnp.isfinite(gradients["loss"])
+    assert jnp.isfinite(gradients["d_peak_hartmann_number"])
+    assert jnp.isfinite(gradients["d_entry_center"])
+    assert jnp.isfinite(gradients["d_exit_center"])
+    assert jnp.isfinite(gradients["d_transition_width"])
+
+
+def test_fringing_inverse_design_reduces_loss():
+    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    target = fringing_mean_velocity_history(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=14.0,
+        entry_center=1.2,
+        exit_center=4.1,
+        transition_width=0.35,
+    )
+    result = run_fringing_history_inverse_design(
+        problem,
+        target_mean_velocity=target["mean_velocity"],
+        forcing=1.0,
+        peak_hartmann_init=8.0,
+        entry_center_init=0.7,
+        exit_center_init=5.0,
+        transition_width_init=0.7,
+        steps=6,
+    )
+
+    assert len(result["history"]) == 6
+    assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
+    assert jnp.isfinite(result["recovered_mean_velocity"]).all()

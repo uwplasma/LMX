@@ -38,6 +38,30 @@ class ExtrudedFieldBundle:
     solver_kind: str
 
 
+@dataclass(frozen=True)
+class ExtrudedInductionlessProblem:
+    case: CaseSpec
+    profile: FringingProfile
+
+
+@dataclass(frozen=True)
+class ExtrudedInductionlessValidation:
+    station_count: int
+    max_residual: float
+    max_charge_balance_residual: float
+    mean_velocity_span: float
+    volumetric_flow_rate_span: float
+    field_mean_velocity_correlation: float
+
+
+@dataclass(frozen=True)
+class ExtrudedInductionlessSolution:
+    problem: ExtrudedInductionlessProblem
+    bundle: ExtrudedFieldBundle
+    station_history: tuple[dict[str, float], ...]
+    validation: ExtrudedInductionlessValidation
+
+
 def smooth_fringing_profile(
     *,
     length: float,
@@ -89,6 +113,7 @@ def build_square_duct_fringing_benchmark(
     base_case = make_shercliff_case(ha=ha_peak, width=width, height=height, ny=ny, nz=nz)
     base_case = replace(
         base_case,
+        geometry=replace(base_case.geometry, length=length, nx=nx_stations),
         time_stepper=replace(
             base_case.time_stepper,
             max_steps=min(base_case.time_stepper.max_steps, 80),
@@ -97,6 +122,7 @@ def build_square_duct_fringing_benchmark(
         ),
         solver=replace(
             base_case.solver,
+            kind="extruded_inductionless",
             coupling_iterations=min(base_case.solver.coupling_iterations, 8),
             coupling_tolerance=1.0e-7,
         ),
@@ -113,6 +139,39 @@ def build_square_duct_fringing_benchmark(
     return base_case, profile
 
 
+def build_square_duct_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    width: float = 2.0,
+    height: float = 2.0,
+    ny: int = 48,
+    nz: int = 48,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+) -> ExtrudedInductionlessProblem:
+    case, profile = build_square_duct_fringing_benchmark(
+        ha_peak=ha_peak,
+        width=width,
+        height=height,
+        ny=ny,
+        nz=nz,
+        length=length,
+        nx_stations=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
+def _station_case(base_case: CaseSpec, *, axis: str, magnitude: float, suffix: str) -> CaseSpec:
+    station_case = clone_case_with_field(base_case, axis=axis, magnitude=magnitude, suffix=suffix)
+    return replace(station_case, solver=replace(station_case.solver, kind="fully_developed_inductionless"))
+
+
 def run_fringing_station_sweep(
     base_case: CaseSpec,
     profile: FringingProfile,
@@ -126,7 +185,7 @@ def run_fringing_station_sweep(
     history: list[dict[str, float]] = []
     previous_state = None
     for index, (x_value, scale) in enumerate(zip(profile.x, profile.field_scale, strict=True)):
-        station_case = clone_case_with_field(
+        station_case = _station_case(
             base_case,
             axis=profile.axis,
             magnitude=base_magnitude * float(scale),
@@ -166,7 +225,7 @@ def run_extruded_inductionless_slice(
     previous_state = None
     station_solutions: list[Solution] = []
     for index, scale in enumerate(profile.field_scale):
-        station_case = clone_case_with_field(
+        station_case = _station_case(
             base_case,
             axis=profile.axis,
             magnitude=base_magnitude * float(scale),
@@ -236,4 +295,52 @@ def run_extruded_inductionless_slice(
         charge_balance_residual=charge_balance_residual,
         geometry_kind=base_case.geometry.kind,
         solver_kind=base_case.solver.kind,
+    )
+
+
+def validate_extruded_inductionless_solution(
+    bundle: ExtrudedFieldBundle,
+    *,
+    station_history: list[dict[str, float]] | tuple[dict[str, float], ...] | None = None,
+) -> ExtrudedInductionlessValidation:
+    field_scale = jnp.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = jnp.asarray(bundle.mean_velocity, dtype=float)
+    volumetric_flow_rate = jnp.asarray(bundle.volumetric_flow_rate, dtype=float)
+    residual = jnp.asarray(bundle.residual, dtype=float)
+    charge_balance_residual = jnp.asarray(bundle.charge_balance_residual, dtype=float)
+    centered_field = field_scale - jnp.mean(field_scale)
+    centered_velocity = mean_velocity - jnp.mean(mean_velocity)
+    denom = jnp.sqrt(jnp.sum(centered_field**2) * jnp.sum(centered_velocity**2))
+    correlation = jnp.where(
+        denom > 0.0,
+        jnp.sum(centered_field * centered_velocity) / denom,
+        0.0,
+    )
+    return ExtrudedInductionlessValidation(
+        station_count=int(bundle.x.shape[0]),
+        max_residual=float(jnp.max(jnp.abs(residual))) if residual.size else 0.0,
+        max_charge_balance_residual=float(jnp.max(jnp.abs(charge_balance_residual)))
+        if charge_balance_residual.size
+        else 0.0,
+        mean_velocity_span=float(jnp.max(mean_velocity) - jnp.min(mean_velocity)) if mean_velocity.size else 0.0,
+        volumetric_flow_rate_span=float(jnp.max(volumetric_flow_rate) - jnp.min(volumetric_flow_rate))
+        if volumetric_flow_rate.size
+        else 0.0,
+        field_mean_velocity_correlation=float(correlation),
+    )
+
+
+def solve_extruded_inductionless(
+    problem: ExtrudedInductionlessProblem,
+    *,
+    solver=solve_steady,
+) -> ExtrudedInductionlessSolution:
+    station_history = run_fringing_station_sweep(problem.case, problem.profile, solver=solver)
+    bundle = run_extruded_inductionless_slice(problem.case, problem.profile, solver=solver)
+    validation = validate_extruded_inductionless_solution(bundle, station_history=station_history)
+    return ExtrudedInductionlessSolution(
+        problem=problem,
+        bundle=bundle,
+        station_history=tuple(station_history),
+        validation=validation,
     )

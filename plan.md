@@ -97,6 +97,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - A third autodiff example now performs full-profile inverse design over both
   forcing and Hartmann number, broadening the differentiable lane from scalar
   matching to small field-level inverse problems.
+- A fourth autodiff example now performs fringing-history inverse design over
+  peak Hartmann number and axial field-profile shape parameters, which is the
+  first retained bridge from Hartmann-only autodiff into fringing-oriented
+  research objectives.
 - The fully developed potential solve now projects its right-hand side onto a
   charge-neutral compatibility space and tracks an explicit
   `charge_balance_residual` diagnostic alongside `max|div J|`.
@@ -109,6 +113,11 @@ Ship a research-grade `1.0` inductionless MHD code with:
   developed solves, plus stationwise charge-balance residuals. This is the
   first explicit vertical slice toward `extruded_inductionless`, even though it
   is still not a full 3D pressure-velocity solve.
+- That fringing path is now wrapped in an explicit
+  `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` public entry
+  point, with validation metrics for residual size, charge balance, and
+  field/response correlation. This is still a vertical slice, not yet the
+  final 3D pressure-velocity-potential solver.
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.
@@ -127,6 +136,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - The CPU and remote-GPU scaling workflow has now been revalidated on the live
   `office` host after the post-`1.0` compatibility changes, including Python
   `3.10` and a different installed JAX version.
+- A manual solver-family hardening script now exists for the heavier
+  post-1.0 release-validation lane so larger Hartmann/Shercliff/Hunt cases can
+  be rerun without polluting the fast ship gate.
 - A fresh matched one-device smoke comparison now confirms the expected device
   direction of travel on the current tree: local CPU `512 x 512`, `32`
   iterations gives `warm_seconds ≈ 4.31e-3`, while a single office GPU gives

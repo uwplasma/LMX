@@ -1,15 +1,18 @@
 # Fringing-Field Research Slice
 
 LMX `1.0` does not yet ship the full `extruded_inductionless` solver family.
-What it does ship now is the executable scaffold that the next paper phase will
-use to get there:
+What it does ship now is the first explicit solver-family entry point that the
+next paper phase will build on:
 
 - a smooth axial fringing-field profile generator in `lmx/fringing.py`
 - a stationwise sweep driver that reuses the fully developed solver as a cheap
   research scaffold
+- an `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` workflow
+  that wraps the stacked slice as an actual public solver entry point
 - a stacked axial field-bundle builder that assembles `u(x, y, z)`,
   `phi(x, y, z)`, current, Lorentz, and charge-balance histories from those
   station solves
+- an explicit validation summary for that extruded slice
 - a publication-style example in `examples/fringing_benchmark_demo.py`
 
 This is explicit by design. The current scaffold is not a replacement for a
@@ -31,6 +34,7 @@ The example writes:
 - `fringing_benchmark.pdf`
 - an `extruded_bundle` section in the JSON summary with axial field-bundle shape
   and charge-balance histories
+- a `validation` section with residual and field/response consistency metrics
 
 ## What the example shows
 
@@ -46,8 +50,8 @@ planning the first `extruded_inductionless` acceptance set.
 ## Source map
 
 - `lmx/fringing.py`
-  - fringing-profile construction, stationwise sweep utilities, and stacked
-    axial field bundles
+  - fringing-profile construction, stationwise sweep utilities, the extruded
+    slice solver entry point, validation helpers, and stacked axial field bundles
 - `examples/fringing_benchmark_demo.py`
   - user-facing fringing benchmark slice with publication-style plots
 - `docs/benchmark_matrix.md`
