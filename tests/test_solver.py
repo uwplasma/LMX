@@ -9,7 +9,7 @@ from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.physics import build_material_fields, magnetic_field_components, magnetic_ramp_scale
 import lmx.solvers as solvers
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
-from lmx.specs import BoundaryCondition
+from lmx.specs import BoundaryCondition, GeometrySpec
 from lmx.solvers import solve_steady, solve_transient
 
 
@@ -521,6 +521,23 @@ def test_bounded_time_step_count_does_not_round_up_fractional_end_times():
     assert solvers._bounded_time_step_count(start_time=0.0, dt=0.02, t_final=0.01, max_steps=200) == 0
 
 
+def test_bounded_time_step_count_rejects_bad_dt_and_handles_empty_windows():
+    with pytest.raises(ValueError, match="dt must be positive"):
+        solvers._bounded_time_step_count(start_time=0.0, dt=0.0, t_final=1.0, max_steps=10)
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.1, t_final=1.0, max_steps=0) == 0
+    assert solvers._bounded_time_step_count(start_time=1.0, dt=0.1, t_final=1.0, max_steps=10) == 0
+
+
+def test_build_mesh_and_mask_helpers_cover_unsupported_and_passthrough_paths():
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    bad_case = replace(case, geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8))
+    with pytest.raises(NotImplementedError, match="not supported"):
+        solvers._build_mesh(bad_case)
+    fluid_mask = jnp.asarray([[True, True], [True, True]])
+    assert solvers._active_velocity_mask_for_solver(fluid_mask, "fully_developed_inductionless").shape == fluid_mask.shape
+    assert jnp.array_equal(solvers._active_velocity_mask_for_solver(fluid_mask, "other"), fluid_mask)
+
+
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(case, time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4))
@@ -614,10 +631,36 @@ def test_potential_solver_supports_lineax_and_rejects_unknown_backend(monkeypatc
         )
 
 
+def test_potential_solver_supports_jacobi_backend():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    sigma = jnp.ones(mesh.yz_shape)
+    fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    u = jnp.zeros(mesh.yz_shape)
+    by = jnp.zeros(mesh.yz_shape)
+    bz = jnp.ones(mesh.yz_shape)
+    phi, residual, iterations, initial_residual = solvers._solve_potential(
+        mesh,
+        sigma,
+        fluid_mask,
+        u,
+        by,
+        bz,
+        anchor=(0, 0),
+        iterations=8,
+        tolerance=1e-6,
+        solver="jacobi",
+    )
+    assert jnp.isfinite(phi).all()
+    assert float(initial_residual) >= 0.0
+    assert float(residual) >= 0.0
+    assert int(iterations) >= 0
+
+
 def test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask():
     full_mask = jnp.ones((2, 2), dtype=bool)
     assert solvers._resolve_potential_solver("auto", None) == "cg"
     assert solvers._resolve_potential_solver("auto", full_mask) == "cg"
+    assert solvers._resolve_potential_solver("jacobi", full_mask) == "jacobi"
 
 
 def test_enforce_velocity_bc_supports_direct_wall_interpolation():
@@ -661,6 +704,45 @@ def test_velocity_update_limiters_cover_local_clip_and_validation_errors():
         solvers._velocity_update_statistics(current, trial, fluid_mask, max_delta=0.5, limiter="bad")
 
 
+def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
+    current = jnp.zeros((2, 2))
+    trial = jnp.asarray([[2.0, -2.0], [0.25, -0.25]])
+    fluid_mask = jnp.asarray([[True, True], [True, False]])
+    updated = solvers._limited_velocity_update(current, trial, fluid_mask, max_delta=0.5, limiter="global_scale")
+    assert float(jnp.max(jnp.abs(updated))) <= 0.5 + 1e-12
+
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=2, nz=2)
+    sigma = jnp.ones((2, 2))
+    rho = jnp.ones((2, 2))
+    phi = jnp.asarray([[0.0, 0.1], [0.2, 0.3]])
+    by = jnp.ones((2, 2))
+    bz = jnp.zeros((2, 2))
+    rhs, lorentz_source = solvers._fully_developed_rhs(
+        mesh=mesh,
+        sigma=sigma,
+        rho=rho,
+        fluid_mask=jnp.ones((2, 2), dtype=bool),
+        phi=phi,
+        by=by,
+        bz=bz,
+        forcing=jnp.asarray(1.0),
+    )
+    assert rhs.shape == phi.shape
+    assert lorentz_source.shape == phi.shape
+    diagnostics = type(
+        "Diagnostics",
+        (),
+        {"face_current_max_history": jnp.asarray([]), "current_max_history": jnp.asarray([2.5])},
+    )()
+    assert solvers._pressure_proxy_reference_current(diagnostics) == pytest.approx(2.5)
+    diagnostics_empty = type(
+        "Diagnostics",
+        (),
+        {"face_current_max_history": jnp.asarray([]), "current_max_history": jnp.asarray([])},
+    )()
+    assert solvers._pressure_proxy_reference_current(diagnostics_empty) is None
+
+
 def test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     tuple_bc = BoundaryCondition("tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="z")
@@ -699,6 +781,134 @@ def test_fully_developed_case_step_rejects_crank_nicolson_in_transient_mode():
             coupling_iterations=1,
             coupling_tolerance=1e-8,
         )
+
+
+def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
+    forcing_case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    mesh = solvers._build_mesh(forcing_case)
+    materials = build_material_fields(forcing_case, mesh)
+    result = solvers._fully_developed_case_step(
+        case=forcing_case,
+        mesh=mesh,
+        materials=materials,
+        u_previous=jnp.zeros(mesh.yz_shape),
+        step_time=forcing_case.time_stepper.dt,
+        potential_solver="cg",
+        target_mean_velocity=None,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        coupling_iterations=2,
+        coupling_tolerance=1e-6,
+    )
+    assert len(result) == 17
+    assert jnp.isfinite(result[0]).all()
+
+    flow_case = replace(
+        forcing_case,
+        forcing=0.0,
+        boundary_conditions=(BoundaryCondition("inlet", "inlet_flow_rate", value=0.5),),
+    )
+    flow_mesh = solvers._build_mesh(flow_case)
+    flow_materials = build_material_fields(flow_case, flow_mesh)
+    flow_result = solvers._fully_developed_case_step(
+        case=flow_case,
+        mesh=flow_mesh,
+        materials=flow_materials,
+        u_previous=jnp.zeros(flow_mesh.yz_shape),
+        step_time=flow_case.time_stepper.dt,
+        potential_solver="cg",
+        target_mean_velocity=solvers._target_mean_velocity(flow_case),
+        linear_solver="cg",
+        preconditioner="jacobi",
+        coupling_iterations=2,
+        coupling_tolerance=1e-6,
+    )
+    assert jnp.isfinite(flow_result[0]).all()
+    assert float(flow_result[14]) == pytest.approx(float(flow_result[14]))
+
+
+def test_solver_logging_helpers_and_footer_are_emitted():
+    calls: list[str] = []
+
+    class Logger:
+        def emit_header(self, **kwargs):
+            calls.append("header")
+
+        def emit_step(self, record):
+            calls.append("step")
+
+        def emit_footer(self, solution):
+            calls.append("footer")
+
+    logger = Logger()
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    solvers._emit_solver_header(
+        logger,
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        mode="steady",
+        potential_solver="cg",
+        target_mean_velocity=None,
+        reference_mean_velocity=None,
+    )
+    solvers._emit_solver_step(
+        logger,
+        step_index=1,
+        step_time=0.1,
+        dt=0.1,
+        u_max_value=0.1,
+        mean_velocity=0.1,
+        max_current=0.0,
+        face_current_max=0.0,
+        emf_max=0.0,
+        max_lorentz=0.0,
+        face_lorentz_max=0.0,
+        residual_value=1.0e-6,
+        potential_residual=1.0e-6,
+        potential_iteration_count=1.0,
+        linear_residual=1.0e-6,
+        linear_iteration_count=1.0,
+        applied_forcing=1.0,
+        pressure_proxy=1.0,
+        current_scaled_pressure_proxy=1.0,
+        raw_update_max=1.0e-6,
+        limiter_scale=1.0,
+        limited_fraction=0.0,
+        courant_like=0.0,
+        ohmic=0.0,
+        volumetric_flow_rate=0.0,
+        mean_current_magnitude=0.0,
+        lorentz_power=0.0,
+        div_current_max=0.0,
+        charge_balance_residual=0.0,
+        gauge_residual=0.0,
+        interface_current_residual=0.0,
+        potential_initial_residual=1.0e-6,
+        linear_initial_residual=1.0e-6,
+    )
+    solution = solve_steady(case)
+    logger.emit_footer(solution)
+    assert calls == ["header", "step", "footer"]
+
+
+def test_fully_developed_solver_rejects_unsupported_geometry_after_mesh_build(monkeypatch: pytest.MonkeyPatch):
+    case = replace(make_hartmann_case(ha=5.0, ny=4, nz=4), geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8))
+    fake_mesh = generate_rect_duct_mesh(width=1.0, height=1.0, ny=4, nz=4)
+    monkeypatch.setattr(solvers, "_build_mesh", lambda case: fake_mesh)
+    monkeypatch.setattr(solvers, "build_material_fields", lambda case, mesh: build_material_fields(make_hartmann_case(ha=5.0, ny=4, nz=4), fake_mesh))
+    with pytest.raises(NotImplementedError, match="does not yet support geometry"):
+        solvers._solve_fully_developed(case)
+
+
+def test_public_solver_entrypoints_reject_unknown_solver_kinds():
+    case = replace(make_hartmann_case(ha=5.0, ny=4, nz=4), solver=replace(make_hartmann_case(ha=5.0, ny=4, nz=4).solver, kind="extruded_inductionless"))
+    with pytest.raises(NotImplementedError, match="not implemented for transient"):
+        solve_transient(case)
+    with pytest.raises(NotImplementedError, match="not implemented for steady"):
+        solve_steady(case)
 
 
 for _unit_test_name in (

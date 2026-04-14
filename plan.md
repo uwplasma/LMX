@@ -258,21 +258,25 @@ That retained gate now passes for all three retained fringing geometries.
   loop itself through a trajectory-level objective that matches selected-station
   `u`, `phi`, `J_y`, `p`, charge-balance, and boundary-current histories across
   the retained projection iterations.
-- The heavier exploratory 3D campaign with mapped pipes revalidated the current
-  gate decision: `pipe_ogrid` still fails the larger retained fringing campaign
-  on the heavier dataset, so the retained publication set remains
-  `rect_duct,layered_duct` while mapped pipes stay exploratory.
+- The heavier bounded 3D campaign now passes the retained conservation gate for
+  `pipe_ogrid` as well, after the cylindrical electric/current operator was
+  rewritten around conservative face fluxes and a stable O-grid time-step
+  estimate. The retained conservation-validation set is now
+  `rect_duct,layered_duct,pipe_ogrid`.
 - A new reviewer-facing geometry panel now ships all three current geometries
   in a single figure, and a dedicated exploratory mapped-pipe comparison script
   now writes a bounded qualitative comparison against the shipped external
   fringing-pipe profiles.
-- The current exploratory mapped-pipe hardening numbers are still too weak for
-  promotion:
-  - `max_charge_balance_residual ≈ 9.16e-1` at `Ha=10`, `resolution=8`
-  - `max_charge_balance_residual ≈ 1.19e0` at `Ha=20`, `resolution=8`
-  - `max_wall_current_leakage ≈ 1.09e-1` at `Ha=20`, `resolution=8`
-  - normalized external-profile shape errors are about `1.02`, `3.84e-1`, and
-    `3.33e-1` on the center, negative-offset, and positive-offset lines
+- The current mapped-pipe hardening numbers on the heavier bounded dataset are:
+  - `max_charge_balance_residual ≈ 5.63e-2` at `Ha=10`, `resolution=8`
+  - `max_charge_balance_residual ≈ 1.20e-2` at `Ha=10`, `resolution=12`
+  - `max_charge_balance_residual ≈ 1.10e-1` at `Ha=20`, `resolution=8`
+  - `max_charge_balance_residual ≈ 2.40e-2` at `Ha=20`, `resolution=12`
+  - `max_wall_current_leakage = 0`
+  - `net_boundary_current_residual = 0`
+  - external-profile comparison is still qualitative, with center-line
+    normalized error about `1.66e-1` and off-center absolute errors about
+    `9.89e-1`
 - The key layered 3D hardening step was replacing the stiff multi-region
   electric Jacobi iteration with a sparse direct solve of the conservative
   variable-coefficient potential operator.

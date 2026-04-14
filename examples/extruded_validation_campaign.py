@@ -33,7 +33,7 @@ def run_extruded_validation_campaign(
     ha_values: str = "10,20",
     resolutions: str = "10,14,18",
     fringing_nx: int = 7,
-    fringing_geometries: str = "rect_duct,layered_duct",
+    fringing_geometries: str = "rect_duct,layered_duct,pipe_ogrid",
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
     summary_path = out_dir / "solver_family_summary.json"
@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ha-values", type=str, default="10,20")
     parser.add_argument("--resolutions", type=str, default="10,14,18")
     parser.add_argument("--fringing-nx", type=int, default=7)
-    parser.add_argument("--fringing-geometries", type=str, default="rect_duct,layered_duct")
+    parser.add_argument("--fringing-geometries", type=str, default="rect_duct,layered_duct,pipe_ogrid")
     args = parser.parse_args(argv)
     run_extruded_validation_campaign(
         out_dir=args.output,

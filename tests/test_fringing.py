@@ -357,6 +357,8 @@ def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
     assert jnp.isfinite(solution.bundle.u).all()
     assert jnp.isfinite(solution.bundle.axial_current).all()
     assert jnp.isfinite(solution.bundle.wall_current_leakage).all()
+    assert solution.validation.max_charge_balance_residual < 0.5
+    assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
 
 
 def test_poisson_helpers_can_stop_early():

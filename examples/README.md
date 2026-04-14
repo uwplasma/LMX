@@ -146,7 +146,7 @@ The restart and validation campaign examples extend that same 3D lane:
     against a direct run with the same total step count
 - `extruded_validation_campaign.py`
   - runs the bounded larger-dataset fringing campaign on the retained
-    `rect_duct,layered_duct` set, writes JSON/CSV, and emits a publication-style
+    `rect_duct,layered_duct,pipe_ogrid` conservation-validation set, writes JSON/CSV, and emits a publication-style
     figure
 - `autodiff_extruded_trajectory_demo.py`
   - matches selected-station fields and conservation histories across the

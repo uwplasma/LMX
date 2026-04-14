@@ -778,6 +778,239 @@ def _pipe_poisson_jacobi_3d(
     return field, residual, iteration_count, initial_residual
 
 
+def _pipe_conservative_current_fluxes_3d(
+    sigma: jnp.ndarray,
+    phi: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_r: jnp.ndarray,
+    uxb_theta: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    nx, nr, ntheta = phi.shape
+    fx = jnp.zeros((nx + 1, nr, ntheta), dtype=phi.dtype)
+    fr = jnp.zeros((nx, nr + 1, ntheta), dtype=phi.dtype)
+    ftheta = jnp.zeros((nx, nr, ntheta), dtype=phi.dtype)
+
+    sigma_x = _harmonic_mean(sigma[1:], sigma[:-1])
+    phi_grad_x = (phi[1:] - phi[:-1]) / max(dx, 1.0e-12)
+    uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
+    fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
+
+    dr_centers = jnp.maximum(0.5 * (jnp.diff(r_faces)[1:] + jnp.diff(r_faces)[:-1]), 1.0e-12)
+    sigma_r = _harmonic_mean(sigma[:, 1:, :], sigma[:, :-1, :])
+    phi_grad_r = (phi[:, 1:, :] - phi[:, :-1, :]) / dr_centers[None, :, None]
+    uxb_face_r = 0.5 * (uxb_r[:, 1:, :] + uxb_r[:, :-1, :])
+    fr = fr.at[:, 1:-1, :].set(sigma_r * (-phi_grad_r + uxb_face_r))
+
+    sigma_theta = _harmonic_mean(sigma, jnp.roll(sigma, -1, axis=2))
+    phi_grad_theta = (jnp.roll(phi, -1, axis=2) - phi) / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-12)
+    uxb_face_theta = 0.5 * (uxb_theta + jnp.roll(uxb_theta, -1, axis=2))
+    ftheta = sigma_theta * (-phi_grad_theta + uxb_face_theta)
+    return fx, fr, ftheta
+
+
+def _pipe_conservative_current_diagnostics_3d(
+    sigma: jnp.ndarray,
+    phi: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_r: jnp.ndarray,
+    uxb_theta: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    fx, fr, ftheta = _pipe_conservative_current_fluxes_3d(
+        sigma,
+        phi,
+        uxb_x,
+        uxb_r,
+        uxb_theta,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    dr = jnp.diff(r_faces)
+    radial_term = (
+        r_faces[None, 1:, None] * fr[:, 1:, :] - r_faces[None, :-1, None] * fr[:, :-1, :]
+    ) / jnp.maximum(r_centers[None, :, None] * dr[None, :, None], 1.0e-12)
+    theta_term = (ftheta - jnp.roll(ftheta, 1, axis=2)) / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-12)
+    div_j = (fx[1:] - fx[:-1]) / max(dx, 1.0e-12) + radial_term + theta_term
+    wall_area = float(r_faces[-1]) * dx * dtheta
+    wall_leakage = jnp.sum(jnp.abs(fr[:, -1, :]) * wall_area, axis=1)
+    yz_area = r_centers[:, None] * dr[:, None] * dtheta
+    boundary_residual = jnp.abs(
+        -jnp.sum(fx[0] * yz_area)
+        + jnp.sum(fx[-1] * yz_area)
+        + jnp.sum(fr[:, -1, :] * wall_area, axis=1)
+    )
+    return div_j, wall_leakage, boundary_residual
+
+
+def _pipe_conservative_emf_rhs_3d(
+    sigma: jnp.ndarray,
+    uxb_x: jnp.ndarray,
+    uxb_r: jnp.ndarray,
+    uxb_theta: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+) -> jnp.ndarray:
+    zeros = jnp.zeros_like(uxb_x)
+    fx, fr, ftheta = _pipe_conservative_current_fluxes_3d(
+        sigma,
+        zeros,
+        uxb_x,
+        uxb_r,
+        uxb_theta,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    dr = jnp.diff(r_faces)
+    radial_term = (
+        r_faces[None, 1:, None] * fr[:, 1:, :] - r_faces[None, :-1, None] * fr[:, :-1, :]
+    ) / jnp.maximum(r_centers[None, :, None] * dr[None, :, None], 1.0e-12)
+    theta_term = (ftheta - jnp.roll(ftheta, 1, axis=2)) / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-12)
+    return (fx[1:] - fx[:-1]) / max(dx, 1.0e-12) + radial_term + theta_term
+
+
+def _pipe_poisson_sparse_3d(
+    rhs: jnp.ndarray,
+    conductivity: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+    iterations: int,
+    tolerance: float,
+    initial_field: jnp.ndarray | None = None,
+) -> tuple[jnp.ndarray, float, int, float]:
+    if sparse is None or sparse_spsolve is None:
+        field, residual, iteration_count, initial_residual = _pipe_poisson_jacobi_3d(
+            rhs,
+            dx=dx,
+            dr=float(jnp.mean(jnp.diff(r_faces))),
+            dtheta=dtheta,
+            r=r_centers[None, :, None],
+            iterations=iterations,
+            tolerance=tolerance,
+        )
+        return field, residual, iteration_count, initial_residual
+
+    rhs_np = np.asarray(rhs, dtype=float)
+    sigma_np = np.asarray(conductivity, dtype=float)
+    r_faces_np = np.asarray(r_faces, dtype=float)
+    r_centers_np = np.asarray(r_centers, dtype=float)
+    dr_np = np.diff(r_faces_np)
+    cell_weights = (r_centers_np[None, :, None] * dr_np[None, :, None]) * dtheta
+    rhs_np = rhs_np - np.sum(rhs_np * cell_weights) / max(np.sum(cell_weights), 1.0e-20)
+
+    nx, nr, ntheta = rhs_np.shape
+    size = nx * nr * ntheta
+
+    def flat(i: int, j: int, k: int) -> int:
+        return (i * nr + j) * ntheta + k
+
+    rows: list[int] = []
+    cols: list[int] = []
+    data: list[float] = []
+    rhs_vector = rhs_np.reshape(-1).copy()
+    anchor = flat(0, 0, 0)
+
+    for i in range(nx):
+        for j in range(nr):
+            for k in range(ntheta):
+                row = flat(i, j, k)
+                if row == anchor:
+                    rows.append(row)
+                    cols.append(row)
+                    data.append(1.0)
+                    rhs_vector[row] = 0.0
+                    continue
+
+                diagonal = 0.0
+                sigma_cell = sigma_np[i, j, k]
+                if i > 0:
+                    sigma_face = _harmonic_mean(jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i - 1, j, k])).item()
+                    coeff = sigma_face / max(dx**2, 1.0e-12)
+                    diagonal += coeff
+                    rows.append(row)
+                    cols.append(flat(i - 1, j, k))
+                    data.append(-coeff)
+                if i < nx - 1:
+                    sigma_face = _harmonic_mean(jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i + 1, j, k])).item()
+                    coeff = sigma_face / max(dx**2, 1.0e-12)
+                    diagonal += coeff
+                    rows.append(row)
+                    cols.append(flat(i + 1, j, k))
+                    data.append(-coeff)
+                if j > 0:
+                    sigma_face = _harmonic_mean(jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j - 1, k])).item()
+                    dr_face = max(0.5 * (dr_np[j - 1] + dr_np[j]), 1.0e-12)
+                    coeff = r_faces_np[j] * sigma_face / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
+                    diagonal += coeff
+                    rows.append(row)
+                    cols.append(flat(i, j - 1, k))
+                    data.append(-coeff)
+                if j < nr - 1:
+                    sigma_face = _harmonic_mean(jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j + 1, k])).item()
+                    dr_face = max(0.5 * (dr_np[j] + dr_np[j + 1]), 1.0e-12)
+                    coeff = r_faces_np[j + 1] * sigma_face / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
+                    diagonal += coeff
+                    rows.append(row)
+                    cols.append(flat(i, j + 1, k))
+                    data.append(-coeff)
+
+                k_prev = (k - 1) % ntheta
+                k_next = (k + 1) % ntheta
+                sigma_prev = _harmonic_mean(jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j, k_prev])).item()
+                sigma_next = _harmonic_mean(jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j, k_next])).item()
+                theta_coeff_prev = sigma_prev / max(r_centers_np[j] ** 2 * dtheta**2, 1.0e-12)
+                theta_coeff_next = sigma_next / max(r_centers_np[j] ** 2 * dtheta**2, 1.0e-12)
+                diagonal += theta_coeff_prev + theta_coeff_next
+                rows.append(row)
+                cols.append(flat(i, j, k_prev))
+                data.append(-theta_coeff_prev)
+                rows.append(row)
+                cols.append(flat(i, j, k_next))
+                data.append(-theta_coeff_next)
+                rows.append(row)
+                cols.append(row)
+                data.append(max(diagonal, 1.0e-12))
+
+    matrix = sparse.csr_matrix((data, (rows, cols)), shape=(size, size))
+    if initial_field is not None:
+        _ = np.asarray(initial_field, dtype=float)
+    initial_residual = float(np.max(np.abs(matrix @ np.zeros(size) - rhs_vector)))
+    solution = sparse_spsolve(matrix, rhs_vector)
+    field = jnp.asarray(solution.reshape((nx, nr, ntheta)), dtype=rhs.dtype)
+    field = field - field[0, 0, 0]
+    residual_field = _pipe_conservative_current_diagnostics_3d(
+        jnp.asarray(conductivity, dtype=field.dtype),
+        field,
+        jnp.zeros_like(field),
+        jnp.zeros_like(field),
+        jnp.zeros_like(field),
+        dx=dx,
+        r_faces=jnp.asarray(r_faces, dtype=field.dtype),
+        r_centers=jnp.asarray(r_centers, dtype=field.dtype),
+        dtheta=dtheta,
+    )[0] - rhs
+    residual = float(jnp.max(jnp.abs(residual_field)))
+    return field, residual, 1, initial_residual
+
+
 def _enforce_pipe_velocity_bc(u: jnp.ndarray, v: jnp.ndarray, w: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     if u.shape[1] > 1:
         u = u.at[:, 0, :].set(u[:, 1, :])
@@ -1196,6 +1429,7 @@ def _solve_extruded_projection(
     mesh = _cross_section_mesh(case)
     if case.geometry.kind == "pipe_ogrid":
         x = jnp.asarray(mesh.x_centers, dtype=float)
+        r_faces = jnp.asarray(mesh.y_faces, dtype=float)
         r = jnp.asarray(mesh.y_centers, dtype=float)
         theta = jnp.asarray(mesh.z_centers, dtype=float)
         nx, nr, ntheta = len(x), len(r), len(theta)
@@ -1232,10 +1466,17 @@ def _solve_extruded_projection(
             p = jnp.zeros_like(u)
             phi = jnp.zeros_like(u)
 
+        min_dr = float(jnp.min(mesh.dy))
+        min_arc = float(jnp.min(jnp.maximum(r[1:], 0.5 * min_dr))) * dtheta if nr > 1 else max(float(r[0]) * dtheta, 0.5 * min_dr * dtheta)
         inverse_diffusive_scale = float(
-            jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dr**2, 1.0e-12) + 1.0 / max((float(jnp.max(rr)) * dtheta) ** 2, 1.0e-12))
+            jnp.max(nu)
+            * (
+                1.0 / max(dx**2, 1.0e-12)
+                + 1.0 / max(min_dr**2, 1.0e-12)
+                + 1.0 / max(min_arc**2, 1.0e-12)
+            )
         )
-        stable_dt = 0.2 / max(inverse_diffusive_scale, 1.0e-12)
+        stable_dt = 0.1 / max(inverse_diffusive_scale, 1.0e-12)
         dt = min(float(case.time_stepper.dt), stable_dt)
         outer_steps = max(2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2)))
         poisson_iterations = min(case.time_stepper.potential_iterations, 80)
@@ -1286,23 +1527,54 @@ def _solve_extruded_projection(
             uxb_x = v_next * btheta - w_next * br
             uxb_r = w_next * bx - u_next * btheta
             uxb_theta = u_next * br - v_next * bx
-            emf_rhs = _pipe_divergence_3d(sigma * uxb_x, sigma * uxb_r, sigma * uxb_theta, dx=dx, dr=dr, dtheta=dtheta, r=rr)
-            phi, _, _, _ = _pipe_poisson_jacobi_3d(
-                emf_rhs,
+            emf_rhs = _pipe_conservative_emf_rhs_3d(
+                sigma,
+                uxb_x,
+                uxb_r,
+                uxb_theta,
                 dx=dx,
-                dr=dr,
+                r_faces=r_faces,
+                r_centers=r,
                 dtheta=dtheta,
-                r=rr,
+            )
+            phi, _, _, _ = _pipe_poisson_sparse_3d(
+                emf_rhs,
+                sigma,
+                dx=dx,
+                r_faces=r_faces,
+                r_centers=r,
+                dtheta=dtheta,
                 iterations=poisson_iterations,
                 tolerance=poisson_tolerance,
+                initial_field=phi,
             )
             phi = _clip_state(phi, scalar_limit)
 
-            dphi_dx, dphi_dr, dphi_dtheta = _pipe_gradient_3d(phi, dx=dx, dr=dr, dtheta=dtheta, r=rr)
-            jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
-            jr = _clip_state(sigma * (-dphi_dr + uxb_r), scalar_limit)
-            jtheta = _clip_state(sigma * (-dphi_dtheta + uxb_theta), scalar_limit)
-            div_j = _pipe_divergence_3d(jx, jr, jtheta, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            fx, fr, ftheta = _pipe_conservative_current_fluxes_3d(
+                sigma,
+                phi,
+                uxb_x,
+                uxb_r,
+                uxb_theta,
+                dx=dx,
+                r_faces=r_faces,
+                r_centers=r,
+                dtheta=dtheta,
+            )
+            div_j, _, _ = _pipe_conservative_current_diagnostics_3d(
+                sigma,
+                phi,
+                uxb_x,
+                uxb_r,
+                uxb_theta,
+                dx=dx,
+                r_faces=r_faces,
+                r_centers=r,
+                dtheta=dtheta,
+            )
+            jx = _clip_state(0.5 * (fx[1:] + fx[:-1]), scalar_limit)
+            jr = _clip_state(0.5 * (fr[:, 1:, :] + fr[:, :-1, :]), scalar_limit)
+            jtheta = _clip_state(0.5 * (ftheta + jnp.roll(ftheta, 1, axis=2)), scalar_limit)
             lorentz_x = jr * btheta - jtheta * br
             lorentz_r = jtheta * bx - jx * btheta
             lorentz_theta = jx * br - jr * bx
@@ -1325,17 +1597,37 @@ def _solve_extruded_projection(
         volumetric_flow_rate = jnp.sum(u * cell_area, axis=(1, 2))
         mean_velocity = volumetric_flow_rate / cross_section_area
         axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
-        wall_current_leakage = jnp.sum(jnp.abs(jr[:, -1, :]) * (float(r[-1] + 0.5 * dr) * dx * dtheta), axis=1)
-        boundary_current_residual = jnp.abs(
-            -jnp.sum(jx[0] * cell_area[0])
-            + jnp.sum(jx[-1] * cell_area[-1])
-            + jnp.sum(jr[:, -1, :] * (float(r[-1] + 0.5 * dr) * dx * dtheta), axis=1)
+        _, wall_current_leakage, boundary_current_residual = _pipe_conservative_current_diagnostics_3d(
+            sigma,
+            phi,
+            uxb_x,
+            uxb_r,
+            uxb_theta,
+            dx=dx,
+            r_faces=r_faces,
+            r_centers=r,
+            dtheta=dtheta,
         )
         current_scaled_pressure_proxy = jnp.max(jnp.abs(jr), axis=(1, 2)) * jnp.maximum(
             jnp.max(jnp.abs(bx) + jnp.abs(br) + jnp.abs(btheta), axis=(1, 2)),
             1.0e-12,
         )
-        charge_balance_residual = jnp.max(jnp.abs(div_j), axis=(1, 2))
+        charge_balance_residual = jnp.max(
+            jnp.abs(
+                _pipe_conservative_current_diagnostics_3d(
+                    sigma,
+                    phi,
+                    uxb_x,
+                    uxb_r,
+                    uxb_theta,
+                    dx=dx,
+                    r_faces=r_faces,
+                    r_centers=r,
+                    dtheta=dtheta,
+                )[0]
+            ),
+            axis=(1, 2),
+        )
         return ExtrudedFieldBundle(
             x=x,
             y=r,

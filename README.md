@@ -43,8 +43,8 @@ The `1.0` ship gate is now closed on the fast release lane:
     fringing runs
   - direct `lmx run fringing_rect|fringing_pipe|fringing_layered` entry points
     now exist for quick 3D/fringing launches without authoring TOML first
-  - retained hard-gate validation now passes for rectangular ducts and layered
-    ducts; mapped pipes remain exploratory on the current larger dataset
+  - retained hard-gate conservation validation now passes for rectangular
+    ducts, layered ducts, and mapped pipes on the bounded larger dataset
   - broader production-grade 3D validation and solver hardening remain
     post-`1.0` work
 
@@ -362,9 +362,9 @@ change: in these incompressible constant-forcing slices, the cross-sectional
 mean flow can stay nearly flat even when the profile redistributes strongly, so
 peak-velocity and pressure-span plots are the more reviewer-proof observables.
 
-Mapped-pipe fringing remains part of the executable research surface, but on
-the heavier retained validation campaign it is still treated as exploratory
-rather than part of the locked publication set.
+Mapped-pipe fringing now passes the retained conservation-validation gate on
+the heavier bounded dataset, but its current external profile comparison is
+still treated as qualitative rather than as a locked parity figure.
 
 The larger retained 3D campaign is also a convergence/screening study. Coarse
 layered high-field points are kept in the figure to show the underresolved
@@ -410,10 +410,11 @@ python examples/extruded_validation_campaign.py --output artifacts/examples/extr
 python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples/autodiff_extruded_trajectory
 ```
 
-The larger retained 3D validation campaign currently defaults to
-`rect_duct,layered_duct`. The mapped-pipe slice is executable and useful for
-research/development, but it currently fails the heavier conservation gate and
-stays outside the retained publication set.
+The larger retained 3D conservation-validation campaign now covers
+`rect_duct,layered_duct,pipe_ogrid`. The mapped-pipe slice still stays
+qualitative on the external profile-comparison side, because the shipped
+reference dataset is a high-`Ha`, high-`Re` benchmark while the current LMX
+mapped-pipe slice is a low-`Re` research model.
 
 For the current exploratory mapped-pipe comparison against the shipped external
 fringing-pipe profiles, use:

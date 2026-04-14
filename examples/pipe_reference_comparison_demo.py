@@ -33,14 +33,14 @@ def _replace_fields(obj, **changes):
     return obj
 
 
-def _load_reference_profile(path: Path) -> tuple[np.ndarray, np.ndarray, float]:
+def _load_reference_profile(path: Path) -> tuple[np.ndarray, np.ndarray, float, float]:
     data = np.genfromtxt(path, delimiter=",", names=True)
     coord = np.asarray(data["Points2"], dtype=float)
     velocity = np.asarray(data["U2"], dtype=float)
     x_offset = float(np.mean(np.asarray(data["Points0"], dtype=float)))
     coord_scale = max(np.max(np.abs(coord)), 1.0e-12)
     velocity_scale = max(np.max(np.abs(velocity)), 1.0e-12)
-    return coord / coord_scale, velocity / velocity_scale, x_offset / coord_scale
+    return coord / coord_scale, velocity / velocity_scale, x_offset / coord_scale, velocity_scale
 
 
 def _extract_pipe_profile(bundle, *, x_offset_fraction: float, samples: int = 121) -> tuple[np.ndarray, np.ndarray]:
@@ -139,7 +139,7 @@ def run_pipe_reference_comparison_demo(
     reference_profiles = {name: _load_reference_profile(path) for name, path in reference_paths.items()}
     lmx_profiles = {
         name: _extract_pipe_profile(solution.bundle, x_offset_fraction=offset)
-        for name, (_, _, offset) in reference_profiles.items()
+        for name, (_, _, offset, _) in reference_profiles.items()
     }
 
     _set_style()
@@ -150,14 +150,19 @@ def run_pipe_reference_comparison_demo(
     summary_profiles: dict[str, dict[str, float]] = {}
 
     for ax, name in zip(axes.ravel()[:3], ("center", "negative", "positive"), strict=False):
-        ref_coord, ref_velocity, offset = reference_profiles[name]
+        ref_coord, ref_velocity, offset, velocity_scale = reference_profiles[name]
         lmx_coord, lmx_velocity = lmx_profiles[name]
         interp_velocity = np.interp(ref_coord, lmx_coord, lmx_velocity)
         l2_error = float(np.sqrt(np.mean((interp_velocity - ref_velocity) ** 2)))
-        summary_profiles[name] = {"x_offset_fraction": float(offset), "normalized_l2_error": l2_error}
+        metric_name = "normalized_l2_error"
+        metric_label = "normalized $L_2$"
+        if velocity_scale <= 1.0e-10 or float(np.max(np.abs(ref_velocity))) <= 1.0e-10:
+            metric_name = "absolute_l2_error"
+            metric_label = "absolute $L_2$"
+        summary_profiles[name] = {"x_offset_fraction": float(offset), metric_name: l2_error}
         ax.plot(ref_coord, ref_velocity, color=colors[name], linewidth=2.2, label="External reference")
         ax.plot(lmx_coord, lmx_velocity, color="#111827", linestyle="--", linewidth=2.0, label="LMX")
-        ax.set_title(f"{labels[name]}\nnormalized $L_2$={l2_error:.3f}")
+        ax.set_title(f"{labels[name]}\n{metric_label}={l2_error:.3f}")
         ax.set_xlabel("Normalized transverse coordinate")
         ax.set_ylabel("Normalized axial velocity")
         ax.set_xlim(-1.02, 1.02)
