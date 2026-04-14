@@ -101,6 +101,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
   peak Hartmann number and axial field-profile shape parameters, which is the
   first retained bridge from Hartmann-only autodiff into fringing-oriented
   research objectives.
+- A fifth autodiff example now performs fringing multi-observable inverse
+  design against both axial mean-velocity and current-proxy histories, which
+  is the current lightweight bridge from scalar fringing objectives toward
+  richer multi-observable fringing calibration.
 - Rectangular fringing cases now have a first true low-Re
   `extruded_inductionless` 3D projection slice, exposing `u`, `v`, `w`, `p`,
   `phi`, current, Lorentz, and charge-balance fields through the explicit

@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 from .linear import solve_poisson_jacobi_state
 from .mesh import StructuredMesh, generate_rect_duct_mesh
+from .operators import gradient_scalar
 from .solvers import (
     _enforce_velocity_bc,
     _face_emf_y,
@@ -240,6 +241,59 @@ def fringing_mean_velocity_history(
     }
 
 
+def hartmann_current_proxy(
+    problem: HartmannAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    hartmann_number: float | jnp.ndarray,
+) -> jnp.ndarray:
+    u, phi = solve_differentiable_hartmann(problem, forcing=forcing, hartmann_number=hartmann_number)
+    dphi_dy, _ = gradient_scalar(phi, problem.mesh)
+    jy = -dphi_dy - u * jnp.asarray(hartmann_number, dtype=u.dtype)
+    return jnp.mean(jnp.abs(jy))
+
+
+def fringing_response_history(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    entry_center: float | jnp.ndarray,
+    exit_center: float | jnp.ndarray,
+    transition_width: float | jnp.ndarray,
+) -> dict[str, jnp.ndarray]:
+    field_scale = _smooth_fringing_scale(
+        problem.x,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+    )
+
+    def single_station(scale_value):
+        station_ha = jnp.asarray(peak_hartmann_number) * scale_value
+        return (
+            hartmann_mean_velocity(
+                problem.base_problem,
+                forcing=forcing,
+                hartmann_number=station_ha,
+            ),
+            hartmann_current_proxy(
+                problem.base_problem,
+                forcing=forcing,
+                hartmann_number=station_ha,
+            ),
+        )
+
+    mean_velocity, current_proxy = jax.vmap(single_station)(field_scale)
+    return {
+        "x": problem.x,
+        "field_scale": field_scale,
+        "mean_velocity": mean_velocity,
+        "current_proxy": current_proxy,
+    }
+
+
 def hartmann_mean_velocity(
     problem: HartmannAutodiffProblem,
     *,
@@ -326,6 +380,33 @@ def fringing_history_loss(
     return jnp.mean(((history - target_mean_velocity) / scale) ** 2)
 
 
+def fringing_response_loss(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    entry_center: float | jnp.ndarray,
+    exit_center: float | jnp.ndarray,
+    transition_width: float | jnp.ndarray,
+    target_mean_velocity: jnp.ndarray,
+    target_current_proxy: jnp.ndarray,
+    current_weight: float = 1.0,
+) -> jnp.ndarray:
+    response = fringing_response_history(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_hartmann_number,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+    )
+    velocity_scale = jnp.maximum(jnp.max(jnp.abs(target_mean_velocity)), 1.0e-12)
+    current_scale = jnp.maximum(jnp.max(jnp.abs(target_current_proxy)), 1.0e-12)
+    velocity_loss = jnp.mean(((response["mean_velocity"] - target_mean_velocity) / velocity_scale) ** 2)
+    current_loss = jnp.mean(((response["current_proxy"] - target_current_proxy) / current_scale) ** 2)
+    return velocity_loss + current_weight * current_loss
+
+
 def hartmann_profile_loss_gradients(
     problem: HartmannAutodiffProblem,
     *,
@@ -366,6 +447,45 @@ def fringing_history_loss_gradients(
         exit_center=exit_,
         transition_width=width,
         target_mean_velocity=target_mean_velocity,
+    )
+    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
+    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
+        peak_hartmann_number,
+        entry_center,
+        exit_center,
+        transition_width,
+    )
+    return {
+        "loss": loss,
+        "d_peak_hartmann_number": d_peak_ha,
+        "d_entry_center": d_entry,
+        "d_exit_center": d_exit,
+        "d_transition_width": d_width,
+    }
+
+
+def fringing_response_loss_gradients(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    entry_center: float | jnp.ndarray,
+    exit_center: float | jnp.ndarray,
+    transition_width: float | jnp.ndarray,
+    target_mean_velocity: jnp.ndarray,
+    target_current_proxy: jnp.ndarray,
+    current_weight: float = 1.0,
+) -> dict[str, jnp.ndarray]:
+    objective = lambda peak_ha, entry, exit_, width: fringing_response_loss(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_ha,
+        entry_center=entry,
+        exit_center=exit_,
+        transition_width=width,
+        target_mean_velocity=target_mean_velocity,
+        target_current_proxy=target_current_proxy,
+        current_weight=current_weight,
     )
     loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
     d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
@@ -497,6 +617,82 @@ def run_fringing_history_inverse_design(
         "transition_width": float(transition_width),
         "history": history,
         "recovered_mean_velocity": recovered["mean_velocity"],
+        "recovered_field_scale": recovered["field_scale"],
+        "x": recovered["x"],
+    }
+
+
+def run_fringing_response_inverse_design(
+    problem: FringingAutodiffProblem,
+    *,
+    target_mean_velocity: jnp.ndarray,
+    target_current_proxy: jnp.ndarray,
+    forcing: float,
+    peak_hartmann_init: float,
+    entry_center_init: float,
+    exit_center_init: float,
+    transition_width_init: float,
+    current_weight: float = 1.0,
+    learning_rate_peak_ha: float = 1.0,
+    learning_rate_entry: float = 0.2,
+    learning_rate_exit: float = 0.2,
+    learning_rate_width: float = 0.1,
+    steps: int = 16,
+) -> dict[str, object]:
+    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
+    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
+    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
+    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
+    history: list[dict[str, float]] = []
+
+    for step in range(steps):
+        gradients = fringing_response_loss_gradients(
+            problem,
+            forcing=forcing,
+            peak_hartmann_number=peak_hartmann_number,
+            entry_center=entry_center,
+            exit_center=exit_center,
+            transition_width=transition_width,
+            target_mean_velocity=target_mean_velocity,
+            target_current_proxy=target_current_proxy,
+            current_weight=current_weight,
+        )
+        history.append(
+            {
+                "iteration": float(step),
+                "peak_hartmann_number": float(peak_hartmann_number),
+                "entry_center": float(entry_center),
+                "exit_center": float(exit_center),
+                "transition_width": float(transition_width),
+                "loss": float(gradients["loss"]),
+            }
+        )
+        peak_hartmann_number = jnp.clip(
+            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
+        )
+        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
+        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
+        transition_width = jnp.clip(
+            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
+        )
+        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
+
+    recovered = fringing_response_history(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_hartmann_number,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+    )
+    return {
+        "peak_hartmann_number": float(peak_hartmann_number),
+        "entry_center": float(entry_center),
+        "exit_center": float(exit_center),
+        "transition_width": float(transition_width),
+        "history": history,
+        "recovered_mean_velocity": recovered["mean_velocity"],
+        "recovered_current_proxy": recovered["current_proxy"],
         "recovered_field_scale": recovered["field_scale"],
         "x": recovered["x"],
     }

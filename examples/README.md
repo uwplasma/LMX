@@ -26,6 +26,7 @@ python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_d
 python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
 python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
 python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
+python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
@@ -78,6 +79,7 @@ python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_d
 python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
 python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
 python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
+python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
 ```
 
 The shipped autodiff examples now cover:
@@ -87,6 +89,8 @@ The shipped autodiff examples now cover:
 - inverse recovery of a synthetic forcing parameter from a target profile
 - full-profile inverse design that recovers both forcing and Hartmann number
 - fringing-history inverse design over axial field-profile parameters
+- fringing multi-observable inverse design over axial field-profile parameters
+  using both velocity and current-response targets
 - publication-style `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:

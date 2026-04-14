@@ -14,7 +14,9 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.build_square_duct_extruded_problem)
     assert callable(lmx.build_fringing_autodiff_problem)
     assert callable(lmx.fringing_mean_velocity_history)
+    assert callable(lmx.fringing_response_history)
     assert callable(lmx.run_fringing_history_inverse_design)
+    assert callable(lmx.run_fringing_response_inverse_design)
     assert callable(lmx.benchmark_sharded_stencil)
     assert callable(lmx.write_scaling_report)
     assert "solve_steady" in lmx.__all__

@@ -12,6 +12,8 @@ for publication figures.
 - inverse forcing identification from synthetic target profiles
 - full-profile inverse design that recovers both forcing and Hartmann number
 - fringing-history inverse design over axial field-profile parameters
+- fringing multi-observable inverse design over axial mean-velocity and
+  current-response histories
 - publication-style summary plots and JSON outputs
 
 The differentiable lane is intentionally explicit:
@@ -69,6 +71,9 @@ history matching:
 ```bash
 python examples/autodiff_fringing_design_demo.py \
   --output artifacts/examples/autodiff_fringing_design
+
+python examples/autodiff_fringing_response_demo.py \
+  --output artifacts/examples/autodiff_fringing_response
 ```
 
 That workflow writes:
@@ -147,6 +152,15 @@ The fringing-design example takes that next step. It optimizes:
 
 against a target axial mean-velocity history, which is the current bridge from
 Hartmann-only autodiff to fringing-oriented inverse design.
+
+The fringing-response example broadens that objective from one observable to
+two. It optimizes the same axial field-shape parameters against:
+
+- a target axial mean-velocity history
+- a target axial current-proxy history
+
+This is the current best lightweight stand-in for multi-observable inverse
+design before the full 3D fringing solver family is made differentiable.
 
 ## References
 

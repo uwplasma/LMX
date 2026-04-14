@@ -255,6 +255,7 @@ python examples/autodiff_design_demo.py --output artifacts/examples/autodiff_des
 python examples/autodiff_sensitivity_demo.py --output artifacts/examples/autodiff_sensitivity
 python examples/autodiff_profile_design_demo.py --output artifacts/examples/autodiff_profile_design
 python examples/autodiff_fringing_design_demo.py --output artifacts/examples/autodiff_fringing_design
+python examples/autodiff_fringing_response_demo.py --output artifacts/examples/autodiff_fringing_response
 ```
 
 Together, those examples demonstrate:
@@ -265,6 +266,8 @@ Together, those examples demonstrate:
 - inverse recovery of a synthetic forcing parameter from a target velocity profile
 - full-profile inverse design recovering both forcing and Hartmann number
 - fringing-history inverse design recovering axial field-profile parameters
+- fringing multi-observable inverse design recovering axial field-profile
+  parameters against both mean-velocity and current-response histories
 - polished `PNG`/`PDF` summary figures for publication use
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)

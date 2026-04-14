@@ -386,6 +386,14 @@ def test_autodiff_fringing_design_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "autodiff_fringing_design_summary.json").exists()
 
 
+def test_autodiff_fringing_response_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("autodiff_fringing_response_demo.py")
+    summary = module.run_autodiff_fringing_response_demo(out_dir=tmp_path, steps=4)
+    assert "recovered" in summary
+    assert (tmp_path / "autodiff_fringing_response.png").exists()
+    assert (tmp_path / "autodiff_fringing_response_summary.json").exists()
+
+
 def test_variable_field_geometry_demo_writes_preview_and_run_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
