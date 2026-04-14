@@ -287,7 +287,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
             "solver_kind": "extruded_inductionless",
         },
     )()
-    monkeypatch.setattr("lmx.fringing._solve_extruded_projection", lambda problem: fake_bundle)
+    monkeypatch.setattr("lmx.fringing._solve_extruded_projection", lambda problem, initial_bundle=None: fake_bundle)
 
     solution = solve_extruded_inductionless(problem)
     assert len(solution.station_history) == 3
@@ -395,7 +395,7 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(monkeypa
     pipe_problem = replace(problem, case=pipe_case)
     monkeypatch.setattr(
         "lmx.fringing._solve_extruded_projection",
-        lambda problem: type(
+        lambda problem, initial_bundle=None: type(
             "Bundle",
             (),
             {
@@ -429,3 +429,14 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(monkeypa
     )
     solution = solve_extruded_inductionless(pipe_problem)
     assert solution.validation.station_count == 1
+
+
+def test_solve_extruded_inductionless_projection_accepts_matching_initial_bundle():
+    problem = build_square_duct_extruded_problem(ha_peak=5.0, nx_stations=3, ny=4, nz=4)
+    first = solve_extruded_inductionless(problem)
+
+    resumed = solve_extruded_inductionless(problem, initial_bundle=first.bundle)
+
+    assert resumed.bundle.u.shape == first.bundle.u.shape
+    assert jnp.isfinite(resumed.bundle.u).all()
+    assert resumed.validation.station_count == first.validation.station_count

@@ -1184,7 +1184,11 @@ def run_extruded_inductionless_slice(
     )
 
 
-def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> ExtrudedFieldBundle:
+def _solve_extruded_projection(
+    problem: ExtrudedInductionlessProblem,
+    *,
+    initial_bundle: ExtrudedFieldBundle | None = None,
+) -> ExtrudedFieldBundle:
     case = problem.case
     mesh = _cross_section_mesh(case)
     if case.geometry.kind == "pipe_ogrid":
@@ -1210,11 +1214,20 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
         br = by * jnp.cos(theta_grid) + bz * jnp.sin(theta_grid)
         btheta = -by * jnp.sin(theta_grid) + bz * jnp.cos(theta_grid)
 
-        u = jnp.zeros((nx, nr, ntheta), dtype=float)
-        v = jnp.zeros_like(u)
-        w = jnp.zeros_like(u)
-        p = jnp.zeros_like(u)
-        phi = jnp.zeros_like(u)
+        if initial_bundle is not None:
+            if initial_bundle.u.shape != (nx, nr, ntheta):
+                raise ValueError("Extruded restart bundle shape does not match the current mapped-pipe problem")
+            u = jnp.asarray(initial_bundle.u, dtype=float)
+            v = jnp.asarray(initial_bundle.v, dtype=float)
+            w = jnp.asarray(initial_bundle.w, dtype=float)
+            p = jnp.asarray(initial_bundle.p, dtype=float)
+            phi = jnp.asarray(initial_bundle.phi, dtype=float)
+        else:
+            u = jnp.zeros((nx, nr, ntheta), dtype=float)
+            v = jnp.zeros_like(u)
+            w = jnp.zeros_like(u)
+            p = jnp.zeros_like(u)
+            phi = jnp.zeros_like(u)
 
         inverse_diffusive_scale = float(
             jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dr**2, 1.0e-12) + 1.0 / max((float(jnp.max(rr)) * dtheta) ** 2, 1.0e-12))
@@ -1366,11 +1379,20 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
     by = _broadcast_station_profile(field_scale * float(base_field[1]), ny, nz)
     bz = _broadcast_station_profile(field_scale * float(base_field[2]), ny, nz)
 
-    u = jnp.zeros((nx, ny, nz), dtype=float)
-    v = jnp.zeros_like(u)
-    w = jnp.zeros_like(u)
-    p = jnp.zeros_like(u)
-    phi = jnp.zeros_like(u)
+    if initial_bundle is not None:
+        if initial_bundle.u.shape != (nx, ny, nz):
+            raise ValueError("Extruded restart bundle shape does not match the current duct problem")
+        u = jnp.asarray(initial_bundle.u, dtype=float)
+        v = jnp.asarray(initial_bundle.v, dtype=float)
+        w = jnp.asarray(initial_bundle.w, dtype=float)
+        p = jnp.asarray(initial_bundle.p, dtype=float)
+        phi = jnp.asarray(initial_bundle.phi, dtype=float)
+    else:
+        u = jnp.zeros((nx, ny, nz), dtype=float)
+        v = jnp.zeros_like(u)
+        w = jnp.zeros_like(u)
+        p = jnp.zeros_like(u)
+        phi = jnp.zeros_like(u)
 
     inverse_diffusive_scale = float(jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12)))
     stable_dt = 0.2 / max(inverse_diffusive_scale, 1.0e-12)
@@ -1573,9 +1595,10 @@ def solve_extruded_inductionless(
     problem: ExtrudedInductionlessProblem,
     *,
     solver=solve_steady,
+    initial_bundle: ExtrudedFieldBundle | None = None,
 ) -> ExtrudedInductionlessSolution:
     if problem.case.geometry.kind in {"rect_duct", "layered_duct", "pipe_ogrid"}:
-        bundle = _solve_extruded_projection(problem)
+        bundle = _solve_extruded_projection(problem, initial_bundle=initial_bundle)
         station_history = _bundle_station_history(bundle)
     else:
         station_history = run_fringing_station_sweep(problem.case, problem.profile, solver=solver)

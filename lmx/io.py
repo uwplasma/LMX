@@ -22,6 +22,27 @@ class RestartBundle:
     geometry_kind: str
 
 
+@dataclass(frozen=True)
+class ExtrudedRestartBundle:
+    path: Path
+    bundle: object
+    station_history: tuple[dict[str, float], ...]
+    metadata: dict[str, object]
+    geometry_kind: str
+    solver_kind: str
+
+
+@dataclass(frozen=True)
+class ExtrudedOutputLayout:
+    root: Path
+    system_dir: Path
+    fields_dir: Path
+    post_dir: Path
+    plots_dir: Path
+    restart_dir: Path
+    logs_dir: Path
+
+
 def _array_text(array: jnp.ndarray) -> str:
     return " ".join(f"{float(value):.12e}" for value in jnp.ravel(array))
 
@@ -240,6 +261,51 @@ def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
     return path
 
 
+def write_extruded_restart_npz(solution, case, path: str | Path) -> Path:
+    from .fringing import ExtrudedFieldBundle
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    bundle = solution.bundle
+    metadata = {
+        "case": case.name,
+        "geometry_kind": case.geometry.kind,
+        "solver_kind": case.solver.kind,
+        "station_count": int(bundle.x.shape[0]),
+        "description": "LMX extruded inductionless restart bundle",
+        "restart_capable": True,
+    }
+    np.savez_compressed(
+        path,
+        metadata_json=json.dumps(metadata),
+        station_history_json=json.dumps(solution.station_history),
+        x=np.asarray(bundle.x),
+        y=np.asarray(bundle.y),
+        z=np.asarray(bundle.z),
+        field_scale=np.asarray(bundle.field_scale),
+        u=np.asarray(bundle.u),
+        v=np.asarray(bundle.v),
+        w=np.asarray(bundle.w),
+        p=np.asarray(bundle.p),
+        phi=np.asarray(bundle.phi),
+        jx=np.asarray(bundle.jx),
+        jy=np.asarray(bundle.jy),
+        jz=np.asarray(bundle.jz),
+        lorentz_x=np.asarray(bundle.lorentz_x),
+        lorentz_y=np.asarray(bundle.lorentz_y),
+        lorentz_z=np.asarray(bundle.lorentz_z),
+        residual=np.asarray(bundle.residual),
+        volumetric_flow_rate=np.asarray(bundle.volumetric_flow_rate),
+        mean_velocity=np.asarray(bundle.mean_velocity),
+        axial_current=np.asarray(bundle.axial_current),
+        wall_current_leakage=np.asarray(bundle.wall_current_leakage),
+        current_scaled_pressure_proxy=np.asarray(bundle.current_scaled_pressure_proxy),
+        charge_balance_residual=np.asarray(bundle.charge_balance_residual),
+        boundary_current_residual=np.asarray(bundle.boundary_current_residual),
+    )
+    return path
+
+
 def write_restart_npz(solution: Solution, case, path: str | Path) -> Path:
     return write_solution_npz(solution, case, path)
 
@@ -313,6 +379,50 @@ def load_restart_bundle(path: str | Path) -> RestartBundle:
         )
 
 
+def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
+    from .fringing import ExtrudedFieldBundle
+
+    path = Path(path).resolve()
+    with np.load(path, allow_pickle=False) as data:
+        metadata = json.loads(str(data["metadata_json"])) if "metadata_json" in data else {}
+        station_history = tuple(json.loads(str(data["station_history_json"]))) if "station_history_json" in data else ()
+        bundle = ExtrudedFieldBundle(
+            x=jnp.asarray(data["x"]),
+            y=jnp.asarray(data["y"]),
+            z=jnp.asarray(data["z"]),
+            field_scale=jnp.asarray(data["field_scale"]),
+            u=jnp.asarray(data["u"]),
+            v=jnp.asarray(data["v"]),
+            w=jnp.asarray(data["w"]),
+            p=jnp.asarray(data["p"]),
+            phi=jnp.asarray(data["phi"]),
+            jx=jnp.asarray(data["jx"]),
+            jy=jnp.asarray(data["jy"]),
+            jz=jnp.asarray(data["jz"]),
+            lorentz_x=jnp.asarray(data["lorentz_x"]),
+            lorentz_y=jnp.asarray(data["lorentz_y"]),
+            lorentz_z=jnp.asarray(data["lorentz_z"]),
+            residual=jnp.asarray(data["residual"]),
+            volumetric_flow_rate=jnp.asarray(data["volumetric_flow_rate"]),
+            mean_velocity=jnp.asarray(data["mean_velocity"]),
+            axial_current=jnp.asarray(data["axial_current"]),
+            wall_current_leakage=jnp.asarray(data["wall_current_leakage"]),
+            current_scaled_pressure_proxy=jnp.asarray(data["current_scaled_pressure_proxy"]),
+            charge_balance_residual=jnp.asarray(data["charge_balance_residual"]),
+            boundary_current_residual=jnp.asarray(data["boundary_current_residual"]),
+            geometry_kind=str(metadata.get("geometry_kind", "unknown")),
+            solver_kind=str(metadata.get("solver_kind", "extruded_inductionless")),
+        )
+        return ExtrudedRestartBundle(
+            path=path,
+            bundle=bundle,
+            station_history=station_history,
+            metadata=metadata,
+            geometry_kind=str(metadata.get("geometry_kind", "unknown")),
+            solver_kind=str(metadata.get("solver_kind", "unknown")),
+        )
+
+
 def validate_restart_bundle(bundle: RestartBundle, *, mesh: StructuredMesh, geometry_kind: str, case_name: str) -> None:
     if bundle.geometry_kind not in {"unknown", geometry_kind}:
         raise ValueError(
@@ -331,6 +441,52 @@ def validate_restart_bundle(bundle: RestartBundle, *, mesh: StructuredMesh, geom
         metadata_name = bundle.metadata.get("case")
         if metadata_name is not None:
             raise ValueError(f"Restart case {metadata_name!r} does not match current case name {case_name!r}")
+
+
+def validate_extruded_restart_bundle(bundle: ExtrudedRestartBundle, *, case) -> None:
+    if bundle.geometry_kind not in {"unknown", case.geometry.kind}:
+        raise ValueError(
+            f"Extruded restart geometry_kind {bundle.geometry_kind!r} does not match current case geometry {case.geometry.kind!r}"
+        )
+    if bundle.solver_kind not in {"unknown", case.solver.kind}:
+        raise ValueError(
+            f"Extruded restart solver_kind {bundle.solver_kind!r} does not match current solver {case.solver.kind!r}"
+        )
+    if str(bundle.metadata.get("case", case.name)) != case.name:
+        metadata_name = bundle.metadata.get("case")
+        if metadata_name is not None:
+            raise ValueError(f"Extruded restart case {metadata_name!r} does not match current case name {case.name!r}")
+    if int(bundle.bundle.x.shape[0]) != int(case.geometry.nx):
+        raise ValueError("Extruded restart station count does not match current geometry.nx")
+    if int(bundle.bundle.y.shape[0]) != int(case.geometry.ny):
+        raise ValueError("Extruded restart y resolution does not match current geometry.ny")
+    expected_z = int(case.geometry.nz if case.geometry.kind != "pipe_ogrid" else (case.geometry.ntheta or case.geometry.nz))
+    if int(bundle.bundle.z.shape[0]) != expected_z:
+        raise ValueError("Extruded restart z/theta resolution does not match current geometry")
+
+
+def prepare_extruded_output_layout(out_dir: str | Path) -> ExtrudedOutputLayout:
+    root = Path(out_dir)
+    layout = ExtrudedOutputLayout(
+        root=root,
+        system_dir=root / "system",
+        fields_dir=root / "fields",
+        post_dir=root / "postProcessing",
+        plots_dir=root / "postProcessing" / "plots",
+        restart_dir=root / "restart",
+        logs_dir=root / "logs",
+    )
+    for directory in (
+        layout.root,
+        layout.system_dir,
+        layout.fields_dir,
+        layout.post_dir,
+        layout.plots_dir,
+        layout.restart_dir,
+        layout.logs_dir,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+    return layout
 
 
 def write_solution_outputs(
@@ -372,12 +528,11 @@ def write_extruded_solution_outputs(
     write_npz: bool = True,
     write_plots: bool = False,
 ) -> dict[str, list[Path]]:
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    layout = prepare_extruded_output_layout(out_dir)
     payload: dict[str, list[Path]] = {"csv": [], "npz": [], "plots": []}
-    station_csv = out_dir / f"{case.name}_station_history.csv"
+    station_csv = layout.post_dir / f"{case.name}_station_history.csv"
     station_csv.write_text(
-        "x,field_scale,u_max,mean_velocity,volumetric_flow_rate,axial_current,wall_current_leakage,current_scaled_pressure_proxy,residual,charge_balance_residual\n"
+        "x,field_scale,u_max,mean_velocity,volumetric_flow_rate,axial_current,wall_current_leakage,current_scaled_pressure_proxy,residual,charge_balance_residual,boundary_current_residual\n"
         + "\n".join(
             ",".join(
                 [
@@ -391,6 +546,7 @@ def write_extruded_solution_outputs(
                     f"{float(record['current_scaled_pressure_proxy']):.12e}",
                     f"{float(record['residual']):.12e}",
                     f"{float(record['charge_balance_residual']):.12e}",
+                    f"{float(record.get('boundary_current_residual', 0.0)):.12e}",
                 ]
             )
             for record in solution.station_history
@@ -400,9 +556,9 @@ def write_extruded_solution_outputs(
     )
     payload["csv"].append(station_csv)
     if write_npz and case.output.write_npz:
-        payload["npz"] = [write_extruded_solution_npz(solution, case, out_dir / f"{case.name}_extruded_results.npz")]
+        payload["npz"] = [write_extruded_solution_npz(solution, case, layout.fields_dir / f"{case.name}_extruded_results.npz")]
     if write_plots and case.output.write_plots:
         from .plotting import write_extruded_overview_plots
 
-        payload["plots"] = write_extruded_overview_plots(solution, out_dir, case_title=case.name)
+        payload["plots"] = write_extruded_overview_plots(solution, layout.plots_dir, case_title=case.name)
     return payload

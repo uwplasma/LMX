@@ -19,7 +19,11 @@ from .fringing import (
     solve_extruded_inductionless,
 )
 from .io import (
+    load_extruded_restart_bundle,
     load_restart_bundle,
+    prepare_extruded_output_layout,
+    validate_extruded_restart_bundle,
+    write_extruded_restart_npz,
     validate_restart_bundle,
     write_extruded_solution_outputs,
     write_paraview,
@@ -199,10 +203,17 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
     return summary
 
 
-def _runtime_summary_extruded(solution, case, out_dir: Path, outputs: dict[str, list[Path]]) -> dict[str, object]:
+def _runtime_summary_extruded(
+    solution,
+    case,
+    out_dir: Path,
+    outputs: dict[str, list[Path]],
+    *,
+    restart_info: dict[str, object] | None = None,
+) -> dict[str, object]:
     bundle = solution.bundle
     validation = solution.validation
-    return {
+    summary = {
         "case": case.name,
         "geometry": case.geometry.kind,
         "solver_kind": case.solver.kind,
@@ -221,6 +232,9 @@ def _runtime_summary_extruded(solution, case, out_dir: Path, outputs: dict[str, 
             if paths
         },
     }
+    if restart_info is not None:
+        summary["restart"] = restart_info
+    return summary
 
 
 def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path | None:
@@ -239,16 +253,30 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         output_dir = getattr(case.output, "directory", None)
     out_dir = Path(output_dir) if output_dir else Path.cwd() / "out" / case.name
     out_dir.mkdir(parents=True, exist_ok=True)
+    extruded_layout = prepare_extruded_output_layout(out_dir) if solver_kind == "extruded_inductionless" else None
     logger = StreamingSolverLogger(config.logging) if config.logging.enabled else None
     log_handle = None
     log_path: Path | None = None
     if logger is not None:
-        log_path = default_log_path(out_dir, case.name)
+        log_root = extruded_layout.logs_dir if extruded_layout is not None else out_dir
+        log_path = default_log_path(log_root, case.name)
         log_handle = open(log_path, "w", encoding="utf-8")
         logger.add_stream(log_handle)
     if solver_kind == "extruded_inductionless":
+        restart_summary: dict[str, object] | None = None
+        initial_bundle = None
         if config.restart.enabled:
-            raise ValueError("Restart is not yet supported for extruded_inductionless runs")
+            if config.restart.path is None:
+                raise ValueError("Restart is enabled but no restart.path was provided")
+            restart_bundle = load_extruded_restart_bundle(config.restart.path)
+            validate_extruded_restart_bundle(restart_bundle, case=case)
+            initial_bundle = restart_bundle.bundle
+            restart_summary = {
+                "enabled": True,
+                "input": str(restart_bundle.path),
+                "station_count": int(restart_bundle.bundle.x.shape[0]),
+                "reset_histories": bool(config.restart.reset_histories),
+            }
         try:
             if not config.fringing.enabled:
                 raise ValueError(
@@ -261,7 +289,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
                 transition_width=config.fringing.transition_width,
                 axis=config.fringing.axis,
             )
-            solution = solve_extruded_inductionless(problem)
+            solution = solve_extruded_inductionless(problem, initial_bundle=initial_bundle)
         finally:
             if log_handle is not None:
                 log_handle.close()
@@ -272,13 +300,20 @@ def _run_config(config: RunConfig) -> dict[str, object]:
             write_npz=getattr(case.output, "write_npz", True),
             write_plots=getattr(case.output, "write_plots", False),
         )
+        if config.restart.write_restart:
+            restart_filename = config.restart.restart_filename or f"{case.name}_extruded_restart.npz"
+            restart_path = write_extruded_restart_npz(solution, case, extruded_layout.restart_dir / restart_filename)
+            outputs.setdefault("restart", []).append(restart_path)
+            if restart_summary is None:
+                restart_summary = {"enabled": False}
+            restart_summary["output"] = _portable_path(restart_path)
         if log_path is not None:
             outputs.setdefault("log", []).append(log_path)
         if config.input_path is not None and getattr(case.output, "copy_input_file", True):
-            copied_input = out_dir / config.input_path.name
+            copied_input = extruded_layout.system_dir / config.input_path.name
             shutil.copy2(config.input_path, copied_input)
             outputs.setdefault("input", []).append(copied_input)
-        summary = _runtime_summary_extruded(solution, case, out_dir, outputs)
+        summary = _runtime_summary_extruded(solution, case, out_dir, outputs, restart_info=restart_summary)
         summary_path = _write_run_summary(summary, case, out_dir)
         if summary_path is not None:
             outputs.setdefault("json", []).append(summary_path)

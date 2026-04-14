@@ -8,8 +8,12 @@ import jax.numpy as jnp
 from lmx.core import Diagnostics, MHDState, Solution, zeros_state
 from lmx.cases import make_hartmann_case
 from lmx.io import (
+    load_extruded_restart_bundle,
     load_restart_bundle,
+    prepare_extruded_output_layout,
+    validate_extruded_restart_bundle,
     validate_restart_bundle,
+    write_extruded_restart_npz,
     write_extruded_solution_npz,
     write_extruded_solution_outputs,
     write_paraview,
@@ -321,6 +325,86 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
     assert outputs["csv"][0].exists()
     assert outputs["npz"][0].exists()
     assert outputs["plots"][0].exists()
+    assert outputs["csv"][0].parent.name == "postProcessing"
+    assert outputs["npz"][0].parent.name == "fields"
+    assert outputs["plots"][0].parent.name == "plots"
     with np.load(npz_path, allow_pickle=False) as data:
         assert data["u"].shape == (3, 2, 2)
         assert data["validation_station_count"] == pytest.approx(3)
+
+
+def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_rect_demo",
+            "geometry": case.geometry.__class__(
+                **{**case.geometry.__dict__, "kind": "rect_duct", "length": 6.0, "nx": 3, "ny": 2, "nz": 2}
+            ),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+        }
+    )
+    bundle = SimpleNamespace(
+        x=jnp.asarray([0.0, 1.0, 2.0]),
+        y=jnp.asarray([-0.5, 0.5]),
+        z=jnp.asarray([-0.5, 0.5]),
+        field_scale=jnp.asarray([0.0, 1.0, 0.0]),
+        u=jnp.ones((3, 2, 2)),
+        v=jnp.zeros((3, 2, 2)),
+        w=jnp.zeros((3, 2, 2)),
+        p=jnp.zeros((3, 2, 2)),
+        phi=jnp.zeros((3, 2, 2)),
+        jx=jnp.zeros((3, 2, 2)),
+        jy=jnp.zeros((3, 2, 2)),
+        jz=jnp.zeros((3, 2, 2)),
+        lorentz_x=jnp.zeros((3, 2, 2)),
+        lorentz_y=jnp.zeros((3, 2, 2)),
+        lorentz_z=jnp.zeros((3, 2, 2)),
+        residual=jnp.asarray([1.0e-3, 2.0e-4, 3.0e-5]),
+        volumetric_flow_rate=jnp.asarray([1.0, 1.1, 1.2]),
+        mean_velocity=jnp.asarray([0.5, 0.55, 0.6]),
+        axial_current=jnp.asarray([0.0, 0.1, 0.0]),
+        wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
+        current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
+        charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
+        boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
+        geometry_kind="rect_duct",
+        solver_kind="extruded_inductionless",
+    )
+    solution = SimpleNamespace(bundle=bundle, station_history=({"x": 0.0},))
+
+    restart_path = write_extruded_restart_npz(solution, case, tmp_path / "restart" / "fringing_restart.npz")
+    restart_bundle = load_extruded_restart_bundle(restart_path)
+    validate_extruded_restart_bundle(restart_bundle, case=case)
+
+    layout = prepare_extruded_output_layout(tmp_path / "run")
+    assert restart_path.exists()
+    assert restart_bundle.bundle.u.shape == (3, 2, 2)
+    assert layout.system_dir.exists()
+    assert layout.fields_dir.exists()
+    assert layout.post_dir.exists()
+    assert layout.plots_dir.exists()
+    assert layout.restart_dir.exists()
+    assert layout.logs_dir.exists()
+
+
+def test_validate_extruded_restart_bundle_rejects_mismatch():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    case = case.__class__(
+        **{
+            **case.__dict__,
+            "name": "fringing_pipe_demo",
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "kind": "pipe_ogrid", "nx": 3, "ny": 4, "nz": 8, "nr": 4, "ntheta": 8}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+        }
+    )
+    bad_bundle = SimpleNamespace(
+        geometry_kind="rect_duct",
+        solver_kind="extruded_inductionless",
+        metadata={"case": "other_case"},
+        bundle=SimpleNamespace(x=jnp.zeros((2,)), y=jnp.zeros((4,)), z=jnp.zeros((8,))),
+    )
+
+    with pytest.raises(ValueError, match="geometry_kind"):
+        validate_extruded_restart_bundle(bad_bundle, case=case)
