@@ -145,6 +145,18 @@ is why LMX tracks:
 
 as first-class diagnostics.
 
+For the post-`1.0` 3D fringing lane, the same conservation view is extended to
+domain boundaries and axial control volumes. The retained 3D slice now also
+tracks:
+
+- stationwise integrated axial current
+- stationwise wall-current leakage at the external `y` and `z` boundaries
+- a net boundary-current residual over the full extruded control volume
+
+Those are the concrete diagnostics needed to harden inlet/outlet handling and
+external-wall current closure, which are the places where inductionless MHD
+solvers most often lose charge conservation in practice.
+
 ## Charge conservation and compatibility projection
 
 The discrete potential equation must satisfy a zero-net-source compatibility
@@ -160,6 +172,11 @@ by:
 - `lmx/runtime_logging.py`
 - `lmx/io.py`
 - `lmx/validation.py`
+
+The 3D fringing slice in `lmx/fringing.py` uses the same principle for its
+variable-coefficient electric solve: the right-hand side is projected onto the
+conductivity-weighted compatibility space before the Jacobi iteration, and the
+result is then audited through both `div J` and boundary-current integrals.
 
 ## Magnetic-field models
 

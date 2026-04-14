@@ -161,6 +161,8 @@ def test_run_extruded_inductionless_slice_stacks_station_fields():
     assert bundle.geometry_kind == base_case.geometry.kind
     assert bundle.solver_kind == base_case.solver.kind
     assert jnp.isfinite(bundle.u).all()
+    assert jnp.isfinite(bundle.axial_current).all()
+    assert jnp.isfinite(bundle.wall_current_leakage).all()
     assert jnp.isfinite(bundle.charge_balance_residual).all()
 
 
@@ -236,6 +238,9 @@ def test_validate_extruded_inductionless_solution_reports_metrics():
     report = validate_extruded_inductionless_solution(bundle)
     assert report.station_count == 4
     assert report.max_charge_balance_residual >= 0.0
+    assert report.axial_current_span >= 0.0
+    assert report.max_wall_current_leakage >= 0.0
+    assert report.net_boundary_current_residual >= 0.0
     assert jnp.isfinite(report.field_mean_velocity_correlation)
 
 
@@ -249,6 +254,8 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
             "field_scale": jnp.asarray([0.0, 1.0, 0.0]),
             "mean_velocity": jnp.asarray([0.1, 0.3, 0.12]),
             "volumetric_flow_rate": jnp.asarray([0.2, 0.4, 0.25]),
+            "axial_current": jnp.asarray([0.01, 0.02, 0.015]),
+            "wall_current_leakage": jnp.asarray([1.0e-6, 2.0e-6, 1.5e-6]),
             "residual": jnp.asarray([1.0e-4, 1.0e-5, 1.0e-5]),
             "charge_balance_residual": jnp.asarray([1.0e-8, 2.0e-8, 1.5e-8]),
             "y": jnp.asarray([0.0]),
@@ -275,6 +282,8 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
     assert len(solution.station_history) == 3
     assert solution.validation.station_count == 3
     assert solution.bundle.solver_kind == "extruded_inductionless"
+    assert "axial_current" in solution.station_history[0]
+    assert "wall_current_leakage" in solution.station_history[0]
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():
@@ -289,6 +298,10 @@ def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bund
     assert solution.bundle.jx.shape == (4, 4, 4)
     assert jnp.isfinite(solution.bundle.u).all()
     assert jnp.isfinite(solution.bundle.p).all()
+    assert jnp.isfinite(solution.bundle.axial_current).all()
+    assert jnp.isfinite(solution.bundle.wall_current_leakage).all()
+    assert solution.validation.max_wall_current_leakage >= 0.0
+    assert solution.validation.net_boundary_current_residual >= 0.0
     assert solution.validation.station_count == 4
 
 
@@ -353,8 +366,15 @@ def test_solve_extruded_inductionless_falls_back_for_nonduct_geometry(monkeypatc
                 "field_scale": jnp.asarray([1.0]),
                 "mean_velocity": jnp.asarray([0.1]),
                 "volumetric_flow_rate": jnp.asarray([0.2]),
+                "axial_current": jnp.asarray([0.0]),
+                "wall_current_leakage": jnp.asarray([0.0]),
                 "residual": jnp.asarray([1.0e-4]),
                 "charge_balance_residual": jnp.asarray([1.0e-6]),
+                "y": jnp.asarray([0.0]),
+                "z": jnp.asarray([0.0]),
+                "jx": jnp.zeros((1, 1, 1)),
+                "jy": jnp.zeros((1, 1, 1)),
+                "jz": jnp.zeros((1, 1, 1)),
             },
         )(),
     )

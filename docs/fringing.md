@@ -12,7 +12,7 @@ entry point that the next paper phase can build on:
   slice and now supports layered ducts through the same projection path
 - a stacked axial field-bundle builder that exposes `u(x, y, z)`,
   `v(x, y, z)`, `w(x, y, z)`, `p(x, y, z)`, `phi(x, y, z)`, current,
-  Lorentz, and charge-balance histories
+  Lorentz, axial-current, wall-current leakage, and charge-balance histories
 - an explicit validation summary for that extruded slice
 - a publication-style example in `examples/fringing_benchmark_demo.py`
 
@@ -48,6 +48,8 @@ The example writes:
 - the stationwise current-scaled pressure surrogate
 - contour views of the stacked velocity bundle in `x-y` and `x-z`
 - the stationwise charge-balance residual along the fringing region
+- the stationwise axial current and wall-current leakage, which are the key
+  conservation diagnostics for inlet/outlet and external-wall hardening
 - a first true 3D pressure field `p(x, y, z)` inside the research slice
 - layered conducting/insulating wall fringing responses through the same API
 

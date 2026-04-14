@@ -39,6 +39,27 @@ Ship a research-grade `1.0` inductionless MHD code with:
    a broader production 3D family.
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
 
+## Conservation hardening lane
+
+The next research-grade solver work must keep conservation properties explicit,
+not implicit. The main implementation targets are:
+
+- conservative face-current construction in every solver family
+- compatibility projection of potential right-hand sides onto a zero-net-source
+  subspace before every Poisson-like electric solve
+- interface-current continuity diagnostics across fluid/solid material jumps
+- explicit boundary-current audits:
+  - wall-normal current leakage on insulating or externally closed boundaries
+  - inlet/outlet axial current imbalance
+  - net boundary-flux residual over the full 3D control volume
+- pressure-velocity updates that reduce both `div(u)` and charge/current
+  imbalance together on the extruded 3D lane
+
+The fully developed lane already carries compatibility projection and
+charge-balance diagnostics. The fringing 3D slice now also carries axial
+current and wall-leakage diagnostics, and the next step is to use those
+metrics as hard gates in the manual validation lane.
+
 ## Current status
 
 - The default duct solver family is now `fully_developed_inductionless`.
@@ -127,6 +148,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
 - That fringing path now writes retained axial field bundles for
   `u(x, y, z)`, `v(x, y, z)`, `w(x, y, z)`, `p(x, y, z)`, `phi(x, y, z)`,
   `J(x, y, z)`, and Lorentz force, together with charge-balance residuals.
+- That fringing path now also audits conservation with stationwise axial
+  current histories, wall-current leakage, and a global net boundary-current
+  residual so inlet/outlet and external-boundary behavior can be hardened
+  explicitly during the post-`1.0` solver-family work.
 - For rectangular ducts, `solve_extruded_inductionless(...)` now runs a first
   true low-Re 3D pressure-velocity-potential iteration. Layered ducts still use
   the stacked-station fallback.

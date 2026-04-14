@@ -40,6 +40,8 @@ class ExtrudedFieldBundle:
     residual: jnp.ndarray
     volumetric_flow_rate: jnp.ndarray
     mean_velocity: jnp.ndarray
+    axial_current: jnp.ndarray
+    wall_current_leakage: jnp.ndarray
     current_scaled_pressure_proxy: jnp.ndarray
     charge_balance_residual: jnp.ndarray
     geometry_kind: str
@@ -59,6 +61,9 @@ class ExtrudedInductionlessValidation:
     max_charge_balance_residual: float
     mean_velocity_span: float
     volumetric_flow_rate_span: float
+    axial_current_span: float
+    max_wall_current_leakage: float
+    net_boundary_current_residual: float
     field_mean_velocity_correlation: float
 
 
@@ -349,12 +354,35 @@ def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, floa
             "u_max": float(jnp.max(jnp.abs(bundle.u[index]))),
             "mean_velocity": float(bundle.mean_velocity[index]),
             "volumetric_flow_rate": float(bundle.volumetric_flow_rate[index]),
+            "axial_current": float(bundle.axial_current[index]),
+            "wall_current_leakage": float(bundle.wall_current_leakage[index]),
             "current_scaled_pressure_proxy": float(bundle.current_scaled_pressure_proxy[index]),
             "residual": float(bundle.residual[index]),
             "charge_balance_residual": float(bundle.charge_balance_residual[index]),
         }
         for index in range(bundle.x.shape[0])
     )
+
+
+def _net_boundary_current_residual(
+    jx: jnp.ndarray,
+    jy: jnp.ndarray,
+    jz: jnp.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> float:
+    yz_area = dy * dz
+    xz_area = dx * dz
+    xy_area = dx * dy
+    inlet_flux = -jnp.sum(jx[0, :, :]) * yz_area
+    outlet_flux = jnp.sum(jx[-1, :, :]) * yz_area
+    south_flux = -jnp.sum(jy[:, 0, :]) * xz_area
+    north_flux = jnp.sum(jy[:, -1, :]) * xz_area
+    bottom_flux = -jnp.sum(jz[:, :, 0]) * xy_area
+    top_flux = jnp.sum(jz[:, :, -1]) * xy_area
+    return float(jnp.abs(inlet_flux + outlet_flux + south_flux + north_flux + bottom_flux + top_flux))
 
 
 def smooth_fringing_profile(
@@ -650,6 +678,8 @@ def run_extruded_inductionless_slice(
         residual=residual,
         volumetric_flow_rate=volumetric_flow_rate,
         mean_velocity=mean_velocity,
+        axial_current=jnp.zeros_like(mean_velocity),
+        wall_current_leakage=jnp.zeros_like(mean_velocity),
         current_scaled_pressure_proxy=current_scaled_pressure_proxy,
         charge_balance_residual=charge_balance_residual,
         geometry_kind=base_case.geometry.kind,
@@ -789,11 +819,20 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
     fluid_area = jnp.maximum(jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
     volumetric_flow_rate = jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
     mean_velocity = volumetric_flow_rate / fluid_area
+    axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
+    wall_current_leakage = (
+        jnp.sum(jnp.abs(jy[:, 0, :]), axis=1) * dx * dz
+        + jnp.sum(jnp.abs(jy[:, -1, :]), axis=1) * dx * dz
+        + jnp.sum(jnp.abs(jz[:, :, 0]), axis=1) * dx * dy
+        + jnp.sum(jnp.abs(jz[:, :, -1]), axis=1) * dx * dy
+    )
     current_scaled_pressure_proxy = jnp.max(jnp.abs(jy), axis=(1, 2)) * jnp.maximum(jnp.max(jnp.abs(bx) + jnp.abs(by) + jnp.abs(bz), axis=(1, 2)), 1.0e-12)
     charge_balance_residual = jnp.max(jnp.abs(_gradient_3d(jx, dx=dx, dy=dy, dz=dz)[0] + _gradient_3d(jy, dx=dx, dy=dy, dz=dz)[1] + _gradient_3d(jz, dx=dx, dy=dy, dz=dz)[2]), axis=(1, 2))
     residual = jnp.nan_to_num(residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     volumetric_flow_rate = jnp.nan_to_num(volumetric_flow_rate)
     mean_velocity = jnp.nan_to_num(mean_velocity)
+    axial_current = jnp.nan_to_num(axial_current, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
+    wall_current_leakage = jnp.nan_to_num(wall_current_leakage, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     current_scaled_pressure_proxy = jnp.nan_to_num(current_scaled_pressure_proxy, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     charge_balance_residual = jnp.nan_to_num(charge_balance_residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit)
     return ExtrudedFieldBundle(
@@ -815,6 +854,8 @@ def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> Extrude
         residual=jnp.asarray(residual, dtype=float),
         volumetric_flow_rate=jnp.asarray(volumetric_flow_rate, dtype=float),
         mean_velocity=jnp.asarray(mean_velocity, dtype=float),
+        axial_current=jnp.asarray(axial_current, dtype=float),
+        wall_current_leakage=jnp.asarray(wall_current_leakage, dtype=float),
         current_scaled_pressure_proxy=jnp.asarray(current_scaled_pressure_proxy, dtype=float),
         charge_balance_residual=jnp.asarray(charge_balance_residual, dtype=float),
         geometry_kind=case.geometry.kind,
@@ -830,9 +871,31 @@ def validate_extruded_inductionless_solution(
     field_scale = jnp.asarray(bundle.field_scale, dtype=float)
     mean_velocity = jnp.asarray(bundle.mean_velocity, dtype=float)
     volumetric_flow_rate = jnp.asarray(bundle.volumetric_flow_rate, dtype=float)
+    axial_current = jnp.asarray(bundle.axial_current, dtype=float)
+    wall_current_leakage = jnp.asarray(bundle.wall_current_leakage, dtype=float)
     residual = jnp.asarray(bundle.residual, dtype=float)
     charge_balance_residual = jnp.asarray(bundle.charge_balance_residual, dtype=float)
     correlation = _safe_correlation(field_scale, mean_velocity)
+    if bundle.x.size > 1:
+        dx = float(jnp.mean(jnp.diff(bundle.x)))
+    else:
+        dx = 1.0
+    if bundle.y.size > 1:
+        dy = float(jnp.mean(jnp.diff(bundle.y)))
+    else:
+        dy = 1.0
+    if bundle.z.size > 1:
+        dz = float(jnp.mean(jnp.diff(bundle.z)))
+    else:
+        dz = 1.0
+    boundary_current_residual = _net_boundary_current_residual(
+        jnp.asarray(bundle.jx, dtype=float),
+        jnp.asarray(bundle.jy, dtype=float),
+        jnp.asarray(bundle.jz, dtype=float),
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
         max_residual=float(jnp.max(jnp.abs(residual))) if residual.size else 0.0,
@@ -843,6 +906,9 @@ def validate_extruded_inductionless_solution(
         volumetric_flow_rate_span=float(jnp.max(volumetric_flow_rate) - jnp.min(volumetric_flow_rate))
         if volumetric_flow_rate.size
         else 0.0,
+        axial_current_span=float(jnp.max(axial_current) - jnp.min(axial_current)) if axial_current.size else 0.0,
+        max_wall_current_leakage=float(jnp.max(jnp.abs(wall_current_leakage))) if wall_current_leakage.size else 0.0,
+        net_boundary_current_residual=boundary_current_residual,
         field_mean_velocity_correlation=correlation,
     )
 

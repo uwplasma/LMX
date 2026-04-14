@@ -95,6 +95,17 @@ the zero-net-source condition required for a bounded potential solve.
 This logic lives in `lmx/solvers.py`, while the diagnostics are stored in
 `lmx/core.py` and persisted through `lmx/io.py`.
 
+The `extruded_inductionless` research slice in `lmx/fringing.py` extends this
+to explicit boundary-flux audits. In addition to `div J`, it now records:
+
+- stationwise integrated axial current
+- stationwise wall-current leakage on the external `y`/`z` boundaries
+- a net boundary-current residual over the full 3D control volume
+
+Those are the right diagnostics for hardening inlet/outlet behavior and for
+checking that the 3D pressure-velocity-potential loop is not quietly creating
+or destroying charge through the axial boundaries.
+
 ## Linear solver backends
 
 Low-level iterative linear solver helpers are implemented in `lmx/linear.py`.

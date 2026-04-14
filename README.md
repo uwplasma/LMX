@@ -291,8 +291,9 @@ That example now writes the first retained rectangular-duct
 `extruded_inductionless` 3D projection slice through the explicit
 `solve_extruded_inductionless(...)` Python entry point: a stacked axial field
 bundle with `u`, `v`, `w`, `p`, `phi`, current, Lorentz, charge-balance
-diagnostics, contour plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a
-compact validation summary for the slice.
+diagnostics, axial-current histories, wall-current leakage audits, contour
+plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a compact validation
+summary for the slice.
 
 That workflow generates a smooth axial fringing profile together with
 cross-sectional response metrics. Rectangular and layered ducts now both go
