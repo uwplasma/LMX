@@ -30,6 +30,7 @@ python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples
 python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
 python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
+python examples/extruded_paper_figures.py --output ./artifacts/examples/extruded_paper_figures
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
@@ -147,6 +148,10 @@ The restart and validation campaign examples extend that same 3D lane:
 - `autodiff_extruded_trajectory_demo.py`
   - matches selected-station fields and conservation histories across the
     retained projection iterations themselves, not just the final extruded state
+- `extruded_paper_figures.py`
+  - writes reviewer-facing 3D fringing figures for the retained rectangular and
+    layered datasets, plus a compact summary panel over velocity, charge
+    balance, axial current, and pressure span
 
 Geometry and mesh preview:
 

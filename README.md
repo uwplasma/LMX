@@ -276,6 +276,7 @@ python examples/autodiff_fringing_response_demo.py --output artifacts/examples/a
 python examples/autodiff_extruded_target_demo.py --output artifacts/examples/autodiff_extruded_target
 python examples/autodiff_extruded_field_design_demo.py --output artifacts/examples/autodiff_extruded_field_design
 python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples/autodiff_extruded_trajectory
+python examples/extruded_paper_figures.py --output artifacts/examples/extruded_paper_figures
 python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
 ```
@@ -298,7 +299,16 @@ Together, those examples demonstrate:
 - projection-trajectory inverse design against selected-station `u`, `phi`,
   `J_y`, `p`, and charge-balance histories taken across the retained
   projection iterations themselves
+- reviewer-facing 3D fringing figures for the retained rectangular and layered
+  datasets
 - polished `PNG`/`PDF` summary figures for publication use
+
+The retained reviewer-facing 3D fringing figures are now shipped in the docs
+tree as:
+
+- `docs/_static/generated/paper_rect_3d.png`
+- `docs/_static/generated/paper_layered_3d.png`
+- `docs/_static/generated/paper_reviewer_summary.png`
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
 

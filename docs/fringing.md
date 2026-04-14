@@ -66,6 +66,8 @@ python examples/fringing_benchmark_demo.py \
 python examples/fringing_benchmark_demo.py \
   --geometry-kind pipe_ogrid \
   --output artifacts/examples/fringing_benchmark_pipe_exploratory
+python examples/extruded_paper_figures.py \
+  --output artifacts/examples/extruded_paper_figures
 ```
 
 The example writes:
@@ -201,6 +203,22 @@ python examples/extruded_validation_campaign.py \
 That example runs the hard-gate fringing campaign on a retained larger
 resolution set, writes JSON/CSV summaries, and produces a publication-style
 summary figure.
+
+For reviewer-facing figures, `examples/extruded_paper_figures.py` now writes a
+bounded retained set of 3D visualizations:
+
+- a rectangular peak-field cross-section rendered in 3D
+- a layered peak-field cross-section rendered in 3D
+- a compact summary panel over mean velocity, charge-balance residual,
+  axial current, and pressure span
+
+Current reviewer-facing retained paper figures:
+
+![LMX rectangular fringing 3D paper figure](_static/generated/paper_rect_3d.png)
+
+![LMX layered fringing 3D paper figure](_static/generated/paper_layered_3d.png)
+
+![LMX fringing reviewer summary](_static/generated/paper_reviewer_summary.png)
 
 Its default larger retained dataset is intentionally `rect_duct,layered_duct`.
 The mapped-pipe slice still belongs to the retained smaller hard gate, but it

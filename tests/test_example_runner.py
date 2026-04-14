@@ -419,6 +419,22 @@ def test_autodiff_extruded_trajectory_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "autodiff_extruded_trajectory_summary.json").exists()
 
 
+def test_extruded_paper_figures_writes_summary(tmp_path: Path):
+    module = _load_example_module("extruded_paper_figures.py")
+    summary = module.run_extruded_paper_figures(
+        out_dir=tmp_path,
+        ha_peak=8.0,
+        ny=4,
+        nz=4,
+        nx_stations=5,
+    )
+    assert summary["case"] == "extruded_paper_figures"
+    assert (tmp_path / "paper_rect_3d.png").exists()
+    assert (tmp_path / "paper_layered_3d.png").exists()
+    assert (tmp_path / "paper_reviewer_summary.png").exists()
+    assert (tmp_path / "extruded_paper_figures_summary.json").exists()
+
+
 def test_autodiff_fringing_design_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("autodiff_fringing_design_demo.py")
     summary = module.run_autodiff_fringing_design_demo(out_dir=tmp_path, steps=4)

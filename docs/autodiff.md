@@ -240,6 +240,11 @@ Current trajectory-level exploratory artifact:
 
 ![LMX extruded trajectory autodiff summary](_static/generated/autodiff_extruded_trajectory.png)
 
+`examples/autodiff_extruded_trajectory_demo.py` is now the deepest bounded
+example in the shipped differentiable fringing lane because it matches fields
+and conservation trajectories across the retained projection iterations, not
+just final-state outputs.
+
 These three extruded autodiff figures should currently be read as research-lane
 evidence of loss reduction, not as the same level of publication-locked
 parameter recovery already achieved by the Hartmann analytical examples. The
