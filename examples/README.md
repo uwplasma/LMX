@@ -27,6 +27,7 @@ python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autod
 python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
 python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
 python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
+python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
@@ -80,6 +81,7 @@ python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autod
 python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
 python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
 python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
+python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
 ```
 
 The shipped autodiff examples now cover:
@@ -91,6 +93,10 @@ The shipped autodiff examples now cover:
 - fringing-history inverse design over axial field-profile parameters
 - fringing multi-observable inverse design over axial field-profile parameters
   using both velocity and current-response targets
+- inverse design against targets generated directly from
+  `solve_extruded_inductionless(...)`, which is the current bridge from the
+  lightweight fringing-response model into the first 3D
+  `extruded_inductionless` solver slice
 - publication-style `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
@@ -98,13 +104,13 @@ Fringing-field scaffold:
 ```bash
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output ./artifacts/examples/fringing_benchmark_layered
+python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe
 ```
 
 That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
 `phi`, current, Lorentz, and charge-balance fields through the explicit
-`solve_extruded_inductionless(...)` entry point. Rectangular ducts now use a
-real low-Re 3D pressure-velocity-potential slice there, and layered ducts now
-use the same public path.
+`solve_extruded_inductionless(...)` entry point. Rectangular ducts, layered
+ducts, and mapped pipes all now use the same public path.
 
 Geometry and mesh preview:
 

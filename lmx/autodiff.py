@@ -696,3 +696,62 @@ def run_fringing_response_inverse_design(
         "recovered_field_scale": recovered["field_scale"],
         "x": recovered["x"],
     }
+
+
+def build_extruded_response_targets(extruded_solution) -> dict[str, jnp.ndarray]:
+    bundle = extruded_solution.bundle
+    return {
+        "x": jnp.asarray(bundle.x, dtype=jnp.float32),
+        "field_scale": jnp.asarray(bundle.field_scale, dtype=jnp.float32),
+        "mean_velocity": jnp.asarray(bundle.mean_velocity, dtype=jnp.float32),
+        "current_proxy": jnp.asarray(bundle.current_scaled_pressure_proxy, dtype=jnp.float32),
+        "charge_balance_residual": jnp.asarray(bundle.charge_balance_residual, dtype=jnp.float32),
+        "wall_current_leakage": jnp.asarray(bundle.wall_current_leakage, dtype=jnp.float32),
+        "axial_current": jnp.asarray(bundle.axial_current, dtype=jnp.float32),
+    }
+
+
+def run_extruded_target_inverse_design(
+    extruded_solution,
+    *,
+    ny: int = 12,
+    nz: int = 12,
+    potential_iterations: int = 12,
+    velocity_iterations: int = 16,
+    macro_iterations: int = 3,
+    peak_hartmann_init: float = 10.0,
+    entry_center_init: float = 1.0,
+    exit_center_init: float = 5.0,
+    transition_width_init: float = 0.7,
+    current_weight: float = 0.5,
+    steps: int = 16,
+) -> dict[str, object]:
+    targets = build_extruded_response_targets(extruded_solution)
+    x = targets["x"]
+    problem = build_fringing_autodiff_problem(
+        nx_stations=int(x.shape[0]),
+        length=float(x[-1] - x[0]) if x.shape[0] > 1 else 1.0,
+        ny=ny,
+        nz=nz,
+        potential_iterations=potential_iterations,
+        velocity_iterations=velocity_iterations,
+        macro_iterations=macro_iterations,
+    )
+    result = run_fringing_response_inverse_design(
+        problem,
+        target_mean_velocity=targets["mean_velocity"],
+        target_current_proxy=targets["current_proxy"],
+        forcing=float(extruded_solution.problem.case.forcing),
+        peak_hartmann_init=peak_hartmann_init,
+        entry_center_init=entry_center_init,
+        exit_center_init=exit_center_init,
+        transition_width_init=transition_width_init,
+        current_weight=current_weight,
+        steps=steps,
+    )
+    return {
+        "target": targets,
+        "recovered": result,
+        "geometry_kind": extruded_solution.problem.case.geometry.kind,
+        "forcing": float(extruded_solution.problem.case.forcing),
+    }

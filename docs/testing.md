@@ -46,7 +46,26 @@ python scripts/run_manual_solver_family_validation.py \
 
 That command keeps the fast lane clean while still exercising the heavier
 Hartmann / Shercliff / Hunt acceptance path together with the bounded
-rectangular-duct fringing slice.
+fringing slices.
+
+The manual lane can also enforce conservation thresholds directly:
+
+```bash
+python scripts/run_manual_solver_family_validation.py \
+  --output artifacts/manual_validation/solver_family_summary.json \
+  --ha-values 10,20 \
+  --resolution 24 \
+  --include-fringing \
+  --fringing-geometries rect_duct,layered_duct,pipe_ogrid \
+  --max-charge-balance 1e-5 \
+  --max-interface-current 1e-5 \
+  --max-fringing-wall-current-leakage 1e-5 \
+  --max-fringing-boundary-current 1e-5 \
+  --fail-on-threshold
+```
+
+This is the intended post-1.0 release-validation mode for conservation
+hardening.
 
 This split avoids exhausting CI runtime on every routine push while still
 preserving reproducible research checks.

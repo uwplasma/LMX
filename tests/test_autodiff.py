@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.autodiff import (
+    build_extruded_response_targets,
     build_fringing_autodiff_problem,
     build_hartmann_autodiff_problem,
     fringing_history_loss_gradients,
@@ -15,10 +16,12 @@ from lmx.autodiff import (
     hartmann_profile_loss,
     hartmann_profile_loss_gradients,
     run_fringing_response_inverse_design,
+    run_extruded_target_inverse_design,
     run_fringing_history_inverse_design,
     run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
 )
+from lmx.fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
 
 
 pytestmark = pytest.mark.unit
@@ -241,3 +244,31 @@ def test_fringing_response_inverse_design_reduces_loss():
     assert len(result["history"]) == 6
     assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
     assert jnp.isfinite(result["recovered_current_proxy"]).all()
+
+
+def test_build_extruded_response_targets_returns_finite_histories():
+    problem = build_square_duct_extruded_problem(ha_peak=6.0, nx_stations=4, ny=4, nz=4)
+    solution = solve_extruded_inductionless(problem)
+
+    targets = build_extruded_response_targets(solution)
+
+    assert targets["x"].shape == (4,)
+    assert targets["mean_velocity"].shape == (4,)
+    assert targets["current_proxy"].shape == (4,)
+    assert targets["charge_balance_residual"].shape == (4,)
+    assert targets["wall_current_leakage"].shape == (4,)
+    assert targets["axial_current"].shape == (4,)
+    assert jnp.isfinite(targets["mean_velocity"]).all()
+
+
+def test_extruded_target_inverse_design_returns_finite_payload():
+    problem = build_square_duct_extruded_problem(ha_peak=6.0, nx_stations=4, ny=4, nz=4)
+    solution = solve_extruded_inductionless(problem)
+
+    result = run_extruded_target_inverse_design(solution, ny=6, nz=6, steps=4)
+
+    assert result["geometry_kind"] == "rect_duct"
+    assert "target" in result
+    assert "recovered" in result
+    assert len(result["recovered"]["history"]) == 4
+    assert jnp.isfinite(result["target"]["mean_velocity"]).all()

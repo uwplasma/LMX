@@ -13,8 +13,8 @@ LMX currently exposes three solver-family names:
 - `reduced_inductionless`
   - a reduced-model alternative retained for comparative studies
 - `extruded_inductionless`
-  - first low-Re 3D pressure-velocity-potential slices for rectangular and
-    layered ducts now exist in `lmx/fringing.py`
+  - first low-Re 3D pressure-velocity-potential slices for rectangular ducts,
+    layered ducts, and mapped pipes now exist in `lmx/fringing.py`
   - full production 3D family hardening remains post-`1.0`
 
 The active implementation today is the fully developed cross-sectional solver
@@ -105,6 +105,34 @@ to explicit boundary-flux audits. In addition to `div J`, it now records:
 Those are the right diagnostics for hardening inlet/outlet behavior and for
 checking that the 3D pressure-velocity-potential loop is not quietly creating
 or destroying charge through the axial boundaries.
+
+The manual validation lane now treats those quantities as hard gates. The main
+driver `scripts/run_manual_solver_family_validation.py` can reject a run when:
+
+- `charge_balance_residual > --max-charge-balance`
+- `interface_current_residual > --max-interface-current`
+- `max_wall_current_leakage > --max-fringing-wall-current-leakage`
+- `net_boundary_current_residual > --max-fringing-boundary-current`
+
+That moves the conservation checks from “reported” to “enforced” for the heavy
+validation path.
+
+## Extruded 3D rectangular/pipe numerics
+
+The retained `extruded_inductionless` slice in `lmx/fringing.py` uses:
+
+1. a structured axial mesh in `x`
+2. either a rectangular `y-z` cross-section or a mapped `r-\theta` pipe grid
+3. a low-Re projection update for `u`, `v`, `w`, and `p`
+4. a Poisson-like electric solve for `\phi`
+5. conservative current reconstruction
+6. post-step conservation audits
+
+For mapped pipes, the same discrete logic is expressed in local cylindrical
+coordinates. The local magnetic field and current components are projected
+between Cartesian and pipe-local frames only at the assembly boundaries; the
+rest of the control-volume bookkeeping remains metric-aware inside
+`lmx/fringing.py`.
 
 ## Linear solver backends
 

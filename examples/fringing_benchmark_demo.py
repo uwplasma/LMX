@@ -9,6 +9,7 @@ import numpy as np
 
 from lmx.fringing import (
     build_layered_duct_extruded_problem,
+    build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     solve_extruded_inductionless,
 )
@@ -54,6 +55,13 @@ def run_fringing_benchmark_demo(
             wall_cells=max(1, min(4, ny // 6)),
             insulator_cells=max(1, min(3, ny // 8)),
         )
+    elif geometry_kind == "pipe_ogrid":
+        problem = build_pipe_ogrid_extruded_problem(
+            ha_peak=ha_peak,
+            nr=ny,
+            ntheta=max(8, nz * 4),
+            nx_stations=nx_stations,
+        )
     else:
         raise ValueError(f"Unsupported geometry_kind {geometry_kind!r}")
     solution = solve_extruded_inductionless(problem)
@@ -72,6 +80,8 @@ def run_fringing_benchmark_demo(
     y_mid = extruded.u.shape[1] // 2
     x_grid, y_grid = np.meshgrid(np.asarray(extruded.x), np.asarray(extruded.y), indexing="xy")
     x_grid_z, z_grid = np.meshgrid(np.asarray(extruded.x), np.asarray(extruded.z), indexing="xy")
+    y_label = "r" if geometry_kind == "pipe_ogrid" else "y"
+    z_label = r"$\theta$" if geometry_kind == "pipe_ogrid" else "z"
 
     axes[0, 0].plot(x, field_scale, color="#1d4ed8")
     axes[0, 0].set_title("Axial field profile")
@@ -91,19 +101,22 @@ def run_fringing_benchmark_demo(
     contour_y = axes[1, 0].contourf(x_grid, y_grid, np.asarray(extruded.u[:, :, z_mid]).T, levels=18, cmap="viridis")
     axes[1, 0].set_title("Midplane velocity u(x, y, zmid)")
     axes[1, 0].set_xlabel("x")
-    axes[1, 0].set_ylabel("y")
+    axes[1, 0].set_ylabel(y_label)
     fig.colorbar(contour_y, ax=axes[1, 0], shrink=0.9, label="u")
 
     contour_z = axes[1, 1].contourf(x_grid_z, z_grid, np.asarray(extruded.u[:, y_mid, :]).T, levels=18, cmap="viridis")
     axes[1, 1].set_title("Centerline-normal velocity u(x, ymid, z)")
     axes[1, 1].set_xlabel("x")
-    axes[1, 1].set_ylabel("z")
+    axes[1, 1].set_ylabel(z_label)
     fig.colorbar(contour_z, ax=axes[1, 1], shrink=0.9, label="u")
 
-    axes[1, 2].semilogy(x, np.maximum(charge_balance, 1.0e-16), color="#7c3aed")
-    axes[1, 2].set_title("Charge-balance residual")
+    axes[1, 2].semilogy(x, np.maximum(charge_balance, 1.0e-16), color="#7c3aed", label="Charge balance")
+    wall_leak = np.asarray(extruded.wall_current_leakage)
+    axes[1, 2].semilogy(x, np.maximum(wall_leak, 1.0e-16), color="#dc2626", linestyle="--", label="Wall leakage")
+    axes[1, 2].set_title("Current conservation")
     axes[1, 2].set_xlabel("x")
     axes[1, 2].set_ylabel("Residual")
+    axes[1, 2].legend(frameon=False)
 
     png_path = out_dir / "fringing_benchmark.png"
     pdf_path = out_dir / "fringing_benchmark.pdf"
@@ -123,6 +136,8 @@ def run_fringing_benchmark_demo(
             "field_scale": np.asarray(extruded.field_scale).tolist(),
             "u_shape": list(np.asarray(extruded.u).shape),
             "charge_balance_residual": np.asarray(extruded.charge_balance_residual).tolist(),
+            "axial_current": np.asarray(extruded.axial_current).tolist(),
+            "wall_current_leakage": np.asarray(extruded.wall_current_leakage).tolist(),
         },
         "validation": {
             "station_count": solution.validation.station_count,
@@ -130,6 +145,9 @@ def run_fringing_benchmark_demo(
             "max_charge_balance_residual": solution.validation.max_charge_balance_residual,
             "mean_velocity_span": solution.validation.mean_velocity_span,
             "volumetric_flow_rate_span": solution.validation.volumetric_flow_rate_span,
+            "axial_current_span": solution.validation.axial_current_span,
+            "max_wall_current_leakage": solution.validation.max_wall_current_leakage,
+            "net_boundary_current_residual": solution.validation.net_boundary_current_residual,
             "field_mean_velocity_correlation": solution.validation.field_mean_velocity_correlation,
         },
         "plots": [png_path.name, pdf_path.name],
@@ -150,7 +168,7 @@ def run_fringing_benchmark_demo(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the LMX fringing-field benchmark scaffold.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/fringing_benchmark"))
-    parser.add_argument("--geometry-kind", choices=("rect_duct", "layered_duct"), default="rect_duct")
+    parser.add_argument("--geometry-kind", choices=("rect_duct", "layered_duct", "pipe_ogrid"), default="rect_duct")
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=12)
     parser.add_argument("--nz", type=int, default=12)

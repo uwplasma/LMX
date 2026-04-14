@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from lmx.fringing import (
     build_layered_duct_extruded_problem,
+    build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     build_square_duct_fringing_benchmark,
     _cross_section_mesh,
@@ -191,11 +192,19 @@ def test_build_layered_duct_extruded_problem_marks_solver_family():
     assert problem.profile.x.shape == (5,)
 
 
-def test_cross_section_mesh_rejects_unsupported_geometry():
+def test_build_pipe_ogrid_extruded_problem_marks_solver_family():
+    problem = build_pipe_ogrid_extruded_problem(nx_stations=5, nr=6, ntheta=12)
+
+    assert problem.case.solver.kind == "extruded_inductionless"
+    assert problem.case.geometry.kind == "pipe_ogrid"
+    assert problem.profile.x.shape == (5,)
+
+
+def test_cross_section_mesh_supports_pipe_ogrid_geometry():
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=4, nz=4)
-    bad_case = replace(problem.case, geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8))
-    with pytest.raises(ValueError, match="Unsupported extruded geometry"):
-        _cross_section_mesh(bad_case)
+    pipe_case = replace(problem.case, geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8))
+    mesh = _cross_section_mesh(pipe_case)
+    assert mesh.geometry == "pipe_ogrid"
 
 
 def test_validate_extruded_inductionless_solution_reports_metrics():
@@ -330,6 +339,18 @@ def test_solve_extruded_inductionless_projection_returns_finite_layered_bundle()
     assert jnp.isfinite(solution.bundle.phi).all()
 
 
+def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
+    problem = build_pipe_ogrid_extruded_problem(ha_peak=6.0, nx_stations=4, nr=4, ntheta=8)
+
+    solution = solve_extruded_inductionless(problem)
+
+    assert solution.bundle.geometry_kind == "pipe_ogrid"
+    assert solution.bundle.u.shape == (4, 4, 8)
+    assert jnp.isfinite(solution.bundle.u).all()
+    assert jnp.isfinite(solution.bundle.axial_current).all()
+    assert jnp.isfinite(solution.bundle.wall_current_leakage).all()
+
+
 def test_poisson_helpers_can_stop_early():
     rhs = jnp.zeros((2, 2, 2))
     field, residual, iterations, initial = _poisson_jacobi_3d(rhs, dx=1.0, dy=1.0, dz=1.0, iterations=4, tolerance=1.0)
@@ -351,14 +372,13 @@ def test_poisson_helpers_can_stop_early():
     assert jnp.isfinite(field_var).all()
 
 
-def test_solve_extruded_inductionless_falls_back_for_nonduct_geometry(monkeypatch: pytest.MonkeyPatch):
+def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(monkeypatch: pytest.MonkeyPatch):
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=4, nz=4)
     pipe_case = replace(problem.case, geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8))
     pipe_problem = replace(problem, case=pipe_case)
-    monkeypatch.setattr("lmx.fringing.run_fringing_station_sweep", lambda case, profile, solver=None: [{"x": 0.0}])
     monkeypatch.setattr(
-        "lmx.fringing.run_extruded_inductionless_slice",
-        lambda case, profile, solver=None: type(
+        "lmx.fringing._solve_extruded_projection",
+        lambda problem: type(
             "Bundle",
             (),
             {
@@ -372,9 +392,20 @@ def test_solve_extruded_inductionless_falls_back_for_nonduct_geometry(monkeypatc
                 "charge_balance_residual": jnp.asarray([1.0e-6]),
                 "y": jnp.asarray([0.0]),
                 "z": jnp.asarray([0.0]),
+                "u": jnp.zeros((1, 1, 1)),
+                "v": jnp.zeros((1, 1, 1)),
+                "w": jnp.zeros((1, 1, 1)),
+                "p": jnp.zeros((1, 1, 1)),
+                "phi": jnp.zeros((1, 1, 1)),
                 "jx": jnp.zeros((1, 1, 1)),
                 "jy": jnp.zeros((1, 1, 1)),
                 "jz": jnp.zeros((1, 1, 1)),
+                "lorentz_x": jnp.zeros((1, 1, 1)),
+                "lorentz_y": jnp.zeros((1, 1, 1)),
+                "lorentz_z": jnp.zeros((1, 1, 1)),
+                "current_scaled_pressure_proxy": jnp.asarray([0.0]),
+                "geometry_kind": "pipe_ogrid",
+                "solver_kind": "extruded_inductionless",
             },
         )(),
     )

@@ -317,6 +317,14 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
     )
     monkeypatch.setattr(
         module,
+        "build_pipe_ogrid_extruded_problem",
+        lambda **kwargs: SimpleNamespace(
+            case=SimpleNamespace(name="fringing_case_pipe", solver=SimpleNamespace(kind="extruded_inductionless")),
+            profile=SimpleNamespace(x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
         "solve_extruded_inductionless",
         lambda *args, **kwargs: SimpleNamespace(
             station_history=(
@@ -330,6 +338,8 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
                 field_scale=np.array([0.0, 1.0]),
                 u=np.ones((2, 2, 2)),
                 charge_balance_residual=np.array([1.0e-7, 2.0e-7]),
+                wall_current_leakage=np.array([1.0e-8, 2.0e-8]),
+                axial_current=np.array([0.01, 0.015]),
             ),
             validation=SimpleNamespace(
                 station_count=2,
@@ -337,6 +347,9 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
                 max_charge_balance_residual=2.0e-7,
                 mean_velocity_span=0.2,
                 volumetric_flow_rate_span=0.1,
+                axial_current_span=0.01,
+                max_wall_current_leakage=2.0e-8,
+                net_boundary_current_residual=3.0e-8,
                 field_mean_velocity_correlation=0.9,
             ),
         ),
@@ -358,6 +371,16 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
     )
     assert summary_layered["case"] == "fringing_case_layered"
     assert summary_layered["geometry_kind"] == "layered_duct"
+
+    summary_pipe = module.run_fringing_benchmark_demo(
+        out_dir=tmp_path / "pipe",
+        geometry_kind="pipe_ogrid",
+        nx_stations=2,
+        ny=4,
+        nz=4,
+    )
+    assert summary_pipe["case"] == "fringing_case_pipe"
+    assert summary_pipe["geometry_kind"] == "pipe_ogrid"
 
 
 def test_autodiff_profile_design_demo_writes_summary(tmp_path: Path):
@@ -392,6 +415,14 @@ def test_autodiff_fringing_response_demo_writes_summary(tmp_path: Path):
     assert "recovered" in summary
     assert (tmp_path / "autodiff_fringing_response.png").exists()
     assert (tmp_path / "autodiff_fringing_response_summary.json").exists()
+
+
+def test_autodiff_extruded_target_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("autodiff_extruded_target_demo.py")
+    summary = module.run_autodiff_extruded_target_demo(out_dir=tmp_path, ny=4, nz=4, nx_stations=4, steps=4)
+    assert summary["solver_kind"] == "extruded_inductionless"
+    assert (tmp_path / "autodiff_extruded_target.png").exists()
+    assert (tmp_path / "autodiff_extruded_target_summary.json").exists()
 
 
 def test_variable_field_geometry_demo_writes_preview_and_run_outputs(

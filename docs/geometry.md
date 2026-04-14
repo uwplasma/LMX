@@ -11,8 +11,8 @@ mesh APIs:
   - used for conducting-wall and mixed-wall benchmark studies
 - `pipe_ogrid`
   - a mapped structured O-grid around a circular core
-  - currently used for geometry preview, postprocessing, and fringing-field
-    research scaffolds until the full `extruded_inductionless` solver lands
+  - currently used for geometry preview, postprocessing, and the first
+    fringing-field `extruded_inductionless` pipe slice
 
 ## Geometry objects in the source tree
 
@@ -26,6 +26,9 @@ The geometry configuration enters the code through:
   - structured mesh generation and mapped pipe O-grid generation
 - `lmx/solvers.py`
   - `_build_mesh(...)` dispatch from case specifications to concrete mesh arrays
+- `lmx/fringing.py`
+  - explicit 3D fringing problems for rectangular ducts, layered ducts, and
+    mapped pipes
 
 ## Build geometries from Python
 
@@ -112,8 +115,8 @@ step before longer studies.
 
 - increase `ny` and `nz` to resolve Hartmann and Shercliff boundary layers
 - use explicit `wall_cells` and nonzero `wall_thickness` for `layered_duct`
-- use `pipe_ogrid` for preprocessing, visualization, and fringing scaffolds
-  until the full `extruded_inductionless` solver family lands
+- use `pipe_ogrid` for preprocessing, visualization, and the current first
+  fringing `extruded_inductionless` pipe slice
 - use the metrics from `lmx/validation.py`, especially
   `duct_layer_resolution_metrics(...)`, to quantify whether the side and
   Hartmann layers are resolved enough for a benchmark-quality run

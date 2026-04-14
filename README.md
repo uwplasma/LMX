@@ -38,7 +38,9 @@ The `1.0` ship gate is now closed on the fast release lane:
   - current repo ships a first rectangular-duct low-Re 3D projection slice
   - layered fringing ducts now use the same projection path through the Python
     API
-  - full CLI/TOML support, mapped-pipe support, and production-grade 3D
+  - mapped `pipe_ogrid` fringing cases now use the same explicit 3D slice
+    through the Python API
+  - full CLI/TOML support and production-grade 3D
     validation remain post-`1.0` work
 
 ## Installation
@@ -256,6 +258,7 @@ python examples/autodiff_sensitivity_demo.py --output artifacts/examples/autodif
 python examples/autodiff_profile_design_demo.py --output artifacts/examples/autodiff_profile_design
 python examples/autodiff_fringing_design_demo.py --output artifacts/examples/autodiff_fringing_design
 python examples/autodiff_fringing_response_demo.py --output artifacts/examples/autodiff_fringing_response
+python examples/autodiff_extruded_target_demo.py --output artifacts/examples/autodiff_extruded_target
 ```
 
 Together, those examples demonstrate:
@@ -268,6 +271,9 @@ Together, those examples demonstrate:
 - fringing-history inverse design recovering axial field-profile parameters
 - fringing multi-observable inverse design recovering axial field-profile
   parameters against both mean-velocity and current-response histories
+- inverse design against targets generated directly from the first
+  `extruded_inductionless` 3D slice, so the differentiable lane is no longer
+  limited to the lightweight response model
 - polished `PNG`/`PDF` summary figures for publication use
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
@@ -285,6 +291,7 @@ The repository now also ships a publication-facing fringing benchmark scaffold:
 ```bash
 python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output artifacts/examples/fringing_benchmark_layered
+python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output artifacts/examples/fringing_benchmark_pipe
 ```
 
 That example now writes the first retained rectangular-duct
@@ -296,9 +303,10 @@ plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a compact validation
 summary for the slice.
 
 That workflow generates a smooth axial fringing profile together with
-cross-sectional response metrics. Rectangular and layered ducts now both go
-through the low-Re pressure-velocity-potential projection slice in the Python
-API, so the workflow is no longer limited to a single fluid-only cross-section.
+cross-sectional response metrics. Rectangular ducts, layered ducts, and mapped
+pipe O-grids now all go through the low-Re pressure-velocity-potential
+projection slice in the Python API, so the workflow is no longer limited to a
+single duct-only cross-section.
 
 ## User workflows
 

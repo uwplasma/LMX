@@ -4,11 +4,11 @@ from dataclasses import dataclass, replace
 
 import jax.numpy as jnp
 
-from .cases import make_shercliff_case
+from .cases import _ha_to_b, make_shercliff_case
 from .core import Solution
-from .mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
+from .mesh import generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
 from .physics import build_material_fields
-from .specs import CaseSpec, MagneticFieldSpec
+from .specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, OutputSpec, RegionSpec, SolverConfig, TimeStepperConfig
 from .solvers import solve_steady
 from .validation import validation_summary
 
@@ -343,6 +343,14 @@ def _cross_section_mesh(case: CaseSpec):
             wall_cells=geometry.wall_cells,
             target_ha=geometry.target_ha,
         )
+    if geometry.kind == "pipe_ogrid":
+        return generate_pipe_ogrid_mesh(
+            radius=geometry.radius or (0.5 * geometry.width),
+            length=geometry.length,
+            nx=geometry.nx,
+            nr=geometry.nr or geometry.ny,
+            ntheta=geometry.ntheta or geometry.nz,
+        )
     raise ValueError(f"Unsupported extruded geometry {geometry.kind!r}")
 
 
@@ -383,6 +391,139 @@ def _net_boundary_current_residual(
     bottom_flux = -jnp.sum(jz[:, :, 0]) * xy_area
     top_flux = jnp.sum(jz[:, :, -1]) * xy_area
     return float(jnp.abs(inlet_flux + outlet_flux + south_flux + north_flux + bottom_flux + top_flux))
+
+
+def _pipe_theta_neighbors(field: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    theta_prev = jnp.concatenate([field[:, :, -1:], field[:, :, :-1]], axis=2)
+    theta_next = jnp.concatenate([field[:, :, 1:], field[:, :, :1]], axis=2)
+    return theta_prev, theta_next
+
+
+def _pipe_gradient_3d(
+    field: jnp.ndarray,
+    *,
+    dx: float,
+    dr: float,
+    dtheta: float,
+    r: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    safe_r = jnp.maximum(r, 0.5 * dr)
+    x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
+    x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
+    r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
+    r_outer = jnp.concatenate([field[:, 1:, :], field[:, -1:, :]], axis=1)
+    theta_prev, theta_next = _pipe_theta_neighbors(field)
+    d_dx = (x_east - x_west) / max(2.0 * dx, 1.0e-12)
+    d_dr = (r_outer - r_inner) / max(2.0 * dr, 1.0e-12)
+    d_dtheta = (theta_next - theta_prev) / jnp.maximum(2.0 * dtheta * safe_r, 1.0e-12)
+    d_dr = d_dr.at[:, 0, :].set(0.0)
+    d_dtheta = d_dtheta.at[:, 0, :].set(0.0)
+    return d_dx, d_dr, d_dtheta
+
+
+def _pipe_laplacian_3d(
+    field: jnp.ndarray,
+    *,
+    dx: float,
+    dr: float,
+    dtheta: float,
+    r: jnp.ndarray,
+    outer_dirichlet: bool = True,
+) -> jnp.ndarray:
+    safe_r = jnp.maximum(r, 0.5 * dr)
+    x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
+    x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
+    r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
+    outer_ghost = jnp.zeros_like(field[:, -1:, :]) if outer_dirichlet else field[:, -1:, :]
+    r_outer = jnp.concatenate([field[:, 1:, :], outer_ghost], axis=1)
+    theta_prev, theta_next = _pipe_theta_neighbors(field)
+    dxx = (x_west - 2.0 * field + x_east) / max(dx**2, 1.0e-12)
+    drr = (r_inner - 2.0 * field + r_outer) / max(dr**2, 1.0e-12)
+    d_dr = (r_outer - r_inner) / max(2.0 * dr, 1.0e-12)
+    dtheta2 = (theta_prev - 2.0 * field + theta_next) / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
+    lap = dxx + drr + d_dr / safe_r + dtheta2
+    return lap.at[:, 0, :].set(dxx[:, 0, :] + 2.0 * (field[:, 1, :] - field[:, 0, :]) / max(dr**2, 1.0e-12))
+
+
+def _pipe_divergence_3d(
+    jx: jnp.ndarray,
+    jr: jnp.ndarray,
+    jtheta: jnp.ndarray,
+    *,
+    dx: float,
+    dr: float,
+    dtheta: float,
+    r: jnp.ndarray,
+) -> jnp.ndarray:
+    safe_r = jnp.maximum(r, 0.5 * dr)
+    djx_dx = _pipe_gradient_3d(jx, dx=dx, dr=dr, dtheta=dtheta, r=r)[0]
+    rjr = safe_r * jr
+    rjr_inner = jnp.concatenate([rjr[:, :1, :], rjr[:, :-1, :]], axis=1)
+    rjr_outer = jnp.concatenate([rjr[:, 1:, :], rjr[:, -1:, :]], axis=1)
+    radial_term = (rjr_outer - rjr_inner) / jnp.maximum(2.0 * dr * safe_r, 1.0e-12)
+    theta_prev, theta_next = _pipe_theta_neighbors(jtheta)
+    theta_term = (theta_next - theta_prev) / jnp.maximum(2.0 * dtheta * safe_r, 1.0e-12)
+    divergence = djx_dx + radial_term + theta_term
+    return divergence.at[:, 0, :].set(djx_dx[:, 0, :] + 2.0 * jr[:, 1, :] / max(dr, 1.0e-12))
+
+
+def _pipe_poisson_jacobi_3d(
+    rhs: jnp.ndarray,
+    *,
+    dx: float,
+    dr: float,
+    dtheta: float,
+    r: jnp.ndarray,
+    iterations: int,
+    tolerance: float,
+) -> tuple[jnp.ndarray, float, int, float]:
+    weights = jnp.maximum(r, 0.5 * dr)
+    rhs_compatible = rhs - jnp.sum(rhs * weights) / jnp.sum(weights)
+    safe_r = jnp.maximum(r, 0.5 * dr)
+    field = jnp.zeros_like(rhs_compatible)
+    initial_residual = float(jnp.max(jnp.abs(_pipe_laplacian_3d(field, dx=dx, dr=dr, dtheta=dtheta, r=r, outer_dirichlet=False) - rhs_compatible)))
+    residual = initial_residual
+    iteration_count = 0
+    diagonal = 2.0 / max(dx**2, 1.0e-12) + 2.0 / max(dr**2, 1.0e-12) + 2.0 / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
+    diagonal = jnp.maximum(diagonal, 1.0e-12)
+    for iteration in range(iterations):
+        x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
+        x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
+        r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
+        r_outer = jnp.concatenate([field[:, 1:, :], field[:, -1:, :]], axis=1)
+        theta_prev, theta_next = _pipe_theta_neighbors(field)
+        cross = (
+            (x_west + x_east) / max(dx**2, 1.0e-12)
+            + (r_inner + r_outer) / max(dr**2, 1.0e-12)
+            + (theta_prev + theta_next) / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
+            + (r_outer - r_inner) / jnp.maximum(2.0 * safe_r * dr, 1.0e-12)
+        )
+        updated = (cross - rhs_compatible) / diagonal
+        updated = updated.at[:, 0, :].set(updated[:, 1, :])
+        field = jnp.nan_to_num(updated - jnp.sum(updated * weights) / jnp.sum(weights))
+        residual = float(jnp.max(jnp.abs(_pipe_laplacian_3d(field, dx=dx, dr=dr, dtheta=dtheta, r=r, outer_dirichlet=False) - rhs_compatible)))
+        iteration_count = iteration + 1
+        if residual <= tolerance:
+            break
+    return field, residual, iteration_count, initial_residual
+
+
+def _enforce_pipe_velocity_bc(u: jnp.ndarray, v: jnp.ndarray, w: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    if u.shape[1] > 1:
+        u = u.at[:, 0, :].set(u[:, 1, :])
+        w = w.at[:, 0, :].set(w[:, 1, :])
+    v = v.at[:, 0, :].set(0.0)
+    u = u.at[:, -1, :].set(0.0)
+    v = v.at[:, -1, :].set(0.0)
+    w = w.at[:, -1, :].set(0.0)
+    if u.shape[0] > 1:
+        u = u.at[0, :, :].set(u[1, :, :])
+        u = u.at[-1, :, :].set(u[-2, :, :])
+        v = v.at[0, :, :].set(v[1, :, :])
+        v = v.at[-1, :, :].set(v[-2, :, :])
+        w = w.at[0, :, :].set(w[1, :, :])
+        w = w.at[-1, :, :].set(w[-2, :, :])
+    return u, v, w
 
 
 def smooth_fringing_profile(
@@ -548,6 +689,74 @@ def build_layered_duct_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
+def build_pipe_ogrid_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    radius: float = 1.0,
+    nr: int = 24,
+    ntheta: int = 64,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+    conductivity: float = 1.0,
+    density: float = 1.0,
+    viscosity: float = 1.0,
+) -> ExtrudedInductionlessProblem:
+    bmag = _ha_to_b(ha_peak, radius, conductivity, density, viscosity)
+    case = CaseSpec(
+        name=f"pipe_fringing_ha{int(ha_peak)}",
+        geometry=GeometrySpec(
+            kind="pipe_ogrid",
+            width=2.0 * radius,
+            height=2.0 * radius,
+            radius=radius,
+            length=length,
+            nx=nx_stations,
+            nr=nr,
+            ntheta=ntheta,
+        ),
+        regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, bmag)),
+        boundary_conditions=(
+            BoundaryCondition("wall", "no_slip"),
+            BoundaryCondition("electric", "insulating"),
+        ),
+        time_stepper=TimeStepperConfig(
+            dt=0.001,
+            t_final=1.0,
+            max_steps=80,
+            potential_iterations=80,
+            steady_tolerance=1.0e-6,
+        ),
+        solver=SolverConfig(
+            kind="extruded_inductionless",
+            mode="steady",
+            linear_solver="auto",
+            preconditioner="jacobi",
+            time_scheme="implicit_euler",
+            coupling_iterations=8,
+            coupling_tolerance=1.0e-7,
+        ),
+        output=OutputSpec(),
+        forcing=1.0,
+        reference_pressure_gradient=-1.0,
+        reference_phi_cell=(max(1, nr // 4), max(1, ntheta // 8)),
+        notes="Mapped-pipe fringing research slice with cylindrical metric terms.",
+    )
+    profile = smooth_fringing_profile(
+        length=length,
+        nx=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
 def _station_case(base_case: CaseSpec, *, axis: str, magnitude: float, suffix: str) -> CaseSpec:
     station_case = clone_case_with_field(base_case, axis=axis, magnitude=magnitude, suffix=suffix)
     return replace(station_case, solver=replace(station_case.solver, kind="fully_developed_inductionless"))
@@ -690,6 +899,160 @@ def run_extruded_inductionless_slice(
 def _solve_extruded_projection(problem: ExtrudedInductionlessProblem) -> ExtrudedFieldBundle:
     case = problem.case
     mesh = _cross_section_mesh(case)
+    if case.geometry.kind == "pipe_ogrid":
+        x = jnp.asarray(mesh.x_centers, dtype=float)
+        r = jnp.asarray(mesh.y_centers, dtype=float)
+        theta = jnp.asarray(mesh.z_centers, dtype=float)
+        nx, nr, ntheta = len(x), len(r), len(theta)
+        dx = float(jnp.mean(mesh.dx))
+        dr = float(jnp.mean(mesh.dy))
+        dtheta = float(jnp.mean(mesh.dz))
+        region = case.regions[0]
+        sigma = jnp.full((nx, nr, ntheta), region.conductivity, dtype=float)
+        rho = jnp.full((nx, nr, ntheta), region.density or 1.0, dtype=float)
+        nu = jnp.full((nx, nr, ntheta), region.viscosity or 1.0, dtype=float)
+        rr = jnp.broadcast_to(jnp.maximum(r[None, :, None], 0.5 * dr), (nx, nr, ntheta))
+        theta_grid = jnp.broadcast_to(theta[None, None, :], (nx, nr, ntheta))
+        forcing = float(case.forcing)
+        field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
+        base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
+        bx = jnp.broadcast_to(field_scale[:, None, None] * float(base_field[0]), (nx, nr, ntheta))
+        by = jnp.broadcast_to(field_scale[:, None, None] * float(base_field[1]), (nx, nr, ntheta))
+        bz = jnp.broadcast_to(field_scale[:, None, None] * float(base_field[2]), (nx, nr, ntheta))
+        br = by * jnp.cos(theta_grid) + bz * jnp.sin(theta_grid)
+        btheta = -by * jnp.sin(theta_grid) + bz * jnp.cos(theta_grid)
+
+        u = jnp.zeros((nx, nr, ntheta), dtype=float)
+        v = jnp.zeros_like(u)
+        w = jnp.zeros_like(u)
+        p = jnp.zeros_like(u)
+        phi = jnp.zeros_like(u)
+
+        inverse_diffusive_scale = float(
+            jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dr**2, 1.0e-12) + 1.0 / max((float(jnp.max(rr)) * dtheta) ** 2, 1.0e-12))
+        )
+        stable_dt = 0.2 / max(inverse_diffusive_scale, 1.0e-12)
+        dt = min(float(case.time_stepper.dt), stable_dt)
+        outer_steps = max(2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2)))
+        poisson_iterations = min(case.time_stepper.potential_iterations, 80)
+        poisson_tolerance = case.solver.coupling_tolerance
+        velocity_limit = 5.0
+        scalar_limit = 20.0
+        residual_by_step: list[float] = []
+
+        for _ in range(outer_steps):
+            dphi_dx, dphi_dr, dphi_dtheta = _pipe_gradient_3d(phi, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            uxb_x = v * btheta - w * br
+            uxb_r = w * bx - u * btheta
+            uxb_theta = u * br - v * bx
+            jx = sigma * (-dphi_dx + uxb_x)
+            jr = sigma * (-dphi_dr + uxb_r)
+            jtheta = sigma * (-dphi_dtheta + uxb_theta)
+            lorentz_x = jr * btheta - jtheta * br
+            lorentz_r = jtheta * bx - jx * btheta
+            lorentz_theta = jx * br - jr * bx
+
+            dp_dx, dp_dr, dp_dtheta = _pipe_gradient_3d(p, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            u_star = u + dt * (_pipe_laplacian_3d(u, dx=dx, dr=dr, dtheta=dtheta, r=rr) * nu + forcing / rho + lorentz_x / rho - dp_dx / rho)
+            v_star = v + dt * (_pipe_laplacian_3d(v, dx=dx, dr=dr, dtheta=dtheta, r=rr) * nu + lorentz_r / rho - dp_dr / rho)
+            w_star = w + dt * (_pipe_laplacian_3d(w, dx=dx, dr=dr, dtheta=dtheta, r=rr) * nu + lorentz_theta / rho - dp_dtheta / rho)
+            u_star = _clip_state(u_star, velocity_limit)
+            v_star = _clip_state(v_star, velocity_limit)
+            w_star = _clip_state(w_star, velocity_limit)
+            u_star, v_star, w_star = _enforce_pipe_velocity_bc(u_star, v_star, w_star)
+
+            divergence = _pipe_divergence_3d(u_star, v_star, w_star, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            p_corr, _, _, _ = _pipe_poisson_jacobi_3d(
+                (rho / max(dt, 1.0e-12)) * divergence,
+                dx=dx,
+                dr=dr,
+                dtheta=dtheta,
+                r=rr,
+                iterations=poisson_iterations,
+                tolerance=poisson_tolerance,
+            )
+            p_corr = _clip_state(p_corr, scalar_limit)
+            dpc_dx, dpc_dr, dpc_dtheta = _pipe_gradient_3d(p_corr, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            u_next = _clip_state(u_star - (dt / rho) * dpc_dx, velocity_limit)
+            v_next = _clip_state(v_star - (dt / rho) * dpc_dr, velocity_limit)
+            w_next = _clip_state(w_star - (dt / rho) * dpc_dtheta, velocity_limit)
+            u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next)
+            p = _clip_state(p + p_corr, scalar_limit)
+
+            uxb_x = v_next * btheta - w_next * br
+            uxb_r = w_next * bx - u_next * btheta
+            uxb_theta = u_next * br - v_next * bx
+            emf_rhs = _pipe_divergence_3d(sigma * uxb_x, sigma * uxb_r, sigma * uxb_theta, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            phi, _, _, _ = _pipe_poisson_jacobi_3d(
+                emf_rhs,
+                dx=dx,
+                dr=dr,
+                dtheta=dtheta,
+                r=rr,
+                iterations=poisson_iterations,
+                tolerance=poisson_tolerance,
+            )
+            phi = _clip_state(phi, scalar_limit)
+
+            dphi_dx, dphi_dr, dphi_dtheta = _pipe_gradient_3d(phi, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
+            jr = _clip_state(sigma * (-dphi_dr + uxb_r), scalar_limit)
+            jtheta = _clip_state(sigma * (-dphi_dtheta + uxb_theta), scalar_limit)
+            div_j = _pipe_divergence_3d(jx, jr, jtheta, dx=dx, dr=dr, dtheta=dtheta, r=rr)
+            lorentz_x = jr * btheta - jtheta * br
+            lorentz_r = jtheta * bx - jx * btheta
+            lorentz_theta = jx * br - jr * bx
+            update_residual = max(
+                float(jnp.max(jnp.abs(u_next - u))),
+                float(jnp.max(jnp.abs(v_next - v))),
+                float(jnp.max(jnp.abs(w_next - w))),
+                float(jnp.max(jnp.abs(divergence))),
+            )
+            charge_balance = float(jnp.max(jnp.abs(div_j)))
+            residual_by_step.append(update_residual)
+            u, v, w = u_next, v_next, w_next
+            if update_residual <= case.solver.coupling_tolerance and charge_balance <= max(1.0e-6, case.solver.coupling_tolerance):
+                break
+
+        final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
+        residual = jnp.full((nx,), final_step_residual, dtype=float)
+        cell_area = rr * dr * dtheta
+        cross_section_area = jnp.maximum(jnp.sum(cell_area, axis=(1, 2)), 1.0e-20)
+        volumetric_flow_rate = jnp.sum(u * cell_area, axis=(1, 2))
+        mean_velocity = volumetric_flow_rate / cross_section_area
+        axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
+        wall_current_leakage = jnp.sum(jnp.abs(jr[:, -1, :]) * (float(r[-1] + 0.5 * dr) * dx * dtheta), axis=1)
+        current_scaled_pressure_proxy = jnp.max(jnp.abs(jr), axis=(1, 2)) * jnp.maximum(
+            jnp.max(jnp.abs(bx) + jnp.abs(br) + jnp.abs(btheta), axis=(1, 2)),
+            1.0e-12,
+        )
+        charge_balance_residual = jnp.max(jnp.abs(div_j), axis=(1, 2))
+        return ExtrudedFieldBundle(
+            x=x,
+            y=r,
+            z=theta,
+            field_scale=field_scale,
+            u=jnp.nan_to_num(u),
+            v=jnp.nan_to_num(v),
+            w=jnp.nan_to_num(w),
+            p=jnp.nan_to_num(p),
+            phi=jnp.nan_to_num(phi),
+            jx=jnp.nan_to_num(jx),
+            jy=jnp.nan_to_num(jr),
+            jz=jnp.nan_to_num(jtheta),
+            lorentz_x=jnp.nan_to_num(lorentz_x),
+            lorentz_y=jnp.nan_to_num(lorentz_r),
+            lorentz_z=jnp.nan_to_num(lorentz_theta),
+            residual=jnp.nan_to_num(residual),
+            volumetric_flow_rate=jnp.nan_to_num(volumetric_flow_rate),
+            mean_velocity=jnp.nan_to_num(mean_velocity),
+            axial_current=jnp.nan_to_num(axial_current),
+            wall_current_leakage=jnp.nan_to_num(wall_current_leakage),
+            current_scaled_pressure_proxy=jnp.nan_to_num(current_scaled_pressure_proxy),
+            charge_balance_residual=jnp.nan_to_num(charge_balance_residual),
+            geometry_kind=case.geometry.kind,
+            solver_kind=case.solver.kind,
+        )
     materials = build_material_fields(case, mesh)
     x = jnp.asarray(mesh.x_centers, dtype=float)
     y = jnp.asarray(mesh.y_centers, dtype=float)
@@ -888,14 +1251,24 @@ def validate_extruded_inductionless_solution(
         dz = float(jnp.mean(jnp.diff(bundle.z)))
     else:
         dz = 1.0
-    boundary_current_residual = _net_boundary_current_residual(
-        jnp.asarray(bundle.jx, dtype=float),
-        jnp.asarray(bundle.jy, dtype=float),
-        jnp.asarray(bundle.jz, dtype=float),
-        dx=dx,
-        dy=dy,
-        dz=dz,
-    )
+    if bundle.geometry_kind == "pipe_ogrid":
+        r = jnp.broadcast_to(jnp.maximum(bundle.y[None, :, None], 0.5 * dy), jnp.asarray(bundle.jx).shape)
+        boundary_current_residual = float(
+            jnp.abs(
+                -jnp.sum(jnp.asarray(bundle.jx, dtype=float)[0, :, :] * r[0, :, :]) * dy * dz
+                + jnp.sum(jnp.asarray(bundle.jx, dtype=float)[-1, :, :] * r[-1, :, :]) * dy * dz
+                + jnp.sum(jnp.asarray(bundle.jy, dtype=float)[:, -1, :] * (float(bundle.y[-1] + 0.5 * dy))) * dx * dz
+            )
+        )
+    else:
+        boundary_current_residual = _net_boundary_current_residual(
+            jnp.asarray(bundle.jx, dtype=float),
+            jnp.asarray(bundle.jy, dtype=float),
+            jnp.asarray(bundle.jz, dtype=float),
+            dx=dx,
+            dy=dy,
+            dz=dz,
+        )
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
         max_residual=float(jnp.max(jnp.abs(residual))) if residual.size else 0.0,
@@ -918,7 +1291,7 @@ def solve_extruded_inductionless(
     *,
     solver=solve_steady,
 ) -> ExtrudedInductionlessSolution:
-    if problem.case.geometry.kind in {"rect_duct", "layered_duct"}:
+    if problem.case.geometry.kind in {"rect_duct", "layered_duct", "pipe_ogrid"}:
         bundle = _solve_extruded_projection(problem)
         station_history = _bundle_station_history(bundle)
     else:

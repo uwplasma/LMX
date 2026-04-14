@@ -21,7 +21,8 @@ The current public scope does **not** yet include:
 - thermal coupling
 - free surfaces
 - full magnetic induction
-- the final 3D `extruded_inductionless` pressure-velocity-potential solver
+- the final production-hardening pass for the 3D `extruded_inductionless`
+  pressure-velocity-potential solver family
 
 ## Governing equations
 
@@ -161,10 +162,29 @@ solvers most often lose charge conservation in practice.
 
 The discrete potential equation must satisfy a zero-net-source compatibility
 condition. In practice, this means the right-hand side of the Poisson-like
-potential solve cannot contain a net source over the connected domain.
+potential solve cannot contain a net source over the connected domain:
+
+$$
+\int_{\Omega} \nabla\cdot\mathbf{J}\, dV
+= \int_{\partial\Omega}\mathbf{J}\cdot\mathbf{n}\, dS
+= 0.
+$$
+
+For the fully developed cross-sectional solve, this reduces to a zero-net
+source condition on the 2D electric problem. For the extruded 3D slice, the
+same requirement becomes a full boundary-flux balance across inlet, outlet,
+and wall surfaces.
 
 LMX enforces this through a compatibility projection before the solve and then
-measures the remaining charge/current mismatch through diagnostics.
+measures the remaining charge/current mismatch through diagnostics. The
+implementation sequence is:
+
+1. assemble `\nabla\cdot(\sigma \nabla \phi)` with conductivity-weighted face
+   coefficients
+2. project the right-hand side onto the compatible zero-net-source subspace
+3. solve the Poisson-like electric problem
+4. reconstruct face currents conservatively
+5. audit the resulting field through local and integral conservation metrics
 
 This treatment lives in `lmx/solvers.py` and is exposed in the runtime outputs
 by:
@@ -177,6 +197,19 @@ The 3D fringing slice in `lmx/fringing.py` uses the same principle for its
 variable-coefficient electric solve: the right-hand side is projected onto the
 conductivity-weighted compatibility space before the Jacobi iteration, and the
 result is then audited through both `div J` and boundary-current integrals.
+
+The retained conservation outputs are:
+
+- `div_current_max_history`
+- `charge_balance_residual_history`
+- `interface_current_residual_history`
+- extruded `axial_current(x)`
+- extruded `wall_current_leakage(x)`
+- extruded `net_boundary_current_residual`
+
+Those are the metrics that matter most for inlet/outlet and wall treatment in
+low-Rm multi-region MHD, where local residuals can look acceptable while the
+integrated boundary flux still drifts.
 
 ## Magnetic-field models
 
@@ -208,11 +241,14 @@ Implemented today:
 
 - `rect_duct`
 - `layered_duct`
-- `pipe_ogrid` mesh generation and preview utilities
+- `pipe_ogrid` mesh generation, preview utilities, and the first
+  `extruded_inductionless` fringing slice
 
-The current production solver families operate on rectangular and layered
-cross-sections. The mapped pipe mesh is presently available for geometry and
-workflow staging while the full 3D solver family is being developed.
+The current production fully developed solver families operate on rectangular
+and layered cross-sections. The mapped pipe mesh is now also used by the first
+3D fringing slice in `lmx/fringing.py`, where the solver is expressed in the
+local pipe frame but still follows the same inductionless current-closure
+principles as the duct cases.
 
 ## Solver-family interpretation
 
@@ -230,13 +266,19 @@ new benchmark-quality results.
 
 ### `extruded_inductionless`
 
-This solver family now has a first retained rectangular-duct low-Re 3D
-pressure-velocity-potential slice in `lmx/fringing.py`. It advances `u`, `v`,
-`w`, and `p` with a simple projection loop, solves a 3D electric potential
-problem for `phi`, and reports current, Lorentz, and charge-balance fields.
-That is a real 3D research slice, but it is still not the final production
-family: mapped pipes, CLI/TOML wiring, larger validation sets, and broader
-geometry/material coverage remain future work.
+This solver family now has the first retained low-Re 3D
+pressure-velocity-potential slices in `lmx/fringing.py`. It advances `u`, `v`,
+`w`, and `p` with a projection loop, solves a 3D electric potential problem
+for `phi`, and reports current, Lorentz, and charge-balance fields. The
+currently exposed geometries are:
+
+- rectangular ducts
+- layered ducts
+- mapped `pipe_ogrid` pipe slices
+
+That is already a real 3D research slice, but it is still not the final
+production family: broader CLI/TOML wiring, larger validation sets, stronger
+mesh studies, and more geometry/material coverage remain future work.
 
 ## JAX and differentiability
 
@@ -259,6 +301,8 @@ Useful references:
 
 - [Samper et al., verification and validation benchmark ladder for MHD codes](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf)
 - [arXiv:2409.08950, multi-region electrically conductive flow solver validation study](https://arxiv.org/abs/2409.08950)
+- [Hunt, *Magnetohydrodynamic flow in rectangular ducts*](https://doi.org/10.1017/S0022112065000344)
+- [Shercliff, *The Theory of Electromagnetic Flow-Measurement*](https://assets.cambridge.org/97805213/35546/excerpt/9780521335546_excerpt.pdf)
 - [JAX advanced autodiff](https://docs.jax.dev/en/latest/advanced-autodiff.html)
 - [Lineax solvers](https://docs.kidger.site/lineax/api/solvers/)
 - [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/)

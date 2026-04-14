@@ -57,8 +57,8 @@ not implicit. The main implementation targets are:
 
 The fully developed lane already carries compatibility projection and
 charge-balance diagnostics. The fringing 3D slice now also carries axial
-current and wall-leakage diagnostics, and the next step is to use those
-metrics as hard gates in the manual validation lane.
+current and wall-leakage diagnostics, and the manual validation lane now
+supports turning those metrics into hard pass/fail gates.
 
 ## Current status
 
@@ -130,10 +130,11 @@ metrics as hard gates in the manual validation lane.
   `extruded_inductionless` 3D projection slice, exposing `u`, `v`, `w`, `p`,
   `phi`, current, Lorentz, and charge-balance fields through the explicit
   `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` Python API.
-- Layered fringing ducts now use the same first low-Re 3D projection slice,
-  so the remaining `extruded_inductionless` work is concentrated on mapped
-  pipes, stronger validation, and broader production hardening rather than on
-  duct-family coverage gaps.
+- Layered fringing ducts now use the same first low-Re 3D projection slice.
+- Mapped `pipe_ogrid` fringing cases now also use the same explicit low-Re
+  3D projection slice, so the remaining `extruded_inductionless` work is
+  concentrated on production hardening, broader validation, and stronger
+  front-end support rather than on geometry-family coverage gaps.
 - The heavy manual validation lane can now include a bounded fringing summary
   through `scripts/run_manual_solver_family_validation.py --include-fringing`,
   so solver-family hardening is no longer limited to fully developed Hartmann /
@@ -152,14 +153,21 @@ metrics as hard gates in the manual validation lane.
   current histories, wall-current leakage, and a global net boundary-current
   residual so inlet/outlet and external-boundary behavior can be hardened
   explicitly during the post-`1.0` solver-family work.
-- For rectangular ducts, `solve_extruded_inductionless(...)` now runs a first
-  true low-Re 3D pressure-velocity-potential iteration. Layered ducts still use
-  the stacked-station fallback.
+- `solve_extruded_inductionless(...)` now runs a first true low-Re 3D
+  pressure-velocity-potential iteration for rectangular ducts, layered ducts,
+  and mapped-pipe fringing slices.
 - That fringing path remains wrapped in an explicit
   `ExtrudedInductionlessProblem -> ExtrudedInductionlessSolution` public entry
   point, with validation metrics for residual size, charge balance, and
   field/response correlation. The remaining gap is now production hardening and
   geometry/scope expansion, not the total absence of a 3D slice.
+- The manual solver-family validation lane can now treat conservation metrics
+  as hard gates through explicit threshold controls for charge balance,
+  interface current continuity, wall-current leakage, and net boundary-current
+  residual.
+- The autodiff lane now includes a bridge from the retained 3D slice back into
+  the differentiable fringing model: `extruded_inductionless` histories can be
+  used directly as inverse-design targets for axial field-shape recovery.
 - Geometry preview tooling now exists for `rect_duct`, `layered_duct`, and
   mapped `pipe_ogrid` meshes, together with a user-facing example and docs for
   preprocessing/postprocessing geometry inspection.
