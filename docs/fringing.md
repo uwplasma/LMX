@@ -51,13 +51,21 @@ lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
 lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
 lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
 python examples/fringing_benchmark_demo.py \
+  --geometry-kind rect_duct \
+  --ha-peak 20 \
+  --ny 12 \
+  --nz 12 \
+  --nx-stations 11 \
+  --max-steps 18 \
+  --coupling-iterations 10 \
+  --potential-iterations 60 \
   --output artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py \
   --geometry-kind layered_duct \
   --output artifacts/examples/fringing_benchmark_layered
 python examples/fringing_benchmark_demo.py \
   --geometry-kind pipe_ogrid \
-  --output artifacts/examples/fringing_benchmark_pipe
+  --output artifacts/examples/fringing_benchmark_pipe_exploratory
 ```
 
 The example writes:
@@ -82,9 +90,13 @@ The paired restart template is `examples/fringing_layered_restart_case.toml`.
 Use it after a base layered run has written its extruded restart bundle under
 `artifacts/examples/toml_fringing_layered/restart/`.
 
-Current publication-style artifact:
+Current retained fringing publication artifact:
 
-![LMX fringing pipe slice](_static/generated/fringing_benchmark_pipe.png)
+![LMX fringing rectangular-duct slice](_static/generated/fringing_benchmark_rect.png)
+
+The mapped-pipe example remains useful for exploratory research and solver
+development, but on the heavier retained validation campaign it is currently
+kept outside the locked publication set.
 
 Restart / resume reproducibility artifact:
 
@@ -93,6 +105,12 @@ Restart / resume reproducibility artifact:
 Larger 3D validation campaign artifact:
 
 ![LMX extruded validation campaign](_static/generated/extruded_validation_campaign.png)
+
+The larger retained campaign is intentionally a resolution study, not a claim
+that every coarse layered case is already publication-grade. In particular, the
+coarsest layered high-field point remains visibly underresolved, so the figure
+is used to show convergence behavior and screening logic rather than as a final
+table of locked publication values.
 
 ## Governing equations for the retained 3D slice
 
@@ -177,6 +195,11 @@ That example runs the hard-gate fringing campaign on a retained larger
 resolution set, writes JSON/CSV summaries, and produces a publication-style
 summary figure.
 
+Its default larger retained dataset is intentionally `rect_duct,layered_duct`.
+The mapped-pipe slice still belongs to the retained smaller hard gate, but it
+is not yet promoted into the larger publication campaign because the heavier
+mesh set still needs more operator hardening there.
+
 Current retained hard-gate dataset:
 
 - fully developed Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
@@ -196,15 +219,29 @@ variable-coefficient potential operator.
 ## What the example shows
 
 - a smooth entrance/exit fringing profile along the duct axis
-- the stationwise cross-sectional mean velocity response
-- the stationwise current-scaled pressure surrogate
+- the stationwise peak axial velocity response, which is a better proxy for the
+  M-shaped redistribution described in the fringing-field literature than the
+  nearly conserved cross-sectional mean flow rate
+- the stationwise pressure span `max(p)-min(p)`, which is a better publication
+  observable than the earlier current-weighted proxy when reviewing 3D fringing
+  behavior
 - contour views of the stacked velocity bundle in `x-y` and `x-z`
-- the stationwise charge-balance residual along the fringing region
-- the stationwise axial current and wall-current leakage, which are the key
-  conservation diagnostics for inlet/outlet and external-wall hardening
+- the stationwise axial current together with charge-balance residuals, which
+  are the key current-closure diagnostics for inlet/outlet hardening
 - a first true 3D pressure field `p(x, y, z)` inside the research slice
 - layered conducting/insulating wall fringing responses through the same API
 - the first mapped-pipe fringing slice through the same public API
+
+## QA note on the retained figures
+
+During the publication QA pass, the fringing figures were tightened to avoid
+misleading observables. In a constant-forcing incompressible slice, the
+cross-sectional mean flow can remain nearly unchanged even when the velocity
+profile redistributes strongly. The literature instead emphasizes profile
+deformation, pressure losses, and axial-current closure in non-uniform fields.
+That is why the retained figures now highlight peak axial velocity, pressure
+span, and axial-current/conservation metrics rather than the earlier
+mean-velocity correlation view.
 
 ## Publication context
 

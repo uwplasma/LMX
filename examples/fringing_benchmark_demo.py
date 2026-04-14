@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import is_dataclass, replace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -29,6 +30,14 @@ def _set_style() -> None:
     )
 
 
+def _replace_fields(obj, **changes):
+    if is_dataclass(obj):
+        return replace(obj, **changes)
+    for name, value in changes.items():
+        setattr(obj, name, value)
+    return obj
+
+
 def run_fringing_benchmark_demo(
     *,
     out_dir: Path,
@@ -37,6 +46,9 @@ def run_fringing_benchmark_demo(
     ny: int = 12,
     nz: int = 12,
     nx_stations: int = 7,
+    max_steps: int = 18,
+    coupling_iterations: int = 10,
+    potential_iterations: int = 60,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
     if geometry_kind == "rect_duct":
@@ -64,6 +76,16 @@ def run_fringing_benchmark_demo(
         )
     else:
         raise ValueError(f"Unsupported geometry_kind {geometry_kind!r}")
+    case_updates = {
+        "solver": _replace_fields(problem.case.solver, coupling_iterations=coupling_iterations),
+    }
+    if hasattr(problem.case, "time_stepper"):
+        case_updates["time_stepper"] = _replace_fields(
+            problem.case.time_stepper,
+            max_steps=max_steps,
+            potential_iterations=potential_iterations,
+        )
+    problem = _replace_fields(problem, case=_replace_fields(problem.case, **case_updates))
     solution = solve_extruded_inductionless(problem)
     history = solution.station_history
     extruded = solution.bundle
@@ -73,8 +95,9 @@ def run_fringing_benchmark_demo(
     fig.suptitle("LMX extruded inductionless fringing slice", fontsize=16)
     x = np.asarray([item["x"] for item in history])
     field_scale = np.asarray([item["field_scale"] for item in history])
-    mean_velocity = np.asarray([item["mean_velocity"] for item in history])
-    pressure_proxy = np.asarray([item["current_scaled_pressure_proxy"] for item in history])
+    u_peak = np.asarray([item["u_max"] for item in history])
+    pressure_span = np.asarray([item["pressure_span"] for item in history])
+    axial_current = np.asarray([item["axial_current"] for item in history])
     charge_balance = np.asarray(extruded.charge_balance_residual)
     z_mid = extruded.u.shape[2] // 2
     y_mid = extruded.u.shape[1] // 2
@@ -88,15 +111,15 @@ def run_fringing_benchmark_demo(
     axes[0, 0].set_xlabel("x")
     axes[0, 0].set_ylabel(r"$B/B_{max}$")
 
-    axes[0, 1].plot(x, mean_velocity, color="#0f766e")
-    axes[0, 1].set_title("Cross-sectional mean velocity")
+    axes[0, 1].plot(x, u_peak, color="#0f766e")
+    axes[0, 1].set_title("Peak axial velocity")
     axes[0, 1].set_xlabel("x")
-    axes[0, 1].set_ylabel(r"$\bar{u}$")
+    axes[0, 1].set_ylabel(r"$u_{max}$")
 
-    axes[0, 2].plot(x, pressure_proxy, color="#b45309")
-    axes[0, 2].set_title("Pressure surrogate")
+    axes[0, 2].plot(x, pressure_span, color="#b45309")
+    axes[0, 2].set_title("Pressure span")
     axes[0, 2].set_xlabel("x")
-    axes[0, 2].set_ylabel("Current-scaled proxy")
+    axes[0, 2].set_ylabel(r"$\max p - \min p$")
 
     contour_y = axes[1, 0].contourf(x_grid, y_grid, np.asarray(extruded.u[:, :, z_mid]).T, levels=18, cmap="viridis")
     axes[1, 0].set_title("Midplane velocity u(x, y, zmid)")
@@ -110,12 +133,11 @@ def run_fringing_benchmark_demo(
     axes[1, 1].set_ylabel(z_label)
     fig.colorbar(contour_z, ax=axes[1, 1], shrink=0.9, label="u")
 
-    axes[1, 2].semilogy(x, np.maximum(charge_balance, 1.0e-16), color="#7c3aed", label="Charge balance")
-    wall_leak = np.asarray(extruded.wall_current_leakage)
-    axes[1, 2].semilogy(x, np.maximum(wall_leak, 1.0e-16), color="#dc2626", linestyle="--", label="Wall leakage")
-    axes[1, 2].set_title("Current conservation")
+    axes[1, 2].plot(x, axial_current, color="#0891b2", label="Axial current")
+    axes[1, 2].semilogy(x, np.maximum(charge_balance, 1.0e-16), color="#7c3aed", linestyle="--", label="Charge balance")
+    axes[1, 2].set_title("Current response and conservation")
     axes[1, 2].set_xlabel("x")
-    axes[1, 2].set_ylabel("Residual")
+    axes[1, 2].set_ylabel("Response / residual")
     axes[1, 2].legend(frameon=False)
 
     png_path = out_dir / "fringing_benchmark.png"
@@ -138,6 +160,8 @@ def run_fringing_benchmark_demo(
             "charge_balance_residual": np.asarray(extruded.charge_balance_residual).tolist(),
             "axial_current": np.asarray(extruded.axial_current).tolist(),
             "wall_current_leakage": np.asarray(extruded.wall_current_leakage).tolist(),
+            "pressure_span": pressure_span.tolist(),
+            "u_peak": u_peak.tolist(),
         },
         "validation": {
             "station_count": solution.validation.station_count,
@@ -146,6 +170,8 @@ def run_fringing_benchmark_demo(
             "mean_velocity_span": solution.validation.mean_velocity_span,
             "volumetric_flow_rate_span": solution.validation.volumetric_flow_rate_span,
             "axial_current_span": solution.validation.axial_current_span,
+            "peak_velocity_span": solution.validation.peak_velocity_span,
+            "pressure_span_range": solution.validation.pressure_span_range,
             "max_wall_current_leakage": solution.validation.max_wall_current_leakage,
             "net_boundary_current_residual": solution.validation.net_boundary_current_residual,
             "field_mean_velocity_correlation": solution.validation.field_mean_velocity_correlation,
@@ -173,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ny", type=int, default=12)
     parser.add_argument("--nz", type=int, default=12)
     parser.add_argument("--nx-stations", type=int, default=7)
+    parser.add_argument("--max-steps", type=int, default=18)
+    parser.add_argument("--coupling-iterations", type=int, default=10)
+    parser.add_argument("--potential-iterations", type=int, default=60)
     args = parser.parse_args(argv)
     run_fringing_benchmark_demo(
         out_dir=args.output,
@@ -181,6 +210,9 @@ def main(argv: list[str] | None = None) -> int:
         ny=args.ny,
         nz=args.nz,
         nx_stations=args.nx_stations,
+        max_steps=args.max_steps,
+        coupling_iterations=args.coupling_iterations,
+        potential_iterations=args.potential_iterations,
     )
     return 0
 

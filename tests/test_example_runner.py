@@ -326,11 +326,11 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
     monkeypatch.setattr(
         module,
         "solve_extruded_inductionless",
-        lambda *args, **kwargs: SimpleNamespace(
-            station_history=(
-                {"x": 0.0, "field_scale": 0.0, "mean_velocity": 1.0, "current_scaled_pressure_proxy": 0.2},
-                {"x": 1.0, "field_scale": 1.0, "mean_velocity": 0.8, "current_scaled_pressure_proxy": 0.25},
-            ),
+            lambda *args, **kwargs: SimpleNamespace(
+                station_history=(
+                    {"x": 0.0, "field_scale": 0.0, "mean_velocity": 1.0, "u_max": 1.1, "pressure_span": 0.3, "axial_current": 0.01, "current_scaled_pressure_proxy": 0.2},
+                    {"x": 1.0, "field_scale": 1.0, "mean_velocity": 0.8, "u_max": 0.9, "pressure_span": 0.2, "axial_current": 0.015, "current_scaled_pressure_proxy": 0.25},
+                ),
             bundle=SimpleNamespace(
                 x=np.array([0.0, 1.0]),
                 y=np.array([-1.0, 1.0]),
@@ -348,6 +348,8 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
                 mean_velocity_span=0.2,
                 volumetric_flow_rate_span=0.1,
                 axial_current_span=0.01,
+                peak_velocity_span=0.03,
+                pressure_span_range=0.04,
                 max_wall_current_leakage=2.0e-8,
                 net_boundary_current_residual=3.0e-8,
                 field_mean_velocity_correlation=0.9,
@@ -359,6 +361,8 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
     assert summary["case"] == "fringing_case"
     assert "extruded_bundle" in summary
     assert "validation" in summary
+    assert "pressure_span" in summary["extruded_bundle"]
+    assert "u_peak" in summary["extruded_bundle"]
     assert (tmp_path / "fringing_benchmark.png").exists()
     assert (tmp_path / "fringing_benchmark_summary.json").exists()
 

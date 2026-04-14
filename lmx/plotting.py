@@ -586,27 +586,14 @@ def write_strong_scaling_plots(
     for color, (platform_name, values) in zip(palette, groups.items(), strict=False):
         device_counts = np.asarray([int(item["num_devices"]) for item in values], dtype=float)
         runtimes = np.asarray([float(item.get("warm_seconds", item["mean_seconds"])) for item in values], dtype=float)
-        compile_times = np.asarray(
-            [float(item.get("cold_seconds", item.get("warm_seconds", item["mean_seconds"]))) for item in values],
-            dtype=float,
-        )
         baseline = runtimes[0]
         speedup = baseline / np.maximum(runtimes, 1.0e-12)
 
-        axes[0].plot(device_counts, runtimes, marker="o", color=color, label=f"{platform_name} steady-state")
-        axes[0].plot(
-            device_counts,
-            compile_times,
-            marker="s",
-            linestyle="--",
-            color=color,
-            alpha=0.35,
-            label=f"{platform_name} first-run",
-        )
+        axes[0].plot(device_counts, runtimes, marker="o", color=color, label=platform_name)
         axes[1].plot(device_counts, speedup, marker="o", color=color, label=platform_name)
         axes[1].plot(device_counts, device_counts / device_counts[0], linestyle="--", color=color, alpha=0.28)
 
-    axes[0].set_title("Runtime")
+    axes[0].set_title("Warm runtime")
     axes[0].set_xlabel("Device count")
     axes[0].set_ylabel("Runtime [s]")
     axes[0].set_xscale("log", base=2)

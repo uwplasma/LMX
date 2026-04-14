@@ -118,9 +118,9 @@ The shipped autodiff examples now cover:
 Fringing-field scaffold:
 
 ```bash
-python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
+python examples/fringing_benchmark_demo.py --geometry-kind rect_duct --ha-peak 20 --ny 12 --nz 12 --nx-stations 11 --max-steps 18 --coupling-iterations 10 --potential-iterations 60 --output ./artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output ./artifacts/examples/fringing_benchmark_layered
-python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe
+python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe_exploratory
 python examples/extruded_restart_demo.py --geometry-kind layered_duct --output ./artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
 ```
@@ -128,16 +128,19 @@ python examples/extruded_validation_campaign.py --output ./artifacts/examples/ex
 That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
 `phi`, current, Lorentz, and charge-balance fields through the explicit
 `solve_extruded_inductionless(...)` entry point. Rectangular ducts, layered
-ducts, and mapped pipes all now use the same public path.
+ducts, and mapped pipes all now use the same public path. The mapped-pipe lane
+is still best treated as exploratory on the larger retained validation set,
+even though the example surface is fully executable.
 
 The restart and validation campaign examples extend that same 3D lane:
 
 - `extruded_restart_demo.py`
-  - writes a restart bundle, resumes from it, and plots restart-to-direct
-    differences
+  - splits a run into base and resumed stages, then compares the resumed result
+    against a direct run with the same total step count
 - `extruded_validation_campaign.py`
-  - runs the bounded larger-dataset fringing campaign, writes JSON/CSV, and
-    emits a publication-style figure
+  - runs the bounded larger-dataset fringing campaign on the retained
+    `rect_duct,layered_duct` set, writes JSON/CSV, and emits a publication-style
+    figure
 
 Geometry and mesh preview:
 

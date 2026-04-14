@@ -309,9 +309,9 @@ Current publication artifact highlight:
 The repository now also ships a publication-facing fringing benchmark scaffold:
 
 ```bash
-python examples/fringing_benchmark_demo.py --output artifacts/examples/fringing_benchmark
+python examples/fringing_benchmark_demo.py --geometry-kind rect_duct --ha-peak 20 --ny 12 --nz 12 --nx-stations 11 --max-steps 18 --coupling-iterations 10 --potential-iterations 60 --output artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output artifacts/examples/fringing_benchmark_layered
-python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output artifacts/examples/fringing_benchmark_pipe
+python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output artifacts/examples/fringing_benchmark_pipe_exploratory
 lmx examples/fringing_rect_case.toml
 lmx examples/fringing_layered_case.toml
 lmx examples/fringing_pipe_case.toml
@@ -336,6 +336,20 @@ cross-sectional response metrics. Rectangular ducts, layered ducts, and mapped
 pipe O-grids now all go through the low-Re pressure-velocity-potential
 projection slice in the Python API, so the workflow is no longer limited to a
 single duct-only cross-section.
+
+The retained publication figure now emphasizes peak axial velocity, pressure
+span, and axial-current / charge-balance diagnostics. That is a deliberate QA
+change: in these incompressible constant-forcing slices, the cross-sectional
+mean flow can stay nearly flat even when the profile redistributes strongly, so
+peak-velocity and pressure-span plots are the more reviewer-proof observables.
+
+Mapped-pipe fringing remains part of the executable research surface, but on
+the heavier retained validation campaign it is still treated as exploratory
+rather than part of the locked publication set.
+
+The larger retained 3D campaign is also a convergence/screening study. Coarse
+layered high-field points are kept in the figure to show the underresolved
+behavior explicitly, not to present them as final publication values.
 
 The shipped 3D TOML inputs are now publication-scale templates rather than
 minimal smoke cases: they write station-history CSV files, NPZ bundles, JSON
@@ -365,6 +379,11 @@ larger validation datasets:
 python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
 ```
+
+The larger retained 3D validation campaign currently defaults to
+`rect_duct,layered_duct`. The mapped-pipe slice still passes the smaller hard
+gate, but it remains outside the larger retained campaign until the heavier
+pipe dataset is hardened further.
 
 ## User workflows
 

@@ -69,9 +69,9 @@ def run_extruded_validation_campaign(
         for value in payload.values()
         if value.get("solver_kind") == "extruded_inductionless"
     ]
-    grouped: dict[str, list[dict[str, float | str]]] = {}
+    grouped: dict[tuple[str, float], list[dict[str, float | str]]] = {}
     for row in fringing_rows:
-        grouped.setdefault(str(row["geometry_kind"]), []).append(row)
+        grouped.setdefault((str(row["geometry_kind"]), float(row["ha"])), []).append(row)
 
     _set_style()
     fig, axes = plt.subplots(2, 2, constrained_layout=True)
@@ -81,31 +81,34 @@ def run_extruded_validation_campaign(
         "layered_duct": "#b45309",
         "pipe_ogrid": "#1d4ed8",
     }
-    for geometry_kind, rows in sorted(grouped.items()):
+    line_styles = {10.0: "-", 20.0: "--", 30.0: ":", 40.0: "-."}
+    for (geometry_kind, ha_value), rows in sorted(grouped.items()):
         rows = sorted(rows, key=lambda row: (float(row["ha"]), float(row["resolution"])))
         resolution = [float(row["resolution"]) for row in rows]
         charge = [max(float(row["max_charge_balance_residual"]), 1.0e-16) for row in rows]
-        wall = [max(float(row["max_wall_current_leakage"]), 1.0e-16) for row in rows]
-        residual = [max(float(row["max_residual"]), 1.0e-16) for row in rows]
-        correlation = [float(row["field_mean_velocity_correlation"]) for row in rows]
+        axial_current_span = [max(float(row.get("axial_current_span", 0.0)), 1.0e-16) for row in rows]
+        peak_velocity_span = [max(float(row.get("peak_velocity_span", 0.0)), 1.0e-16) for row in rows]
+        pressure_span_range = [max(float(row.get("pressure_span_range", 0.0)), 1.0e-16) for row in rows]
         color = palette.get(geometry_kind, "#7c3aed")
-        axes[0, 0].semilogy(resolution, charge, marker="o", linewidth=2.0, color=color, label=geometry_kind)
-        axes[0, 1].semilogy(resolution, wall, marker="o", linewidth=2.0, color=color, label=geometry_kind)
-        axes[1, 0].semilogy(resolution, residual, marker="o", linewidth=2.0, color=color, label=geometry_kind)
-        axes[1, 1].plot(resolution, correlation, marker="o", linewidth=2.0, color=color, label=geometry_kind)
+        label = f"{geometry_kind}, Ha={int(ha_value)}"
+        style = line_styles.get(ha_value, "-")
+        axes[0, 0].semilogy(resolution, charge, marker="o", linewidth=2.0, linestyle=style, color=color, label=label)
+        axes[0, 1].semilogy(resolution, axial_current_span, marker="o", linewidth=2.0, linestyle=style, color=color, label=label)
+        axes[1, 0].semilogy(resolution, peak_velocity_span, marker="o", linewidth=2.0, linestyle=style, color=color, label=label)
+        axes[1, 1].semilogy(resolution, pressure_span_range, marker="o", linewidth=2.0, linestyle=style, color=color, label=label)
     axes[0, 0].set_title("Charge-balance residual")
     axes[0, 0].set_xlabel("Cross-section resolution")
     axes[0, 0].set_ylabel(r"$\max |\nabla \cdot J|$")
-    axes[0, 1].set_title("Wall-current leakage")
+    axes[0, 1].set_title("Axial-current span")
     axes[0, 1].set_xlabel("Cross-section resolution")
-    axes[0, 1].set_ylabel("Leakage")
-    axes[1, 0].set_title("Projection residual")
+    axes[0, 1].set_ylabel(r"$\Delta \int J_x\,dA$")
+    axes[1, 0].set_title("Peak-velocity span")
     axes[1, 0].set_xlabel("Cross-section resolution")
-    axes[1, 0].set_ylabel("Residual")
-    axes[1, 1].set_title("Field / mean-velocity correlation")
+    axes[1, 0].set_ylabel(r"$\Delta u_{max}$")
+    axes[1, 1].set_title("Pressure-span range")
     axes[1, 1].set_xlabel("Cross-section resolution")
-    axes[1, 1].set_ylabel("Correlation")
-    axes[0, 0].legend(frameon=False)
+    axes[1, 1].set_ylabel(r"$\Delta (\max p - \min p)$")
+    axes[0, 0].legend(frameon=False, ncols=2)
 
     png_path = out_dir / "extruded_validation_campaign.png"
     pdf_path = out_dir / "extruded_validation_campaign.pdf"

@@ -238,6 +238,16 @@ That retained gate now passes for all three retained fringing geometries.
 - The retained hard-gate dataset now passes for fully developed Hartmann /
   Shercliff / Hunt plus fringing `rect_duct`, `layered_duct`, and
   `pipe_ogrid`.
+- The publication QA pass tightened several post-`1.0` figures:
+  - the strong-scaling artifact now plots warm runtime only
+  - the extruded restart figure now compares split-and-resumed solves against a
+    direct solve with the same total step count
+  - the fringing benchmark and larger validation figures now emphasize peak
+    axial velocity, pressure span, axial-current span, and charge-balance
+    metrics instead of the weaker mean-velocity-correlation view
+  - the mapped-pipe slice remains inside the smaller retained hard gate, but it
+    is still outside the larger retained publication campaign pending heavier
+    mesh hardening
 - The key layered 3D hardening step was replacing the stiff multi-region
   electric Jacobi iteration with a sparse direct solve of the conservative
   variable-coefficient potential operator.

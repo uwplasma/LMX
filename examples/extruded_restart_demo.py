@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -65,46 +66,72 @@ def run_extruded_restart_demo(
     ny: int = 6,
     nz: int = 6,
     nx_stations: int = 5,
+    split_steps: int = 4,
+    resume_steps: int = 4,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
     problem = _build_problem(geometry_kind, ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations)
+    base_problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=split_steps),
+        ),
+    )
+    resumed_problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=resume_steps),
+        ),
+    )
+    direct_problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=split_steps + resume_steps),
+        ),
+    )
 
     base_dir = out_dir / "base"
     resumed_dir = out_dir / "resumed"
-    base_solution = solve_extruded_inductionless(problem)
-    base_outputs = write_extruded_solution_outputs(base_solution, problem.case, base_dir, write_plots=True)
-    restart_path = write_extruded_restart_npz(base_solution, problem.case, base_dir / "restart" / f"{problem.case.name}_restart.npz")
+    direct_dir = out_dir / "direct"
+    base_solution = solve_extruded_inductionless(base_problem)
+    base_outputs = write_extruded_solution_outputs(base_solution, base_problem.case, base_dir, write_plots=True)
+    restart_path = write_extruded_restart_npz(base_solution, base_problem.case, base_dir / "restart" / f"{base_problem.case.name}_restart.npz")
     restart_bundle = load_extruded_restart_bundle(restart_path)
-    validate_extruded_restart_bundle(restart_bundle, case=problem.case)
+    validate_extruded_restart_bundle(restart_bundle, case=resumed_problem.case)
 
-    resumed_solution = solve_extruded_inductionless(problem, initial_bundle=restart_bundle.bundle)
-    resumed_outputs = write_extruded_solution_outputs(resumed_solution, problem.case, resumed_dir, write_plots=True)
+    resumed_solution = solve_extruded_inductionless(resumed_problem, initial_bundle=restart_bundle.bundle)
+    resumed_outputs = write_extruded_solution_outputs(resumed_solution, resumed_problem.case, resumed_dir, write_plots=True)
     resumed_restart_path = write_extruded_restart_npz(
         resumed_solution,
-        problem.case,
-        resumed_dir / "restart" / f"{problem.case.name}_restart.npz",
+        resumed_problem.case,
+        resumed_dir / "restart" / f"{resumed_problem.case.name}_restart.npz",
     )
+    direct_solution = solve_extruded_inductionless(direct_problem)
+    direct_outputs = write_extruded_solution_outputs(direct_solution, direct_problem.case, direct_dir, write_plots=True)
 
-    x = np.asarray(base_solution.bundle.x)
-    base_mean = np.asarray(base_solution.bundle.mean_velocity)
+    x = np.asarray(direct_solution.bundle.x)
+    direct_mean = np.asarray(direct_solution.bundle.mean_velocity)
     resumed_mean = np.asarray(resumed_solution.bundle.mean_velocity)
-    base_charge = np.asarray(base_solution.bundle.charge_balance_residual)
+    direct_charge = np.asarray(direct_solution.bundle.charge_balance_residual)
     resumed_charge = np.asarray(resumed_solution.bundle.charge_balance_residual)
-    mean_difference = np.abs(base_mean - resumed_mean)
-    charge_difference = np.abs(base_charge - resumed_charge)
+    mean_difference = np.abs(direct_mean - resumed_mean)
+    charge_difference = np.abs(direct_charge - resumed_charge)
 
     _set_style()
     fig, axes = plt.subplots(1, 3, constrained_layout=True)
     fig.suptitle("LMX extruded restart / resume reproducibility", fontsize=16)
 
-    axes[0].plot(x, base_mean, color="#0f766e", label="Base", linewidth=2.0)
+    axes[0].plot(x, direct_mean, color="#0f766e", label="Direct", linewidth=2.0)
     axes[0].plot(x, resumed_mean, color="#b45309", linestyle="--", label="Restarted", linewidth=2.0)
     axes[0].set_title("Mean velocity history")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel(r"$\bar{u}$")
     axes[0].legend(frameon=False)
 
-    axes[1].semilogy(x, np.maximum(base_charge, 1.0e-16), color="#7c3aed", label="Base")
+    axes[1].semilogy(x, np.maximum(direct_charge, 1.0e-16), color="#7c3aed", label="Direct")
     axes[1].semilogy(x, np.maximum(resumed_charge, 1.0e-16), color="#dc2626", linestyle="--", label="Restarted")
     axes[1].set_title("Charge-balance residual")
     axes[1].set_xlabel("x")
@@ -127,10 +154,13 @@ def run_extruded_restart_demo(
     summary = {
         "geometry_kind": geometry_kind,
         "case": problem.case.name,
+        "split_steps": split_steps,
+        "resume_steps": resume_steps,
         "restart_input": str(restart_path),
         "restart_output": str(resumed_restart_path),
         "base_outputs": {key: [str(path) for path in value] for key, value in base_outputs.items()},
         "resumed_outputs": {key: [str(path) for path in value] for key, value in resumed_outputs.items()},
+        "direct_outputs": {key: [str(path) for path in value] for key, value in direct_outputs.items()},
         "max_mean_velocity_difference": float(np.max(mean_difference)),
         "max_charge_balance_difference": float(np.max(charge_difference)),
         "plots": [png_path.name, pdf_path.name],
@@ -147,6 +177,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ny", type=int, default=6)
     parser.add_argument("--nz", type=int, default=6)
     parser.add_argument("--nx-stations", type=int, default=5)
+    parser.add_argument("--split-steps", type=int, default=4)
+    parser.add_argument("--resume-steps", type=int, default=4)
     args = parser.parse_args(argv)
     run_extruded_restart_demo(
         out_dir=args.output,
@@ -155,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         ny=args.ny,
         nz=args.nz,
         nx_stations=args.nx_stations,
+        split_steps=args.split_steps,
+        resume_steps=args.resume_steps,
     )
     return 0
 

@@ -249,6 +249,8 @@ def test_validate_extruded_inductionless_solution_reports_metrics():
     assert report.station_count == 4
     assert report.max_charge_balance_residual >= 0.0
     assert report.axial_current_span >= 0.0
+    assert report.peak_velocity_span >= 0.0
+    assert report.pressure_span_range >= 0.0
     assert report.max_wall_current_leakage >= 0.0
     assert report.net_boundary_current_residual >= 0.0
     assert jnp.isfinite(report.field_mean_velocity_correlation)
@@ -296,6 +298,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(monkey
     assert "axial_current" in solution.station_history[0]
     assert "wall_current_leakage" in solution.station_history[0]
     assert "boundary_current_residual" in solution.station_history[0]
+    assert "pressure_span" in solution.station_history[0]
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():

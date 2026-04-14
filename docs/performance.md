@@ -81,6 +81,11 @@ The current `1.0` publication artifact is committed under
 
 ![LMX strong scaling](_static/generated/strong_scaling.png)
 
+The QA-tightened figure now shows warm runtime only. First-run compile / JIT
+overhead is still stored in the JSON summary, but it is no longer plotted in
+the main publication figure because it dominated the left panel without helping
+the actual strong-scaling interpretation.
+
 Observed warm-runtime points from that artifact:
 
 - CPU:

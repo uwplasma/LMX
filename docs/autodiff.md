@@ -198,7 +198,7 @@ audit as the executable rectangular 3D fringing slice, so its charge/current
 loss terms are closer to the retained solver family than the earlier
 cell-gradient-only version.
 
-Current extruded-target publication artifact:
+Current extruded-target exploratory artifact:
 
 ![LMX extruded-target autodiff summary](_static/generated/autodiff_extruded_target.png)
 
@@ -218,9 +218,16 @@ python examples/autodiff_extruded_field_design_demo.py \
   --output artifacts/examples/autodiff_extruded_field_design
 ```
 
-Current field-level publication artifact:
+Current field-level exploratory artifact:
 
 ![LMX extruded field autodiff summary](_static/generated/autodiff_extruded_field_design.png)
+
+These two extruded autodiff figures should currently be read as research-lane
+evidence of loss reduction, not as the same level of publication-locked
+parameter recovery already achieved by the Hartmann analytical examples. The
+current retained publication autodiff figure remains the Hartmann sensitivity
+and inverse-design summary above; the extruded-target and field-level examples
+are the next differentiable-solver steps and remain explicitly exploratory.
 
 ## References
 

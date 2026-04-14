@@ -74,6 +74,8 @@ class ExtrudedInductionlessValidation:
     max_wall_current_leakage: float
     net_boundary_current_residual: float
     field_mean_velocity_correlation: float
+    peak_velocity_span: float = 0.0
+    pressure_span_range: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -527,6 +529,7 @@ def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, floa
             "axial_current": float(bundle.axial_current[index]),
             "wall_current_leakage": float(bundle.wall_current_leakage[index]),
             "current_scaled_pressure_proxy": float(bundle.current_scaled_pressure_proxy[index]),
+            "pressure_span": float(jnp.max(bundle.p[index]) - jnp.min(bundle.p[index])),
             "residual": float(bundle.residual[index]),
             "charge_balance_residual": float(bundle.charge_balance_residual[index]),
             "boundary_current_residual": float(bundle.boundary_current_residual[index]),
@@ -1573,6 +1576,8 @@ def validate_extruded_inductionless_solution(
     residual = jnp.asarray(bundle.residual, dtype=float)
     charge_balance_residual = jnp.asarray(bundle.charge_balance_residual, dtype=float)
     boundary_current_residual = jnp.asarray(bundle.boundary_current_residual, dtype=float)
+    peak_velocity = jnp.max(jnp.abs(bundle.u), axis=(1, 2))
+    pressure_span = jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2))
     correlation = _safe_correlation(field_scale, mean_velocity)
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
@@ -1588,6 +1593,8 @@ def validate_extruded_inductionless_solution(
         max_wall_current_leakage=float(jnp.max(jnp.abs(wall_current_leakage))) if wall_current_leakage.size else 0.0,
         net_boundary_current_residual=float(jnp.max(jnp.abs(boundary_current_residual))) if boundary_current_residual.size else 0.0,
         field_mean_velocity_correlation=correlation,
+        peak_velocity_span=float(jnp.max(peak_velocity) - jnp.min(peak_velocity)) if peak_velocity.size else 0.0,
+        pressure_span_range=float(jnp.max(pressure_span) - jnp.min(pressure_span)) if pressure_span.size else 0.0,
     )
 
 

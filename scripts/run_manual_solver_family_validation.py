@@ -92,28 +92,40 @@ def _write_summary_plot(payload: dict[str, dict[str, float | str]], path: Path) 
     ]
     if not fringing_rows:
         return None
-    grouped: dict[str, list[dict[str, float | str]]] = {}
+    grouped: dict[tuple[str, float], list[dict[str, float | str]]] = {}
     for row in fringing_rows:
-        grouped.setdefault(str(row["geometry_kind"]), []).append(row)
+        grouped.setdefault((str(row["geometry_kind"]), float(row.get("ha", 0.0))), []).append(row)
     plt.style.use("default")
     plt.rcParams.update({"figure.dpi": 160, "savefig.dpi": 300, "font.family": "STIXGeneral", "mathtext.fontset": "stix"})
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8.4), constrained_layout=True)
     palette = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed", "#dc2626"]
-    for color, (geometry_kind, rows) in zip(palette, sorted(grouped.items()), strict=False):
+    line_styles = {10.0: "-", 20.0: "--", 30.0: ":", 40.0: "-."}
+    for color, ((geometry_kind, ha_value), rows) in zip(palette, sorted(grouped.items()), strict=False):
         rows = sorted(rows, key=lambda row: (float(row.get("ha", 0.0)), float(row.get("resolution", 0.0))))
         resolutions = [float(row.get("resolution", 0.0)) for row in rows]
         charge = [max(float(row.get("max_charge_balance_residual", 0.0)), 1.0e-16) for row in rows]
-        wall = [max(float(row.get("max_wall_current_leakage", 0.0)), 1.0e-16) for row in rows]
-        axes[0].semilogy(resolutions, charge, marker="o", color=color, label=geometry_kind)
-        axes[1].semilogy(resolutions, wall, marker="o", color=color, label=geometry_kind)
-    axes[0].set_title("Fringing charge-balance residual")
-    axes[0].set_xlabel("Cross-section resolution")
-    axes[0].set_ylabel(r"$\max |\nabla \cdot J|$")
-    axes[1].set_title("Fringing wall-current leakage")
-    axes[1].set_xlabel("Cross-section resolution")
-    axes[1].set_ylabel("Leakage")
-    axes[0].legend(frameon=False)
-    axes[1].legend(frameon=False)
+        axial_current_span = [max(float(row.get("axial_current_span", 0.0)), 1.0e-16) for row in rows]
+        peak_velocity_span = [max(float(row.get("peak_velocity_span", 0.0)), 1.0e-16) for row in rows]
+        pressure_span_range = [max(float(row.get("pressure_span_range", 0.0)), 1.0e-16) for row in rows]
+        label = f"{geometry_kind}, Ha={int(ha_value)}"
+        style = line_styles.get(ha_value, "-")
+        axes[0, 0].semilogy(resolutions, charge, marker="o", color=color, linestyle=style, label=label)
+        axes[0, 1].semilogy(resolutions, axial_current_span, marker="o", color=color, linestyle=style, label=label)
+        axes[1, 0].semilogy(resolutions, peak_velocity_span, marker="o", color=color, linestyle=style, label=label)
+        axes[1, 1].semilogy(resolutions, pressure_span_range, marker="o", color=color, linestyle=style, label=label)
+    axes[0, 0].set_title("Fringing charge-balance residual")
+    axes[0, 0].set_xlabel("Cross-section resolution")
+    axes[0, 0].set_ylabel(r"$\max |\nabla \cdot J|$")
+    axes[0, 1].set_title("Axial-current span")
+    axes[0, 1].set_xlabel("Cross-section resolution")
+    axes[0, 1].set_ylabel(r"$\Delta \int J_x\,dA$")
+    axes[1, 0].set_title("Peak-velocity span")
+    axes[1, 0].set_xlabel("Cross-section resolution")
+    axes[1, 0].set_ylabel(r"$\Delta u_{max}$")
+    axes[1, 1].set_title("Pressure-span range")
+    axes[1, 1].set_xlabel("Cross-section resolution")
+    axes[1, 1].set_ylabel(r"$\Delta (\max p - \min p)$")
+    axes[0, 0].legend(frameon=False, ncols=2)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, bbox_inches="tight")
     pdf_path = path.with_suffix(".pdf")
@@ -254,6 +266,8 @@ def main(argv: list[str] | None = None) -> int:
                         "mean_velocity_span": solution.validation.mean_velocity_span,
                         "volumetric_flow_rate_span": solution.validation.volumetric_flow_rate_span,
                         "axial_current_span": solution.validation.axial_current_span,
+                        "peak_velocity_span": solution.validation.peak_velocity_span,
+                        "pressure_span_range": solution.validation.pressure_span_range,
                         "max_wall_current_leakage": solution.validation.max_wall_current_leakage,
                         "net_boundary_current_residual": solution.validation.net_boundary_current_residual,
                         "field_mean_velocity_correlation": solution.validation.field_mean_velocity_correlation,
