@@ -471,6 +471,41 @@ def test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid():
     assert diagonal[2, 2] == pytest.approx(4.0 * expected)
 
 
+def test_velocity_system_coefficients_cover_connected_and_boundary_fallback_paths():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=6,
+        nz=6,
+        wall_thickness=(0.1, 0.1, 0.1, 0.1),
+        wall_cells=(1, 1, 1, 1),
+        target_ha=20.0,
+    )
+    diffusivity = jnp.ones(mesh.yz_shape) * 0.2
+    reaction = jnp.ones(mesh.yz_shape) * 0.05
+    active_mask = jnp.zeros(mesh.yz_shape, dtype=bool)
+    active_mask = active_mask.at[2:5, 2:5].set(True)
+
+    diagonal, west, east, south, north = solvers._velocity_system_coefficients(
+        mesh,
+        diffusivity,
+        reaction,
+        active_mask,
+    )
+
+    assert diagonal.shape == mesh.yz_shape
+    assert float(diagonal[0, 0]) == pytest.approx(1.0)
+    assert float(west[0, 0]) == pytest.approx(0.0)
+    assert float(north[0, 0]) == pytest.approx(0.0)
+
+    interior_value = float(west[3, 3])
+    boundary_fallback = float(west[2, 2])
+    assert interior_value > 0.0
+    assert boundary_fallback > 0.0
+    assert boundary_fallback != pytest.approx(interior_value)
+    assert float(diagonal[3, 3]) > float(reaction[3, 3])
+
+
 def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
     mesh = generate_layered_duct_mesh(
         width=2.0,

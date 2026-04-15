@@ -1,534 +1,181 @@
 # LMX
 
-LMX is a JAX-native toolkit for laminar inductionless magnetohydrodynamics on
-structured meshes. Version `1.0` targets a research-grade core for fully
-developed duct flows, benchmark-quality validation, explicit runtime
-diagnostics, restartable CLI workflows, and a clean differentiable lane for
-inverse problems and design studies.
+[![CI](https://github.com/uwplasma/LMX/actions/workflows/ci.yml/badge.svg)](https://github.com/uwplasma/LMX/actions/workflows/ci.yml)
+[![Docs](https://github.com/uwplasma/LMX/actions/workflows/docs.yml/badge.svg)](https://github.com/uwplasma/LMX/actions/workflows/docs.yml)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)
+![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-The `1.0` ship gate is now closed on the fast release lane:
+LMX is a JAX-native inductionless MHD code for structured meshes. It ships a
+validated fully developed solver family, a retained 3D `extruded_inductionless`
+fringing-field lane, restartable CLI workflows, strong-scaling tooling, and a
+differentiable workflow for sensitivity analysis and inverse design.
 
-- fast validation suite passes within the five-minute budget
-- docs build cleanly
-- combined `lmx/` + `scripts/` coverage is at `94%`
-- CLI and restart smokes pass on the shipped TOML workflow
-- publication-facing strong-scaling and autodiff artifacts are committed
+## Why use LMX
 
-## What LMX is for
-
-- Hartmann, Shercliff, and Hunt benchmark problems
-- layered conducting and insulating wall models
-- scripted and input-file-driven studies
-- publication-ready plots, movies, and benchmark reports
-- differentiable steady and transient workflows in JAX
-- CPU and multi-GPU strong-scaling benchmark tooling
-- executable fringing-field benchmark scaffolds for the next solver phase
-
-## Current solver status
-
-- `fully_developed_inductionless`
-  - default solver for `rect_duct` and `layered_duct`
-  - steady and transient streamwise-velocity / electric-potential solves
-  - research path for Hartmann, Shercliff, and Hunt cases
-- `extruded_inductionless`
-  - staged next solver family for 3D/fringing-field work
-  - current repo ships a first rectangular-duct low-Re 3D projection slice
-  - layered fringing ducts now use the same projection path and conservative
-    face-current audit through the Python API
-  - layered multi-region fringing now uses a sparse direct electric solve for
-    the variable-coefficient potential equation
-  - mapped `pipe_ogrid` fringing cases now use the same explicit 3D slice
-    through the Python API
-  - executable TOML/CLI front-end now exists for rectangular and mapped-pipe
-    fringing runs
-  - direct `lmx run fringing_rect|fringing_pipe|fringing_layered` entry points
-    now exist for quick 3D/fringing launches without authoring TOML first
-  - retained hard-gate conservation validation now passes for rectangular
-    ducts, layered ducts, and mapped pipes on the bounded larger dataset
-  - broader production-grade 3D validation and solver hardening remain
-    post-`1.0` work
+- Fully developed Hartmann, Shercliff, and Hunt workflows
+- Rectangular, layered, and mapped-pipe geometry support
+- JAX-based CPU and GPU execution
+- Explicit conservation diagnostics for charge closure and boundary-current audits
+- Input-file and Python-driver workflows
+- Publication-oriented plots, movies, and validation reports
+- Autodiff examples for inverse design and sensitivity analysis
 
 ## Installation
 
-### Minimal install
+Minimal install:
 
 ```bash
-git clone https://github.com/uwplasma/lmx
+git clone https://github.com/uwplasma/LMX
 cd LMX
 python -m pip install -e .
 ```
 
-LMX supports Python `3.10+`. On Python `3.10`, TOML parsing falls back
-automatically to `tomli`, and the package now accepts the installed `jax`
-family directly rather than pinning a narrow version window.
-
-Recent compatibility checks were run on:
-
-- local Python `3.13` with JAX `0.9.2`
-- remote Python `3.10.12` on `office` with JAX `0.6.2` and two RTX A4000 GPUs
-
-### Development install
+Full development install:
 
 ```bash
-git clone https://github.com/uwplasma/lmx
-cd LMX
 python -m pip install -e '.[dev,plotting,docs,extras]'
 ```
 
+LMX supports Python `3.10+`, falls back to `tomli` on Python `3.10`, and works
+with the installed JAX/JAXLIB pair rather than pinning a narrow runtime window.
+
 ## Quick start
 
-### Run from the CLI
+CLI:
 
 ```bash
 lmx examples/hartmann_case.toml
-lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx examples/fringing_rect_case.toml
-lmx examples/fringing_layered_case.toml
-lmx examples/fringing_layered_restart_case.toml
-lmx examples/fringing_pipe_case.toml
-lmx run hartmann --ha 20 --verbose
-lmx run hunt --ha 20 --verbosity debug
-lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
 lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
-lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
-JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
-XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
-ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/hunt_case.toml'
 ```
 
-The module entrypoint works as well:
-
-```bash
-python -m lmx examples/hartmann_case.toml
-```
-
-### Run from Python
+Python:
 
 ```python
 from lmx.cases import make_hartmann_case
-from lmx.config import LoggingSpec
-from lmx.runtime_logging import StreamingSolverLogger
 from lmx.solvers import solve_steady
 
 case = make_hartmann_case(ha=20.0, ny=48, nz=48)
-logger = StreamingSolverLogger(LoggingSpec.from_user_controls(verbose=True, verbosity="debug"))
-solution = solve_steady(case, logger=logger)
+solution = solve_steady(case)
 print(solution.diagnostics.residual_history[-1])
 ```
 
-### Run tests and docs
+Backend selection from the shell:
 
 ```bash
-python -m pytest
-python -m sphinx -W -b html docs docs/_build/html
+JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
+CUDA_VISIBLE_DEVICES=0 JAX_PLATFORMS=cuda lmx examples/hunt_case.toml
+XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
 ```
 
-### CI modes
-
-The repository now uses two lanes:
-
-- fast default CI on pushes and pull requests
-  - unit and validation tests
-  - docs
-- manual research-artifact workflows via GitHub Actions `workflow_dispatch`
-  - regression and physics suites
-  - heavy validation artifact generation
-  - benchmark artifact generation
-  - extended coverage collection
-
-This keeps the default gate practical while preserving reproducible benchmark
-and reporting workflows for release work and paper figures.
-
-Current local baseline:
-
-- full fast test suite: about `31 s`
-- full coverage lane: about `37 s`
-
-Both are intentionally kept below a five-minute routine validation budget.
-
-## Geometry and mesh preview
-
-LMX now ships a dedicated geometry preview workflow:
-
-```bash
-python examples/geometry_preview_demo.py --output artifacts/examples/geometry_preview
-python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
-```
-
-That example shows:
-
-- a rectangular Hartmann duct
-- a layered Hunt duct with explicit wall regions
-- a mapped pipe O-grid
-
-The default invocation is preview-only so it stays fast. Add `--with-post-run`
-to append a short steady Hartmann or Hunt solve and matching overview plots in
-the same output tree.
-
-This is the intended preprocessing/postprocessing bridge for users who want to
-inspect the geometry and mesh before launching longer runs.
-
-For a single reviewer-facing panel with all shipped geometries, use:
-
-```bash
-python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
-```
-
-![LMX geometry panel](docs/_static/generated/geometry_gallery.png)
-
-For Python-native variable fields and custom geometry edits, use:
-
-```bash
-python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
-```
-
-That driver shows how to:
-
-- start from a benchmark constructor
-- modify geometry fields with `dataclasses.replace(...)`
-- define an analytic magnetic-field callable
-- preview the mesh and material layout
-- run a short solve and emit the same summary/plot artifacts as the other examples
-
-## Typical outputs
-
-An LMX run can produce:
-
-- live solver logs with verbosity control
-- JSON summaries
-- restartable `.npz` state bundles
-- ParaView VTK output
-- CSV centerline and midplane profiles
-- publication-style plots and GIF movies from the examples
-
-The runtime logger is intentionally detailed. It reports solver-family
-information, linear-solve residuals, integral MHD diagnostics, conservation
-checks, initial and final linear/potential residuals, and transient progress in
-a format intended for long research runs.
-
-At `verbosity = "detailed"` or `verbosity = "debug"`, each step reports:
-
-- initial and final residuals for the potential and velocity solves
-- linear iteration counts
-- `max|div J|`
-- charge-balance residual
-- interface-current continuity residual
-- volumetric flow rate, mean current magnitude, and Lorentz power
-
-## Performance and autodiff examples
-
-### Strong scaling
-
-The repository ships a publication-oriented strong-scaling example for the
-dominant stencil/linear-solve kernel:
+For publication-style scaling studies, use:
 
 ```bash
 python examples/strong_scaling_demo.py --output artifacts/examples/strong_scaling_cpu
 python examples/strong_scaling_demo.py --remote-host office --output artifacts/examples/strong_scaling_full
 ```
 
-This writes raw timing JSON plus polished `PNG`/`PDF` scaling plots suitable for
-docs and paper drafts.
+## Showcase
+
+### Geometries
+
+LMX currently ships rectangular ducts, layered ducts, and mapped pipe O-grids.
+
+![LMX geometry gallery](docs/_static/generated/geometry_gallery.png)
+
+### 2D and 3D startup movies
+
+These README assets are generated from the retained `examples/readme_showcase_demo.py`
+workflow and show a short Hunt startup sequence in 2D and 3D.
+
+<p align="center">
+  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D startup movie" width="48%">
+</p>
+
+### 3D fringing-field figures
+
+The retained publication set currently includes rectangular and layered 3D
+fringing figures. The mapped-pipe lane is validated on conservation metrics and
+kept qualitative on external profile comparison.
+
+<p align="center">
+  <img src="docs/_static/generated/paper_rect_3d.png" alt="LMX rectangular 3D fringing figure" width="48%">
+  <img src="docs/_static/generated/paper_layered_3d.png" alt="LMX layered 3D fringing figure" width="48%">
+</p>
+
+### Scaling and autodiff
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
 
-Current publication artifact highlights:
-
-- local CPU warm-runtime sweep on a `1024 x 1024` cross-section:
-  - `1` device: `0.0898 s`
-  - `4` devices: `0.0563 s`
-  - `8` devices: `0.0549 s`
-- remote GPU warm-runtime sweep on a `2048 x 2048` cross-section:
-  - `1` GPU: `0.0524 s`
-  - `2` GPUs: `0.0392 s`
-
-The remote GPU workflow automatically prefers the highest-index single GPU for
-the one-device baseline, which avoids workstation display contention on desktop
-GPU hosts.
-
-Standard CLI runs are not themselves a multi-device scaling benchmark, but they
-inherit the active JAX backend from the shell. Use `examples/strong_scaling_demo.py`
-for publication scaling studies and use `JAX_PLATFORMS` / `CUDA_VISIBLE_DEVICES`
-to steer normal CLI runs to CPU or GPU backends. If you want multiple logical
-CPU devices visible to JAX from the CLI, also set
-`XLA_FLAGS=--xla_force_host_platform_device_count=<N>`.
-
-The recent remote smoke validation on `office` confirmed that a `512 x 512`
-GPU kernel run is faster than the matching local one-device CPU run on the
-current post-`1.0` tree:
-
-- local CPU, `512 x 512`, `32` iterations:
-  - `warm_seconds ≈ 4.31e-3`
-- remote office GPU, `512 x 512`, `32` iterations:
-  - `warm_seconds ≈ 6.65e-4`
-
-Very small multi-GPU problems can still scale poorly. Use the dedicated scaling
-example, not routine CLI runs, when you need publication-quality strong-scaling
-data.
-
-### Autodiff sensitivity and inverse design
-
-The repository also ships a differentiable Hartmann example:
-
-```bash
-python examples/autodiff_design_demo.py --output artifacts/examples/autodiff_design
-python examples/autodiff_sensitivity_demo.py --output artifacts/examples/autodiff_sensitivity
-python examples/autodiff_profile_design_demo.py --output artifacts/examples/autodiff_profile_design
-python examples/autodiff_fringing_design_demo.py --output artifacts/examples/autodiff_fringing_design
-python examples/autodiff_fringing_response_demo.py --output artifacts/examples/autodiff_fringing_response
-python examples/autodiff_extruded_target_demo.py --output artifacts/examples/autodiff_extruded_target
-python examples/autodiff_extruded_field_design_demo.py --output artifacts/examples/autodiff_extruded_field_design
-python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples/autodiff_extruded_trajectory
-python examples/extruded_paper_figures.py --output artifacts/examples/extruded_paper_figures
-python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
-python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
-```
-
-Together, those examples demonstrate:
-
-- `jax.grad` sensitivity of mean velocity with respect to Hartmann number
-- finite-difference cross-checks for autodiff sensitivities with respect to
-  Hartmann number and forcing
-- inverse recovery of a synthetic forcing parameter from a target velocity profile
-- full-profile inverse design recovering both forcing and Hartmann number
-- fringing-history inverse design recovering axial field-profile parameters
-- fringing multi-observable inverse design recovering axial field-profile
-  parameters against both mean-velocity and current-response histories
-- inverse design against targets generated directly from the first
-  `extruded_inductionless` 3D slice, using a direct differentiable
-  rectangular extruded response model in the default rectangular workflow
-- field-level inverse design against selected `u`, `phi`, `J_y`, and `p`
-  slices from the retained extruded projection loop
-- projection-trajectory inverse design against selected-station `u`, `phi`,
-  `J_y`, `p`, and charge-balance histories taken across the retained
-  projection iterations themselves
-- reviewer-facing 3D fringing figures for the retained rectangular and layered
-  datasets
-- polished `PNG`/`PDF` summary figures for publication use
-
-The retained reviewer-facing 3D fringing figures are now shipped in the docs
-tree as:
-
-- `docs/_static/generated/paper_rect_3d.png`
-- `docs/_static/generated/paper_layered_3d.png`
-- `docs/_static/generated/paper_reviewer_summary.png`
-
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
 
-Current publication artifact highlight:
+## Validation status
 
-- synthetic target forcing: `1.0`
-- recovered forcing after `24` gradient steps: `0.999863`
-- final profile loss: `2.9e-12`
+The current retained validation surface includes:
 
-### Fringing-field scaffold
+- fast CI under a five-minute routine budget
+- strict docs build
+- restartable TOML and CLI workflows
+- internal conservation and fringing-physics gates on `rect_duct`, `layered_duct`, and `pipe_ogrid`
+- mapped-pipe external comparison kept explicitly qualitative
+- widened bounded manual fringing campaign at `Ha = 10, 20, 30`, `resolution = 8`
 
-The repository now also ships a publication-facing fringing benchmark scaffold:
+The widened bounded manual campaign is intentionally stricter than the release
+gate. On the current tree it confirms the 3D fringing set at `Ha = 10, 20, 30`
+for `rect_duct`, `layered_duct`, and `pipe_ogrid`, and it also exposes one
+remaining fully developed issue: Hunt at `Ha = 10`, `resolution = 8` still
+fails the heavier interface-current threshold.
 
-```bash
-python examples/fringing_benchmark_demo.py --geometry-kind rect_duct --ha-peak 20 --ny 12 --nz 12 --nx-stations 11 --max-steps 18 --coupling-iterations 10 --potential-iterations 60 --output artifacts/examples/fringing_benchmark
-python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output artifacts/examples/fringing_benchmark_layered
-python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output artifacts/examples/fringing_benchmark_pipe_exploratory
-lmx examples/fringing_rect_case.toml
-lmx examples/fringing_layered_case.toml
-lmx examples/fringing_pipe_case.toml
-```
-
-That example now writes the first retained rectangular-duct
-`extruded_inductionless` 3D projection slice through the explicit
-`solve_extruded_inductionless(...)` Python entry point: a stacked axial field
-bundle with `u`, `v`, `w`, `p`, `phi`, current, Lorentz, charge-balance
-diagnostics, axial-current histories, wall-current leakage audits, contour
-plots for `u(x, y, zmid)` and `u(x, ymid, z)`, and a compact validation
-summary for the slice.
-
-For rectangular and layered extruded cases, those conservation diagnostics are
-now assembled from conservative face-current fluxes with closed-current axial
-boundary treatment, so the reported `div J` and boundary-current metrics are
-aligned with the discrete electric operator rather than cell-gradient checks at
-conductivity jumps.
-
-That workflow generates a smooth axial fringing profile together with
-cross-sectional response metrics. Rectangular ducts, layered ducts, and mapped
-pipe O-grids now all go through the low-Re pressure-velocity-potential
-projection slice in the Python API, so the workflow is no longer limited to a
-single duct-only cross-section.
-
-The retained publication figure now emphasizes peak axial velocity, pressure
-span, and axial-current / charge-balance diagnostics. That is a deliberate QA
-change: in these incompressible constant-forcing slices, the cross-sectional
-mean flow can stay nearly flat even when the profile redistributes strongly, so
-peak-velocity and pressure-span plots are the more reviewer-proof observables.
-
-Mapped-pipe fringing now passes the retained conservation-validation gate on
-the heavier bounded dataset, but its current external profile comparison is
-still treated as qualitative rather than as a locked parity figure.
-
-The larger retained 3D campaign is also a convergence/screening study. Coarse
-layered high-field points are kept in the figure to show the underresolved
-behavior explicitly, not to present them as final publication values.
-
-The shipped 3D TOML inputs are now publication-scale templates rather than
-minimal smoke cases: they write station-history CSV files, NPZ bundles, JSON
-summaries, copied input files, and overview/conservation figures directly from
-`lmx input.toml`.
-
-Extruded runs now also write a richer archive surface for larger campaigns:
-
-- `system/<case>_extruded_manifest.json`
-- `fields/stations/station_XXXX.npz`
-
-The manifest records the archived station indices and field list, and the
-station bundles store the retained `u`, `v`, `w`, `p`, `phi`, current, Lorentz,
-and conservation fields at the selected axial stations. The existing
-`write_stride` knob controls the station archive stride.
-
-The 3D lane is now restartable on the executable TOML path as well. Extruded
-runs write a structured output tree:
-
-- `system/`
-- `fields/`
-- `postProcessing/`
-- `restart/`
-- `logs/`
-
-Use the paired layered templates to exercise that workflow directly:
+The heavier retained 3D validation campaign is generated with:
 
 ```bash
-lmx examples/fringing_layered_case.toml
-lmx examples/fringing_layered_restart_case.toml
+python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign --ha-values 10,20 --resolutions 10,14 --fringing-nx 5
+python scripts/run_manual_solver_family_validation.py --output artifacts/manual_validation/solver_family_summary.json --ha-values 10,20 --resolutions 8,12 --include-fringing --fringing-geometries rect_duct,layered_duct,pipe_ogrid --fringing-nx 5 --max-steps 12 --potential-iterations 48 --coupling-iterations 8 --write-csv --write-plot
 ```
 
-And use the publication-facing scripts when you want restart reproducibility or
-larger validation datasets:
+## Examples
 
-```bash
-python examples/extruded_restart_demo.py --output artifacts/examples/extruded_restart_demo
-python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign
-python examples/autodiff_extruded_trajectory_demo.py --output artifacts/examples/autodiff_extruded_trajectory
-```
+Useful entry points:
 
-The larger retained 3D conservation-validation campaign now covers
-`rect_duct,layered_duct,pipe_ogrid`. The mapped-pipe slice still stays
-qualitative on the external profile-comparison side, because the shipped
-reference dataset is a high-`Ha`, high-`Re` benchmark while the current LMX
-mapped-pipe slice is a low-`Re` research model.
-
-The retained 3D gate is not only an external-comparison gate. It also enforces
-physics-facing checks:
-
-- bounded charge-balance residual
-- bounded wall and external-boundary current leakage
-- small axial `volumetric_flow_rate_span`
-- negative enough `field_mean_velocity_correlation`
-
-On the current bounded larger dataset, those stricter fringing-physics checks
-now pass for `rect_duct`, `layered_duct`, and `pipe_ogrid`. The key layered
-hardening step was a partial stationwise throughput-closure correction inside
-the 3D projection loop, which brought `volumetric_flow_rate_span` down to
-`≈ 1.00e-3` at `Ha=10` and `≈ 2.75e-3` at `Ha=20` while preserving the expected
-negative field/mean-velocity correlation.
-
-For the current exploratory mapped-pipe comparison against the shipped external
-fringing-pipe profiles, use:
-
-```bash
-python examples/pipe_reference_comparison_demo.py --output artifacts/examples/pipe_reference_comparison
-```
-
-![LMX mapped-pipe exploratory comparison](docs/_static/generated/pipe_reference_comparison.png)
-
-## User workflows
-
-### Input-file workflow
-
-The primary executable path is:
-
-```bash
-lmx examples/hartmann_case.toml
-```
-
-The TOML schema is documented in
-[docs/input_reference.md](docs/input_reference.md). The important high-level
-blocks are:
-
-- `[case]`
-- `[geometry]`
-- `[magnetic_field]`
-- `[solver]`
-- `[time_stepper]`
-- `[output]`
-- `[logging]`
-- `[restart]`
-
-The `[logging]` block supports both:
-
-- `verbose = true|false`
-- `verbosity = "quiet" | "normal" | "detailed" | "debug"`
-
-Use `verbose = false` for quiet batch runs and `verbosity = "debug"` when you
-need the most detailed live runtime output.
-
-The `[time_stepper]` block also now uses bounded step-count logic:
-
-- `t_final` is a stop horizon, not a target that is rounded up
-- `max_steps` is treated as a hard ceiling
-- fractional `t_final / dt` ratios do not trigger a spurious extra step
-
-### Example workflow
-
-Examples live in [examples/README.md](examples/README.md). They are meant to be
-teachable, explicit templates rather than black-box wrappers. Each example shows
-how to:
-
-- define geometry and resolution
-- choose a solver family
-- configure time stepping and logging
-- save fields and diagnostics
-- generate 2D and 3D visualizations
+- `examples/readme_showcase_demo.py`: regenerates the README media bundle
+- `examples/geometry_panel_demo.py`: static geometry panel
+- `examples/fringing_benchmark_demo.py`: retained fringing benchmark plots
+- `examples/extruded_paper_figures.py`: reviewer-facing 3D fringing figures
+- `examples/autodiff_sensitivity_demo.py`: Hartmann sensitivities
+- `examples/autodiff_extruded_trajectory_demo.py`: deeper extruded autodiff target matching
+- `examples/variable_field_geometry_demo.py`: Python-native geometry and field editing
 
 ## Documentation
 
-- [User and theory docs](docs/index.md)
-- [Getting started](docs/getting_started.md)
-- [Theory and equations](docs/theory.md)
-- [Numerics and implementation](docs/numerics.md)
-- [Geometry and mesh workflows](docs/geometry.md)
-- [Input reference](docs/input_reference.md)
-- [Case cookbook](docs/case_cookbook.md)
-- [Testing and validation strategy](docs/testing.md)
-- [Benchmark matrix](docs/benchmark_matrix.md)
-- [Performance and scaling](docs/performance.md)
-- [Autodiff and inverse design](docs/autodiff.md)
-- [Developer guide](docs/developer_guide.md)
-- [Validation report](docs/validation_report.md)
+The detailed documentation lives under [`docs/`](docs/) and covers:
 
-## Research directions and references
+- equations and physics model
+- numerics and solver structure
+- geometry and mesh handling
+- input reference and CLI usage
+- testing and validation strategy
+- autodiff and performance workflows
 
-LMX is being positioned around the benchmark ladder used in liquid-metal MHD
-verification and validation:
+Build locally with:
 
-- [Samper et al., benchmark review for MHD validation and verification](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf)
-- [JAX gradient checkpointing](https://docs.jax.dev/en/latest/gradient-checkpointing.html)
-- [Lineax linear solvers](https://docs.kidger.site/lineax/api/solvers/)
-- [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/)
-- [Φ-Flow differentiable PDE tooling](https://proceedings.mlr.press/v235/holl24a.html)
+```bash
+python -m sphinx -W -b html docs docs/_build/html
+```
 
-The near-term research targets are:
+## Testing
 
-- benchmark-grade fully developed Hartmann, Shercliff, and Hunt cases
-- laminar fringing-field benchmarks in square ducts and pipes
-- differentiable inverse studies over magnetic field, geometry, and wall
-  conductance parameters
+Fast routine gate:
 
-## Security and reproducibility notes
+```bash
+python -m pytest -m "unit or validation"
+```
 
-- The repository avoids hard-coded machine-local absolute paths in public docs
-  and examples.
-- CLI and plotting utilities are allowed to use pragmatic non-differentiable
-  utilities where that improves robustness, while the solver core remains JAX
-  based.
-- External benchmark comparisons are treated as secondary validation assets and
-  are kept separate from the governing solver implementation.
+Focused coverage or solver work should stay bounded; runs over five minutes are
+explicitly treated as failures for routine local development.
+
+## License
+
+LMX is released under the [MIT License](LICENSE).

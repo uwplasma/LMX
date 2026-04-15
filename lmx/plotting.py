@@ -10,6 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib import colors
+from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
@@ -434,12 +435,26 @@ def _draw_geometry_preview(
     if mask.size == 0:
         mask = jnp.ones(mesh.yz_shape, dtype=bool)
     mask_image = np.asarray(mask.astype(float))
+    view_elev = 22
+    view_azim = 34
 
     if mesh.point_coordinates is not None:
         points = np.asarray(mesh.point_coordinates)
         section = points[0]
         stride_r = max(section.shape[0] // 12, 1)
         stride_theta = max(section.shape[1] // 18, 1)
+        radial = np.sqrt(section[:, :, 1] ** 2 + section[:, :, 2] ** 2)
+        radial_scale = max(float(np.max(radial)), 1.0e-12)
+        ax2d.scatter(
+            section[:, :, 1].ravel(),
+            section[:, :, 2].ravel(),
+            c=(radial / radial_scale).ravel(),
+            cmap="viridis",
+            s=10,
+            alpha=0.28,
+            linewidths=0.0,
+            zorder=0,
+        )
         for radial_index in range(0, section.shape[0], stride_r):
             ax2d.plot(section[radial_index, :, 1], section[radial_index, :, 2], color="#1d4ed8", linewidth=0.8, alpha=0.9)
         for theta_index in range(0, section.shape[1], stride_theta):
@@ -448,8 +463,12 @@ def _draw_geometry_preview(
         ax2d.set_xlabel("y")
         ax2d.set_ylabel("z")
         ax2d.set_aspect("equal")
+        ax2d.scatter([0.0], [0.0], color="#111827", s=16, zorder=5)
 
-        for slice_index, color in ((0, "#1d4ed8"), (-1, "#b45309")):
+        x_indices = (0, points.shape[0] // 3, (2 * points.shape[0]) // 3, -1)
+        for offset, (slice_index, color) in enumerate(
+            zip(x_indices, ("#1d4ed8", "#0f766e", "#9333ea", "#b45309"), strict=True)
+        ):
             section = points[slice_index]
             ax3d.plot_wireframe(
                 section[:, :, 1],
@@ -461,21 +480,86 @@ def _draw_geometry_preview(
                 linewidth=0.65,
                 alpha=0.9,
             )
+            section_radial = np.sqrt(section[:, :, 1] ** 2 + section[:, :, 2] ** 2)
+            ax3d.plot_surface(
+                section[:, :, 1],
+                section[:, :, 2],
+                section[:, :, 0],
+                facecolors=plt.cm.viridis(section_radial / max(float(np.max(section_radial)), 1.0e-12)),
+                shade=False,
+                linewidth=0.0,
+                antialiased=True,
+                alpha=0.10 + 0.06 * offset,
+            )
+        middle = points[points.shape[0] // 2]
+        middle_radial = np.sqrt(middle[:, :, 1] ** 2 + middle[:, :, 2] ** 2)
+        ax3d.plot_surface(
+            middle[:, :, 1],
+            middle[:, :, 2],
+            middle[:, :, 0],
+            facecolors=plt.cm.viridis(middle_radial / max(float(np.max(middle_radial)), 1.0e-12)),
+            shade=False,
+            linewidth=0.0,
+            antialiased=True,
+            alpha=0.92,
+        )
+        shell_r = np.asarray(points[:, -1, :, 1], dtype=float)
+        shell_z = np.asarray(points[:, -1, :, 2], dtype=float)
+        shell_x = np.asarray(points[:, -1, :, 0], dtype=float)
+        ax3d.plot_surface(
+            shell_r,
+            shell_z,
+            shell_x,
+            color="#93c5fd",
+            linewidth=0.0,
+            antialiased=False,
+            alpha=0.12,
+            shade=False,
+        )
         centerline_y = points[:, 0, 0, 1]
         centerline_z = points[:, 0, 0, 2]
         centerline_x = points[:, 0, 0, 0]
         ax3d.plot(centerline_y, centerline_z, centerline_x, color="#111827", linewidth=2.0)
         ax3d.set_title(f"{case_title}\nMapped pipe O-grid preview")
+        view_elev = 18
+        view_azim = -62
     else:
-        cmap = colors.ListedColormap(["#d1d5db", "#0f766e"])
-        ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, mask_image, shading="auto", cmap=cmap, vmin=0.0, vmax=1.0)
-        ax2d.set_title(f"{case_title}\nCross-section material map")
+        ax2d.set_facecolor("#f8fafc")
+        z0, z1 = float(mesh.z_faces[0]), float(mesh.z_faces[-1])
+        y0, y1 = float(mesh.y_faces[0]), float(mesh.y_faces[-1])
+        for z_face in np.asarray(mesh.z_faces, dtype=float):
+            ax2d.plot([z_face, z_face], [y0, y1], color="#cbd5e1", linewidth=0.55, alpha=0.8, zorder=1)
+        for y_face in np.asarray(mesh.y_faces, dtype=float):
+            ax2d.plot([z0, z1], [y_face, y_face], color="#cbd5e1", linewidth=0.55, alpha=0.8, zorder=1)
+        if np.all(mask_image > 0.5):
+            ax2d.add_patch(
+                Rectangle(
+                    (z0, y0),
+                    z1 - z0,
+                    y1 - y0,
+                    facecolor="#ccfbf1",
+                    edgecolor="#0f766e",
+                    linewidth=1.6,
+                    alpha=0.85,
+                    zorder=0,
+                )
+            )
+            legend_handles = [Patch(facecolor="#ccfbf1", edgecolor="#0f766e", label="Fluid cells")]
+            ax2d.set_title(f"{case_title}\nCross-section mesh")
+        else:
+            region_map = np.where(mask_image > 0.5, 1.0, 0.0)
+            cmap = colors.ListedColormap(["#e5e7eb", "#99f6e4"])
+            ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, region_map, shading="auto", cmap=cmap, vmin=0.0, vmax=1.0, zorder=0)
+            legend_handles = [
+                Patch(facecolor="#99f6e4", edgecolor="none", label="Fluid region"),
+                Patch(facecolor="#e5e7eb", edgecolor="none", label="Wall / exterior cells"),
+            ]
+            ax2d.set_title(f"{case_title}\nCross-section regions")
         ax2d.set_xlabel("z")
         ax2d.set_ylabel("y")
         ax2d.set_aspect("equal")
+        ax2d.legend(handles=legend_handles, loc="upper right")
         x0, x1 = float(mesh.x_faces[0]), float(mesh.x_faces[-1])
-        y0, y1 = float(mesh.y_faces[0]), float(mesh.y_faces[-1])
-        z0, z1 = float(mesh.z_faces[0]), float(mesh.z_faces[-1])
         corners = np.asarray(
             [
                 [x0, y0, z0],
@@ -499,7 +583,32 @@ def _draw_geometry_preview(
                 [corners[start, 2], corners[end, 2]],
                 [corners[start, 0], corners[end, 0]],
                 color="#1d4ed8",
-                linewidth=1.2,
+                linewidth=1.0,
+                alpha=0.65,
+            )
+        x_slices = np.linspace(x0, x1, 5)
+        for slice_index, x_slice in enumerate(x_slices):
+            if np.all(mask_image > 0.5):
+                facecolors = np.zeros(mask_image.shape + (4,), dtype=float)
+                facecolors[..., :] = colors.to_rgba("#14b8a6", alpha=0.24 if slice_index not in (1, 3) else 0.44)
+            else:
+                facecolors = np.zeros(mask_image.shape + (4,), dtype=float)
+                facecolors[mask_image > 0.5, :] = colors.to_rgba(
+                    "#14b8a6", alpha=0.22 if slice_index not in (1, 3) else 0.42
+                )
+                facecolors[mask_image <= 0.5, :] = colors.to_rgba(
+                    "#cbd5e1", alpha=0.10 if slice_index not in (1, 3) else 0.22
+                )
+            ax3d.plot_surface(
+                np.full_like(mask_image, x_slice, dtype=float),
+                np.broadcast_to(np.asarray(mesh.y_centers)[:, None], mask_image.shape),
+                np.broadcast_to(np.asarray(mesh.z_centers)[None, :], mask_image.shape),
+                facecolors=facecolors,
+                rstride=1,
+                cstride=1,
+                shade=False,
+                linewidth=0.0,
+                antialiased=False,
             )
         if np.any(mask_image > 0.5):
             fluid_rows = np.where(np.any(mask_image > 0.5, axis=1))[0]
@@ -526,7 +635,7 @@ def _draw_geometry_preview(
                     [fluid_corners[start, 2], fluid_corners[end, 2]],
                     [fluid_corners[start, 0], fluid_corners[end, 0]],
                     color="#b45309",
-                    linewidth=1.0,
+                    linewidth=1.25,
                     alpha=0.85,
                 )
         ax3d.set_title(f"{case_title}\nExtruded duct preview")
@@ -534,14 +643,17 @@ def _draw_geometry_preview(
     ax3d.set_xlabel("y")
     ax3d.set_ylabel("z")
     ax3d.set_zlabel("x")
-    ax3d.view_init(elev=22, azim=34)
+    ax3d.view_init(elev=view_elev, azim=view_azim)
     ax3d.set_box_aspect(
         (
             float(mesh.y_faces[-1] - mesh.y_faces[0]),
             float(mesh.z_faces[-1] - mesh.z_faces[0]),
-            float(mesh.x_faces[-1] - mesh.x_faces[0]),
+            max(0.75 * float(mesh.x_faces[-1] - mesh.x_faces[0]), 1.2 * float(mesh.y_faces[-1] - mesh.y_faces[0])),
         )
     )
+    ax3d.set_xticks([])
+    ax3d.set_yticks([])
+    ax3d.set_zticks([])
 
 
 def write_extruded_overview_plots(

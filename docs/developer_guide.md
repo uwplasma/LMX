@@ -90,15 +90,19 @@ The repository uses a split CI model:
 
 - fast default CI
   - runs on pushes and pull requests
-  - covers unit and validation tests plus the documentation build
+  - covers unit and validation tests
+- dedicated docs workflow
+  - runs on pushes, pull requests, and manual dispatch
+  - builds the Sphinx site as an independent status surface
 - manual research-artifact workflows
   - run only through GitHub Actions `workflow_dispatch`
   - run the heavier regression and physics suites
   - generate benchmark, validation-artifact, and extended coverage outputs
 
 This separation is intentional. The fast lane protects the `1.0` public
-surface, while the manual lane preserves reproducible research artifacts
-without exhausting routine CI runtime.
+surface, the docs lane keeps the documentation badge honest, and the manual
+lane preserves reproducible research artifacts without exhausting routine CI
+runtime.
 
 ## Test runtime baseline
 

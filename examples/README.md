@@ -31,6 +31,7 @@ python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/a
 python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
 python examples/extruded_paper_figures.py --output ./artifacts/examples/extruded_paper_figures
+python examples/readme_showcase_demo.py --output ./docs/_static/generated
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
@@ -155,6 +156,9 @@ The restart and validation campaign examples extend that same 3D lane:
   - writes reviewer-facing 3D fringing figures for the retained rectangular and
     layered datasets, plus a compact summary panel over velocity, charge
     balance, axial current, and pressure span
+- `readme_showcase_demo.py`
+  - regenerates the retained README media bundle, including the geometry panel
+    and bounded 2D/3D Hunt startup GIFs
 
 Geometry and mesh preview:
 

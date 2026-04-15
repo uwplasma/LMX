@@ -352,6 +352,36 @@ def test_geometry_preview_demo_writes_preview_and_optional_post_outputs(
     assert (tmp_path / "geometry_preview_summary.json").exists()
 
 
+def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("readme_showcase_demo.py")
+
+    monkeypatch.setattr(
+        module,
+        "run_geometry_panel_demo",
+        lambda *, out_dir: {"plots": ["geometry_gallery.png"], "geometries": {"rect_duct": {}}},
+    )
+    monkeypatch.setattr(module, "solve_case_snapshots", lambda *args, **kwargs: [{"time": 0.0, "u": np.ones((2, 2)), "mesh": None}])
+
+    def fake_write_transient_movies(frames, out_dir: Path, *, case_title: str, fps: int, field_mode: str, output_stem: str):
+        outputs = [
+            out_dir / f"{output_stem}_2d.gif",
+            out_dir / f"{output_stem}_3d.gif",
+        ]
+        for path in outputs:
+            path.write_bytes(b"gif")
+        return outputs
+
+    monkeypatch.setattr(module, "write_transient_movies", fake_write_transient_movies)
+    monkeypatch.setattr(module, "run_extruded_paper_figures", lambda **kwargs: {"plots": ["paper_rect_3d.png", "paper_reviewer_summary.png"]})
+
+    summary = module.run_readme_showcase_demo(out_dir=tmp_path, movie_frames=2)
+
+    assert summary["case"] == "readme_showcase_demo"
+    assert (tmp_path / "readme_hunt_startup_2d.gif").exists()
+    assert (tmp_path / "readme_hunt_startup_3d.gif").exists()
+    assert (tmp_path / "readme_showcase_summary.json").exists()
+
+
 def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("fringing_benchmark_demo.py")
 
@@ -592,7 +622,25 @@ def test_solve_case_snapshots_records_fully_developed_frames(monkeypatch: pytest
         u_prev = kwargs["u_previous"]
         updated = np.asarray(u_prev) + 0.1
         zeros = np.zeros_like(updated)
-        return updated, zeros, zeros, zeros, zeros, 1.0e-6, 1.0e-6, 2, 3, 0.2, 0.1, 0.05, float(np.mean(updated)), 0.3
+        return (
+            updated,
+            zeros,
+            zeros,
+            zeros,
+            zeros,
+            1.0e-6,
+            1.0e-6,
+            2,
+            1.0e-6,
+            3,
+            0.2,
+            0.1,
+            0.05,
+            float(np.mean(updated)),
+            0.3,
+            1.0e-4,
+            1.0e-4,
+        )
 
     monkeypatch.setattr(example_runner.solvers, "_fully_developed_case_step", fake_step)
     frames = example_runner.solve_case_snapshots(case, frame_count=3)

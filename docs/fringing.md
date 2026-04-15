@@ -285,6 +285,15 @@ So the current reviewer-proof statement is:
 - mapped pipe still remains qualitative on the external profile-comparison side,
   even though it is now inside the retained internal validation gate
 
+The widened bounded manual campaign at `Ha = 10, 20, 30`, `resolution = 8`
+keeps those three fringing geometries inside the combined conservation and
+fringing-physics gate on the current tree. That same widened campaign also
+shows where the next fully developed hardening work belongs: the Hunt case at
+`Ha = 10`, `resolution = 8` still exceeds the heavier interface-current
+threshold in the manual validation script, so that path remains under active
+solver hardening rather than being promoted silently into the broader retained
+manual gate.
+
 Current retained mapped-pipe hardening signals on the heavier bounded
 dataset:
 

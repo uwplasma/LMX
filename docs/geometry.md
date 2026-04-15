@@ -95,12 +95,14 @@ drivers in:
 - `examples/geometry_preview_demo.py`
 - `examples/variable_field_geometry_demo.py`
 - `examples/geometry_panel_demo.py`
+- `examples/readme_showcase_demo.py`
 
 ```bash
 python examples/geometry_preview_demo.py --output artifacts/examples/geometry_preview
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
 python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
 python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
+python examples/readme_showcase_demo.py --output docs/_static/generated
 ```
 
 Those drivers write:
@@ -109,6 +111,7 @@ Those drivers write:
 - 3D wireframe previews of the extruded mesh
 - publication-style `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
+- retained README-ready media, including bounded 2D/3D startup GIFs
 
 The preview path is intentionally cheap so it can be used as a preprocessing
 step before longer studies.
