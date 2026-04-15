@@ -530,6 +530,49 @@ def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
     assert emf_z[3, 4] == pytest.approx(float(expected))
 
 
+def test_conductive_current_components_keep_wall_currents_for_interface_audits():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=6,
+        nz=6,
+        wall_thickness=(0.1, 0.1, 0.1, 0.1),
+        wall_cells=(1, 1, 1, 1),
+        target_ha=20.0,
+    )
+    case = make_hunt_case(ha=10.0, ny=6, nz=6, wall_cells=1)
+    materials = build_material_fields(case, mesh)
+    phi = jnp.linspace(0.0, 1.0, mesh.ny * mesh.nz, dtype=float).reshape(mesh.yz_shape)
+    u = jnp.ones(mesh.yz_shape) * 0.1
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=0.0)
+
+    jy_all, jz_all = solvers._conductive_current_components(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
+    )
+    jy_masked, jz_masked, _ = solvers._compute_current_and_lorentz(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
+        reconstruction="cell_centered",
+    )
+
+    wall_mask = ~materials.fluid_mask
+    assert float(jnp.max(jnp.abs(jy_all[wall_mask]))) > 0.0
+    assert float(jnp.max(jnp.abs(jz_all[wall_mask]))) > 0.0
+    assert jnp.allclose(jy_masked[wall_mask], 0.0)
+    assert jnp.allclose(jz_masked[wall_mask], 0.0)
+
+
 def test_solve_steady_respects_t_final_when_tolerance_not_reached(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(
@@ -548,6 +591,20 @@ def test_solve_steady_respects_t_final_when_tolerance_not_reached(monkeypatch: p
     assert solution.diagnostics.time_history.shape[0] == 5
     assert float(solution.diagnostics.time_history[-1]) == pytest.approx(0.01)
     assert solution.state.time == pytest.approx(0.01)
+
+
+def test_hunt_low_resolution_manual_interface_gate_is_now_bounded():
+    case = make_hunt_case(ha=10.0, ny=8, nz=8, wall_cells=2)
+    case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, max_steps=12, potential_iterations=48),
+        solver=replace(case.solver, coupling_iterations=8),
+    )
+
+    solution = solve_steady(case)
+
+    assert float(solution.diagnostics.charge_balance_residual_history[-1]) <= 8.0e-1
+    assert float(solution.diagnostics.interface_current_residual_history[-1]) <= 2.5e-1
 
 
 def test_bounded_time_step_count_does_not_round_up_fractional_end_times():

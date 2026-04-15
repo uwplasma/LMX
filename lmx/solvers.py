@@ -402,9 +402,7 @@ def _compute_current_and_lorentz(
         jz = face_jz_centered
         lorentz_x = jy * bz - jz * by
     else:
-        dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
-        jy = sigma * (-dphi_dy - u * bz)
-        jz = sigma * (-dphi_dz + u * by)
+        jy, jz = _conductive_current_components(mesh, sigma, fluid_mask, u, phi, by, bz)
         lorentz_x = jy * bz - jz * by
         if reconstruction == "hybrid_face_lorentz":
             lorentz_x = face_jy_centered * bz - face_jz_centered * by
@@ -430,6 +428,22 @@ def _face_current_components(
     face_jy = _interface_conductance_y(mesh, sigma) * (phi[:-1, :] - phi[1:, :]) + emf_y
     face_jz = _interface_conductance_z(mesh, sigma) * (phi[:, :-1] - phi[:, 1:]) + emf_z
     return face_jy, face_jz, emf_y, emf_z
+
+
+def _conductive_current_components(
+    mesh: StructuredMesh,
+    sigma: jnp.ndarray,
+    fluid_mask: jnp.ndarray,
+    u: jnp.ndarray,
+    phi: jnp.ndarray,
+    by: jnp.ndarray,
+    bz: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
+    fluid_velocity = jnp.where(fluid_mask, u, 0.0)
+    jy = sigma * (-dphi_dy - fluid_velocity * bz)
+    jz = sigma * (-dphi_dz + fluid_velocity * by)
+    return jy, jz
 
 
 def _face_current_emf_and_lorentz_max(
@@ -487,14 +501,16 @@ def _integral_diagnostics(
     conductivity_jump_z = jnp.abs(sigma[:, :-1] - sigma[:, 1:]) > 1e-12
     interface_mask_y = conductivity_jump_y | (fluid_mask[:-1, :] != fluid_mask[1:, :])
     interface_mask_z = conductivity_jump_z | (fluid_mask[:, :-1] != fluid_mask[:, 1:])
+    face_jy_centered = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
+    face_jz_centered = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
     interface_residual_y = jnp.where(
         interface_mask_y,
-        jnp.abs(face_jy - 0.5 * (jy[:-1, :] + jy[1:, :])),
+        jnp.abs(face_jy - 0.5 * (face_jy_centered[:-1, :] + face_jy_centered[1:, :])),
         0.0,
     )
     interface_residual_z = jnp.where(
         interface_mask_z,
-        jnp.abs(face_jz - 0.5 * (jz[:, :-1] + jz[:, 1:])),
+        jnp.abs(face_jz - 0.5 * (face_jz_centered[:, :-1] + face_jz_centered[:, 1:])),
         0.0,
     )
     interface_current_residual = jnp.maximum(

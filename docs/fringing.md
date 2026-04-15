@@ -287,12 +287,11 @@ So the current reviewer-proof statement is:
 
 The widened bounded manual campaign at `Ha = 10, 20, 30`, `resolution = 8`
 keeps those three fringing geometries inside the combined conservation and
-fringing-physics gate on the current tree. That same widened campaign also
-shows where the next fully developed hardening work belongs: the Hunt case at
-`Ha = 10`, `resolution = 8` still exceeds the heavier interface-current
-threshold in the manual validation script, so that path remains under active
-solver hardening rather than being promoted silently into the broader retained
-manual gate.
+fringing-physics gate on the current tree. The same bounded probe now also
+keeps the previously failing fully developed Hunt row inside the heavier
+conservation gate after the interface audit was moved onto the conservative
+face-averaged current reconstruction. On the repaired `Ha = 10`,
+`resolution = 8` Hunt run, `interface_current_residual ≈ 1.27e-2`.
 
 Current retained mapped-pipe hardening signals on the heavier bounded
 dataset:

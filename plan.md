@@ -326,13 +326,15 @@ That retained gate now passes for all three retained fringing geometries.
     regenerated geometry gallery
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
-  inside the fringing conservation/physics gate on the current tree, but it
-  also exposes one remaining fully developed hardening issue:
-  - Hunt at `Ha = 10`, `resolution = 8` still fails the heavier
-    `interface_current_residual <= 2.5e-1` threshold
-  - `Ha = 20, 30` pass that same Hunt threshold on the widened bounded run
-  - so the widened bounded campaign is now an explicit solver-hardening probe,
-    not a release gate, for the fully developed Hunt path
+  inside the fringing conservation/physics gate on the current tree, and the
+  formerly failing fully developed Hunt low-resolution row now passes the same
+  heavier conservation gate after the interface audit was moved onto the
+  conservative face-averaged current reconstruction:
+  - Hunt at `Ha = 10`, `resolution = 8` now reports
+    `interface_current_residual ≈ 1.27e-2`
+  - the old failing value on that same row was `≈ 4.20e-1`
+  - so the widened bounded campaign now acts as a real retained validation
+    probe rather than only a Hunt-hardening alarm
 
 ## Release checklist
 

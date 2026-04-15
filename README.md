@@ -125,9 +125,11 @@ The current retained validation surface includes:
 
 The widened bounded manual campaign is intentionally stricter than the release
 gate. On the current tree it confirms the 3D fringing set at `Ha = 10, 20, 30`
-for `rect_duct`, `layered_duct`, and `pipe_ogrid`, and it also exposes one
-remaining fully developed issue: Hunt at `Ha = 10`, `resolution = 8` still
-fails the heavier interface-current threshold.
+for `rect_duct`, `layered_duct`, and `pipe_ogrid`, and the repaired fully
+developed Hunt low-resolution row now also passes that heavier conservation
+check. On the bounded `Ha = 10`, `resolution = 8` manual run, the Hunt
+interface-current residual is now `≈ 1.27e-2` instead of the old failing
+`≈ 4.20e-1`.
 
 The heavier retained 3D validation campaign is generated with:
 
