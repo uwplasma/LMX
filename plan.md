@@ -39,6 +39,48 @@ Ship a research-grade `1.0` inductionless MHD code with:
    a broader production 3D family.
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
 
+## Finish-line gates
+
+LMX reaches the next research-grade milestone only when the following gates are
+explicitly documented and passing:
+
+### Physics gates
+
+- Benchmark A
+  - Hartmann/Shercliff/Hunt profiles converge under mesh refinement
+  - flow rate, current-density, Lorentz-force, and pressure-proxy trends are
+    stable with respect to resolution and timestep
+  - charge-balance and interface-current residuals stay below configured
+    thresholds on both routine and heavier manual datasets
+- Benchmark B
+  - rectangular, layered, and mapped-pipe fringing cases satisfy the
+    conservation thresholds
+  - throughput variation outside the field-ramp region remains bounded
+  - pressure span rises through the magnetized region and relaxes downstream
+  - field/mean-velocity correlation carries the expected negative sign
+
+### Quality gates
+
+- fast routine test lane under five minutes
+- strict docs build
+- restart continuation equivalence on CLI/TOML and Python workflows
+- stable JSON/CSV/NPZ output schemas
+- figure/movie examples regenerate the committed docs assets
+- branch coverage keeps shrinking in live solver code rather than being hidden
+  behind dead branches
+
+### Validation ladder after the current duct/fringing set
+
+Following the benchmark sequence summarized by Samper et al., the next
+publication-grade additions after the current A/B ladder are:
+
+- quasi-2D turbulent duct validation
+- 3D turbulent magnetic-obstacle or duct validation
+- heat-transfer / buoyant-convection validation
+- closed-pipe fringing validation
+- open-channel / free-surface validation
+- current-driven channel validation
+
 ## Conservation hardening lane
 
 The next research-grade solver work must keep conservation properties explicit,

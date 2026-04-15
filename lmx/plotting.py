@@ -351,7 +351,15 @@ def write_transient_movies(
     anim2d = None
     if include_2d:
         fig2d, ax2d = plt.subplots(figsize=(6.1, 5.2), constrained_layout=True)
-        image = ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, _movie_field(0), shading="auto", cmap=cmap, norm=norm)
+        image = ax2d.imshow(
+            _movie_field(0),
+            extent=[float(mesh.z_faces[0]), float(mesh.z_faces[-1]), float(mesh.y_faces[0]), float(mesh.y_faces[-1])],
+            origin="lower",
+            interpolation="bicubic",
+            cmap=cmap,
+            norm=norm,
+            aspect="equal",
+        )
         ax2d.set_xlabel("z")
         ax2d.set_ylabel("y")
         ax2d.set_title(f"{case_title}\n2D {effective_label.lower()}")
@@ -365,7 +373,7 @@ def write_transient_movies(
 
         def update_2d(index: int):
             field = _movie_field(index)
-            image.set_array(field.ravel())
+            image.set_data(field)
             if contour_state:
                 previous_contour = contour_state.pop()
                 if hasattr(previous_contour, "remove"):
@@ -402,40 +410,107 @@ def write_transient_movies(
     y_centers = mesh.y_centers
     z_centers = mesh.z_centers
     zz, yy = np.meshgrid(np.asarray(z_centers), np.asarray(y_centers))
+    x_extent = max(float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.y_faces[-1] - mesh.y_faces[0]), 1.0)
     fig3d = None
     anim3d = None
     if include_3d:
         fig3d = plt.figure(figsize=(6.8, 5.2), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
+        cmap_obj = plt.get_cmap(cmap)
 
         def update_3d(index: int):
             ax3d.cla()
             field = _movie_field(index)
-            boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
-            boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
-            surface = ax3d.plot_surface(
+            facecolors = cmap_obj(norm(field))
+            x0 = np.zeros_like(yy)
+            x1 = np.full_like(yy, x_extent)
+            inlet = ax3d.plot_surface(
+                x0,
                 zz,
                 yy,
-                field,
-                cmap=cmap,
-                norm=norm,
+                facecolors=facecolors,
+                shade=False,
                 linewidth=0,
-                antialiased=True,
+                antialiased=False,
             )
-            ax3d.plot(boundary_z, boundary_y, np.zeros_like(boundary_y), color="#111827", linewidth=1.2, alpha=0.9)
-            ax3d.set_xlabel("z")
-            ax3d.set_ylabel("y")
-            ax3d.set_zlabel(effective_colorbar_label)
+            outlet = ax3d.plot_surface(
+                x1,
+                zz,
+                yy,
+                facecolors=facecolors,
+                shade=False,
+                linewidth=0,
+                antialiased=False,
+                alpha=0.78,
+            )
+            boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
+            boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
+            for x_plane in (0.0, x_extent):
+                ax3d.plot(
+                    np.full_like(boundary_y, x_plane),
+                    boundary_z,
+                    boundary_y,
+                    color="#111827",
+                    linewidth=1.2,
+                    alpha=0.95,
+                )
+
+            side_x = np.asarray([[0.0, x_extent], [0.0, x_extent]], dtype=float)
+            side_z0 = np.full_like(side_x, float(mesh.z_faces[0]))
+            side_z1 = np.full_like(side_x, float(mesh.z_faces[-1]))
+            side_y0 = np.asarray(
+                [[float(mesh.y_faces[0]), float(mesh.y_faces[0])], [float(mesh.y_faces[-1]), float(mesh.y_faces[-1])]],
+                dtype=float,
+            )
+            side_y1 = np.asarray(
+                [[float(mesh.y_faces[0]), float(mesh.y_faces[0])], [float(mesh.y_faces[-1]), float(mesh.y_faces[-1])]],
+                dtype=float,
+            )
+            bottom_y = np.full_like(side_x, float(mesh.y_faces[0]))
+            top_y = np.full_like(side_x, float(mesh.y_faces[-1]))
+            z_span = np.asarray(
+                [[float(mesh.z_faces[0]), float(mesh.z_faces[-1])], [float(mesh.z_faces[0]), float(mesh.z_faces[-1])]],
+                dtype=float,
+            )
+
+            wall_style = {"color": "#cbd5e1", "alpha": 0.08, "linewidth": 0.0, "shade": False}
+            ax3d.plot_surface(side_x, side_z0, side_y0, **wall_style)
+            ax3d.plot_surface(side_x, side_z1, side_y1, **wall_style)
+            ax3d.plot_surface(side_x, z_span, bottom_y, **wall_style)
+            ax3d.plot_surface(side_x, z_span, top_y, **wall_style)
+
+            ax3d.quiver(
+                0.08 * x_extent,
+                float(mesh.z_faces[0]) - 0.06 * (mesh.z_faces[-1] - mesh.z_faces[0]),
+                float(mesh.y_faces[0]),
+                0.72 * x_extent,
+                0.0,
+                0.0,
+                color="#111827",
+                linewidth=1.6,
+                arrow_length_ratio=0.08,
+            )
+            ax3d.text(
+                0.82 * x_extent,
+                float(mesh.z_faces[0]) - 0.08 * (mesh.z_faces[-1] - mesh.z_faces[0]),
+                float(mesh.y_faces[0]),
+                "flow",
+                color="#111827",
+                fontsize=11,
+            )
+            ax3d.set_xlabel("x")
+            ax3d.set_ylabel("z")
+            ax3d.set_zlabel("y")
             ax3d.set_title(
-                f"{case_title} | 3D {effective_label.lower()}\n"
+                f"{case_title} | extruded duct view\n"
                 f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
             )
-            if use_normalized_positive:
-                ax3d.set_zlim(0.0, 1.05)
-            else:
-                ax3d.set_zlim(-stack_abs_max, stack_abs_max)
-            ax3d.view_init(elev=26, azim=38)
-            return (surface,)
+            ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)
+            ax3d.set_ylim(float(mesh.z_faces[0]) - 0.12 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
+            ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
+            ax3d.view_init(elev=24, azim=-57)
+            ax3d.set_box_aspect((1.45, 1.0, 1.0))
+            return (inlet, outlet)
 
         anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)
         update_3d(len(frames) - 1)

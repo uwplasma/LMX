@@ -71,6 +71,34 @@ python scripts/run_manual_solver_family_validation.py \
 This is the intended post-1.0 release-validation mode for conservation
 hardening.
 
+## Physics gates
+
+The heavier validation lane should only be considered passing when all of the
+following are satisfied on the selected dataset:
+
+- fully developed ducts
+  - Hartmann/Shercliff/Hunt profile errors remain bounded under refinement
+  - flow-rate and forcing/pressure-proxy trends stabilize under refinement
+  - charge-balance and interface-current residuals stay below configured
+    thresholds
+- fringing 3D cases
+  - charge-balance, wall-current leakage, and boundary-current residuals stay
+    below configured thresholds
+  - throughput variation outside the field-ramp region remains bounded
+  - field/mean-velocity correlation has the expected negative sign
+  - pressure span grows through the magnet region and relaxes downstream
+
+## Quality gates
+
+Routine and release validation together should maintain:
+
+- fast lane under five minutes
+- strict docs build
+- deterministic restart continuation on the executable TOML/CLI path
+- stable JSON/CSV/NPZ output schemas
+- example workflows that regenerate the committed docs media and figures
+- branch coverage concentrated away from dead or historical code paths
+
 Current larger dataset:
 
 - `Ha = 10, 20`

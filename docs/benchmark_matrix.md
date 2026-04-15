@@ -48,6 +48,33 @@ ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Dra
   - current-density redistribution
   - Lorentz-force localization
 
+## Validation gates for Benchmarks A and B
+
+The current codebase should be judged against a fixed set of physics and
+quality gates rather than only against visual agreement:
+
+- profile agreement
+  - normalized velocity/potential/profile errors on matched cuts
+- integral agreement
+  - flow rate, pressure-span surrogate, axial-current span, and Lorentz-power
+    trends under mesh refinement
+- conservation
+  - `div J`
+  - charge-balance residual
+  - interface-current residual
+  - wall-current leakage
+  - net boundary-current residual
+- fringing-response physics
+  - throughput constancy outside the field ramp
+  - negative field/mean-velocity correlation through the ramp
+  - pressure growth in the magnetized zone and recovery downstream
+- quality gates
+  - restart continuation equivalence
+  - stable CLI/TOML and Python-driver workflows
+  - machine-readable JSON/CSV outputs
+  - strict docs build
+  - fast routine test lane under five minutes
+
 ## Staged but deferred
 
 - Benchmark C: Q2D turbulent duct flow
