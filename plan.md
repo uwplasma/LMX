@@ -329,12 +329,22 @@ That retained gate now passes for all three retained fringing geometries.
   - the README/docs/examples surface no longer uses the old
     older release-narrative framing
 - The scaling artifact was refreshed onto larger fixed problems:
-  - CPU `2048 x 2048`, `128` iterations, `1/4/8` logical devices
-  - GPU `4096 x 4096`, `128` iterations, `1/2` devices on `office`
+  - CPU `4096 x 4096`, `512` iterations, `1/2/4/8` logical devices
+  - GPU `6144 x 6144`, `512` iterations, `1/2` devices on `office`
   - the figure now labels the ideal linear-speedup dashed line explicitly
+  - measured warm runtimes on the retained artifact are:
+    - CPU: `5.7053 s`, `5.0795 s`, `5.0979 s`, `4.8551 s`
+    - GPU: `1.1841 s`, `0.9032 s`
+  - the CPU line remains modest and bandwidth-limited on this workstation,
+    while the two-GPU path shows the clearer fixed-problem gain
 - The autodiff summary figure now carries direct explanatory callouts for the
   Hartmann-layer sensitivity interpretation and the recovered inverse-design
   parameter value.
+- The README showcase workflow was tightened around bounded regeneration:
+  - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
+    geometry-only refreshes
+  - the shipped Hunt startup GIFs were slowed down and stretched to make the
+    transient easier to read without rerunning an unbounded all-in-one media job
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the
@@ -346,6 +356,12 @@ That retained gate now passes for all three retained fringing geometries.
   - the old failing value on that same row was `≈ 4.20e-1`
   - so the widened bounded campaign now acts as a real retained validation
     probe rather than only a Hunt-hardening alarm
+- A fresh bounded rerun on the tightened README/media tree confirms the same
+  fringing gate on the lighter retained set `Ha = 10, 20`, `resolution = 8`:
+  - `rect_duct`: `validation_pass = 1`, `max_charge_balance_residual ≈ 1.72e-1`
+  - `layered_duct`: `validation_pass = 1`, `max_charge_balance_residual ≈ 1.60e-7`
+  - `pipe_ogrid`: `validation_pass = 1`, `max_charge_balance_residual ≈ 2.18e-1`
+  - all three also keep `field_mean_velocity_correlation ≈ -8.02e-1`
 
 ## Release checklist
 

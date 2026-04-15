@@ -4,6 +4,13 @@ LMX now ships the first executable `extruded_inductionless` solver-family
 front-end together with the retained 3D research slice that the next paper
 phase can build on.
 
+In plain terms, a fringing-field problem is a duct or pipe flow where the
+magnetic field does not stay uniform from inlet to outlet. Instead, the fluid
+enters a magnetized region, passes through the strongest field, and then exits
+again. That spatial field variation drives pressure redistribution, current
+closure, and velocity-profile changes that do not appear in a strictly fully
+developed 2D benchmark.
+
 The intended model distinction is:
 
 - `fully_developed_inductionless`
@@ -18,6 +25,16 @@ That distinction matters physically. The 2D family is the right model for
 fully developed benchmark ducts, while the 3D family is the right model once
 axial field variation, inlet/outlet current closure, or fringing-region
 pressure redistribution become important.
+
+The three shipped fringing geometries are:
+
+- `rect_duct`
+  a plain rectangular liquid-metal channel
+- `layered_duct`
+  the same channel with explicit conducting and insulating wall regions
+- `pipe_ogrid`
+  a circular pipe represented on an O-grid so radial and azimuthal resolution
+  can be controlled separately
 
 The current retained 3D slice includes:
 

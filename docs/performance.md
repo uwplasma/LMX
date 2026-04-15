@@ -76,8 +76,8 @@ ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/
 The current committed scaling artifact is stored under
 `docs/_static/generated/strong_scaling.png` and is generated from:
 
-- a local CPU sweep on a fixed `2048 x 2048` cross-section with `128` Jacobi iterations
-- a remote GPU sweep on a fixed `4096 x 4096` cross-section with the same iteration count
+- a local CPU sweep on a fixed `4096 x 4096` cross-section with `512` Jacobi iterations
+- a remote GPU sweep on a fixed `6144 x 6144` cross-section with the same iteration count
 
 ![LMX strong scaling](_static/generated/strong_scaling.png)
 
@@ -89,19 +89,20 @@ the actual strong-scaling interpretation.
 Observed warm-runtime points from that artifact:
 
 - CPU:
-  - `1` device: `0.2388 s`
-  - `4` devices: `0.1904 s`
-  - `8` devices: `0.2644 s`
+  - `1` device: `5.7053 s`
+  - `2` devices: `5.0795 s`
+  - `4` devices: `5.0979 s`
+  - `8` devices: `4.8551 s`
 - GPU:
-  - `1` GPU: `0.1328 s`
-  - `2` GPUs: `0.0867 s`
+  - `1` GPU: `1.1841 s`
+  - `2` GPUs: `0.9032 s`
 
-The CPU sweep is intentionally reported as measured rather than idealized.
-On this workstation the kernel improves from `1` to `4` logical devices and
-then saturates, so the CPU panel should be read as a practical host baseline
-rather than as a claim of perfect monotone scaling. The remote GPU path shows a
-cleaner two-device speedup on the larger fixed problem, which is the more
-important result for the current LMX research lane.
+The CPU sweep is intentionally reported as measured rather than idealized. On
+this workstation the kernel improves only modestly across `1, 2, 4, 8` logical
+CPU devices, which means the fixed-problem stencil is still dominated by host
+bandwidth and sharding overhead on the CPU path. The remote GPU path shows the
+clearer two-device speedup on the larger fixed problem, which is the more
+important result for the current LMX acceleration lane.
 
 ## Recent compatibility and platform validation
 

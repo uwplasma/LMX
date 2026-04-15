@@ -29,17 +29,20 @@ def _set_plot_style() -> None:
             "savefig.dpi": 300,
             "font.family": "STIXGeneral",
             "mathtext.fontset": "stix",
-            "axes.titlesize": 14,
-            "axes.labelsize": 12,
+            "axes.titlesize": 16,
+            "axes.labelsize": 14,
             "axes.linewidth": 0.9,
             "axes.grid": True,
             "grid.alpha": 0.18,
             "grid.linewidth": 0.5,
             "grid.color": "#4f4f4f",
-            "legend.frameon": False,
-            "legend.fontsize": 10,
-            "xtick.labelsize": 10,
-            "ytick.labelsize": 10,
+            "legend.frameon": True,
+            "legend.framealpha": 0.92,
+            "legend.facecolor": "white",
+            "legend.edgecolor": "#cbd5e1",
+            "legend.fontsize": 12,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
             "lines.linewidth": 2.0,
         }
     )
@@ -234,7 +237,7 @@ def _add_layer_annotations(ax: plt.Axes, mesh: StructuredMesh, fluid_mask: jnp.n
     annotation_style = {
         "bbox": {"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
         "arrowprops": {"arrowstyle": "->", "color": "#111827", "lw": 1.0},
-        "fontsize": 9,
+        "fontsize": 11,
         "color": "#111827",
     }
     ax.annotate(
@@ -306,6 +309,8 @@ def write_transient_movies(
     fps: int = 6,
     field_mode: str = "raw",
     output_stem: str = "hunt_velocity",
+    include_2d: bool = True,
+    include_3d: bool = True,
 ) -> list[Path]:
     if not frames:
         return []
@@ -338,111 +343,124 @@ def write_transient_movies(
             return field / frame_peaks[index]
         return field
 
-    fig2d, ax2d = plt.subplots(figsize=(7, 6), constrained_layout=True)
-    image = ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, _movie_field(0), shading="auto", cmap=cmap, norm=norm)
-    ax2d.set_xlabel("z")
-    ax2d.set_ylabel("y")
     effective_label = f"Normalized {movie_label.lower()}" if use_normalized_positive else movie_label
-    ax2d.set_title(f"{case_title}\n2D {effective_label.lower()}")
-    ax2d.set_aspect("equal")
-    _add_layer_annotations(ax2d, mesh, frames[0].get("fluid_mask"), show_side_layers=show_side_layers)
-    annotation_bbox = {"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "none", "alpha": 0.85}
-    time_text = ax2d.text(0.02, 0.98, "", transform=ax2d.transAxes, ha="left", va="top", bbox=annotation_bbox)
-    peak_text = ax2d.text(0.98, 0.98, "", transform=ax2d.transAxes, ha="right", va="top", bbox=annotation_bbox)
     effective_colorbar_label = f"{colorbar_label} / max|u(t)|" if use_normalized_positive else colorbar_label
-    plt.colorbar(image, ax=ax2d, fraction=0.046, pad=0.04, label=effective_colorbar_label)
-    contour_state: list[object] = []
+    outputs: list[Path] = []
 
-    def update_2d(index: int):
-        field = _movie_field(index)
-        image.set_array(field.ravel())
-        if contour_state:
-            previous_contour = contour_state.pop()
-            if hasattr(previous_contour, "remove"):
-                previous_contour.remove()
-            elif hasattr(previous_contour, "collections"):
-                for collection in previous_contour.collections:
-                    collection.remove()
-        if use_normalized_positive:
-            contour_levels = np.linspace(0.2, 0.95, 4)
-        else:
-            contour_levels = np.linspace(-0.8 * stack_abs_max, 0.8 * stack_abs_max, 5)
-        contour = ax2d.contour(
-            np.asarray(mesh.z_centers),
-            np.asarray(mesh.y_centers),
-            field,
-            levels=contour_levels,
-            colors="white",
-            linewidths=0.55,
-            alpha=0.55,
-        )
-        contour_state.append(contour)
-        time_text.set_text(f"t = {_format_time_with_units(times[index])}")
-        peak_text.set_text(f"max|u| = {frame_peaks[index]:.2e}")
-        return image, time_text, peak_text
+    fig2d = None
+    anim2d = None
+    if include_2d:
+        fig2d, ax2d = plt.subplots(figsize=(6.1, 5.2), constrained_layout=True)
+        image = ax2d.pcolormesh(mesh.z_faces, mesh.y_faces, _movie_field(0), shading="auto", cmap=cmap, norm=norm)
+        ax2d.set_xlabel("z")
+        ax2d.set_ylabel("y")
+        ax2d.set_title(f"{case_title}\n2D {effective_label.lower()}")
+        ax2d.set_aspect("equal")
+        _add_layer_annotations(ax2d, mesh, frames[0].get("fluid_mask"), show_side_layers=show_side_layers)
+        annotation_bbox = {"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "none", "alpha": 0.85}
+        time_text = ax2d.text(0.02, 0.98, "", transform=ax2d.transAxes, ha="left", va="top", bbox=annotation_bbox)
+        peak_text = ax2d.text(0.98, 0.98, "", transform=ax2d.transAxes, ha="right", va="top", bbox=annotation_bbox)
+        plt.colorbar(image, ax=ax2d, fraction=0.046, pad=0.04, label=effective_colorbar_label)
+        contour_state: list[object] = []
 
-    anim2d = animation.FuncAnimation(fig2d, update_2d, frames=len(frames), interval=1000 / fps, blit=False)
-    update_2d(len(frames) - 1)
-    poster_2d = out_dir / f"{output_stem}_2d_poster.png"
-    fig2d.savefig(poster_2d, bbox_inches="tight")
-    poster_2d_pdf = out_dir / f"{output_stem}_2d_poster.pdf"
-    fig2d.savefig(poster_2d_pdf, bbox_inches="tight")
+        def update_2d(index: int):
+            field = _movie_field(index)
+            image.set_array(field.ravel())
+            if contour_state:
+                previous_contour = contour_state.pop()
+                if hasattr(previous_contour, "remove"):
+                    previous_contour.remove()
+                elif hasattr(previous_contour, "collections"):
+                    for collection in previous_contour.collections:
+                        collection.remove()
+            if use_normalized_positive:
+                contour_levels = np.linspace(0.2, 0.95, 4)
+            else:
+                contour_levels = np.linspace(-0.8 * stack_abs_max, 0.8 * stack_abs_max, 5)
+            contour = ax2d.contour(
+                np.asarray(mesh.z_centers),
+                np.asarray(mesh.y_centers),
+                field,
+                levels=contour_levels,
+                colors="white",
+                linewidths=0.55,
+                alpha=0.55,
+            )
+            contour_state.append(contour)
+            time_text.set_text(f"t = {_format_time_with_units(times[index])}")
+            peak_text.set_text(f"max|u| = {frame_peaks[index]:.2e}")
+            return image, time_text, peak_text
+
+        anim2d = animation.FuncAnimation(fig2d, update_2d, frames=len(frames), interval=1000 / fps, blit=False)
+        update_2d(len(frames) - 1)
+        poster_2d = out_dir / f"{output_stem}_2d_poster.png"
+        fig2d.savefig(poster_2d, bbox_inches="tight")
+        poster_2d_pdf = out_dir / f"{output_stem}_2d_poster.pdf"
+        fig2d.savefig(poster_2d_pdf, bbox_inches="tight")
+        outputs.extend([poster_2d, poster_2d_pdf])
 
     y_centers = mesh.y_centers
     z_centers = mesh.z_centers
     zz, yy = np.meshgrid(np.asarray(z_centers), np.asarray(y_centers))
-    fig3d = plt.figure(figsize=(8, 6), constrained_layout=True)
-    ax3d = fig3d.add_subplot(111, projection="3d")
+    fig3d = None
+    anim3d = None
+    if include_3d:
+        fig3d = plt.figure(figsize=(6.8, 5.2), constrained_layout=True)
+        ax3d = fig3d.add_subplot(111, projection="3d")
 
-    def update_3d(index: int):
-        ax3d.cla()
-        field = _movie_field(index)
-        boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
-        boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
-        surface = ax3d.plot_surface(
-            zz,
-            yy,
-            field,
-            cmap=cmap,
-            norm=norm,
-            linewidth=0,
-            antialiased=True,
-        )
-        ax3d.plot(boundary_z, boundary_y, np.zeros_like(boundary_y), color="#111827", linewidth=1.2, alpha=0.9)
-        ax3d.set_xlabel("z")
-        ax3d.set_ylabel("y")
-        ax3d.set_zlabel(effective_colorbar_label)
-        ax3d.set_title(
-            f"{case_title} | 3D {effective_label.lower()}\n"
-            f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
-        )
-        if use_normalized_positive:
-            ax3d.set_zlim(0.0, 1.05)
-        else:
-            ax3d.set_zlim(-stack_abs_max, stack_abs_max)
-        ax3d.view_init(elev=26, azim=38)
-        return (surface,)
+        def update_3d(index: int):
+            ax3d.cla()
+            field = _movie_field(index)
+            boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
+            boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
+            surface = ax3d.plot_surface(
+                zz,
+                yy,
+                field,
+                cmap=cmap,
+                norm=norm,
+                linewidth=0,
+                antialiased=True,
+            )
+            ax3d.plot(boundary_z, boundary_y, np.zeros_like(boundary_y), color="#111827", linewidth=1.2, alpha=0.9)
+            ax3d.set_xlabel("z")
+            ax3d.set_ylabel("y")
+            ax3d.set_zlabel(effective_colorbar_label)
+            ax3d.set_title(
+                f"{case_title} | 3D {effective_label.lower()}\n"
+                f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
+            )
+            if use_normalized_positive:
+                ax3d.set_zlim(0.0, 1.05)
+            else:
+                ax3d.set_zlim(-stack_abs_max, stack_abs_max)
+            ax3d.view_init(elev=26, azim=38)
+            return (surface,)
 
-    anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)
-    update_3d(len(frames) - 1)
-    poster_3d = out_dir / f"{output_stem}_3d_poster.png"
-    fig3d.savefig(poster_3d, bbox_inches="tight")
-    poster_3d_pdf = out_dir / f"{output_stem}_3d_poster.pdf"
-    fig3d.savefig(poster_3d_pdf, bbox_inches="tight")
+        anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)
+        update_3d(len(frames) - 1)
+        poster_3d = out_dir / f"{output_stem}_3d_poster.png"
+        fig3d.savefig(poster_3d, bbox_inches="tight")
+        poster_3d_pdf = out_dir / f"{output_stem}_3d_poster.pdf"
+        fig3d.savefig(poster_3d_pdf, bbox_inches="tight")
+        outputs.extend([poster_3d, poster_3d_pdf])
 
-    outputs: list[Path] = [poster_2d, poster_2d_pdf, poster_3d, poster_3d_pdf]
     for suffix, writer_name in _safe_writer_candidates():
-        writer = animation.writers[writer_name](fps=fps)
-        path2d = out_dir / f"{output_stem}_2d.{suffix}"
-        anim2d.save(path2d, writer=writer, dpi=140)
-        outputs.append(path2d)
-        path3d = out_dir / f"{output_stem}_3d.{suffix}"
-        writer3d = animation.writers[writer_name](fps=fps)
-        anim3d.save(path3d, writer=writer3d, dpi=140)
-        outputs.append(path3d)
+        if include_2d and anim2d is not None:
+            writer = animation.writers[writer_name](fps=fps)
+            path2d = out_dir / f"{output_stem}_2d.{suffix}"
+            anim2d.save(path2d, writer=writer, dpi=72)
+            outputs.append(path2d)
+        if include_3d and anim3d is not None:
+            path3d = out_dir / f"{output_stem}_3d.{suffix}"
+            writer3d = animation.writers[writer_name](fps=fps)
+            anim3d.save(path3d, writer=writer3d, dpi=72)
+            outputs.append(path3d)
 
-    plt.close(fig2d)
-    plt.close(fig3d)
+    if fig2d is not None:
+        plt.close(fig2d)
+    if fig3d is not None:
+        plt.close(fig3d)
     return outputs
 
 
@@ -558,7 +576,7 @@ def _draw_geometry_preview(
             transform=ax2d.transAxes,
             ha="left",
             va="top",
-            fontsize=9,
+            fontsize=11,
             bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
         )
 
@@ -904,7 +922,7 @@ def write_strong_scaling_plots(
         transform=axes[0].transAxes,
         ha="left",
         va="bottom",
-        fontsize=9,
+        fontsize=11,
         bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.9},
     )
 
@@ -939,7 +957,7 @@ def write_autodiff_plots(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.4), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)
 
     ha_values = np.asarray([item["hartmann_number"] for item in sensitivity_scan], dtype=float)
@@ -959,7 +977,7 @@ def write_autodiff_plots(
         transform=axes[0].transAxes,
         ha="left",
         va="bottom",
-        fontsize=9,
+        fontsize=11,
         bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.9},
     )
 
@@ -983,13 +1001,13 @@ def write_autodiff_plots(
             transform=axes[1].transAxes,
             ha="left",
             va="bottom",
-            fontsize=9,
+            fontsize=11,
             bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.9},
         )
 
     lines_left, labels_left = axes[1].get_legend_handles_labels()
     lines_right, labels_right = twin.get_legend_handles_labels()
-    axes[1].legend(lines_left + lines_right, labels_left + labels_right, loc="upper right")
+    axes[1].legend(lines_left + lines_right, labels_left + labels_right, loc="upper left")
 
     png_path = out_dir / "autodiff_summary.png"
     pdf_path = out_dir / "autodiff_summary.pdf"

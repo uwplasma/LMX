@@ -362,11 +362,22 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
     )
     monkeypatch.setattr(module, "solve_case_snapshots", lambda *args, **kwargs: [{"time": 0.0, "u": np.ones((2, 2)), "mesh": None}])
 
-    def fake_write_transient_movies(frames, out_dir: Path, *, case_title: str, fps: int, field_mode: str, output_stem: str):
-        outputs = [
-            out_dir / f"{output_stem}_2d.gif",
-            out_dir / f"{output_stem}_3d.gif",
-        ]
+    def fake_write_transient_movies(
+        frames,
+        out_dir: Path,
+        *,
+        case_title: str,
+        fps: int,
+        field_mode: str,
+        output_stem: str,
+        include_2d: bool = True,
+        include_3d: bool = True,
+    ):
+        outputs = []
+        if include_2d:
+            outputs.append(out_dir / f"{output_stem}_2d.gif")
+        if include_3d:
+            outputs.append(out_dir / f"{output_stem}_3d.gif")
         for path in outputs:
             path.write_bytes(b"gif")
         return outputs

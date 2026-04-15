@@ -111,6 +111,13 @@ The shipped run demonstrates:
 - convergence from forcing `0.2` to `0.999863` for a target forcing of `1.0`
 - final profile misfit `2.9e-12`
 
+The left panel should be read physically, not only numerically: mean
+throughput drops as the Hartmann number rises because the transverse magnetic
+field strengthens the Hartmann layers at the walls normal to `B`, and the
+dashed line is the autodiff sensitivity quantifying that trend. The right panel
+shows the inverse-design path itself: the profile-misfit decays by many orders
+of magnitude while the recovered forcing approaches the synthetic target.
+
 ## Source map
 
 - `lmx/autodiff.py`

@@ -88,6 +88,24 @@ wall layout each solver sees:
 - Hunt flow in a layered duct with conducting Hartmann walls
 - a mapped-pipe O-grid for fringing-field studies
 
+LMX solves liquid-metal duct and pipe flows in imposed magnetic fields. No
+plasma background is needed to read the figures:
+
+- a `rect_duct` is a plain rectangular channel
+- a `layered_duct` adds wall materials around that channel so conducting and
+  insulating walls can be represented explicitly
+- a `pipe_ogrid` is the same idea in a circular pipe with an O-grid mesh
+
+The two most important benchmark ideas in the README are:
+
+- `Hunt` flow:
+  liquid metal in a rectangular duct with conducting Hartmann walls, insulating
+  side walls, and a transverse magnetic field
+- `fringing field`:
+  a magnetic field that changes along the flow direction instead of staying
+  uniform, which makes the problem fully 3D because the fluid accelerates and
+  redistributes as it enters and leaves the magnetized region
+
 ![LMX geometry gallery](docs/_static/generated/geometry_gallery.png)
 
 Those geometries are not shown in isolation in the rest of the README:
@@ -105,6 +123,8 @@ physical units, the fluid domain is outlined explicitly, and the 2D view points
 out the Hartmann layers at the top and bottom walls and the side layers at the
 insulating walls. The sequence is sampled more densely through the transient so
 the approach to steady state is easier to follow than in the earlier short GIFs.
+In this case, the Hartmann layers are the thin boundary layers along the walls
+normal to the magnetic field, where the strongest MHD damping occurs.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">
@@ -120,17 +140,24 @@ velocity, the pressure span, and the charge/current diagnostics in one place,
 which aligns much better with how fringing-field results are usually presented
 in the duct-flow literature.
 
+Here the magnetic field is weak upstream, ramps up inside the magnet region,
+and drops again downstream. That axial field variation is what “fringing” means
+in this context.
+
 ![LMX fringing-field overview](docs/_static/generated/fringing_benchmark_rect.png)
 
 ### Scaling and autodiff
 
 The scaling panel below is the fixed-problem strong-scaling kernel benchmark.
 Solid lines are measured warm runtimes and speedups; the dashed line is ideal
-linear speedup. The current retained figure uses a larger `2048×2048` CPU case
-and a larger `4096×4096` two-GPU case so the GPU panel shows a cleaner speedup
-signal than the old smoke-level plot. The CPU line is still clearly limited by
-host overhead and bandwidth on this stencil-dominated kernel, while the two-GPU
-line shows the stronger parallel gain expected from the larger fixed problem.
+linear speedup. The current retained figure uses a fixed `4096×4096` CPU case
+with `1, 2, 4, 8` logical CPU devices and a larger `6144×6144` GPU case with
+`1` and `2` GPUs. On the measured warm-runtime benchmark, the CPU curve moves
+from about `5.71 s` at one device to `4.86 s` at eight devices, while the GPU
+curve moves from about `1.18 s` on one GPU to `0.90 s` on two GPUs. That is an
+honest result for the current stencil-dominated kernel: the CPU path is
+bandwidth-limited and only weakly benefits from logical-device sharding on this
+workstation, while the two-GPU run shows the clearer fixed-problem gain.
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
 
