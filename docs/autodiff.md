@@ -1,7 +1,7 @@
 # Autodiff and Inverse Design
 
-LMX `1.0` now includes an explicit differentiable duct lane for
-parameter-sensitivity and inverse-design studies. The shipped example focuses on
+LMX includes an explicit differentiable duct lane for
+parameter-sensitivity and inverse-design studies. The default example focuses on
 Hartmann flow because it is fast, well understood, and a clean starting point
 for differentiable benchmark figures.
 
@@ -14,7 +14,7 @@ for differentiable benchmark figures.
 - fringing-history inverse design over axial field-profile parameters
 - fringing multi-observable inverse design over axial mean-velocity and
   current-response histories
-- inverse design against response targets produced directly by the retained
+- inverse design against response targets produced directly by the
   `extruded_inductionless` 3D slice
 - a first direct differentiable rectangular `extruded_inductionless` response
   model used for inverse design against 3D-solver-generated targets
@@ -104,7 +104,7 @@ The current committed autodiff summary is stored under
 
 ![LMX autodiff summary](_static/generated/autodiff_summary.png)
 
-The shipped run demonstrates:
+The run demonstrates:
 
 - a Hartmann-number sensitivity scan of mean velocity and `d(mean velocity)/dHa`
 - inverse recovery of a synthetic forcing parameter at fixed Hartmann number
@@ -146,7 +146,7 @@ These are the standard ingredients for a first differentiable-solver section in
 an MHD code paper: local sensitivities, explicit gradient verification, and a
 small inverse problem.
 
-## Additional shipped workflow
+## Additional workflows
 
 The sensitivity-validation example compares autodiff gradients against central
 finite differences for:
@@ -186,8 +186,8 @@ two. It optimizes the same axial field-shape parameters against:
 This is the current best lightweight stand-in for multi-observable inverse
 design before the full 3D fringing solver family is made differentiable.
 
-The new extruded-target example is the first direct bridge into the retained
-3D slice. It:
+The extruded-target example is the first direct bridge into the 3D solver lane.
+It:
 
 - runs `solve_extruded_inductionless(...)` on a small fringing problem
 - extracts axial mean-velocity, current-weighted pressure proxy,
@@ -202,18 +202,18 @@ That is not yet full reverse-mode differentiation through the complete 3D
 projection loop. It is the intended intermediate step: the inverse-design
 objective is tied directly to `extruded_inductionless`-style 3D response
 histories, while the optimization remains cheap enough for routine tests and
-figures. The retained rectangular differentiable model now also
-uses the same conservative electric source assembly and face-current boundary
-audit as the executable rectangular 3D fringing slice, so its charge/current
-loss terms are closer to the retained solver family than the earlier
+figures. The rectangular differentiable model also uses the same conservative
+electric source assembly and face-current boundary audit as the executable
+rectangular 3D fringing slice, so its charge/current loss terms are closer to
+the solver family than the earlier
 cell-gradient-only version.
 
-Current extruded-target exploratory artifact:
+Extruded-target artifact:
 
 ![LMX extruded-target autodiff summary](_static/generated/autodiff_extruded_target.png)
 
-The new field-level extruded example pushes the objective deeper into the
-retained projection loop. It matches selected-station fields instead of only
+The field-level extruded example pushes the objective deeper into the
+projection loop. It matches selected-station fields instead of only
 station histories:
 
 - `u(x_i, y, z)`
@@ -228,12 +228,12 @@ python examples/autodiff_extruded_field_design_demo.py \
   --output artifacts/examples/autodiff_extruded_field_design
 ```
 
-Current field-level exploratory artifact:
+Field-level artifact:
 
 ![LMX extruded field autodiff summary](_static/generated/autodiff_extruded_field_design.png)
 
-The new projection-trajectory example goes one step deeper still. It matches
-selected-station fields and conservation diagnostics across the retained
+The projection-trajectory example goes one step deeper still. It matches
+selected-station fields and conservation diagnostics across the
 projection iterations themselves:
 
 - `u_k(x_i, y, z)`
@@ -243,21 +243,20 @@ projection iterations themselves:
 - `\max |\nabla \cdot J|_k(x_i)`
 - boundary-current residual history at the sampled stations
 
-Current trajectory-level exploratory artifact:
+Trajectory-level artifact:
 
 ![LMX extruded trajectory autodiff summary](_static/generated/autodiff_extruded_trajectory.png)
 
-`examples/autodiff_extruded_trajectory_demo.py` is now the deepest bounded
-example in the shipped differentiable fringing lane because it matches fields
-and conservation trajectories across the retained projection iterations, not
+`examples/autodiff_extruded_trajectory_demo.py` is the deepest bounded
+example in the differentiable fringing lane because it matches fields
+and conservation trajectories across the projection iterations, not
 just final-state outputs.
 
-These three extruded autodiff figures should currently be read as research-lane
-evidence of loss reduction, not as the same level of locked parameter recovery
-already achieved by the Hartmann analytical examples. The Hartmann sensitivity
-and inverse-design summary above remains the most mature autodiff figure in the
-shipped tree; the extruded-target, field-level, and trajectory-level examples
-are the next differentiable-solver steps and remain explicitly exploratory.
+These three extruded autodiff figures should be read as field- and
+trajectory-matching examples built around the current 3D projection loop. The
+Hartmann sensitivity and inverse-design summary above remains the cleanest
+analytical reference, while the extruded-target, field-level, and
+trajectory-level examples extend the same workflow into 3D fringing problems.
 
 ## References
 

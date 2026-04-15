@@ -31,7 +31,7 @@ automatically to `tomli`.
 
 ## Fastest first run
 
-Run one of the shipped cases:
+Run one of the example cases:
 
 ```bash
 lmx examples/hartmann_case.toml
@@ -80,7 +80,7 @@ JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
 
 ## Use custom geometry and magnetic fields from Python
 
-The shipped `examples/variable_field_geometry_demo.py` shows how to:
+`examples/variable_field_geometry_demo.py` shows how to:
 
 - build a `CaseSpec` directly
 - define a custom `GeometrySpec`

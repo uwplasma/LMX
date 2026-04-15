@@ -6,10 +6,10 @@
 ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-LMX is a JAX-native inductionless MHD code for structured meshes. It ships a
-validated fully developed solver family, a retained 3D `extruded_inductionless`
-fringing-field lane, restartable CLI workflows, strong-scaling tooling, and a
-differentiable workflow for sensitivity analysis and inverse design.
+LMX is a JAX-native inductionless MHD code for structured meshes. It provides
+fully developed duct solvers, a 3D `extruded_inductionless` fringing-field
+solver lane, restartable CLI workflows, strong-scaling tooling, and
+differentiable workflows for sensitivity analysis and inverse design.
 
 ## Why use LMX
 
@@ -81,7 +81,7 @@ python examples/strong_scaling_demo.py --remote-host office --output artifacts/e
 
 ### Geometry and flow states
 
-The top panel shows the three shipped geometry families and the actual mesh or
+The top panel shows the three geometry families and the actual mesh or
 wall layout each solver sees:
 
 - Hartmann flow in a rectangular duct
@@ -117,14 +117,13 @@ Those geometries are not shown in isolation in the rest of the README:
 
 ### 2D and 3D startup movies
 
-These README assets are generated from the retained `examples/readme_showcase_demo.py`
-workflow and show a longer Hunt startup sequence in 2D and 3D. Time is shown in
-physical units, the fluid domain is outlined explicitly, and the 2D view points
-out the Hartmann layers at the top and bottom walls and the side layers at the
-insulating walls. The sequence is sampled more densely through the transient so
-the approach to steady state is easier to follow than in the earlier short GIFs.
-In this case, the Hartmann layers are the thin boundary layers along the walls
-normal to the magnetic field, where the strongest MHD damping occurs.
+These README assets are generated from `examples/readme_showcase_demo.py` and
+show the Hunt startup sequence in 2D and 3D from `t = 0` to `t = 10 ms`. Time
+is shown in physical units, the fluid domain is outlined explicitly, and the
+2D view marks the Hartmann layers at the top and bottom walls and the side
+layers at the insulating side walls. In this case, the Hartmann layers are the
+thin boundary layers along the walls normal to the magnetic field, where the
+strongest MHD damping occurs.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">
@@ -133,12 +132,9 @@ normal to the magnetic field, where the strongest MHD damping occurs.
 
 ### Fringing-field response
 
-For the 3D fringing lane, the most informative shipped figure is the
-cross-section and history overview rather than the older surface-rendered slice.
-It shows the imposed magnetic-field ramp, the response of the streamwise
-velocity, the pressure span, and the charge/current diagnostics in one place,
-which aligns much better with how fringing-field results are usually presented
-in the duct-flow literature.
+The 3D fringing overview shows the imposed magnetic-field ramp, the response of
+the streamwise velocity, the pressure span, and the charge/current diagnostics
+for a rectangular duct in one place.
 
 Here the magnetic field is weak upstream, ramps up inside the magnet region,
 and drops again downstream. That axial field variation is what “fringing” means
@@ -148,32 +144,50 @@ in this context.
 
 ### Scaling and autodiff
 
-The scaling panel below is the fixed-problem strong-scaling kernel benchmark.
-Solid lines are measured warm runtimes and speedups; the dashed line is ideal
-linear speedup. The current retained figure uses a fixed `4096×4096` CPU case
-with `1, 2, 4, 8` logical CPU devices and a larger `6144×6144` GPU case with
-`1` and `2` GPUs. On the measured warm-runtime benchmark, the CPU curve moves
-from about `5.71 s` at one device to `4.86 s` at eight devices, while the GPU
-curve moves from about `1.18 s` on one GPU to `0.90 s` on two GPUs. That is an
-honest result for the current stencil-dominated kernel: the CPU path is
-bandwidth-limited and only weakly benefits from logical-device sharding on this
-workstation, while the two-GPU run shows the clearer fixed-problem gain.
+The scaling panel below is a fixed-problem strong-scaling benchmark for a dense
+structured-grid inductionless MHD operator. Solid lines are measured warm
+runtimes and speedups; the dashed line is ideal linear speedup. The current
+figure uses a `4096×4096` CPU case and an `8192×8192` GPU case, both with
+`256` fixed operator iterations, so the device curves are measured on runs that
+are long enough to reduce startup noise.
+
+Measured warm-runtime points:
+
+- CPU: `16.15 s`, `10.29 s`, `8.96 s`, `8.81 s` at `1, 2, 4, 8`
+- GPU: `1.75 s`, `1.28 s` at `1, 2`
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
 
 The autodiff panel summarizes two things: the mean velocity and its sensitivity
 to Hartmann number on the left, and a simple inverse-design loop recovering the
-forcing on the right. It is meant to show both gradient quality and parameter
-recovery, not only loss decay. The left panel shows the expected decrease in
-throughput as Hartmann layers strengthen, while the right panel shows that the
-optimizer recovers the forcing that generated the target profile within solver
-precision.
+forcing on the right. The left panel shows the expected decrease in throughput
+as Hartmann layers strengthen. The right panel shows the optimizer recovering
+the forcing that generated the target profile while the loss falls by several
+orders of magnitude.
+
+## Meshing
+
+LMX uses structured meshes. The user controls resolution directly through the
+input file or Python case object:
+
+- `ny`, `nz` for rectangular and layered ducts
+- `wall_cells`, `wall_thickness`, and `insulator_cells` when wall materials are
+  modeled explicitly
+- `nx_stations` for the axial resolution of `extruded_inductionless`
+- `nr`, `ntheta`, and `radius` for `pipe_ogrid`
+
+The practical rule is to resolve the thin boundary layers before trusting a
+benchmark or design study. For Hartmann and Hunt problems, increase `ny` and
+`nz` until flow rate, current diagnostics, and interface-current residuals stop
+moving materially. For fringing-field studies, refine both the cross-section and
+the axial stations until pressure span, charge-balance residuals, and
+throughput variation stabilize.
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
 
 ## Validation status
 
-The current retained validation surface includes:
+The current validation surface includes:
 
 - fast CI under a five-minute routine budget
 - strict docs build

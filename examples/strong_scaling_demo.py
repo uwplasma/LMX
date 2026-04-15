@@ -183,8 +183,8 @@ def run_strong_scaling_demo(
     cpu_counts: tuple[int, ...] = (1, 2, 4, 8),
     gpu_counts: tuple[int, ...] = (1, 2),
     cpu_problem: tuple[int, int] = (4096, 4096),
-    gpu_problem: tuple[int, int] = (6144, 6144),
-    iterations: int = 512,
+    gpu_problem: tuple[int, int] = (8192, 8192),
+    iterations: int = 256,
     repeats: int = 3,
     python_executable: str = sys.executable,
     remote_host: str | None = None,
@@ -232,14 +232,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", type=str, default=sys.executable)
     parser.add_argument("--remote-host", type=str, default=None)
     parser.add_argument("--remote-dir", type=str, default="/home/rjorge/tmp/lmx_scaling_repo")
-    parser.add_argument("--iterations", type=int, default=512)
+    parser.add_argument("--iterations", type=int, default=256)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--cpu-counts", type=str, default="1,2,4,8")
     parser.add_argument("--gpu-counts", type=str, default="1,2")
     parser.add_argument("--cpu-ny", type=int, default=4096)
     parser.add_argument("--cpu-nz", type=int, default=4096)
-    parser.add_argument("--gpu-ny", type=int, default=6144)
-    parser.add_argument("--gpu-nz", type=int, default=6144)
+    parser.add_argument("--gpu-ny", type=int, default=8192)
+    parser.add_argument("--gpu-nz", type=int, default=8192)
     args = parser.parse_args(argv)
 
     run_strong_scaling_demo(

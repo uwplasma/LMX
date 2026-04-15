@@ -40,7 +40,7 @@ def _set_plot_style() -> None:
             "legend.framealpha": 0.92,
             "legend.facecolor": "white",
             "legend.edgecolor": "#cbd5e1",
-            "legend.fontsize": 12,
+            "legend.fontsize": 13,
             "xtick.labelsize": 12,
             "ytick.labelsize": 12,
             "lines.linewidth": 2.0,
@@ -109,7 +109,7 @@ def _plot_profile(
     ax.set_xlabel(f"Normalized {axis_name}")
     ax.set_ylabel("Normalized velocity")
     ax.set_xlim(-1.02, 1.02)
-    ax.legend()
+    ax.legend(loc="upper left", bbox_to_anchor=(0.02, 0.98))
 
 
 def write_case_overview_plots(
@@ -174,7 +174,7 @@ def write_case_overview_plots(
         axes[0].set_title("Trace magnitudes")
         axes[0].set_xlabel("time")
         axes[0].set_ylabel("magnitude")
-        axes[0].legend()
+        axes[0].legend(loc="upper left", bbox_to_anchor=(0.02, 0.98))
 
         axes[1].plot(time_history, solution.diagnostics.residual_history, color="#0f766e", label="velocity residual")
         if solution.diagnostics.potential_residual_history.size:
@@ -188,7 +188,7 @@ def write_case_overview_plots(
         axes[1].set_xlabel("time")
         axes[1].set_ylabel("residual")
         axes[1].set_yscale("log")
-        axes[1].legend()
+        axes[1].legend(loc="upper left", bbox_to_anchor=(0.02, 0.98))
 
         diag_png = out_dir / "diagnostics.png"
         diag_pdf = out_dir / "diagnostics.pdf"
@@ -500,7 +500,7 @@ def write_geometry_gallery_plots(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    fig = plt.figure(figsize=(15.5, 8.8), constrained_layout=True)
+    fig = plt.figure(figsize=(14.2, 7.6), constrained_layout=True)
     grid = fig.add_gridspec(2, len(items), height_ratios=(1.0, 1.15))
     fig.suptitle(title, fontsize=18)
 
@@ -825,7 +825,7 @@ def write_extruded_overview_plots(
     axes[0, 0].plot(x, field_scale, color="#1d4ed8", alpha=0.7, label="Field scale")
     axes[0, 0].set_title("Station response")
     axes[0, 0].set_xlabel("x")
-    axes[0, 0].legend()
+    axes[0, 0].legend(loc="upper left", bbox_to_anchor=(0.02, 0.98))
 
     axes[0, 1].semilogy(x, charge_balance, color="#7c3aed", label="Charge balance")
     axes[0, 1].semilogy(x, wall_leakage, color="#dc2626", linestyle="--", label="Wall leakage")
@@ -837,7 +837,7 @@ def write_extruded_overview_plots(
         f"net boundary={validation.net_boundary_current_residual:.2e}"
     )
     axes[0, 1].set_xlabel("x")
-    axes[0, 1].legend()
+    axes[0, 1].legend(loc="upper left", bbox_to_anchor=(0.02, 0.98))
 
     u_station = np.asarray(bundle.u[peak_index], dtype=float)
     phi_station = np.asarray(bundle.phi[peak_index], dtype=float)
@@ -914,7 +914,7 @@ def write_strong_scaling_plots(
     axes[0].set_xscale("log", base=2)
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
-    axes[0].legend()
+    axes[0].legend(loc="upper right", bbox_to_anchor=(0.98, 0.98))
     axes[0].text(
         0.02,
         0.02,
@@ -932,7 +932,7 @@ def write_strong_scaling_plots(
     axes[1].set_xscale("log", base=2)
     axes[1].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[1].get_xaxis().set_major_formatter(ScalarFormatter())
-    axes[1].legend()
+    axes[1].legend(loc="lower right", bbox_to_anchor=(0.98, 0.04))
 
     png_path = out_dir / "strong_scaling.png"
     pdf_path = out_dir / "strong_scaling.pdf"
@@ -969,7 +969,7 @@ def write_autodiff_plots(
     axes[0].set_title("Sensitivity scan")
     axes[0].set_xlabel("Hartmann number")
     axes[0].set_ylabel("Response")
-    axes[0].legend()
+    axes[0].legend(loc="upper right", bbox_to_anchor=(0.98, 0.98))
     axes[0].text(
         0.03,
         0.03,
@@ -1007,7 +1007,13 @@ def write_autodiff_plots(
 
     lines_left, labels_left = axes[1].get_legend_handles_labels()
     lines_right, labels_right = twin.get_legend_handles_labels()
-    axes[1].legend(lines_left + lines_right, labels_left + labels_right, loc="upper left")
+    axes[1].legend(
+        lines_left + lines_right,
+        labels_left + labels_right,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.08),
+        ncol=3,
+    )
 
     png_path = out_dir / "autodiff_summary.png"
     pdf_path = out_dir / "autodiff_summary.pdf"

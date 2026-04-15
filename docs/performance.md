@@ -1,8 +1,8 @@
 # Performance and Scaling
 
-LMX keeps the fully developed duct solver on a JAX-native operator path and now
-ships a dedicated strong-scaling benchmark for the dominant stencil/linear-solve
-kernel. The goal is practical research throughput:
+LMX keeps the fully developed duct solver on a JAX-native operator path and
+includes a dedicated strong-scaling benchmark for a dense structured-grid
+inductionless MHD operator. The goal is practical research throughput:
 
 - keep the routine validation lane under five minutes
 - preserve a differentiable fixed-iteration lane
@@ -10,15 +10,16 @@ kernel. The goal is practical research throughput:
 
 ## What is benchmarked
 
-The shipped strong-scaling workflow benchmarks a fixed-iteration Poisson/Jacobi
-stencil solve on the same global cross-section while increasing the number of
-devices:
+The strong-scaling workflow benchmarks a fixed-iteration coupled operator on
+the same global cross-section while increasing the number of devices:
 
 - local CPU runs use logical CPU devices via `XLA_FLAGS`
 - multi-GPU runs use JAX sharding over the first mesh dimension
 
-This is intended as a kernel-scaling benchmark for the current `1.0` solver
-family. It is not yet a full domain-decomposed 3D fringing-field solver.
+The benchmark applies repeated viscous, electric-potential, and Lorentz-like
+updates on a structured cross-section. It is still a kernel benchmark rather
+than a fully domain-decomposed 3D fringing solver, but it is closer to the
+arithmetic mix of the current solver family than the earlier Jacobi-only path.
 
 ## Run the benchmark
 
@@ -73,15 +74,15 @@ ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/
 
 ## Current artifact
 
-The current committed scaling artifact is stored under
+The current scaling artifact is stored under
 `docs/_static/generated/strong_scaling.png` and is generated from:
 
-- a local CPU sweep on a fixed `4096 x 4096` cross-section with `512` Jacobi iterations
-- a remote GPU sweep on a fixed `6144 x 6144` cross-section with the same iteration count
+- a local CPU sweep on a fixed `4096 x 4096` cross-section with `256` operator iterations
+- a remote GPU sweep on a fixed `8192 x 8192` cross-section with the same iteration count
 
 ![LMX strong scaling](_static/generated/strong_scaling.png)
 
-The QA-tightened figure now shows warm runtime only. First-run compile / JIT
+The figure shows warm runtime only. First-run compile / JIT
 overhead is still stored in the JSON summary, but it is no longer plotted in
 the main scaling figure because it dominated the left panel without helping
 the actual strong-scaling interpretation.
@@ -89,20 +90,19 @@ the actual strong-scaling interpretation.
 Observed warm-runtime points from that artifact:
 
 - CPU:
-  - `1` device: `5.7053 s`
-  - `2` devices: `5.0795 s`
-  - `4` devices: `5.0979 s`
-  - `8` devices: `4.8551 s`
+  - `1` device: `16.1459 s`
+  - `2` devices: `10.2904 s`
+  - `4` devices: `8.9624 s`
+  - `8` devices: `8.8102 s`
 - GPU:
-  - `1` GPU: `1.1841 s`
-  - `2` GPUs: `0.9032 s`
+  - `1` GPU: `1.7494 s`
+  - `2` GPUs: `1.2834 s`
 
-The CPU sweep is intentionally reported as measured rather than idealized. On
-this workstation the kernel improves only modestly across `1, 2, 4, 8` logical
-CPU devices, which means the fixed-problem stencil is still dominated by host
-bandwidth and sharding overhead on the CPU path. The remote GPU path shows the
-clearer two-device speedup on the larger fixed problem, which is the more
-important result for the current LMX acceleration lane.
+The CPU sweep is reported as measured rather than idealized. On this
+workstation, the denser operator gives a materially stronger curve than the old
+Jacobi-only benchmark: the warm runtime drops by about `1.83x` from `1` to `8`
+CPU settings. The remote GPU path shows about `1.36x` speedup from `1` to `2`
+GPUs on the larger fixed problem.
 
 ## Recent compatibility and platform validation
 
@@ -123,8 +123,8 @@ Recent small validation run on `office`:
   - `1` GPU warm runtime: `6.11e-4 s`
   - `2` GPUs warm runtime: `3.91e-3 s`
 
-Those numbers are not the main scaling artifact; they are the current
-post-`1.0` smoke validation that the remote-GPU orchestration still works on a
+Those numbers are not the main scaling artifact; they are a smoke validation
+that the remote-GPU orchestration still works on a
 live two-GPU host.
 
 Recent matched one-device comparison used to confirm the expected CPU/GPU

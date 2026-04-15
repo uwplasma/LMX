@@ -113,12 +113,12 @@ Those drivers write:
 - 3D wireframe previews of the extruded mesh
 - `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
-- retained README-ready media, including bounded 2D/3D startup GIFs
+  - README-ready media, including bounded 2D/3D startup GIFs
 
 The preview path is intentionally cheap so it can be used as a preprocessing
 step before longer studies.
 
-Current shipped geometry panel:
+Current geometry panel:
 
 ![LMX geometry panel](_static/generated/geometry_gallery.png)
 

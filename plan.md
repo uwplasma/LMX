@@ -328,15 +328,16 @@ That retained gate now passes for all three retained fringing geometries.
     annotations
   - the README/docs/examples surface no longer uses the old
     older release-narrative framing
-- The scaling artifact was refreshed onto larger fixed problems:
-  - CPU `4096 x 4096`, `512` iterations, `1/2/4/8` logical devices
-  - GPU `6144 x 6144`, `512` iterations, `1/2` devices on `office`
-  - the figure now labels the ideal linear-speedup dashed line explicitly
-  - measured warm runtimes on the retained artifact are:
-    - CPU: `5.7053 s`, `5.0795 s`, `5.0979 s`, `4.8551 s`
-    - GPU: `1.1841 s`, `0.9032 s`
-  - the CPU line remains modest and bandwidth-limited on this workstation,
-    while the two-GPU path shows the clearer fixed-problem gain
+- The scaling artifact was refreshed onto a denser coupled structured-grid
+  operator benchmark:
+  - CPU `4096 x 4096`, `256` iterations, `1/2/4/8` settings
+  - GPU `8192 x 8192`, `256` iterations, `1/2` GPUs on `office`
+  - the figure labels the ideal linear-speedup dashed line explicitly
+  - measured warm runtimes on the current artifact are:
+    - CPU: `16.1459 s`, `10.2904 s`, `8.9624 s`, `8.8102 s`
+    - GPU: `1.7494 s`, `1.2834 s`
+  - this gives a materially stronger CPU curve than the earlier Jacobi-only
+    benchmark and a clearer two-GPU speedup on the larger GPU problem
 - The autodiff summary figure now carries direct explanatory callouts for the
   Hartmann-layer sensitivity interpretation and the recovered inverse-design
   parameter value.
@@ -361,6 +362,11 @@ That retained gate now passes for all three retained fringing geometries.
   - `rect_duct`: `validation_pass = 1`, `max_charge_balance_residual ≈ 1.72e-1`
   - `layered_duct`: `validation_pass = 1`, `max_charge_balance_residual ≈ 1.60e-7`
   - `pipe_ogrid`: `validation_pass = 1`, `max_charge_balance_residual ≈ 2.18e-1`
+- The benchmark roadmap now also records the next publication-facing additions:
+  - closed-pipe fringing-field validation
+  - free-surface dam-break or sloshing validation
+  - open-channel fringing-field validation
+  - current-driven slotted-channel validation
   - all three also keep `field_mean_velocity_correlation ≈ -8.02e-1`
 
 ## Release checklist

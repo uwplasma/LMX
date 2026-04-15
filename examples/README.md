@@ -105,7 +105,7 @@ python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/a
 python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 ```
 
-The shipped autodiff examples now cover:
+The autodiff examples cover:
 
 - a Hartmann-number sensitivity scan of mean velocity
 - a finite-difference cross-check of autodiff gradients
@@ -119,9 +119,9 @@ The shipped autodiff examples now cover:
   rectangular `extruded_inductionless` response model for the default
   rectangular target workflow
 - field-level inverse design against selected `u`, `phi`, `jy`, and `p`
-  slices from the retained extruded projection loop
+  slices from the extruded projection loop
 - projection-trajectory inverse design against selected-station fields and
-  charge-balance histories from the retained projection iterations
+  charge-balance histories from the projection iterations
 - `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
@@ -129,7 +129,7 @@ Fringing-field scaffold:
 ```bash
 python examples/fringing_benchmark_demo.py --geometry-kind rect_duct --ha-peak 20 --ny 12 --nz 12 --nx-stations 11 --max-steps 18 --coupling-iterations 10 --potential-iterations 60 --output ./artifacts/examples/fringing_benchmark
 python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output ./artifacts/examples/fringing_benchmark_layered
-python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe_exploratory
+python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe
 python examples/extruded_restart_demo.py --geometry-kind layered_duct --output ./artifacts/examples/extruded_restart_demo
 python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
 ```
@@ -138,9 +138,7 @@ That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
 `phi`, current, Lorentz, and charge-balance fields through the explicit
 `solve_extruded_inductionless(...)` entry point. Rectangular ducts, layered
 ducts, and mapped pipes all now use the same public path. The mapped-pipe lane
-is still best treated as exploratory on the larger retained validation set,
-even though the example surface is fully executable and now has a dedicated
-qualitative external-profile comparison script.
+also has a dedicated external-profile comparison script.
 
 The restart and validation campaign examples extend that same 3D lane:
 
@@ -148,17 +146,17 @@ The restart and validation campaign examples extend that same 3D lane:
   - splits a run into base and resumed stages, then compares the resumed result
     against a direct run with the same total step count
 - `extruded_validation_campaign.py`
-  - runs the bounded larger-dataset fringing campaign on the retained
+  - runs the bounded larger-dataset fringing campaign on the
     `rect_duct,layered_duct,pipe_ogrid` conservation-validation set, writes JSON/CSV, and emits a
     figure
 - `autodiff_extruded_trajectory_demo.py`
   - matches selected-station fields and conservation histories across the
-    retained projection iterations themselves, not just the final extruded state
+    projection iterations themselves, not just the final extruded state
 - `extruded_summary_figures.py`
   - writes extra 3D fringing figures and compact summary panels for the
     rectangular and layered datasets
 - `readme_showcase_demo.py`
-  - regenerates the retained README media bundle, including the geometry panel
+  - regenerates the README media bundle, including the geometry panel
     and bounded 2D/3D Hunt startup GIFs
   - supports split refreshes with `--movie-view 2d` or `--movie-view 3d`
     when only one GIF needs to be updated inside the five-minute local budget

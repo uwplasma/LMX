@@ -57,3 +57,27 @@ ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Dra
 - blanket mock-up / coupled-duct effects
 
 These remain part of the research roadmap, but not the `1.0` solver promise.
+
+## Additional benchmark targets for the next publication cycle
+
+The broader validation ladder used in recent inductionless liquid-metal MHD
+solver papers suggests the following next additions after the current duct and
+fringing set:
+
+- closed pipe in a fringing magnetic field
+  - observables:
+    wall potential, pressure redistribution, and distorted axial velocity
+- free-surface dam-break or sloshing benchmark
+  - observables:
+    front position, free-surface shape, and magnetic damping of the transient
+- open-channel fringing-field benchmark
+  - observables:
+    free-surface deformation, recirculation, and current closure near the field
+    ramp
+- current-driven slotted-channel benchmark
+  - observables:
+    wall-current closure, jet structure, and electric-potential redistribution
+
+Those cases extend the current validation ladder in the same direction as the
+existing duct and fringing workflows: from fully developed 2D ducts to 3D
+fringing response, then to free-surface and current-driven configurations.

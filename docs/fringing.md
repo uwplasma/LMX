@@ -1,8 +1,7 @@
-# Fringing-Field Research Slice
+# Fringing-Field Workflows
 
-LMX now ships the first executable `extruded_inductionless` solver-family
-front-end together with the retained 3D research slice that the next paper
-phase can build on.
+LMX includes an executable `extruded_inductionless` solver-family front-end for
+3D fringing-field workflows.
 
 In plain terms, a fringing-field problem is a duct or pipe flow where the
 magnetic field does not stay uniform from inlet to outlet. Instead, the fluid
@@ -26,7 +25,7 @@ fully developed benchmark ducts, while the 3D family is the right model once
 axial field variation, inlet/outlet current closure, or fringing-region
 pressure redistribution become important.
 
-The three shipped fringing geometries are:
+The three fringing geometries are:
 
 - `rect_duct`
   a plain rectangular liquid-metal channel
@@ -36,7 +35,7 @@ The three shipped fringing geometries are:
   a circular pipe represented on an O-grid so radial and azimuthal resolution
   can be controlled separately
 
-The current retained 3D slice includes:
+The current 3D solver lane includes:
 
 - a smooth axial fringing-field profile generator in `lmx/fringing.py`
 - a stationwise sweep driver that reuses the fully developed solver as a cheap
@@ -50,13 +49,10 @@ The current retained 3D slice includes:
 - an explicit validation summary for that extruded slice
 - a detailed example in `examples/fringing_benchmark_demo.py`
 
-This is explicit by design. The current slice is a real 3D
+This is explicit by design. The current lane is a real 3D
 pressure-velocity-potential iteration and is now available through both Python
 and TOML/CLI workflows, including direct `lmx run fringing_*` entry points for
-quick rectangular, layered, and mapped-pipe launches. It is still a research
-slice rather than the final
-production family, but it is now a real executable part of LMX rather than a
-Python-only staging path.
+quick rectangular, layered, and mapped-pipe launches.
 
 ## Run the scaffold
 
@@ -82,7 +78,7 @@ python examples/fringing_benchmark_demo.py \
   --output artifacts/examples/fringing_benchmark_layered
 python examples/fringing_benchmark_demo.py \
   --geometry-kind pipe_ogrid \
-  --output artifacts/examples/fringing_benchmark_pipe_exploratory
+  --output artifacts/examples/fringing_benchmark_pipe
 python examples/extruded_summary_figures.py \
   --output artifacts/examples/extruded_summary_figures
 ```
@@ -99,7 +95,7 @@ The example writes:
   `overview.png`, `overview.pdf`, a station-archive manifest, per-station
   `station_XXXX.npz` field bundles, and a JSON summary with conservation metrics
 
-The shipped input files `examples/fringing_rect_case.toml`,
+The input files `examples/fringing_rect_case.toml`,
 `examples/fringing_layered_case.toml`, and
 `examples/fringing_pipe_case.toml` are now the recommended starting points for
 3D fringing studies. They enable figure writing directly
@@ -110,17 +106,13 @@ The paired restart template is `examples/fringing_layered_restart_case.toml`.
 Use it after a base layered run has written its extruded restart bundle under
 `artifacts/examples/toml_fringing_layered/restart/`.
 
-Current fringing overview artifact:
+Fringing overview artifact:
 
 ![LMX fringing rectangular-duct slice](_static/generated/fringing_benchmark_rect.png)
 
-The mapped-pipe example remains useful for exploratory research and solver
-development, but on the heavier retained validation campaign it is still best
-treated as a qualitative comparison rather than a locked external benchmark.
+Mapped-pipe comparison artifact:
 
-Current exploratory mapped-pipe comparison artifact:
-
-![LMX mapped-pipe exploratory comparison](_static/generated/pipe_reference_comparison.png)
+![LMX mapped-pipe comparison](_static/generated/pipe_reference_comparison.png)
 
 Restart / resume reproducibility artifact:
 
@@ -130,19 +122,13 @@ Larger 3D validation campaign artifact:
 
 ![LMX extruded validation campaign](_static/generated/extruded_validation_campaign.png)
 
-The larger retained campaign is intentionally a resolution study, not a claim
+The larger campaign is intentionally a resolution study, not a claim
 that every coarse layered case is already fully converged. In particular, the
 coarsest layered high-field point remains visibly underresolved, so the figure
 is used to show convergence behavior and screening logic rather than as a final
 reference table.
 
-The heavier exploratory campaign that reintroduces mapped pipes shows that
-`pipe_ogrid` still falls outside the larger retained gate on the current
-post-`1.0` tree. Its charge-balance residual exceeds the retained threshold on
-the heavier `Ha=20` and finer-mesh runs, so the mapped-pipe slice remains a
-research/development lane rather than a locked benchmark comparison.
-
-## Governing equations for the retained 3D slice
+## Governing equations for the 3D solver lane
 
 The current 3D slice is still incompressible and inductionless. It solves
 
@@ -174,8 +160,8 @@ are assembled.
 
 ## Conservation gates
 
-The fringing lane now treats charge conservation as a hard validation target,
-not just a descriptive metric. Each retained extruded bundle now reports:
+The fringing lane treats charge conservation as a hard validation target. Each
+extruded bundle now reports:
 
 - `charge_balance_residual(x)`
   - a stationwise compatibility and `\nabla\cdot J` residual
@@ -197,7 +183,7 @@ $$
 and the extruded validation lane now checks that condition directly instead of
 relying only on local `\nabla\cdot J` norms.
 
-For rectangular and layered extruded cases, the retained audit now assembles
+For rectangular and layered extruded cases, the audit assembles
 that boundary-flux check from conservative face currents with closed-current
 axial boundary treatment. This aligns the reported `div J` and boundary-current
 metrics with the actual discrete operator used in the electric solve instead of
@@ -221,18 +207,18 @@ python examples/extruded_validation_campaign.py \
   --output artifacts/examples/extruded_validation_campaign
 ```
 
-That example runs the hard-gate fringing campaign on a retained larger
+That example runs the hard-gate fringing campaign on a larger
 resolution set, writes JSON/CSV summaries, and produces a compact comparison
 figure.
 
-Its default larger retained conservation dataset is now
+Its default larger conservation dataset is now
 `rect_duct,layered_duct,pipe_ogrid`. The mapped-pipe slice is inside that hard
 gate on the bounded larger dataset, but its external profile comparison is still best
-treated as qualitative because the shipped reference dataset is a high-`Ha`,
-high-`Re` benchmark while the retained LMX pipe slice is still a low-`Re`
-research model.
+treated as qualitative because the reference dataset is a high-`Ha`,
+high-`Re` benchmark while the current LMX pipe slice is still a low-`Re`
+model.
 
-Current retained hard-gate dataset:
+Current hard-gate dataset:
 
 - fully developed Hartmann / Shercliff / Hunt at `Ha = 10, 20`, resolution `10`
 - fringing `rect_duct`, `layered_duct`, and `pipe_ogrid` at the same `Ha`
@@ -246,8 +232,8 @@ Current retained hard-gate dataset:
   - `volumetric_flow_rate_span <= 5e-3`
   - `field_mean_velocity_correlation <= -5e-1`
 
-That retained gate now passes for `rect_duct`, `layered_duct`, and
-`pipe_ogrid`. The layered case joined the retained gate after the multi-region
+That gate now passes for `rect_duct`, `layered_duct`, and
+`pipe_ogrid`. The layered case joined the gate after the multi-region
 electric subproblem was switched to a sparse direct solve of the conservative
 variable-coefficient potential operator, and the mapped-pipe slice joined after
 the cylindrical electric/current operator was rewritten around the conservative
@@ -263,14 +249,14 @@ The last two gates are explicitly physics-facing rather than solver-facing:
   streamwise velocity under constant forcing
 
 On the current bounded larger dataset, those added physics gates now pass for
-all three retained fringing geometries:
+all three fringing geometries:
 
 - `rect_duct` passes
 - `layered_duct` passes after adding a partial stationwise throughput-closure
   step inside the 3D projection loop
 - `pipe_ogrid` passes
 
-Current retained layered hardening signals on that dataset:
+Current layered hardening signals on that dataset:
 
 - `volumetric_flow_rate_span ≈ 1.00e-3` at `Ha=10`
 - `volumetric_flow_rate_span ≈ 2.75e-3` at `Ha=20`
@@ -279,12 +265,11 @@ Current retained layered hardening signals on that dataset:
 
 So the current bounded-validation statement is:
 
-- the retained conservation gate covers `rect_duct`, `layered_duct`, and
+- the conservation gate covers `rect_duct`, `layered_duct`, and
   `pipe_ogrid`
-- the stricter fringing physics gate now also covers `rect_duct`,
+- the stricter fringing physics gate also covers `rect_duct`,
   `layered_duct`, and `pipe_ogrid`
-- mapped pipe still remains qualitative on the external profile-comparison side,
-  even though it is now inside the retained internal validation gate
+- mapped-pipe external profile comparison is still treated as qualitative
 
 The widened bounded manual campaign at `Ha = 10, 20, 30`, `resolution = 8`
 keeps those three fringing geometries inside the combined conservation and
@@ -294,7 +279,7 @@ conservation gate after the interface audit was moved onto the conservative
 face-averaged current reconstruction. On the repaired `Ha = 10`,
 `resolution = 8` Hunt run, `interface_current_residual ≈ 1.27e-2`.
 
-Current retained mapped-pipe hardening signals on the heavier bounded
+Current mapped-pipe hardening signals on the heavier bounded
 dataset:
 
 - `max_charge_balance_residual ≈ 5.63e-2` at `Ha=10`, `resolution=8`
@@ -304,7 +289,7 @@ dataset:
 - `max_wall_current_leakage = 0`
 - `net_boundary_current_residual = 0`
 
-The shipped qualitative comparison against the external high-`Ha`, high-`Re`
+The current qualitative comparison against the external high-`Ha`, high-`Re`
 fringing-pipe profile data gives:
 
 - center line normalized axial-velocity shape error: `≈ 1.66e-1`
@@ -312,7 +297,7 @@ fringing-pipe profile data gives:
 - positive-offset absolute line error: `≈ 9.89e-1`
 
 So the current conclusion is still deliberately conservative: mapped
-pipe is now part of the retained conservation/solver-validation set, but the
+pipe is part of the conservation/solver-validation set, but the
 current external pipe-profile comparison remains qualitative rather than a
 strict parity gate.
 
@@ -328,18 +313,18 @@ strict parity gate.
 - contour views of the stacked velocity bundle in `x-y` and `x-z`
 - the stationwise axial current together with charge-balance residuals, which
   are the key current-closure diagnostics for inlet/outlet hardening
-- a first true 3D pressure field `p(x, y, z)` inside the research slice
+- a first true 3D pressure field `p(x, y, z)`
 - layered conducting/insulating wall fringing responses through the same API
 - the first mapped-pipe fringing slice through the same public API
 
-## QA note on the retained figures
+## QA note on the figures
 
 During the media QA pass, the fringing figures were tightened to avoid
 misleading observables. In a constant-forcing incompressible slice, the
 cross-sectional mean flow can remain nearly unchanged even when the velocity
 profile redistributes strongly. The literature instead emphasizes profile
 deformation, pressure losses, and axial-current closure in non-uniform fields.
-That is why the retained figures now highlight peak axial velocity, pressure
+That is why the figures now highlight peak axial velocity, pressure
 span, and axial-current/conservation metrics rather than the earlier
 mean-velocity correlation view.
 

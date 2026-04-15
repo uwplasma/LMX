@@ -384,7 +384,7 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
 
     monkeypatch.setattr(module, "write_transient_movies", fake_write_transient_movies)
 
-    summary = module.run_readme_showcase_demo(out_dir=tmp_path, movie_frames=2)
+    summary = module.run_readme_showcase_demo(out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5)
 
     assert summary["case"] == "readme_showcase_demo"
     assert (tmp_path / "readme_hunt_startup_2d.gif").exists()
