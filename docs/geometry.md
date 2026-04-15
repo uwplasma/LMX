@@ -109,7 +109,7 @@ Those drivers write:
 
 - cross-sectional material maps
 - 3D wireframe previews of the extruded mesh
-- publication-style `PNG` and `PDF` outputs
+- `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
 - retained README-ready media, including bounded 2D/3D startup GIFs
 

@@ -76,7 +76,7 @@ The shipped `examples/variable_field_geometry_demo.py` shows how to:
 - define a custom `GeometrySpec`
 - attach an analytic magnetic field callback through `MagneticFieldSpec(kind="analytic", fn=...)`
 - preview the geometry before solving
-- run the solver and write publication-style plots
+- run the solver and write plots
 
 Run it with:
 
@@ -93,7 +93,7 @@ A standard run can produce:
 - restartable `.npz` state bundles
 - VTK files for ParaView
 - CSV profiles
-- publication-style `PNG` / `PDF` plots
+- `PNG` / `PDF` plots
 
 The precise output selection is controlled by `[output]` in the TOML input or
 the corresponding `OutputSpec` in Python.

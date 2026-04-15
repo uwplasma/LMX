@@ -34,7 +34,7 @@ Ship a research-grade `1.0` inductionless MHD code with:
 
 1. Keep hardening the default fully developed solver family in the manual
    release-validation lane.
-2. Expand benchmark and physics depth for publication datasets.
+2. Expand benchmark and physics depth for larger comparison datasets.
 3. Harden and extend the first true `extruded_inductionless` solver slice into
    a broader production 3D family.
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
@@ -123,18 +123,17 @@ That retained gate now passes for all three retained fringing geometries.
 - the differentiable lane now includes field-level inverse design over
   selected extruded `u`, `phi`, `J_y`, and `p` slices
 - the heavier manual validation lane now has a larger bounded 3D campaign with
-  JSON/CSV outputs and publication-style figures
+  JSON/CSV outputs and retained summary figures
   the release gate uses short-budget generated TOMLs rather than full
   long-horizon example runs so the interface is verified without violating the
   five-minute rule.
 - CPU and GPU strong-scaling artifacts now exist for the dominant stencil kernel,
-  with a committed publication figure under `docs/_static/generated/strong_scaling.png`.
-- The differentiable Hartmann example now has a committed publication figure under
+  with a committed summary figure under `docs/_static/generated/strong_scaling.png`.
+- The differentiable Hartmann example now has a committed summary figure under
   `docs/_static/generated/autodiff_summary.png`, showing both Hartmann-number
   sensitivity and inverse recovery of a forcing parameter.
 - A second autodiff example now validates Hartmann and forcing sensitivities
-  against finite differences for a publication-friendly derivative-verification
-  figure.
+  against finite differences for a compact derivative-verification figure.
 - A third autodiff example now performs full-profile inverse design over both
   forcing and Hartmann number, broadening the differentiable lane from scalar
   matching to small field-level inverse problems.
@@ -163,7 +162,7 @@ That retained gate now passes for all three retained fringing geometries.
 - The executable surface now also includes direct `lmx run fringing_rect`,
   `lmx run fringing_pipe`, and `lmx run fringing_layered` shortcuts for quick
   3D/fringing launches without authoring TOML first.
-- The publication-scale 3D input-file workflow now writes station-history CSV,
+- The 3D input-file workflow now writes station-history CSV,
   NPZ bundles, JSON summaries, copied TOMLs, and overview/conservation plots
   directly from `lmx input.toml`.
 - The `extruded_inductionless` output tree now also writes a richer archive
@@ -240,7 +239,7 @@ That retained gate now passes for all three retained fringing geometries.
   be rerun without polluting the fast ship gate.
 - The retained hard-gate dataset now passes for fully developed Hartmann /
   Shercliff / Hunt plus fringing `rect_duct` and `layered_duct`.
-- The publication QA pass tightened several post-`1.0` figures:
+- The media QA pass tightened several post-`1.0` figures:
   - the strong-scaling artifact now plots warm runtime only
   - the extruded restart figure now compares split-and-resumed solves against a
     direct solve with the same total step count
@@ -249,10 +248,10 @@ That retained gate now passes for all three retained fringing geometries.
     metrics instead of the weaker mean-velocity-correlation view
   - the mapped-pipe slice is fully executable, but the heavier bounded
     validation and external-profile comparison both keep it outside the
-    retained publication campaign for now
-- A dedicated reviewer-facing paper-figure workflow now ships in
-  `examples/extruded_paper_figures.py`, with committed 3D retained rectangular
-  and layered fringing figures plus a compact reviewer summary panel under
+    retained larger comparison campaign for now
+- A dedicated fringing-figure workflow now ships in
+  `examples/extruded_summary_figures.py`, with committed 3D retained rectangular
+  and layered fringing figures plus a compact summary panel under
   `docs/_static/generated/`.
 - The autodiff lane now reaches deeper into the retained extruded projection
   loop itself through a trajectory-level objective that matches selected-station
@@ -263,7 +262,7 @@ That retained gate now passes for all three retained fringing geometries.
   rewritten around conservative face fluxes and a stable O-grid time-step
   estimate. The retained conservation-validation set is now
   `rect_duct,layered_duct,pipe_ogrid`.
-- A new reviewer-facing geometry panel now ships all three current geometries
+- A new geometry panel now ships all three current geometries
   in a single figure, and a dedicated exploratory mapped-pipe comparison script
   now writes a bounded qualitative comparison against the shipped external
   fringing-pipe profiles.
@@ -322,8 +321,20 @@ That retained gate now passes for all three retained fringing geometries.
   - the repo now carries an MIT license and MIT package metadata
   - docs build status has its own dedicated GitHub Actions workflow and badge
   - the README now acts as a short landing page rather than a long changelog
-  - retained README media now includes bounded 2D/3D startup GIFs and a
-    regenerated geometry gallery
+  - the geometry gallery now uses a denser `2 x 3` layout with clearer legends
+    and more informative mapped-pipe previews
+  - the README startup media is being kept on a bounded longer-timestep Hunt
+    sequence with unit-bearing timestamps and explicit Hartmann/side-layer
+    annotations
+  - the README/docs/examples surface no longer uses the old
+    older release-narrative framing
+- The scaling artifact was refreshed onto larger fixed problems:
+  - CPU `2048 x 2048`, `128` iterations, `1/4/8` logical devices
+  - GPU `4096 x 4096`, `128` iterations, `1/2` devices on `office`
+  - the figure now labels the ideal linear-speedup dashed line explicitly
+- The autodiff summary figure now carries direct explanatory callouts for the
+  Hartmann-layer sensitivity interpretation and the recovered inverse-design
+  parameter value.
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the

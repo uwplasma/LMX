@@ -30,7 +30,7 @@ python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples
 python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
 python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
-python examples/extruded_paper_figures.py --output ./artifacts/examples/extruded_paper_figures
+python examples/extruded_summary_figures.py --output ./artifacts/examples/extruded_summary_figures
 python examples/readme_showcase_demo.py --output ./docs/_static/generated
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
 python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_restart_demo
@@ -65,7 +65,7 @@ The example TOML files expose both `verbose = true|false` and
 block, so they double as templates for both batch and interactive runs.
 The fringing TOML files now also enable `write_plots = true`, so a plain
 `lmx input.toml` run produces the station-history CSV, NPZ bundle, JSON
-summary, and publication-style overview plots without any Python wrapper.
+summary, and overview plots without any Python wrapper.
 
 ## Replot saved NPZ outputs
 
@@ -73,7 +73,7 @@ summary, and publication-style overview plots without any Python wrapper.
 python examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
 ```
 
-## Publication-facing demos
+## Larger-study demos
 
 Strong scaling:
 
@@ -120,7 +120,7 @@ The shipped autodiff examples now cover:
   slices from the retained extruded projection loop
 - projection-trajectory inverse design against selected-station fields and
   charge-balance histories from the retained projection iterations
-- publication-style `PNG`/`PDF` summary figures
+- `PNG`/`PDF` summary figures
 
 Fringing-field scaffold:
 
@@ -147,15 +147,14 @@ The restart and validation campaign examples extend that same 3D lane:
     against a direct run with the same total step count
 - `extruded_validation_campaign.py`
   - runs the bounded larger-dataset fringing campaign on the retained
-    `rect_duct,layered_duct,pipe_ogrid` conservation-validation set, writes JSON/CSV, and emits a publication-style
+    `rect_duct,layered_duct,pipe_ogrid` conservation-validation set, writes JSON/CSV, and emits a
     figure
 - `autodiff_extruded_trajectory_demo.py`
   - matches selected-station fields and conservation histories across the
     retained projection iterations themselves, not just the final extruded state
-- `extruded_paper_figures.py`
-  - writes reviewer-facing 3D fringing figures for the retained rectangular and
-    layered datasets, plus a compact summary panel over velocity, charge
-    balance, axial current, and pressure span
+- `extruded_summary_figures.py`
+  - writes extra 3D fringing figures and compact summary panels for the
+    rectangular and layered datasets
 - `readme_showcase_demo.py`
   - regenerates the retained README media bundle, including the geometry panel
     and bounded 2D/3D Hunt startup GIFs

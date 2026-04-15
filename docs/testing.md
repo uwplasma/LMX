@@ -49,7 +49,7 @@ python scripts/run_manual_solver_family_validation.py \
 That command keeps the fast lane clean while still exercising the heavier
 Hartmann / Shercliff / Hunt acceptance path together with the bounded
 fringing slices. With `--write-csv` and `--write-plot`, the same run produces
-a machine-readable campaign table and a publication-style convergence figure
+a machine-readable campaign table and a convergence figure
 for the fringing conservation metrics.
 
 The manual lane can also enforce conservation thresholds directly:

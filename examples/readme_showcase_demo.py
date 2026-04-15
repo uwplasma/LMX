@@ -15,15 +15,14 @@ if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
 from geometry_panel_demo import run_geometry_panel_demo
-from extruded_paper_figures import run_extruded_paper_figures
 
 
 def run_readme_showcase_demo(
     *,
     out_dir: Path,
     movie_ha: float = 20.0,
-    movie_resolution: int = 18,
-    movie_frames: int = 8,
+    movie_resolution: int = 16,
+    movie_frames: int = 16,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -34,9 +33,9 @@ def run_readme_showcase_demo(
         movie_case,
         time_stepper=replace(
             movie_case.time_stepper,
-            dt=1.0e-3,
-            t_final=1.0e-1,
-            max_steps=12,
+            dt=7.5e-4,
+            t_final=6.0e-2,
+            max_steps=60,
             potential_iterations=80,
         ),
     )
@@ -50,19 +49,10 @@ def run_readme_showcase_demo(
         output_stem="readme_hunt_startup",
     )
 
-    paper_summary = run_extruded_paper_figures(
-        out_dir=out_dir,
-        ha_peak=20.0,
-        ny=10,
-        nz=10,
-        nx_stations=7,
-    )
-
     summary = {
         "case": "readme_showcase_demo",
         "geometry": geometry_summary,
         "movie_outputs": [path.name for path in movie_outputs],
-        "paper_figures": paper_summary["plots"],
     }
     (out_dir / "readme_showcase_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary
@@ -72,8 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate the retained README showcase media bundle.")
     parser.add_argument("--output", type=Path, default=Path("docs/_static/generated"))
     parser.add_argument("--movie-ha", type=float, default=20.0)
-    parser.add_argument("--movie-resolution", type=int, default=18)
-    parser.add_argument("--movie-frames", type=int, default=8)
+    parser.add_argument("--movie-resolution", type=int, default=16)
+    parser.add_argument("--movie-frames", type=int, default=16)
     args = parser.parse_args(argv)
     run_readme_showcase_demo(
         out_dir=args.output,

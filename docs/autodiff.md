@@ -3,7 +3,7 @@
 LMX `1.0` now includes an explicit differentiable duct lane for
 parameter-sensitivity and inverse-design studies. The shipped example focuses on
 Hartmann flow because it is fast, well understood, and a clean starting point
-for publication figures.
+for differentiable benchmark figures.
 
 ## What is included
 
@@ -20,7 +20,7 @@ for publication figures.
   model used for inverse design against 3D-solver-generated targets
 - a field-level inverse-design workflow over selected extruded `u`, `\phi`,
   `J_y`, and `p` slices
-- publication-style summary plots and JSON outputs
+- summary plots and JSON outputs
 
 The differentiable lane is intentionally explicit:
 
@@ -97,9 +97,9 @@ That workflow writes:
 - `autodiff_fringing_design.png`
 - `autodiff_fringing_design.pdf`
 
-## Publication artifact
+## Current artifact
 
-The current `1.0` publication artifact is committed under
+The current committed autodiff summary is stored under
 `docs/_static/generated/autodiff_summary.png`.
 
 ![LMX autodiff summary](_static/generated/autodiff_summary.png)
@@ -127,7 +127,7 @@ The shipped run demonstrates:
 - `lmx/plotting.py`
   - polished sensitivity/inverse summary figure
 
-## Typical publication figures
+## Typical summary figures
 
 The default example produces two common autodiff figures:
 
@@ -147,7 +147,7 @@ finite differences for:
 - `d(mean velocity)/dHa`
 - `d(mean velocity)/dF`
 
-This is the fast, publication-friendly gradient-verification figure that should
+This is the fast gradient-verification figure that should
 accompany broader inverse-design claims.
 
 The profile-design example broadens the differentiable lane from scalar
@@ -195,7 +195,7 @@ That is not yet full reverse-mode differentiation through the complete 3D
 projection loop. It is the intended intermediate step: the inverse-design
 objective is tied directly to `extruded_inductionless`-style 3D response
 histories, while the optimization remains cheap enough for routine tests and
-publication figures. The retained rectangular differentiable model now also
+figures. The retained rectangular differentiable model now also
 uses the same conservative electric source assembly and face-current boundary
 audit as the executable rectangular 3D fringing slice, so its charge/current
 loss terms are closer to the retained solver family than the earlier
@@ -246,12 +246,11 @@ and conservation trajectories across the retained projection iterations, not
 just final-state outputs.
 
 These three extruded autodiff figures should currently be read as research-lane
-evidence of loss reduction, not as the same level of publication-locked
-parameter recovery already achieved by the Hartmann analytical examples. The
-current retained publication autodiff figure remains the Hartmann sensitivity
-and inverse-design summary above; the extruded-target, field-level, and
-trajectory-level examples are the next differentiable-solver steps and remain
-explicitly exploratory.
+evidence of loss reduction, not as the same level of locked parameter recovery
+already achieved by the Hartmann analytical examples. The Hartmann sensitivity
+and inverse-design summary above remains the most mature autodiff figure in the
+shipped tree; the extruded-target, field-level, and trajectory-level examples
+are the next differentiable-solver steps and remain explicitly exploratory.
 
 ## References
 

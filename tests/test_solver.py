@@ -630,6 +630,26 @@ def test_build_mesh_and_mask_helpers_cover_unsupported_and_passthrough_paths():
     assert jnp.array_equal(solvers._active_velocity_mask_for_solver(fluid_mask, "other"), fluid_mask)
 
 
+def test_fully_developed_solver_rejects_pipe_geometry():
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    bad_case = replace(
+        case,
+        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
+    )
+    with pytest.raises(NotImplementedError, match="not supported by the laminar solver"):
+        solvers._solve_fully_developed(bad_case)
+
+
+def test_solve_steady_and_transient_reject_unknown_solver_kind():
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    bad_case = replace(case, solver=replace(case.solver, kind="extruded_inductionless"))
+
+    with pytest.raises(NotImplementedError, match="not implemented for steady runs"):
+        solve_steady(bad_case)
+    with pytest.raises(NotImplementedError, match="not implemented for transient runs"):
+        solve_transient(bad_case)
+
+
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = replace(case, time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4))

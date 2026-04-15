@@ -11,7 +11,7 @@ from lmx.example_runner import run_case_example_cli
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a Shercliff example and generate publication-ready plots.")
+    parser = argparse.ArgumentParser(description="Run a Shercliff example and generate summary plots.")
     parser.add_argument("--ha", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=64)
     parser.add_argument("--nz", type=int, default=64)

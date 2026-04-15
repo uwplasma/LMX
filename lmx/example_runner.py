@@ -121,6 +121,7 @@ def solve_case_snapshots(
             frames.append(
                 {
                     "time": step_time,
+                    "case": case,
                     "u": u,
                     "phi": phi,
                     "jy": jy,

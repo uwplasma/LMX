@@ -48,7 +48,7 @@ def run_geometry_panel_demo(*, out_dir: Path) -> dict[str, object]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write a polished panel with all shipped LMX geometries.")
+    parser = argparse.ArgumentParser(description="Write a compact panel with all shipped LMX geometries.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/geometry_panel"))
     args = parser.parse_args(argv)
     run_geometry_panel_demo(out_dir=args.output)

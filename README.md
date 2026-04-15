@@ -18,7 +18,7 @@ differentiable workflow for sensitivity analysis and inverse design.
 - JAX-based CPU and GPU execution
 - Explicit conservation diagnostics for charge closure and boundary-current audits
 - Input-file and Python-driver workflows
-- Publication-oriented plots, movies, and validation reports
+- Built-in plots, movies, and validation reports
 - Autodiff examples for inverse design and sensitivity analysis
 
 ## Installation
@@ -70,7 +70,7 @@ CUDA_VISIBLE_DEVICES=0 JAX_PLATFORMS=cuda lmx examples/hunt_case.toml
 XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
 ```
 
-For publication-style scaling studies, use:
+For larger scaling studies, use:
 
 ```bash
 python examples/strong_scaling_demo.py --output artifacts/examples/strong_scaling_cpu
@@ -79,36 +79,68 @@ python examples/strong_scaling_demo.py --remote-host office --output artifacts/e
 
 ## Showcase
 
-### Geometries
+### Geometry and flow states
 
-LMX currently ships rectangular ducts, layered ducts, and mapped pipe O-grids.
+The top panel shows the three shipped geometry families and the actual mesh or
+wall layout each solver sees:
+
+- Hartmann flow in a rectangular duct
+- Hunt flow in a layered duct with conducting Hartmann walls
+- a mapped-pipe O-grid for fringing-field studies
 
 ![LMX geometry gallery](docs/_static/generated/geometry_gallery.png)
+
+Those geometries are not shown in isolation in the rest of the README:
+
+- the startup GIFs below use the layered Hunt geometry
+- the fringing overview below uses the rectangular extruded 3D geometry
+- the mapped-pipe workflow is exercised through the fringing CLI/TOML and the
+  pipe comparison example in `examples/pipe_reference_comparison_demo.py`
 
 ### 2D and 3D startup movies
 
 These README assets are generated from the retained `examples/readme_showcase_demo.py`
-workflow and show a short Hunt startup sequence in 2D and 3D.
+workflow and show a longer Hunt startup sequence in 2D and 3D. Time is shown in
+physical units, the fluid domain is outlined explicitly, and the 2D view points
+out the Hartmann layers at the top and bottom walls and the side layers at the
+insulating walls. The sequence is sampled more densely through the transient so
+the approach to steady state is easier to follow than in the earlier short GIFs.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">
   <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D startup movie" width="48%">
 </p>
 
-### 3D fringing-field figures
+### Fringing-field response
 
-The retained publication set currently includes rectangular and layered 3D
-fringing figures. The mapped-pipe lane is validated on conservation metrics and
-kept qualitative on external profile comparison.
+For the 3D fringing lane, the most informative shipped figure is the
+cross-section and history overview rather than the older surface-rendered slice.
+It shows the imposed magnetic-field ramp, the response of the streamwise
+velocity, the pressure span, and the charge/current diagnostics in one place,
+which aligns much better with how fringing-field results are usually presented
+in the duct-flow literature.
 
-<p align="center">
-  <img src="docs/_static/generated/paper_rect_3d.png" alt="LMX rectangular 3D fringing figure" width="48%">
-  <img src="docs/_static/generated/paper_layered_3d.png" alt="LMX layered 3D fringing figure" width="48%">
-</p>
+![LMX fringing-field overview](docs/_static/generated/fringing_benchmark_rect.png)
 
 ### Scaling and autodiff
 
+The scaling panel below is the fixed-problem strong-scaling kernel benchmark.
+Solid lines are measured warm runtimes and speedups; the dashed line is ideal
+linear speedup. The current retained figure uses a larger `2048×2048` CPU case
+and a larger `4096×4096` two-GPU case so the GPU panel shows a cleaner speedup
+signal than the old smoke-level plot. The CPU line is still clearly limited by
+host overhead and bandwidth on this stencil-dominated kernel, while the two-GPU
+line shows the stronger parallel gain expected from the larger fixed problem.
+
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
+
+The autodiff panel summarizes two things: the mean velocity and its sensitivity
+to Hartmann number on the left, and a simple inverse-design loop recovering the
+forcing on the right. It is meant to show both gradient quality and parameter
+recovery, not only loss decay. The left panel shows the expected decrease in
+throughput as Hartmann layers strengthen, while the right panel shows that the
+optimizer recovers the forcing that generated the target profile within solver
+precision.
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
 
@@ -131,7 +163,7 @@ check. On the bounded `Ha = 10`, `resolution = 8` manual run, the Hunt
 interface-current residual is now `≈ 1.27e-2` instead of the old failing
 `≈ 4.20e-1`.
 
-The heavier retained 3D validation campaign is generated with:
+The heavier 3D validation campaign is generated with:
 
 ```bash
 python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign --ha-values 10,20 --resolutions 10,14 --fringing-nx 5
@@ -143,9 +175,9 @@ python scripts/run_manual_solver_family_validation.py --output artifacts/manual_
 Useful entry points:
 
 - `examples/readme_showcase_demo.py`: regenerates the README media bundle
-- `examples/geometry_panel_demo.py`: static geometry panel
-- `examples/fringing_benchmark_demo.py`: retained fringing benchmark plots
-- `examples/extruded_paper_figures.py`: reviewer-facing 3D fringing figures
+- `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
+- `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots
+- `examples/extruded_summary_figures.py`: extra fringing-figure generator used by the docs asset workflow
 - `examples/autodiff_sensitivity_demo.py`: Hartmann sensitivities
 - `examples/autodiff_extruded_trajectory_demo.py`: deeper extruded autodiff target matching
 - `examples/variable_field_geometry_demo.py`: Python-native geometry and field editing

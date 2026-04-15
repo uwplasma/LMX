@@ -122,7 +122,7 @@ python examples/strong_scaling_demo.py --remote-host office --output ./artifacts
 ```
 
 Routine CLI runs inherit the active JAX backend from the shell, while
-`examples/strong_scaling_demo.py` is the publication-facing path for explicit
+`examples/strong_scaling_demo.py` is the main path for explicit
 CPU and GPU scaling studies.
 
 ## Restart

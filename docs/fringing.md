@@ -31,7 +31,7 @@ The current retained 3D slice includes:
   `v(x, y, z)`, `w(x, y, z)`, `p(x, y, z)`, `phi(x, y, z)`, current,
   Lorentz, axial-current, wall-current leakage, and charge-balance histories
 - an explicit validation summary for that extruded slice
-- a publication-style example in `examples/fringing_benchmark_demo.py`
+- a detailed example in `examples/fringing_benchmark_demo.py`
 
 This is explicit by design. The current slice is a real 3D
 pressure-velocity-potential iteration and is now available through both Python
@@ -66,8 +66,8 @@ python examples/fringing_benchmark_demo.py \
 python examples/fringing_benchmark_demo.py \
   --geometry-kind pipe_ogrid \
   --output artifacts/examples/fringing_benchmark_pipe_exploratory
-python examples/extruded_paper_figures.py \
-  --output artifacts/examples/extruded_paper_figures
+python examples/extruded_summary_figures.py \
+  --output artifacts/examples/extruded_summary_figures
 ```
 
 The example writes:
@@ -84,8 +84,8 @@ The example writes:
 
 The shipped input files `examples/fringing_rect_case.toml`,
 `examples/fringing_layered_case.toml`, and
-`examples/fringing_pipe_case.toml` are now the recommended publication-scale
-starting points for 3D fringing studies. They enable figure writing directly
+`examples/fringing_pipe_case.toml` are now the recommended starting points for
+3D fringing studies. They enable figure writing directly
 through `[output].write_plots = true` and keep the full solver setup in the
 input file rather than hiding it in Python glue.
 
@@ -93,13 +93,13 @@ The paired restart template is `examples/fringing_layered_restart_case.toml`.
 Use it after a base layered run has written its extruded restart bundle under
 `artifacts/examples/toml_fringing_layered/restart/`.
 
-Current retained fringing publication artifact:
+Current fringing overview artifact:
 
 ![LMX fringing rectangular-duct slice](_static/generated/fringing_benchmark_rect.png)
 
 The mapped-pipe example remains useful for exploratory research and solver
-development, but on the heavier retained validation campaign it is currently
-kept outside the locked publication set.
+development, but on the heavier retained validation campaign it is still best
+treated as a qualitative comparison rather than a locked external benchmark.
 
 Current exploratory mapped-pipe comparison artifact:
 
@@ -114,16 +114,16 @@ Larger 3D validation campaign artifact:
 ![LMX extruded validation campaign](_static/generated/extruded_validation_campaign.png)
 
 The larger retained campaign is intentionally a resolution study, not a claim
-that every coarse layered case is already publication-grade. In particular, the
+that every coarse layered case is already fully converged. In particular, the
 coarsest layered high-field point remains visibly underresolved, so the figure
 is used to show convergence behavior and screening logic rather than as a final
-table of locked publication values.
+reference table.
 
 The heavier exploratory campaign that reintroduces mapped pipes shows that
 `pipe_ogrid` still falls outside the larger retained gate on the current
 post-`1.0` tree. Its charge-balance residual exceeds the retained threshold on
 the heavier `Ha=20` and finer-mesh runs, so the mapped-pipe slice remains a
-research/development lane rather than a locked publication benchmark.
+research/development lane rather than a locked benchmark comparison.
 
 ## Governing equations for the retained 3D slice
 
@@ -205,24 +205,8 @@ python examples/extruded_validation_campaign.py \
 ```
 
 That example runs the hard-gate fringing campaign on a retained larger
-resolution set, writes JSON/CSV summaries, and produces a publication-style
-summary figure.
-
-For reviewer-facing figures, `examples/extruded_paper_figures.py` now writes a
-bounded retained set of 3D visualizations:
-
-- a rectangular peak-field cross-section rendered in 3D
-- a layered peak-field cross-section rendered in 3D
-- a compact summary panel over mean velocity, charge-balance residual,
-  axial current, and pressure span
-
-Current reviewer-facing retained paper figures:
-
-![LMX rectangular fringing 3D paper figure](_static/generated/paper_rect_3d.png)
-
-![LMX layered fringing 3D paper figure](_static/generated/paper_layered_3d.png)
-
-![LMX fringing reviewer summary](_static/generated/paper_reviewer_summary.png)
+resolution set, writes JSON/CSV summaries, and produces a compact comparison
+figure.
 
 Its default larger retained conservation dataset is now
 `rect_duct,layered_duct,pipe_ogrid`. The mapped-pipe slice is inside that hard
@@ -276,7 +260,7 @@ Current retained layered hardening signals on that dataset:
 - `field_mean_velocity_correlation ≈ -8.02e-1`
 - `max_charge_balance_residual <= 1.37e-5`
 
-So the current reviewer-proof statement is:
+So the current bounded-validation statement is:
 
 - the retained conservation gate covers `rect_duct`, `layered_duct`, and
   `pipe_ogrid`
@@ -310,10 +294,10 @@ fringing-pipe profile data gives:
 - negative-offset absolute line error: `≈ 9.89e-1`
 - positive-offset absolute line error: `≈ 9.89e-1`
 
-So the reviewer-facing conclusion is still deliberately conservative: mapped
+So the current conclusion is still deliberately conservative: mapped
 pipe is now part of the retained conservation/solver-validation set, but the
 current external pipe-profile comparison remains qualitative rather than a
-publication parity gate.
+strict parity gate.
 
 ## What the example shows
 
@@ -321,7 +305,7 @@ publication parity gate.
 - the stationwise peak axial velocity response, which is a better proxy for the
   M-shaped redistribution described in the fringing-field literature than the
   nearly conserved cross-sectional mean flow rate
-- the stationwise pressure span `max(p)-min(p)`, which is a better publication
+- the stationwise pressure span `max(p)-min(p)`, which is a more stable
   observable than the earlier current-weighted proxy when reviewing 3D fringing
   behavior
 - contour views of the stacked velocity bundle in `x-y` and `x-z`
@@ -333,7 +317,7 @@ publication parity gate.
 
 ## QA note on the retained figures
 
-During the publication QA pass, the fringing figures were tightened to avoid
+During the media QA pass, the fringing figures were tightened to avoid
 misleading observables. In a constant-forcing incompressible slice, the
 cross-sectional mean flow can remain nearly unchanged even when the velocity
 profile redistributes strongly. The literature instead emphasizes profile
@@ -342,7 +326,7 @@ That is why the retained figures now highlight peak axial velocity, pressure
 span, and axial-current/conservation metrics rather than the earlier
 mean-velocity correlation view.
 
-## Publication context
+## Literature context
 
 The duct benchmark ladder and fringing-region validation targets documented
 here are aligned with the standard low-magnetic-Reynolds-number literature and
@@ -359,6 +343,6 @@ with fusion liquid-metal V&V practice:
   - fringing-profile construction, stationwise sweep utilities, the extruded
     slice solver entry point, validation helpers, and stacked axial field bundles
 - `examples/fringing_benchmark_demo.py`
-  - user-facing fringing benchmark slice with publication-style plots
+  - user-facing fringing benchmark slice with detailed plots
 - `docs/benchmark_matrix.md`
   - benchmark targets that this scaffold is preparing

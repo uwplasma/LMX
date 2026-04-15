@@ -120,7 +120,7 @@ def run_extruded_validation_campaign(
         "summary_json": str(summary_path),
         "summary_csv": str(summary_path.with_suffix(".csv")),
         "default_fringing_plot": str(summary_path.with_name(f"{summary_path.stem}_fringing.png")),
-        "publication_plot": str(png_path),
+        "summary_plot": str(png_path),
         "ha_values": ha_values,
         "resolutions": resolutions,
         "fringing_nx": fringing_nx,

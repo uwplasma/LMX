@@ -108,7 +108,7 @@ def _write_geometry_3d_plot(solution, out_dir: Path, *, title: str, stem: str) -
     return [png.name, pdf.name]
 
 
-def run_extruded_paper_figures(
+def run_extruded_summary_figures(
     *,
     out_dir: Path,
     ha_peak: float = 20.0,
@@ -120,12 +120,12 @@ def run_extruded_paper_figures(
     rect = solve_extruded_inductionless(_build_problem("rect_duct", ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations))
     layered = solve_extruded_inductionless(_build_problem("layered_duct", ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations))
 
-    rect_plots = _write_geometry_3d_plot(rect, out_dir, title="LMX rectangular fringing slice", stem="paper_rect_3d")
-    layered_plots = _write_geometry_3d_plot(layered, out_dir, title="LMX layered fringing slice", stem="paper_layered_3d")
+    rect_plots = _write_geometry_3d_plot(rect, out_dir, title="LMX rectangular fringing slice", stem="fringing_rect_3d")
+    layered_plots = _write_geometry_3d_plot(layered, out_dir, title="LMX layered fringing slice", stem="fringing_layered_3d")
 
     _set_style()
     fig, axes = plt.subplots(2, 2, constrained_layout=True)
-    fig.suptitle("LMX reviewer-facing fringing summary", fontsize=16)
+    fig.suptitle("LMX fringing summary", fontsize=16)
     for solution, label, color in (
         (rect, "Rectangular", "#0f766e"),
         (layered, "Layered", "#b45309"),
@@ -144,14 +144,14 @@ def run_extruded_paper_figures(
         ax.set_xlabel("x")
         ax.legend(frameon=False)
     axes[0, 1].set_ylabel(r"$\max |\nabla \cdot J|$")
-    png = out_dir / "paper_reviewer_summary.png"
-    pdf = out_dir / "paper_reviewer_summary.pdf"
+    png = out_dir / "fringing_summary_panel.png"
+    pdf = out_dir / "fringing_summary_panel.pdf"
     fig.savefig(png, bbox_inches="tight")
     fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
 
     summary = {
-        "case": "extruded_paper_figures",
+        "case": "extruded_summary_figures",
         "rectangular": {
             "max_charge_balance_residual": rect.validation.max_charge_balance_residual,
             "net_boundary_current_residual": rect.validation.net_boundary_current_residual,
@@ -164,19 +164,19 @@ def run_extruded_paper_figures(
         },
         "plots": rect_plots + layered_plots + [png.name, pdf.name],
     }
-    (out_dir / "extruded_paper_figures_summary.json").write_text(json.dumps(summary, indent=2))
+    (out_dir / "extruded_summary_figures_summary.json").write_text(json.dumps(summary, indent=2))
     return summary
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate reviewer-facing paper figures for retained extruded fringing cases.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/extruded_paper_figures"))
+    parser = argparse.ArgumentParser(description="Generate additional fringing figures for retained extruded cases.")
+    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/extruded_summary_figures"))
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=10)
     parser.add_argument("--nz", type=int, default=10)
     parser.add_argument("--nx-stations", type=int, default=7)
     args = parser.parse_args(argv)
-    run_extruded_paper_figures(
+    run_extruded_summary_figures(
         out_dir=args.output,
         ha_peak=args.ha_peak,
         ny=args.ny,

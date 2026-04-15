@@ -6,7 +6,7 @@ kernel. The goal is practical research throughput:
 
 - keep the routine validation lane under five minutes
 - preserve a differentiable fixed-iteration lane
-- provide explicit CPU and multi-GPU scaling evidence for publication figures
+- provide explicit CPU and multi-GPU scaling evidence for larger studies
 
 ## What is benchmarked
 
@@ -40,8 +40,8 @@ The example writes:
 
 - raw JSON timing records
 - `strong_scaling_summary.json`
-- publication-style `strong_scaling.png`
-- publication-style `strong_scaling.pdf`
+- `strong_scaling.png`
+- `strong_scaling.pdf`
 
 ## Backend selection for CLI runs
 
@@ -62,7 +62,7 @@ JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
 ```
 
 Those commands select the execution device for the normal CLI solver run. The
-publication strong-scaling figures use `examples/strong_scaling_demo.py`,
+committed strong-scaling figures use `examples/strong_scaling_demo.py`,
 because that benchmark intentionally exercises the sharded stencil kernel across
 multiple CPU or GPU devices. For remote GPU runs on the `office` host, the same
 pattern works over SSH:
@@ -71,38 +71,37 @@ pattern works over SSH:
 ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/hunt_case.toml'
 ```
 
-## Publication artifact
+## Current artifact
 
-The current `1.0` publication artifact is committed under
+The current committed scaling artifact is stored under
 `docs/_static/generated/strong_scaling.png` and is generated from:
 
-- a local CPU sweep on a fixed `1024 x 1024` cross-section with `96` Jacobi iterations
-- a remote GPU sweep on a fixed `2048 x 2048` cross-section with the same iteration count
+- a local CPU sweep on a fixed `2048 x 2048` cross-section with `128` Jacobi iterations
+- a remote GPU sweep on a fixed `4096 x 4096` cross-section with the same iteration count
 
 ![LMX strong scaling](_static/generated/strong_scaling.png)
 
 The QA-tightened figure now shows warm runtime only. First-run compile / JIT
 overhead is still stored in the JSON summary, but it is no longer plotted in
-the main publication figure because it dominated the left panel without helping
+the main scaling figure because it dominated the left panel without helping
 the actual strong-scaling interpretation.
 
 Observed warm-runtime points from that artifact:
 
 - CPU:
-  - `1` device: `0.0898 s`
-  - `2` devices: `0.1548 s`
-  - `4` devices: `0.0563 s`
-  - `8` devices: `0.0549 s`
+  - `1` device: `0.2388 s`
+  - `4` devices: `0.1904 s`
+  - `8` devices: `0.2644 s`
 - GPU:
-  - `1` GPU: `0.0524 s`
-  - `2` GPUs: `0.0392 s`
+  - `1` GPU: `0.1328 s`
+  - `2` GPUs: `0.0867 s`
 
-The CPU sweep is intentionally reported as measured rather than idealized:
-logical CPU sharding on a single workstation is sensitive to host-thread
-contention, so the figure is useful as a reproducible performance baseline, not
-as a claim of perfect monotone scaling. The remote GPU path uses the highest
-available single GPU index for the one-device baseline so the measurement is
-not distorted by workstation display load.
+The CPU sweep is intentionally reported as measured rather than idealized.
+On this workstation the kernel improves from `1` to `4` logical devices and
+then saturates, so the CPU panel should be read as a practical host baseline
+rather than as a claim of perfect monotone scaling. The remote GPU path shows a
+cleaner two-device speedup on the larger fixed problem, which is the more
+important result for the current LMX research lane.
 
 ## Recent compatibility and platform validation
 
@@ -123,7 +122,7 @@ Recent small validation run on `office`:
   - `1` GPU warm runtime: `6.11e-4 s`
   - `2` GPUs warm runtime: `3.91e-3 s`
 
-Those numbers are not the publication artifact; they are the current
+Those numbers are not the main scaling artifact; they are the current
 post-`1.0` smoke validation that the remote-GPU orchestration still works on a
 live two-GPU host.
 
@@ -138,7 +137,7 @@ direction of travel for the current tree:
 At that problem size the remote single-GPU warm runtime is faster than the
 local one-device CPU warm runtime. Small two-GPU runs are still dominated by
 overhead, so multi-GPU strong scaling should be judged on the larger committed
-publication artifact, not on these smoke runs.
+main artifact, not on these smoke runs.
 
 ## Design notes
 
