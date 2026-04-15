@@ -328,24 +328,28 @@ That retained gate now passes for all three retained fringing geometries.
     annotations
   - the README/docs/examples surface no longer uses the old
     older release-narrative framing
-- The scaling artifact was refreshed onto a denser coupled structured-grid
-  operator benchmark:
-  - CPU `4096 x 4096`, `256` iterations, `1/2/4/8` settings
-  - GPU `8192 x 8192`, `256` iterations, `1/2` GPUs on `office`
-  - the figure labels the ideal linear-speedup dashed line explicitly
+- The scaling artifact was refreshed again onto longer fixed-problem runs:
+  - CPU `4096 x 4096`, `1024` iterations, `1/2/4/8` settings
+  - GPU `10240 x 10240`, `4096` iterations, `1/2` GPUs on `office`
+  - the runtime panel no longer carries an in-plot text box; the interpretation
+    is documented in the README and performance page instead
   - measured warm runtimes on the current artifact are:
-    - CPU: `16.1459 s`, `10.2904 s`, `8.9624 s`, `8.8102 s`
-    - GPU: `1.7494 s`, `1.2834 s`
-  - this gives a materially stronger CPU curve than the earlier Jacobi-only
-    benchmark and a clearer two-GPU speedup on the larger GPU problem
+    - CPU: `56.9564 s`, `45.8947 s`, `62.8218 s`, `62.5103 s`
+    - GPU: `58.1897 s`, `31.2451 s`
+  - the current host reaches its best CPU point at `2` logical devices and
+    then flattens, while the remote GPU path shows about `1.86x` speedup from
+    `1` to `2` GPUs on the larger fixed problem
 - The autodiff summary figure now carries direct explanatory callouts for the
   Hartmann-layer sensitivity interpretation and the recovered inverse-design
   parameter value.
 - The README showcase workflow was tightened around bounded regeneration:
   - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
     geometry-only refreshes
-  - the shipped Hunt startup GIFs were slowed down and stretched to make the
-    transient easier to read without rerunning an unbounded all-in-one media job
+  - the Hunt startup GIFs now use `dt = 3.75e-5 s`, `t_final = 7 ms`, and all
+    solved timesteps in the output movie
+  - the bounded README movie configuration that regenerates locally uses
+    `ny = nz = 2`, `potential_iterations = 4`, and
+    `coupling_iterations = 2`
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the

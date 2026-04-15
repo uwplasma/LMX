@@ -183,9 +183,10 @@ def run_strong_scaling_demo(
     cpu_counts: tuple[int, ...] = (1, 2, 4, 8),
     gpu_counts: tuple[int, ...] = (1, 2),
     cpu_problem: tuple[int, int] = (4096, 4096),
-    gpu_problem: tuple[int, int] = (8192, 8192),
-    iterations: int = 256,
-    repeats: int = 3,
+    gpu_problem: tuple[int, int] = (10240, 10240),
+    cpu_iterations: int = 1024,
+    gpu_iterations: int = 4096,
+    repeats: int = 2,
     python_executable: str = sys.executable,
     remote_host: str | None = None,
     remote_dir: str = "/home/rjorge/tmp/lmx_scaling_repo",
@@ -198,7 +199,7 @@ def run_strong_scaling_demo(
         device_counts=cpu_counts,
         ny=cpu_problem[0],
         nz=cpu_problem[1],
-        iterations=iterations,
+        iterations=cpu_iterations,
         repeats=repeats,
         python_executable=python_executable,
     )
@@ -212,7 +213,7 @@ def run_strong_scaling_demo(
                 device_counts=gpu_counts,
                 ny=gpu_problem[0],
                 nz=gpu_problem[1],
-                iterations=iterations,
+                iterations=gpu_iterations,
                 repeats=repeats,
             )
         )
@@ -232,15 +233,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", type=str, default=sys.executable)
     parser.add_argument("--remote-host", type=str, default=None)
     parser.add_argument("--remote-dir", type=str, default="/home/rjorge/tmp/lmx_scaling_repo")
-    parser.add_argument("--iterations", type=int, default=256)
-    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--iterations", type=int, default=None)
+    parser.add_argument("--cpu-iterations", type=int, default=None)
+    parser.add_argument("--gpu-iterations", type=int, default=None)
+    parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--cpu-counts", type=str, default="1,2,4,8")
     parser.add_argument("--gpu-counts", type=str, default="1,2")
     parser.add_argument("--cpu-ny", type=int, default=4096)
     parser.add_argument("--cpu-nz", type=int, default=4096)
-    parser.add_argument("--gpu-ny", type=int, default=8192)
-    parser.add_argument("--gpu-nz", type=int, default=8192)
+    parser.add_argument("--gpu-ny", type=int, default=10240)
+    parser.add_argument("--gpu-nz", type=int, default=10240)
     args = parser.parse_args(argv)
+
+    shared_iterations = args.iterations
+    cpu_iterations = args.cpu_iterations if args.cpu_iterations is not None else shared_iterations
+    gpu_iterations = args.gpu_iterations if args.gpu_iterations is not None else shared_iterations
+    if cpu_iterations is None:
+        cpu_iterations = 1024
+    if gpu_iterations is None:
+        gpu_iterations = 4096
 
     run_strong_scaling_demo(
         out_dir=args.output,
@@ -248,10 +259,11 @@ def main(argv: list[str] | None = None) -> int:
         gpu_counts=tuple(int(value) for value in args.gpu_counts.split(",") if value),
         cpu_problem=(args.cpu_ny, args.cpu_nz),
         gpu_problem=(args.gpu_ny, args.gpu_nz),
+        cpu_iterations=cpu_iterations,
+        gpu_iterations=gpu_iterations,
         python_executable=args.python,
         remote_host=args.remote_host,
         remote_dir=args.remote_dir,
-        iterations=args.iterations,
         repeats=args.repeats,
     )
     return 0

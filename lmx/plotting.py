@@ -888,12 +888,16 @@ def write_strong_scaling_plots(
         speedup = baseline / np.maximum(runtimes, 1.0e-12)
         ny_value = values[0].get("ny")
         nz_value = values[0].get("nz")
+        iteration_value = values[0].get("iterations")
         if ny_value is None or nz_value is None:
             label = str(platform_name)
         else:
             ny = int(ny_value)
             nz = int(nz_value)
-            label = f"{platform_name} ({ny}×{nz})"
+            if iteration_value is None:
+                label = f"{platform_name} ({ny}×{nz})"
+            else:
+                label = f"{platform_name} ({ny}×{nz}, {int(iteration_value)} iters)"
 
         axes[0].plot(device_counts, runtimes, marker="o", color=color, label=label)
         axes[1].plot(device_counts, speedup, marker="o", color=color, label=label)
@@ -915,16 +919,6 @@ def write_strong_scaling_plots(
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
     axes[0].legend(loc="upper right", bbox_to_anchor=(0.98, 0.98))
-    axes[0].text(
-        0.02,
-        0.02,
-        "Fixed global problem per platform.\nWarm runtime excludes first-call compilation.",
-        transform=axes[0].transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=11,
-        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.9},
-    )
 
     axes[1].set_title("Strong-scaling speedup")
     axes[1].set_xlabel("Device count")

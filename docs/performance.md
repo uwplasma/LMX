@@ -77,8 +77,10 @@ ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/
 The current scaling artifact is stored under
 `docs/_static/generated/strong_scaling.png` and is generated from:
 
-- a local CPU sweep on a fixed `4096 x 4096` cross-section with `256` operator iterations
-- a remote GPU sweep on a fixed `8192 x 8192` cross-section with the same iteration count
+- a local CPU sweep on a fixed `4096 x 4096` cross-section with `1024`
+  operator iterations
+- a remote GPU sweep on a fixed `10240 x 10240` cross-section with `4096`
+  operator iterations
 
 ![LMX strong scaling](_static/generated/strong_scaling.png)
 
@@ -90,19 +92,19 @@ the actual strong-scaling interpretation.
 Observed warm-runtime points from that artifact:
 
 - CPU:
-  - `1` device: `16.1459 s`
-  - `2` devices: `10.2904 s`
-  - `4` devices: `8.9624 s`
-  - `8` devices: `8.8102 s`
+  - `1` device: `56.9564 s`
+  - `2` devices: `45.8947 s`
+  - `4` devices: `62.8218 s`
+  - `8` devices: `62.5103 s`
 - GPU:
-  - `1` GPU: `1.7494 s`
-  - `2` GPUs: `1.2834 s`
+  - `1` GPU: `58.1897 s`
+  - `2` GPUs: `31.2451 s`
 
 The CPU sweep is reported as measured rather than idealized. On this
-workstation, the denser operator gives a materially stronger curve than the old
-Jacobi-only benchmark: the warm runtime drops by about `1.83x` from `1` to `8`
-CPU settings. The remote GPU path shows about `1.36x` speedup from `1` to `2`
-GPUs on the larger fixed problem.
+workstation, the denser operator reaches its best warm runtime at `2` logical
+CPU devices and then flattens, which is consistent with a memory-bandwidth
+limit on the host path. The remote GPU path shows about `1.86x` speedup from
+`1` to `2` GPUs on the larger fixed problem.
 
 ## Recent compatibility and platform validation
 

@@ -118,12 +118,13 @@ Those geometries are not shown in isolation in the rest of the README:
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show the Hunt startup sequence in 2D and 3D from `t = 0` to `t = 10 ms`. Time
+show the Hunt startup sequence in 2D and 3D from `t = 0` to `t = 7 ms`. Time
 is shown in physical units, the fluid domain is outlined explicitly, and the
 2D view marks the Hartmann layers at the top and bottom walls and the side
 layers at the insulating side walls. In this case, the Hartmann layers are the
 thin boundary layers along the walls normal to the magnetic field, where the
-strongest MHD damping occurs.
+strongest MHD damping occurs. The showcase timestep is small enough to make the
+boundary-layer formation easier to follow early in the transient.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">
@@ -147,14 +148,18 @@ in this context.
 The scaling panel below is a fixed-problem strong-scaling benchmark for a dense
 structured-grid inductionless MHD operator. Solid lines are measured warm
 runtimes and speedups; the dashed line is ideal linear speedup. The current
-figure uses a `4096×4096` CPU case and an `8192×8192` GPU case, both with
-`256` fixed operator iterations, so the device curves are measured on runs that
-are long enough to reduce startup noise.
+figure uses a `4096×4096` CPU case with `1024` operator iterations and a
+`10240×10240` GPU case with `4096` operator iterations, so the device curves
+come from minute-scale kernels instead of short smoke tests.
 
 Measured warm-runtime points:
 
-- CPU: `16.15 s`, `10.29 s`, `8.96 s`, `8.81 s` at `1, 2, 4, 8`
-- GPU: `1.75 s`, `1.28 s` at `1, 2`
+- CPU: `56.96 s`, `45.89 s`, `62.82 s`, `62.51 s` at `1, 2, 4, 8`
+- GPU: `58.19 s`, `31.25 s` at `1, 2`
+
+On this workstation the CPU curve reaches its best point at `2` logical
+devices and then flattens, which is consistent with a bandwidth-limited kernel.
+The GPU curve keeps a cleaner strong-scaling trend on the larger fixed problem.
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
 

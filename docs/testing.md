@@ -71,7 +71,7 @@ python scripts/run_manual_solver_family_validation.py \
 This is the intended post-1.0 release-validation mode for conservation
 hardening.
 
-Current retained larger dataset:
+Current larger dataset:
 
 - `Ha = 10, 20`
 - `resolution = 10`
@@ -82,11 +82,11 @@ Current retained larger dataset:
   - `wall_current_leakage <= 1e-1`
   - `boundary_current <= 1e-5`
 
-The layered 3D case joined that retained gate after the multi-region electric
+The layered 3D case joined that validation gate after the multi-region electric
 subproblem was upgraded from a bounded iterative solve to a sparse direct solve
 of the conservative variable-coefficient potential operator.
 
-That retained gate now passes on the current tree for rectangular ducts,
+That gate now passes on the current tree for rectangular ducts,
 layered ducts, and mapped pipes.
 
 This split avoids exhausting CI runtime on every routine push while still

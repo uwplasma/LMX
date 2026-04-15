@@ -2,7 +2,7 @@
 
 LMX solves low-magnetic-Reynolds-number liquid-metal magnetohydrodynamics in the
 inductionless limit on structured meshes. This page documents the governing
-equations, the reductions used by the currently shipped solver families, and
+equations, the reductions used by the current solver families, and
 where those equations are assembled in the source tree.
 
 ## Scope
@@ -65,7 +65,7 @@ These equations are represented in the current source tree by:
 
 ## Fully developed duct reduction
 
-The default shipped solver family is
+The default solver family is
 `solver.kind = "fully_developed_inductionless"`.
 
 For this family, LMX assumes a streamwise velocity field
@@ -118,7 +118,7 @@ These are the two fields actually advanced by the current default solver.
 
 ## Boundary and interface conditions
 
-The currently shipped boundary-condition vocabulary is declared in
+The current boundary-condition vocabulary is declared in
 `lmx/specs.py` and interpreted by `lmx/physics.py` and `lmx/solvers.py`.
 
 The main physical conditions are:
@@ -146,9 +146,8 @@ is why LMX tracks:
 
 as first-class diagnostics.
 
-For the post-`1.0` 3D fringing lane, the same conservation view is extended to
-domain boundaries and axial control volumes. The retained 3D slice now also
-tracks:
+For the 3D fringing workflows, the same conservation view is extended to
+domain boundaries and axial control volumes. LMX also tracks:
 
 - stationwise integrated axial current
 - stationwise wall-current leakage at the external `y` and `z` boundaries
@@ -200,7 +199,7 @@ result is then audited through both `div J` and boundary-current integrals.
 For layered ducts, the multi-region potential equation is solved with a sparse
 direct solve of the conservative variable-coefficient operator rather than the
 bounded Jacobi path used in the cheaper rectangular slice.
-For rectangular and layered extruded cases, the retained face-flux audit also
+For rectangular and layered extruded cases, the face-flux audit also
 enforces a closed-current condition on the axial inlet/outlet faces in the
 conservative current reconstruction used for validation. This is the discrete
 statement of
@@ -212,7 +211,7 @@ $$
 which is the boundary treatment needed to prevent spurious charge leakage
 through the fringing section ends.
 
-The retained conservation outputs are:
+The conservation outputs are:
 
 - `div_current_max_history`
 - `charge_balance_residual_history`
@@ -274,7 +273,7 @@ modes.
 
 ### `extruded_inductionless`
 
-This solver family now has the first retained low-Re 3D
+This solver family now provides low-Re 3D
 pressure-velocity-potential slices in `lmx/fringing.py`. It advances `u`, `v`,
 `w`, and `p` with a projection loop, solves a 3D electric potential problem
 for `phi`, and reports current, Lorentz, and charge-balance fields. The
@@ -284,9 +283,9 @@ currently exposed geometries are:
 - layered ducts
 - mapped `pipe_ogrid` pipe slices
 
-That is already a real 3D research slice, but it is still not the final
-production family: broader CLI/TOML wiring, larger validation sets, stronger
-mesh studies, and more geometry/material coverage remain future work.
+This is a real 3D pressure-velocity-potential workflow. Broader validation
+sets, stronger mesh studies, and more geometry/material coverage remain future
+work.
 
 ## JAX and differentiability
 

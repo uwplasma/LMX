@@ -18,8 +18,8 @@ structured meshes. The project is organized so that:
 - strong-scaling benchmark tooling for CPU and GPU kernels
 - differentiable benchmark and inverse-design workflows in JAX
 - geometry preview and postprocessing utilities
-- a retained fringing-field research slice that stages the path to the next 3D
-  solver family
+- 3D fringing-field workflows on rectangular ducts, layered ducts, and mapped
+  pipes
 
 ## Read this first
 
