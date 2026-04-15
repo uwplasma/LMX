@@ -242,6 +242,8 @@ Current retained hard-gate dataset:
   - `max_interface_current <= 2.5e-1`
   - `max_fringing_wall_current_leakage <= 1e-1`
   - `max_fringing_boundary_current <= 1e-5`
+  - `volumetric_flow_rate_span <= 5e-3`
+  - `field_mean_velocity_correlation <= -5e-1`
 
 That retained gate now passes for `rect_duct`, `layered_duct`, and
 `pipe_ogrid`. The layered case joined the retained gate after the multi-region
@@ -249,6 +251,33 @@ electric subproblem was switched to a sparse direct solve of the conservative
 variable-coefficient potential operator, and the mapped-pipe slice joined after
 the cylindrical electric/current operator was rewritten around the conservative
 face-flux form and a stable O-grid time-step estimate.
+
+The last two gates are explicitly physics-facing rather than solver-facing:
+
+- `volumetric_flow_rate_span`
+  enforces near-constant axial throughput across the fringing region for these
+  incompressible low-`Re` benchmark slices
+- `field_mean_velocity_correlation`
+  enforces the expected anti-correlation between local field strength and mean
+  streamwise velocity under constant forcing
+
+On the current bounded larger dataset, those added physics gates split the
+fringing set more sharply than the conservation gates do:
+
+- `rect_duct` passes
+- `pipe_ogrid` passes
+- `layered_duct` still fails the throughput-constancy gate on the heavier runs,
+  with `volumetric_flow_rate_span ≈ 5.37e-3` at `Ha=10`, `resolution=8` and
+  `≈ 1.13e-2` at `Ha=20`, `resolution=12`
+
+So the current reviewer-proof statement is:
+
+- the retained conservation gate covers `rect_duct`, `layered_duct`, and
+  `pipe_ogrid`
+- the stricter fringing physics gate currently covers `rect_duct` and
+  `pipe_ogrid`
+- layered 3D fringing still needs another operator-hardening pass before it can
+  join that stricter set
 
 Current retained mapped-pipe hardening signals on the heavier bounded
 dataset:

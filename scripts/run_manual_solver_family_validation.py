@@ -153,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-interface-current", type=float, default=2.5e-1)
     parser.add_argument("--max-fringing-wall-current-leakage", type=float, default=1.0e-1)
     parser.add_argument("--max-fringing-boundary-current", type=float, default=1.0e-5)
+    parser.add_argument("--max-fringing-flow-span", type=float, default=5.0e-3)
+    parser.add_argument("--max-field-velocity-correlation", type=float, default=-5.0e-1)
     parser.add_argument("--write-csv", action="store_true")
     parser.add_argument("--write-plot", action="store_true")
     parser.add_argument("--fail-on-threshold", action="store_true")
@@ -276,11 +278,20 @@ def main(argv: list[str] | None = None) -> int:
                             and solution.validation.max_wall_current_leakage <= args.max_fringing_wall_current_leakage
                             and solution.validation.net_boundary_current_residual <= args.max_fringing_boundary_current
                         ),
+                        "physics_pass": float(
+                            solution.validation.volumetric_flow_rate_span <= args.max_fringing_flow_span
+                            and solution.validation.field_mean_velocity_correlation <= args.max_field_velocity_correlation
+                        ),
                         "charge_balance_threshold": float(args.max_charge_balance),
                         "wall_current_leakage_threshold": float(args.max_fringing_wall_current_leakage),
                         "boundary_current_threshold": float(args.max_fringing_boundary_current),
+                        "flow_span_threshold": float(args.max_fringing_flow_span),
+                        "field_velocity_correlation_threshold": float(args.max_field_velocity_correlation),
                     }
-                    if not bool(summary[key]["conservation_pass"]):
+                    summary[key]["validation_pass"] = float(
+                        bool(summary[key]["conservation_pass"]) and bool(summary[key]["physics_pass"])
+                    )
+                    if not bool(summary[key]["validation_pass"]):
                         failures.append(key)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

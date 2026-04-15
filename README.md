@@ -416,6 +416,20 @@ qualitative on the external profile-comparison side, because the shipped
 reference dataset is a high-`Ha`, high-`Re` benchmark while the current LMX
 mapped-pipe slice is a low-`Re` research model.
 
+The retained 3D gate is not only an external-comparison gate. It also enforces
+physics-facing checks:
+
+- bounded charge-balance residual
+- bounded wall and external-boundary current leakage
+- small axial `volumetric_flow_rate_span`
+- negative enough `field_mean_velocity_correlation`
+
+On the current bounded larger dataset, those stricter fringing-physics checks
+pass for `rect_duct` and `pipe_ogrid`, and they still expose one real open
+issue in `layered_duct`: throughput constancy is not yet tight enough there on
+the heavier runs. That is now a tracked solver-hardening item rather than a
+hidden deficiency.
+
 For the current exploratory mapped-pipe comparison against the shipped external
 fringing-pipe profiles, use:
 

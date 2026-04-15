@@ -57,7 +57,7 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
                         "max_residual": 1.0e-4,
                         "max_charge_balance_residual": 2.0e-6,
                         "mean_velocity_span": 0.1,
-                        "volumetric_flow_rate_span": 0.2,
+                        "volumetric_flow_rate_span": 2.0e-3,
                         "axial_current_span": 0.01,
                         "peak_velocity_span": 0.03,
                         "pressure_span_range": 0.04,
@@ -95,6 +95,8 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
     assert "fringing_pipe_ogrid_ha10" in payload
     assert payload["hartmann_ha10"]["conservation_pass"] == pytest.approx(1.0)
     assert payload["fringing_rect_duct_ha10"]["conservation_pass"] == pytest.approx(1.0)
+    assert payload["fringing_rect_duct_ha10"]["physics_pass"] == pytest.approx(1.0)
+    assert payload["fringing_rect_duct_ha10"]["validation_pass"] == pytest.approx(1.0)
 
 
 def test_main_can_fail_on_conservation_threshold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -185,7 +187,7 @@ def test_main_writes_multi_resolution_csv_and_plot(tmp_path: Path, monkeypatch: 
                         "max_residual": 1.0e-4,
                         "max_charge_balance_residual": 2.0e-6,
                         "mean_velocity_span": 0.1,
-                        "volumetric_flow_rate_span": 0.2,
+                        "volumetric_flow_rate_span": 2.0e-3,
                         "axial_current_span": 0.01,
                         "peak_velocity_span": 0.03,
                         "pressure_span_range": 0.04,
@@ -219,3 +221,82 @@ def test_main_writes_multi_resolution_csv_and_plot(tmp_path: Path, monkeypatch: 
     assert "fringing_rect_duct_ha10_n10" in payload
     assert output.with_suffix(".csv").exists()
     assert output.with_name("manual_summary_multi_fringing.png").exists()
+
+
+def test_main_can_fail_on_fringing_physics_thresholds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        manual_validation,
+        "solve_steady",
+        lambda case: type("Solution", (), {"mesh": object(), "case_name": case.name})(),
+    )
+    monkeypatch.setattr(
+        manual_validation,
+        "validation_summary",
+        lambda solution, case_name, ha=None: {
+            "case": case_name,
+            "u_max": 1.0,
+            "charge_balance_residual": 1.0e-7,
+            "interface_current_residual": 1.0e-7,
+        },
+    )
+    monkeypatch.setattr(manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {})
+    monkeypatch.setattr(
+        manual_validation,
+        "hartmann_acceptance",
+        lambda solution, ha, l2_threshold, linf_threshold: type(
+            "Acceptance",
+            (),
+            {"passed": True, "l2_error": 0.01, "linf_error": 0.02},
+        )(),
+    )
+    monkeypatch.setattr(
+        manual_validation,
+        "solve_extruded_inductionless",
+        lambda problem: type(
+            "ExtrudedSolution",
+            (),
+            {
+                "validation": type(
+                    "Validation",
+                    (),
+                    {
+                        "station_count": 5,
+                        "max_residual": 1.0e-4,
+                        "max_charge_balance_residual": 2.0e-6,
+                        "mean_velocity_span": 0.1,
+                        "volumetric_flow_rate_span": 0.2,
+                        "axial_current_span": 0.01,
+                        "peak_velocity_span": 0.03,
+                        "pressure_span_range": 0.04,
+                        "max_wall_current_leakage": 1.0e-6,
+                        "net_boundary_current_residual": 2.0e-6,
+                        "field_mean_velocity_correlation": -0.1,
+                    },
+                )(),
+            },
+        )(),
+    )
+
+    output = tmp_path / "manual_summary_physics_fail.json"
+    exit_code = manual_validation.main(
+        [
+            "--output",
+            str(output),
+            "--ha-values",
+            "10",
+            "--resolution",
+            "8",
+            "--include-fringing",
+            "--max-fringing-flow-span",
+            "1e-2",
+            "--max-field-velocity-correlation",
+            "-0.5",
+            "--fail-on-threshold",
+        ]
+    )
+
+    assert exit_code == 1
+    payload = json.loads(output.read_text())
+    assert payload["fringing_rect_duct_ha10"]["conservation_pass"] == pytest.approx(1.0)
+    assert payload["fringing_rect_duct_ha10"]["physics_pass"] == pytest.approx(0.0)
+    assert payload["fringing_rect_duct_ha10"]["validation_pass"] == pytest.approx(0.0)
