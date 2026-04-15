@@ -118,13 +118,14 @@ Those geometries are not shown in isolation in the rest of the README:
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show the Hunt startup sequence in 2D and 3D from `t = 0` to `t = 7 ms`. Time
+show the Hunt startup sequence in 2D and 3D from `t = 0` to `t = 2 ms`. Time
 is shown in physical units, the fluid domain is outlined explicitly, and the
 2D view marks the Hartmann layers at the top and bottom walls and the side
 layers at the insulating side walls. In this case, the Hartmann layers are the
 thin boundary layers along the walls normal to the magnetic field, where the
-strongest MHD damping occurs. The showcase timestep is small enough to make the
-boundary-layer formation easier to follow early in the transient.
+strongest MHD damping occurs. The README movie uses a finer `6 × 6`
+cross-sectional solve with all timesteps written to the GIF so the early
+boundary-layer formation is easier to follow.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">

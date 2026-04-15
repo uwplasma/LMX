@@ -81,6 +81,28 @@ publication-grade additions after the current A/B ladder are:
 - open-channel / free-surface validation
 - current-driven channel validation
 
+## Parallelization work required before manuscript closeout
+
+- CPU scaling
+  - replace the current forced-logical-device host benchmark with a more
+    representative CPU benchmark tied to the real `extruded_inductionless`
+    arithmetic mix or another higher-intensity 3D operator
+  - use JAX profiling traces to confirm whether the benchmark is limited by
+    memory bandwidth, cross-device communication, or kernel launch overhead
+  - document the accepted CPU scaling path explicitly rather than mixing
+    host-device sharding and thread-count claims
+- GPU scaling
+  - keep the larger fixed-problem two-GPU benchmark as the main scaling figure
+  - extend that benchmark toward the actual 3D solver path once the CPU lane is
+    made consistent
+- profiling and implementation checks
+  - profile the strong-scaling kernel and at least one `extruded_inductionless`
+    solve on CPU
+  - compare single-device CPU execution, forced host-device sharding, and any
+    revised higher-intensity benchmark path
+  - only promote a CPU scaling figure once the chosen execution model is
+    coherent with the solver implementation and the measured bottleneck
+
 ## Conservation hardening lane
 
 The next research-grade solver work must keep conservation properties explicit,

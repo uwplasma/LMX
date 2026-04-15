@@ -22,9 +22,9 @@ def run_readme_showcase_demo(
     *,
     out_dir: Path,
     movie_ha: float = 20.0,
-    movie_resolution: int = 2,
+    movie_resolution: int = 6,
     movie_dt: float = 3.75e-5,
-    movie_t_final: float = 7.0e-3,
+    movie_t_final: float = 2.0e-3,
     movie_fps: int = 36,
     movie_view: str = "both",
     include_geometry: bool = True,
@@ -52,7 +52,7 @@ def run_readme_showcase_demo(
                 dt=movie_dt,
                 t_final=movie_t_final,
                 max_steps=movie_steps,
-                potential_iterations=4,
+                potential_iterations=6,
             ),
         )
         movie_frames_payload = solve_case_snapshots(movie_case, frame_count=movie_steps)
@@ -82,9 +82,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate the retained README showcase media bundle.")
     parser.add_argument("--output", type=Path, default=Path("docs/_static/generated"))
     parser.add_argument("--movie-ha", type=float, default=20.0)
-    parser.add_argument("--movie-resolution", type=int, default=2)
+    parser.add_argument("--movie-resolution", type=int, default=6)
     parser.add_argument("--movie-dt", type=float, default=3.75e-5)
-    parser.add_argument("--movie-t-final", type=float, default=7.0e-3)
+    parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
     parser.add_argument("--movie-fps", type=int, default=36)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
     parser.add_argument("--skip-geometry", action="store_true")

@@ -106,6 +106,14 @@ CPU devices and then flattens, which is consistent with a memory-bandwidth
 limit on the host path. The remote GPU path shows about `1.86x` speedup from
 `1` to `2` GPUs on the larger fixed problem.
 
+Recent local profiling confirms that the current CPU benchmark is still the
+wrong place to claim a final CPU strong-scaling result. A JAX trace collected
+for the `2`-device CPU benchmark (`/tmp/lmx_cpu_scaling_profile`) shows the
+current path is dominated by a memory-bound sharded stencil on forced logical
+host devices. The next CPU scaling benchmark should therefore move closer to
+the actual `extruded_inductionless` operator path or a higher-intensity 3D
+kernel rather than relying on the present host-device sharding curve alone.
+
 ## Recent compatibility and platform validation
 
 The current tree has also been validated on:
