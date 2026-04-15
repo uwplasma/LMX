@@ -425,10 +425,11 @@ physics-facing checks:
 - negative enough `field_mean_velocity_correlation`
 
 On the current bounded larger dataset, those stricter fringing-physics checks
-pass for `rect_duct` and `pipe_ogrid`, and they still expose one real open
-issue in `layered_duct`: throughput constancy is not yet tight enough there on
-the heavier runs. That is now a tracked solver-hardening item rather than a
-hidden deficiency.
+now pass for `rect_duct`, `layered_duct`, and `pipe_ogrid`. The key layered
+hardening step was a partial stationwise throughput-closure correction inside
+the 3D projection loop, which brought `volumetric_flow_rate_span` down to
+`≈ 1.00e-3` at `Ha=10` and `≈ 2.75e-3` at `Ha=20` while preserving the expected
+negative field/mean-velocity correlation.
 
 For the current exploratory mapped-pipe comparison against the shipped external
 fringing-pipe profiles, use:

@@ -347,6 +347,31 @@ def test_solve_extruded_inductionless_projection_returns_finite_layered_bundle()
     assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
 
 
+def test_layered_projection_keeps_throughput_span_bounded_on_heavier_case():
+    problem = build_layered_duct_extruded_problem(
+        ha_peak=20.0,
+        nx_stations=5,
+        ny=6,
+        nz=6,
+        wall_cells=1,
+        insulator_cells=1,
+    )
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=12, potential_iterations=48),
+            solver=replace(problem.case.solver, coupling_iterations=8),
+        ),
+    )
+
+    solution = solve_extruded_inductionless(problem)
+
+    assert solution.validation.volumetric_flow_rate_span < 5.0e-3
+    assert solution.validation.field_mean_velocity_correlation < -5.0e-1
+    assert solution.validation.max_charge_balance_residual < 1.0e-4
+
+
 def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
     problem = build_pipe_ogrid_extruded_problem(ha_peak=6.0, nx_stations=4, nr=4, ntheta=8)
 

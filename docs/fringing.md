@@ -261,23 +261,29 @@ The last two gates are explicitly physics-facing rather than solver-facing:
   enforces the expected anti-correlation between local field strength and mean
   streamwise velocity under constant forcing
 
-On the current bounded larger dataset, those added physics gates split the
-fringing set more sharply than the conservation gates do:
+On the current bounded larger dataset, those added physics gates now pass for
+all three retained fringing geometries:
 
 - `rect_duct` passes
+- `layered_duct` passes after adding a partial stationwise throughput-closure
+  step inside the 3D projection loop
 - `pipe_ogrid` passes
-- `layered_duct` still fails the throughput-constancy gate on the heavier runs,
-  with `volumetric_flow_rate_span ≈ 5.37e-3` at `Ha=10`, `resolution=8` and
-  `≈ 1.13e-2` at `Ha=20`, `resolution=12`
+
+Current retained layered hardening signals on that dataset:
+
+- `volumetric_flow_rate_span ≈ 1.00e-3` at `Ha=10`
+- `volumetric_flow_rate_span ≈ 2.75e-3` at `Ha=20`
+- `field_mean_velocity_correlation ≈ -8.02e-1`
+- `max_charge_balance_residual <= 1.37e-5`
 
 So the current reviewer-proof statement is:
 
 - the retained conservation gate covers `rect_duct`, `layered_duct`, and
   `pipe_ogrid`
-- the stricter fringing physics gate currently covers `rect_duct` and
-  `pipe_ogrid`
-- layered 3D fringing still needs another operator-hardening pass before it can
-  join that stricter set
+- the stricter fringing physics gate now also covers `rect_duct`,
+  `layered_duct`, and `pipe_ogrid`
+- mapped pipe still remains qualitative on the external profile-comparison side,
+  even though it is now inside the retained internal validation gate
 
 Current retained mapped-pipe hardening signals on the heavier bounded
 dataset:

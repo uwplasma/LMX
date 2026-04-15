@@ -285,12 +285,16 @@ That retained gate now passes for all three retained fringing geometries.
 - A stricter fringing-physics gate is now also in the manual validation lane:
   - `volumetric_flow_rate_span <= 5e-3`
   - `field_mean_velocity_correlation <= -5e-1`
-- On the current bounded larger dataset that stricter gate passes for
-  `rect_duct` and `pipe_ogrid`, but layered 3D fringing still fails it:
-  - `volumetric_flow_rate_span ≈ 5.37e-3` at `Ha=10`, `resolution=8`
-  - `volumetric_flow_rate_span ≈ 1.13e-2` at `Ha=20`, `resolution=12`
-  - the next layered-fringing hardening step is therefore about throughput
-    constancy, not charge closure
+- On the current bounded larger dataset that stricter gate now passes for all
+  three retained fringing geometries:
+  - `rect_duct`
+  - `layered_duct`
+  - `pipe_ogrid`
+- The layered 3D hardening step that closed that gap was a partial
+  stationwise throughput-closure correction inside the 3D projection loop:
+  - `volumetric_flow_rate_span ≈ 1.00e-3` at `Ha=10`
+  - `volumetric_flow_rate_span ≈ 2.75e-3` at `Ha=20`
+  - `field_mean_velocity_correlation ≈ -8.02e-1`
 - The key layered 3D hardening step was replacing the stiff multi-region
   electric Jacobi iteration with a sparse direct solve of the conservative
   variable-coefficient potential operator.

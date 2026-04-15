@@ -170,6 +170,25 @@ def _enforce_velocity_bc_3d(field: jnp.ndarray, active_mask: jnp.ndarray | None 
     return bounded
 
 
+def _enforce_stationwise_flow_rate_3d(
+    u: jnp.ndarray,
+    *,
+    active_mask: jnp.ndarray,
+    cell_area: jnp.ndarray,
+    target_flow_rate: float | None = None,
+    relaxation: float = 1.0,
+) -> jnp.ndarray:
+    active_area = jnp.maximum(jnp.sum(jnp.where(active_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
+    station_flow_rate = jnp.sum(jnp.where(active_mask, u * cell_area, 0.0), axis=(1, 2))
+    if target_flow_rate is None:
+        target = jnp.mean(station_flow_rate)
+    else:
+        target = jnp.asarray(target_flow_rate, dtype=u.dtype)
+    correction = (relaxation * (station_flow_rate - target) / active_area)[:, None, None]
+    corrected = jnp.where(active_mask, u - correction, 0.0)
+    return corrected
+
+
 def _poisson_jacobi_3d(
     rhs: jnp.ndarray,
     *,
@@ -1478,6 +1497,8 @@ def _solve_extruded_projection(
         )
         stable_dt = 0.1 / max(inverse_diffusive_scale, 1.0e-12)
         dt = min(float(case.time_stepper.dt), stable_dt)
+        cell_area = rr * dr * dtheta
+        target_flow_rate = float(jnp.mean(jnp.sum(u * cell_area, axis=(1, 2)))) if initial_bundle is not None else None
         outer_steps = max(2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2)))
         poisson_iterations = min(case.time_stepper.potential_iterations, 80)
         poisson_tolerance = case.solver.coupling_tolerance
@@ -1521,6 +1542,14 @@ def _solve_extruded_projection(
             u_next = _clip_state(u_star - (dt / rho) * dpc_dx, velocity_limit)
             v_next = _clip_state(v_star - (dt / rho) * dpc_dr, velocity_limit)
             w_next = _clip_state(w_star - (dt / rho) * dpc_dtheta, velocity_limit)
+            u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next)
+            u_next = _enforce_stationwise_flow_rate_3d(
+                u_next,
+                active_mask=jnp.ones_like(u_next, dtype=bool),
+                cell_area=cell_area,
+                target_flow_rate=target_flow_rate,
+                relaxation=0.25,
+            )
             u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next)
             p = _clip_state(p + p_corr, scalar_limit)
 
@@ -1592,7 +1621,6 @@ def _solve_extruded_projection(
 
         final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
         residual = jnp.full((nx,), final_step_residual, dtype=float)
-        cell_area = rr * dr * dtheta
         cross_section_area = jnp.maximum(jnp.sum(cell_area, axis=(1, 2)), 1.0e-20)
         volumetric_flow_rate = jnp.sum(u * cell_area, axis=(1, 2))
         mean_velocity = volumetric_flow_rate / cross_section_area
@@ -1667,6 +1695,7 @@ def _solve_extruded_projection(
     rho = _broadcast_cross_section(materials.density, nx)
     nu = _broadcast_cross_section(materials.viscosity, nx)
     fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
+    cell_area = _broadcast_cross_section(mesh.dy[:, None] * mesh.dz[None, :], nx)
     forcing = float(case.forcing)
     field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
     base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
@@ -1692,6 +1721,7 @@ def _solve_extruded_projection(
     inverse_diffusive_scale = float(jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12)))
     stable_dt = 0.2 / max(inverse_diffusive_scale, 1.0e-12)
     dt = min(float(case.time_stepper.dt), stable_dt)
+    target_flow_rate = float(jnp.mean(jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2)))) if initial_bundle is not None else None
     outer_steps = max(2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2)))
     poisson_iterations = min(case.time_stepper.potential_iterations, 80)
     poisson_tolerance = case.solver.coupling_tolerance
@@ -1742,6 +1772,14 @@ def _solve_extruded_projection(
         u_next = _clip_state(u_next, velocity_limit)
         v_next = _clip_state(v_next, velocity_limit)
         w_next = _clip_state(w_next, velocity_limit)
+        u_next = _enforce_stationwise_flow_rate_3d(
+            u_next,
+            active_mask=fluid_mask,
+            cell_area=cell_area,
+            target_flow_rate=target_flow_rate,
+            relaxation=0.6 if case.geometry.kind == "layered_duct" else 0.0,
+        )
+        u_next = _enforce_velocity_bc_3d(u_next, fluid_mask)
         p = _clip_state(jnp.where(fluid_mask, p + p_corr, 0.0), scalar_limit)
 
         uxb_x = v_next * bz - w_next * by
@@ -1801,7 +1839,6 @@ def _solve_extruded_projection(
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
     residual = jnp.full((nx,), final_step_residual, dtype=float)
-    cell_area = _broadcast_cross_section(mesh.dy[:, None] * mesh.dz[None, :], nx)
     fluid_area = jnp.maximum(jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
     volumetric_flow_rate = jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
     mean_velocity = volumetric_flow_rate / fluid_area
