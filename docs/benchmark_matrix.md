@@ -194,3 +194,24 @@ used to stage the next validation campaigns:
 - `external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/Divertorlets`
   - current-driven / complex-geometry reference data for later engineering
     validation
+
+## Planned geometry and field extensions
+
+Two capability lanes should be treated as explicit benchmark projects rather
+than as ad hoc feature work:
+
+- bent-pipe geometry
+  - baseline: no-field Dean-flow verification
+  - inductionless extension: uniform-field bent pipe
+  - nonuniform-field extension: fringing-field bent pipe
+  - required observables:
+    pressure span, secondary-flow structure, current closure, and mesh
+    convergence with curvature
+- spatially varying magnetic fields
+  - baseline: manufactured divergence-free field verification
+  - recovery test: reproduce the current fringing benchmarks through the
+    generic field-loading path
+  - extension: tabulated or analytic 3D fields for ducts and pipes
+  - required observables:
+    pressure redistribution, Lorentz-force localization, throughput change, and
+    charge/current closure under mesh refinement

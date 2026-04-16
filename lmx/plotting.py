@@ -18,6 +18,7 @@ import numpy as np
 
 from .core import Solution
 from .mesh import StructuredMesh
+from .validation import hartmann_analytic_profile
 from .validation import extract_midplane_profile
 
 
@@ -350,15 +351,18 @@ def write_transient_movies(
     fig2d = None
     anim2d = None
     if include_2d:
-        fig2d, ax2d = plt.subplots(figsize=(6.1, 5.2), constrained_layout=True)
-        image = ax2d.imshow(
+        fig2d = plt.figure(figsize=(8.6, 5.6), constrained_layout=True)
+        grid2d = fig2d.add_gridspec(2, 2, width_ratios=(1.0, 0.38), height_ratios=(1.0, 1.0))
+        ax2d = fig2d.add_subplot(grid2d[:, 0])
+        profile_y_ax = fig2d.add_subplot(grid2d[0, 1])
+        profile_z_ax = fig2d.add_subplot(grid2d[1, 1])
+        image = ax2d.pcolormesh(
+            np.asarray(mesh.z_faces),
+            np.asarray(mesh.y_faces),
             _movie_field(0),
-            extent=[float(mesh.z_faces[0]), float(mesh.z_faces[-1]), float(mesh.y_faces[0]), float(mesh.y_faces[-1])],
-            origin="lower",
-            interpolation="bicubic",
+            shading="auto",
             cmap=cmap,
             norm=norm,
-            aspect="equal",
         )
         ax2d.set_xlabel("z")
         ax2d.set_ylabel("y")
@@ -366,19 +370,56 @@ def write_transient_movies(
         ax2d.set_aspect("equal")
         _add_layer_annotations(ax2d, mesh, frames[0].get("fluid_mask"), show_side_layers=show_side_layers)
         mid_z = int(len(mesh.z_centers) // 2)
-        profile_ax = ax2d.inset_axes([0.53, 0.07, 0.34, 0.24])
-        profile_ax.set_facecolor((1.0, 1.0, 1.0, 0.88))
-        profile_ax.set_title("Centerline profile", fontsize=8)
-        profile_ax.set_xlabel("u", fontsize=8)
-        profile_ax.set_ylabel("y", fontsize=8)
-        profile_ax.tick_params(labelsize=7)
-        profile_line, = profile_ax.plot(
-            np.asarray(frames[0]["u"])[:, mid_z],
+        mid_y = int(len(mesh.y_centers) // 2)
+        current_y_profile = np.asarray(frames[0]["u"])[:, mid_z]
+        current_z_profile = np.asarray(frames[0]["u"])[mid_y, :]
+        peak_profile = max(float(np.max(np.abs(current_y_profile))), 1.0e-12)
+        hartmann_reference = None
+        if "hartmann" in case_name and getattr(getattr(case, "geometry", None), "target_ha", None) is not None:
+            hartmann_reference = np.asarray(
+                hartmann_analytic_profile(
+                    np.asarray(mesh.y_centers, dtype=float),
+                    float(case.geometry.target_ha),
+                )
+            )
+
+        profile_y_ax.set_title("y-centerline", fontsize=11)
+        profile_y_ax.set_xlabel("u / max u(t)", fontsize=11)
+        profile_y_ax.set_ylabel("y", fontsize=11)
+        profile_y_ax.tick_params(labelsize=10)
+        profile_y_line, = profile_y_ax.plot(
+            current_y_profile / peak_profile,
             np.asarray(mesh.y_centers),
             color="#111827",
-            linewidth=1.4,
+            linewidth=1.7,
+            label="LMX transient",
         )
-        profile_ax.set_ylim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
+        if hartmann_reference is not None:
+            reference_scale = max(float(np.max(np.abs(hartmann_reference))), 1.0e-12)
+            profile_y_ax.plot(
+                hartmann_reference / reference_scale,
+                np.asarray(mesh.y_centers),
+                color="#b45309",
+                linestyle="--",
+                linewidth=1.5,
+                label="steady analytic",
+            )
+        profile_y_ax.set_xlim(-0.02, 1.05)
+        profile_y_ax.set_ylim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
+        profile_y_ax.legend(loc="lower right", fontsize=10)
+
+        profile_z_ax.set_title("z-centerline", fontsize=11)
+        profile_z_ax.set_xlabel("z", fontsize=11)
+        profile_z_ax.set_ylabel("u / max u(t)", fontsize=11)
+        profile_z_ax.tick_params(labelsize=10)
+        profile_z_line, = profile_z_ax.plot(
+            np.asarray(mesh.z_centers),
+            current_z_profile / peak_profile,
+            color="#0f766e",
+            linewidth=1.7,
+        )
+        profile_z_ax.set_xlim(float(mesh.z_faces[0]), float(mesh.z_faces[-1]))
+        profile_z_ax.set_ylim(-0.02, 1.05)
         annotation_bbox = {"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "none", "alpha": 0.85}
         time_text = ax2d.text(0.02, 0.98, "", transform=ax2d.transAxes, ha="left", va="top", bbox=annotation_bbox)
         peak_text = ax2d.text(0.98, 0.98, "", transform=ax2d.transAxes, ha="right", va="top", bbox=annotation_bbox)
@@ -387,7 +428,7 @@ def write_transient_movies(
 
         def update_2d(index: int):
             field = _movie_field(index)
-            image.set_data(field)
+            image.set_array(np.asarray(field).ravel())
             if contour_state:
                 previous_contour = contour_state.pop()
                 if hasattr(previous_contour, "remove"):
@@ -409,13 +450,16 @@ def write_transient_movies(
                 alpha=0.55,
             )
             contour_state.append(contour)
-            profile_field = np.asarray(frames[index]["u"])[:, mid_z]
-            profile_line.set_data(profile_field, np.asarray(mesh.y_centers))
-            profile_span = max(float(np.max(np.abs(profile_field))), 1.0e-12)
-            profile_ax.set_xlim(-0.05 * profile_span, 1.05 * profile_span)
+            y_profile_field = np.asarray(frames[index]["u"])[:, mid_z]
+            z_profile_field = np.asarray(frames[index]["u"])[mid_y, :]
+            profile_span = max(float(np.max(np.abs(y_profile_field))), 1.0e-12)
+            profile_y_line.set_data(y_profile_field / profile_span, np.asarray(mesh.y_centers))
+            profile_z_line.set_data(np.asarray(mesh.z_centers), z_profile_field / profile_span)
+            profile_y_ax.set_xlim(-0.02, 1.05)
+            profile_z_ax.set_ylim(-0.02, 1.05)
             time_text.set_text(f"t = {_format_time_with_units(times[index])}")
             peak_text.set_text(f"max|u| = {frame_peaks[index]:.2e}")
-            return image, time_text, peak_text, profile_line
+            return image, time_text, peak_text, profile_y_line, profile_z_line
 
         anim2d = animation.FuncAnimation(fig2d, update_2d, frames=len(frames), interval=1000 / fps, blit=False)
         update_2d(len(frames) - 1)
@@ -435,27 +479,34 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
+        mid_z = int(len(mesh.z_centers) // 2)
+        z_ribbon_halfwidth = 0.08 * max(float(mesh.z_faces[-1] - mesh.z_faces[0]), 1.0e-12)
+        z_ribbon = np.linspace(-z_ribbon_halfwidth, z_ribbon_halfwidth, 9)
+        yy_ribbon, zz_ribbon = np.meshgrid(np.asarray(y_centers), z_ribbon, indexing="ij")
 
         def update_3d(index: int):
             ax3d.cla()
             field = _movie_field(index)
-            facecolors = cmap_obj(norm(field))
-            surfaces = []
+            center_profile = np.asarray(frames[index]["u"])[:, mid_z]
+            profile_peak = max(float(np.max(np.abs(center_profile))), 1.0e-12)
             if use_normalized_positive:
-                normalized_field = np.clip(field, 0.0, 1.0)
-                x_surface = 0.14 * x_extent + 0.78 * x_extent * normalized_field
+                normalized_profile = np.clip(center_profile / profile_peak, 0.0, 1.0)
+                x_surface = 0.16 * x_extent + 0.74 * x_extent * normalized_profile[:, None]
+                ribbon_colors = cmap_obj(norm(np.repeat(normalized_profile[:, None], z_ribbon.size, axis=1)))
             else:
-                normalized_field = np.clip(field / stack_abs_max, -1.0, 1.0)
-                x_surface = 0.52 * x_extent + 0.36 * x_extent * normalized_field
+                normalized_profile = np.clip(center_profile / stack_abs_max, -1.0, 1.0)
+                x_surface = 0.50 * x_extent + 0.32 * x_extent * normalized_profile[:, None]
+                ribbon_colors = cmap_obj(norm(np.repeat(center_profile[:, None], z_ribbon.size, axis=1)))
+            surfaces = []
             surfaces.append(
                 ax3d.plot_surface(
                     x_surface,
-                    zz,
-                    yy,
-                    facecolors=facecolors,
+                    zz_ribbon,
+                    yy_ribbon,
+                    facecolors=ribbon_colors,
                     shade=False,
-                    linewidth=0.22,
-                    edgecolor=(1.0, 1.0, 1.0, 0.18),
+                    linewidth=0.18,
+                    edgecolor=(1.0, 1.0, 1.0, 0.12),
                     antialiased=True,
                     alpha=0.96,
                     rstride=1,
@@ -468,11 +519,11 @@ def write_transient_movies(
                     back_plane_x,
                     zz,
                     yy,
-                    color="#cbd5e1",
+                    facecolors=cmap_obj(norm(field)),
                     shade=False,
                     linewidth=0.0,
                     antialiased=False,
-                    alpha=0.12,
+                    alpha=0.20,
                 )
             )
             boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
@@ -534,7 +585,7 @@ def write_transient_movies(
             ax3d.set_ylabel("z")
             ax3d.set_zlabel("y")
             ax3d.set_title(
-                f"{case_title} | 3D streamwise-velocity surface\n"
+                f"{case_title} | 3D centerplane velocity ribbon\n"
                 f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
             )
             ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)

@@ -118,17 +118,20 @@ Those geometries are not shown in isolation in the rest of the README:
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show Hartmann startup in 2D and 3D from `t = 0` to `t = 2 ms`. The duct starts
-from rest and evolves toward the familiar plug-like Hartmann profile, with thin
-boundary layers along the walls normal to the imposed magnetic field. Time is
-shown in physical units, the fluid domain is outlined explicitly, and all solved
-timesteps are written to the GIF so the early layer formation is visible rather
-than skipped. The README path now uses a `48 × 48` cross-section to make the
-wall layers and core profile visible at landing-page scale.
+show Hunt startup in 2D and 3D. Hunt flow is the closed-channel inductionless
+benchmark with conducting Hartmann walls, insulating side walls, and a
+transverse magnetic field. The magnetic field suppresses the core, drives thin
+Hartmann layers at the conducting walls, and produces the sidewall jet
+structure seen in the `z`-centerline profile. Time is shown in physical units,
+the fluid domain is outlined explicitly, and all solved timesteps are written
+to the GIF. The 2D panel carries both the `y`-centerline Hartmann-layer profile
+and the `z`-centerline sidewall profile, while the 3D panel renders a
+centerplane velocity ribbon inside the duct rather than a detached color
+surface.
 
 <p align="center">
-  <img src="docs/_static/generated/readme_hartmann_startup_2d.gif" alt="LMX 2D Hartmann startup movie" width="48%">
-  <img src="docs/_static/generated/readme_hartmann_startup_3d.gif" alt="LMX 3D Hartmann startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt startup movie" width="48%">
 </p>
 
 ### Fringing-field response

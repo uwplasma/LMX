@@ -104,6 +104,93 @@ publication-grade additions after the current A/B ladder are:
 - open-channel / free-surface validation
 - current-driven channel validation
 
+### Remaining real gaps
+
+- README/media QA
+  - the landing-page startup movies still need a final high-resolution refresh
+    with symmetric, layer-resolved Hartmann visuals
+  - the movie path should use solver settings and gauge treatment that do not
+    introduce visible left/right bias in closed symmetric cases
+- Benchmark B quantitative closure
+  - dense `rect_duct` fringing remains the main quantitative hardening target
+  - mapped-pipe external comparison is still qualitative rather than a locked
+    parity table
+- CPU scaling
+  - the current longer-run CPU artifact is honest, but it is still a surrogate
+    benchmark rather than the final solver-faithful CPU scaling story
+  - the next accepted CPU figure must be tied more directly to the executable
+    `extruded_inductionless` operator path and backed by profiling
+- Solver coverage
+  - `lmx/solvers.py` still carries the main branch-heavy coverage debt
+  - remaining coverage work should remove or test historical branches rather
+    than hiding them behind low-value integration harnesses
+- Validation runtime discipline
+  - the combined A/B validation exercise is a manual lane rather than a
+    routine sub-five-minute gate
+
+### Capability roadmap beyond the current geometry set
+
+#### Bent-pipe geometry
+
+Required implementation work:
+
+- centerline-following structured mesh for a constant-radius bend
+- mapped wall metrics and face areas consistent with conservative current
+  reconstruction
+- inlet/outlet boundary handling for curved centerlines
+- 3D electric-potential solve with the same compatibility and boundary-current
+  audits used in the existing fringing lane
+
+Required validation work:
+
+- no-field Dean-flow baseline before any MHD coupling
+- uniform-field bent-pipe inductionless case
+- nonuniform/fringing-field bent-pipe case
+- mesh-convergence study on curvature, pressure span, and current closure
+
+#### Spatially varying magnetic fields
+
+Required implementation work:
+
+- executable support for analytic and tabulated 3D magnetic-field profiles
+- validation of interpolation, normalization, and field loading through both
+  Python and TOML/CLI workflows
+- conservative current/Lorentz assembly with fully spatially varying `B(x,y,z)`
+
+Required validation work:
+
+- manufactured divergence-free field checks
+- recovery of the existing fringing benchmarks using the generic field path
+- variable-field duct studies where pressure span, flow-rate distortion, and
+  current closure are compared under mesh refinement
+
+### Literature-anchored benchmark expansion
+
+Using the V&V sequence summarized by Samper et al., the benchmark ladder after
+the current closed-duct and fringing set should be organized as:
+
+1. Benchmark A
+   - 2D fully developed laminar steady MHD duct cases
+   - Hartmann, Shercliff, Hunt profiles, integrals, and conservation
+2. Benchmark B
+   - 3D laminar developing flow in nonuniform magnetic fields
+   - rectangular duct, layered duct, mapped pipe, then bent pipe
+3. Benchmark C
+   - quasi-2D turbulent duct/channel MHD
+4. Benchmark D
+   - fully 3D turbulent or magnetic-obstacle MHD
+5. Benchmark E
+   - heat-transfer / buoyant-convection MHD
+
+For LMX, each benchmark level should only be promoted once the following are
+documented together:
+
+- governing observables
+- mesh and timestep refinement rules
+- conservation thresholds
+- external reference or experimental source
+- executable driver and committed example inputs
+
 ## Parallelization work required before manuscript closeout
 
 - CPU scaling
@@ -410,9 +497,9 @@ That retained gate now passes for all three retained fringing geometries.
   - the README now acts as a short landing page rather than a long changelog
   - the geometry gallery now uses a denser `2 x 3` layout with clearer legends
     and more informative mapped-pipe previews
-  - the README startup media now uses a bounded `0–2 ms` Hartmann startup
-    sequence with unit-bearing timestamps, explicit wall-layer annotation, and
-    all solved timesteps written to the GIF
+  - the README startup media now uses a bounded Hunt startup sequence with
+    unit-bearing timestamps, explicit wall-layer annotation, and all solved
+    timesteps written to the GIF
   - the README/docs/examples surface no longer uses the older
     release-narrative framing
 - The scaling workflow now benchmarks a denser 3D operator path instead of the
@@ -439,11 +526,11 @@ That retained gate now passes for all three retained fringing geometries.
 - The README showcase workflow was tightened around bounded regeneration:
   - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
     geometry-only refreshes
-  - the Hartmann startup GIFs now use `dt = 2.0e-5 s`, `t_final = 2 ms`, and
+  - the current Hunt startup GIFs use `dt = 2.5e-4 s`, `t_final = 10 ms`, and
     all solved timesteps in the output movie
   - the current README movie configuration that regenerates locally uses
-    `ny = nz = 24`, `potential_iterations = 24`, and
-    `coupling_iterations = 6`
+    `ny = nz = 48`, `wall_cells = 4`, `potential_iterations = 128`, and
+    `coupling_iterations = 16`
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the
@@ -480,15 +567,16 @@ That retained gate now passes for all three retained fringing geometries.
     - `DamBreak`
     - `LMX-U`
     - `Divertorlets`
-- The README Hartmann startup media was rerun on the bounded high-resolution
-  configuration now used by `examples/readme_showcase_demo.py`:
+- The README startup media workflow now supports both Hartmann and Hunt cases,
+  and the current landing-page path uses the Hunt benchmark because it exposes
+  the sidewall-jet structure more clearly:
   - `Ha = 20`
-  - `48 × 48` cross-section
-  - `dt = 2.0e-5`
-  - `t_final = 2.0e-3`
+  - `48 × 48` fluid cross-section with `4` wall cells
+  - `dt = 2.5e-4`
+  - `t_final = 1.0e-2`
   - all solved timesteps written to the GIF
-  - the 3D view is now a streamwise-velocity surface rather than a detached
-    slice stack
+  - the 2D panel carries `y`- and `z`-centerline diagnostics
+  - the 3D panel is a centerplane velocity ribbon inside the duct
 - The current longer strong-scaling artifact now uses:
   - CPU: `2048×64×64`, `1024` iterations
   - GPU: `6144×96×96`, `4096` iterations

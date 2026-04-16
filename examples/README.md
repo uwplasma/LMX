@@ -32,6 +32,7 @@ python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/exam
 python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
 python examples/extruded_summary_figures.py --output ./artifacts/examples/extruded_summary_figures
 python examples/readme_showcase_demo.py --output ./docs/_static/generated
+python examples/readme_showcase_demo.py --output ./docs/_static/generated --movie-case-kind hunt
 python examples/readme_showcase_demo.py --output ./docs/_static/generated --skip-geometry --movie-view 2d
 python examples/readme_showcase_demo.py --output ./docs/_static/generated --skip-geometry --movie-view 3d
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
@@ -157,7 +158,7 @@ The restart and validation campaign examples extend that same 3D lane:
     rectangular and layered datasets
 - `readme_showcase_demo.py`
   - regenerates the README media bundle, including the geometry panel
-    and bounded 2D/3D Hartmann startup GIFs
+    and bounded 2D/3D Hunt startup GIFs
   - supports split refreshes with `--movie-view 2d` or `--movie-view 3d`
     when only one GIF needs to be updated inside the five-minute local budget
 
