@@ -158,13 +158,14 @@ device curves come from minute-scale kernels instead of short smoke tests.
 
 Measured warm-runtime points:
 
-- CPU: `128.87 s`, `103.69 s`, `73.65 s`, `72.90 s` at `1, 2, 4, 8`
-- GPU: `78.59 s`, `62.56 s` at `1, 2`
+- CPU: `79.45 s`, `68.68 s`, `64.09 s`, `66.16 s` at `1, 2, 4, 8`
+- GPU: `78.58 s`, `62.52 s` at `1, 2`
 
-On this workstation the CPU curve improves materially up to `4` logical
-devices and then plateaus between `4` and `8`, which is consistent with a
-host-memory-bandwidth limit on the current sharded operator path. The GPU curve
-keeps a cleaner strong-scaling trend on the larger fixed problem.
+On this workstation the CPU curve improves through `4` logical devices and then
+flattens at `8`, which is still consistent with a host-memory-bandwidth and
+communication limit on the current sharded operator path. The corrected
+two-GPU path keeps the cleaner strong-scaling trend on the larger fixed
+problem.
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
 

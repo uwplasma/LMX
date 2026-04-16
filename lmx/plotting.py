@@ -475,8 +475,8 @@ def write_transient_movies(
 
     y_centers = np.asarray(mesh.y_centers, dtype=float)
     z_centers = np.asarray(mesh.z_centers, dtype=float)
-    y_display_stride = max(1, int(math.ceil(y_centers.size / 33)))
-    z_display_stride = max(1, int(math.ceil(z_centers.size / 33)))
+    y_display_stride = max(1, int(math.ceil(y_centers.size / 29)))
+    z_display_stride = max(1, int(math.ceil(z_centers.size / 29)))
     y_display = y_centers[::y_display_stride]
     z_display = z_centers[::z_display_stride]
     if y_display[-1] != y_centers[-1]:
@@ -493,7 +493,7 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
-        x_slice_positions = np.linspace(0.06 * x_extent, 0.94 * x_extent, 9)
+        x_slice_positions = np.linspace(0.06 * x_extent, 0.94 * x_extent, 7)
         x_front = 0.04 * x_extent
         x_back = 0.96 * x_extent
 

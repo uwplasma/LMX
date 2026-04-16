@@ -36,9 +36,9 @@ def run_readme_showcase_demo(
     movie_t_final: float = 2.0e-3,
     movie_fps: int = 20,
     movie_view: str = "both",
-    movie_coupling_iterations: int = 12,
+    movie_coupling_iterations: int = 8,
     movie_coupling_tolerance: float = 1.0e-6,
-    movie_potential_iterations: int = 120,
+    movie_potential_iterations: int = 80,
     movie_wall_cells: int = 4,
     movie_initial_velocity: float = 1.0,
     include_geometry: bool = True,
@@ -141,9 +141,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
     parser.add_argument("--movie-fps", type=int, default=20)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
-    parser.add_argument("--movie-coupling-iterations", type=int, default=12)
+    parser.add_argument("--movie-coupling-iterations", type=int, default=8)
     parser.add_argument("--movie-coupling-tolerance", type=float, default=1.0e-6)
-    parser.add_argument("--movie-potential-iterations", type=int, default=120)
+    parser.add_argument("--movie-potential-iterations", type=int, default=80)
     parser.add_argument("--movie-wall-cells", type=int, default=4)
     parser.add_argument("--movie-initial-velocity", type=float, default=1.0)
     parser.add_argument("--skip-geometry", action="store_true")

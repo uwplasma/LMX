@@ -550,7 +550,7 @@ That retained gate now passes for all three retained fringing geometries.
     `t_final = 2.0 ms`, and all solved timesteps in the output movie
   - the current README movie configuration that regenerates locally uses
     `ny = nz = 49`, a flat plug-flow initial condition, and the bounded
-    `coupling_iterations = 12` / `potential_iterations = 120` settings from
+    `coupling_iterations = 8` / `potential_iterations = 80` settings from
     `examples/readme_showcase_demo.py`
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
@@ -607,10 +607,10 @@ That retained gate now passes for all three retained fringing geometries.
   - CPU: `2048×64×64`, `1024` iterations
   - GPU: `6144×96×96`, `4096` iterations
   - warm runtime points:
-    - CPU: `128.87 s`, `103.69 s`, `73.65 s`, `72.90 s` at `1, 2, 4, 8`
-    - GPU: `78.59 s`, `62.56 s` at `1, 2`
+    - CPU: `79.45 s`, `68.68 s`, `64.09 s`, `66.16 s` at `1, 2, 4, 8`
+    - GPU: `78.58 s`, `62.52 s` at `1, 2`
   - current interpretation:
-    - the host CPU path improves strongly through `4` logical devices and then
+    - the host CPU path improves through `4` logical devices and then
       plateaus at `8`
     - the remote two-GPU path still shows the cleaner fixed-problem scaling
       curve
