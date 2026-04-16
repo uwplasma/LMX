@@ -16,13 +16,15 @@ def test_run_validation_suite_writes_summary(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(
         suite.argparse.ArgumentParser,
         "parse_args",
-        lambda self: SimpleNamespace(
+        lambda self, argv=None: SimpleNamespace(
             output=output,
             ha=5.0,
+            resolution=12,
             reference_root=None,
             x_slice="1m",
             hartmann_l2_threshold=0.05,
             hartmann_linf_threshold=0.1,
+            skip_paraview=False,
         ),
     )
     monkeypatch.setattr(suite, "make_hartmann_case", lambda **kwargs: case)
@@ -66,13 +68,15 @@ def test_run_validation_suite_handles_reference_branch(tmp_path: Path, monkeypat
     monkeypatch.setattr(
         suite.argparse.ArgumentParser,
         "parse_args",
-        lambda self: SimpleNamespace(
+        lambda self, argv=None: SimpleNamespace(
             output=output,
             ha=5.0,
+            resolution=12,
             reference_root=tmp_path / "refs",
             x_slice="1m",
             hartmann_l2_threshold=0.05,
             hartmann_linf_threshold=0.1,
+            skip_paraview=False,
         ),
     )
     monkeypatch.setattr(suite, "make_hartmann_case", lambda **kwargs: SimpleNamespace(name="hartmann_ha5", output=SimpleNamespace(directory=str(output / "hartmann"))))

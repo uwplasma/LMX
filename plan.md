@@ -69,6 +69,29 @@ explicitly documented and passing:
 - branch coverage keeps shrinking in live solver code rather than being hidden
   behind dead branches
 
+### Executable validation exercise
+
+The current top-level validation workflow that should be used before manuscript
+drafting is:
+
+```bash
+python scripts/run_full_validation_exercise.py \
+  --output artifacts/validation/full_validation_exercise \
+  --ha-values 10,20 \
+  --resolution 12 \
+  --fringing-resolutions 8,12 \
+  --skip-paraview \
+  --write-plot
+```
+
+That run must produce:
+
+- Benchmark A case artifacts and summaries
+- Benchmark B fringing gate summaries
+- one combined JSON summary
+- one combined CSV table
+- one combined Markdown report
+
 ### Validation ladder after the current duct/fringing set
 
 Following the benchmark sequence summarized by Samper et al., the next

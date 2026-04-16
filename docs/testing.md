@@ -71,6 +71,21 @@ python scripts/run_manual_solver_family_validation.py \
 This is the intended post-1.0 release-validation mode for conservation
 hardening.
 
+The current combined Benchmark A/B exercise is:
+
+```bash
+python scripts/run_full_validation_exercise.py \
+  --output artifacts/validation/full_validation_exercise \
+  --ha-values 10,20 \
+  --resolution 12 \
+  --fringing-resolutions 8,12 \
+  --skip-paraview \
+  --write-plot
+```
+
+That driver produces Benchmark A artifacts, Benchmark B gate summaries, and a
+combined JSON/CSV/Markdown report for the current documented thresholds.
+
 ## Physics gates
 
 The heavier validation lane should only be considered passing when all of the

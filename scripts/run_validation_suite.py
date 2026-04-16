@@ -28,32 +28,35 @@ from lmx.validation import (
 )
 
 
-def _cases(ha: float, output_dir: Path):
+def _cases(ha: float, output_dir: Path, resolution: int):
     return [
-        make_hartmann_case(ha=ha, ny=16, nz=16, output_dir=str(output_dir / "hartmann")),
-        make_shercliff_case(ha=ha, ny=16, nz=16, output_dir=str(output_dir / "shercliff")),
-        make_hunt_case(ha=ha, ny=16, nz=16, wall_cells=2, output_dir=str(output_dir / "hunt")),
+        make_hartmann_case(ha=ha, ny=resolution, nz=resolution, output_dir=str(output_dir / "hartmann")),
+        make_shercliff_case(ha=ha, ny=resolution, nz=resolution, output_dir=str(output_dir / "shercliff")),
+        make_hunt_case(ha=ha, ny=resolution, nz=resolution, wall_cells=2, output_dir=str(output_dir / "hunt")),
     ]
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the LMX validation artifact suite.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/validation"))
     parser.add_argument("--ha", type=float, default=5.0)
+    parser.add_argument("--resolution", type=int, default=16)
     parser.add_argument("--reference-root", type=Path, default=None)
     parser.add_argument("--x-slice", type=str, default="1m")
     parser.add_argument("--hartmann-l2-threshold", type=float, default=0.05)
     parser.add_argument("--hartmann-linf-threshold", type=float, default=0.1)
-    args = parser.parse_args()
+    parser.add_argument("--skip-paraview", action="store_true")
+    args = parser.parse_args(argv)
 
     args.output.mkdir(parents=True, exist_ok=True)
     summary: dict[str, dict[str, float | str]] = {}
 
-    for case in _cases(args.ha, args.output):
+    for case in _cases(args.ha, args.output, args.resolution):
         solution = solve_steady(case)
         case_dir = args.output / case.name
         case_dir.mkdir(parents=True, exist_ok=True)
-        write_paraview(solution, case_dir)
+        if not args.skip_paraview:
+            write_paraview(solution, case_dir)
         write_profile_csv(case_dir / "centerline.csv", extract_centerline(solution))
         write_profile_csv(case_dir / "midplane_z.csv", extract_midplane_profile(solution, axis="z"))
         metrics = validation_summary(solution, case.name, ha=args.ha)

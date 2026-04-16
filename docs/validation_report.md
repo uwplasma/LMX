@@ -39,6 +39,23 @@ The `1.0` release is aiming for:
 - Hunt validation that is judged from profile and integral observables, not from
   ad hoc scalar trace tuning
 
+## Combined validation workflow
+
+The top-level executable validation driver is:
+
+```bash
+python scripts/run_full_validation_exercise.py \
+  --output artifacts/validation/full_validation_exercise \
+  --ha-values 10,20 \
+  --resolution 12 \
+  --fringing-resolutions 8,12 \
+  --skip-paraview \
+  --write-plot
+```
+
+This combines Benchmark A artifact generation with Benchmark B fringing gate
+checks and writes JSON, CSV, and Markdown summaries for the current thresholds.
+
 ## Runtime diagnostics now exposed
 
 The default solver writes or reports:

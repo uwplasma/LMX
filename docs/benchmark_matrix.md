@@ -75,6 +75,29 @@ quality gates rather than only against visual agreement:
   - strict docs build
   - fast routine test lane under five minutes
 
+## Combined validation exercise
+
+The current executable path for the full Benchmark A/B validation sweep is:
+
+```bash
+python scripts/run_full_validation_exercise.py \
+  --output artifacts/validation/full_validation_exercise \
+  --ha-values 10,20 \
+  --resolution 12 \
+  --fringing-resolutions 8,12 \
+  --skip-paraview \
+  --reference-root ./references/ClosedChannel \
+  --write-plot
+```
+
+That workflow produces:
+
+- Benchmark A case directories with field/profile artifacts
+- Benchmark B fringing summaries and optional fringing-resolution plot
+- one combined JSON summary
+- one combined CSV table
+- one combined Markdown gate report
+
 ## Staged but deferred
 
 - Benchmark C: Q2D turbulent duct flow
