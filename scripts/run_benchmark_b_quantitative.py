@@ -62,10 +62,21 @@ def _pipe_profile_errors(bundle, reference_dir: Path | None) -> dict[str, float]
         "negative": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_NegXLine_5.89s.csv",
         "positive": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_PosXLine_5.89s.csv",
     }
+    reference_profiles = {name: _load_reference_profile(path) for name, path in reference_paths.items()}
+    reference_velocity_scale = max(
+        max(np.max(np.abs(velocity)), 1.0e-12) for _, velocity, _ in reference_profiles.values()
+    )
+    lmx_profiles = {
+        name: _extract_pipe_profile(bundle, x_offset_fraction=offset)
+        for name, (_, _, offset) in reference_profiles.items()
+    }
+    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_profiles.values())
     errors: dict[str, float] = {}
-    for name, path in reference_paths.items():
-        ref_coord, ref_velocity, offset, _ = _load_reference_profile(path)
-        lmx_coord, lmx_velocity = _extract_pipe_profile(bundle, x_offset_fraction=offset)
+    for name in reference_paths:
+        ref_coord, ref_velocity_raw, _ = reference_profiles[name]
+        lmx_coord, lmx_velocity_raw = lmx_profiles[name]
+        ref_velocity = ref_velocity_raw / reference_velocity_scale
+        lmx_velocity = lmx_velocity_raw / lmx_velocity_scale
         interpolated = np.interp(ref_coord, lmx_coord, lmx_velocity)
         errors[f"{name}_profile_l2_error"] = float(np.sqrt(np.mean((interpolated - ref_velocity) ** 2)))
         errors[f"{name}_profile_linf_error"] = float(np.max(np.abs(interpolated - ref_velocity)))

@@ -213,10 +213,10 @@ figure.
 
 Its default larger conservation dataset is now
 `rect_duct,layered_duct,pipe_ogrid`. The mapped-pipe slice is inside that hard
-gate on the bounded larger dataset, but its external profile comparison is still best
-treated as qualitative because the reference dataset is a high-`Ha`,
-high-`Re` benchmark while the current LMX pipe slice is still a low-`Re`
-model.
+gate on the bounded larger dataset, and its external profile comparison is now
+quantitative. The remaining gap is physical rather than bookkeeping: the
+reference dataset is a high-`Ha`, high-`Re` benchmark while the current LMX
+pipe slice is still a laminar inductionless model.
 
 Current hard-gate dataset:
 
@@ -269,7 +269,8 @@ So the current bounded-validation statement is:
   `pipe_ogrid`
 - the stricter fringing physics gate also covers `rect_duct`,
   `layered_duct`, and `pipe_ogrid`
-- mapped-pipe external profile comparison is still treated as qualitative
+- mapped-pipe external profile comparison is now quantitative and shows a
+  real high-`Ha`, high-`Re` parity gap against the current laminar pipe slice
 
 The widened bounded manual campaign at `Ha = 10, 20, 30`, `resolution = 8`
 keeps those three fringing geometries inside the combined conservation and
@@ -289,17 +290,18 @@ dataset:
 - `max_wall_current_leakage = 0`
 - `net_boundary_current_residual = 0`
 
-The current qualitative comparison against the external high-`Ha`, high-`Re`
+The current quantitative comparison against the external high-`Ha`, high-`Re`
 fringing-pipe profile data gives:
 
-- center line normalized axial-velocity shape error: `≈ 1.66e-1`
-- negative-offset absolute line error: `≈ 9.89e-1`
-- positive-offset absolute line error: `≈ 9.89e-1`
+- center-line `L_2 ≈ 1.64e-1`, `L_\infty ≈ 9.82e-1`
+- negative-offset `L_2 ≈ 9.94e-1`, `L_\infty ≈ 1.00`
+- positive-offset `L_2 ≈ 9.94e-1`, `L_\infty ≈ 1.00`
 
-So the current conclusion is still deliberately conservative: mapped
-pipe is part of the conservation/solver-validation set, but the
-current external pipe-profile comparison remains qualitative rather than a
-strict parity gate.
+Those numbers are now computed on one shared velocity normalization across all
+three comparison lines, so they describe a real parity gap rather than a
+per-line normalization artifact. The physical interpretation is also direct:
+the external dataset is a high-`Ha`, high-`Re` fringing-pipe case, while the
+current `pipe_ogrid` slice is still a laminar inductionless model.
 
 The denser `Ha=20`, `20×20×21` Benchmark B summary from
 `scripts/run_benchmark_b_quantitative.py` currently reports:

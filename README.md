@@ -201,7 +201,9 @@ The current validation surface includes:
 - strict docs build
 - restartable TOML and CLI workflows
 - internal conservation and fringing-physics gates on `rect_duct`, `layered_duct`, and `pipe_ogrid`
-- mapped-pipe external comparison kept explicitly qualitative
+- mapped-pipe external comparison now uses one shared velocity normalization
+  across all transverse lines, and currently exposes a real high-`Ha`,
+  high-`Re` parity gap rather than hiding it behind per-line normalization
 - widened bounded manual fringing campaign at `Ha = 10, 20, 30`, `resolution = 8`
 - a standalone quantitative Benchmark B summary driver for rectangular, layered,
   and mapped-pipe fringing cases

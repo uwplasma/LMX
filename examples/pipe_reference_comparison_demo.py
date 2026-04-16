@@ -33,17 +33,21 @@ def _replace_fields(obj, **changes):
     return obj
 
 
-def _load_reference_profile(path: Path) -> tuple[np.ndarray, np.ndarray, float, float]:
+def _load_reference_profile(path: Path) -> tuple[np.ndarray, np.ndarray, float]:
     data = np.genfromtxt(path, delimiter=",", names=True)
     coord = np.asarray(data["Points2"], dtype=float)
     velocity = np.asarray(data["U2"], dtype=float)
     x_offset = float(np.mean(np.asarray(data["Points0"], dtype=float)))
     coord_scale = max(np.max(np.abs(coord)), 1.0e-12)
-    velocity_scale = max(np.max(np.abs(velocity)), 1.0e-12)
-    return coord / coord_scale, velocity / velocity_scale, x_offset / coord_scale, velocity_scale
+    return coord / coord_scale, velocity, x_offset / coord_scale
 
 
-def _extract_pipe_profile(bundle, *, x_offset_fraction: float, samples: int = 121) -> tuple[np.ndarray, np.ndarray]:
+def _extract_pipe_profile(
+    bundle,
+    *,
+    x_offset_fraction: float,
+    samples: int = 121,
+) -> tuple[np.ndarray, np.ndarray]:
     peak_index = int(np.argmax(np.abs(np.asarray(bundle.field_scale, dtype=float))))
     radius = float(np.max(np.asarray(bundle.y, dtype=float)))
     u_station = np.asarray(bundle.u[peak_index], dtype=float)
@@ -86,8 +90,7 @@ def _extract_pipe_profile(bundle, *, x_offset_fraction: float, samples: int = 12
         if abs(target_x) <= 1.0e-12:
             theta_target = np.pi / 2.0 if z_target >= 0.0 else 3.0 * np.pi / 2.0
         profile[idx] = sample_value(r_target, theta_target)
-    profile_scale = max(np.max(np.abs(profile)), 1.0e-12)
-    return z_targets / z_limit, profile / profile_scale
+    return z_targets / z_limit, profile
 
 
 def run_pipe_reference_comparison_demo(
@@ -137,10 +140,14 @@ def run_pipe_reference_comparison_demo(
     solution = solve_extruded_inductionless(problem)
 
     reference_profiles = {name: _load_reference_profile(path) for name, path in reference_paths.items()}
+    reference_velocity_scale = max(
+        max(np.max(np.abs(velocity)), 1.0e-12) for _, velocity, _ in reference_profiles.values()
+    )
     lmx_profiles = {
         name: _extract_pipe_profile(solution.bundle, x_offset_fraction=offset)
-        for name, (_, _, offset, _) in reference_profiles.items()
+        for name, (_, _, offset) in reference_profiles.items()
     }
+    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_profiles.values())
 
     _set_style()
     fig, axes = plt.subplots(2, 2, constrained_layout=True)
@@ -150,19 +157,21 @@ def run_pipe_reference_comparison_demo(
     summary_profiles: dict[str, dict[str, float]] = {}
 
     for ax, name in zip(axes.ravel()[:3], ("center", "negative", "positive"), strict=False):
-        ref_coord, ref_velocity, offset, velocity_scale = reference_profiles[name]
-        lmx_coord, lmx_velocity = lmx_profiles[name]
+        ref_coord, ref_velocity_raw, offset = reference_profiles[name]
+        lmx_coord, lmx_velocity_raw = lmx_profiles[name]
+        ref_velocity = ref_velocity_raw / reference_velocity_scale
+        lmx_velocity = lmx_velocity_raw / lmx_velocity_scale
         interp_velocity = np.interp(ref_coord, lmx_coord, lmx_velocity)
         l2_error = float(np.sqrt(np.mean((interp_velocity - ref_velocity) ** 2)))
-        metric_name = "normalized_l2_error"
-        metric_label = "normalized $L_2$"
-        if velocity_scale <= 1.0e-10 or float(np.max(np.abs(ref_velocity))) <= 1.0e-10:
-            metric_name = "absolute_l2_error"
-            metric_label = "absolute $L_2$"
-        summary_profiles[name] = {"x_offset_fraction": float(offset), metric_name: l2_error}
+        linf_error = float(np.max(np.abs(interp_velocity - ref_velocity)))
+        summary_profiles[name] = {
+            "x_offset_fraction": float(offset),
+            "normalized_l2_error": l2_error,
+            "normalized_linf_error": linf_error,
+        }
         ax.plot(ref_coord, ref_velocity, color=colors[name], linewidth=2.2, label="External reference")
         ax.plot(lmx_coord, lmx_velocity, color="#111827", linestyle="--", linewidth=2.0, label="LMX")
-        ax.set_title(f"{labels[name]}\n{metric_label}={l2_error:.3f}")
+        ax.set_title(f"{labels[name]}\n$L_2$={l2_error:.3f} | $L_\\infty$={linf_error:.3f}")
         ax.set_xlabel("Normalized transverse coordinate")
         ax.set_ylabel("Normalized axial velocity")
         ax.set_xlim(-1.02, 1.02)
@@ -193,11 +202,11 @@ def run_pipe_reference_comparison_demo(
     summary = {
         "case": "pipe_reference_comparison_demo",
         "geometry_kind": "pipe_ogrid",
-        "qualitative_only": True,
+        "velocity_normalization": "shared_peak_by_dataset",
         "notes": (
-            "The external reference profile comes from a high-Ha, high-Re fringing-pipe "
-            "benchmark dataset. This figure is presented as a qualitative shape comparison, "
-            "with absolute errors shown on off-center lines where the reference signal is near zero."
+            "The external reference profile comes from a fringing-pipe benchmark dataset. "
+            "All three transverse lines are normalized by one shared peak velocity per dataset "
+            "so center and off-center errors can be compared on the same scale."
         ),
         "profiles": summary_profiles,
         "validation": {

@@ -854,6 +854,88 @@ def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
     )()
     assert solvers._pressure_proxy_reference_current(diagnostics_empty) is None
 
+    scaled, reference = solvers._scaled_pressure_proxy_value(
+        pressure_proxy=3.0,
+        current_max=2.0,
+        face_current_max=0.0,
+        reference_current=None,
+    )
+    assert scaled == pytest.approx(3.0)
+    assert reference == pytest.approx(2.0)
+
+    scaled_face, reference_face = solvers._scaled_pressure_proxy_value(
+        pressure_proxy=3.0,
+        current_max=2.0,
+        face_current_max=4.0,
+        reference_current=8.0,
+    )
+    assert scaled_face == pytest.approx(1.5)
+    assert reference_face == pytest.approx(8.0)
+
+
+def test_concat_history_and_velocity_targets_cover_empty_and_forcing_paths():
+    current = jnp.asarray([1.0, 2.0])
+    previous = jnp.asarray([0.5])
+    assert jnp.array_equal(solvers._concat_history(None, current, append=True), current)
+    assert jnp.array_equal(solvers._concat_history(previous, current, append=False), current)
+    assert jnp.array_equal(solvers._concat_history(previous, current, append=True), jnp.asarray([0.5, 1.0, 2.0]))
+
+    forced_case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    assert solvers._target_mean_velocity(forced_case) is None
+    assert solvers._reference_mean_velocity(forced_case) is None
+
+    flow_rate_case = replace(
+        forced_case,
+        forcing=0.0,
+        boundary_conditions=(BoundaryCondition("inlet", "inlet_flow_rate", value=1.0, axis="x"),),
+    )
+    expected_speed = 1.0 / (forced_case.geometry.width * forced_case.geometry.height)
+    assert solvers._target_mean_velocity(flow_rate_case) == pytest.approx(expected_speed)
+    assert solvers._reference_mean_velocity(flow_rate_case) == pytest.approx(expected_speed)
+
+    inlet_velocity_case = replace(
+        forced_case,
+        boundary_conditions=(BoundaryCondition("inlet", "inlet_velocity", value=0.25, axis="x"),),
+    )
+    assert solvers._reference_mean_velocity(inlet_velocity_case) == pytest.approx(0.25)
+
+    initial_case = replace(forced_case, initial_velocity=0.125, boundary_conditions=())
+    assert solvers._reference_mean_velocity(initial_case) == pytest.approx(0.125)
+
+
+def test_initial_solver_state_restores_restart_fields_and_time():
+    case = replace(make_hartmann_case(ha=5.0, ny=4, nz=4), initial_velocity=0.25)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    fluid_mask = materials.fluid_mask
+    restart_state = type(
+        "RestartState",
+        (),
+        {
+            "u": jnp.ones(mesh.yz_shape) * 0.3,
+            "phi": jnp.ones(mesh.yz_shape) * 0.1,
+            "jy": jnp.ones(mesh.yz_shape) * 0.2,
+            "jz": jnp.ones(mesh.yz_shape) * -0.2,
+            "lorentz_x": jnp.ones(mesh.yz_shape) * 0.05,
+            "time": 0.75,
+        },
+    )()
+
+    u0, phi0, jy0, jz0, lorentz0, start_time = solvers._initial_solver_state(
+        case=case,
+        mesh=mesh,
+        fluid_mask=fluid_mask,
+        interpolate_direct_fluid_walls=False,
+        initial_state=restart_state,
+    )
+
+    assert float(start_time) == pytest.approx(0.75)
+    assert jnp.isfinite(u0).all()
+    assert jnp.array_equal(phi0, restart_state.phi)
+    assert jnp.array_equal(jy0, restart_state.jy)
+    assert jnp.array_equal(jz0, restart_state.jz)
+    assert jnp.array_equal(lorentz0, restart_state.lorentz_x)
+
 
 def test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)

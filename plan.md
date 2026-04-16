@@ -112,9 +112,9 @@ publication-grade additions after the current A/B ladder are:
   - the movie path should use solver settings and gauge treatment that do not
     introduce visible left/right bias in closed symmetric cases
 - Benchmark B quantitative closure
-  - dense `rect_duct` fringing remains the main quantitative hardening target
-  - mapped-pipe external comparison is still qualitative rather than a locked
-    parity table
+  - dense `rect_duct` fringing is now inside the quantitative internal gate
+  - mapped-pipe external comparison is now quantitative, and the next target
+    is reducing that high-`Ha`, high-`Re` parity gap
 - CPU scaling
   - the current longer-run CPU artifact is honest, but it is still a surrogate
     benchmark rather than the final solver-faithful CPU scaling story
@@ -437,9 +437,9 @@ That retained gate now passes for all three retained fringing geometries.
   estimate. The retained conservation-validation set is now
   `rect_duct,layered_duct,pipe_ogrid`.
 - A new geometry panel now ships all three current geometries
-  in a single figure, and a dedicated exploratory mapped-pipe comparison script
-  now writes a bounded qualitative comparison against the shipped external
-  fringing-pipe profiles.
+  in a single figure, and a dedicated mapped-pipe comparison script now writes
+  a bounded quantitative comparison against the external fringing-pipe
+  profiles using one shared velocity normalization across all comparison lines.
 - The current mapped-pipe hardening numbers on the heavier bounded dataset are:
   - `max_charge_balance_residual ≈ 5.63e-2` at `Ha=10`, `resolution=8`
   - `max_charge_balance_residual ≈ 1.20e-2` at `Ha=10`, `resolution=12`
@@ -452,9 +452,9 @@ That retained gate now passes for all three retained fringing geometries.
   - `field_mean_velocity_correlation ≈ -8.0e-1`, matching the expected
     anticorrelation between field strength and throughput under constant
     forcing
-  - external-profile comparison is still qualitative, with center-line
-    normalized error about `1.66e-1` and off-center absolute errors about
-    `9.89e-1`
+  - external-profile comparison is now quantitative, with
+    `center-line L2 ≈ 1.64e-1`, `center-line Linf ≈ 9.82e-1`, and
+    off-center `L2 ≈ 9.94e-1`, `Linf ≈ 1.00`
 - A stricter fringing-physics gate is now also in the manual validation lane:
   - `volumetric_flow_rate_span <= 5e-3`
   - `field_mean_velocity_correlation <= -5e-1`
