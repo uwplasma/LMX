@@ -26,20 +26,21 @@ def _hartmann_b_from_ha(*, ha: float, hartmann_spacing: float, conductivity: flo
 def run_readme_showcase_demo(
     *,
     out_dir: Path,
-    movie_case_kind: str = "hunt",
+    movie_case_kind: str = "hartmann",
     movie_ha: float = 20.0,
     movie_width: float = 2.0,
     movie_height: float = 2.0,
-    movie_ny: int = 48,
-    movie_nz: int = 48,
-    movie_dt: float = 2.5e-4,
-    movie_t_final: float = 1.0e-2,
-    movie_fps: int = 24,
+    movie_ny: int = 49,
+    movie_nz: int = 49,
+    movie_dt: float = 1.0e-5,
+    movie_t_final: float = 2.0e-3,
+    movie_fps: int = 15,
     movie_view: str = "both",
-    movie_coupling_iterations: int = 16,
-    movie_coupling_tolerance: float = 5.0e-6,
-    movie_potential_iterations: int = 128,
+    movie_coupling_iterations: int = 12,
+    movie_coupling_tolerance: float = 1.0e-6,
+    movie_potential_iterations: int = 120,
     movie_wall_cells: int = 4,
+    movie_initial_velocity: float = 1.0,
     include_geometry: bool = True,
     include_movie: bool = True,
 ) -> dict[str, object]:
@@ -101,6 +102,7 @@ def run_readme_showcase_demo(
                 max_steps=movie_steps,
                 potential_iterations=movie_potential_iterations,
             ),
+            initial_velocity=movie_initial_velocity,
         )
         movie_frames_payload = solve_case_snapshots(movie_case, frame_count=movie_steps)
         include_2d = movie_view in {"both", "2d"}
@@ -129,20 +131,21 @@ def run_readme_showcase_demo(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate the README showcase media bundle.")
     parser.add_argument("--output", type=Path, default=Path("docs/_static/generated"))
-    parser.add_argument("--movie-case-kind", choices=("hartmann", "hunt"), default="hunt")
+    parser.add_argument("--movie-case-kind", choices=("hartmann", "hunt"), default="hartmann")
     parser.add_argument("--movie-ha", type=float, default=20.0)
     parser.add_argument("--movie-width", type=float, default=2.0)
     parser.add_argument("--movie-height", type=float, default=2.0)
-    parser.add_argument("--movie-ny", type=int, default=48)
-    parser.add_argument("--movie-nz", type=int, default=48)
-    parser.add_argument("--movie-dt", type=float, default=2.5e-4)
-    parser.add_argument("--movie-t-final", type=float, default=1.0e-2)
-    parser.add_argument("--movie-fps", type=int, default=24)
+    parser.add_argument("--movie-ny", type=int, default=49)
+    parser.add_argument("--movie-nz", type=int, default=49)
+    parser.add_argument("--movie-dt", type=float, default=1.0e-5)
+    parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
+    parser.add_argument("--movie-fps", type=int, default=15)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
-    parser.add_argument("--movie-coupling-iterations", type=int, default=16)
-    parser.add_argument("--movie-coupling-tolerance", type=float, default=5.0e-6)
-    parser.add_argument("--movie-potential-iterations", type=int, default=128)
+    parser.add_argument("--movie-coupling-iterations", type=int, default=12)
+    parser.add_argument("--movie-coupling-tolerance", type=float, default=1.0e-6)
+    parser.add_argument("--movie-potential-iterations", type=int, default=120)
     parser.add_argument("--movie-wall-cells", type=int, default=4)
+    parser.add_argument("--movie-initial-velocity", type=float, default=1.0)
     parser.add_argument("--skip-geometry", action="store_true")
     parser.add_argument("--skip-movie", action="store_true")
     args = parser.parse_args(argv)
@@ -162,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         movie_coupling_tolerance=args.movie_coupling_tolerance,
         movie_potential_iterations=args.movie_potential_iterations,
         movie_wall_cells=args.movie_wall_cells,
+        movie_initial_velocity=args.movie_initial_velocity,
         include_geometry=not args.skip_geometry,
         include_movie=not args.skip_movie,
     )

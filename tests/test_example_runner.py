@@ -387,9 +387,9 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
     summary = module.run_readme_showcase_demo(out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5)
 
     assert summary["case"] == "readme_showcase_demo"
-    assert summary["movie_case_kind"] == "hunt"
-    assert (tmp_path / "readme_hunt_startup_2d.gif").exists()
-    assert (tmp_path / "readme_hunt_startup_3d.gif").exists()
+    assert summary["movie_case_kind"] == "hartmann"
+    assert (tmp_path / "readme_hartmann_startup_2d.gif").exists()
+    assert (tmp_path / "readme_hartmann_startup_3d.gif").exists()
     assert (tmp_path / "readme_showcase_summary.json").exists()
 
 

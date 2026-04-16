@@ -1794,7 +1794,11 @@ def _solve_extruded_projection(
             dy=dy,
             dz=dz,
         )
-        electric_solver = _variable_coefficient_poisson_sparse_3d if case.geometry.kind == "layered_duct" else _variable_coefficient_poisson_jacobi_3d
+        electric_solver = (
+            _variable_coefficient_poisson_sparse_3d
+            if case.geometry.kind in {"rect_duct", "layered_duct"}
+            else _variable_coefficient_poisson_jacobi_3d
+        )
         phi, _, _, _ = electric_solver(
             emf_rhs,
             sigma,

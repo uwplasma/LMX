@@ -320,6 +320,28 @@ def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bund
     assert solution.validation.station_count == 4
 
 
+def test_rectangular_projection_uses_sparse_electric_solve(monkeypatch: pytest.MonkeyPatch):
+    problem = build_square_duct_extruded_problem(ha_peak=8.0, nx_stations=3, ny=4, nz=4)
+    sparse_calls = {"count": 0}
+    jacobi_calls = {"count": 0}
+
+    def wrapped_sparse(*args, **kwargs):
+        sparse_calls["count"] += 1
+        return _variable_coefficient_poisson_sparse_3d(*args, **kwargs)
+
+    def wrapped_jacobi(*args, **kwargs):
+        jacobi_calls["count"] += 1
+        return _variable_coefficient_poisson_jacobi_3d(*args, **kwargs)
+
+    monkeypatch.setattr("lmx.fringing._variable_coefficient_poisson_sparse_3d", wrapped_sparse)
+    monkeypatch.setattr("lmx.fringing._variable_coefficient_poisson_jacobi_3d", wrapped_jacobi)
+
+    solve_extruded_inductionless(problem)
+
+    assert sparse_calls["count"] > 0
+    assert jacobi_calls["count"] == 0
+
+
 def test_projection_solver_can_break_early_with_loose_tolerance():
     problem = build_square_duct_extruded_problem(ha_peak=4.0, nx_stations=3, ny=4, nz=4)
     loose_problem = replace(problem, case=replace(problem.case, solver=replace(problem.case.solver, coupling_tolerance=10.0)))

@@ -304,6 +304,11 @@ strict parity gate.
 The denser `Ha=20`, `20×20×21` Benchmark B summary from
 `scripts/run_benchmark_b_quantitative.py` currently reports:
 
+- `rect_duct`
+  - `max_charge_balance_residual ≈ 5.48e-6`
+  - `volumetric_flow_rate_span ≈ 1.08e-3`
+  - `axial_current_span ≈ 5.14e-8`
+  - `pressure_span_range ≈ 8.10e-1`
 - `layered_duct`
   - `max_charge_balance_residual ≈ 2.76e-5`
   - `volumetric_flow_rate_span ≈ 2.18e-3`
@@ -314,18 +319,13 @@ The denser `Ha=20`, `20×20×21` Benchmark B summary from
   - `volumetric_flow_rate_span ≈ 1.83e-9`
   - `axial_current_span ≈ 9.09e-10`
   - `pressure_span_range ≈ 5.51e-4`
-- `rect_duct`
-  - `max_charge_balance_residual ≈ 7.38e-1`
-  - `volumetric_flow_rate_span ≈ 8.75e-4`
-  - `axial_current_span ≈ 1.35e-8`
-  - `pressure_span_range ≈ 1.95e-1`
-
 That summary separates the current dense-slice status clearly:
 
-- layered and mapped-pipe slices are quantitatively well-behaved on the current
+- rectangular and layered slices are quantitatively well-behaved on the current
   Benchmark B settings
-- the rectangular fringing slice still needs electric/current hardening before
-  it can be treated as a quantitative Benchmark B reference case
+- mapped pipe is quantitatively well-behaved on the internal conservation and
+  throughput metrics, while its external profile comparison remains the next
+  parity-hardening target
 
 ![Benchmark B quantitative summary](_static/generated/benchmark_b_quantitative_summary.png)
 

@@ -322,10 +322,13 @@ def write_transient_movies(
     mesh = frames[0]["mesh"]
     display_fields, frame_peaks, movie_label, colorbar_label = _movie_field_stack(frames, field_mode=field_mode)
     u_stack = jnp.asarray(np.stack(display_fields))
-    stack_min = float(jnp.min(u_stack))
-    stack_max = float(jnp.max(u_stack))
-    stack_abs_max = max(float(jnp.max(jnp.abs(u_stack))), 1e-12)
-    use_normalized_positive = stack_min >= 0.0 or stack_max <= 0.0
+    fluid_mask = jnp.asarray(frames[0].get("fluid_mask", jnp.ones_like(display_fields[0], dtype=bool)))
+    fluid_values = jnp.asarray(np.stack([jnp.where(fluid_mask, jnp.asarray(field), jnp.nan) for field in display_fields]))
+    stack_min = float(jnp.nanmin(fluid_values))
+    stack_max = float(jnp.nanmax(fluid_values))
+    stack_abs_max = max(float(jnp.nanmax(jnp.abs(fluid_values))), 1e-12)
+    negative_tolerance = 1.0e-3 * stack_abs_max
+    use_normalized_positive = stack_min >= -negative_tolerance or stack_max <= negative_tolerance
     if use_normalized_positive:
         cmap = "magma"
         norm = colors.Normalize(vmin=0.0, vmax=1.0)
@@ -480,23 +483,55 @@ def write_transient_movies(
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
         mid_z = int(len(mesh.z_centers) // 2)
-        z_ribbon_halfwidth = 0.08 * max(float(mesh.z_faces[-1] - mesh.z_faces[0]), 1.0e-12)
-        z_ribbon = np.linspace(-z_ribbon_halfwidth, z_ribbon_halfwidth, 9)
-        yy_ribbon, zz_ribbon = np.meshgrid(np.asarray(y_centers), z_ribbon, indexing="ij")
+        mid_y = int(len(mesh.y_centers) // 2)
+        uses_sidewall_profile = "hunt" in case_name or "shercliff" in case_name
+        ribbon_halfwidth = 0.08 * max(float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.y_faces[-1] - mesh.y_faces[0]), 1.0e-12)
+        ribbon_offsets = np.linspace(-ribbon_halfwidth, ribbon_halfwidth, 9)
+        if uses_sidewall_profile:
+            yy_ribbon, zz_ribbon = np.meshgrid(ribbon_offsets, np.asarray(z_centers), indexing="ij")
+        else:
+            yy_ribbon, zz_ribbon = np.meshgrid(np.asarray(y_centers), ribbon_offsets, indexing="ij")
 
         def update_3d(index: int):
             ax3d.cla()
             field = _movie_field(index)
-            center_profile = np.asarray(frames[index]["u"])[:, mid_z]
+            if uses_sidewall_profile:
+                center_profile = np.asarray(frames[index]["u"])[mid_y, :]
+            else:
+                center_profile = np.asarray(frames[index]["u"])[:, mid_z]
             profile_peak = max(float(np.max(np.abs(center_profile))), 1.0e-12)
             if use_normalized_positive:
                 normalized_profile = np.clip(center_profile / profile_peak, 0.0, 1.0)
-                x_surface = 0.16 * x_extent + 0.74 * x_extent * normalized_profile[:, None]
-                ribbon_colors = cmap_obj(norm(np.repeat(normalized_profile[:, None], z_ribbon.size, axis=1)))
+                x_profile = 0.16 * x_extent + 0.74 * x_extent * normalized_profile
+                if uses_sidewall_profile:
+                    x_surface = np.repeat(x_profile[None, :], ribbon_offsets.size, axis=0)
+                else:
+                    x_surface = np.repeat(x_profile[:, None], ribbon_offsets.size, axis=1)
+                ribbon_colors = cmap_obj(
+                    norm(
+                        np.repeat(
+                            normalized_profile[None, :] if uses_sidewall_profile else normalized_profile[:, None],
+                            ribbon_offsets.size,
+                            axis=0 if uses_sidewall_profile else 1,
+                        )
+                    )
+                )
             else:
                 normalized_profile = np.clip(center_profile / stack_abs_max, -1.0, 1.0)
-                x_surface = 0.50 * x_extent + 0.32 * x_extent * normalized_profile[:, None]
-                ribbon_colors = cmap_obj(norm(np.repeat(center_profile[:, None], z_ribbon.size, axis=1)))
+                x_profile = 0.50 * x_extent + 0.32 * x_extent * normalized_profile
+                if uses_sidewall_profile:
+                    x_surface = np.repeat(x_profile[None, :], ribbon_offsets.size, axis=0)
+                else:
+                    x_surface = np.repeat(x_profile[:, None], ribbon_offsets.size, axis=1)
+                ribbon_colors = cmap_obj(
+                    norm(
+                        np.repeat(
+                            center_profile[None, :] if uses_sidewall_profile else center_profile[:, None],
+                            ribbon_offsets.size,
+                            axis=0 if uses_sidewall_profile else 1,
+                        )
+                    )
+                )
             surfaces = []
             surfaces.append(
                 ax3d.plot_surface(

@@ -497,7 +497,7 @@ That retained gate now passes for all three retained fringing geometries.
   - the README now acts as a short landing page rather than a long changelog
   - the geometry gallery now uses a denser `2 x 3` layout with clearer legends
     and more informative mapped-pipe previews
-  - the README startup media now uses a bounded Hunt startup sequence with
+  - the README startup media now uses a bounded Hartmann startup sequence with
     unit-bearing timestamps, explicit wall-layer annotation, and all solved
     timesteps written to the GIF
   - the README/docs/examples surface no longer uses the older
@@ -526,11 +526,12 @@ That retained gate now passes for all three retained fringing geometries.
 - The README showcase workflow was tightened around bounded regeneration:
   - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
     geometry-only refreshes
-  - the current Hunt startup GIFs use `dt = 2.5e-4 s`, `t_final = 10 ms`, and
-    all solved timesteps in the output movie
+  - the current Hartmann startup GIFs use `dt = 1.0e-5 s`,
+    `t_final = 2.0 ms`, and all solved timesteps in the output movie
   - the current README movie configuration that regenerates locally uses
-    `ny = nz = 48`, `wall_cells = 4`, `potential_iterations = 128`, and
-    `coupling_iterations = 16`
+    `ny = nz = 49`, a flat plug-flow initial condition, and the bounded
+    `coupling_iterations = 12` / `potential_iterations = 120` settings from
+    `examples/readme_showcase_demo.py`
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the
@@ -551,11 +552,13 @@ That retained gate now passes for all three retained fringing geometries.
   JSON, CSV, Markdown, and figure outputs for `rect_duct`, `layered_duct`, and
   `pipe_ogrid` fringing cases. On the current dense `Ha=20`, `20×20×21`
   summary:
-  - `layered_duct` is quantitatively clean on charge balance and flow span
-  - `pipe_ogrid` is quantitatively well-behaved on the internal metrics, while
-    its external profile comparison remains a separate qualitative workflow
-  - `rect_duct` still shows `max_charge_balance_residual ≈ 7.38e-1`, which is
-    the main open Benchmark B hardening item on the dense rectangular slice
+  - `rect_duct` now reports `max_charge_balance_residual ≈ 5.48e-6`,
+    `volumetric_flow_rate_span ≈ 1.08e-3`, and
+    `field_mean_velocity_correlation ≈ -8.57e-1` after moving the rectangular
+    3D electric subproblem onto the sparse direct conservative solve
+  - `layered_duct` remains quantitatively clean on charge balance and flow span
+  - `pipe_ogrid` remains quantitatively well-behaved on the internal metrics,
+    while its external profile comparison is now the main parity-hardening lane
 - The benchmark roadmap now also records the next publication-facing additions:
   - closed-pipe fringing-field validation
   - free-surface dam-break or sloshing validation
@@ -568,14 +571,16 @@ That retained gate now passes for all three retained fringing geometries.
     - `LMX-U`
     - `Divertorlets`
 - The README startup media workflow now supports both Hartmann and Hunt cases,
-  and the current landing-page path uses the Hunt benchmark because it exposes
-  the sidewall-jet structure more clearly:
+  and the current landing-page path uses the Hartmann benchmark because it
+  preserves cross-sectional symmetry while showing layer formation from a flat
+  plug-flow initial condition:
   - `Ha = 20`
-  - `48 × 48` fluid cross-section with `4` wall cells
-  - `dt = 2.5e-4`
-  - `t_final = 1.0e-2`
+  - `49 × 49` fluid cross-section
+  - `dt = 1.0e-5`
+  - `t_final = 2.0e-3`
   - all solved timesteps written to the GIF
-  - the 2D panel carries `y`- and `z`-centerline diagnostics
+  - the 2D panel carries the transient centerline profile and the steady
+    analytic Hartmann reference
   - the 3D panel is a centerplane velocity ribbon inside the duct
 - The current longer strong-scaling artifact now uses:
   - CPU: `2048×64×64`, `1024` iterations

@@ -4,6 +4,8 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import jax.numpy as jnp
+
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
 from .physics import build_material_fields, magnetic_field_components
@@ -60,17 +62,23 @@ def solve_case_snapshots(
     reference_mean_velocity = solvers._reference_mean_velocity(case)
     potential_solver = solvers._resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     interpolate_direct_fluid_walls = not bool(materials.fluid_mask.all())
-
-    initial_u = materials.fluid_mask.astype(float) * case.initial_velocity
-    initial_u = solvers._enforce_velocity_bc(
+    (
         initial_u,
-        mesh,
-        materials.fluid_mask,
+        initial_phi,
+        initial_jy,
+        initial_jz,
+        initial_lorentz,
+        start_time,
+    ) = solvers._initial_solver_state(
+        case=case,
+        mesh=mesh,
+        fluid_mask=materials.fluid_mask,
         interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
+        initial_state=None,
     )
     dt = case.time_stepper.dt
     steps = solvers._bounded_time_step_count(
-        start_time=0.0,
+        start_time=start_time,
         dt=dt,
         t_final=case.time_stepper.t_final,
         max_steps=case.time_stepper.max_steps,
@@ -78,9 +86,32 @@ def solve_case_snapshots(
     stride = max(1, steps // max(frame_count, 1))
 
     frames: list[dict[str, object]] = []
+    initial_mean_velocity = float(jnp.mean(jnp.where(materials.fluid_mask, initial_u, 0.0)))
+    frames.append(
+        {
+            "time": float(start_time),
+            "case": case,
+            "u": initial_u,
+            "phi": initial_phi,
+            "jy": initial_jy,
+            "jz": initial_jz,
+            "lorentz_x": initial_lorentz,
+            "fluid_mask": materials.fluid_mask,
+            "residual": 0.0,
+            "potential_residual": 0.0,
+            "potential_iterations": 0.0,
+            "face_current_max": 0.0,
+            "emf_max": 0.0,
+            "face_lorentz_max": 0.0,
+            "mean_velocity": initial_mean_velocity,
+            "applied_forcing": float(case.forcing),
+            "pressure_proxy": float(case.forcing),
+            "mesh": mesh,
+        }
+    )
     u = initial_u
     for step_index in range(steps):
-        step_time = float((step_index + 1) * dt)
+        step_time = float(start_time + (step_index + 1) * dt)
         if case.solver.kind != "fully_developed_inductionless":
             raise NotImplementedError("solve_case_snapshots only supports fully_developed_inductionless cases")
         linear_solver = "cg" if case.solver.linear_solver == "auto" else case.solver.linear_solver

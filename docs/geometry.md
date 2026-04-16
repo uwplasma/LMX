@@ -103,6 +103,7 @@ python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --
 python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
 python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
 python examples/readme_showcase_demo.py --output docs/_static/generated
+# optional Hunt alternative for side-layer startup media
 python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hunt
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 2d
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 3d

@@ -72,6 +72,31 @@ def _row_or_replicated_sharding(mesh: Mesh, shape: tuple[int, ...], num_devices:
     return NamedSharding(mesh, P())
 
 
+def _factor_device_mesh(num_devices: int) -> tuple[int, int]:
+    for rows in range(int(np.sqrt(num_devices)), 0, -1):
+        if num_devices % rows == 0:
+            return rows, num_devices // rows
+    return 1, num_devices
+
+
+def _two_axis_mesh_and_sharding(
+    devices: list[object],
+    *,
+    num_devices: int,
+    shape: tuple[int, ...],
+) -> tuple[Mesh, NamedSharding]:
+    rows, cols = _factor_device_mesh(num_devices)
+    selected = np.asarray(devices[:num_devices], dtype=object).reshape(rows, cols)
+    mesh = Mesh(selected, ("x", "y"))
+    if len(shape) >= 2 and shape[0] % rows == 0 and shape[1] % cols == 0:
+        partition = ("x", "y", *([None] * max(0, len(shape) - 2)))
+        return mesh, NamedSharding(mesh, P(*partition))
+    if shape and shape[0] % num_devices == 0:
+        partition = (("x", "y"), *([None] * max(0, len(shape) - 1)))
+        return mesh, NamedSharding(mesh, P(*partition))
+    raise ValueError(f"Shape {shape} is not compatible with a {rows}x{cols} device mesh.")
+
+
 def benchmark_sharded_stencil(
     *,
     ny: int = 1024,
@@ -90,13 +115,10 @@ def benchmark_sharded_stencil(
     if ny % num_devices != 0:
         raise ValueError(f"ny={ny} must be divisible by num_devices={num_devices} for y-sharded scaling.")
 
-    selected = np.asarray(devices[:num_devices], dtype=object)
-    mesh = Mesh(selected, ("d",))
-    field_sharding = NamedSharding(mesh, P("d", None))
+    mesh, field_sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=(ny, nz))
     field, potential, forcing = _build_operator_problem(ny, nz)
-    field_sharding = _row_or_replicated_sharding(mesh, field.shape, num_devices)
-    potential_sharding = _row_or_replicated_sharding(mesh, potential.shape, num_devices)
-    forcing_sharding = _row_or_replicated_sharding(mesh, forcing.shape, num_devices)
+    _, potential_sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=potential.shape)
+    _, forcing_sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=forcing.shape)
     field = jax.device_put(field, field_sharding)
     potential = jax.device_put(potential, potential_sharding)
     forcing = jax.device_put(forcing, forcing_sharding)
@@ -150,12 +172,7 @@ def benchmark_sharded_extruded_operator(
         num_devices = len(devices)
     if num_devices < 1 or num_devices > len(devices):
         raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
-    if nx % num_devices != 0:
-        raise ValueError(f"nx={nx} must be divisible by num_devices={num_devices} for x-sharded scaling.")
-
-    selected = np.asarray(devices[:num_devices], dtype=object)
-    mesh = Mesh(selected, ("d",))
-    sharding = NamedSharding(mesh, P("d", None, None))
+    mesh, sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=(nx, ny, nz))
     u, v, w, phi, forcing, sigma = _build_extruded_operator_problem(nx, ny, nz)
     u = jax.device_put(u, sharding)
     v = jax.device_put(v, sharding)
