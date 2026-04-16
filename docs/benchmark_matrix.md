@@ -9,10 +9,15 @@ release.
 
 - solver family: `fully_developed_inductionless`
 - geometry: `rect_duct`
+- literature target:
+  - Samper et al. Table I insulating square-duct cases at `Ha = 500, 5000,
+    10000, 15000`
+  - compare the dimensionless flow-rate integral `Q̃`, not only local cuts
 - observables:
   - velocity profiles
   - potential profiles
   - flow-rate and pressure-gradient surrogates
+  - dimensionless flow-rate integral under mesh refinement
 
 ### A2. Shercliff and Hunt conducting/insulating wall validation
 
@@ -20,11 +25,15 @@ release.
 - geometries:
   - `rect_duct`
   - `layered_duct`
+- literature target:
+  - Samper et al. Table I conducting-wall square-duct cases at `Ha = 500,
+    5000, 10000, 15000` with Hartmann-wall conductance ratio `cw = 0.01`
 - observables:
   - matched `y` and `z` profiles
   - current-density profiles
   - Lorentz-force profiles
   - integral flow-rate and conservation diagnostics
+  - side-layer / jet structure in the conducting-wall case
 
 ## Mandatory next: Benchmark B
 
@@ -35,18 +44,24 @@ ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Dra
 
 - solver family: `extruded_inductionless`
 - required geometry support: mapped pipe O-grid
+- literature target:
+  - Samper et al. Table II pipe case: `Ha ≈ 6600`, `N ≈ 10700`, `cw ≈ 0.027`
 - required observables:
-  - pressure drop
-  - velocity distortion
-  - electric-potential redistribution
+  - dimensionless pressure drop between the documented upstream/downstream taps
+  - axial velocity distortion through the magnetic-field ramp
+  - electric-potential redistribution on the wall and across the pipe section
+  - mesh convergence of pressure drop and current-closure metrics
 
 ### B2. Conducting square duct in a fringing magnetic field
 
 - solver family: `extruded_inductionless`
+- literature target:
+  - Samper et al. Table II square-duct case: `Ha ≈ 2900`, `N ≈ 540`, `cw ≈ 0.07`
 - required observables:
-  - cross-sectional velocity structure
-  - current-density redistribution
-  - Lorentz-force localization
+  - dimensionless pressure drop between the documented upstream/downstream taps
+  - cross-sectional velocity distortion through the fringing region
+  - current-density redistribution and Lorentz-force localization
+  - mesh convergence of pressure drop, current closure, and throughput recovery
 
 ## Validation gates for Benchmarks A and B
 
@@ -58,6 +73,11 @@ quality gates rather than only against visual agreement:
 - integral agreement
   - flow rate, pressure-span surrogate, axial-current span, and Lorentz-power
     trends under mesh refinement
+- literature observables
+  - Benchmark A: dimensionless flow-rate integral `Q̃` against the analytical
+    values tabulated by Samper et al.
+  - Benchmark B: dimensionless pressure drop between the documented taps and
+    matched velocity/potential cuts at the reference axial stations
 - conservation
   - `div J`
   - charge-balance residual
@@ -117,6 +137,17 @@ python scripts/run_benchmark_b_quantitative.py \
 That workflow writes one JSON summary, one CSV table, one Markdown table, and
 one four-panel figure over charge balance, throughput span, axial-current
 span, and pressure-span range.
+
+That internal summary is the low-cost quantitative gate. The literature-anchored
+Benchmark B closure still needs a second layer:
+
+- B1 pipe:
+  - dimensionless pressure-drop comparison against the documented tap spacing
+  - shared-normalization profile comparisons on center and offset cuts
+- B2 square duct:
+  - dimensionless pressure-drop comparison through the field ramp
+  - matched cross-sectional velocity and potential cuts at the same axial
+    stations used in the reference data
 
 Current dense-slice summary at `Ha = 20`, `20×20×21` for ducts and
 `20×80×21` for the mapped pipe:

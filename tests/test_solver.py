@@ -29,6 +29,21 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
     assert jnp.isfinite(solution.state.phi).all()
 
 
+def test_build_mesh_rejects_unsupported_geometry_kind():
+    case = make_hartmann_case(ha=10.0, ny=8, nz=8)
+    unsupported = replace(case, geometry=replace(case.geometry, kind="pipe_ogrid"))
+
+    with pytest.raises(NotImplementedError, match="not supported"):
+        solvers._build_mesh(unsupported)
+
+
+def test_bounded_time_step_count_covers_zero_and_invalid_dt_cases():
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.1, t_final=1.0, max_steps=0) == 0
+    assert solvers._bounded_time_step_count(start_time=1.0, dt=0.1, t_final=0.5, max_steps=10) == 0
+    with pytest.raises(ValueError, match="dt must be positive"):
+        solvers._bounded_time_step_count(start_time=0.0, dt=0.0, t_final=1.0, max_steps=10)
+
+
 def test_hunt_solver_keeps_solid_velocity_zero():
     case = make_hunt_case(ha=10.0, ny=10, nz=10, wall_cells=2)
     mesh = solvers._build_mesh(case)

@@ -106,6 +106,16 @@ devices and then flattens between `4` and `8`, which is consistent with a
 memory-bandwidth limit on the host path. The remote GPU path shows about
 `1.26x` speedup from `1` to `2` GPUs on the larger fixed problem.
 
+This is also the point where the current JAX implementation strategy matters.
+The official JAX guidance distinguishes automatic sharding from explicit
+per-device kernels with [`jax.shard_map`](https://docs.jax.dev/en/latest/notebooks/shard_map.html),
+and the profiling docs recommend validating those choices with Perfetto or
+XProf traces rather than inferring bottlenecks from wall time alone. For LMX,
+that means the next CPU-scaling step is not another presentation-only rerun of
+the same host benchmark: it is a profiler-guided check on the current
+`extruded3d` path and, if needed, an explicit `shard_map` / halo-exchange
+version of the most communication-heavy stencil/projection kernels.
+
 Recent local profiling confirms that the current CPU benchmark is still the
 wrong place to claim a final CPU strong-scaling result. A JAX trace collected
 for the `2`-device CPU benchmark (`/tmp/lmx_cpu_scaling_profile`) shows the

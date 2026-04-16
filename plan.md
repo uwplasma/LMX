@@ -47,14 +47,25 @@ explicitly documented and passing:
 ### Physics gates
 
 - Benchmark A
+  - Samper Table I parameter sets are covered explicitly:
+    - insulating square duct at `Ha = 500, 5000, 10000, 15000`
+    - conducting-wall square duct at the same `Ha` values with Hartmann-wall
+      conductance ratio `cw = 0.01`
   - Hartmann/Shercliff/Hunt profiles converge under mesh refinement
   - flow rate, current-density, Lorentz-force, and pressure-proxy trends are
     stable with respect to resolution and timestep
+  - the dimensionless flow-rate integral `Q̃` agrees with the analytical
+    values used in the literature ladder, not only the local profile cuts
   - charge-balance and interface-current residuals stay below configured
     thresholds on both routine and heavier manual datasets
 - Benchmark B
+  - Samper Table II parameter sets are staged explicitly:
+    - B1 pipe at `Ha ≈ 6600`, `N ≈ 10700`, `cw ≈ 0.027`
+    - B2 square duct at `Ha ≈ 2900`, `N ≈ 540`, `cw ≈ 0.07`
   - rectangular, layered, and mapped-pipe fringing cases satisfy the
     conservation thresholds
+  - dimensionless pressure-drop comparison between the documented measurement
+    taps is available for the B1/B2 parity table
   - throughput variation outside the field-ramp region remains bounded
   - pressure span rises through the magnetized region and relaxes downstream
   - field/mean-velocity correlation carries the expected negative sign
@@ -115,6 +126,12 @@ publication-grade additions after the current A/B ladder are:
   - dense `rect_duct` fringing is now inside the quantitative internal gate
   - mapped-pipe external comparison is now quantitative, and the next target
     is reducing that high-`Ha`, high-`Re` parity gap
+  - the next literature-anchored B1/B2 closure still needs the Samper-style
+    observables, not only the internal fringing metrics:
+    - B1 pipe: pressure-drop comparison between the documented tap locations
+      plus center and offset profile errors on a shared normalization
+    - B2 square duct: pressure-drop comparison through the ramp plus matched
+      cross-sectional velocity/potential cuts at reference axial stations
 - CPU scaling
   - the current longer-run CPU artifact is honest, but it is still a surrogate
     benchmark rather than the final solver-faithful CPU scaling story
@@ -210,6 +227,9 @@ documented together:
     solve on CPU
   - compare single-device CPU execution, forced host-device sharding, and any
     revised higher-intensity benchmark path
+  - if automatic sharding remains communication-limited, prototype an explicit
+    `jax.shard_map` path for the most communication-heavy stencil/projection
+    kernels and compare it against the current automatic-sharding baseline
   - only promote a CPU scaling figure once the chosen execution model is
     coherent with the solver implementation and the measured bottleneck
 
@@ -526,7 +546,7 @@ That retained gate now passes for all three retained fringing geometries.
 - The README showcase workflow was tightened around bounded regeneration:
   - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
     geometry-only refreshes
-  - the current Hartmann startup GIFs use `dt = 1.0e-5 s`,
+  - the current Hartmann startup GIFs use `dt = 2.0e-6 s`,
     `t_final = 2.0 ms`, and all solved timesteps in the output movie
   - the current README movie configuration that regenerates locally uses
     `ny = nz = 49`, a flat plug-flow initial condition, and the bounded
