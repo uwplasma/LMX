@@ -124,7 +124,9 @@ normal to the imposed magnetic field instead of appearing already developed in
 the first frame. Time is shown in physical units, all solved timesteps are
 written to the GIF, and the 2D panel carries both the transient centerline
 profile and the steady analytic Hartmann profile for reference. The 3D panel
-renders a centerplane velocity ribbon inside the duct.
+renders the full streamwise-velocity field as a stack of `y-z` slices inside
+the duct, so the movie shows the whole cross-section evolving along `x` rather
+than a single centerplane ribbon.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hartmann_startup_2d.gif" alt="LMX 2D Hartmann startup movie" width="48%">

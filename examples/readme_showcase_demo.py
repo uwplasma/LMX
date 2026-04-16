@@ -32,9 +32,9 @@ def run_readme_showcase_demo(
     movie_height: float = 2.0,
     movie_ny: int = 49,
     movie_nz: int = 49,
-    movie_dt: float = 1.0e-5,
+    movie_dt: float = 2.0e-6,
     movie_t_final: float = 2.0e-3,
-    movie_fps: int = 15,
+    movie_fps: int = 20,
     movie_view: str = "both",
     movie_coupling_iterations: int = 12,
     movie_coupling_tolerance: float = 1.0e-6,
@@ -137,9 +137,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-height", type=float, default=2.0)
     parser.add_argument("--movie-ny", type=int, default=49)
     parser.add_argument("--movie-nz", type=int, default=49)
-    parser.add_argument("--movie-dt", type=float, default=1.0e-5)
+    parser.add_argument("--movie-dt", type=float, default=2.0e-6)
     parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
-    parser.add_argument("--movie-fps", type=int, default=15)
+    parser.add_argument("--movie-fps", type=int, default=20)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
     parser.add_argument("--movie-coupling-iterations", type=int, default=12)
     parser.add_argument("--movie-coupling-tolerance", type=float, default=1.0e-6)

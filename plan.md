@@ -576,12 +576,13 @@ That retained gate now passes for all three retained fringing geometries.
   plug-flow initial condition:
   - `Ha = 20`
   - `49 × 49` fluid cross-section
-  - `dt = 1.0e-5`
+  - `dt = 2.0e-6`
   - `t_final = 2.0e-3`
   - all solved timesteps written to the GIF
   - the 2D panel carries the transient centerline profile and the steady
     analytic Hartmann reference
-  - the 3D panel is a centerplane velocity ribbon inside the duct
+  - the 3D panel renders the full streamwise-velocity field as stacked `y-z`
+    slices through the duct
 - The current longer strong-scaling artifact now uses:
   - CPU: `2048×64×64`, `1024` iterations
   - GPU: `6144×96×96`, `4096` iterations

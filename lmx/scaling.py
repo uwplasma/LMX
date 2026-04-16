@@ -86,6 +86,13 @@ def _two_axis_mesh_and_sharding(
     shape: tuple[int, ...],
 ) -> tuple[Mesh, NamedSharding]:
     rows, cols = _factor_device_mesh(num_devices)
+    if rows == 1 or cols == 1:
+        selected = np.asarray(devices[:num_devices], dtype=object)
+        mesh = Mesh(selected, ("d",))
+        if shape and shape[0] % num_devices == 0:
+            partition = ("d", *([None] * max(0, len(shape) - 1)))
+            return mesh, NamedSharding(mesh, P(*partition))
+        return mesh, NamedSharding(mesh, P())
     selected = np.asarray(devices[:num_devices], dtype=object).reshape(rows, cols)
     mesh = Mesh(selected, ("x", "y"))
     if len(shape) >= 2 and shape[0] % rows == 0 and shape[1] % cols == 0:

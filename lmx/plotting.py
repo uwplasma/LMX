@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -472,9 +473,19 @@ def write_transient_movies(
         fig2d.savefig(poster_2d_pdf, bbox_inches="tight")
         outputs.extend([poster_2d, poster_2d_pdf])
 
-    y_centers = mesh.y_centers
-    z_centers = mesh.z_centers
-    zz, yy = np.meshgrid(np.asarray(z_centers), np.asarray(y_centers))
+    y_centers = np.asarray(mesh.y_centers, dtype=float)
+    z_centers = np.asarray(mesh.z_centers, dtype=float)
+    y_display_stride = max(1, int(math.ceil(y_centers.size / 33)))
+    z_display_stride = max(1, int(math.ceil(z_centers.size / 33)))
+    y_display = y_centers[::y_display_stride]
+    z_display = z_centers[::z_display_stride]
+    if y_display[-1] != y_centers[-1]:
+        y_display = np.append(y_display, y_centers[-1])
+    if z_display[-1] != z_centers[-1]:
+        z_display = np.append(z_display, z_centers[-1])
+    zz_display, yy_display = np.meshgrid(z_display, y_display)
+    display_y_indices = np.clip(np.round(np.linspace(0, y_centers.size - 1, y_display.size)).astype(int), 0, y_centers.size - 1)
+    display_z_indices = np.clip(np.round(np.linspace(0, z_centers.size - 1, z_display.size)).astype(int), 0, z_centers.size - 1)
     x_extent = max(float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.y_faces[-1] - mesh.y_faces[0]), 1.0)
     fig3d = None
     anim3d = None
@@ -482,83 +493,64 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
-        mid_z = int(len(mesh.z_centers) // 2)
-        mid_y = int(len(mesh.y_centers) // 2)
-        uses_sidewall_profile = "hunt" in case_name or "shercliff" in case_name
-        ribbon_halfwidth = 0.08 * max(float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.y_faces[-1] - mesh.y_faces[0]), 1.0e-12)
-        ribbon_offsets = np.linspace(-ribbon_halfwidth, ribbon_halfwidth, 9)
-        if uses_sidewall_profile:
-            yy_ribbon, zz_ribbon = np.meshgrid(ribbon_offsets, np.asarray(z_centers), indexing="ij")
-        else:
-            yy_ribbon, zz_ribbon = np.meshgrid(np.asarray(y_centers), ribbon_offsets, indexing="ij")
+        x_slice_positions = np.linspace(0.06 * x_extent, 0.94 * x_extent, 9)
+        x_front = 0.04 * x_extent
+        x_back = 0.96 * x_extent
 
         def update_3d(index: int):
             ax3d.cla()
             field = _movie_field(index)
-            if uses_sidewall_profile:
-                center_profile = np.asarray(frames[index]["u"])[mid_y, :]
-            else:
-                center_profile = np.asarray(frames[index]["u"])[:, mid_z]
-            profile_peak = max(float(np.max(np.abs(center_profile))), 1.0e-12)
+            display_field = np.asarray(field)[np.ix_(display_y_indices, display_z_indices)]
             if use_normalized_positive:
-                normalized_profile = np.clip(center_profile / profile_peak, 0.0, 1.0)
-                x_profile = 0.16 * x_extent + 0.74 * x_extent * normalized_profile
-                if uses_sidewall_profile:
-                    x_surface = np.repeat(x_profile[None, :], ribbon_offsets.size, axis=0)
-                else:
-                    x_surface = np.repeat(x_profile[:, None], ribbon_offsets.size, axis=1)
-                ribbon_colors = cmap_obj(
-                    norm(
-                        np.repeat(
-                            normalized_profile[None, :] if uses_sidewall_profile else normalized_profile[:, None],
-                            ribbon_offsets.size,
-                            axis=0 if uses_sidewall_profile else 1,
-                        )
-                    )
-                )
+                color_field = display_field / frame_peaks[index]
             else:
-                normalized_profile = np.clip(center_profile / stack_abs_max, -1.0, 1.0)
-                x_profile = 0.50 * x_extent + 0.32 * x_extent * normalized_profile
-                if uses_sidewall_profile:
-                    x_surface = np.repeat(x_profile[None, :], ribbon_offsets.size, axis=0)
-                else:
-                    x_surface = np.repeat(x_profile[:, None], ribbon_offsets.size, axis=1)
-                ribbon_colors = cmap_obj(
-                    norm(
-                        np.repeat(
-                            center_profile[None, :] if uses_sidewall_profile else center_profile[:, None],
-                            ribbon_offsets.size,
-                            axis=0 if uses_sidewall_profile else 1,
-                        )
+                color_field = display_field
+            surfaces = []
+            color_rgba = cmap_obj(norm(color_field))
+            for plane_index, x_plane in enumerate(x_slice_positions):
+                rgba = color_rgba.copy()
+                rgba[..., 3] = 0.14 + 0.05 * (plane_index / max(len(x_slice_positions) - 1, 1))
+                surfaces.append(
+                    ax3d.plot_surface(
+                        np.full_like(yy_display, x_plane),
+                        zz_display,
+                        yy_display,
+                        facecolors=rgba,
+                        shade=False,
+                        linewidth=0.0,
+                        antialiased=False,
+                        alpha=None,
                     )
                 )
-            surfaces = []
+            front_plane_x = np.full_like(yy_display, x_front)
+            back_plane_x = np.full_like(yy_display, x_back)
+            front_rgba = color_rgba.copy()
+            front_rgba[..., 3] = 0.96
             surfaces.append(
                 ax3d.plot_surface(
-                    x_surface,
-                    zz_ribbon,
-                    yy_ribbon,
-                    facecolors=ribbon_colors,
+                    front_plane_x,
+                    zz_display,
+                    yy_display,
+                    facecolors=front_rgba,
                     shade=False,
-                    linewidth=0.18,
-                    edgecolor=(1.0, 1.0, 1.0, 0.12),
+                    linewidth=0.1,
+                    edgecolor=(1.0, 1.0, 1.0, 0.10),
                     antialiased=True,
-                    alpha=0.96,
-                    rstride=1,
-                    cstride=1,
+                    alpha=None,
                 )
             )
-            back_plane_x = np.full_like(yy, 0.10 * x_extent)
+            back_rgba = color_rgba.copy()
+            back_rgba[..., 3] = 0.30
             surfaces.append(
                 ax3d.plot_surface(
                     back_plane_x,
-                    zz,
-                    yy,
-                    facecolors=cmap_obj(norm(field)),
+                    zz_display,
+                    yy_display,
+                    facecolors=back_rgba,
                     shade=False,
                     linewidth=0.0,
                     antialiased=False,
-                    alpha=0.20,
+                    alpha=None,
                 )
             )
             boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
@@ -620,7 +612,7 @@ def write_transient_movies(
             ax3d.set_ylabel("z")
             ax3d.set_zlabel("y")
             ax3d.set_title(
-                f"{case_title} | 3D centerplane velocity ribbon\n"
+                f"{case_title} | 3D streamwise-velocity volume\n"
                 f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
             )
             ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)
