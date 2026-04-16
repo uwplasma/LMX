@@ -301,6 +301,34 @@ pipe is part of the conservation/solver-validation set, but the
 current external pipe-profile comparison remains qualitative rather than a
 strict parity gate.
 
+The denser `Ha=20`, `20×20×21` Benchmark B summary from
+`scripts/run_benchmark_b_quantitative.py` currently reports:
+
+- `layered_duct`
+  - `max_charge_balance_residual ≈ 2.76e-5`
+  - `volumetric_flow_rate_span ≈ 2.18e-3`
+  - `axial_current_span ≈ 6.66e-1`
+  - `pressure_span_range ≈ 3.40e1`
+- `pipe_ogrid`
+  - `max_charge_balance_residual ≈ 7.72e-3`
+  - `volumetric_flow_rate_span ≈ 1.83e-9`
+  - `axial_current_span ≈ 9.09e-10`
+  - `pressure_span_range ≈ 5.51e-4`
+- `rect_duct`
+  - `max_charge_balance_residual ≈ 7.38e-1`
+  - `volumetric_flow_rate_span ≈ 8.75e-4`
+  - `axial_current_span ≈ 1.35e-8`
+  - `pressure_span_range ≈ 1.95e-1`
+
+That summary separates the current dense-slice status clearly:
+
+- layered and mapped-pipe slices are quantitatively well-behaved on the current
+  Benchmark B settings
+- the rectangular fringing slice still needs electric/current hardening before
+  it can be treated as a quantitative Benchmark B reference case
+
+![Benchmark B quantitative summary](_static/generated/benchmark_b_quantitative_summary.png)
+
 ## What the example shows
 
 - a smooth entrance/exit fringing profile along the duct axis
@@ -316,17 +344,6 @@ strict parity gate.
 - a first true 3D pressure field `p(x, y, z)`
 - layered conducting/insulating wall fringing responses through the same API
 - the first mapped-pipe fringing slice through the same public API
-
-## QA note on the figures
-
-During the media QA pass, the fringing figures were tightened to avoid
-misleading observables. In a constant-forcing incompressible slice, the
-cross-sectional mean flow can remain nearly unchanged even when the velocity
-profile redistributes strongly. The literature instead emphasizes profile
-deformation, pressure losses, and axial-current closure in non-uniform fields.
-That is why the figures now highlight peak axial velocity, pressure
-span, and axial-current/conservation metrics rather than the earlier
-mean-velocity correlation view.
 
 ## Literature context
 

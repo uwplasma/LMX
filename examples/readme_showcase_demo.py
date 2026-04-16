@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 import sys
 
-from lmx.cases import make_hunt_case
+from lmx.cases import make_hartmann_case
 from lmx.example_runner import solve_case_snapshots
 from lmx.plotting import write_transient_movies
 
@@ -22,10 +22,10 @@ def run_readme_showcase_demo(
     *,
     out_dir: Path,
     movie_ha: float = 20.0,
-    movie_resolution: int = 6,
-    movie_dt: float = 3.75e-5,
+    movie_resolution: int = 48,
+    movie_dt: float = 2.0e-5,
     movie_t_final: float = 2.0e-3,
-    movie_fps: int = 36,
+    movie_fps: int = 28,
     movie_view: str = "both",
     include_geometry: bool = True,
     include_movie: bool = True,
@@ -39,20 +39,20 @@ def run_readme_showcase_demo(
     movie_outputs: list[Path] = []
     if include_movie:
         movie_steps = max(1, int(math.floor(movie_t_final / movie_dt)))
-        movie_case = make_hunt_case(ha=movie_ha, ny=movie_resolution, nz=movie_resolution, wall_cells=1)
+        movie_case = make_hartmann_case(ha=movie_ha, ny=movie_resolution, nz=movie_resolution)
         movie_case = replace(
             movie_case,
             solver=replace(
                 movie_case.solver,
-                coupling_iterations=2,
-                coupling_tolerance=1.0e-3,
+                coupling_iterations=8,
+                coupling_tolerance=2.5e-4,
             ),
             time_stepper=replace(
                 movie_case.time_stepper,
                 dt=movie_dt,
                 t_final=movie_t_final,
                 max_steps=movie_steps,
-                potential_iterations=6,
+                potential_iterations=48,
             ),
         )
         movie_frames_payload = solve_case_snapshots(movie_case, frame_count=movie_steps)
@@ -61,10 +61,10 @@ def run_readme_showcase_demo(
         movie_outputs = write_transient_movies(
             movie_frames_payload,
             out_dir,
-            case_title="LMX Hunt startup showcase",
+            case_title="LMX Hartmann startup",
             fps=movie_fps,
-            field_mode="bulk_deviation",
-            output_stem="readme_hunt_startup",
+            field_mode="raw",
+            output_stem="readme_hartmann_startup",
             include_2d=include_2d,
             include_3d=include_3d,
         )
@@ -79,13 +79,13 @@ def run_readme_showcase_demo(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate the retained README showcase media bundle.")
+    parser = argparse.ArgumentParser(description="Generate the README showcase media bundle.")
     parser.add_argument("--output", type=Path, default=Path("docs/_static/generated"))
     parser.add_argument("--movie-ha", type=float, default=20.0)
-    parser.add_argument("--movie-resolution", type=int, default=6)
-    parser.add_argument("--movie-dt", type=float, default=3.75e-5)
+    parser.add_argument("--movie-resolution", type=int, default=48)
+    parser.add_argument("--movie-dt", type=float, default=2.0e-5)
     parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
-    parser.add_argument("--movie-fps", type=int, default=36)
+    parser.add_argument("--movie-fps", type=int, default=28)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
     parser.add_argument("--skip-geometry", action="store_true")
     parser.add_argument("--skip-movie", action="store_true")

@@ -77,10 +77,10 @@ ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/
 The current scaling artifact is stored under
 `docs/_static/generated/strong_scaling.png` and is generated from:
 
-- a local CPU sweep on a fixed `4096 x 4096` cross-section with `1024`
-  operator iterations
-- a remote GPU sweep on a fixed `10240 x 10240` cross-section with `4096`
-  operator iterations
+- a local CPU sweep on a fixed `2048 x 64 x 64` extruded operator with `1024`
+  iterations
+- a remote GPU sweep on a fixed `6144 x 96 x 96` extruded operator with `4096`
+  iterations
 
 ![LMX strong scaling](_static/generated/strong_scaling.png)
 
@@ -92,27 +92,28 @@ the actual strong-scaling interpretation.
 Observed warm-runtime points from that artifact:
 
 - CPU:
-  - `1` device: `56.9564 s`
-  - `2` devices: `45.8947 s`
-  - `4` devices: `62.8218 s`
-  - `8` devices: `62.5103 s`
+  - `1` device: `128.8671 s`
+  - `2` devices: `103.6910 s`
+  - `4` devices: `73.6536 s`
+  - `8` devices: `72.9044 s`
 - GPU:
-  - `1` GPU: `58.1897 s`
-  - `2` GPUs: `31.2451 s`
+  - `1` GPU: `78.5901 s`
+  - `2` GPUs: `62.5561 s`
 
 The CPU sweep is reported as measured rather than idealized. On this
-workstation, the denser operator reaches its best warm runtime at `2` logical
-CPU devices and then flattens, which is consistent with a memory-bandwidth
-limit on the host path. The remote GPU path shows about `1.86x` speedup from
-`1` to `2` GPUs on the larger fixed problem.
+workstation, the denser operator improves strongly through `4` logical CPU
+devices and then flattens between `4` and `8`, which is consistent with a
+memory-bandwidth limit on the host path. The remote GPU path shows about
+`1.26x` speedup from `1` to `2` GPUs on the larger fixed problem.
 
 Recent local profiling confirms that the current CPU benchmark is still the
 wrong place to claim a final CPU strong-scaling result. A JAX trace collected
 for the `2`-device CPU benchmark (`/tmp/lmx_cpu_scaling_profile`) shows the
 current path is dominated by a memory-bound sharded stencil on forced logical
 host devices. The next CPU scaling benchmark should therefore move closer to
-the actual `extruded_inductionless` operator path or a higher-intensity 3D
-kernel rather than relying on the present host-device sharding curve alone.
+the executable `extruded_inductionless` projection loop or a higher-intensity
+3D operator path rather than relying on the present host-device sharding curve
+alone.
 
 ## Recent compatibility and platform validation
 

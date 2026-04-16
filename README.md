@@ -110,7 +110,7 @@ The two most important benchmark ideas in the README are:
 
 Those geometries are not shown in isolation in the rest of the README:
 
-- the startup GIFs below use the layered Hunt geometry
+- the startup GIFs below use the rectangular Hartmann geometry
 - the fringing overview below uses the rectangular extruded 3D geometry
 - the mapped-pipe workflow is exercised through the fringing CLI/TOML and the
   pipe comparison example in `examples/pipe_reference_comparison_demo.py`
@@ -118,18 +118,17 @@ Those geometries are not shown in isolation in the rest of the README:
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show the Hunt startup sequence in 2D and 3D from `t = 0` to `t = 2 ms`. Time
-is shown in physical units, the fluid domain is outlined explicitly, and the
-2D view marks the Hartmann layers at the top and bottom walls and the side
-layers at the insulating side walls. In this case, the Hartmann layers are the
-thin boundary layers along the walls normal to the magnetic field, where the
-strongest MHD damping occurs. The README movie uses a finer `6 × 6`
-cross-sectional solve with all timesteps written to the GIF so the early
-boundary-layer formation is easier to follow.
+show Hartmann startup in 2D and 3D from `t = 0` to `t = 2 ms`. The duct starts
+from rest and evolves toward the familiar plug-like Hartmann profile, with thin
+boundary layers along the walls normal to the imposed magnetic field. Time is
+shown in physical units, the fluid domain is outlined explicitly, and all solved
+timesteps are written to the GIF so the early layer formation is visible rather
+than skipped. The README path now uses a `48 × 48` cross-section to make the
+wall layers and core profile visible at landing-page scale.
 
 <p align="center">
-  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D startup movie" width="48%">
-  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hartmann_startup_2d.gif" alt="LMX 2D Hartmann startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hartmann_startup_3d.gif" alt="LMX 3D Hartmann startup movie" width="48%">
 </p>
 
 ### Fringing-field response
@@ -140,27 +139,30 @@ for a rectangular duct in one place.
 
 Here the magnetic field is weak upstream, ramps up inside the magnet region,
 and drops again downstream. That axial field variation is what “fringing” means
-in this context.
+in this context. The committed overview is generated on a `24 × 24 × 33`
+cross-section/station grid so the axial histories and cross-sectional panels
+are not limited by a coarse axial sweep.
 
 ![LMX fringing-field overview](docs/_static/generated/fringing_benchmark_rect.png)
 
 ### Scaling and autodiff
 
 The scaling panel below is a fixed-problem strong-scaling benchmark for a dense
-structured-grid inductionless MHD operator. Solid lines are measured warm
-runtimes and speedups; the dashed line is ideal linear speedup. The current
-figure uses a `4096×4096` CPU case with `1024` operator iterations and a
-`10240×10240` GPU case with `4096` operator iterations, so the device curves
-come from minute-scale kernels instead of short smoke tests.
+structured-grid `extruded3d` inductionless MHD operator. Solid lines are
+measured warm runtimes and speedups; the dashed line is ideal linear speedup.
+The current figure uses a `2048×64×64` CPU case with `1024` operator
+iterations and a `6144×96×96` GPU case with `4096` operator iterations, so the
+device curves come from minute-scale kernels instead of short smoke tests.
 
 Measured warm-runtime points:
 
-- CPU: `56.96 s`, `45.89 s`, `62.82 s`, `62.51 s` at `1, 2, 4, 8`
-- GPU: `58.19 s`, `31.25 s` at `1, 2`
+- CPU: `128.87 s`, `103.69 s`, `73.65 s`, `72.90 s` at `1, 2, 4, 8`
+- GPU: `78.59 s`, `62.56 s` at `1, 2`
 
-On this workstation the CPU curve reaches its best point at `2` logical
-devices and then flattens, which is consistent with a bandwidth-limited kernel.
-The GPU curve keeps a cleaner strong-scaling trend on the larger fixed problem.
+On this workstation the CPU curve improves materially up to `4` logical
+devices and then plateaus between `4` and `8`, which is consistent with a
+host-memory-bandwidth limit on the current sharded operator path. The GPU curve
+keeps a cleaner strong-scaling trend on the larger fixed problem.
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
 
@@ -201,6 +203,8 @@ The current validation surface includes:
 - internal conservation and fringing-physics gates on `rect_duct`, `layered_duct`, and `pipe_ogrid`
 - mapped-pipe external comparison kept explicitly qualitative
 - widened bounded manual fringing campaign at `Ha = 10, 20, 30`, `resolution = 8`
+- a standalone quantitative Benchmark B summary driver for rectangular, layered,
+  and mapped-pipe fringing cases
 
 The widened bounded manual campaign is intentionally stricter than the release
 gate. On the current tree it confirms the 3D fringing set at `Ha = 10, 20, 30`
@@ -214,6 +218,7 @@ The heavier 3D validation campaign is generated with:
 
 ```bash
 python scripts/run_full_validation_exercise.py --output artifacts/validation/full_validation_exercise --ha-values 10,20 --resolution 12 --fringing-resolutions 8,12 --skip-paraview --write-plot
+python scripts/run_benchmark_b_quantitative.py --output artifacts/validation/benchmark_b_quantitative --ha-peak 20 --duct-ny 20 --duct-nz 20 --pipe-nr 20 --pipe-ntheta 80 --nx-stations 21 --max-steps 24 --coupling-iterations 12 --potential-iterations 80
 python examples/extruded_validation_campaign.py --output artifacts/examples/extruded_validation_campaign --ha-values 10,20 --resolutions 10,14 --fringing-nx 5
 python scripts/run_manual_solver_family_validation.py --output artifacts/manual_validation/solver_family_summary.json --ha-values 10,20 --resolutions 8,12 --include-fringing --fringing-geometries rect_duct,layered_duct,pipe_ogrid --fringing-nx 5 --max-steps 12 --potential-iterations 48 --coupling-iterations 8 --write-csv --write-plot
 ```

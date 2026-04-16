@@ -365,6 +365,20 @@ def write_transient_movies(
         ax2d.set_title(f"{case_title}\n2D {effective_label.lower()}")
         ax2d.set_aspect("equal")
         _add_layer_annotations(ax2d, mesh, frames[0].get("fluid_mask"), show_side_layers=show_side_layers)
+        mid_z = int(len(mesh.z_centers) // 2)
+        profile_ax = ax2d.inset_axes([0.53, 0.07, 0.34, 0.24])
+        profile_ax.set_facecolor((1.0, 1.0, 1.0, 0.88))
+        profile_ax.set_title("Centerline profile", fontsize=8)
+        profile_ax.set_xlabel("u", fontsize=8)
+        profile_ax.set_ylabel("y", fontsize=8)
+        profile_ax.tick_params(labelsize=7)
+        profile_line, = profile_ax.plot(
+            np.asarray(frames[0]["u"])[:, mid_z],
+            np.asarray(mesh.y_centers),
+            color="#111827",
+            linewidth=1.4,
+        )
+        profile_ax.set_ylim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
         annotation_bbox = {"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "none", "alpha": 0.85}
         time_text = ax2d.text(0.02, 0.98, "", transform=ax2d.transAxes, ha="left", va="top", bbox=annotation_bbox)
         peak_text = ax2d.text(0.98, 0.98, "", transform=ax2d.transAxes, ha="right", va="top", bbox=annotation_bbox)
@@ -395,9 +409,13 @@ def write_transient_movies(
                 alpha=0.55,
             )
             contour_state.append(contour)
+            profile_field = np.asarray(frames[index]["u"])[:, mid_z]
+            profile_line.set_data(profile_field, np.asarray(mesh.y_centers))
+            profile_span = max(float(np.max(np.abs(profile_field))), 1.0e-12)
+            profile_ax.set_xlim(-0.05 * profile_span, 1.05 * profile_span)
             time_text.set_text(f"t = {_format_time_with_units(times[index])}")
             peak_text.set_text(f"max|u| = {frame_peaks[index]:.2e}")
-            return image, time_text, peak_text
+            return image, time_text, peak_text, profile_line
 
         anim2d = animation.FuncAnimation(fig2d, update_2d, frames=len(frames), interval=1000 / fps, blit=False)
         update_2d(len(frames) - 1)
@@ -414,7 +432,7 @@ def write_transient_movies(
     fig3d = None
     anim3d = None
     if include_3d:
-        fig3d = plt.figure(figsize=(6.8, 5.2), constrained_layout=True)
+        fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
 
@@ -422,26 +440,40 @@ def write_transient_movies(
             ax3d.cla()
             field = _movie_field(index)
             facecolors = cmap_obj(norm(field))
-            x0 = np.zeros_like(yy)
-            x1 = np.full_like(yy, x_extent)
-            inlet = ax3d.plot_surface(
-                x0,
-                zz,
-                yy,
-                facecolors=facecolors,
-                shade=False,
-                linewidth=0,
-                antialiased=False,
+            surfaces = []
+            if use_normalized_positive:
+                normalized_field = np.clip(field, 0.0, 1.0)
+                x_surface = 0.14 * x_extent + 0.78 * x_extent * normalized_field
+            else:
+                normalized_field = np.clip(field / stack_abs_max, -1.0, 1.0)
+                x_surface = 0.52 * x_extent + 0.36 * x_extent * normalized_field
+            surfaces.append(
+                ax3d.plot_surface(
+                    x_surface,
+                    zz,
+                    yy,
+                    facecolors=facecolors,
+                    shade=False,
+                    linewidth=0.22,
+                    edgecolor=(1.0, 1.0, 1.0, 0.18),
+                    antialiased=True,
+                    alpha=0.96,
+                    rstride=1,
+                    cstride=1,
+                )
             )
-            outlet = ax3d.plot_surface(
-                x1,
-                zz,
-                yy,
-                facecolors=facecolors,
-                shade=False,
-                linewidth=0,
-                antialiased=False,
-                alpha=0.78,
+            back_plane_x = np.full_like(yy, 0.10 * x_extent)
+            surfaces.append(
+                ax3d.plot_surface(
+                    back_plane_x,
+                    zz,
+                    yy,
+                    color="#cbd5e1",
+                    shade=False,
+                    linewidth=0.0,
+                    antialiased=False,
+                    alpha=0.12,
+                )
             )
             boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
             boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
@@ -473,17 +505,17 @@ def write_transient_movies(
                 dtype=float,
             )
 
-            wall_style = {"color": "#cbd5e1", "alpha": 0.08, "linewidth": 0.0, "shade": False}
+            wall_style = {"color": "#cbd5e1", "alpha": 0.07, "linewidth": 0.0, "shade": False}
             ax3d.plot_surface(side_x, side_z0, side_y0, **wall_style)
             ax3d.plot_surface(side_x, side_z1, side_y1, **wall_style)
             ax3d.plot_surface(side_x, z_span, bottom_y, **wall_style)
             ax3d.plot_surface(side_x, z_span, top_y, **wall_style)
 
             ax3d.quiver(
-                0.08 * x_extent,
+                0.05 * x_extent,
                 float(mesh.z_faces[0]) - 0.06 * (mesh.z_faces[-1] - mesh.z_faces[0]),
                 float(mesh.y_faces[0]),
-                0.72 * x_extent,
+                0.82 * x_extent,
                 0.0,
                 0.0,
                 color="#111827",
@@ -491,7 +523,7 @@ def write_transient_movies(
                 arrow_length_ratio=0.08,
             )
             ax3d.text(
-                0.82 * x_extent,
+                0.92 * x_extent,
                 float(mesh.z_faces[0]) - 0.08 * (mesh.z_faces[-1] - mesh.z_faces[0]),
                 float(mesh.y_faces[0]),
                 "flow",
@@ -502,15 +534,15 @@ def write_transient_movies(
             ax3d.set_ylabel("z")
             ax3d.set_zlabel("y")
             ax3d.set_title(
-                f"{case_title} | extruded duct view\n"
+                f"{case_title} | 3D streamwise-velocity surface\n"
                 f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
             )
             ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)
             ax3d.set_ylim(float(mesh.z_faces[0]) - 0.12 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
             ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
-            ax3d.view_init(elev=24, azim=-57)
-            ax3d.set_box_aspect((1.45, 1.0, 1.0))
-            return (inlet, outlet)
+            ax3d.view_init(elev=24, azim=-58)
+            ax3d.set_box_aspect((1.55, 1.0, 1.0))
+            return tuple(surfaces)
 
         anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)
         update_3d(len(frames) - 1)
@@ -524,12 +556,12 @@ def write_transient_movies(
         if include_2d and anim2d is not None:
             writer = animation.writers[writer_name](fps=fps)
             path2d = out_dir / f"{output_stem}_2d.{suffix}"
-            anim2d.save(path2d, writer=writer, dpi=72)
+            anim2d.save(path2d, writer=writer, dpi=110)
             outputs.append(path2d)
         if include_3d and anim3d is not None:
             path3d = out_dir / f"{output_stem}_3d.{suffix}"
             writer3d = animation.writers[writer_name](fps=fps)
-            anim3d.save(path3d, writer=writer3d, dpi=72)
+            anim3d.save(path3d, writer=writer3d, dpi=110)
             outputs.append(path3d)
 
     if fig2d is not None:
@@ -956,6 +988,8 @@ def write_strong_scaling_plots(
     fig.suptitle(case_title, fontsize=16)
     palette = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed"]
 
+    legend_handles: list[Line2D] = []
+    legend_labels: list[str] = []
     for color, (platform_name, values) in zip(palette, groups.items(), strict=False):
         device_counts = np.asarray([int(item["num_devices"]) for item in values], dtype=float)
         runtimes = np.asarray([float(item.get("warm_seconds", item["mean_seconds"])) for item in values], dtype=float)
@@ -963,19 +997,26 @@ def write_strong_scaling_plots(
         speedup = baseline / np.maximum(runtimes, 1.0e-12)
         ny_value = values[0].get("ny")
         nz_value = values[0].get("nz")
+        nx_value = values[0].get("nx")
         iteration_value = values[0].get("iterations")
+        platform_label = str(platform_name)
         if ny_value is None or nz_value is None:
-            label = str(platform_name)
+            label = platform_label
         else:
             ny = int(ny_value)
             nz = int(nz_value)
+            benchmark_kind = str(values[0].get("benchmark_kind", ""))
+            shape_text = f"{ny}×{nz}" if nx_value in (None, 0) else f"{int(nx_value)}×{ny}×{nz}"
             if iteration_value is None:
-                label = f"{platform_name} ({ny}×{nz})"
+                label = f"{platform_label} ({shape_text})"
             else:
-                label = f"{platform_name} ({ny}×{nz}, {int(iteration_value)} iters)"
+                suffix = "" if not benchmark_kind else f", {benchmark_kind}"
+                label = f"{platform_label} ({shape_text}, {int(iteration_value)} iters{suffix})"
 
         axes[0].plot(device_counts, runtimes, marker="o", color=color, label=label)
         axes[1].plot(device_counts, speedup, marker="o", color=color, label=label)
+        legend_handles.append(Line2D([0], [0], color=color, marker="o", label=label))
+        legend_labels.append(label)
 
     ideal_device_counts = np.asarray(sorted({int(item["num_devices"]) for item in records}), dtype=float)
     axes[1].plot(
@@ -986,6 +1027,8 @@ def write_strong_scaling_plots(
         alpha=0.85,
         label="Ideal linear speedup",
     )
+    legend_handles.append(Line2D([0], [0], color="#64748b", linestyle="--", label="Ideal linear speedup"))
+    legend_labels.append("Ideal linear speedup")
 
     axes[0].set_title("Warm runtime")
     axes[0].set_xlabel("Device count")
@@ -993,15 +1036,20 @@ def write_strong_scaling_plots(
     axes[0].set_xscale("log", base=2)
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
-    axes[0].legend(loc="upper right", bbox_to_anchor=(0.98, 0.98))
-
     axes[1].set_title("Strong-scaling speedup")
     axes[1].set_xlabel("Device count")
     axes[1].set_ylabel("Warm-runtime speedup")
     axes[1].set_xscale("log", base=2)
     axes[1].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[1].get_xaxis().set_major_formatter(ScalarFormatter())
-    axes[1].legend(loc="lower right", bbox_to_anchor=(0.98, 0.04))
+    fig.legend(
+        legend_handles,
+        legend_labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.92),
+        ncol=max(1, min(3, len(legend_handles))),
+        frameon=True,
+    )
 
     png_path = out_dir / "strong_scaling.png"
     pdf_path = out_dir / "strong_scaling.pdf"

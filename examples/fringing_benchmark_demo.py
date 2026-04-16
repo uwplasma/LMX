@@ -43,12 +43,12 @@ def run_fringing_benchmark_demo(
     out_dir: Path,
     geometry_kind: str = "rect_duct",
     ha_peak: float = 20.0,
-    ny: int = 12,
-    nz: int = 12,
-    nx_stations: int = 7,
-    max_steps: int = 18,
-    coupling_iterations: int = 10,
-    potential_iterations: int = 60,
+    ny: int = 24,
+    nz: int = 24,
+    nx_stations: int = 33,
+    max_steps: int = 24,
+    coupling_iterations: int = 12,
+    potential_iterations: int = 80,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
     if geometry_kind == "rect_duct":
@@ -178,13 +178,9 @@ def run_fringing_benchmark_demo(
         },
         "plots": [png_path.name, pdf_path.name],
         "notes": (
-            "This example now runs through the explicit extruded_inductionless "
-            "slice entry point, writing both station history and stacked axial "
-            "field bundles for u, v, w, p, phi, current, and Lorentz force. "
-            f"{geometry_kind} now runs through the explicit extruded slice "
-            "entry point. Rectangular and layered ducts both use the low-Re "
-            "3D projection path here; broader production hardening remains "
-            "future work."
+            "This example writes station histories together with stacked axial "
+            "field bundles for velocity, pressure, potential, current, and "
+            "Lorentz-force diagnostics on the extruded inductionless path."
         ),
     }
     (out_dir / "fringing_benchmark_summary.json").write_text(json.dumps(summary, indent=2))
@@ -196,12 +192,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/fringing_benchmark"))
     parser.add_argument("--geometry-kind", choices=("rect_duct", "layered_duct", "pipe_ogrid"), default="rect_duct")
     parser.add_argument("--ha-peak", type=float, default=20.0)
-    parser.add_argument("--ny", type=int, default=12)
-    parser.add_argument("--nz", type=int, default=12)
-    parser.add_argument("--nx-stations", type=int, default=7)
-    parser.add_argument("--max-steps", type=int, default=18)
-    parser.add_argument("--coupling-iterations", type=int, default=10)
-    parser.add_argument("--potential-iterations", type=int, default=60)
+    parser.add_argument("--ny", type=int, default=24)
+    parser.add_argument("--nz", type=int, default=24)
+    parser.add_argument("--nx-stations", type=int, default=33)
+    parser.add_argument("--max-steps", type=int, default=24)
+    parser.add_argument("--coupling-iterations", type=int, default=12)
+    parser.add_argument("--potential-iterations", type=int, default=80)
     args = parser.parse_args(argv)
     run_fringing_benchmark_demo(
         out_dir=args.output,

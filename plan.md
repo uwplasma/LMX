@@ -410,33 +410,40 @@ That retained gate now passes for all three retained fringing geometries.
   - the README now acts as a short landing page rather than a long changelog
   - the geometry gallery now uses a denser `2 x 3` layout with clearer legends
     and more informative mapped-pipe previews
-  - the README startup media is being kept on a bounded longer-timestep Hunt
-    sequence with unit-bearing timestamps and explicit Hartmann/side-layer
-    annotations
-  - the README/docs/examples surface no longer uses the old
-    older release-narrative framing
-- The scaling artifact was refreshed again onto longer fixed-problem runs:
-  - CPU `4096 x 4096`, `1024` iterations, `1/2/4/8` settings
-  - GPU `10240 x 10240`, `4096` iterations, `1/2` GPUs on `office`
-  - the runtime panel no longer carries an in-plot text box; the interpretation
-    is documented in the README and performance page instead
-  - measured warm runtimes on the current artifact are:
-    - CPU: `56.9564 s`, `45.8947 s`, `62.8218 s`, `62.5103 s`
-    - GPU: `58.1897 s`, `31.2451 s`
-  - the current host reaches its best CPU point at `2` logical devices and
-    then flattens, while the remote GPU path shows about `1.86x` speedup from
-    `1` to `2` GPUs on the larger fixed problem
+  - the README startup media now uses a bounded `0–2 ms` Hartmann startup
+    sequence with unit-bearing timestamps, explicit wall-layer annotation, and
+    all solved timesteps written to the GIF
+  - the README/docs/examples surface no longer uses the older
+    release-narrative framing
+- The scaling workflow now benchmarks a denser 3D operator path instead of the
+  earlier 2D stencil-only path:
+  - the local CPU benchmark is now tied to a long-axial `extruded3d` operator
+    shape rather than a square cross-section toy kernel
+  - the synthetic benchmark fields are now built on the host with `numpy`
+    before explicit device/shard placement, which avoids single-device
+    allocation spikes on the large multi-GPU cases
+  - the current long-axial CPU probe on this host is:
+    `2048 × 64 × 64`, `1024` iterations, `1/2/4/8`
+  - the current large remote GPU probe on `office` is:
+    `6144 × 96 × 96`, `2048` iterations, `1/2`
+  - current probe warm runtimes are:
+    - CPU: `96.8449 s`, `75.2597 s`, `69.0905 s`, `68.1907 s`
+    - GPU: `40.0537 s`, `32.0196 s`
+  - the long-axial CPU benchmark is better than the shorter square-like CPU
+    benchmark, but still flattens beyond `4` host devices on this machine
+  - the resized remote GPU benchmark now scales without the earlier OOM path
+    and improves from `1` to `2` GPUs on the two-A4000 host
 - The autodiff summary figure now carries direct explanatory callouts for the
   Hartmann-layer sensitivity interpretation and the recovered inverse-design
   parameter value.
 - The README showcase workflow was tightened around bounded regeneration:
   - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
     geometry-only refreshes
-  - the Hunt startup GIFs now use `dt = 3.75e-5 s`, `t_final = 7 ms`, and all
-    solved timesteps in the output movie
-  - the bounded README movie configuration that regenerates locally uses
-    `ny = nz = 2`, `potential_iterations = 4`, and
-    `coupling_iterations = 2`
+  - the Hartmann startup GIFs now use `dt = 2.0e-5 s`, `t_final = 2 ms`, and
+    all solved timesteps in the output movie
+  - the current README movie configuration that regenerates locally uses
+    `ny = nz = 24`, `potential_iterations = 24`, and
+    `coupling_iterations = 6`
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the
@@ -453,12 +460,49 @@ That retained gate now passes for all three retained fringing geometries.
   - `rect_duct`: `validation_pass = 1`, `max_charge_balance_residual ≈ 1.72e-1`
   - `layered_duct`: `validation_pass = 1`, `max_charge_balance_residual ≈ 1.60e-7`
   - `pipe_ogrid`: `validation_pass = 1`, `max_charge_balance_residual ≈ 2.18e-1`
+- The dedicated quantitative Benchmark B summary driver now exists and writes
+  JSON, CSV, Markdown, and figure outputs for `rect_duct`, `layered_duct`, and
+  `pipe_ogrid` fringing cases. On the current dense `Ha=20`, `20×20×21`
+  summary:
+  - `layered_duct` is quantitatively clean on charge balance and flow span
+  - `pipe_ogrid` is quantitatively well-behaved on the internal metrics, while
+    its external profile comparison remains a separate qualitative workflow
+  - `rect_duct` still shows `max_charge_balance_residual ≈ 7.38e-1`, which is
+    the main open Benchmark B hardening item on the dense rectangular slice
 - The benchmark roadmap now also records the next publication-facing additions:
   - closed-pipe fringing-field validation
   - free-surface dam-break or sloshing validation
   - open-channel fringing-field validation
   - current-driven slotted-channel validation
-  - all three also keep `field_mean_velocity_correlation ≈ -8.02e-1`
+  - the staged external reference data already in-tree are:
+    - `ClosedChannel`
+    - `FringingBPipe`
+    - `DamBreak`
+    - `LMX-U`
+    - `Divertorlets`
+- The README Hartmann startup media was rerun on the bounded high-resolution
+  configuration now used by `examples/readme_showcase_demo.py`:
+  - `Ha = 20`
+  - `48 × 48` cross-section
+  - `dt = 2.0e-5`
+  - `t_final = 2.0e-3`
+  - all solved timesteps written to the GIF
+  - the 3D view is now a streamwise-velocity surface rather than a detached
+    slice stack
+- The current longer strong-scaling artifact now uses:
+  - CPU: `2048×64×64`, `1024` iterations
+  - GPU: `6144×96×96`, `4096` iterations
+  - warm runtime points:
+    - CPU: `128.87 s`, `103.69 s`, `73.65 s`, `72.90 s` at `1, 2, 4, 8`
+    - GPU: `78.59 s`, `62.56 s` at `1, 2`
+  - current interpretation:
+    - the host CPU path improves strongly through `4` logical devices and then
+      plateaus at `8`
+    - the remote two-GPU path still shows the cleaner fixed-problem scaling
+      curve
+    - the next CPU-scaling benchmark should move closer to the executable
+      `extruded_inductionless` projection loop rather than relying on the
+      current sharded operator kernel alone
 
 ## Release checklist
 

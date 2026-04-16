@@ -169,7 +169,7 @@ def run_extruded_summary_figures(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate additional fringing figures for retained extruded cases.")
+    parser = argparse.ArgumentParser(description="Generate additional fringing figures for extruded cases.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/extruded_summary_figures"))
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=10)

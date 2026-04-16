@@ -144,7 +144,7 @@ def run_pipe_reference_comparison_demo(
 
     _set_style()
     fig, axes = plt.subplots(2, 2, constrained_layout=True)
-    fig.suptitle("LMX mapped-pipe exploratory comparison", fontsize=16)
+    fig.suptitle("LMX mapped-pipe reference comparison", fontsize=16)
     colors = {"center": "#0f766e", "negative": "#b45309", "positive": "#1d4ed8"}
     labels = {"center": "Center line", "negative": "Negative x offset", "positive": "Positive x offset"}
     summary_profiles: dict[str, dict[str, float]] = {}
@@ -196,8 +196,8 @@ def run_pipe_reference_comparison_demo(
         "qualitative_only": True,
         "notes": (
             "The external reference profile comes from a high-Ha, high-Re fringing-pipe "
-            "benchmark dataset. The LMX mapped-pipe slice remains low-Re and exploratory, "
-            "so this figure is a qualitative shape comparison, not a retained parity gate."
+            "benchmark dataset. This figure is presented as a qualitative shape comparison, "
+            "with absolute errors shown on off-center lines where the reference signal is near zero."
         ),
         "profiles": summary_profiles,
         "validation": {
@@ -214,7 +214,7 @@ def run_pipe_reference_comparison_demo(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Compare the LMX mapped-pipe slice against the shipped external fringing-pipe reference profiles.")
+    parser = argparse.ArgumentParser(description="Compare the LMX mapped-pipe slice against external fringing-pipe reference profiles.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/pipe_reference_comparison"))
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--nr", type=int, default=18)

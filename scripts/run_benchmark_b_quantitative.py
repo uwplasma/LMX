@@ -1,0 +1,302 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+from dataclasses import is_dataclass, replace
+from pathlib import Path
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from examples.pipe_reference_comparison_demo import _extract_pipe_profile, _load_reference_profile
+from lmx.fringing import (
+    build_layered_duct_extruded_problem,
+    build_pipe_ogrid_extruded_problem,
+    build_square_duct_extruded_problem,
+    solve_extruded_inductionless,
+)
+
+
+def _set_style() -> None:
+    plt.style.use("default")
+    plt.rcParams.update(
+        {
+            "figure.figsize": (12.8, 7.4),
+            "axes.grid": True,
+            "grid.alpha": 0.2,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "font.size": 11,
+        }
+    )
+
+
+def _pipe_reference_root(reference_dir: Path | None) -> Path:
+    if reference_dir is not None:
+        return reference_dir
+    return (
+        Path(__file__).resolve().parents[1]
+        / "external"
+        / "FreeMHDPaperAllFigures"
+        / "FreeMHDPaperAllFigures"
+        / "FringingBPipe"
+    )
+
+
+def _replace_fields(obj, **changes):
+    if is_dataclass(obj):
+        return replace(obj, **changes)
+    for name, value in changes.items():
+        setattr(obj, name, value)
+    return obj
+
+
+def _pipe_profile_errors(bundle, reference_dir: Path | None) -> dict[str, float]:
+    root = _pipe_reference_root(reference_dir)
+    reference_paths = {
+        "center": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv",
+        "negative": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_NegXLine_5.89s.csv",
+        "positive": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_PosXLine_5.89s.csv",
+    }
+    errors: dict[str, float] = {}
+    for name, path in reference_paths.items():
+        ref_coord, ref_velocity, offset, _ = _load_reference_profile(path)
+        lmx_coord, lmx_velocity = _extract_pipe_profile(bundle, x_offset_fraction=offset)
+        interpolated = np.interp(ref_coord, lmx_coord, lmx_velocity)
+        errors[f"{name}_profile_l2_error"] = float(np.sqrt(np.mean((interpolated - ref_velocity) ** 2)))
+        errors[f"{name}_profile_linf_error"] = float(np.max(np.abs(interpolated - ref_velocity)))
+    return errors
+
+
+def _build_problem(
+    geometry_kind: str,
+    *,
+    ha_peak: float,
+    ny: int,
+    nz: int,
+    nx_stations: int,
+    max_steps: int,
+    coupling_iterations: int,
+    potential_iterations: int,
+):
+    if geometry_kind == "rect_duct":
+        problem = build_square_duct_extruded_problem(ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations)
+        return _replace_fields(
+            problem,
+            case=_replace_fields(
+                problem.case,
+                solver=_replace_fields(problem.case.solver, coupling_iterations=coupling_iterations),
+                time_stepper=_replace_fields(problem.case.time_stepper, max_steps=max_steps, potential_iterations=potential_iterations),
+            ),
+        )
+    if geometry_kind == "layered_duct":
+        problem = build_layered_duct_extruded_problem(
+            ha_peak=ha_peak,
+            ny=ny,
+            nz=nz,
+            nx_stations=nx_stations,
+            wall_cells=max(1, min(3, ny // 8)),
+            insulator_cells=max(1, min(2, ny // 10)),
+        )
+        return _replace_fields(
+            problem,
+            case=_replace_fields(
+                problem.case,
+                solver=_replace_fields(problem.case.solver, coupling_iterations=coupling_iterations),
+                time_stepper=_replace_fields(problem.case.time_stepper, max_steps=max_steps, potential_iterations=potential_iterations),
+            ),
+        )
+    if geometry_kind == "pipe_ogrid":
+        problem = build_pipe_ogrid_extruded_problem(ha_peak=ha_peak, nr=ny, ntheta=nz, nx_stations=nx_stations)
+        return _replace_fields(
+            problem,
+            case=_replace_fields(
+                problem.case,
+                solver=_replace_fields(problem.case.solver, coupling_iterations=coupling_iterations),
+                time_stepper=_replace_fields(problem.case.time_stepper, max_steps=max_steps, potential_iterations=potential_iterations),
+            ),
+        )
+    raise ValueError(f"Unsupported geometry {geometry_kind!r}")
+
+
+def _row_for_solution(geometry_kind: str, solution, *, ha_peak: float, ny: int, nz: int, nx_stations: int) -> dict[str, float | str]:
+    validation = solution.validation
+    row: dict[str, float | str] = {
+        "geometry_kind": geometry_kind,
+        "ha_peak": float(ha_peak),
+        "cross_section_y": float(ny),
+        "cross_section_z": float(nz),
+        "nx_stations": float(nx_stations),
+        "station_count": float(validation.station_count),
+        "max_residual": float(validation.max_residual),
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "volumetric_flow_rate_span": float(validation.volumetric_flow_rate_span),
+        "axial_current_span": float(validation.axial_current_span),
+        "peak_velocity_span": float(validation.peak_velocity_span),
+        "pressure_span_range": float(validation.pressure_span_range),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "field_mean_velocity_correlation": float(validation.field_mean_velocity_correlation),
+    }
+    return row
+
+
+def _write_csv(rows: list[dict[str, float | str]], path: Path) -> Path:
+    fieldnames: set[str] = set()
+    for row in rows:
+        fieldnames.update(row.keys())
+    ordered = [
+        "geometry_kind",
+        "ha_peak",
+        "cross_section_y",
+        "cross_section_z",
+        "nx_stations",
+        "max_charge_balance_residual",
+        "volumetric_flow_rate_span",
+        "axial_current_span",
+        "pressure_span_range",
+        "field_mean_velocity_correlation",
+        "center_profile_l2_error",
+        "negative_profile_l2_error",
+        "positive_profile_l2_error",
+    ]
+    remaining = sorted(name for name in fieldnames if name not in ordered)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=[*ordered, *remaining], extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+    return path
+
+
+def _write_markdown(rows: list[dict[str, float | str]], path: Path) -> Path:
+    lines = [
+        "# Benchmark B Quantitative Summary",
+        "",
+        "| Geometry | Ha | Resolution | Charge balance | Flow span | Axial-current span | Pressure-span range | Correlation | Center L2 | Neg L2 | Pos L2 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in rows:
+        resolution = f"{int(float(row['cross_section_y']))}×{int(float(row['cross_section_z']))}×{int(float(row['nx_stations']))}"
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    str(row["geometry_kind"]),
+                    f"{float(row['ha_peak']):.0f}",
+                    resolution,
+                    f"{float(row['max_charge_balance_residual']):.3e}",
+                    f"{float(row['volumetric_flow_rate_span']):.3e}",
+                    f"{float(row['axial_current_span']):.3e}",
+                    f"{float(row['pressure_span_range']):.3e}",
+                    f"{float(row['field_mean_velocity_correlation']):.3f}",
+                    "-" if "center_profile_l2_error" not in row else f"{float(row['center_profile_l2_error']):.3f}",
+                    "-" if "negative_profile_l2_error" not in row else f"{float(row['negative_profile_l2_error']):.3f}",
+                    "-" if "positive_profile_l2_error" not in row else f"{float(row['positive_profile_l2_error']):.3f}",
+                ]
+            )
+            + " |"
+        )
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def _write_plot(rows: list[dict[str, float | str]], path: Path) -> list[Path]:
+    _set_style()
+    fig, axes = plt.subplots(2, 2, constrained_layout=True)
+    colors = {"rect_duct": "#0f766e", "layered_duct": "#b45309", "pipe_ogrid": "#1d4ed8"}
+    labels = {"rect_duct": "Rectangular duct", "layered_duct": "Layered duct", "pipe_ogrid": "Mapped pipe"}
+    geometries = [str(row["geometry_kind"]) for row in rows]
+    x = np.arange(len(rows))
+
+    axes[0, 0].bar(x, [float(row["max_charge_balance_residual"]) for row in rows], color=[colors[g] for g in geometries])
+    axes[0, 0].set_yscale("log")
+    axes[0, 0].set_title("Charge-balance residual")
+    axes[0, 1].bar(x, [float(row["volumetric_flow_rate_span"]) for row in rows], color=[colors[g] for g in geometries])
+    axes[0, 1].set_yscale("log")
+    axes[0, 1].set_title("Throughput span")
+    axes[1, 0].bar(x, [float(row["pressure_span_range"]) for row in rows], color=[colors[g] for g in geometries])
+    axes[1, 0].set_yscale("log")
+    axes[1, 0].set_title("Pressure-span range")
+    axes[1, 1].bar(x, [float(row["axial_current_span"]) for row in rows], color=[colors[g] for g in geometries])
+    axes[1, 1].set_yscale("log")
+    axes[1, 1].set_title("Axial-current span")
+    for ax in axes.ravel():
+        ax.set_xticks(x)
+        ax.set_xticklabels([labels[g] for g in geometries], rotation=12, ha="right")
+    png = path
+    pdf = path.with_suffix(".pdf")
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    return [png, pdf]
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run a quantitative Benchmark B summary over duct and pipe fringing cases.")
+    parser.add_argument("--output", type=Path, default=Path("artifacts/validation/benchmark_b_quantitative"))
+    parser.add_argument("--ha-peak", type=float, default=20.0)
+    parser.add_argument("--duct-ny", type=int, default=20)
+    parser.add_argument("--duct-nz", type=int, default=20)
+    parser.add_argument("--pipe-nr", type=int, default=20)
+    parser.add_argument("--pipe-ntheta", type=int, default=80)
+    parser.add_argument("--nx-stations", type=int, default=21)
+    parser.add_argument("--max-steps", type=int, default=24)
+    parser.add_argument("--coupling-iterations", type=int, default=12)
+    parser.add_argument("--potential-iterations", type=int, default=80)
+    parser.add_argument("--reference-dir", type=Path, default=None)
+    parser.add_argument("--include-pipe-reference", action="store_true")
+    args = parser.parse_args(argv)
+
+    args.output.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, float | str]] = []
+    for geometry_kind, ny, nz in (
+        ("rect_duct", args.duct_ny, args.duct_nz),
+        ("layered_duct", args.duct_ny, args.duct_nz),
+        ("pipe_ogrid", args.pipe_nr, args.pipe_ntheta),
+    ):
+        problem = _build_problem(
+            geometry_kind,
+            ha_peak=args.ha_peak,
+            ny=ny,
+            nz=nz,
+            nx_stations=args.nx_stations,
+            max_steps=args.max_steps,
+            coupling_iterations=args.coupling_iterations,
+            potential_iterations=args.potential_iterations,
+        )
+        solution = solve_extruded_inductionless(problem)
+        row = _row_for_solution(geometry_kind, solution, ha_peak=args.ha_peak, ny=ny, nz=nz, nx_stations=args.nx_stations)
+        if geometry_kind == "pipe_ogrid" and args.include_pipe_reference:
+            row.update(_pipe_profile_errors(solution.bundle, args.reference_dir))
+        rows.append(row)
+
+    rows.sort(key=lambda row: str(row["geometry_kind"]))
+    json_path = args.output / "benchmark_b_quantitative_summary.json"
+    csv_path = args.output / "benchmark_b_quantitative_summary.csv"
+    md_path = args.output / "benchmark_b_quantitative_summary.md"
+    plot_path = args.output / "benchmark_b_quantitative_summary.png"
+    json_path.write_text(json.dumps(rows, indent=2) + "\n")
+    _write_csv(rows, csv_path)
+    _write_markdown(rows, md_path)
+    plots = _write_plot(rows, plot_path)
+    payload = {
+        "rows": rows,
+        "artifacts": {
+            "json": str(json_path),
+            "csv": str(csv_path),
+            "markdown": str(md_path),
+            "plots": [str(path) for path in plots],
+        },
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

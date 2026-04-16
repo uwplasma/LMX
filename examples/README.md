@@ -157,7 +157,7 @@ The restart and validation campaign examples extend that same 3D lane:
     rectangular and layered datasets
 - `readme_showcase_demo.py`
   - regenerates the README media bundle, including the geometry panel
-    and bounded 2D/3D Hunt startup GIFs
+    and bounded 2D/3D Hartmann startup GIFs
   - supports split refreshes with `--movie-view 2d` or `--movie-view 3d`
     when only one GIF needs to be updated inside the five-minute local budget
 
