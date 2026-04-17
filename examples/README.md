@@ -30,10 +30,11 @@ python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples
 python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
 python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
 python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
+python examples/plotting_api_demo.py --output ./artifacts/examples/plotting_api_demo
 python examples/extruded_summary_figures.py --output ./artifacts/examples/extruded_summary_figures
 python examples/readme_showcase_demo.py --output ./docs/_static/generated
-# optional Hunt alternative for side-layer startup media
-python examples/readme_showcase_demo.py --output ./docs/_static/generated --movie-case-kind hunt
+# optional Hartmann alternative for wall-layer startup media
+python examples/readme_showcase_demo.py --output ./docs/_static/generated --movie-case-kind hartmann
 python examples/readme_showcase_demo.py --output ./docs/_static/generated --skip-geometry --movie-view 2d
 python examples/readme_showcase_demo.py --output ./docs/_static/generated --skip-geometry --movie-view 3d
 python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
@@ -70,6 +71,8 @@ block, so they double as templates for both batch and interactive runs.
 The fringing TOML files now also enable `write_plots = true`, so a plain
 `lmx input.toml` run produces the station-history CSV, NPZ bundle, JSON
 summary, and overview plots without any Python wrapper.
+When run from the source tree, the validation and example workflows also pick
+up the bundled closed-channel reference dataset automatically.
 
 ## Replot saved NPZ outputs
 
@@ -159,7 +162,7 @@ The restart and validation campaign examples extend that same 3D lane:
     rectangular and layered datasets
 - `readme_showcase_demo.py`
   - regenerates the README media bundle, including the geometry panel
-    and bounded 2D/3D Hartmann startup GIFs
+    and bounded 2D/3D Hunt startup GIFs
   - supports split refreshes with `--movie-view 2d` or `--movie-view 3d`
     when only one GIF needs to be updated inside the five-minute local budget
 
@@ -187,6 +190,19 @@ That example is the clearest Python-native template for users who want to:
 - preview the resulting geometry before running
 - run a short solve and emit the same plots and JSON summaries used elsewhere
 - use LMX as a programmable research driver instead of only through TOML files
+
+Importable plotting API:
+
+```bash
+python examples/plotting_api_demo.py --output ./artifacts/examples/plotting_api_demo
+```
+
+That example is the minimal template for users who want to:
+
+- call the plotting helpers directly from `import lmx`
+- save geometry previews before running
+- write steady-state overview plots after a solve
+- generate transient GIFs from `solve_case_snapshots(...)`
 
 ## Teaching goal
 

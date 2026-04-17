@@ -517,7 +517,7 @@ That retained gate now passes for all three retained fringing geometries.
   - the README now acts as a short landing page rather than a long changelog
   - the geometry gallery now uses a denser `2 x 3` layout with clearer legends
     and more informative mapped-pipe previews
-  - the README startup media now uses a bounded Hartmann startup sequence with
+  - the README startup media now uses a bounded Hunt startup sequence with
     unit-bearing timestamps, explicit wall-layer annotation, and all solved
     timesteps written to the GIF
   - the README/docs/examples surface no longer uses the older
@@ -546,12 +546,15 @@ That retained gate now passes for all three retained fringing geometries.
 - The README showcase workflow was tightened around bounded regeneration:
   - `examples/readme_showcase_demo.py` now supports split 2D/3D movie runs and
     geometry-only refreshes
-  - the current Hartmann startup GIFs use `dt = 2.0e-6 s`,
+  - the current Hunt startup GIFs use `dt = 1.0e-5 s`,
     `t_final = 2.0 ms`, and all solved timesteps in the output movie
   - the current README movie configuration that regenerates locally uses
-    `ny = nz = 49`, a flat plug-flow initial condition, and the bounded
-    `coupling_iterations = 8` / `potential_iterations = 80` settings from
+    `ny = nz = 37`, a flat plug-flow initial condition, and the bounded
+    `coupling_iterations = 3` / `potential_iterations = 16` settings from
     `examples/readme_showcase_demo.py`
+  - the 3D movie renderer now uses stacked interior `y-z` slices through the
+    duct volume and prefers the ImageMagick GIF writer when available, which is
+    materially faster than the old Pillow-only path on this workstation
 - The widened bounded manual validation probe at `Ha = 10, 20, 30`,
   `resolution = 8`, with fringing `rect_duct,layered_duct,pipe_ogrid`, stays
   inside the fringing conservation/physics gate on the current tree, and the
@@ -591,18 +594,43 @@ That retained gate now passes for all three retained fringing geometries.
     - `LMX-U`
     - `Divertorlets`
 - The README startup media workflow now supports both Hartmann and Hunt cases,
-  and the current landing-page path uses the Hartmann benchmark because it
-  preserves cross-sectional symmetry while showing layer formation from a flat
-  plug-flow initial condition:
+  and the current landing-page path uses the Hunt startup because it shows the
+  layered-duct geometry, the conducting Hartmann walls, and the transient
+  formation of the side/Hartmann layers from a flat plug-flow initial
+  condition:
   - `Ha = 20`
-  - `49 × 49` fluid cross-section
-  - `dt = 2.0e-6`
+  - `37 × 37` fluid cross-section
+  - `dt = 1.0e-5`
   - `t_final = 2.0e-3`
   - all solved timesteps written to the GIF
-  - the 2D panel carries the transient centerline profile and the steady
-    analytic Hartmann reference
-  - the 3D panel renders the full streamwise-velocity field as stacked `y-z`
-    slices through the duct
+  - the 2D panel carries the transient `y`- and `z`-centerline diagnostics
+    against the cross-section field
+  - the 3D panel renders stacked `y-z` slices through the duct volume instead
+    of the older single-ribbon view
+- The top-level Python API now also exposes the plotting/post-processing lane:
+  `solve_case_snapshots`, `write_geometry_preview_plots`,
+  `write_case_overview_plots`, `write_transient_movies`,
+  `write_extruded_overview_plots`, `write_strong_scaling_plots`, and
+  `write_autodiff_plots`, with `examples/plotting_api_demo.py` as the minimal
+  import-and-plot example.
+- Closed-channel validation now falls back to the bundled repository reference
+  dataset under `external/FreeMHDPaperAllFigures/.../ClosedChannel` whenever a
+  custom `reference_root` is not provided, so the local validation commands and
+  examples use the same staged literature/reference data by default.
+- Fringing-pipe reference profiles are now loaded through the same public
+  `lmx.reference_data` lane, so both the mapped-pipe comparison example and
+  the quantitative Benchmark B driver share one CSV/header parser and one
+  bundled-data fallback path.
+- The fast validation lane now includes cheap literature-anchored physics
+  regressions for Hartmann, Shercliff, and Hunt against the bundled analytic
+  or staged-reference profiles, so there is direct low-resolution physics
+  coverage between the smoke tests and the heavier A/B validation campaigns.
+- On the current workstation, those new bundled-reference physics regressions
+  are the main reason the broad `pytest tests -m 'unit or validation'` lane no
+  longer fits comfortably inside the historical five-minute guard. The changed
+  surface is still green on targeted validation slices, but the next test
+  hygiene step is to trim or reclassify the slow physics subset so the routine
+  lane is honest about its runtime again.
 - The current longer strong-scaling artifact now uses:
   - CPU: `2048×64×64`, `1024` iterations
   - GPU: `6144×96×96`, `4096` iterations

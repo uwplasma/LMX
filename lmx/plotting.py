@@ -203,7 +203,13 @@ def write_case_overview_plots(
 
 
 def _safe_writer_candidates() -> list[tuple[str, str]]:
-    return [("gif", "pillow")]
+    available = set(animation.writers.list())
+    candidates: list[tuple[str, str]] = []
+    if "imagemagick" in available:
+        candidates.append(("gif", "imagemagick"))
+    if "pillow" in available:
+        candidates.append(("gif", "pillow"))
+    return candidates or [("gif", "pillow")]
 
 
 def _format_time_with_units(value: float) -> str:
@@ -328,10 +334,15 @@ def write_transient_movies(
     stack_min = float(jnp.nanmin(fluid_values))
     stack_max = float(jnp.nanmax(fluid_values))
     stack_abs_max = max(float(jnp.nanmax(jnp.abs(fluid_values))), 1e-12)
-    negative_tolerance = 1.0e-3 * stack_abs_max
-    use_normalized_positive = stack_min >= -negative_tolerance or stack_max <= negative_tolerance
+    negative_tolerance = 5.0e-2 * stack_abs_max
+    negative_fraction = float(jnp.nanmean((fluid_values < -negative_tolerance).astype(float)))
+    use_normalized_positive = (
+        stack_max <= negative_tolerance
+        or stack_min >= -negative_tolerance
+        or negative_fraction <= 0.02
+    )
     if use_normalized_positive:
-        cmap = "magma"
+        cmap = "viridis"
         norm = colors.Normalize(vmin=0.0, vmax=1.0)
     else:
         cmap = "RdBu_r"
@@ -493,9 +504,7 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
-        x_slice_positions = np.linspace(0.06 * x_extent, 0.94 * x_extent, 7)
-        x_front = 0.04 * x_extent
-        x_back = 0.96 * x_extent
+        x_slice_positions = np.linspace(0.04 * x_extent, 0.96 * x_extent, 11)
 
         def update_3d(index: int):
             ax3d.cla()
@@ -509,7 +518,7 @@ def write_transient_movies(
             color_rgba = cmap_obj(norm(color_field))
             for plane_index, x_plane in enumerate(x_slice_positions):
                 rgba = color_rgba.copy()
-                rgba[..., 3] = 0.14 + 0.05 * (plane_index / max(len(x_slice_positions) - 1, 1))
+                rgba[..., 3] = 0.16 + 0.30 * (plane_index / max(len(x_slice_positions) - 1, 1))
                 surfaces.append(
                     ax3d.plot_surface(
                         np.full_like(yy_display, x_plane),
@@ -522,37 +531,6 @@ def write_transient_movies(
                         alpha=None,
                     )
                 )
-            front_plane_x = np.full_like(yy_display, x_front)
-            back_plane_x = np.full_like(yy_display, x_back)
-            front_rgba = color_rgba.copy()
-            front_rgba[..., 3] = 0.96
-            surfaces.append(
-                ax3d.plot_surface(
-                    front_plane_x,
-                    zz_display,
-                    yy_display,
-                    facecolors=front_rgba,
-                    shade=False,
-                    linewidth=0.1,
-                    edgecolor=(1.0, 1.0, 1.0, 0.10),
-                    antialiased=True,
-                    alpha=None,
-                )
-            )
-            back_rgba = color_rgba.copy()
-            back_rgba[..., 3] = 0.30
-            surfaces.append(
-                ax3d.plot_surface(
-                    back_plane_x,
-                    zz_display,
-                    yy_display,
-                    facecolors=back_rgba,
-                    shade=False,
-                    linewidth=0.0,
-                    antialiased=False,
-                    alpha=None,
-                )
-            )
             boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
             boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
             for x_plane in (0.0, x_extent):
@@ -582,8 +560,7 @@ def write_transient_movies(
                 [[float(mesh.z_faces[0]), float(mesh.z_faces[-1])], [float(mesh.z_faces[0]), float(mesh.z_faces[-1])]],
                 dtype=float,
             )
-
-            wall_style = {"color": "#cbd5e1", "alpha": 0.07, "linewidth": 0.0, "shade": False}
+            wall_style = {"color": "#cbd5e1", "alpha": 0.025, "linewidth": 0.0, "shade": False}
             ax3d.plot_surface(side_x, side_z0, side_y0, **wall_style)
             ax3d.plot_surface(side_x, side_z1, side_y1, **wall_style)
             ax3d.plot_surface(side_x, z_span, bottom_y, **wall_style)
@@ -618,8 +595,8 @@ def write_transient_movies(
             ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)
             ax3d.set_ylim(float(mesh.z_faces[0]) - 0.12 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
             ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
-            ax3d.view_init(elev=24, azim=-58)
-            ax3d.set_box_aspect((1.55, 1.0, 1.0))
+            ax3d.view_init(elev=22, azim=-52)
+            ax3d.set_box_aspect((1.8, 1.0, 1.0))
             return tuple(surfaces)
 
         anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)

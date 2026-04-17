@@ -62,6 +62,26 @@ solution = solve_steady(case)
 print(solution.diagnostics.residual_history[-1])
 ```
 
+Post-processing from Python:
+
+```python
+from lmx import (
+    make_hartmann_case,
+    solve_steady,
+    solve_case_snapshots,
+    write_case_overview_plots,
+    write_geometry_preview_plots,
+    write_transient_movies,
+)
+
+case = make_hartmann_case(ha=20.0, ny=32, nz=32)
+steady = solve_steady(case)
+write_geometry_preview_plots(steady.mesh, "out/geometry", case_title=case.name)
+write_case_overview_plots(steady, "out/steady", case_title=case.name)
+frames = solve_case_snapshots(case, frame_count=40)
+write_transient_movies(frames, "out/movies", case_title=case.name, output_stem="hartmann_startup")
+```
+
 Backend selection from the shell:
 
 ```bash
@@ -110,7 +130,7 @@ The two most important benchmark ideas in the README are:
 
 Those geometries are not shown in isolation in the rest of the README:
 
-- the startup GIFs below use the rectangular Hartmann geometry
+- the startup GIFs below use the layered Hunt geometry
 - the fringing overview below uses the rectangular extruded 3D geometry
 - the mapped-pipe workflow is exercised through the fringing CLI/TOML and the
   pipe comparison example in `examples/pipe_reference_comparison_demo.py`
@@ -118,19 +138,21 @@ Those geometries are not shown in isolation in the rest of the README:
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show Hartmann startup in 2D and 3D over `t = 0` to `t = 2 ms`. The run starts
-from a flat plug-flow profile so the boundary layers form visibly at the walls
-normal to the imposed magnetic field instead of appearing already developed in
-the first frame. Time is shown in physical units, all solved timesteps are
-written to the GIF, and the 2D panel carries both the transient centerline
-profile and the steady analytic Hartmann profile for reference. The 3D panel
-renders the full streamwise-velocity field as a stack of `y-z` slices inside
-the duct, so the movie shows the whole cross-section evolving along `x` rather
-than a single centerplane ribbon.
+show Hunt startup in 2D and 3D over `t = 0` to `t = 2 ms`. Hunt flow uses a
+layered duct with conducting Hartmann walls and insulating side walls, so the
+startup sequence develops thin Hartmann layers at the conducting walls and a
+deformed core profile across the span. The run starts from a flat plug-flow
+profile, time is shown in physical units, and all solved timesteps are written
+to the GIF. The 2D panel carries the transient `y`- and `z`-centerline
+diagnostics so the layer growth can be read directly from the movie, while the
+3D panel renders the full streamwise-velocity field as a stack of `y-z` slices
+inside the duct volume. The README regeneration path uses a bounded `37 × 37`
+cross-section with `dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 3`,
+and `potential_iterations = 16`.
 
 <p align="center">
-  <img src="docs/_static/generated/readme_hartmann_startup_2d.gif" alt="LMX 2D Hartmann startup movie" width="48%">
-  <img src="docs/_static/generated/readme_hartmann_startup_3d.gif" alt="LMX 3D Hartmann startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">
+  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt startup movie" width="48%">
 </p>
 
 ### Fringing-field response
@@ -228,11 +250,17 @@ python examples/extruded_validation_campaign.py --output artifacts/examples/extr
 python scripts/run_manual_solver_family_validation.py --output artifacts/manual_validation/solver_family_summary.json --ha-values 10,20 --resolutions 8,12 --include-fringing --fringing-geometries rect_duct,layered_duct,pipe_ogrid --fringing-nx 5 --max-steps 12 --potential-iterations 48 --coupling-iterations 8 --write-csv --write-plot
 ```
 
+When run from the source tree, the closed-channel validation commands use the
+bundled reference dataset under `external/FreeMHDPaperAllFigures/.../ClosedChannel`
+by default, so an explicit `--reference-root` is only needed when comparing
+against a different dataset.
+
 ## Examples
 
 Useful entry points:
 
 - `examples/readme_showcase_demo.py`: regenerates the README media bundle
+- `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots
 - `examples/extruded_summary_figures.py`: extra fringing-figure generator used by the docs asset workflow

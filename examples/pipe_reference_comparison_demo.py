@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from lmx.fringing import build_pipe_ogrid_extruded_problem, solve_extruded_inductionless
+from lmx.reference_data import default_fringing_pipe_reference_root, load_fringing_pipe_profile
 
 
 def _set_style() -> None:
@@ -31,16 +32,6 @@ def _replace_fields(obj, **changes):
     for name, value in changes.items():
         setattr(obj, name, value)
     return obj
-
-
-def _load_reference_profile(path: Path) -> tuple[np.ndarray, np.ndarray, float]:
-    data = np.genfromtxt(path, delimiter=",", names=True)
-    coord = np.asarray(data["Points2"], dtype=float)
-    velocity = np.asarray(data["U2"], dtype=float)
-    x_offset = float(np.mean(np.asarray(data["Points0"], dtype=float)))
-    coord_scale = max(np.max(np.abs(coord)), 1.0e-12)
-    return coord / coord_scale, velocity, x_offset / coord_scale
-
 
 def _extract_pipe_profile(
     bundle,
@@ -106,20 +97,7 @@ def run_pipe_reference_comparison_demo(
     reference_dir: Path | None = None,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    base_dir = (
-        reference_dir
-        if reference_dir is not None
-        else Path(__file__).resolve().parents[1]
-        / "external"
-        / "FreeMHDPaperAllFigures"
-        / "FreeMHDPaperAllFigures"
-        / "FringingBPipe"
-    )
-    reference_paths = {
-        "center": base_dir / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv",
-        "negative": base_dir / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_NegXLine_5.89s.csv",
-        "positive": base_dir / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_PosXLine_5.89s.csv",
-    }
+    base_dir = default_fringing_pipe_reference_root(reference_dir)
 
     problem = build_pipe_ogrid_extruded_problem(
         ha_peak=ha_peak,
@@ -139,13 +117,17 @@ def run_pipe_reference_comparison_demo(
     problem = _replace_fields(problem, case=_replace_fields(problem.case, **case_updates))
     solution = solve_extruded_inductionless(problem)
 
-    reference_profiles = {name: _load_reference_profile(path) for name, path in reference_paths.items()}
+    reference_profiles = {
+        name: load_fringing_pipe_profile(name, base_dir)
+        for name in ("center", "negative", "positive")
+    }
     reference_velocity_scale = max(
-        max(np.max(np.abs(velocity)), 1.0e-12) for _, velocity, _ in reference_profiles.values()
+        max(np.max(np.abs(np.asarray(profile.velocity, dtype=float))), 1.0e-12)
+        for profile in reference_profiles.values()
     )
     lmx_profiles = {
-        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=offset)
-        for name, (_, _, offset) in reference_profiles.items()
+        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=profile.x_offset_fraction)
+        for name, profile in reference_profiles.items()
     }
     lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_profiles.values())
 
@@ -157,19 +139,19 @@ def run_pipe_reference_comparison_demo(
     summary_profiles: dict[str, dict[str, float]] = {}
 
     for ax, name in zip(axes.ravel()[:3], ("center", "negative", "positive"), strict=False):
-        ref_coord, ref_velocity_raw, offset = reference_profiles[name]
+        reference = reference_profiles[name]
         lmx_coord, lmx_velocity_raw = lmx_profiles[name]
-        ref_velocity = ref_velocity_raw / reference_velocity_scale
+        ref_velocity = np.asarray(reference.velocity, dtype=float) / reference_velocity_scale
         lmx_velocity = lmx_velocity_raw / lmx_velocity_scale
-        interp_velocity = np.interp(ref_coord, lmx_coord, lmx_velocity)
+        interp_velocity = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_velocity)
         l2_error = float(np.sqrt(np.mean((interp_velocity - ref_velocity) ** 2)))
         linf_error = float(np.max(np.abs(interp_velocity - ref_velocity)))
         summary_profiles[name] = {
-            "x_offset_fraction": float(offset),
+            "x_offset_fraction": float(reference.x_offset_fraction),
             "normalized_l2_error": l2_error,
             "normalized_linf_error": linf_error,
         }
-        ax.plot(ref_coord, ref_velocity, color=colors[name], linewidth=2.2, label="External reference")
+        ax.plot(np.asarray(reference.coordinate, dtype=float), ref_velocity, color=colors[name], linewidth=2.2, label="External reference")
         ax.plot(lmx_coord, lmx_velocity, color="#111827", linestyle="--", linewidth=2.0, label="LMX")
         ax.set_title(f"{labels[name]}\n$L_2$={l2_error:.3f} | $L_\\infty$={linf_error:.3f}")
         ax.set_xlabel("Normalized transverse coordinate")

@@ -12,13 +12,14 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from examples.pipe_reference_comparison_demo import _extract_pipe_profile, _load_reference_profile
+from examples.pipe_reference_comparison_demo import _extract_pipe_profile
 from lmx.fringing import (
     build_layered_duct_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     solve_extruded_inductionless,
 )
+from lmx.reference_data import default_fringing_pipe_reference_root, load_fringing_pipe_profile
 
 
 def _set_style() -> None:
@@ -38,13 +39,7 @@ def _set_style() -> None:
 def _pipe_reference_root(reference_dir: Path | None) -> Path:
     if reference_dir is not None:
         return reference_dir
-    return (
-        Path(__file__).resolve().parents[1]
-        / "external"
-        / "FreeMHDPaperAllFigures"
-        / "FreeMHDPaperAllFigures"
-        / "FringingBPipe"
-    )
+    return default_fringing_pipe_reference_root()
 
 
 def _replace_fields(obj, **changes):
@@ -57,27 +52,23 @@ def _replace_fields(obj, **changes):
 
 def _pipe_profile_errors(bundle, reference_dir: Path | None) -> dict[str, float]:
     root = _pipe_reference_root(reference_dir)
-    reference_paths = {
-        "center": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv",
-        "negative": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_NegXLine_5.89s.csv",
-        "positive": root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_PosXLine_5.89s.csv",
-    }
-    reference_profiles = {name: _load_reference_profile(path) for name, path in reference_paths.items()}
+    reference_profiles = {name: load_fringing_pipe_profile(name, root) for name in ("center", "negative", "positive")}
     reference_velocity_scale = max(
-        max(np.max(np.abs(velocity)), 1.0e-12) for _, velocity, _ in reference_profiles.values()
+        max(np.max(np.abs(np.asarray(profile.velocity, dtype=float))), 1.0e-12)
+        for profile in reference_profiles.values()
     )
     lmx_profiles = {
-        name: _extract_pipe_profile(bundle, x_offset_fraction=offset)
-        for name, (_, _, offset) in reference_profiles.items()
+        name: _extract_pipe_profile(bundle, x_offset_fraction=profile.x_offset_fraction)
+        for name, profile in reference_profiles.items()
     }
     lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_profiles.values())
     errors: dict[str, float] = {}
-    for name in reference_paths:
-        ref_coord, ref_velocity_raw, _ = reference_profiles[name]
+    for name in ("center", "negative", "positive"):
+        reference = reference_profiles[name]
         lmx_coord, lmx_velocity_raw = lmx_profiles[name]
-        ref_velocity = ref_velocity_raw / reference_velocity_scale
+        ref_velocity = np.asarray(reference.velocity, dtype=float) / reference_velocity_scale
         lmx_velocity = lmx_velocity_raw / lmx_velocity_scale
-        interpolated = np.interp(ref_coord, lmx_coord, lmx_velocity)
+        interpolated = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_velocity)
         errors[f"{name}_profile_l2_error"] = float(np.sqrt(np.mean((interpolated - ref_velocity) ** 2)))
         errors[f"{name}_profile_linf_error"] = float(np.max(np.abs(interpolated - ref_velocity)))
     return errors

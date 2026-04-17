@@ -118,6 +118,10 @@ That workflow produces:
 - one combined CSV table
 - one combined Markdown gate report
 
+When run from the source tree, `--reference-root` can be omitted and the
+workflow will use the bundled closed-channel reference dataset under
+`external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel`.
+
 For the fringing-only quantitative summary, use:
 
 ```bash
@@ -171,6 +175,16 @@ On the current tree, rectangular and layered slices are quantitatively
 well-behaved on these settings. The next dense Benchmark B hardening target is
 the mapped-pipe external parity lane rather than the internal rectangular
 charge-balance lane.
+
+The current mapped-pipe external comparison remains the main Benchmark B
+external gap. On the latest bounded pipe-reference comparison:
+
+- center cut: `L2 ≈ 1.63e-1`, `L∞ ≈ 9.82e-1`
+- negative offset cut: `L2 ≈ 9.93e-1`, `L∞ ≈ 1.00`
+- positive offset cut: `L2 ≈ 9.93e-1`, `L∞ ≈ 1.00`
+
+That is enough to say the comparison is quantitative, but not enough to call it
+parity closure.
 
 ## Staged but deferred
 

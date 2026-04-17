@@ -409,6 +409,60 @@ def test_current_reconstruction_modes_and_face_diagnostics_are_finite():
     assert float(face_lorentz_max) >= 0.0
 
 
+def test_face_current_components_and_integral_diagnostics_remain_bounded():
+    case = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    y_index = jnp.arange(mesh.yz_shape[0], dtype=jnp.float32)[:, None]
+    z_index = jnp.arange(mesh.yz_shape[1], dtype=jnp.float32)[None, :]
+    u = jnp.where(materials.fluid_mask, 0.2 + 0.03 * y_index - 0.01 * z_index, 0.0)
+    phi = 0.02 * y_index - 0.01 * z_index
+    jy, jz = solvers._conductive_current_components(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
+    )
+    lorentz = jy * bz - jz * by
+    face_jy, face_jz, emf_y, emf_z = solvers._face_current_components(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
+    )
+
+    diagnostics = solvers._integral_diagnostics(
+        mesh=mesh,
+        sigma=materials.conductivity,
+        fluid_mask=materials.fluid_mask,
+        u=u,
+        phi=phi,
+        jy=jy,
+        jz=jz,
+        lorentz=lorentz,
+        by=by,
+        bz=bz,
+        anchor=(0, 0),
+    )
+
+    assert face_jy.shape == (mesh.yz_shape[0] - 1, mesh.yz_shape[1])
+    assert face_jz.shape == (mesh.yz_shape[0], mesh.yz_shape[1] - 1)
+    assert emf_y.shape == face_jy.shape
+    assert emf_z.shape == face_jz.shape
+    assert all(jnp.isfinite(value) for value in diagnostics)
+    volumetric_flow_rate, mean_current_magnitude, lorentz_power, *_ = diagnostics
+    assert float(volumetric_flow_rate) > 0.0
+    assert float(mean_current_magnitude) >= 0.0
+    assert jnp.isfinite(lorentz_power)
+
+
 def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases():
     hartmann = make_hartmann_case(ha=5.0, ny=6, nz=6)
     hunt = make_hunt_case(ha=20.0, ny=6, nz=6, wall_cells=1)
@@ -653,6 +707,220 @@ def test_fully_developed_solver_rejects_pipe_geometry():
     )
     with pytest.raises(NotImplementedError, match="not supported by the laminar solver"):
         solvers._solve_fully_developed(bad_case)
+
+
+def test_fully_developed_case_step_rejects_non_implicit_transient_scheme():
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    case = replace(case, solver=replace(case.solver, mode="transient", time_scheme="crank_nicolson"))
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    u_previous = jnp.zeros(mesh.yz_shape)
+
+    with pytest.raises(NotImplementedError, match="implicit_euler only"):
+        solvers._fully_developed_case_step(
+            case=case,
+            mesh=mesh,
+            materials=materials,
+            u_previous=u_previous,
+            step_time=case.time_stepper.dt,
+            potential_solver="jacobi",
+            target_mean_velocity=None,
+            linear_solver="cg",
+            preconditioner="jacobi",
+            coupling_iterations=1,
+            coupling_tolerance=1.0e-6,
+        )
+
+
+def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    u_previous = jnp.zeros(mesh.yz_shape)
+    call_counter = {"velocity": 0}
+
+    monkeypatch.setattr(
+        solvers,
+        "_solve_potential",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.asarray(1.0e-9),
+            jnp.asarray(3, dtype=jnp.int32),
+            jnp.asarray(1.0e-6),
+        ),
+    )
+
+    def fake_solve_velocity_system(**kwargs):
+        call_counter["velocity"] += 1
+        field = jnp.full(mesh.yz_shape, 0.25)
+        return field, jnp.asarray(2.0e-7), jnp.asarray(5, dtype=jnp.int32), jnp.asarray(4.0e-6)
+
+    monkeypatch.setattr(solvers, "_solve_velocity_system", fake_solve_velocity_system)
+    monkeypatch.setattr(
+        solvers,
+        "_compute_current_and_lorentz",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+        ),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_face_current_emf_and_lorentz_max",
+        lambda *args, **kwargs: (
+            jnp.asarray(1.0e-4),
+            jnp.asarray(2.0e-4),
+            jnp.asarray(3.0e-4),
+        ),
+    )
+
+    (
+        u_next,
+        _phi,
+        _jy,
+        _jz,
+        _lorentz,
+        velocity_residual,
+        potential_residual,
+        potential_iterations,
+        linear_residual,
+        linear_iterations,
+        face_current_max,
+        emf_max,
+        face_lorentz_max,
+        mean_velocity,
+        applied_forcing,
+        potential_initial_residual,
+        linear_initial_residual,
+    ) = solvers._fully_developed_case_step(
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        u_previous=u_previous,
+        step_time=case.time_stepper.dt,
+        potential_solver="jacobi",
+        target_mean_velocity=None,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        coupling_iterations=1,
+        coupling_tolerance=1.0e-6,
+    )
+
+    active_mask = solvers._active_velocity_mask(materials.fluid_mask)
+    assert call_counter["velocity"] == 1
+    assert jnp.allclose(u_next[active_mask], 0.25)
+    assert jnp.allclose(u_next[~active_mask], 0.0)
+    assert float(velocity_residual) == pytest.approx(0.25)
+    assert float(potential_residual) == pytest.approx(1.0e-9)
+    assert int(potential_iterations) == 3
+    assert float(linear_residual) == pytest.approx(2.0e-7)
+    assert int(linear_iterations) == 5
+    assert float(face_current_max) == pytest.approx(1.0e-4)
+    assert float(emf_max) == pytest.approx(2.0e-4)
+    assert float(face_lorentz_max) == pytest.approx(3.0e-4)
+    assert float(mean_velocity) == pytest.approx(float(jnp.mean(u_next)))
+    assert float(applied_forcing) == pytest.approx(case.forcing)
+    assert float(potential_initial_residual) == pytest.approx(1.0e-6)
+    assert float(linear_initial_residual) == pytest.approx(4.0e-6)
+
+
+def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity_solve(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    u_previous = jnp.zeros(mesh.yz_shape)
+    velocity_calls = {"count": 0}
+
+    monkeypatch.setattr(
+        solvers,
+        "_solve_potential",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.asarray(5.0e-10),
+            jnp.asarray(2, dtype=jnp.int32),
+            jnp.asarray(8.0e-7),
+        ),
+    )
+
+    def fake_solve_velocity_system(**kwargs):
+        velocity_calls["count"] += 1
+        if velocity_calls["count"] == 1:
+            return (
+                jnp.full(mesh.yz_shape, 0.2),
+                jnp.asarray(3.0e-7),
+                jnp.asarray(4, dtype=jnp.int32),
+                jnp.asarray(6.0e-6),
+            )
+        return (
+            jnp.full(mesh.yz_shape, 0.5),
+            jnp.asarray(1.0e-7),
+            jnp.asarray(3, dtype=jnp.int32),
+            jnp.asarray(9.0e-6),
+        )
+
+    monkeypatch.setattr(solvers, "_solve_velocity_system", fake_solve_velocity_system)
+    monkeypatch.setattr(
+        solvers,
+        "_compute_current_and_lorentz",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+        ),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_face_current_emf_and_lorentz_max",
+        lambda *args, **kwargs: (
+            jnp.asarray(0.0),
+            jnp.asarray(0.0),
+            jnp.asarray(0.0),
+        ),
+    )
+
+    (
+        u_next,
+        _phi,
+        _jy,
+        _jz,
+        _lorentz,
+        velocity_residual,
+        _potential_residual,
+        _potential_iterations,
+        linear_residual,
+        linear_iterations,
+        _face_current_max,
+        _emf_max,
+        _face_lorentz_max,
+        mean_velocity,
+        applied_forcing,
+        _potential_initial_residual,
+        linear_initial_residual,
+    ) = solvers._fully_developed_case_step(
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        u_previous=u_previous,
+        step_time=case.time_stepper.dt,
+        potential_solver="jacobi",
+        target_mean_velocity=0.7,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        coupling_iterations=1,
+        coupling_tolerance=1.0e-6,
+    )
+
+    active_mask = solvers._active_velocity_mask(materials.fluid_mask)
+    assert velocity_calls["count"] == 2
+    assert jnp.allclose(u_next[active_mask], 0.7)
+    assert jnp.allclose(u_next[~active_mask], 0.0)
+    assert float(velocity_residual) == pytest.approx(0.7)
+    assert float(linear_residual) == pytest.approx(3.0e-7)
+    assert int(linear_iterations) == 4
+    assert float(mean_velocity) == pytest.approx(float(jnp.mean(u_next)))
+    assert float(applied_forcing) == pytest.approx(1.0)
+    assert float(linear_initial_residual) == pytest.approx(9.0e-6)
 
 
 def test_solve_steady_and_transient_reject_unknown_solver_kind():

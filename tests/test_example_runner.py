@@ -387,10 +387,32 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
     summary = module.run_readme_showcase_demo(out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5)
 
     assert summary["case"] == "readme_showcase_demo"
-    assert summary["movie_case_kind"] == "hartmann"
-    assert (tmp_path / "readme_hartmann_startup_2d.gif").exists()
-    assert (tmp_path / "readme_hartmann_startup_3d.gif").exists()
+    assert summary["movie_case_kind"] == "hunt"
+    assert (tmp_path / "readme_hunt_startup_2d.gif").exists()
+    assert (tmp_path / "readme_hunt_startup_3d.gif").exists()
     assert (tmp_path / "readme_showcase_summary.json").exists()
+
+
+def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("plotting_api_demo.py")
+
+    monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace(mesh=SimpleNamespace(), case_name=case.name))
+    monkeypatch.setattr(module, "write_geometry_preview_plots", lambda mesh, out_dir, case_title: [out_dir / "geometry_preview.png"])
+    monkeypatch.setattr(module, "write_case_overview_plots", lambda solution, out_dir, case_title: [out_dir / "overview.png"])
+    monkeypatch.setattr(module, "solve_case_snapshots", lambda case, frame_count=12: [{"time": 0.0, "u": np.ones((2, 2)), "mesh": None}])
+    monkeypatch.setattr(
+        module,
+        "write_transient_movies",
+        lambda frames, out_dir, case_title, output_stem, fps=18: [out_dir / f"{output_stem}_2d.gif", out_dir / f"{output_stem}_3d.gif"],
+    )
+
+    summary = module.run_plotting_api_demo(out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5)
+
+    assert summary["case"] == "hartmann_ha20"
+    assert "geometry_preview.png" in summary["geometry"]
+    assert "overview.png" in summary["steady"]
+    assert "plotting_api_demo_2d.gif" in summary["movies"]
+    assert (tmp_path / "plotting_api_demo_summary.json").exists()
 
 
 def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

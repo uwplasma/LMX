@@ -10,6 +10,7 @@ from lmx.core import Diagnostics, MHDState, Solution
 from lmx.plotting import (
     _movie_field_stack,
     _plot_field,
+    _safe_writer_candidates,
     write_autodiff_plots,
     write_case_overview_plots,
     write_geometry_gallery_plots,
@@ -230,6 +231,11 @@ def test_movie_field_stack_rejects_unknown_mode():
 
 def test_write_transient_movies_returns_empty_list_for_empty_frames(tmp_path: Path):
     assert write_transient_movies([], tmp_path, case_title="empty") == []
+
+
+def test_safe_writer_candidates_prefers_imagemagick_when_available(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("matplotlib.animation.writers.list", lambda: ["ffmpeg", "imagemagick", "pillow"])
+    assert _safe_writer_candidates() == [("gif", "imagemagick"), ("gif", "pillow")]
 
 
 @pytest.mark.filterwarnings("ignore:Animation was deleted without rendering anything:UserWarning")

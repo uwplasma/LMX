@@ -21,6 +21,7 @@ This lane is intentionally kept below five minutes. It covers:
 - plotting/reporting contracts
 - low-cost solver checks
 - manufactured/direct-kernel tests
+- small bundled-reference physics regressions for Hartmann, Shercliff, and Hunt
 
 ## Manual research lanes
 
@@ -85,6 +86,14 @@ python scripts/run_full_validation_exercise.py \
 
 That driver produces Benchmark A artifacts, Benchmark B gate summaries, and a
 combined JSON/CSV/Markdown report for the current documented thresholds.
+When run from the source tree it uses the bundled closed-channel reference
+dataset by default, so `--reference-root` is only needed for an alternate
+comparison set.
+
+The bundled-reference physics regressions sit between the fast gate and the
+manual campaign: they use the real steady solver on small grids, compare
+against the bundled analytical/reference datasets, and keep low-resolution
+profile drift visible without forcing the full A/B exercise into routine CI.
 
 ## Physics gates
 

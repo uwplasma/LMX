@@ -8,10 +8,18 @@ from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.physics import _boundary_sides, build_material_fields, magnetic_field_components
+from lmx.reference_data import default_closed_channel_reference_root
 from lmx.specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, RegionSpec, TimeStepperConfig
 from lmx.solvers import _build_mesh, solve_steady, solve_transient
 import lmx.solvers as solvers
-from lmx.validation import hartmann_acceptance, hartmann_analytic_profile, write_acceptance_report
+from lmx.validation import (
+    closed_channel_validation,
+    combined_profile_error,
+    hartmann_acceptance,
+    hartmann_analytic_profile,
+    hartmann_validation,
+    write_acceptance_report,
+)
 
 
 def _synthetic_solution(case, profile: jnp.ndarray) -> Solution:
@@ -141,6 +149,66 @@ def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
     assert path.exists()
     assert acceptance.passed is True
     assert acceptance.passed_l2 is True
+
+
+@pytest.mark.validation
+def test_small_hartmann_solution_matches_analytic_profile():
+    case = make_hartmann_case(ha=10.0, ny=10, nz=10)
+    case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, max_steps=16, potential_iterations=48),
+        solver=replace(case.solver, coupling_iterations=8),
+    )
+
+    solution = solve_steady(case)
+    comparison = hartmann_validation(solution, ha=10.0)
+
+    assert comparison.l2_error < 0.06
+    assert comparison.linf_error < 0.11
+
+
+@pytest.mark.validation
+def test_small_shercliff_solution_matches_bundled_reference_profiles():
+    case = make_shercliff_case(ha=20.0, ny=10, nz=10)
+    case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, max_steps=16, potential_iterations=48),
+        solver=replace(case.solver, coupling_iterations=8),
+    )
+
+    solution = solve_steady(case)
+    comparison = closed_channel_validation(
+        solution,
+        "shercliff",
+        20,
+        reference_root=default_closed_channel_reference_root(),
+    )
+
+    assert comparison.y_profile.l2_error < 0.4
+    assert comparison.z_profile.l2_error < 0.16
+    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.32
+
+
+@pytest.mark.validation
+def test_small_hunt_solution_matches_bundled_reference_profiles():
+    case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=2)
+    case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, max_steps=16, potential_iterations=48),
+        solver=replace(case.solver, coupling_iterations=8),
+    )
+
+    solution = solve_steady(case)
+    comparison = closed_channel_validation(
+        solution,
+        "hunt",
+        20,
+        reference_root=default_closed_channel_reference_root(),
+    )
+
+    assert comparison.y_profile.l2_error < 0.07
+    assert comparison.z_profile.l2_error < 0.1
+    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.09
 
 
 @pytest.mark.unit
