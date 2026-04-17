@@ -319,6 +319,8 @@ def write_transient_movies(
     output_stem: str = "hunt_velocity",
     include_2d: bool = True,
     include_3d: bool = True,
+    symmetry_average_axes: tuple[str, ...] = (),
+    profile_fluid_only: bool = True,
 ) -> list[Path]:
     if not frames:
         return []
@@ -328,8 +330,23 @@ def write_transient_movies(
 
     mesh = frames[0]["mesh"]
     display_fields, frame_peaks, movie_label, colorbar_label = _movie_field_stack(frames, field_mode=field_mode)
+    raw_u_fields = [np.asarray(frame["u"], dtype=float) for frame in frames]
     u_stack = jnp.asarray(np.stack(display_fields))
     fluid_mask = jnp.asarray(frames[0].get("fluid_mask", jnp.ones_like(display_fields[0], dtype=bool)))
+
+    def _symmetrize(field: np.ndarray) -> np.ndarray:
+        result = np.asarray(field, dtype=float)
+        if "y" in symmetry_average_axes:
+            result = 0.5 * (result + result[::-1, :])
+        if "z" in symmetry_average_axes:
+            result = 0.5 * (result + result[:, ::-1])
+        return result
+
+    if symmetry_average_axes:
+        display_fields = [_symmetrize(field) for field in display_fields]
+        raw_u_fields = [_symmetrize(field) for field in raw_u_fields]
+        frame_peaks = [max(float(np.max(np.abs(field[np.asarray(fluid_mask, dtype=bool)]))), 1.0e-12) for field in raw_u_fields]
+
     fluid_values = jnp.asarray(np.stack([jnp.where(fluid_mask, jnp.asarray(field), jnp.nan) for field in display_fields]))
     stack_min = float(jnp.nanmin(fluid_values))
     stack_max = float(jnp.nanmax(fluid_values))
@@ -363,6 +380,30 @@ def write_transient_movies(
     effective_colorbar_label = f"{colorbar_label} / max|u(t)|" if use_normalized_positive else colorbar_label
     outputs: list[Path] = []
 
+    fluid_mask_np = np.asarray(fluid_mask, dtype=bool)
+
+    def _profile_data(index: int, axis: str) -> tuple[np.ndarray, np.ndarray]:
+        field = raw_u_fields[index]
+        if axis == "y":
+            mid_z = int(len(mesh.z_centers) // 2)
+            values = np.asarray(field[:, mid_z], dtype=float)
+            coords = np.asarray(mesh.y_centers, dtype=float)
+            if profile_fluid_only:
+                mask = fluid_mask_np[:, mid_z]
+                values = values[mask]
+                coords = coords[mask]
+            return coords, values
+        if axis == "z":
+            mid_y = int(len(mesh.y_centers) // 2)
+            values = np.asarray(field[mid_y, :], dtype=float)
+            coords = np.asarray(mesh.z_centers, dtype=float)
+            if profile_fluid_only:
+                mask = fluid_mask_np[mid_y, :]
+                values = values[mask]
+                coords = coords[mask]
+            return coords, values
+        raise ValueError(f"Unsupported profile axis {axis}")
+
     fig2d = None
     anim2d = None
     if include_2d:
@@ -386,14 +427,14 @@ def write_transient_movies(
         _add_layer_annotations(ax2d, mesh, frames[0].get("fluid_mask"), show_side_layers=show_side_layers)
         mid_z = int(len(mesh.z_centers) // 2)
         mid_y = int(len(mesh.y_centers) // 2)
-        current_y_profile = np.asarray(frames[0]["u"])[:, mid_z]
-        current_z_profile = np.asarray(frames[0]["u"])[mid_y, :]
-        peak_profile = max(float(np.max(np.abs(current_y_profile))), 1.0e-12)
+        y_profile_coord, current_y_profile = _profile_data(0, "y")
+        z_profile_coord, current_z_profile = _profile_data(0, "z")
+        peak_profile = max(frame_peaks[0], 1.0e-12)
         hartmann_reference = None
         if "hartmann" in case_name and getattr(getattr(case, "geometry", None), "target_ha", None) is not None:
             hartmann_reference = np.asarray(
                 hartmann_analytic_profile(
-                    np.asarray(mesh.y_centers, dtype=float),
+                    y_profile_coord,
                     float(case.geometry.target_ha),
                 )
             )
@@ -404,7 +445,7 @@ def write_transient_movies(
         profile_y_ax.tick_params(labelsize=10)
         profile_y_line, = profile_y_ax.plot(
             current_y_profile / peak_profile,
-            np.asarray(mesh.y_centers),
+            y_profile_coord,
             color="#111827",
             linewidth=1.7,
             label="LMX transient",
@@ -413,14 +454,14 @@ def write_transient_movies(
             reference_scale = max(float(np.max(np.abs(hartmann_reference))), 1.0e-12)
             profile_y_ax.plot(
                 hartmann_reference / reference_scale,
-                np.asarray(mesh.y_centers),
+                y_profile_coord,
                 color="#b45309",
                 linestyle="--",
                 linewidth=1.5,
                 label="steady analytic",
             )
         profile_y_ax.set_xlim(-0.02, 1.05)
-        profile_y_ax.set_ylim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
+        profile_y_ax.set_ylim(float(np.min(y_profile_coord)), float(np.max(y_profile_coord)))
         profile_y_ax.legend(loc="lower right", fontsize=10)
 
         profile_z_ax.set_title("z-centerline", fontsize=11)
@@ -428,12 +469,12 @@ def write_transient_movies(
         profile_z_ax.set_ylabel("u / max u(t)", fontsize=11)
         profile_z_ax.tick_params(labelsize=10)
         profile_z_line, = profile_z_ax.plot(
-            np.asarray(mesh.z_centers),
+            z_profile_coord,
             current_z_profile / peak_profile,
             color="#0f766e",
             linewidth=1.7,
         )
-        profile_z_ax.set_xlim(float(mesh.z_faces[0]), float(mesh.z_faces[-1]))
+        profile_z_ax.set_xlim(float(np.min(z_profile_coord)), float(np.max(z_profile_coord)))
         profile_z_ax.set_ylim(-0.02, 1.05)
         annotation_bbox = {"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "none", "alpha": 0.85}
         time_text = ax2d.text(0.02, 0.98, "", transform=ax2d.transAxes, ha="left", va="top", bbox=annotation_bbox)
@@ -465,11 +506,11 @@ def write_transient_movies(
                 alpha=0.55,
             )
             contour_state.append(contour)
-            y_profile_field = np.asarray(frames[index]["u"])[:, mid_z]
-            z_profile_field = np.asarray(frames[index]["u"])[mid_y, :]
-            profile_span = max(float(np.max(np.abs(y_profile_field))), 1.0e-12)
-            profile_y_line.set_data(y_profile_field / profile_span, np.asarray(mesh.y_centers))
-            profile_z_line.set_data(np.asarray(mesh.z_centers), z_profile_field / profile_span)
+            y_profile_coord, y_profile_field = _profile_data(index, "y")
+            z_profile_coord, z_profile_field = _profile_data(index, "z")
+            profile_span = max(frame_peaks[index], 1.0e-12)
+            profile_y_line.set_data(y_profile_field / profile_span, y_profile_coord)
+            profile_z_line.set_data(z_profile_coord, z_profile_field / profile_span)
             profile_y_ax.set_xlim(-0.02, 1.05)
             profile_z_ax.set_ylim(-0.02, 1.05)
             time_text.set_text(f"t = {_format_time_with_units(times[index])}")

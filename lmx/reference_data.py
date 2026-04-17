@@ -110,6 +110,14 @@ def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str 
     )
 
 
+def load_shercliff_analytical(ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+    return load_closed_channel_analytical("shercliff", ha, reference_root)
+
+
+def load_hunt_analytical(ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+    return load_closed_channel_analytical("hunt", ha, reference_root)
+
+
 def load_processed_slice(
     case_kind: str,
     ha: int,

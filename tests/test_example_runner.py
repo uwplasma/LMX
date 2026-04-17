@@ -372,6 +372,7 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
         output_stem: str,
         include_2d: bool = True,
         include_3d: bool = True,
+        symmetry_average_axes=(),
     ):
         outputs = []
         if include_2d:
@@ -391,6 +392,94 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
     assert (tmp_path / "readme_hunt_startup_2d.gif").exists()
     assert (tmp_path / "readme_hunt_startup_3d.gif").exists()
     assert (tmp_path / "readme_showcase_summary.json").exists()
+
+
+def test_straight_duct_geometry_and_mesh_demo_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("straight_duct_geometry_and_mesh.py")
+
+    monkeypatch.setattr(module, "generate_layered_duct_mesh", lambda **kwargs: SimpleNamespace(ny=4, nz=4, y_faces=np.linspace(-1.0, 1.0, 5), z_faces=np.linspace(-1.0, 1.0, 5), y_centers=np.linspace(-0.75, 0.75, 4), z_centers=np.linspace(-0.75, 0.75, 4)))
+    monkeypatch.setattr(module, "write_lm_duct_geometry_setup_figure", lambda *args, **kwargs: [tmp_path / "lm_duct_geometry_setup.png"])
+    monkeypatch.setattr(module, "write_structured_mesh_figure", lambda *args, **kwargs: [tmp_path / "structured_mesh_ha20.png"])
+
+    for name in ("lm_duct_geometry_setup.png", "structured_mesh_ha20.png"):
+        (tmp_path / name).write_bytes(b"img")
+
+    summary = module.run_straight_duct_geometry_and_mesh_demo(out_dir=tmp_path)
+
+    assert summary["case"] == "straight_duct_geometry_and_mesh"
+    assert "lm_duct_geometry_setup.png" in summary["geometry_outputs"]
+    assert "structured_mesh_ha20.png" in summary["mesh_outputs"]
+    assert (tmp_path / "straight_duct_geometry_and_mesh_summary.json").exists()
+
+
+def test_shercliff_showcase_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("shercliff_showcase.py")
+
+    comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=1.0e-3), z_profile=SimpleNamespace(l2_error=2.0e-3))
+    monkeypatch.setattr(module, "solve_closed_channel_benchmark", lambda *args, **kwargs: (SimpleNamespace(name="shercliff_ha20"), SimpleNamespace(), comparison))
+    monkeypatch.setattr(module, "write_boundary_layer_figure", lambda *args, **kwargs: [tmp_path / "boundary_layer_development.png"])
+    monkeypatch.setattr(module, "write_velocity_profile_volume_figure", lambda *args, **kwargs: [tmp_path / "velocity_profile_volume.png"])
+    monkeypatch.setattr(module, "write_annotated_layer_figure", lambda *args, **kwargs: [tmp_path / "annotated_layers.png"])
+    monkeypatch.setattr(module, "write_closed_channel_startup_movies", lambda *args, **kwargs: [tmp_path / "shercliff_startup_2d.gif", tmp_path / "shercliff_startup_3d.gif"])
+
+    for name in ("boundary_layer_development.png", "velocity_profile_volume.png", "annotated_layers.png", "shercliff_startup_2d.gif", "shercliff_startup_3d.gif"):
+        (tmp_path / name).write_bytes(b"artifact")
+
+    summary = module.run_shercliff_showcase(out_dir=tmp_path)
+
+    assert summary["case"] == "shercliff_ha20"
+    assert summary["comparison"]["y_l2_error"] == pytest.approx(1.0e-3)
+    assert "annotated_layers.png" in summary["annotated_outputs"]
+    assert "shercliff_startup_3d.gif" in summary["movie_outputs"]
+    assert (tmp_path / "shercliff_showcase_summary.json").exists()
+
+
+def test_hunt_showcase_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("hunt_showcase.py")
+
+    comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=3.0e-3), z_profile=SimpleNamespace(l2_error=4.0e-3))
+    monkeypatch.setattr(module, "solve_closed_channel_benchmark", lambda *args, **kwargs: (SimpleNamespace(name="hunt_ha20"), SimpleNamespace(), comparison))
+    monkeypatch.setattr(module, "write_boundary_layer_figure", lambda *args, **kwargs: [tmp_path / "boundary_layer_development.png"])
+    monkeypatch.setattr(module, "write_velocity_profile_volume_figure", lambda *args, **kwargs: [tmp_path / "velocity_profile_volume.png"])
+    monkeypatch.setattr(module, "write_annotated_layer_figure", lambda *args, **kwargs: [tmp_path / "annotated_layers.png"])
+    monkeypatch.setattr(module, "write_closed_channel_startup_movies", lambda *args, **kwargs: [tmp_path / "hunt_startup_2d.gif", tmp_path / "hunt_startup_3d.gif"])
+
+    for name in ("boundary_layer_development.png", "velocity_profile_volume.png", "annotated_layers.png", "hunt_startup_2d.gif", "hunt_startup_3d.gif"):
+        (tmp_path / name).write_bytes(b"artifact")
+
+    summary = module.run_hunt_showcase(out_dir=tmp_path)
+
+    assert summary["case"] == "hunt_ha20"
+    assert summary["comparison"]["z_l2_error"] == pytest.approx(4.0e-3)
+    assert "hunt_startup_2d.gif" in summary["movie_outputs"]
+    assert (tmp_path / "hunt_showcase_summary.json").exists()
+
+
+def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("straight_duct_profile_comparison.py")
+
+    call_count = {"value": 0}
+
+    def fake_solve(*args, **kwargs):
+        call_count["value"] += 1
+        if call_count["value"] == 1:
+            comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=1.0e-3), z_profile=SimpleNamespace(l2_error=2.0e-3))
+            return SimpleNamespace(), SimpleNamespace(), comparison
+        comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=3.0e-3), z_profile=SimpleNamespace(l2_error=4.0e-3))
+        return SimpleNamespace(), SimpleNamespace(), comparison
+
+    monkeypatch.setattr(module, "solve_closed_channel_benchmark", fake_solve)
+    monkeypatch.setattr(module, "write_closed_channel_profile_comparison_figure", lambda *args, **kwargs: [tmp_path / "analytic_velocity_profiles.png"])
+
+    (tmp_path / "analytic_velocity_profiles.png").write_bytes(b"img")
+
+    summary = module.run_straight_duct_profile_comparison(out_dir=tmp_path)
+
+    assert summary["case"] == "straight_duct_profile_comparison"
+    assert summary["shercliff"]["y_l2_error"] == pytest.approx(1.0e-3)
+    assert summary["hunt"]["z_l2_error"] == pytest.approx(4.0e-3)
+    assert "analytic_velocity_profiles.png" in summary["outputs"]
+    assert (tmp_path / "straight_duct_profile_comparison_summary.json").exists()
 
 
 def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -786,7 +875,16 @@ def test_run_theory_meeting_demo_rejects_unknown_movie_case(tmp_path: Path, monk
         lambda case: SimpleNamespace(
             state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
             mesh=SimpleNamespace(),
-            case_name="hunt_ha5",
+                case_name="hunt_ha5",
+            ),
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "closed_channel_validation",
+        lambda *args, **kwargs: SimpleNamespace(
+            reference_path="reference.txt",
+            y_profile=SimpleNamespace(l2_error=0.0, coordinate=np.array([0.0]), reference=np.array([1.0])),
+            z_profile=SimpleNamespace(l2_error=0.0, coordinate=np.array([0.0]), reference=np.array([1.0])),
         ),
     )
     monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])

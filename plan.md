@@ -599,14 +599,31 @@ That retained gate now passes for all three retained fringing geometries.
   formation of the side/Hartmann layers from a flat plug-flow initial
   condition:
   - `Ha = 20`
-  - `37 × 37` fluid cross-section
+  - `49 × 49` fluid cross-section
   - `dt = 1.0e-5`
   - `t_final = 2.0e-3`
+  - `coupling_iterations = 6`
+  - `potential_iterations = 48`
   - all solved timesteps written to the GIF
   - the 2D panel carries the transient `y`- and `z`-centerline diagnostics
     against the cross-section field
-  - the 3D panel renders stacked `y-z` slices through the duct volume instead
-    of the older single-ribbon view
+  - the 3D panel renders stacked `y-z` slices through the duct volume
+- The stale asymmetric Hunt 2D README asset was traced to the old committed
+  media bundle, not the current renderer. The refreshed render path now:
+  - symmetrizes the display field for closed-channel README movies across
+    `y` and `z`
+  - uses fluid-only centerline diagnostics instead of including wall cells in
+    the plotted lineouts
+  - preserves the corrected Hunt 3D volumetric slice rendering while replacing
+    the broken 2D Hunt GIF/poster in `docs/_static/generated`
+- LMX now also has a dedicated straight-duct showcase API in `lmx.showcase`
+  with standalone examples for:
+  - geometry setup and structured mesh figure generation
+  - Shercliff boundary-layer, annotated-layer, 3D profile, and startup media
+  - Hunt boundary-layer, annotated-layer, 3D profile, and startup media
+  - analytical versus LMX Shercliff/Hunt profile overlays
+  - the corresponding reusable source-level helpers are exported from
+    `import lmx`
 - The top-level Python API now also exposes the plotting/post-processing lane:
   `solve_case_snapshots`, `write_geometry_preview_plots`,
   `write_case_overview_plots`, `write_transient_movies`,
@@ -625,6 +642,15 @@ That retained gate now passes for all three retained fringing geometries.
   regressions for Hartmann, Shercliff, and Hunt against the bundled analytic
   or staged-reference profiles, so there is direct low-resolution physics
   coverage between the smoke tests and the heavier A/B validation campaigns.
+- Remaining honest gaps on the straight-duct showcase lane:
+  - the refreshed Hunt 2D README asset is fixed and checked locally
+  - the committed Hunt 3D README GIF already renders as stacked `y-z` slices,
+    not as a single ribbon, but the full 3D README movie regeneration path is
+    still substantially slower than the 2D path
+  - the new steady Shercliff/Hunt showcase scripts are structurally in place
+    and covered by unit/example tests, but their default full-resolution solve
+    path is still heavier than a routine smoke example and needs a dedicated
+    runtime pass before calling it “lightweight”
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

@@ -9,7 +9,9 @@ from lmx.reference_data import (
     fringing_pipe_profile_reference_path,
     load_closed_channel_analytical,
     load_fringing_pipe_profile,
+    load_hunt_analytical,
     load_processed_slice,
+    load_shercliff_analytical,
 )
 
 
@@ -69,6 +71,17 @@ def test_load_bundled_reference_data_uses_repo_dataset():
     assert analytical.midplane_y.shape == analytical.coordinate.shape
     assert processed.columns["U:0"].shape[0] > 10
     assert "potE" in processed.columns
+
+
+def test_case_specific_closed_channel_reference_helpers_forward_to_dataset():
+    root = default_closed_channel_reference_root()
+    shercliff = load_shercliff_analytical(20, root)
+    hunt = load_hunt_analytical(20, root)
+
+    assert shercliff.case_kind == "shercliff"
+    assert shercliff.coordinate.shape[0] > 10
+    assert hunt.case_kind == "hunt"
+    assert hunt.coordinate.shape[0] > 10
 
 
 def test_default_fringing_pipe_reference_root_resolves_bundled_dataset():

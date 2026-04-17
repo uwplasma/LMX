@@ -135,6 +135,19 @@ Those geometries are not shown in isolation in the rest of the README:
 - the mapped-pipe workflow is exercised through the fringing CLI/TOML and the
   pipe comparison example in `examples/pipe_reference_comparison_demo.py`
 
+### Straight-duct setup
+
+The standalone straight-duct showcase scripts build the same Shercliff/Hunt
+family from explicit geometry, material, and mesh parameters. The first figure
+labels the wall-material layout used by the Shercliff and Hunt benchmarks, and
+the second shows the clustered structured mesh used to resolve the Hartmann
+layers.
+
+<p align="center">
+  <img src="docs/_static/generated/lm_duct_geometry_setup.png" alt="Straight-duct geometry setup" width="48%">
+  <img src="docs/_static/generated/structured_mesh_ha20.png" alt="Structured straight-duct mesh" width="48%">
+</p>
+
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
@@ -146,9 +159,9 @@ profile, time is shown in physical units, and all solved timesteps are written
 to the GIF. The 2D panel carries the transient `y`- and `z`-centerline
 diagnostics so the layer growth can be read directly from the movie, while the
 3D panel renders the full streamwise-velocity field as a stack of `y-z` slices
-inside the duct volume. The README regeneration path uses a bounded `37 × 37`
-cross-section with `dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 3`,
-and `potential_iterations = 16`.
+inside the duct volume. The README regeneration path uses a bounded `49 × 49`
+cross-section with `dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 6`,
+and `potential_iterations = 48`.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">
@@ -260,6 +273,10 @@ against a different dataset.
 Useful entry points:
 
 - `examples/readme_showcase_demo.py`: regenerates the README media bundle
+- `examples/straight_duct_geometry_and_mesh.py`: geometry/setup and structured mesh figures for Shercliff/Hunt straight ducts
+- `examples/shercliff_showcase.py`: Shercliff boundary-layer, annotated cross-section, 3D profile, and startup media
+- `examples/hunt_showcase.py`: Hunt boundary-layer, annotated cross-section, 3D profile, and startup media
+- `examples/straight_duct_profile_comparison.py`: analytical versus LMX Shercliff/Hunt profile overlay
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

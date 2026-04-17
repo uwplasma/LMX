@@ -5,6 +5,7 @@ The examples are explicit templates for research workflows. They show how to:
 - build cases directly in Python
 - run from TOML input files
 - generate plots and movies
+- reproduce canonical Shercliff and Hunt benchmark figures
 - save `.npz` state bundles
 - resume runs from restart files
 - benchmark strong scaling
@@ -20,6 +21,10 @@ The examples are explicit templates for research workflows. They show how to:
 python examples/hartmann_example.py --ha 20 --output ./artifacts/examples/hartmann
 python examples/shercliff_example.py --ha 20 --output ./artifacts/examples/shercliff
 python examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
+python examples/straight_duct_geometry_and_mesh.py
+python examples/shercliff_showcase.py
+python examples/hunt_showcase.py
+python examples/straight_duct_profile_comparison.py
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
@@ -209,3 +214,24 @@ That example is the minimal template for users who want to:
 The examples are intentionally written with explicit helper functions and
 configuration blocks so that new users can adapt them into custom research
 drivers.
+
+## Straight-duct showcase
+
+These four standalone scripts are the shortest path to the canonical
+Shercliff/Hunt figures:
+
+```bash
+python examples/straight_duct_geometry_and_mesh.py
+python examples/shercliff_showcase.py
+python examples/hunt_showcase.py
+python examples/straight_duct_profile_comparison.py
+```
+
+They are parameter-driven Python files rather than argparse front ends:
+
+- edit the configuration block at the top of the file
+- rerun the script
+- inspect the output tree under `artifacts/examples/...`
+
+The shared reusable logic lives in `lmx.showcase`, so the example scripts stay
+teachable without duplicating the geometry setup, solve, and plotting code.
