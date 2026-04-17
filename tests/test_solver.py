@@ -1,5 +1,6 @@
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import jax.numpy as jnp
 import pytest
@@ -270,6 +271,37 @@ def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
 
     assert solvers._reference_mean_velocity(inlet_velocity_case) == pytest.approx(0.2)
     assert solvers._reference_mean_velocity(initial_velocity_case) == pytest.approx(0.15)
+
+
+def test_concat_history_handles_append_and_empty_inputs():
+    current = jnp.asarray([1.0, 2.0])
+
+    assert jnp.allclose(solvers._concat_history(None, current, append=True), current)
+    assert jnp.allclose(solvers._concat_history(jnp.asarray([]), current, append=True), current)
+    assert jnp.allclose(solvers._concat_history(jnp.asarray([9.0]), current, append=False), current)
+    assert jnp.allclose(solvers._concat_history(jnp.asarray([9.0]), current, append=True), jnp.asarray([9.0, 1.0, 2.0]))
+
+
+def test_pressure_proxy_reference_current_prefers_face_current_history():
+    diagnostics = SimpleNamespace(
+        face_current_max_history=jnp.asarray([0.4, 0.3]),
+        current_max_history=jnp.asarray([0.2, 0.1]),
+    )
+
+    assert solvers._pressure_proxy_reference_current(diagnostics) == pytest.approx(0.4)
+    assert solvers._pressure_proxy_reference_current(SimpleNamespace(face_current_max_history=jnp.asarray([]), current_max_history=jnp.asarray([0.2]))) == pytest.approx(0.2)
+    assert solvers._pressure_proxy_reference_current(SimpleNamespace(face_current_max_history=jnp.asarray([]), current_max_history=jnp.asarray([]))) is None
+    assert solvers._pressure_proxy_reference_current(None) is None
+
+
+def test_scaled_pressure_proxy_value_uses_available_current_source():
+    value, reference = solvers._scaled_pressure_proxy_value(pressure_proxy=2.0, current_max=0.5, face_current_max=0.0, reference_current=None)
+    assert reference == pytest.approx(0.5)
+    assert value == pytest.approx(2.0)
+
+    value, reference = solvers._scaled_pressure_proxy_value(pressure_proxy=2.0, current_max=0.5, face_current_max=1.0, reference_current=0.25)
+    assert reference == pytest.approx(0.25)
+    assert value == pytest.approx(8.0)
 
 
 def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
