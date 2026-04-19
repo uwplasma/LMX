@@ -607,15 +607,17 @@ That retained gate now passes for all three retained fringing geometries.
   - all solved timesteps written to the GIF
   - the 2D panel carries the transient `y`- and `z`-centerline diagnostics
     against the cross-section field
-  - the 3D panel renders stacked `y-z` slices through the duct volume
+  - the 3D panel renders a Hunt velocity-profile slab inside the duct rather
+    than a stacked-slice volume view
 - The stale asymmetric Hunt 2D README asset was traced to the old committed
   media bundle, not the current renderer. The refreshed render path now:
   - symmetrizes the display field for closed-channel README movies across
     `y` and `z`
   - uses fluid-only centerline diagnostics instead of including wall cells in
     the plotted lineouts
-  - preserves the corrected Hunt 3D volumetric slice rendering while replacing
-    the broken 2D Hunt GIF/poster in `docs/_static/generated`
+  - replaces the older Hunt 3D slice-style view with a cleaner profile-slab
+    rendering that matches the straight-duct showcase more closely
+  - replaces the broken 2D Hunt GIF/poster in `docs/_static/generated`
 - LMX now also has a dedicated straight-duct showcase API in `lmx.showcase`
   with standalone examples for:
   - geometry setup and structured mesh figure generation
@@ -644,13 +646,20 @@ That retained gate now passes for all three retained fringing geometries.
   coverage between the smoke tests and the heavier A/B validation campaigns.
 - Remaining honest gaps on the straight-duct showcase lane:
   - the refreshed Hunt 2D README asset is fixed and checked locally
-  - the committed Hunt 3D README GIF already renders as stacked `y-z` slices,
-    not as a single ribbon, but the full 3D README movie regeneration path is
-    still substantially slower than the 2D path
+  - the committed Hunt 3D README GIF now uses the corrected profile-slab
+    renderer, but that full 3D regeneration path is still substantially slower
+    than the 2D path
+  - the straight-duct analytical overlay is now generated and checked into the
+    docs tree, but the current `Ha = 20` Shercliff overlay remains visibly
+    flatter than the bundled analytical curve even after peak matching, so the
+    Shercliff fully developed setup is still a real benchmark-hardening target
   - the new steady Shercliff/Hunt showcase scripts are structurally in place
     and covered by unit/example tests, but their default full-resolution solve
     path is still heavier than a routine smoke example and needs a dedicated
     runtime pass before calling it “lightweight”
+- A denser quantitative Benchmark B rerun was started on the current tree at
+  `rect/layered: 24 × 24 × 33` and `pipe: 24 × 96 × 33`, but it did not finish
+  inside this pass and remains part of the heavier manual validation lane.
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

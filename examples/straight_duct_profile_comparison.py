@@ -10,10 +10,13 @@ OUTPUT_DIR = Path("artifacts/examples/straight_duct_profile_comparison")
 HA = 20.0
 WIDTH = 0.2
 HEIGHT = 0.2
-NY = 72
-NZ = 72
+NY = 48
+NZ = 48
 WALL_CELLS = 10
 WALL_THICKNESS = 0.02
+COUPLING_ITERATIONS = 12
+POTENTIAL_ITERATIONS = 96
+MAX_STEPS = 96
 
 FLUID_CONDUCTIVITY = 1.0e6
 CONDUCTING_WALL_CONDUCTIVITY = 1.0e7
@@ -38,6 +41,9 @@ def run_straight_duct_profile_comparison(
         fluid_conductivity=FLUID_CONDUCTIVITY,
         density=DENSITY,
         viscosity=VISCOSITY,
+        coupling_iterations=COUPLING_ITERATIONS,
+        potential_iterations=POTENTIAL_ITERATIONS,
+        max_steps=MAX_STEPS,
     )
     _, hunt_solution, hunt_comparison = solve_closed_channel_benchmark(
         "hunt",
@@ -53,6 +59,9 @@ def run_straight_duct_profile_comparison(
         viscosity=VISCOSITY,
         conducting_wall_conductivity=CONDUCTING_WALL_CONDUCTIVITY,
         insulating_wall_conductivity=INSULATING_WALL_CONDUCTIVITY,
+        coupling_iterations=COUPLING_ITERATIONS,
+        potential_iterations=POTENTIAL_ITERATIONS,
+        max_steps=MAX_STEPS,
     )
 
     comparison_outputs = write_closed_channel_profile_comparison_figure(

@@ -527,17 +527,19 @@ def write_transient_movies(
 
     y_centers = np.asarray(mesh.y_centers, dtype=float)
     z_centers = np.asarray(mesh.z_centers, dtype=float)
-    y_display_stride = max(1, int(math.ceil(y_centers.size / 29)))
-    z_display_stride = max(1, int(math.ceil(z_centers.size / 29)))
-    y_display = y_centers[::y_display_stride]
-    z_display = z_centers[::z_display_stride]
-    if y_display[-1] != y_centers[-1]:
-        y_display = np.append(y_display, y_centers[-1])
-    if z_display[-1] != z_centers[-1]:
-        z_display = np.append(z_display, z_centers[-1])
-    zz_display, yy_display = np.meshgrid(z_display, y_display)
-    display_y_indices = np.clip(np.round(np.linspace(0, y_centers.size - 1, y_display.size)).astype(int), 0, y_centers.size - 1)
-    display_z_indices = np.clip(np.round(np.linspace(0, z_centers.size - 1, z_display.size)).astype(int), 0, z_centers.size - 1)
+    max_display_points = 49
+    if y_centers.size <= max_display_points:
+        y_display = y_centers
+        display_y_indices = np.arange(y_centers.size, dtype=int)
+    else:
+        display_y_indices = np.unique(np.round(np.linspace(0, y_centers.size - 1, max_display_points)).astype(int))
+        y_display = y_centers[display_y_indices]
+    if z_centers.size <= max_display_points:
+        z_display = z_centers
+        display_z_indices = np.arange(z_centers.size, dtype=int)
+    else:
+        display_z_indices = np.unique(np.round(np.linspace(0, z_centers.size - 1, max_display_points)).astype(int))
+        z_display = z_centers[display_z_indices]
     x_extent = max(float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.y_faces[-1] - mesh.y_faces[0]), 1.0)
     fig3d = None
     anim3d = None
@@ -545,38 +547,43 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
-        x_slice_positions = np.linspace(0.04 * x_extent, 0.96 * x_extent, 11)
+        x_plane = 0.40 * x_extent
 
         def update_3d(index: int):
             ax3d.cla()
             field = _movie_field(index)
-            display_field = np.asarray(field)[np.ix_(display_y_indices, display_z_indices)]
+            profile_y_coord, profile_y_field = _profile_data(index, "y")
+            profile_y_coord = np.asarray(profile_y_coord, dtype=float)
+            profile_y_field = np.asarray(profile_y_field, dtype=float)
             if use_normalized_positive:
-                color_field = display_field / frame_peaks[index]
+                color_field = profile_y_field / frame_peaks[index]
             else:
-                color_field = display_field
-            surfaces = []
-            color_rgba = cmap_obj(norm(color_field))
-            for plane_index, x_plane in enumerate(x_slice_positions):
-                rgba = color_rgba.copy()
-                rgba[..., 3] = 0.16 + 0.30 * (plane_index / max(len(x_slice_positions) - 1, 1))
-                surfaces.append(
-                    ax3d.plot_surface(
-                        np.full_like(yy_display, x_plane),
-                        zz_display,
-                        yy_display,
-                        facecolors=rgba,
-                        shade=False,
-                        linewidth=0.0,
-                        antialiased=False,
-                        alpha=None,
-                    )
-                )
+                color_field = profile_y_field
+            z_mid = 0.5 * float(mesh.z_faces[0] + mesh.z_faces[-1])
+            z_half_thickness = 0.32 * float(mesh.z_faces[-1] - mesh.z_faces[0])
+            z_profile = np.linspace(z_mid - z_half_thickness, z_mid + z_half_thickness, 13)
+            yy_profile, zz_profile = np.meshgrid(profile_y_coord, z_profile, indexing="ij")
+            color_rgba = cmap_obj(norm(np.repeat(color_field[:, None], z_profile.size, axis=1)))
+            amplitude = 0.22 * x_extent
+            positive_field = np.clip(color_field, 0.0, None)
+            peak = max(float(np.max(positive_field)), 1.0e-12)
+            x_profile = x_plane + amplitude * positive_field / peak
+            x_surface = np.repeat(x_profile[:, None], z_profile.size, axis=1)
+            surface = ax3d.plot_surface(
+                x_surface,
+                zz_profile,
+                yy_profile,
+                facecolors=color_rgba,
+                shade=False,
+                linewidth=0.0,
+                edgecolor="none",
+                antialiased=True,
+            )
             boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
             boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
-            for x_plane in (0.0, x_extent):
+            for x_boundary in (0.0, x_extent):
                 ax3d.plot(
-                    np.full_like(boundary_y, x_plane),
+                    np.full_like(boundary_y, x_boundary),
                     boundary_z,
                     boundary_y,
                     color="#111827",
@@ -626,19 +633,21 @@ def write_transient_movies(
                 color="#111827",
                 fontsize=11,
             )
-            ax3d.set_xlabel("x")
-            ax3d.set_ylabel("z")
-            ax3d.set_zlabel("y")
             ax3d.set_title(
-                f"{case_title} | 3D streamwise-velocity volume\n"
+                f"{case_title} | 3D streamwise-velocity profile\n"
                 f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
             )
             ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)
             ax3d.set_ylim(float(mesh.z_faces[0]) - 0.12 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
             ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
-            ax3d.view_init(elev=22, azim=-52)
+            ax3d.view_init(elev=12, azim=-104)
             ax3d.set_box_aspect((1.8, 1.0, 1.0))
-            return tuple(surfaces)
+            ax3d.grid(False)
+            ax3d.set_xticks([])
+            ax3d.set_yticks([])
+            ax3d.set_zticks([])
+            ax3d.set_axis_off()
+            return (surface,)
 
         anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)
         update_3d(len(frames) - 1)

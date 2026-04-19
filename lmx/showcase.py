@@ -72,6 +72,10 @@ def _normalized_fluid_field(solution) -> tuple[np.ndarray, np.ndarray, np.ndarra
     return y_faces, z_faces, y_centers, z_centers, field / scale
 
 
+def _fluid_field(solution) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    return _fluid_crop(solution.mesh, np.asarray(solution.state.u, dtype=float))
+
+
 def _surface_colors(field: np.ndarray, *, cmap: str = "coolwarm", vmax: float = 1.0) -> np.ndarray:
     cmap_obj = plt.get_cmap(cmap)
     norm = colors.Normalize(vmin=0.0, vmax=vmax)
@@ -268,11 +272,12 @@ def write_boundary_layer_figure(solution, out_dir: str | Path, *, title: str, cm
     _set_showcase_style()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    y_faces, z_faces, _, _, field = _normalized_fluid_field(solution)
+    y_faces, z_faces, _, _, field = _fluid_field(solution)
+    vmax = max(float(np.max(field)), 1.0e-12)
 
     fig, ax = plt.subplots(figsize=(10.5, 6.7))
     _add_slide_title(fig, title)
-    image = ax.pcolormesh(z_faces, y_faces, field, shading="auto", cmap=cmap, vmin=0.0, vmax=1.05)
+    image = ax.pcolormesh(z_faces, y_faces, field, shading="auto", cmap=cmap, vmin=0.0, vmax=1.05 * vmax)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
@@ -280,7 +285,7 @@ def write_boundary_layer_figure(solution, out_dir: str | Path, *, title: str, cm
         spine.set_linewidth(1.6)
         spine.set_edgecolor("#8c8c8c")
     cbar = fig.colorbar(image, ax=ax, orientation="horizontal", fraction=0.06, pad=0.08)
-    cbar.set_label("u / max(u)")
+    cbar.set_label("Velocity magnitude")
     png_path = out_dir / "boundary_layer_development.png"
     pdf_path = out_dir / "boundary_layer_development.pdf"
     fig.savefig(png_path, bbox_inches="tight")
@@ -301,13 +306,14 @@ def write_annotated_layer_figure(
     _set_showcase_style()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    y_faces, z_faces, _, _, field = _normalized_fluid_field(solution)
+    y_faces, z_faces, _, _, field = _fluid_field(solution)
+    vmax = max(float(np.max(field)), 1.0e-12)
 
     delta_ha = half_width / ha
     delta_side = half_width / np.sqrt(ha)
     fig, ax = plt.subplots(figsize=(12.5, 7.0))
     _add_slide_title(fig, title)
-    image = ax.pcolormesh(z_faces, y_faces, field, shading="auto", cmap="turbo", vmin=0.0, vmax=1.05)
+    image = ax.pcolormesh(z_faces, y_faces, field, shading="auto", cmap="turbo", vmin=0.0, vmax=1.05 * vmax)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
@@ -374,13 +380,22 @@ def _draw_duct_box(ax, *, length: float, y_faces: np.ndarray, z_faces: np.ndarra
             ax.plot([0.0, length], [z, z], [y, y], color="#9ca3af", linewidth=1.0, alpha=0.7)
 
 
+def _profile_surface_x(field: np.ndarray, *, length: float, x_plane: float, amplitude: float) -> np.ndarray:
+    normalized = np.clip(np.asarray(field, dtype=float), 0.0, None)
+    peak = max(float(np.max(normalized)), 1.0e-12)
+    return x_plane + amplitude * normalized / peak
+
+
 def write_velocity_profile_volume_figure(solution, out_dir: str | Path, *, title: str, case_kind: str, length: float = 1.0) -> list[Path]:
     _set_showcase_style()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    y_faces, z_faces, y_centers, z_centers, field = _normalized_fluid_field(solution)
+    y_faces, z_faces, y_centers, z_centers, field = _fluid_field(solution)
     zz, yy = np.meshgrid(z_centers, y_centers)
-    colors_rgba = _surface_colors(field, cmap="coolwarm", vmax=1.0)
+    vmax = max(float(np.max(field)), 1.0e-12)
+    colors_rgba = _surface_colors(field, cmap="coolwarm", vmax=vmax)
+    x_plane = 0.40 * length
+    x_surface = _profile_surface_x(field / vmax, length=length, x_plane=x_plane, amplitude=0.20 * length)
 
     fig = plt.figure(figsize=(13.2, 6.8))
     _add_slide_title(fig, title)
@@ -389,22 +404,28 @@ def write_velocity_profile_volume_figure(solution, out_dir: str | Path, *, title
 
     for target_ax in (ax, inset):
         _draw_duct_box(target_ax, length=length, y_faces=y_faces, z_faces=z_faces)
-        for idx, x_plane in enumerate(np.linspace(0.42 * length, 0.58 * length, 10)):
-            rgba = colors_rgba.copy()
-            rgba[..., 3] = 0.20 + 0.06 * idx
-            target_ax.plot_surface(np.full_like(yy, x_plane), zz, yy, facecolors=rgba, shade=False, linewidth=0.0, antialiased=False)
+        target_ax.plot_surface(
+            x_surface,
+            zz,
+            yy,
+            facecolors=colors_rgba,
+            shade=False,
+            linewidth=0.25,
+            edgecolor=(0.1, 0.1, 0.1, 0.12),
+            antialiased=True,
+        )
         target_ax.set_xlim(0.0, length)
         target_ax.set_ylim(float(z_faces[0]), float(z_faces[-1]))
         target_ax.set_zlim(float(y_faces[0]), float(y_faces[-1]))
         target_ax.set_box_aspect((4.0, 1.2, 1.2))
         target_ax.set_axis_off()
 
-    ax.view_init(elev=16, azim=-72)
-    inset.view_init(elev=24, azim=-128)
+    ax.view_init(elev=12, azim=-92)
+    inset.view_init(elev=20, azim=-130)
     cax = fig.add_axes([0.28, 0.14, 0.34, 0.03])
-    sm = plt.cm.ScalarMappable(norm=colors.Normalize(vmin=0.0, vmax=1.0), cmap="coolwarm")
+    sm = plt.cm.ScalarMappable(norm=colors.Normalize(vmin=0.0, vmax=vmax), cmap="coolwarm")
     cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
-    cbar.set_label(f"Normalized velocity magnitude - {case_kind.capitalize()}")
+    cbar.set_label("Velocity Magnitude")
 
     png_path = out_dir / "velocity_profile_volume.png"
     pdf_path = out_dir / "velocity_profile_volume.pdf"
@@ -428,17 +449,51 @@ def write_closed_channel_profile_comparison_figure(
     hunt_ref = load_hunt_analytical(int(ha))
     shercliff_profile = extract_midplane_profile(shercliff_solution, axis="z", fluid_only=True)
     hunt_profile = extract_midplane_profile(hunt_solution, axis="z", fluid_only=True)
+    shercliff_peak = max(float(np.max(np.asarray(shercliff_profile["u"], dtype=float))), 1.0e-12)
+    hunt_peak = max(float(np.max(np.asarray(hunt_profile["u"], dtype=float))), 1.0e-12)
+    shercliff_ref_peak = max(float(np.max(np.asarray(shercliff_ref.midplane_z, dtype=float))), 1.0e-12)
+    hunt_ref_peak = max(float(np.max(np.asarray(hunt_ref.midplane_z, dtype=float))), 1.0e-12)
+    shercliff_scaled = np.asarray(shercliff_profile["u"], dtype=float) * (shercliff_ref_peak / shercliff_peak)
+    hunt_scaled = np.asarray(hunt_profile["u"], dtype=float) * (hunt_ref_peak / hunt_peak)
 
-    shercliff_scale = max(float(jnp.max(jnp.abs(shercliff_profile["u"]))), 1.0e-12)
-    hunt_scale = max(float(jnp.max(jnp.abs(hunt_profile["u"]))), 1.0e-12)
     fig, ax = plt.subplots(figsize=(10.2, 6.4))
-    _add_slide_title(fig, "Analytical and LMX midplane velocity profiles")
-    ax.plot(np.asarray(shercliff_ref.coordinate), np.asarray(shercliff_ref.midplane_z), color="#111827", linestyle="--", linewidth=2.0, label="Analytical: Shercliff")
-    ax.plot(np.asarray(shercliff_profile["z"]), np.asarray(shercliff_profile["u"]) / shercliff_scale, color="#1d4ed8", marker="x", markersize=5, linewidth=1.6, label="LMX: Shercliff")
-    ax.plot(np.asarray(hunt_ref.coordinate), np.asarray(hunt_ref.midplane_z), color="#b91c1c", linewidth=2.0, label="Analytical: Hunt")
-    ax.plot(np.asarray(hunt_profile["z"]), np.asarray(hunt_profile["u"]) / hunt_scale, color="#ef4444", marker="o", markersize=3.5, linewidth=1.2, label="LMX: Hunt")
-    ax.set_xlabel("Position z [m]")
-    ax.set_ylabel("Normalized streamwise velocity")
+    _add_slide_title(fig, f"LMX benchmarking: velocity profiles (Ha = {int(ha)})")
+    ax.plot(
+        np.asarray(shercliff_ref.coordinate),
+        np.asarray(shercliff_ref.midplane_z),
+        color="#111827",
+        linestyle="--",
+        linewidth=1.8,
+        label="Analytical: Shercliff (insulating)",
+    )
+    ax.plot(
+        np.asarray(shercliff_profile["z"]),
+        shercliff_scaled,
+        color="#1d4ed8",
+        marker="x",
+        markersize=5,
+        linewidth=1.2,
+        label="LMX: Shercliff (peak-matched)",
+    )
+    ax.plot(
+        np.asarray(hunt_ref.coordinate),
+        np.asarray(hunt_ref.midplane_z),
+        color="#7f1d1d",
+        linestyle="--",
+        linewidth=1.8,
+        label="Analytical: Hunt (conducting)",
+    )
+    ax.plot(
+        np.asarray(hunt_profile["z"]),
+        hunt_scaled,
+        color="#dc2626",
+        marker="o",
+        markersize=3.2,
+        linewidth=1.2,
+        label="LMX: Hunt (peak-matched)",
+    )
+    ax.set_xlabel("Position (z) [m]")
+    ax.set_ylabel("Streamwise Velocity u(x) [m/s]")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="lower right", frameon=True)
     png_path = out_dir / "analytic_velocity_profiles.png"

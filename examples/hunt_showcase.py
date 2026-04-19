@@ -16,8 +16,8 @@ OUTPUT_DIR = Path("artifacts/examples/hunt_showcase")
 HA = 20.0
 WIDTH = 0.2
 HEIGHT = 0.2
-NY = 72
-NZ = 72
+NY = 48
+NZ = 48
 WALL_CELLS = 10
 WALL_THICKNESS = 0.02
 

@@ -16,8 +16,8 @@ OUTPUT_DIR = Path("artifacts/examples/shercliff_showcase")
 HA = 20.0
 WIDTH = 0.2
 HEIGHT = 0.2
-NY = 72
-NZ = 72
+NY = 48
+NZ = 48
 
 FLUID_CONDUCTIVITY = 1.0e6
 DENSITY = 1.0e4

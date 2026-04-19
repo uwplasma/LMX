@@ -148,6 +148,14 @@ layers.
   <img src="docs/_static/generated/structured_mesh_ha20.png" alt="Structured straight-duct mesh" width="48%">
 </p>
 
+The straight-duct comparison workflow also overlays the analytical Shercliff
+and Hunt midplane profiles with the corresponding LMX solutions at `Ha = 20`.
+The current README figure uses the same reference profiles as the validation
+utilities and peak-matches the LMX curves so the profile-shape agreement can be
+read directly.
+
+![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
+
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
@@ -158,10 +166,11 @@ deformed core profile across the span. The run starts from a flat plug-flow
 profile, time is shown in physical units, and all solved timesteps are written
 to the GIF. The 2D panel carries the transient `y`- and `z`-centerline
 diagnostics so the layer growth can be read directly from the movie, while the
-3D panel renders the full streamwise-velocity field as a stack of `y-z` slices
-inside the duct volume. The README regeneration path uses a bounded `49 × 49`
-cross-section with `dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 6`,
-and `potential_iterations = 48`.
+3D panel shows a streamwise-velocity profile slab inside the duct so the Hunt
+side-layer shape is visible as the transient approaches steady state. The
+README regeneration path uses a bounded `49 × 49` cross-section with
+`dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 6`, and
+`potential_iterations = 48`.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">
