@@ -1,6 +1,7 @@
 import os
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import jax.numpy as jnp
 import pytest
@@ -435,6 +436,32 @@ def test_extract_midplane_profile_fluid_only_excludes_layer_walls():
     assert float(full_profile["u"][-1]) == pytest.approx(0.0)
     assert float(fluid_profile["z"][0]) > -0.5 * case.geometry.height
     assert float(fluid_profile["z"][-1]) < 0.5 * case.geometry.height
+
+
+def test_extract_midplane_profile_averages_even_grid_centerlines():
+    u = jnp.asarray(
+        [
+            [0.0, 1.0, 3.0, 0.0],
+            [0.0, 2.0, 4.0, 0.0],
+            [0.0, 4.0, 6.0, 0.0],
+            [0.0, 5.0, 7.0, 0.0],
+        ],
+        dtype=float,
+    )
+    phi = 10.0 * u
+    centers = jnp.asarray([-0.75, -0.25, 0.25, 0.75], dtype=float)
+    solution = SimpleNamespace(
+        mesh=SimpleNamespace(y_centers=centers, z_centers=centers, fluid_mask=None),
+        state=SimpleNamespace(u=u, phi=phi),
+    )
+
+    y_profile = extract_midplane_profile(solution, axis="y", fluid_only=False)
+    z_profile = extract_midplane_profile(solution, axis="z", fluid_only=False)
+
+    assert jnp.allclose(y_profile["u"], 0.5 * (u[:, 1] + u[:, 2]))
+    assert jnp.allclose(z_profile["u"], 0.5 * (u[1, :] + u[2, :]))
+    assert jnp.allclose(y_profile["phi"], 0.5 * (phi[:, 1] + phi[:, 2]))
+    assert jnp.allclose(z_profile["phi"], 0.5 * (phi[1, :] + phi[2, :]))
 
 
 def test_latest_reference_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: Path):

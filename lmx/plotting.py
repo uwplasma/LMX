@@ -135,6 +135,38 @@ def _draw_profile_slab(
         linewidth=0.0,
         shade=False,
     )
+    edge_alpha = 0.86
+    side_color_top = cmap_obj(norm(field_dense[-1, :]))
+    side_color_bottom = cmap_obj(norm(field_dense[0, :]))
+    top_x = np.vstack([base_plane[-1, :], x_surface[-1, :]])
+    top_z = np.vstack([zz_surface[-1, :], zz_surface[-1, :]])
+    top_y = np.vstack([yy_surface[-1, :], yy_surface[-1, :]])
+    bottom_x = np.vstack([base_plane[0, :], x_surface[0, :]])
+    bottom_z = np.vstack([zz_surface[0, :], zz_surface[0, :]])
+    bottom_y = np.vstack([yy_surface[0, :], yy_surface[0, :]])
+    left_x = np.column_stack([base_plane[:, 0], x_surface[:, 0]])
+    left_z = np.column_stack([zz_surface[:, 0], zz_surface[:, 0]])
+    left_y = np.column_stack([yy_surface[:, 0], yy_surface[:, 0]])
+    right_x = np.column_stack([base_plane[:, -1], x_surface[:, -1]])
+    right_z = np.column_stack([zz_surface[:, -1], zz_surface[:, -1]])
+    right_y = np.column_stack([yy_surface[:, -1], yy_surface[:, -1]])
+    for side_x, side_z, side_y, side_color in (
+        (top_x, top_z, top_y, np.tile(side_color_top[None, :, :], (2, 1, 1))),
+        (bottom_x, bottom_z, bottom_y, np.tile(side_color_bottom[None, :, :], (2, 1, 1))),
+        (left_x, left_z, left_y, np.tile(cmap_obj(norm(field_dense[:, 0]))[:, None, :], (1, 2, 1))),
+        (right_x, right_z, right_y, np.tile(cmap_obj(norm(field_dense[:, -1]))[:, None, :], (1, 2, 1))),
+    ):
+        ax.plot_surface(
+            side_x,
+            side_z,
+            side_y,
+            facecolors=side_color,
+            shade=False,
+            linewidth=0.0,
+            edgecolor="none",
+            antialiased=True,
+            alpha=edge_alpha,
+        )
 
 
 def _plot_field(ax: plt.Axes, solution: Solution, field: jnp.ndarray, *, title: str, cmap: str) -> None:
@@ -674,18 +706,30 @@ def write_transient_movies(
 
     y_centers = np.asarray(mesh.y_centers, dtype=float)
     z_centers = np.asarray(mesh.z_centers, dtype=float)
+    if np.any(fluid_mask_np):
+        fluid_y_indices = np.where(np.any(fluid_mask_np, axis=1))[0]
+        fluid_z_indices = np.where(np.any(fluid_mask_np, axis=0))[0]
+        y_centers_3d = y_centers[fluid_y_indices]
+        z_centers_3d = z_centers[fluid_z_indices]
+    else:
+        fluid_y_indices = np.arange(y_centers.size, dtype=int)
+        fluid_z_indices = np.arange(z_centers.size, dtype=int)
+        y_centers_3d = y_centers
+        z_centers_3d = z_centers
     max_display_points = 49
-    if y_centers.size <= max_display_points:
-        y_display = y_centers
-        display_y_indices = np.arange(y_centers.size, dtype=int)
+    if y_centers_3d.size <= max_display_points:
+        y_display = y_centers_3d
+        display_y_indices = fluid_y_indices
     else:
-        display_y_indices = np.unique(np.round(np.linspace(0, y_centers.size - 1, max_display_points)).astype(int))
+        display_y_local = np.unique(np.round(np.linspace(0, y_centers_3d.size - 1, max_display_points)).astype(int))
+        display_y_indices = fluid_y_indices[display_y_local]
         y_display = y_centers[display_y_indices]
-    if z_centers.size <= max_display_points:
-        z_display = z_centers
-        display_z_indices = np.arange(z_centers.size, dtype=int)
+    if z_centers_3d.size <= max_display_points:
+        z_display = z_centers_3d
+        display_z_indices = fluid_z_indices
     else:
-        display_z_indices = np.unique(np.round(np.linspace(0, z_centers.size - 1, max_display_points)).astype(int))
+        display_z_local = np.unique(np.round(np.linspace(0, z_centers_3d.size - 1, max_display_points)).astype(int))
+        display_z_indices = fluid_z_indices[display_z_local]
         z_display = z_centers[display_z_indices]
     x_extent = max(float(mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.y_faces[-1] - mesh.y_faces[0]), 1.0)
     fig3d = None
@@ -700,7 +744,7 @@ def write_transient_movies(
             ax3d.cla()
             field = _movie_field(index)
             field_display = np.asarray(field[np.ix_(display_y_indices, display_z_indices)], dtype=float)
-            amplitude = 0.26 * x_extent
+            amplitude = 0.32 * x_extent
             _draw_duct_wireframe(
                 ax3d,
                 length=x_extent,
@@ -715,7 +759,7 @@ def write_transient_movies(
                 z_display=z_display,
                 cmap_obj=cmap_obj,
                 norm=norm,
-                x_plane=x_plane,
+                x_plane=0.38 * x_extent,
                 amplitude=amplitude,
                 use_normalized_positive=use_normalized_positive,
             )
@@ -746,8 +790,8 @@ def write_transient_movies(
             ax3d.set_xlim(0.0, 1.01 * x_extent)
             ax3d.set_ylim(float(mesh.z_faces[0]) - 0.14 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
             ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
-            ax3d.view_init(elev=11, azim=-96)
-            ax3d.set_box_aspect((4.8, 1.2, 1.2))
+            ax3d.view_init(elev=14, azim=-90)
+            ax3d.set_box_aspect((5.6, 1.25, 1.25))
             ax3d.grid(False)
             ax3d.set_xticks([])
             ax3d.set_yticks([])

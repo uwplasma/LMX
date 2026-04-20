@@ -207,11 +207,19 @@ def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
 
 
 def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
-    mid_z = solution.state.u.shape[1] // 2
+    z_count = solution.state.u.shape[1]
+    if z_count % 2 == 0:
+        mid_columns = (z_count // 2 - 1, z_count // 2)
+        u_profile = 0.5 * (solution.state.u[:, mid_columns[0]] + solution.state.u[:, mid_columns[1]])
+        phi_profile = 0.5 * (solution.state.phi[:, mid_columns[0]] + solution.state.phi[:, mid_columns[1]])
+    else:
+        mid_column = z_count // 2
+        u_profile = solution.state.u[:, mid_column]
+        phi_profile = solution.state.phi[:, mid_column]
     return {
         "y": solution.mesh.y_centers,
-        "u": solution.state.u[:, mid_z],
-        "phi": solution.state.phi[:, mid_z],
+        "u": u_profile,
+        "phi": phi_profile,
     }
 
 
@@ -235,23 +243,52 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
         profile = extract_centerline(solution)
         if not fluid_only:
             return profile
-        mid_z = solution.state.u.shape[1] // 2
-        mask = _profile_axis_mask(solution, axis="y", fixed_index=mid_z)
+        z_count = solution.state.u.shape[1]
+        if z_count % 2 == 0:
+            left = z_count // 2 - 1
+            right = z_count // 2
+            mask = _profile_axis_mask(solution, axis="y", fixed_index=left) & _profile_axis_mask(
+                solution,
+                axis="y",
+                fixed_index=right,
+            )
+        else:
+            mid_z = z_count // 2
+            mask = _profile_axis_mask(solution, axis="y", fixed_index=mid_z)
         return {
             "y": profile["y"][mask],
             "u": profile["u"][mask],
             "phi": profile["phi"][mask],
         }
     if axis == "z":
-        mid_y = solution.state.u.shape[0] // 2
+        y_count = solution.state.u.shape[0]
+        if y_count % 2 == 0:
+            lower = y_count // 2 - 1
+            upper = y_count // 2
+            u_profile = 0.5 * (solution.state.u[lower, :] + solution.state.u[upper, :])
+            phi_profile = 0.5 * (solution.state.phi[lower, :] + solution.state.phi[upper, :])
+        else:
+            mid_y = y_count // 2
+            u_profile = solution.state.u[mid_y, :]
+            phi_profile = solution.state.phi[mid_y, :]
         profile = {
             "z": solution.mesh.z_centers,
-            "u": solution.state.u[mid_y, :],
-            "phi": solution.state.phi[mid_y, :],
+            "u": u_profile,
+            "phi": phi_profile,
         }
         if not fluid_only:
             return profile
-        mask = _profile_axis_mask(solution, axis="z", fixed_index=mid_y)
+        if y_count % 2 == 0:
+            lower = y_count // 2 - 1
+            upper = y_count // 2
+            mask = _profile_axis_mask(solution, axis="z", fixed_index=lower) & _profile_axis_mask(
+                solution,
+                axis="z",
+                fixed_index=upper,
+            )
+        else:
+            mid_y = y_count // 2
+            mask = _profile_axis_mask(solution, axis="z", fixed_index=mid_y)
         return {
             "z": profile["z"][mask],
             "u": profile["u"][mask],
