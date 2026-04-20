@@ -171,6 +171,18 @@ the layered one. Rectangular slices are now quantitatively clean on the dense
 duct settings; layered slices still carry a large axial-current span and a very
 large pressure-span range, so layered Benchmark B hardening remains open.
 
+A follow-on layered retune with `max_steps = 64`, `coupling_iterations = 24`,
+and `potential_iterations = 160` did not improve the dense layered metrics.
+It moved them in the wrong direction:
+
+- `max_charge_balance_residual ≈ 1.16e-4`
+- `volumetric_flow_rate_span ≈ 2.08e-3`
+- `axial_current_span ≈ 9.19e-1`
+- `pressure_span_range ≈ 3.36e1`
+
+That means the dense layered Benchmark B gap is not a simple “run it longer”
+issue. The next correction has to be in the layered operator path itself.
+
 The current mapped-pipe external comparison remains the main Benchmark B
 external gap. On the latest bounded pipe-reference comparison:
 

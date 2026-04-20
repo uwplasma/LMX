@@ -56,6 +56,40 @@ def test_bounded_time_step_count_covers_zero_and_invalid_dt_cases():
         solvers._bounded_time_step_count(start_time=0.0, dt=0.0, t_final=1.0, max_steps=10)
 
 
+def test_active_velocity_mask_for_solver_switches_between_fluid_and_extended_masks():
+    fluid_mask = jnp.asarray([[True, True, True], [True, True, True], [True, True, True]])
+
+    fully_developed = solvers._active_velocity_mask_for_solver(fluid_mask, "fully_developed_inductionless")
+    extruded = solvers._active_velocity_mask_for_solver(fluid_mask, "extruded_inductionless")
+
+    assert jnp.array_equal(extruded, fluid_mask)
+    assert jnp.array_equal(
+        fully_developed,
+        jnp.asarray([[False, False, False], [False, True, False], [False, False, False]]),
+    )
+
+
+def test_potential_coefficients_stay_positive_for_low_conductivity_cells():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    sigma = jnp.asarray(
+        [
+            [1.0, 0.5, 1.0, 1.0],
+            [1.0e-12, 1.0e-8, 0.25, 1.0],
+            [0.75, 1.0, 1.0, 0.5],
+            [1.0, 1.0, 1.0e-10, 1.0],
+        ],
+        dtype=float,
+    )
+
+    diagonal, west, east, south, north = solvers._potential_coefficients(mesh, sigma)
+
+    assert jnp.all(diagonal > 0.0)
+    assert jnp.all(west >= 0.0)
+    assert jnp.all(east >= 0.0)
+    assert jnp.all(south >= 0.0)
+    assert jnp.all(north >= 0.0)
+
+
 def test_hunt_solver_keeps_solid_velocity_zero():
     case = make_hunt_case(ha=10.0, ny=10, nz=10, wall_cells=2)
     mesh = solvers._build_mesh(case)
@@ -1114,6 +1148,26 @@ def test_enforce_velocity_bc_supports_direct_wall_interpolation():
     assert not jnp.allclose(enforced, zeroed)
     assert float(enforced[0, 0]) > 0.0
     assert float(enforced[-1, -1]) > 0.0
+
+
+def test_solve_fully_developed_enables_direct_wall_interpolation_only_for_rectangular_ducts(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    flags: list[bool] = []
+
+    def fake_initial_solver_state(*, interpolate_direct_fluid_walls, **kwargs):
+        flags.append(interpolate_direct_fluid_walls)
+        mesh = kwargs["mesh"]
+        zeros = jnp.zeros(mesh.yz_shape, dtype=float)
+        return zeros, zeros, zeros, zeros, zeros, 0.0
+
+    monkeypatch.setattr(solvers, "_initial_solver_state", fake_initial_solver_state)
+    monkeypatch.setattr(solvers, "_bounded_time_step_count", lambda **kwargs: 0)
+
+    solve_steady(make_shercliff_case(ha=10.0, ny=8, nz=8))
+    solve_steady(make_hunt_case(ha=10.0, ny=8, nz=8, wall_cells=1))
+
+    assert flags == [True, False]
 
 
 def test_velocity_update_limiters_cover_local_clip_and_validation_errors():

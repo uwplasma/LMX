@@ -207,15 +207,23 @@ def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
 
 
 def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
-    z_count = solution.state.u.shape[1]
-    if z_count % 2 == 0:
-        mid_columns = (z_count // 2 - 1, z_count // 2)
-        u_profile = 0.5 * (solution.state.u[:, mid_columns[0]] + solution.state.u[:, mid_columns[1]])
-        phi_profile = 0.5 * (solution.state.phi[:, mid_columns[0]] + solution.state.phi[:, mid_columns[1]])
+    z_coords = solution.mesh.z_centers
+    if z_coords.size == 1:
+        u_profile = solution.state.u[:, 0]
+        phi_profile = solution.state.phi[:, 0]
     else:
-        mid_column = z_count // 2
-        u_profile = solution.state.u[:, mid_column]
-        phi_profile = solution.state.phi[:, mid_column]
+        right = int(jnp.searchsorted(z_coords, 0.0))
+        right = max(1, min(right, z_coords.size - 1))
+        left = right - 1
+        z_left = float(z_coords[left])
+        z_right = float(z_coords[right])
+        if abs(z_right - z_left) <= 1.0e-12:
+            weight = 0.5
+        else:
+            weight = float((0.0 - z_left) / (z_right - z_left))
+        weight = min(max(weight, 0.0), 1.0)
+        u_profile = (1.0 - weight) * solution.state.u[:, left] + weight * solution.state.u[:, right]
+        phi_profile = (1.0 - weight) * solution.state.phi[:, left] + weight * solution.state.phi[:, right]
     return {
         "y": solution.mesh.y_centers,
         "u": u_profile,
@@ -243,34 +251,47 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
         profile = extract_centerline(solution)
         if not fluid_only:
             return profile
-        z_count = solution.state.u.shape[1]
-        if z_count % 2 == 0:
-            left = z_count // 2 - 1
-            right = z_count // 2
+        z_coords = solution.mesh.z_centers
+        if z_coords.size == 1:
+            mask = _profile_axis_mask(solution, axis="y", fixed_index=0)
+        else:
+            right = int(jnp.searchsorted(z_coords, 0.0))
+            right = max(1, min(right, z_coords.size - 1))
+            left = right - 1
             mask = _profile_axis_mask(solution, axis="y", fixed_index=left) & _profile_axis_mask(
                 solution,
                 axis="y",
                 fixed_index=right,
             )
-        else:
-            mid_z = z_count // 2
-            mask = _profile_axis_mask(solution, axis="y", fixed_index=mid_z)
         return {
             "y": profile["y"][mask],
             "u": profile["u"][mask],
             "phi": profile["phi"][mask],
         }
     if axis == "z":
-        y_count = solution.state.u.shape[0]
-        if y_count % 2 == 0:
-            lower = y_count // 2 - 1
-            upper = y_count // 2
-            u_profile = 0.5 * (solution.state.u[lower, :] + solution.state.u[upper, :])
-            phi_profile = 0.5 * (solution.state.phi[lower, :] + solution.state.phi[upper, :])
+        y_coords = solution.mesh.y_centers
+        if y_coords.size == 1:
+            u_profile = solution.state.u[0, :]
+            phi_profile = solution.state.phi[0, :]
+            mask = _profile_axis_mask(solution, axis="z", fixed_index=0)
         else:
-            mid_y = y_count // 2
-            u_profile = solution.state.u[mid_y, :]
-            phi_profile = solution.state.phi[mid_y, :]
+            upper = int(jnp.searchsorted(y_coords, 0.0))
+            upper = max(1, min(upper, y_coords.size - 1))
+            lower = upper - 1
+            y_lower = float(y_coords[lower])
+            y_upper = float(y_coords[upper])
+            if abs(y_upper - y_lower) <= 1.0e-12:
+                weight = 0.5
+            else:
+                weight = float((0.0 - y_lower) / (y_upper - y_lower))
+            weight = min(max(weight, 0.0), 1.0)
+            u_profile = (1.0 - weight) * solution.state.u[lower, :] + weight * solution.state.u[upper, :]
+            phi_profile = (1.0 - weight) * solution.state.phi[lower, :] + weight * solution.state.phi[upper, :]
+            mask = _profile_axis_mask(solution, axis="z", fixed_index=lower) & _profile_axis_mask(
+                solution,
+                axis="z",
+                fixed_index=upper,
+            )
         profile = {
             "z": solution.mesh.z_centers,
             "u": u_profile,
@@ -278,17 +299,6 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
         }
         if not fluid_only:
             return profile
-        if y_count % 2 == 0:
-            lower = y_count // 2 - 1
-            upper = y_count // 2
-            mask = _profile_axis_mask(solution, axis="z", fixed_index=lower) & _profile_axis_mask(
-                solution,
-                axis="z",
-                fixed_index=upper,
-            )
-        else:
-            mid_y = y_count // 2
-            mask = _profile_axis_mask(solution, axis="z", fixed_index=mid_y)
         return {
             "z": profile["z"][mask],
             "u": profile["u"][mask],

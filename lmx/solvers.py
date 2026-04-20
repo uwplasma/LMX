@@ -1094,7 +1094,7 @@ def _solve_fully_developed(
     linear_solver = "cg" if case.solver.linear_solver == "auto" else case.solver.linear_solver
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError(f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}")
-    interpolate_direct_fluid_walls = False
+    interpolate_direct_fluid_walls = case.geometry.kind == "rect_duct"
     initial_u, initial_phi, initial_jy, initial_jz, initial_lorentz, start_time = _initial_solver_state(
         case=case,
         mesh=mesh,

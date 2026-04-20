@@ -693,6 +693,12 @@ That retained gate now passes for all three retained fringing geometries.
     path, not just the fixed-point iteration count; the next runtime pass for
     these examples therefore needs to target compilation pressure and code-path
     specialization, not only smaller `t_final` or fewer fixed-point steps
+  - the straight-duct comparison path now samples the actual symmetry plane
+    through linear interpolation instead of reading the nearest stored
+    row/column, and the rectangular fully developed solve now enables direct
+    wall interpolation on that path; that is the correct physics-facing
+    direction for the analytical overlay lane, but the high-resolution rerun is
+    still too compile-heavy to use as an interactive tuning loop on this host
   - a local persistent JAX compilation cache is now wired into the heavy
     README/straight-duct example paths under `artifacts/jax_cache`, so repeat
     reruns on the same host do not recompile the same solve kernels from
@@ -714,6 +720,15 @@ That retained gate now passes for all three retained fringing geometries.
     axial-current span and a very large pressure-span range even after a tuned
     rerun with `max_steps = 48`, `coupling_iterations = 16`, and
     `potential_iterations = 128`
+  - a second layered retune at `max_steps = 64`,
+    `coupling_iterations = 24`, and `potential_iterations = 160` moved the
+    dense layered metrics the wrong way:
+    - `max_charge_balance_residual ≈ 1.16e-4`
+    - `volumetric_flow_rate_span ≈ 2.08e-3`
+    - `axial_current_span ≈ 9.19e-1`
+    - `pressure_span_range ≈ 3.36e1`
+  - that rules out simple under-iteration as the main dense layered blocker;
+    the next fix needs to be operator-level in the layered extruded solve
   - the benchmark driver now accepts `--geometries ...` so dense duct closure,
     layered retuning, and mapped-pipe parity can be run as separate manual
     lanes instead of one monolithic long campaign
