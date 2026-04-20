@@ -38,6 +38,17 @@ def test_build_mesh_rejects_unsupported_geometry_kind():
         solvers._build_mesh(unsupported)
 
 
+def test_build_mesh_uses_magnetic_axis_to_cluster_rect_duct_layers():
+    hartmann_case = make_hartmann_case(ha=20.0, width=0.2, height=0.2, ny=48, nz=48)
+    shercliff_case = make_shercliff_case(ha=20.0, width=0.2, height=0.2, ny=48, nz=48)
+
+    hartmann_mesh = solvers._build_mesh(hartmann_case)
+    shercliff_mesh = solvers._build_mesh(shercliff_case)
+
+    assert float(jnp.min(hartmann_mesh.dy)) < float(jnp.min(hartmann_mesh.dz))
+    assert float(jnp.min(shercliff_mesh.dz)) < float(jnp.min(shercliff_mesh.dy))
+
+
 def test_bounded_time_step_count_covers_zero_and_invalid_dt_cases():
     assert solvers._bounded_time_step_count(start_time=0.0, dt=0.1, t_final=1.0, max_steps=0) == 0
     assert solvers._bounded_time_step_count(start_time=1.0, dt=0.1, t_final=0.5, max_steps=10) == 0

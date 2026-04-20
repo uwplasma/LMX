@@ -207,6 +207,17 @@ def test_rect_duct_mesh_uses_field_aware_boundary_layer_spacing():
     assert float(jnp.min(hartmann_mesh.dz)) > float(jnp.min(hartmann_mesh.dy))
 
 
+@pytest.mark.unit
+def test_high_ha_rect_duct_mesh_switches_to_segmented_boundary_layer_layout():
+    case = make_shercliff_case(ha=1000.0, width=0.2, height=0.2, ny=96, nz=96)
+    mesh = _build_mesh(case)
+    metrics = duct_layer_resolution_metrics(case, mesh)
+
+    assert metrics["hartmann_layer_cells"] >= 5.0
+    assert metrics["side_layer_cells"] >= metrics["hartmann_layer_cells"]
+    assert float(jnp.max(mesh.dz) / jnp.maximum(jnp.min(mesh.dz), 1.0e-12)) > 10.0
+
+
 @pytest.mark.validation
 def test_small_hunt_solution_matches_bundled_reference_profiles():
     case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=2)

@@ -153,28 +153,23 @@ Benchmark B closure still needs a second layer:
   - matched cross-sectional velocity and potential cuts at the same axial
     stations used in the reference data
 
-Current dense-slice summary at `Ha = 20`, `20×20×21` for ducts and
-`20×80×21` for the mapped pipe:
+Current dense-slice duct summary at `Ha = 20`, `24×24×33`:
 
 - `rect_duct`
-  - `max_charge_balance_residual ≈ 5.48e-6`
-  - `volumetric_flow_rate_span ≈ 1.08e-3`
-  - `axial_current_span ≈ 5.14e-8`
-  - `pressure_span_range ≈ 8.10e-1`
+  - `max_charge_balance_residual ≈ 6.82e-6`
+  - `volumetric_flow_rate_span ≈ 4.75e-4`
+  - `axial_current_span ≈ 1.14e-7`
+  - `pressure_span_range ≈ 6.30e-1`
 - `layered_duct`
-  - `max_charge_balance_residual ≈ 2.76e-5`
-  - `volumetric_flow_rate_span ≈ 2.18e-3`
-  - `axial_current_span ≈ 6.66e-1`
-  - `pressure_span_range ≈ 3.40e1`
-- `pipe_ogrid`
-  - `max_charge_balance_residual ≈ 7.72e-3`
-  - `volumetric_flow_rate_span ≈ 1.83e-9`
-  - `axial_current_span ≈ 9.09e-10`
-  - `pressure_span_range ≈ 5.51e-4`
-On the current tree, rectangular and layered slices are quantitatively
-well-behaved on these settings. The next dense Benchmark B hardening target is
-the mapped-pipe external parity lane rather than the internal rectangular
-charge-balance lane.
+  - `max_charge_balance_residual ≈ 7.99e-5`
+  - `volumetric_flow_rate_span ≈ 1.19e-3`
+  - `axial_current_span ≈ 5.20e-1`
+  - `pressure_span_range ≈ 4.00e1`
+
+That dense run closes the rectangular duct internal Benchmark B lane, but not
+the layered one. Rectangular slices are now quantitatively clean on the dense
+duct settings; layered slices still carry a large axial-current span and a very
+large pressure-span range, so layered Benchmark B hardening remains open.
 
 The current mapped-pipe external comparison remains the main Benchmark B
 external gap. On the latest bounded pipe-reference comparison:

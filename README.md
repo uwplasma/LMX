@@ -261,6 +261,9 @@ The current validation surface includes:
 - widened bounded manual fringing campaign at `Ha = 10, 20, 30`, `resolution = 8`
 - a standalone quantitative Benchmark B summary driver for rectangular, layered,
   and mapped-pipe fringing cases
+- dense duct Benchmark B at `24 × 24 × 33` now closes `rect_duct` internally,
+  while `layered_duct` still needs pressure/current hardening on that denser
+  run
 
 The widened bounded manual campaign is intentionally stricter than the release
 gate. On the current tree it confirms the 3D fringing set at `Ha = 10, 20, 30`

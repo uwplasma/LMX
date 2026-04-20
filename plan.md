@@ -579,7 +579,7 @@ That retained gate now passes for all three retained fringing geometries.
     `volumetric_flow_rate_span ≈ 1.08e-3`, and
     `field_mean_velocity_correlation ≈ -8.57e-1` after moving the rectangular
     3D electric subproblem onto the sparse direct conservative solve
-  - `layered_duct` remains quantitatively clean on charge balance and flow span
+  - `layered_duct` remained the next dense hardening target
   - `pipe_ogrid` remains quantitatively well-behaved on the internal metrics,
     while its external profile comparison is now the main parity-hardening lane
 - The benchmark roadmap now also records the next publication-facing additions:
@@ -689,9 +689,26 @@ That retained gate now passes for all three retained fringing geometries.
     README/straight-duct example paths under `artifacts/jax_cache`, so repeat
     reruns on the same host do not recompile the same solve kernels from
     scratch every time
-- A denser quantitative Benchmark B rerun was started on the current tree at
-  `rect/layered: 24 × 24 × 33` and `pipe: 24 × 96 × 33`, but it did not finish
-  inside this pass and remains part of the heavier manual validation lane.
+- The focused dense duct Benchmark B rerun at `Ha = 20`, `24 × 24 × 33` is now
+  in hand:
+  - `rect_duct`
+    - `max_charge_balance_residual ≈ 6.82e-6`
+    - `volumetric_flow_rate_span ≈ 4.75e-4`
+    - `axial_current_span ≈ 1.14e-7`
+    - `pressure_span_range ≈ 6.30e-1`
+  - `layered_duct`
+    - `max_charge_balance_residual ≈ 7.99e-5`
+    - `volumetric_flow_rate_span ≈ 1.19e-3`
+    - `axial_current_span ≈ 5.20e-1`
+    - `pressure_span_range ≈ 4.00e1`
+  - that closes the dense internal rectangular Benchmark B lane
+  - it does not close the layered dense lane; layered still carries a large
+    axial-current span and a very large pressure-span range even after a tuned
+    rerun with `max_steps = 48`, `coupling_iterations = 16`, and
+    `potential_iterations = 128`
+  - the benchmark driver now accepts `--geometries ...` so dense duct closure,
+    layered retuning, and mapped-pipe parity can be run as separate manual
+    lanes instead of one monolithic long campaign
 - The mapped-pipe external comparison lane is now more tightly understood:
   - the bundled center-line reference is a real axial-velocity target
   - the bundled off-center files carry nontrivial electric-potential/current

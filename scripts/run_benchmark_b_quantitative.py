@@ -272,16 +272,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--potential-iterations", type=int, default=80)
     parser.add_argument("--reference-dir", type=Path, default=None)
     parser.add_argument("--include-pipe-reference", action="store_true")
+    parser.add_argument(
+        "--geometries",
+        nargs="+",
+        choices=("rect_duct", "layered_duct", "pipe_ogrid"),
+        default=("rect_duct", "layered_duct", "pipe_ogrid"),
+    )
     args = parser.parse_args(argv)
     enable_compilation_cache(JAX_CACHE_DIR)
 
     args.output.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, float | str]] = []
-    for geometry_kind, ny, nz in (
-        ("rect_duct", args.duct_ny, args.duct_nz),
-        ("layered_duct", args.duct_ny, args.duct_nz),
-        ("pipe_ogrid", args.pipe_nr, args.pipe_ntheta),
-    ):
+    geometry_map = {
+        "rect_duct": (args.duct_ny, args.duct_nz),
+        "layered_duct": (args.duct_ny, args.duct_nz),
+        "pipe_ogrid": (args.pipe_nr, args.pipe_ntheta),
+    }
+    for geometry_kind in args.geometries:
+        ny, nz = geometry_map[geometry_kind]
         problem = _build_problem(
             geometry_kind,
             ha_peak=args.ha_peak,

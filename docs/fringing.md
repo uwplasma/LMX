@@ -303,31 +303,29 @@ per-line normalization artifact. The physical interpretation is also direct:
 the external dataset is a high-`Ha`, high-`Re` fringing-pipe case, while the
 current `pipe_ogrid` slice is still a laminar inductionless model.
 
-The denser `Ha=20`, `20×20×21` Benchmark B summary from
-`scripts/run_benchmark_b_quantitative.py` currently reports:
+The focused dense duct Benchmark B summary from
+`scripts/run_benchmark_b_quantitative.py` at `Ha = 20`, `24×24×33` currently
+reports:
 
 - `rect_duct`
-  - `max_charge_balance_residual ≈ 5.48e-6`
-  - `volumetric_flow_rate_span ≈ 1.08e-3`
-  - `axial_current_span ≈ 5.14e-8`
-  - `pressure_span_range ≈ 8.10e-1`
+  - `max_charge_balance_residual ≈ 6.82e-6`
+  - `volumetric_flow_rate_span ≈ 4.75e-4`
+  - `axial_current_span ≈ 1.14e-7`
+  - `pressure_span_range ≈ 6.30e-1`
 - `layered_duct`
-  - `max_charge_balance_residual ≈ 2.76e-5`
-  - `volumetric_flow_rate_span ≈ 2.18e-3`
-  - `axial_current_span ≈ 6.66e-1`
-  - `pressure_span_range ≈ 3.40e1`
-- `pipe_ogrid`
-  - `max_charge_balance_residual ≈ 7.72e-3`
-  - `volumetric_flow_rate_span ≈ 1.83e-9`
-  - `axial_current_span ≈ 9.09e-10`
-  - `pressure_span_range ≈ 5.51e-4`
+  - `max_charge_balance_residual ≈ 7.99e-5`
+  - `volumetric_flow_rate_span ≈ 1.19e-3`
+  - `axial_current_span ≈ 5.20e-1`
+  - `pressure_span_range ≈ 4.00e1`
 That summary separates the current dense-slice status clearly:
 
-- rectangular and layered slices are quantitatively well-behaved on the current
+- rectangular dense slices are now quantitatively clean on the current
   Benchmark B settings
-- mapped pipe is quantitatively well-behaved on the internal conservation and
-  throughput metrics, while its external profile comparison remains the next
-  parity-hardening target
+- layered dense slices are not closed yet; charge balance and throughput are
+  bounded, but axial-current span and pressure-span range remain much too large
+- mapped pipe remains a separate quantitative external-comparison lane, and its
+  parity gap is still dominated by the high-`Ha`, high-`Re` reference regime
+  mismatch described above
 
 ![Benchmark B quantitative summary](_static/generated/benchmark_b_quantitative_summary.png)
 
