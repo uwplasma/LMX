@@ -235,3 +235,5 @@ They are parameter-driven Python files rather than argparse front ends:
 
 The shared reusable logic lives in `lmx.showcase`, so the example scripts stay
 teachable without duplicating the geometry setup, solve, and plotting code.
+`straight_duct_profile_comparison.py` writes the normalized Shercliff/Hunt
+midplane comparison figure used in the README and docs.

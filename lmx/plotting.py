@@ -50,6 +50,87 @@ def _set_plot_style() -> None:
     )
 
 
+def _draw_duct_wireframe(
+    ax,
+    *,
+    length: float,
+    y_faces: np.ndarray,
+    z_faces: np.ndarray,
+    face_alpha: float = 0.09,
+) -> None:
+    y0, y1 = float(y_faces[0]), float(y_faces[-1])
+    z0, z1 = float(z_faces[0]), float(z_faces[-1])
+    x0, x1 = 0.0, float(length)
+    wall_style = {"color": "#d1d5db", "alpha": face_alpha, "linewidth": 0.0, "shade": False}
+    line_color = "#6b7280"
+    xx = np.asarray([[x0, x1], [x0, x1]], dtype=float)
+    yy_span = np.asarray([[y0, y0], [y1, y1]], dtype=float)
+    zz_span = np.asarray([[z0, z1], [z0, z1]], dtype=float)
+    ax.plot_surface(xx, np.full_like(xx, z0), yy_span, **wall_style)
+    ax.plot_surface(xx, np.full_like(xx, z1), yy_span, **wall_style)
+    ax.plot_surface(xx, zz_span, np.full_like(xx, y0), **wall_style)
+    ax.plot_surface(xx, zz_span, np.full_like(xx, y1), **wall_style)
+    boundary_y = np.asarray([y0, y1, y1, y0, y0], dtype=float)
+    boundary_z = np.asarray([z0, z0, z1, z1, z0], dtype=float)
+    for x in (x0, x1):
+        ax.plot(
+            np.full_like(boundary_y, x),
+            boundary_z,
+            boundary_y,
+            color=line_color,
+            linewidth=1.2,
+            alpha=0.85,
+        )
+    for y in (y0, y1):
+        for z in (z0, z1):
+            ax.plot([x0, x1], [z, z], [y, y], color=line_color, linewidth=1.2, alpha=0.85)
+
+
+def _draw_profile_slab(
+    ax,
+    *,
+    field: np.ndarray,
+    y_display: np.ndarray,
+    z_display: np.ndarray,
+    cmap_obj,
+    norm,
+    x_plane: float,
+    amplitude: float,
+    use_normalized_positive: bool,
+) -> None:
+    yy_surface, zz_surface = np.meshgrid(y_display, z_display, indexing="ij")
+    field_display = np.asarray(field, dtype=float)
+    if use_normalized_positive:
+        displacement_field = np.clip(field_display, 0.0, None)
+        peak = max(float(np.max(displacement_field)), 1.0e-12)
+        normalized_displacement = displacement_field / peak
+    else:
+        peak = max(float(np.max(np.abs(field_display))), 1.0e-12)
+        normalized_displacement = 0.5 * (field_display / peak + 1.0)
+    x_surface = x_plane + amplitude * normalized_displacement
+    color_rgba = cmap_obj(norm(field_display))
+    ax.plot_surface(
+        x_surface,
+        zz_surface,
+        yy_surface,
+        facecolors=color_rgba,
+        shade=False,
+        linewidth=0.18,
+        edgecolor=(0.09, 0.09, 0.09, 0.20),
+        antialiased=True,
+    )
+    base_plane = np.full_like(yy_surface, x_plane)
+    ax.plot_surface(
+        base_plane,
+        zz_surface,
+        yy_surface,
+        color="#cbd5e1",
+        alpha=0.08,
+        linewidth=0.0,
+        shade=False,
+    )
+
+
 def _plot_field(ax: plt.Axes, solution: Solution, field: jnp.ndarray, *, title: str, cmap: str) -> None:
     mesh = solution.mesh
     field_min = float(jnp.min(field))
@@ -239,39 +320,35 @@ def _add_fluid_outline(ax: plt.Axes, mesh: StructuredMesh, fluid_mask: jnp.ndarr
         return
 
 
-def _add_layer_annotations(ax: plt.Axes, mesh: StructuredMesh, fluid_mask: jnp.ndarray | None, *, show_side_layers: bool) -> None:
+def _add_layer_annotations(
+    ax: plt.Axes,
+    mesh: StructuredMesh,
+    fluid_mask: jnp.ndarray | None,
+    *,
+    show_side_layers: bool,
+    case_hint: str = "",
+) -> None:
     y0, y1 = float(mesh.y_faces[0]), float(mesh.y_faces[-1])
     z0, z1 = float(mesh.z_faces[0]), float(mesh.z_faces[-1])
+    case_hint = case_hint.lower()
+    side_label = "Side layers"
+    hartmann_vertical = "hunt" in case_hint or "shercliff" in case_hint
+    if "hunt" in case_hint:
+        side_label = "Hunt / side\nlayers"
+    elif "shercliff" in case_hint:
+        side_label = "Shercliff\nlayers"
     annotation_style = {
         "bbox": {"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
         "arrowprops": {"arrowstyle": "->", "color": "#111827", "lw": 1.0},
         "fontsize": 11,
         "color": "#111827",
     }
-    ax.annotate(
-        "Hartmann\nlayers",
-        xy=(0.5, 0.94),
-        xycoords="axes fraction",
-        xytext=(0.5, 0.985),
-        textcoords="axes fraction",
-        ha="center",
-        va="top",
-        **annotation_style,
-    )
-    ax.annotate(
-        "",
-        xy=(0.5, 0.06),
-        xycoords="axes fraction",
-        xytext=(0.5, 0.015),
-        textcoords="axes fraction",
-        **{key: value for key, value in annotation_style.items() if key in {"arrowprops"}},
-    )
-    if show_side_layers:
+    if hartmann_vertical:
         ax.annotate(
-            "Side layers",
-            xy=(0.93, 0.5),
+            "Hartmann\nlayers",
+            xy=(0.93, 0.50),
             xycoords="axes fraction",
-            xytext=(1.03, 0.5),
+            xytext=(1.03, 0.50),
             textcoords="axes fraction",
             ha="left",
             va="center",
@@ -279,12 +356,70 @@ def _add_layer_annotations(ax: plt.Axes, mesh: StructuredMesh, fluid_mask: jnp.n
         )
         ax.annotate(
             "",
-            xy=(0.07, 0.5),
+            xy=(0.07, 0.50),
             xycoords="axes fraction",
-            xytext=(-0.03, 0.5),
+            xytext=(-0.03, 0.50),
             textcoords="axes fraction",
             **{key: value for key, value in annotation_style.items() if key in {"arrowprops"}},
         )
+    else:
+        ax.annotate(
+            "Hartmann\nlayers",
+            xy=(0.5, 0.94),
+            xycoords="axes fraction",
+            xytext=(0.5, 0.985),
+            textcoords="axes fraction",
+            ha="center",
+            va="top",
+            **annotation_style,
+        )
+        ax.annotate(
+            "",
+            xy=(0.5, 0.06),
+            xycoords="axes fraction",
+            xytext=(0.5, 0.015),
+            textcoords="axes fraction",
+            **{key: value for key, value in annotation_style.items() if key in {"arrowprops"}},
+        )
+    if show_side_layers:
+        if hartmann_vertical:
+            ax.annotate(
+                side_label,
+                xy=(0.50, 0.93),
+                xycoords="axes fraction",
+                xytext=(0.50, 0.985),
+                textcoords="axes fraction",
+                ha="center",
+                va="top",
+                **annotation_style,
+            )
+            ax.annotate(
+                "",
+                xy=(0.50, 0.07),
+                xycoords="axes fraction",
+                xytext=(0.50, 0.015),
+                textcoords="axes fraction",
+                **{key: value for key, value in annotation_style.items() if key in {"arrowprops"}},
+            )
+        else:
+            ax.annotate(
+                side_label,
+                xy=(0.93, 0.5),
+                xycoords="axes fraction",
+                xytext=(1.03, 0.5),
+                textcoords="axes fraction",
+                ha="left",
+                va="center",
+                **annotation_style,
+            )
+            ax.annotate(
+                "",
+                xy=(0.07, 0.5),
+                xycoords="axes fraction",
+                xytext=(-0.03, 0.5),
+                textcoords="axes fraction",
+                **{key: value for key, value in annotation_style.items() if key in {"arrowprops"}},
+            )
     _add_fluid_outline(ax, mesh, fluid_mask)
 
 
@@ -424,7 +559,13 @@ def write_transient_movies(
         ax2d.set_ylabel("y")
         ax2d.set_title(f"{case_title}\n2D {effective_label.lower()}")
         ax2d.set_aspect("equal")
-        _add_layer_annotations(ax2d, mesh, frames[0].get("fluid_mask"), show_side_layers=show_side_layers)
+        _add_layer_annotations(
+            ax2d,
+            mesh,
+            frames[0].get("fluid_mask"),
+            show_side_layers=show_side_layers,
+            case_hint=case_title,
+        )
         mid_z = int(len(mesh.z_centers) // 2)
         mid_y = int(len(mesh.y_centers) // 2)
         y_profile_coord, current_y_profile = _profile_data(0, "y")
@@ -547,78 +688,37 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
-        x_plane = 0.40 * x_extent
+        x_plane = 0.42 * x_extent
 
         def update_3d(index: int):
             ax3d.cla()
             field = _movie_field(index)
-            profile_y_coord, profile_y_field = _profile_data(index, "y")
-            profile_y_coord = np.asarray(profile_y_coord, dtype=float)
-            profile_y_field = np.asarray(profile_y_field, dtype=float)
-            if use_normalized_positive:
-                color_field = profile_y_field / frame_peaks[index]
-            else:
-                color_field = profile_y_field
-            z_mid = 0.5 * float(mesh.z_faces[0] + mesh.z_faces[-1])
-            z_half_thickness = 0.32 * float(mesh.z_faces[-1] - mesh.z_faces[0])
-            z_profile = np.linspace(z_mid - z_half_thickness, z_mid + z_half_thickness, 13)
-            yy_profile, zz_profile = np.meshgrid(profile_y_coord, z_profile, indexing="ij")
-            color_rgba = cmap_obj(norm(np.repeat(color_field[:, None], z_profile.size, axis=1)))
-            amplitude = 0.22 * x_extent
-            positive_field = np.clip(color_field, 0.0, None)
-            peak = max(float(np.max(positive_field)), 1.0e-12)
-            x_profile = x_plane + amplitude * positive_field / peak
-            x_surface = np.repeat(x_profile[:, None], z_profile.size, axis=1)
-            surface = ax3d.plot_surface(
-                x_surface,
-                zz_profile,
-                yy_profile,
-                facecolors=color_rgba,
-                shade=False,
-                linewidth=0.0,
-                edgecolor="none",
-                antialiased=True,
+            field_display = np.asarray(field[np.ix_(display_y_indices, display_z_indices)], dtype=float)
+            amplitude = 0.26 * x_extent
+            _draw_duct_wireframe(
+                ax3d,
+                length=x_extent,
+                y_faces=np.asarray(mesh.y_faces, dtype=float),
+                z_faces=np.asarray(mesh.z_faces, dtype=float),
+                face_alpha=0.11,
             )
-            boundary_y = np.asarray([mesh.y_faces[0], mesh.y_faces[-1], mesh.y_faces[-1], mesh.y_faces[0], mesh.y_faces[0]], dtype=float)
-            boundary_z = np.asarray([mesh.z_faces[0], mesh.z_faces[0], mesh.z_faces[-1], mesh.z_faces[-1], mesh.z_faces[0]], dtype=float)
-            for x_boundary in (0.0, x_extent):
-                ax3d.plot(
-                    np.full_like(boundary_y, x_boundary),
-                    boundary_z,
-                    boundary_y,
-                    color="#111827",
-                    linewidth=1.2,
-                    alpha=0.95,
-                )
-
-            side_x = np.asarray([[0.0, x_extent], [0.0, x_extent]], dtype=float)
-            side_z0 = np.full_like(side_x, float(mesh.z_faces[0]))
-            side_z1 = np.full_like(side_x, float(mesh.z_faces[-1]))
-            side_y0 = np.asarray(
-                [[float(mesh.y_faces[0]), float(mesh.y_faces[0])], [float(mesh.y_faces[-1]), float(mesh.y_faces[-1])]],
-                dtype=float,
+            _draw_profile_slab(
+                ax3d,
+                field=field_display,
+                y_display=y_display,
+                z_display=z_display,
+                cmap_obj=cmap_obj,
+                norm=norm,
+                x_plane=x_plane,
+                amplitude=amplitude,
+                use_normalized_positive=use_normalized_positive,
             )
-            side_y1 = np.asarray(
-                [[float(mesh.y_faces[0]), float(mesh.y_faces[0])], [float(mesh.y_faces[-1]), float(mesh.y_faces[-1])]],
-                dtype=float,
-            )
-            bottom_y = np.full_like(side_x, float(mesh.y_faces[0]))
-            top_y = np.full_like(side_x, float(mesh.y_faces[-1]))
-            z_span = np.asarray(
-                [[float(mesh.z_faces[0]), float(mesh.z_faces[-1])], [float(mesh.z_faces[0]), float(mesh.z_faces[-1])]],
-                dtype=float,
-            )
-            wall_style = {"color": "#cbd5e1", "alpha": 0.025, "linewidth": 0.0, "shade": False}
-            ax3d.plot_surface(side_x, side_z0, side_y0, **wall_style)
-            ax3d.plot_surface(side_x, side_z1, side_y1, **wall_style)
-            ax3d.plot_surface(side_x, z_span, bottom_y, **wall_style)
-            ax3d.plot_surface(side_x, z_span, top_y, **wall_style)
 
             ax3d.quiver(
-                0.05 * x_extent,
-                float(mesh.z_faces[0]) - 0.06 * (mesh.z_faces[-1] - mesh.z_faces[0]),
+                0.10 * x_extent,
+                float(mesh.z_faces[0]) - 0.08 * (mesh.z_faces[-1] - mesh.z_faces[0]),
                 float(mesh.y_faces[0]),
-                0.82 * x_extent,
+                0.72 * x_extent,
                 0.0,
                 0.0,
                 color="#111827",
@@ -626,8 +726,8 @@ def write_transient_movies(
                 arrow_length_ratio=0.08,
             )
             ax3d.text(
-                0.92 * x_extent,
-                float(mesh.z_faces[0]) - 0.08 * (mesh.z_faces[-1] - mesh.z_faces[0]),
+                0.86 * x_extent,
+                float(mesh.z_faces[0]) - 0.10 * (mesh.z_faces[-1] - mesh.z_faces[0]),
                 float(mesh.y_faces[0]),
                 "flow",
                 color="#111827",
@@ -637,17 +737,17 @@ def write_transient_movies(
                 f"{case_title} | 3D streamwise-velocity profile\n"
                 f"t = {_format_time_with_units(times[index])} | max|u| = {frame_peaks[index]:.2e}"
             )
-            ax3d.set_xlim(-0.08 * x_extent, 1.02 * x_extent)
-            ax3d.set_ylim(float(mesh.z_faces[0]) - 0.12 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
+            ax3d.set_xlim(0.0, 1.01 * x_extent)
+            ax3d.set_ylim(float(mesh.z_faces[0]) - 0.14 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
             ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
-            ax3d.view_init(elev=12, azim=-104)
-            ax3d.set_box_aspect((1.8, 1.0, 1.0))
+            ax3d.view_init(elev=11, azim=-96)
+            ax3d.set_box_aspect((4.8, 1.2, 1.2))
             ax3d.grid(False)
             ax3d.set_xticks([])
             ax3d.set_yticks([])
             ax3d.set_zticks([])
             ax3d.set_axis_off()
-            return (surface,)
+            return ()
 
         anim3d = animation.FuncAnimation(fig3d, update_3d, frames=len(frames), interval=1000 / fps, blit=False)
         update_3d(len(frames) - 1)

@@ -13,6 +13,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from examples.pipe_reference_comparison_demo import _extract_pipe_profile
+from lmx import enable_compilation_cache
 from lmx.fringing import (
     build_layered_duct_extruded_problem,
     build_pipe_ogrid_extruded_problem,
@@ -20,6 +21,8 @@ from lmx.fringing import (
     solve_extruded_inductionless,
 )
 from lmx.reference_data import default_fringing_pipe_reference_root, load_fringing_pipe_profile
+
+JAX_CACHE_DIR = Path("artifacts/jax_cache")
 
 
 def _set_style() -> None:
@@ -57,20 +60,36 @@ def _pipe_profile_errors(bundle, reference_dir: Path | None) -> dict[str, float]
         max(np.max(np.abs(np.asarray(profile.velocity, dtype=float))), 1.0e-12)
         for profile in reference_profiles.values()
     )
-    lmx_profiles = {
-        name: _extract_pipe_profile(bundle, x_offset_fraction=profile.x_offset_fraction)
+    lmx_velocity_profiles = {
+        name: _extract_pipe_profile(bundle, x_offset_fraction=profile.x_offset_fraction, field_name="u")
         for name, profile in reference_profiles.items()
     }
-    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_profiles.values())
+    lmx_potential_profiles = {
+        name: _extract_pipe_profile(bundle, x_offset_fraction=profile.x_offset_fraction, field_name="phi")
+        for name, profile in reference_profiles.items()
+    }
+    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_velocity_profiles.values())
     errors: dict[str, float] = {}
     for name in ("center", "negative", "positive"):
         reference = reference_profiles[name]
-        lmx_coord, lmx_velocity_raw = lmx_profiles[name]
-        ref_velocity = np.asarray(reference.velocity, dtype=float) / reference_velocity_scale
-        lmx_velocity = lmx_velocity_raw / lmx_velocity_scale
-        interpolated = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_velocity)
-        errors[f"{name}_profile_l2_error"] = float(np.sqrt(np.mean((interpolated - ref_velocity) ** 2)))
-        errors[f"{name}_profile_linf_error"] = float(np.max(np.abs(interpolated - ref_velocity)))
+        reference_velocity = np.asarray(reference.velocity, dtype=float)
+        use_velocity = float(np.max(np.abs(reference_velocity))) > 1.0e-8
+        if use_velocity:
+            lmx_coord, lmx_profile_raw = lmx_velocity_profiles[name]
+            ref_profile = reference_velocity / reference_velocity_scale
+            lmx_profile = lmx_profile_raw / lmx_velocity_scale
+            metric_prefix = "velocity"
+        else:
+            lmx_coord, lmx_profile_raw = lmx_potential_profiles[name]
+            potential_values = np.loadtxt(reference.path, delimiter=",", skiprows=1, usecols=13)
+            ref_scale = max(float(np.max(np.abs(potential_values))), 1.0e-12)
+            ref_profile = potential_values / ref_scale
+            lmx_scale = max(float(np.max(np.abs(lmx_profile_raw))), 1.0e-12)
+            lmx_profile = lmx_profile_raw / lmx_scale
+            metric_prefix = "potential"
+        interpolated = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_profile)
+        errors[f"{name}_{metric_prefix}_l2_error"] = float(np.sqrt(np.mean((interpolated - ref_profile) ** 2)))
+        errors[f"{name}_{metric_prefix}_linf_error"] = float(np.max(np.abs(interpolated - ref_profile)))
     return errors
 
 
@@ -162,9 +181,9 @@ def _write_csv(rows: list[dict[str, float | str]], path: Path) -> Path:
         "axial_current_span",
         "pressure_span_range",
         "field_mean_velocity_correlation",
-        "center_profile_l2_error",
-        "negative_profile_l2_error",
-        "positive_profile_l2_error",
+        "center_velocity_l2_error",
+        "negative_potential_l2_error",
+        "positive_potential_l2_error",
     ]
     remaining = sorted(name for name in fieldnames if name not in ordered)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,9 +216,9 @@ def _write_markdown(rows: list[dict[str, float | str]], path: Path) -> Path:
                     f"{float(row['axial_current_span']):.3e}",
                     f"{float(row['pressure_span_range']):.3e}",
                     f"{float(row['field_mean_velocity_correlation']):.3f}",
-                    "-" if "center_profile_l2_error" not in row else f"{float(row['center_profile_l2_error']):.3f}",
-                    "-" if "negative_profile_l2_error" not in row else f"{float(row['negative_profile_l2_error']):.3f}",
-                    "-" if "positive_profile_l2_error" not in row else f"{float(row['positive_profile_l2_error']):.3f}",
+                    "-" if "center_velocity_l2_error" not in row else f"{float(row['center_velocity_l2_error']):.3f}",
+                    "-" if "negative_potential_l2_error" not in row else f"{float(row['negative_potential_l2_error']):.3f}",
+                    "-" if "positive_potential_l2_error" not in row else f"{float(row['positive_potential_l2_error']):.3f}",
                 ]
             )
             + " |"
@@ -254,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reference-dir", type=Path, default=None)
     parser.add_argument("--include-pipe-reference", action="store_true")
     args = parser.parse_args(argv)
+    enable_compilation_cache(JAX_CACHE_DIR)
 
     args.output.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, float | str]] = []

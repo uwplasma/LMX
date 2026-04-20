@@ -161,6 +161,27 @@ def test_solve_five_point_cg_state_supports_none_preconditioner_and_rejects_unkn
         )
 
 
+def test_solve_five_point_cg_state_stays_finite_when_denominator_breaks_down():
+    zeros = jnp.zeros((2, 2))
+    rhs = jnp.ones((2, 2))
+
+    field, residual, iterations = linear.solve_five_point_cg_state(
+        zeros,
+        zeros,
+        zeros,
+        zeros,
+        zeros,
+        rhs,
+        iterations=4,
+        tolerance=None,
+        preconditioner="none",
+    )
+
+    assert jnp.all(jnp.isfinite(field))
+    assert jnp.isfinite(residual)
+    assert int(iterations) <= 1
+
+
 def test_solve_five_point_lineax_falls_back_without_lineax(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(linear, "lx", None)
     diagonal, west, east, south, north, rhs = _five_point_coefficients()

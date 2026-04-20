@@ -186,6 +186,14 @@ external gap. On the latest bounded pipe-reference comparison:
 That is enough to say the comparison is quantitative, but not enough to call it
 parity closure.
 
+The underlying reason is now clearer from the bundled FreeMHD reference set:
+the mapped-pipe comparison files correspond to the Bühler fringing-pipe case
+at `Ha = 2000`, `Re = 20000`, while the current LMX `pipe_ogrid`
+`extruded_inductionless` lane is still a low-Re inductionless research slice.
+That means the present pipe comparison is still useful for qualitative shape
+and sign checks, but quantitative parity will require a higher-inertia pipe
+solver path rather than only denser sampling or plot cleanup.
+
 ## Staged but deferred
 
 - Benchmark C: Q2D turbulent duct flow

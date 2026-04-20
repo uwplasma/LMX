@@ -595,26 +595,28 @@ That retained gate now passes for all three retained fringing geometries.
     - `Divertorlets`
 - The README startup media workflow now supports both Hartmann and Hunt cases,
   and the current landing-page path uses the Hunt startup because it shows the
-  layered-duct geometry, the conducting Hartmann walls, and the transient
-  formation of the side/Hartmann layers from a flat plug-flow initial
+  layered-duct geometry, the conducting side walls, and the transient
+  formation of the Hunt side jets and Hartmann layers from a flat plug-flow
   condition:
   - `Ha = 20`
   - `49 × 49` fluid cross-section
   - `dt = 1.0e-5`
-  - `t_final = 2.0e-3`
+  - `t_final = 1.0e-3`
   - `coupling_iterations = 6`
   - `potential_iterations = 48`
   - all solved timesteps written to the GIF
   - the 2D panel carries the transient `y`- and `z`-centerline diagnostics
     against the cross-section field
-  - the 3D panel renders a Hunt velocity-profile slab inside the duct rather
-    than a stacked-slice volume view
+  - the 3D panel renders a Hunt velocity-profile slab embedded in the duct
+    rather than a stacked-slice volume view
 - The stale asymmetric Hunt 2D README asset was traced to the old committed
   media bundle, not the current renderer. The refreshed render path now:
   - symmetrizes the display field for closed-channel README movies across
     `y` and `z`
   - uses fluid-only centerline diagnostics instead of including wall cells in
     the plotted lineouts
+  - annotates Hunt with conducting side-wall jets and insulating Hartmann
+    walls instead of reusing the old Hartmann-oriented label placement
   - replaces the older Hunt 3D slice-style view with a cleaner profile-slab
     rendering that matches the straight-duct showcase more closely
   - replaces the broken 2D Hunt GIF/poster in `docs/_static/generated`
@@ -650,16 +652,61 @@ That retained gate now passes for all three retained fringing geometries.
     renderer, but that full 3D regeneration path is still substantially slower
     than the 2D path
   - the straight-duct analytical overlay is now generated and checked into the
-    docs tree, but the current `Ha = 20` Shercliff overlay remains visibly
-    flatter than the bundled analytical curve even after peak matching, so the
-    Shercliff fully developed setup is still a real benchmark-hardening target
+    docs tree from the stable clustered-wall `32 × 32` comparison setup with
+    `velocity_update_limit = 4e-3`, `potential_iterations = 80`, and
+    `max_steps = 64`
+  - that artifact is materially closer to the bundled analytical curves than
+    the earlier broken runs, but Shercliff is still slightly too concave
+    through the core compared to the bundled analytical reference, so dense
+    straight-duct hardening is still an open literature-comparison task rather
+    than a fully closed lane
+  - the main numerical finding from this pass is that the old uniform
+    `rect_duct` mesh was under-resolving the Hartmann layer badly at
+    `Ha = 20`; the rect-duct mesher is now field-aware and assigns Hartmann
+    and side-layer spacing on different axes, which is the correct benchmark
+    direction for Shercliff/Hartmann cases
+  - the first stable Shercliff probe on that field-aware mesh also showed that
+    the fully developed fixed-point update needs explicit damping on the
+    clustered wall cells; the velocity-update limiter is now active in the
+    fully developed iteration loop again, and the five-point CG path is now
+    guarded against denominator breakdown so the denser clustered-wall cases
+    return finite fields instead of `NaN`s
+  - on that hardened solve path, the first dense `48 × 48` Shercliff run now
+    reaches `z_l2_error ≈ 1.08e-1` on the bundled analytical midplane profile,
+    while the corresponding `64 × 64` run is still worse; so `48 × 48` is the
+    current dense straight-duct hardening point and `32 × 32` remains the
+    cleaner reader-facing overlay artifact
   - the new steady Shercliff/Hunt showcase scripts are structurally in place
     and covered by unit/example tests, but their default full-resolution solve
     path is still heavier than a routine smoke example and needs a dedicated
     runtime pass before calling it “lightweight”
+  - direct profiling of the straight-duct comparison example on this host
+    shows the long pole is JAX CPU compilation of the fully developed solve
+    path, not just the fixed-point iteration count; the next runtime pass for
+    these examples therefore needs to target compilation pressure and code-path
+    specialization, not only smaller `t_final` or fewer fixed-point steps
+  - a local persistent JAX compilation cache is now wired into the heavy
+    README/straight-duct example paths under `artifacts/jax_cache`, so repeat
+    reruns on the same host do not recompile the same solve kernels from
+    scratch every time
 - A denser quantitative Benchmark B rerun was started on the current tree at
   `rect/layered: 24 × 24 × 33` and `pipe: 24 × 96 × 33`, but it did not finish
   inside this pass and remains part of the heavier manual validation lane.
+- The mapped-pipe external comparison lane is now more tightly understood:
+  - the bundled center-line reference is a real axial-velocity target
+  - the bundled off-center files carry nontrivial electric-potential/current
+    information but zero axial velocity, so they cannot be treated as
+    like-for-like axial-velocity parity curves
+  - the bundled FreeMHD pipe-reference files are specifically the
+    `Ha = 2000`, `Re = 20000` Bühler fringing-pipe case, while the current
+    `pipe_ogrid` `extruded_inductionless` lane is still a lower-Re inductionless
+    research slice
+  - the next parity step is therefore:
+    - center-line axial-velocity closure
+    - off-center electric-potential closure
+    - pressure-drop / pressure-span closure through the same reference lane
+    - and, before claiming true parity, a higher-inertia pipe solver path that
+      is actually in the same regime as the bundled reference
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

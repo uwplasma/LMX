@@ -3,32 +3,35 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lmx import solve_closed_channel_benchmark, write_closed_channel_profile_comparison_figure
+from lmx import enable_compilation_cache, solve_closed_channel_benchmark, write_closed_channel_profile_comparison_figure
 
 
 OUTPUT_DIR = Path("artifacts/examples/straight_duct_profile_comparison")
+JAX_CACHE_DIR = Path("artifacts/jax_cache")
 HA = 20.0
 WIDTH = 0.2
 HEIGHT = 0.2
-NY = 48
-NZ = 48
+NY = 32
+NZ = 32
 WALL_CELLS = 10
 WALL_THICKNESS = 0.02
-COUPLING_ITERATIONS = 12
-POTENTIAL_ITERATIONS = 96
-MAX_STEPS = 96
+COUPLING_ITERATIONS = 10
+POTENTIAL_ITERATIONS = 80
+MAX_STEPS = 64
+VELOCITY_UPDATE_LIMIT = 4.0e-3
 
-FLUID_CONDUCTIVITY = 1.0e6
-CONDUCTING_WALL_CONDUCTIVITY = 1.0e7
-INSULATING_WALL_CONDUCTIVITY = 1.0e-6
-DENSITY = 1.0e4
-VISCOSITY = 1.0e-3
+FLUID_CONDUCTIVITY = 1.0
+CONDUCTING_WALL_CONDUCTIVITY = 0.25
+INSULATING_WALL_CONDUCTIVITY = 1.0e-12
+DENSITY = 1.0
+VISCOSITY = 1.0
 
 
 def run_straight_duct_profile_comparison(
     *,
     out_dir: Path = OUTPUT_DIR,
 ) -> dict[str, object]:
+    enable_compilation_cache(JAX_CACHE_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     _, shercliff_solution, shercliff_comparison = solve_closed_channel_benchmark(
@@ -44,6 +47,7 @@ def run_straight_duct_profile_comparison(
         coupling_iterations=COUPLING_ITERATIONS,
         potential_iterations=POTENTIAL_ITERATIONS,
         max_steps=MAX_STEPS,
+        velocity_update_limit=VELOCITY_UPDATE_LIMIT,
     )
     _, hunt_solution, hunt_comparison = solve_closed_channel_benchmark(
         "hunt",
@@ -62,6 +66,7 @@ def run_straight_duct_profile_comparison(
         coupling_iterations=COUPLING_ITERATIONS,
         potential_iterations=POTENTIAL_ITERATIONS,
         max_steps=MAX_STEPS,
+        velocity_update_limit=VELOCITY_UPDATE_LIMIT,
     )
 
     comparison_outputs = write_closed_channel_profile_comparison_figure(

@@ -49,8 +49,8 @@ If you are new to liquid-metal MHD, the two benchmark names that appear most
 often in LMX are:
 
 - `Hunt`:
-  a rectangular duct with conducting Hartmann walls, insulating side walls,
-  and a transverse magnetic field
+  a rectangular duct with conducting walls parallel to the imposed field,
+  insulating Hartmann walls, and a transverse magnetic field
 - `fringing field`:
   a magnetic field that varies along the flow direction, so the problem is no
   longer fully developed and must be treated as 3D

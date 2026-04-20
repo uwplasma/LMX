@@ -100,6 +100,7 @@ def solve_closed_channel_benchmark(
     coupling_iterations: int = 16,
     potential_iterations: int = 160,
     max_steps: int = 160,
+    velocity_update_limit: float | None = None,
 ):
     if case_kind == "shercliff":
         case = make_shercliff_case(
@@ -140,6 +141,7 @@ def solve_closed_channel_benchmark(
             steady_tolerance=1.0e-9,
             potential_tolerance=1.0e-9,
             potential_relaxation=1.0,
+            velocity_update_limit=case.time_stepper.velocity_update_limit if velocity_update_limit is None else velocity_update_limit,
         ),
     )
     solution = solve_steady(case)
@@ -453,14 +455,16 @@ def write_closed_channel_profile_comparison_figure(
     hunt_peak = max(float(np.max(np.asarray(hunt_profile["u"], dtype=float))), 1.0e-12)
     shercliff_ref_peak = max(float(np.max(np.asarray(shercliff_ref.midplane_z, dtype=float))), 1.0e-12)
     hunt_ref_peak = max(float(np.max(np.asarray(hunt_ref.midplane_z, dtype=float))), 1.0e-12)
-    shercliff_scaled = np.asarray(shercliff_profile["u"], dtype=float) * (shercliff_ref_peak / shercliff_peak)
-    hunt_scaled = np.asarray(hunt_profile["u"], dtype=float) * (hunt_ref_peak / hunt_peak)
+    shercliff_normalized = np.asarray(shercliff_profile["u"], dtype=float) / shercliff_peak
+    hunt_normalized = np.asarray(hunt_profile["u"], dtype=float) / hunt_peak
+    shercliff_ref_normalized = np.asarray(shercliff_ref.midplane_z, dtype=float) / shercliff_ref_peak
+    hunt_ref_normalized = np.asarray(hunt_ref.midplane_z, dtype=float) / hunt_ref_peak
 
     fig, ax = plt.subplots(figsize=(10.2, 6.4))
     _add_slide_title(fig, f"LMX benchmarking: velocity profiles (Ha = {int(ha)})")
     ax.plot(
         np.asarray(shercliff_ref.coordinate),
-        np.asarray(shercliff_ref.midplane_z),
+        shercliff_ref_normalized,
         color="#111827",
         linestyle="--",
         linewidth=1.8,
@@ -468,16 +472,16 @@ def write_closed_channel_profile_comparison_figure(
     )
     ax.plot(
         np.asarray(shercliff_profile["z"]),
-        shercliff_scaled,
+        shercliff_normalized,
         color="#1d4ed8",
         marker="x",
         markersize=5,
         linewidth=1.2,
-        label="LMX: Shercliff (peak-matched)",
+        label="LMX: Shercliff",
     )
     ax.plot(
         np.asarray(hunt_ref.coordinate),
-        np.asarray(hunt_ref.midplane_z),
+        hunt_ref_normalized,
         color="#7f1d1d",
         linestyle="--",
         linewidth=1.8,
@@ -485,15 +489,15 @@ def write_closed_channel_profile_comparison_figure(
     )
     ax.plot(
         np.asarray(hunt_profile["z"]),
-        hunt_scaled,
+        hunt_normalized,
         color="#dc2626",
         marker="o",
         markersize=3.2,
         linewidth=1.2,
-        label="LMX: Hunt (peak-matched)",
+        label="LMX: Hunt",
     )
-    ax.set_xlabel("Position (z) [m]")
-    ax.set_ylabel("Streamwise Velocity u(x) [m/s]")
+    ax.set_xlabel("Position [m]")
+    ax.set_ylabel("Normalized streamwise velocity u / max(u)")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="lower right", frameon=True)
     png_path = out_dir / "analytic_velocity_profiles.png"

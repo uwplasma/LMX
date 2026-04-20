@@ -105,7 +105,7 @@ The top panel shows the three geometry families and the actual mesh or
 wall layout each solver sees:
 
 - Hartmann flow in a rectangular duct
-- Hunt flow in a layered duct with conducting Hartmann walls
+- Hunt flow in a layered duct with conducting side walls
 - a mapped-pipe O-grid for fringing-field studies
 
 LMX solves liquid-metal duct and pipe flows in imposed magnetic fields. No
@@ -119,8 +119,8 @@ plasma background is needed to read the figures:
 The two most important benchmark ideas in the README are:
 
 - `Hunt` flow:
-  liquid metal in a rectangular duct with conducting Hartmann walls, insulating
-  side walls, and a transverse magnetic field
+  liquid metal in a rectangular duct with conducting walls parallel to the
+  imposed field, insulating Hartmann walls, and a transverse magnetic field
 - `fringing field`:
   a magnetic field that changes along the flow direction instead of staying
   uniform, which makes the problem fully 3D because the fluid accelerates and
@@ -150,27 +150,34 @@ layers.
 
 The straight-duct comparison workflow also overlays the analytical Shercliff
 and Hunt midplane profiles with the corresponding LMX solutions at `Ha = 20`.
-The current README figure uses the same reference profiles as the validation
-utilities and peak-matches the LMX curves so the profile-shape agreement can be
-read directly.
+The comparison uses the same bundled reference profiles as the validation
+utilities and plots the profiles in normalized form so the shape agreement can
+be read directly. The current artifact uses the stable clustered-wall
+`32 × 32` benchmark setup from
+`examples/straight_duct_profile_comparison.py`, while denser `48 × 48`
+comparison runs are kept in the validation lane for ongoing Shercliff
+hardening.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show Hunt startup in 2D and 3D over `t = 0` to `t = 2 ms`. Hunt flow uses a
-layered duct with conducting Hartmann walls and insulating side walls, so the
-startup sequence develops thin Hartmann layers at the conducting walls and a
-deformed core profile across the span. The run starts from a flat plug-flow
-profile, time is shown in physical units, and all solved timesteps are written
-to the GIF. The 2D panel carries the transient `y`- and `z`-centerline
-diagnostics so the layer growth can be read directly from the movie, while the
-3D panel shows a streamwise-velocity profile slab inside the duct so the Hunt
-side-layer shape is visible as the transient approaches steady state. The
+show Hunt startup in 2D and 3D over `t = 0` to `t = 1 ms`. Hunt flow uses a
+layered duct with conducting side walls and insulating Hartmann walls, so the
+startup sequence develops thin Hartmann layers at the insulating walls and
+the characteristic Hunt side jets along the conducting walls. The run starts
+from a flat plug-flow profile, time is shown in physical units, and all solved
+timesteps are written to the GIF. The 2D panel carries the transient `y`- and
+`z`-centerline diagnostics so the layer growth can be read directly from the
+movie, while the 3D panel shows a streamwise-velocity profile slab embedded
+inside the duct so the evolving Hunt profile can be read in the full geometry.
+The
 README regeneration path uses a bounded `49 × 49` cross-section with
-`dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 6`, and
-`potential_iterations = 48`.
+`dt = 1e-5 s`, `t_final = 1e-3 s`, `coupling_iterations = 6`, and
+`potential_iterations = 48`. Heavy example reruns now also populate a local
+JAX compilation cache under `artifacts/jax_cache` so repeated runs on the same
+host do not pay the full cold-compile cost every time.
 
 <p align="center">
   <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">

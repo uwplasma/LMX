@@ -3,6 +3,7 @@ import lmx
 
 def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.generate_rect_duct_mesh)
+    assert callable(lmx.enable_compilation_cache)
     assert callable(lmx.load_fringing_pipe_profile)
     assert callable(lmx.load_shercliff_analytical)
     assert callable(lmx.load_hunt_analytical)

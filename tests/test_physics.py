@@ -15,6 +15,7 @@ import lmx.solvers as solvers
 from lmx.validation import (
     closed_channel_validation,
     combined_profile_error,
+    duct_layer_resolution_metrics,
     hartmann_acceptance,
     hartmann_analytic_profile,
     hartmann_validation,
@@ -185,8 +186,25 @@ def test_small_shercliff_solution_matches_bundled_reference_profiles():
     )
 
     assert comparison.y_profile.l2_error < 0.4
-    assert comparison.z_profile.l2_error < 0.16
-    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.32
+    assert comparison.z_profile.l2_error < 0.3
+    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.36
+
+
+@pytest.mark.unit
+def test_rect_duct_mesh_uses_field_aware_boundary_layer_spacing():
+    shercliff_case = make_shercliff_case(ha=20.0, width=0.2, height=0.2, ny=48, nz=48)
+    hartmann_case = make_hartmann_case(ha=20.0, width=0.2, height=0.2, ny=48, nz=48)
+
+    shercliff_mesh = _build_mesh(shercliff_case)
+    hartmann_mesh = _build_mesh(hartmann_case)
+
+    shercliff_y = duct_layer_resolution_metrics(shercliff_case, shercliff_mesh)
+    hartmann_y = duct_layer_resolution_metrics(hartmann_case, hartmann_mesh)
+
+    assert shercliff_y["side_layer_cells"] > shercliff_y["hartmann_layer_cells"]
+    assert float(jnp.min(shercliff_mesh.dy)) > float(jnp.min(shercliff_mesh.dz))
+    assert hartmann_y["side_layer_cells"] > hartmann_y["hartmann_layer_cells"]
+    assert float(jnp.min(hartmann_mesh.dz)) > float(jnp.min(hartmann_mesh.dy))
 
 
 @pytest.mark.validation

@@ -8,8 +8,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from lmx import enable_compilation_cache
 from lmx.fringing import build_pipe_ogrid_extruded_problem, solve_extruded_inductionless
 from lmx.reference_data import default_fringing_pipe_reference_root, load_fringing_pipe_profile
+
+JAX_CACHE_DIR = Path("artifacts/jax_cache")
 
 
 def _set_style() -> None:
@@ -38,10 +41,11 @@ def _extract_pipe_profile(
     *,
     x_offset_fraction: float,
     samples: int = 121,
+    field_name: str = "u",
 ) -> tuple[np.ndarray, np.ndarray]:
     peak_index = int(np.argmax(np.abs(np.asarray(bundle.field_scale, dtype=float))))
     radius = float(np.max(np.asarray(bundle.y, dtype=float)))
-    u_station = np.asarray(bundle.u[peak_index], dtype=float)
+    station_field = np.asarray(getattr(bundle, field_name)[peak_index], dtype=float)
     radial = np.asarray(bundle.y, dtype=float)
     theta = np.asarray(bundle.z, dtype=float)
     target_x = x_offset_fraction * radius
@@ -59,17 +63,17 @@ def _extract_pipe_profile(
         r_weight = (r_target - radial[r_lo]) / r_span
 
         theta_extended = np.concatenate([theta, [theta[0] + 2.0 * np.pi]])
-        u_extended = np.concatenate([u_station, u_station[:, :1]], axis=1)
+        field_extended = np.concatenate([station_field, station_field[:, :1]], axis=1)
         t_hi = int(np.searchsorted(theta_extended, theta_target, side="right"))
         t_hi = min(max(t_hi, 1), theta_extended.size - 1)
         t_lo = t_hi - 1
         t_span = max(theta_extended[t_hi] - theta_extended[t_lo], 1.0e-12)
         t_weight = (theta_target - theta_extended[t_lo]) / t_span
 
-        v00 = u_extended[r_lo, t_lo]
-        v01 = u_extended[r_lo, t_hi]
-        v10 = u_extended[r_hi, t_lo]
-        v11 = u_extended[r_hi, t_hi]
+        v00 = field_extended[r_lo, t_lo]
+        v01 = field_extended[r_lo, t_hi]
+        v10 = field_extended[r_hi, t_lo]
+        v11 = field_extended[r_hi, t_hi]
         return float(
             (1.0 - r_weight) * ((1.0 - t_weight) * v00 + t_weight * v01)
             + r_weight * ((1.0 - t_weight) * v10 + t_weight * v11)
@@ -96,6 +100,7 @@ def run_pipe_reference_comparison_demo(
     potential_iterations: int = 60,
     reference_dir: Path | None = None,
 ) -> dict[str, object]:
+    enable_compilation_cache(JAX_CACHE_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     base_dir = default_fringing_pipe_reference_root(reference_dir)
 
@@ -125,11 +130,15 @@ def run_pipe_reference_comparison_demo(
         max(np.max(np.abs(np.asarray(profile.velocity, dtype=float))), 1.0e-12)
         for profile in reference_profiles.values()
     )
-    lmx_profiles = {
-        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=profile.x_offset_fraction)
+    lmx_velocity_profiles = {
+        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=profile.x_offset_fraction, field_name="u")
         for name, profile in reference_profiles.items()
     }
-    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_profiles.values())
+    lmx_potential_profiles = {
+        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=profile.x_offset_fraction, field_name="phi")
+        for name, profile in reference_profiles.items()
+    }
+    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_velocity_profiles.values())
 
     _set_style()
     fig, axes = plt.subplots(2, 2, constrained_layout=True)
@@ -140,22 +149,38 @@ def run_pipe_reference_comparison_demo(
 
     for ax, name in zip(axes.ravel()[:3], ("center", "negative", "positive"), strict=False):
         reference = reference_profiles[name]
-        lmx_coord, lmx_velocity_raw = lmx_profiles[name]
-        ref_velocity = np.asarray(reference.velocity, dtype=float) / reference_velocity_scale
-        lmx_velocity = lmx_velocity_raw / lmx_velocity_scale
-        interp_velocity = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_velocity)
-        l2_error = float(np.sqrt(np.mean((interp_velocity - ref_velocity) ** 2)))
-        linf_error = float(np.max(np.abs(interp_velocity - ref_velocity)))
+        reference_velocity = np.asarray(reference.velocity, dtype=float)
+        use_velocity = float(np.max(np.abs(reference_velocity))) > 1.0e-8
+        if use_velocity:
+            lmx_coord, lmx_profile_raw = lmx_velocity_profiles[name]
+            ref_profile = reference_velocity / reference_velocity_scale
+            lmx_profile = lmx_profile_raw / lmx_velocity_scale
+            metric_prefix = "velocity"
+            y_label = "Normalized axial velocity"
+            title_suffix = "velocity"
+        else:
+            lmx_coord, lmx_profile_raw = lmx_potential_profiles[name]
+            potential_values = np.loadtxt(reference.path, delimiter=",", skiprows=1, usecols=13)
+            ref_scale = max(float(np.max(np.abs(potential_values))), 1.0e-12)
+            ref_profile = potential_values / ref_scale
+            lmx_scale = max(float(np.max(np.abs(lmx_profile_raw))), 1.0e-12)
+            lmx_profile = lmx_profile_raw / lmx_scale
+            metric_prefix = "potential"
+            y_label = "Normalized electric potential"
+            title_suffix = "potential"
+        interp_profile = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_profile)
+        l2_error = float(np.sqrt(np.mean((interp_profile - ref_profile) ** 2)))
+        linf_error = float(np.max(np.abs(interp_profile - ref_profile)))
         summary_profiles[name] = {
             "x_offset_fraction": float(reference.x_offset_fraction),
-            "normalized_l2_error": l2_error,
-            "normalized_linf_error": linf_error,
+            f"{metric_prefix}_normalized_l2_error": l2_error,
+            f"{metric_prefix}_normalized_linf_error": linf_error,
         }
-        ax.plot(np.asarray(reference.coordinate, dtype=float), ref_velocity, color=colors[name], linewidth=2.2, label="External reference")
-        ax.plot(lmx_coord, lmx_velocity, color="#111827", linestyle="--", linewidth=2.0, label="LMX")
-        ax.set_title(f"{labels[name]}\n$L_2$={l2_error:.3f} | $L_\\infty$={linf_error:.3f}")
+        ax.plot(np.asarray(reference.coordinate, dtype=float), ref_profile, color=colors[name], linewidth=2.2, label="External reference")
+        ax.plot(lmx_coord, lmx_profile, color="#111827", linestyle="--", linewidth=2.0, label="LMX")
+        ax.set_title(f"{labels[name]} {title_suffix}\n$L_2$={l2_error:.3f} | $L_\\infty$={linf_error:.3f}")
         ax.set_xlabel("Normalized transverse coordinate")
-        ax.set_ylabel("Normalized axial velocity")
+        ax.set_ylabel(y_label)
         ax.set_xlim(-1.02, 1.02)
         ax.legend(frameon=False)
 
@@ -184,11 +209,16 @@ def run_pipe_reference_comparison_demo(
     summary = {
         "case": "pipe_reference_comparison_demo",
         "geometry_kind": "pipe_ogrid",
-        "velocity_normalization": "shared_peak_by_dataset",
+        "normalization": {
+            "center": "shared_peak_axial_velocity",
+            "negative": "independent_peak_electric_potential",
+            "positive": "independent_peak_electric_potential",
+        },
         "notes": (
-            "The external reference profile comes from a fringing-pipe benchmark dataset. "
-            "All three transverse lines are normalized by one shared peak velocity per dataset "
-            "so center and off-center errors can be compared on the same scale."
+            "The center line compares normalized axial velocity. "
+            "The off-center lines compare normalized electric potential because the bundled "
+            "external reference carries zero axial velocity there while still carrying "
+            "non-trivial electric-potential and current information."
         ),
         "profiles": summary_profiles,
         "validation": {

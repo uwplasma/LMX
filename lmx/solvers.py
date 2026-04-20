@@ -24,8 +24,23 @@ from .specs import BoundaryCondition, CaseSpec
 
 def _build_mesh(case: CaseSpec) -> StructuredMesh:
     g = case.geometry
+    magnetic_axis = None
+    if case.magnetic_field.kind == "constant" and case.magnetic_field.value is not None:
+        bx, by, bz = case.magnetic_field.value
+        magnitudes = {"x": abs(bx), "y": abs(by), "z": abs(bz)}
+        dominant = max(magnitudes, key=magnitudes.get)
+        magnetic_axis = dominant if magnitudes[dominant] > 0.0 else None
     if g.kind == "rect_duct":
-        return generate_rect_duct_mesh(width=g.width, height=g.height, length=g.length, nx=g.nx, ny=g.ny, nz=g.nz)
+        return generate_rect_duct_mesh(
+            width=g.width,
+            height=g.height,
+            length=g.length,
+            nx=g.nx,
+            ny=g.ny,
+            nz=g.nz,
+            target_ha=g.target_ha,
+            magnetic_axis=magnetic_axis,
+        )
     if g.kind == "layered_duct":
         return generate_layered_duct_mesh(
             width=g.width,
@@ -973,6 +988,13 @@ def _fully_developed_case_step(
             )
             u_next = u_base + applied_forcing * u_sensitivity
         linear_residual = velocity_linear_residual
+        u_next = _limited_velocity_update(
+            u_iter,
+            u_next,
+            fluid_mask,
+            max_delta=case.time_stepper.velocity_update_limit,
+            limiter=case.time_stepper.velocity_update_limiter,
+        )
         u_next = _enforce_velocity_bc(
             jnp.where(fluid_mask, u_next, 0.0),
             mesh,

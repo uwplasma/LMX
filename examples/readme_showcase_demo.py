@@ -7,12 +7,14 @@ import math
 from pathlib import Path
 import sys
 
+from lmx import enable_compilation_cache
 from lmx.cases import make_hartmann_case, make_hunt_case
 from lmx.example_runner import solve_case_snapshots
 from lmx.plotting import write_transient_movies
 from lmx.specs import MagneticFieldSpec
 
 EXAMPLES_DIR = Path(__file__).resolve().parent
+JAX_CACHE_DIR = EXAMPLES_DIR.parent / "artifacts" / "jax_cache"
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
@@ -33,7 +35,7 @@ def run_readme_showcase_demo(
     movie_ny: int = 49,
     movie_nz: int = 49,
     movie_dt: float = 1.0e-5,
-    movie_t_final: float = 2.0e-3,
+    movie_t_final: float = 1.0e-3,
     movie_fps: int = 12,
     movie_view: str = "both",
     movie_coupling_iterations: int = 6,
@@ -44,6 +46,7 @@ def run_readme_showcase_demo(
     include_geometry: bool = True,
     include_movie: bool = True,
 ) -> dict[str, object]:
+    enable_compilation_cache(JAX_CACHE_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     geometry_summary: dict[str, object] | None = None
@@ -139,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-ny", type=int, default=49)
     parser.add_argument("--movie-nz", type=int, default=49)
     parser.add_argument("--movie-dt", type=float, default=1.0e-5)
-    parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
+    parser.add_argument("--movie-t-final", type=float, default=1.0e-3)
     parser.add_argument("--movie-fps", type=int, default=12)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
     parser.add_argument("--movie-coupling-iterations", type=int, default=6)

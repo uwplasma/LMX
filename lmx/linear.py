@@ -171,17 +171,22 @@ def solve_five_point_cg_state(
         count, field, residual_norm, residual, direction, rz_old, _ = state
         applied = apply_five_point_operator(diagonal, west, east, south, north, direction)
         denom = jnp.sum(direction * applied)
-        safe_denom = jnp.where(jnp.abs(denom) > 1e-20, denom, 1.0)
-        alpha = rz_old / safe_denom
-        field_next = field + alpha * direction
-        residual_next = residual - alpha * applied
+        finite_denom = jnp.logical_and(jnp.isfinite(denom), jnp.abs(denom) > 1e-20)
+        safe_denom = jnp.where(finite_denom, denom, 1.0)
+        alpha = jnp.where(finite_denom, rz_old / safe_denom, 0.0)
+        field_next = jnp.nan_to_num(field + alpha * direction, nan=0.0, posinf=0.0, neginf=0.0)
+        residual_next = jnp.nan_to_num(residual - alpha * applied, nan=0.0, posinf=0.0, neginf=0.0)
         z_next = apply_preconditioner(residual_next)
         rz_next = jnp.sum(residual_next * z_next)
         safe_rz_old = jnp.where(jnp.abs(rz_old) > 1e-20, rz_old, 1.0)
-        beta = rz_next / safe_rz_old
-        direction_next = z_next + beta * direction
+        finite_rz = jnp.logical_and(jnp.isfinite(rz_next), jnp.isfinite(rz_old))
+        beta = jnp.where(finite_rz, rz_next / safe_rz_old, 0.0)
+        direction_next = jnp.nan_to_num(z_next + beta * direction, nan=0.0, posinf=0.0, neginf=0.0)
         residual_norm_next = five_point_residual_norm(diagonal, west, east, south, north, rhs, field_next)
-        active_next = jnp.logical_and(jnp.abs(denom) > 1e-20, rz_next > 1e-24)
+        active_next = jnp.logical_and(
+            finite_denom,
+            jnp.logical_and(finite_rz, jnp.logical_and(jnp.isfinite(residual_norm_next), rz_next > 1e-24)),
+        )
         return count + 1, field_next, residual_norm_next, residual_next, direction_next, rz_next, active_next
 
     init_state = (

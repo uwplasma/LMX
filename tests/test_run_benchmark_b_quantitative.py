@@ -57,9 +57,9 @@ def test_run_benchmark_b_quantitative_writes_outputs(
         suite,
         "_pipe_profile_errors",
         lambda bundle, reference_dir: {
-            "center_profile_l2_error": 0.1,
-            "negative_profile_l2_error": 0.2,
-            "positive_profile_l2_error": 0.3,
+            "center_velocity_l2_error": 0.1,
+            "negative_potential_l2_error": 0.2,
+            "positive_potential_l2_error": 0.3,
         },
     )
 
@@ -72,5 +72,6 @@ def test_run_benchmark_b_quantitative_writes_outputs(
     assert exit_code == 0
     assert len(payload) == 3
     assert "pipe_ogrid" in markdown
-    assert "center_profile_l2_error" in csv_text
+    assert "center_velocity_l2_error" in csv_text
+    assert "negative_potential_l2_error" in csv_text
     assert (tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.png").exists()

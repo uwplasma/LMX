@@ -66,6 +66,111 @@ def _clustered_segment(start: float, stop: float, count: int, beta: float = 2.5)
     return start + (stop - start) * scaled
 
 
+def _geometric_widths(total_width: float, cells: int, ratio: float) -> jnp.ndarray:
+    if cells <= 0:
+        return jnp.asarray([], dtype=float)
+    if cells == 1 or abs(ratio - 1.0) < 1e-12:
+        return jnp.full((cells,), total_width / max(cells, 1), dtype=float)
+    scale = total_width * (ratio - 1.0) / (ratio**cells - 1.0)
+    indices = jnp.arange(cells, dtype=float)
+    return scale * ratio**indices
+
+
+def _symmetric_boundary_layer_segment(
+    start: float,
+    stop: float,
+    count: int,
+    *,
+    layer_thickness: float,
+    layer_cells: int,
+    growth_ratio: float = 1.35,
+) -> jnp.ndarray:
+    length = stop - start
+    if count <= 1 or layer_cells <= 0 or layer_thickness <= 0.0:
+        return jnp.linspace(start, stop, count + 1)
+    capped_layer_thickness = min(layer_thickness, 0.24 * length)
+    capped_layer_cells = min(layer_cells, max(1, (count - 2) // 2))
+    if capped_layer_cells <= 0:
+        return jnp.linspace(start, stop, count + 1)
+    core_cells = count - 2 * capped_layer_cells
+    if core_cells <= 0:
+        return _clustered_segment(start, stop, count, beta=1.5)
+    left_widths = _geometric_widths(capped_layer_thickness, capped_layer_cells, growth_ratio)
+    right_widths = left_widths[::-1]
+    core_width = (length - 2.0 * capped_layer_thickness) / core_cells
+    core_widths = jnp.full((core_cells,), core_width, dtype=float)
+    widths = jnp.concatenate([left_widths, core_widths, right_widths])
+    faces = start + jnp.concatenate([jnp.asarray([0.0], dtype=float), jnp.cumsum(widths)])
+    return faces
+
+
+def _segmented_boundary_layer_segment(
+    start: float,
+    stop: float,
+    count: int,
+    *,
+    wall_layer_width: float,
+    wall_fraction: float = 0.10,
+    expansion_fraction: float = 0.25,
+    core_fraction: float = 0.30,
+    min_wall_cells: int = 5,
+    min_expansion_cells: int = 4,
+    growth_ratio: float = 10.0,
+) -> jnp.ndarray:
+    length = stop - start
+    if count <= 1 or wall_layer_width <= 0.0:
+        return jnp.linspace(start, stop, count + 1)
+
+    wall_cells = max(min_wall_cells, int(round(wall_fraction * count)))
+    expansion_cells = max(min_expansion_cells, int(round(expansion_fraction * count)))
+    core_cells = int(round(core_fraction * count))
+
+    total_assigned = 2 * wall_cells + 2 * expansion_cells + core_cells
+    if total_assigned > count:
+        overflow = total_assigned - count
+        reducible_expansion = max(0, expansion_cells - min_expansion_cells)
+        reduce_expansion = min(overflow // 2 + overflow % 2, reducible_expansion)
+        expansion_cells -= reduce_expansion
+        overflow -= 2 * reduce_expansion
+        reducible_wall = max(0, wall_cells - max(3, min_wall_cells - 1))
+        reduce_wall = min(overflow // 2 + overflow % 2, reducible_wall)
+        wall_cells -= reduce_wall
+        overflow -= 2 * reduce_wall
+        core_cells = max(2, count - 2 * wall_cells - 2 * expansion_cells)
+    else:
+        core_cells = count - 2 * wall_cells - 2 * expansion_cells
+
+    if core_cells <= 0 or wall_cells <= 0:
+        return _clustered_segment(start, stop, count, beta=1.8)
+
+    max_wall_width = 0.18 * length
+    wall_width = min(wall_layer_width, max_wall_width)
+    target_core_width = max(core_fraction * length, 0.20 * length)
+    expansion_width = max(0.0, 0.5 * (length - target_core_width) - wall_width)
+    core_width = length - 2.0 * wall_width - 2.0 * expansion_width
+    if core_width <= 0.0:
+        target_core_width = 0.12 * length
+        expansion_width = max(0.0, 0.5 * (length - target_core_width) - wall_width)
+        core_width = length - 2.0 * wall_width - 2.0 * expansion_width
+    if core_width <= 0.0:
+        return _symmetric_boundary_layer_segment(
+            start,
+            stop,
+            count,
+            layer_thickness=wall_width,
+            layer_cells=wall_cells,
+            growth_ratio=min(growth_ratio, 1.8),
+        )
+
+    wall_widths = jnp.full((wall_cells,), wall_width / wall_cells, dtype=float)
+    left_expansion = _geometric_widths(expansion_width, expansion_cells, growth_ratio)
+    right_expansion = left_expansion[::-1]
+    core_widths = jnp.full((core_cells,), core_width / core_cells, dtype=float)
+    widths = jnp.concatenate([wall_widths, left_expansion, core_widths, right_expansion, wall_widths])
+    faces = start + jnp.concatenate([jnp.asarray([0.0], dtype=float), jnp.cumsum(widths)])
+    return faces
+
+
 def generate_rect_duct_mesh(
     width: float,
     height: float,
@@ -73,10 +178,69 @@ def generate_rect_duct_mesh(
     nx: int = 1,
     ny: int = 64,
     nz: int = 64,
+    target_ha: float | None = None,
+    magnetic_axis: str | None = None,
 ) -> StructuredMesh:
     x_faces = jnp.linspace(0.0, length, nx + 1)
-    y_faces = jnp.linspace(-0.5 * width, 0.5 * width, ny + 1)
-    z_faces = jnp.linspace(-0.5 * height, 0.5 * height, nz + 1)
+    if target_ha and target_ha > 0.0:
+        side_y = 0.5 * width / jnp.sqrt(target_ha)
+        side_z = 0.5 * height / jnp.sqrt(target_ha)
+        hartmann_y = 0.5 * width / target_ha
+        hartmann_z = 0.5 * height / target_ha
+        if magnetic_axis == "y":
+            y_layer_thickness = hartmann_y
+            z_layer_thickness = side_z
+        elif magnetic_axis == "z":
+            y_layer_thickness = side_y
+            z_layer_thickness = hartmann_z
+        else:
+            y_layer_thickness = hartmann_y
+            z_layer_thickness = hartmann_z
+        if target_ha >= 100.0:
+            y_faces = _segmented_boundary_layer_segment(
+                -0.5 * width,
+                0.5 * width,
+                ny,
+                wall_layer_width=float(y_layer_thickness),
+                wall_fraction=0.10,
+                expansion_fraction=0.25,
+                core_fraction=0.30,
+                min_wall_cells=max(5, int(round(0.10 * ny))),
+                min_expansion_cells=max(4, int(round(0.18 * ny))),
+                growth_ratio=8.0 if magnetic_axis == "z" else 6.0,
+            )
+            z_faces = _segmented_boundary_layer_segment(
+                -0.5 * height,
+                0.5 * height,
+                nz,
+                wall_layer_width=float(z_layer_thickness),
+                wall_fraction=0.10,
+                expansion_fraction=0.25,
+                core_fraction=0.30,
+                min_wall_cells=max(5, int(round(0.10 * nz))),
+                min_expansion_cells=max(4, int(round(0.18 * nz))),
+                growth_ratio=8.0 if magnetic_axis == "y" else 6.0,
+            )
+        else:
+            y_faces = _symmetric_boundary_layer_segment(
+                -0.5 * width,
+                0.5 * width,
+                ny,
+                layer_thickness=float(y_layer_thickness),
+                layer_cells=max(4, int(round((0.16 if magnetic_axis == "z" else 0.12) * ny))),
+                growth_ratio=1.35,
+            )
+            z_faces = _symmetric_boundary_layer_segment(
+                -0.5 * height,
+                0.5 * height,
+                nz,
+                layer_thickness=float(z_layer_thickness),
+                layer_cells=max(4, int(round((0.16 if magnetic_axis == "y" else 0.12) * nz))),
+                growth_ratio=1.35,
+            )
+    else:
+        y_faces = jnp.linspace(-0.5 * width, 0.5 * width, ny + 1)
+        z_faces = jnp.linspace(-0.5 * height, 0.5 * height, nz + 1)
     return StructuredMesh(x_faces=x_faces, y_faces=y_faces, z_faces=z_faces, geometry="rect_duct")
 
 
