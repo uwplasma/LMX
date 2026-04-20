@@ -1160,6 +1160,7 @@ def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
         sigma=sigma,
         rho=rho,
         fluid_mask=jnp.ones((2, 2), dtype=bool),
+        u=jnp.asarray([[0.2, 0.1], [0.0, -0.1]]),
         phi=phi,
         by=by,
         bz=bz,
@@ -1167,6 +1168,20 @@ def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
     )
     assert rhs.shape == phi.shape
     assert lorentz_source.shape == phi.shape
+    rhs_face, lorentz_face = solvers._fully_developed_rhs(
+        mesh=mesh,
+        sigma=sigma,
+        rho=rho,
+        fluid_mask=jnp.ones((2, 2), dtype=bool),
+        u=jnp.asarray([[0.2, 0.1], [0.0, -0.1]]),
+        phi=phi,
+        by=by,
+        bz=bz,
+        forcing=jnp.asarray(1.0),
+        current_reconstruction="face_averaged",
+    )
+    assert jnp.isfinite(rhs_face).all()
+    assert jnp.isfinite(lorentz_face).all()
     diagnostics = type(
         "Diagnostics",
         (),

@@ -152,18 +152,18 @@ The straight-duct comparison workflow also overlays the analytical Shercliff
 and Hunt midplane profiles with the corresponding LMX solutions at `Ha = 20`.
 The comparison uses the same bundled reference profiles as the validation
 utilities and plots the profiles in normalized form so the shape agreement can
-be read directly. The current artifact uses the stable clustered-wall
-`32 × 32` benchmark setup from
-`examples/straight_duct_profile_comparison.py`, while denser `48 × 48`
-comparison runs are kept in the validation lane for ongoing Shercliff
-hardening.
+be read directly. The current artifact is generated directly from
+`examples/straight_duct_profile_comparison.py`, which runs denser Shercliff and
+Hunt steady solves on the same parameter set used by the validation helpers.
+On the current `48 × 48` face-averaged solve path, the plotted `z`-profile
+errors are down to about `8.2e-2` for Shercliff and `6.8e-2` for Hunt.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show Hunt startup in 2D and 3D over `t = 0` to `t = 1 ms`. Hunt flow uses a
+show Hunt startup in 2D and 3D over `t = 0` to `t = 2 ms`. Hunt flow uses a
 layered duct with conducting side walls and insulating Hartmann walls, so the
 startup sequence develops thin Hartmann layers at the insulating walls and
 the characteristic Hunt side jets along the conducting walls. The run starts
@@ -172,10 +172,9 @@ timesteps are written to the GIF. The 2D panel carries the transient `y`- and
 `z`-centerline diagnostics so the layer growth can be read directly from the
 movie, while the 3D panel shows a streamwise-velocity profile slab embedded
 inside the duct so the evolving Hunt profile can be read in the full geometry.
-The
-README regeneration path uses a bounded `49 × 49` cross-section with
-`dt = 1e-5 s`, `t_final = 1e-3 s`, `coupling_iterations = 6`, and
-`potential_iterations = 48`. Heavy example reruns now also populate a local
+The README regeneration path uses a bounded `49 × 49` cross-section with
+`dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 8`, and
+`potential_iterations = 80`. Heavy example reruns now also populate a local
 JAX compilation cache under `artifacts/jax_cache` so repeated runs on the same
 host do not pay the full cold-compile cost every time.
 
@@ -205,17 +204,17 @@ structured-grid `extruded3d` inductionless MHD operator. Solid lines are
 measured warm runtimes and speedups; the dashed line is ideal linear speedup.
 The current figure uses a `2048×64×64` CPU case with `1024` operator
 iterations and a `6144×96×96` GPU case with `4096` operator iterations, so the
-device curves come from minute-scale kernels instead of short smoke tests.
+device curves come from minute-scale kernels instead of short smoke tests. The
+CPU panel is limited to `1, 2, 4` devices, which is where the current host
+still shows a meaningful reduction in warm runtime.
 
 Measured warm-runtime points:
 
-- CPU: `79.45 s`, `68.68 s`, `64.09 s`, `66.16 s` at `1, 2, 4, 8`
+- CPU: `79.45 s`, `68.68 s`, `64.09 s` at `1, 2, 4`
 - GPU: `78.58 s`, `62.52 s` at `1, 2`
 
-On this workstation the CPU curve improves through `4` logical devices and then
-flattens at `8`, which is still consistent with a host-memory-bandwidth and
-communication limit on the current sharded operator path. The corrected
-two-GPU path keeps the cleaner strong-scaling trend on the larger fixed
+On this workstation the CPU curve improves through `4` logical devices, while
+the two-GPU path keeps the cleaner strong-scaling trend on the larger fixed
 problem.
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)

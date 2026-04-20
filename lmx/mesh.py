@@ -196,7 +196,7 @@ def generate_rect_duct_mesh(
         else:
             y_layer_thickness = hartmann_y
             z_layer_thickness = hartmann_z
-        if target_ha >= 100.0:
+        if target_ha >= 20.0:
             y_faces = _segmented_boundary_layer_segment(
                 -0.5 * width,
                 0.5 * width,
@@ -206,8 +206,8 @@ def generate_rect_duct_mesh(
                 expansion_fraction=0.25,
                 core_fraction=0.30,
                 min_wall_cells=max(5, int(round(0.10 * ny))),
-                min_expansion_cells=max(4, int(round(0.18 * ny))),
-                growth_ratio=8.0 if magnetic_axis == "z" else 6.0,
+                min_expansion_cells=max(4, int(round(0.20 * ny))),
+                growth_ratio=10.0,
             )
             z_faces = _segmented_boundary_layer_segment(
                 -0.5 * height,
@@ -218,8 +218,8 @@ def generate_rect_duct_mesh(
                 expansion_fraction=0.25,
                 core_fraction=0.30,
                 min_wall_cells=max(5, int(round(0.10 * nz))),
-                min_expansion_cells=max(4, int(round(0.18 * nz))),
-                growth_ratio=8.0 if magnetic_axis == "y" else 6.0,
+                min_expansion_cells=max(4, int(round(0.20 * nz))),
+                growth_ratio=10.0,
             )
         else:
             y_faces = _symmetric_boundary_layer_segment(
@@ -254,12 +254,27 @@ def generate_layered_duct_mesh(
     wall_thickness: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
     wall_cells: tuple[int, int, int, int] = (0, 0, 0, 0),
     target_ha: float | None = None,
+    magnetic_axis: str | None = None,
 ) -> StructuredMesh:
     left_t, right_t, bottom_t, top_t = wall_thickness
     left_c, right_c, bottom_c, top_c = wall_cells
 
-    fluid_y = _clustered_segment(-0.5 * width, 0.5 * width, ny, beta=3.0 if target_ha else 2.0)
-    fluid_z = _clustered_segment(-0.5 * height, 0.5 * height, nz, beta=3.0 if target_ha else 2.0)
+    if target_ha and target_ha > 0.0:
+        fluid_mesh = generate_rect_duct_mesh(
+            width=width,
+            height=height,
+            length=length,
+            nx=max(nx, 1),
+            ny=ny,
+            nz=nz,
+            target_ha=target_ha,
+            magnetic_axis=magnetic_axis,
+        )
+        fluid_y = fluid_mesh.y_faces
+        fluid_z = fluid_mesh.z_faces
+    else:
+        fluid_y = _clustered_segment(-0.5 * width, 0.5 * width, ny, beta=2.0)
+        fluid_z = _clustered_segment(-0.5 * height, 0.5 * height, nz, beta=2.0)
 
     if left_c:
         left_faces = jnp.linspace(-0.5 * width - left_t, -0.5 * width, left_c + 1)

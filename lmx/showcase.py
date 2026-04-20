@@ -15,8 +15,10 @@ from .example_runner import solve_case_snapshots
 from .mesh import StructuredMesh, generate_layered_duct_mesh
 from .plotting import write_transient_movies
 from .reference_data import load_hunt_analytical, load_shercliff_analytical
-from .solvers import solve_steady
+from .solvers import _build_mesh, solve_steady
+from .specs import BoundaryCondition
 from .validation import closed_channel_validation, extract_midplane_profile
+from .core import MHDState
 
 
 def _set_showcase_style() -> None:
@@ -101,6 +103,10 @@ def solve_closed_channel_benchmark(
     potential_iterations: int = 160,
     max_steps: int = 160,
     velocity_update_limit: float | None = None,
+    current_reconstruction: str = "face_averaged",
+    drive_mode: str = "forcing",
+    target_mean_velocity: float = 0.1,
+    initial_profile: str = "analytic",
 ):
     if case_kind == "shercliff":
         case = make_shercliff_case(
@@ -131,6 +137,53 @@ def solve_closed_channel_benchmark(
     else:
         raise ValueError(f"Unsupported case kind {case_kind!r}")
 
+    if drive_mode == "flow_rate":
+        case = replace(
+            case,
+            forcing=0.0,
+            initial_velocity=target_mean_velocity,
+            boundary_conditions=case.boundary_conditions
+            + (
+                BoundaryCondition(
+                    "inlet",
+                    "inlet_flow_rate",
+                    value=target_mean_velocity * width * height,
+                    axis="x",
+                ),
+            ),
+        )
+    elif drive_mode != "forcing":
+        raise ValueError(f"Unsupported closed-channel benchmark drive mode {drive_mode!r}")
+
+    initial_state = None
+    if initial_profile == "analytic":
+        reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
+        mesh = _build_mesh(case)
+        y_target = np.asarray(mesh.y_centers, dtype=float)
+        z_target = np.asarray(mesh.z_centers, dtype=float)
+        ref_coord = np.asarray(reference.coordinate, dtype=float)
+        ref_y = np.asarray(reference.midplane_y, dtype=float)
+        ref_z = np.asarray(reference.midplane_z, dtype=float)
+        y_profile = np.interp(y_target, ref_coord, ref_y)
+        z_profile = np.interp(z_target, ref_coord, ref_z)
+        yz_field = np.outer(y_profile, z_profile)
+        yz_scale = max(float(np.max(np.abs(yz_field))), 1.0e-12)
+        yz_field = yz_field / yz_scale
+        if mesh.fluid_mask is not None:
+            yz_field = np.where(np.asarray(mesh.fluid_mask, dtype=bool), yz_field, 0.0)
+        zeros = np.zeros_like(yz_field)
+        initial_state = MHDState(
+            u=jnp.asarray(yz_field, dtype=float),
+            phi=jnp.asarray(zeros, dtype=float),
+            jy=jnp.asarray(zeros, dtype=float),
+            jz=jnp.asarray(zeros, dtype=float),
+            lorentz_x=jnp.asarray(zeros, dtype=float),
+            time=0.0,
+            residual=0.0,
+        )
+    elif initial_profile != "zero":
+        raise ValueError(f"Unsupported closed-channel benchmark initial profile {initial_profile!r}")
+
     case = replace(
         case,
         solver=replace(case.solver, coupling_iterations=coupling_iterations, coupling_tolerance=1.0e-9),
@@ -141,10 +194,11 @@ def solve_closed_channel_benchmark(
             steady_tolerance=1.0e-9,
             potential_tolerance=1.0e-9,
             potential_relaxation=1.0,
+            current_reconstruction=current_reconstruction,
             velocity_update_limit=case.time_stepper.velocity_update_limit if velocity_update_limit is None else velocity_update_limit,
         ),
     )
-    solution = solve_steady(case)
+    solution = solve_steady(case, initial_state=initial_state)
     comparison = closed_channel_validation(solution, case_kind, int(ha))
     return case, solution, comparison
 
@@ -561,7 +615,7 @@ def write_closed_channel_startup_movies(
     steps = max(1, int(t_final / dt))
     case = replace(
         case,
-        solver=replace(case.solver, coupling_iterations=coupling_iterations, coupling_tolerance=1.0e-8),
+        solver=replace(case.solver, mode="transient", coupling_iterations=coupling_iterations, coupling_tolerance=1.0e-8),
         time_stepper=replace(
             case.time_stepper,
             dt=dt,
@@ -570,6 +624,7 @@ def write_closed_channel_startup_movies(
             potential_iterations=potential_iterations,
             potential_tolerance=1.0e-8,
             potential_relaxation=1.0,
+            current_reconstruction="face_averaged",
         ),
         initial_velocity=1.0,
     )

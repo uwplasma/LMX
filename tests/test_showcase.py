@@ -99,7 +99,14 @@ def test_showcase_profile_comparison_writer_uses_reference_helpers(tmp_path: Pat
 
 
 def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(showcase, "solve_case_snapshots", lambda case, frame_count=1: [{"time": 0.0, "u": np.ones((2, 2)), "mesh": _fake_mesh(), "fluid_mask": np.ones((2, 2), dtype=bool)}])
+    captured = {}
+
+    def fake_solve_case_snapshots(case, frame_count=1):
+        captured["solver_mode"] = case.solver.mode
+        captured["current_reconstruction"] = case.time_stepper.current_reconstruction
+        return [{"time": 0.0, "u": np.ones((2, 2)), "mesh": _fake_mesh(), "fluid_mask": np.ones((2, 2), dtype=bool)}]
+
+    monkeypatch.setattr(showcase, "solve_case_snapshots", fake_solve_case_snapshots)
 
     def fake_write_transient_movies(frames, out_dir, *, case_title: str, output_stem: str, fps: int, symmetry_average_axes=()):
         outputs = [out_dir / f"{output_stem}_2d.gif", out_dir / f"{output_stem}_3d.gif"]
@@ -111,6 +118,8 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(tmp_path
 
     outputs = showcase.write_closed_channel_startup_movies("shercliff", tmp_path, ny=8, nz=8, dt=1.0e-4, t_final=2.0e-4)
 
+    assert captured["solver_mode"] == "transient"
+    assert captured["current_reconstruction"] == "face_averaged"
     assert (tmp_path / "shercliff_startup_2d.gif") in outputs
     assert (tmp_path / "shercliff_startup_2d.gif").exists()
     assert (tmp_path / "shercliff_startup_3d.gif").exists()

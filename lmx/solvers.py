@@ -52,6 +52,7 @@ def _build_mesh(case: CaseSpec) -> StructuredMesh:
             wall_thickness=g.wall_thickness,
             wall_cells=g.wall_cells,
             target_ha=g.target_ha,
+            magnetic_axis=magnetic_axis,
         )
     raise NotImplementedError(f"Geometry {g.kind} is not supported by the laminar solver yet.")
 
@@ -249,13 +250,23 @@ def _fully_developed_rhs(
     sigma: jnp.ndarray,
     rho: jnp.ndarray,
     fluid_mask: jnp.ndarray,
+    u: jnp.ndarray,
     phi: jnp.ndarray,
     by: jnp.ndarray,
     bz: jnp.ndarray,
     forcing: jnp.ndarray,
+    current_reconstruction: str = "cell_centered",
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
-    lorentz_source = sigma * (-(bz * dphi_dy) - (by * dphi_dz))
+    _, _, lorentz_source = _compute_current_and_lorentz(
+        mesh,
+        sigma,
+        fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
+        reconstruction=current_reconstruction,
+    )
     rhs = jnp.where(fluid_mask, (forcing + lorentz_source) / rho, 0.0)
     return rhs, lorentz_source
 
@@ -933,10 +944,12 @@ def _fully_developed_case_step(
             sigma=materials.conductivity,
             rho=materials.density,
             fluid_mask=fluid_mask,
+            u=u_iter,
             phi=phi,
             by=by,
             bz=bz,
             forcing=jnp.asarray(0.0, dtype=u_previous.dtype),
+            current_reconstruction=case.time_stepper.current_reconstruction,
         )
         if not steady_mode:
             rhs_base = rhs_base + jnp.where(active_mask, u_previous / dt, 0.0)
@@ -1031,7 +1044,7 @@ def _fully_developed_case_step(
         phi,
         by,
         bz,
-        reconstruction="cell_centered",
+        reconstruction=case.time_stepper.current_reconstruction,
     )
     face_current_max, emf_max, face_lorentz_max = _face_current_emf_and_lorentz_max(
         mesh,

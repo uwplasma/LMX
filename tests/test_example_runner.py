@@ -354,13 +354,20 @@ def test_geometry_preview_demo_writes_preview_and_optional_post_outputs(
 
 def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("readme_showcase_demo.py")
+    captured = {}
 
     monkeypatch.setattr(
         module,
         "run_geometry_panel_demo",
         lambda *, out_dir: {"plots": ["geometry_gallery.png"], "geometries": {"rect_duct": {}}},
     )
-    monkeypatch.setattr(module, "solve_case_snapshots", lambda *args, **kwargs: [{"time": 0.0, "u": np.ones((2, 2)), "mesh": None}])
+
+    def fake_solve_case_snapshots(case, *args, **kwargs):
+        captured["solver_mode"] = case.solver.mode
+        captured["current_reconstruction"] = case.time_stepper.current_reconstruction
+        return [{"time": 0.0, "u": np.ones((2, 2)), "mesh": None}]
+
+    monkeypatch.setattr(module, "solve_case_snapshots", fake_solve_case_snapshots)
 
     def fake_write_transient_movies(
         frames,
@@ -389,6 +396,8 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
 
     assert summary["case"] == "readme_showcase_demo"
     assert summary["movie_case_kind"] == "hunt"
+    assert captured["solver_mode"] == "transient"
+    assert captured["current_reconstruction"] == "face_averaged"
     assert (tmp_path / "readme_hunt_startup_2d.gif").exists()
     assert (tmp_path / "readme_hunt_startup_3d.gif").exists()
     assert (tmp_path / "readme_showcase_summary.json").exists()

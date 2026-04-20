@@ -35,12 +35,12 @@ def run_readme_showcase_demo(
     movie_ny: int = 49,
     movie_nz: int = 49,
     movie_dt: float = 1.0e-5,
-    movie_t_final: float = 1.0e-3,
+    movie_t_final: float = 2.0e-3,
     movie_fps: int = 12,
     movie_view: str = "both",
-    movie_coupling_iterations: int = 6,
+    movie_coupling_iterations: int = 8,
     movie_coupling_tolerance: float = 1.0e-6,
-    movie_potential_iterations: int = 48,
+    movie_potential_iterations: int = 80,
     movie_wall_cells: int = 6,
     movie_initial_velocity: float = 1.0,
     include_geometry: bool = True,
@@ -95,6 +95,7 @@ def run_readme_showcase_demo(
             movie_case,
             solver=replace(
                 movie_case.solver,
+                mode="transient",
                 coupling_iterations=movie_coupling_iterations,
                 coupling_tolerance=movie_coupling_tolerance,
             ),
@@ -104,6 +105,7 @@ def run_readme_showcase_demo(
                 t_final=movie_t_final,
                 max_steps=movie_steps,
                 potential_iterations=movie_potential_iterations,
+                current_reconstruction="face_averaged",
             ),
             initial_velocity=movie_initial_velocity,
         )
@@ -142,12 +144,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-ny", type=int, default=49)
     parser.add_argument("--movie-nz", type=int, default=49)
     parser.add_argument("--movie-dt", type=float, default=1.0e-5)
-    parser.add_argument("--movie-t-final", type=float, default=1.0e-3)
+    parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
     parser.add_argument("--movie-fps", type=int, default=12)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
-    parser.add_argument("--movie-coupling-iterations", type=int, default=6)
+    parser.add_argument("--movie-coupling-iterations", type=int, default=8)
     parser.add_argument("--movie-coupling-tolerance", type=float, default=1.0e-6)
-    parser.add_argument("--movie-potential-iterations", type=int, default=48)
+    parser.add_argument("--movie-potential-iterations", type=int, default=80)
     parser.add_argument("--movie-wall-cells", type=int, default=6)
     parser.add_argument("--movie-initial-velocity", type=float, default=1.0)
     parser.add_argument("--skip-geometry", action="store_true")

@@ -648,18 +648,26 @@ That retained gate now passes for all three retained fringing geometries.
   coverage between the smoke tests and the heavier A/B validation campaigns.
 - Remaining honest gaps on the straight-duct showcase lane:
   - the refreshed Hunt 2D README asset is fixed and checked locally
-  - the committed Hunt 3D README GIF now uses the corrected profile-slab
-    renderer, but that full 3D regeneration path is still substantially slower
-    than the 2D path
-  - the straight-duct analytical overlay is now generated and checked into the
-    docs tree from the stable clustered-wall `32 × 32` comparison setup with
-    `velocity_update_limit = 4e-3`, `potential_iterations = 80`, and
-    `max_steps = 64`
-  - that artifact is materially closer to the bundled analytical curves than
-    the earlier broken runs, but Shercliff is still slightly too concave
-    through the core compared to the bundled analytical reference, so dense
-    straight-duct hardening is still an open literature-comparison task rather
-    than a fully closed lane
+  - the Hunt README movie path now runs the actual transient solver over
+    `t = 0 … 2 ms` instead of pseudo-time stepping the steady solver, so the
+    committed `2D` and `3D` Hunt posters/GIFs no longer collapse to zero at the
+    final frame
+  - the committed Hunt 3D README path now uses the smoothed profile-slab
+    renderer, but the full `3D` GIF regeneration is still slower than the `2D`
+    path because it writes all solved timesteps
+  - the straight-duct analytical overlay is now generated from the denser
+    `48 × 48` face-averaged comparison setup with
+    `velocity_update_limit = 1e-3`, `potential_iterations = 160`, and
+    `max_steps = 120`
+  - that current artifact materially reduced the bundled midplane `z`-profile
+    errors to:
+    - Shercliff `z_l2_error ≈ 8.23e-2`
+    - Hunt `z_l2_error ≈ 6.80e-2`
+  - the `z`-profile agreement is now much closer than the older reader-facing
+    artifact, but the full straight-duct literature-comparison lane is still
+    open because the orthogonal `y`-profile errors remain larger:
+    - Shercliff `y_l2_error ≈ 2.39e-1`
+    - Hunt `y_l2_error ≈ 2.45e-1`
   - the main numerical finding from this pass is that the old uniform
     `rect_duct` mesh was under-resolving the Hartmann layer badly at
     `Ha = 20`; the rect-duct mesher is now field-aware and assigns Hartmann
@@ -671,11 +679,11 @@ That retained gate now passes for all three retained fringing geometries.
     fully developed iteration loop again, and the five-point CG path is now
     guarded against denominator breakdown so the denser clustered-wall cases
     return finite fields instead of `NaN`s
-  - on that hardened solve path, the first dense `48 × 48` Shercliff run now
-    reaches `z_l2_error ≈ 1.08e-1` on the bundled analytical midplane profile,
-    while the corresponding `64 × 64` run is still worse; so `48 × 48` is the
-    current dense straight-duct hardening point and `32 × 32` remains the
-    cleaner reader-facing overlay artifact
+  - on the hardened solve path, the current dense `48 × 48` straight-duct run
+    is now the best reader-facing comparison artifact on this host; a larger
+    fully coupled rerun may still improve the remaining `y`-profile mismatch,
+    but `48 × 48` is the current practical hardening point before the runtime
+    jumps again
   - the new steady Shercliff/Hunt showcase scripts are structurally in place
     and covered by unit/example tests, but their default full-resolution solve
     path is still heavier than a routine smoke example and needs a dedicated
@@ -734,11 +742,10 @@ That retained gate now passes for all three retained fringing geometries.
   - CPU: `2048×64×64`, `1024` iterations
   - GPU: `6144×96×96`, `4096` iterations
   - warm runtime points:
-    - CPU: `79.45 s`, `68.68 s`, `64.09 s`, `66.16 s` at `1, 2, 4, 8`
+    - CPU: `79.45 s`, `68.68 s`, `64.09 s` at `1, 2, 4`
     - GPU: `78.58 s`, `62.52 s` at `1, 2`
   - current interpretation:
-    - the host CPU path improves through `4` logical devices and then
-      plateaus at `8`
+    - the host CPU path improves through `4` logical devices
     - the remote two-GPU path still shows the cleaner fixed-problem scaling
       curve
     - the next CPU-scaling benchmark should move closer to the executable

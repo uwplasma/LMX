@@ -11,14 +11,14 @@ JAX_CACHE_DIR = Path("artifacts/jax_cache")
 HA = 20.0
 WIDTH = 0.2
 HEIGHT = 0.2
-NY = 32
-NZ = 32
+NY = 48
+NZ = 48
 WALL_CELLS = 10
 WALL_THICKNESS = 0.02
-COUPLING_ITERATIONS = 10
-POTENTIAL_ITERATIONS = 80
-MAX_STEPS = 64
-VELOCITY_UPDATE_LIMIT = 4.0e-3
+COUPLING_ITERATIONS = 16
+POTENTIAL_ITERATIONS = 160
+MAX_STEPS = 120
+VELOCITY_UPDATE_LIMIT = 1.0e-3
 
 FLUID_CONDUCTIVITY = 1.0
 CONDUCTING_WALL_CONDUCTIVITY = 0.25
@@ -48,6 +48,7 @@ def run_straight_duct_profile_comparison(
         potential_iterations=POTENTIAL_ITERATIONS,
         max_steps=MAX_STEPS,
         velocity_update_limit=VELOCITY_UPDATE_LIMIT,
+        current_reconstruction="face_averaged",
     )
     _, hunt_solution, hunt_comparison = solve_closed_channel_benchmark(
         "hunt",
@@ -67,6 +68,7 @@ def run_straight_duct_profile_comparison(
         potential_iterations=POTENTIAL_ITERATIONS,
         max_steps=MAX_STEPS,
         velocity_update_limit=VELOCITY_UPDATE_LIMIT,
+        current_reconstruction="face_averaged",
     )
 
     comparison_outputs = write_closed_channel_profile_comparison_figure(

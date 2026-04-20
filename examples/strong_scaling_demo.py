@@ -193,7 +193,7 @@ def run_strong_scaling_demo(
     *,
     out_dir: Path,
     benchmark_kind: str = "extruded3d",
-    cpu_counts: tuple[int, ...] = (1, 2, 4, 8),
+    cpu_counts: tuple[int, ...] = (1, 2, 4),
     gpu_counts: tuple[int, ...] = (1, 2),
     cpu_problem: tuple[int, int, int] = (2048, 64, 64),
     gpu_problem: tuple[int, int, int] = (6144, 96, 96),
@@ -255,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cpu-iterations", type=int, default=None)
     parser.add_argument("--gpu-iterations", type=int, default=None)
     parser.add_argument("--repeats", type=int, default=2)
-    parser.add_argument("--cpu-counts", type=str, default="1,2,4,8")
+    parser.add_argument("--cpu-counts", type=str, default="1,2,4")
     parser.add_argument("--gpu-counts", type=str, default="1,2")
     parser.add_argument("--cpu-nx", type=int, default=2048)
     parser.add_argument("--cpu-ny", type=int, default=64)

@@ -95,16 +95,15 @@ Observed warm-runtime points from that artifact:
   - `1` device: `79.4471 s`
   - `2` devices: `68.6761 s`
   - `4` devices: `64.0858 s`
-  - `8` devices: `66.1551 s`
 - GPU:
   - `1` GPU: `78.5845 s`
   - `2` GPUs: `62.5184 s`
 
 The CPU sweep is reported as measured rather than idealized. On this
-workstation, the denser operator improves through `4` logical CPU devices and
-then flattens between `4` and `8`, which is still consistent with a
-memory-bandwidth and communication limit on the host path. The remote GPU path
-shows about `1.26x` speedup from `1` to `2` GPUs on the larger fixed problem.
+workstation, the denser operator improves through `4` logical CPU devices,
+which is still consistent with a memory-bandwidth and communication limit on
+the host path beyond that range. The remote GPU path shows about `1.26x`
+speedup from `1` to `2` GPUs on the larger fixed problem.
 
 This is also the point where the current JAX implementation strategy matters.
 The official JAX guidance distinguishes automatic sharding from explicit

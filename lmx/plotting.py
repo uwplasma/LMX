@@ -98,25 +98,31 @@ def _draw_profile_slab(
     amplitude: float,
     use_normalized_positive: bool,
 ) -> None:
-    yy_surface, zz_surface = np.meshgrid(y_display, z_display, indexing="ij")
     field_display = np.asarray(field, dtype=float)
+    dense_y_count = max(3 * y_display.size, y_display.size)
+    dense_z_count = max(3 * z_display.size, z_display.size)
+    y_dense = np.linspace(float(y_display[0]), float(y_display[-1]), dense_y_count)
+    z_dense = np.linspace(float(z_display[0]), float(z_display[-1]), dense_z_count)
+    field_z_dense = np.vstack([np.interp(z_dense, z_display, row) for row in field_display])
+    field_dense = np.column_stack([np.interp(y_dense, y_display, field_z_dense[:, j]) for j in range(field_z_dense.shape[1])])
+    yy_surface, zz_surface = np.meshgrid(y_dense, z_dense, indexing="ij")
     if use_normalized_positive:
-        displacement_field = np.clip(field_display, 0.0, None)
+        displacement_field = np.clip(field_dense, 0.0, None)
         peak = max(float(np.max(displacement_field)), 1.0e-12)
         normalized_displacement = displacement_field / peak
     else:
-        peak = max(float(np.max(np.abs(field_display))), 1.0e-12)
-        normalized_displacement = 0.5 * (field_display / peak + 1.0)
+        peak = max(float(np.max(np.abs(field_dense))), 1.0e-12)
+        normalized_displacement = 0.5 * (field_dense / peak + 1.0)
     x_surface = x_plane + amplitude * normalized_displacement
-    color_rgba = cmap_obj(norm(field_display))
+    color_rgba = cmap_obj(norm(field_dense))
     ax.plot_surface(
         x_surface,
         zz_surface,
         yy_surface,
         facecolors=color_rgba,
         shade=False,
-        linewidth=0.18,
-        edgecolor=(0.09, 0.09, 0.09, 0.20),
+        linewidth=0.0,
+        edgecolor="none",
         antialiased=True,
     )
     base_plane = np.full_like(yy_surface, x_plane)
