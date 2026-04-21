@@ -74,8 +74,12 @@ class ExtrudedInductionlessValidation:
     max_wall_current_leakage: float
     net_boundary_current_residual: float
     field_mean_velocity_correlation: float
+    axial_current_mirror_residual: float = 0.0
     peak_velocity_span: float = 0.0
     pressure_span_range: float = 0.0
+    pressure_span_mirror_residual: float = 0.0
+    center_axial_current: float = 0.0
+    center_pressure_span: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -497,6 +501,23 @@ def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
     centered_y = y - jnp.mean(y)
     denom = jnp.sqrt(jnp.sum(centered_x**2) * jnp.sum(centered_y**2))
     return float(jnp.where(denom > 0.0, jnp.sum(centered_x * centered_y) / denom, 0.0))
+
+
+def _mirror_residual(values: jnp.ndarray, *, odd: bool) -> float:
+    if values.size == 0:
+        return 0.0
+    mirrored = values[::-1]
+    residual = values + mirrored if odd else values - mirrored
+    return float(jnp.max(jnp.abs(residual)))
+
+
+def _center_station_value(values: jnp.ndarray) -> float:
+    if values.size == 0:
+        return 0.0
+    n = int(values.shape[0])
+    if n % 2 == 1:
+        return float(values[n // 2])
+    return float(0.5 * (values[n // 2 - 1] + values[n // 2]))
 
 
 def _clip_state(field: jnp.ndarray, limit: float) -> jnp.ndarray:
@@ -1939,6 +1960,10 @@ def validate_extruded_inductionless_solution(
     peak_velocity = jnp.max(jnp.abs(bundle.u), axis=(1, 2))
     pressure_span = jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2))
     correlation = _safe_correlation(field_scale, mean_velocity)
+    axial_current_mirror_residual = _mirror_residual(axial_current, odd=True)
+    pressure_span_mirror_residual = _mirror_residual(pressure_span, odd=False)
+    center_axial_current = _center_station_value(axial_current)
+    center_pressure_span = _center_station_value(pressure_span)
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
         max_residual=float(jnp.max(jnp.abs(residual))) if residual.size else 0.0,
@@ -1950,11 +1975,15 @@ def validate_extruded_inductionless_solution(
         if volumetric_flow_rate.size
         else 0.0,
         axial_current_span=float(jnp.max(axial_current) - jnp.min(axial_current)) if axial_current.size else 0.0,
+        axial_current_mirror_residual=axial_current_mirror_residual,
         max_wall_current_leakage=float(jnp.max(jnp.abs(wall_current_leakage))) if wall_current_leakage.size else 0.0,
         net_boundary_current_residual=float(jnp.max(jnp.abs(boundary_current_residual))) if boundary_current_residual.size else 0.0,
         field_mean_velocity_correlation=correlation,
         peak_velocity_span=float(jnp.max(peak_velocity) - jnp.min(peak_velocity)) if peak_velocity.size else 0.0,
         pressure_span_range=float(jnp.max(pressure_span) - jnp.min(pressure_span)) if pressure_span.size else 0.0,
+        pressure_span_mirror_residual=pressure_span_mirror_residual,
+        center_axial_current=center_axial_current,
+        center_pressure_span=center_pressure_span,
     )
 
 

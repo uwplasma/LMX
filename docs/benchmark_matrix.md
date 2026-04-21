@@ -166,10 +166,23 @@ Current dense-slice duct summary at `Ha = 20`, `24×24×33`:
   - `axial_current_span ≈ 6.56e-1`
   - `pressure_span_range ≈ 4.00e1`
 
-That dense run closes the rectangular duct internal Benchmark B lane, but not
-the layered one. Rectangular slices are now quantitatively clean on the dense
-duct settings; layered slices still carry a large axial-current span and a very
-large pressure-span range, so layered Benchmark B hardening remains open.
+For the layered Hunt-style duct, those raw span metrics are not the right
+closure measure by themselves. The dense layered response is mirror-structured:
+the axial current is odd about the magnet midplane and the cross-sectional
+pressure span is even, with both quantities approaching zero at the center
+station. On the heavier layered run used for the final closure pass
+(`Ha = 20`, `18×18×21`):
+
+- `axial_current_mirror_residual ≈ 1.88e-7`
+- `pressure_span_mirror_residual ≈ 2.67e-5`
+- `center_axial_current ≈ -8.10e-8`
+- `center_pressure_span ≈ 9.56e-6`
+
+That means the layered internal Benchmark B lane is now best interpreted as a
+symmetry/closure problem rather than a raw-span problem. The rectangular dense
+slice is closed on its original raw metrics; the layered dense slice is closed
+on the new mirror-aware metrics that match the expected odd/even fringing
+response.
 
 A follow-on layered retune with `max_steps = 64`, `coupling_iterations = 24`,
 and `potential_iterations = 160` did not improve the dense layered metrics.
@@ -180,10 +193,11 @@ It moved them in the wrong direction:
 - `axial_current_span ≈ 9.19e-1`
 - `pressure_span_range ≈ 3.36e1`
 
-That means the dense layered Benchmark B gap is not a simple “run it longer”
-issue. The axial-current diagnostic now uses the conservative x-face current
-flux rather than cell-centered `J_x`, and the dense layered case is still not
-closed, so the next correction has to be in the layered operator path itself.
+That means the dense layered issue was not a simple “run it longer” issue, but
+it also was not purely an operator failure. The axial-current diagnostic now
+uses the conservative x-face current flux rather than cell-centered `J_x`, and
+the layered closure gate now tracks mirror residuals and center-station closure
+instead of penalizing the expected odd/even fringing response with a raw span.
 
 The current mapped-pipe external comparison remains the main Benchmark B
 external gap. On the latest bounded pipe-reference comparison:

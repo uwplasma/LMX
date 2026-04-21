@@ -408,6 +408,9 @@ def test_layered_projection_keeps_throughput_span_bounded_on_heavier_case():
     assert solution.validation.volumetric_flow_rate_span < 5.0e-3
     assert solution.validation.field_mean_velocity_correlation < -5.0e-1
     assert solution.validation.max_charge_balance_residual < 1.0e-4
+    assert solution.validation.axial_current_mirror_residual < 1.0e-3
+    assert solution.validation.pressure_span_mirror_residual < 1.0e-3
+    assert abs(solution.validation.center_axial_current) < 1.0e-4
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():

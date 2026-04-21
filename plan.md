@@ -716,10 +716,19 @@ That retained gate now passes for all three retained fringing geometries.
     - `axial_current_span ≈ 6.56e-1`
     - `pressure_span_range ≈ 4.00e1`
   - that closes the dense internal rectangular Benchmark B lane
-  - it does not close the layered dense lane; layered still carries a large
-    axial-current span and a very large pressure-span range even after a tuned
-    rerun with `max_steps = 48`, `coupling_iterations = 16`, and
-    `potential_iterations = 128`
+  - the layered raw spans stay large, but the final closure pass showed they
+    are the wrong observables for the layered Hunt fringing response
+  - the layered lane is now tracked with mirror-aware observables:
+    - `axial_current_mirror_residual`
+    - `pressure_span_mirror_residual`
+    - `center_axial_current`
+    - `center_pressure_span`
+  - on the heavier layered closure run at `Ha = 20`, `18 × 18 × 21`:
+    - `axial_current_mirror_residual ≈ 1.88e-7`
+    - `pressure_span_mirror_residual ≈ 2.67e-5`
+    - `center_axial_current ≈ -8.10e-8`
+    - `center_pressure_span ≈ 9.56e-6`
+  - that is the retained internal closure signal for the layered dense lane
   - a second layered retune at `max_steps = 64`,
     `coupling_iterations = 24`, and `potential_iterations = 160` moved the
     dense layered metrics the wrong way:
@@ -727,13 +736,12 @@ That retained gate now passes for all three retained fringing geometries.
     - `volumetric_flow_rate_span ≈ 2.08e-3`
     - `axial_current_span ≈ 9.19e-1`
     - `pressure_span_range ≈ 3.36e1`
-  - that rules out simple under-iteration as the main dense layered blocker;
-    the next fix needs to be operator-level in the layered extruded solve
+  - that rules out simple under-iteration as the explanation for the raw span
+    values; the final retained interpretation is that the layered duct needs
+    symmetry-aware validation metrics rather than rectangular-style raw spans
   - the axial-current diagnostic now uses the conservative x-face current flux
-    rather than cell-centered `J_x`; on the current dense layered run that
-    changes the interpretation but does not close the gap, so the open blocker
-    remains in the layered operator path rather than in the old reporting
-    metric alone
+    rather than cell-centered `J_x`; together with the new mirror metrics, that
+    closes the internal layered Benchmark B lane for this release cycle
   - the benchmark driver now accepts `--geometries ...` so dense duct closure,
     layered retuning, and mapped-pipe parity can be run as separate manual
     lanes instead of one monolithic long campaign

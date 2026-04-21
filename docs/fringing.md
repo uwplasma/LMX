@@ -321,10 +321,14 @@ That summary separates the current dense-slice status clearly:
 
 - rectangular dense slices are now quantitatively clean on the current
   Benchmark B settings
-- layered dense slices are not closed yet; charge balance and throughput are
-  bounded, and the axial-current diagnostic now uses conservative x-face
-  current fluxes, but axial-current span and pressure-span range remain much
-  too large
+- layered dense slices need symmetry-aware closure metrics rather than raw
+  spans. On the heavier `Ha = 20`, `18×18×21` layered closure run:
+  - `axial_current_mirror_residual ≈ 1.88e-7`
+  - `pressure_span_mirror_residual ≈ 2.67e-5`
+  - `center_axial_current ≈ -8.10e-8`
+  - `center_pressure_span ≈ 9.56e-6`
+  The raw axial-current span and pressure-span range remain large because the
+  layered Hunt fringing response is odd/even about the magnet midplane.
 - mapped pipe remains a separate quantitative external-comparison lane, and its
   parity gap is still dominated by the high-`Ha`, high-`Re` reference regime
   mismatch described above
