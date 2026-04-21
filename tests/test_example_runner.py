@@ -672,7 +672,7 @@ def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
         potential_iterations=16,
     )
     assert summary["geometry_kind"] == "pipe_ogrid"
-    assert summary["velocity_normalization"] == "shared_peak_by_dataset"
+    assert summary["normalization"]["center"] == "shared_peak_axial_velocity"
     assert (tmp_path / "pipe_reference_comparison.png").exists()
     assert (tmp_path / "pipe_reference_comparison_summary.json").exists()
 

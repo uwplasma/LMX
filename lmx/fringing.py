@@ -1035,14 +1035,26 @@ def _pipe_poisson_sparse_3d(
     return field, residual, 1, initial_residual
 
 
-def _enforce_pipe_velocity_bc(u: jnp.ndarray, v: jnp.ndarray, w: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+def _enforce_pipe_velocity_bc(
+    u: jnp.ndarray,
+    v: jnp.ndarray,
+    w: jnp.ndarray,
+    *,
+    r_centers: jnp.ndarray | None = None,
+    r_faces: jnp.ndarray | None = None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     if u.shape[1] > 1:
         u = u.at[:, 0, :].set(u[:, 1, :])
         w = w.at[:, 0, :].set(w[:, 1, :])
     v = v.at[:, 0, :].set(0.0)
-    u = u.at[:, -1, :].set(0.0)
+    if r_centers is not None and r_faces is not None and u.shape[1] > 1:
+        outer_ratio = 0.9 * (r_faces[-1] - r_centers[-1]) / jnp.maximum(r_faces[-1] - r_centers[-2], 1.0e-12)
+        u = u.at[:, -1, :].set(outer_ratio * u[:, -2, :])
+        w = w.at[:, -1, :].set(outer_ratio * w[:, -2, :])
+    else:
+        u = u.at[:, -1, :].set(0.0)
+        w = w.at[:, -1, :].set(0.0)
     v = v.at[:, -1, :].set(0.0)
-    w = w.at[:, -1, :].set(0.0)
     if u.shape[0] > 1:
         u = u.at[0, :, :].set(u[1, :, :])
         u = u.at[-1, :, :].set(u[-2, :, :])
@@ -1530,7 +1542,7 @@ def _solve_extruded_projection(
             u_star = _clip_state(u_star, velocity_limit)
             v_star = _clip_state(v_star, velocity_limit)
             w_star = _clip_state(w_star, velocity_limit)
-            u_star, v_star, w_star = _enforce_pipe_velocity_bc(u_star, v_star, w_star)
+            u_star, v_star, w_star = _enforce_pipe_velocity_bc(u_star, v_star, w_star, r_centers=r, r_faces=r_faces)
 
             divergence = _pipe_divergence_3d(u_star, v_star, w_star, dx=dx, dr=dr, dtheta=dtheta, r=rr)
             p_corr, _, _, _ = _pipe_poisson_jacobi_3d(
@@ -1547,7 +1559,7 @@ def _solve_extruded_projection(
             u_next = _clip_state(u_star - (dt / rho) * dpc_dx, velocity_limit)
             v_next = _clip_state(v_star - (dt / rho) * dpc_dr, velocity_limit)
             w_next = _clip_state(w_star - (dt / rho) * dpc_dtheta, velocity_limit)
-            u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next)
+            u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next, r_centers=r, r_faces=r_faces)
             u_next = _enforce_stationwise_flow_rate_3d(
                 u_next,
                 active_mask=jnp.ones_like(u_next, dtype=bool),
@@ -1555,7 +1567,7 @@ def _solve_extruded_projection(
                 target_flow_rate=target_flow_rate,
                 relaxation=0.25,
             )
-            u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next)
+            u_next, v_next, w_next = _enforce_pipe_velocity_bc(u_next, v_next, w_next, r_centers=r, r_faces=r_faces)
             p = _clip_state(p + p_corr, scalar_limit)
 
             uxb_x = v_next * btheta - w_next * br

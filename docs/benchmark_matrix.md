@@ -188,9 +188,9 @@ closed, so the next correction has to be in the layered operator path itself.
 The current mapped-pipe external comparison remains the main Benchmark B
 external gap. On the latest bounded pipe-reference comparison:
 
-- center cut: `L2 ≈ 1.63e-1`, `L∞ ≈ 9.82e-1`
-- negative offset cut: `L2 ≈ 9.93e-1`, `L∞ ≈ 1.00`
-- positive offset cut: `L2 ≈ 9.93e-1`, `L∞ ≈ 1.00`
+- center cut: `L2 ≈ 1.57e-1`, `L∞ ≈ 7.27e-1`
+- negative offset cut: `L2 ≈ 1.68`, `L∞ ≈ 1.96`
+- positive offset cut: `L2 ≈ 1.68`, `L∞ ≈ 1.95`
 
 That is enough to say the comparison is quantitative, but not enough to call it
 parity closure.

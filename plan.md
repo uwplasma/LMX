@@ -473,8 +473,8 @@ That retained gate now passes for all three retained fringing geometries.
     anticorrelation between field strength and throughput under constant
     forcing
   - external-profile comparison is now quantitative, with
-    `center-line L2 ≈ 1.64e-1`, `center-line Linf ≈ 9.82e-1`, and
-    off-center `L2 ≈ 9.94e-1`, `Linf ≈ 1.00`
+    `center-line L2 ≈ 1.57e-1`, `center-line Linf ≈ 7.27e-1`, and
+    off-center potential `L2 ≈ 1.68`, `Linf ≈ 1.95`
 - A stricter fringing-physics gate is now also in the manual validation lane:
   - `volumetric_flow_rate_span <= 5e-3`
   - `field_mean_velocity_correlation <= -5e-1`
