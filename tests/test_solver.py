@@ -305,6 +305,14 @@ def test_target_mean_velocity_only_uses_inlet_flow_rate():
     assert solvers._target_mean_velocity(inlet_flow_rate_case) == pytest.approx(0.2)
 
 
+def test_inlet_speed_reads_tuple_components_by_axis():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+
+    assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="x"), case) == pytest.approx(1.0)
+    assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="y"), case) == pytest.approx(2.0)
+    assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="z"), case) == pytest.approx(3.0)
+
+
 def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
     case = make_hunt_case(ha=20.0, ny=8, nz=8, wall_cells=1)
     inlet_velocity_case = replace(
@@ -615,6 +623,28 @@ def test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid():
     assert south[2, 2] == pytest.approx(expected)
     assert north[2, 1] == pytest.approx(expected)
     assert diagonal[2, 2] == pytest.approx(4.0 * expected)
+
+
+def test_interface_and_face_conductances_match_uniform_rect_grid_symmetry():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    sigma = jnp.ones((4, 4))
+
+    conductance_y = solvers._interface_conductance_y(mesh, sigma)
+    west, east = solvers._face_conductance_y(mesh, sigma)
+    conductance_z = solvers._interface_conductance_z(mesh, sigma)
+    south, north = solvers._face_conductance_z(mesh, sigma)
+
+    expected = 1.0 / (0.5 * mesh.dy[1] + 0.5 * mesh.dy[2])
+    assert conductance_y[1, 2] == pytest.approx(expected)
+    assert conductance_z[2, 1] == pytest.approx(expected)
+    assert west.shape == sigma.shape
+    assert east.shape == sigma.shape
+    assert south.shape == sigma.shape
+    assert north.shape == sigma.shape
+    assert west[2, 2] == pytest.approx(expected / mesh.dy[2])
+    assert east[1, 2] == pytest.approx(expected / mesh.dy[1])
+    assert south[2, 2] == pytest.approx(expected / mesh.dz[2])
+    assert north[2, 1] == pytest.approx(expected / mesh.dz[1])
 
 
 def test_velocity_system_coefficients_cover_connected_and_boundary_fallback_paths():
