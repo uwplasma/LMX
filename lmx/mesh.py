@@ -163,7 +163,14 @@ def _segmented_boundary_layer_segment(
         )
 
     wall_widths = jnp.full((wall_cells,), wall_width / wall_cells, dtype=float)
-    left_expansion = _geometric_widths(expansion_width, expansion_cells, growth_ratio)
+    if expansion_cells <= 1 or expansion_width <= 0.0:
+        left_expansion = jnp.full((expansion_cells,), expansion_width / max(expansion_cells, 1), dtype=float)
+    else:
+        # Treat growth_ratio as the total expansion across the segment, not the
+        # per-cell ratio. A large per-cell ratio on fine meshes creates
+        # numerically zero-width cells near the wall.
+        per_cell_ratio = max(growth_ratio, 1.0) ** (1.0 / max(expansion_cells - 1, 1))
+        left_expansion = _geometric_widths(expansion_width, expansion_cells, per_cell_ratio)
     right_expansion = left_expansion[::-1]
     core_widths = jnp.full((core_cells,), core_width / core_cells, dtype=float)
     widths = jnp.concatenate([wall_widths, left_expansion, core_widths, right_expansion, wall_widths])
@@ -196,7 +203,7 @@ def generate_rect_duct_mesh(
         else:
             y_layer_thickness = hartmann_y
             z_layer_thickness = hartmann_z
-        if target_ha >= 20.0:
+        if target_ha >= 100.0:
             y_faces = _segmented_boundary_layer_segment(
                 -0.5 * width,
                 0.5 * width,

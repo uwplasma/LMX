@@ -153,10 +153,12 @@ and Hunt midplane profiles with the corresponding LMX solutions at `Ha = 20`.
 The comparison uses the same bundled reference profiles as the validation
 utilities and plots the profiles in normalized form so the shape agreement can
 be read directly. The current artifact is generated directly from
-`examples/straight_duct_profile_comparison.py`, which runs denser Shercliff and
-Hunt steady solves on the same parameter set used by the validation helpers.
-On the current `48 × 48` face-averaged solve path, the plotted `z`-profile
-errors are down to about `8.2e-2` for Shercliff and `6.8e-2` for Hunt.
+`examples/straight_duct_profile_comparison.py`, which runs Shercliff and Hunt
+steady solves on the same parameter set used by the validation helpers. After
+fixing the clustered-mesh spacing bug in the rect-duct mesher and enabling
+direct wall interpolation on the rectangular fully developed solve path, the
+current `25 × 25` comparison artifact is down to about `5.4e-2` / `6.8e-2`
+for Shercliff (`y` / `z`) and `2.8e-2` / `4.6e-2` for Hunt.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 
@@ -172,9 +174,9 @@ timesteps are written to the GIF. The 2D panel carries the transient `y`- and
 `z`-centerline diagnostics so the layer growth can be read directly from the
 movie, while the 3D panel shows a streamwise-velocity profile slab embedded
 inside the duct so the evolving Hunt profile can be read in the full geometry.
-The README regeneration path uses a bounded `49 × 49` cross-section with
+The README regeneration path uses a bounded `57 × 57` cross-section with
 `dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 8`, and
-`potential_iterations = 80`. Heavy example reruns now also populate a local
+`potential_iterations = 80`, plus `8` wall cells on the Hunt geometry. Heavy example reruns now also populate a local
 JAX compilation cache under `artifacts/jax_cache` so repeated runs on the same
 host do not pay the full cold-compile cost every time.
 
@@ -262,7 +264,10 @@ The current validation surface includes:
   and mapped-pipe fringing cases
 - dense duct Benchmark B at `24 × 24 × 33` now closes `rect_duct` internally,
   while `layered_duct` still needs pressure/current hardening on that denser
-  run
+  run (`max_charge_balance_residual ≈ 9.80e-5`,
+  `volumetric_flow_rate_span ≈ 9.62e-4`,
+  `axial_current_span ≈ 6.56e-1`,
+  `pressure_span_range ≈ 4.00e1`)
 
 The widened bounded manual campaign is intentionally stricter than the release
 gate. On the current tree it confirms the 3D fringing set at `Ha = 10, 20, 30`

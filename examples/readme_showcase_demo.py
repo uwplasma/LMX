@@ -32,8 +32,8 @@ def run_readme_showcase_demo(
     movie_ha: float = 20.0,
     movie_width: float = 2.0,
     movie_height: float = 2.0,
-    movie_ny: int = 49,
-    movie_nz: int = 49,
+    movie_ny: int = 57,
+    movie_nz: int = 57,
     movie_dt: float = 1.0e-5,
     movie_t_final: float = 2.0e-3,
     movie_fps: int = 12,
@@ -41,7 +41,7 @@ def run_readme_showcase_demo(
     movie_coupling_iterations: int = 8,
     movie_coupling_tolerance: float = 1.0e-6,
     movie_potential_iterations: int = 80,
-    movie_wall_cells: int = 6,
+    movie_wall_cells: int = 8,
     movie_initial_velocity: float = 1.0,
     include_geometry: bool = True,
     include_movie: bool = True,
@@ -141,8 +141,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-ha", type=float, default=20.0)
     parser.add_argument("--movie-width", type=float, default=2.0)
     parser.add_argument("--movie-height", type=float, default=2.0)
-    parser.add_argument("--movie-ny", type=int, default=49)
-    parser.add_argument("--movie-nz", type=int, default=49)
+    parser.add_argument("--movie-ny", type=int, default=57)
+    parser.add_argument("--movie-nz", type=int, default=57)
     parser.add_argument("--movie-dt", type=float, default=1.0e-5)
     parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
     parser.add_argument("--movie-fps", type=int, default=12)
@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-coupling-iterations", type=int, default=8)
     parser.add_argument("--movie-coupling-tolerance", type=float, default=1.0e-6)
     parser.add_argument("--movie-potential-iterations", type=int, default=80)
-    parser.add_argument("--movie-wall-cells", type=int, default=6)
+    parser.add_argument("--movie-wall-cells", type=int, default=8)
     parser.add_argument("--movie-initial-velocity", type=float, default=1.0)
     parser.add_argument("--skip-geometry", action="store_true")
     parser.add_argument("--skip-movie", action="store_true")

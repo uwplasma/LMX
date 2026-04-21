@@ -1012,7 +1012,7 @@ def _fully_developed_case_step(
             jnp.where(fluid_mask, u_next, 0.0),
             mesh,
             fluid_mask,
-            interpolate_direct_fluid_walls=False,
+            interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
         )
         velocity_residual = jnp.max(jnp.abs(u_next - u_iter))
         u_iter = u_next

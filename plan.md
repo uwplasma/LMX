@@ -652,22 +652,23 @@ That retained gate now passes for all three retained fringing geometries.
     `t = 0 … 2 ms` instead of pseudo-time stepping the steady solver, so the
     committed `2D` and `3D` Hunt posters/GIFs no longer collapse to zero at the
     final frame
-  - the committed Hunt 3D README path now uses the smoothed profile-slab
-    renderer, but the full `3D` GIF regeneration is still slower than the `2D`
-    path because it writes all solved timesteps
-  - the straight-duct analytical overlay is now generated from the denser
-    `48 × 48` face-averaged comparison setup with
-    `velocity_update_limit = 1e-3`, `potential_iterations = 160`, and
-    `max_steps = 120`
-  - that current artifact materially reduced the bundled midplane `z`-profile
-    errors to:
-    - Shercliff `z_l2_error ≈ 8.23e-2`
-    - Hunt `z_l2_error ≈ 6.80e-2`
-  - the `z`-profile agreement is now much closer than the older reader-facing
-    artifact, but the full straight-duct literature-comparison lane is still
-    open because the orthogonal `y`-profile errors remain larger:
-    - Shercliff `y_l2_error ≈ 2.39e-1`
-    - Hunt `y_l2_error ≈ 2.45e-1`
+  - the committed Hunt README movie path now uses a denser `57 × 57`
+    cross-section and `8` wall cells on the layered Hunt geometry
+  - the committed Hunt 3D README path uses the profile-slab renderer, and the
+    regenerated `57 × 57` posters/GIFs are now in `docs/_static/generated`
+  - the straight-duct analytical overlay now uses the corrected rect-duct mesh
+    policy for `Ha = 20`: the segmented boundary-layer layout is reserved for
+    higher-`Ha` cases, and the moderate-`Ha` path uses the smoother symmetric
+    clustered layout with strictly positive face spacings
+  - the rectangular fully developed solve path now applies direct wall
+    interpolation consistently during the fixed-point update, not only during
+    initialization
+  - with those fixes, the current reader-facing `25 × 25` analytical overlay
+    reports:
+    - Shercliff `y_l2_error ≈ 5.40e-2`
+    - Shercliff `z_l2_error ≈ 6.84e-2`
+    - Hunt `y_l2_error ≈ 2.77e-2`
+    - Hunt `z_l2_error ≈ 4.57e-2`
   - the main numerical finding from this pass is that the old uniform
     `rect_duct` mesh was under-resolving the Hartmann layer badly at
     `Ha = 20`; the rect-duct mesher is now field-aware and assigns Hartmann
@@ -679,11 +680,10 @@ That retained gate now passes for all three retained fringing geometries.
     fully developed iteration loop again, and the five-point CG path is now
     guarded against denominator breakdown so the denser clustered-wall cases
     return finite fields instead of `NaN`s
-  - on the hardened solve path, the current dense `48 × 48` straight-duct run
-    is now the best reader-facing comparison artifact on this host; a larger
-    fully coupled rerun may still improve the remaining `y`-profile mismatch,
-    but `48 × 48` is the current practical hardening point before the runtime
-    jumps again
+  - the earlier dense `48 × 48` and `97 × 97` comparison runs were misleading
+    because the segmented `Ha = 20` mesh path was creating repeated face
+    coordinates through an overly aggressive per-cell expansion ratio; that
+    defect is now fixed and covered by a mesh-spacing regression
   - the new steady Shercliff/Hunt showcase scripts are structurally in place
     and covered by unit/example tests, but their default full-resolution solve
     path is still heavier than a routine smoke example and needs a dedicated
@@ -711,9 +711,9 @@ That retained gate now passes for all three retained fringing geometries.
     - `axial_current_span ≈ 1.14e-7`
     - `pressure_span_range ≈ 6.30e-1`
   - `layered_duct`
-    - `max_charge_balance_residual ≈ 7.99e-5`
-    - `volumetric_flow_rate_span ≈ 1.19e-3`
-    - `axial_current_span ≈ 5.20e-1`
+    - `max_charge_balance_residual ≈ 9.80e-5`
+    - `volumetric_flow_rate_span ≈ 9.62e-4`
+    - `axial_current_span ≈ 6.56e-1`
     - `pressure_span_range ≈ 4.00e1`
   - that closes the dense internal rectangular Benchmark B lane
   - it does not close the layered dense lane; layered still carries a large

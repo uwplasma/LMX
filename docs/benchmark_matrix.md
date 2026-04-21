@@ -161,9 +161,9 @@ Current dense-slice duct summary at `Ha = 20`, `24×24×33`:
   - `axial_current_span ≈ 1.14e-7`
   - `pressure_span_range ≈ 6.30e-1`
 - `layered_duct`
-  - `max_charge_balance_residual ≈ 7.99e-5`
-  - `volumetric_flow_rate_span ≈ 1.19e-3`
-  - `axial_current_span ≈ 5.20e-1`
+  - `max_charge_balance_residual ≈ 9.80e-5`
+  - `volumetric_flow_rate_span ≈ 9.62e-4`
+  - `axial_current_span ≈ 6.56e-1`
   - `pressure_span_range ≈ 4.00e1`
 
 That dense run closes the rectangular duct internal Benchmark B lane, but not

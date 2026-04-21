@@ -1170,6 +1170,81 @@ def test_solve_fully_developed_enables_direct_wall_interpolation_only_for_rectan
     assert flags == [True, False]
 
 
+def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangular_ducts(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = make_shercliff_case(ha=10.0, ny=8, nz=8)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    flags: list[bool] = []
+
+    monkeypatch.setattr(
+        solvers,
+        "_solve_potential",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.asarray(0.0),
+            jnp.asarray(0),
+            jnp.asarray(0.0),
+        ),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_fully_developed_rhs",
+        lambda **kwargs: (jnp.zeros(mesh.yz_shape), jnp.zeros(mesh.yz_shape)),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_solve_velocity_system",
+        lambda **kwargs: (
+            jnp.ones(mesh.yz_shape),
+            jnp.asarray(0.0),
+            jnp.asarray(0),
+            jnp.asarray(0.0),
+        ),
+    )
+
+    def fake_enforce(u, mesh_arg, fluid_mask, *, interpolate_direct_fluid_walls):
+        flags.append(interpolate_direct_fluid_walls)
+        return u
+
+    monkeypatch.setattr(solvers, "_enforce_velocity_bc", fake_enforce)
+    monkeypatch.setattr(
+        solvers,
+        "_compute_current_and_lorentz",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+        ),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_face_current_emf_and_lorentz_max",
+        lambda *args, **kwargs: (
+            jnp.asarray(0.0),
+            jnp.asarray(0.0),
+            jnp.asarray(0.0),
+        ),
+    )
+
+    solvers._fully_developed_case_step(
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        u_previous=jnp.zeros(mesh.yz_shape),
+        step_time=0.0,
+        potential_solver="cg",
+        target_mean_velocity=None,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        coupling_iterations=1,
+        coupling_tolerance=1.0e-8,
+    )
+
+    assert flags == [True]
+
+
 def test_velocity_update_limiters_cover_local_clip_and_validation_errors():
     current = jnp.zeros((2, 2))
     trial = jnp.asarray([[2.0, -2.0], [0.25, -0.25]])

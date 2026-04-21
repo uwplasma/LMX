@@ -218,6 +218,15 @@ def test_high_ha_rect_duct_mesh_switches_to_segmented_boundary_layer_layout():
     assert float(jnp.max(mesh.dz) / jnp.maximum(jnp.min(mesh.dz), 1.0e-12)) > 10.0
 
 
+@pytest.mark.unit
+def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
+    case = make_shercliff_case(ha=20.0, width=0.2, height=0.2, ny=97, nz=97)
+    mesh = _build_mesh(case)
+
+    assert float(jnp.min(mesh.dy)) > 0.0
+    assert float(jnp.min(mesh.dz)) > 0.0
+
+
 @pytest.mark.validation
 def test_small_hunt_solution_matches_bundled_reference_profiles():
     case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=2)
