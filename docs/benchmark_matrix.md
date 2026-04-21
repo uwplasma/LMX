@@ -237,6 +237,42 @@ Current executable Benchmark C baseline:
   - role:
     first Q2D validation surface before adding turbulent closures
 
+Current forced Benchmark C baseline:
+
+- `examples/q2d_forced_validation.py`
+  - forced periodic Q2D Hartmann-friction duct mode
+  - observables:
+    steady-state `L2/L∞` error and steady-amplitude error against the analytic
+    forced solution
+  - role:
+    first forced Q2D duct slice before turbulent closures
+
+Current bounded result:
+
+- `96 × 96`, `ν = 0.01`, Hartmann-friction `= 2.0`
+- `l2_error ≈ 4.44e-4`
+- `linf_error ≈ 4.44e-4`
+- `steady_amplitude_rel_error ≈ 4.44e-4`
+
+Current first Benchmark D slice:
+
+- `examples/magnetic_obstacle_baseline.py`
+  - localized-field magnetic-obstacle baseline on the rectangular extruded
+    inductionless lane
+  - observables:
+    obstacle-induced velocity deficit, current-proxy peak, field/velocity
+    anticorrelation, and conservation metrics
+  - role:
+    first executable magnetic-obstacle slice before any turbulent Benchmark D claim
+
+Current bounded result:
+
+- `28 × 28 × 17` rectangular duct with localized analytic obstacle field
+- `obstacle_velocity_deficit ≈ 8.57e-8`
+- `current_proxy_peak ≈ 1.06e-1`
+- `field_velocity_correlation ≈ -5.16e-1`
+- `max_charge_balance_residual ≈ 5.36e-7`
+
 ## Additional benchmark targets for the next publication cycle
 
 The broader validation ladder used in recent inductionless liquid-metal MHD
@@ -307,9 +343,25 @@ Current bounded low-De baseline:
   - baseline: manufactured divergence-free field verification
     plus executable rectangular `extruded_inductionless` validation through
     `examples/variable_field_extruded_demo.py`
+  - layered extension:
+    `examples/variable_field_layered_demo.py`
+  - curved-pipe extension:
+    `examples/variable_field_bent_pipe_demo.py`
   - recovery test: reproduce the current fringing benchmarks through the
     generic field-loading path
   - extension: tabulated or analytic 3D fields for ducts and pipes
   - required observables:
     pressure redistribution, Lorentz-force localization, throughput change, and
     charge/current closure under mesh refinement
+
+Current bounded results:
+
+- layered variable-field duct:
+  `field_velocity_correlation ≈ -9.98e-1`,
+  `current_proxy_change ≈ 2.69e2`,
+  `max_charge_balance_residual ≈ 1.36e-1`
+- bent-pipe variable-field low-De comparison:
+  straight/bent equivalence still satisfies
+  `cross_section_l2_error ≈ 8.12e-6`,
+  `centerline_l2_error ≈ 8.20e-6`,
+  while the field-response gate passes on the normalized divergence metric

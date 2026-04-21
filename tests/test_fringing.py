@@ -5,10 +5,14 @@ from dataclasses import replace
 from lmx.fringing import (
     build_bent_pipe_extruded_problem,
     build_layered_duct_extruded_problem,
+    build_magnetic_obstacle_rect_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     build_square_duct_fringing_benchmark,
     build_variable_field_duct_extruded_problem,
+    build_variable_field_bent_pipe_extruded_problem,
+    build_variable_field_layered_extruded_problem,
+    build_variable_field_pipe_ogrid_extruded_problem,
     _cross_section_mesh,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
@@ -21,6 +25,8 @@ from lmx.fringing import (
     smooth_fringing_profile,
     validate_bent_pipe_low_de_baseline,
     validate_extruded_inductionless_solution,
+    validate_magnetic_obstacle_baseline,
+    validate_variable_field_pipe_solution,
     validate_variable_field_extruded_solution,
 )
 from lmx.specs import GeometrySpec
@@ -479,6 +485,45 @@ def test_solve_extruded_inductionless_supports_analytic_variable_field():
     assert jnp.all(jnp.isfinite(solution.bundle.u))
     assert validation["mean_velocity_change"] > 0.0
     assert validation["current_proxy_change"] > 0.0
+    assert isinstance(validation["validation_pass"], bool)
+
+
+def test_solve_extruded_inductionless_supports_layered_analytic_variable_field():
+    problem = build_variable_field_layered_extruded_problem(nx_stations=7, ny=10, nz=10)
+    solution = solve_extruded_inductionless(problem)
+    validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
+
+    assert solution.bundle.geometry_kind == "layered_duct"
+    assert jnp.all(jnp.isfinite(solution.bundle.u))
+    assert validation["mean_velocity_change"] > 0.0
+    assert isinstance(validation["validation_pass"], bool)
+
+
+def test_solve_extruded_inductionless_supports_variable_field_pipe_and_bent_pipe():
+    straight_problem = build_variable_field_pipe_ogrid_extruded_problem(nx_stations=7, nr=8, ntheta=16)
+    bent_problem = build_variable_field_bent_pipe_extruded_problem(nx_stations=7, nr=8, ntheta=16)
+    straight_solution = solve_extruded_inductionless(straight_problem)
+    bent_solution = solve_extruded_inductionless(bent_problem)
+
+    pipe_validation = validate_variable_field_pipe_solution(straight_solution, field_ny=41, field_nz=41)
+    bent_field_validation = validate_variable_field_pipe_solution(bent_solution, field_ny=41, field_nz=41)
+    bent_low_de_validation = validate_bent_pipe_low_de_baseline(bent_solution, straight_solution)
+
+    assert straight_solution.bundle.geometry_kind == "pipe_ogrid"
+    assert bent_solution.bundle.geometry_kind == "bent_pipe"
+    assert pipe_validation["current_proxy_change"] > 0.0
+    assert bent_field_validation["current_proxy_change"] > 0.0
+    assert isinstance(bent_low_de_validation["validation_pass"], bool)
+
+
+def test_magnetic_obstacle_baseline_reports_velocity_deficit():
+    problem = build_magnetic_obstacle_rect_extruded_problem(nx_stations=9, ny=12, nz=12)
+    solution = solve_extruded_inductionless(problem)
+    validation = validate_magnetic_obstacle_baseline(solution, field_ny=41, field_nz=41)
+
+    assert solution.bundle.geometry_kind == "rect_duct"
+    assert validation["obstacle_velocity_deficit"] > 0.0
+    assert validation["current_proxy_peak"] > 0.0
     assert isinstance(validation["validation_pass"], bool)
 
 

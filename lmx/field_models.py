@@ -28,6 +28,29 @@ def make_divergence_free_cross_section_field(
     return field
 
 
+def make_localized_divergence_free_obstacle_field(
+    *,
+    width: float,
+    height: float,
+    base_bz: float,
+    core_fraction_y: float = 0.35,
+    core_fraction_z: float = 0.35,
+):
+    """Return a localized divergence-free field with a central Bz-dominant obstacle."""
+
+    ay = max(0.5 * width * core_fraction_y, 1.0e-6)
+    az = max(0.5 * height * core_fraction_z, 1.0e-6)
+
+    def field(y: jnp.ndarray, z: jnp.ndarray) -> jnp.ndarray:
+        gaussian = jnp.exp(-((y / ay) ** 2 + (z / az) ** 2))
+        by = 2.0 * base_bz * y * z * gaussian / (az**2)
+        bz = base_bz * gaussian * (1.0 - 2.0 * (y / ay) ** 2)
+        bx = jnp.zeros_like(by)
+        return jnp.stack([bx, by, bz], axis=-1)
+
+    return field
+
+
 def sample_cross_section_field(
     field_fn,
     *,

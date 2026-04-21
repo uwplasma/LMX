@@ -708,6 +708,30 @@ def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "variable_field_extruded_summary.json").exists()
 
 
+def test_variable_field_layered_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("variable_field_layered_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NY = 16
+    module.NZ = 16
+    module.NX_STATIONS = 9
+    summary = module.run_variable_field_layered_demo()
+    assert summary["case"] == "variable_field_layered"
+    assert (tmp_path / "extruded_overview.png").exists()
+    assert (tmp_path / "variable_field_layered_summary.json").exists()
+
+
+def test_variable_field_bent_pipe_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("variable_field_bent_pipe_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NR = 8
+    module.NTHETA = 16
+    module.NX_STATIONS = 9
+    summary = module.run_variable_field_bent_pipe_demo()
+    assert summary["case"] == "variable_field_bent_pipe"
+    assert (tmp_path / "bent_pipe_overview.png").exists()
+    assert (tmp_path / "variable_field_bent_pipe_summary.json").exists()
+
+
 def test_q2d_decay_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_decay_validation.py")
     module.OUTPUT_DIR = tmp_path
@@ -719,6 +743,31 @@ def test_q2d_decay_validation_writes_summary(tmp_path: Path):
     assert summary["validation"]["validation_pass"] is True
     assert (tmp_path / "q2d_decay_overview.png").exists()
     assert (tmp_path / "q2d_decay_validation_summary.json").exists()
+
+
+def test_q2d_forced_validation_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2d_forced_validation.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NX = 48
+    module.NY = 48
+    module.T_FINAL = 0.08
+    summary = module.run_q2d_forced_validation()
+    assert summary["case"] == "q2d_forced_validation"
+    assert summary["validation"]["validation_pass"] is True
+    assert (tmp_path / "q2d_forced_overview.png").exists()
+    assert (tmp_path / "q2d_forced_validation_summary.json").exists()
+
+
+def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
+    module = _load_example_module("magnetic_obstacle_baseline.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NY = 16
+    module.NZ = 16
+    module.NX_STATIONS = 9
+    summary = module.run_magnetic_obstacle_baseline()
+    assert summary["case"] == "magnetic_obstacle_baseline"
+    assert (tmp_path / "extruded_overview.png").exists()
+    assert (tmp_path / "magnetic_obstacle_baseline_summary.json").exists()
 
 
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):

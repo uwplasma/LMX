@@ -213,8 +213,14 @@ Current status:
   `build_variable_field_duct_extruded_problem(...)`,
   `validate_variable_field_extruded_solution(...)`, and
   `examples/variable_field_extruded_demo.py`
+- layered and curved-pipe extensions now also exist through
+  `build_variable_field_layered_extruded_problem(...)`,
+  `build_variable_field_pipe_ogrid_extruded_problem(...)`,
+  `build_variable_field_bent_pipe_extruded_problem(...)`, and the paired
+  example drivers
 - the remaining work is full generic 3D/tabulated field support through the
-  fringing and CLI lanes, plus pipe/bent-pipe variable-field validation
+  fringing and CLI lanes, plus broader parity-grade validation on those new
+  geometries
 
 ### Literature-anchored benchmark expansion
 
@@ -255,6 +261,35 @@ Current Benchmark C baseline:
 - remaining work before any turbulent Benchmark C claim:
   Q2D duct forcing, wall/friction closures closer to Sommeria-Moreau, and
   literature-anchored turbulent observables
+
+Current forced Benchmark C slice:
+
+- `examples/q2d_forced_validation.py` now adds the first forced Q2D duct
+  validation problem
+- observables:
+  steady-state `L2/L∞` error and amplitude error against the analytic forced
+  solution
+- remaining work before any turbulent Benchmark C claim:
+  wall-bounded Q2D duct forcing, closure terms closer to the Sommeria-Moreau
+  model, and literature-anchored turbulent observables
+- current bounded result from `examples/q2d_forced_validation.py`:
+  `l2_error ≈ 4.44e-4`, `linf_error ≈ 4.44e-4`,
+  `steady_amplitude_rel_error ≈ 4.44e-4`
+
+Current first Benchmark D slice:
+
+- `examples/magnetic_obstacle_baseline.py` now provides the first executable
+  magnetic-obstacle baseline on the rectangular extruded lane
+- observables:
+  obstacle-induced velocity deficit, current response, and conservation metrics
+- remaining work before any full Benchmark D claim:
+  stronger-inertia obstacle regimes, literature parity on magnetic-obstacle
+  observables, and truly turbulent 3D validation
+- current bounded result from `examples/magnetic_obstacle_baseline.py`:
+  `obstacle_velocity_deficit ≈ 8.57e-8`,
+  `current_proxy_peak ≈ 1.06e-1`,
+  `field_velocity_correlation ≈ -5.16e-1`,
+  `max_charge_balance_residual ≈ 5.36e-7`
 
 ## Parallelization work required before manuscript closeout
 

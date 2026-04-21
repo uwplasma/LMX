@@ -56,7 +56,11 @@ python examples/bent_pipe_preview.py
 python examples/bent_pipe_inductionless_demo.py
 python examples/variable_field_validation.py
 python examples/variable_field_extruded_demo.py
+python examples/variable_field_layered_demo.py
+python examples/variable_field_bent_pipe_demo.py
 python examples/q2d_decay_validation.py
+python examples/q2d_forced_validation.py
+python examples/magnetic_obstacle_baseline.py
 ```
 
 ## Input-file examples
@@ -254,6 +258,19 @@ That example extends the field-QA lane into an actual 3D solve:
 - write the field preview and extruded overview plots
 - record field-divergence and 3D conservation metrics in one summary
 
+Variable-field layered duct and curved pipe:
+
+```bash
+python examples/variable_field_layered_demo.py
+python examples/variable_field_bent_pipe_demo.py
+```
+
+Those examples extend the same field API into:
+
+- layered ducts with wall materials retained in the 3D solve
+- curved pipes validated against the straight-pipe low-De limit under the same field
+- reusable machine-readable summaries of field and conservation metrics
+
 Benchmark C / Q2D baseline:
 
 ```bash
@@ -265,6 +282,30 @@ That example is the first executable Benchmark C slice:
 - solve a periodic quasi-2D Hartmann-friction decay problem
 - compare the numerical final state against the analytic decay
 - write a compact validation figure and summary JSON
+
+Forced Benchmark C / Q2D duct:
+
+```bash
+python examples/q2d_forced_validation.py
+```
+
+That example upgrades the Q2D lane from decay-only to a forced duct baseline:
+
+- solve a periodic Hartmann-friction mode driven toward a steady state
+- compare the steady state and approach-to-steady-state against the analytic solution
+- write a compact validation figure and summary JSON
+
+First Benchmark D slice:
+
+```bash
+python examples/magnetic_obstacle_baseline.py
+```
+
+That example is the first executable magnetic-obstacle baseline:
+
+- solve a rectangular extruded duct with a localized analytic magnetic obstacle
+- write the full extruded overview panel
+- record obstacle-induced velocity deficit, current response, and conservation metrics
 
 Importable plotting API:
 
