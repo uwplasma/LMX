@@ -625,6 +625,47 @@ def test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid():
     assert diagonal[2, 2] == pytest.approx(4.0 * expected)
 
 
+def test_fully_developed_rhs_uses_lorentz_source_only_inside_fluid(monkeypatch: pytest.MonkeyPatch):
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    fluid_mask = jnp.asarray(
+        [
+            [False, False, False, False],
+            [False, True, True, False],
+            [False, True, True, False],
+            [False, False, False, False],
+        ]
+    )
+    sigma = jnp.ones(mesh.yz_shape)
+    rho = jnp.ones(mesh.yz_shape) * 2.0
+    u = jnp.zeros(mesh.yz_shape)
+    phi = jnp.zeros(mesh.yz_shape)
+    by = jnp.zeros(mesh.yz_shape)
+    bz = jnp.ones(mesh.yz_shape)
+    lorentz = jnp.arange(mesh.ny * mesh.nz, dtype=float).reshape(mesh.yz_shape)
+
+    monkeypatch.setattr(
+        solvers,
+        "_compute_current_and_lorentz",
+        lambda *args, **kwargs: (jnp.zeros_like(lorentz), jnp.zeros_like(lorentz), lorentz),
+    )
+
+    rhs, lorentz_source = solvers._fully_developed_rhs(
+        mesh=mesh,
+        sigma=sigma,
+        rho=rho,
+        fluid_mask=fluid_mask,
+        u=u,
+        phi=phi,
+        by=by,
+        bz=bz,
+        forcing=jnp.asarray(0.5),
+    )
+
+    assert jnp.allclose(lorentz_source, lorentz)
+    assert jnp.allclose(rhs[~fluid_mask], 0.0)
+    assert jnp.allclose(rhs[fluid_mask], (0.5 + lorentz[fluid_mask]) / 2.0)
+
+
 def test_interface_and_face_conductances_match_uniform_rect_grid_symmetry():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     sigma = jnp.ones((4, 4))
@@ -645,6 +686,40 @@ def test_interface_and_face_conductances_match_uniform_rect_grid_symmetry():
     assert east[1, 2] == pytest.approx(expected / mesh.dy[1])
     assert south[2, 2] == pytest.approx(expected / mesh.dz[2])
     assert north[2, 1] == pytest.approx(expected / mesh.dz[1])
+
+
+def test_solve_velocity_system_returns_zero_outside_active_mask():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
+    diffusivity = jnp.ones(mesh.yz_shape) * 0.1
+    reaction = jnp.ones(mesh.yz_shape) * 0.05
+    rhs = jnp.ones(mesh.yz_shape)
+    active_mask = jnp.asarray(
+        [
+            [False, False, False, False],
+            [False, True, True, False],
+            [False, True, True, False],
+            [False, False, False, False],
+        ]
+    )
+
+    field, residual, iterations, initial_residual = solvers._solve_velocity_system(
+        mesh=mesh,
+        diffusivity=diffusivity,
+        reaction=reaction,
+        rhs=rhs,
+        active_mask=active_mask,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        max_steps=64,
+        tolerance=1.0e-10,
+    )
+
+    assert field.shape == mesh.yz_shape
+    assert jnp.allclose(field[~active_mask], 0.0)
+    assert jnp.all(jnp.isfinite(field))
+    assert float(residual) >= 0.0
+    assert int(iterations) >= 0
+    assert float(initial_residual) >= 0.0
 
 
 def test_velocity_system_coefficients_cover_connected_and_boundary_fallback_paths():
