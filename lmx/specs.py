@@ -8,7 +8,7 @@ import jax.numpy as jnp
 
 
 RegionKind = Literal["fluid", "solid"]
-GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid"]
+GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid", "bent_pipe"]
 SolverKind = Literal["fully_developed_inductionless", "extruded_inductionless"]
 SolveMode = Literal["steady", "transient"]
 BoundaryKind = Literal[
@@ -122,6 +122,8 @@ class GeometrySpec:
     ny: int = 64
     nz: int = 64
     radius: float | None = None
+    bend_radius: float | None = None
+    bend_angle: float | None = None
     nr: int | None = None
     ntheta: int | None = None
     wall_thickness: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)

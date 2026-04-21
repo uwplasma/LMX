@@ -656,8 +656,28 @@ def test_geometry_panel_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("geometry_panel_demo.py")
     summary = module.run_geometry_panel_demo(out_dir=tmp_path)
     assert summary["case"] == "geometry_panel_demo"
+    assert "bent_pipe" in summary["geometries"]
     assert (tmp_path / "geometry_gallery.png").exists()
     assert (tmp_path / "geometry_panel_summary.json").exists()
+
+
+def test_bent_pipe_preview_writes_summary(tmp_path: Path):
+    module = _load_example_module("bent_pipe_preview.py")
+    monkeypatch_output = tmp_path
+    module.OUTPUT_DIR = monkeypatch_output
+    summary = module.run_bent_pipe_preview()
+    assert summary["geometry_kind"] == "bent_pipe"
+    assert (tmp_path / "geometry_preview.png").exists()
+    assert (tmp_path / "bent_pipe_preview_summary.json").exists()
+
+
+def test_variable_field_validation_writes_summary(tmp_path: Path):
+    module = _load_example_module("variable_field_validation.py")
+    module.OUTPUT_DIR = tmp_path
+    summary = module.run_variable_field_validation()
+    assert summary["case"] == "variable_field_validation"
+    assert (tmp_path / "field_preview.png").exists()
+    assert (tmp_path / "field_divergence_metrics.json").exists()
 
 
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):

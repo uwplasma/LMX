@@ -14,6 +14,8 @@ The examples are explicit templates for research workflows. They show how to:
 - stage fringing-field benchmark workflows for the next solver family
 - prescribe variable magnetic fields directly from Python
 - customize geometry objects before a solve and preview them in 3D
+- preview bent-pipe geometries before solver support lands
+- validate analytic cross-sectional magnetic fields before using them in runs
 
 ## Quick examples
 
@@ -50,6 +52,8 @@ python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --
 python examples/geometry_panel_demo.py --output ./artifacts/examples/geometry_panel
 python examples/pipe_reference_comparison_demo.py --output ./artifacts/examples/pipe_reference_comparison
 python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
+python examples/bent_pipe_preview.py
+python examples/variable_field_validation.py
 ```
 
 ## Input-file examples
@@ -195,6 +199,31 @@ That example is the clearest Python-native template for users who want to:
 - preview the resulting geometry before running
 - run a short solve and emit the same plots and JSON summaries used elsewhere
 - use LMX as a programmable research driver instead of only through TOML files
+
+Bent-pipe preview:
+
+```bash
+python examples/bent_pipe_preview.py
+```
+
+That example is the preprocessing template for the curved-pipe lane:
+
+- build a mapped constant-radius bend directly from Python
+- write `PNG`/`PDF` previews of the curved centerline and cross-sections
+- record the mesh parameters that should be reused when the bent-pipe solver lane is added
+
+Variable-field validation:
+
+```bash
+python examples/variable_field_validation.py
+```
+
+That example is the smallest field-QA workflow:
+
+- build an analytic divergence-free cross-sectional magnetic field
+- sample it on a research-sized grid
+- write component and magnitude plots
+- record finite-difference divergence metrics before using that field in a solve
 
 Importable plotting API:
 

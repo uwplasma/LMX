@@ -337,3 +337,48 @@ def generate_pipe_ogrid_mesh(
         geometry="pipe_ogrid",
         point_coordinates=point_coordinates,
     )
+
+
+def generate_bent_pipe_mesh(
+    *,
+    tube_radius: float,
+    bend_radius: float,
+    bend_angle: float = 0.5 * pi,
+    nx: int = 24,
+    nr: int = 24,
+    ntheta: int = 64,
+) -> StructuredMesh:
+    arc_length = bend_radius * bend_angle
+    s_faces = jnp.linspace(0.0, arc_length, nx + 1)
+    r_faces = _clustered_segment(0.0, tube_radius, nr, beta=2.0)
+    theta_faces = jnp.linspace(0.0, 2.0 * pi, ntheta + 1)
+
+    points = []
+    for s in s_faces:
+        phi = float(bend_angle * s / max(arc_length, 1.0e-12))
+        center = jnp.asarray(
+            [
+                bend_radius * sin(phi),
+                bend_radius * (1.0 - cos(phi)),
+                0.0,
+            ],
+            dtype=float,
+        )
+        tangent = jnp.asarray([cos(phi), sin(phi), 0.0], dtype=float)
+        normal = jnp.asarray([-sin(phi), cos(phi), 0.0], dtype=float)
+        binormal = jnp.asarray([0.0, 0.0, 1.0], dtype=float)
+        _ = tangent  # documents local frame construction for future solver work
+        for r in r_faces:
+            for theta in theta_faces:
+                offset = float(r) * cos(theta) * normal + float(r) * sin(theta) * binormal
+                xyz = center + offset
+                points.append((float(xyz[0]), float(xyz[1]), float(xyz[2])))
+
+    point_coordinates = jnp.asarray(points).reshape((nx + 1, nr + 1, ntheta + 1, 3))
+    return StructuredMesh(
+        x_faces=s_faces,
+        y_faces=r_faces,
+        z_faces=theta_faces,
+        geometry="bent_pipe",
+        point_coordinates=point_coordinates,
+    )

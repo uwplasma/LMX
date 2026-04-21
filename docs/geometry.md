@@ -13,6 +13,10 @@ mesh APIs:
   - a mapped structured O-grid around a circular core
   - currently used for geometry preview, postprocessing, and the first
     fringing-field `extruded_inductionless` pipe slice
+- `bent_pipe`
+  - a centerline-following mapped pipe around a constant-radius bend
+  - currently used for preprocessing, geometry preview, and upcoming
+    curved-pipe benchmark preparation
 
 ## Geometry objects in the source tree
 
@@ -36,7 +40,7 @@ The geometry configuration enters the code through:
 from dataclasses import replace
 
 from lmx.cases import make_hartmann_case, make_hunt_case
-from lmx.mesh import generate_pipe_ogrid_mesh
+from lmx.mesh import generate_bent_pipe_mesh, generate_pipe_ogrid_mesh
 from lmx.solvers import _build_mesh
 
 hartmann_case = make_hartmann_case(ha=20.0, ny=48, nz=48)
@@ -50,6 +54,7 @@ custom_hartmann = replace(
 hartmann_mesh = _build_mesh(custom_hartmann)
 hunt_mesh = _build_mesh(hunt_case)
 pipe_mesh = generate_pipe_ogrid_mesh(radius=0.5, length=2.0, nx=16, nr=18, ntheta=48)
+bent_pipe_mesh = generate_bent_pipe_mesh(tube_radius=0.25, bend_radius=1.0, bend_angle=1.2, nx=18, nr=16, ntheta=48)
 ```
 
 That is the intended route for variable-geometry studies. The benchmark helpers
@@ -59,8 +64,9 @@ resulting research driver explicit.
 ## Variable magnetic fields from Python
 
 Analytic spatially varying magnetic fields are currently configured from Python,
-not from TOML. The public example for that workflow is
-`examples/variable_field_geometry_demo.py`.
+not from TOML. The public examples for that workflow are
+`examples/variable_field_geometry_demo.py` and
+`examples/variable_field_validation.py`.
 
 ```python
 from dataclasses import replace
@@ -86,6 +92,7 @@ This route is the current way to explore:
 - parameterized field maps in inverse-design studies
 - custom benchmark variants that are easier to define as Python callables than
   as table files
+- divergence checks on analytic fields before they are used in a solve
 
 ## Preview geometries before running
 
@@ -95,6 +102,7 @@ drivers in:
 - `examples/geometry_preview_demo.py`
 - `examples/variable_field_geometry_demo.py`
 - `examples/geometry_panel_demo.py`
+- `examples/bent_pipe_preview.py`
 - `examples/readme_showcase_demo.py`
 
 ```bash
@@ -102,6 +110,7 @@ python examples/geometry_preview_demo.py --output artifacts/examples/geometry_pr
 python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
 python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
 python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
+python examples/bent_pipe_preview.py
 python examples/readme_showcase_demo.py --output docs/_static/generated
 # optional Hartmann alternative for wall-layer startup media
 python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
@@ -113,6 +122,7 @@ Those drivers write:
 
 - cross-sectional material maps
 - 3D wireframe previews of the extruded mesh
+- centerline-following previews for bent pipes
 - `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
   - README-ready media, including bounded 2D/3D startup GIFs
@@ -130,6 +140,8 @@ Current geometry panel:
 - use explicit `wall_cells` and nonzero `wall_thickness` for `layered_duct`
 - use `pipe_ogrid` for preprocessing, visualization, and the current first
   fringing `extruded_inductionless` pipe slice
+- use `bent_pipe` for preprocessing and geometry QA before the curved-pipe
+  solver lane is added
 - use the metrics from `lmx/validation.py`, especially
   `duct_layer_resolution_metrics(...)`, to quantify whether the side and
   Hartmann layers are resolved enough for a benchmark-quality run

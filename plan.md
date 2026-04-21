@@ -165,6 +165,13 @@ Required validation work:
 - nonuniform/fringing-field bent-pipe case
 - mesh-convergence study on curvature, pressure span, and current closure
 
+Current status:
+
+- public bent-pipe preprocessing support now exists through
+  `generate_bent_pipe_mesh(...)`
+- preview/QA examples now exist for the curved-centerline geometry lane
+- the remaining work is solver-side, not geometry-construction-side
+
 #### Spatially varying magnetic fields
 
 Required implementation work:
@@ -180,6 +187,15 @@ Required validation work:
 - recovery of the existing fringing benchmarks using the generic field path
 - variable-field duct studies where pressure span, flow-rate distortion, and
   current closure are compared under mesh refinement
+
+Current status:
+
+- reusable analytic divergence-free cross-sectional field builders and
+  finite-difference divergence checks are now in the public API
+- example workflows now cover both geometry-plus-solve field usage and pure
+  field QA before a solve
+- the remaining work is full executable support for generic 3D/tabulated field
+  maps through the fringing and CLI lanes
 
 ### Literature-anchored benchmark expansion
 

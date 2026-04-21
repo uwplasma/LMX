@@ -14,7 +14,7 @@ differentiable workflows for sensitivity analysis and inverse design.
 ## Why use LMX
 
 - Fully developed Hartmann, Shercliff, and Hunt workflows
-- Rectangular, layered, and mapped-pipe geometry support
+- Rectangular, layered, mapped-pipe, and bent-pipe geometry support
 - JAX-based CPU and GPU execution
 - Explicit conservation diagnostics for charge closure and boundary-current audits
 - Input-file and Python-driver workflows
@@ -115,6 +115,8 @@ plasma background is needed to read the figures:
 - a `layered_duct` adds wall materials around that channel so conducting and
   insulating walls can be represented explicitly
 - a `pipe_ogrid` is the same idea in a circular pipe with an O-grid mesh
+- a `bent_pipe` is the same mapped-pipe cross-section carried along a curved
+  centerline for preprocessing and upcoming curved-pipe studies
 
 The two most important benchmark ideas in the README are:
 

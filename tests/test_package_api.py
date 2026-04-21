@@ -3,6 +3,7 @@ import lmx
 
 def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.generate_rect_duct_mesh)
+    assert callable(lmx.generate_bent_pipe_mesh)
     assert callable(lmx.enable_compilation_cache)
     assert callable(lmx.load_fringing_pipe_profile)
     assert callable(lmx.load_shercliff_analytical)
@@ -39,6 +40,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_extruded_overview_plots)
     assert callable(lmx.write_geometry_gallery_plots)
     assert callable(lmx.write_geometry_preview_plots)
+    assert callable(lmx.write_cross_section_field_plots)
     assert callable(lmx.write_transient_movies)
     assert callable(lmx.write_strong_scaling_plots)
     assert callable(lmx.write_autodiff_plots)
@@ -50,6 +52,8 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_velocity_profile_volume_figure)
     assert callable(lmx.write_closed_channel_profile_comparison_figure)
     assert callable(lmx.write_closed_channel_startup_movies)
+    assert callable(lmx.make_divergence_free_cross_section_field)
+    assert callable(lmx.cross_section_divergence_metrics)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__
     assert "write_case_overview_plots" in lmx.__all__

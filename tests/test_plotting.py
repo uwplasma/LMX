@@ -13,6 +13,7 @@ from lmx.plotting import (
     _safe_writer_candidates,
     write_autodiff_plots,
     write_case_overview_plots,
+    write_cross_section_field_plots,
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
     write_strong_scaling_plots,
@@ -327,5 +328,16 @@ def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
     )
 
     assert outputs == [tmp_path / "autodiff_summary.png", tmp_path / "autodiff_summary.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_cross_section_field_plots_writes_png_and_pdf(tmp_path: Path):
+    y = np.linspace(-1.0, 1.0, 9)
+    z = np.linspace(-1.0, 1.0, 11)
+    yy, zz = np.meshgrid(y, z, indexing="ij")
+    field = np.stack([np.zeros_like(yy), 0.2 * yy, 1.0 + 0.1 * zz], axis=-1)
+    outputs = write_cross_section_field_plots(y=y, z=z, field=field, out_dir=tmp_path, title="Field preview")
+    assert outputs == [tmp_path / "field_preview.png", tmp_path / "field_preview.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()

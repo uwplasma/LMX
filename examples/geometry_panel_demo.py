@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from lmx.mesh import generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
+from lmx.mesh import generate_bent_pipe_mesh, generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
 from lmx.plotting import write_geometry_gallery_plots
 
 
@@ -23,12 +23,14 @@ def run_geometry_panel_demo(*, out_dir: Path) -> dict[str, object]:
         wall_cells=(2, 2, 1, 1),
     )
     pipe_mesh = generate_pipe_ogrid_mesh(radius=0.5, length=2.0, nx=12, nr=18, ntheta=48)
+    bent_pipe_mesh = generate_bent_pipe_mesh(tube_radius=0.28, bend_radius=1.1, bend_angle=1.2, nx=16, nr=16, ntheta=48)
 
     outputs = write_geometry_gallery_plots(
         [
             ("Rectangular duct", rect_mesh, rect_mesh.fluid_mask),
             ("Layered duct", layered_mesh, layered_mesh.fluid_mask),
             ("Mapped pipe O-grid", pipe_mesh, pipe_mesh.fluid_mask),
+            ("Bent pipe", bent_pipe_mesh, bent_pipe_mesh.fluid_mask),
         ],
         out_dir,
         title="LMX geometry panel",
@@ -41,6 +43,7 @@ def run_geometry_panel_demo(*, out_dir: Path) -> dict[str, object]:
             "rect_duct": {"nx": rect_mesh.nx, "ny": rect_mesh.ny, "nz": rect_mesh.nz},
             "layered_duct": {"nx": layered_mesh.nx, "ny": layered_mesh.ny, "nz": layered_mesh.nz},
             "pipe_ogrid": {"nx": pipe_mesh.nx, "nr": pipe_mesh.ny, "ntheta": pipe_mesh.nz},
+            "bent_pipe": {"nx": bent_pipe_mesh.nx, "nr": bent_pipe_mesh.ny, "ntheta": bent_pipe_mesh.nz},
         },
     }
     (out_dir / "geometry_panel_summary.json").write_text(json.dumps(summary, indent=2) + "\n")

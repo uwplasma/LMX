@@ -879,6 +879,61 @@ def write_geometry_gallery_plots(
     return [png_path, pdf_path]
 
 
+def write_cross_section_field_plots(
+    *,
+    y: np.ndarray,
+    z: np.ndarray,
+    field: np.ndarray,
+    out_dir: str | Path,
+    title: str,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    yy, zz = np.meshgrid(y, z, indexing="ij")
+    bx = field[..., 0]
+    by = field[..., 1]
+    bz = field[..., 2]
+    bmag = np.sqrt(np.sum(field**2, axis=-1))
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 9.0), constrained_layout=True)
+    fig.suptitle(title, fontsize=18)
+    panels = [
+        (by, r"$B_y$", "PuOr_r"),
+        (bz, r"$B_z$", "RdBu_r"),
+        (bmag, r"$|B|$", "viridis"),
+    ]
+    for ax, (values, label, cmap) in zip(axes.ravel()[:3], panels, strict=True):
+        image = ax.pcolormesh(z, y, values, shading="auto", cmap=cmap)
+        ax.set_xlabel("z")
+        ax.set_ylabel("y")
+        ax.set_aspect("equal")
+        ax.set_title(label)
+        plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+    axq = axes.ravel()[3]
+    stride_y = max(1, len(y) // 20)
+    stride_z = max(1, len(z) // 20)
+    axq.quiver(
+        zz[::stride_y, ::stride_z],
+        yy[::stride_y, ::stride_z],
+        bz[::stride_y, ::stride_z],
+        by[::stride_y, ::stride_z],
+        color="#0f172a",
+        pivot="mid",
+        scale=max(float(np.max(bmag)), 1.0e-12) * 18.0,
+    )
+    axq.set_title("Transverse field directions")
+    axq.set_xlabel("z")
+    axq.set_ylabel("y")
+    axq.set_aspect("equal")
+    png = out_dir / "field_preview.png"
+    pdf = out_dir / "field_preview.pdf"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    return [png, pdf]
+
+
 def _centers_to_edges(values: np.ndarray) -> np.ndarray:
     if values.size <= 1:
         delta = 0.5
@@ -926,7 +981,8 @@ def _draw_geometry_preview(
             ax2d.plot(section[radial_index, :, 1], section[radial_index, :, 2], color="#1d4ed8", linewidth=0.8, alpha=0.9)
         for theta_index in range(0, section.shape[1], stride_theta):
             ax2d.plot(section[:, theta_index, 1], section[:, theta_index, 2], color="#b45309", linewidth=0.7, alpha=0.8)
-        ax2d.set_title(f"{case_title}\nPipe cross-section")
+        cross_section_label = "Bent-pipe cross-section" if mesh.geometry == "bent_pipe" else "Pipe cross-section"
+        ax2d.set_title(f"{case_title}\n{cross_section_label}")
         ax2d.set_xlabel("y")
         ax2d.set_ylabel("z")
         ax2d.set_aspect("equal")
@@ -934,7 +990,7 @@ def _draw_geometry_preview(
         ax2d.text(
             0.02,
             0.98,
-            "O-grid lines follow r and θ",
+            "O-grid lines follow r and θ" if mesh.geometry != "bent_pipe" else "Mapped bend section in local r, θ",
             transform=ax2d.transAxes,
             ha="left",
             va="top",
@@ -1002,7 +1058,8 @@ def _draw_geometry_preview(
             "flow",
             color="#111827",
         )
-        ax3d.set_title(f"{case_title}\nPipe domain")
+        domain_label = "Bent-pipe domain" if mesh.geometry == "bent_pipe" else "Pipe domain"
+        ax3d.set_title(f"{case_title}\n{domain_label}")
         view_elev = 18
         view_azim = -52
     else:

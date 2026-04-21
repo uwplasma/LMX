@@ -9,6 +9,7 @@ __all__ = [
     "benchmark_solver",
     "compare_with_reference_outputs",
     "generate_layered_duct_mesh",
+    "generate_bent_pipe_mesh",
     "generate_pipe_ogrid_mesh",
     "generate_rect_duct_mesh",
     "enable_compilation_cache",
@@ -58,6 +59,7 @@ __all__ = [
     "write_extruded_overview_plots",
     "write_geometry_gallery_plots",
     "write_geometry_preview_plots",
+    "write_cross_section_field_plots",
     "write_transient_movies",
     "write_strong_scaling_plots",
     "write_autodiff_plots",
@@ -77,6 +79,10 @@ __all__ = [
     "run_fringing_station_sweep",
     "solve_extruded_inductionless",
     "validate_extruded_inductionless_solution",
+    "make_divergence_free_cross_section_field",
+    "sample_cross_section_field",
+    "cross_section_divergence_metrics",
+    "save_cross_section_divergence_report",
 ]
 
 
@@ -90,6 +96,7 @@ _EXPORTS = {
     "run_theory_meeting_demo": ("lmx.example_runner", "run_theory_meeting_demo"),
     "solve_case_snapshots": ("lmx.example_runner", "solve_case_snapshots"),
     "generate_layered_duct_mesh": ("lmx.mesh", "generate_layered_duct_mesh"),
+    "generate_bent_pipe_mesh": ("lmx.mesh", "generate_bent_pipe_mesh"),
     "generate_pipe_ogrid_mesh": ("lmx.mesh", "generate_pipe_ogrid_mesh"),
     "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
     "enable_compilation_cache": ("lmx.jax_setup", "enable_compilation_cache"),
@@ -133,6 +140,7 @@ _EXPORTS = {
     "write_extruded_overview_plots": ("lmx.plotting", "write_extruded_overview_plots"),
     "write_geometry_gallery_plots": ("lmx.plotting", "write_geometry_gallery_plots"),
     "write_geometry_preview_plots": ("lmx.plotting", "write_geometry_preview_plots"),
+    "write_cross_section_field_plots": ("lmx.plotting", "write_cross_section_field_plots"),
     "write_transient_movies": ("lmx.plotting", "write_transient_movies"),
     "write_strong_scaling_plots": ("lmx.plotting", "write_strong_scaling_plots"),
     "write_autodiff_plots": ("lmx.plotting", "write_autodiff_plots"),
@@ -152,6 +160,10 @@ _EXPORTS = {
     "run_fringing_station_sweep": ("lmx.fringing", "run_fringing_station_sweep"),
     "solve_extruded_inductionless": ("lmx.fringing", "solve_extruded_inductionless"),
     "validate_extruded_inductionless_solution": ("lmx.fringing", "validate_extruded_inductionless_solution"),
+    "make_divergence_free_cross_section_field": ("lmx.field_models", "make_divergence_free_cross_section_field"),
+    "sample_cross_section_field": ("lmx.field_models", "sample_cross_section_field"),
+    "cross_section_divergence_metrics": ("lmx.field_models", "cross_section_divergence_metrics"),
+    "save_cross_section_divergence_report": ("lmx.field_models", "save_cross_section_divergence_report"),
 }
 
 
