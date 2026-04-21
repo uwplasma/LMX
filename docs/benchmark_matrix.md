@@ -277,12 +277,22 @@ Two capability lanes should be treated as explicit benchmark projects rather
 than as ad hoc feature work:
 
 - bent-pipe geometry
-  - baseline: no-field Dean-flow verification
+  - baseline: low-De inductionless straight-pipe-equivalence verification
+    using `examples/bent_pipe_inductionless_demo.py`
   - inductionless extension: uniform-field bent pipe
   - nonuniform-field extension: fringing-field bent pipe
   - required observables:
-    pressure span, secondary-flow structure, current closure, and mesh
-    convergence with curvature
+    low-De profile equivalence, pressure span, secondary-flow structure,
+    current closure, and mesh convergence with curvature
+
+Current bounded low-De baseline:
+
+- `Ha = 20`, `R = 0.45`, `R_c = 3.6`, `15 × 18 × 40`
+- `De ≈ 5.19e-7`
+- `cross_section_l2_error = 0`
+- `centerline_l2_error = 0`
+- `max_charge_balance_residual ≈ 2.15e-2`
+- `volumetric_flow_rate_span ≈ 1.14e-9`
 - spatially varying magnetic fields
   - baseline: manufactured divergence-free field verification
   - recovery test: reproduce the current fringing benchmarks through the

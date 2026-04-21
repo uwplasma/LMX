@@ -18,7 +18,7 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
 
 from .core import Solution
-from .mesh import StructuredMesh
+from .mesh import StructuredMesh, generate_bent_pipe_mesh
 from .validation import hartmann_analytic_profile
 from .validation import extract_midplane_profile
 
@@ -928,6 +928,135 @@ def write_cross_section_field_plots(
     axq.set_aspect("equal")
     png = out_dir / "field_preview.png"
     pdf = out_dir / "field_preview.pdf"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    return [png, pdf]
+
+
+def write_bent_pipe_overview_plots(
+    solution,
+    out_dir: Path,
+    *,
+    straight_solution=None,
+    title: str = "LMX bent-pipe inductionless baseline",
+) -> list[Path]:
+    geometry = solution.problem.case.geometry
+    if geometry.kind != "bent_pipe":
+        raise ValueError("Bent-pipe overview plots require a bent_pipe solution")
+
+    mesh = generate_bent_pipe_mesh(
+        tube_radius=geometry.radius or 0.5 * geometry.width,
+        bend_radius=geometry.bend_radius or max(geometry.length, geometry.width),
+        bend_angle=geometry.bend_angle or (0.5 * np.pi),
+        nx=geometry.nx,
+        nr=geometry.nr or geometry.ny,
+        ntheta=geometry.ntheta or geometry.nz,
+    )
+    points = np.asarray(mesh.point_coordinates, dtype=float)
+    bundle = solution.bundle
+    mid_index = int(bundle.u.shape[0] // 2)
+    u_mid = np.asarray(bundle.u[mid_index], dtype=float)
+    x_hist = np.asarray(bundle.x, dtype=float)
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    charge_balance = np.asarray(bundle.charge_balance_residual, dtype=float)
+    r_faces = np.asarray(mesh.y_faces, dtype=float)
+    theta_faces = np.asarray(mesh.z_faces, dtype=float)
+    yy = r_faces[:, None] * np.cos(theta_faces[None, :])
+    zz = r_faces[:, None] * np.sin(theta_faces[None, :])
+    u_peak = max(float(np.max(np.abs(u_mid))), 1.0e-12)
+    u_mid_display = u_mid / u_peak
+    mean_velocity_display = mean_velocity / max(float(np.max(np.abs(mean_velocity))), 1.0e-12)
+    norm = colors.Normalize(vmin=0.0, vmax=1.0)
+    cmap = plt.get_cmap("coolwarm")
+
+    _set_plot_style()
+    fig = plt.figure(figsize=(13.0, 9.2), constrained_layout=True)
+    grid = fig.add_gridspec(2, 2, height_ratios=(1.05, 1.0))
+    ax3d = fig.add_subplot(grid[0, 0], projection="3d")
+    ax_cross = fig.add_subplot(grid[0, 1])
+    ax_hist = fig.add_subplot(grid[1, 0])
+    ax_cmp = fig.add_subplot(grid[1, 1])
+    fig.suptitle(title, fontsize=18)
+
+    shell = points[:, -1, :, :]
+    ax3d.plot_surface(
+        shell[:, :, 0],
+        shell[:, :, 1],
+        shell[:, :, 2],
+        color="#cbd5e1",
+        alpha=0.14,
+        linewidth=0.0,
+        antialiased=False,
+        shade=False,
+    )
+    centerline = points[:, 0, 0, :]
+    ax3d.plot(centerline[:, 0], centerline[:, 1], centerline[:, 2], color="#111827", linewidth=2.0)
+    section = points[mid_index]
+    ax3d.plot_surface(
+        section[:, :, 0],
+        section[:, :, 1],
+        section[:, :, 2],
+        facecolors=cmap(norm(u_mid_display)),
+        linewidth=0.0,
+        antialiased=False,
+        shade=False,
+    )
+    ax3d.text(
+        float(centerline[mid_index, 0]),
+        float(centerline[mid_index, 1]),
+        float(centerline[mid_index, 2] + 1.35 * (geometry.radius or 0.5 * geometry.width)),
+        "mid-bend profile",
+        color="#111827",
+        fontsize=11,
+    )
+    ax3d.set_title("Curved centerline and local profile slab")
+    ax3d.set_xlabel("x")
+    ax3d.set_ylabel("y")
+    ax3d.set_zlabel("z")
+    ax3d.view_init(elev=22, azim=-55)
+
+    image = ax_cross.pcolormesh(yy, zz, u_mid_display, shading="auto", cmap="coolwarm", vmin=0.0, vmax=1.0)
+    ax_cross.set_title("Mid-bend axial velocity")
+    ax_cross.set_xlabel("local y")
+    ax_cross.set_ylabel("local z")
+    ax_cross.set_aspect("equal")
+    fig.colorbar(image, ax=ax_cross, fraction=0.046, pad=0.04, label=r"$u/u_{peak}$")
+
+    ax_hist.plot(x_hist, field_scale, color="#1d4ed8", label=r"$B/B_{max}$")
+    ax_hist.plot(x_hist, mean_velocity_display, color="#0f766e", label=r"Mean velocity / peak")
+    ax_hist.set_title("Arc-length response")
+    ax_hist.set_xlabel("s")
+    ax_hist.set_ylabel("Response")
+    ax_hist.legend(loc="upper left")
+    ax_hist_right = ax_hist.twinx()
+    ax_hist_right.semilogy(
+        x_hist,
+        np.maximum(charge_balance, 1.0e-16),
+        color="#7c3aed",
+        linestyle="--",
+        label="Charge balance",
+    )
+    ax_hist_right.set_ylabel("Residual")
+
+    r_centers = np.asarray(bundle.y, dtype=float)
+    theta_index = 0
+    opposite = (theta_index + len(bundle.z) // 2) % len(bundle.z)
+    signed_r = np.concatenate([-r_centers[::-1], r_centers[1:]])
+    bent_cut = np.concatenate([u_mid[:, opposite][::-1], u_mid[1:, theta_index]])
+    ax_cmp.plot(signed_r, bent_cut / u_peak, color="#b91c1c", label="Bent-pipe baseline")
+    if straight_solution is not None:
+        straight_mid = np.asarray(straight_solution.bundle.u[mid_index], dtype=float)
+        straight_cut = np.concatenate([straight_mid[:, opposite][::-1], straight_mid[1:, theta_index]])
+        ax_cmp.plot(signed_r, straight_cut / u_peak, color="#111827", linestyle="--", label="Straight-pipe limit")
+    ax_cmp.set_title("Local centerline cut")
+    ax_cmp.set_xlabel("signed local radius")
+    ax_cmp.set_ylabel(r"$u/u_{peak}$")
+    ax_cmp.legend(loc="best")
+
+    png = out_dir / "bent_pipe_overview.png"
+    pdf = out_dir / "bent_pipe_overview.pdf"
     fig.savefig(png, bbox_inches="tight")
     fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)

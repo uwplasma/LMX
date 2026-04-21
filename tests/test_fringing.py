@@ -3,6 +3,7 @@ import pytest
 from dataclasses import replace
 
 from lmx.fringing import (
+    build_bent_pipe_extruded_problem,
     build_layered_duct_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
@@ -17,6 +18,7 @@ from lmx.fringing import (
     run_fringing_station_sweep,
     solve_extruded_inductionless,
     smooth_fringing_profile,
+    validate_bent_pipe_low_de_baseline,
     validate_extruded_inductionless_solution,
 )
 from lmx.specs import GeometrySpec
@@ -214,6 +216,14 @@ def test_build_pipe_ogrid_extruded_problem_marks_solver_family():
 
     assert problem.case.solver.kind == "extruded_inductionless"
     assert problem.case.geometry.kind == "pipe_ogrid"
+    assert problem.profile.x.shape == (5,)
+
+
+def test_build_bent_pipe_extruded_problem_marks_solver_family():
+    problem = build_bent_pipe_extruded_problem(nx_stations=5, nr=6, ntheta=12)
+
+    assert problem.case.solver.kind == "extruded_inductionless"
+    assert problem.case.geometry.kind == "bent_pipe"
     assert problem.profile.x.shape == (5,)
 
 
@@ -426,6 +436,36 @@ def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
     assert float(jnp.max(jnp.abs(solution.bundle.u[:, -1, :]))) > 0.0
     assert solution.validation.max_charge_balance_residual < 0.5
     assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
+
+
+def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle():
+    bent_problem = build_bent_pipe_extruded_problem(
+        ha_peak=6.0,
+        bend_radius=4.0,
+        bend_angle=1.0,
+        nx_stations=4,
+        nr=4,
+        ntheta=8,
+    )
+    straight_problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=6.0,
+        radius=float(bent_problem.case.geometry.radius),
+        length=float(bent_problem.case.geometry.length),
+        nx_stations=4,
+        nr=4,
+        ntheta=8,
+    )
+    straight_problem = replace(straight_problem, profile=bent_problem.profile)
+
+    bent_solution = solve_extruded_inductionless(bent_problem)
+    straight_solution = solve_extruded_inductionless(straight_problem)
+    validation = validate_bent_pipe_low_de_baseline(bent_solution, straight_solution)
+
+    assert bent_solution.bundle.geometry_kind == "bent_pipe"
+    assert jnp.isfinite(bent_solution.bundle.u).all()
+    assert validation["dean_number"] >= 0.0
+    assert validation["cross_section_l2_error"] <= 0.2
+    assert isinstance(validation["validation_pass"], bool)
 
 
 def test_poisson_helpers_can_stop_early():

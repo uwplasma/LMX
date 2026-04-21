@@ -12,6 +12,7 @@ from lmx.plotting import (
     _plot_field,
     _safe_writer_candidates,
     write_autodiff_plots,
+    write_bent_pipe_overview_plots,
     write_case_overview_plots,
     write_cross_section_field_plots,
     write_geometry_gallery_plots,
@@ -19,6 +20,7 @@ from lmx.plotting import (
     write_strong_scaling_plots,
     write_transient_movies,
 )
+from lmx.fringing import build_bent_pipe_extruded_problem, build_pipe_ogrid_extruded_problem, solve_extruded_inductionless
 from lmx.solvers import _build_mesh
 
 
@@ -339,5 +341,24 @@ def test_write_cross_section_field_plots_writes_png_and_pdf(tmp_path: Path):
     field = np.stack([np.zeros_like(yy), 0.2 * yy, 1.0 + 0.1 * zz], axis=-1)
     outputs = write_cross_section_field_plots(y=y, z=z, field=field, out_dir=tmp_path, title="Field preview")
     assert outputs == [tmp_path / "field_preview.png", tmp_path / "field_preview.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
+    bent_problem = build_bent_pipe_extruded_problem(ha_peak=4.0, bend_radius=4.0, bend_angle=1.0, nx_stations=4, nr=4, ntheta=12)
+    straight_problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=4.0,
+        radius=float(bent_problem.case.geometry.radius),
+        length=float(bent_problem.case.geometry.length),
+        nx_stations=4,
+        nr=4,
+        ntheta=12,
+    )
+    bent_solution = solve_extruded_inductionless(bent_problem)
+    straight_solution = solve_extruded_inductionless(straight_problem)
+
+    outputs = write_bent_pipe_overview_plots(bent_solution, tmp_path, straight_solution=straight_solution)
+    assert outputs == [tmp_path / "bent_pipe_overview.png", tmp_path / "bent_pipe_overview.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()

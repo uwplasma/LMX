@@ -170,7 +170,21 @@ Current status:
 - public bent-pipe preprocessing support now exists through
   `generate_bent_pipe_mesh(...)`
 - preview/QA examples now exist for the curved-centerline geometry lane
-- the remaining work is solver-side, not geometry-construction-side
+- the first executable curved-pipe lane now exists through
+  `build_bent_pipe_extruded_problem(...)`,
+  `validate_bent_pipe_low_de_baseline(...)`, and
+  `examples/bent_pipe_inductionless_demo.py`
+- the current bent-pipe lane is the low-De inductionless baseline, validated
+  against the straight-pipe limit rather than a full Dean-vortex benchmark
+- current bounded example (`Ha = 20`, `R = 0.45`, `R_c = 3.6`,
+  `15 × 18 × 40`) gives:
+  - `De ≈ 5.19e-7`
+  - `cross_section_l2_error = 0`
+  - `centerline_l2_error = 0`
+  - `max_charge_balance_residual ≈ 2.15e-2`
+  - `volumetric_flow_rate_span ≈ 1.14e-9`
+- the remaining work is the higher-inertia curved-pipe solver path, not the
+  geometry-construction-side
 
 #### Spatially varying magnetic fields
 

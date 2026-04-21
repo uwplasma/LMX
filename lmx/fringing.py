@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover - SciPy should be present in shipped envir
 
 from .cases import _ha_to_b, make_shercliff_case
 from .core import Solution
-from .mesh import generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
+from .mesh import generate_bent_pipe_mesh, generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
 from .physics import build_material_fields
 from .specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, OutputSpec, RegionSpec, SolverConfig, TimeStepperConfig
 from .solvers import solve_steady
@@ -551,6 +551,15 @@ def _cross_section_mesh(case: CaseSpec):
         return generate_pipe_ogrid_mesh(
             radius=geometry.radius or (0.5 * geometry.width),
             length=geometry.length,
+            nx=geometry.nx,
+            nr=geometry.nr or geometry.ny,
+            ntheta=geometry.ntheta or geometry.nz,
+        )
+    if geometry.kind == "bent_pipe":
+        return generate_bent_pipe_mesh(
+            tube_radius=geometry.radius or (0.5 * geometry.width),
+            bend_radius=geometry.bend_radius or max(geometry.length, geometry.width),
+            bend_angle=geometry.bend_angle or 0.5 * jnp.pi,
             nx=geometry.nx,
             nr=geometry.nr or geometry.ny,
             ntheta=geometry.ntheta or geometry.nz,
@@ -1317,6 +1326,153 @@ def build_pipe_ogrid_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
+def build_bent_pipe_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    radius: float = 1.0,
+    bend_radius: float = 6.0,
+    bend_angle: float = 0.75 * jnp.pi,
+    nr: int = 24,
+    ntheta: int = 64,
+    nx_stations: int = 25,
+    entry_center_fraction: float = 0.25,
+    exit_center_fraction: float = 0.75,
+    transition_width_fraction: float = 0.08,
+    conductivity: float = 1.0,
+    density: float = 1.0,
+    viscosity: float = 1.0,
+) -> ExtrudedInductionlessProblem:
+    arc_length = float(bend_radius * bend_angle)
+    bmag = _ha_to_b(ha_peak, radius, conductivity, density, viscosity)
+    case = CaseSpec(
+        name=f"bent_pipe_fringing_ha{int(ha_peak)}",
+        geometry=GeometrySpec(
+            kind="bent_pipe",
+            width=2.0 * radius,
+            height=2.0 * radius,
+            radius=radius,
+            bend_radius=bend_radius,
+            bend_angle=bend_angle,
+            length=arc_length,
+            nx=nx_stations,
+            nr=nr,
+            ntheta=ntheta,
+        ),
+        regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, bmag)),
+        boundary_conditions=(
+            BoundaryCondition("wall", "no_slip"),
+            BoundaryCondition("electric", "insulating"),
+        ),
+        time_stepper=TimeStepperConfig(
+            dt=0.001,
+            t_final=1.0,
+            max_steps=80,
+            potential_iterations=80,
+            steady_tolerance=1.0e-6,
+        ),
+        solver=SolverConfig(
+            kind="extruded_inductionless",
+            mode="steady",
+            linear_solver="auto",
+            preconditioner="jacobi",
+            time_scheme="implicit_euler",
+            coupling_iterations=8,
+            coupling_tolerance=1.0e-7,
+        ),
+        output=OutputSpec(),
+        forcing=1.0,
+        reference_pressure_gradient=-1.0,
+        reference_phi_cell=(max(1, nr // 4), max(1, ntheta // 8)),
+        notes=(
+            "Curved-centerline inductionless baseline for low-De bent-pipe MHD. "
+            "Secondary Dean vortices are not modeled in this lane."
+        ),
+    )
+    profile = smooth_fringing_profile(
+        length=arc_length,
+        nx=nx_stations,
+        entry_center=entry_center_fraction * arc_length,
+        exit_center=exit_center_fraction * arc_length,
+        transition_width=transition_width_fraction * arc_length,
+        peak_scale=1.0,
+        axis="z",
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
+def _signed_pipe_cut(values: jnp.ndarray, r: jnp.ndarray, *, theta_index: int) -> tuple[jnp.ndarray, jnp.ndarray]:
+    ntheta = int(values.shape[1])
+    opposite = (theta_index + ntheta // 2) % ntheta
+    negative = values[:, opposite][::-1]
+    positive = values[1:, theta_index]
+    positions = jnp.concatenate([-r[::-1], r[1:]])
+    cut = jnp.concatenate([negative, positive])
+    return positions, cut
+
+
+def validate_bent_pipe_low_de_baseline(
+    bent_solution: ExtrudedInductionlessSolution,
+    straight_solution: ExtrudedInductionlessSolution,
+) -> dict[str, float | bool]:
+    bent_geometry = bent_solution.problem.case.geometry
+    if bent_geometry.kind != "bent_pipe":
+        raise ValueError("Bent-pipe validation requires a bent_pipe solution")
+    if straight_solution.problem.case.geometry.kind != "pipe_ogrid":
+        raise ValueError("Bent-pipe validation requires a straight pipe_ogrid comparison solution")
+    if bent_solution.bundle.u.shape != straight_solution.bundle.u.shape:
+        raise ValueError("Bent and straight comparison bundles must share the same shape")
+
+    bent_bundle = bent_solution.bundle
+    straight_bundle = straight_solution.bundle
+    mid_index = int(bent_bundle.u.shape[0] // 2)
+    bent_mid = bent_bundle.u[mid_index]
+    straight_mid = straight_bundle.u[mid_index]
+    reference_norm = jnp.maximum(jnp.linalg.norm(straight_mid), 1.0e-12)
+    cross_section_l2_error = float(jnp.linalg.norm(bent_mid - straight_mid) / reference_norm)
+
+    r = jnp.asarray(bent_bundle.y, dtype=float)
+    signed_r, bent_cut = _signed_pipe_cut(bent_mid, r, theta_index=0)
+    _, straight_cut = _signed_pipe_cut(straight_mid, r, theta_index=0)
+    cut_norm = jnp.maximum(jnp.linalg.norm(straight_cut), 1.0e-12)
+    centerline_l2_error = float(jnp.linalg.norm(bent_cut - straight_cut) / cut_norm)
+
+    region = bent_solution.problem.case.regions[0]
+    mean_velocity = float(jnp.mean(jnp.abs(bent_bundle.mean_velocity)))
+    diameter = 2.0 * float(bent_geometry.radius or 0.5 * bent_geometry.width)
+    reynolds_number = float((region.density or 1.0) * mean_velocity * diameter / max(region.viscosity or 1.0, 1.0e-12))
+    curvature_ratio = float((bent_geometry.radius or 0.5 * bent_geometry.width) / max(bent_geometry.bend_radius or 1.0, 1.0e-12))
+    dean_number = float(reynolds_number * np.sqrt(max(curvature_ratio, 0.0)))
+    throughput_span = float(bent_solution.validation.volumetric_flow_rate_span)
+    max_charge_balance_residual = float(bent_solution.validation.max_charge_balance_residual)
+    max_wall_current_leakage = float(bent_solution.validation.max_wall_current_leakage)
+    net_boundary_current_residual = float(bent_solution.validation.net_boundary_current_residual)
+    validation_pass = bool(
+        dean_number <= 10.0
+        and cross_section_l2_error <= 0.08
+        and centerline_l2_error <= 0.08
+        and throughput_span <= 1.0e-3
+        and max_charge_balance_residual <= 5.0e-2
+        and max_wall_current_leakage <= 1.0e-8
+        and net_boundary_current_residual <= 1.0e-8
+    )
+    return {
+        "curvature_ratio": curvature_ratio,
+        "reynolds_number": reynolds_number,
+        "dean_number": dean_number,
+        "cross_section_l2_error": cross_section_l2_error,
+        "centerline_l2_error": centerline_l2_error,
+        "throughput_span": throughput_span,
+        "max_charge_balance_residual": max_charge_balance_residual,
+        "max_wall_current_leakage": max_wall_current_leakage,
+        "net_boundary_current_residual": net_boundary_current_residual,
+        "validation_pass": validation_pass,
+        "signed_radius": np.asarray(signed_r, dtype=float).tolist(),
+        "bent_centerline_cut": np.asarray(bent_cut, dtype=float).tolist(),
+        "straight_centerline_cut": np.asarray(straight_cut, dtype=float).tolist(),
+    }
+
+
 def build_extruded_problem_from_case(
     case: CaseSpec,
     *,
@@ -1484,7 +1640,7 @@ def _solve_extruded_projection(
 ) -> ExtrudedFieldBundle:
     case = problem.case
     mesh = _cross_section_mesh(case)
-    if case.geometry.kind == "pipe_ogrid":
+    if case.geometry.kind in {"pipe_ogrid", "bent_pipe"}:
         x = jnp.asarray(mesh.x_centers, dtype=float)
         r_faces = jnp.asarray(mesh.y_faces, dtype=float)
         r = jnp.asarray(mesh.y_centers, dtype=float)
@@ -1993,7 +2149,7 @@ def solve_extruded_inductionless(
     solver=solve_steady,
     initial_bundle: ExtrudedFieldBundle | None = None,
 ) -> ExtrudedInductionlessSolution:
-    if problem.case.geometry.kind in {"rect_duct", "layered_duct", "pipe_ogrid"}:
+    if problem.case.geometry.kind in {"rect_duct", "layered_duct", "pipe_ogrid", "bent_pipe"}:
         bundle = _solve_extruded_projection(problem, initial_bundle=initial_bundle)
         station_history = _bundle_station_history(bundle)
     else:

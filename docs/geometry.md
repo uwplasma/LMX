@@ -15,8 +15,8 @@ mesh APIs:
     fringing-field `extruded_inductionless` pipe slice
 - `bent_pipe`
   - a centerline-following mapped pipe around a constant-radius bend
-  - currently used for preprocessing, geometry preview, and upcoming
-    curved-pipe benchmark preparation
+  - currently used for preprocessing, geometry preview, and the low-De
+    curved-pipe inductionless baseline
 
 ## Geometry objects in the source tree
 
@@ -103,6 +103,7 @@ drivers in:
 - `examples/variable_field_geometry_demo.py`
 - `examples/geometry_panel_demo.py`
 - `examples/bent_pipe_preview.py`
+- `examples/bent_pipe_inductionless_demo.py`
 - `examples/readme_showcase_demo.py`
 
 ```bash
@@ -111,6 +112,7 @@ python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --
 python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
 python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
 python examples/bent_pipe_preview.py
+python examples/bent_pipe_inductionless_demo.py
 python examples/readme_showcase_demo.py --output docs/_static/generated
 # optional Hartmann alternative for wall-layer startup media
 python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
@@ -126,6 +128,7 @@ Those drivers write:
 - `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
   - README-ready media, including bounded 2D/3D startup GIFs
+  - bent-pipe geometry-plus-solution panels for the low-De curved-pipe lane
 
 The preview path is intentionally cheap so it can be used as a preprocessing
 step before longer studies.
@@ -140,8 +143,12 @@ Current geometry panel:
 - use explicit `wall_cells` and nonzero `wall_thickness` for `layered_duct`
 - use `pipe_ogrid` for preprocessing, visualization, and the current first
   fringing `extruded_inductionless` pipe slice
-- use `bent_pipe` for preprocessing and geometry QA before the curved-pipe
-  solver lane is added
+- use `bent_pipe` for curved-centerline geometry QA and for the current low-De
+  inductionless baseline before the full Dean-vortex solver lane is added
 - use the metrics from `lmx/validation.py`, especially
   `duct_layer_resolution_metrics(...)`, to quantify whether the side and
   Hartmann layers are resolved enough for a benchmark-quality run
+
+Current bent-pipe baseline:
+
+![LMX bent-pipe inductionless baseline](_static/generated/bent_pipe_overview.png)

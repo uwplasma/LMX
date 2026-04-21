@@ -671,6 +671,21 @@ def test_bent_pipe_preview_writes_summary(tmp_path: Path):
     assert (tmp_path / "bent_pipe_preview_summary.json").exists()
 
 
+def test_bent_pipe_inductionless_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("bent_pipe_inductionless_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NR = 8
+    module.NTHETA = 24
+    module.NX_STATIONS = 9
+    module.MAX_STEPS = 8
+    module.POTENTIAL_ITERATIONS = 24
+    summary = module.run_bent_pipe_inductionless_demo()
+    assert summary["geometry_kind"] == "bent_pipe"
+    assert "validation" in summary
+    assert (tmp_path / "bent_pipe_overview.png").exists()
+    assert (tmp_path / "bent_pipe_inductionless_summary.json").exists()
+
+
 def test_variable_field_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("variable_field_validation.py")
     module.OUTPUT_DIR = tmp_path

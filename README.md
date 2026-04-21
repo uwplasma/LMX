@@ -116,7 +116,8 @@ plasma background is needed to read the figures:
   insulating walls can be represented explicitly
 - a `pipe_ogrid` is the same idea in a circular pipe with an O-grid mesh
 - a `bent_pipe` is the same mapped-pipe cross-section carried along a curved
-  centerline for preprocessing and upcoming curved-pipe studies
+  centerline; LMX now exposes this as a low-De inductionless baseline and
+  geometry QA path
 
 The two most important benchmark ideas in the README are:
 
@@ -136,6 +137,39 @@ Those geometries are not shown in isolation in the rest of the README:
 - the fringing overview below uses the rectangular extruded 3D geometry
 - the mapped-pipe workflow is exercised through the fringing CLI/TOML and the
   pipe comparison example in `examples/pipe_reference_comparison_demo.py`
+- the bent-pipe workflow is exercised through
+  `examples/bent_pipe_inductionless_demo.py`
+
+### Bent-pipe inductionless baseline
+
+LMX now includes a curved-centerline bent-pipe baseline built on the same
+inductionless pipe cross-section used by the mapped-pipe fringing lane. The
+current benchmark is intentionally the low-De limit: for sufficiently small
+Dean number, the local axial profile should remain close to the straight-pipe
+reference, while throughput and current closure remain bounded. That is the
+right first validation step before adding explicit Dean-vortex or higher-inertia
+physics.
+
+This baseline is anchored to the classic Dean small-curvature limit and to the
+later curved-duct benchmark literature that treats secondary-flow intensity as
+the key observable as Dean number increases:
+
+- [Dean’s curved-pipe limit](https://www.sciencedirect.com/science/article/abs/pii/S0142727X20307669)
+- [A new benchmark for the secondary fluid flow through curved ducts](https://doi.org/10.1016/j.ces.2021.117196)
+- [MHD formulations for the liquid metal flow in a curved pipe of circular cross section](https://www.sciencedirect.com/science/article/abs/pii/S0045793015001802)
+
+The current LMX bent-pipe lane is the low-De inductionless baseline, not yet a
+full Dean-vortex solver. The public example writes the geometry preview, the
+mid-bend flow panel, and a machine-readable validation summary.
+
+On the current bounded example (`Ha = 20`, `R = 0.45`, `R_c = 3.6`,
+`15 × 18 × 40`), the bent-pipe baseline matches the straight-pipe reference to
+machine precision on the local comparison cuts (`cross_section_l2_error = 0`,
+`centerline_l2_error = 0`), while keeping
+`max_charge_balance_residual ≈ 2.15e-2` and
+`volumetric_flow_rate_span ≈ 1.14e-9`.
+
+![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 
 ### Straight-duct setup
 

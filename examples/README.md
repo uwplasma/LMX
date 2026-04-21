@@ -53,6 +53,7 @@ python examples/geometry_panel_demo.py --output ./artifacts/examples/geometry_pa
 python examples/pipe_reference_comparison_demo.py --output ./artifacts/examples/pipe_reference_comparison
 python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
 python examples/bent_pipe_preview.py
+python examples/bent_pipe_inductionless_demo.py
 python examples/variable_field_validation.py
 ```
 
@@ -211,6 +212,19 @@ That example is the preprocessing template for the curved-pipe lane:
 - build a mapped constant-radius bend directly from Python
 - write `PNG`/`PDF` previews of the curved centerline and cross-sections
 - record the mesh parameters that should be reused when the bent-pipe solver lane is added
+
+Bent-pipe inductionless baseline:
+
+```bash
+python examples/bent_pipe_inductionless_demo.py
+```
+
+That example is the current curved-pipe executable lane:
+
+- build a bent-pipe inductionless problem and the matching straight-pipe reference
+- solve both on the same fringing-field profile
+- write a bent-pipe geometry-plus-solution panel
+- record low-De equivalence metrics against the straight-pipe limit
 
 Variable-field validation:
 
