@@ -344,7 +344,7 @@ Those examples are the current executable Benchmark D entry points:
 - `wham_mirror_pipe_demo.py`
   - write a tabulated WHAM-like mirror field
   - solve a straight pipe crossing that 3D field
-  - export the field preview and pipe-response overview
+  - export the field preview, a 3D WHAM overview figure, and the pipe-response overview
 - `autodiff_wham_pressure_sensitivity.py`
   - treat the same mirror topology as a differentiable stationwise profile
   - compute pressure-drop sensitivity with respect to coil separation

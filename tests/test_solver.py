@@ -258,6 +258,20 @@ def test_transient_restart_matches_direct_run(tmp_path: Path, monkeypatch: pytes
     assert jnp.allclose(resumed.state.lorentz_x, direct.state.lorentz_x, atol=1e-6, rtol=1e-6)
 
 
+def test_solve_steady_rejects_unknown_solver_kind():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    bad = replace(case, solver=replace(case.solver, kind="definitely_missing"))
+    with pytest.raises(NotImplementedError, match="not implemented for steady runs"):
+        solve_steady(bad)
+
+
+def test_solve_transient_rejects_unknown_solver_kind():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    bad = replace(case, solver=replace(case.solver, kind="definitely_missing"))
+    with pytest.raises(NotImplementedError, match="not implemented for transient runs"):
+        solve_transient(bad)
+
+
 def test_transient_restart_can_append_diagnostics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     direct_case = replace(case, time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4))

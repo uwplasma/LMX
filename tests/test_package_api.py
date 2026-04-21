@@ -58,6 +58,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_geometry_gallery_plots)
     assert callable(lmx.write_geometry_preview_plots)
     assert callable(lmx.write_cross_section_field_plots)
+    assert callable(lmx.write_wham_mirror_overview_plots)
     assert callable(lmx.write_transient_movies)
     assert callable(lmx.write_strong_scaling_plots)
     assert callable(lmx.write_autodiff_plots)

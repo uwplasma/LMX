@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -18,8 +19,10 @@ from lmx.plotting import (
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
     write_strong_scaling_plots,
+    write_wham_mirror_overview_plots,
     write_transient_movies,
 )
+from lmx.field_models import write_tabulated_field_npz
 from lmx.fringing import build_bent_pipe_extruded_problem, build_pipe_ogrid_extruded_problem, solve_extruded_inductionless
 from lmx.solvers import _build_mesh
 
@@ -360,5 +363,45 @@ def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
 
     outputs = write_bent_pipe_overview_plots(bent_solution, tmp_path, straight_solution=straight_solution)
     assert outputs == [tmp_path / "bent_pipe_overview.png", tmp_path / "bent_pipe_overview.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_wham_mirror_overview_plots_writes_png_and_pdf(tmp_path: Path):
+    x = np.linspace(-0.4, 0.4, 9)
+    y = np.linspace(-0.2, 0.2, 7)
+    z = np.linspace(-0.5, 0.5, 11)
+    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+    bx = np.zeros_like(xx)
+    by = 0.2 * yy
+    bz = 1.0 + 0.4 * np.exp(-(zz / 0.25) ** 2)
+    table_path = write_tabulated_field_npz(tmp_path / "wham_test_field.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz)
+
+    bundle = SimpleNamespace(
+        x=np.linspace(-0.4, 0.4, 5),
+        field_scale=np.asarray([0.3, 0.7, 1.0, 0.7, 0.3]),
+        mean_velocity=np.asarray([1.0, 0.98, 0.96, 0.98, 1.0]),
+        current_scaled_pressure_proxy=np.asarray([0.1, 0.2, 0.35, 0.2, 0.1]),
+        p=np.linspace(0.0, 0.2, 5)[:, None, None] + np.zeros((5, 4, 12)),
+        u=np.broadcast_to(np.linspace(0.6, 1.0, 4)[:, None], (5, 4, 12)),
+    )
+    solution = SimpleNamespace(bundle=bundle)
+    autodiff_summary = {
+        "reference_separation": 1.96,
+        "separation_sweep": [1.6, 1.8, 2.0, 2.2],
+        "pressure_drop_curve": [3.1, 3.4, 3.6, 3.7],
+        "sensitivity_curve": [0.7, 0.4, 0.2, 0.0],
+    }
+
+    outputs = write_wham_mirror_overview_plots(
+        solution,
+        table_path=table_path,
+        pipe_radius=0.2,
+        coil_separation=1.0,
+        out_dir=tmp_path,
+        case_title="WHAM overview",
+        autodiff_summary=autodiff_summary,
+    )
+    assert outputs == [tmp_path / "wham_mirror_overview.png", tmp_path / "wham_mirror_overview.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()

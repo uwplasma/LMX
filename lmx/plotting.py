@@ -1519,6 +1519,231 @@ def write_magnetic_obstacle_benchmark_plots(
     return [png_path, pdf_path]
 
 
+def write_wham_mirror_overview_plots(
+    solution,
+    *,
+    table_path: str | Path,
+    pipe_radius: float,
+    coil_separation: float,
+    out_dir: str | Path,
+    case_title: str,
+    coil_inner_radius: float = 0.5 * 86.0e-3,
+    coil_outer_radius: float = 0.5 * 730.0e-3,
+    autodiff_summary: dict[str, object] | None = None,
+) -> list[Path]:
+    from .field_models import load_tabulated_field, sample_tabulated_field_volume
+
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    table = load_tabulated_field(table_path)
+    x_axis = np.asarray(table["x"], dtype=float)
+    z_axis = np.asarray(table["z"], dtype=float)
+    x_dense = np.linspace(float(x_axis[0]), float(x_axis[-1]), 181)
+    z_dense = np.linspace(float(z_axis[0]), float(z_axis[-1]), 181)
+    xx, zz = np.meshgrid(x_dense, z_dense, indexing="ij")
+    centerplane = np.asarray(
+        sample_tabulated_field_volume(
+            table_path,
+            x=xx,
+            y=np.zeros_like(xx),
+            z=zz,
+        ),
+        dtype=float,
+    )
+    bmag_center = np.linalg.norm(centerplane, axis=-1)
+    peak_bmag = max(float(np.max(bmag_center)), 1.0e-12)
+
+    bundle = solution.bundle
+    x = np.asarray(bundle.x, dtype=float)
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    pressure_span = np.max(np.asarray(bundle.p, dtype=float), axis=(1, 2)) - np.min(np.asarray(bundle.p, dtype=float), axis=(1, 2))
+    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
+    peak_station_x = float(x[peak_index]) if x.size else 0.0
+
+    u_peak = np.asarray(bundle.u[peak_index], dtype=float)
+    nr, ntheta = u_peak.shape
+    radial = np.linspace(0.0, pipe_radius, nr)
+    theta = np.linspace(0.0, 2.0 * np.pi, ntheta, endpoint=False)
+    rr, tt = np.meshgrid(radial, theta, indexing="ij")
+    disk_y = rr * np.cos(tt)
+    disk_z = rr * np.sin(tt)
+    disk_x = np.full_like(disk_y, peak_station_x)
+    u_peak_norm = np.clip(u_peak / max(float(np.max(np.abs(u_peak))), 1.0e-12), 0.0, None)
+
+    fig = plt.figure(figsize=(15.6, 9.2), constrained_layout=True)
+    gs = fig.add_gridspec(3, 2, width_ratios=[1.35, 1.0], height_ratios=[1.0, 1.0, 1.0])
+    ax3d = fig.add_subplot(gs[:, 0], projection="3d")
+    ax_contour = fig.add_subplot(gs[0, 1])
+    ax_response = fig.add_subplot(gs[1, 1])
+    ax_autodiff = fig.add_subplot(gs[2, 1])
+    fig.suptitle(case_title, fontsize=17)
+
+    cmap_field = plt.cm.viridis
+    norm_field = colors.Normalize(vmin=0.0, vmax=peak_bmag)
+    cmap_velocity = plt.cm.magma
+    norm_velocity = colors.Normalize(vmin=0.0, vmax=1.0)
+
+    x_cyl = np.linspace(float(x_axis[0]), float(x_axis[-1]), 160)
+    theta_cyl = np.linspace(0.0, 2.0 * np.pi, 120)
+    x_cyl_grid, theta_cyl_grid = np.meshgrid(x_cyl, theta_cyl, indexing="ij")
+    y_cyl = pipe_radius * np.cos(theta_cyl_grid)
+    z_cyl = pipe_radius * np.sin(theta_cyl_grid)
+    ax3d.plot_surface(
+        x_cyl_grid,
+        y_cyl,
+        z_cyl,
+        color="#cbd5e1",
+        alpha=0.12,
+        linewidth=0.0,
+        antialiased=False,
+        shade=False,
+    )
+    ax3d.plot(
+        [float(x_axis[0]), float(x_axis[-1])],
+        [0.0, 0.0],
+        [0.0, 0.0],
+        color="#111827",
+        linewidth=1.8,
+        alpha=0.85,
+    )
+
+    phi = np.linspace(0.0, 2.0 * np.pi, 240)
+    for z_center, style in ((-0.5 * coil_separation, "#1f2937"), (0.5 * coil_separation, "#1f2937")):
+        ax3d.plot(
+            coil_outer_radius * np.cos(phi),
+            coil_outer_radius * np.sin(phi),
+            np.full_like(phi, z_center),
+            color=style,
+            linewidth=1.8,
+            alpha=0.85,
+        )
+        ax3d.plot(
+            coil_inner_radius * np.cos(phi),
+            coil_inner_radius * np.sin(phi),
+            np.full_like(phi, z_center),
+            color="#94a3b8",
+            linewidth=1.2,
+            alpha=0.85,
+        )
+
+    y_sheet = np.zeros_like(xx)
+    ax3d.plot_surface(
+        xx,
+        y_sheet,
+        zz,
+        facecolors=cmap_field(norm_field(bmag_center)),
+        linewidth=0.0,
+        antialiased=False,
+        shade=False,
+        alpha=0.74,
+    )
+    ax3d.plot_surface(
+        disk_x,
+        disk_y,
+        disk_z,
+        facecolors=cmap_velocity(norm_velocity(u_peak_norm)),
+        linewidth=0.0,
+        antialiased=True,
+        shade=False,
+        alpha=0.98,
+    )
+    ax3d.text(
+        peak_station_x,
+        0.0,
+        1.15 * pipe_radius,
+        "velocity cross-section",
+        color="#111827",
+        ha="center",
+    )
+    ax3d.text(
+        float(x_axis[0]) + 0.04 * float(x_axis[-1] - x_axis[0]),
+        0.0,
+        0.95 * float(z_axis[-1]),
+        "centerplane |B| contours",
+        color="#111827",
+    )
+    ax3d.set_title("3D mirror field, pipe, and solved velocity slice")
+    ax3d.set_xlabel("x")
+    ax3d.set_ylabel("y")
+    ax3d.set_zlabel("z")
+    radial_extent = max(pipe_radius * 1.3, coil_outer_radius * 1.15)
+    z_extent = max(float(np.max(np.abs(z_axis))), 0.5 * coil_separation + 0.15)
+    ax3d.set_xlim(float(x_axis[0]), float(x_axis[-1]))
+    ax3d.set_ylim(-radial_extent, radial_extent)
+    ax3d.set_zlim(-z_extent, z_extent)
+    ax3d.set_box_aspect((float(x_axis[-1] - x_axis[0]), 2.0 * radial_extent, 2.0 * z_extent))
+    ax3d.view_init(elev=22, azim=-57)
+
+    contour_levels = np.linspace(0.0, peak_bmag, 12)
+    im = ax_contour.contourf(x_dense, z_dense, bmag_center.T, levels=contour_levels, cmap="viridis")
+    ax_contour.contour(x_dense, z_dense, bmag_center.T, levels=contour_levels[2:-1:2], colors="white", linewidths=0.8, alpha=0.75)
+    ax_contour.add_patch(
+        Rectangle(
+            (float(x_axis[0]), -pipe_radius),
+            float(x_axis[-1] - x_axis[0]),
+            2.0 * pipe_radius,
+            fill=False,
+            edgecolor="#111827",
+            linewidth=1.4,
+            linestyle="--",
+        )
+    )
+    ax_contour.axhline(-0.5 * coil_separation, color="#1f2937", linestyle=":", linewidth=1.1)
+    ax_contour.axhline(0.5 * coil_separation, color="#1f2937", linestyle=":", linewidth=1.1)
+    ax_contour.text(float(x_axis[0]), 0.5 * coil_separation + 0.03, "coil centers", color="#1f2937", va="bottom")
+    ax_contour.set_title(r"Midplane $|B(x,0,z)|$")
+    ax_contour.set_xlabel("x")
+    ax_contour.set_ylabel("z")
+    plt.colorbar(im, ax=ax_contour, fraction=0.046, pad=0.04, label=r"$|B|$")
+
+    mean_velocity_norm = mean_velocity / max(float(mean_velocity[0]), 1.0e-12)
+    current_proxy_norm = current_proxy / max(float(np.max(np.abs(current_proxy))), 1.0e-12)
+    pressure_span_norm = pressure_span / max(float(np.max(np.abs(pressure_span))), 1.0e-12)
+    ax_response.plot(x, field_scale / max(float(np.max(field_scale)), 1.0e-12), color="#1d4ed8", label=r"$B/B_{max}$")
+    ax_response.plot(x, mean_velocity_norm, color="#0f766e", label=r"$\bar{u}/\bar{u}_{in}$")
+    ax_response.plot(x, current_proxy_norm, color="#b45309", linestyle="--", label="current proxy / peak")
+    ax_response.plot(x, pressure_span_norm, color="#7c3aed", linestyle=":", label=r"$\Delta p/\Delta p_{max}$")
+    ax_response.set_title("Executable pipe response")
+    ax_response.set_xlabel("x")
+    ax_response.set_ylabel("Normalized response")
+    ax_response.legend(loc="best")
+
+    if autodiff_summary is not None:
+        separation = np.asarray(autodiff_summary["separation_sweep"], dtype=float)
+        pressure_curve = np.asarray(autodiff_summary["pressure_drop_curve"], dtype=float)
+        sensitivity_curve = np.asarray(autodiff_summary["sensitivity_curve"], dtype=float)
+        reference_separation = float(autodiff_summary["reference_separation"])
+        ax_autodiff.plot(separation, pressure_curve, color="#0f766e", marker="o", label="pressure-drop proxy")
+        ax_autodiff.axvline(reference_separation, color="#111827", linestyle="--", linewidth=1.0)
+        ax_autodiff.set_xlabel("coil separation")
+        ax_autodiff.set_ylabel("proxy", color="#0f766e")
+        ax_autodiff.tick_params(axis="y", labelcolor="#0f766e")
+        ax_autodiff.set_title("Autodiff sensitivity to coil separation")
+        ax_sens = ax_autodiff.twinx()
+        ax_sens.plot(separation, sensitivity_curve, color="#7c3aed", marker="s", label=r"$d(\Delta p)/ds$")
+        ax_sens.set_ylabel(r"$d(\Delta p)/ds$", color="#7c3aed")
+        ax_sens.tick_params(axis="y", labelcolor="#7c3aed")
+        handles = [
+            Line2D([], [], color="#0f766e", marker="o", label="pressure-drop proxy"),
+            Line2D([], [], color="#7c3aed", marker="s", label=r"$d(\Delta p)/ds$"),
+        ]
+        ax_autodiff.legend(handles=handles, loc="best")
+    else:
+        ax_autodiff.text(0.5, 0.5, "Autodiff summary not provided", ha="center", va="center", transform=ax_autodiff.transAxes)
+        ax_autodiff.set_axis_off()
+
+    png_path = out_dir / "wham_mirror_overview.png"
+    pdf_path = out_dir / "wham_mirror_overview.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
 def write_strong_scaling_plots(
     records: list[dict[str, object]],
     out_dir: str | Path,

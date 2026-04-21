@@ -251,11 +251,21 @@ cross-sectional distortion, and clean conservation.
 LMX now also includes a tabulated WHAM-like mirror-field pipe lane and a
 matching differentiable pressure-drop sensitivity study. The executable driver
 is `examples/wham_mirror_pipe_demo.py`: it writes the tabulated 3D field,
-solves the pipe crossing that field, and exports the field preview plus the
-extruded response panel. The paired reduced differentiable study is
+solves the pipe crossing that field, and exports the field preview plus a
+dedicated WHAM overview showing the mirror coils, centerplane field contours,
+the pipe location, and the solved velocity cross-section at peak field. The
+paired reduced differentiable study is
 `examples/autodiff_wham_pressure_sensitivity.py`, which treats the same WHAM
 mirror topology as a stationwise field profile and differentiates a
 pressure-drop proxy with respect to coil separation.
+
+The executable WHAM lane is useful today for field loading, geometry context,
+and conservation auditing. The new overview figure shows exactly that: the pipe
+passes across the mirror field, the centerplane field contours are sampled from
+the tabulated 3D field, and the colored disk is the solved axial velocity slice
+inside the pipe at the station of peak field.
+
+![LMX WHAM-like mirror pipe overview](docs/_static/generated/wham_mirror_overview.png)
 
 At the current reference separation (`1.96 m`), the reduced differentiable
 lane gives `pressure_drop_proxy ≈ 3.85` and `d(Δp)/ds ≈ 2.98e-1`, with a

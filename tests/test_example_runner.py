@@ -524,19 +524,31 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
 
     monkeypatch.setattr(module, "write_wham_mirror_field_npz", fake_write_wham_mirror_field_npz)
     monkeypatch.setattr(module, "build_wham_mirror_pipe_extruded_problem", lambda **kwargs: SimpleNamespace(case=SimpleNamespace(time_stepper=SimpleNamespace(max_steps=8, potential_iterations=16), solver=SimpleNamespace(coupling_iterations=6)), profile=SimpleNamespace(x=np.linspace(-0.2, 0.2, 5))))
+    monkeypatch.setattr(module, "build_fringing_autodiff_problem", lambda **kwargs: SimpleNamespace())
     monkeypatch.setattr(module, "replace", lambda obj, **kwargs: SimpleNamespace(**{**obj.__dict__, **kwargs}))
     monkeypatch.setattr(module, "solve_extruded_inductionless", lambda problem: SimpleNamespace(bundle=SimpleNamespace(), validation=SimpleNamespace()))
+    monkeypatch.setattr(
+        module,
+        "wham_mirror_pressure_drop_sensitivity",
+        lambda *args, **kwargs: {
+            "pressure_drop_proxy": 1.0,
+            "d_pressure_drop_d_separation": -0.1,
+        },
+    )
     monkeypatch.setattr(module, "validate_wham_mirror_pipe_baseline", lambda solution: {"validation_pass": True, "pressure_drop_proxy": 1.0})
     monkeypatch.setattr(module, "sample_tabulated_field_volume", lambda *args, **kwargs: np.zeros((module.FIELD_NY, module.FIELD_NZ, 3)))
     monkeypatch.setattr(module, "write_cross_section_field_plots", lambda **kwargs: [tmp_path / "field_preview.png"])
     monkeypatch.setattr(module, "write_extruded_overview_plots", lambda *args, **kwargs: [tmp_path / "extruded_overview.png"])
+    monkeypatch.setattr(module, "write_wham_mirror_overview_plots", lambda *args, **kwargs: [tmp_path / "wham_mirror_overview.png"])
     (tmp_path / "field_preview.png").write_bytes(b"img")
     (tmp_path / "extruded_overview.png").write_bytes(b"img")
+    (tmp_path / "wham_mirror_overview.png").write_bytes(b"img")
 
     summary = module.run_wham_mirror_pipe_demo()
 
     assert summary["case"] == "wham_mirror_pipe"
     assert "field_preview.png" in summary["plots"]
+    assert "wham_mirror_overview.png" in summary["plots"]
     assert (tmp_path / "wham_mirror_pipe_summary.json").exists()
 
 
