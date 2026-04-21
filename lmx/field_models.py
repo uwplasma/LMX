@@ -78,6 +78,9 @@ def sample_wham_mirror_field(
     coil_axial_thickness: float = 14.3e-3 * 8.0,
     radial_loops: int = 24,
     axial_loops: int = 8,
+    x_offset: float | jnp.ndarray = 0.0,
+    y_offset: float | jnp.ndarray = 0.0,
+    z_offset: float | jnp.ndarray = 0.0,
 ) -> jnp.ndarray:
     """Sample a differentiable WHAM-like mirror field with magpylib_jax.
 
@@ -106,7 +109,10 @@ def sample_wham_mirror_field(
         axial_loops,
         dtype=jnp.float32,
     )
-    points = jnp.stack([x_arr.reshape(-1), y_arr.reshape(-1), z_arr.reshape(-1)], axis=-1)
+    x_shifted = x_arr + jnp.asarray(x_offset, dtype=jnp.float32)
+    y_shifted = y_arr + jnp.asarray(y_offset, dtype=jnp.float32)
+    z_shifted = z_arr + jnp.asarray(z_offset, dtype=jnp.float32)
+    points = jnp.stack([x_shifted.reshape(-1), y_shifted.reshape(-1), z_shifted.reshape(-1)], axis=-1)
 
     sources = []
     for coil_center in (-0.5 * separation, 0.5 * separation):
@@ -137,6 +143,9 @@ def sample_wham_mirror_axis_profile(
     coil_axial_thickness: float = 14.3e-3 * 8.0,
     radial_loops: int = 24,
     axial_loops: int = 8,
+    x_offset: float | jnp.ndarray = 0.0,
+    y_offset: float | jnp.ndarray = 0.0,
+    z_offset: float | jnp.ndarray = 0.0,
 ) -> jnp.ndarray:
     x_arr = jnp.asarray(x, dtype=jnp.float32)
     zeros = jnp.zeros_like(x_arr)
@@ -151,6 +160,9 @@ def sample_wham_mirror_axis_profile(
         coil_axial_thickness=coil_axial_thickness,
         radial_loops=radial_loops,
         axial_loops=axial_loops,
+        x_offset=x_offset,
+        y_offset=y_offset,
+        z_offset=z_offset,
     )
     return field[..., 2]
 
@@ -165,6 +177,9 @@ def wham_mirror_station_scale(
     coil_axial_thickness: float = 14.3e-3 * 8.0,
     radial_loops: int = 24,
     axial_loops: int = 8,
+    x_offset: float | jnp.ndarray = 0.0,
+    y_offset: float | jnp.ndarray = 0.0,
+    z_offset: float | jnp.ndarray = 0.0,
 ) -> jnp.ndarray:
     profile = sample_wham_mirror_axis_profile(
         x,
@@ -175,6 +190,9 @@ def wham_mirror_station_scale(
         coil_axial_thickness=coil_axial_thickness,
         radial_loops=radial_loops,
         axial_loops=axial_loops,
+        x_offset=x_offset,
+        y_offset=y_offset,
+        z_offset=z_offset,
     )
     magnitude = jnp.abs(profile)
     return magnitude / jnp.maximum(jnp.max(magnitude), 1.0e-12)
@@ -193,6 +211,9 @@ def write_wham_mirror_field_npz(
     coil_axial_thickness: float = 14.3e-3 * 8.0,
     radial_loops: int = 24,
     axial_loops: int = 8,
+    x_offset: float = 0.0,
+    y_offset: float = 0.0,
+    z_offset: float = 0.0,
 ) -> Path:
     xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
     field = np.asarray(
@@ -207,6 +228,9 @@ def write_wham_mirror_field_npz(
             coil_axial_thickness=coil_axial_thickness,
             radial_loops=radial_loops,
             axial_loops=axial_loops,
+            x_offset=x_offset,
+            y_offset=y_offset,
+            z_offset=z_offset,
         ),
         dtype=float,
     )

@@ -849,6 +849,21 @@ def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
     assert (tmp_path / "magnetic_obstacle_baseline_summary.json").exists()
 
 
+def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
+    module = _load_example_module("magnetic_obstacle_benchmark.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NY = 12
+    module.NZ = 12
+    module.NX_STATIONS = 9
+    module.MAX_STEPS = 8
+    module.POTENTIAL_ITERATIONS = 24
+    module.COUPLING_ITERATIONS = 6
+    summary = module.run_magnetic_obstacle_benchmark()
+    assert summary["case"] == "magnetic_obstacle_benchmark"
+    assert (tmp_path / "magnetic_obstacle_benchmark.png").exists()
+    assert (tmp_path / "magnetic_obstacle_benchmark_summary.json").exists()
+
+
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("pipe_reference_comparison_demo.py")
     summary = module.run_pipe_reference_comparison_demo(

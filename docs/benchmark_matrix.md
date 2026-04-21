@@ -273,22 +273,30 @@ Current bounded wall-bounded result:
 
 Current first Benchmark D slice:
 
-- `examples/magnetic_obstacle_baseline.py`
-  - localized-field magnetic-obstacle baseline on the rectangular extruded
-    inductionless lane
+- `examples/magnetic_obstacle_benchmark.py`
+  - localized-field magnetic-obstacle benchmark on the rectangular extruded
+    inductionless lane, compared directly against a matched no-field reference
   - observables:
-    obstacle-induced velocity deficit, current-proxy peak, field/velocity
-    anticorrelation, and conservation metrics
+    normalized velocity-deficit ratio, pressure-excess response, current
+    response, centerline-cut distortion, and conservation metrics
   - role:
-    first executable magnetic-obstacle slice before any turbulent Benchmark D claim
+    first literature-facing magnetic-obstacle slice before any turbulent
+    Benchmark D claim
 
 Current bounded result:
 
-- `28 × 28 × 17` rectangular duct with localized analytic obstacle field
-- `obstacle_velocity_deficit ≈ 8.57e-8`
-- `current_proxy_peak ≈ 1.06e-1`
-- `field_velocity_correlation ≈ -5.16e-1`
-- `max_charge_balance_residual ≈ 5.36e-7`
+- `24 × 24 × 17` rectangular duct with localized analytic obstacle field
+  against a matched no-field reference
+- `peak_velocity_deficit_ratio ≈ 3.23e-2`
+- `peak_station_velocity_deficit_ratio ≈ 2.87e-2`
+- `peak_pressure_excess ≈ 2.50e-1`
+- `pressure_excess_proxy ≈ 6.08e-2`
+- `current_proxy_peak ≈ 2.28`
+- `y_l2_distortion ≈ 2.31e-1`
+- `z_l2_distortion ≈ 2.08e-1`
+- `divergence_to_field_ratio ≈ 1.69e-2`
+- `max_charge_balance_residual ≈ 1.99e-13`
+- `benchmark_pass = true`
 
 Current tabulated-field / mirror-field extension:
 
@@ -319,7 +327,7 @@ Current bounded executable tabulated-pipe result:
 - `max_charge_balance_residual ≈ 3.06e-5`
 - `pressure_drop_proxy ≈ 1.86e-11`
 - the nominal-WHAM low-Re response is therefore still too weak to count as a
-  literature-facing magnetic-obstacle parity case
+  forceful Benchmark D executable comparison case
 
 ## Additional benchmark targets for the next publication cycle
 

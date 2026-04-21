@@ -64,6 +64,7 @@ python examples/autodiff_wham_pressure_sensitivity.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py
+python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_baseline.py
 ```
 
@@ -322,6 +323,7 @@ That example moves the Q2D lane from periodic modes to a wall-bounded duct:
 First Benchmark D slice:
 
 ```bash
+python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_baseline.py
 python examples/wham_mirror_pipe_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
@@ -329,6 +331,12 @@ python examples/autodiff_wham_pressure_sensitivity.py
 
 Those examples are the current executable Benchmark D entry points:
 
+- `magnetic_obstacle_benchmark.py`
+  - solve a rectangular extruded duct with a localized analytic magnetic obstacle
+  - compare it directly against a matched no-field reference
+  - write both the generic extruded overview and a dedicated benchmark panel
+  - record normalized velocity-deficit, pressure-excess, distortion, and
+    conservation metrics
 - `magnetic_obstacle_baseline.py`
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
   - write the full extruded overview panel

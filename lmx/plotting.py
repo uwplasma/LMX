@@ -1435,6 +1435,90 @@ def write_extruded_overview_plots(
     return [png_path, pdf_path]
 
 
+def write_magnetic_obstacle_benchmark_plots(
+    solution,
+    reference_solution,
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    bundle = solution.bundle
+    reference_bundle = reference_solution.bundle
+    x = np.asarray(bundle.x, dtype=float)
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    reference_mean_velocity = np.asarray(reference_bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    pressure_span = np.max(np.asarray(bundle.p, dtype=float), axis=(1, 2)) - np.min(np.asarray(bundle.p, dtype=float), axis=(1, 2))
+    reference_pressure_span = np.max(np.asarray(reference_bundle.p, dtype=float), axis=(1, 2)) - np.min(np.asarray(reference_bundle.p, dtype=float), axis=(1, 2))
+    velocity_ratio = mean_velocity / np.maximum(reference_mean_velocity, 1.0e-12)
+    pressure_excess = np.maximum(pressure_span - reference_pressure_span, 0.0)
+    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
+    mid_y = int(bundle.u.shape[1] // 2)
+    mid_z = int(bundle.u.shape[2] // 2)
+    y = np.asarray(bundle.y, dtype=float)
+    z = np.asarray(bundle.z, dtype=float)
+    y_edges = _centers_to_edges(y)
+    z_edges = _centers_to_edges(z)
+
+    u_peak = np.asarray(bundle.u[peak_index], dtype=float)
+    u_ref_peak = np.asarray(reference_bundle.u[peak_index], dtype=float)
+    y_cut = np.asarray(bundle.u[peak_index, :, mid_z], dtype=float)
+    y_cut_ref = np.asarray(reference_bundle.u[peak_index, :, mid_z], dtype=float)
+    z_cut = np.asarray(bundle.u[peak_index, mid_y, :], dtype=float)
+    z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
+    peak_u = max(float(np.max(np.abs(u_peak))), 1.0e-12)
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.0, 8.8), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    ax = axes[0, 0]
+    ax.plot(x, field_scale / max(float(np.max(field_scale)), 1.0e-12), color="#1d4ed8", label=r"$B/B_{max}$")
+    ax.plot(x, velocity_ratio, color="#0f766e", label=r"$\bar{u}/\bar{u}_{ref}$")
+    ax.plot(x, 1.0 - velocity_ratio, color="#b45309", linestyle="--", label="velocity deficit ratio")
+    ax.set_title("Obstacle response along x")
+    ax.set_xlabel("x")
+    ax.set_ylabel("Normalized response")
+    ax.legend(loc="lower left")
+
+    ax = axes[0, 1]
+    ax.plot(x, pressure_excess, color="#7c3aed", label="pressure excess")
+    ax.plot(x, current_proxy, color="#dc2626", linestyle="--", label="current proxy")
+    ax.set_title("Pressure and current response")
+    ax.set_xlabel("x")
+    ax.set_ylabel("Response")
+    ax.legend(loc="upper left")
+
+    ax = axes[1, 0]
+    im = ax.pcolormesh(z_edges, y_edges, u_peak / peak_u, shading="auto", cmap="RdBu_r", vmin=0.0, vmax=1.0)
+    ax.contour(z, y, u_peak / peak_u, levels=np.linspace(0.2, 0.95, 5), colors="white", linewidths=0.8, alpha=0.75)
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label=r"$u/u_{peak}$")
+    ax.set_title(f"Peak-field cross-section (x={x[peak_index]:.2f})")
+    ax.set_xlabel("z")
+    ax.set_ylabel("y")
+
+    ax = axes[1, 1]
+    ax.plot(y, y_cut_ref / max(float(np.max(np.abs(y_cut_ref))), 1.0e-12), color="#64748b", label="reference y-cut")
+    ax.plot(y, y_cut / max(float(np.max(np.abs(y_cut))), 1.0e-12), color="#1d4ed8", linestyle="--", label="field y-cut")
+    ax.plot(z, z_cut_ref / max(float(np.max(np.abs(z_cut_ref))), 1.0e-12), color="#94a3b8", label="reference z-cut")
+    ax.plot(z, z_cut / max(float(np.max(np.abs(z_cut))), 1.0e-12), color="#b45309", linestyle="--", label="field z-cut")
+    ax.set_title("Peak-field centerline cuts")
+    ax.set_xlabel("local coordinate")
+    ax.set_ylabel(r"$u/u_{cut,max}$")
+    ax.legend(loc="lower center", ncol=2)
+
+    png_path = out_dir / "magnetic_obstacle_benchmark.png"
+    pdf_path = out_dir / "magnetic_obstacle_benchmark.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
 def write_strong_scaling_plots(
     records: list[dict[str, object]],
     out_dir: str | Path,

@@ -299,19 +299,26 @@ Current wall-bounded Benchmark C slice:
 
 Current first Benchmark D slice:
 
-- `examples/magnetic_obstacle_baseline.py` now provides the first executable
-  magnetic-obstacle baseline on the rectangular extruded lane
+- `examples/magnetic_obstacle_benchmark.py` now provides the first stronger
+  magnetic-obstacle benchmark on the rectangular extruded lane
 - observables:
-  obstacle-induced velocity deficit, current response, and conservation metrics
+  normalized velocity-deficit ratio, pressure-excess response, centerline-cut
+  distortion, current response, and conservation metrics
 - remaining work before any full Benchmark D claim:
   stronger-inertia obstacle regimes, literature parity on magnetic-obstacle
   observables, a more forceful executable mirror-field pipe response, and
   truly turbulent 3D validation
-- current bounded result from `examples/magnetic_obstacle_baseline.py`:
-  `obstacle_velocity_deficit ≈ 8.57e-8`,
-  `current_proxy_peak ≈ 1.06e-1`,
-  `field_velocity_correlation ≈ -5.16e-1`,
-  `max_charge_balance_residual ≈ 5.36e-7`
+- current bounded result from `examples/magnetic_obstacle_benchmark.py`:
+  `peak_velocity_deficit_ratio ≈ 3.23e-2`,
+  `peak_station_velocity_deficit_ratio ≈ 2.87e-2`,
+  `peak_pressure_excess ≈ 2.50e-1`,
+  `pressure_excess_proxy ≈ 6.08e-2`,
+  `current_proxy_peak ≈ 2.28`,
+  `y_l2_distortion ≈ 2.31e-1`,
+  `z_l2_distortion ≈ 2.08e-1`,
+  `divergence_to_field_ratio ≈ 1.69e-2`,
+  `max_charge_balance_residual ≈ 1.99e-13`,
+  `benchmark_pass = true`
 - `examples/wham_mirror_pipe_demo.py` now adds a tabulated WHAM-like mirror
   field on the pipe lane using `magpylib_jax`
 - `examples/autodiff_wham_pressure_sensitivity.py` now adds the first

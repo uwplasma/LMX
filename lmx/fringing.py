@@ -1485,6 +1485,7 @@ def build_magnetic_obstacle_rect_extruded_problem(
     entry_center: float = 2.2,
     exit_center: float = 3.8,
     transition_width: float = 0.22,
+    forcing: float = 1.0,
 ) -> ExtrudedInductionlessProblem:
     from .field_models import make_localized_divergence_free_obstacle_field
 
@@ -1513,6 +1514,7 @@ def build_magnetic_obstacle_rect_extruded_problem(
             coupling_iterations=min(case.solver.coupling_iterations, 8),
             coupling_tolerance=1.0e-7,
         ),
+        forcing=forcing,
         notes=(
             "Localized-field magnetic-obstacle baseline on the rectangular "
             "extruded inductionless solver lane."
@@ -2055,6 +2057,80 @@ def validate_magnetic_obstacle_baseline(
         "max_wall_current_leakage": float(validation.max_wall_current_leakage),
         "net_boundary_current_residual": float(validation.net_boundary_current_residual),
         "validation_pass": validation_pass,
+    }
+
+
+def validate_magnetic_obstacle_benchmark(
+    solution: ExtrudedInductionlessSolution,
+    reference_solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float | bool]:
+    if solution.problem.case.geometry.kind != "rect_duct":
+        raise ValueError("Magnetic-obstacle benchmark currently supports rectangular ducts only")
+    if reference_solution.problem.case.geometry.kind != "rect_duct":
+        raise ValueError("Magnetic-obstacle benchmark reference must be a rectangular duct")
+    if solution.bundle.u.shape != reference_solution.bundle.u.shape:
+        raise ValueError("Benchmark and reference solutions must share the same stacked field shape")
+
+    baseline = validate_magnetic_obstacle_baseline(solution, field_ny=field_ny, field_nz=field_nz)
+    bundle = solution.bundle
+    reference_bundle = reference_solution.bundle
+    divergence_ratio = float(baseline["rms_divergence"] / max(baseline["mean_field_magnitude"], 1.0e-12))
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    ref_mean_velocity = np.asarray(reference_bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    pressure_span = np.max(np.asarray(bundle.p, dtype=float), axis=(1, 2)) - np.min(np.asarray(bundle.p, dtype=float), axis=(1, 2))
+    reference_pressure_span = np.max(np.asarray(reference_bundle.p, dtype=float), axis=(1, 2)) - np.min(np.asarray(reference_bundle.p, dtype=float), axis=(1, 2))
+    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
+
+    denom = np.maximum(np.abs(ref_mean_velocity), 1.0e-12)
+    velocity_deficit_ratio = np.maximum((ref_mean_velocity - mean_velocity) / denom, 0.0)
+    peak_velocity_deficit_ratio = float(np.max(velocity_deficit_ratio)) if velocity_deficit_ratio.size else 0.0
+    peak_station_velocity_deficit_ratio = float(velocity_deficit_ratio[peak_index]) if velocity_deficit_ratio.size else 0.0
+    wake_recovery_ratio = float(mean_velocity[-1] / max(mean_velocity[0], 1.0e-12)) if mean_velocity.size else 0.0
+
+    pressure_excess = np.maximum(pressure_span - reference_pressure_span, 0.0)
+    pressure_excess_proxy = float(np.trapezoid(pressure_excess, np.asarray(bundle.x, dtype=float)) / max(float(bundle.x[-1] - bundle.x[0]), 1.0e-12)) if pressure_excess.size > 1 else 0.0
+    peak_pressure_excess = float(np.max(pressure_excess)) if pressure_excess.size else 0.0
+    current_proxy_peak = float(np.max(np.abs(current_proxy))) if current_proxy.size else 0.0
+
+    mid_y = int(bundle.u.shape[1] // 2)
+    mid_z = int(bundle.u.shape[2] // 2)
+    y_cut = np.asarray(bundle.u[peak_index, :, mid_z], dtype=float)
+    y_cut_ref = np.asarray(reference_bundle.u[peak_index, :, mid_z], dtype=float)
+    z_cut = np.asarray(bundle.u[peak_index, mid_y, :], dtype=float)
+    z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
+    y_l2_distortion = float(np.linalg.norm(y_cut - y_cut_ref) / max(np.linalg.norm(y_cut_ref), 1.0e-12))
+    z_l2_distortion = float(np.linalg.norm(z_cut - z_cut_ref) / max(np.linalg.norm(z_cut_ref), 1.0e-12))
+
+    validation_pass = bool(
+        divergence_ratio <= 2.5e-2
+        and baseline["max_charge_balance_residual"] <= 5.0e-2
+        and baseline["net_boundary_current_residual"] <= 1.0e-8
+        and baseline["max_wall_current_leakage"] <= 1.0e-8
+        and peak_velocity_deficit_ratio >= 1.0e-2
+        and peak_station_velocity_deficit_ratio >= 5.0e-3
+        and peak_pressure_excess >= 1.0e-3
+        and pressure_excess_proxy >= 1.0e-3
+        and current_proxy_peak >= 1.0e-2
+        and y_l2_distortion >= 5.0e-3
+        and z_l2_distortion >= 5.0e-3
+        and wake_recovery_ratio > 0.8
+    )
+    return {
+        **baseline,
+        "divergence_to_field_ratio": divergence_ratio,
+        "peak_velocity_deficit_ratio": peak_velocity_deficit_ratio,
+        "peak_station_velocity_deficit_ratio": peak_station_velocity_deficit_ratio,
+        "wake_recovery_ratio": wake_recovery_ratio,
+        "peak_pressure_excess": peak_pressure_excess,
+        "pressure_excess_proxy": pressure_excess_proxy,
+        "y_l2_distortion": y_l2_distortion,
+        "z_l2_distortion": z_l2_distortion,
+        "benchmark_pass": validation_pass,
     }
 
 

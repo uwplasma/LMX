@@ -224,11 +224,29 @@ first wall-bounded Q2D validation surface.
 
 ### Benchmark D first slice
 
-LMX now includes the first executable magnetic-obstacle baseline on the
+LMX now includes a stronger executable magnetic-obstacle benchmark on the
 rectangular extruded solver lane. This is still a low-inertia inductionless
-slice, not a turbulent magnetic-obstacle solver, but it is a real executable
-Benchmark D starting point with obstacle-induced velocity-deficit and current
-response observables.
+slice, not a turbulent magnetic-obstacle solver, but it now compares the
+obstacle case directly against a matched no-field reference and reports
+normalized response observables rather than only baseline internal metrics.
+
+The main driver is `examples/magnetic_obstacle_benchmark.py`. On the current
+bounded case (`24 × 24 × 17`, localized obstacle field, matched no-field
+reference), it reports:
+
+- `peak_velocity_deficit_ratio ≈ 3.23e-2`
+- `peak_pressure_excess ≈ 2.50e-1`
+- `pressure_excess_proxy ≈ 6.08e-2`
+- `current_proxy_peak ≈ 2.28`
+- `y_l2_distortion ≈ 2.31e-1`
+- `z_l2_distortion ≈ 2.08e-1`
+- `max_charge_balance_residual ≈ 1.99e-13`
+
+That is the current reviewer-facing Benchmark D slice: a real 3D obstacle
+response benchmark with measurable pressure growth, current redistribution,
+cross-sectional distortion, and clean conservation.
+
+![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
 LMX now also includes a tabulated WHAM-like mirror-field pipe lane and a
 matching differentiable pressure-drop sensitivity study. The executable driver
@@ -240,12 +258,11 @@ mirror topology as a stationwise field profile and differentiates a
 pressure-drop proxy with respect to coil separation.
 
 At the current reference separation (`1.96 m`), the reduced differentiable
-lane gives `pressure_drop_proxy ≈ 3.85` and
-`d(Δp)/ds ≈ 2.98e-1`, with a smooth monotone pressure-drop trend over the
-tested separation sweep. The full executable tabulated-pipe solve is now a
-real field-loading and conservation baseline, but its nominal-WHAM low-Re
-response remains weak enough that the reduced sensitivity lane is the cleaner
-reviewer-facing result today.
+lane gives `pressure_drop_proxy ≈ 3.85` and `d(Δp)/ds ≈ 2.98e-1`, with a
+smooth monotone pressure-drop trend over the tested separation sweep. The full
+executable tabulated-pipe solve remains a stable field-loading and conservation
+baseline, but its nominal-WHAM low-Re response is still much weaker than the
+rectangular magnetic-obstacle benchmark above.
 
 ![LMX WHAM-like mirror pressure sensitivity](docs/_static/generated/autodiff_wham_pressure_sensitivity.png)
 
