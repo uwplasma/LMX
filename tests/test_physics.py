@@ -2,10 +2,12 @@ from dataclasses import replace
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
+from lmx.field_models import write_tabulated_field_npz
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.physics import _boundary_sides, build_material_fields, magnetic_field_components
 from lmx.reference_data import default_closed_channel_reference_root
@@ -250,7 +252,7 @@ def test_small_hunt_solution_matches_bundled_reference_profiles():
 
 
 @pytest.mark.unit
-def test_magnetic_field_components_support_analytic_and_reject_tabulated_without_loader():
+def test_magnetic_field_components_support_analytic_and_tabulated_fields(tmp_path: Path):
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     analytic = MagneticFieldSpec(
         kind="analytic",
@@ -262,8 +264,21 @@ def test_magnetic_field_components_support_analytic_and_reject_tabulated_without
     assert by.shape == mesh.yz_shape
     assert bz.shape == mesh.yz_shape
 
-    with pytest.raises(NotImplementedError, match="Tabulated magnetic fields"):
-        magnetic_field_components(MagneticFieldSpec(kind="tabulated", table_path="field.csv"), mesh, time=0.0)
+    y = np.asarray(mesh.y_centers, dtype=float)
+    z = np.asarray(mesh.z_centers, dtype=float)
+    yy, zz = np.meshgrid(y, z, indexing="ij")
+    path = write_tabulated_field_npz(
+        tmp_path / "field.npz",
+        y=y,
+        z=z,
+        bx=np.zeros_like(yy),
+        by=yy + zz,
+        bz=yy - zz,
+    )
+    tbx, tby, tbz = magnetic_field_components(MagneticFieldSpec(kind="tabulated", table_path=str(path)), mesh, time=0.0)
+    assert jnp.allclose(tbx, 0.0)
+    assert jnp.allclose(tby, by)
+    assert jnp.allclose(tbz, bz)
 
     with pytest.raises(ValueError, match="requires fn"):
         magnetic_field_components(MagneticFieldSpec(kind="analytic"), mesh, time=0.0)

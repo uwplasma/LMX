@@ -85,6 +85,8 @@ JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
 - build a `CaseSpec` directly
 - define a custom `GeometrySpec`
 - attach an analytic magnetic field callback through `MagneticFieldSpec(kind="analytic", fn=...)`
+- or point a TOML / Python case at a tabulated NPZ field through
+  `MagneticFieldSpec(kind="tabulated", table_path=...)`
 - preview the geometry before solving
 - run the solver and write plots
 

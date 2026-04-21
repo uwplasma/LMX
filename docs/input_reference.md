@@ -165,12 +165,13 @@ side = "max"
 
 - `kind`
   - `constant`
-  - `table`
+  - `tabulated`
   - analytic callables are Python-only, not TOML inputs
 - `value`
   - constant field components
 - `table_path`
-  - optional table-backed field input path
+  - optional NPZ-backed field input path with either `y,z,bx,by,bz` or
+    `x,y,z,bx,by,bz` arrays
 - `ramp_start`
 - `ramp_duration`
 

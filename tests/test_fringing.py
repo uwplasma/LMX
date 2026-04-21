@@ -1,7 +1,9 @@
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from dataclasses import replace
 
+from lmx.field_models import make_divergence_free_cross_section_field, sample_cross_section_field, write_tabulated_field_npz
 from lmx.fringing import (
     build_bent_pipe_extruded_problem,
     build_layered_duct_extruded_problem,
@@ -30,6 +32,7 @@ from lmx.fringing import (
     validate_variable_field_extruded_solution,
 )
 from lmx.specs import GeometrySpec
+from lmx.specs import MagneticFieldSpec
 
 
 pytestmark = pytest.mark.unit
@@ -496,6 +499,27 @@ def test_solve_extruded_inductionless_supports_layered_analytic_variable_field()
     assert solution.bundle.geometry_kind == "layered_duct"
     assert jnp.all(jnp.isfinite(solution.bundle.u))
     assert validation["mean_velocity_change"] > 0.0
+    assert isinstance(validation["validation_pass"], bool)
+
+
+def test_solve_extruded_inductionless_supports_tabulated_variable_field(tmp_path):
+    field_fn = make_divergence_free_cross_section_field(width=2.4, height=1.6, base_bz=12.0, perturbation=0.12)
+    y, z, field = sample_cross_section_field(field_fn, width=2.4, height=1.6, ny=41, nz=41)
+    path = write_tabulated_field_npz(
+        tmp_path / "field.npz",
+        y=y,
+        z=z,
+        bx=field[..., 0],
+        by=field[..., 1],
+        bz=field[..., 2],
+    )
+    problem = build_square_duct_extruded_problem(nx_stations=7, ny=10, nz=10, width=2.4, height=1.6, ha_peak=12.0)
+    problem = replace(problem, case=replace(problem.case, magnetic_field=MagneticFieldSpec(kind="tabulated", table_path=str(path))))
+    solution = solve_extruded_inductionless(problem)
+    validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
+
+    assert solution.bundle.geometry_kind == "rect_duct"
+    assert validation["rms_divergence"] >= 0.0
     assert isinstance(validation["validation_pass"], bool)
 
 

@@ -14,6 +14,7 @@ except Exception:  # pragma: no cover - SciPy should be present in shipped envir
 
 from .cases import _ha_to_b, make_hunt_case, make_shercliff_case
 from .core import Solution
+from .field_models import load_tabulated_field, sample_tabulated_field_volume
 from .mesh import generate_bent_pipe_mesh, generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
 from .physics import build_material_fields
 from .specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, OutputSpec, RegionSpec, SolverConfig, TimeStepperConfig
@@ -576,6 +577,9 @@ def _sample_station_magnetic_field_duct(
     ny: int,
     nz: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float)
+    y_coords = np.asarray(mesh.y_centers, dtype=float)
+    z_coords = np.asarray(mesh.z_centers, dtype=float)
     if case.magnetic_field.kind == "constant":
         base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         bx = _broadcast_station_profile(field_scale * float(base_field[0]), ny, nz)
@@ -596,7 +600,20 @@ def _sample_station_magnetic_field_duct(
         bz0 = _broadcast_cross_section(sampled[..., 2], nx)
         station_scale = field_scale[:, None, None]
         return station_scale * bx0, station_scale * by0, station_scale * bz0
-    raise NotImplementedError("Tabulated magnetic fields are planned but not yet implemented for extruded solves.")
+    if case.magnetic_field.kind == "tabulated":
+        if case.magnetic_field.table_path is None:
+            raise ValueError("Tabulated magnetic field requires table_path")
+        table = load_tabulated_field(case.magnetic_field.table_path)
+        xx, yy, zz = np.meshgrid(x_coords, y_coords, z_coords, indexing="ij")
+        sampled = sample_tabulated_field_volume(case.magnetic_field.table_path, x=xx, y=yy, z=zz)
+        if "x" not in table:
+            sampled = sampled * np.asarray(field_scale[:, None, None, None], dtype=float)
+        return (
+            jnp.asarray(sampled[..., 0], dtype=float),
+            jnp.asarray(sampled[..., 1], dtype=float),
+            jnp.asarray(sampled[..., 2], dtype=float),
+        )
+    raise ValueError(f"Unsupported magnetic-field kind {case.magnetic_field.kind!r}")
 
 
 def _sample_station_magnetic_field_pipe(
@@ -606,6 +623,9 @@ def _sample_station_magnetic_field_pipe(
     theta_grid: jnp.ndarray,
     field_scale: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, rr.shape[0]), dtype=float)
+    yy = np.asarray(rr[0] * jnp.cos(theta_grid[0]), dtype=float)
+    zz = np.asarray(rr[0] * jnp.sin(theta_grid[0]), dtype=float)
     if case.magnetic_field.kind == "constant":
         base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         bx = jnp.broadcast_to(field_scale[:, None, None] * float(base_field[0]), rr.shape)
@@ -615,15 +635,28 @@ def _sample_station_magnetic_field_pipe(
     if case.magnetic_field.kind == "analytic":
         if case.magnetic_field.fn is None:
             raise ValueError("Analytic magnetic field requires fn")
-        yy = rr[0] * jnp.cos(theta_grid[0])
-        zz = rr[0] * jnp.sin(theta_grid[0])
-        sampled = jnp.asarray(case.magnetic_field.fn(yy, zz), dtype=float)
+        sampled = jnp.asarray(case.magnetic_field.fn(jnp.asarray(yy), jnp.asarray(zz)), dtype=float)
         bx0 = jnp.broadcast_to(sampled[..., 0][None, :, :], rr.shape)
         by0 = jnp.broadcast_to(sampled[..., 1][None, :, :], rr.shape)
         bz0 = jnp.broadcast_to(sampled[..., 2][None, :, :], rr.shape)
         station_scale = field_scale[:, None, None]
         return station_scale * bx0, station_scale * by0, station_scale * bz0
-    raise NotImplementedError("Tabulated magnetic fields are planned but not yet implemented for pipe extruded solves.")
+    if case.magnetic_field.kind == "tabulated":
+        if case.magnetic_field.table_path is None:
+            raise ValueError("Tabulated magnetic field requires table_path")
+        table = load_tabulated_field(case.magnetic_field.table_path)
+        xx = np.broadcast_to(x_coords[:, None, None], rr.shape)
+        yy3 = np.broadcast_to(yy[None, :, :], rr.shape)
+        zz3 = np.broadcast_to(zz[None, :, :], rr.shape)
+        sampled = sample_tabulated_field_volume(case.magnetic_field.table_path, x=xx, y=yy3, z=zz3)
+        if "x" not in table:
+            sampled = sampled * np.asarray(field_scale[:, None, None, None], dtype=float)
+        return (
+            jnp.asarray(sampled[..., 0], dtype=float),
+            jnp.asarray(sampled[..., 1], dtype=float),
+            jnp.asarray(sampled[..., 2], dtype=float),
+        )
+    raise ValueError(f"Unsupported magnetic-field kind {case.magnetic_field.kind!r}")
 
 
 def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, float], ...]:
@@ -1824,19 +1857,7 @@ def validate_variable_field_extruded_solution(
 ) -> dict[str, float | bool]:
     if solution.problem.case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise ValueError("Variable-field extruded validation currently supports rectangular and layered ducts only")
-    if solution.problem.case.magnetic_field.kind != "analytic" or solution.problem.case.magnetic_field.fn is None:
-        raise ValueError("Variable-field extruded validation requires an analytic magnetic field")
-
-    from .field_models import cross_section_divergence_metrics
-
-    geometry = solution.problem.case.geometry
-    field_metrics = cross_section_divergence_metrics(
-        solution.problem.case.magnetic_field.fn,
-        width=geometry.width,
-        height=geometry.height,
-        ny=field_ny,
-        nz=field_nz,
-    )
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
     validation = solution.validation
     field_scale = np.asarray(solution.bundle.field_scale, dtype=float)
     mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
@@ -1874,19 +1895,7 @@ def validate_variable_field_pipe_solution(
 ) -> dict[str, float | bool]:
     if solution.problem.case.geometry.kind not in {"pipe_ogrid", "bent_pipe"}:
         raise ValueError("Variable-field pipe validation currently supports pipe_ogrid and bent_pipe only")
-    if solution.problem.case.magnetic_field.kind != "analytic" or solution.problem.case.magnetic_field.fn is None:
-        raise ValueError("Variable-field pipe validation requires an analytic magnetic field")
-
-    from .field_models import cross_section_divergence_metrics
-
-    geometry = solution.problem.case.geometry
-    field_metrics = cross_section_divergence_metrics(
-        solution.problem.case.magnetic_field.fn,
-        width=geometry.width,
-        height=geometry.height,
-        ny=field_ny,
-        nz=field_nz,
-    )
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
     validation = solution.validation
     mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
     current_proxy = np.asarray(solution.bundle.current_scaled_pressure_proxy, dtype=float)
@@ -1910,6 +1919,49 @@ def validate_variable_field_pipe_solution(
         "net_boundary_current_residual": float(validation.net_boundary_current_residual),
         "validation_pass": validation_pass,
     }
+
+
+def _variable_field_metrics(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float]:
+    field_kind = solution.problem.case.magnetic_field.kind
+    geometry = solution.problem.case.geometry
+    if field_kind == "analytic" and solution.problem.case.magnetic_field.fn is not None:
+        from .field_models import cross_section_divergence_metrics
+
+        return cross_section_divergence_metrics(
+            solution.problem.case.magnetic_field.fn,
+            width=geometry.width,
+            height=geometry.height,
+            ny=field_ny,
+            nz=field_nz,
+        )
+    if field_kind == "tabulated":
+        # The bundle does not store B explicitly, so resample the tabulated field at the magnet mid-station.
+        mesh = _cross_section_mesh(solution.problem.case)
+        x_mid = np.full((mesh.ny, mesh.nz), 0.5 * geometry.length, dtype=float)
+        y_mid, z_mid = np.meshgrid(np.asarray(mesh.y_centers, dtype=float), np.asarray(mesh.z_centers, dtype=float), indexing="ij")
+        sampled = sample_tabulated_field_volume(
+            solution.problem.case.magnetic_field.table_path,
+            x=x_mid,
+            y=y_mid,
+            z=z_mid,
+        )
+        by = np.asarray(sampled[..., 1], dtype=float)
+        bz = np.asarray(sampled[..., 2], dtype=float)
+        dy = float(mesh.y_centers[1] - mesh.y_centers[0]) if mesh.ny > 1 else 1.0
+        dz = float(mesh.z_centers[1] - mesh.z_centers[0]) if mesh.nz > 1 else 1.0
+        div = np.gradient(by, dy, axis=0) + np.gradient(bz, dz, axis=1)
+        magnitude = np.sqrt(by**2 + bz**2)
+        return {
+            "max_abs_divergence": float(np.max(np.abs(div))),
+            "rms_divergence": float(np.sqrt(np.mean(div**2))),
+            "mean_field_magnitude": float(np.mean(magnitude)),
+        }
+    raise ValueError("Variable-field validation currently supports analytic and tabulated magnetic fields")
 
 
 def validate_magnetic_obstacle_baseline(

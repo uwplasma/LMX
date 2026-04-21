@@ -218,9 +218,16 @@ Current status:
   `build_variable_field_pipe_ogrid_extruded_problem(...)`,
   `build_variable_field_bent_pipe_extruded_problem(...)`, and the paired
   example drivers
-- the remaining work is full generic 3D/tabulated field support through the
-  fringing and CLI lanes, plus broader parity-grade validation on those new
-  geometries
+- tabulated-field rectangular support now also exists through
+  `examples/variable_field_tabulated_demo.py` and
+  `examples/fringing_tabulated_case.toml`
+- current bounded rectangular tabulated-field result:
+  `field_velocity_correlation ≈ -7.52e-1`,
+  `current_proxy_change ≈ 8.28e-1`,
+  `max_charge_balance_residual ≈ 5.34e-6`
+- the remaining work is broader parity-grade validation on those new
+  geometries and generic 3D tabulated fields beyond the current structured
+  duct baseline
 
 ### Literature-anchored benchmark expansion
 
@@ -275,6 +282,20 @@ Current forced Benchmark C slice:
 - current bounded result from `examples/q2d_forced_validation.py`:
   `l2_error ≈ 4.44e-4`, `linf_error ≈ 4.44e-4`,
   `steady_amplitude_rel_error ≈ 4.44e-4`
+
+Current wall-bounded Benchmark C slice:
+
+- `examples/q2d_wall_bounded_validation.py` now adds the first no-slip Q2D
+  duct benchmark
+- observables:
+  final-state `L2/L∞` error and amplitude error against the exact Dirichlet
+  transient solution
+- remaining work before any turbulent Benchmark C claim:
+  Sommeria-Moreau-style closures, literature-anchored wall-bounded duct
+  observables, and Q2D turbulence
+- current bounded result from `examples/q2d_wall_bounded_validation.py`:
+  `l2_error ≈ 4.89e-4`, `linf_error ≈ 4.89e-4`,
+  `amplitude_rel_error ≈ 4.89e-4`
 
 Current first Benchmark D slice:
 

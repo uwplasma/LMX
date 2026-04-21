@@ -720,6 +720,20 @@ def test_variable_field_layered_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "variable_field_layered_summary.json").exists()
 
 
+def test_variable_field_tabulated_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("variable_field_tabulated_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.TABLE_PATH = tmp_path / "tabulated_rect_field.npz"
+    module.NY = 16
+    module.NZ = 16
+    module.NX_STATIONS = 9
+    summary = module.run_variable_field_tabulated_demo()
+    assert summary["case"] == "variable_field_tabulated"
+    assert (tmp_path / "extruded_overview.png").exists()
+    assert (tmp_path / "variable_field_tabulated_summary.json").exists()
+    assert (tmp_path / "tabulated_rect_field.npz").exists()
+
+
 def test_variable_field_bent_pipe_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("variable_field_bent_pipe_demo.py")
     module.OUTPUT_DIR = tmp_path
@@ -756,6 +770,19 @@ def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     assert summary["validation"]["validation_pass"] is True
     assert (tmp_path / "q2d_forced_overview.png").exists()
     assert (tmp_path / "q2d_forced_validation_summary.json").exists()
+
+
+def test_q2d_wall_bounded_validation_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2d_wall_bounded_validation.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NX = 48
+    module.NY = 48
+    module.T_FINAL = 0.08
+    summary = module.run_q2d_wall_bounded_validation()
+    assert summary["case"] == "q2d_wall_bounded_validation"
+    assert summary["validation"]["validation_pass"] is True
+    assert (tmp_path / "q2d_wall_bounded_overview.png").exists()
+    assert (tmp_path / "q2d_wall_bounded_validation_summary.json").exists()
 
 
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):

@@ -58,8 +58,10 @@ python examples/variable_field_validation.py
 python examples/variable_field_extruded_demo.py
 python examples/variable_field_layered_demo.py
 python examples/variable_field_bent_pipe_demo.py
+python examples/variable_field_tabulated_demo.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
+python examples/q2d_wall_bounded_validation.py
 python examples/magnetic_obstacle_baseline.py
 ```
 
@@ -71,6 +73,7 @@ lmx examples/hartmann_restart_case.toml
 lmx examples/shercliff_case.toml
 lmx examples/hunt_case.toml
 lmx examples/fringing_rect_case.toml
+lmx examples/fringing_tabulated_case.toml
 lmx examples/fringing_layered_case.toml
 lmx examples/fringing_layered_restart_case.toml
 lmx examples/fringing_pipe_case.toml
@@ -263,6 +266,7 @@ Variable-field layered duct and curved pipe:
 ```bash
 python examples/variable_field_layered_demo.py
 python examples/variable_field_bent_pipe_demo.py
+python examples/variable_field_tabulated_demo.py
 ```
 
 Those examples extend the same field API into:
@@ -270,6 +274,7 @@ Those examples extend the same field API into:
 - layered ducts with wall materials retained in the 3D solve
 - curved pipes validated against the straight-pipe low-De limit under the same field
 - reusable machine-readable summaries of field and conservation metrics
+- a tabulated-field duct run that also matches the TOML/CLI path
 
 Benchmark C / Q2D baseline:
 
@@ -293,6 +298,18 @@ That example upgrades the Q2D lane from decay-only to a forced duct baseline:
 
 - solve a periodic Hartmann-friction mode driven toward a steady state
 - compare the steady state and approach-to-steady-state against the analytic solution
+- write a compact validation figure and summary JSON
+
+Wall-bounded Benchmark C / Q2D duct:
+
+```bash
+python examples/q2d_wall_bounded_validation.py
+```
+
+That example moves the Q2D lane from periodic modes to a wall-bounded duct:
+
+- solve a no-slip forced Q2D Hartmann-friction mode in a rectangular box
+- compare the transient final state against the exact Dirichlet solution
 - write a compact validation figure and summary JSON
 
 First Benchmark D slice:

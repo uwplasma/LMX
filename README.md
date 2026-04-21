@@ -17,6 +17,7 @@ differentiable workflows for sensitivity analysis and inverse design.
 - Rectangular, layered, mapped-pipe, and bent-pipe geometry support
 - Executable analytic variable-field duct workflows
 - Layered and curved-pipe variable-field research drivers
+- Tabulated 3D magnetic-field support through Python and TOML/CLI
 - JAX-based CPU and GPU execution
 - Explicit conservation diagnostics for charge closure and boundary-current audits
 - Input-file and Python-driver workflows
@@ -190,6 +191,11 @@ The same field API now also drives:
 - layered duct variable-field solves
 - straight-pipe variable-field solves
 - bent-pipe low-De variable-field comparisons against the matching straight-pipe limit
+- tabulated-field extruded solves through both Python examples and TOML input files
+
+The tabulated rectangular lane is exercised by
+`examples/variable_field_tabulated_demo.py` and
+`examples/fringing_tabulated_case.toml`.
 
 ### Benchmark C baseline
 
@@ -201,6 +207,11 @@ drag and is compared against the corresponding analytic exponential decay.
 LMX also now includes the first forced Benchmark C slice: a periodic Q2D mode
 driven to a steady state and compared against the corresponding analytic forced
 solution.
+
+The next wall-bounded Q2D slice is now also executable: a no-slip duct mode
+forced inside a rectangular box and compared against the exact transient
+Dirichlet solution. That closes the gap between the periodic baseline and the
+first wall-bounded Q2D validation surface.
 
 ### Benchmark D first slice
 

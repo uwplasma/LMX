@@ -247,12 +247,29 @@ Current forced Benchmark C baseline:
   - role:
     first forced Q2D duct slice before turbulent closures
 
+Current wall-bounded Benchmark C baseline:
+
+- `examples/q2d_wall_bounded_validation.py`
+  - forced wall-bounded Q2D Hartmann-friction duct mode
+  - observables:
+    final-state `L2/L∞` error and amplitude error against the exact transient
+    Dirichlet solution
+  - role:
+    first wall-bounded Q2D duct slice before Sommeria-Moreau-style closures
+
 Current bounded result:
 
 - `96 × 96`, `ν = 0.01`, Hartmann-friction `= 2.0`
 - `l2_error ≈ 4.44e-4`
 - `linf_error ≈ 4.44e-4`
 - `steady_amplitude_rel_error ≈ 4.44e-4`
+
+Current bounded wall-bounded result:
+
+- `96 × 96`, `ν = 0.01`, Hartmann-friction `= 2.0`
+- `l2_error ≈ 4.89e-4`
+- `linf_error ≈ 4.89e-4`
+- `amplitude_rel_error ≈ 4.89e-4`
 
 Current first Benchmark D slice:
 
@@ -347,6 +364,9 @@ Current bounded low-De baseline:
     `examples/variable_field_layered_demo.py`
   - curved-pipe extension:
     `examples/variable_field_bent_pipe_demo.py`
+  - tabulated-field extension:
+    `examples/variable_field_tabulated_demo.py` and
+    `examples/fringing_tabulated_case.toml`
   - recovery test: reproduce the current fringing benchmarks through the
     generic field-loading path
   - extension: tabulated or analytic 3D fields for ducts and pipes
@@ -360,6 +380,12 @@ Current bounded results:
   `field_velocity_correlation ≈ -9.98e-1`,
   `current_proxy_change ≈ 2.69e2`,
   `max_charge_balance_residual ≈ 1.36e-1`
+- tabulated rectangular variable-field duct:
+  bounded validation pass on the same conservation and divergence metrics as
+  the analytic rectangular lane, currently
+  `field_velocity_correlation ≈ -7.52e-1`,
+  `current_proxy_change ≈ 8.28e-1`,
+  `max_charge_balance_residual ≈ 5.34e-6`
 - bent-pipe variable-field low-De comparison:
   straight/bent equivalence still satisfies
   `cross_section_l2_error ≈ 8.12e-6`,

@@ -503,6 +503,8 @@ def write_closed_channel_profile_comparison_figure(
     out_dir.mkdir(parents=True, exist_ok=True)
     shercliff_ref = load_shercliff_analytical(int(ha))
     hunt_ref = load_hunt_analytical(int(ha))
+    shercliff_validation = closed_channel_validation(shercliff_solution, "shercliff", int(ha))
+    hunt_validation = closed_channel_validation(hunt_solution, "hunt", int(ha))
     shercliff_profile = extract_midplane_profile(shercliff_solution, axis="z", fluid_only=True)
     hunt_profile = extract_midplane_profile(hunt_solution, axis="z", fluid_only=True)
     shercliff_peak = max(float(np.max(np.asarray(shercliff_profile["u"], dtype=float))), 1.0e-12)
@@ -529,8 +531,8 @@ def write_closed_channel_profile_comparison_figure(
         shercliff_normalized,
         color="#1d4ed8",
         marker="x",
-        markersize=5,
-        linewidth=1.2,
+        markersize=4.0,
+        linewidth=1.4,
         label="LMX: Shercliff",
     )
     ax.plot(
@@ -546,14 +548,27 @@ def write_closed_channel_profile_comparison_figure(
         hunt_normalized,
         color="#dc2626",
         marker="o",
-        markersize=3.2,
-        linewidth=1.2,
+        markersize=2.8,
+        linewidth=1.4,
+        markerfacecolor="white",
         label="LMX: Hunt",
     )
     ax.set_xlabel("Position [m]")
     ax.set_ylabel("Normalized streamwise velocity u / max(u)")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="lower right", frameon=True)
+    ax.text(
+        0.03,
+        0.97,
+        (
+            f"Shercliff z-L2 = {shercliff_validation.z_profile.l2_error:.2e}\n"
+            f"Hunt z-L2 = {hunt_validation.z_profile.l2_error:.2e}"
+        ),
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
+    )
     png_path = out_dir / "analytic_velocity_profiles.png"
     pdf_path = out_dir / "analytic_velocity_profiles.pdf"
     fig.savefig(png_path, bbox_inches="tight")

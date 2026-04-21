@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import jax.numpy as jnp
+import numpy as np
 
+from .field_models import sample_tabulated_cross_section_field
 from .mesh import StructuredMesh
 from .operators import center_coordinates
 from .specs import BoundaryCondition, CaseSpec, MagneticFieldSpec, RegionSpec
@@ -41,8 +43,21 @@ def magnetic_field_components(
             raise ValueError("Analytic magnetic field requires fn")
         field = spec.fn(yc, zc)
         field = field[..., 0], field[..., 1], field[..., 2]
+    elif spec.kind == "tabulated":
+        if spec.table_path is None:
+            raise ValueError("Tabulated magnetic field requires table_path")
+        sampled = sample_tabulated_cross_section_field(
+            spec.table_path,
+            y=np.asarray(yc, dtype=float),
+            z=np.asarray(zc, dtype=float),
+        )
+        field = (
+            jnp.asarray(sampled[..., 0], dtype=float),
+            jnp.asarray(sampled[..., 1], dtype=float),
+            jnp.asarray(sampled[..., 2], dtype=float),
+        )
     else:
-        raise NotImplementedError("Tabulated magnetic fields are planned but not yet implemented.")
+        raise ValueError(f"Unsupported magnetic-field kind {spec.kind!r}")
     scale = magnetic_ramp_scale(spec, time)
     return field[0] * scale, field[1] * scale, field[2] * scale
 

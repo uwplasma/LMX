@@ -247,6 +247,7 @@ def test_shipped_example_toml_files_parse():
         "shercliff_case.toml",
         "hunt_case.toml",
         "fringing_rect_case.toml",
+        "fringing_tabulated_case.toml",
         "fringing_layered_case.toml",
         "fringing_layered_restart_case.toml",
         "fringing_pipe_case.toml",
