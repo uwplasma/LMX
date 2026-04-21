@@ -65,6 +65,7 @@ python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py
 python examples/magnetic_obstacle_benchmark.py
+python examples/magnetic_obstacle_regime_scan.py
 python examples/magnetic_obstacle_baseline.py
 ```
 
@@ -337,6 +338,11 @@ Those examples are the current executable Benchmark D entry points:
   - write both the generic extruded overview and a dedicated benchmark panel
   - record normalized velocity-deficit, pressure-excess, distortion, and
     conservation metrics
+- `magnetic_obstacle_regime_scan.py`
+  - sweep localized-field obstacle runs over `Bz` scale and forcing
+  - write a compact response-map figure over velocity deficit, pressure excess,
+    current response, and cross-cut distortion
+  - stage the transition from the current baseline toward stronger-inertia Benchmark D cases
 - `magnetic_obstacle_baseline.py`
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
   - write the full extruded overview panel

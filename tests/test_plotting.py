@@ -18,6 +18,7 @@ from lmx.plotting import (
     write_cross_section_field_plots,
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
+    write_magnetic_obstacle_regime_plots,
     write_strong_scaling_plots,
     write_wham_mirror_overview_plots,
     write_transient_movies,
@@ -403,5 +404,18 @@ def test_write_wham_mirror_overview_plots_writes_png_and_pdf(tmp_path: Path):
         autodiff_summary=autodiff_summary,
     )
     assert outputs == [tmp_path / "wham_mirror_overview.png", tmp_path / "wham_mirror_overview.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_magnetic_obstacle_regime_plots_writes_png_and_pdf(tmp_path: Path):
+    records = [
+        {"base_bz": 20.0, "forcing": 0.5, "peak_velocity_deficit_ratio": 1.0e-2, "pressure_excess_proxy": 2.0e-2, "current_proxy_peak": 5.0e-1, "y_l2_distortion": 1.5e-1, "z_l2_distortion": 1.3e-1},
+        {"base_bz": 20.0, "forcing": 1.0, "peak_velocity_deficit_ratio": 2.0e-2, "pressure_excess_proxy": 3.0e-2, "current_proxy_peak": 7.0e-1, "y_l2_distortion": 1.8e-1, "z_l2_distortion": 1.6e-1},
+        {"base_bz": 40.0, "forcing": 0.5, "peak_velocity_deficit_ratio": 3.0e-2, "pressure_excess_proxy": 5.0e-2, "current_proxy_peak": 1.2, "y_l2_distortion": 2.0e-1, "z_l2_distortion": 1.9e-1},
+        {"base_bz": 40.0, "forcing": 1.0, "peak_velocity_deficit_ratio": 4.0e-2, "pressure_excess_proxy": 7.0e-2, "current_proxy_peak": 1.7, "y_l2_distortion": 2.4e-1, "z_l2_distortion": 2.2e-1},
+    ]
+    outputs = write_magnetic_obstacle_regime_plots(records, tmp_path, case_title="Obstacle regime scan")
+    assert outputs == [tmp_path / "magnetic_obstacle_regime_scan.png", tmp_path / "magnetic_obstacle_regime_scan.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()

@@ -54,6 +54,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_case_overview_plots)
     assert callable(lmx.write_extruded_overview_plots)
     assert callable(lmx.write_magnetic_obstacle_benchmark_plots)
+    assert callable(lmx.write_magnetic_obstacle_regime_plots)
     assert callable(lmx.write_bent_pipe_overview_plots)
     assert callable(lmx.write_geometry_gallery_plots)
     assert callable(lmx.write_geometry_preview_plots)

@@ -298,6 +298,24 @@ Current bounded result:
 - `max_charge_balance_residual ≈ 1.99e-13`
 - `benchmark_pass = true`
 
+Current bounded regime scan:
+
+- `examples/magnetic_obstacle_regime_scan.py`
+  - sweeps the same localized-field rectangular obstacle case over
+    `Bz` scale and forcing
+  - writes a four-panel response map over velocity deficit, pressure response,
+    current response, and mean cross-cut distortion
+- bounded `3 × 3` scan:
+  - low response at `Bz = 20`
+  - clearly stronger obstacle signature and passing bounded gate at `Bz = 40`
+  - strong distortion and pressure/current response at `Bz = 60`
+- strongest bounded point in the checked scan:
+  - `Bz = 60`, `forcing = 2`
+  - `peak_velocity_deficit_ratio ≈ 7.01e-2`
+  - `pressure_excess_proxy ≈ 6.74e-1`
+  - `current_proxy_peak ≈ 9.40e1`
+  - `mean cross-cut distortion ≈ 6.22e-1`
+
 Current tabulated-field / mirror-field extension:
 
 - `examples/wham_mirror_pipe_demo.py`

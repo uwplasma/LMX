@@ -319,6 +319,10 @@ Current first Benchmark D slice:
   `divergence_to_field_ratio ≈ 1.69e-2`,
   `max_charge_balance_residual ≈ 1.99e-13`,
   `benchmark_pass = true`
+- `examples/magnetic_obstacle_regime_scan.py` now stages the next step beyond
+  that bounded point by sweeping obstacle cases over field scale and forcing
+  and recording how deficit, pressure response, current response, and
+  distortion strengthen across the small regime map
 - `examples/wham_mirror_pipe_demo.py` now adds a tabulated WHAM-like mirror
   field on the pipe lane using `magpylib_jax`
 - `examples/autodiff_wham_pressure_sensitivity.py` now adds the first

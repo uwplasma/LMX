@@ -248,6 +248,14 @@ cross-sectional distortion, and clean conservation.
 
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
+To push beyond that single bounded point, LMX also now includes
+`examples/magnetic_obstacle_regime_scan.py`, which sweeps obstacle runs over
+field scale and forcing and writes a compact response map. That scan is the
+current bridge from the low-inertia baseline toward stronger-inertia Benchmark
+D cases, while keeping the routine example and test surface bounded.
+
+![LMX magnetic-obstacle regime scan](docs/_static/generated/magnetic_obstacle_regime_scan.png)
+
 LMX now also includes a tabulated WHAM-like mirror-field pipe lane and a
 matching differentiable pressure-drop sensitivity study. The executable driver
 is `examples/wham_mirror_pipe_demo.py`: it writes the tabulated 3D field,

@@ -876,6 +876,23 @@ def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
     assert (tmp_path / "magnetic_obstacle_benchmark_summary.json").exists()
 
 
+def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):
+    module = _load_example_module("magnetic_obstacle_regime_scan.py")
+    module.OUTPUT_DIR = tmp_path
+    module.BASE_BZ_VALUES = [20.0]
+    module.FORCING_VALUES = [1.0]
+    module.NY = 10
+    module.NZ = 10
+    module.NX_STATIONS = 7
+    module.MAX_STEPS = 6
+    module.POTENTIAL_ITERATIONS = 16
+    module.COUPLING_ITERATIONS = 4
+    summary = module.run_magnetic_obstacle_regime_scan()
+    assert summary["case"] == "magnetic_obstacle_regime_scan"
+    assert (tmp_path / "magnetic_obstacle_regime_scan.png").exists()
+    assert (tmp_path / "magnetic_obstacle_regime_scan_summary.json").exists()
+
+
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("pipe_reference_comparison_demo.py")
     summary = module.run_pipe_reference_comparison_demo(

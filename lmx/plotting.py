@@ -1744,6 +1744,65 @@ def write_wham_mirror_overview_plots(
     return [png_path, pdf_path]
 
 
+def write_magnetic_obstacle_regime_plots(
+    records: list[dict[str, float]],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if not records:
+        raise ValueError("Need at least one record to write magnetic-obstacle regime plots")
+
+    forcings = sorted({float(row["forcing"]) for row in records})
+    base_bz_values = sorted({float(row["base_bz"]) for row in records})
+    forcing_index = {value: idx for idx, value in enumerate(forcings)}
+    field_index = {value: idx for idx, value in enumerate(base_bz_values)}
+
+    def build_grid(key: str) -> np.ndarray:
+        grid = np.full((len(base_bz_values), len(forcings)), np.nan, dtype=float)
+        for row in records:
+            grid[field_index[float(row["base_bz"])] , forcing_index[float(row["forcing"])]] = float(row[key])
+        return grid
+
+    peak_velocity = build_grid("peak_velocity_deficit_ratio")
+    pressure_proxy = build_grid("pressure_excess_proxy")
+    current_proxy = build_grid("current_proxy_peak")
+    distortion = 0.5 * (build_grid("y_l2_distortion") + build_grid("z_l2_distortion"))
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.8, 9.2), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    panels = (
+        (peak_velocity, "Peak velocity-deficit ratio", "viridis"),
+        (pressure_proxy, "Pressure-excess proxy", "magma"),
+        (current_proxy, "Current proxy peak", "plasma"),
+        (distortion, "Mean cross-cut distortion", "cividis"),
+    )
+    for ax, (grid, title, cmap_name) in zip(axes.ravel(), panels, strict=True):
+        image = ax.imshow(grid, origin="lower", aspect="auto", cmap=cmap_name)
+        ax.set_title(title)
+        ax.set_xticks(range(len(forcings)), [f"{value:g}" for value in forcings])
+        ax.set_yticks(range(len(base_bz_values)), [f"{value:g}" for value in base_bz_values])
+        ax.set_xlabel("forcing")
+        ax.set_ylabel(r"$B_z$ scale")
+        for iy in range(grid.shape[0]):
+            for ix in range(grid.shape[1]):
+                value = grid[iy, ix]
+                if np.isfinite(value):
+                    ax.text(ix, iy, f"{value:.2e}", ha="center", va="center", fontsize=9, color="white")
+        plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+
+    png_path = out_dir / "magnetic_obstacle_regime_scan.png"
+    pdf_path = out_dir / "magnetic_obstacle_regime_scan.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
 def write_strong_scaling_plots(
     records: list[dict[str, object]],
     out_dir: str | Path,
