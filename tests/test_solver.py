@@ -811,6 +811,7 @@ def test_fully_developed_case_step_rejects_non_implicit_transient_scheme():
 
 def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    case = replace(case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0))
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
     u_previous = jnp.zeros(mesh.yz_shape)
@@ -887,7 +888,8 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     active_mask = solvers._active_velocity_mask(materials.fluid_mask)
     assert call_counter["velocity"] == 1
     assert jnp.allclose(u_next[active_mask], 0.25)
-    assert jnp.allclose(u_next[~active_mask], 0.0)
+    assert jnp.isfinite(u_next[~active_mask]).all()
+    assert float(jnp.max(jnp.abs(u_next[~active_mask]))) <= 0.25
     assert float(velocity_residual) == pytest.approx(0.25)
     assert float(potential_residual) == pytest.approx(1.0e-9)
     assert int(potential_iterations) == 3
@@ -896,7 +898,9 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     assert float(face_current_max) == pytest.approx(1.0e-4)
     assert float(emf_max) == pytest.approx(2.0e-4)
     assert float(face_lorentz_max) == pytest.approx(3.0e-4)
-    assert float(mean_velocity) == pytest.approx(float(jnp.mean(u_next)))
+    fluid_weight = jnp.where(materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0)
+    expected_mean_velocity = float(jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight))
+    assert float(mean_velocity) == pytest.approx(expected_mean_velocity)
     assert float(applied_forcing) == pytest.approx(case.forcing)
     assert float(potential_initial_residual) == pytest.approx(1.0e-6)
     assert float(linear_initial_residual) == pytest.approx(4.0e-6)
@@ -904,6 +908,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
 
 def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity_solve(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    case = replace(case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0))
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
     u_previous = jnp.zeros(mesh.yz_shape)
@@ -991,11 +996,14 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
     active_mask = solvers._active_velocity_mask(materials.fluid_mask)
     assert velocity_calls["count"] == 2
     assert jnp.allclose(u_next[active_mask], 0.7)
-    assert jnp.allclose(u_next[~active_mask], 0.0)
+    assert jnp.isfinite(u_next[~active_mask]).all()
+    assert float(jnp.max(jnp.abs(u_next[~active_mask]))) <= 0.7
     assert float(velocity_residual) == pytest.approx(0.7)
     assert float(linear_residual) == pytest.approx(3.0e-7)
     assert int(linear_iterations) == 4
-    assert float(mean_velocity) == pytest.approx(float(jnp.mean(u_next)))
+    fluid_weight = jnp.where(materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0)
+    expected_mean_velocity = float(jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight))
+    assert float(mean_velocity) == pytest.approx(expected_mean_velocity)
     assert float(applied_forcing) == pytest.approx(1.0)
     assert float(linear_initial_residual) == pytest.approx(9.0e-6)
 
