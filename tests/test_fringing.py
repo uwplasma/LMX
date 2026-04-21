@@ -15,6 +15,7 @@ from lmx.fringing import (
     build_variable_field_bent_pipe_extruded_problem,
     build_variable_field_layered_extruded_problem,
     build_variable_field_pipe_ogrid_extruded_problem,
+    build_wham_mirror_pipe_extruded_problem,
     _cross_section_mesh,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
@@ -28,6 +29,7 @@ from lmx.fringing import (
     validate_bent_pipe_low_de_baseline,
     validate_extruded_inductionless_solution,
     validate_magnetic_obstacle_baseline,
+    validate_wham_mirror_pipe_baseline,
     validate_variable_field_pipe_solution,
     validate_variable_field_extruded_solution,
 )
@@ -236,6 +238,34 @@ def test_build_bent_pipe_extruded_problem_marks_solver_family():
     assert problem.case.solver.kind == "extruded_inductionless"
     assert problem.case.geometry.kind == "bent_pipe"
     assert problem.profile.x.shape == (5,)
+
+
+def test_build_wham_mirror_pipe_extruded_problem_marks_solver_family(tmp_path):
+    x = np.linspace(-0.2, 0.2, 5)
+    y = np.linspace(-0.1, 0.1, 5)
+    z = np.linspace(-0.1, 0.1, 5)
+    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+    path = write_tabulated_field_npz(
+        tmp_path / "field.npz",
+        x=x,
+        y=y,
+        z=z,
+        bx=np.zeros_like(xx),
+        by=np.zeros_like(xx),
+        bz=1.0 + 0.1 * np.cos(np.pi * xx / max(np.max(np.abs(x)), 1.0e-12)),
+    )
+    problem = build_wham_mirror_pipe_extruded_problem(
+        table_path=str(path),
+        radius=0.1,
+        nr=4,
+        ntheta=12,
+        length=0.4,
+        nx_stations=5,
+    )
+    assert problem.case.solver.kind == "extruded_inductionless"
+    assert problem.case.geometry.kind == "pipe_ogrid"
+    assert problem.case.magnetic_field.kind == "tabulated"
+    assert np.allclose(np.asarray(problem.profile.field_scale, dtype=float), 1.0)
 
 
 def test_cross_section_mesh_supports_pipe_ogrid_geometry():
@@ -447,6 +477,45 @@ def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
     assert float(jnp.max(jnp.abs(solution.bundle.u[:, -1, :]))) > 0.0
     assert solution.validation.max_charge_balance_residual < 0.5
     assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
+
+
+def test_wham_mirror_pipe_baseline_reports_finite_metrics(tmp_path):
+    x = np.linspace(-0.2, 0.2, 7)
+    y = np.linspace(-0.12, 0.12, 7)
+    z = np.linspace(-0.12, 0.12, 7)
+    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+    bz = 1.0 + 0.3 * np.exp(-(xx / 0.12) ** 2)
+    path = write_tabulated_field_npz(
+        tmp_path / "wham_small.npz",
+        x=x,
+        y=y,
+        z=z,
+        bx=np.zeros_like(xx),
+        by=np.zeros_like(xx),
+        bz=bz,
+    )
+    problem = build_wham_mirror_pipe_extruded_problem(
+        table_path=str(path),
+        radius=0.12,
+        nr=4,
+        ntheta=12,
+        length=0.4,
+        nx_stations=7,
+    )
+    problem = replace(
+        problem,
+        profile=replace(problem.profile, x=jnp.asarray(x, dtype=float)),
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=4, potential_iterations=12),
+            solver=replace(problem.case.solver, coupling_iterations=4),
+        ),
+    )
+    solution = solve_extruded_inductionless(problem)
+    metrics = validate_wham_mirror_pipe_baseline(solution)
+    assert np.isfinite(metrics["pressure_drop_proxy"])
+    assert np.isfinite(metrics["field_velocity_correlation"])
+    assert np.isfinite(metrics["max_charge_balance_residual"])
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle():

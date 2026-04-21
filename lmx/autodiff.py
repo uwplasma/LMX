@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
+from .field_models import wham_mirror_station_scale
 from .linear import solve_poisson_jacobi_state
 from .mesh import StructuredMesh, generate_rect_duct_mesh
 from .operators import gradient_scalar
@@ -91,6 +92,177 @@ def _smooth_fringing_scale(
     rise = 0.5 * (1.0 + jnp.tanh((x - jnp.asarray(entry_center)) / width))
     fall = 0.5 * (1.0 - jnp.tanh((x - jnp.asarray(exit_center)) / width))
     return jnp.asarray(peak_scale) * rise * fall
+
+
+def _extruded_rect_response_history_from_field_scale(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    field_scale: jnp.ndarray,
+) -> dict[str, jnp.ndarray]:
+    mesh = problem.base_problem.mesh
+    dy = float(jnp.mean(mesh.dy))
+    dz = float(jnp.mean(mesh.dz))
+    scale = jnp.asarray(field_scale, dtype=problem.base_problem.sigma.dtype)
+    bz = jnp.broadcast_to(jnp.asarray(peak_hartmann_number) * scale[:, None, None], (scale.shape[0], *mesh.yz_shape))
+    sigma = jnp.broadcast_to(problem.base_problem.sigma[None, :, :], bz.shape)
+    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
+
+    def station_response(bz_slice: jnp.ndarray) -> dict[str, jnp.ndarray]:
+        u, phi = solve_differentiable_hartmann(problem.base_problem, forcing=forcing_value, hartmann_number=bz_slice[0, 0])
+        dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
+        uxb_y = -u * bz_slice
+        jx = jnp.zeros_like(u)
+        jy = sigma[0] * (-dphi_dy + uxb_y)
+        jz = sigma[0] * (-dphi_dz)
+        div_j = jnp.gradient(jy, float(jnp.mean(mesh.dy)), axis=0) + jnp.gradient(jz, float(jnp.mean(mesh.dz)), axis=1)
+        boundary_current_residual = jnp.abs(
+            -jnp.sum(jy[0, :]) * dz
+            + jnp.sum(jy[-1, :]) * dz
+            - jnp.sum(jz[:, 0]) * dy
+            + jnp.sum(jz[:, -1]) * dy
+        )
+        return {
+            "mean_velocity": jnp.mean(u),
+            "current_proxy": jnp.mean(jnp.abs(jy)),
+            "charge_balance_residual": jnp.max(jnp.abs(div_j)),
+            "boundary_current_residual": boundary_current_residual,
+        }
+
+    payload = jax.vmap(station_response)(bz)
+    return {
+        "x": problem.x,
+        "field_scale": scale,
+        **payload,
+    }
+
+
+def _extruded_rect_projection_history_from_field_scale(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    field_scale: jnp.ndarray,
+) -> dict[str, jnp.ndarray]:
+    mesh = problem.base_problem.mesh
+    ny, nz = mesh.yz_shape
+    nx = int(problem.x.shape[0])
+    dx = float((problem.x[-1] - problem.x[0]) / max(nx - 1, 1)) if nx > 1 else 1.0
+    dy = float(jnp.mean(mesh.dy))
+    dz = float(jnp.mean(mesh.dz))
+    sigma = jnp.broadcast_to(problem.base_problem.sigma[None, :, :], (nx, ny, nz))
+    rho = jnp.broadcast_to(problem.base_problem.rho[None, :, :], (nx, ny, nz))
+    nu = jnp.broadcast_to(problem.base_problem.nu[None, :, :], (nx, ny, nz))
+    scale = jnp.asarray(field_scale, dtype=sigma.dtype)
+    bz = jnp.broadcast_to(jnp.asarray(peak_hartmann_number) * scale[:, None, None], (nx, ny, nz))
+    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
+    inverse_diffusive_scale = jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12))
+    dt = jnp.asarray(0.2) / jnp.maximum(inverse_diffusive_scale, 1.0e-12)
+    pressure_iterations = max(4, problem.base_problem.potential_iterations // 2)
+
+    def macro_body(_, state):
+        u, v, w, p, phi = state
+        dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
+        uxb_x = v * bz
+        uxb_y = -u * bz
+        uxb_z = jnp.zeros_like(u)
+        jx = sigma * (-dphi_dx + uxb_x)
+        jy = sigma * (-dphi_dy + uxb_y)
+        lorentz_x = jy * bz
+        lorentz_y = -jx * bz
+        lorentz_z = jnp.zeros_like(u)
+
+        dp_dx, dp_dy, dp_dz = _extruded_gradient(p, dx=dx, dy=dy, dz=dz)
+        u_star = _extruded_enforce_velocity_bc(
+            u + dt * (nu * _extruded_laplacian(u, dx=dx, dy=dy, dz=dz) + forcing_value / jnp.maximum(rho, 1.0e-12) + lorentz_x / jnp.maximum(rho, 1.0e-12) - dp_dx / jnp.maximum(rho, 1.0e-12))
+        )
+        v_star = _extruded_enforce_velocity_bc(
+            v + dt * (nu * _extruded_laplacian(v, dx=dx, dy=dy, dz=dz) + lorentz_y / jnp.maximum(rho, 1.0e-12) - dp_dy / jnp.maximum(rho, 1.0e-12))
+        )
+        w_star = _extruded_enforce_velocity_bc(
+            w + dt * (nu * _extruded_laplacian(w, dx=dx, dy=dy, dz=dz) + lorentz_z / jnp.maximum(rho, 1.0e-12) - dp_dz / jnp.maximum(rho, 1.0e-12))
+        )
+
+        du_dx, _, _ = _extruded_gradient(u_star, dx=dx, dy=dy, dz=dz)
+        _, dv_dy, _ = _extruded_gradient(v_star, dx=dx, dy=dy, dz=dz)
+        _, _, dw_dz = _extruded_gradient(w_star, dx=dx, dy=dy, dz=dz)
+        divergence = du_dx + dv_dy + dw_dz
+        p_corr = _extruded_poisson_jacobi((rho / jnp.maximum(dt, 1.0e-12)) * divergence, dx=dx, dy=dy, dz=dz, iterations=pressure_iterations)
+        dpc_dx, dpc_dy, dpc_dz = _extruded_gradient(p_corr, dx=dx, dy=dy, dz=dz)
+        u_next = _extruded_enforce_velocity_bc(u_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dx)
+        v_next = _extruded_enforce_velocity_bc(v_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dy)
+        w_next = _extruded_enforce_velocity_bc(w_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dz)
+        p_next = p + p_corr
+
+        uxb_x = v_next * bz
+        uxb_y = -u_next * bz
+        uxb_z = jnp.zeros_like(u_next)
+        rhs_phi = _extruded_conservative_emf_rhs(sigma, uxb_x, uxb_y, uxb_z, dx=dx, dy=dy, dz=dz)
+        phi_next = _extruded_poisson_jacobi(
+            rhs_phi,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=problem.base_problem.potential_iterations,
+        )
+        return u_next, v_next, w_next, p_next, phi_next
+
+    initial_state = (
+        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+    )
+    u, v, w, p, phi = jax.lax.fori_loop(0, problem.base_problem.macro_iterations, macro_body, initial_state)
+
+    dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
+    uxb_x = v * bz
+    uxb_y = -u * bz
+    uxb_z = jnp.zeros_like(u)
+    jx = sigma * (-dphi_dx + uxb_x)
+    jy = sigma * (-dphi_dy + uxb_y)
+    fx, fy, fz = _extruded_conservative_current_fluxes(sigma, phi, uxb_x, uxb_y, uxb_z, dx=dx, dy=dy, dz=dz)
+    div_j = (
+        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
+        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
+    )
+    boundary_current_residual = jnp.abs(
+        -jnp.sum(fx[0], axis=(0, 1)) * dy * dz
+        + jnp.sum(fx[-1], axis=(0, 1)) * dy * dz
+        - jnp.sum(fy[:, 0, :], axis=1) * dx * dz
+        + jnp.sum(fy[:, -1, :], axis=1) * dx * dz
+        - jnp.sum(fz[:, :, 0], axis=1) * dx * dy
+        + jnp.sum(fz[:, :, -1], axis=1) * dx * dy
+    )
+    wall_current_leakage = (
+        jnp.sum(jnp.abs(fy[:, 0, :]), axis=1) * dx * dz
+        + jnp.sum(jnp.abs(fy[:, -1, :]), axis=1) * dx * dz
+        + jnp.sum(jnp.abs(fz[:, :, 0]), axis=1) * dx * dy
+        + jnp.sum(jnp.abs(fz[:, :, -1]), axis=1) * dx * dy
+    )
+    pressure_span = jnp.max(p, axis=(1, 2)) - jnp.min(p, axis=(1, 2))
+    transverse_kinetic_energy = jnp.mean(v**2 + w**2, axis=(1, 2))
+    return {
+        "x": problem.x,
+        "field_scale": scale,
+        "mean_velocity": jnp.mean(u, axis=(1, 2)),
+        "current_proxy": jnp.mean(jnp.abs(jy), axis=(1, 2)),
+        "charge_balance_residual": jnp.max(jnp.abs(div_j), axis=(1, 2)),
+        "boundary_current_residual": boundary_current_residual,
+        "pressure_span": pressure_span,
+        "transverse_kinetic_energy": transverse_kinetic_energy,
+        "wall_current_leakage": wall_current_leakage,
+        "axial_current": jnp.sum(jx, axis=(1, 2)) * dy * dz,
+        "u_field": u,
+        "v_field": v,
+        "w_field": w,
+        "pressure_field": p,
+        "phi_field": phi,
+        "jy_field": jy,
+    }
 
 
 def _extruded_neighbor_fields(field: jnp.ndarray) -> tuple[jnp.ndarray, ...]:
@@ -457,15 +629,6 @@ def extruded_rect_response_history(
     exit_center: float | jnp.ndarray,
     transition_width: float | jnp.ndarray,
 ) -> dict[str, jnp.ndarray]:
-    mesh = problem.base_problem.mesh
-    ny, nz = mesh.yz_shape
-    nx = int(problem.x.shape[0])
-    dx = float((problem.x[-1] - problem.x[0]) / max(nx - 1, 1)) if nx > 1 else 1.0
-    dy = float(jnp.mean(mesh.dy))
-    dz = float(jnp.mean(mesh.dz))
-    sigma = jnp.broadcast_to(problem.base_problem.sigma[None, :, :], (nx, ny, nz))
-    rho = jnp.broadcast_to(problem.base_problem.rho[None, :, :], (nx, ny, nz))
-    nu = jnp.broadcast_to(problem.base_problem.nu[None, :, :], (nx, ny, nz))
     field_scale = _smooth_fringing_scale(
         problem.x,
         entry_center=entry_center,
@@ -473,107 +636,12 @@ def extruded_rect_response_history(
         transition_width=transition_width,
         peak_scale=1.0,
     )
-    bz = jnp.broadcast_to(jnp.asarray(peak_hartmann_number) * field_scale[:, None, None], (nx, ny, nz))
-    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
-
-    def macro_body(_, u_iter):
-        uxb_x = jnp.zeros_like(u_iter)
-        uxb_y = -u_iter * bz
-        uxb_z = jnp.zeros_like(u_iter)
-        rhs_phi = _extruded_conservative_emf_rhs(
-            sigma,
-            uxb_x,
-            uxb_y,
-            uxb_z,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-        )
-        phi = _extruded_poisson_jacobi(
-            rhs_phi,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=problem.base_problem.potential_iterations,
-        )
-        dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
-        jx = -dphi_dx
-        jy = -dphi_dy - u_iter * bz
-        jz = -dphi_dz
-        lorentz_x = jy * bz
-        reaction = sigma * (bz**2) / jnp.maximum(rho, 1.0e-12)
-        rhs_u = forcing_value / jnp.maximum(rho, 1.0e-12) + lorentz_x / jnp.maximum(rho, 1.0e-12)
-        return _solve_extruded_velocity_jacobi(
-            rhs=rhs_u,
-            diffusivity=nu,
-            reaction=reaction,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=problem.base_problem.velocity_iterations,
-            relaxation=problem.base_problem.relaxation,
-        )
-
-    u = jax.lax.fori_loop(
-        0,
-        problem.base_problem.macro_iterations,
-        macro_body,
-        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+    return _extruded_rect_response_history_from_field_scale(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_hartmann_number,
+        field_scale=field_scale,
     )
-    uxb_x = jnp.zeros_like(u)
-    uxb_y = -u * bz
-    uxb_z = jnp.zeros_like(u)
-    rhs_phi = _extruded_conservative_emf_rhs(
-        sigma,
-        uxb_x,
-        uxb_y,
-        uxb_z,
-        dx=dx,
-        dy=dy,
-        dz=dz,
-    )
-    phi = _extruded_poisson_jacobi(
-        rhs_phi,
-        dx=dx,
-        dy=dy,
-        dz=dz,
-        iterations=problem.base_problem.potential_iterations,
-    )
-    dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
-    jx = -dphi_dx
-    jy = -dphi_dy - u * bz
-    jz = -dphi_dz
-    fx, fy, fz = _extruded_conservative_current_fluxes(
-        sigma,
-        phi,
-        uxb_x,
-        uxb_y,
-        uxb_z,
-        dx=dx,
-        dy=dy,
-        dz=dz,
-    )
-    div_j = (
-        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
-        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
-        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
-    )
-    boundary_current_residual = jnp.abs(
-        -jnp.sum(fx[0], axis=(0, 1)) * dy * dz
-        + jnp.sum(fx[-1], axis=(0, 1)) * dy * dz
-        - jnp.sum(fy[:, 0, :], axis=1) * dx * dz
-        + jnp.sum(fy[:, -1, :], axis=1) * dx * dz
-        - jnp.sum(fz[:, :, 0], axis=1) * dx * dy
-        + jnp.sum(fz[:, :, -1], axis=1) * dx * dy
-    )
-    return {
-        "x": problem.x,
-        "field_scale": field_scale,
-        "mean_velocity": jnp.mean(u, axis=(1, 2)),
-        "current_proxy": jnp.mean(jnp.abs(jy), axis=(1, 2)),
-        "charge_balance_residual": jnp.max(jnp.abs(div_j), axis=(1, 2)),
-        "boundary_current_residual": boundary_current_residual,
-    }
 
 
 def extruded_rect_projection_history(
@@ -585,15 +653,6 @@ def extruded_rect_projection_history(
     exit_center: float | jnp.ndarray,
     transition_width: float | jnp.ndarray,
 ) -> dict[str, jnp.ndarray]:
-    mesh = problem.base_problem.mesh
-    ny, nz = mesh.yz_shape
-    nx = int(problem.x.shape[0])
-    dx = float((problem.x[-1] - problem.x[0]) / max(nx - 1, 1)) if nx > 1 else 1.0
-    dy = float(jnp.mean(mesh.dy))
-    dz = float(jnp.mean(mesh.dz))
-    sigma = jnp.broadcast_to(problem.base_problem.sigma[None, :, :], (nx, ny, nz))
-    rho = jnp.broadcast_to(problem.base_problem.rho[None, :, :], (nx, ny, nz))
-    nu = jnp.broadcast_to(problem.base_problem.nu[None, :, :], (nx, ny, nz))
     field_scale = _smooth_fringing_scale(
         problem.x,
         entry_center=entry_center,
@@ -601,132 +660,102 @@ def extruded_rect_projection_history(
         transition_width=transition_width,
         peak_scale=1.0,
     )
-    bz = jnp.broadcast_to(jnp.asarray(peak_hartmann_number) * field_scale[:, None, None], (nx, ny, nz))
-    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
-    inverse_diffusive_scale = jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12))
-    dt = jnp.asarray(0.2) / jnp.maximum(inverse_diffusive_scale, 1.0e-12)
-    pressure_iterations = max(4, problem.base_problem.potential_iterations // 2)
-
-    def macro_body(_, state):
-        u, v, w, p, phi = state
-        dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
-        uxb_x = v * bz
-        uxb_y = -u * bz
-        uxb_z = jnp.zeros_like(u)
-        jx = sigma * (-dphi_dx + uxb_x)
-        jy = sigma * (-dphi_dy + uxb_y)
-        jz = sigma * (-dphi_dz + uxb_z)
-        lorentz_x = jy * bz
-        lorentz_y = -jx * bz
-        lorentz_z = jnp.zeros_like(u)
-
-        dp_dx, dp_dy, dp_dz = _extruded_gradient(p, dx=dx, dy=dy, dz=dz)
-        u_star = _extruded_enforce_velocity_bc(
-            u + dt * (nu * _extruded_laplacian(u, dx=dx, dy=dy, dz=dz) + forcing_value / jnp.maximum(rho, 1.0e-12) + lorentz_x / jnp.maximum(rho, 1.0e-12) - dp_dx / jnp.maximum(rho, 1.0e-12))
-        )
-        v_star = _extruded_enforce_velocity_bc(
-            v + dt * (nu * _extruded_laplacian(v, dx=dx, dy=dy, dz=dz) + lorentz_y / jnp.maximum(rho, 1.0e-12) - dp_dy / jnp.maximum(rho, 1.0e-12))
-        )
-        w_star = _extruded_enforce_velocity_bc(
-            w + dt * (nu * _extruded_laplacian(w, dx=dx, dy=dy, dz=dz) + lorentz_z / jnp.maximum(rho, 1.0e-12) - dp_dz / jnp.maximum(rho, 1.0e-12))
-        )
-
-        du_dx, _, _ = _extruded_gradient(u_star, dx=dx, dy=dy, dz=dz)
-        _, dv_dy, _ = _extruded_gradient(v_star, dx=dx, dy=dy, dz=dz)
-        _, _, dw_dz = _extruded_gradient(w_star, dx=dx, dy=dy, dz=dz)
-        divergence = du_dx + dv_dy + dw_dz
-        p_corr = _extruded_poisson_jacobi((rho / jnp.maximum(dt, 1.0e-12)) * divergence, dx=dx, dy=dy, dz=dz, iterations=pressure_iterations)
-        dpc_dx, dpc_dy, dpc_dz = _extruded_gradient(p_corr, dx=dx, dy=dy, dz=dz)
-        u_next = _extruded_enforce_velocity_bc(u_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dx)
-        v_next = _extruded_enforce_velocity_bc(v_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dy)
-        w_next = _extruded_enforce_velocity_bc(w_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dz)
-        p_next = p + p_corr
-
-        uxb_x = v_next * bz
-        uxb_y = -u_next * bz
-        uxb_z = jnp.zeros_like(u_next)
-        rhs_phi = _extruded_conservative_emf_rhs(
-            sigma,
-            uxb_x,
-            uxb_y,
-            uxb_z,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-        )
-        phi_next = _extruded_poisson_jacobi(
-            rhs_phi,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=problem.base_problem.potential_iterations,
-        )
-        return u_next, v_next, w_next, p_next, phi_next
-
-    initial_state = (
-        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
-        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
-        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
-        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
-        jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype),
+    return _extruded_rect_projection_history_from_field_scale(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_hartmann_number,
+        field_scale=field_scale,
     )
-    u, v, w, p, phi = jax.lax.fori_loop(0, problem.base_problem.macro_iterations, macro_body, initial_state)
 
-    dphi_dx, dphi_dy, dphi_dz = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
-    uxb_x = v * bz
-    uxb_y = -u * bz
-    uxb_z = jnp.zeros_like(u)
-    jx = sigma * (-dphi_dx + uxb_x)
-    jy = sigma * (-dphi_dy + uxb_y)
-    jz = sigma * (-dphi_dz + uxb_z)
-    fx, fy, fz = _extruded_conservative_current_fluxes(
-        sigma,
-        phi,
-        uxb_x,
-        uxb_y,
-        uxb_z,
-        dx=dx,
-        dy=dy,
-        dz=dz,
+
+def wham_mirror_pressure_drop_history(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    coil_separation: float | jnp.ndarray,
+    center_offset: float | jnp.ndarray = 0.0,
+    current_scale: float = 2000.0 * 17.0 / 17.51,
+    inner_radius: float = 0.5 * 86.0e-3,
+    outer_radius: float = 0.5 * 730.0e-3,
+    coil_axial_thickness: float = 14.3e-3 * 8.0,
+    radial_loops: int = 24,
+    axial_loops: int = 8,
+) -> dict[str, jnp.ndarray]:
+    centered_x = problem.x - 0.5 * (problem.x[0] + problem.x[-1]) - jnp.asarray(center_offset, dtype=jnp.float32)
+    field_scale = wham_mirror_station_scale(
+        centered_x,
+        coil_separation=coil_separation,
+        current_scale=current_scale,
+        inner_radius=inner_radius,
+        outer_radius=outer_radius,
+        coil_axial_thickness=coil_axial_thickness,
+        radial_loops=radial_loops,
+        axial_loops=axial_loops,
     )
-    div_j = (
-        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
-        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
-        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
+    return _extruded_rect_projection_history_from_field_scale(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_hartmann_number,
+        field_scale=field_scale,
     )
-    boundary_current_residual = jnp.abs(
-        -jnp.sum(fx[0], axis=(0, 1)) * dy * dz
-        + jnp.sum(fx[-1], axis=(0, 1)) * dy * dz
-        - jnp.sum(fy[:, 0, :], axis=1) * dx * dz
-        + jnp.sum(fy[:, -1, :], axis=1) * dx * dz
-        - jnp.sum(fz[:, :, 0], axis=1) * dx * dy
-        + jnp.sum(fz[:, :, -1], axis=1) * dx * dy
+
+
+def wham_mirror_pressure_drop_sensitivity(
+    problem: FringingAutodiffProblem,
+    *,
+    forcing: float | jnp.ndarray,
+    peak_hartmann_number: float | jnp.ndarray,
+    coil_separation: float | jnp.ndarray,
+    center_offset: float | jnp.ndarray = 0.0,
+    current_scale: float = 2000.0 * 17.0 / 17.51,
+    inner_radius: float = 0.5 * 86.0e-3,
+    outer_radius: float = 0.5 * 730.0e-3,
+    coil_axial_thickness: float = 14.3e-3 * 8.0,
+    radial_loops: int = 24,
+    axial_loops: int = 8,
+) -> dict[str, jnp.ndarray]:
+    def objective(separation_value):
+        response = wham_mirror_pressure_drop_history(
+            problem,
+            forcing=forcing,
+            peak_hartmann_number=peak_hartmann_number,
+            coil_separation=separation_value,
+            center_offset=center_offset,
+            current_scale=current_scale,
+            inner_radius=inner_radius,
+            outer_radius=outer_radius,
+            coil_axial_thickness=coil_axial_thickness,
+            radial_loops=radial_loops,
+            axial_loops=axial_loops,
+        )
+        x = response["x"]
+        pressure_span = response["pressure_span"]
+        dx = x[1:] - x[:-1]
+        return jnp.sum(0.5 * (pressure_span[1:] + pressure_span[:-1]) * dx) / jnp.maximum(x[-1] - x[0], 1.0e-12)
+
+    pressure_drop_proxy = objective(coil_separation)
+    response = wham_mirror_pressure_drop_history(
+        problem,
+        forcing=forcing,
+        peak_hartmann_number=peak_hartmann_number,
+        coil_separation=coil_separation,
+        center_offset=center_offset,
+        current_scale=current_scale,
+        inner_radius=inner_radius,
+        outer_radius=outer_radius,
+        coil_axial_thickness=coil_axial_thickness,
+        radial_loops=radial_loops,
+        axial_loops=axial_loops,
     )
-    wall_current_leakage = (
-        jnp.sum(jnp.abs(fy[:, 0, :]), axis=1) * dx * dz
-        + jnp.sum(jnp.abs(fy[:, -1, :]), axis=1) * dx * dz
-        + jnp.sum(jnp.abs(fz[:, :, 0]), axis=1) * dx * dy
-        + jnp.sum(jnp.abs(fz[:, :, -1]), axis=1) * dx * dy
-    )
-    pressure_span = jnp.max(p, axis=(1, 2)) - jnp.min(p, axis=(1, 2))
-    transverse_kinetic_energy = jnp.mean(v**2 + w**2, axis=(1, 2))
     return {
-        "x": problem.x,
-        "field_scale": field_scale,
-        "mean_velocity": jnp.mean(u, axis=(1, 2)),
-        "current_proxy": jnp.mean(jnp.abs(jy), axis=(1, 2)),
-        "charge_balance_residual": jnp.max(jnp.abs(div_j), axis=(1, 2)),
-        "boundary_current_residual": boundary_current_residual,
-        "pressure_span": pressure_span,
-        "transverse_kinetic_energy": transverse_kinetic_energy,
-        "wall_current_leakage": wall_current_leakage,
-        "axial_current": jnp.sum(jx, axis=(1, 2)) * dy * dz,
-        "u_field": u,
-        "v_field": v,
-        "w_field": w,
-        "pressure_field": p,
-        "phi_field": phi,
-        "jy_field": jy,
+        "pressure_drop_proxy": pressure_drop_proxy,
+        "d_pressure_drop_d_separation": jax.grad(objective)(coil_separation),
+        "x": response["x"],
+        "field_scale": response["field_scale"],
+        "pressure_span": response["pressure_span"],
+        "mean_velocity": response["mean_velocity"],
+        "current_proxy": response["current_proxy"],
     }
 
 

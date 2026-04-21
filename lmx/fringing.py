@@ -1530,6 +1530,48 @@ def build_magnetic_obstacle_rect_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
+def build_wham_mirror_pipe_extruded_problem(
+    *,
+    table_path: str,
+    radius: float = 0.25,
+    nr: int = 18,
+    ntheta: int = 48,
+    length: float = 1.4,
+    nx_stations: int = 25,
+    conductivity: float = 1.0,
+    density: float = 1.0,
+    viscosity: float = 1.0,
+    forcing: float = 1.0,
+) -> ExtrudedInductionlessProblem:
+    problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=1.0,
+        radius=radius,
+        nr=nr,
+        ntheta=ntheta,
+        length=length,
+        nx_stations=nx_stations,
+        entry_center=0.3 * length,
+        exit_center=0.7 * length,
+        transition_width=0.08 * length,
+        conductivity=conductivity,
+        density=density,
+        viscosity=viscosity,
+    )
+    return ExtrudedInductionlessProblem(
+        case=replace(
+            problem.case,
+            name="wham_mirror_pipe",
+            magnetic_field=MagneticFieldSpec(kind="tabulated", table_path=str(table_path)),
+            forcing=forcing,
+            notes=(
+                "Pipe crossing a tabulated WHAM-like mirror field. "
+                "This is the current stronger Benchmark D inductionless baseline."
+            ),
+        ),
+        profile=FringingProfile(x=problem.profile.x, field_scale=jnp.ones_like(problem.profile.field_scale), axis="z"),
+    )
+
+
 def build_layered_duct_extruded_problem(
     *,
     ha_peak: float = 20.0,
@@ -2009,6 +2051,56 @@ def validate_magnetic_obstacle_baseline(
         "obstacle_velocity_deficit": obstacle_velocity_deficit,
         "current_proxy_peak": current_proxy_peak,
         "field_velocity_correlation": field_velocity_correlation,
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "validation_pass": validation_pass,
+    }
+
+
+def validate_wham_mirror_pipe_baseline(solution: ExtrudedInductionlessSolution) -> dict[str, float | bool]:
+    if solution.problem.case.geometry.kind != "pipe_ogrid":
+        raise ValueError("WHAM mirror pipe validation currently supports pipe_ogrid only")
+    if solution.problem.case.magnetic_field.kind != "tabulated" or solution.problem.case.magnetic_field.table_path is None:
+        raise ValueError("WHAM mirror pipe validation requires a tabulated magnetic field")
+
+    bundle = solution.bundle
+    validation = solution.validation
+    x = np.asarray(bundle.x, dtype=float)
+    zeros = np.zeros_like(x)
+    centerline_field = np.asarray(
+        sample_tabulated_field_volume(
+            solution.problem.case.magnetic_field.table_path,
+            x=x,
+            y=zeros,
+            z=zeros,
+        ),
+        dtype=float,
+    )
+    bz_profile = centerline_field[..., 2]
+    field_scale = np.abs(bz_profile) / max(float(np.max(np.abs(bz_profile))), 1.0e-12)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    pressure_span = np.max(np.asarray(bundle.p, dtype=float), axis=(1, 2)) - np.min(np.asarray(bundle.p, dtype=float), axis=(1, 2))
+    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
+    obstacle_velocity_deficit = float(mean_velocity[0] - mean_velocity[peak_index]) if mean_velocity.size else 0.0
+    field_velocity_correlation = float(_safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity)))
+    current_proxy_peak = float(np.max(np.abs(current_proxy))) if current_proxy.size else 0.0
+    pressure_drop_proxy = float(np.trapezoid(pressure_span, x) / max(x[-1] - x[0], 1.0e-12)) if pressure_span.size > 1 else 0.0
+    validation_pass = bool(
+        validation.max_charge_balance_residual <= 6.0e-2
+        and validation.net_boundary_current_residual <= 1.0e-8
+        and validation.max_wall_current_leakage <= 1.0e-8
+        and obstacle_velocity_deficit > 1.0e-8
+        and current_proxy_peak > 1.0e-6
+        and pressure_drop_proxy > 1.0e-8
+        and field_velocity_correlation < -0.2
+    )
+    return {
+        "obstacle_velocity_deficit": obstacle_velocity_deficit,
+        "current_proxy_peak": current_proxy_peak,
+        "field_velocity_correlation": field_velocity_correlation,
+        "pressure_drop_proxy": pressure_drop_proxy,
         "max_charge_balance_residual": float(validation.max_charge_balance_residual),
         "max_wall_current_leakage": float(validation.max_wall_current_leakage),
         "net_boundary_current_residual": float(validation.net_boundary_current_residual),

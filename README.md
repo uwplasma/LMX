@@ -174,6 +174,15 @@ machine precision on the local comparison cuts (`cross_section_l2_error = 0`,
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 
+The panel is meant to be read left to right, then top to bottom:
+
+- the 3D slab shows the curved centerline and the local mid-bend profile plane
+- the cross-section panel shows the normalized axial velocity at the bend midpoint
+- the response panel overlays `B/Bmax`, mean velocity, and charge-balance residual
+  along the arc length
+- the cut panel compares the bent-pipe and straight-pipe low-De limits and now
+  includes a wall-layer zoom rather than only the full-radius view
+
 ### Variable-field extruded duct
 
 LMX now also supports executable rectangular `extruded_inductionless` solves
@@ -220,6 +229,25 @@ rectangular extruded solver lane. This is still a low-inertia inductionless
 slice, not a turbulent magnetic-obstacle solver, but it is a real executable
 Benchmark D starting point with obstacle-induced velocity-deficit and current
 response observables.
+
+LMX now also includes a tabulated WHAM-like mirror-field pipe lane and a
+matching differentiable pressure-drop sensitivity study. The executable driver
+is `examples/wham_mirror_pipe_demo.py`: it writes the tabulated 3D field,
+solves the pipe crossing that field, and exports the field preview plus the
+extruded response panel. The paired reduced differentiable study is
+`examples/autodiff_wham_pressure_sensitivity.py`, which treats the same WHAM
+mirror topology as a stationwise field profile and differentiates a
+pressure-drop proxy with respect to coil separation.
+
+At the current reference separation (`1.96 m`), the reduced differentiable
+lane gives `pressure_drop_proxy ≈ 3.85` and
+`d(Δp)/ds ≈ 2.98e-1`, with a smooth monotone pressure-drop trend over the
+tested separation sweep. The full executable tabulated-pipe solve is now a
+real field-loading and conservation baseline, but its nominal-WHAM low-Re
+response remains weak enough that the reduced sensitivity lane is the cleaner
+reviewer-facing result today.
+
+![LMX WHAM-like mirror pressure sensitivity](docs/_static/generated/autodiff_wham_pressure_sensitivity.png)
 
 ### Straight-duct setup
 

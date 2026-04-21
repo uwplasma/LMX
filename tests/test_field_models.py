@@ -9,7 +9,11 @@ from lmx.field_models import (
     sample_cross_section_field,
     sample_tabulated_cross_section_field,
     sample_tabulated_field_volume,
+    sample_wham_mirror_axis_profile,
+    sample_wham_mirror_field,
+    wham_mirror_station_scale,
     write_tabulated_field_npz,
+    write_wham_mirror_field_npz,
 )
 
 
@@ -68,3 +72,38 @@ def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
     sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
     assert sampled.shape == xx.shape + (3,)
     assert sampled[..., 0] == pytest.approx(bx)
+
+
+def test_wham_mirror_axis_profile_is_symmetric():
+    x = np.linspace(-0.4, 0.4, 9)
+    profile = np.asarray(sample_wham_mirror_axis_profile(x, coil_separation=1.2, radial_loops=4, axial_loops=2), dtype=float)
+    assert profile.shape == (9,)
+    assert np.all(np.isfinite(profile))
+    assert profile == pytest.approx(profile[::-1], rel=1.0e-6, abs=1.0e-8)
+
+
+def test_wham_mirror_station_scale_is_normalized():
+    x = np.linspace(-0.5, 0.5, 11)
+    scale = np.asarray(wham_mirror_station_scale(x, coil_separation=1.3, radial_loops=4, axial_loops=2), dtype=float)
+    assert scale.shape == (11,)
+    assert np.max(scale) == pytest.approx(1.0)
+    assert np.min(scale) >= 0.0
+
+
+def test_write_wham_mirror_field_npz_round_trip(tmp_path):
+    x = np.linspace(-0.3, 0.3, 5)
+    y = np.linspace(-0.1, 0.1, 4)
+    z = np.linspace(-0.1, 0.1, 4)
+    path = write_wham_mirror_field_npz(
+        tmp_path / "wham_field.npz",
+        x=x,
+        y=y,
+        z=z,
+        coil_separation=1.2,
+        radial_loops=3,
+        axial_loops=2,
+    )
+    payload = load_tabulated_field(path)
+    assert set(payload) == {"x", "y", "z", "bx", "by", "bz"}
+    sampled = np.asarray(sample_wham_mirror_field(*np.meshgrid(x, y, z, indexing="ij"), coil_separation=1.2, radial_loops=3, axial_loops=2))
+    assert sampled.shape == (5, 4, 4, 3)

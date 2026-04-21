@@ -290,6 +290,37 @@ Current bounded result:
 - `field_velocity_correlation ≈ -5.16e-1`
 - `max_charge_balance_residual ≈ 5.36e-7`
 
+Current tabulated-field / mirror-field extension:
+
+- `examples/wham_mirror_pipe_demo.py`
+  - writes a tabulated WHAM-like mirror field with `magpylib_jax`
+  - solves the current low-Re inductionless pipe baseline through that field
+  - observables:
+    field/velocity anticorrelation, pressure-drop proxy, current response, and
+    conservation metrics
+- `examples/autodiff_wham_pressure_sensitivity.py`
+  - treats the same mirror topology as a differentiable stationwise profile
+  - observables:
+    pressure-drop proxy and `d(Δp)/ds` with respect to coil separation
+
+Current bounded reduced sensitivity result:
+
+- reference separation `s = 1.96 m`
+- `pressure_drop_proxy ≈ 3.85`
+- `d(Δp)/ds ≈ 2.98e-1`
+- sweep trend:
+  monotone pressure-drop growth over `s = 1.5 … 2.2 m`, then flattening near
+  the largest tested separation
+
+Current bounded executable tabulated-pipe result:
+
+- the field-loading and conservation path is stable
+- `field_velocity_correlation ≈ -9.70e-1`
+- `max_charge_balance_residual ≈ 3.06e-5`
+- `pressure_drop_proxy ≈ 1.86e-11`
+- the nominal-WHAM low-Re response is therefore still too weak to count as a
+  literature-facing magnetic-obstacle parity case
+
 ## Additional benchmark targets for the next publication cycle
 
 The broader validation ladder used in recent inductionless liquid-metal MHD

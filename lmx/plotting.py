@@ -14,6 +14,7 @@ from matplotlib import colors
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import ScalarFormatter
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
 
@@ -965,6 +966,10 @@ def write_bent_pipe_overview_plots(
     theta_faces = np.asarray(mesh.z_faces, dtype=float)
     yy = r_faces[:, None] * np.cos(theta_faces[None, :])
     zz = r_faces[:, None] * np.sin(theta_faces[None, :])
+    r_centers = np.asarray(bundle.y, dtype=float)
+    theta_centers = np.asarray(bundle.z, dtype=float)
+    yyc = r_centers[:, None] * np.cos(theta_centers[None, :])
+    zzc = r_centers[:, None] * np.sin(theta_centers[None, :])
     u_peak = max(float(np.max(np.abs(u_mid))), 1.0e-12)
     u_mid_display = u_mid / u_peak
     mean_velocity_display = mean_velocity / max(float(np.max(np.abs(mean_velocity))), 1.0e-12)
@@ -972,7 +977,7 @@ def write_bent_pipe_overview_plots(
     cmap = plt.get_cmap("coolwarm")
 
     _set_plot_style()
-    fig = plt.figure(figsize=(13.0, 9.2), constrained_layout=True)
+    fig = plt.figure(figsize=(13.4, 9.4), constrained_layout=True)
     grid = fig.add_gridspec(2, 2, height_ratios=(1.05, 1.0))
     ax3d = fig.add_subplot(grid[0, 0], projection="3d")
     ax_cross = fig.add_subplot(grid[0, 1])
@@ -1011,27 +1016,29 @@ def write_bent_pipe_overview_plots(
         color="#111827",
         fontsize=11,
     )
-    ax3d.set_title("Curved centerline and local profile slab")
+    ax3d.set_title("Curved centerline and mid-bend profile slab")
     ax3d.set_xlabel("x")
     ax3d.set_ylabel("y")
     ax3d.set_zlabel("z")
     ax3d.view_init(elev=22, azim=-55)
 
     image = ax_cross.pcolormesh(yy, zz, u_mid_display, shading="auto", cmap="coolwarm", vmin=0.0, vmax=1.0)
+    ax_cross.contour(yyc, zzc, u_mid_display, levels=np.linspace(0.2, 0.95, 5), colors="white", linewidths=0.6, alpha=0.75)
+    ax_cross.plot(r_faces * 0.0, r_faces, color="#111827", linewidth=1.1, linestyle="--", alpha=0.85, label="local z-cut")
     ax_cross.set_title("Mid-bend axial velocity")
     ax_cross.set_xlabel("local y")
     ax_cross.set_ylabel("local z")
     ax_cross.set_aspect("equal")
+    ax_cross.legend(loc="lower left")
     fig.colorbar(image, ax=ax_cross, fraction=0.046, pad=0.04, label=r"$u/u_{peak}$")
 
-    ax_hist.plot(x_hist, field_scale, color="#1d4ed8", label=r"$B/B_{max}$")
-    ax_hist.plot(x_hist, mean_velocity_display, color="#0f766e", label=r"Mean velocity / peak")
+    line_field, = ax_hist.plot(x_hist, field_scale, color="#1d4ed8", label=r"$B/B_{max}$")
+    line_mean, = ax_hist.plot(x_hist, mean_velocity_display, color="#0f766e", label=r"$\bar{u}/\bar{u}_{max}$")
     ax_hist.set_title("Arc-length response")
     ax_hist.set_xlabel("s")
     ax_hist.set_ylabel("Response")
-    ax_hist.legend(loc="upper left")
     ax_hist_right = ax_hist.twinx()
-    ax_hist_right.semilogy(
+    line_charge, = ax_hist_right.semilogy(
         x_hist,
         np.maximum(charge_balance, 1.0e-16),
         color="#7c3aed",
@@ -1039,21 +1046,40 @@ def write_bent_pipe_overview_plots(
         label="Charge balance",
     )
     ax_hist_right.set_ylabel("Residual")
+    ax_hist.legend(
+        [line_field, line_mean, line_charge],
+        [line_field.get_label(), line_mean.get_label(), r"Charge balance residual"],
+        loc="upper left",
+    )
 
-    r_centers = np.asarray(bundle.y, dtype=float)
     theta_index = 0
     opposite = (theta_index + len(bundle.z) // 2) % len(bundle.z)
     signed_r = np.concatenate([-r_centers[::-1], r_centers[1:]])
     bent_cut = np.concatenate([u_mid[:, opposite][::-1], u_mid[1:, theta_index]])
-    ax_cmp.plot(signed_r, bent_cut / u_peak, color="#b91c1c", label="Bent-pipe baseline")
+    bent_norm = bent_cut / u_peak
+    ax_cmp.plot(signed_r, bent_norm, color="#b91c1c", label="Bent-pipe baseline")
     if straight_solution is not None:
         straight_mid = np.asarray(straight_solution.bundle.u[mid_index], dtype=float)
         straight_cut = np.concatenate([straight_mid[:, opposite][::-1], straight_mid[1:, theta_index]])
-        ax_cmp.plot(signed_r, straight_cut / u_peak, color="#111827", linestyle="--", label="Straight-pipe limit")
+        straight_norm = straight_cut / u_peak
+        ax_cmp.plot(signed_r, straight_norm, color="#111827", linestyle="--", label="Straight-pipe limit")
+    else:
+        straight_norm = bent_norm
     ax_cmp.set_title("Local centerline cut")
     ax_cmp.set_xlabel("signed local radius")
     ax_cmp.set_ylabel(r"$u/u_{peak}$")
-    ax_cmp.legend(loc="best")
+    ax_cmp.legend(loc="lower center")
+
+    inset = inset_axes(ax_cmp, width="45%", height="45%", loc="lower left", borderpad=1.2)
+    edge_window = max(3, len(signed_r) // 8)
+    inset.plot(signed_r[-edge_window:], bent_norm[-edge_window:], color="#b91c1c")
+    if straight_solution is not None:
+        inset.plot(signed_r[-edge_window:], straight_norm[-edge_window:], color="#111827", linestyle="--")
+    inset.set_xlim(float(signed_r[-edge_window]), float(signed_r[-1]))
+    inset.set_ylim(float(min(np.min(bent_norm[-edge_window:]), np.min(straight_norm[-edge_window:]))) - 0.02, 1.02)
+    inset.set_title("wall-layer zoom", fontsize=10)
+    inset.tick_params(labelsize=9)
+    mark_inset(ax_cmp, inset, loc1=2, loc2=4, fc="none", ec="#6b7280", linewidth=0.8)
 
     png = out_dir / "bent_pipe_overview.png"
     pdf = out_dir / "bent_pipe_overview.pdf"
@@ -1363,7 +1389,7 @@ def write_extruded_overview_plots(
     y_edges = _centers_to_edges(y)
     z_edges = _centers_to_edges(z)
     coord_x_label = "r" if bundle.geometry_kind == "pipe_ogrid" else "y"
-    coord_y_label = r"$\\theta$" if bundle.geometry_kind == "pipe_ogrid" else "z"
+    coord_y_label = r"$\theta$" if bundle.geometry_kind == "pipe_ogrid" else "z"
 
     fig, axes = plt.subplots(2, 2, figsize=(12.5, 8.5), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)

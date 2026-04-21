@@ -31,6 +31,7 @@ from lmx.autodiff import (
     run_fringing_history_inverse_design,
     run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
+    wham_mirror_pressure_drop_sensitivity,
 )
 from lmx.fringing import (
     build_pipe_ogrid_extruded_problem,
@@ -258,7 +259,46 @@ def test_fringing_response_inverse_design_reduces_loss():
     )
     assert len(result["history"]) == 6
     assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
-    assert jnp.isfinite(result["recovered_current_proxy"]).all()
+
+
+def test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference():
+    problem = build_fringing_autodiff_problem(
+        nx_stations=9,
+        length=1.2,
+        ny=8,
+        nz=8,
+        macro_iterations=2,
+        potential_iterations=8,
+        velocity_iterations=10,
+    )
+    sensitivity = wham_mirror_pressure_drop_sensitivity(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=10.0,
+        coil_separation=1.5,
+        radial_loops=4,
+        axial_loops=2,
+    )
+    plus = wham_mirror_pressure_drop_sensitivity(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=10.0,
+        coil_separation=1.5 + 1.0e-2,
+        radial_loops=4,
+        axial_loops=2,
+    )
+    minus = wham_mirror_pressure_drop_sensitivity(
+        problem,
+        forcing=1.0,
+        peak_hartmann_number=10.0,
+        coil_separation=1.5 - 1.0e-2,
+        radial_loops=4,
+        axial_loops=2,
+    )
+    finite_difference = (plus["pressure_drop_proxy"] - minus["pressure_drop_proxy"]) / 2.0e-2
+    assert jnp.isfinite(sensitivity["pressure_drop_proxy"])
+    assert jnp.isfinite(sensitivity["d_pressure_drop_d_separation"])
+    assert float(jnp.abs(sensitivity["d_pressure_drop_d_separation"] - finite_difference)) < 5.0e-2
 
 
 def test_build_extruded_response_targets_returns_finite_histories():

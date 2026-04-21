@@ -59,6 +59,8 @@ python examples/variable_field_extruded_demo.py
 python examples/variable_field_layered_demo.py
 python examples/variable_field_bent_pipe_demo.py
 python examples/variable_field_tabulated_demo.py
+python examples/wham_mirror_pipe_demo.py
+python examples/autodiff_wham_pressure_sensitivity.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py
@@ -267,6 +269,8 @@ Variable-field layered duct and curved pipe:
 python examples/variable_field_layered_demo.py
 python examples/variable_field_bent_pipe_demo.py
 python examples/variable_field_tabulated_demo.py
+python examples/wham_mirror_pipe_demo.py
+python examples/autodiff_wham_pressure_sensitivity.py
 ```
 
 Those examples extend the same field API into:
@@ -275,6 +279,9 @@ Those examples extend the same field API into:
 - curved pipes validated against the straight-pipe low-De limit under the same field
 - reusable machine-readable summaries of field and conservation metrics
 - a tabulated-field duct run that also matches the TOML/CLI path
+- a tabulated WHAM-like mirror field written to disk and reused by a pipe solve
+- a reduced differentiable pressure-drop sensitivity study with respect to
+  coil-coil separation
 
 Benchmark C / Q2D baseline:
 
@@ -316,13 +323,24 @@ First Benchmark D slice:
 
 ```bash
 python examples/magnetic_obstacle_baseline.py
+python examples/wham_mirror_pipe_demo.py
+python examples/autodiff_wham_pressure_sensitivity.py
 ```
 
-That example is the first executable magnetic-obstacle baseline:
+Those examples are the current executable Benchmark D entry points:
 
-- solve a rectangular extruded duct with a localized analytic magnetic obstacle
-- write the full extruded overview panel
-- record obstacle-induced velocity deficit, current response, and conservation metrics
+- `magnetic_obstacle_baseline.py`
+  - solve a rectangular extruded duct with a localized analytic magnetic obstacle
+  - write the full extruded overview panel
+  - record obstacle-induced velocity deficit, current response, and conservation metrics
+- `wham_mirror_pipe_demo.py`
+  - write a tabulated WHAM-like mirror field
+  - solve a straight pipe crossing that 3D field
+  - export the field preview and pipe-response overview
+- `autodiff_wham_pressure_sensitivity.py`
+  - treat the same mirror topology as a differentiable stationwise profile
+  - compute pressure-drop sensitivity with respect to coil separation
+  - write the three-panel sensitivity figure and summary JSON
 
 Importable plotting API:
 

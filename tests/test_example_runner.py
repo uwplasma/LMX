@@ -513,6 +513,58 @@ def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monk
     assert (tmp_path / "plotting_api_demo_summary.json").exists()
 
 
+def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("wham_mirror_pipe_demo.py")
+
+    monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path)
+    def fake_write_wham_mirror_field_npz(path, **kwargs):
+        target = Path(path)
+        target.write_bytes(b"npz")
+        return target
+
+    monkeypatch.setattr(module, "write_wham_mirror_field_npz", fake_write_wham_mirror_field_npz)
+    monkeypatch.setattr(module, "build_wham_mirror_pipe_extruded_problem", lambda **kwargs: SimpleNamespace(case=SimpleNamespace(time_stepper=SimpleNamespace(max_steps=8, potential_iterations=16), solver=SimpleNamespace(coupling_iterations=6)), profile=SimpleNamespace(x=np.linspace(-0.2, 0.2, 5))))
+    monkeypatch.setattr(module, "replace", lambda obj, **kwargs: SimpleNamespace(**{**obj.__dict__, **kwargs}))
+    monkeypatch.setattr(module, "solve_extruded_inductionless", lambda problem: SimpleNamespace(bundle=SimpleNamespace(), validation=SimpleNamespace()))
+    monkeypatch.setattr(module, "validate_wham_mirror_pipe_baseline", lambda solution: {"validation_pass": True, "pressure_drop_proxy": 1.0})
+    monkeypatch.setattr(module, "sample_tabulated_field_volume", lambda *args, **kwargs: np.zeros((module.FIELD_NY, module.FIELD_NZ, 3)))
+    monkeypatch.setattr(module, "write_cross_section_field_plots", lambda **kwargs: [tmp_path / "field_preview.png"])
+    monkeypatch.setattr(module, "write_extruded_overview_plots", lambda *args, **kwargs: [tmp_path / "extruded_overview.png"])
+    (tmp_path / "field_preview.png").write_bytes(b"img")
+    (tmp_path / "extruded_overview.png").write_bytes(b"img")
+
+    summary = module.run_wham_mirror_pipe_demo()
+
+    assert summary["case"] == "wham_mirror_pipe"
+    assert "field_preview.png" in summary["plots"]
+    assert (tmp_path / "wham_mirror_pipe_summary.json").exists()
+
+
+def test_autodiff_wham_pressure_sensitivity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("autodiff_wham_pressure_sensitivity.py")
+    monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "build_fringing_autodiff_problem", lambda **kwargs: SimpleNamespace())
+    monkeypatch.setattr(
+        module,
+        "wham_mirror_pressure_drop_sensitivity",
+        lambda *args, **kwargs: {
+            "pressure_drop_proxy": 1.0,
+            "d_pressure_drop_d_separation": -0.1,
+            "x": np.linspace(-0.2, 0.2, 5),
+            "field_scale": np.linspace(0.2, 1.0, 5),
+            "pressure_span": np.linspace(0.1, 0.5, 5),
+            "mean_velocity": np.linspace(1.0, 0.7, 5),
+            "current_proxy": np.linspace(0.2, 0.3, 5),
+        },
+    )
+
+    summary = module.run_autodiff_wham_pressure_sensitivity()
+
+    assert summary["case"] == "autodiff_wham_pressure_sensitivity"
+    assert "autodiff_wham_pressure_sensitivity.png" in summary["plots"]
+    assert (tmp_path / "autodiff_wham_pressure_sensitivity_summary.json").exists()
+
+
 def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("fringing_benchmark_demo.py")
 

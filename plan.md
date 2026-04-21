@@ -305,12 +305,27 @@ Current first Benchmark D slice:
   obstacle-induced velocity deficit, current response, and conservation metrics
 - remaining work before any full Benchmark D claim:
   stronger-inertia obstacle regimes, literature parity on magnetic-obstacle
-  observables, and truly turbulent 3D validation
+  observables, a more forceful executable mirror-field pipe response, and
+  truly turbulent 3D validation
 - current bounded result from `examples/magnetic_obstacle_baseline.py`:
   `obstacle_velocity_deficit ≈ 8.57e-8`,
   `current_proxy_peak ≈ 1.06e-1`,
   `field_velocity_correlation ≈ -5.16e-1`,
   `max_charge_balance_residual ≈ 5.36e-7`
+- `examples/wham_mirror_pipe_demo.py` now adds a tabulated WHAM-like mirror
+  field on the pipe lane using `magpylib_jax`
+- `examples/autodiff_wham_pressure_sensitivity.py` now adds the first
+  coil-separation sensitivity study for pressure-drop proxy on that mirror
+  topology
+- current bounded reduced sensitivity result:
+  `pressure_drop_proxy ≈ 3.85`,
+  `d(Δp)/ds ≈ 2.98e-1` at `s = 1.96 m`
+- current bounded executable tabulated-pipe result:
+  field loading and conservation are stable, but the nominal-WHAM low-Re
+  response is still weak
+  (`field_velocity_correlation ≈ -9.70e-1`,
+  `max_charge_balance_residual ≈ 3.06e-5`,
+  `pressure_drop_proxy ≈ 1.86e-11`)
 
 ## Parallelization work required before manuscript closeout
 
