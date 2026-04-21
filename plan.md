@@ -208,8 +208,13 @@ Current status:
   finite-difference divergence checks are now in the public API
 - example workflows now cover both geometry-plus-solve field usage and pure
   field QA before a solve
-- the remaining work is full executable support for generic 3D/tabulated field
-  maps through the fringing and CLI lanes
+- executable rectangular `extruded_inductionless` support for analytic
+  cross-sectional magnetic fields now exists through
+  `build_variable_field_duct_extruded_problem(...)`,
+  `validate_variable_field_extruded_solution(...)`, and
+  `examples/variable_field_extruded_demo.py`
+- the remaining work is full generic 3D/tabulated field support through the
+  fringing and CLI lanes, plus pipe/bent-pipe variable-field validation
 
 ### Literature-anchored benchmark expansion
 
@@ -237,6 +242,19 @@ documented together:
 - conservation thresholds
 - external reference or experimental source
 - executable driver and committed example inputs
+
+Current Benchmark C baseline:
+
+- `examples/q2d_decay_validation.py` now provides the first executable Q2D
+  validation surface
+- scope:
+  periodic Hartmann-friction decay of a single 2D mode
+- observables:
+  final-state `L2/L∞` error and amplitude-decay error against the analytic
+  exponential decay
+- remaining work before any turbulent Benchmark C claim:
+  Q2D duct forcing, wall/friction closures closer to Sommeria-Moreau, and
+  literature-anchored turbulent observables
 
 ## Parallelization work required before manuscript closeout
 

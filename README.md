@@ -15,6 +15,7 @@ differentiable workflows for sensitivity analysis and inverse design.
 
 - Fully developed Hartmann, Shercliff, and Hunt workflows
 - Rectangular, layered, mapped-pipe, and bent-pipe geometry support
+- Executable analytic variable-field duct workflows
 - JAX-based CPU and GPU execution
 - Explicit conservation diagnostics for charge closure and boundary-current audits
 - Input-file and Python-driver workflows
@@ -170,6 +171,25 @@ machine precision on the local comparison cuts (`cross_section_l2_error = 0`,
 `volumetric_flow_rate_span ≈ 1.14e-9`.
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
+
+### Variable-field extruded duct
+
+LMX now also supports executable rectangular `extruded_inductionless` solves
+with analytic cross-sectional magnetic fields through the Python API. The
+current public lane uses a divergence-free analytic field model, runs the full
+extruded duct solve, writes the field preview and extruded response plots, and
+checks both field divergence and 3D conservation metrics.
+
+This is the right next step after the uniform-field fringing benchmarks: it
+keeps the geometry fixed while broadening the admissible magnetic-field models
+that can drive the 3D inductionless response.
+
+### Benchmark C baseline
+
+LMX now includes a first Benchmark C baseline as a quasi-2D Hartmann-friction
+decay problem. This is not a turbulent closure yet. It is the first executable
+Q2D validation surface: a 2D mode decays under diffusion plus Hartmann-friction
+drag and is compared against the corresponding analytic exponential decay.
 
 ### Straight-duct setup
 

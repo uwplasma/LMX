@@ -8,6 +8,7 @@ from lmx.fringing import (
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     build_square_duct_fringing_benchmark,
+    build_variable_field_duct_extruded_problem,
     _cross_section_mesh,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
@@ -20,6 +21,7 @@ from lmx.fringing import (
     smooth_fringing_profile,
     validate_bent_pipe_low_de_baseline,
     validate_extruded_inductionless_solution,
+    validate_variable_field_extruded_solution,
 )
 from lmx.specs import GeometrySpec
 
@@ -465,6 +467,18 @@ def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle
     assert jnp.isfinite(bent_solution.bundle.u).all()
     assert validation["dean_number"] >= 0.0
     assert validation["cross_section_l2_error"] <= 0.2
+    assert isinstance(validation["validation_pass"], bool)
+
+
+def test_solve_extruded_inductionless_supports_analytic_variable_field():
+    problem = build_variable_field_duct_extruded_problem(nx_stations=7, ny=10, nz=10)
+    solution = solve_extruded_inductionless(problem)
+    validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
+
+    assert solution.bundle.geometry_kind == "rect_duct"
+    assert jnp.all(jnp.isfinite(solution.bundle.u))
+    assert validation["mean_velocity_change"] > 0.0
+    assert validation["current_proxy_change"] > 0.0
     assert isinstance(validation["validation_pass"], bool)
 
 

@@ -227,6 +227,16 @@ solver path rather than only denser sampling or plot cleanup.
 
 These remain part of the research roadmap, but not the `1.0` solver promise.
 
+Current executable Benchmark C baseline:
+
+- `examples/q2d_decay_validation.py`
+  - quasi-2D Hartmann-friction decay of a single periodic mode
+  - observables:
+    final-state `L2/L∞` error and amplitude-decay error against the analytic
+    exponential decay
+  - role:
+    first Q2D validation surface before adding turbulent closures
+
 ## Additional benchmark targets for the next publication cycle
 
 The broader validation ladder used in recent inductionless liquid-metal MHD
@@ -295,6 +305,8 @@ Current bounded low-De baseline:
 - `volumetric_flow_rate_span ≈ 1.14e-9`
 - spatially varying magnetic fields
   - baseline: manufactured divergence-free field verification
+    plus executable rectangular `extruded_inductionless` validation through
+    `examples/variable_field_extruded_demo.py`
   - recovery test: reproduce the current fringing benchmarks through the
     generic field-loading path
   - extension: tabulated or analytic 3D fields for ducts and pipes

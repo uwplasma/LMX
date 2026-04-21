@@ -55,6 +55,8 @@ python examples/variable_field_geometry_demo.py --output ./artifacts/examples/va
 python examples/bent_pipe_preview.py
 python examples/bent_pipe_inductionless_demo.py
 python examples/variable_field_validation.py
+python examples/variable_field_extruded_demo.py
+python examples/q2d_decay_validation.py
 ```
 
 ## Input-file examples
@@ -238,6 +240,31 @@ That example is the smallest field-QA workflow:
 - sample it on a research-sized grid
 - write component and magnitude plots
 - record finite-difference divergence metrics before using that field in a solve
+
+Variable-field extruded solve:
+
+```bash
+python examples/variable_field_extruded_demo.py
+```
+
+That example extends the field-QA lane into an actual 3D solve:
+
+- build an analytic divergence-free magnetic field
+- run the rectangular `extruded_inductionless` solve with that field
+- write the field preview and extruded overview plots
+- record field-divergence and 3D conservation metrics in one summary
+
+Benchmark C / Q2D baseline:
+
+```bash
+python examples/q2d_decay_validation.py
+```
+
+That example is the first executable Benchmark C slice:
+
+- solve a periodic quasi-2D Hartmann-friction decay problem
+- compare the numerical final state against the analytic decay
+- write a compact validation figure and summary JSON
 
 Importable plotting API:
 

@@ -16,10 +16,12 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.build_square_duct_fringing_benchmark)
     assert callable(lmx.build_layered_duct_extruded_problem)
     assert callable(lmx.build_bent_pipe_extruded_problem)
+    assert callable(lmx.build_variable_field_duct_extruded_problem)
     assert callable(lmx.build_pipe_ogrid_extruded_problem)
     assert callable(lmx.run_extruded_inductionless_slice)
     assert callable(lmx.solve_extruded_inductionless)
     assert callable(lmx.validate_bent_pipe_low_de_baseline)
+    assert callable(lmx.validate_variable_field_extruded_solution)
     assert callable(lmx.build_square_duct_extruded_problem)
     assert callable(lmx.build_fringing_autodiff_problem)
     assert callable(lmx.extruded_rect_response_history)
@@ -57,6 +59,10 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_closed_channel_startup_movies)
     assert callable(lmx.make_divergence_free_cross_section_field)
     assert callable(lmx.cross_section_divergence_metrics)
+    assert callable(lmx.build_q2d_decay_case)
+    assert callable(lmx.solve_q2d_decay)
+    assert callable(lmx.validate_q2d_decay_solution)
+    assert callable(lmx.write_q2d_decay_plots)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__
     assert "write_case_overview_plots" in lmx.__all__

@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from lmx.q2d import build_q2d_decay_case, solve_q2d_decay, validate_q2d_decay_solution, write_q2d_decay_plots
+
+
+pytestmark = pytest.mark.unit
+
+
+def test_q2d_decay_validation_passes_on_baseline_case():
+    case = build_q2d_decay_case(nx=48, ny=48, dt=2.5e-4, t_final=0.04)
+    solution = solve_q2d_decay(case)
+    validation = validate_q2d_decay_solution(case, solution)
+    assert validation["l2_error"] < 5.0e-2
+    assert validation["validation_pass"] is True
+
+
+def test_write_q2d_decay_plots_writes_png_and_pdf(tmp_path: Path):
+    case = build_q2d_decay_case(nx=32, ny=32, dt=5.0e-4, t_final=0.02)
+    solution = solve_q2d_decay(case)
+    outputs = write_q2d_decay_plots(case, solution, tmp_path)
+    assert outputs == [tmp_path / "q2d_decay_overview.png", tmp_path / "q2d_decay_overview.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()

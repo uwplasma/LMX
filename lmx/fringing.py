@@ -567,6 +567,38 @@ def _cross_section_mesh(case: CaseSpec):
     raise ValueError(f"Unsupported extruded geometry {geometry.kind!r}")
 
 
+def _sample_station_magnetic_field_duct(
+    case: CaseSpec,
+    mesh,
+    *,
+    field_scale: jnp.ndarray,
+    nx: int,
+    ny: int,
+    nz: int,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    if case.magnetic_field.kind == "constant":
+        base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
+        bx = _broadcast_station_profile(field_scale * float(base_field[0]), ny, nz)
+        by = _broadcast_station_profile(field_scale * float(base_field[1]), ny, nz)
+        bz = _broadcast_station_profile(field_scale * float(base_field[2]), ny, nz)
+        return bx, by, bz
+    if case.magnetic_field.kind == "analytic":
+        if case.magnetic_field.fn is None:
+            raise ValueError("Analytic magnetic field requires fn")
+        yc, zc = jnp.meshgrid(
+            jnp.asarray(mesh.y_centers, dtype=float),
+            jnp.asarray(mesh.z_centers, dtype=float),
+            indexing="ij",
+        )
+        sampled = jnp.asarray(case.magnetic_field.fn(yc, zc), dtype=float)
+        bx0 = _broadcast_cross_section(sampled[..., 0], nx)
+        by0 = _broadcast_cross_section(sampled[..., 1], nx)
+        bz0 = _broadcast_cross_section(sampled[..., 2], nx)
+        station_scale = field_scale[:, None, None]
+        return station_scale * bx0, station_scale * by0, station_scale * bz0
+    raise NotImplementedError("Tabulated magnetic fields are planned but not yet implemented for extruded solves.")
+
+
 def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, float], ...]:
     return tuple(
         {
@@ -1200,6 +1232,63 @@ def build_square_duct_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
+def build_variable_field_duct_extruded_problem(
+    *,
+    width: float = 2.4,
+    height: float = 1.6,
+    base_bz: float = 12.0,
+    perturbation: float = 0.12,
+    ny: int = 40,
+    nz: int = 40,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+) -> ExtrudedInductionlessProblem:
+    from .field_models import make_divergence_free_cross_section_field
+
+    field_fn = make_divergence_free_cross_section_field(
+        width=width,
+        height=height,
+        base_bz=base_bz,
+        perturbation=perturbation,
+    )
+    case = make_shercliff_case(ha=1.0, width=width, height=height, ny=ny, nz=nz)
+    case = replace(
+        case,
+        name=f"variable_field_duct_bz{int(base_bz)}",
+        geometry=replace(case.geometry, length=length, nx=nx_stations),
+        magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=min(case.time_stepper.max_steps, 80),
+            potential_iterations=min(case.time_stepper.potential_iterations, 80),
+            steady_tolerance=1.0e-6,
+        ),
+        solver=replace(
+            case.solver,
+            kind="extruded_inductionless",
+            coupling_iterations=min(case.solver.coupling_iterations, 8),
+            coupling_tolerance=1.0e-7,
+        ),
+        notes=(
+            "Rectangular extruded inductionless solve with analytic divergence-free "
+            "cross-sectional magnetic field variation."
+        ),
+    )
+    profile = smooth_fringing_profile(
+        length=length,
+        nx=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
 def build_layered_duct_extruded_problem(
     *,
     ha_peak: float = 20.0,
@@ -1470,6 +1559,55 @@ def validate_bent_pipe_low_de_baseline(
         "signed_radius": np.asarray(signed_r, dtype=float).tolist(),
         "bent_centerline_cut": np.asarray(bent_cut, dtype=float).tolist(),
         "straight_centerline_cut": np.asarray(straight_cut, dtype=float).tolist(),
+    }
+
+
+def validate_variable_field_extruded_solution(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float | bool]:
+    if solution.problem.case.geometry.kind != "rect_duct":
+        raise ValueError("Variable-field extruded validation currently supports rectangular ducts only")
+    if solution.problem.case.magnetic_field.kind != "analytic" or solution.problem.case.magnetic_field.fn is None:
+        raise ValueError("Variable-field extruded validation requires an analytic magnetic field")
+
+    from .field_models import cross_section_divergence_metrics
+
+    geometry = solution.problem.case.geometry
+    field_metrics = cross_section_divergence_metrics(
+        solution.problem.case.magnetic_field.fn,
+        width=geometry.width,
+        height=geometry.height,
+        ny=field_ny,
+        nz=field_nz,
+    )
+    validation = solution.validation
+    field_scale = np.asarray(solution.bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(solution.bundle.current_scaled_pressure_proxy, dtype=float)
+    field_velocity_correlation = float(_safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity)))
+    velocity_change = float(np.max(mean_velocity) - np.min(mean_velocity)) if mean_velocity.size else 0.0
+    current_proxy_change = float(np.max(current_proxy) - np.min(current_proxy)) if current_proxy.size else 0.0
+    validation_pass = bool(
+        field_metrics["rms_divergence"] <= 5.0e-2
+        and validation.max_charge_balance_residual <= 5.0e-2
+        and validation.net_boundary_current_residual <= 1.0e-8
+        and validation.max_wall_current_leakage <= 1.0e-8
+        and abs(field_velocity_correlation) >= 0.2
+        and velocity_change > 1.0e-8
+        and current_proxy_change > 1.0e-8
+    )
+    return {
+        **field_metrics,
+        "field_velocity_correlation": field_velocity_correlation,
+        "mean_velocity_change": velocity_change,
+        "current_proxy_change": current_proxy_change,
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "validation_pass": validation_pass,
     }
 
 
@@ -1892,10 +2030,7 @@ def _solve_extruded_projection(
     cell_area = _broadcast_cross_section(mesh.dy[:, None] * mesh.dz[None, :], nx)
     forcing = float(case.forcing)
     field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
-    base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
-    bx = _broadcast_station_profile(field_scale * float(base_field[0]), ny, nz)
-    by = _broadcast_station_profile(field_scale * float(base_field[1]), ny, nz)
-    bz = _broadcast_station_profile(field_scale * float(base_field[2]), ny, nz)
+    bx, by, bz = _sample_station_magnetic_field_duct(case, mesh, field_scale=field_scale, nx=nx, ny=ny, nz=nz)
 
     if initial_bundle is not None:
         if initial_bundle.u.shape != (nx, ny, nz):
