@@ -322,7 +322,9 @@ That summary separates the current dense-slice status clearly:
 - rectangular dense slices are now quantitatively clean on the current
   Benchmark B settings
 - layered dense slices are not closed yet; charge balance and throughput are
-  bounded, but axial-current span and pressure-span range remain much too large
+  bounded, and the axial-current diagnostic now uses conservative x-face
+  current fluxes, but axial-current span and pressure-span range remain much
+  too large
 - mapped pipe remains a separate quantitative external-comparison lane, and its
   parity gap is still dominated by the high-`Ha`, high-`Re` reference regime
   mismatch described above

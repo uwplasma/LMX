@@ -181,7 +181,9 @@ It moved them in the wrong direction:
 - `pressure_span_range ≈ 3.36e1`
 
 That means the dense layered Benchmark B gap is not a simple “run it longer”
-issue. The next correction has to be in the layered operator path itself.
+issue. The axial-current diagnostic now uses the conservative x-face current
+flux rather than cell-centered `J_x`, and the dense layered case is still not
+closed, so the next correction has to be in the layered operator path itself.
 
 The current mapped-pipe external comparison remains the main Benchmark B
 external gap. On the latest bounded pipe-reference comparison:

@@ -611,6 +611,11 @@ def _conservative_current_fluxes_3d(
     return fx, fy, fz
 
 
+def _station_axial_current_from_fluxes(fx: jnp.ndarray, cell_area: jnp.ndarray) -> jnp.ndarray:
+    face_axial_current = jnp.sum(fx * cell_area[None, :, :], axis=(1, 2))
+    return 0.5 * (face_axial_current[1:] + face_axial_current[:-1])
+
+
 def _conservative_current_diagnostics_3d(
     sigma: jnp.ndarray,
     phi: jnp.ndarray,
@@ -1846,7 +1851,17 @@ def _solve_extruded_projection(
     fluid_area = jnp.maximum(jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
     volumetric_flow_rate = jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
     mean_velocity = volumetric_flow_rate / fluid_area
-    axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
+    fx, _, _ = _conservative_current_fluxes_3d(
+        sigma,
+        phi,
+        uxb_x,
+        uxb_y,
+        uxb_z,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+    )
+    axial_current = _station_axial_current_from_fluxes(fx, cell_area[0])
     div_j, wall_current_leakage, boundary_current_residual = _conservative_current_diagnostics_3d(
         sigma,
         phi,

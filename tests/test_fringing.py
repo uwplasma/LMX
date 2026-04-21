@@ -8,6 +8,7 @@ from lmx.fringing import (
     build_square_duct_extruded_problem,
     build_square_duct_fringing_benchmark,
     _cross_section_mesh,
+    _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
     _variable_coefficient_poisson_jacobi_3d,
     _variable_coefficient_poisson_sparse_3d,
@@ -70,6 +71,21 @@ def test_clone_case_with_field_rejects_invalid_axis():
     base_case, _ = build_square_duct_fringing_benchmark(nx_stations=5, ny=8, nz=8)
     with pytest.raises(ValueError, match="Unsupported magnetic axis"):
         clone_case_with_field(base_case, axis="bad", magnitude=1.0)
+
+
+def test_station_axial_current_from_fluxes_averages_adjacent_x_faces():
+    fx = jnp.asarray([
+        [[0.0, 1.0]],
+        [[2.0, 3.0]],
+        [[4.0, 5.0]],
+    ])
+    cell_area = jnp.asarray([[2.0, 4.0]])
+
+    axial_current = _station_axial_current_from_fluxes(fx, cell_area)
+
+    assert axial_current.shape == (2,)
+    assert axial_current[0] == pytest.approx(10.0)
+    assert axial_current[1] == pytest.approx(22.0)
 
 
 def test_run_fringing_station_sweep_chains_initial_state(monkeypatch: pytest.MonkeyPatch):

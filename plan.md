@@ -729,6 +729,11 @@ That retained gate now passes for all three retained fringing geometries.
     - `pressure_span_range ≈ 3.36e1`
   - that rules out simple under-iteration as the main dense layered blocker;
     the next fix needs to be operator-level in the layered extruded solve
+  - the axial-current diagnostic now uses the conservative x-face current flux
+    rather than cell-centered `J_x`; on the current dense layered run that
+    changes the interpretation but does not close the gap, so the open blocker
+    remains in the layered operator path rather than in the old reporting
+    metric alone
   - the benchmark driver now accepts `--geometries ...` so dense duct closure,
     layered retuning, and mapped-pipe parity can be run as separate manual
     lanes instead of one monolithic long campaign
