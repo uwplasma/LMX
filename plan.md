@@ -212,6 +212,14 @@ JSON summary carrying:
 
 Tests should validate the summary values and schema rather than image pixels.
 
+Verification-heavy tests that demonstrate numerics or physics quality should
+not stay test-only when they are manuscript-relevant. Each such family should
+also have a companion artifact-producing example or script that emits:
+
+- a publication-ready figure
+- a summary JSON with the governing observables and references
+- stable artifact paths for docs and future manuscript inclusion
+
 #### Phase 5: software architecture and module split
 
 The current codebase is functionally broad enough that the remaining quality
@@ -406,6 +414,9 @@ Rules for manuscript figures:
 - the example must write a summary JSON with governing observables and gates
 - the README/docs may use lighter variants, but the manuscript figures should be
   traceable to the tested examples
+- numerics-facing figures are allowed and encouraged when they demonstrate
+  observed order, solver robustness, or verification quality in a way that is
+  literature-consistent and manuscript-useful
 
 #### Testing documentation plan
 
@@ -496,6 +507,27 @@ Before a new capability is declared "done", it should satisfy all of:
 
 This keeps parity claims with FreeMHD and the literature explicit and prevents
 README-only features from drifting ahead of the tested solver surface.
+
+#### Performance, differentiability, and accuracy priorities
+
+Implementation work should continue to optimize for all three of:
+
+- accuracy:
+  numerical verification, literature agreement, conservative invariants, and
+  physically meaningful benchmark observables
+- end-to-end differentiability:
+  avoid introducing non-differentiable helper paths into the public design/UQ
+  workflows when a JAX-native alternative is practical
+- performance:
+  keep the routine lane bounded, keep artifact workflows reproducible, and
+  prefer operator/solver changes that do not undermine the stronger-scaling and
+  differentiable execution goals
+
+When tradeoffs appear, the expected closeout path is:
+
+- first make the physics and numerics correct
+- then preserve or recover differentiability
+- then optimize performance without silently changing validated behavior
 
 #### Coverage targets
 

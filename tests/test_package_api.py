@@ -64,6 +64,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_transient_movies)
     assert callable(lmx.write_strong_scaling_plots)
     assert callable(lmx.write_autodiff_plots)
+    assert callable(lmx.write_operator_verification_plots)
     assert callable(lmx.solve_closed_channel_benchmark)
     assert callable(lmx.write_lm_duct_geometry_setup_figure)
     assert callable(lmx.write_structured_mesh_figure)

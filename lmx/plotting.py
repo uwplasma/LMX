@@ -1989,3 +1989,68 @@ def write_autodiff_plots(
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
     return [png_path, pdf_path]
+
+
+def write_operator_verification_plots(
+    records: list[dict[str, float]],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    resolution = np.asarray([float(item["resolution"]) for item in records], dtype=float)
+    spacing = np.asarray([float(item["max_spacing"]) for item in records], dtype=float)
+    gradient_y = np.asarray([float(item["gradient_y_l2_error"]) for item in records], dtype=float)
+    gradient_z = np.asarray([float(item["gradient_z_l2_error"]) for item in records], dtype=float)
+    laplacian = np.asarray([float(item["laplacian_l2_error"]) for item in records], dtype=float)
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.0), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    axes[0].loglog(spacing, gradient_y, marker="o", color="#0f766e", label=r"$\partial_y$ error")
+    axes[0].loglog(spacing, gradient_z, marker="s", color="#b45309", label=r"$\partial_z$ error")
+    axes[0].loglog(spacing, laplacian, marker="^", color="#1d4ed8", label=r"$\nabla^2$ error")
+    axes[0].set_xlabel("Max cell spacing")
+    axes[0].set_ylabel(r"$L_2$ error")
+    axes[0].set_title("Observed-order convergence")
+    axes[0].invert_xaxis()
+    axes[0].legend(loc="upper left")
+
+    grad_order_y = np.log(gradient_y[:-1] / gradient_y[1:]) / np.log(spacing[:-1] / spacing[1:]) if len(records) > 1 else np.asarray([])
+    grad_order_z = np.log(gradient_z[:-1] / gradient_z[1:]) / np.log(spacing[:-1] / spacing[1:]) if len(records) > 1 else np.asarray([])
+    lap_order = np.log(laplacian[:-1] / laplacian[1:]) / np.log(spacing[:-1] / spacing[1:]) if len(records) > 1 else np.asarray([])
+    axes[0].text(
+        0.03,
+        0.03,
+        "\n".join(
+            [
+                f"grad-y order ≈ {float(np.mean(grad_order_y)):.2f}" if grad_order_y.size else "",
+                f"grad-z order ≈ {float(np.mean(grad_order_z)):.2f}" if grad_order_z.size else "",
+                f"laplacian order ≈ {float(np.mean(lap_order)):.2f}" if lap_order.size else "",
+            ]
+        ).strip(),
+        transform=axes[0].transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=10.5,
+        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+    )
+
+    axes[1].plot(resolution, gradient_y, marker="o", color="#0f766e", label=r"$\partial_y$")
+    axes[1].plot(resolution, gradient_z, marker="s", color="#b45309", label=r"$\partial_z$")
+    axes[1].plot(resolution, laplacian, marker="^", color="#1d4ed8", label=r"$\nabla^2$")
+    axes[1].set_yscale("log")
+    axes[1].set_xlabel("Cross-section resolution")
+    axes[1].set_ylabel(r"$L_2$ error")
+    axes[1].set_title("Error decay with refinement")
+    axes[1].legend(loc="upper right")
+
+    png_path = out_dir / "operator_verification.png"
+    pdf_path = out_dir / "operator_verification.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]

@@ -19,6 +19,7 @@ from lmx.plotting import (
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
     write_magnetic_obstacle_regime_plots,
+    write_operator_verification_plots,
     write_strong_scaling_plots,
     write_wham_mirror_overview_plots,
     write_transient_movies,
@@ -334,6 +335,19 @@ def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
     )
 
     assert outputs == [tmp_path / "autodiff_summary.png", tmp_path / "autodiff_summary.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_operator_verification_plots_writes_png_and_pdf(tmp_path: Path):
+    records = [
+        {"resolution": 16.0, "max_spacing": 0.125, "gradient_y_l2_error": 2.0e-2, "gradient_z_l2_error": 2.2e-2, "laplacian_l2_error": 5.0e-2},
+        {"resolution": 32.0, "max_spacing": 0.0625, "gradient_y_l2_error": 5.0e-3, "gradient_z_l2_error": 5.5e-3, "laplacian_l2_error": 1.3e-2},
+        {"resolution": 64.0, "max_spacing": 0.03125, "gradient_y_l2_error": 1.3e-3, "gradient_z_l2_error": 1.4e-3, "laplacian_l2_error": 3.3e-3},
+    ]
+    outputs = write_operator_verification_plots(records, tmp_path, case_title="Operator verification")
+
+    assert outputs == [tmp_path / "operator_verification.png", tmp_path / "operator_verification.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
 

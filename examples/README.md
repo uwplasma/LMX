@@ -16,6 +16,7 @@ The examples are explicit templates for research workflows. They show how to:
 - customize geometry objects before a solve and preview them in 3D
 - preview bent-pipe geometries before solver support lands
 - validate analytic cross-sectional magnetic fields before using them in runs
+- generate publication-ready verification figures with checked JSON summaries
 
 ## Quick examples
 
@@ -67,6 +68,7 @@ python examples/q2d_wall_bounded_validation.py
 python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_regime_scan.py
 python examples/magnetic_obstacle_baseline.py
+python examples/operator_verification_demo.py
 ```
 
 ## Input-file examples

@@ -235,3 +235,22 @@ verification/validation practice, not only to internal regression history.
 - [A research framework for writing differentiable PDE discretizations in JAX](https://arxiv.org/abs/2111.05218)
   - anchors the autodiff verification philosophy for gradient, optimization,
     and differentiable-operator tests
+
+## Artifact-producing verification examples
+
+When a numerical or physics verification family is strong enough to support
+the docs or manuscript, it should not remain only as a unit test. The intended
+pattern is:
+
+- keep the cheap direct test in `tests/`
+- add a companion standalone example under `examples/`
+- write a publication-ready figure plus a summary JSON
+- validate the summary schema and governing observables in tests
+
+This keeps the fast lane bounded while making the same verification evidence
+available for documentation and later manuscript figures.
+
+The first explicit example following this pattern is
+`examples/operator_verification_demo.py`, which turns the manufactured smooth
+operator checks into a convergence figure and summary JSON rather than leaving
+them only in `tests/test_operators.py`.
