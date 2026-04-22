@@ -307,6 +307,12 @@ These observables are meant to read closer to the magnetic-obstacle literature:
 streamwise wake deficit, centerline recovery location, pressure response, and
 cross-cut distortion against a matched no-field reference.
 
+The choice of observables follows the wake/recovery framing used in magnetic-
+obstacle studies such as Cuevas et al., *On the flow past a magnetic obstacle*
+and Votyakov et al., *Constrained flow around a magnetic obstacle*, even
+though the current LMX slice is still a bounded low-inertia inductionless case
+rather than a full turbulent or experimental parity benchmark.
+
 Current bounded literature-facing slice:
 
 - `peak_station ≈ 3.00`

@@ -1783,6 +1783,27 @@ def test_explicit_forcing_preserves_dtype():
     assert float(value) == pytest.approx(1.25)
 
 
+def test_scaled_pressure_proxy_value_falls_back_to_unity_reference_for_zero_currents():
+    scaled, reference = solvers._scaled_pressure_proxy_value(
+        pressure_proxy=2.0,
+        current_max=0.0,
+        face_current_max=0.0,
+        reference_current=0.0,
+    )
+    assert scaled == pytest.approx(0.0)
+    assert reference == pytest.approx(1.0)
+
+
+def test_inlet_speed_defaults_tuple_axis_to_x_and_rejects_zero_area_flow_rate():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    tuple_bc = BoundaryCondition("tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="bad")
+    zero_area_case = replace(case, geometry=replace(case.geometry, width=0.0))
+    flow_bc = BoundaryCondition("flow", "inlet_flow_rate", value=1.0, axis="x")
+
+    assert solvers._inlet_speed(tuple_bc, case) == pytest.approx(1.0)
+    assert solvers._inlet_speed(flow_bc, zero_area_case) is None
+
+
 def test_emit_solver_header_forwards_restart_payload():
     captured = {}
 
