@@ -2054,3 +2054,77 @@ def write_operator_verification_plots(
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
     return [png_path, pdf_path]
+
+
+def write_interface_verification_plots(
+    records: list[dict[str, float]],
+    profile: dict[str, np.ndarray],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+    interface_location: float = 0.0,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    resolution = np.asarray([float(item["resolution"]) for item in records], dtype=float)
+    spacing = np.asarray([float(item["max_spacing"]) for item in records], dtype=float)
+    profile_error = np.asarray([float(item["profile_l2_error"]) for item in records], dtype=float)
+    flux_error = np.asarray([float(item["flux_error"]) for item in records], dtype=float)
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.0), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    axes[0].plot(profile["y"], profile["u_exact"], color="#111827", linewidth=2.0, label="Exact")
+    axes[0].plot(profile["y"], profile["u_numeric"], color="#1d4ed8", linestyle="--", linewidth=2.0, label="LMX harmonic-average FV")
+    axes[0].axvline(interface_location, color="#7c3aed", linestyle=":", linewidth=1.5, label="Conductivity jump")
+    axes[0].set_xlabel("Cross-stream coordinate")
+    axes[0].set_ylabel("Potential / scalar state")
+    axes[0].set_title("Piecewise-linear interface solution")
+    axes[0].legend(loc="upper left")
+
+    axes[1].loglog(spacing, profile_error, marker="o", color="#0f766e", label="Profile $L_2$ error")
+    axes[1].loglog(spacing, flux_error, marker="s", color="#b45309", label="Flux error")
+    axes[1].set_xlabel("Max cell spacing")
+    axes[1].set_ylabel("Error")
+    axes[1].set_title("Layered-media convergence")
+    axes[1].invert_xaxis()
+    axes[1].legend(loc="upper left")
+
+    if len(records) > 1 and np.all(profile_error > 1e-12) and np.all(flux_error > 1e-12):
+        profile_order = np.log(profile_error[:-1] / profile_error[1:]) / np.log(spacing[:-1] / spacing[1:])
+        flux_order = np.log(flux_error[:-1] / flux_error[1:]) / np.log(spacing[:-1] / spacing[1:])
+        axes[1].text(
+            0.03,
+            0.03,
+            "\n".join(
+                [
+                    f"profile order ≈ {float(np.mean(profile_order)):.2f}",
+                    f"flux order ≈ {float(np.mean(flux_order)):.2f}",
+                ]
+            ),
+            transform=axes[1].transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=10.5,
+            bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+        )
+    else:
+        axes[1].text(
+            0.03,
+            0.03,
+            "Roundoff-limited exact reproduction\non the aligned interface case",
+            transform=axes[1].transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=10.5,
+            bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+        )
+
+    png_path = out_dir / "interface_verification.png"
+    pdf_path = out_dir / "interface_verification.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]

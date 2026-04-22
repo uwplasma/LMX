@@ -847,6 +847,18 @@ def test_operator_clustered_verification_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "operator_clustered_verification_summary.json").exists()
 
 
+def test_interface_conductivity_verification_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("interface_conductivity_verification_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.RESOLUTIONS = (16, 32, 64)
+    summary = module.run_interface_conductivity_verification_demo()
+    assert summary["case"] == "interface_conductivity_verification"
+    assert max(row["profile_l2_error"] for row in summary["records"]) < 1e-10
+    assert max(row["flux_error"] for row in summary["records"]) < 1e-10
+    assert (tmp_path / "interface_verification.png").exists()
+    assert (tmp_path / "interface_conductivity_verification_summary.json").exists()
+
+
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_forced_validation.py")
     module.OUTPUT_DIR = tmp_path

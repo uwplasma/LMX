@@ -18,6 +18,7 @@ from lmx.plotting import (
     write_cross_section_field_plots,
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
+    write_interface_verification_plots,
     write_magnetic_obstacle_regime_plots,
     write_operator_verification_plots,
     write_strong_scaling_plots,
@@ -348,6 +349,24 @@ def test_write_operator_verification_plots_writes_png_and_pdf(tmp_path: Path):
     outputs = write_operator_verification_plots(records, tmp_path, case_title="Operator verification")
 
     assert outputs == [tmp_path / "operator_verification.png", tmp_path / "operator_verification.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_interface_verification_plots_writes_png_and_pdf(tmp_path: Path):
+    records = [
+        {"resolution": 24.0, "max_spacing": 0.0833, "profile_l2_error": 1.0e-6, "flux_error": 2.0e-6},
+        {"resolution": 48.0, "max_spacing": 0.0417, "profile_l2_error": 2.5e-7, "flux_error": 5.0e-7},
+        {"resolution": 96.0, "max_spacing": 0.0208, "profile_l2_error": 6.0e-8, "flux_error": 1.2e-7},
+    ]
+    profile = {
+        "y": np.linspace(-1.0, 1.0, 9),
+        "u_exact": np.linspace(0.0, 1.0, 9),
+        "u_numeric": np.linspace(0.0, 1.0, 9) + 1.0e-3,
+    }
+    outputs = write_interface_verification_plots(records, profile, tmp_path, case_title="Interface verification")
+
+    assert outputs == [tmp_path / "interface_verification.png", tmp_path / "interface_verification.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
