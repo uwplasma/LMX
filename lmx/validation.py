@@ -208,9 +208,10 @@ def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
 
 def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
     z_coords = solution.mesh.z_centers
+    phi_state = getattr(solution.state, "phi", jnp.zeros_like(solution.state.u))
     if z_coords.size == 1:
         u_profile = solution.state.u[:, 0]
-        phi_profile = solution.state.phi[:, 0]
+        phi_profile = phi_state[:, 0]
     else:
         right = int(jnp.searchsorted(z_coords, 0.0))
         right = max(1, min(right, z_coords.size - 1))
@@ -223,7 +224,7 @@ def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
             weight = float((0.0 - z_left) / (z_right - z_left))
         weight = min(max(weight, 0.0), 1.0)
         u_profile = (1.0 - weight) * solution.state.u[:, left] + weight * solution.state.u[:, right]
-        phi_profile = (1.0 - weight) * solution.state.phi[:, left] + weight * solution.state.phi[:, right]
+        phi_profile = (1.0 - weight) * phi_state[:, left] + weight * phi_state[:, right]
     return {
         "y": solution.mesh.y_centers,
         "u": u_profile,
@@ -270,9 +271,10 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
         }
     if axis == "z":
         y_coords = solution.mesh.y_centers
+        phi_state = getattr(solution.state, "phi", jnp.zeros_like(solution.state.u))
         if y_coords.size == 1:
             u_profile = solution.state.u[0, :]
-            phi_profile = solution.state.phi[0, :]
+            phi_profile = phi_state[0, :]
             mask = _profile_axis_mask(solution, axis="z", fixed_index=0)
         else:
             upper = int(jnp.searchsorted(y_coords, 0.0))
@@ -286,7 +288,7 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
                 weight = float((0.0 - y_lower) / (y_upper - y_lower))
             weight = min(max(weight, 0.0), 1.0)
             u_profile = (1.0 - weight) * solution.state.u[lower, :] + weight * solution.state.u[upper, :]
-            phi_profile = (1.0 - weight) * solution.state.phi[lower, :] + weight * solution.state.phi[upper, :]
+            phi_profile = (1.0 - weight) * phi_state[lower, :] + weight * phi_state[upper, :]
             mask = _profile_axis_mask(solution, axis="z", fixed_index=lower) & _profile_axis_mask(
                 solution,
                 axis="z",
@@ -480,7 +482,9 @@ def validation_summary(solution: Solution, case_name: str, ha: float | None = No
 
 def hartmann_validation(solution: Solution, ha: float) -> AnalyticComparison:
     profile = extract_centerline(solution)
-    coordinate = profile["y"] / jnp.max(jnp.abs(profile["y"]))
+    half_width = 0.5 * float(solution.mesh.y_faces[-1] - solution.mesh.y_faces[0])
+    scale_y = half_width if half_width > 0.0 else float(jnp.max(jnp.abs(profile["y"])))
+    coordinate = profile["y"] / max(scale_y, 1.0e-12)
     u = profile["u"]
     scale = jnp.max(jnp.abs(u))
     scale = jnp.where(scale > 0.0, scale, 1.0)

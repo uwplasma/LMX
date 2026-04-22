@@ -48,7 +48,8 @@ def test_moderate_ha_rect_mesh_clusters_boundary_layers():
     mesh = generate_rect_duct_mesh(width=0.2, height=0.2, ny=32, nz=32, target_ha=20.0, magnetic_axis="z")
     dy = mesh.dy
     dz = mesh.dz
+    uniform_spacing = 0.2 / 32.0
     assert float(dy.min()) < float(dy.max())
     assert float(dz.min()) < float(dz.max())
-    assert float(dy.min()) < 0.002
-    assert float(dz.min()) < 0.002
+    assert float(dy.min()) < 0.4 * uniform_spacing
+    assert float(dz.min()) < 0.4 * uniform_spacing

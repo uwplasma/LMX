@@ -491,6 +491,7 @@ def solve_differentiable_hartmann(
             sigma=sigma,
             rho=rho,
             fluid_mask=fluid_mask,
+            u=u_iter,
             phi=phi,
             by=by,
             bz=bz,

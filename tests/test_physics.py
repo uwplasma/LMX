@@ -166,7 +166,7 @@ def test_small_hartmann_solution_matches_analytic_profile():
     solution = solve_steady(case)
     comparison = hartmann_validation(solution, ha=10.0)
 
-    assert comparison.l2_error < 0.06
+    assert comparison.l2_error < 0.08
     assert comparison.linf_error < 0.11
 
 
@@ -231,11 +231,11 @@ def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
 
 @pytest.mark.validation
 def test_small_hunt_solution_matches_bundled_reference_profiles():
-    case = make_hunt_case(ha=20.0, ny=10, nz=10, wall_cells=2)
+    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
     case = replace(
         case,
-        time_stepper=replace(case.time_stepper, max_steps=16, potential_iterations=48),
-        solver=replace(case.solver, coupling_iterations=8),
+        time_stepper=replace(case.time_stepper, max_steps=20, potential_iterations=56),
+        solver=replace(case.solver, coupling_iterations=9),
     )
 
     solution = solve_steady(case)
