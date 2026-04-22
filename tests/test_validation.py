@@ -608,6 +608,43 @@ def test_profile_and_validation_writers_emit_expected_files(tmp_path: Path):
     assert profile_path.read_text().startswith("x,u")
 
 
+def test_reference_parsing_helpers_cover_invalid_axis_missing_time_and_missing_case(tmp_path: Path):
+    assert validation.parse_location_tuple("not-a-location") is None
+
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        infer_mesh_axis_coordinates(tmp_path, axis="bad")
+
+    with pytest.raises(ValueError, match="Unable to infer sample time"):
+        validation.infer_sample_time_from_path(Path("postProcessing") / "liquid" / "centerlineY.xy")
+
+    inspection = inspect_reference_case(tmp_path / "missing_case")
+    assert inspection.control_dicts == ()
+    assert inspection.fv_solutions == ()
+    assert inspection.parallel_time_dirs == ()
+
+
+def test_latest_field_minmax_record_and_sample_pair_handle_malformed_or_incomplete_outputs(tmp_path: Path):
+    post_dir = tmp_path / "postProcessing" / "fieldMinMax1" / "0.1"
+    post_dir.mkdir(parents=True)
+    (post_dir / "fieldMinMax.dat").write_text(
+        "\n".join(
+            [
+                "# malformed header",
+                "nonsense line that should be skipped",
+                "0.1 mag(phi) cellZone -1.0 (0 0 0) foo 2.0 (1 0 0) bar",
+            ]
+        )
+    )
+
+    assert read_field_minmax(post_dir / "fieldMinMax.dat") == ()
+    assert latest_field_minmax_record(tmp_path, field="mag(U)") is None
+
+    sample_root = tmp_path / "postProcessing" / "lmxSample" / "liquid" / "0.2"
+    sample_root.mkdir(parents=True)
+    (sample_root / "centerlineY_potE_U.xy").write_text("0.0 0.0 1.0 0.0 0.0\n")
+    assert latest_reference_sampled_profiles(tmp_path) is None
+
+
 def test_processed_slice_validation_writer(tmp_path: Path):
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
     y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")

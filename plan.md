@@ -212,6 +212,159 @@ JSON summary carrying:
 
 Tests should validate the summary values and schema rather than image pixels.
 
+#### Phase 5: software architecture and module split
+
+The current codebase is functionally broad enough that the remaining quality
+work is now partly architectural. The largest files should be split without
+changing behavior, public API semantics, FreeMHD parity status, or existing
+artifact paths.
+
+Immediate module-size hotspots:
+
+- `lmx/fringing.py` (~2900 lines)
+- `lmx/autodiff.py` (~2100 lines)
+- `lmx/plotting.py` (~2000 lines)
+- `lmx/solvers.py` (~1400 lines)
+- `lmx/validation.py` (~1100 lines)
+
+Target split map:
+
+- `lmx/fringing.py`
+  - `lmx/fringing/problems.py`: problem builders and case assembly
+  - `lmx/fringing/solve.py`: executable projection loop and stepping logic
+  - `lmx/fringing/metrics.py`: conservative current/pressure/throughput metrics
+  - `lmx/fringing/validation.py`: benchmark gates and literature-facing slices
+  - `lmx/fringing/reference.py`: reference comparison helpers and normalizations
+- `lmx/autodiff.py`
+  - `lmx/autodiff/objectives.py`: differentiable loss/objective definitions
+  - `lmx/autodiff/gradients.py`: gradient/JVP/VJP utilities and checks
+  - `lmx/autodiff/design.py`: inverse-design loops and optimization wrappers
+  - `lmx/autodiff/uq.py`: local uncertainty propagation / sensitivity utilities
+- `lmx/plotting.py`
+  - `lmx/plotting/profiles.py`
+  - `lmx/plotting/benchmarks.py`
+  - `lmx/plotting/media.py`
+  - `lmx/plotting/fields.py`
+- `lmx/validation.py`
+  - `lmx/validation/profiles.py`
+  - `lmx/validation/reference.py`
+  - `lmx/validation/reports.py`
+- `lmx/solvers.py`
+  - keep a thin public façade
+  - move helper-heavy internals into:
+    - `lmx/solvers/fully_developed.py`
+    - `lmx/solvers/potential.py`
+    - `lmx/solvers/diagnostics.py`
+    - `lmx/solvers/logging.py`
+
+Refactor rules:
+
+- preserve existing public import paths during the split cycle
+- move tests with the code they exercise
+- split only after the behavior is locked by direct tests
+- do not mix refactors with numerical changes in the same patch when possible
+
+#### Phase 6: autodiff, UQ, and optimization verification
+
+LMX should not stop at "gradients exist." The differentiable lane needs its own
+verification ladder so sensitivity analysis, inverse design, uncertainty
+quantification, and mirror/okamak/stellarator-related optimization work are
+defensible.
+
+Required additions:
+
+- gradient checks against finite differences for:
+  - straight-duct profile objectives
+  - fringing pressure-drop / current-response objectives
+  - WHAM-like mirror-field coil-separation objectives
+  - tabulated-field amplitude/placement objectives
+- optimization regressions:
+  - objective decreases monotonically on bounded inverse-design demos
+  - final design outperforms the initial design on the tracked objective
+- UQ baselines:
+  - local linear uncertainty propagation versus finite-difference covariance
+  - low-dimensional Monte Carlo or sparse-grid checks on reduced examples
+- JAX-specific correctness checks:
+  - `jit` and eager agreement
+  - `grad` and finite-difference sign agreement
+  - `vmap` / batched-objective consistency
+  - dtype/device stability where the code claims support
+
+Domain-facing optimization roadmap:
+
+- mirror optimization:
+  coil spacing, coil current scale, pipe placement, pressure-drop objectives
+- tokamak/blanket optimization:
+  tabulated 3D field loading, pressure-drop sensitivity, wall-conductance scans
+- stellarator / non-axisymmetric field support:
+  begin with tabulated-field sensitivity and shape/placement parameter studies,
+  not full equilibrium optimization
+
+#### Phase 7: comments, docstrings, and developer-facing clarity
+
+The remaining maintainability gap is not only tests. The solver needs explicit
+documentation at the code level so the numerical intent is reviewable.
+
+Rules:
+
+- every public function should have a docstring with:
+  - purpose
+  - expected units / normalization
+  - array shape conventions where relevant
+  - return values and failure modes
+- module docstrings should state:
+  - governing approximation
+  - literature anchor where appropriate
+  - what is verified versus what is only demonstrated
+- comments should be sparse and technical:
+  - explain conservative reconstructions, gauge choices, symmetry metrics, and
+    non-obvious numerical safeguards
+  - do not narrate obvious assignments or control flow
+
+#### Example and benchmark validation matrix
+
+Every example should be classified as one of:
+
+- verification example
+- validation example
+- capability demo
+- optimization/autodiff demo
+
+Current target matrix:
+
+- Benchmark A / straight-duct verification
+  - `hartmann_example.py`
+  - `shercliff_example.py`
+  - `hunt_example.py`
+  - `straight_duct_profile_comparison.py`
+- Benchmark B / 3D fringing validation
+  - `fringing_benchmark_demo.py`
+  - `extruded_validation_campaign.py`
+  - `pipe_reference_comparison_demo.py`
+  - bent-pipe inductionless baseline
+- Benchmark C / Q2D validation
+  - `q2d_decay_validation.py`
+  - `q2d_forced_validation.py`
+  - `q2d_wall_bounded_validation.py`
+- Benchmark D / magnetic-obstacle and mirror-field validation
+  - `magnetic_obstacle_benchmark.py`
+  - `magnetic_obstacle_regime_scan.py`
+  - `wham_mirror_pipe_demo.py`
+  - `autodiff_wham_pressure_sensitivity.py`
+- Variable-field capability and tabulated-field validation
+  - `variable_field_extruded_demo.py`
+  - `variable_field_layered_demo.py`
+  - `variable_field_bent_pipe_demo.py`
+  - `variable_field_tabulated_demo.py`
+
+Every item in that matrix should ultimately have:
+
+- a validated JSON summary
+- named physics/numerics gates
+- a test that reads the summary and asserts the governing observables
+- a clear statement in docs whether it is verification, validation, or only a
+  capability demonstration
+
 #### Coverage targets
 
 The practical targets are:
