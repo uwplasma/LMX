@@ -101,3 +101,48 @@ def test_center_spacing_returns_empty_for_single_cell_axes():
     mesh = generate_rect_duct_mesh(width=1.0, height=1.0, ny=1, nz=1)
     assert center_spacing_y(mesh).shape == (0,)
     assert center_spacing_z(mesh).shape == (0,)
+
+
+def test_gradient_observed_order_for_smooth_manufactured_solution():
+    errors_y = []
+    errors_z = []
+    spacings = []
+
+    for n in (16, 32, 64):
+        mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=n, nz=n)
+        y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+        field = jnp.sin(jnp.pi * y) * jnp.cos(0.5 * jnp.pi * z)
+        exact_y = jnp.pi * jnp.cos(jnp.pi * y) * jnp.cos(0.5 * jnp.pi * z)
+        exact_z = -0.5 * jnp.pi * jnp.sin(jnp.pi * y) * jnp.sin(0.5 * jnp.pi * z)
+
+        grad_y, grad_z = gradient_scalar(field, mesh)
+        sl = (slice(2, -2), slice(2, -2))
+        errors_y.append(float(jnp.sqrt(jnp.mean((grad_y[sl] - exact_y[sl]) ** 2))))
+        errors_z.append(float(jnp.sqrt(jnp.mean((grad_z[sl] - exact_z[sl]) ** 2))))
+        spacings.append(float(jnp.max(mesh.dy)))
+
+    order_y = jnp.log(errors_y[0] / errors_y[1]) / jnp.log(spacings[0] / spacings[1])
+    order_z = jnp.log(errors_z[0] / errors_z[1]) / jnp.log(spacings[0] / spacings[1])
+    assert float(order_y) > 1.8
+    assert float(order_z) > 1.8
+
+
+def test_laplacian_manufactured_solution_and_masking_are_consistent():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=48, nz=48)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    field = jnp.sin(jnp.pi * y) * jnp.sin(jnp.pi * z)
+    exact = -2.0 * (jnp.pi**2) * field
+
+    full_lap = laplacian_scalar(field, mesh)
+    sl = (slice(4, -4), slice(4, -4))
+    interior_error = float(jnp.sqrt(jnp.mean((full_lap[sl] - exact[sl]) ** 2)))
+    assert interior_error < 0.15
+
+    mask = jnp.ones(mesh.yz_shape, dtype=bool)
+    mask = mask.at[:4, :].set(False)
+    mask = mask.at[-4:, :].set(False)
+    mask = mask.at[:, :4].set(False)
+    mask = mask.at[:, -4:].set(False)
+
+    lap = laplacian_scalar(field, mesh, mask=mask)
+    assert jnp.allclose(lap[~mask], 0.0)
