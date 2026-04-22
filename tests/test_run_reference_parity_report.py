@@ -15,6 +15,20 @@ def test_infer_initial_velocity_x_reads_uniform_liquid_u(tmp_path: Path):
     assert parity.infer_initial_velocity_x(tmp_path) == pytest.approx(0.9725)
 
 
+def test_portable_path_and_inference_helpers_cover_missing_paths(tmp_path: Path):
+    nested = tmp_path / "a" / "b" / "file.txt"
+    nested.parent.mkdir(parents=True)
+    nested.write_text("x")
+
+    assert parity._portable_path(nested, relative_to=tmp_path) == "a/b/file.txt"
+    assert parity._portable_path(nested, relative_to=tmp_path / "other") == "file.txt"
+    assert parity.infer_initial_velocity_x(tmp_path / "missing") is None
+    assert parity.infer_inlet_flow_rate(tmp_path / "missing") is None
+    assert parity.infer_inlet_drive_mode(tmp_path / "missing") is None
+    assert parity.infer_reduced_inlet_flow_rate(tmp_path / "missing", reduced_area=1.0) is None
+    assert parity.infer_magnetic_ramp(tmp_path / "missing") == pytest.approx((0.0, 0.0))
+
+
 def test_infer_inlet_drive_mode_and_flow_rate_reads_hunt_inlet_block(tmp_path: Path):
     path = tmp_path / "0" / "liquid"
     path.mkdir(parents=True)
@@ -42,6 +56,65 @@ def test_infer_magnetic_ramp_reads_control_dict(tmp_path: Path):
     system.mkdir()
     (system / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
     assert parity.infer_magnetic_ramp(tmp_path) == pytest.approx((1e-5, 2e-4))
+
+
+def test_build_case_covers_hunt_inlet_velocity_and_flow_rate_modes():
+    velocity_case = parity.build_case(
+        "hunt",
+        ha=20.0,
+        ny=8,
+        nz=8,
+        initial_velocity=0.2,
+        dt=1.0e-4,
+        t_final=1.0e-3,
+        max_steps=10,
+        forcing=0.0,
+        drive_mode="inlet_velocity",
+        inlet_flow_rate=None,
+        ramp_start=1.0e-5,
+        ramp_duration=2.0e-4,
+    )
+    flow_case = parity.build_case(
+        "hunt",
+        ha=20.0,
+        ny=8,
+        nz=8,
+        initial_velocity=0.2,
+        dt=1.0e-4,
+        t_final=1.0e-3,
+        max_steps=10,
+        forcing=0.0,
+        drive_mode="inlet_flow_rate",
+        inlet_flow_rate=0.03,
+        ramp_start=1.0e-5,
+        ramp_duration=2.0e-4,
+    )
+
+    velocity_bcs = [bc for bc in velocity_case.boundary_conditions if bc.name == "inlet"]
+    flow_bcs = [bc for bc in flow_case.boundary_conditions if bc.name == "inlet"]
+    assert velocity_bcs[-1].kind == "inlet_velocity"
+    assert flow_bcs[-1].kind == "inlet_flow_rate"
+    assert flow_bcs[-1].value == pytest.approx(0.03)
+
+
+def test_build_case_defaults_hunt_flow_rate_from_area():
+    case = parity.build_case(
+        "hunt",
+        ha=20.0,
+        ny=8,
+        nz=8,
+        initial_velocity=0.2,
+        dt=1.0e-4,
+        t_final=1.0e-3,
+        max_steps=10,
+        forcing=0.0,
+        drive_mode="inlet_flow_rate",
+        inlet_flow_rate=None,
+        ramp_start=0.0,
+        ramp_duration=0.0,
+    )
+    inlet = [bc for bc in case.boundary_conditions if bc.name == "inlet"][-1]
+    assert inlet.value == pytest.approx(0.2 * case.geometry.width * case.geometry.height)
 
 
 def test_main_writes_parity_report(

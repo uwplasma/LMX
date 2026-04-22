@@ -20,9 +20,61 @@ def test_replace_like_rejects_unsupported_object():
         suite._replace_like(3.14, dt=0.1)
 
 
+def test_replace_like_supports_plain_objects_with_dict():
+    class Config:
+        def __init__(self, dt: float, max_steps: int):
+            self.dt = dt
+            self.max_steps = max_steps
+
+    updated = suite._replace_like(Config(0.01, 10), dt=0.02)
+    assert updated.dt == pytest.approx(0.02)
+    assert updated.max_steps == 10
+
+
 def test_build_case_rejects_unknown_case(tmp_path: Path):
     with pytest.raises(ValueError, match="unknown"):
         suite._build_case("unknown", 20.0, 16, tmp_path, None)
+
+
+def test_build_case_covers_hartmann_shercliff_and_hunt(tmp_path: Path):
+    hartmann = suite._build_case("hartmann", 20.0, 12, tmp_path / "hartmann", None)
+    shercliff = suite._build_case("shercliff", 20.0, 12, tmp_path / "shercliff", None)
+    hunt = suite._build_case("hunt", 20.0, 18, tmp_path / "hunt", None)
+
+    assert hartmann.name.startswith("hartmann")
+    assert shercliff.name.startswith("shercliff")
+    assert hunt.name.startswith("hunt")
+    assert hunt.geometry.kind == "layered_duct"
+
+
+def test_collect_metrics_covers_hartmann_and_slice_present_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
+    comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
+    slice_report = SimpleNamespace(y_profile=profile, z_profile=profile)
+
+    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
+    monkeypatch.setattr(suite, "hartmann_validation", lambda *args, **kwargs: SimpleNamespace(l2_error=0.01, linf_error=0.02))
+    monkeypatch.setattr(suite, "hartmann_acceptance", lambda *args, **kwargs: SimpleNamespace(passed=True))
+    monkeypatch.setattr(suite, "closed_channel_validation", lambda *args, **kwargs: comparison)
+    monkeypatch.setattr(suite, "processed_slice_validation", lambda *args, **kwargs: slice_report)
+
+    hartmann_metrics = suite._collect_metrics(
+        solution=SimpleNamespace(),
+        case_kind="hartmann",
+        ha=20.0,
+        reference_root=None,
+        x_slice="1m",
+    )
+    hunt_metrics = suite._collect_metrics(
+        solution=SimpleNamespace(),
+        case_kind="hunt",
+        ha=20.0,
+        reference_root=tmp_path / "refs",
+        x_slice="1m",
+    )
+
+    assert hartmann_metrics["accepted"] == pytest.approx(1.0)
+    assert hunt_metrics["slice_combined_l2_error"] == pytest.approx(0.2)
 
 
 def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

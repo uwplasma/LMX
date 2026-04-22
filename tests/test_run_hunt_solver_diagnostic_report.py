@@ -45,6 +45,18 @@ def _fake_solution() -> Solution:
     return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name="hunt_ha20")
 
 
+def test_hunt_diagnostic_helpers_cover_portable_path_and_pressure_proxy_scaling(tmp_path: Path):
+    nested = tmp_path / "a" / "b" / "out.json"
+    nested.parent.mkdir(parents=True)
+    nested.write_text("{}")
+
+    assert huntdiag._portable_path(nested, relative_to=tmp_path) == "a/b/out.json"
+    assert huntdiag._portable_path(nested, relative_to=tmp_path / "other") == "out.json"
+    assert huntdiag._derive_current_scaled_pressure_proxy_history([], [1.0], [2.0]) == []
+    assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0], [], []) == []
+    assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0, 2.0], [2.0, 4.0], []) == pytest.approx([1.0, 4.0])
+
+
 def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)

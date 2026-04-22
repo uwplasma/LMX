@@ -128,3 +128,109 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(tmp_path
 def test_write_closed_channel_startup_movies_rejects_unsupported_case(tmp_path: Path):
     with pytest.raises(ValueError):
         showcase.write_closed_channel_startup_movies("bad_case", tmp_path)
+
+
+def test_showcase_fluid_crop_and_normalization_cover_masked_and_unmasked_paths():
+    mesh = _fake_mesh()
+    field = np.arange(mesh.ny * mesh.nz, dtype=float).reshape(mesh.ny, mesh.nz)
+
+    y_faces, z_faces, y_centers, z_centers, cropped = showcase._fluid_crop(mesh, field)
+    assert cropped.shape == field.shape
+    assert y_faces.shape[0] == mesh.y_faces.shape[0]
+    assert z_faces.shape[0] == mesh.z_faces.shape[0]
+
+    masked = np.zeros_like(mesh.fluid_mask, dtype=bool)
+    masked[1:4, 2:5] = True
+    masked_mesh = SimpleNamespace(**{**vars(mesh), "fluid_mask": masked})
+    _, _, masked_y, masked_z, masked_field = showcase._fluid_crop(masked_mesh, field)
+    assert masked_field.shape == (3, 3)
+    assert masked_y.shape[0] == 3
+    assert masked_z.shape[0] == 3
+
+    unmasked_mesh = SimpleNamespace(**{**vars(mesh), "fluid_mask": None})
+    solution = SimpleNamespace(mesh=unmasked_mesh, state=SimpleNamespace(u=np.zeros_like(field)))
+    _, _, _, _, normalized = showcase._normalized_fluid_field(solution)
+    assert np.allclose(normalized, 0.0)
+
+
+def test_showcase_surface_helpers_return_expected_shapes():
+    colors = showcase._surface_colors(np.array([[0.0, 0.5], [0.75, 1.0]]), vmax=1.0)
+    assert colors.shape == (2, 2, 4)
+
+    surface = showcase._profile_surface_x(np.array([[0.0, 1.0], [0.5, 0.25]]), length=2.0, x_plane=0.4, amplitude=0.3)
+    assert surface.shape == (2, 2)
+    assert surface.min() == pytest.approx(0.4)
+    assert surface.max() == pytest.approx(0.7)
+
+
+def test_solve_closed_channel_benchmark_supports_flow_rate_and_zero_initial_profile(monkeypatch: pytest.MonkeyPatch):
+    fake_case = showcase.make_shercliff_case(ha=20.0, ny=8, nz=8, width=0.3, height=0.4)
+    captured = {}
+
+    monkeypatch.setattr(showcase, "make_shercliff_case", lambda **kwargs: fake_case)
+
+    def fake_solve_steady(case, initial_state=None):
+        captured["case"] = case
+        captured["initial_state"] = initial_state
+        return "solution"
+
+    monkeypatch.setattr(showcase, "solve_steady", fake_solve_steady)
+    monkeypatch.setattr(showcase, "closed_channel_validation", lambda solution, case_kind, ha: {"ok": True})
+
+    case, solution, comparison = showcase.solve_closed_channel_benchmark(
+        "shercliff",
+        drive_mode="flow_rate",
+        target_mean_velocity=0.2,
+        initial_profile="zero",
+        width=0.3,
+        height=0.4,
+    )
+
+    assert solution == "solution"
+    assert comparison == {"ok": True}
+    assert captured["initial_state"] is None
+    assert case.forcing == pytest.approx(0.0)
+    assert case.initial_velocity == pytest.approx(0.2)
+    inlet = case.boundary_conditions[-1]
+    assert inlet.kind == "inlet_flow_rate"
+    assert inlet.value == pytest.approx(0.2 * 0.3 * 0.4)
+
+
+def test_solve_closed_channel_benchmark_builds_hunt_analytic_initial_state(monkeypatch: pytest.MonkeyPatch):
+    fake_case = showcase.make_hunt_case(ha=20.0, ny=8, nz=8)
+    mesh = _fake_mesh()
+    mesh = SimpleNamespace(**{**vars(mesh), "fluid_mask": np.tri(mesh.ny, mesh.nz, dtype=bool)})
+    reference = SimpleNamespace(
+        coordinate=np.linspace(-1.0, 1.0, 5),
+        midplane_y=np.linspace(0.2, 1.0, 5),
+        midplane_z=np.linspace(1.0, 0.2, 5),
+    )
+    captured = {}
+
+    monkeypatch.setattr(showcase, "make_hunt_case", lambda **kwargs: fake_case)
+    monkeypatch.setattr(showcase, "load_hunt_analytical", lambda ha: reference)
+    monkeypatch.setattr(showcase, "_build_mesh", lambda case: mesh)
+
+    def fake_solve_steady(case, initial_state=None):
+        captured["initial_state"] = initial_state
+        return "solution"
+
+    monkeypatch.setattr(showcase, "solve_steady", fake_solve_steady)
+    monkeypatch.setattr(showcase, "closed_channel_validation", lambda solution, case_kind, ha: {"ok": True})
+
+    showcase.solve_closed_channel_benchmark("hunt", initial_profile="analytic")
+
+    initial_state = captured["initial_state"]
+    assert initial_state is not None
+    assert np.isfinite(np.asarray(initial_state.u)).all()
+    assert np.asarray(initial_state.u).shape == mesh.fluid_mask.shape
+    assert np.all(np.asarray(initial_state.u)[~mesh.fluid_mask] == 0.0)
+
+
+def test_solve_closed_channel_benchmark_rejects_invalid_modes_and_profiles():
+    with pytest.raises(ValueError, match="Unsupported case kind"):
+        showcase.solve_closed_channel_benchmark("bad_case")
+    with pytest.raises(ValueError, match="Unsupported closed-channel benchmark drive mode"):
+        showcase.solve_closed_channel_benchmark("shercliff", drive_mode="bad_drive")
+    with pytest.raises(ValueError, match="Unsupported closed-channel benchmark initial profile"):
+        showcase.solve_closed_channel_benchmark("shercliff", initial_profile="bad_profile")

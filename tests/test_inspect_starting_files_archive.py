@@ -45,6 +45,28 @@ def test_inspect_archive_reports_missing(tmp_path: Path):
     assert payload["entries"] == []
 
 
+def test_read_partial_entries_stops_on_data_descriptor_flag(tmp_path: Path):
+    archive_path = tmp_path / "descriptor.zip"
+    name = "Hunt/case.dat"
+    header = struct.pack(
+        "<4sHHHHHIIIHH",
+        archive_tools.LOCAL_FILE_HEADER,
+        20,
+        0x08,
+        0,
+        0,
+        0,
+        0,
+        3,
+        3,
+        len(name.encode()),
+        0,
+    )
+    archive_path.write_bytes(header + name.encode() + b"abc")
+
+    assert archive_tools._read_partial_entries(archive_path) == []
+
+
 def test_inspect_archive_filters_valid_zip_entries(tmp_path: Path):
     archive_path = tmp_path / "cases.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:

@@ -58,6 +58,16 @@ def test_build_case_rejects_unknown_case(tmp_path: Path):
         suite._build_case("unknown", 20.0, 16, tmp_path)
 
 
+def test_build_case_covers_all_supported_cases(tmp_path: Path):
+    hartmann = suite._build_case("hartmann", 20.0, 12, tmp_path / "hartmann")
+    shercliff = suite._build_case("shercliff", 20.0, 12, tmp_path / "shercliff")
+    hunt = suite._build_case("hunt", 20.0, 18, tmp_path / "hunt")
+
+    assert hartmann.name.startswith("hartmann")
+    assert shercliff.name.startswith("shercliff")
+    assert hunt.name.startswith("hunt")
+
+
 def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
     comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
