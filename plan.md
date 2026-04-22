@@ -365,6 +365,138 @@ Every item in that matrix should ultimately have:
 - a clear statement in docs whether it is verification, validation, or only a
   capability demonstration
 
+#### Manuscript figure plan
+
+The paper should not be assembled ad hoc from whatever figures happen to exist.
+Each major validation lane needs one or two canonical figures, generated from a
+tested example, with its summary checked in CI.
+
+Target manuscript figures:
+
+- Straight-duct verification
+  - Hartmann/Shercliff/Hunt analytical overlays on the same normalization
+  - cross-sectional contour panel showing Hartmann and side/Hunt layers
+  - optional mesh-inset figure showing boundary-layer clustering for the
+    highest-Ha verification case
+- Benchmark B: laminar developing flow in non-uniform magnetic field
+  - rectangular and layered 3D fringing cross-sections plus streamwise history
+  - one quantitative summary panel for pressure span, current closure, and
+    throughput constancy
+  - mapped-pipe comparison figure remains optional until external parity is
+    reopened and closed
+- Benchmark C: Q2D validation
+  - decay/forced/wall-bounded amplitude-versus-time validation panel
+  - one asymptotic Q2D figure showing stronger transverse field suppressing
+    three-dimensionality in the expected direction
+- Benchmark D: magnetic obstacle / localized-field interaction
+  - wake-deficit / recovery / cross-cut distortion benchmark panel
+  - one regime map or literature-slice comparison figure showing how response
+    changes with obstacle strength
+- Variable-field and mirror-field capability
+  - WHAM-like mirror-field overview with coils, field contours, pipe location,
+    executable response, and autodiff sensitivity
+  - one tabulated-field validation figure for structured 3D fields
+- Bent-pipe and curved-geometry capability
+  - curved-pipe geometry/solution/response figure with layer zoom and symmetry
+    or curvature-response diagnostics
+
+Rules for manuscript figures:
+
+- every paper-facing figure must come from a standalone example
+- the example must write a summary JSON with governing observables and gates
+- the README/docs may use lighter variants, but the manuscript figures should be
+  traceable to the tested examples
+
+#### Testing documentation plan
+
+The testing surface is now large enough that it needs first-class
+documentation, not only scattered references in the README.
+
+Required docs additions:
+
+- a dedicated testing architecture page describing:
+  - test taxonomy: unit, regression, verification, validation, literature
+  - fast lane versus heavy manual lane
+  - artifact-summary testing strategy
+  - coverage targets and how to interpret line versus branch coverage
+- a verification and validation guide mapping LMX tests/examples to the
+  Samper A/B/C/D/E ladder
+- a numerical verification page documenting:
+  - manufactured solutions
+  - observed-order studies
+  - solver-safety and invariant tests
+- an autodiff verification page documenting:
+  - gradient checks
+  - inverse-design regressions
+  - UQ/sensitivity tests
+  - JIT/eager/batched consistency expectations
+- a benchmark-artifact page listing every JSON summary used to support the
+  manuscript/README/docs figures
+
+#### Code-structure documentation plan
+
+As the large modules are split, the code structure should be documented
+explicitly so contributors can find the numerical and scientific logic quickly.
+
+Required docs additions:
+
+- one architecture page covering:
+  - case specification and config flow
+  - mesh generation
+  - fully developed solver path
+  - extruded/fringing solver path
+  - field-model and tabulated-field path
+  - validation/reporting path
+  - plotting/media path
+  - autodiff/design/UQ path
+- per-module docstrings summarizing governing equations, conventions, and
+  literature anchors
+- developer notes explaining where numerical helpers end and benchmark logic
+  begins, so benchmark-specific assertions do not leak back into solver code
+
+#### Additional literature-backed tests worth adding
+
+Beyond the current set, the following would materially strengthen a future LMX
+ paper if implemented and validated correctly.
+
+- High-Ha straight-duct asymptotics
+  - very-high-Ha Hartmann/Shercliff/Hunt verification slices with boundary-layer
+    focused meshes, aligned with the high-Ha cases emphasized in the FreeMHD
+    paper and related fusion-blanket literature
+- Q2D turbulent/shear benchmark extension
+  - benchmark-C-style quasi-2D forced shear or vortex problem anchored in the
+    Sommeria-Moreau / Pothérat literature
+- Stronger magnetic-obstacle comparison
+  - wake deficit, recovery distance, and cross-cut distortion against published
+    obstacle datasets from Cuevas/Votyakov-type studies, not only internal
+    response trends
+- Heat-transfer / buoyant-convection benchmark
+  - benchmark-E-style liquid-metal magnetoconvection case with wall-bounded
+    temperature field and magnetically modified convection
+- Curved/toroidal duct benchmark
+  - low-Re or low-Ha toroidal/curved duct comparison, following the class of
+    validation cases used by robust 3-D fusion MHD solver papers
+- Current-driven and electrically forced shallow-layer flows
+  - electrically driven vortex / localized-field interaction cases for stronger
+    validation of localized Lorentz forcing and Q2D response
+- Tabulated 3D fusion-field loading
+  - mirror/tokamak/stellarator-like field interpolation, divergence audit, and
+    response sensitivity against structured or sampled magnetic data
+
+#### Final pre-implementation rule set
+
+Before a new capability is declared "done", it should satisfy all of:
+
+- one direct unit test for helper/fallback logic
+- one numerical verification or invariant test
+- one physics or literature-facing validation test
+- one example that writes a checked summary JSON
+- one docs entry that states whether the case is verification, validation, or a
+  capability demonstration
+
+This keeps parity claims with FreeMHD and the literature explicit and prevents
+README-only features from drifting ahead of the tested solver surface.
+
 #### Coverage targets
 
 The practical targets are:
