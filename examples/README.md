@@ -69,6 +69,7 @@ python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_regime_scan.py
 python examples/magnetic_obstacle_baseline.py
 python examples/operator_verification_demo.py
+python examples/operator_clustered_verification_demo.py
 ```
 
 ## Input-file examples

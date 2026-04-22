@@ -645,6 +645,32 @@ def test_latest_field_minmax_record_and_sample_pair_handle_malformed_or_incomple
     assert latest_reference_sampled_profiles(tmp_path) is None
 
 
+def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_selection(tmp_path: Path):
+    points_path = tmp_path / "constant" / "polyMesh" / "points"
+    points_path.parent.mkdir(parents=True)
+    points_path.write_text(
+        "FoamFile\n{\n}\n4\n(\n"
+        "(0.0 0.0 0.0)\n"
+        "(0.25 0.0 0.0)\n"
+        "(0.5 0.0 0.0)\n"
+        "(1.0 0.0 0.0)\n"
+        ")\n"
+    )
+    assert infer_mesh_axis_coordinates(tmp_path, axis="x") == pytest.approx((0.0, 0.25, 0.5, 1.0))
+
+    old_path = tmp_path / "postProcessing" / "minMaxA" / "0.1" / "fieldMinMax.dat"
+    new_path = tmp_path / "postProcessing" / "minMaxB" / "0.2" / "fieldMinMax.dat"
+    old_path.parent.mkdir(parents=True)
+    new_path.parent.mkdir(parents=True)
+    old_path.write_text("0.1 mag(U) 0.0 (0 0 0) x 1.0 (1 0 0) x\n")
+    new_path.write_text("0.2 mag(U) 0.0 (0 0 0) x 2.0 (1 0 0) x\n")
+
+    latest = latest_field_minmax_record(tmp_path, field="mag(U)")
+    assert latest is not None
+    assert latest.time == pytest.approx(0.2)
+    assert latest.max_value == pytest.approx(2.0)
+
+
 def test_processed_slice_validation_writer(tmp_path: Path):
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
     y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")

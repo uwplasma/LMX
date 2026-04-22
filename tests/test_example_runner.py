@@ -835,6 +835,18 @@ def test_operator_verification_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "operator_verification_summary.json").exists()
 
 
+def test_operator_clustered_verification_demo_writes_summary(tmp_path: Path):
+    module = _load_example_module("operator_clustered_verification_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.RESOLUTIONS = (20, 40, 80)
+    summary = module.run_operator_clustered_verification_demo()
+    assert summary["case"] == "operator_clustered_verification"
+    assert summary["observed_order"]["gradient_y"] > 1.5
+    assert summary["observed_order"]["gradient_z"] > 1.5
+    assert (tmp_path / "operator_verification.png").exists()
+    assert (tmp_path / "operator_clustered_verification_summary.json").exists()
+
+
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_forced_validation.py")
     module.OUTPUT_DIR = tmp_path
