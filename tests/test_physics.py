@@ -203,9 +203,11 @@ def test_rect_duct_mesh_uses_field_aware_boundary_layer_spacing():
     shercliff_y = duct_layer_resolution_metrics(shercliff_case, shercliff_mesh)
     hartmann_y = duct_layer_resolution_metrics(hartmann_case, hartmann_mesh)
 
-    assert shercliff_y["side_layer_cells"] > shercliff_y["hartmann_layer_cells"]
-    assert float(jnp.min(shercliff_mesh.dy)) > float(jnp.min(shercliff_mesh.dz))
-    assert hartmann_y["side_layer_cells"] > hartmann_y["hartmann_layer_cells"]
+    assert shercliff_y["hartmann_layer_cells"] >= 5.0
+    assert shercliff_y["side_layer_cells"] >= 5.0
+    assert float(jnp.min(shercliff_mesh.dy)) < float(jnp.min(shercliff_mesh.dz))
+    assert hartmann_y["hartmann_layer_cells"] >= 5.0
+    assert hartmann_y["side_layer_cells"] >= 5.0
     assert float(jnp.min(hartmann_mesh.dz)) > float(jnp.min(hartmann_mesh.dy))
 
 

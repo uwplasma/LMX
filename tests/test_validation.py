@@ -120,6 +120,43 @@ def test_hartmann_profile_center_is_maximum():
     assert float(profile[50]) >= float(profile[0])
 
 
+def test_extract_centerline_uses_exact_zero_column_when_available():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
+    u = jnp.tile(jnp.asarray([10.0, 20.0, 30.0, 40.0, 50.0])[None, :], (5, 1))
+    phi = 2.0 * u
+    solution = Solution(
+        mesh=mesh,
+        state=MHDState(u=u, phi=phi, jy=jnp.zeros_like(u), jz=jnp.zeros_like(u), lorentz_x=jnp.zeros_like(u), time=0.0, residual=0.0),
+        diagnostics=Diagnostics(residual_history=jnp.zeros((0,)), courant_like=jnp.zeros((0,)), ohmic_power=jnp.zeros((0,))),
+        case_name="exact_centerline",
+    )
+
+    profile = validation.extract_centerline(solution)
+
+    assert float(mesh.z_centers[2]) == pytest.approx(0.0)
+    assert jnp.allclose(profile["u"], 30.0)
+    assert jnp.allclose(profile["phi"], 60.0)
+
+
+def test_extract_midplane_profile_uses_exact_zero_row_when_available():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=5, nz=5)
+    row_values = jnp.asarray([1.0, 2.0, 3.0, 4.0, 5.0])
+    u = jnp.tile(row_values[:, None], (1, 5))
+    phi = -u
+    solution = Solution(
+        mesh=mesh,
+        state=MHDState(u=u, phi=phi, jy=jnp.zeros_like(u), jz=jnp.zeros_like(u), lorentz_x=jnp.zeros_like(u), time=0.0, residual=0.0),
+        diagnostics=Diagnostics(residual_history=jnp.zeros((0,)), courant_like=jnp.zeros((0,)), ohmic_power=jnp.zeros((0,))),
+        case_name="exact_midplane",
+    )
+
+    profile = extract_midplane_profile(solution, axis="z")
+
+    assert float(mesh.y_centers[2]) == pytest.approx(0.0)
+    assert jnp.allclose(profile["u"], 3.0)
+    assert jnp.allclose(profile["phi"], -3.0)
+
+
 def test_combined_profile_error_uses_root_mean_square():
     assert combined_profile_error(3.0, 4.0) == pytest.approx((12.5) ** 0.5)
 

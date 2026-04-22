@@ -405,6 +405,14 @@ def _resolve_potential_solver(solver: str, fluid_mask: jnp.ndarray | None) -> st
     return "cg" if bool(np.asarray(fluid_mask).all()) else "cg_volume"
 
 
+def _has_uniform_spacing(mesh: StructuredMesh, *, tolerance: float = 1.0e-12) -> bool:
+    dy = np.asarray(mesh.dy, dtype=float)
+    dz = np.asarray(mesh.dz, dtype=float)
+    dy_uniform = np.allclose(dy, dy[0], rtol=0.0, atol=tolerance) if dy.size else True
+    dz_uniform = np.allclose(dz, dz[0], rtol=0.0, atol=tolerance) if dz.size else True
+    return bool(dy_uniform and dz_uniform)
+
+
 def _compute_current_and_lorentz(
     mesh: StructuredMesh,
     sigma: jnp.ndarray,
@@ -1091,6 +1099,12 @@ def _solve_fully_developed(
     target_mean_velocity = _target_mean_velocity(case)
     reference_mean_velocity = _reference_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
+    if (
+        case.time_stepper.potential_solver == "auto"
+        and potential_solver == "cg"
+        and not _has_uniform_spacing(mesh)
+    ):
+        potential_solver = "cg_volume"
     linear_solver = "cg" if case.solver.linear_solver == "auto" else case.solver.linear_solver
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError(f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}")
@@ -1297,14 +1311,15 @@ def _solve_fully_developed(
         )
         step_count = step_index + 1
         potential_gate = case.time_stepper.steady_potential_tolerance
+        if potential_gate is None:
+            potential_gate = case.time_stepper.potential_tolerance
+        if potential_gate is None:
+            potential_gate = case.time_stepper.steady_tolerance
         if (
             steady_mode
             and residual_value <= float(case.time_stepper.steady_tolerance)
             and float(linear_residual) <= float(case.time_stepper.steady_tolerance)
-            and (
-                potential_gate is None
-                or float(potential_residual) <= float(potential_gate)
-            )
+            and float(potential_residual) <= float(potential_gate)
         ):
             break
 

@@ -262,10 +262,10 @@ def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann
     config = load_run_config(root / "hunt_case.toml")
 
     boundaries = {boundary.name: boundary for boundary in config.case.boundary_conditions}
-    assert boundaries["left_wall"].kind == "insulating"
-    assert boundaries["right_wall"].kind == "insulating"
-    assert boundaries["bottom_wall"].kind == "conducting_wall"
-    assert boundaries["top_wall"].kind == "conducting_wall"
+    assert boundaries["left_wall"].kind == "conducting_wall"
+    assert boundaries["right_wall"].kind == "conducting_wall"
+    assert boundaries["bottom_wall"].kind == "insulating"
+    assert boundaries["top_wall"].kind == "insulating"
 
 
 def test_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):

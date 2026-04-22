@@ -126,7 +126,7 @@ def make_shercliff_case(
         name=f"shercliff_ha{int(ha)}",
         geometry=GeometrySpec(kind="rect_duct", width=width, height=height, ny=ny, nz=nz, target_ha=ha),
         regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
-        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0 * bmag)),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 1.0 * bmag, 0.0)),
         boundary_conditions=(
             BoundaryCondition("walls", "no_slip"),
             BoundaryCondition("electric", "insulating"),
@@ -193,11 +193,11 @@ def make_hunt_case(
             RegionSpec("conducting_wall", "solid", wall_conductivity, density, viscosity, wall_thickness),
             RegionSpec("insulating_wall", "solid", insulator_conductivity, density, viscosity, insulator_thickness),
         ),
-        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0 * bmag)),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 1.0 * bmag, 0.0)),
         boundary_conditions=(
             BoundaryCondition("walls", "no_slip"),
-            BoundaryCondition("conducting_hartmann_walls", "conducting_wall", region="conducting_wall", side="top_bottom"),
-            BoundaryCondition("insulating_side_walls", "insulating", region="insulating_wall", side="left_right"),
+            BoundaryCondition("conducting_hartmann_walls", "conducting_wall", region="conducting_wall", side="left_right"),
+            BoundaryCondition("insulating_side_walls", "insulating", region="insulating_wall", side="top_bottom"),
         ),
         time_stepper=controls,
         solver=_fully_developed_solver(),

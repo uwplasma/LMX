@@ -229,12 +229,14 @@ def generate_rect_duct_mesh(
                 growth_ratio=10.0,
             )
         else:
+            y_layer_cells = max(5, int(round((0.20 if magnetic_axis == "y" else 0.16) * ny)))
+            z_layer_cells = max(5, int(round((0.20 if magnetic_axis == "z" else 0.16) * nz)))
             y_faces = _symmetric_boundary_layer_segment(
                 -0.5 * width,
                 0.5 * width,
                 ny,
                 layer_thickness=float(y_layer_thickness),
-                layer_cells=max(4, int(round((0.16 if magnetic_axis == "z" else 0.12) * ny))),
+                layer_cells=y_layer_cells,
                 growth_ratio=1.35,
             )
             z_faces = _symmetric_boundary_layer_segment(
@@ -242,7 +244,7 @@ def generate_rect_duct_mesh(
                 0.5 * height,
                 nz,
                 layer_thickness=float(z_layer_thickness),
-                layer_cells=max(4, int(round((0.16 if magnetic_axis == "y" else 0.12) * nz))),
+                layer_cells=z_layer_cells,
                 growth_ratio=1.35,
             )
     else:

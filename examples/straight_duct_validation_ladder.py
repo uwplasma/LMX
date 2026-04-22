@@ -17,9 +17,10 @@ NZ = 25
 WALL_CELLS = 6
 WALL_THICKNESS = 0.02
 COUPLING_ITERATIONS = 10
-POTENTIAL_ITERATIONS = 80
-MAX_STEPS = 60
-VELOCITY_UPDATE_LIMIT = 7.5e-4
+POTENTIAL_ITERATIONS = 200
+MAX_STEPS = 120
+VELOCITY_UPDATE_LIMIT = 5.0e-4
+POTENTIAL_TOLERANCE = 1.0e-8
 
 FLUID_CONDUCTIVITY = 1.0
 CONDUCTING_WALL_CONDUCTIVITY = 0.25
@@ -53,6 +54,7 @@ def run_straight_duct_validation_ladder(
             max_steps=MAX_STEPS,
             velocity_update_limit=VELOCITY_UPDATE_LIMIT,
             current_reconstruction="face_averaged",
+            potential_tolerance=POTENTIAL_TOLERANCE,
         )
         shercliff_records.append(
             {
@@ -82,6 +84,7 @@ def run_straight_duct_validation_ladder(
             max_steps=MAX_STEPS,
             velocity_update_limit=VELOCITY_UPDATE_LIMIT,
             current_reconstruction="face_averaged",
+            potential_tolerance=POTENTIAL_TOLERANCE,
         )
         hunt_records.append(
             {

@@ -21,7 +21,7 @@ target_side_layer = 4.47213595499958
 
 [magnetic_field]
 kind = "constant"
-value = [0.0, 0.0, 20.0]
+value = [0.0, 20.0, 0.0]
 ramp_start = 0.0
 ramp_duration = 0.0
 
@@ -91,28 +91,28 @@ wall_thickness = 0.1
 
 [[boundary_conditions]]
 name = "left_wall"
-kind = "insulating"
+kind = "conducting_wall"
 axis = "y"
 side = "left"
-region = "insulating_wall"
+region = "conducting_wall"
 
 [[boundary_conditions]]
 name = "right_wall"
-kind = "insulating"
+kind = "conducting_wall"
 axis = "y"
 side = "right"
-region = "insulating_wall"
+region = "conducting_wall"
 
 [[boundary_conditions]]
 name = "bottom_wall"
-kind = "conducting_wall"
+kind = "insulating"
 axis = "z"
 side = "bottom"
-region = "conducting_wall"
+region = "insulating_wall"
 
 [[boundary_conditions]]
 name = "top_wall"
-kind = "conducting_wall"
+kind = "insulating"
 axis = "z"
 side = "top"
-region = "conducting_wall"
+region = "insulating_wall"

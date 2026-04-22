@@ -21,7 +21,7 @@ target_side_layer = 4.47213595499958
 
 [magnetic_field]
 kind = "constant"
-value = [0.0, 0.0, 20.0]
+value = [0.0, 20.0, 0.0]
 ramp_start = 0.0
 ramp_duration = 0.0
 

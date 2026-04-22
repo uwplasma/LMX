@@ -46,7 +46,7 @@ def test_build_mesh_uses_magnetic_axis_to_cluster_rect_duct_layers():
     shercliff_mesh = solvers._build_mesh(shercliff_case)
 
     assert float(jnp.min(hartmann_mesh.dy)) < float(jnp.min(hartmann_mesh.dz))
-    assert float(jnp.min(shercliff_mesh.dz)) < float(jnp.min(shercliff_mesh.dy))
+    assert float(jnp.min(shercliff_mesh.dy)) < float(jnp.min(shercliff_mesh.dz))
 
 
 def test_bounded_time_step_count_covers_zero_and_invalid_dt_cases():
@@ -609,10 +609,10 @@ def test_build_material_fields_assigns_hunt_side_and_hartmann_wall_regions():
     mid_y = mesh.yz_shape[0] // 2
     mid_z = mesh.yz_shape[1] // 2
 
-    assert materials.conductivity[0, mid_z] == pytest.approx(1.5)
-    assert materials.conductivity[-1, mid_z] == pytest.approx(1.5)
-    assert materials.conductivity[mid_y, 0] == pytest.approx(9.0)
-    assert materials.conductivity[mid_y, -1] == pytest.approx(9.0)
+    assert materials.conductivity[0, mid_z] == pytest.approx(9.0)
+    assert materials.conductivity[-1, mid_z] == pytest.approx(9.0)
+    assert materials.conductivity[mid_y, 0] == pytest.approx(1.5)
+    assert materials.conductivity[mid_y, -1] == pytest.approx(1.5)
     assert materials.conductivity[mid_y, mid_z] == pytest.approx(3.0)
 
 
@@ -1157,7 +1157,15 @@ def test_solve_steady_and_transient_reject_unknown_solver_kind():
 
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=10, steady_tolerance=1e-4))
+    case = replace(
+        case,
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=10,
+            steady_tolerance=1e-4,
+            potential_tolerance=1.0e-2,
+        ),
+    )
     residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
 
     def fake_fully_developed_case_step(**kwargs):

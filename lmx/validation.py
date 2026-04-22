@@ -8,6 +8,7 @@ from math import log
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 
 from .core import Solution
 from .mesh import StructuredMesh
@@ -206,6 +207,16 @@ def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
     return 1.0 - (jnp.cosh(ha * y) - 1.0) / denom
 
 
+def _exact_coordinate_index(coordinate: jnp.ndarray, *, target: float = 0.0, tolerance: float = 1.0e-12) -> int | None:
+    coordinate = jnp.asarray(coordinate, dtype=float)
+    if coordinate.size == 0:
+        return None
+    matches = np.where(np.abs(np.asarray(coordinate, dtype=float) - float(target)) <= tolerance)[0]
+    if matches.size == 0:
+        return None
+    return int(matches[0])
+
+
 def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
     z_coords = solution.mesh.z_centers
     phi_state = getattr(solution.state, "phi", jnp.zeros_like(solution.state.u))
@@ -213,18 +224,23 @@ def extract_centerline(solution: Solution) -> dict[str, jnp.ndarray]:
         u_profile = solution.state.u[:, 0]
         phi_profile = phi_state[:, 0]
     else:
-        right = int(jnp.searchsorted(z_coords, 0.0))
-        right = max(1, min(right, z_coords.size - 1))
-        left = right - 1
-        z_left = float(z_coords[left])
-        z_right = float(z_coords[right])
-        if abs(z_right - z_left) <= 1.0e-12:
-            weight = 0.5
+        center_index = _exact_coordinate_index(z_coords)
+        if center_index is not None:
+            u_profile = solution.state.u[:, center_index]
+            phi_profile = phi_state[:, center_index]
         else:
-            weight = float((0.0 - z_left) / (z_right - z_left))
-        weight = min(max(weight, 0.0), 1.0)
-        u_profile = (1.0 - weight) * solution.state.u[:, left] + weight * solution.state.u[:, right]
-        phi_profile = (1.0 - weight) * phi_state[:, left] + weight * phi_state[:, right]
+            right = int(jnp.searchsorted(z_coords, 0.0))
+            right = max(1, min(right, z_coords.size - 1))
+            left = right - 1
+            z_left = float(z_coords[left])
+            z_right = float(z_coords[right])
+            if abs(z_right - z_left) <= 1.0e-12:
+                weight = 0.5
+            else:
+                weight = float((0.0 - z_left) / (z_right - z_left))
+            weight = min(max(weight, 0.0), 1.0)
+            u_profile = (1.0 - weight) * solution.state.u[:, left] + weight * solution.state.u[:, right]
+            phi_profile = (1.0 - weight) * phi_state[:, left] + weight * phi_state[:, right]
     return {
         "y": solution.mesh.y_centers,
         "u": u_profile,
@@ -256,14 +272,18 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
         if z_coords.size == 1:
             mask = _profile_axis_mask(solution, axis="y", fixed_index=0)
         else:
-            right = int(jnp.searchsorted(z_coords, 0.0))
-            right = max(1, min(right, z_coords.size - 1))
-            left = right - 1
-            mask = _profile_axis_mask(solution, axis="y", fixed_index=left) & _profile_axis_mask(
-                solution,
-                axis="y",
-                fixed_index=right,
-            )
+            center_index = _exact_coordinate_index(z_coords)
+            if center_index is not None:
+                mask = _profile_axis_mask(solution, axis="y", fixed_index=center_index)
+            else:
+                right = int(jnp.searchsorted(z_coords, 0.0))
+                right = max(1, min(right, z_coords.size - 1))
+                left = right - 1
+                mask = _profile_axis_mask(solution, axis="y", fixed_index=left) & _profile_axis_mask(
+                    solution,
+                    axis="y",
+                    fixed_index=right,
+                )
         return {
             "y": profile["y"][mask],
             "u": profile["u"][mask],
@@ -277,23 +297,29 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
             phi_profile = phi_state[0, :]
             mask = _profile_axis_mask(solution, axis="z", fixed_index=0)
         else:
-            upper = int(jnp.searchsorted(y_coords, 0.0))
-            upper = max(1, min(upper, y_coords.size - 1))
-            lower = upper - 1
-            y_lower = float(y_coords[lower])
-            y_upper = float(y_coords[upper])
-            if abs(y_upper - y_lower) <= 1.0e-12:
-                weight = 0.5
+            center_index = _exact_coordinate_index(y_coords)
+            if center_index is not None:
+                u_profile = solution.state.u[center_index, :]
+                phi_profile = phi_state[center_index, :]
+                mask = _profile_axis_mask(solution, axis="z", fixed_index=center_index)
             else:
-                weight = float((0.0 - y_lower) / (y_upper - y_lower))
-            weight = min(max(weight, 0.0), 1.0)
-            u_profile = (1.0 - weight) * solution.state.u[lower, :] + weight * solution.state.u[upper, :]
-            phi_profile = (1.0 - weight) * phi_state[lower, :] + weight * phi_state[upper, :]
-            mask = _profile_axis_mask(solution, axis="z", fixed_index=lower) & _profile_axis_mask(
-                solution,
-                axis="z",
-                fixed_index=upper,
-            )
+                upper = int(jnp.searchsorted(y_coords, 0.0))
+                upper = max(1, min(upper, y_coords.size - 1))
+                lower = upper - 1
+                y_lower = float(y_coords[lower])
+                y_upper = float(y_coords[upper])
+                if abs(y_upper - y_lower) <= 1.0e-12:
+                    weight = 0.5
+                else:
+                    weight = float((0.0 - y_lower) / (y_upper - y_lower))
+                weight = min(max(weight, 0.0), 1.0)
+                u_profile = (1.0 - weight) * solution.state.u[lower, :] + weight * solution.state.u[upper, :]
+                phi_profile = (1.0 - weight) * phi_state[lower, :] + weight * phi_state[upper, :]
+                mask = _profile_axis_mask(solution, axis="z", fixed_index=lower) & _profile_axis_mask(
+                    solution,
+                    axis="z",
+                    fixed_index=upper,
+                )
         profile = {
             "z": solution.mesh.z_centers,
             "u": u_profile,
