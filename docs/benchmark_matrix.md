@@ -470,3 +470,15 @@ Current bounded results:
   `cross_section_l2_error ≈ 8.12e-6`,
   `centerline_l2_error ≈ 8.20e-6`,
   while the field-response gate passes on the normalized divergence metric
+
+## Key references
+
+These are the main benchmark and comparison references currently driving the
+LMX validation ladder and the planned manuscript figures.
+
+- [Samper et al., *An approach to verification and validation of MHD codes for fusion applications*](https://www.sciencedirect.com/science/article/pii/S0920379614003263)
+- [FreeMHD V&V paper, arXiv:2409.08950](https://arxiv.org/abs/2409.08950)
+- [Quasi-two dimensional perturbations in duct flows under transverse magnetic field](https://arxiv.org/abs/2006.03993)
+- [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
+- [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
+- [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)

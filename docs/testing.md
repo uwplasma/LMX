@@ -213,3 +213,25 @@ coverage near the release target.
   - differentiable lane checks
 - `tests/test_fringing.py`
   - fringing research slice
+
+## Literature anchors
+
+The testing strategy is intentionally tied to published benchmark ladders and
+verification/validation practice, not only to internal regression history.
+
+- [Samper et al., *An approach to verification and validation of MHD codes for fusion applications*](https://www.sciencedirect.com/science/article/pii/S0920379614003263)
+  - governs the A/B/C/D/E benchmark ladder used in the plan and benchmark docs
+- [FreeMHD V&V paper, arXiv:2409.08950](https://arxiv.org/abs/2409.08950)
+  - provides straight-duct, fringing, and free-surface comparison targets and
+    a useful reference implementation baseline
+- [Quasi-two dimensional perturbations in duct flows under transverse magnetic field](https://arxiv.org/abs/2006.03993)
+  - anchors the current Benchmark C Q2D validation direction
+- [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
+- [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
+  - anchor the wake-deficit / recovery / distortion observables for Benchmark D
+- [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)
+  - supports the broader validation roadmap for curved ducts, magnetic
+    obstacles, and 3D liquid-metal benchmark structure
+- [A research framework for writing differentiable PDE discretizations in JAX](https://arxiv.org/abs/2111.05218)
+  - anchors the autodiff verification philosophy for gradient, optimization,
+    and differentiable-operator tests

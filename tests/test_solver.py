@@ -1857,6 +1857,22 @@ def test_public_solver_entrypoints_reject_unknown_solver_kinds():
         solve_steady(case)
 
 
+def test_public_solver_entrypoints_coerce_or_preserve_mode_before_dispatch(monkeypatch: pytest.MonkeyPatch):
+    base_case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    steady_case = replace(base_case, solver=replace(base_case.solver, mode="steady"))
+    calls: list[tuple[str, bool]] = []
+
+    def fake_solve(case_arg, **kwargs):
+        calls.append((case_arg.solver.mode, bool(kwargs.get("append_diagnostics", False))))
+        return "ok"
+
+    monkeypatch.setattr(solvers, "_solve_fully_developed", fake_solve)
+
+    assert solve_transient(base_case) == "ok"
+    assert solve_steady(steady_case, append_diagnostics=True) == "ok"
+    assert calls == [("transient", False), ("steady", True)]
+
+
 for _unit_test_name in (
     "test_hartmann_solver_runs",
     "test_hunt_solver_keeps_solid_velocity_zero",
