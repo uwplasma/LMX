@@ -318,6 +318,15 @@ duct setup.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 
+For the literature-style ladder, `examples/straight_duct_validation_ladder.py`
+now writes the bounded Shercliff/Hunt multi-`Ha` validation panel used in the
+testing docs. The current checked ladder runs `Ha = 20` and `Ha = 100` on the
+same normalized `y` and `z` cuts and keeps the reference filenames in the
+summary JSON so the later paper figures remain traceable to the bundled
+analytical datasets.
+
+![LMX straight-duct validation ladder](docs/_static/generated/closed_channel_validation_ladder.png)
+
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and

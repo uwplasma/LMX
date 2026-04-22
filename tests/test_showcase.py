@@ -102,6 +102,27 @@ def test_showcase_profile_comparison_writer_uses_reference_helpers(tmp_path: Pat
     assert (tmp_path / "analytic_velocity_profiles.pdf").exists()
 
 
+def test_showcase_validation_ladder_writer_emits_outputs(tmp_path: Path):
+    comparison = SimpleNamespace(
+        coordinate=np.linspace(-1.0, 1.0, 5),
+        simulated=np.linspace(0.0, 1.0, 5),
+        reference=np.linspace(0.0, 1.0, 5),
+        l2_error=1.0e-3,
+        linf_error=2.0e-3,
+    )
+    record = {"ha": 20.0, "y_profile": comparison, "z_profile": comparison, "reference_path": "/tmp/ref.csv"}
+
+    outputs = showcase.write_closed_channel_validation_ladder_figure(
+        tmp_path,
+        shercliff_records=[record],
+        hunt_records=[record],
+    )
+
+    assert (tmp_path / "closed_channel_validation_ladder.png") in outputs
+    assert (tmp_path / "closed_channel_validation_ladder.png").exists()
+    assert (tmp_path / "closed_channel_validation_ladder.pdf").exists()
+
+
 def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     captured = {}
 

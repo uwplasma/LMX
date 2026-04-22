@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors
+from matplotlib.lines import Line2D
 from matplotlib.patches import ConnectionPatch, FancyArrowPatch, Polygon, Rectangle
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -669,6 +670,108 @@ def write_closed_channel_profile_comparison_figure(
 
     png_path = out_dir / "analytic_velocity_profiles.png"
     pdf_path = out_dir / "analytic_velocity_profiles.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
+def write_closed_channel_validation_ladder_figure(
+    out_dir: str | Path,
+    *,
+    shercliff_records: list[dict[str, object]],
+    hunt_records: list[dict[str, object]],
+) -> list[Path]:
+    _set_showcase_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.2, 8.8))
+    _add_slide_title(fig, "LMX benchmarking: straight-duct validation ladder")
+    fig.subplots_adjust(left=0.08, right=0.98, bottom=0.10, top=0.88, wspace=0.22, hspace=0.28)
+
+    ha_colors = {20: "#fde047", 100: "#84cc16", 1000: "#2563eb"}
+
+    def _draw_case(ax, records, *, axis_key: str, title: str, xlabel: str) -> None:
+        line_handles = []
+        marker_handles = []
+        for index, record in enumerate(records):
+            ha = int(record["ha"])
+            color = ha_colors.get(ha, plt.cm.viridis(index / max(len(records) - 1, 1)))
+            comparison = record[axis_key]
+            coordinate = np.asarray(comparison.coordinate, dtype=float)
+            reference = np.asarray(comparison.reference, dtype=float)
+            simulated = np.asarray(comparison.simulated, dtype=float)
+            marker = "o" if axis_key == "z_profile" else "s"
+            ax.plot(coordinate, reference, color=color, linewidth=1.8)
+            ax.plot(
+                coordinate,
+                simulated,
+                color=color,
+                marker=marker,
+                markersize=3.2,
+                markerfacecolor="white",
+                linewidth=1.0,
+            )
+            line_handles.append(Line2D([0], [0], color=color, linewidth=1.8, label=f"Analytical, Ha={ha}"))
+            marker_handles.append(
+                Line2D(
+                    [0],
+                    [0],
+                    color=color,
+                    marker=marker,
+                    markersize=4.0,
+                    markerfacecolor="white",
+                    linewidth=1.0,
+                    label=f"LMX, Ha={ha}",
+                )
+            )
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("u / max(u)")
+        ax.set_xlim(-1.02, 1.02)
+        ax.set_ylim(-0.02, 1.05)
+        ax.grid(True, alpha=0.25)
+        handles = line_handles + marker_handles
+        ax.legend(handles=handles, loc="lower center", bbox_to_anchor=(0.5, -0.02), ncol=2, frameon=True)
+
+    _draw_case(axes[0, 0], shercliff_records, axis_key="y_profile", title="Shercliff Hartmann cut", xlabel="y / a")
+    _draw_case(axes[0, 1], shercliff_records, axis_key="z_profile", title="Shercliff side-layer cut", xlabel="z / a")
+    _draw_case(axes[1, 0], hunt_records, axis_key="y_profile", title="Hunt Hartmann cut", xlabel="y / a")
+    _draw_case(axes[1, 1], hunt_records, axis_key="z_profile", title="Hunt side-layer cut", xlabel="z / a")
+
+    def _error_block(records: list[dict[str, object]]) -> str:
+        lines = []
+        for record in records:
+            ha = int(record["ha"])
+            y_comp = record["y_profile"]
+            z_comp = record["z_profile"]
+            lines.append(f"Ha={ha}: y L2={y_comp.l2_error:.2e}, z L2={z_comp.l2_error:.2e}")
+        return "\n".join(lines)
+
+    axes[0, 0].text(
+        0.03,
+        0.97,
+        _error_block(shercliff_records),
+        transform=axes[0, 0].transAxes,
+        va="top",
+        ha="left",
+        fontsize=10,
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
+    )
+    axes[1, 0].text(
+        0.03,
+        0.97,
+        _error_block(hunt_records),
+        transform=axes[1, 0].transAxes,
+        va="top",
+        ha="left",
+        fontsize=10,
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
+    )
+
+    png_path = out_dir / "closed_channel_validation_ladder.png"
+    pdf_path = out_dir / "closed_channel_validation_ladder.pdf"
     fig.savefig(png_path, bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)

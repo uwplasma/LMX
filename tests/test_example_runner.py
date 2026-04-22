@@ -501,6 +501,32 @@ def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeyp
     assert (tmp_path / "straight_duct_profile_comparison_summary.json").exists()
 
 
+def test_straight_duct_validation_ladder_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("straight_duct_validation_ladder.py")
+
+    def fake_solve(case_kind, **kwargs):
+        ha = kwargs["ha"]
+        comparison = SimpleNamespace(
+            y_profile=SimpleNamespace(l2_error=ha * 1.0e-4, linf_error=ha * 2.0e-4),
+            z_profile=SimpleNamespace(l2_error=ha * 3.0e-4, linf_error=ha * 4.0e-4),
+            reference_path=f"reference/{case_kind}_ha{int(ha)}.txt",
+        )
+        return SimpleNamespace(), SimpleNamespace(), comparison
+
+    monkeypatch.setattr(module, "solve_closed_channel_benchmark", fake_solve)
+    monkeypatch.setattr(module, "write_closed_channel_validation_ladder_figure", lambda *args, **kwargs: [tmp_path / "closed_channel_validation_ladder.png"])
+
+    (tmp_path / "closed_channel_validation_ladder.png").write_bytes(b"img")
+    summary = module.run_straight_duct_validation_ladder(out_dir=tmp_path)
+
+    assert summary["case"] == "straight_duct_validation_ladder"
+    assert summary["ha_values"] == [20.0, 100.0]
+    assert summary["shercliff"][0]["y_l2_error"] == pytest.approx(2.0e-3)
+    assert summary["hunt"][1]["z_linf_error"] == pytest.approx(4.0e-2)
+    assert "closed_channel_validation_ladder.png" in summary["outputs"]
+    assert (tmp_path / "straight_duct_validation_ladder_summary.json").exists()
+
+
 def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("plotting_api_demo.py")
 

@@ -168,6 +168,24 @@ def test_compare_normalized_profiles_handles_cell_centered_simulation_against_wa
     assert comparison.linf_error < 0.05
 
 
+def test_compare_normalized_profiles_handles_unsorted_and_zero_scaled_inputs():
+    simulated_coordinate = jnp.asarray([0.5, -0.5, 0.0])
+    simulated = jnp.asarray([0.0, 0.0, 0.0])
+    reference_coordinate = jnp.asarray([1.0, 0.0, -1.0])
+    reference = jnp.asarray([0.0, 0.0, 0.0])
+
+    comparison = compare_normalized_profiles(
+        simulated_coordinate,
+        simulated,
+        reference_coordinate,
+        reference,
+    )
+
+    assert jnp.all(jnp.diff(comparison.coordinate) >= 0.0)
+    assert comparison.l2_error == pytest.approx(0.0)
+    assert comparison.linf_error == pytest.approx(0.0)
+
+
 def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles():
     profile = jnp.asarray([0.1, 0.05, -0.02, -0.01, 0.03, 0.02])
 

@@ -259,3 +259,5 @@ The first explicit examples following this pattern are:
   coefficient-jump verification
 - `examples/straight_duct_profile_comparison.py` for the Hartmann /
   Shercliff / Hunt literature-facing straight-duct panel
+- `examples/straight_duct_validation_ladder.py` for the bounded Shercliff /
+  Hunt multi-Ha literature ladder
