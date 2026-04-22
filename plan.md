@@ -115,6 +115,119 @@ publication-grade additions after the current A/B ladder are:
 - open-channel / free-surface validation
 - current-driven channel validation
 
+### Coverage and verification roadmap
+
+The remaining test/coverage work is not "add more tests until the percentage
+goes up." The goal is to lock the code against:
+
+- literature-backed physics regressions
+- numerical/discretization regressions
+- branch-heavy helper/fallback regressions
+
+The governing references for that workstream are:
+
+- Samper et al., *An approach to verification and validation of MHD codes for
+  fusion applications*
+- the FreeMHD V&V paper and bundled case/reference data
+- Sommeria-Moreau Q2D model literature
+- magnetic-obstacle literature from Cuevas/Votyakov and related JFM work
+- standard CFD/MHD verification practice through manufactured solutions and
+  observed-order studies
+
+That workstream is organized as follows.
+
+#### Phase 1: branch-heavy core cleanup
+
+Scope:
+
+- `lmx/solvers.py`
+- `lmx/validation.py`
+- bounded helper/script surfaces that still drag branch coverage down
+
+Rules:
+
+- if a branch is part of the intended public behavior, test it directly
+- if a branch is dead or historical, remove it rather than covering around it
+- prefer cheap direct tests over slow integration runs
+
+Current module priorities:
+
+- `lmx/validation.py`: fallback paths, missing-field handling, acceptance
+  branches, profile extraction branches, optional-reference branches
+- `lmx/solvers.py`: helper/fallback branches, restart/initialization paths,
+  forcing and inlet-mode branches, bounded update/diagnostic branches
+
+#### Phase 2: numerical verification
+
+Required additions:
+
+- manufactured-solution tests for the electric-potential and diffusion-like
+  operators
+- observed-order tests on uniform and clustered meshes
+- coefficient-jump/interface tests on layered media
+- iterative-solver safety tests:
+  - residual monotonicity on small SPD systems
+  - finite-denominator/nonfinite guard behavior
+  - backend equivalence on bounded toy problems
+- discrete invariants:
+  - net current closure
+  - symmetry preservation under symmetric data
+  - boundedness / no obvious overshoot on simple elliptic cases
+
+Implementation targets:
+
+- `tests/test_operators.py`
+- `tests/test_linear.py`
+- `tests/test_solver.py`
+- a dedicated manufactured-solution test module if the operator coverage grows
+  beyond the current files
+
+#### Phase 3: literature-backed physics verification
+
+Required additions:
+
+- parameterized Hartmann validation ladder
+- parameterized Shercliff validation ladder
+- parameterized Hunt validation ladder
+- explicit integral/trend checks, not only local profile overlays
+- stronger benchmark-observable regression checks for Benchmark B/C/D figures
+
+Implementation targets:
+
+- `tests/test_physics.py`
+- `tests/test_fringing.py`
+- `tests/test_q2d.py`
+- additional benchmark-specific validation test modules where that keeps the
+  assertions readable
+
+#### Phase 4: artifact/regression protection
+
+Every paper-facing example or docs-facing benchmark figure should regenerate a
+JSON summary carrying:
+
+- the input parameters
+- the governing observables
+- the pass/fail gates
+- the artifact paths
+
+Tests should validate the summary values and schema rather than image pixels.
+
+#### Coverage targets
+
+The practical targets are:
+
+- broad routine line coverage stays at or above `95%`
+- `lmx/` line coverage stays at or above `95%`
+- module-level branch coverage keeps increasing in:
+  - `lmx/solvers.py`
+  - `lmx/validation.py`
+  - `lmx/fringing.py`
+  - `lmx/plotting.py`
+
+Branch coverage is expected to lag line coverage. The correct closeout path is
+continued helper-path testing and dead-path removal, not inflating the routine
+validation lane with heavier solver runs.
+
 ### Remaining real gaps
 
 - README/media QA

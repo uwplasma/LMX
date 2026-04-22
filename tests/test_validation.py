@@ -13,6 +13,9 @@ from lmx.core import Diagnostics, MHDState, Solution
 from lmx.mesh import generate_rect_duct_mesh
 from lmx.solvers import _build_mesh
 from lmx.validation import (
+    _cells_across_layer,
+    _dominant_magnetic_axis,
+    _fluid_axis_profile,
     closed_channel_validation,
     compare_normalized_profiles,
     compare_with_reference_outputs,
@@ -30,6 +33,7 @@ from lmx.validation import (
     latest_reference_sampled_profiles,
     negative_fraction,
     hartmann_analytic_profile,
+    hartmann_acceptance,
     hartmann_validation,
     inspect_reference_case,
     latest_field_minmax_record,
@@ -41,6 +45,7 @@ from lmx.validation import (
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
+    write_profile_csv,
     write_processed_slice_validation,
     write_validation_report,
     validation_summary,
@@ -119,6 +124,33 @@ def test_combined_profile_error_uses_root_mean_square():
     assert combined_profile_error(3.0, 4.0) == pytest.approx((12.5) ** 0.5)
 
 
+def test_combined_profile_error_returns_zero_for_empty_input():
+    assert combined_profile_error() == pytest.approx(0.0)
+
+
+def test_dominant_magnetic_axis_handles_zero_and_nonconstant_fields():
+    zero_case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    zero_case = replace(zero_case, magnetic_field=replace(zero_case.magnetic_field, value=(0.0, 0.0, 0.0)))
+    varying_case = replace(zero_case, magnetic_field=replace(zero_case.magnetic_field, kind="analytic", value=None))
+
+    assert _dominant_magnetic_axis(zero_case) is None
+    assert _dominant_magnetic_axis(varying_case) is None
+
+
+def test_fluid_axis_profile_and_layer_metrics_cover_empty_and_invalid_paths():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=8, nz=6)
+    y_coords, y_widths = _fluid_axis_profile(mesh, "y")
+    z_coords, z_widths = _fluid_axis_profile(mesh, "z")
+
+    assert y_coords.shape == y_widths.shape
+    assert z_coords.shape == z_widths.shape
+    assert _cells_across_layer(jnp.asarray([]), 0.1) == pytest.approx(0.0)
+    assert _cells_across_layer(jnp.asarray([0.1, 0.1, 0.1]), 0.15) == pytest.approx(1.5)
+
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        _fluid_axis_profile(mesh, "x")
+
+
 def test_compare_normalized_profiles_handles_cell_centered_simulation_against_wall_sample():
     simulated_coordinate = jnp.linspace(-0.99, 0.99, 65)
     simulated = 1.0 - simulated_coordinate**2
@@ -141,6 +173,11 @@ def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles(
 
     assert profile_sign_changes(profile) == 2
     assert negative_fraction(profile) == pytest.approx(2.0 / 6.0)
+
+
+def test_profile_sign_changes_and_negative_fraction_handle_short_profiles():
+    assert profile_sign_changes(jnp.asarray([0.1])) == 0
+    assert negative_fraction(jnp.asarray([])) == pytest.approx(0.0)
 
 
 def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
@@ -190,6 +227,30 @@ def test_validation_summary_includes_latest_potential_residual():
     assert 0.0 <= metrics["limited_fraction"] <= 1.0
 
 
+def test_extract_centerline_and_midplane_profile_cover_singleton_and_invalid_axis_paths():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=1)
+    solution = _synthetic_solution(case)
+
+    centerline = validation.extract_centerline(solution)
+    z_profile = extract_midplane_profile(solution, axis="z", fluid_only=False)
+
+    assert centerline["u"].shape[0] == solution.mesh.y_centers.shape[0]
+    assert z_profile["u"].shape[0] == 1
+
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        extract_midplane_profile(solution, axis="bad")
+
+
+def test_hartmann_acceptance_covers_failing_path():
+    case = make_hartmann_case(ha=50.0, ny=6, nz=6)
+    solution = _synthetic_solution(case, oscillatory=True)
+
+    acceptance = hartmann_acceptance(solution, 50.0, l2_threshold=1.0e-4, linf_threshold=1.0e-4)
+
+    assert acceptance.passed is False
+    assert acceptance.passed_l2 is False or acceptance.passed_linf is False
+
+
 def test_compare_with_reference_outputs_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case()
     monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
@@ -218,6 +279,21 @@ def test_compare_with_reference_outputs_report(tmp_path: Path, monkeypatch: pyte
     assert report.metrics["reference_u_max_latest"] == pytest.approx(0.25)
     assert report.metrics["sampled_profile_pair_available"] == pytest.approx(1.0)
     assert "reference_sample_y_l2_error" in report.metrics
+
+
+def test_compare_with_reference_outputs_handles_missing_minmax_and_samples(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case()
+    monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
+    (tmp_path / "system").mkdir()
+    (tmp_path / "constant").mkdir()
+    (tmp_path / "0").mkdir()
+    (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
+
+    report = compare_with_reference_outputs(case, tmp_path)
+
+    assert report.metrics["run_dir_exists"] == pytest.approx(1.0)
+    assert "reference_u_max_latest" not in report.metrics
+    assert report.metrics["sampled_profile_pair_available"] == pytest.approx(0.0)
 
 
 def test_duct_profile_metrics_reports_sign_pathology():
@@ -524,6 +600,12 @@ def test_closed_channel_validation_writer(tmp_path: Path):
     comparison = closed_channel_validation(solution, "shercliff", 2, reference_root=tmp_path / "ClosedChannel")
     path = write_closed_channel_validation(comparison, tmp_path / "closed_channel_validation.json")
     assert path.exists()
+
+
+def test_profile_and_validation_writers_emit_expected_files(tmp_path: Path):
+    profile_path = write_profile_csv(tmp_path / "profile.csv", {"x": jnp.asarray([0.0, 1.0]), "u": jnp.asarray([1.0, 2.0])})
+    assert profile_path.exists()
+    assert profile_path.read_text().startswith("x,u")
 
 
 def test_processed_slice_validation_writer(tmp_path: Path):
