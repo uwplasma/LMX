@@ -248,6 +248,10 @@ That is the current reviewer-facing Benchmark D slice: a real 3D obstacle
 response benchmark with measurable wake deficit, streamwise recovery, pressure
 growth, cross-sectional distortion, and clean conservation.
 
+LMX now also reports a literature-facing validation view on the same case:
+`peak_station ≈ 3.00`, `normalized_recovery_distance ≈ 6.25e-1`, and
+`literature_pass = true` for the current bounded obstacle slice.
+
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
 To push beyond that single bounded point, LMX also now includes

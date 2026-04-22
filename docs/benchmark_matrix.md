@@ -307,6 +307,13 @@ These observables are meant to read closer to the magnetic-obstacle literature:
 streamwise wake deficit, centerline recovery location, pressure response, and
 cross-cut distortion against a matched no-field reference.
 
+Current bounded literature-facing slice:
+
+- `peak_station ≈ 3.00`
+- `recovery_distance ≈ 1.76`
+- `normalized_recovery_distance ≈ 6.25e-1`
+- `literature_pass = true`
+
 Current bounded regime scan:
 
 - `examples/magnetic_obstacle_regime_scan.py`

@@ -323,6 +323,11 @@ Current first Benchmark D slice:
   `divergence_to_field_ratio ≈ 1.69e-2`,
   `max_charge_balance_residual ≈ 3.98e-13`,
   `benchmark_pass = true`
+- current bounded literature-facing slice on the same case:
+  `peak_station ≈ 3.00`,
+  `recovery_distance ≈ 1.76`,
+  `normalized_recovery_distance ≈ 6.25e-1`,
+  `literature_pass = true`
 - `examples/magnetic_obstacle_regime_scan.py` now stages the next step beyond
   that bounded point by sweeping obstacle cases over field scale and forcing
   and recording how deficit, pressure response, current response, and

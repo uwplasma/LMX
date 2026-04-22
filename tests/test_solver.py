@@ -1777,6 +1777,39 @@ def test_initial_solver_state_without_restart_zeros_auxiliary_fields():
     assert jnp.allclose(lorentz0, 0.0)
 
 
+def test_explicit_forcing_preserves_dtype():
+    value = solvers._explicit_forcing(1.25, jnp.float32)
+    assert value.dtype == jnp.float32
+    assert float(value) == pytest.approx(1.25)
+
+
+def test_emit_solver_header_forwards_restart_payload():
+    captured = {}
+
+    class Logger:
+        def emit_header(self, **kwargs):
+            captured.update(kwargs)
+
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    restart = SimpleNamespace(time=0.5, source="restart.npz")
+    solvers._emit_solver_header(
+        Logger(),
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        mode="steady",
+        potential_solver="cg",
+        target_mean_velocity=None,
+        reference_mean_velocity=0.2,
+        restart=restart,
+    )
+
+    assert captured["restart"] is restart
+    assert captured["reference_mean_velocity"] == pytest.approx(0.2)
+
+
 def test_build_mesh_rejects_bent_pipe_for_laminar_solver():
     case = replace(
         make_hartmann_case(ha=5.0, ny=4, nz=4),

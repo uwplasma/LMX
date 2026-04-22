@@ -10,6 +10,7 @@ from lmx import (
     build_magnetic_obstacle_rect_extruded_problem,
     solve_extruded_inductionless,
     validate_magnetic_obstacle_benchmark,
+    validate_magnetic_obstacle_literature_slice,
     write_extruded_overview_plots,
     write_magnetic_obstacle_benchmark_plots,
 )
@@ -62,6 +63,7 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
     solution = solve_extruded_inductionless(problem)
     reference_solution = solve_extruded_inductionless(reference_problem)
     validation = validate_magnetic_obstacle_benchmark(solution, reference_solution)
+    literature_validation = validate_magnetic_obstacle_literature_slice(solution, reference_solution)
     plots = [
         *write_extruded_overview_plots(solution, OUTPUT_DIR, case_title="Magnetic-obstacle benchmark"),
         *write_magnetic_obstacle_benchmark_plots(
@@ -76,6 +78,7 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
         "geometry_kind": solution.bundle.geometry_kind,
         "plots": [path.name for path in plots],
         "validation": validation,
+        "literature_validation": literature_validation,
     }
     (OUTPUT_DIR / "magnetic_obstacle_benchmark_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

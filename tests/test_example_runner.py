@@ -874,6 +874,7 @@ def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
     assert summary["case"] == "magnetic_obstacle_benchmark"
     assert (tmp_path / "magnetic_obstacle_benchmark.png").exists()
     assert (tmp_path / "magnetic_obstacle_benchmark_summary.json").exists()
+    assert "literature_validation" in summary
 
 
 def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):

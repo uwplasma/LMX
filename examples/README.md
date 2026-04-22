@@ -338,6 +338,7 @@ Those examples are the current executable Benchmark D entry points:
   - write both the generic extruded overview and a dedicated benchmark panel
   - record streamwise wake-deficit, centerline recovery, pressure-excess,
     distortion, and conservation metrics
+  - also emit a literature-facing recovery/deficit summary on the same bounded case
 - `magnetic_obstacle_regime_scan.py`
   - sweep localized-field obstacle runs over `Bz` scale and forcing
   - write a compact response-map figure over velocity deficit, pressure excess,

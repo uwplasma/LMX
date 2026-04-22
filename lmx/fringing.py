@@ -2161,6 +2161,43 @@ def validate_magnetic_obstacle_benchmark(
     }
 
 
+def validate_magnetic_obstacle_literature_slice(
+    solution: ExtrudedInductionlessSolution,
+    reference_solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float | bool]:
+    benchmark = validate_magnetic_obstacle_benchmark(
+        solution,
+        reference_solution,
+        field_ny=field_ny,
+        field_nz=field_nz,
+    )
+    x = np.asarray(solution.bundle.x, dtype=float)
+    peak_index = int(np.argmax(np.asarray(solution.bundle.field_scale, dtype=float))) if len(solution.bundle.x) else 0
+    peak_station = float(x[peak_index]) if x.size else 0.0
+    outlet_station = float(x[-1]) if x.size else 0.0
+    recovery_distance = max(float(benchmark["recovery_station"]) - peak_station, 0.0)
+    normalized_recovery_distance = recovery_distance / max(outlet_station - peak_station, 1.0e-12)
+    literature_pass = bool(
+        benchmark["benchmark_pass"]
+        and benchmark["peak_centerline_deficit_ratio"] >= 0.2
+        and benchmark["integrated_velocity_deficit_ratio"] >= 1.0e-2
+        and benchmark["peak_crosscut_distortion"] >= 1.0e-1
+        and benchmark["pressure_excess_proxy"] >= 5.0e-2
+        and 0.0 <= normalized_recovery_distance <= 1.0
+    )
+    return {
+        **benchmark,
+        "peak_station": peak_station,
+        "outlet_station": outlet_station,
+        "recovery_distance": recovery_distance,
+        "normalized_recovery_distance": normalized_recovery_distance,
+        "literature_pass": literature_pass,
+    }
+
+
 def validate_wham_mirror_pipe_baseline(solution: ExtrudedInductionlessSolution) -> dict[str, float | bool]:
     if solution.problem.case.geometry.kind != "pipe_ogrid":
         raise ValueError("WHAM mirror pipe validation currently supports pipe_ogrid only")

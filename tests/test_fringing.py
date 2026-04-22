@@ -30,6 +30,7 @@ from lmx.fringing import (
     validate_extruded_inductionless_solution,
     validate_magnetic_obstacle_benchmark,
     validate_magnetic_obstacle_baseline,
+    validate_magnetic_obstacle_literature_slice,
     validate_wham_mirror_pipe_baseline,
     validate_variable_field_pipe_solution,
     validate_variable_field_extruded_solution,
@@ -648,6 +649,27 @@ def test_magnetic_obstacle_benchmark_reports_normalized_response():
     assert validation["z_l2_distortion"] > 0.0
     assert validation["peak_crosscut_distortion"] == pytest.approx(max(validation["y_l2_distortion"], validation["z_l2_distortion"]))
     assert isinstance(validation["benchmark_pass"], bool)
+
+
+def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
+    problem = build_magnetic_obstacle_rect_extruded_problem(base_bz=60.0, nx_stations=9, ny=12, nz=12, forcing=2.0)
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=12, potential_iterations=24),
+            solver=replace(problem.case.solver, coupling_iterations=6),
+        ),
+    )
+    solution = solve_extruded_inductionless(problem)
+    reference_problem = replace(problem, profile=replace(problem.profile, field_scale=jnp.zeros_like(problem.profile.field_scale)))
+    reference_solution = solve_extruded_inductionless(reference_problem)
+    validation = validate_magnetic_obstacle_literature_slice(solution, reference_solution, field_ny=41, field_nz=41)
+
+    assert validation["peak_station"] >= float(solution.bundle.x[0])
+    assert validation["recovery_distance"] >= 0.0
+    assert 0.0 <= validation["normalized_recovery_distance"] <= 1.0
+    assert isinstance(validation["literature_pass"], bool)
 
 
 def test_poisson_helpers_can_stop_early():
