@@ -250,7 +250,12 @@ pattern is:
 This keeps the fast lane bounded while making the same verification evidence
 available for documentation and later manuscript figures.
 
-The first explicit example following this pattern is
-`examples/operator_verification_demo.py`, which turns the manufactured smooth
-operator checks into a convergence figure and summary JSON rather than leaving
-them only in `tests/test_operators.py`.
+The first explicit examples following this pattern are:
+- `examples/operator_verification_demo.py` for smooth-grid manufactured
+  operator convergence
+- `examples/operator_clustered_verification_demo.py` for clustered
+  boundary-layer operator convergence
+- `examples/interface_conductivity_verification_demo.py` for aligned
+  coefficient-jump verification
+- `examples/straight_duct_profile_comparison.py` for the Hartmann /
+  Shercliff / Hunt literature-facing straight-duct panel

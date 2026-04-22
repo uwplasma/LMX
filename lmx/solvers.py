@@ -279,7 +279,7 @@ def _volume_scaled_potential_system(
     south: jnp.ndarray,
     north: jnp.ndarray,
     rhs: jnp.ndarray,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     cell_metric = _cell_metric(mesh)
     return (
         diagonal * cell_metric,

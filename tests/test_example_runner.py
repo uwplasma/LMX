@@ -472,12 +472,20 @@ def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeyp
     def fake_solve(*args, **kwargs):
         call_count["value"] += 1
         if call_count["value"] == 1:
-            comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=1.0e-3), z_profile=SimpleNamespace(l2_error=2.0e-3))
+            comparison = SimpleNamespace(
+                y_profile=SimpleNamespace(l2_error=1.0e-3, linf_error=1.5e-3),
+                z_profile=SimpleNamespace(l2_error=2.0e-3, linf_error=2.5e-3),
+            )
             return SimpleNamespace(), SimpleNamespace(), comparison
-        comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=3.0e-3), z_profile=SimpleNamespace(l2_error=4.0e-3))
+        comparison = SimpleNamespace(
+            y_profile=SimpleNamespace(l2_error=3.0e-3, linf_error=3.5e-3),
+            z_profile=SimpleNamespace(l2_error=4.0e-3, linf_error=4.5e-3),
+        )
         return SimpleNamespace(), SimpleNamespace(), comparison
 
     monkeypatch.setattr(module, "solve_closed_channel_benchmark", fake_solve)
+    monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace())
+    monkeypatch.setattr(module, "hartmann_validation", lambda solution, ha: SimpleNamespace(l2_error=5.0e-4, linf_error=7.0e-4))
     monkeypatch.setattr(module, "write_closed_channel_profile_comparison_figure", lambda *args, **kwargs: [tmp_path / "analytic_velocity_profiles.png"])
 
     (tmp_path / "analytic_velocity_profiles.png").write_bytes(b"img")
@@ -485,7 +493,9 @@ def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeyp
     summary = module.run_straight_duct_profile_comparison(out_dir=tmp_path)
 
     assert summary["case"] == "straight_duct_profile_comparison"
+    assert summary["hartmann"]["l2_error"] == pytest.approx(5.0e-4)
     assert summary["shercliff"]["y_l2_error"] == pytest.approx(1.0e-3)
+    assert summary["shercliff"]["z_linf_error"] == pytest.approx(2.5e-3)
     assert summary["hunt"]["z_l2_error"] == pytest.approx(4.0e-3)
     assert "analytic_velocity_profiles.png" in summary["outputs"]
     assert (tmp_path / "straight_duct_profile_comparison_summary.json").exists()

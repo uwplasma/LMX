@@ -74,20 +74,24 @@ def test_showcase_solution_plot_writers_emit_outputs(tmp_path: Path):
 
 
 def test_showcase_profile_comparison_writer_uses_reference_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    analytical = SimpleNamespace(
-        coordinate=np.linspace(-0.1, 0.1, 5),
-        midplane_z=np.linspace(0.0, 1.0, 5),
+    comparison = SimpleNamespace(
+        coordinate=np.linspace(-1.0, 1.0, 5),
+        simulated=np.linspace(0.0, 1.0, 5),
+        reference=np.linspace(0.0, 1.0, 5),
+        l2_error=1.0e-3,
+        linf_error=2.0e-3,
     )
-    monkeypatch.setattr(showcase, "load_shercliff_analytical", lambda ha: analytical)
-    monkeypatch.setattr(showcase, "load_hunt_analytical", lambda ha: analytical)
-    monkeypatch.setattr(
-        showcase,
-        "extract_midplane_profile",
-        lambda solution, axis="z", fluid_only=True: {"z": np.linspace(-0.1, 0.1, 5), "u": np.linspace(0.0, 1.0, 5)},
+    validation = SimpleNamespace(
+        y_profile=comparison,
+        z_profile=comparison,
+        reference_path="/tmp/reference.csv",
     )
+    monkeypatch.setattr(showcase, "hartmann_validation", lambda solution, ha: comparison)
+    monkeypatch.setattr(showcase, "closed_channel_validation", lambda solution, case_kind, ha: validation)
 
     outputs = showcase.write_closed_channel_profile_comparison_figure(
         tmp_path,
+        hartmann_solution=_fake_solution(),
         shercliff_solution=_fake_solution(),
         hunt_solution=_fake_solution(),
         ha=20.0,

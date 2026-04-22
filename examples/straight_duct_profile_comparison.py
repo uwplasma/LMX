@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 
 from lmx import enable_compilation_cache, solve_closed_channel_benchmark, write_closed_channel_profile_comparison_figure
+from lmx.cases import make_hartmann_case
+from lmx.solvers import solve_steady
+from lmx.validation import hartmann_validation
 
 
 OUTPUT_DIR = Path("artifacts/examples/straight_duct_profile_comparison")
@@ -33,6 +37,30 @@ def run_straight_duct_profile_comparison(
 ) -> dict[str, object]:
     enable_compilation_cache(JAX_CACHE_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    hartmann_case = make_hartmann_case(
+        ha=HA,
+        width=WIDTH,
+        height=HEIGHT,
+        ny=NY,
+        nz=NZ,
+        conductivity=FLUID_CONDUCTIVITY,
+        density=DENSITY,
+        viscosity=VISCOSITY,
+    )
+    hartmann_case = replace(
+        hartmann_case,
+        time_stepper=replace(
+            hartmann_case.time_stepper,
+            potential_iterations=POTENTIAL_ITERATIONS,
+            max_steps=MAX_STEPS,
+            velocity_update_limit=VELOCITY_UPDATE_LIMIT,
+            current_reconstruction="face_averaged",
+        ),
+        solver=replace(hartmann_case.solver, coupling_iterations=COUPLING_ITERATIONS),
+    )
+    hartmann_solution = solve_steady(hartmann_case)
+    hartmann_comparison = hartmann_validation(hartmann_solution, ha=HA)
 
     _, shercliff_solution, shercliff_comparison = solve_closed_channel_benchmark(
         "shercliff",
@@ -73,6 +101,7 @@ def run_straight_duct_profile_comparison(
 
     comparison_outputs = write_closed_channel_profile_comparison_figure(
         out_dir,
+        hartmann_solution=hartmann_solution,
         shercliff_solution=shercliff_solution,
         hunt_solution=hunt_solution,
         ha=HA,
@@ -81,13 +110,21 @@ def run_straight_duct_profile_comparison(
     summary = {
         "case": "straight_duct_profile_comparison",
         "ha": HA,
+        "hartmann": {
+            "l2_error": hartmann_comparison.l2_error,
+            "linf_error": hartmann_comparison.linf_error,
+        },
         "shercliff": {
             "y_l2_error": shercliff_comparison.y_profile.l2_error,
+            "y_linf_error": shercliff_comparison.y_profile.linf_error,
             "z_l2_error": shercliff_comparison.z_profile.l2_error,
+            "z_linf_error": shercliff_comparison.z_profile.linf_error,
         },
         "hunt": {
             "y_l2_error": hunt_comparison.y_profile.l2_error,
+            "y_linf_error": hunt_comparison.y_profile.linf_error,
             "z_l2_error": hunt_comparison.z_profile.l2_error,
+            "z_linf_error": hunt_comparison.z_profile.linf_error,
         },
         "outputs": [path.name for path in comparison_outputs],
     }

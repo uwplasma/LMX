@@ -303,17 +303,18 @@ layers.
   <img src="docs/_static/generated/structured_mesh_ha20.png" alt="Structured straight-duct mesh" width="48%">
 </p>
 
-The straight-duct comparison workflow also overlays the analytical Shercliff
-and Hunt midplane profiles with the corresponding LMX solutions at `Ha = 20`.
-The comparison uses the same bundled reference profiles as the validation
-utilities and plots the profiles in normalized form so the shape agreement can
-be read directly. The current artifact is generated directly from
-`examples/straight_duct_profile_comparison.py`, which runs Shercliff and Hunt
-steady solves on the same parameter set used by the validation helpers. After
-fixing the clustered-mesh spacing bug in the rect-duct mesher and enabling
-direct wall interpolation on the rectangular fully developed solve path, the
-current `25 × 25` comparison artifact is down to about `5.4e-2` / `6.8e-2`
-for Shercliff (`y` / `z`) and `2.8e-2` / `4.6e-2` for Hunt.
+The straight-duct comparison workflow now bundles the three canonical
+fully-developed checks at `Ha = 20`: Hartmann, Shercliff, and Hunt. The panel
+shows the Hartmann centerline together with a wall-layer zoom, then the
+Shercliff and Hunt `y` and `z` cuts against the same bundled analytical
+references used by the validation utilities. The artifact is generated
+directly from `examples/straight_duct_profile_comparison.py`, which runs the
+same parameter set used by the bounded validation helpers. On the current
+bounded `25 × 25` setup, Shercliff and Hunt remain the stronger literature
+matches at about `5.4e-2` / `6.8e-2` and `2.8e-2` / `4.6e-2` for the `y` / `z`
+`L2` cuts, while the Hartmann centerline is included as a planar-reference
+slice and still remains the weakest of the three on the current finite-width
+duct setup.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 

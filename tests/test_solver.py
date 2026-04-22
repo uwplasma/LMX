@@ -1273,6 +1273,41 @@ def test_potential_solver_supports_jacobi_backend():
     assert int(iterations) >= 0
 
 
+def test_potential_solver_supports_cg_volume_backend():
+    mesh = generate_layered_duct_mesh(
+        width=2.0,
+        height=2.0,
+        ny=6,
+        nz=6,
+        wall_thickness=(0.05, 0.05, 0.05, 0.05),
+        wall_cells=(1, 1, 1, 1),
+        target_ha=20.0,
+    )
+    sigma = jnp.ones(mesh.yz_shape)
+    fluid_mask = jnp.asarray(mesh.fluid_mask, dtype=bool)
+    u = jnp.zeros(mesh.yz_shape)
+    by = jnp.zeros(mesh.yz_shape)
+    bz = jnp.ones(mesh.yz_shape)
+
+    phi, residual, iterations, initial_residual = solvers._solve_potential(
+        mesh,
+        sigma,
+        fluid_mask,
+        u,
+        by,
+        bz,
+        anchor=(mesh.yz_shape[0] // 2, mesh.yz_shape[1] // 2),
+        iterations=12,
+        tolerance=1.0e-6,
+        solver="cg_volume",
+    )
+
+    assert jnp.isfinite(phi).all()
+    assert float(initial_residual) >= 0.0
+    assert float(residual) >= 0.0
+    assert int(iterations) >= 0
+
+
 def test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask():
     full_mask = jnp.ones((2, 2), dtype=bool)
     assert solvers._resolve_potential_solver("auto", None) == "cg"

@@ -17,7 +17,7 @@ from .plotting import write_transient_movies
 from .reference_data import load_hunt_analytical, load_shercliff_analytical
 from .solvers import _build_mesh, solve_steady
 from .specs import BoundaryCondition
-from .validation import closed_channel_validation, extract_midplane_profile
+from .validation import closed_channel_validation, extract_midplane_profile, hartmann_validation
 from .core import MHDState
 
 
@@ -494,6 +494,7 @@ def write_velocity_profile_volume_figure(solution, out_dir: str | Path, *, title
 def write_closed_channel_profile_comparison_figure(
     out_dir: str | Path,
     *,
+    hartmann_solution,
     shercliff_solution,
     hunt_solution,
     ha: float = 20.0,
@@ -501,74 +502,171 @@ def write_closed_channel_profile_comparison_figure(
     _set_showcase_style()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    shercliff_ref = load_shercliff_analytical(int(ha))
-    hunt_ref = load_hunt_analytical(int(ha))
+    hartmann_comparison = hartmann_validation(hartmann_solution, ha)
     shercliff_validation = closed_channel_validation(shercliff_solution, "shercliff", int(ha))
     hunt_validation = closed_channel_validation(hunt_solution, "hunt", int(ha))
-    shercliff_profile = extract_midplane_profile(shercliff_solution, axis="z", fluid_only=True)
-    hunt_profile = extract_midplane_profile(hunt_solution, axis="z", fluid_only=True)
-    shercliff_peak = max(float(np.max(np.asarray(shercliff_profile["u"], dtype=float))), 1.0e-12)
-    hunt_peak = max(float(np.max(np.asarray(hunt_profile["u"], dtype=float))), 1.0e-12)
-    shercliff_ref_peak = max(float(np.max(np.asarray(shercliff_ref.midplane_z, dtype=float))), 1.0e-12)
-    hunt_ref_peak = max(float(np.max(np.asarray(hunt_ref.midplane_z, dtype=float))), 1.0e-12)
-    shercliff_normalized = np.asarray(shercliff_profile["u"], dtype=float) / shercliff_peak
-    hunt_normalized = np.asarray(hunt_profile["u"], dtype=float) / hunt_peak
-    shercliff_ref_normalized = np.asarray(shercliff_ref.midplane_z, dtype=float) / shercliff_ref_peak
-    hunt_ref_normalized = np.asarray(hunt_ref.midplane_z, dtype=float) / hunt_ref_peak
+    fig = plt.figure(figsize=(12.0, 8.8))
+    _add_slide_title(fig, f"LMX benchmarking: straight-duct analytical validation (Ha = {int(ha)})")
+    grid = fig.add_gridspec(2, 2, left=0.08, right=0.97, bottom=0.10, top=0.88, wspace=0.24, hspace=0.28)
+    ax_hartmann = fig.add_subplot(grid[0, 0])
+    ax_shercliff = fig.add_subplot(grid[0, 1])
+    ax_hunt = fig.add_subplot(grid[1, 0])
+    ax_summary = fig.add_subplot(grid[1, 1])
 
-    fig, ax = plt.subplots(figsize=(10.2, 6.4))
-    _add_slide_title(fig, f"LMX benchmarking: velocity profiles (Ha = {int(ha)})")
-    ax.plot(
-        np.asarray(shercliff_ref.coordinate),
-        shercliff_ref_normalized,
-        color="#111827",
-        linestyle="--",
-        linewidth=1.8,
-        label="Analytical: Shercliff (insulating)",
-    )
-    ax.plot(
-        np.asarray(shercliff_profile["z"]),
-        shercliff_normalized,
-        color="#1d4ed8",
-        marker="x",
-        markersize=4.0,
-        linewidth=1.4,
-        label="LMX: Shercliff",
-    )
-    ax.plot(
-        np.asarray(hunt_ref.coordinate),
-        hunt_ref_normalized,
-        color="#7f1d1d",
-        linestyle="--",
-        linewidth=1.8,
-        label="Analytical: Hunt (conducting)",
-    )
-    ax.plot(
-        np.asarray(hunt_profile["z"]),
-        hunt_normalized,
-        color="#dc2626",
+    hartmann_coord = np.asarray(hartmann_comparison.coordinate, dtype=float)
+    hartmann_sim = np.asarray(hartmann_comparison.simulated, dtype=float)
+    hartmann_ref = np.asarray(hartmann_comparison.reference, dtype=float)
+    positive_mask = hartmann_coord >= 0.0
+
+    ax_hartmann.plot(hartmann_coord, hartmann_ref, color="#111827", linestyle="--", linewidth=1.8, label="Analytical")
+    ax_hartmann.plot(
+        hartmann_coord,
+        hartmann_sim,
+        color="#b91c1c",
         marker="o",
-        markersize=2.8,
-        linewidth=1.4,
+        markersize=3.0,
         markerfacecolor="white",
-        label="LMX: Hunt",
+        linewidth=1.4,
+        label="LMX",
     )
-    ax.set_xlabel("Position [m]")
-    ax.set_ylabel("Normalized streamwise velocity u / max(u)")
-    ax.grid(True, alpha=0.25)
-    ax.legend(loc="lower right", frameon=True)
-    ax.text(
+    ax_hartmann.set_title("Hartmann centerline")
+    ax_hartmann.set_xlabel("Normalized wall-normal coordinate")
+    ax_hartmann.set_ylabel("u / max(u)")
+    ax_hartmann.set_xlim(-1.02, 1.02)
+    ax_hartmann.set_ylim(-0.02, 1.05)
+    ax_hartmann.grid(True, alpha=0.25)
+    ax_hartmann.legend(loc="lower right", frameon=True)
+    ax_hartmann.text(
         0.03,
         0.97,
         (
-            f"Shercliff z-L2 = {shercliff_validation.z_profile.l2_error:.2e}\n"
-            f"Hunt z-L2 = {hunt_validation.z_profile.l2_error:.2e}"
+            f"L2 = {hartmann_comparison.l2_error:.2e}\n"
+            f"L∞ = {hartmann_comparison.linf_error:.2e}"
         ),
-        transform=ax.transAxes,
+        transform=ax_hartmann.transAxes,
         va="top",
         ha="left",
         bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
     )
+    inset = ax_hartmann.inset_axes([0.55, 0.18, 0.38, 0.40])
+    inset.plot(hartmann_coord[positive_mask], hartmann_ref[positive_mask], color="#111827", linestyle="--", linewidth=1.5)
+    inset.plot(
+        hartmann_coord[positive_mask],
+        hartmann_sim[positive_mask],
+        color="#b91c1c",
+        marker="o",
+        markersize=2.2,
+        markerfacecolor="white",
+        linewidth=1.1,
+    )
+    inset.set_xlim(0.72, 1.02)
+    inset.set_ylim(-0.02, min(0.42, 1.05 * max(np.max(hartmann_ref[positive_mask]), np.max(hartmann_sim[positive_mask]))))
+    inset.set_title("Hartmann layer", fontsize=9)
+    inset.grid(True, alpha=0.18)
+    inset.tick_params(labelsize=8)
+
+    def _plot_closed_channel_case(ax, title: str, validation, z_color: str, y_color: str) -> None:
+        z_comp = validation.z_profile
+        y_comp = validation.y_profile
+        ax.plot(
+            np.asarray(z_comp.coordinate, dtype=float),
+            np.asarray(z_comp.reference, dtype=float),
+            color=z_color,
+            linestyle="--",
+            linewidth=1.8,
+            label="Analytical z-cut",
+        )
+        ax.plot(
+            np.asarray(z_comp.coordinate, dtype=float),
+            np.asarray(z_comp.simulated, dtype=float),
+            color=z_color,
+            marker="o",
+            markersize=2.8,
+            markerfacecolor="white",
+            linewidth=1.3,
+            label="LMX z-cut",
+        )
+        ax.plot(
+            np.asarray(y_comp.coordinate, dtype=float),
+            np.asarray(y_comp.reference, dtype=float),
+            color=y_color,
+            linestyle="--",
+            linewidth=1.8,
+            label="Analytical y-cut",
+        )
+        ax.plot(
+            np.asarray(y_comp.coordinate, dtype=float),
+            np.asarray(y_comp.simulated, dtype=float),
+            color=y_color,
+            marker="x",
+            markersize=4.2,
+            linewidth=1.3,
+            label="LMX y-cut",
+        )
+        ax.set_title(title)
+        ax.set_xlabel("Normalized coordinate")
+        ax.set_ylabel("u / max(u)")
+        ax.set_xlim(-1.02, 1.02)
+        ax.set_ylim(-0.02, 1.05)
+        ax.grid(True, alpha=0.25)
+        ax.legend(loc="lower right", frameon=True, ncol=2)
+
+    _plot_closed_channel_case(ax_shercliff, "Shercliff duct", shercliff_validation, "#1d4ed8", "#0f766e")
+    ax_shercliff.text(
+        0.03,
+        0.97,
+        (
+            f"y: L2={shercliff_validation.y_profile.l2_error:.2e}, L∞={shercliff_validation.y_profile.linf_error:.2e}\n"
+            f"z: L2={shercliff_validation.z_profile.l2_error:.2e}, L∞={shercliff_validation.z_profile.linf_error:.2e}"
+        ),
+        transform=ax_shercliff.transAxes,
+        va="top",
+        ha="left",
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
+    )
+
+    _plot_closed_channel_case(ax_hunt, "Hunt duct", hunt_validation, "#dc2626", "#7c3aed")
+    ax_hunt.text(
+        0.03,
+        0.97,
+        (
+            f"y: L2={hunt_validation.y_profile.l2_error:.2e}, L∞={hunt_validation.y_profile.linf_error:.2e}\n"
+            f"z: L2={hunt_validation.z_profile.l2_error:.2e}, L∞={hunt_validation.z_profile.linf_error:.2e}"
+        ),
+        transform=ax_hunt.transAxes,
+        va="top",
+        ha="left",
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
+    )
+
+    ax_summary.axis("off")
+    summary_lines = [
+        "Validation summary",
+        "",
+        "Literature anchors",
+        "• Hartmann analytical profile",
+        "• Shercliff insulating-duct analytical solution",
+        "• Hunt conducting-wall analytical solution",
+        "",
+        "Current bounded errors",
+        f"• Hartmann: L2={hartmann_comparison.l2_error:.2e}, L∞={hartmann_comparison.linf_error:.2e}",
+        f"• Shercliff y/z: {shercliff_validation.y_profile.l2_error:.2e} / {shercliff_validation.z_profile.l2_error:.2e}",
+        f"• Hunt y/z: {hunt_validation.y_profile.l2_error:.2e} / {hunt_validation.z_profile.l2_error:.2e}",
+        "",
+        "Reference data",
+        f"• Shercliff: {Path(shercliff_validation.reference_path).name}",
+        f"• Hunt: {Path(hunt_validation.reference_path).name}",
+    ]
+    ax_summary.text(
+        0.02,
+        0.98,
+        "\n".join(summary_lines),
+        va="top",
+        ha="left",
+        fontsize=12,
+        bbox={"facecolor": "#f8fafc", "edgecolor": "#cbd5e1", "alpha": 0.98, "boxstyle": "round,pad=0.45"},
+    )
+
     png_path = out_dir / "analytic_velocity_profiles.png"
     pdf_path = out_dir / "analytic_velocity_profiles.pdf"
     fig.savefig(png_path, bbox_inches="tight")
