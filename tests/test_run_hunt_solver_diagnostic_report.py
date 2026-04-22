@@ -55,6 +55,7 @@ def test_hunt_diagnostic_helpers_cover_portable_path_and_pressure_proxy_scaling(
     assert huntdiag._derive_current_scaled_pressure_proxy_history([], [1.0], [2.0]) == []
     assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0], [], []) == []
     assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0, 2.0], [2.0, 4.0], []) == pytest.approx([1.0, 4.0])
+    assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0, 2.0], [2.0], []) == []
 
 
 def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

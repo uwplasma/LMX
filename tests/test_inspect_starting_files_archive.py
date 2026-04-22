@@ -67,6 +67,19 @@ def test_read_partial_entries_stops_on_data_descriptor_flag(tmp_path: Path):
     assert archive_tools._read_partial_entries(archive_path) == []
 
 
+def test_read_partial_entries_skips_garbage_before_signature(tmp_path: Path):
+    archive_path = tmp_path / "prefixed.zip"
+    payload = b"garbage-prefix"
+    temp = tmp_path / "partial.bin"
+    _write_partial_zip(temp, "Hunt/case.dat", b"payload")
+    archive_path.write_bytes(payload + temp.read_bytes())
+
+    entries = archive_tools._read_partial_entries(archive_path)
+
+    assert len(entries) == 1
+    assert entries[0].name == "Hunt/case.dat"
+
+
 def test_inspect_archive_filters_valid_zip_entries(tmp_path: Path):
     archive_path = tmp_path / "cases.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
@@ -136,6 +149,16 @@ def test_extract_partial_entry_rejects_unknown_compression(tmp_path: Path):
 
     with pytest.raises(ValueError, match="Unsupported compression method"):
         archive_tools._extract_partial_entry(archive_path, bad_entry, tmp_path / "out")
+
+
+def test_extract_partial_entry_creates_directories(tmp_path: Path):
+    archive_path = tmp_path / "partial.zip"
+    _write_partial_zip(archive_path, "Hunt/subdir/", b"")
+    entry = archive_tools._read_partial_entries(archive_path)[0]
+
+    target = archive_tools._extract_partial_entry(archive_path, entry, tmp_path / "out")
+
+    assert target.is_dir()
 
 
 def test_extract_matching_uses_partial_zip_fallback(tmp_path: Path):

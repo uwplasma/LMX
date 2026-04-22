@@ -29,6 +29,63 @@ def test_portable_path_and_inference_helpers_cover_missing_paths(tmp_path: Path)
     assert parity.infer_magnetic_ramp(tmp_path / "missing") == pytest.approx((0.0, 0.0))
 
 
+def test_extract_inlet_block_and_inference_cover_missing_and_velocity_only_cases(tmp_path: Path):
+    text = "boundaryField\n{\n inlet\n {\n type fixedValue;\n "
+    assert parity._extract_inlet_block(text) is None
+
+    path = tmp_path / "0" / "fluid"
+    path.mkdir(parents=True)
+    (path / "U").write_text(
+        """internalField   uniform ( 0.25 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform ( 0.25 0 0 );
+    }
+}
+"""
+    )
+    assert parity.infer_inlet_drive_mode(tmp_path) == "inlet_velocity"
+    assert parity.infer_inlet_flow_rate(tmp_path) is None
+
+
+def test_infer_reduced_inlet_flow_rate_rejects_zero_area_and_zero_speed(tmp_path: Path):
+    path = tmp_path / "0" / "liquid"
+    path.mkdir(parents=True)
+    (path / "U").write_text(
+        """internalField   uniform ( 0.0 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type            flowRateInletVelocity;
+        volumetricFlowRate 0.0047;
+    }
+}
+"""
+    )
+    assert parity.infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0) is None
+
+    (path / "U").write_text(
+        """internalField   uniform ( 0.1175 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type            flowRateInletVelocity;
+        volumetricFlowRate 0.0;
+    }
+}
+"""
+    )
+    assert parity.infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0) is None
+
+
 def test_infer_inlet_drive_mode_and_flow_rate_reads_hunt_inlet_block(tmp_path: Path):
     path = tmp_path / "0" / "liquid"
     path.mkdir(parents=True)

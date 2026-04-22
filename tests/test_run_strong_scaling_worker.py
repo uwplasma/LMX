@@ -1,8 +1,13 @@
 from pathlib import Path
 import json
 
+import pytest
+
 from lmx.scaling import StrongScalingRecord
 from scripts import run_strong_scaling_worker
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_run_strong_scaling_worker_writes_expected_json(monkeypatch, tmp_path: Path, capsys):
@@ -62,3 +67,54 @@ def test_run_strong_scaling_worker_writes_expected_json(monkeypatch, tmp_path: P
     assert payload["warm_seconds"] == 0.1
     assert payload["benchmark_kind"] == "extruded3d"
     assert json.loads(capsys.readouterr().out)["num_devices"] == 1
+
+
+def test_run_strong_scaling_worker_covers_stencil_branch(monkeypatch, tmp_path: Path):
+    def fake_benchmark_sharded_stencil(**kwargs):
+        assert kwargs["ny"] == 32
+        assert kwargs["nz"] == 24
+        assert kwargs["iterations"] == 7
+        assert kwargs["repeats"] == 1
+        assert kwargs["num_devices"] == 2
+        return StrongScalingRecord(
+            backend="cpu",
+            device_kind="cpu",
+            num_devices=2,
+            ny=32,
+            nz=24,
+            iterations=7,
+            repeats=1,
+            cold_seconds=0.4,
+            warm_seconds=0.4,
+            mean_seconds=0.4,
+            python_version="3.x",
+            jax_version="0.x",
+            benchmark_kind="stencil2d",
+        )
+
+    monkeypatch.setattr(run_strong_scaling_worker, "benchmark_sharded_stencil", fake_benchmark_sharded_stencil)
+    output_path = tmp_path / "worker_stencil.json"
+
+    rc = run_strong_scaling_worker.main(
+        [
+            "--benchmark-kind",
+            "stencil2d",
+            "--ny",
+            "32",
+            "--nz",
+            "24",
+            "--iterations",
+            "7",
+            "--repeats",
+            "1",
+            "--num-devices",
+            "2",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert rc == 0
+    payload = json.loads(output_path.read_text())
+    assert payload["benchmark_kind"] == "stencil2d"
+    assert payload["num_devices"] == 2

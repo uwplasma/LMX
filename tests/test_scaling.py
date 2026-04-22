@@ -115,6 +115,29 @@ def test_two_axis_mesh_and_sharding_covers_elongated_and_replicated_paths():
     assert isinstance(sharding2, NamedSharding)
 
 
+def test_two_axis_mesh_and_sharding_covers_multi_axis_and_flattened_partitions(monkeypatch: pytest.MonkeyPatch):
+    class FakeMesh:
+        def __init__(self, devices, axis_names):
+            self.devices = devices
+            self.axis_names = axis_names
+
+    class FakeSharding:
+        def __init__(self, mesh, spec):
+            self.mesh = mesh
+            self.spec = spec
+
+    monkeypatch.setattr(scaling, "Mesh", FakeMesh)
+    monkeypatch.setattr(scaling, "NamedSharding", FakeSharding)
+
+    mesh1, sharding1 = _two_axis_mesh_and_sharding([object(), object(), object(), object()], num_devices=4, shape=(4, 4, 2))
+    mesh2, sharding2 = _two_axis_mesh_and_sharding([object(), object(), object(), object()], num_devices=4, shape=(4, 3, 2))
+
+    assert mesh1.axis_names == ("x", "y")
+    assert sharding1.spec == scaling.P("x", "y", None)
+    assert mesh2.axis_names == ("x", "y")
+    assert sharding2.spec == scaling.P(("x", "y"), None, None)
+
+
 def test_two_axis_mesh_and_sharding_rejects_incompatible_multi_axis_shape(monkeypatch: pytest.MonkeyPatch):
     class FakeMesh:
         def __init__(self, *args, **kwargs):
