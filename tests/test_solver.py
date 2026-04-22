@@ -1719,6 +1719,64 @@ def test_emit_solver_header_is_noop_without_logger():
     )
 
 
+def test_emit_solver_step_is_noop_without_logger():
+    solvers._emit_solver_step(
+        None,
+        step_index=0,
+        step_time=0.0,
+        dt=1.0,
+        u_max_value=0.0,
+        mean_velocity=0.0,
+        max_current=0.0,
+        face_current_max=0.0,
+        emf_max=0.0,
+        max_lorentz=0.0,
+        face_lorentz_max=0.0,
+        residual_value=0.0,
+        potential_residual=0.0,
+        potential_iteration_count=0.0,
+        linear_residual=0.0,
+        linear_iteration_count=0.0,
+        applied_forcing=0.0,
+        pressure_proxy=0.0,
+        current_scaled_pressure_proxy=0.0,
+        raw_update_max=0.0,
+        limiter_scale=1.0,
+        limited_fraction=0.0,
+        courant_like=0.0,
+        ohmic=0.0,
+        volumetric_flow_rate=0.0,
+        mean_current_magnitude=0.0,
+        lorentz_power=0.0,
+        div_current_max=0.0,
+        charge_balance_residual=0.0,
+        gauge_residual=0.0,
+        interface_current_residual=0.0,
+    )
+
+
+def test_initial_solver_state_without_restart_zeros_auxiliary_fields():
+    case = replace(make_hartmann_case(ha=5.0, ny=4, nz=4), initial_velocity=0.2)
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    fluid_mask = materials.fluid_mask
+
+    u0, phi0, jy0, jz0, lorentz0, start_time = solvers._initial_solver_state(
+        case=case,
+        mesh=mesh,
+        fluid_mask=fluid_mask,
+        interpolate_direct_fluid_walls=True,
+        initial_state=None,
+    )
+
+    assert float(start_time) == pytest.approx(0.0)
+    assert jnp.isfinite(u0).all()
+    assert jnp.allclose(phi0, 0.0)
+    assert jnp.allclose(jy0, 0.0)
+    assert jnp.allclose(jz0, 0.0)
+    assert jnp.allclose(lorentz0, 0.0)
+
+
 def test_build_mesh_rejects_bent_pipe_for_laminar_solver():
     case = replace(
         make_hartmann_case(ha=5.0, ny=4, nz=4),

@@ -289,14 +289,23 @@ Current bounded result:
   against a matched no-field reference
 - `peak_velocity_deficit_ratio ≈ 3.23e-2`
 - `peak_station_velocity_deficit_ratio ≈ 2.87e-2`
-- `peak_pressure_excess ≈ 2.50e-1`
-- `pressure_excess_proxy ≈ 6.08e-2`
-- `current_proxy_peak ≈ 2.28`
+- `integrated_velocity_deficit_ratio ≈ 2.78e-2`
+- `peak_centerline_deficit_ratio ≈ 3.76e-1`
+- `peak_centerline_station_deficit_ratio ≈ 3.49e-1`
+- `recovery_station ≈ 4.76`
+- `peak_pressure_excess ≈ 5.01e-1`
+- `pressure_excess_proxy ≈ 1.22e-1`
+- `current_proxy_peak ≈ 4.56`
 - `y_l2_distortion ≈ 2.31e-1`
 - `z_l2_distortion ≈ 2.08e-1`
+- `peak_crosscut_distortion ≈ 2.31e-1`
 - `divergence_to_field_ratio ≈ 1.69e-2`
-- `max_charge_balance_residual ≈ 1.99e-13`
+- `max_charge_balance_residual ≈ 3.98e-13`
 - `benchmark_pass = true`
+
+These observables are meant to read closer to the magnetic-obstacle literature:
+streamwise wake deficit, centerline recovery location, pressure response, and
+cross-cut distortion against a matched no-field reference.
 
 Current bounded regime scan:
 

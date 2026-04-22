@@ -336,8 +336,8 @@ Those examples are the current executable Benchmark D entry points:
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
   - compare it directly against a matched no-field reference
   - write both the generic extruded overview and a dedicated benchmark panel
-  - record normalized velocity-deficit, pressure-excess, distortion, and
-    conservation metrics
+  - record streamwise wake-deficit, centerline recovery, pressure-excess,
+    distortion, and conservation metrics
 - `magnetic_obstacle_regime_scan.py`
   - sweep localized-field obstacle runs over `Bz` scale and forcing
   - write a compact response-map figure over velocity deficit, pressure excess,

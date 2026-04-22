@@ -235,16 +235,18 @@ bounded case (`24 × 24 × 17`, localized obstacle field, matched no-field
 reference), it reports:
 
 - `peak_velocity_deficit_ratio ≈ 3.23e-2`
-- `peak_pressure_excess ≈ 2.50e-1`
-- `pressure_excess_proxy ≈ 6.08e-2`
-- `current_proxy_peak ≈ 2.28`
-- `y_l2_distortion ≈ 2.31e-1`
-- `z_l2_distortion ≈ 2.08e-1`
-- `max_charge_balance_residual ≈ 1.99e-13`
+- `peak_centerline_deficit_ratio ≈ 3.76e-1`
+- `integrated_velocity_deficit_ratio ≈ 2.78e-2`
+- `recovery_station ≈ 4.76`
+- `peak_pressure_excess ≈ 5.01e-1`
+- `pressure_excess_proxy ≈ 1.22e-1`
+- `current_proxy_peak ≈ 4.56`
+- `peak_crosscut_distortion ≈ 2.31e-1`
+- `max_charge_balance_residual ≈ 3.98e-13`
 
 That is the current reviewer-facing Benchmark D slice: a real 3D obstacle
-response benchmark with measurable pressure growth, current redistribution,
-cross-sectional distortion, and clean conservation.
+response benchmark with measurable wake deficit, streamwise recovery, pressure
+growth, cross-sectional distortion, and clean conservation.
 
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 

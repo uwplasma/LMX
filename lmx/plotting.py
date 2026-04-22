@@ -1472,6 +1472,19 @@ def write_magnetic_obstacle_benchmark_plots(
     z_cut = np.asarray(bundle.u[peak_index, mid_y, :], dtype=float)
     z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
     peak_u = max(float(np.max(np.abs(u_peak))), 1.0e-12)
+    center_velocity = np.asarray(bundle.u[:, mid_y, mid_z], dtype=float)
+    ref_center_velocity = np.asarray(reference_bundle.u[:, mid_y, mid_z], dtype=float)
+    center_deficit = np.maximum(
+        (ref_center_velocity - center_velocity) / np.maximum(np.abs(ref_center_velocity), 1.0e-12),
+        0.0,
+    )
+    peak_centerline_deficit = float(np.max(center_deficit)) if center_deficit.size else 0.0
+    recovery_station = float(x[-1]) if x.size else 0.0
+    if center_deficit.size:
+        threshold = max(0.1 * peak_centerline_deficit, 1.0e-6)
+        tail = np.where(center_deficit[peak_index:] <= threshold)[0]
+        if tail.size:
+            recovery_station = float(x[peak_index + int(tail[0])])
 
     fig, axes = plt.subplots(2, 2, figsize=(13.0, 8.8), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)
@@ -1480,10 +1493,13 @@ def write_magnetic_obstacle_benchmark_plots(
     ax.plot(x, field_scale / max(float(np.max(field_scale)), 1.0e-12), color="#1d4ed8", label=r"$B/B_{max}$")
     ax.plot(x, velocity_ratio, color="#0f766e", label=r"$\bar{u}/\bar{u}_{ref}$")
     ax.plot(x, 1.0 - velocity_ratio, color="#b45309", linestyle="--", label="velocity deficit ratio")
+    ax.plot(x, center_deficit, color="#dc2626", linestyle="-.", label="centerline deficit ratio")
+    ax.axvline(x[peak_index], color="#64748b", linestyle=":", linewidth=1.0, label="peak-field station")
+    ax.axvline(recovery_station, color="#7c3aed", linestyle=":", linewidth=1.0, label="recovery station")
     ax.set_title("Obstacle response along x")
     ax.set_xlabel("x")
     ax.set_ylabel("Normalized response")
-    ax.legend(loc="lower left")
+    ax.legend(loc="lower left", fontsize=9)
 
     ax = axes[0, 1]
     ax.plot(x, pressure_excess, color="#7c3aed", label="pressure excess")
@@ -1491,7 +1507,7 @@ def write_magnetic_obstacle_benchmark_plots(
     ax.set_title("Pressure and current response")
     ax.set_xlabel("x")
     ax.set_ylabel("Response")
-    ax.legend(loc="upper left")
+    ax.legend(loc="upper left", fontsize=9)
 
     ax = axes[1, 0]
     im = ax.pcolormesh(z_edges, y_edges, u_peak / peak_u, shading="auto", cmap="RdBu_r", vmin=0.0, vmax=1.0)
@@ -1509,7 +1525,7 @@ def write_magnetic_obstacle_benchmark_plots(
     ax.set_title("Peak-field centerline cuts")
     ax.set_xlabel("local coordinate")
     ax.set_ylabel(r"$u/u_{cut,max}$")
-    ax.legend(loc="lower center", ncol=2)
+    ax.legend(loc="lower center", ncol=2, fontsize=9)
 
     png_path = out_dir / "magnetic_obstacle_benchmark.png"
     pdf_path = out_dir / "magnetic_obstacle_benchmark.pdf"

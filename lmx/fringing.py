@@ -2096,6 +2096,10 @@ def validate_magnetic_obstacle_benchmark(
     pressure_excess_proxy = float(np.trapezoid(pressure_excess, np.asarray(bundle.x, dtype=float)) / max(float(bundle.x[-1] - bundle.x[0]), 1.0e-12)) if pressure_excess.size > 1 else 0.0
     peak_pressure_excess = float(np.max(pressure_excess)) if pressure_excess.size else 0.0
     current_proxy_peak = float(np.max(np.abs(current_proxy))) if current_proxy.size else 0.0
+    integrated_velocity_deficit_ratio = float(
+        np.trapezoid(velocity_deficit_ratio, np.asarray(bundle.x, dtype=float))
+        / max(float(bundle.x[-1] - bundle.x[0]), 1.0e-12)
+    ) if velocity_deficit_ratio.size > 1 else 0.0
 
     mid_y = int(bundle.u.shape[1] // 2)
     mid_z = int(bundle.u.shape[2] // 2)
@@ -2105,6 +2109,24 @@ def validate_magnetic_obstacle_benchmark(
     z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
     y_l2_distortion = float(np.linalg.norm(y_cut - y_cut_ref) / max(np.linalg.norm(y_cut_ref), 1.0e-12))
     z_l2_distortion = float(np.linalg.norm(z_cut - z_cut_ref) / max(np.linalg.norm(z_cut_ref), 1.0e-12))
+    peak_crosscut_distortion = max(y_l2_distortion, z_l2_distortion)
+
+    center_velocity = np.asarray(bundle.u[:, mid_y, mid_z], dtype=float)
+    ref_center_velocity = np.asarray(reference_bundle.u[:, mid_y, mid_z], dtype=float)
+    center_velocity_deficit_ratio = np.maximum(
+        (ref_center_velocity - center_velocity) / np.maximum(np.abs(ref_center_velocity), 1.0e-12),
+        0.0,
+    )
+    peak_centerline_deficit_ratio = float(np.max(center_velocity_deficit_ratio)) if center_velocity_deficit_ratio.size else 0.0
+    peak_centerline_station_deficit_ratio = (
+        float(center_velocity_deficit_ratio[peak_index]) if center_velocity_deficit_ratio.size else 0.0
+    )
+    recovery_station = float(bundle.x[-1]) if len(bundle.x) else 0.0
+    if center_velocity_deficit_ratio.size:
+        threshold = max(0.1 * peak_centerline_deficit_ratio, 1.0e-6)
+        tail = np.where(center_velocity_deficit_ratio[peak_index:] <= threshold)[0]
+        if tail.size:
+            recovery_station = float(bundle.x[peak_index + int(tail[0])])
 
     validation_pass = bool(
         divergence_ratio <= 2.5e-2
@@ -2125,11 +2147,16 @@ def validate_magnetic_obstacle_benchmark(
         "divergence_to_field_ratio": divergence_ratio,
         "peak_velocity_deficit_ratio": peak_velocity_deficit_ratio,
         "peak_station_velocity_deficit_ratio": peak_station_velocity_deficit_ratio,
+        "integrated_velocity_deficit_ratio": integrated_velocity_deficit_ratio,
+        "peak_centerline_deficit_ratio": peak_centerline_deficit_ratio,
+        "peak_centerline_station_deficit_ratio": peak_centerline_station_deficit_ratio,
+        "recovery_station": recovery_station,
         "wake_recovery_ratio": wake_recovery_ratio,
         "peak_pressure_excess": peak_pressure_excess,
         "pressure_excess_proxy": pressure_excess_proxy,
         "y_l2_distortion": y_l2_distortion,
         "z_l2_distortion": z_l2_distortion,
+        "peak_crosscut_distortion": peak_crosscut_distortion,
         "benchmark_pass": validation_pass,
     }
 

@@ -622,7 +622,7 @@ def test_magnetic_obstacle_baseline_reports_velocity_deficit():
 
 
 def test_magnetic_obstacle_benchmark_reports_normalized_response():
-    problem = build_magnetic_obstacle_rect_extruded_problem(base_bz=60.0, nx_stations=9, ny=12, nz=12, forcing=1.0)
+    problem = build_magnetic_obstacle_rect_extruded_problem(base_bz=60.0, nx_stations=9, ny=12, nz=12, forcing=2.0)
     problem = replace(
         problem,
         case=replace(
@@ -640,8 +640,13 @@ def test_magnetic_obstacle_benchmark_reports_normalized_response():
     assert validation["current_proxy_peak"] > 0.0
     assert validation["peak_pressure_excess"] >= 0.0
     assert validation["peak_velocity_deficit_ratio"] >= 0.0
+    assert validation["integrated_velocity_deficit_ratio"] >= 0.0
+    assert validation["peak_centerline_deficit_ratio"] >= 0.0
+    assert validation["peak_centerline_station_deficit_ratio"] >= 0.0
+    assert validation["recovery_station"] >= float(solution.bundle.x[0])
     assert validation["y_l2_distortion"] > 0.0
     assert validation["z_l2_distortion"] > 0.0
+    assert validation["peak_crosscut_distortion"] == pytest.approx(max(validation["y_l2_distortion"], validation["z_l2_distortion"]))
     assert isinstance(validation["benchmark_pass"], bool)
 
 
