@@ -1491,8 +1491,9 @@ That retained gate now passes for all three retained fringing geometries.
     - the processed-slice extractor now interpolates symmetric near-center
       planes instead of interleaving duplicate cuts, and low-signal `potE(y)`
       / `J_y` cuts are no longer treated as the leading physical blockers
-    - dominant Hunt `J_z`, `J×B_z`, Lorentz-y, and y-velocity parity remain
-      outside the target band
+    - switching Hunt observable parity to conservative face-current
+      reconstruction removes the previous dominant `J_z` / `J×B_z` artifact;
+      Hunt Lorentz-y and velocity-shape parity remain outside the target band
   - the main next technical target is not more plotting work; it is a more
     faithful and reviewer-proof fully developed constant-`Q` solve path, since
     the current LMX steady solver matches the FreeMHD paper slices better under
@@ -1508,10 +1509,10 @@ That retained gate now passes for all three retained fringing geometries.
     normalization
   - the FreeMHD parity examples now write ranked offender tables into their
     summary JSON files; after centerline interpolation and low-signal
-    filtering, the largest current paper-slice offenders are Hunt `J_z`,
-    Hunt `J×B_z`, Hunt Lorentz-y, and Hunt y-velocity distortion, so the next
-    solver patch should target dominant current/Lorentz reconstruction before
-    adding new comparison plots
+    filtering, the largest current paper-slice offenders are Hunt Lorentz-y,
+    Hunt y-velocity distortion, Hunt z-velocity distortion, and Shercliff
+    z-velocity distortion, so the next solver patch should target
+    velocity/Lorentz shape reconstruction before adding new comparison plots
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

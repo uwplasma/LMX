@@ -99,7 +99,7 @@ It now runs on case-specific settings rather than a single showcase default:
 - Shercliff:
   - `17 × 17`, `48` steady steps, `face_averaged` current reconstruction
 - Hunt:
-  - `13 × 13`, `48` steady steps, `cell_centered` current reconstruction
+  - `13 × 13`, `48` steady steps, `face_averaged` current reconstruction
 
 Current retained result on that richer parity lane:
 
@@ -109,10 +109,10 @@ Current retained result on that richer parity lane:
   - current: `L2(y) ≈ 6.46e-1`, `L2(z) ≈ 4.12e-2`
   - Lorentz: `L2(y) ≈ 7.86e-2`, `L2(z) ≈ 4.12e-2`
 - Hunt:
-  - velocity: `L2(y) ≈ 2.39e-1`, `L2(z) ≈ 3.73e-2`
-  - potential: `L2(y) ≈ 2.37e-1`, `L2(z) ≈ 3.48e-2`
-  - current: `L2(y) ≈ 7.12e-1`, `L2(z) ≈ 5.49e-1`
-  - Lorentz: `L2(y) ≈ 2.71e-1`, `L2(z) ≈ 5.52e-1`
+  - velocity: `L2(y) ≈ 2.40e-1`, `L2(z) ≈ 1.28e-1`
+  - potential: `L2(y) ≈ 2.94e-1`, `L2(z) ≈ 3.83e-2`
+  - current: `L2(y) ≈ 4.93e-1`, `L2(z) ≈ 4.81e-2`
+  - Lorentz: `L2(y) ≈ 3.01e-1`, `L2(z) ≈ 4.81e-2`
 
 This is now a useful manuscript-grade external comparison figure because it
 shows much more than one velocity cut, but it also makes the remaining parity
@@ -120,7 +120,9 @@ gap explicit. The processed-slice extractor now interpolates between symmetric
 near-center planes instead of interleaving duplicate cuts when the CSV has no
 exact centerline. Near-degenerate y-cuts for `potE` and `J_y` are labelled as
 low-signal in the summary JSON, so the physically significant blockers are now
-the Hunt dominant-current / Lorentz cuts and the Hunt y-velocity distortion.
+the Hunt Lorentz-y response, Hunt y-velocity distortion, and Hunt z-velocity
+distortion. Switching the Hunt comparison to the conservative face-current
+reconstruction removed the previous dominant `J_z` / `J×B_z` artifact.
 
 ![LMX vs FreeMHD observable parity](_static/generated/freemhd_closed_channel_observable_parity.png)
 
@@ -147,8 +149,8 @@ mass-flow normalization.
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
 low-signal normalized cuts. That ranking is the triage surface for the next
-solver work: fix the dominant Hunt `J_z`, `J×B_z`, Lorentz-y, and y-velocity
-offenders before adding more FreeMHD comparison figures.
+solver work: fix the dominant Hunt Lorentz-y and velocity-shape offenders
+before adding more FreeMHD comparison figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the

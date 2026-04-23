@@ -27,7 +27,7 @@ CONDUCTING_WALL_CONDUCTIVITY = 5.0e6
 INSULATING_WALL_CONDUCTIVITY = 1.0e-6
 CASE_SETTINGS = {
     "shercliff": {"ny": 17, "nz": 17, "max_steps": 48, "current_reconstruction": "face_averaged"},
-    "hunt": {"ny": 13, "nz": 13, "max_steps": 48, "current_reconstruction": "cell_centered"},
+    "hunt": {"ny": 13, "nz": 13, "max_steps": 48, "current_reconstruction": "face_averaged"},
 }
 INITIAL_PROFILE = "analytic"
 DRIVE_MODE = "forcing"
