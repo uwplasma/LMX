@@ -34,9 +34,9 @@ CASE_SETTINGS = {
         "velocity_update_limit": 0.1,
     },
     "hunt": {
-        "ny": 13,
-        "nz": 13,
-        "max_steps": 48,
+        "ny": 21,
+        "nz": 21,
+        "max_steps": 64,
         "current_reconstruction": "face_averaged",
         "velocity_update_limit": 0.1,
     },

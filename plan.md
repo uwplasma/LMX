@@ -1499,6 +1499,10 @@ That retained gate now passes for all three retained fringing geometries.
       parsed from the reference filenames; this fixes the previous arbitrary
       unit-forcing scale mismatch and brings dominant velocity/current/Lorentz
       peak ratios to roughly `O(10%)`
+    - the retained Hunt paper-slice comparison now uses a `21 x 21` mesh and
+      `64` steady steps, which drops Hunt `z`-cut velocity/current/Lorentz
+      errors to roughly `2e-2` / `1.25e-2`; the leading physical offenders are
+      now the Shercliff/Hunt wall-normal Lorentz-y and y-velocity shapes
   - the main next technical target is not more plotting work; it is a more
     faithful and reviewer-proof fully developed drive path. The pressure-drop
     lane is now the best external-paper overlay; the constant-`Q` lane remains
@@ -1515,8 +1519,8 @@ That retained gate now passes for all three retained fringing geometries.
   - the FreeMHD parity examples now write ranked offender tables into their
     summary JSON files; after centerline interpolation and low-signal
     filtering, the largest current paper-slice offenders are Hunt Lorentz-y,
-    Hunt y-velocity distortion, Hunt z-velocity distortion, and Shercliff
-    z-velocity distortion, so the next solver patch should target
+    Shercliff Lorentz-y, Hunt y-velocity distortion, and Shercliff y-velocity
+    distortion, so the next solver patch should target wall-normal
     velocity/Lorentz shape reconstruction before adding new comparison plots
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no

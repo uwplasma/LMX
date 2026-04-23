@@ -101,7 +101,7 @@ It now runs on case-specific settings rather than a single showcase default:
   - `17 × 17`, `48` steady steps, `face_averaged` current reconstruction
 - Hunt:
   - analytical pressure gradient `514.2123 Pa/m`
-  - `13 × 13`, `48` steady steps, `face_averaged` current reconstruction
+  - `21 × 21`, `64` steady steps, `face_averaged` current reconstruction
 
 Current retained result on that richer parity lane:
 
@@ -111,10 +111,10 @@ Current retained result on that richer parity lane:
   - current: `L2(y) ≈ 6.92e-1`, `L2(z) ≈ 1.95e-2`
   - Lorentz: `L2(y) ≈ 7.90e-2`, `L2(z) ≈ 1.95e-2`
 - Hunt:
-  - velocity: `L2(y) ≈ 2.40e-1`, `L2(z) ≈ 1.28e-1`
-  - potential: `L2(y) ≈ 2.94e-1`, `L2(z) ≈ 3.83e-2`
-  - current: `L2(y) ≈ 4.93e-1`, `L2(z) ≈ 4.81e-2`
-  - Lorentz: `L2(y) ≈ 3.01e-1`, `L2(z) ≈ 4.81e-2`
+  - velocity: `L2(y) ≈ 5.89e-2`, `L2(z) ≈ 1.98e-2`
+  - potential: `L2(y) ≈ 1.20e0`, `L2(z) ≈ 3.45e-2`
+  - current: `L2(y) ≈ 9.64e-1`, `L2(z) ≈ 1.25e-2`
+  - Lorentz: `L2(y) ≈ 7.15e-2`, `L2(z) ≈ 1.25e-2`
 
 This is now a useful manuscript-grade external comparison figure because it
 shows much more than one velocity cut, but it also makes the remaining parity
@@ -122,12 +122,14 @@ gap explicit. The processed-slice extractor now interpolates between symmetric
 near-center planes instead of interleaving duplicate cuts when the CSV has no
 exact centerline. Near-degenerate y-cuts for `potE` and `J_y` are labelled as
 low-signal in the summary JSON, so the physically significant blockers are now
-the Hunt Lorentz-y response, Hunt y-velocity distortion, and Hunt z-velocity
-distortion. Switching the Hunt comparison to the conservative face-current
+the Shercliff/Hunt Lorentz-y response and the remaining y-velocity distortion.
+Switching the Hunt comparison to the conservative face-current
 reconstruction removed the previous dominant `J_z` / `J×B_z` artifact. Driving
 the cases with the analytical pressure gradients also brings the absolute
 velocity, current, and Lorentz peak scales into `O(10%)` agreement for the
-dominant cuts, so the remaining gap is now mostly a shape/discretization issue.
+dominant cuts. Increasing the Hunt retained mesh from `13 × 13` to `21 × 21`
+closes the main `z`-cut current/Lorentz gap to near the `1e-2` target; the
+remaining gap is now mostly a wall-normal shape/discretization issue.
 
 ![LMX vs FreeMHD observable parity](_static/generated/freemhd_closed_channel_observable_parity.png)
 
@@ -154,8 +156,8 @@ mass-flow normalization.
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
 low-signal normalized cuts. That ranking is the triage surface for the next
-solver work: fix the dominant Hunt Lorentz-y and velocity-shape offenders
-before adding more FreeMHD comparison figures.
+solver work: fix the dominant Shercliff/Hunt Lorentz-y and y-velocity-shape
+offenders before adding more FreeMHD comparison figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the
