@@ -23,6 +23,7 @@ from lmx.validation import (
     duct_layer_resolution_metrics,
     duct_profile_metrics,
     estimate_observed_order,
+    extract_midplane_scalar_profile,
     infer_mesh_axis_coordinates,
     infer_mesh_bounds,
     infer_region_conductivity,
@@ -119,6 +120,16 @@ def test_hartmann_profile_center_is_maximum():
     y = jnp.linspace(-1.0, 1.0, 101)
     profile = hartmann_analytic_profile(y, ha=10.0)
     assert float(profile[50]) >= float(profile[0])
+
+
+def test_extract_midplane_scalar_profile_returns_requested_field():
+    solution = _synthetic_solution(make_hartmann_case(ha=5.0, ny=6, nz=6))
+    y_profile = extract_midplane_scalar_profile(solution, solution.state.jy, axis="y", fluid_only=True)
+    z_profile = extract_midplane_scalar_profile(solution, solution.state.lorentz_x, axis="z", fluid_only=True)
+    assert y_profile["coordinate"].size == y_profile["value"].size
+    assert z_profile["coordinate"].size == z_profile["value"].size
+    assert float(jnp.max(jnp.abs(y_profile["value"]))) > 0.0
+    assert float(jnp.max(jnp.abs(z_profile["value"]))) > 0.0
 
 
 def test_extract_centerline_uses_exact_zero_column_when_available():

@@ -12,6 +12,7 @@ from lmx.freemhd import (
 )
 from lmx.solvers import solve_transient
 from lmx.validation import latest_field_minmax_record, reference_profile_validation
+from lmx.validation import read_field_minmax
 
 
 OUTPUT_DIR = Path("artifacts/examples/freemhd_closed_channel_parity")
@@ -48,6 +49,10 @@ def _run_case(case_kind: str, ha: float, reference_run_dir: Path) -> dict[str, o
     latest_u = latest_field_minmax_record(reference_run_dir, field="mag(U)")
     lmx_u_max = float(solution.state.u.max())
     u_max_abs_diff = abs(lmx_u_max - float(latest_u.max_value if latest_u is not None else lmx_u_max))
+    freemhd_history_records = []
+    for path in reference_run_dir.glob("postProcessing/**/fieldMinMax.dat"):
+        freemhd_history_records.extend(record for record in read_field_minmax(path) if record.field == "mag(U)")
+    freemhd_history_records.sort(key=lambda record: record.time)
     return {
         "case_kind": case_kind,
         "ha": ha,
@@ -57,6 +62,14 @@ def _run_case(case_kind: str, ha: float, reference_run_dir: Path) -> dict[str, o
         "u_max_abs_diff": float(u_max_abs_diff),
         "y_l2_error": float(sample_validation.y_profile.l2_error),
         "z_l2_error": float(sample_validation.z_profile.l2_error),
+        "freemhd_u_max_history": {
+            "time": [float(record.time) for record in freemhd_history_records],
+            "value": [float(record.max_value) for record in freemhd_history_records],
+        },
+        "lmx_u_max_history": {
+            "time": solution.diagnostics.time_history.tolist(),
+            "value": solution.diagnostics.u_max_history.tolist(),
+        },
         "y_profile": {
             "coordinate": sample_validation.y_profile.coordinate.tolist(),
             "simulated": sample_validation.y_profile.simulated.tolist(),

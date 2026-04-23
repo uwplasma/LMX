@@ -5,6 +5,7 @@ import pytest
 from lmx.reference_data import (
     default_closed_channel_reference_root,
     default_fringing_pipe_reference_root,
+    extract_processed_profile,
     extract_processed_midplane_profile,
     fringing_pipe_profile_reference_path,
     load_closed_channel_analytical,
@@ -52,6 +53,31 @@ def test_extract_processed_midplane_profile_returns_sorted_cut(tmp_path: Path):
     assert y_profile["u"].tolist() == pytest.approx([4.0, 2.0, 5.0])
     assert z_profile["z"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
     assert z_profile["u"].tolist() == pytest.approx([1.0, 2.0, 3.0])
+
+
+def test_extract_processed_profile_returns_requested_field_component(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "Points:1,Points:2,U:0,J:1,J:2,potE",
+                "0.0,-1.0,1.0,10.0,11.0,0.1",
+                "0.0,0.0,2.0,20.0,21.0,0.2",
+                "0.0,1.0,3.0,30.0,31.0,0.3",
+                "-1.0,0.0,4.0,40.0,41.0,0.4",
+                "1.0,0.0,5.0,50.0,51.0,0.5",
+            ]
+        )
+    )
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+    y_profile = extract_processed_profile(reference, axis="y", field_name="J", component=1)
+    z_profile = extract_processed_profile(reference, axis="z", field_name="potE")
+    assert y_profile["coordinate"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
+    assert y_profile["value"].tolist() == pytest.approx([40.0, 20.0, 50.0])
+    assert z_profile["coordinate"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
+    assert z_profile["value"].tolist() == pytest.approx([0.1, 0.2, 0.3])
 
 
 def test_default_closed_channel_reference_root_resolves_bundled_dataset():

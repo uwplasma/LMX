@@ -45,18 +45,23 @@ python examples/freemhd_closed_channel_parity.py
 That example reuses fresh Shercliff and Hunt reruns from
 `/Users/rogerio/local/tests/freemhd_install/freemhd_output`, reconstructs the
 matching LMX transient cases from the copied OpenFOAM fields and control files,
-and writes a parity panel plus checked summary JSON.
+and writes a parity panel plus checked summary JSON. The panel now includes:
+
+- final transverse and vertical velocity cuts
+- transient `u_max(t)` histories from FreeMHD `fieldMinMax.dat` and LMX
+  diagnostics
+- same-host runtime comparison
 
 Current bounded result from the fresh reruns on this host:
 
 - Shercliff:
   - FreeMHD wall time: `35.32 s`
-  - LMX wall time: `15.06 s`
-  - `u_max` mismatch: `≈ 5.57e-2`
+  - LMX wall time: `21.60 s`
+  - `u_max` mismatch: `≈ 3.22e-2`
   - profile errors: `L2(y) ≈ 6.66e-2`, `L2(z) ≈ 1.03e-1`
 - Hunt:
   - FreeMHD wall time: `35.28 s`
-  - LMX wall time: `27.66 s`
+  - LMX wall time: `28.44 s`
   - `u_max` mismatch: `≈ 5.08e-2`
   - profile errors: `L2(y) ≈ 7.21e-2`, `L2(z) ≈ 8.14e-2`
 
@@ -68,3 +73,24 @@ parity figure is still worth keeping in the docs and future paper as an
 independent executable baseline.
 
 ![LMX vs FreeMHD straight-duct parity](_static/generated/freemhd_closed_channel_parity.png)
+
+## FreeMHD paper-slice observable parity
+
+LMX also includes a richer observable comparison workflow against the bundled
+FreeMHD paper slices for the closed-channel family:
+
+```bash
+python examples/freemhd_closed_channel_observable_parity.py
+```
+
+That example compares normalized midplane profiles of:
+
+- axial velocity `u`
+- electric potential `potE`
+- cut-aligned current components `J_y` and `J_z`
+- streamwise Lorentz force `J×B_x`
+
+for Shercliff and Hunt against the processed slice CSV files in
+`/Users/rogerio/local/tests/freemhd_test_cases/FreeMHDPaperAllFigures/ClosedChannel`.
+It is intentionally treated as a heavier manual artifact-generation lane than
+the fresh transient parity example.

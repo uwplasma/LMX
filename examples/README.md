@@ -420,5 +420,12 @@ normalization and with a checked summary JSON.
 it reuses fresh Shercliff and Hunt reruns from
 `/Users/rogerio/local/tests/freemhd_install/freemhd_output`, reconstructs
 matching LMX transient cases from the FreeMHD case files, compares normalized
-transverse and vertical cuts, records FreeMHD versus LMX wall times on the
-same host, and writes a publication-ready parity panel plus JSON summary.
+transverse and vertical cuts, compares `u_max(t)` histories, records FreeMHD
+versus LMX wall times on the same host, and writes a publication-ready parity
+panel plus JSON summary.
+
+`freemhd_closed_channel_observable_parity.py` is the richer field-level
+cross-check against the FreeMHD paper slices. It compares normalized
+midplane profiles of `u`, `potE`, cut-aligned `J`, and `J×B_x` for Shercliff
+and Hunt, and writes a publication-ready panel plus JSON summary. This is a
+heavier manual artifact-generation lane than the transient parity example.

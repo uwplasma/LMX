@@ -16,6 +16,7 @@ from lmx.plotting import (
     write_bent_pipe_overview_plots,
     write_case_overview_plots,
     write_cross_section_field_plots,
+    write_freemhd_observable_parity_plots,
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
     write_interface_verification_plots,
@@ -252,6 +253,8 @@ def test_write_freemhd_parity_plots_writes_outputs(tmp_path: Path):
             "u_max_abs_diff": 1.0e-3,
             "y_l2_error": 5.0e-3,
             "z_l2_error": 3.0e-3,
+            "freemhd_u_max_history": {"time": [0.0, 1.0e-5], "value": [0.0, 1.0]},
+            "lmx_u_max_history": {"time": [0.0, 1.0e-5], "value": [0.0, 0.98]},
             "y_profile": {
                 "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
                 "simulated": np.array([0.0, 0.8, 1.0, 0.8, 0.0]).tolist(),
@@ -270,6 +273,8 @@ def test_write_freemhd_parity_plots_writes_outputs(tmp_path: Path):
             "u_max_abs_diff": 2.0e-3,
             "y_l2_error": 8.0e-3,
             "z_l2_error": 6.0e-3,
+            "freemhd_u_max_history": {"time": [0.0, 1.0e-5], "value": [0.0, 1.0]},
+            "lmx_u_max_history": {"time": [0.0, 1.0e-5], "value": [0.0, 0.97]},
             "y_profile": {
                 "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
                 "simulated": np.array([0.0, 0.9, 0.8, 0.9, 0.0]).tolist(),
@@ -284,6 +289,39 @@ def test_write_freemhd_parity_plots_writes_outputs(tmp_path: Path):
     ]
     outputs = write_freemhd_parity_plots(records, tmp_path, case_title="Parity demo")
     assert outputs == [tmp_path / "freemhd_closed_channel_parity.png", tmp_path / "freemhd_closed_channel_parity.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
+    cut = {
+        "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
+        "simulated": np.array([0.0, 0.9, 1.0, 0.9, 0.0]).tolist(),
+        "reference": np.array([0.0, 0.92, 1.0, 0.92, 0.0]).tolist(),
+        "l2_error": 5.0e-3,
+        "linf_error": 2.0e-2,
+    }
+    records = [
+        {
+            "case_kind": "shercliff",
+            "observables": {
+                name: {"y": {**cut}, "z": {**cut}, "peak_ratio": 0.98}
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+        },
+        {
+            "case_kind": "hunt",
+            "observables": {
+                name: {"y": {**cut}, "z": {**cut}, "peak_ratio": 1.02}
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+        },
+    ]
+    outputs = write_freemhd_observable_parity_plots(records, tmp_path, case_title="Observable parity")
+    assert outputs == [
+        tmp_path / "freemhd_closed_channel_observable_parity.png",
+        tmp_path / "freemhd_closed_channel_observable_parity.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 

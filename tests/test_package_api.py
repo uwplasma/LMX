@@ -67,6 +67,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_operator_verification_plots)
     assert callable(lmx.write_interface_verification_plots)
     assert callable(lmx.write_freemhd_parity_plots)
+    assert callable(lmx.write_freemhd_observable_parity_plots)
     assert callable(lmx.solve_closed_channel_benchmark)
     assert callable(lmx.write_lm_duct_geometry_setup_figure)
     assert callable(lmx.write_structured_mesh_figure)

@@ -955,6 +955,52 @@ def test_freemhd_closed_channel_parity_writes_summary(tmp_path: Path, monkeypatc
     assert (tmp_path / "freemhd_closed_channel_parity_summary.json").exists()
 
 
+def test_freemhd_closed_channel_observable_parity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("freemhd_closed_channel_observable_parity.py")
+    module.OUTPUT_DIR = tmp_path
+    monkeypatch.setattr(
+        module,
+        "_observable_record",
+        lambda case_kind: {
+            "case_kind": case_kind,
+            "observables": {
+                name: {
+                    "y": {
+                        "coordinate": [-1.0, 0.0, 1.0],
+                        "reference": [0.0, 1.0, 0.0],
+                        "simulated": [0.0, 0.98, 0.0],
+                        "l2_error": 2.0e-2,
+                        "linf_error": 2.0e-2,
+                    },
+                    "z": {
+                        "coordinate": [-1.0, 0.0, 1.0],
+                        "reference": [0.0, 1.0, 0.0],
+                        "simulated": [0.0, 0.97, 0.0],
+                        "l2_error": 3.0e-2,
+                        "linf_error": 3.0e-2,
+                    },
+                    "peak_ratio": 0.99,
+                }
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "write_freemhd_observable_parity_plots",
+        lambda records, out_dir, case_title: [
+            Path(out_dir) / "freemhd_closed_channel_observable_parity.png",
+            Path(out_dir) / "freemhd_closed_channel_observable_parity.pdf",
+        ],
+    )
+    (tmp_path / "freemhd_closed_channel_observable_parity.png").write_bytes(b"img")
+    (tmp_path / "freemhd_closed_channel_observable_parity.pdf").write_bytes(b"pdf")
+    summary = module.run_freemhd_closed_channel_observable_parity()
+    assert summary["case"] == "freemhd_closed_channel_observable_parity"
+    assert len(summary["records"]) == 2
+    assert (tmp_path / "freemhd_closed_channel_observable_parity_summary.json").exists()
+
+
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_forced_validation.py")
     module.OUTPUT_DIR = tmp_path

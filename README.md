@@ -485,6 +485,7 @@ Useful entry points:
 - `examples/hunt_showcase.py`: Hunt boundary-layer, annotated cross-section, 3D profile, and startup media
 - `examples/straight_duct_profile_comparison.py`: analytical versus LMX Shercliff/Hunt profile overlay
 - `examples/freemhd_closed_channel_parity.py`: fresh LMX versus FreeMHD transient parity and runtime comparison on the same host
+- `examples/freemhd_closed_channel_observable_parity.py`: normalized `u`, `potE`, `J`, and `J×B_x` parity against the bundled FreeMHD paper slices
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

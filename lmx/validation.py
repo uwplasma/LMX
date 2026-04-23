@@ -344,6 +344,66 @@ def extract_midplane_profile(solution: Solution, axis: str = "y", fluid_only: bo
     raise ValueError(f"Unsupported axis {axis}")
 
 
+def extract_midplane_scalar_profile(
+    solution: Solution,
+    field: jnp.ndarray,
+    *,
+    axis: str = "y",
+    fluid_only: bool = False,
+) -> dict[str, jnp.ndarray]:
+    if axis == "y":
+        base = extract_midplane_profile(solution, axis="y", fluid_only=fluid_only)
+        z_coords = solution.mesh.z_centers
+        if z_coords.size == 1:
+            values = field[:, 0]
+        else:
+            center_index = _exact_coordinate_index(z_coords)
+            if center_index is not None:
+                values = field[:, center_index]
+            else:
+                right = int(jnp.searchsorted(z_coords, 0.0))
+                right = max(1, min(right, z_coords.size - 1))
+                left = right - 1
+                z_left = float(z_coords[left])
+                z_right = float(z_coords[right])
+                if abs(z_right - z_left) <= 1.0e-12:
+                    weight = 0.5
+                else:
+                    weight = float((0.0 - z_left) / (z_right - z_left))
+                weight = min(max(weight, 0.0), 1.0)
+                values = (1.0 - weight) * field[:, left] + weight * field[:, right]
+        if fluid_only:
+            mask = jnp.isin(solution.mesh.y_centers, base["y"])
+            values = values[mask]
+        return {"coordinate": base["y"], "value": values}
+    if axis == "z":
+        base = extract_midplane_profile(solution, axis="z", fluid_only=fluid_only)
+        y_coords = solution.mesh.y_centers
+        if y_coords.size == 1:
+            values = field[0, :]
+        else:
+            center_index = _exact_coordinate_index(y_coords)
+            if center_index is not None:
+                values = field[center_index, :]
+            else:
+                upper = int(jnp.searchsorted(y_coords, 0.0))
+                upper = max(1, min(upper, y_coords.size - 1))
+                lower = upper - 1
+                y_lower = float(y_coords[lower])
+                y_upper = float(y_coords[upper])
+                if abs(y_upper - y_lower) <= 1.0e-12:
+                    weight = 0.5
+                else:
+                    weight = float((0.0 - y_lower) / (y_upper - y_lower))
+                weight = min(max(weight, 0.0), 1.0)
+                values = (1.0 - weight) * field[lower, :] + weight * field[upper, :]
+        if fluid_only:
+            mask = jnp.isin(solution.mesh.z_centers, base["z"])
+            values = values[mask]
+        return {"coordinate": base["z"], "value": values}
+    raise ValueError(f"Unsupported axis {axis}")
+
+
 def compare_profile_to_reference(
     coordinate: jnp.ndarray,
     simulated: jnp.ndarray,

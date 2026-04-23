@@ -2140,7 +2140,7 @@ def write_freemhd_parity_plots(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    fig, axes = plt.subplots(2, 2, figsize=(13.5, 9.0), constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(13.5, 9.2), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)
 
     case_axes = [axes[0, 0], axes[0, 1]]
@@ -2169,11 +2169,37 @@ def write_freemhd_parity_plots(
     names = [str(record["case_kind"]).capitalize() for record in records]
     freemhd_times = np.asarray([float(record["freemhd_execution_seconds"]) for record in records], dtype=float)
     lmx_times = np.asarray([float(record["lmx_execution_seconds"]) for record in records], dtype=float)
-    y_l2 = np.asarray([float(record["y_l2_error"]) for record in records], dtype=float)
-    z_l2 = np.asarray([float(record["z_l2_error"]) for record in records], dtype=float)
-    u_max_diff = np.asarray([float(record["u_max_abs_diff"]) for record in records], dtype=float)
 
     ax = axes[1, 0]
+    colors_runtime = {"Shercliff": "#0f766e", "Hunt": "#7c3aed"}
+    for record in records:
+        case_name = str(record["case_kind"]).capitalize()
+        color = colors_runtime.get(case_name, "#0f766e")
+        freemhd_history = record.get("freemhd_u_max_history", {})
+        lmx_history = record.get("lmx_u_max_history", {})
+        if freemhd_history:
+            ax.plot(
+                np.asarray(freemhd_history["time"], dtype=float),
+                np.asarray(freemhd_history["value"], dtype=float),
+                color=color,
+                linewidth=2.1,
+                label=f"{case_name} FreeMHD",
+            )
+        if lmx_history:
+            ax.plot(
+                np.asarray(lmx_history["time"], dtype=float),
+                np.asarray(lmx_history["value"], dtype=float),
+                color=color,
+                linewidth=1.9,
+                linestyle="--",
+                label=f"{case_name} LMX",
+            )
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel(r"$u_{max}$")
+    ax.set_title("Transient peak-velocity evolution")
+    ax.legend(loc="best", fontsize=10, ncol=2)
+
+    ax = axes[1, 1]
     x_positions = np.arange(len(names), dtype=float)
     width = 0.34
     ax.bar(x_positions - 0.5 * width, freemhd_times, width=width, color="#0f766e", label="FreeMHD wall time")
@@ -2181,20 +2207,90 @@ def write_freemhd_parity_plots(
     ax.set_xticks(x_positions, names)
     ax.set_ylabel("Seconds")
     ax.set_title("Runtime comparison on the same host")
-    ax.legend(loc="upper left", fontsize=10)
-
-    ax = axes[1, 1]
-    ax.semilogy(x_positions, y_l2, marker="o", color="#1d4ed8", label=r"$L_2(y)$")
-    ax.semilogy(x_positions, z_l2, marker="s", color="#dc2626", label=r"$L_2(z)$")
-    ax.semilogy(x_positions, np.maximum(u_max_diff, 1.0e-12), marker="^", color="#7c3aed", label=r"$|u_{max}^{LMX} - u_{max}^{FreeMHD}|$")
-    ax.axhline(1.2e-2, color="#64748b", linestyle=":", linewidth=1.4, label=r"Acceptance target $1.2\times10^{-2}$")
-    ax.set_xticks(x_positions, names)
-    ax.set_ylabel("Error")
-    ax.set_title("Profile and peak-velocity mismatch")
+    for index, record in enumerate(records):
+        ax.text(
+            x_positions[index],
+            max(freemhd_times[index], lmx_times[index]) * 1.03,
+            (
+                rf"$L_2(y)$={float(record['y_l2_error']):.2e}" "\n"
+                rf"$L_2(z)$={float(record['z_l2_error']):.2e}" "\n"
+                rf"$|u_{{max}}|$ diff={float(record['u_max_abs_diff']):.2e}"
+            ),
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            bbox={"boxstyle": "round,pad=0.24", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+        )
     ax.legend(loc="upper right", fontsize=10)
 
     png_path = out_dir / "freemhd_closed_channel_parity.png"
     pdf_path = out_dir / "freemhd_closed_channel_parity.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
+def write_freemhd_observable_parity_plots(
+    records: list[dict[str, object]],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(2, 4, figsize=(18.0, 8.8), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+    cut_colors = {"y": "#1d4ed8", "z": "#dc2626"}
+    observable_titles = {
+        "velocity": r"Velocity $u/u_{peak}$",
+        "potential": r"Potential $\phi/|\phi|_{max}$",
+        "current": r"Cut-aligned current $J/|J|_{max}$",
+        "lorentz": r"Lorentz $J\times B_x/|J\times B_x|_{max}$",
+    }
+
+    for row_index, record in enumerate(records[:2]):
+        case_name = str(record["case_kind"]).capitalize()
+        for column_index, observable in enumerate(("velocity", "potential", "current", "lorentz")):
+            ax = axes[row_index, column_index]
+            observable_payload = record["observables"][observable]
+            for axis in ("y", "z"):
+                cut = observable_payload[axis]
+                coordinate = np.asarray(cut["coordinate"], dtype=float)
+                reference = np.asarray(cut["reference"], dtype=float)
+                simulated = np.asarray(cut["simulated"], dtype=float)
+                color = cut_colors[axis]
+                label_prefix = "Transverse" if axis == "y" else "Vertical"
+                ax.plot(coordinate, reference, color=color, linewidth=2.0, label=f"{label_prefix} FreeMHD")
+                ax.plot(coordinate, simulated, color=color, linestyle="--", linewidth=1.8, label=f"{label_prefix} LMX")
+            metric_lines = []
+            for axis in ("y", "z"):
+                cut = observable_payload[axis]
+                metric_lines.append(rf"$L_2({axis})$={float(cut['l2_error']):.2e}")
+            peak_ratio = float(observable_payload["peak_ratio"])
+            metric_lines.append(rf"peak ratio={peak_ratio:.3f}")
+            ax.set_title(observable_titles[observable], fontsize=13)
+            ax.text(
+                0.98,
+                0.04,
+                "\n".join(metric_lines),
+                transform=ax.transAxes,
+                ha="right",
+                va="bottom",
+                fontsize=9.5,
+                bbox={"boxstyle": "round,pad=0.22", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+            )
+            ax.set_xlim(-1.0, 1.0)
+            ax.set_xlabel("Normalized coordinate")
+            if column_index == 0:
+                ax.set_ylabel(case_name)
+            if row_index == 0 and column_index == 3:
+                ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.30), ncol=2, fontsize=9.5)
+
+    png_path = out_dir / "freemhd_closed_channel_observable_parity.png"
+    pdf_path = out_dir / "freemhd_closed_channel_observable_parity.pdf"
     fig.savefig(png_path, bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)

@@ -167,6 +167,39 @@ def extract_processed_midplane_profile(reference: ProcessedSliceReference, axis:
     raise ValueError(f"Unsupported axis {axis}")
 
 
+def extract_processed_profile(
+    reference: ProcessedSliceReference,
+    *,
+    axis: str,
+    field_name: str,
+    component: int | None = None,
+) -> dict[str, jnp.ndarray]:
+    points_y = reference.columns["Points:1"]
+    points_z = reference.columns["Points:2"]
+    if component is None:
+        values = reference.columns[field_name]
+    else:
+        values = reference.columns[f"{field_name}:{component}"]
+
+    if axis == "y":
+        target = jnp.min(jnp.abs(points_z))
+        mask = jnp.isclose(jnp.abs(points_z), target)
+        order = jnp.argsort(points_y[mask])
+        return {
+            "coordinate": points_y[mask][order],
+            "value": values[mask][order],
+        }
+    if axis == "z":
+        target = jnp.min(jnp.abs(points_y))
+        mask = jnp.isclose(jnp.abs(points_y), target)
+        order = jnp.argsort(points_z[mask])
+        return {
+            "coordinate": points_z[mask][order],
+            "value": values[mask][order],
+        }
+    raise ValueError(f"Unsupported axis {axis}")
+
+
 def fringing_pipe_profile_reference_path(profile_kind: str, reference_root: str | Path | None = None) -> Path:
     root = default_fringing_pipe_reference_root(reference_root)
     stem = {
