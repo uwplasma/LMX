@@ -149,12 +149,12 @@ def build_case_from_freemhd_reference(
     ramp_start, ramp_duration = infer_magnetic_ramp(reference_run_dir)
     boundary_conditions = case.boundary_conditions
     if forcing is None:
-        forcing_value = case.forcing if case_kind != "hunt" else 0.0
+        forcing_value = case.forcing
     else:
         forcing_value = forcing
 
-    if case_kind == "hunt" and forcing is None:
-        drive_mode = infer_inlet_drive_mode(reference_run_dir) or "inlet_velocity"
+    if forcing is None:
+        drive_mode = infer_inlet_drive_mode(reference_run_dir)
         reduced_area = case.geometry.width * case.geometry.height
         reduced_inlet_flow_rate = infer_reduced_inlet_flow_rate(
             reference_run_dir,
@@ -162,13 +162,16 @@ def build_case_from_freemhd_reference(
             initial_velocity=initial_velocity,
         )
         if drive_mode == "inlet_flow_rate":
+            forcing_value = 0.0
             flow_rate = reduced_inlet_flow_rate
             if flow_rate is None:
                 flow_rate = initial_velocity * reduced_area
             inlet_bc = BoundaryCondition("inlet", "inlet_flow_rate", value=flow_rate, axis="x")
-        else:
+            boundary_conditions = boundary_conditions + (inlet_bc,)
+        elif drive_mode == "inlet_velocity":
+            forcing_value = 0.0
             inlet_bc = BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x")
-        boundary_conditions = boundary_conditions + (inlet_bc,)
+            boundary_conditions = boundary_conditions + (inlet_bc,)
 
     return replace(
         case,

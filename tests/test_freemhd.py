@@ -61,6 +61,43 @@ def test_build_case_from_freemhd_reference_preserves_default_forcing_for_shercli
     assert case.initial_velocity == pytest.approx(0.9725)
 
 
+def test_build_case_from_freemhd_reference_switches_to_inlet_flow_rate_when_reference_uses_it(tmp_path: Path):
+    u_path = tmp_path / "case" / "0" / "liquid"
+    u_path.mkdir(parents=True)
+    (u_path / "U").write_text(
+        """internalField   uniform ( 0.9725 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type            flowRateInletVelocity;
+        value           uniform ( 0.9725 0 0 );
+        volumetricFlowRate 0.0389;
+    }
+}
+"""
+    )
+
+    case = build_case_from_freemhd_reference(
+        case_kind="shercliff",
+        ha=20.0,
+        ny=12,
+        nz=12,
+        dt=1.0e-5,
+        t_final=1.0e-4,
+        max_steps=10,
+        reference_run_dir=tmp_path,
+        forcing=None,
+    )
+
+    inlet_boundaries = [bc for bc in case.boundary_conditions if bc.name == "inlet"]
+    assert case.forcing == pytest.approx(0.0)
+    assert inlet_boundaries
+    assert inlet_boundaries[-1].kind == "inlet_flow_rate"
+    assert inlet_boundaries[-1].value == pytest.approx(3.89)
+
+
 def test_parse_freemhd_execution_seconds_returns_latest_value(tmp_path: Path):
     path = tmp_path / "run.log"
     path.write_text(
