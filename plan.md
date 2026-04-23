@@ -1348,6 +1348,29 @@ That retained gate now passes for all three retained fringing geometries.
     - pressure-drop / pressure-span closure through the same reference lane
     - and, before claiming true parity, a higher-inertia pipe solver path that
       is actually in the same regime as the bundled reference
+- The straight-duct FreeMHD parity lane is now split explicitly into two
+  different comparison surfaces and should stay that way in the manuscript:
+  - a fresh host-local transient rerun lane from
+    `examples/freemhd_closed_channel_parity.py`, which remains useful for
+    runtime and `u_max(t)` cross-checks but still sits around
+    `O(1e-1)` on the final velocity-cut `L2` errors
+  - a richer paper-slice observable lane from
+    `examples/freemhd_closed_channel_observable_parity.py`, which now uses
+    physically aligned `0.2 × 0.2` geometry, `ρ = 1000`, `μ = 1e-3`,
+    `σ = 1e6`, thin Hunt wall layers, gauge-shifted potential parity, and
+    case-specific validated settings
+  - retained current best velocity-cut observable parity on that paper-slice
+    lane is:
+    - Shercliff: `L2(y) ≈ 4.75e-2`, `L2(z) ≈ 4.90e-3`
+    - Hunt: `L2(y) ≈ 9.28e-2`, `L2(z) ≈ 6.24e-2`
+  - retained current best field-level parity on that lane is still mixed:
+    - some `z`-cut potential/current/Lorentz comparisons are already at
+      `O(1e-2)` to `O(1e-3)`
+    - `y`-cut potential/current parity is still poor
+  - the main next technical target is not more plotting work; it is a more
+    faithful and reviewer-proof fully developed constant-`Q` solve path, since
+    the current LMX steady solver matches the FreeMHD paper slices better under
+    `forcing` than under the physically matched `flow_rate` path
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

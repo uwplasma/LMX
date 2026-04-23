@@ -25,6 +25,26 @@ def candidate_u_paths(case_dir: str | Path) -> list[Path]:
     ]
 
 
+def _candidate_paths(case_dir: str | Path, *relative_paths: str) -> list[Path]:
+    root = Path(case_dir)
+    return [root / relative for relative in relative_paths]
+
+
+def _first_existing(case_dir: str | Path, *relative_paths: str) -> Path | None:
+    for path in _candidate_paths(case_dir, *relative_paths):
+        if path.exists():
+            return path
+    return None
+
+
+def _extract_first_scalar(text: str, *patterns: str) -> float | None:
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.MULTILINE)
+        if match is not None:
+            return float(match.group(1))
+    return None
+
+
 def infer_initial_velocity_x(case_dir: str | Path) -> float | None:
     pattern = re.compile(r"internalField\s+uniform\s+\(\s*(\S+)\s+\S+\s+\S+\s*\)")
     for path in candidate_u_paths(case_dir):
@@ -110,6 +130,87 @@ def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
     return None
 
 
+def infer_liquid_properties(case_dir: str | Path) -> tuple[float, float, float] | None:
+    path = _first_existing(
+        case_dir,
+        "case/constant/liquid/thermophysicalProperties.liquidMetal",
+        "constant/liquid/thermophysicalProperties.liquidMetal",
+        "case/constant/liquid/thermophysicalProperties",
+        "constant/liquid/thermophysicalProperties",
+    )
+    if path is None:
+        return None
+    text = path.read_text()
+    conductivity = _extract_first_scalar(text, r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;")
+    if conductivity is None:
+        conductivity = _extract_first_scalar(text, r"\bsigma\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;")
+    density = _extract_first_scalar(text, r"\brho\s+([0-9eE+.\-]+)\s*;")
+    viscosity = _extract_first_scalar(text, r"\bmu\s+([0-9eE+.\-]+)\s*;")
+    if conductivity is None or density is None or viscosity is None:
+        return None
+    return conductivity, density, viscosity
+
+
+def infer_solid_conductivities(case_dir: str | Path) -> tuple[float | None, float | None]:
+    solid_path = _first_existing(
+        case_dir,
+        "case/constant/solidWalls/thermophysicalProperties",
+        "constant/solidWalls/thermophysicalProperties",
+    )
+    insulator_path = _first_existing(
+        case_dir,
+        "case/constant/insulator/thermophysicalProperties",
+        "constant/insulator/thermophysicalProperties",
+    )
+    solid_conductivity = None
+    insulator_conductivity = None
+    if solid_path is not None:
+        solid_conductivity = _extract_first_scalar(
+            solid_path.read_text(),
+            r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;",
+        )
+    if insulator_path is not None:
+        insulator_conductivity = _extract_first_scalar(
+            insulator_path.read_text(),
+            r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;",
+        )
+    return solid_conductivity, insulator_conductivity
+
+
+def infer_uniform_b0(case_dir: str | Path) -> tuple[float, float, float] | None:
+    path = _first_existing(
+        case_dir,
+        "case/0/liquid/B0",
+        "0/liquid/B0",
+        "latestTime/liquid/B0",
+        "case/0/B0",
+        "0/B0",
+        "latestTime/B0",
+    )
+    if path is None:
+        return None
+    match = re.search(r"internalField\s+uniform\s+\(\s*(\S+)\s+(\S+)\s+(\S+)\s*\)", path.read_text())
+    if match is None:
+        return None
+    return float(match.group(1)), float(match.group(2)), float(match.group(3))
+
+
+def infer_rectangular_geometry(case_dir: str | Path) -> tuple[float, float, float | None, int | None] | None:
+    path = _first_existing(case_dir, "case/system/blockMeshDict", "system/blockMeshDict")
+    if path is None:
+        return None
+    text = path.read_text()
+    half_width = _extract_first_scalar(text, r"\bLy\s+([0-9eE+.\-]+)\s*;")
+    outer_half_width = _extract_first_scalar(text, r"\bLy_wall\s+([0-9eE+.\-]+)\s*;")
+    wall_cells = _extract_first_scalar(text, r"\bN_wall\s+([0-9eE+.\-]+)\s*;")
+    if half_width is None:
+        return None
+    wall_thickness = None
+    if outer_half_width is not None and outer_half_width >= half_width:
+        wall_thickness = outer_half_width - half_width
+    return 2.0 * half_width, 2.0 * half_width, wall_thickness, None if wall_cells is None else int(round(wall_cells))
+
+
 def _infer_control_dict_scalar(case_dir: str | Path, key: str) -> float | None:
     path = Path(case_dir) / "system" / "controlDict"
     if not path.exists():
@@ -139,12 +240,64 @@ def build_case_from_freemhd_reference(
     reference_run_dir: str | Path,
     forcing: float | None = None,
 ) -> CaseSpec:
-    factories = {
-        "hartmann": make_hartmann_case,
-        "shercliff": make_shercliff_case,
-        "hunt": make_hunt_case,
-    }
-    case = factories[case_kind](ha=ha, ny=ny, nz=nz)
+    liquid_properties = infer_liquid_properties(reference_run_dir)
+    geometry = infer_rectangular_geometry(reference_run_dir)
+    b0 = infer_uniform_b0(reference_run_dir)
+    solid_conductivity, insulator_conductivity = infer_solid_conductivities(reference_run_dir)
+    conductivity = 1.0
+    density = 1.0
+    viscosity = 1.0
+    if liquid_properties is not None:
+        conductivity, density, viscosity = liquid_properties
+    width = 2.0
+    height = 2.0
+    wall_thickness = 0.1
+    wall_cells = 8
+    if geometry is not None:
+        width, height, inferred_wall_thickness, inferred_wall_cells = geometry
+        if inferred_wall_thickness is not None and inferred_wall_thickness > 0.0:
+            wall_thickness = inferred_wall_thickness
+        if inferred_wall_cells is not None and inferred_wall_cells > 0:
+            wall_cells = inferred_wall_cells
+    if case_kind == "hartmann":
+        case = make_hartmann_case(
+            ha=ha,
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            conductivity=conductivity,
+            density=density,
+            viscosity=viscosity,
+        )
+    elif case_kind == "shercliff":
+        case = make_shercliff_case(
+            ha=ha,
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            conductivity=conductivity,
+            density=density,
+            viscosity=viscosity,
+        )
+    elif case_kind == "hunt":
+        case = make_hunt_case(
+            ha=ha,
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            wall_cells=wall_cells,
+            wall_thickness=wall_thickness,
+            fluid_conductivity=conductivity,
+            wall_conductivity=solid_conductivity,
+            insulator_conductivity=insulator_conductivity,
+            density=density,
+            viscosity=viscosity,
+        )
+    else:
+        raise ValueError(f"Unsupported FreeMHD reference case kind {case_kind!r}")
     initial_velocity = infer_initial_velocity_x(reference_run_dir) or 0.0
     ramp_start, ramp_duration = infer_magnetic_ramp(reference_run_dir)
     boundary_conditions = case.boundary_conditions
@@ -176,7 +329,12 @@ def build_case_from_freemhd_reference(
     return replace(
         case,
         boundary_conditions=boundary_conditions,
-        magnetic_field=replace(case.magnetic_field, ramp_start=ramp_start, ramp_duration=ramp_duration),
+        magnetic_field=replace(
+            case.magnetic_field,
+            value=case.magnetic_field.value if b0 is None else b0,
+            ramp_start=ramp_start,
+            ramp_duration=ramp_duration,
+        ),
         initial_velocity=initial_velocity,
         forcing=forcing_value,
         time_stepper=replace(case.time_stepper, dt=dt, t_final=t_final, max_steps=max_steps),

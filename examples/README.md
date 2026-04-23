@@ -426,6 +426,8 @@ panel plus JSON summary.
 
 `freemhd_closed_channel_observable_parity.py` is the richer field-level
 cross-check against the FreeMHD paper slices. It compares normalized
-midplane profiles of `u`, `potE`, cut-aligned `J`, and `J×B_x` for Shercliff
-and Hunt, and writes a publication-ready panel plus JSON summary. This is a
-heavier manual artifact-generation lane than the transient parity example.
+midplane profiles of `u`, gauge-shifted `potE`, cut-aligned `J`, and
+`J×B_x` for Shercliff and Hunt, uses case-specific validated settings and
+current reconstructions, and writes a publication-ready panel plus JSON
+summary. This remains a heavier manual artifact-generation lane than the
+transient parity example.

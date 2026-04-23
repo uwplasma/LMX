@@ -15,11 +15,22 @@ OUTPUT_DIR = Path("artifacts/examples/freemhd_closed_channel_observable_parity")
 REFERENCE_ROOT = Path("/Users/rogerio/local/tests/freemhd_test_cases/FreeMHDPaperAllFigures/ClosedChannel")
 HA = 20
 X_SLICE = "1m"
-NY = 13
-NZ = 13
-MAX_STEPS = 48
+WIDTH = 0.2
+HEIGHT = 0.2
+WALL_THICKNESS = 0.001
+WALL_CELLS = 2
+FLUID_CONDUCTIVITY = 1.0e6
+DENSITY = 1.0e3
+VISCOSITY = 1.0e-3
+CONDUCTING_WALL_CONDUCTIVITY = 5.0e6
+INSULATING_WALL_CONDUCTIVITY = 1.0e-6
+CASE_SETTINGS = {
+    "shercliff": {"ny": 17, "nz": 17, "max_steps": 48, "current_reconstruction": "face_averaged"},
+    "hunt": {"ny": 13, "nz": 13, "max_steps": 48, "current_reconstruction": "cell_centered"},
+}
 INITIAL_PROFILE = "analytic"
-DRIVE_MODE = "flow_rate"
+DRIVE_MODE = "forcing"
+TARGET_MEAN_VELOCITY = 0.9725
 
 
 def _max_abs(value: jnp.ndarray) -> float:
@@ -33,7 +44,11 @@ def _profile_metrics(
     reference_coordinate: jnp.ndarray,
     reference_values: jnp.ndarray,
     simulated_boundary_values: tuple[float, float] | None = None,
+    remove_offset: bool = False,
 ) -> dict[str, object]:
+    if remove_offset:
+        simulated_values = simulated_values - simulated_values[simulated_values.shape[0] // 2]
+        reference_values = reference_values - reference_values[reference_values.shape[0] // 2]
     comparison = compare_normalized_profiles(
         simulated_coordinate,
         simulated_values,
@@ -54,32 +69,44 @@ def _profile_metrics(
 
 
 def _observable_record(case_kind: str) -> dict[str, object]:
+    settings = CASE_SETTINGS[case_kind]
     _, solution, _ = solve_closed_channel_benchmark(
         case_kind,
         ha=HA,
-        ny=NY,
-        nz=NZ,
-        max_steps=MAX_STEPS,
+        width=WIDTH,
+        height=HEIGHT,
+        ny=settings["ny"],
+        nz=settings["nz"],
+        wall_cells=WALL_CELLS,
+        wall_thickness=WALL_THICKNESS,
+        fluid_conductivity=FLUID_CONDUCTIVITY,
+        density=DENSITY,
+        viscosity=VISCOSITY,
+        conducting_wall_conductivity=CONDUCTING_WALL_CONDUCTIVITY,
+        insulating_wall_conductivity=INSULATING_WALL_CONDUCTIVITY,
+        max_steps=settings["max_steps"],
         drive_mode=DRIVE_MODE,
+        target_mean_velocity=TARGET_MEAN_VELOCITY,
         initial_profile=INITIAL_PROFILE,
+        current_reconstruction=settings["current_reconstruction"],
     )
     reference = load_processed_slice(case_kind, HA, x_slice=X_SLICE, reference_root=REFERENCE_ROOT)
     observable_specs = {
         "velocity": {
-            "y": (solution.state.u, "U", 0, (0.0, 0.0)),
-            "z": (solution.state.u, "U", 0, (0.0, 0.0)),
+            "y": (solution.state.u, "U", 0, (0.0, 0.0), False),
+            "z": (solution.state.u, "U", 0, (0.0, 0.0), False),
         },
         "potential": {
-            "y": (solution.state.phi, "potE", None, None),
-            "z": (solution.state.phi, "potE", None, None),
+            "y": (solution.state.phi, "potE", None, None, True),
+            "z": (solution.state.phi, "potE", None, None, True),
         },
         "current": {
-            "y": (solution.state.jy, "J", 1, None),
-            "z": (solution.state.jz, "J", 2, None),
+            "y": (solution.state.jy, "J", 1, None, False),
+            "z": (solution.state.jz, "J", 2, None, False),
         },
         "lorentz": {
-            "y": (solution.state.lorentz_x, "JxB", 0, None),
-            "z": (solution.state.lorentz_x, "JxB", 0, None),
+            "y": (solution.state.lorentz_x, "JxB", 0, None, False),
+            "z": (solution.state.lorentz_x, "JxB", 0, None, False),
         },
     }
 
@@ -87,7 +114,7 @@ def _observable_record(case_kind: str) -> dict[str, object]:
     for observable_name, axis_specs in observable_specs.items():
         axis_payload: dict[str, object] = {}
         peak_ratios: list[float] = []
-        for axis, (sim_field, ref_name, ref_component, boundary_values) in axis_specs.items():
+        for axis, (sim_field, ref_name, ref_component, boundary_values, remove_offset) in axis_specs.items():
             simulated = extract_midplane_scalar_profile(solution, sim_field, axis=axis, fluid_only=True)
             reference_profile = extract_processed_profile(reference, axis=axis, field_name=ref_name, component=ref_component)
             metrics = _profile_metrics(
@@ -96,6 +123,7 @@ def _observable_record(case_kind: str) -> dict[str, object]:
                 reference_coordinate=reference_profile["coordinate"],
                 reference_values=reference_profile["value"],
                 simulated_boundary_values=boundary_values,
+                remove_offset=remove_offset,
             )
             axis_payload[axis] = metrics
             peak_ratios.append(float(metrics["peak_ratio"]))
@@ -108,6 +136,8 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         "x_slice": X_SLICE,
         "initial_profile": INITIAL_PROFILE,
         "drive_mode": DRIVE_MODE,
+        "target_mean_velocity": TARGET_MEAN_VELOCITY,
+        "settings": settings,
         "reference_path": reference.path,
         "observables": observables,
     }
@@ -127,8 +157,16 @@ def run_freemhd_closed_channel_observable_parity() -> dict[str, object]:
         "x_slice": X_SLICE,
         "initial_profile": INITIAL_PROFILE,
         "drive_mode": DRIVE_MODE,
-        "resolution": {"ny": NY, "nz": NZ},
-        "max_steps": MAX_STEPS,
+        "target_mean_velocity": TARGET_MEAN_VELOCITY,
+        "settings": CASE_SETTINGS,
+        "geometry": {"width": WIDTH, "height": HEIGHT, "wall_thickness": WALL_THICKNESS, "wall_cells": WALL_CELLS},
+        "material": {
+            "fluid_conductivity": FLUID_CONDUCTIVITY,
+            "density": DENSITY,
+            "viscosity": VISCOSITY,
+            "conducting_wall_conductivity": CONDUCTING_WALL_CONDUCTIVITY,
+            "insulating_wall_conductivity": INSULATING_WALL_CONDUCTIVITY,
+        },
         "records": records,
         "plots": [path.name for path in plots],
     }
