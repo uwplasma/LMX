@@ -4,13 +4,18 @@ import pytest
 
 from lmx.freemhd import (
     build_case_from_freemhd_reference,
+    candidate_u_paths,
     infer_initial_velocity_x,
     infer_inlet_drive_mode,
+    infer_inlet_flow_rate,
     infer_liquid_properties,
+    infer_magnetic_ramp,
     infer_rectangular_geometry,
+    infer_reduced_inlet_flow_rate,
     infer_solid_conductivities,
     infer_uniform_b0,
     parse_freemhd_execution_seconds,
+    run_freemhd_demo,
 )
 
 
@@ -230,3 +235,163 @@ def test_parse_freemhd_execution_seconds_returns_latest_value(tmp_path: Path):
         )
     )
     assert parse_freemhd_execution_seconds(path) == pytest.approx(35.28)
+
+
+def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Path):
+    assert len(candidate_u_paths(tmp_path)) >= 6
+    assert infer_liquid_properties(tmp_path) is None
+    assert infer_uniform_b0(tmp_path) is None
+    assert infer_rectangular_geometry(tmp_path) is None
+    assert infer_solid_conductivities(tmp_path) == (None, None)
+    assert parse_freemhd_execution_seconds(tmp_path / "missing.log") is None
+
+    incomplete_liquid = tmp_path / "case" / "constant" / "liquid"
+    incomplete_liquid.mkdir(parents=True)
+    (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\n")
+    assert infer_liquid_properties(tmp_path) is None
+
+    (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\nmu 0.002;\n")
+    assert infer_liquid_properties(tmp_path) == pytest.approx((3.0, 1000.0, 0.002))
+
+    b0_dir = tmp_path / "case" / "0" / "liquid"
+    b0_dir.mkdir(parents=True, exist_ok=True)
+    (b0_dir / "B0").write_text("internalField nonuniform List<vector> 0();\n")
+    assert infer_uniform_b0(tmp_path) is None
+
+    system = tmp_path / "case" / "system"
+    system.mkdir(parents=True)
+    (system / "blockMeshDict").write_text("Ly_wall 0.1;\n")
+    assert infer_rectangular_geometry(tmp_path) is None
+    (system / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.09;\n")
+    width, height, wall_thickness, wall_cells = infer_rectangular_geometry(tmp_path)
+    assert width == pytest.approx(0.2)
+    assert height == pytest.approx(0.2)
+    assert wall_thickness is None
+    assert wall_cells is None
+
+    control = tmp_path / "system"
+    control.mkdir(exist_ok=True)
+    (control / "controlDict").write_text("application epotMultiRegionFoam;\n")
+    assert infer_magnetic_ramp(tmp_path) == pytest.approx((0.0, 0.0))
+
+
+def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Path):
+    u_dir = tmp_path / "0"
+    u_dir.mkdir()
+    (u_dir / "U").write_text(
+        """internalField uniform ( 0.2 0 0 );
+boundaryField
+{
+    outlet
+    {
+        type zeroGradient;
+    }
+}
+"""
+    )
+    assert infer_inlet_drive_mode(tmp_path) is None
+    assert infer_inlet_flow_rate(tmp_path) is None
+
+    (u_dir / "U").write_text(
+        """internalField uniform ( 0.2 0 0 );
+boundaryField
+{
+    inlet
+    {
+        value uniform (0.2 0 0);
+    }
+}
+"""
+    )
+    assert infer_inlet_drive_mode(tmp_path) is None
+    assert infer_inlet_flow_rate(tmp_path) is None
+
+    (u_dir / "U").write_text(
+        """internalField uniform ( 0.2 0 0 );
+boundaryField
+{
+    inlet
+    {
+        type flowRateInletVelocity;
+        volumetricFlowRate 0.0;
+    }
+}
+"""
+    )
+    assert infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0, initial_velocity=0.2) is None
+
+
+def test_build_case_from_freemhd_reference_covers_hartmann_velocity_mode_and_errors(tmp_path: Path):
+    u_dir = tmp_path / "0"
+    u_dir.mkdir()
+    (u_dir / "U").write_text(
+        """internalField uniform ( 0.3 0 0 );
+boundaryField
+{
+    inlet
+    {
+        type fixedValue;
+        value uniform (0.3 0 0);
+    }
+}
+"""
+    )
+    case = build_case_from_freemhd_reference(
+        case_kind="hartmann",
+        ha=10.0,
+        ny=8,
+        nz=8,
+        dt=1.0e-4,
+        t_final=1.0e-3,
+        max_steps=10,
+        reference_run_dir=tmp_path,
+        forcing=None,
+    )
+    inlet = [bc for bc in case.boundary_conditions if bc.name == "inlet"][-1]
+    assert case.name == "hartmann_ha10"
+    assert case.forcing == pytest.approx(0.0)
+    assert inlet.kind == "inlet_velocity"
+    assert inlet.value == pytest.approx((0.3, 0.0, 0.0))
+
+    forced = build_case_from_freemhd_reference(
+        case_kind="hartmann",
+        ha=10.0,
+        ny=8,
+        nz=8,
+        dt=1.0e-4,
+        t_final=1.0e-3,
+        max_steps=10,
+        reference_run_dir=tmp_path,
+        forcing=2.5,
+    )
+    assert forced.forcing == pytest.approx(2.5)
+    assert not [bc for bc in forced.boundary_conditions if bc.name == "inlet"]
+
+    with pytest.raises(ValueError, match="Unsupported FreeMHD reference case kind"):
+        build_case_from_freemhd_reference(
+            case_kind="unknown",
+            ha=10.0,
+            ny=8,
+            nz=8,
+            dt=1.0e-4,
+            t_final=1.0e-3,
+            max_steps=10,
+            reference_run_dir=tmp_path,
+        )
+
+
+def test_run_freemhd_demo_invokes_script_and_returns_output_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    calls: list[dict[str, object]] = []
+
+    def fake_run(args, *, cwd, env, check):
+        calls.append({"args": args, "cwd": cwd, "env": env, "check": check})
+
+    monkeypatch.setattr("lmx.freemhd.subprocess.run", fake_run)
+
+    output = run_freemhd_demo(tmp_path, demo_kind="hunt", nproc=4, extra_env={"A": "B"})
+
+    assert output == tmp_path / "freemhd_output" / "hunt"
+    assert calls[0]["args"] == [str(tmp_path / "run_hunt.sh"), "4"]
+    assert calls[0]["cwd"] == tmp_path
+    assert calls[0]["check"] is True
+    assert calls[0]["env"]["A"] == "B"
