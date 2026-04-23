@@ -317,7 +317,8 @@ The first explicit examples following this pattern are:
   Shercliff / Hunt literature-facing straight-duct panel, including no-slip
   wall reconstruction when comparing cell-centered profiles against the
   analytical wall-to-wall curves; the current release target is
-  `L2 <= 1.2e-2` on the retained Shercliff/Hunt cuts
+  `L2 <= 1.2e-2` on the retained cuts, and the current bounded `37 × 37`
+  artifact meets it for Hartmann, Shercliff, and Hunt
 - `examples/hartmann_validation_ladder.py` for the bounded Hartmann multi-`Ha`
   literature ladder, with the same stable summary-JSON pattern used by the
   manuscript-facing straight-duct figures

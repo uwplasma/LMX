@@ -1359,12 +1359,13 @@ That retained gate now passes for all three retained fringing geometries.
   - the rectangular fully developed solve path now applies direct wall
     interpolation consistently during the fixed-point update, not only during
     initialization
-  - with those fixes, the current reader-facing `25 × 25` analytical overlay
+  - with those fixes, the current reader-facing `37 × 37` analytical overlay
     reports:
-    - Shercliff `y_l2_error ≈ 1.19e-2`
-    - Shercliff `z_l2_error ≈ 3.15e-3`
-    - Hunt `y_l2_error ≈ 1.13e-2`
-    - Hunt `z_l2_error ≈ 5.23e-3`
+    - Hartmann `l2_error ≈ 1.15e-2`
+    - Shercliff `y_l2_error ≈ 7.46e-3`
+    - Shercliff `z_l2_error ≈ 7.22e-3`
+    - Hunt `y_l2_error ≈ 8.96e-3`
+    - Hunt `z_l2_error ≈ 5.99e-3`
   - the main numerical finding from this pass is that the old uniform
     `rect_duct` mesh was under-resolving the Hartmann layer badly at
     `Ha = 20`; the rect-duct mesher is now field-aware and assigns Hartmann
@@ -1397,16 +1398,17 @@ That retained gate now passes for all three retained fringing geometries.
     still too compile-heavy to use as an interactive tuning loop on this host
   - the analytical comparison now reconstructs the no-slip wall value
     explicitly when matching cell-centered LMX profiles against the analytical
-    wall-to-wall curves; the retained reader-facing `25 × 25` artifact
+    wall-to-wall curves; the retained reader-facing `37 × 37` artifact
     currently reports:
-    - Shercliff `y_l2_error ≈ 1.19e-2`
-    - Shercliff `z_l2_error ≈ 3.15e-3`
-    - Hunt `y_l2_error ≈ 1.13e-2`
-    - Hunt `z_l2_error ≈ 5.23e-3`
+    - Hartmann `l2_error ≈ 1.15e-2`
+    - Shercliff `y_l2_error ≈ 7.46e-3`
+    - Shercliff `z_l2_error ≈ 7.22e-3`
+    - Hunt `y_l2_error ≈ 8.96e-3`
+    - Hunt `z_l2_error ≈ 5.99e-3`
   - for this release cycle, the accepted straight-duct manuscript threshold is
-    `L2 <= 1.2e-2` on the retained Shercliff/Hunt profile cuts; Hartmann
-    remains the weakest cut on the current finite-width duct path and stays an
-    explicitly open solver-quality item rather than a blocked release gate
+    `L2 <= 1.2e-2` on the retained profile cuts; the current Hartmann,
+    Shercliff, and Hunt overlays meet that bounded target after the implicit
+    Lorentz reaction split fix
   - a local persistent JAX compilation cache is now wired into the heavy
     README/straight-duct example paths under `artifacts/jax_cache`, so repeat
     reruns on the same host do not recompile the same solve kernels from

@@ -1043,6 +1043,78 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     assert float(linear_initial_residual) == pytest.approx(4.0e-6)
 
 
+def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_reaction(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    case = replace(case, forcing=0.0, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0))
+    mesh = solvers._build_mesh(case)
+    materials = build_material_fields(case, mesh)
+    u_previous = jnp.where(materials.fluid_mask, 0.4, 0.0)
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=case.time_stepper.dt)
+    magnetic_reaction = jnp.where(
+        materials.fluid_mask,
+        materials.conductivity * (by**2 + bz**2) / materials.density,
+        0.0,
+    )
+    captured_rhs: list[jnp.ndarray] = []
+
+    monkeypatch.setattr(
+        solvers,
+        "_solve_potential",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.asarray(1.0e-12),
+            jnp.asarray(1, dtype=jnp.int32),
+            jnp.asarray(1.0e-12),
+        ),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_fully_developed_rhs",
+        lambda **kwargs: (-magnetic_reaction * u_previous, jnp.zeros(mesh.yz_shape)),
+    )
+
+    def fake_solve_velocity_system(**kwargs):
+        captured_rhs.append(kwargs["rhs"])
+        return jnp.zeros(mesh.yz_shape), jnp.asarray(0.0), jnp.asarray(1, dtype=jnp.int32), jnp.asarray(0.0)
+
+    monkeypatch.setattr(solvers, "_solve_velocity_system", fake_solve_velocity_system)
+    monkeypatch.setattr(
+        solvers,
+        "_compute_current_and_lorentz",
+        lambda *args, **kwargs: (
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+            jnp.zeros(mesh.yz_shape),
+        ),
+    )
+    monkeypatch.setattr(
+        solvers,
+        "_face_current_emf_and_lorentz_max",
+        lambda *args, **kwargs: (
+            jnp.asarray(0.0),
+            jnp.asarray(0.0),
+            jnp.asarray(0.0),
+        ),
+    )
+
+    solvers._fully_developed_case_step(
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        u_previous=u_previous,
+        step_time=case.time_stepper.dt,
+        potential_solver="jacobi",
+        target_mean_velocity=None,
+        linear_solver="cg",
+        preconditioner="jacobi",
+        coupling_iterations=1,
+        coupling_tolerance=1.0e-6,
+    )
+
+    assert len(captured_rhs) == 1
+    assert jnp.allclose(captured_rhs[0][materials.fluid_mask], 0.0)
+
+
 def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity_solve(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     case = replace(case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0))

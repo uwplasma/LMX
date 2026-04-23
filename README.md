@@ -315,17 +315,12 @@ fully-developed checks at `Ha = 20`: Hartmann, Shercliff, and Hunt. The panel
 shows the Hartmann centerline together with a wall-layer zoom, then the
 Shercliff and Hunt `y` and `z` cuts against the same bundled analytical
 references used by the validation utilities. The artifact is generated
-directly from `examples/straight_duct_profile_comparison.py`, which runs the
-same parameter set used by the bounded validation helpers. The comparison now
-reconstructs the no-slip wall value explicitly when matching the cell-centered
-LMX profile against the analytical wall-to-wall curves. On the current bounded
-`25 × 25` setup with the corrected field orientation and tighter steady
-electric solve, Shercliff/Hunt sit in the `O(1e-2)` range rather than the old
-`O(1e-1)` mismatch. For this release cycle, the manuscript-facing acceptance
-target is `L2 <= 1.2e-2` on the retained Shercliff/Hunt cuts. Hartmann remains
-the weakest of the three reference cuts on the current finite-width duct path,
-so that lane stays documented as the next solver-quality improvement rather
-than being overstated as closed.
+directly from `examples/straight_duct_profile_comparison.py`, which uses a
+bounded `37 × 37` cross-section with no-slip wall reconstruction when matching
+cell-centered LMX profiles against analytical wall-to-wall curves. With the
+corrected implicit Lorentz reaction split, the retained cuts now meet the
+manuscript-facing `L2 <= 1.2e-2` target: Hartmann `1.15e-2`, Shercliff
+`7.46e-3 / 7.22e-3`, and Hunt `8.96e-3 / 5.99e-3`.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 

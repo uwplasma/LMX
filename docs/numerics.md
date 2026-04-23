@@ -68,6 +68,14 @@ solver pipeline is:
 6. solve for $u$
 7. update diagnostics and convergence checks
 
+The implicit momentum solve treats the local magnetic damping term
+$(\sigma/\rho)(B_y^2 + B_z^2)u$ as a reaction coefficient on the velocity
+matrix. The right-hand side therefore adds back only the corresponding
+linearized contribution from the explicit Lorentz assembly. This split keeps
+the steady Hartmann/Shercliff/Hunt operator from double-counting the
+streamwise Lorentz damping while still retaining the potential-coupled current
+terms in the conservative face-current reconstruction.
+
 For `inlet_flow_rate` / constant-`Q` fully developed runs, the solver treats
 the requested mean velocity as a hard area-weighted constraint after the
 bounded velocity update and wall interpolation. This keeps direct-wall

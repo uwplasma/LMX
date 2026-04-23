@@ -959,11 +959,12 @@ def _fully_developed_case_step(
             solver=potential_solver,
         )
         phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
-        reaction = jnp.where(
+        magnetic_reaction = jnp.where(
             active_mask,
             materials.conductivity * (by**2 + bz**2) / materials.density,
             0.0,
         )
+        reaction = magnetic_reaction
         if not steady_mode:
             reaction = reaction + jnp.where(active_mask, 1.0 / dt, 0.0)
         rhs_base, _ = _fully_developed_rhs(
@@ -978,6 +979,7 @@ def _fully_developed_case_step(
             forcing=jnp.asarray(0.0, dtype=u_previous.dtype),
             current_reconstruction=case.time_stepper.current_reconstruction,
         )
+        rhs_base = rhs_base + magnetic_reaction * jnp.where(active_mask, u_iter, 0.0)
         if not steady_mode:
             rhs_base = rhs_base + jnp.where(active_mask, u_previous / dt, 0.0)
         if target_mean_velocity is None:
