@@ -309,12 +309,13 @@ shows the Hartmann centerline together with a wall-layer zoom, then the
 Shercliff and Hunt `y` and `z` cuts against the same bundled analytical
 references used by the validation utilities. The artifact is generated
 directly from `examples/straight_duct_profile_comparison.py`, which runs the
-same parameter set used by the bounded validation helpers. On the current
-bounded `25 × 25` setup, Shercliff and Hunt remain the stronger literature
-matches at about `5.4e-2` / `6.8e-2` and `2.8e-2` / `4.6e-2` for the `y` / `z`
-`L2` cuts, while the Hartmann centerline is included as a planar-reference
-slice and still remains the weakest of the three on the current finite-width
-duct setup.
+same parameter set used by the bounded validation helpers. The comparison now
+reconstructs the no-slip wall value explicitly when matching the cell-centered
+LMX profile against the analytical wall-to-wall curves. On the current bounded
+`25 × 25` setup with the corrected field orientation and tighter steady
+electric solve, Shercliff/Hunt sit in the `O(1e-2)` range rather than the old
+`O(1e-1)` mismatch, but that straight-duct lane is still not yet at the final
+`O(1e-3)` target needed for manuscript-grade closure.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 

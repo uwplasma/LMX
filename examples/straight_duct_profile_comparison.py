@@ -19,10 +19,11 @@ NY = 25
 NZ = 25
 WALL_CELLS = 6
 WALL_THICKNESS = 0.02
-COUPLING_ITERATIONS = 10
-POTENTIAL_ITERATIONS = 80
-MAX_STEPS = 60
-VELOCITY_UPDATE_LIMIT = 7.5e-4
+COUPLING_ITERATIONS = 16
+POTENTIAL_ITERATIONS = 240
+MAX_STEPS = 240
+VELOCITY_UPDATE_LIMIT = 1.0e-4
+POTENTIAL_TOLERANCE = 1.0e-8
 
 FLUID_CONDUCTIVITY = 1.0
 CONDUCTING_WALL_CONDUCTIVITY = 0.25
@@ -54,6 +55,8 @@ def run_straight_duct_profile_comparison(
             hartmann_case.time_stepper,
             potential_iterations=POTENTIAL_ITERATIONS,
             max_steps=MAX_STEPS,
+            potential_tolerance=POTENTIAL_TOLERANCE,
+            steady_potential_tolerance=POTENTIAL_TOLERANCE,
             velocity_update_limit=VELOCITY_UPDATE_LIMIT,
             current_reconstruction="face_averaged",
         ),
@@ -77,6 +80,7 @@ def run_straight_duct_profile_comparison(
         max_steps=MAX_STEPS,
         velocity_update_limit=VELOCITY_UPDATE_LIMIT,
         current_reconstruction="face_averaged",
+        potential_tolerance=POTENTIAL_TOLERANCE,
     )
     _, hunt_solution, hunt_comparison = solve_closed_channel_benchmark(
         "hunt",
@@ -97,6 +101,7 @@ def run_straight_duct_profile_comparison(
         max_steps=MAX_STEPS,
         velocity_update_limit=VELOCITY_UPDATE_LIMIT,
         current_reconstruction="face_averaged",
+        potential_tolerance=POTENTIAL_TOLERANCE,
     )
 
     comparison_outputs = write_closed_channel_profile_comparison_figure(
@@ -127,6 +132,7 @@ def run_straight_duct_profile_comparison(
             "z_linf_error": hunt_comparison.z_profile.linf_error,
         },
         "outputs": [path.name for path in comparison_outputs],
+        "comparison_method": "normalized analytical comparison with no-slip wall reconstruction at the duct boundaries",
     }
     (out_dir / "straight_duct_profile_comparison_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

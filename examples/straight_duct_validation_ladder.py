@@ -16,10 +16,10 @@ NY = 25
 NZ = 25
 WALL_CELLS = 6
 WALL_THICKNESS = 0.02
-COUPLING_ITERATIONS = 10
+COUPLING_ITERATIONS = 16
 POTENTIAL_ITERATIONS = 200
-MAX_STEPS = 120
-VELOCITY_UPDATE_LIMIT = 5.0e-4
+MAX_STEPS = 240
+VELOCITY_UPDATE_LIMIT = 1.0e-4
 POTENTIAL_TOLERANCE = 1.0e-8
 
 FLUID_CONDUCTIVITY = 1.0
@@ -124,6 +124,7 @@ def run_straight_duct_validation_ladder(
         "shercliff": _serialize(shercliff_records),
         "hunt": _serialize(hunt_records),
         "outputs": [path.name for path in outputs],
+        "comparison_method": "normalized analytical comparison with no-slip wall reconstruction at the duct boundaries",
     }
     (out_dir / "straight_duct_validation_ladder_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

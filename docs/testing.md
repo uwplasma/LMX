@@ -258,6 +258,8 @@ The first explicit examples following this pattern are:
 - `examples/interface_conductivity_verification_demo.py` for aligned
   coefficient-jump verification
 - `examples/straight_duct_profile_comparison.py` for the Hartmann /
-  Shercliff / Hunt literature-facing straight-duct panel
+  Shercliff / Hunt literature-facing straight-duct panel, including no-slip
+  wall reconstruction when comparing cell-centered profiles against the
+  analytical wall-to-wall curves
 - `examples/straight_duct_validation_ladder.py` for the bounded Shercliff /
   Hunt multi-Ha literature ladder

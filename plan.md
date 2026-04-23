@@ -38,6 +38,9 @@ Ship a research-grade `1.0` inductionless MHD code with:
 3. Harden and extend the first true `extruded_inductionless` solver slice into
    a broader production 3D family.
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
+5. Replace the current branch-sensitive straight-duct manuscript lane with a
+   more faithful validation path if the remaining Shercliff/Hunt error plateau
+   stays in the `O(1e-2)` range.
 
 ## Finish-line gates
 
@@ -191,6 +194,10 @@ Required additions:
 - parameterized Hunt validation ladder
 - explicit integral/trend checks, not only local profile overlays
 - stronger benchmark-observable regression checks for Benchmark B/C/D figures
+- if the present fully-developed pseudo-steady path remains branch-sensitive,
+  add a dedicated straight-duct validation path for the paper figures:
+  either a direct coupled fully-developed solve or a long-duct extruded solve
+  sampled far downstream
 
 Implementation targets:
 

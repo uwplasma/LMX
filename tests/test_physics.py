@@ -12,6 +12,7 @@ from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.physics import _boundary_sides, build_material_fields, magnetic_field_components
 from lmx.reference_data import default_closed_channel_reference_root
 from lmx.specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, RegionSpec, TimeStepperConfig
+from lmx.showcase import solve_closed_channel_benchmark
 from lmx.solvers import _build_mesh, solve_steady, solve_transient
 import lmx.solvers as solvers
 from lmx.validation import (
@@ -233,24 +234,31 @@ def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
 
 @pytest.mark.validation
 def test_small_hunt_solution_matches_bundled_reference_profiles():
-    case = make_hunt_case(ha=20.0, ny=12, nz=12, wall_cells=2)
-    case = replace(
-        case,
-        time_stepper=replace(case.time_stepper, max_steps=20, potential_iterations=56),
-        solver=replace(case.solver, coupling_iterations=9),
-    )
-
-    solution = solve_steady(case)
-    comparison = closed_channel_validation(
-        solution,
+    _, solution, comparison = solve_closed_channel_benchmark(
         "hunt",
-        20,
-        reference_root=default_closed_channel_reference_root(),
+        ha=20.0,
+        width=0.2,
+        height=0.2,
+        ny=17,
+        nz=17,
+        wall_cells=4,
+        wall_thickness=0.02,
+        fluid_conductivity=1.0,
+        conducting_wall_conductivity=0.25,
+        insulating_wall_conductivity=1.0e-12,
+        density=1.0,
+        viscosity=1.0,
+        coupling_iterations=10,
+        potential_iterations=80,
+        max_steps=60,
+        velocity_update_limit=5.0e-4,
+        current_reconstruction="face_averaged",
+        potential_tolerance=1.0e-8,
     )
-
-    assert comparison.y_profile.l2_error < 0.07
-    assert comparison.z_profile.l2_error < 0.1
-    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.09
+    assert solution.diagnostics.potential_residual_history.size > 0
+    assert comparison.y_profile.l2_error < 0.04
+    assert comparison.z_profile.l2_error < 0.02
+    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.03
 
 
 @pytest.mark.unit

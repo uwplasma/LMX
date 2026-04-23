@@ -371,11 +371,40 @@ def _sorted_profile(coordinate: jnp.ndarray, values: jnp.ndarray) -> tuple[jnp.n
     return coordinate[order], values[order]
 
 
+def _extend_profile_with_boundary_values(
+    coordinate: jnp.ndarray,
+    values: jnp.ndarray,
+    *,
+    lower_coordinate: float = -1.0,
+    upper_coordinate: float = 1.0,
+    lower_value: float = 0.0,
+    upper_value: float = 0.0,
+    tolerance: float = 1.0e-12,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    coordinate = jnp.asarray(coordinate, dtype=float)
+    values = jnp.asarray(values, dtype=float)
+    lower_present = coordinate.size > 0 and abs(float(coordinate[0]) - lower_coordinate) <= tolerance
+    upper_present = coordinate.size > 0 and abs(float(coordinate[-1]) - upper_coordinate) <= tolerance
+    if lower_present:
+        values = values.at[0].set(lower_value)
+    else:
+        coordinate = jnp.concatenate([jnp.asarray([lower_coordinate], dtype=coordinate.dtype), coordinate])
+        values = jnp.concatenate([jnp.asarray([lower_value], dtype=values.dtype), values])
+    if upper_present:
+        values = values.at[-1].set(upper_value)
+    else:
+        coordinate = jnp.concatenate([coordinate, jnp.asarray([upper_coordinate], dtype=coordinate.dtype)])
+        values = jnp.concatenate([values, jnp.asarray([upper_value], dtype=values.dtype)])
+    return coordinate, values
+
+
 def compare_normalized_profiles(
     simulated_coordinate: jnp.ndarray,
     simulated: jnp.ndarray,
     reference_coordinate: jnp.ndarray,
     reference: jnp.ndarray,
+    *,
+    simulated_boundary_values: tuple[float, float] | None = None,
 ) -> AnalyticComparison:
     sim_scale_coord = _normalization_scale(simulated_coordinate, infer_boundary_extent=True)
     ref_scale_coord = _normalization_scale(reference_coordinate, infer_boundary_extent=False)
@@ -388,6 +417,16 @@ def compare_normalized_profiles(
     normalized_simulated = simulated / sim_scale
     normalized_reference = reference / ref_scale
     sim_coord, normalized_simulated = _sorted_profile(sim_coord, normalized_simulated)
+    if simulated_boundary_values is not None:
+        normalized_simulated = jnp.asarray(normalized_simulated, dtype=float)
+        lower_value, upper_value = simulated_boundary_values
+        normalized_simulated = normalized_simulated.astype(float)
+        sim_coord, normalized_simulated = _extend_profile_with_boundary_values(
+            sim_coord,
+            normalized_simulated,
+            lower_value=lower_value / float(sim_scale),
+            upper_value=upper_value / float(sim_scale),
+        )
     ref_coord, normalized_reference = _sorted_profile(ref_coord, normalized_reference)
     interpolated_simulated = jnp.interp(ref_coord, sim_coord, normalized_simulated)
     return compare_profile_to_reference(ref_coord, interpolated_simulated, normalized_reference)
@@ -571,12 +610,14 @@ def closed_channel_validation(
         y_profile["u"],
         reference.coordinate,
         reference.midplane_y,
+        simulated_boundary_values=(0.0, 0.0),
     )
     z_comparison = compare_normalized_profiles(
         z_profile["z"],
         z_profile["u"],
         reference.coordinate,
         reference.midplane_z,
+        simulated_boundary_values=(0.0, 0.0),
     )
     return ClosedChannelValidation(
         case_kind=case_kind,

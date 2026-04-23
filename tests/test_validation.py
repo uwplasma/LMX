@@ -199,10 +199,11 @@ def test_compare_normalized_profiles_handles_cell_centered_simulation_against_wa
         simulated,
         reference_coordinate,
         reference,
+        simulated_boundary_values=(0.0, 0.0),
     )
 
-    assert comparison.l2_error < 0.02
-    assert comparison.linf_error < 0.05
+    assert comparison.l2_error < 5.0e-3
+    assert comparison.linf_error < 1.5e-2
 
 
 def test_compare_normalized_profiles_handles_unsorted_and_zero_scaled_inputs():
@@ -221,6 +222,24 @@ def test_compare_normalized_profiles_handles_unsorted_and_zero_scaled_inputs():
     assert jnp.all(jnp.diff(comparison.coordinate) >= 0.0)
     assert comparison.l2_error == pytest.approx(0.0)
     assert comparison.linf_error == pytest.approx(0.0)
+
+
+def test_compare_normalized_profiles_extends_wall_values_without_duplicate_boundary_points():
+    simulated_coordinate = jnp.asarray([-1.0, -0.5, 0.5, 1.0])
+    simulated = jnp.asarray([0.2, 0.75, 0.75, 0.2])
+    reference_coordinate = jnp.linspace(-1.0, 1.0, 9)
+    reference = 1.0 - reference_coordinate**2
+
+    comparison = compare_normalized_profiles(
+        simulated_coordinate,
+        simulated,
+        reference_coordinate,
+        reference,
+        simulated_boundary_values=(0.0, 0.0),
+    )
+
+    assert comparison.simulated[0] == pytest.approx(0.0)
+    assert comparison.simulated[-1] == pytest.approx(0.0)
 
 
 def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles():
