@@ -262,5 +262,8 @@ The first explicit examples following this pattern are:
   wall reconstruction when comparing cell-centered profiles against the
   analytical wall-to-wall curves; the current release target is
   `L2 <= 1.2e-2` on the retained Shercliff/Hunt cuts
+- `examples/hartmann_validation_ladder.py` for the bounded Hartmann multi-`Ha`
+  literature ladder, with the same stable summary-JSON pattern used by the
+  manuscript-facing straight-duct figures
 - `examples/straight_duct_validation_ladder.py` for the bounded Shercliff /
   Hunt multi-Ha literature ladder

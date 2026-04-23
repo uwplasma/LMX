@@ -329,6 +329,11 @@ same normalized `y` and `z` cuts and keeps the reference filenames in the
 summary JSON so the later paper figures remain traceable to the bundled
 analytical datasets.
 
+`examples/hartmann_validation_ladder.py` now does the same for the Hartmann
+centerline, including a wall-layer zoom and a checked summary JSON, so the
+straight-duct manuscript lane is no longer relying on a single Hartmann panel
+embedded only inside the broader comparison figure.
+
 ![LMX straight-duct validation ladder](docs/_static/generated/closed_channel_validation_ladder.png)
 
 ### 2D and 3D startup movies

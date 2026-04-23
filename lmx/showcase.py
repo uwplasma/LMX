@@ -780,6 +780,140 @@ def write_closed_channel_validation_ladder_figure(
     return [png_path, pdf_path]
 
 
+def write_hartmann_validation_ladder_figure(
+    out_dir: str | Path,
+    *,
+    hartmann_records: list[dict[str, object]],
+) -> list[Path]:
+    _set_showcase_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig = plt.figure(figsize=(12.0, 8.4))
+    _add_slide_title(fig, "LMX benchmarking: Hartmann validation ladder")
+    grid = fig.add_gridspec(2, 2, left=0.08, right=0.97, bottom=0.10, top=0.88, wspace=0.24, hspace=0.30)
+    ax_profile = fig.add_subplot(grid[0, 0])
+    ax_zoom = fig.add_subplot(grid[0, 1])
+    ax_error = fig.add_subplot(grid[1, 0])
+    ax_summary = fig.add_subplot(grid[1, 1])
+
+    ha_values = [int(record["ha"]) for record in hartmann_records]
+    palette = plt.cm.viridis(np.linspace(0.15, 0.85, max(len(hartmann_records), 2)))
+
+    full_handles: list[Line2D] = []
+    for idx, record in enumerate(hartmann_records):
+        comparison = record["comparison"]
+        color = palette[min(idx, len(palette) - 1)]
+        coordinate = np.asarray(comparison.coordinate, dtype=float)
+        reference = np.asarray(comparison.reference, dtype=float)
+        simulated = np.asarray(comparison.simulated, dtype=float)
+        positive_mask = coordinate >= 0.0
+        ha = int(record["ha"])
+
+        ax_profile.plot(coordinate, reference, color=color, linestyle="--", linewidth=1.8)
+        ax_profile.plot(
+            coordinate,
+            simulated,
+            color=color,
+            marker="o",
+            markersize=2.8,
+            markerfacecolor="white",
+            linewidth=1.2,
+        )
+        ax_zoom.plot(coordinate[positive_mask], reference[positive_mask], color=color, linestyle="--", linewidth=1.8)
+        ax_zoom.plot(
+            coordinate[positive_mask],
+            simulated[positive_mask],
+            color=color,
+            marker="o",
+            markersize=2.6,
+            markerfacecolor="white",
+            linewidth=1.1,
+        )
+        full_handles.extend(
+            [
+                Line2D([0], [0], color=color, linestyle="--", linewidth=1.8, label=f"Analytical, Ha={ha}"),
+                Line2D(
+                    [0],
+                    [0],
+                    color=color,
+                    marker="o",
+                    markersize=4.0,
+                    markerfacecolor="white",
+                    linewidth=1.0,
+                    label=f"LMX, Ha={ha}",
+                ),
+            ]
+        )
+
+    ax_profile.set_title("Hartmann centerline")
+    ax_profile.set_xlabel("Normalized wall-normal coordinate")
+    ax_profile.set_ylabel("u / max(u)")
+    ax_profile.set_xlim(-1.02, 1.02)
+    ax_profile.set_ylim(-0.02, 1.05)
+    ax_profile.grid(True, alpha=0.25)
+    ax_profile.legend(handles=full_handles, loc="lower right", frameon=True, ncol=2)
+
+    ax_zoom.set_title("Hartmann wall-layer zoom")
+    ax_zoom.set_xlabel("Normalized wall-normal coordinate")
+    ax_zoom.set_ylabel("u / max(u)")
+    ax_zoom.set_xlim(0.72, 1.02)
+    ax_zoom.set_ylim(-0.02, 0.42)
+    ax_zoom.grid(True, alpha=0.25)
+
+    l2_errors = [float(record["comparison"].l2_error) for record in hartmann_records]
+    linf_errors = [float(record["comparison"].linf_error) for record in hartmann_records]
+    ax_error.plot(ha_values, l2_errors, color="#1d4ed8", marker="o", linewidth=1.8, label="L2 error")
+    ax_error.plot(ha_values, linf_errors, color="#b91c1c", marker="s", linewidth=1.8, label="L∞ error")
+    ax_error.axhline(1.2e-2, color="#0f766e", linestyle="--", linewidth=1.5, label="Release L2 target")
+    ax_error.set_title("Validation error by Hartmann number")
+    ax_error.set_xlabel("Hartmann number")
+    ax_error.set_ylabel("Normalized profile error")
+    ax_error.set_yscale("log")
+    ax_error.grid(True, alpha=0.25)
+    ax_error.legend(loc="best", frameon=True)
+
+    summary_lines = [
+        "Validation summary",
+        "",
+        "Literature anchor",
+        "• Classical Hartmann analytical profile",
+        "",
+        "Current bounded errors",
+    ]
+    for record in hartmann_records:
+        comparison = record["comparison"]
+        summary_lines.append(
+            f"• Ha={int(record['ha'])}: L2={comparison.l2_error:.2e}, L∞={comparison.linf_error:.2e}"
+        )
+    summary_lines.extend(
+        [
+            "",
+            "Acceptance",
+            "• Release target: L2 <= 1.2e-2",
+            "• Hartmann remains an explicit open quality lane",
+            "  if any retained cut stays above that threshold",
+        ]
+    )
+    ax_summary.axis("off")
+    ax_summary.text(
+        0.02,
+        0.98,
+        "\n".join(summary_lines),
+        va="top",
+        ha="left",
+        fontsize=12,
+        bbox={"facecolor": "#f8fafc", "edgecolor": "#cbd5e1", "alpha": 0.98, "boxstyle": "round,pad=0.45"},
+    )
+
+    png_path = out_dir / "hartmann_validation_ladder.png"
+    pdf_path = out_dir / "hartmann_validation_ladder.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
 def write_closed_channel_startup_movies(
     case_kind: str,
     out_dir: str | Path,

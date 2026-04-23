@@ -73,6 +73,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_annotated_layer_figure)
     assert callable(lmx.write_velocity_profile_volume_figure)
     assert callable(lmx.write_closed_channel_profile_comparison_figure)
+    assert callable(lmx.write_hartmann_validation_ladder_figure)
     assert callable(lmx.write_closed_channel_startup_movies)
     assert callable(lmx.make_divergence_free_cross_section_field)
     assert callable(lmx.make_localized_divergence_free_obstacle_field)

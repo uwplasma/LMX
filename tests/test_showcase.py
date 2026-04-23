@@ -123,6 +123,26 @@ def test_showcase_validation_ladder_writer_emits_outputs(tmp_path: Path):
     assert (tmp_path / "closed_channel_validation_ladder.pdf").exists()
 
 
+def test_showcase_hartmann_validation_ladder_writer_emits_outputs(tmp_path: Path):
+    comparison = SimpleNamespace(
+        coordinate=np.linspace(-1.0, 1.0, 7),
+        simulated=np.linspace(0.0, 1.0, 7),
+        reference=np.linspace(0.0, 1.0, 7),
+        l2_error=8.0e-3,
+        linf_error=1.4e-2,
+    )
+    records = [{"ha": 20.0, "comparison": comparison}, {"ha": 100.0, "comparison": comparison}]
+
+    outputs = showcase.write_hartmann_validation_ladder_figure(
+        tmp_path,
+        hartmann_records=records,
+    )
+
+    assert (tmp_path / "hartmann_validation_ladder.png") in outputs
+    assert (tmp_path / "hartmann_validation_ladder.png").exists()
+    assert (tmp_path / "hartmann_validation_ladder.pdf").exists()
+
+
 def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     captured = {}
 

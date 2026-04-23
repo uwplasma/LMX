@@ -527,6 +527,29 @@ def test_straight_duct_validation_ladder_writes_summary(tmp_path: Path, monkeypa
     assert (tmp_path / "straight_duct_validation_ladder_summary.json").exists()
 
 
+def test_hartmann_validation_ladder_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("hartmann_validation_ladder.py")
+
+    monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace())
+    monkeypatch.setattr(
+        module,
+        "hartmann_validation",
+        lambda solution, ha: SimpleNamespace(l2_error=ha * 1.0e-4, linf_error=ha * 2.0e-4, coordinate=np.linspace(-1.0, 1.0, 5), simulated=np.linspace(0.0, 1.0, 5), reference=np.linspace(0.0, 1.0, 5)),
+    )
+    monkeypatch.setattr(module, "write_hartmann_validation_ladder_figure", lambda *args, **kwargs: [tmp_path / "hartmann_validation_ladder.png"])
+
+    (tmp_path / "hartmann_validation_ladder.png").write_bytes(b"img")
+    summary = module.run_hartmann_validation_ladder(out_dir=tmp_path)
+
+    assert summary["case"] == "hartmann_validation_ladder"
+    assert summary["ha_values"] == [20.0, 100.0]
+    assert summary["release_l2_target"] == pytest.approx(1.2e-2)
+    assert summary["hartmann"][0]["l2_error"] == pytest.approx(2.0e-3)
+    assert summary["hartmann"][1]["passes_release_target"] is True
+    assert "hartmann_validation_ladder.png" in summary["outputs"]
+    assert (tmp_path / "hartmann_validation_ladder_summary.json").exists()
+
+
 def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("plotting_api_demo.py")
 

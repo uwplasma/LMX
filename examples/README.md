@@ -405,6 +405,10 @@ publication-ready profile overlays, explicit no-slip wall reconstruction in
 the analytical comparison, a release target of `L2 <= 1.2e-2` on the retained
 Shercliff/Hunt cuts, and a checked summary JSON.
 
+`hartmann_validation_ladder.py` writes the bounded Hartmann multi-`Ha`
+validation ladder with a publication-ready centerline / wall-layer panel and a
+checked summary JSON for docs and later paper use.
+
 `straight_duct_validation_ladder.py` writes the bounded straight-duct
 literature ladder used for the numerics/validation docs, comparing Shercliff
 and Hunt `y` and `z` cuts across multiple Hartmann numbers on the same
