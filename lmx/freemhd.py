@@ -81,7 +81,7 @@ def _extract_inlet_block(text: str) -> str | None:
 
 
 def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
-    pattern = re.compile(r"volumetricFlowRate\s+(\S+)\s*;")
+    pattern = re.compile(r"volumetricFlowRate\s+(?:constant\s+)?([0-9eE+.\-]+)\s*;")
     for path in candidate_u_paths(case_dir):
         if not path.exists():
             continue
@@ -92,6 +92,96 @@ def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
         if match is not None:
             return float(match.group(1))
     return None
+
+
+def summarize_observable_offenders(
+    records: list[dict[str, object]],
+    *,
+    l2_target: float = 1.0e-2,
+    top_n: int | None = None,
+) -> list[dict[str, object]]:
+    offenders: list[dict[str, object]] = []
+    for record in records:
+        observables = record.get("observables", {})
+        if not isinstance(observables, dict):
+            continue
+        for observable_name, observable_payload in observables.items():
+            if not isinstance(observable_payload, dict):
+                continue
+            for axis in ("y", "z"):
+                cut = observable_payload.get(axis)
+                if not isinstance(cut, dict):
+                    continue
+                l2_error = float(cut.get("l2_error", 0.0))
+                linf_error = float(cut.get("linf_error", 0.0))
+                peak_ratio = float(cut.get("peak_ratio", observable_payload.get("peak_ratio", 1.0)))
+                offenders.append(
+                    {
+                        "case_kind": str(record.get("case_kind", "")),
+                        "drive_mode": str(record.get("drive_mode", "")),
+                        "observable": str(observable_name),
+                        "axis": axis,
+                        "l2_error": l2_error,
+                        "linf_error": linf_error,
+                        "peak_ratio": peak_ratio,
+                        "l2_target": float(l2_target),
+                        "target_ratio": l2_error / max(float(l2_target), 1.0e-20),
+                        "status": "pass" if l2_error <= l2_target else "offender",
+                    }
+                )
+    offenders.sort(key=lambda item: (float(item["target_ratio"]), float(item["linf_error"])), reverse=True)
+    if top_n is not None:
+        return offenders[: max(0, int(top_n))]
+    return offenders
+
+
+def summarize_profile_error_offenders(
+    records: list[dict[str, object]],
+    *,
+    l2_target: float = 1.0e-2,
+    top_n: int | None = None,
+) -> list[dict[str, object]]:
+    offenders: list[dict[str, object]] = []
+    for record in records:
+        for axis in ("y", "z"):
+            key = f"{axis}_l2_error"
+            if key not in record:
+                continue
+            l2_error = float(record[key])
+            offenders.append(
+                {
+                    "case_kind": str(record.get("case_kind", "")),
+                    "axis": axis,
+                    "l2_error": l2_error,
+                    "l2_target": float(l2_target),
+                    "target_ratio": l2_error / max(float(l2_target), 1.0e-20),
+                    "status": "pass" if l2_error <= l2_target else "offender",
+                }
+            )
+    offenders.sort(key=lambda item: float(item["target_ratio"]), reverse=True)
+    if top_n is not None:
+        return offenders[: max(0, int(top_n))]
+    return offenders
+
+
+def summarize_runtime_offenders(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    offenders: list[dict[str, object]] = []
+    for record in records:
+        freemhd_seconds = float(record.get("freemhd_execution_seconds", 0.0) or 0.0)
+        lmx_seconds = float(record.get("lmx_execution_seconds", 0.0) or 0.0)
+        if freemhd_seconds <= 0.0 or lmx_seconds <= 0.0:
+            continue
+        offenders.append(
+            {
+                "case_kind": str(record.get("case_kind", "")),
+                "freemhd_execution_seconds": freemhd_seconds,
+                "lmx_execution_seconds": lmx_seconds,
+                "lmx_to_freemhd_runtime_ratio": lmx_seconds / freemhd_seconds,
+                "status": "pass" if lmx_seconds <= freemhd_seconds else "offender",
+            }
+        )
+    offenders.sort(key=lambda item: float(item["lmx_to_freemhd_runtime_ratio"]), reverse=True)
+    return offenders
 
 
 def infer_reduced_inlet_flow_rate(

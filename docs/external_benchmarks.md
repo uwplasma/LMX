@@ -51,19 +51,21 @@ and writes a parity panel plus checked summary JSON. The panel now includes:
 - transient `u_max(t)` histories from FreeMHD `fieldMinMax.dat` and LMX
   diagnostics
 - same-host runtime comparison
+- ranked profile-error and runtime offender tables in the summary JSON, so
+  reviewer-facing parity gaps are explicit rather than inferred from the plot
 
 Current bounded result from the fresh reruns on this host:
 
 - Shercliff:
   - FreeMHD wall time: `35.32 s`
-  - LMX wall time: `21.75 s`
-  - `u_max` mismatch: `≈ 4.51e-2`
-  - profile errors: `L2(y) ≈ 6.70e-2`, `L2(z) ≈ 1.04e-1`
+  - LMX wall time: `22.78 s`
+  - `u_max` mismatch: `≈ 3.04e-2`
+  - profile errors: `L2(y) ≈ 6.68e-2`, `L2(z) ≈ 1.04e-1`
 - Hunt:
   - FreeMHD wall time: `35.28 s`
-  - LMX wall time: `40.08 s`
-  - `u_max` mismatch: `≈ 5.08e-2`
-  - profile errors: `L2(y) ≈ 7.21e-2`, `L2(z) ≈ 8.14e-2`
+  - LMX wall time: `23.81 s`
+  - `u_max` mismatch: `≈ 6.49e-2`
+  - profile errors: `L2(y) ≈ 7.32e-2`, `L2(z) ≈ 7.88e-2`
 
 This is useful as an implementation cross-check and host-runtime comparison,
 but it is not currently the manuscript acceptance gate for the straight-duct
@@ -102,15 +104,15 @@ It now runs on case-specific settings rather than a single showcase default:
 Current retained result on that richer parity lane:
 
 - Shercliff:
-  - velocity: `L2(y) ≈ 4.75e-2`, `L2(z) ≈ 4.90e-3`
-  - potential: `L2(y) ≈ 7.50e-1`, `L2(z) ≈ 3.87e-3`
-  - current: `L2(y) ≈ 9.45e-1`, `L2(z) ≈ 4.06e-2`
-  - Lorentz: `L2(y) ≈ 4.20e-2`, `L2(z) ≈ 4.06e-2`
+  - velocity: `L2(y) ≈ 6.30e-2`, `L2(z) ≈ 1.01e-1`
+  - potential: `L2(y) ≈ 3.54e-1`, `L2(z) ≈ 2.31e-2`
+  - current: `L2(y) ≈ 6.46e-1`, `L2(z) ≈ 4.12e-2`
+  - Lorentz: `L2(y) ≈ 7.86e-2`, `L2(z) ≈ 4.12e-2`
 - Hunt:
-  - velocity: `L2(y) ≈ 9.28e-2`, `L2(z) ≈ 6.24e-2`
-  - potential: `L2(y) ≈ 1.12e0`, `L2(z) ≈ 3.27e-2`
-  - current: `L2(y) ≈ 1.02e0`, `L2(z) ≈ 5.92e-1`
-  - Lorentz: `L2(y) ≈ 1.18e-1`, `L2(z) ≈ 5.92e-1`
+  - velocity: `L2(y) ≈ 2.39e-1`, `L2(z) ≈ 3.73e-2`
+  - potential: `L2(y) ≈ 1.10e0`, `L2(z) ≈ 3.49e-2`
+  - current: `L2(y) ≈ 1.02e0`, `L2(z) ≈ 5.52e-1`
+  - Lorentz: `L2(y) ≈ 2.71e-1`, `L2(z) ≈ 5.52e-1`
 
 This is now a useful manuscript-grade external comparison figure because it
 shows much more than one velocity cut, but it also makes the remaining parity
@@ -139,6 +141,11 @@ wall interpolation and limiter application for `inlet_flow_rate` runs. A fresh
 close observable parity by itself: the remaining gap is in the coupled
 pressure-gradient/current reconstruction and field-level matching, not only in
 mass-flow normalization.
+
+The observable-parity summary JSON now also ranks offenders across velocity,
+gauge-shifted potential, current, and Lorentz-force cuts. That ranking is the
+triage surface for the next solver work: fix the largest `potE`, `J`, and
+`J×B` offenders before adding more FreeMHD comparison figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the

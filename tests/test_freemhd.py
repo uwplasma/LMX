@@ -16,6 +16,9 @@ from lmx.freemhd import (
     infer_uniform_b0,
     parse_freemhd_execution_seconds,
     run_freemhd_demo,
+    summarize_observable_offenders,
+    summarize_profile_error_offenders,
+    summarize_runtime_offenders,
 )
 
 
@@ -319,6 +322,69 @@ boundaryField
 """
     )
     assert infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0, initial_velocity=0.2) is None
+
+    (u_dir / "U").write_text(
+        """internalField uniform ( 0.2 0 0 );
+boundaryField
+{
+    inlet
+    {
+        type flowRateInletVelocity;
+        volumetricFlowRate constant 0.125;
+    }
+}
+"""
+    )
+    assert infer_inlet_flow_rate(tmp_path) == pytest.approx(0.125)
+
+
+def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
+    observable_records = [
+        {
+            "case_kind": "shercliff",
+            "drive_mode": "forcing",
+            "observables": {
+                "velocity": {
+                    "y": {"l2_error": 2.0e-2, "linf_error": 5.0e-2},
+                    "z": {"l2_error": 4.0e-3, "linf_error": 1.0e-2},
+                    "peak_ratio": 0.95,
+                },
+                "current": {
+                    "y": {"l2_error": 8.0e-2, "linf_error": 2.0e-1, "peak_ratio": 1.4},
+                    "z": {"l2_error": 1.0e-2, "linf_error": 2.0e-2},
+                    "peak_ratio": 1.1,
+                },
+            },
+        }
+    ]
+    observable_offenders = summarize_observable_offenders(observable_records, l2_target=1.0e-2)
+    assert observable_offenders[0]["observable"] == "current"
+    assert observable_offenders[0]["axis"] == "y"
+    assert observable_offenders[0]["status"] == "offender"
+    assert observable_offenders[-1]["status"] == "pass"
+
+    profile_records = [
+        {
+            "case_kind": "shercliff",
+            "freemhd_execution_seconds": 10.0,
+            "lmx_execution_seconds": 8.0,
+            "y_l2_error": 2.0e-2,
+            "z_l2_error": 5.0e-3,
+        },
+        {
+            "case_kind": "hunt",
+            "freemhd_execution_seconds": 10.0,
+            "lmx_execution_seconds": 14.0,
+            "y_l2_error": 1.0e-1,
+            "z_l2_error": 7.0e-2,
+        },
+    ]
+    profile_offenders = summarize_profile_error_offenders(profile_records, l2_target=1.0e-2, top_n=2)
+    assert [item["case_kind"] for item in profile_offenders] == ["hunt", "hunt"]
+    runtime_offenders = summarize_runtime_offenders(profile_records)
+    assert runtime_offenders[0]["case_kind"] == "hunt"
+    assert runtime_offenders[0]["status"] == "offender"
+    assert runtime_offenders[1]["status"] == "pass"
 
 
 def test_build_case_from_freemhd_reference_covers_hartmann_velocity_mode_and_errors(tmp_path: Path):

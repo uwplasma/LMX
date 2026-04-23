@@ -9,6 +9,8 @@ from lmx.freemhd import (
     build_case_from_freemhd_reference,
     parse_freemhd_execution_seconds,
     run_freemhd_demo,
+    summarize_profile_error_offenders,
+    summarize_runtime_offenders,
 )
 from lmx.solvers import solve_transient
 from lmx.validation import latest_field_minmax_record, reference_profile_validation
@@ -96,6 +98,8 @@ def run_freemhd_closed_channel_parity() -> dict[str, object]:
     summary = {
         "case": "freemhd_closed_channel_parity",
         "records": records,
+        "top_profile_offenders": summarize_profile_error_offenders(records, l2_target=1.0e-2, top_n=4),
+        "runtime_offenders": summarize_runtime_offenders(records),
         "plots": [path.name for path in plots],
         "reran_freemhd": RERUN_FREEMHD,
         "nproc": NPROC,

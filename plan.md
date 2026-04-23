@@ -1483,8 +1483,8 @@ That retained gate now passes for all three retained fringing geometries.
     case-specific validated settings
   - retained current best velocity-cut observable parity on that paper-slice
     lane is:
-    - Shercliff: `L2(y) ≈ 4.75e-2`, `L2(z) ≈ 4.90e-3`
-    - Hunt: `L2(y) ≈ 9.28e-2`, `L2(z) ≈ 6.24e-2`
+    - Shercliff: `L2(y) ≈ 6.30e-2`, `L2(z) ≈ 1.01e-1`
+    - Hunt: `L2(y) ≈ 2.39e-1`, `L2(z) ≈ 3.73e-2`
   - retained current best field-level parity on that lane is still mixed:
     - some `z`-cut potential/current/Lorentz comparisons are already at
       `O(1e-2)` to `O(1e-3)`
@@ -1502,6 +1502,11 @@ That retained gate now passes for all three retained fringing geometries.
     cut, and Hunt remains outside the target error band; the next fix must
     target the coupled pressure-gradient/current reconstruction, not only mass
     normalization
+  - the FreeMHD parity examples now write ranked offender tables into their
+    summary JSON files; the largest current paper-slice offenders are Hunt
+    `potE(y)`, Hunt `J_y`, Shercliff `J_y`, and Hunt `J_z` / `J×B_z`, so the
+    next solver patch should target current/potential reconstruction before
+    adding new comparison plots
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed
