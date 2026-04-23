@@ -1482,6 +1482,15 @@ That retained gate now passes for all three retained fringing geometries.
     faithful and reviewer-proof fully developed constant-`Q` solve path, since
     the current LMX steady solver matches the FreeMHD paper slices better under
     `forcing` than under the physically matched `flow_rate` path
+  - the first constant-`Q` hardening step is now in place: the fully developed
+    solver projects `inlet_flow_rate` runs back to the requested area-weighted
+    mean velocity after wall interpolation and limiter application
+  - a fresh `flow_rate` paper-slice probe confirms that this closes the
+    volumetric-flow drift but does not close field-level parity by itself:
+    Shercliff improves on the `y` velocity cut but worsens on the `z` velocity
+    cut, and Hunt remains outside the target error band; the next fix must
+    target the coupled pressure-gradient/current reconstruction, not only mass
+    normalization
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

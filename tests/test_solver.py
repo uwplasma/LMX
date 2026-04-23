@@ -1132,15 +1132,18 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
 
     active_mask = solvers._active_velocity_mask(materials.fluid_mask)
     assert velocity_calls["count"] == 2
-    assert jnp.allclose(u_next[active_mask], 0.7)
-    assert jnp.isfinite(u_next[~active_mask]).all()
-    assert float(jnp.max(jnp.abs(u_next[~active_mask]))) <= 0.7
-    assert float(velocity_residual) == pytest.approx(0.7)
-    assert float(linear_residual) == pytest.approx(3.0e-7)
-    assert int(linear_iterations) == 4
     fluid_weight = jnp.where(materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0)
     expected_mean_velocity = float(jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight))
-    assert float(mean_velocity) == pytest.approx(expected_mean_velocity)
+    assert float(mean_velocity) == pytest.approx(0.7)
+    assert expected_mean_velocity == pytest.approx(0.7)
+    assert float(jnp.max(u_next[active_mask])) > 0.7
+    west_ratio = float((mesh.y_centers[0] - mesh.y_faces[0]) / (mesh.y_centers[1] - mesh.y_faces[0]))
+    assert float(u_next[0, 1] / u_next[1, 1]) == pytest.approx(west_ratio)
+    assert jnp.isfinite(u_next[~active_mask]).all()
+    assert float(jnp.max(jnp.abs(u_next[~active_mask]))) <= float(jnp.max(u_next[active_mask]))
+    assert float(velocity_residual) == pytest.approx(float(jnp.max(u_next)))
+    assert float(linear_residual) == pytest.approx(3.0e-7)
+    assert int(linear_iterations) == 4
     assert float(applied_forcing) == pytest.approx(1.0)
     assert float(linear_initial_residual) == pytest.approx(9.0e-6)
 
@@ -1459,6 +1462,24 @@ def test_velocity_update_limiters_cover_local_clip_and_validation_errors():
         solvers._velocity_update_statistics(current, trial, fluid_mask, max_delta=0.5, limiter="bad")
 
 
+def test_target_mean_velocity_projection_preserves_area_weighted_flow_rate():
+    mesh = generate_rect_duct_mesh(width=2.0, height=1.0, ny=2, nz=2)
+    fluid_mask = jnp.asarray([[True, True], [True, False]])
+    field = jnp.asarray([[0.2, 0.4], [0.6, 0.0]])
+
+    projected = solvers._enforce_target_mean_velocity(field, mesh, fluid_mask, 0.5)
+    fluid_weight = jnp.where(fluid_mask, solvers._cell_metric(mesh).astype(projected.dtype), 0.0)
+    mean = jnp.sum(fluid_weight * projected) / jnp.sum(fluid_weight)
+
+    assert float(mean) == pytest.approx(0.5)
+    assert float(projected[1, 1]) == pytest.approx(0.0)
+    assert jnp.allclose(solvers._enforce_target_mean_velocity(field, mesh, fluid_mask, 0.0), jnp.zeros_like(field))
+    assert jnp.allclose(
+        solvers._enforce_target_mean_velocity(field, mesh, fluid_mask, None),
+        jnp.where(fluid_mask, field, 0.0),
+    )
+
+
 def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
     current = jnp.zeros((2, 2))
     trial = jnp.asarray([[2.0, -2.0], [0.25, -0.25]])
@@ -1676,6 +1697,11 @@ def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
         coupling_tolerance=1e-6,
     )
     assert jnp.isfinite(flow_result[0]).all()
+    fluid_weight = jnp.where(flow_materials.fluid_mask, solvers._cell_metric(flow_mesh).astype(flow_result[0].dtype), 0.0)
+    target_mean = solvers._target_mean_velocity(flow_case)
+    projected_mean = float(jnp.sum(fluid_weight * flow_result[0]) / jnp.sum(fluid_weight))
+    assert projected_mean == pytest.approx(target_mean)
+    assert float(flow_result[13]) == pytest.approx(target_mean)
     assert float(flow_result[14]) == pytest.approx(float(flow_result[14]))
 
 

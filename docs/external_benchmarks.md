@@ -133,6 +133,13 @@ constant-flow-rate solve with:
 - explicit comparison of compile time, warm runtime, and memory-relevant grid
   sizes when the same host is used
 
+The current code now enforces the requested area-weighted mean velocity after
+wall interpolation and limiter application for `inlet_flow_rate` runs. A fresh
+`flow_rate` probe shows that this removes one numerical ambiguity but does not
+close observable parity by itself: the remaining gap is in the coupled
+pressure-gradient/current reconstruction and field-level matching, not only in
+mass-flow normalization.
+
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the
 current mapped-pipe LMX path is still a lower-Re inductionless slice. It should

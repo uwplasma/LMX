@@ -68,6 +68,14 @@ solver pipeline is:
 6. solve for $u$
 7. update diagnostics and convergence checks
 
+For `inlet_flow_rate` / constant-`Q` fully developed runs, the solver treats
+the requested mean velocity as a hard area-weighted constraint after the
+bounded velocity update and wall interpolation. This keeps direct-wall
+reconstruction intact while preventing the limiter from silently shifting the
+reported volumetric flow rate away from the requested value. The pressure /
+forcing proxy is still reported separately and remains part of the external
+parity hardening lane.
+
 The conservative face-conductance and face-EMF helpers are implemented in
 `lmx/solvers.py`:
 

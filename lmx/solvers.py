@@ -631,6 +631,25 @@ def _limited_velocity_update(
     return jnp.where(fluid_mask, current + scale * delta, 0.0)
 
 
+def _enforce_target_mean_velocity(
+    u: jnp.ndarray,
+    mesh: StructuredMesh,
+    fluid_mask: jnp.ndarray,
+    target_mean_velocity: float | None,
+) -> jnp.ndarray:
+    if target_mean_velocity is None:
+        return jnp.where(fluid_mask, u, 0.0)
+    cell_metric = _cell_metric(mesh).astype(u.dtype)
+    fluid_weight = jnp.where(fluid_mask, cell_metric, 0.0)
+    fluid_total_weight = jnp.maximum(jnp.sum(fluid_weight), 1e-20)
+    current_mean = jnp.sum(fluid_weight * u) / fluid_total_weight
+    target = jnp.asarray(target_mean_velocity, dtype=u.dtype)
+    zero_target = jnp.abs(target) <= 1e-20
+    safe_mean = jnp.where(jnp.abs(current_mean) > 1e-20, current_mean, 1.0)
+    scaled = jnp.where(zero_target, jnp.zeros_like(u), u * (target / safe_mean))
+    return jnp.where(fluid_mask, scaled, 0.0)
+
+
 def _velocity_update_statistics(
     current: jnp.ndarray,
     trial: jnp.ndarray,
@@ -1022,6 +1041,7 @@ def _fully_developed_case_step(
             fluid_mask,
             interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
         )
+        u_next = _enforce_target_mean_velocity(u_next, mesh, fluid_mask, target_mean_velocity)
         velocity_residual = jnp.max(jnp.abs(u_next - u_iter))
         u_iter = u_next
         if (
