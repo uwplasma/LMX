@@ -168,7 +168,7 @@ The latest local evidence pass on this workstation shows:
 
 - default push/PR lane, `python -m pytest -m "unit or validation" -q`:
   passes and remains inside the five-minute guard
-- broad coverage lane over `lmx/` and `scripts/`: passes at about `94.39%`
+- broad coverage lane over `lmx/` and `scripts/`: passes at about `95.4%`
   combined line/branch coverage
 
 The hard rule for routine validation is that these lanes must stay under five

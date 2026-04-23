@@ -1192,6 +1192,8 @@ def infer_sample_time_from_path(path: str | Path) -> float:
         try:
             return float(parent.name)
         except ValueError:
+            if parent.name == "postProcessing":
+                break
             continue
     raise ValueError(f"Unable to infer sample time from path {sample_path}")
 

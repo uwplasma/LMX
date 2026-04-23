@@ -200,6 +200,28 @@ def test_fluid_axis_profile_and_layer_metrics_cover_empty_and_invalid_paths():
         _fluid_axis_profile(mesh, "x")
 
 
+def test_layer_resolution_metrics_reject_unsupported_or_empty_fluid_meshes():
+    case = make_hartmann_case(ha=20.0, ny=4, nz=4)
+    x_field_case = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
+    assert duct_layer_resolution_metrics(x_field_case, _build_mesh(x_field_case)) == {}
+
+    empty_mesh = SimpleNamespace(
+        y_centers=jnp.asarray([-0.5, 0.5]),
+        z_centers=jnp.asarray([-0.5, 0.5]),
+        dy=jnp.asarray([1.0, 1.0]),
+        dz=jnp.asarray([1.0, 1.0]),
+        fluid_mask=jnp.zeros((2, 2), dtype=bool),
+    )
+    assert duct_layer_resolution_metrics(case, empty_mesh) == {}
+
+    assert validation._exact_coordinate_index(jnp.asarray([])) is None
+
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        validation._profile_axis_mask(SimpleNamespace(mesh=SimpleNamespace(fluid_mask=None), state=SimpleNamespace(u=jnp.zeros((2, 2)))), "x", 0)
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        validation._profile_axis_mask(SimpleNamespace(mesh=empty_mesh, state=SimpleNamespace(u=jnp.zeros((2, 2)))), "x", 0)
+
+
 def test_compare_normalized_profiles_handles_cell_centered_simulation_against_wall_sample():
     simulated_coordinate = jnp.linspace(-0.99, 0.99, 65)
     simulated = 1.0 - simulated_coordinate**2
@@ -241,6 +263,24 @@ def test_compare_normalized_profiles_extends_wall_values_without_duplicate_bound
     simulated = jnp.asarray([0.2, 0.75, 0.75, 0.2])
     reference_coordinate = jnp.linspace(-1.0, 1.0, 9)
     reference = 1.0 - reference_coordinate**2
+
+    comparison = compare_normalized_profiles(
+        simulated_coordinate,
+        simulated,
+        reference_coordinate,
+        reference,
+        simulated_boundary_values=(0.0, 0.0),
+    )
+
+    assert comparison.simulated[0] == pytest.approx(0.0)
+    assert comparison.simulated[-1] == pytest.approx(0.0)
+
+
+def test_compare_normalized_profiles_overwrites_existing_boundary_values():
+    simulated_coordinate = jnp.asarray([-1.0, 0.0, 1.0])
+    simulated = jnp.asarray([0.4, 1.0, 0.6])
+    reference_coordinate = jnp.asarray([-1.0, 0.0, 1.0])
+    reference = jnp.asarray([0.0, 1.0, 0.0])
 
     comparison = compare_normalized_profiles(
         simulated_coordinate,
@@ -327,6 +367,60 @@ def test_extract_centerline_and_midplane_profile_cover_singleton_and_invalid_axi
         extract_midplane_profile(solution, axis="bad")
 
 
+def test_midplane_extraction_covers_singleton_degenerate_and_scalar_paths():
+    singleton_y_solution = SimpleNamespace(
+        mesh=SimpleNamespace(y_centers=jnp.asarray([0.0]), z_centers=jnp.asarray([-0.5, 0.5]), fluid_mask=None),
+        state=SimpleNamespace(u=jnp.asarray([[1.0, 3.0]]), phi=jnp.asarray([[2.0, 6.0]]), jy=jnp.asarray([[4.0, 8.0]])),
+    )
+    z_profile = extract_midplane_profile(singleton_y_solution, axis="z", fluid_only=True)
+    z_scalar = extract_midplane_scalar_profile(singleton_y_solution, singleton_y_solution.state.jy, axis="z")
+    assert jnp.allclose(z_profile["u"], jnp.asarray([1.0, 3.0]))
+    assert jnp.allclose(z_scalar["value"], jnp.asarray([4.0, 8.0]))
+
+    singleton_z_solution = SimpleNamespace(
+        mesh=SimpleNamespace(y_centers=jnp.asarray([-0.5, 0.5]), z_centers=jnp.asarray([0.0]), fluid_mask=None),
+        state=SimpleNamespace(u=jnp.asarray([[1.0], [3.0]]), phi=jnp.asarray([[2.0], [6.0]]), jy=jnp.asarray([[5.0], [7.0]])),
+    )
+    y_profile = extract_midplane_profile(singleton_z_solution, axis="y", fluid_only=True)
+    y_scalar = extract_midplane_scalar_profile(singleton_z_solution, singleton_z_solution.state.jy, axis="y")
+    assert jnp.allclose(y_profile["u"], jnp.asarray([1.0, 3.0]))
+    assert jnp.allclose(y_scalar["value"], jnp.asarray([5.0, 7.0]))
+
+    exact_centers = jnp.asarray([-0.5, 0.0, 0.5])
+    exact_solution = SimpleNamespace(
+        mesh=SimpleNamespace(y_centers=exact_centers, z_centers=exact_centers, fluid_mask=None),
+        state=SimpleNamespace(
+            u=jnp.arange(9, dtype=float).reshape((3, 3)),
+            phi=jnp.zeros((3, 3)),
+            jy=jnp.arange(10, 19, dtype=float).reshape((3, 3)),
+        ),
+    )
+    assert jnp.allclose(extract_midplane_scalar_profile(exact_solution, exact_solution.state.jy, axis="y")["value"], exact_solution.state.jy[:, 1])
+    assert jnp.allclose(extract_midplane_scalar_profile(exact_solution, exact_solution.state.jy, axis="z")["value"], exact_solution.state.jy[1, :])
+
+    degenerate_centers = jnp.asarray([0.1, 0.1])
+    degenerate_solution = SimpleNamespace(
+        mesh=SimpleNamespace(y_centers=degenerate_centers, z_centers=degenerate_centers, fluid_mask=None),
+        state=SimpleNamespace(
+            u=jnp.asarray([[1.0, 5.0], [3.0, 7.0]]),
+            phi=jnp.asarray([[2.0, 10.0], [6.0, 14.0]]),
+            jy=jnp.asarray([[4.0, 8.0], [12.0, 16.0]]),
+        ),
+    )
+    centerline = validation.extract_centerline(degenerate_solution)
+    degenerate_z = extract_midplane_profile(degenerate_solution, axis="z")
+    degenerate_y_scalar = extract_midplane_scalar_profile(degenerate_solution, degenerate_solution.state.jy, axis="y")
+    degenerate_z_scalar = extract_midplane_scalar_profile(degenerate_solution, degenerate_solution.state.jy, axis="z")
+
+    assert jnp.allclose(centerline["u"], jnp.asarray([3.0, 5.0]))
+    assert jnp.allclose(degenerate_z["u"], jnp.asarray([2.0, 6.0]))
+    assert jnp.allclose(degenerate_y_scalar["value"], jnp.asarray([6.0, 14.0]))
+    assert jnp.allclose(degenerate_z_scalar["value"], jnp.asarray([8.0, 12.0]))
+
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        extract_midplane_scalar_profile(degenerate_solution, degenerate_solution.state.jy, axis="bad")
+
+
 def test_hartmann_acceptance_covers_failing_path():
     case = make_hartmann_case(ha=50.0, ny=6, nz=6)
     solution = _synthetic_solution(case, oscillatory=True)
@@ -380,6 +474,23 @@ def test_compare_with_reference_outputs_handles_missing_minmax_and_samples(tmp_p
     assert report.metrics["run_dir_exists"] == pytest.approx(1.0)
     assert "reference_u_max_latest" not in report.metrics
     assert report.metrics["sampled_profile_pair_available"] == pytest.approx(0.0)
+
+
+def test_compare_with_reference_outputs_solves_when_only_sample_profiles_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=6, nz=6)
+    monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
+    sample_root = tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1"
+    sample_root.mkdir(parents=True)
+    rows = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
+    (sample_root / "centerlineY_potE_U.xy").write_text(rows)
+    (sample_root / "centerlineZ_potE_U.xy").write_text(rows)
+
+    report = compare_with_reference_outputs(case, tmp_path)
+
+    assert report.metrics["field_minmax_file_count"] == pytest.approx(0.0)
+    assert report.metrics["sampled_profile_pair_available"] == pytest.approx(1.0)
+    assert "reference_sample_y_l2_error" in report.metrics
+    assert "reference_u_max_latest" not in report.metrics
 
 
 def test_duct_profile_metrics_reports_sign_pathology():
@@ -690,6 +801,7 @@ def test_estimate_observed_order_returns_second_order_for_quadratic_drop():
 
 def test_estimate_observed_order_returns_none_for_invalid_inputs():
     assert estimate_observed_order(0.0, 1.0e-2, 0.25, 0.125) is None
+    assert estimate_observed_order(1.0e-2, 1.0e-3, 0.25, 0.0) is None
     assert estimate_observed_order(1.0e-2, 1.0e-3, 0.125, 0.25) is None
 
 
@@ -726,8 +838,14 @@ def test_reference_parsing_helpers_cover_invalid_axis_missing_time_and_missing_c
     with pytest.raises(ValueError, match="Unsupported axis"):
         infer_mesh_axis_coordinates(tmp_path, axis="bad")
 
+    with pytest.raises(ValueError, match="Unable to infer sampling geometry"):
+        infer_sampling_geometry(tmp_path)
+
     with pytest.raises(ValueError, match="Unable to infer sample time"):
         validation.infer_sample_time_from_path(Path("postProcessing") / "liquid" / "centerlineY.xy")
+
+    with pytest.raises(FileNotFoundError, match="No paired sampled reference profiles"):
+        validation.reference_profile_validation(_synthetic_solution(make_hartmann_case()), tmp_path)
 
     inspection = inspect_reference_case(tmp_path / "missing_case")
     assert inspection.control_dicts == ()
@@ -757,6 +875,54 @@ def test_latest_field_minmax_record_and_sample_pair_handle_malformed_or_incomple
     assert latest_reference_sampled_profiles(tmp_path) is None
 
 
+def test_reference_readers_skip_comments_short_rows_and_malformed_csv_values(tmp_path: Path):
+    xy_path = tmp_path / "centerlineY_potE_U.xy"
+    xy_path.write_text(
+        "# comment\n"
+        "\n"
+        "0.0 0.0 1.0\n"
+        "1.0 0.2 3.0 4.0 5.0\n"
+    )
+    xy = read_reference_xy_sample(xy_path)
+    assert xy.distance.tolist() == pytest.approx([1.0])
+    assert xy.u_x.tolist() == pytest.approx([3.0])
+
+    csv_path = tmp_path / "lineTransverse_p_U.csv"
+    csv_path.write_text(
+        "y,p,U_0,U_1,U_2\n"
+        "bad,1.0,2.0,3.0,4.0\n"
+        "0.0,1.0,2.0,3.0,4.0\n"
+    )
+    csv_sample = read_reference_csv_sample(csv_path)
+    assert csv_sample.distance.tolist() == pytest.approx([0.0])
+    assert csv_sample.u_x.tolist() == pytest.approx([2.0])
+
+
+def test_reference_mesh_and_profile_discovery_cover_empty_and_incomplete_files(tmp_path: Path):
+    points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
+    points_path.parent.mkdir(parents=True)
+    points_path.write_text("FoamFile\n{\n}\n(\nnot-a-point\n)\n")
+    assert infer_mesh_bounds(tmp_path) is None
+    assert infer_mesh_axis_coordinates(tmp_path, axis="x") is None
+    assert interior_sample_coordinate((0.25,), 1.0) == pytest.approx(0.25)
+    assert infer_region_conductivity(tmp_path, "liquid") is None
+
+    invalid_xy_root = tmp_path / "postProcessing" / "sampleDict" / "liquid" / "not_time"
+    invalid_xy_root.mkdir(parents=True)
+    (invalid_xy_root / "centerlineY_potE_U.xy").write_text("0.0 0.0 1.0 0.0 0.0\n")
+    (invalid_xy_root / "centerlineZ_potE_U.xy").write_text("0.0 0.0 1.0 0.0 0.0\n")
+
+    invalid_csv_root = tmp_path / "postProcessing" / "outputLines" / "liquid" / "also_bad"
+    invalid_csv_root.mkdir(parents=True)
+    (invalid_csv_root / "lineTransverse_p_U.csv").write_text("y,p,U_0\n0.0,0.0,1.0\n")
+
+    valid_csv_root = tmp_path / "postProcessing" / "outputLines" / "liquid" / "0.3"
+    valid_csv_root.mkdir(parents=True)
+    (valid_csv_root / "lineTransverse_p_U.csv").write_text("y,p,U_0\n0.0,0.0,1.0\n")
+
+    assert latest_reference_sampled_profiles(tmp_path) is None
+
+
 def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_selection(tmp_path: Path):
     points_path = tmp_path / "constant" / "polyMesh" / "points"
     points_path.parent.mkdir(parents=True)
@@ -774,13 +940,33 @@ def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_sel
     new_path = tmp_path / "postProcessing" / "minMaxB" / "0.2" / "fieldMinMax.dat"
     old_path.parent.mkdir(parents=True)
     new_path.parent.mkdir(parents=True)
-    old_path.write_text("0.1 mag(U) 0.0 (0 0 0) x 1.0 (1 0 0) x\n")
+    old_path.write_text("0.05 mag(phi) 0.0 (0 0 0) x 9.0 (1 0 0) x\n0.1 mag(U) 0.0 (0 0 0) x 1.0 (1 0 0) x\n")
     new_path.write_text("0.2 mag(U) 0.0 (0 0 0) x 2.0 (1 0 0) x\n")
 
     latest = latest_field_minmax_record(tmp_path, field="mag(U)")
     assert latest is not None
     assert latest.time == pytest.approx(0.2)
     assert latest.max_value == pytest.approx(2.0)
+
+
+def test_inspect_reference_case_skips_files_and_nonnumeric_parallel_times(tmp_path: Path):
+    (tmp_path / "system").mkdir()
+    (tmp_path / "0").mkdir()
+    (tmp_path / "processors8").mkdir()
+    (tmp_path / "processors8" / "constant").mkdir()
+    (tmp_path / "processors8" / "not_time").mkdir()
+    (tmp_path / "processors8" / "0.25").mkdir()
+    (tmp_path / "2.0").write_text("not a directory")
+    (tmp_path / "0" / "U").write_text("root field is not a region directory")
+    (tmp_path / "0" / "liquid").mkdir()
+    (tmp_path / "0" / "liquid" / "U").write_text("internalField uniform (0 0 0);")
+
+    inspection = inspect_reference_case(tmp_path)
+
+    assert inspection.latest_time_dirs == ()
+    assert inspection.region_zero_dirs == ("0/liquid",)
+    assert inspection.zero_field_files == ("0/liquid/U",)
+    assert inspection.parallel_time_dirs == ("processors8/0.25",)
 
 
 def test_processed_slice_validation_writer(tmp_path: Path):

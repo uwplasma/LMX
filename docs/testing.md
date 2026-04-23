@@ -214,10 +214,11 @@ strategy uses:
 - focused autodiff tests on reduced iteration counts
 
 This is how the project maintains the routine five-minute budget while keeping
-coverage near the release target.
+coverage at the release target.
 
-The next coverage target is `95%` broad coverage without moving long benchmark
-runs into routine CI. The preferred order is:
+The broad local coverage gate now clears `95%` over `lmx/` and `scripts/`
+without moving long benchmark runs into routine CI. The current preferred order
+for further coverage work is:
 
 - delete genuinely dead helper branches instead of testing historical behavior
 - add cheap direct tests for `lmx/solvers.py` branch helpers, restart/initial
@@ -230,8 +231,8 @@ runs into routine CI. The preferred order is:
 - leave heavy FreeMHD reruns, high-Ha mesh ladders, and long scaling campaigns
   in manual or release workflows
 
-The `95%` gate should be promoted in CI only after the local broad coverage
-run is stable on the current dependency set. Until then, the manual coverage
+The `95%` gate should be promoted in CI after the local broad coverage run
+stays stable on the current dependency set. Until then, the manual coverage
 workflow remains the enforcement surface and the default push/PR lane remains
 the sub-five-minute `unit or validation` suite.
 

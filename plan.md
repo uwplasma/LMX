@@ -106,7 +106,7 @@ Demonstrated but not yet research-grade validation:
 - higher-inertia bent-pipe physics beyond the low-De baseline
 - variable-field validation beyond bounded duct/layered/pipe/bent examples
 - solver-faithful CPU strong scaling and memory-model documentation
-- broad `95%` coverage and PyPI release automation
+- PyPI release automation
 
 ### Immediate technical sequence
 
@@ -128,8 +128,8 @@ Demonstrated but not yet research-grade validation:
    that can be compared with the FreeMHD-style conservative face-current
    reconstruction: `phi` gauge, `J`, `J×B`, `div J`, wall leakage, interface
    continuity, and net boundary-current residual.
-4. Reach `95%` coverage by testing live behavior and deleting dead branches.
-   The target is not more long solves. The next coverage pass should focus on
+4. Keep `95%` coverage by testing live behavior and deleting dead branches.
+   The target is not more long solves. Further coverage passes should focus on
    `lmx/solvers.py` branch helpers, validation fallbacks, restart/initial
    condition paths, current/forcing/flow-rate modes, and cheap manufactured or
    monkeypatched tests.
@@ -996,7 +996,13 @@ That retained gate now passes for all three retained fringing geometries.
 - The latest local default push/PR lane
   `python -m pytest -m "unit or validation" -q` passes and remains within the
   hard five-minute guard, but the older sub-minute runtime notes are stale.
-- Current combined coverage for `lmx/` and `scripts/` is `94.39%`.
+- Current combined coverage for `lmx/` and `scripts/` is `95.4%`.
+- The `95%` coverage lift came from live validation behavior, not image or
+  smoke-test padding: FreeMHD helper inference, reference-output fallbacks,
+  midplane/scalar profile extraction, mesh-bound inference, and sample-time
+  parsing are now directly tested. That pass also fixed a real parser bug where
+  `infer_sample_time_from_path` could accidentally consume a numeric ancestor
+  outside the OpenFOAM `postProcessing` tree.
 - Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
 - the executable `extruded_inductionless` path now also supports restart and a
   structured `system/fields/postProcessing/restart/logs` output tree through
