@@ -26,12 +26,24 @@ VISCOSITY = 1.0e-3
 CONDUCTING_WALL_CONDUCTIVITY = 5.0e6
 INSULATING_WALL_CONDUCTIVITY = 1.0e-6
 CASE_SETTINGS = {
-    "shercliff": {"ny": 17, "nz": 17, "max_steps": 48, "current_reconstruction": "face_averaged"},
-    "hunt": {"ny": 13, "nz": 13, "max_steps": 48, "current_reconstruction": "face_averaged"},
+    "shercliff": {
+        "ny": 17,
+        "nz": 17,
+        "max_steps": 48,
+        "current_reconstruction": "face_averaged",
+        "velocity_update_limit": 0.1,
+    },
+    "hunt": {
+        "ny": 13,
+        "nz": 13,
+        "max_steps": 48,
+        "current_reconstruction": "face_averaged",
+        "velocity_update_limit": 0.1,
+    },
 }
 INITIAL_PROFILE = "analytic"
-DRIVE_MODE = "forcing"
-TARGET_MEAN_VELOCITY = 0.9725
+DRIVE_MODE = "pressure_gradient"
+FLOW_RATE_TARGET_MEAN_VELOCITY = 0.9725
 
 
 def _max_abs(value: jnp.ndarray) -> float:
@@ -89,9 +101,10 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         insulating_wall_conductivity=INSULATING_WALL_CONDUCTIVITY,
         max_steps=settings["max_steps"],
         drive_mode=DRIVE_MODE,
-        target_mean_velocity=TARGET_MEAN_VELOCITY,
+        target_mean_velocity=FLOW_RATE_TARGET_MEAN_VELOCITY,
         initial_profile=INITIAL_PROFILE,
         current_reconstruction=settings["current_reconstruction"],
+        velocity_update_limit=settings["velocity_update_limit"],
     )
     reference = load_processed_slice(case_kind, HA, x_slice=X_SLICE, reference_root=REFERENCE_ROOT)
     observable_specs = {
@@ -139,8 +152,9 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         "x_slice": X_SLICE,
         "initial_profile": INITIAL_PROFILE,
         "drive_mode": DRIVE_MODE,
-        "target_mean_velocity": TARGET_MEAN_VELOCITY,
+        "target_mean_velocity": FLOW_RATE_TARGET_MEAN_VELOCITY if DRIVE_MODE == "flow_rate" else None,
         "settings": settings,
+        "applied_pressure_gradient": float(solution.diagnostics.applied_forcing_history[-1]),
         "reference_path": reference.path,
         "observables": observables,
     }
@@ -160,7 +174,7 @@ def run_freemhd_closed_channel_observable_parity() -> dict[str, object]:
         "x_slice": X_SLICE,
         "initial_profile": INITIAL_PROFILE,
         "drive_mode": DRIVE_MODE,
-        "target_mean_velocity": TARGET_MEAN_VELOCITY,
+        "target_mean_velocity": FLOW_RATE_TARGET_MEAN_VELOCITY if DRIVE_MODE == "flow_rate" else None,
         "settings": CASE_SETTINGS,
         "geometry": {"width": WIDTH, "height": HEIGHT, "wall_thickness": WALL_THICKNESS, "wall_cells": WALL_CELLS},
         "material": {

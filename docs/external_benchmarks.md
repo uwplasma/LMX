@@ -97,17 +97,19 @@ for Shercliff and Hunt against the processed slice CSV files in
 It now runs on case-specific settings rather than a single showcase default:
 
 - Shercliff:
+  - analytical pressure gradient `2512.1961 Pa/m`
   - `17 × 17`, `48` steady steps, `face_averaged` current reconstruction
 - Hunt:
+  - analytical pressure gradient `514.2123 Pa/m`
   - `13 × 13`, `48` steady steps, `face_averaged` current reconstruction
 
 Current retained result on that richer parity lane:
 
 - Shercliff:
-  - velocity: `L2(y) ≈ 6.30e-2`, `L2(z) ≈ 1.01e-1`
-  - potential: `L2(y) ≈ 3.54e-1`, `L2(z) ≈ 2.31e-2`
-  - current: `L2(y) ≈ 6.46e-1`, `L2(z) ≈ 4.12e-2`
-  - Lorentz: `L2(y) ≈ 7.86e-2`, `L2(z) ≈ 4.12e-2`
+  - velocity: `L2(y) ≈ 6.08e-2`, `L2(z) ≈ 2.05e-2`
+  - potential: `L2(y) ≈ 3.71e-1`, `L2(z) ≈ 1.51e-3`
+  - current: `L2(y) ≈ 6.92e-1`, `L2(z) ≈ 1.95e-2`
+  - Lorentz: `L2(y) ≈ 7.90e-2`, `L2(z) ≈ 1.95e-2`
 - Hunt:
   - velocity: `L2(y) ≈ 2.40e-1`, `L2(z) ≈ 1.28e-1`
   - potential: `L2(y) ≈ 2.94e-1`, `L2(z) ≈ 3.83e-2`
@@ -122,7 +124,10 @@ exact centerline. Near-degenerate y-cuts for `potE` and `J_y` are labelled as
 low-signal in the summary JSON, so the physically significant blockers are now
 the Hunt Lorentz-y response, Hunt y-velocity distortion, and Hunt z-velocity
 distortion. Switching the Hunt comparison to the conservative face-current
-reconstruction removed the previous dominant `J_z` / `J×B_z` artifact.
+reconstruction removed the previous dominant `J_z` / `J×B_z` artifact. Driving
+the cases with the analytical pressure gradients also brings the absolute
+velocity, current, and Lorentz peak scales into `O(10%)` agreement for the
+dominant cuts, so the remaining gap is now mostly a shape/discretization issue.
 
 ![LMX vs FreeMHD observable parity](_static/generated/freemhd_closed_channel_observable_parity.png)
 

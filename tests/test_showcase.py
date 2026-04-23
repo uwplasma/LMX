@@ -241,6 +241,36 @@ def test_solve_closed_channel_benchmark_supports_flow_rate_and_zero_initial_prof
     assert inlet.value == pytest.approx(0.2 * 0.3 * 0.4)
 
 
+def test_solve_closed_channel_benchmark_supports_reference_pressure_gradient(monkeypatch: pytest.MonkeyPatch):
+    fake_case = showcase.make_shercliff_case(ha=20.0, ny=8, nz=8, width=0.3, height=0.4)
+    reference = SimpleNamespace(
+        coordinate=np.linspace(-1.0, 1.0, 5),
+        midplane_y=np.linspace(0.2, 1.0, 5),
+        midplane_z=np.linspace(1.0, 0.2, 5),
+        pressure_drop=123.0,
+    )
+    captured = {}
+
+    monkeypatch.setattr(showcase, "make_shercliff_case", lambda **kwargs: fake_case)
+    monkeypatch.setattr(showcase, "load_shercliff_analytical", lambda ha: reference)
+    monkeypatch.setattr(showcase, "_build_mesh", lambda case: _fake_mesh())
+
+    def fake_solve_steady(case, initial_state=None):
+        captured["case"] = case
+        captured["initial_state"] = initial_state
+        return "solution"
+
+    monkeypatch.setattr(showcase, "solve_steady", fake_solve_steady)
+    monkeypatch.setattr(showcase, "closed_channel_validation", lambda solution, case_kind, ha: {"ok": True})
+
+    case, solution, comparison = showcase.solve_closed_channel_benchmark("shercliff", drive_mode="pressure_gradient")
+
+    assert solution == "solution"
+    assert comparison == {"ok": True}
+    assert case.forcing == pytest.approx(123.0)
+    assert captured["initial_state"] is not None
+
+
 def test_solve_closed_channel_benchmark_builds_hunt_analytic_initial_state(monkeypatch: pytest.MonkeyPatch):
     fake_case = showcase.make_hunt_case(ha=20.0, ny=8, nz=8)
     mesh = _fake_mesh()

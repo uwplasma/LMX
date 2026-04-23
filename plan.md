@@ -1494,10 +1494,15 @@ That retained gate now passes for all three retained fringing geometries.
     - switching Hunt observable parity to conservative face-current
       reconstruction removes the previous dominant `J_z` / `J×B_z` artifact;
       Hunt Lorentz-y and velocity-shape parity remain outside the target band
+    - the observable-parity example now supports an analytical
+      pressure-gradient drive and uses the Shercliff/Hunt pressure drops
+      parsed from the reference filenames; this fixes the previous arbitrary
+      unit-forcing scale mismatch and brings dominant velocity/current/Lorentz
+      peak ratios to roughly `O(10%)`
   - the main next technical target is not more plotting work; it is a more
-    faithful and reviewer-proof fully developed constant-`Q` solve path, since
-    the current LMX steady solver matches the FreeMHD paper slices better under
-    `forcing` than under the physically matched `flow_rate` path
+    faithful and reviewer-proof fully developed drive path. The pressure-drop
+    lane is now the best external-paper overlay; the constant-`Q` lane remains
+    important for matching inlet-flow-rate OpenFOAM cases.
   - the first constant-`Q` hardening step is now in place: the fully developed
     solver projects `inlet_flow_rate` runs back to the requested area-weighted
     mean velocity after wall interpolation and limiter application

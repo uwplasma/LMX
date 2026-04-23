@@ -107,9 +107,11 @@ def solve_closed_channel_benchmark(
     velocity_update_limit: float | None = None,
     current_reconstruction: str = "face_averaged",
     drive_mode: str = "forcing",
+    pressure_gradient: float | None = None,
     target_mean_velocity: float = 0.1,
     initial_profile: str = "analytic",
 ):
+    reference = None
     if case_kind == "shercliff":
         case = make_shercliff_case(
             ha=ha,
@@ -154,12 +156,20 @@ def solve_closed_channel_benchmark(
                 ),
             ),
         )
+    elif drive_mode == "pressure_gradient":
+        reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
+        if pressure_gradient is None:
+            pressure_gradient = reference.pressure_drop
+        if pressure_gradient is None:
+            raise ValueError(f"No analytical pressure-gradient reference is available for {case_kind} Ha={ha:g}")
+        case = replace(case, forcing=float(pressure_gradient))
     elif drive_mode != "forcing":
         raise ValueError(f"Unsupported closed-channel benchmark drive mode {drive_mode!r}")
 
     initial_state = None
     if initial_profile == "analytic":
-        reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
+        if reference is None:
+            reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
         mesh = _build_mesh(case)
         y_target = np.asarray(mesh.y_centers, dtype=float)
         z_target = np.asarray(mesh.z_centers, dtype=float)
