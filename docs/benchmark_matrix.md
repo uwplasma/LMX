@@ -68,6 +68,11 @@ ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Dra
 The current codebase should be judged against a fixed set of physics and
 quality gates rather than only against visual agreement:
 
+- mesh resolution
+  - high-Ha Hartmann and side layers use focused meshes with several cells
+    inside the thinnest boundary layer and smooth expansion into the core
+  - mesh convergence is demonstrated on profiles, integral flow rate, current
+    closure, and pressure/forcing observables
 - profile agreement
   - normalized velocity/potential/profile errors on matched cuts
 - integral agreement
@@ -216,6 +221,12 @@ at `Ha = 2000`, `Re = 20000`, while the current LMX `pipe_ogrid`
 That means the present pipe comparison is still useful for qualitative shape
 and sign checks, but quantitative parity will require a higher-inertia pipe
 solver path rather than only denser sampling or plot cleanup.
+
+Mapped-pipe external parity is therefore deferred from the current closeout.
+The retained Benchmark B work should continue to use the internal conservation
+and pressure-response gates for rectangular, layered, and mapped-pipe cases,
+while any future parity claim against the Bühler/FreeMHD pipe dataset must move
+the LMX pipe solver into a matching high-`Ha`, high-`Re` regime first.
 
 ## Staged but deferred
 

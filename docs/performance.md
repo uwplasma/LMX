@@ -8,6 +8,33 @@ inductionless MHD operator. The goal is practical research throughput:
 - preserve a differentiable fixed-iteration lane
 - provide explicit CPU and multi-GPU scaling evidence for larger studies
 
+## Performance closeout gates
+
+LMX should separate user-facing runtime feedback from benchmark claims.
+
+Required user-facing behavior:
+
+- progress output with current step, simulated time, residuals, flow rate,
+  current diagnostics, elapsed time, and estimated remaining time
+- explicit grid sizes, write stride, and output paths in summaries
+- memory-relevant problem dimensions in benchmark JSON files
+- compile time and warm runtime reported separately for JAX paths
+
+Required benchmark behavior:
+
+- CPU scaling tied to the executable `extruded_inductionless` projection
+  arithmetic or a documented higher-intensity surrogate
+- GPU scaling run on problem sizes large enough that sharding overhead does not
+  dominate
+- profiler traces before promoting a new strong-scaling figure
+- memory-allocation and host-to-device placement checks for large arrays
+- persistent JAX compilation cache on long artifact workflows where supported
+
+The current scaling figure is useful evidence, but it should not be the final
+CPU-scaling claim for a paper. The next accepted CPU panel needs to be backed
+by a profile explaining whether the limiting factor is memory bandwidth,
+cross-device communication, compile overhead, or kernel launch overhead.
+
 ## What is benchmarked
 
 The strong-scaling workflow benchmarks a fixed-iteration coupled operator on

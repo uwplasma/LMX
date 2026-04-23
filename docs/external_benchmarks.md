@@ -119,3 +119,22 @@ main blocker, and field-level parity is not yet closed on `potE`, `J`, and
 `J×B`.
 
 ![LMX vs FreeMHD observable parity](_static/generated/freemhd_closed_channel_observable_parity.png)
+
+## Next external-parity gate
+
+The next FreeMHD-facing work should focus on the straight-duct fully developed
+path before adding more comparison plots. The target is a physically matched
+constant-flow-rate solve with:
+
+- boundary-layer-focused mesh convergence
+- matched velocity, gauge-shifted potential, current-density, and Lorentz-force
+  cuts
+- integral flow-rate and pressure/forcing observables
+- explicit comparison of compile time, warm runtime, and memory-relevant grid
+  sizes when the same host is used
+
+Mapped-pipe external parity remains documented but deferred. The bundled pipe
+reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the
+current mapped-pipe LMX path is still a lower-Re inductionless slice. It should
+not be promoted to a parity claim until the pipe solver is in the matching
+regime.

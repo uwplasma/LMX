@@ -30,6 +30,33 @@ The differentiable lane is intentionally explicit:
 - the production CLI/reporting path remains free to use pragmatic
   non-differentiable tooling where that improves robustness
 
+## Differentiability verification gates
+
+Differentiable examples should not be accepted only because `jax.grad` returns
+a number. Each research-facing autodiff workflow should check:
+
+- central finite-difference agreement for scalar sensitivities
+- sign and scale agreement for pressure-drop, current-response, and profile
+  objectives
+- eager versus `jit` agreement on the same reduced problem
+- `vmap` or batched-objective consistency when a workflow claims batch support
+- objective decrease and final improvement on bounded inverse-design examples
+- stable behavior under the dtype/device modes documented for the example
+
+Priority sensitivity targets are:
+
+- Hartmann/Shercliff/Hunt forcing and Hartmann-number objectives
+- fringing pressure-drop and current-response objectives
+- WHAM-like mirror-field coil-separation objectives
+- tabulated-field amplitude, placement, and interpolation objectives
+- reduced UQ checks where finite-difference covariance agrees with local
+  autodiff linearization
+
+The full production solver is not required to be reverse-mode differentiable in
+one step. The rule is that every advertised differentiable path must be explicit
+about the approximation it differentiates, the fixed iteration count, and the
+finite-difference evidence supporting the gradient.
+
 ## Run the example
 
 ```bash

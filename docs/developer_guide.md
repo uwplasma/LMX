@@ -25,6 +25,38 @@ The codebase is organized around a small number of core modules:
 - `lmx/validation.py`
   - analytical and reference-output comparison helpers
 
+## Planned module split
+
+The current flat layout is still intentional for compatibility, but several
+modules are now too large for long-term maintenance. The split should happen
+only after the relevant behavior is locked by direct tests and artifact
+summaries.
+
+Target structure:
+
+- `lmx/fringing/`
+  - problem builders, projection solve, conservative metrics, benchmark gates,
+    and reference comparison helpers
+- `lmx/solvers/`
+  - a thin public facade plus fully developed solve logic, potential helpers,
+    diagnostics, and logging adapters
+- `lmx/validation/`
+  - profile comparisons, reference-data loading, and report construction
+- `lmx/plotting/`
+  - profiles, benchmark figures, fields, media, and scaling/autodiff panels
+- `lmx/autodiff/`
+  - objectives, gradient checks, design loops, and uncertainty propagation
+
+Refactor rules:
+
+- preserve existing `import lmx` and module-level public paths during the
+  split cycle
+- do not mix numerical changes with file moves
+- move or add tests with each extracted module
+- keep benchmark-specific acceptance logic out of the low-level solver kernels
+- update module docstrings with governing equations, shape conventions, units,
+  and literature anchors
+
 ## Solver families
 
 ### `fully_developed_inductionless`
@@ -104,13 +136,40 @@ surface, the docs lane keeps the documentation badge honest, and the manual
 lane preserves reproducible research artifacts without exhausting routine CI
 runtime.
 
+## Release and publishing roadmap
+
+The release workflow should be promoted in stages:
+
+- default push/PR CI:
+  - install `.[dev]`
+  - run `python -m pytest -m "unit or validation"`
+  - keep the lane below five minutes
+- docs CI:
+  - install `.[dev,docs]`
+  - run `python -m sphinx -W -b html docs docs/_build/html`
+- manual release validation:
+  - run physics/regression suites
+  - regenerate selected validation artifacts
+  - run broad branch coverage with the current target lifted to `95%`
+- packaging:
+  - build sdist and wheel artifacts
+  - inspect/install the wheel in a clean environment
+  - publish to TestPyPI first
+  - publish to PyPI from tagged releases using PyPI Trusted Publishing
+
+Do not enable automatic PyPI publishing before the coverage, docs, and release
+validation lanes are stable. The first publish workflow should be conservative:
+manual dispatch or tag-triggered, explicit artifact build, TestPyPI dry run,
+then PyPI release.
+
 ## Test runtime baseline
 
-The current local baseline is:
+The latest local evidence pass on this workstation shows:
 
-- full fast `pytest -q`: about `31 s`
-- full coverage lane over `lmx/` and `scripts/`: about `37 s`
-- current combined coverage over `lmx/` and `scripts/`: about `90%`
+- default push/PR lane, `python -m pytest -m "unit or validation" -q`:
+  passes and remains inside the five-minute guard
+- broad coverage lane over `lmx/` and `scripts/`: passes at about `94.39%`
+  combined line/branch coverage
 
 The hard rule for routine validation is that these lanes must stay under five
 minutes. When a new test exceeds that budget, prefer:

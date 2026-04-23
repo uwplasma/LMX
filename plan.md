@@ -42,6 +42,116 @@ Ship a research-grade `1.0` inductionless MHD code with:
    more faithful validation path if the remaining Shercliff/Hunt error plateau
    stays above the accepted `L2 <= 1.2e-2` release target.
 
+## Evidence pass and closeout sequence
+
+This pass re-checked the plan against the local git history, current docs,
+tests, examples, FreeMHD source/case files, and the main literature anchors.
+The project direction is still right, but the next work has to stay ordered:
+do not expand capability demos faster than the verified solver surface.
+
+### Evidence anchors
+
+- Samper et al. remains the organizing V&V ladder:
+  - A: fully developed laminar ducts
+  - B: 3D laminar developing/fringing MHD
+  - C: quasi-2D turbulent MHD
+  - D: 3D turbulent or magnetic-obstacle MHD
+  - E: heat-transfer / buoyant-convection MHD
+- FreeMHD and its OpenFOAM source remain the main independent executable
+  comparison surface. The relevant parity target is observable agreement, but
+  the source confirms the numerical structure LMX should match where possible:
+  conservative electric-potential source assembly, face-current reconstruction,
+  gauge-handled potential comparisons, and Lorentz forcing from the same
+  current convention.
+- The local FreeMHD case files make the mesh policy explicit: high-Ha duct
+  comparisons use boundary-layer-focused meshes with several cells inside the
+  Hartmann and side layers and smooth expansion into the core. LMX high-Ha
+  validation should therefore be judged on a mesh-convergence ladder, not on a
+  single visually acceptable plot.
+- The JAX documentation and current scaling data point to the same performance
+  plan: separate compile time from warm runtime, profile before claiming strong
+  scaling, keep memory estimates visible, and move the CPU scaling figure
+  toward the real `extruded_inductionless` projection arithmetic rather than a
+  presentation-only kernel.
+- The PyPA publishing guidance points to a release workflow built around
+  build artifacts, TestPyPI/PyPI Trusted Publishing, and a tagged-release gate
+  after tests, docs, coverage, and validation artifacts pass.
+
+### Current status classification
+
+Paper-ready or close to paper-ready:
+
+- low-cost numerical operator verification on smooth, clustered, and
+  interface/coefficient-jump cases
+- retained Hartmann/Shercliff/Hunt analytical profile overlays at the accepted
+  `L2 <= 1.2e-2` release target for the current reader-facing cuts
+- dense internal rectangular Benchmark B fringing conservation metrics
+- layered Benchmark B closure on mirror-aware current/pressure observables
+- Q2D decay, forced, and wall-bounded reduced validation examples
+- magnetic-obstacle bounded response and regime-scan figures as Benchmark D
+  precursors
+- runtime logging, ETA/progress output, restart, plotting, and artifact-summary
+  workflows
+
+Demonstrated but not yet research-grade validation:
+
+- FreeMHD paper-slice observable parity for fully developed ducts, especially
+  the physical constant-`Q` / `flow_rate` path and `potE`, `J`, `J×B` cuts
+- mapped-pipe external parity against the high-`Ha`, high-`Re` Bühler case;
+  this is now explicitly future work, not a blocker for the current closeout
+- full Benchmark C turbulent observables
+- full Benchmark D turbulent or experimentally anchored magnetic-obstacle
+  parity
+- Benchmark E heat-transfer / buoyant-convection
+- higher-inertia bent-pipe physics beyond the low-De baseline
+- variable-field validation beyond bounded duct/layered/pipe/bent examples
+- solver-faithful CPU strong scaling and memory-model documentation
+- broad `95%` coverage and PyPI release automation
+
+### Immediate technical sequence
+
+1. Repair the fully developed constant-`Q` / `flow_rate` path.
+   The next solver campaign should derive and test the constrained
+   flow-rate/pressure-gradient update directly, then compare velocity,
+   potential, current, Lorentz force, flow rate, and pressure-proxy observables
+   against analytical ducts and FreeMHD paper slices. The acceptance target is
+   not plot-level agreement; it is stable profile/integral errors under mesh
+   refinement with the retained profile cuts at or below `1.2e-2` and the
+   external observable lane trending toward `O(1e-2)`.
+2. Make boundary-layer meshing first-class.
+   Add a documented mesh ladder for Hartmann and side layers with at least
+   8-10 cells across the thinnest layer in high-Ha validation runs, smooth
+   expansion into the core, no repeated faces, and explicit convergence of
+   `Q̃`, profile cuts, current closure, and pressure proxy.
+3. Close conservative-current parity.
+   Every fully developed and extruded solver family should expose diagnostics
+   that can be compared with the FreeMHD-style conservative face-current
+   reconstruction: `phi` gauge, `J`, `J×B`, `div J`, wall leakage, interface
+   continuity, and net boundary-current residual.
+4. Reach `95%` coverage by testing live behavior and deleting dead branches.
+   The target is not more long solves. The next coverage pass should focus on
+   `lmx/solvers.py` branch helpers, validation fallbacks, restart/initial
+   condition paths, current/forcing/flow-rate modes, and cheap manufactured or
+   monkeypatched tests.
+5. Promote only literature-gated capability lanes.
+   Bent pipe, variable-field, Benchmark C, Benchmark D, and Benchmark E should
+   each require one numerical invariant, one physics/literature gate, one
+   artifact-producing example, and one docs entry stating whether the case is
+   verification, validation, or only a capability demo.
+6. Finish performance and differentiability gates.
+   The solver must report progress, ETA, memory-relevant grid sizes, compile
+   versus warm runtime, and device placement. Differentiable workflows must
+   carry finite-difference gradient checks, JIT/eager agreement, batched
+   objective consistency, and at least one pressure-drop or field-design
+   inverse problem.
+7. Split large modules after behavior is locked.
+   Refactor `fringing`, `autodiff`, `plotting`, `solvers`, and `validation`
+   only behind passing tests and stable public import facades.
+8. Add release automation after the gates are real.
+   The publish lane should build sdist/wheel artifacts, run fast tests, docs,
+   coverage, and selected validation artifact checks, publish to TestPyPI
+   first, then PyPI through Trusted Publishing on tagged releases.
+
 ## Finish-line gates
 
 LMX reaches the next research-grade milestone only when the following gates are
@@ -561,8 +671,9 @@ validation lane with heavier solver runs.
     introduce visible left/right bias in closed symmetric cases
 - Benchmark B quantitative closure
   - dense `rect_duct` fringing is now inside the quantitative internal gate
-  - mapped-pipe external comparison is now quantitative, and the next target
-    is reducing that high-`Ha`, high-`Re` parity gap
+  - mapped-pipe external comparison is now quantitative but intentionally
+    deferred; it compares against a high-`Ha`, high-`Re` Bühler reference while
+    the current LMX mapped-pipe lane is still a lower-Re inductionless slice
   - the next literature-anchored B1/B2 closure still needs the Samper-style
     observables, not only the internal fringing metrics:
     - B1 pipe: pressure-drop comparison between the documented tap locations
@@ -882,10 +993,10 @@ That retained gate now passes for all three retained fringing geometries.
 - The default push/PR gate also excludes the heavier `regression` marker
   tests, which are now part of the manual release-validation lane together
   with physics.
-- The full local fast suite now completes in about `35 s`, and the full
-  local coverage lane completes in about `45 s`, both within the hard
-  five-minute limit for routine validation.
-- Current combined coverage for `lmx/` and `scripts/` is `94%`.
+- The latest local default push/PR lane
+  `python -m pytest -m "unit or validation" -q` passes and remains within the
+  hard five-minute guard, but the older sub-minute runtime notes are stale.
+- Current combined coverage for `lmx/` and `scripts/` is `94.39%`.
 - Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
 - the executable `extruded_inductionless` path now also supports restart and a
   structured `system/fields/postProcessing/restart/logs` output tree through
@@ -1342,7 +1453,7 @@ That retained gate now passes for all three retained fringing geometries.
     `Ha = 2000`, `Re = 20000` Bühler fringing-pipe case, while the current
     `pipe_ogrid` `extruded_inductionless` lane is still a lower-Re inductionless
     research slice
-  - the next parity step is therefore:
+  - the deferred parity step is therefore:
     - center-line axial-velocity closure
     - off-center electric-potential closure
     - pressure-drop / pressure-span closure through the same reference lane

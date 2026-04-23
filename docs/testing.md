@@ -3,6 +3,25 @@
 LMX uses a split validation strategy so that the default release gate remains
 fast while deeper research checks stay reproducible.
 
+## Research-grade test contract
+
+The test suite is expected to protect scientific behavior, not only exercise
+lines of Python. Every new paper-facing capability should have all of the
+following before it is described as validated:
+
+- a direct unit test for setup, helper, and fallback logic
+- a numerical verification or invariant test
+- a physics or literature-facing validation test
+- an artifact-producing example that writes a figure and summary JSON
+- a docs entry that states whether the case is verification, validation, or a
+  capability demonstration
+
+This contract follows the benchmark hierarchy in Samper et al. and the current
+FreeMHD comparison surface: analytical solutions and conservation checks are
+the primary acceptance gate, while external solver comparisons add independent
+evidence through matched observables such as velocity, potential, current,
+Lorentz force, pressure proxy, and runtime.
+
 ## Fast ship gate
 
 The routine gate is the fast `unit` / `validation` lane:
@@ -196,6 +215,42 @@ strategy uses:
 
 This is how the project maintains the routine five-minute budget while keeping
 coverage near the release target.
+
+The next coverage target is `95%` broad coverage without moving long benchmark
+runs into routine CI. The preferred order is:
+
+- delete genuinely dead helper branches instead of testing historical behavior
+- add cheap direct tests for `lmx/solvers.py` branch helpers, restart/initial
+  condition paths, flow-rate/forcing modes, current reconstruction, and
+  diagnostic guards
+- keep manufactured-solution and invariant tests close to `lmx/operators.py`
+  and `lmx/linear.py`
+- keep paper-facing examples in `examples/`, then test their summary JSON
+  schema and governing observables rather than comparing image pixels
+- leave heavy FreeMHD reruns, high-Ha mesh ladders, and long scaling campaigns
+  in manual or release workflows
+
+The `95%` gate should be promoted in CI only after the local broad coverage
+run is stable on the current dependency set. Until then, the manual coverage
+workflow remains the enforcement surface and the default push/PR lane remains
+the sub-five-minute `unit or validation` suite.
+
+## Publication artifact rule
+
+Numerical and physics tests that demonstrate publishable behavior should have a
+matching artifact-producing workflow. The expected pattern is:
+
+- the test asserts the invariant, convergence rate, profile error, or
+  conservation metric cheaply
+- the example writes a publication-ready PNG/PDF and a machine-readable JSON
+  summary
+- the docs link the figure and state the literature anchor
+- CI checks the JSON summary and docs build; manual workflows regenerate the
+  heavier figures when needed
+
+This is the route for the straight-duct overlays, Benchmark B summaries, Q2D
+panels, magnetic-obstacle panels, WHAM sensitivity figures, bent-pipe
+overview, and future Benchmark E heat-transfer plots.
 
 ## Source map
 
