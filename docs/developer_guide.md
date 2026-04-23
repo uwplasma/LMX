@@ -150,7 +150,7 @@ The release workflow should be promoted in stages:
 - manual release validation:
   - run physics/regression suites
   - regenerate selected validation artifacts
-  - run broad branch coverage with the current target lifted to `95%`
+  - run broad branch coverage with `--cov-fail-under=95`
 - packaging:
   - build sdist and wheel artifacts
   - inspect/install the wheel in a clean environment

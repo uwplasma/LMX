@@ -231,10 +231,10 @@ for further coverage work is:
 - leave heavy FreeMHD reruns, high-Ha mesh ladders, and long scaling campaigns
   in manual or release workflows
 
-The `95%` gate should be promoted in CI after the local broad coverage run
-stays stable on the current dependency set. Until then, the manual coverage
-workflow remains the enforcement surface and the default push/PR lane remains
-the sub-five-minute `unit or validation` suite.
+The manual coverage workflow now enforces the `95%` gate with
+`--cov-fail-under=95`. The default push/PR lane remains the sub-five-minute
+`unit or validation` suite so routine commits do not run the full coverage
+campaign.
 
 ## Publication artifact rule
 

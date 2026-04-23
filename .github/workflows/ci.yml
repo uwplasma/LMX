@@ -178,7 +178,7 @@ jobs:
             --cov=lmx \
             --cov=scripts \
             --cov-branch \
-            --cov-fail-under=90 \
+            --cov-fail-under=95 \
             --cov-report=term-missing:skip-covered \
             --cov-report=xml:artifacts/coverage/coverage.xml \
             --cov-report=json:artifacts/coverage/coverage.json

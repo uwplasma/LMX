@@ -1003,6 +1003,9 @@ That retained gate now passes for all three retained fringing geometries.
   parsing are now directly tested. That pass also fixed a real parser bug where
   `infer_sample_time_from_path` could accidentally consume a numeric ancestor
   outside the OpenFOAM `postProcessing` tree.
+- The manual GitHub Actions coverage workflow now enforces
+  `--cov-fail-under=95`; the default push/PR lane remains the bounded
+  `unit or validation` suite.
 - Budgeted CLI and restart smokes now pass on the shipped Hartmann TOML path;
 - the executable `extruded_inductionless` path now also supports restart and a
   structured `system/fields/postProcessing/restart/logs` output tree through
