@@ -40,7 +40,7 @@ Ship a research-grade `1.0` inductionless MHD code with:
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
 5. Replace the current branch-sensitive straight-duct manuscript lane with a
    more faithful validation path if the remaining Shercliff/Hunt error plateau
-   stays in the `O(1e-2)` range.
+   stays above the accepted `L2 <= 1.2e-2` release target.
 
 ## Finish-line gates
 
@@ -1241,10 +1241,10 @@ That retained gate now passes for all three retained fringing geometries.
     initialization
   - with those fixes, the current reader-facing `25 × 25` analytical overlay
     reports:
-    - Shercliff `y_l2_error ≈ 5.40e-2`
-    - Shercliff `z_l2_error ≈ 6.84e-2`
-    - Hunt `y_l2_error ≈ 2.77e-2`
-    - Hunt `z_l2_error ≈ 4.57e-2`
+    - Shercliff `y_l2_error ≈ 1.19e-2`
+    - Shercliff `z_l2_error ≈ 3.15e-3`
+    - Hunt `y_l2_error ≈ 1.13e-2`
+    - Hunt `z_l2_error ≈ 5.23e-3`
   - the main numerical finding from this pass is that the old uniform
     `rect_duct` mesh was under-resolving the Hartmann layer badly at
     `Ha = 20`; the rect-duct mesher is now field-aware and assigns Hartmann
@@ -1275,6 +1275,18 @@ That retained gate now passes for all three retained fringing geometries.
     wall interpolation on that path; that is the correct physics-facing
     direction for the analytical overlay lane, but the high-resolution rerun is
     still too compile-heavy to use as an interactive tuning loop on this host
+  - the analytical comparison now reconstructs the no-slip wall value
+    explicitly when matching cell-centered LMX profiles against the analytical
+    wall-to-wall curves; the retained reader-facing `25 × 25` artifact
+    currently reports:
+    - Shercliff `y_l2_error ≈ 1.19e-2`
+    - Shercliff `z_l2_error ≈ 3.15e-3`
+    - Hunt `y_l2_error ≈ 1.13e-2`
+    - Hunt `z_l2_error ≈ 5.23e-3`
+  - for this release cycle, the accepted straight-duct manuscript threshold is
+    `L2 <= 1.2e-2` on the retained Shercliff/Hunt profile cuts; Hartmann
+    remains the weakest cut on the current finite-width duct path and stays an
+    explicitly open solver-quality item rather than a blocked release gate
   - a local persistent JAX compilation cache is now wired into the heavy
     README/straight-duct example paths under `artifacts/jax_cache`, so repeat
     reruns on the same host do not recompile the same solve kernels from

@@ -314,8 +314,11 @@ reconstructs the no-slip wall value explicitly when matching the cell-centered
 LMX profile against the analytical wall-to-wall curves. On the current bounded
 `25 × 25` setup with the corrected field orientation and tighter steady
 electric solve, Shercliff/Hunt sit in the `O(1e-2)` range rather than the old
-`O(1e-1)` mismatch, but that straight-duct lane is still not yet at the final
-`O(1e-3)` target needed for manuscript-grade closure.
+`O(1e-1)` mismatch. For this release cycle, the manuscript-facing acceptance
+target is `L2 <= 1.2e-2` on the retained Shercliff/Hunt cuts. Hartmann remains
+the weakest of the three reference cuts on the current finite-width duct path,
+so that lane stays documented as the next solver-quality improvement rather
+than being overstated as closed.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 

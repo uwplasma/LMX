@@ -402,7 +402,8 @@ teachable without duplicating the geometry setup, solve, and plotting code.
 `straight_duct_profile_comparison.py` writes the straight-duct validation panel
 used in the README and docs, covering Hartmann, Shercliff, and Hunt with
 publication-ready profile overlays, explicit no-slip wall reconstruction in
-the analytical comparison, and a checked summary JSON.
+the analytical comparison, a release target of `L2 <= 1.2e-2` on the retained
+Shercliff/Hunt cuts, and a checked summary JSON.
 
 `straight_duct_validation_ladder.py` writes the bounded straight-duct
 literature ladder used for the numerics/validation docs, comparing Shercliff

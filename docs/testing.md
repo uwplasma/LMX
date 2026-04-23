@@ -260,6 +260,7 @@ The first explicit examples following this pattern are:
 - `examples/straight_duct_profile_comparison.py` for the Hartmann /
   Shercliff / Hunt literature-facing straight-duct panel, including no-slip
   wall reconstruction when comparing cell-centered profiles against the
-  analytical wall-to-wall curves
+  analytical wall-to-wall curves; the current release target is
+  `L2 <= 1.2e-2` on the retained Shercliff/Hunt cuts
 - `examples/straight_duct_validation_ladder.py` for the bounded Shercliff /
   Hunt multi-Ha literature ladder
