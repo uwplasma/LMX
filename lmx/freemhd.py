@@ -98,6 +98,7 @@ def summarize_observable_offenders(
     records: list[dict[str, object]],
     *,
     l2_target: float = 1.0e-2,
+    min_reference_peak_fraction: float = 1.0e-3,
     top_n: int | None = None,
 ) -> list[dict[str, object]]:
     offenders: list[dict[str, object]] = []
@@ -108,6 +109,14 @@ def summarize_observable_offenders(
         for observable_name, observable_payload in observables.items():
             if not isinstance(observable_payload, dict):
                 continue
+            observable_reference_peak = max(
+                (
+                    float(cut.get("reference_peak_abs", 1.0))
+                    for axis in ("y", "z")
+                    if isinstance((cut := observable_payload.get(axis)), dict)
+                ),
+                default=1.0,
+            )
             for axis in ("y", "z"):
                 cut = observable_payload.get(axis)
                 if not isinstance(cut, dict):
@@ -115,6 +124,10 @@ def summarize_observable_offenders(
                 l2_error = float(cut.get("l2_error", 0.0))
                 linf_error = float(cut.get("linf_error", 0.0))
                 peak_ratio = float(cut.get("peak_ratio", observable_payload.get("peak_ratio", 1.0)))
+                reference_peak_abs = float(cut.get("reference_peak_abs", observable_reference_peak))
+                reference_peak_fraction = reference_peak_abs / max(observable_reference_peak, 1.0e-20)
+                low_signal = reference_peak_fraction < float(min_reference_peak_fraction)
+                status = "low_signal" if low_signal else ("pass" if l2_error <= l2_target else "offender")
                 offenders.append(
                     {
                         "case_kind": str(record.get("case_kind", "")),
@@ -124,12 +137,22 @@ def summarize_observable_offenders(
                         "l2_error": l2_error,
                         "linf_error": linf_error,
                         "peak_ratio": peak_ratio,
+                        "reference_peak_abs": reference_peak_abs,
+                        "reference_peak_fraction": reference_peak_fraction,
                         "l2_target": float(l2_target),
                         "target_ratio": l2_error / max(float(l2_target), 1.0e-20),
-                        "status": "pass" if l2_error <= l2_target else "offender",
+                        "status": status,
                     }
                 )
-    offenders.sort(key=lambda item: (float(item["target_ratio"]), float(item["linf_error"])), reverse=True)
+    status_rank = {"offender": 2, "pass": 1, "low_signal": 0}
+    offenders.sort(
+        key=lambda item: (
+            status_rank.get(str(item["status"]), 0),
+            float(item["target_ratio"]),
+            float(item["linf_error"]),
+        ),
+        reverse=True,
+    )
     if top_n is not None:
         return offenders[: max(0, int(top_n))]
     return offenders

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,55 @@ def load_processed_slice(
     )
 
 
+def _unique_plane_profile(profile_coord: jnp.ndarray, values: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    coord_np = np.asarray(profile_coord, dtype=float)
+    values_np = np.asarray(values, dtype=float)
+    unique_coord = np.unique(coord_np)
+    unique_values = np.asarray([np.mean(values_np[np.isclose(coord_np, coord)]) for coord in unique_coord])
+    order = np.argsort(unique_coord)
+    return jnp.asarray(unique_coord[order]), jnp.asarray(unique_values[order])
+
+
+def _interpolated_centerline_profile(
+    profile_coord: jnp.ndarray,
+    cross_coord: jnp.ndarray,
+    values: jnp.ndarray,
+    *,
+    tolerance: float = 1.0e-12,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    profile_np = np.asarray(profile_coord, dtype=float)
+    cross_np = np.asarray(cross_coord, dtype=float)
+    values_np = np.asarray(values, dtype=float)
+    unique_cross = np.unique(cross_np)
+    if unique_cross.size == 0:
+        return jnp.asarray([]), jnp.asarray([])
+
+    exact = unique_cross[np.isclose(unique_cross, 0.0, atol=tolerance, rtol=0.0)]
+    if exact.size:
+        target = float(exact[np.argmin(np.abs(exact))])
+        mask = np.isclose(cross_np, target, atol=tolerance, rtol=0.0)
+        return _unique_plane_profile(jnp.asarray(profile_np[mask]), jnp.asarray(values_np[mask]))
+
+    lower_candidates = unique_cross[unique_cross < 0.0]
+    upper_candidates = unique_cross[unique_cross > 0.0]
+    if lower_candidates.size == 0 or upper_candidates.size == 0:
+        target = float(unique_cross[np.argmin(np.abs(unique_cross))])
+        mask = np.isclose(cross_np, target, atol=tolerance, rtol=0.0)
+        return _unique_plane_profile(jnp.asarray(profile_np[mask]), jnp.asarray(values_np[mask]))
+
+    lower = float(lower_candidates[np.argmax(lower_candidates)])
+    upper = float(upper_candidates[np.argmin(upper_candidates)])
+    lower_mask = np.isclose(cross_np, lower, atol=tolerance, rtol=0.0)
+    upper_mask = np.isclose(cross_np, upper, atol=tolerance, rtol=0.0)
+    lower_coord, lower_values = _unique_plane_profile(jnp.asarray(profile_np[lower_mask]), jnp.asarray(values_np[lower_mask]))
+    upper_coord, upper_values = _unique_plane_profile(jnp.asarray(profile_np[upper_mask]), jnp.asarray(values_np[upper_mask]))
+    coord = np.union1d(np.asarray(lower_coord, dtype=float), np.asarray(upper_coord, dtype=float))
+    lower_interp = np.interp(coord, np.asarray(lower_coord, dtype=float), np.asarray(lower_values, dtype=float))
+    upper_interp = np.interp(coord, np.asarray(upper_coord, dtype=float), np.asarray(upper_values, dtype=float))
+    weight = (0.0 - lower) / (upper - lower)
+    return jnp.asarray(coord), jnp.asarray((1.0 - weight) * lower_interp + weight * upper_interp)
+
+
 def extract_processed_midplane_profile(reference: ProcessedSliceReference, axis: str = "y") -> dict[str, jnp.ndarray]:
     points_y = reference.columns["Points:1"]
     points_z = reference.columns["Points:2"]
@@ -147,22 +197,20 @@ def extract_processed_midplane_profile(reference: ProcessedSliceReference, axis:
     pot_e = reference.columns.get("potE", jnp.zeros_like(u_x))
 
     if axis == "y":
-        target = jnp.min(jnp.abs(points_z))
-        mask = jnp.isclose(jnp.abs(points_z), target)
-        order = jnp.argsort(points_y[mask])
+        coordinate, u_values = _interpolated_centerline_profile(points_y, points_z, u_x)
+        _, phi_values = _interpolated_centerline_profile(points_y, points_z, pot_e)
         return {
-            "y": points_y[mask][order],
-            "u": u_x[mask][order],
-            "phi": pot_e[mask][order],
+            "y": coordinate,
+            "u": u_values,
+            "phi": phi_values,
         }
     if axis == "z":
-        target = jnp.min(jnp.abs(points_y))
-        mask = jnp.isclose(jnp.abs(points_y), target)
-        order = jnp.argsort(points_z[mask])
+        coordinate, u_values = _interpolated_centerline_profile(points_z, points_y, u_x)
+        _, phi_values = _interpolated_centerline_profile(points_z, points_y, pot_e)
         return {
-            "z": points_z[mask][order],
-            "u": u_x[mask][order],
-            "phi": pot_e[mask][order],
+            "z": coordinate,
+            "u": u_values,
+            "phi": phi_values,
         }
     raise ValueError(f"Unsupported axis {axis}")
 
@@ -182,20 +230,16 @@ def extract_processed_profile(
         values = reference.columns[f"{field_name}:{component}"]
 
     if axis == "y":
-        target = jnp.min(jnp.abs(points_z))
-        mask = jnp.isclose(jnp.abs(points_z), target)
-        order = jnp.argsort(points_y[mask])
+        coordinate, profile_values = _interpolated_centerline_profile(points_y, points_z, values)
         return {
-            "coordinate": points_y[mask][order],
-            "value": values[mask][order],
+            "coordinate": coordinate,
+            "value": profile_values,
         }
     if axis == "z":
-        target = jnp.min(jnp.abs(points_y))
-        mask = jnp.isclose(jnp.abs(points_y), target)
-        order = jnp.argsort(points_z[mask])
+        coordinate, profile_values = _interpolated_centerline_profile(points_z, points_y, values)
         return {
-            "coordinate": points_z[mask][order],
-            "value": values[mask][order],
+            "coordinate": coordinate,
+            "value": profile_values,
         }
     raise ValueError(f"Unsupported axis {axis}")
 

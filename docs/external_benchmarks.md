@@ -110,15 +110,17 @@ Current retained result on that richer parity lane:
   - Lorentz: `L2(y) ≈ 7.86e-2`, `L2(z) ≈ 4.12e-2`
 - Hunt:
   - velocity: `L2(y) ≈ 2.39e-1`, `L2(z) ≈ 3.73e-2`
-  - potential: `L2(y) ≈ 1.10e0`, `L2(z) ≈ 3.49e-2`
-  - current: `L2(y) ≈ 1.02e0`, `L2(z) ≈ 5.52e-1`
+  - potential: `L2(y) ≈ 2.37e-1`, `L2(z) ≈ 3.48e-2`
+  - current: `L2(y) ≈ 7.12e-1`, `L2(z) ≈ 5.49e-1`
   - Lorentz: `L2(y) ≈ 2.71e-1`, `L2(z) ≈ 5.52e-1`
 
 This is now a useful manuscript-grade external comparison figure because it
 shows much more than one velocity cut, but it also makes the remaining parity
-gap explicit: the fully developed constant-`Q`/flow-rate lane is still the
-main blocker, and field-level parity is not yet closed on `potE`, `J`, and
-`J×B`.
+gap explicit. The processed-slice extractor now interpolates between symmetric
+near-center planes instead of interleaving duplicate cuts when the CSV has no
+exact centerline. Near-degenerate y-cuts for `potE` and `J_y` are labelled as
+low-signal in the summary JSON, so the physically significant blockers are now
+the Hunt dominant-current / Lorentz cuts and the Hunt y-velocity distortion.
 
 ![LMX vs FreeMHD observable parity](_static/generated/freemhd_closed_channel_observable_parity.png)
 
@@ -142,10 +144,11 @@ close observable parity by itself: the remaining gap is in the coupled
 pressure-gradient/current reconstruction and field-level matching, not only in
 mass-flow normalization.
 
-The observable-parity summary JSON now also ranks offenders across velocity,
-gauge-shifted potential, current, and Lorentz-force cuts. That ranking is the
-triage surface for the next solver work: fix the largest `potE`, `J`, and
-`J×B` offenders before adding more FreeMHD comparison figures.
+The observable-parity summary JSON now ranks offenders across velocity,
+gauge-shifted potential, current, and Lorentz-force cuts while demoting
+low-signal normalized cuts. That ranking is the triage surface for the next
+solver work: fix the dominant Hunt `J_z`, `J×B_z`, Lorentz-y, and y-velocity
+offenders before adding more FreeMHD comparison figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the

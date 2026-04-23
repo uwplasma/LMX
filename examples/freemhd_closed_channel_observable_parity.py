@@ -65,6 +65,8 @@ def _profile_metrics(
         "simulated": comparison.simulated.tolist(),
         "l2_error": float(comparison.l2_error),
         "linf_error": float(comparison.linf_error),
+        "reference_peak_abs": float(ref_scale),
+        "simulated_peak_abs": float(sim_scale),
         "peak_ratio": float(sim_scale / ref_scale),
     }
 

@@ -354,6 +354,10 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
                     "z": {"l2_error": 1.0e-2, "linf_error": 2.0e-2},
                     "peak_ratio": 1.1,
                 },
+                "potential": {
+                    "y": {"l2_error": 1.0, "linf_error": 1.0, "reference_peak_abs": 1.0e-8},
+                    "z": {"l2_error": 2.0e-2, "linf_error": 5.0e-2, "reference_peak_abs": 1.0},
+                },
             },
         }
     ]
@@ -361,7 +365,7 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
     assert observable_offenders[0]["observable"] == "current"
     assert observable_offenders[0]["axis"] == "y"
     assert observable_offenders[0]["status"] == "offender"
-    assert observable_offenders[-1]["status"] == "pass"
+    assert observable_offenders[-1]["status"] == "low_signal"
 
     profile_records = [
         {

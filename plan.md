@@ -1488,7 +1488,11 @@ That retained gate now passes for all three retained fringing geometries.
   - retained current best field-level parity on that lane is still mixed:
     - some `z`-cut potential/current/Lorentz comparisons are already at
       `O(1e-2)` to `O(1e-3)`
-    - `y`-cut potential/current parity is still poor
+    - the processed-slice extractor now interpolates symmetric near-center
+      planes instead of interleaving duplicate cuts, and low-signal `potE(y)`
+      / `J_y` cuts are no longer treated as the leading physical blockers
+    - dominant Hunt `J_z`, `J×B_z`, Lorentz-y, and y-velocity parity remain
+      outside the target band
   - the main next technical target is not more plotting work; it is a more
     faithful and reviewer-proof fully developed constant-`Q` solve path, since
     the current LMX steady solver matches the FreeMHD paper slices better under
@@ -1503,9 +1507,10 @@ That retained gate now passes for all three retained fringing geometries.
     target the coupled pressure-gradient/current reconstruction, not only mass
     normalization
   - the FreeMHD parity examples now write ranked offender tables into their
-    summary JSON files; the largest current paper-slice offenders are Hunt
-    `potE(y)`, Hunt `J_y`, Shercliff `J_y`, and Hunt `J_z` / `J×B_z`, so the
-    next solver patch should target current/potential reconstruction before
+    summary JSON files; after centerline interpolation and low-signal
+    filtering, the largest current paper-slice offenders are Hunt `J_z`,
+    Hunt `J×B_z`, Hunt Lorentz-y, and Hunt y-velocity distortion, so the next
+    solver patch should target dominant current/Lorentz reconstruction before
     adding new comparison plots
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no

@@ -80,6 +80,38 @@ def test_extract_processed_profile_returns_requested_field_component(tmp_path: P
     assert z_profile["value"].tolist() == pytest.approx([0.1, 0.2, 0.3])
 
 
+def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "Points:1,Points:2,U:0,J:1,potE",
+                "-1.0,-0.1,1.0,10.0,-2.0",
+                "0.0,-0.1,2.0,20.0,-4.0",
+                "1.0,-0.1,3.0,30.0,-6.0",
+                "-1.0,0.1,5.0,50.0,2.0",
+                "0.0,0.1,6.0,60.0,4.0",
+                "1.0,0.1,7.0,70.0,6.0",
+                "0.0,-1.0,11.0,110.0,-8.0",
+                "0.0,1.0,13.0,130.0,8.0",
+            ]
+        )
+    )
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+
+    y_profile = extract_processed_profile(reference, axis="y", field_name="J", component=1)
+    y_midplane = extract_processed_midplane_profile(reference, axis="y")
+    z_profile = extract_processed_profile(reference, axis="z", field_name="potE")
+
+    assert y_profile["coordinate"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
+    assert y_profile["value"].tolist() == pytest.approx([30.0, 40.0, 50.0])
+    assert y_midplane["u"].tolist() == pytest.approx([3.0, 4.0, 5.0])
+    assert z_profile["coordinate"].tolist() == pytest.approx([-1.0, -0.1, 0.1, 1.0])
+    assert z_profile["value"].tolist() == pytest.approx([-8.0, -4.0, 4.0, 8.0])
+
+
 def test_default_closed_channel_reference_root_resolves_bundled_dataset():
     root = default_closed_channel_reference_root()
     assert root.exists()
