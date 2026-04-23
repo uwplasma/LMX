@@ -128,6 +128,9 @@ def test_streaming_solver_logger_prints_live_solver_sections():
     assert "rawUpdateMax" in text
     assert "limitedFraction" in text
     assert "steadySolver" in text
+    assert "Progress" in text
+    assert "complete =" in text
+    assert "remaining ≈" in text
     assert "ExecutionTime" in text
 
 
@@ -262,3 +265,12 @@ def test_streaming_solver_logger_debug_verbosity_prints_debug_line():
     assert "MHD debug" in text
     assert "faceCurrentRatio" in text
     assert "faceLorentzRatio" in text
+
+
+def test_streaming_solver_logger_progress_falls_back_without_header_context():
+    stream = StringIO()
+    logger = StreamingSolverLogger(LoggingSpec(step_stride=1), stream=stream)
+    logger.emit_step(_sample_record(step_index=3))
+    text = stream.getvalue()
+    assert "Progress" in text
+    assert "avgStepWallTime" in text

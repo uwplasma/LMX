@@ -28,6 +28,7 @@ python examples/straight_duct_geometry_and_mesh.py
 python examples/shercliff_showcase.py
 python examples/hunt_showcase.py
 python examples/straight_duct_profile_comparison.py
+python examples/freemhd_closed_channel_parity.py
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
@@ -389,6 +390,7 @@ python examples/straight_duct_geometry_and_mesh.py
 python examples/shercliff_showcase.py
 python examples/hunt_showcase.py
 python examples/straight_duct_profile_comparison.py
+python examples/freemhd_closed_channel_parity.py
 ```
 
 They are parameter-driven Python files rather than argparse front ends:
@@ -413,3 +415,10 @@ checked summary JSON for docs and later paper use.
 literature ladder used for the numerics/validation docs, comparing Shercliff
 and Hunt `y` and `z` cuts across multiple Hartmann numbers on the same
 normalization and with a checked summary JSON.
+
+`freemhd_closed_channel_parity.py` is the external straight-duct cross-check:
+it reuses fresh Shercliff and Hunt reruns from
+`/Users/rogerio/local/tests/freemhd_install/freemhd_output`, reconstructs
+matching LMX transient cases from the FreeMHD case files, compares normalized
+transverse and vertical cuts, records FreeMHD versus LMX wall times on the
+same host, and writes a publication-ready parity panel plus JSON summary.

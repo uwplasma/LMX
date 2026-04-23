@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import sys
 import time
@@ -63,6 +64,9 @@ class StreamingSolverLogger:
         self.config = config or LoggingSpec()
         self.streams: list[TextIO] = [stream or sys.stdout]
         self._start_time = time.perf_counter()
+        self._max_steps: int | None = None
+        self._target_final_time: float | None = None
+        self._mode: str = "steady"
 
     def add_stream(self, stream: TextIO) -> None:
         self.streams.append(stream)
@@ -88,6 +92,9 @@ class StreamingSolverLogger:
     ) -> None:
         if not self.config.is_enabled():
             return
+        self._max_steps = int(case.time_stepper.max_steps)
+        self._target_final_time = float(case.time_stepper.t_final)
+        self._mode = mode
         width = 92
         if self.config.banner:
             self._write("=" * width)
@@ -143,12 +150,37 @@ class StreamingSolverLogger:
                 )
         self._write("-" * width)
 
+    def _progress_fraction(self, record: SolverStepRecord) -> float | None:
+        candidates: list[float] = []
+        if self._max_steps is not None and self._max_steps > 0:
+            candidates.append(record.step_index / float(self._max_steps))
+        if self._target_final_time is not None and self._target_final_time > 0.0:
+            candidates.append(record.time / float(self._target_final_time))
+        if not candidates:
+            return None
+        return min(max(max(candidates), 0.0), 1.0)
+
+    @staticmethod
+    def _format_seconds(seconds: float | None) -> str:
+        if seconds is None or not math.isfinite(float(seconds)):
+            return "unknown"
+        total = max(float(seconds), 0.0)
+        minutes, secs = divmod(total, 60.0)
+        hours, minutes = divmod(minutes, 60.0)
+        if hours >= 1.0:
+            return f"{int(hours):02d}:{int(minutes):02d}:{secs:04.1f}"
+        return f"{int(minutes):02d}:{secs:04.1f}"
+
     def emit_step(self, record: SolverStepRecord) -> None:
         if not self.config.is_enabled():
             return
         if record.step_index > 1 and (record.step_index - 1) % max(self.config.step_stride, 1) != 0:
             return
         elapsed = time.perf_counter() - self._start_time
+        progress = self._progress_fraction(record)
+        average_step = elapsed / max(record.step_index, 1)
+        estimated_total = elapsed / progress if progress is not None and progress > 0.0 else None
+        remaining = estimated_total - elapsed if estimated_total is not None else None
         self._write(f"Time = {record.time:.6e}")
         self._write(
             "smoothSolver: potE             "
@@ -206,6 +238,18 @@ class StreamingSolverLogger:
             "steadySolver                   "
             f"velocity residual = {record.residual:.6e}"
         )
+        if progress is None:
+            self._write(
+                "Progress                       "
+                f"step = {record.step_index:d}, avgStepWallTime = {average_step:.3f} s"
+            )
+        else:
+            self._write(
+                "Progress                       "
+                f"step = {record.step_index:d}/{self._max_steps if self._max_steps is not None else '-'}, "
+                f"complete = {100.0 * progress:5.1f} %, avgStepWallTime = {average_step:.3f} s, "
+                f"remaining ≈ {self._format_seconds(remaining)}, total ≈ {self._format_seconds(estimated_total)}"
+            )
         self._write(f"ExecutionTime = {elapsed:.3f} s")
         self._write("")
 

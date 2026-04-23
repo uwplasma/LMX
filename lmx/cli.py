@@ -4,6 +4,7 @@ import argparse
 import json
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -262,6 +263,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         log_path = default_log_path(log_root, case.name)
         log_handle = open(log_path, "w", encoding="utf-8")
         logger.add_stream(log_handle)
+    solve_start = time.perf_counter()
     if solver_kind == "extruded_inductionless":
         restart_summary: dict[str, object] | None = None
         initial_bundle = None
@@ -314,6 +316,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
             shutil.copy2(config.input_path, copied_input)
             outputs.setdefault("input", []).append(copied_input)
         summary = _runtime_summary_extruded(solution, case, out_dir, outputs, restart_info=restart_summary)
+        summary["execution_seconds"] = time.perf_counter() - solve_start
         summary_path = _write_run_summary(summary, case, out_dir)
         if summary_path is not None:
             outputs.setdefault("json", []).append(summary_path)
@@ -378,6 +381,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         shutil.copy2(config.input_path, copied_input)
         outputs.setdefault("input", []).append(copied_input)
     summary = _runtime_summary(solution, case, out_dir, outputs, restart_info=restart_summary)
+    summary["execution_seconds"] = time.perf_counter() - solve_start
     summary_path = _write_run_summary(summary, case, out_dir)
     if summary_path is not None:
         outputs.setdefault("json", []).append(summary_path)

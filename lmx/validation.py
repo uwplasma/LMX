@@ -68,6 +68,15 @@ class ProcessedSliceValidation:
 
 
 @dataclass(frozen=True)
+class ReferenceProfileValidation:
+    sample_time: float
+    y_profile: AnalyticComparison
+    z_profile: AnalyticComparison
+    y_path: str
+    z_path: str
+
+
+@dataclass(frozen=True)
 class ReferenceCaseInspection:
     case_dir: str
     control_dicts: tuple[str, ...]
@@ -668,6 +677,37 @@ def processed_slice_validation(
     )
 
 
+def reference_profile_validation(
+    solution: Solution,
+    reference_run_dir: str | Path,
+) -> ReferenceProfileValidation:
+    sampled_profiles = latest_reference_sampled_profiles(reference_run_dir)
+    if sampled_profiles is None:
+        raise FileNotFoundError(f"No paired sampled reference profiles found under {reference_run_dir}")
+    y_sample, z_sample = sampled_profiles
+    y_profile = extract_midplane_profile(solution, axis="y", fluid_only=True)
+    z_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
+    y_comparison = compare_normalized_profiles(
+        y_profile["y"],
+        y_profile["u"],
+        normalize_sample_distance(y_sample.distance),
+        y_sample.u_x,
+    )
+    z_comparison = compare_normalized_profiles(
+        z_profile["z"],
+        z_profile["u"],
+        normalize_sample_distance(z_sample.distance),
+        z_sample.u_x,
+    )
+    return ReferenceProfileValidation(
+        sample_time=infer_sample_time_from_path(y_sample.path),
+        y_profile=y_comparison,
+        z_profile=z_comparison,
+        y_path=y_sample.path,
+        z_path=z_sample.path,
+    )
+
+
 def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -720,26 +760,12 @@ def compare_with_reference_outputs(case_spec: CaseSpec, reference_run_dir: str |
     if sampled_profiles is not None:
         if lmx_solution is None:
             lmx_solution = solve_transient(case_spec)
-        y_sample, z_sample = sampled_profiles
-        y_profile = extract_midplane_profile(lmx_solution, axis="y", fluid_only=True)
-        z_profile = extract_midplane_profile(lmx_solution, axis="z", fluid_only=True)
-        y_comparison = compare_normalized_profiles(
-            y_profile["y"],
-            y_profile["u"],
-            normalize_sample_distance(y_sample.distance),
-            y_sample.u_x,
-        )
-        z_comparison = compare_normalized_profiles(
-            z_profile["z"],
-            z_profile["u"],
-            normalize_sample_distance(z_sample.distance),
-            z_sample.u_x,
-        )
-        metrics["reference_sample_time"] = infer_sample_time_from_path(y_sample.path)
-        metrics["reference_sample_y_l2_error"] = y_comparison.l2_error
-        metrics["reference_sample_y_linf_error"] = y_comparison.linf_error
-        metrics["reference_sample_z_l2_error"] = z_comparison.l2_error
-        metrics["reference_sample_z_linf_error"] = z_comparison.linf_error
+        sample_validation = reference_profile_validation(lmx_solution, run_dir)
+        metrics["reference_sample_time"] = sample_validation.sample_time
+        metrics["reference_sample_y_l2_error"] = sample_validation.y_profile.l2_error
+        metrics["reference_sample_y_linf_error"] = sample_validation.y_profile.linf_error
+        metrics["reference_sample_z_l2_error"] = sample_validation.z_profile.l2_error
+        metrics["reference_sample_z_linf_error"] = sample_validation.z_profile.linf_error
     artifacts = {
         "reference_run_dir": str(run_dir),
         "control_dicts": json.dumps(inspection.control_dicts),
@@ -1067,6 +1093,39 @@ def read_reference_xy_sample(path: str | Path) -> ReferenceLineSample:
     )
 
 
+def read_reference_csv_sample(path: str | Path) -> ReferenceLineSample:
+    distance: list[float] = []
+    pot_e: list[float] = []
+    u_x: list[float] = []
+    u_y: list[float] = []
+    u_z: list[float] = []
+    with Path(path).open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if row is None:
+                continue
+            keys = tuple(row.keys())
+            if not keys:
+                continue
+            coordinate_key = keys[0]
+            try:
+                distance.append(float(row[coordinate_key]))
+                pot_e.append(float(row.get("p", 0.0)))
+                u_x.append(float(row.get("U_0", 0.0)))
+                u_y.append(float(row.get("U_1", 0.0)))
+                u_z.append(float(row.get("U_2", 0.0)))
+            except (TypeError, ValueError):
+                continue
+    return ReferenceLineSample(
+        path=str(Path(path)),
+        distance=jnp.asarray(distance, dtype=float),
+        pot_e=jnp.asarray(pot_e, dtype=float),
+        u_x=jnp.asarray(u_x, dtype=float),
+        u_y=jnp.asarray(u_y, dtype=float),
+        u_z=jnp.asarray(u_z, dtype=float),
+    )
+
+
 def infer_sample_time_from_path(path: str | Path) -> float:
     sample_path = Path(path)
     for parent in sample_path.parents:
@@ -1098,7 +1157,24 @@ def latest_reference_sampled_profiles(run_dir: str | Path) -> tuple[ReferenceLin
             latest_key = ordering_key
             latest_y_path = path
     if latest_y_path is None:
-        return None
+        csv_candidates = sorted(root.glob("postProcessing/outputLines/liquid/*/lineTransverse_p_U.csv"))
+        latest_csv_path: Path | None = None
+        latest_csv_key: tuple[float, int] | None = None
+        for path in csv_candidates:
+            try:
+                sample_time = infer_sample_time_from_path(path)
+            except ValueError:
+                continue
+            ordering_key = (sample_time, int(path.stat().st_mtime_ns))
+            if latest_csv_key is None or ordering_key > latest_csv_key:
+                latest_csv_key = ordering_key
+                latest_csv_path = path
+        if latest_csv_path is None:
+            return None
+        z_path = latest_csv_path.with_name("lineVertical_p_U.csv")
+        if not z_path.exists():
+            return None
+        return read_reference_csv_sample(latest_csv_path), read_reference_csv_sample(z_path)
     z_path = latest_y_path.with_name("centerlineZ_potE_U.xy")
     if not z_path.exists():
         return None

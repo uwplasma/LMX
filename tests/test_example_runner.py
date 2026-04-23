@@ -918,6 +918,43 @@ def test_interface_conductivity_verification_demo_writes_summary(tmp_path: Path)
     assert (tmp_path / "interface_conductivity_verification_summary.json").exists()
 
 
+def test_freemhd_closed_channel_parity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("freemhd_closed_channel_parity.py")
+    module.OUTPUT_DIR = tmp_path
+    module.FREEMHD_INSTALL_DIR = tmp_path / "freemhd_install"
+    (module.FREEMHD_INSTALL_DIR / "freemhd_output" / "shercliff").mkdir(parents=True)
+    (module.FREEMHD_INSTALL_DIR / "freemhd_output" / "hunt").mkdir(parents=True)
+
+    monkeypatch.setattr(
+        module,
+        "_run_case",
+        lambda case_kind, ha, reference_run_dir: {
+            "case_kind": case_kind,
+            "ha": ha,
+            "reference_run_dir": str(reference_run_dir),
+            "freemhd_execution_seconds": 35.0,
+            "lmx_execution_seconds": 2.0,
+            "u_max_abs_diff": 1.0e-3,
+            "y_l2_error": 5.0e-3,
+            "z_l2_error": 4.0e-3,
+            "y_profile": {"coordinate": [-1.0, 0.0, 1.0], "simulated": [0.0, 1.0, 0.0], "reference": [0.0, 1.0, 0.0]},
+            "z_profile": {"coordinate": [-1.0, 0.0, 1.0], "simulated": [0.0, 1.0, 0.0], "reference": [0.0, 1.0, 0.0]},
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "write_freemhd_parity_plots",
+        lambda records, out_dir, case_title: [Path(out_dir) / "freemhd_closed_channel_parity.png", Path(out_dir) / "freemhd_closed_channel_parity.pdf"],
+    )
+    (tmp_path / "freemhd_closed_channel_parity.png").write_bytes(b"img")
+    (tmp_path / "freemhd_closed_channel_parity.pdf").write_bytes(b"pdf")
+
+    summary = module.run_freemhd_closed_channel_parity()
+    assert summary["case"] == "freemhd_closed_channel_parity"
+    assert len(summary["records"]) == 2
+    assert (tmp_path / "freemhd_closed_channel_parity_summary.json").exists()
+
+
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_forced_validation.py")
     module.OUTPUT_DIR = tmp_path

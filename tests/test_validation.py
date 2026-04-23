@@ -42,6 +42,7 @@ from lmx.validation import (
     processed_slice_validation,
     read_reference_xy_sample,
     read_field_minmax,
+    read_reference_csv_sample,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
@@ -573,6 +574,32 @@ def test_sample_reader_and_latest_profile_detection(tmp_path: Path):
     normalized = normalize_sample_distance(sample.distance)
     assert float(normalized[0]) == pytest.approx(-1.0)
     assert float(normalized[-1]) == pytest.approx(1.0)
+
+
+def test_csv_sample_reader_and_latest_profile_detection(tmp_path: Path):
+    sample_root = tmp_path / "postProcessing" / "outputLines" / "liquid" / "1.0e-05"
+    sample_root.mkdir(parents=True)
+    rows = "\n".join(
+        [
+            "y,p,U_0,U_1,U_2",
+            "-0.1,100.0,0.0,0.0,0.0",
+            "0.0,90.0,1.0,0.0,0.0",
+            "0.1,100.0,0.0,0.0,0.0",
+        ]
+    )
+    y_path = sample_root / "lineTransverse_p_U.csv"
+    z_path = sample_root / "lineVertical_p_U.csv"
+    y_path.write_text(rows)
+    z_path.write_text(rows.replace("y,", "z,", 1))
+
+    sample = read_reference_csv_sample(y_path)
+    latest = latest_reference_sampled_profiles(tmp_path)
+
+    assert sample.distance.shape[0] == 3
+    assert float(sample.u_x[1]) == pytest.approx(1.0)
+    assert latest is not None
+    assert latest[0].path.endswith("lineTransverse_p_U.csv")
+    assert latest[1].path.endswith("lineVertical_p_U.csv")
 
 
 def test_extract_midplane_profile_fluid_only_excludes_layer_walls():

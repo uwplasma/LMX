@@ -279,6 +279,16 @@ side = "max"
 - at `detailed` and `debug`, the live log prints both initial and final
   residuals for the potential and velocity solves together with conservation
   diagnostics
+- the live `Progress` line now reports:
+  - completed step count
+  - completion fraction
+  - average wall time per step
+  - estimated remaining wall time
+  - estimated total wall time
+
+Run summaries written by the CLI and example surface now also include
+`execution_seconds`, so local performance and parity scripts can compare wall
+times without scraping terminal output.
 
 Recommended usage:
 

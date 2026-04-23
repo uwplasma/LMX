@@ -267,3 +267,5 @@ The first explicit examples following this pattern are:
   manuscript-facing straight-duct figures
 - `examples/straight_duct_validation_ladder.py` for the bounded Shercliff /
   Hunt multi-Ha literature ladder
+- `examples/freemhd_closed_channel_parity.py` for fresh LMX versus FreeMHD
+  transient straight-duct parity and runtime comparison on the same host

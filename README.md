@@ -65,6 +65,13 @@ solution = solve_steady(case)
 print(solution.diagnostics.residual_history[-1])
 ```
 
+Live runtime feedback:
+
+- the CLI logger prints `Progress` lines with completed step fraction, average
+  wall time per step, estimated remaining time, and estimated total runtime
+- the generated run summary JSON now includes `execution_seconds`, so example,
+  benchmark, and CLI runs can be compared on the same host without parsing logs
+
 Post-processing from Python:
 
 ```python
@@ -477,6 +484,7 @@ Useful entry points:
 - `examples/shercliff_showcase.py`: Shercliff boundary-layer, annotated cross-section, 3D profile, and startup media
 - `examples/hunt_showcase.py`: Hunt boundary-layer, annotated cross-section, 3D profile, and startup media
 - `examples/straight_duct_profile_comparison.py`: analytical versus LMX Shercliff/Hunt profile overlay
+- `examples/freemhd_closed_channel_parity.py`: fresh LMX versus FreeMHD transient parity and runtime comparison on the same host
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

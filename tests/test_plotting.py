@@ -19,6 +19,7 @@ from lmx.plotting import (
     write_geometry_gallery_plots,
     write_geometry_preview_plots,
     write_interface_verification_plots,
+    write_freemhd_parity_plots,
     write_magnetic_obstacle_regime_plots,
     write_operator_verification_plots,
     write_strong_scaling_plots,
@@ -240,6 +241,51 @@ def test_movie_field_stack_rejects_unknown_mode():
 
 def test_write_transient_movies_returns_empty_list_for_empty_frames(tmp_path: Path):
     assert write_transient_movies([], tmp_path, case_title="empty") == []
+
+
+def test_write_freemhd_parity_plots_writes_outputs(tmp_path: Path):
+    records = [
+        {
+            "case_kind": "shercliff",
+            "freemhd_execution_seconds": 35.0,
+            "lmx_execution_seconds": 2.5,
+            "u_max_abs_diff": 1.0e-3,
+            "y_l2_error": 5.0e-3,
+            "z_l2_error": 3.0e-3,
+            "y_profile": {
+                "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
+                "simulated": np.array([0.0, 0.8, 1.0, 0.8, 0.0]).tolist(),
+                "reference": np.array([0.0, 0.82, 1.0, 0.82, 0.0]).tolist(),
+            },
+            "z_profile": {
+                "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
+                "simulated": np.array([0.0, 0.75, 1.0, 0.75, 0.0]).tolist(),
+                "reference": np.array([0.0, 0.77, 1.0, 0.77, 0.0]).tolist(),
+            },
+        },
+        {
+            "case_kind": "hunt",
+            "freemhd_execution_seconds": 36.0,
+            "lmx_execution_seconds": 2.8,
+            "u_max_abs_diff": 2.0e-3,
+            "y_l2_error": 8.0e-3,
+            "z_l2_error": 6.0e-3,
+            "y_profile": {
+                "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
+                "simulated": np.array([0.0, 0.9, 0.8, 0.9, 0.0]).tolist(),
+                "reference": np.array([0.0, 0.92, 0.78, 0.92, 0.0]).tolist(),
+            },
+            "z_profile": {
+                "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
+                "simulated": np.array([0.0, 0.7, 1.0, 0.7, 0.0]).tolist(),
+                "reference": np.array([0.0, 0.72, 1.0, 0.72, 0.0]).tolist(),
+            },
+        },
+    ]
+    outputs = write_freemhd_parity_plots(records, tmp_path, case_title="Parity demo")
+    assert outputs == [tmp_path / "freemhd_closed_channel_parity.png", tmp_path / "freemhd_closed_channel_parity.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
 
 
 def test_safe_writer_candidates_prefers_imagemagick_when_available(monkeypatch: pytest.MonkeyPatch):

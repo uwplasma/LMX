@@ -2128,3 +2128,74 @@ def write_interface_verification_plots(
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
     return [png_path, pdf_path]
+
+
+def write_freemhd_parity_plots(
+    records: list[dict[str, object]],
+    out_dir: str | Path,
+    *,
+    case_title: str,
+) -> list[Path]:
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.5, 9.0), constrained_layout=True)
+    fig.suptitle(case_title, fontsize=16)
+
+    case_axes = [axes[0, 0], axes[0, 1]]
+    colors_case = {"y": "#1d4ed8", "z": "#dc2626"}
+    for ax, record in zip(case_axes, records[:2], strict=False):
+        case_name = str(record["case_kind"]).capitalize()
+        for axis, label in (("y", "Transverse cut"), ("z", "Vertical cut")):
+            profile = record[f"{axis}_profile"]
+            coordinate = np.asarray(profile["coordinate"], dtype=float)
+            simulated = np.asarray(profile["simulated"], dtype=float)
+            reference = np.asarray(profile["reference"], dtype=float)
+            color = colors_case[axis]
+            ax.plot(coordinate, reference, color=color, linewidth=2.0, label=f"{label} FreeMHD")
+            ax.plot(coordinate, simulated, color=color, linewidth=1.9, linestyle="--", label=f"{label} LMX")
+        ax.set_title(
+            f"{case_name} parity\n"
+            f"$L_2(y)$={float(record['y_l2_error']):.2e}, "
+            f"$L_2(z)$={float(record['z_l2_error']):.2e}"
+        )
+        ax.set_xlabel("Normalized coordinate")
+        ax.set_ylabel(r"$u/u_{max}$")
+        ax.set_xlim(-1.0, 1.0)
+        ax.set_ylim(-0.02, 1.08)
+        ax.legend(loc="lower center", ncol=2, fontsize=10)
+
+    names = [str(record["case_kind"]).capitalize() for record in records]
+    freemhd_times = np.asarray([float(record["freemhd_execution_seconds"]) for record in records], dtype=float)
+    lmx_times = np.asarray([float(record["lmx_execution_seconds"]) for record in records], dtype=float)
+    y_l2 = np.asarray([float(record["y_l2_error"]) for record in records], dtype=float)
+    z_l2 = np.asarray([float(record["z_l2_error"]) for record in records], dtype=float)
+    u_max_diff = np.asarray([float(record["u_max_abs_diff"]) for record in records], dtype=float)
+
+    ax = axes[1, 0]
+    x_positions = np.arange(len(names), dtype=float)
+    width = 0.34
+    ax.bar(x_positions - 0.5 * width, freemhd_times, width=width, color="#0f766e", label="FreeMHD wall time")
+    ax.bar(x_positions + 0.5 * width, lmx_times, width=width, color="#b45309", label="LMX wall time")
+    ax.set_xticks(x_positions, names)
+    ax.set_ylabel("Seconds")
+    ax.set_title("Runtime comparison on the same host")
+    ax.legend(loc="upper left", fontsize=10)
+
+    ax = axes[1, 1]
+    ax.semilogy(x_positions, y_l2, marker="o", color="#1d4ed8", label=r"$L_2(y)$")
+    ax.semilogy(x_positions, z_l2, marker="s", color="#dc2626", label=r"$L_2(z)$")
+    ax.semilogy(x_positions, np.maximum(u_max_diff, 1.0e-12), marker="^", color="#7c3aed", label=r"$|u_{max}^{LMX} - u_{max}^{FreeMHD}|$")
+    ax.axhline(1.2e-2, color="#64748b", linestyle=":", linewidth=1.4, label=r"Acceptance target $1.2\times10^{-2}$")
+    ax.set_xticks(x_positions, names)
+    ax.set_ylabel("Error")
+    ax.set_title("Profile and peak-velocity mismatch")
+    ax.legend(loc="upper right", fontsize=10)
+
+    png_path = out_dir / "freemhd_closed_channel_parity.png"
+    pdf_path = out_dir / "freemhd_closed_channel_parity.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]

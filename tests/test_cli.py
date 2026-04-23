@@ -205,6 +205,8 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(tmp_path: Path
     monkeypatch.setattr(cli, "load_restart_bundle", lambda path: bundle)
     monkeypatch.setattr(cli, "validate_restart_bundle", lambda bundle, mesh, geometry_kind, case_name: None)
     monkeypatch.setattr(cli, "_build_mesh", lambda built_case: SimpleNamespace())
+    perf_values = iter([10.0, 13.5])
+    monkeypatch.setattr(cli.time, "perf_counter", lambda: next(perf_values))
     monkeypatch.setattr(
         cli,
         "_solve_case_with_optional_logger",
@@ -222,6 +224,7 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(tmp_path: Path
     assert summary["restart"]["enabled"] is True
     assert summary["restart"]["start_time"] == pytest.approx(0.2)
     assert summary["restart"]["output"] == "resume_state.npz"
+    assert summary["execution_seconds"] == pytest.approx(3.5)
     assert '"restart"' in capsys.readouterr().out
 
 
@@ -263,6 +266,8 @@ def test_run_config_dispatches_extruded_solver_kind(tmp_path: Path, monkeypatch:
         "build_extruded_problem_from_case",
         lambda built_case, **kwargs: recorded.update(problem_kwargs=kwargs) or SimpleNamespace(case=built_case),
     )
+    perf_values = iter([20.0, 26.0])
+    monkeypatch.setattr(cli.time, "perf_counter", lambda: next(perf_values))
     monkeypatch.setattr(cli, "solve_extruded_inductionless", lambda problem, initial_bundle=None: solution)
     monkeypatch.setattr(
         cli,
@@ -277,6 +282,7 @@ def test_run_config_dispatches_extruded_solver_kind(tmp_path: Path, monkeypatch:
     assert recorded["problem_kwargs"]["exit_center"] == pytest.approx(4.0)
     assert summary["solver_kind"] == "extruded_inductionless"
     assert summary["station_count"] == 2
+    assert summary["execution_seconds"] == pytest.approx(6.0)
     assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
 
 

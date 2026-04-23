@@ -196,6 +196,7 @@ _EXPORTS = {
     "write_autodiff_plots": ("lmx.plotting", "write_autodiff_plots"),
     "write_operator_verification_plots": ("lmx.plotting", "write_operator_verification_plots"),
     "write_interface_verification_plots": ("lmx.plotting", "write_interface_verification_plots"),
+    "write_freemhd_parity_plots": ("lmx.plotting", "write_freemhd_parity_plots"),
     "solve_closed_channel_benchmark": ("lmx.showcase", "solve_closed_channel_benchmark"),
     "write_lm_duct_geometry_setup_figure": ("lmx.showcase", "write_lm_duct_geometry_setup_figure"),
     "write_structured_mesh_figure": ("lmx.showcase", "write_structured_mesh_figure"),

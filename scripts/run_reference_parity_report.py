@@ -3,15 +3,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.specs import BoundaryCondition
+from lmx.freemhd import (
+    _extract_inlet_block,
+    build_case_from_freemhd_reference,
+    infer_initial_velocity_x,
+    infer_inlet_drive_mode,
+    infer_inlet_flow_rate,
+    infer_magnetic_ramp,
+    infer_reduced_inlet_flow_rate,
+)
 from lmx.validation import ValidationReport, compare_with_reference_outputs, write_validation_report
 
 
@@ -27,122 +32,9 @@ def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -
             return candidate.name if candidate.name else str(candidate)
 
 
-def _candidate_u_paths(case_dir: str | Path) -> list[Path]:
-    root = Path(case_dir)
-    return [
-        root / "0" / "liquid" / "U",
-        root / "0" / "fluid" / "U",
-    ]
-
-
-def infer_initial_velocity_x(case_dir: str | Path) -> float | None:
-    pattern = re.compile(r"internalField\s+uniform\s+\(\s*(\S+)\s+\S+\s+\S+\s*\)")
-    for path in _candidate_u_paths(case_dir):
-        if not path.exists():
-            continue
-        text = path.read_text()
-        match = pattern.search(text)
-        if match is None:
-            continue
-        return float(match.group(1))
-    return None
-
-
-def _extract_inlet_block(text: str) -> str | None:
-    boundary_match = re.search(r"boundaryField\s*\{", text)
-    if boundary_match is None:
-        return None
-    boundary_text = text[boundary_match.end() :]
-    inlet_match = re.search(r"\binlet\b\s*\{", boundary_text)
-    if inlet_match is None:
-        return None
-    start = inlet_match.end()
-    depth = 1
-    index = start
-    while index < len(boundary_text) and depth > 0:
-        char = boundary_text[index]
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-        index += 1
-    if depth != 0:
-        return None
-    return boundary_text[start : index - 1]
-
-
-def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
-    pattern = re.compile(r"volumetricFlowRate\s+(\S+)\s*;")
-    for path in _candidate_u_paths(case_dir):
-        if not path.exists():
-            continue
-        inlet_block = _extract_inlet_block(path.read_text())
-        if inlet_block is None:
-            continue
-        match = pattern.search(inlet_block)
-        if match is None:
-            continue
-        return float(match.group(1))
-    return None
-
-
-def infer_reduced_inlet_flow_rate(
-    case_dir: str | Path,
-    *,
-    reduced_area: float,
-    initial_velocity: float | None = None,
-) -> float | None:
-    recovered_flow_rate = infer_inlet_flow_rate(case_dir)
-    if recovered_flow_rate is None:
-        return None
-    speed = initial_velocity
-    if speed is None:
-        speed = infer_initial_velocity_x(case_dir)
-    if speed is None or abs(speed) <= 1e-20:
-        return None
-    recovered_area = recovered_flow_rate / speed
-    if abs(recovered_area) <= 1e-20:
-        return None
-    return recovered_flow_rate * (reduced_area / recovered_area)
-
-
-def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
-    type_pattern = re.compile(r"type\s+(\S+)\s*;")
-    for path in _candidate_u_paths(case_dir):
-        if not path.exists():
-            continue
-        inlet_block = _extract_inlet_block(path.read_text())
-        if inlet_block is None:
-            continue
-        match = type_pattern.search(inlet_block)
-        if match is None:
-            continue
-        inlet_type = match.group(1)
-        if inlet_type == "flowRateInletVelocity":
-            return "inlet_flow_rate"
-        return "inlet_velocity"
-    return None
-
-
-def _infer_control_dict_scalar(case_dir: str | Path, key: str) -> float | None:
-    path = Path(case_dir) / "system" / "controlDict"
-    if not path.exists():
-        return None
-    pattern = re.compile(rf"{re.escape(key)}\s+(\S+)\s*;")
-    match = pattern.search(path.read_text())
-    if match is None:
-        return None
-    return float(match.group(1))
-
-
-def infer_magnetic_ramp(case_dir: str | Path) -> tuple[float, float]:
-    start = _infer_control_dict_scalar(case_dir, "BtStartTime")
-    duration = _infer_control_dict_scalar(case_dir, "BtDuration")
-    return (0.0 if start is None else start, 0.0 if duration is None else duration)
-
-
 def build_case(
     case_kind: str,
+    *,
     ha: float,
     ny: int,
     nz: int,
@@ -156,6 +48,11 @@ def build_case(
     ramp_start: float = 0.0,
     ramp_duration: float = 0.0,
 ):
+    from dataclasses import replace
+
+    from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+    from lmx.specs import BoundaryCondition
+
     factories = {
         "hartmann": make_hartmann_case,
         "shercliff": make_shercliff_case,
@@ -197,57 +94,49 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    initial_velocity = args.initial_velocity
-    if initial_velocity is None:
-        initial_velocity = infer_initial_velocity_x(args.reference_run_dir) or 0.0
-    ramp_start, ramp_duration = infer_magnetic_ramp(args.reference_run_dir)
-    inferred_drive_mode = infer_inlet_drive_mode(args.reference_run_dir) if args.case_kind == "hunt" else None
     recovered_inlet_flow_rate = infer_inlet_flow_rate(args.reference_run_dir) if args.case_kind == "hunt" else None
     reduced_inlet_flow_rate = None
-    drive_mode = "none"
-    case_factory = {"hartmann": make_hartmann_case, "shercliff": make_shercliff_case, "hunt": make_hunt_case}[args.case_kind]
-    geometry_case = case_factory(ha=args.ha, ny=args.ny, nz=args.nz)
-    reduced_area = geometry_case.geometry.width * geometry_case.geometry.height
     if args.case_kind == "hunt":
+        initial_velocity = infer_initial_velocity_x(args.reference_run_dir) or 0.0
+        geometry_case = build_case(
+            args.case_kind,
+            ha=args.ha,
+            ny=args.ny,
+            nz=args.nz,
+            initial_velocity=initial_velocity,
+            dt=args.dt,
+            t_final=args.t_final,
+            max_steps=args.max_steps,
+            forcing=0.0,
+        )
         reduced_inlet_flow_rate = infer_reduced_inlet_flow_rate(
             args.reference_run_dir,
-            reduced_area=reduced_area,
+            reduced_area=geometry_case.geometry.width * geometry_case.geometry.height,
             initial_velocity=initial_velocity,
         )
-    if args.forcing is None and args.case_kind == "hunt":
-        drive_mode = inferred_drive_mode or "inlet_velocity"
-
-    case = build_case(
+    case = build_case_from_freemhd_reference(
         case_kind=args.case_kind,
         ha=args.ha,
         ny=args.ny,
         nz=args.nz,
-        initial_velocity=initial_velocity,
         dt=args.dt,
         t_final=args.t_final,
         max_steps=args.max_steps,
-        forcing=0.0 if args.forcing is None else args.forcing,
-        drive_mode=drive_mode if args.forcing is None else None,
-        inlet_flow_rate=reduced_inlet_flow_rate,
-        ramp_start=ramp_start,
-        ramp_duration=ramp_duration,
+        reference_run_dir=args.reference_run_dir,
+        forcing=args.forcing,
     )
-    if args.forcing is None and args.case_kind != "hunt":
-        drive_mode = "none"
-    elif args.forcing is not None:
-        drive_mode = "explicit_forcing"
     report = compare_with_reference_outputs(case, args.reference_run_dir)
     write_validation_report(report, args.output)
     payload = {
         "case_kind": args.case_kind,
         "ha": args.ha,
-        "initial_velocity": initial_velocity,
+        "initial_velocity": case.initial_velocity,
         "forcing": case.forcing,
-        "drive_mode": drive_mode,
+        "drive_mode": "explicit_forcing" if args.forcing is not None else ((infer_inlet_drive_mode(args.reference_run_dir) or "inlet_velocity") if args.case_kind == "hunt" else "none"),
         "recovered_inlet_flow_rate": recovered_inlet_flow_rate,
         "reduced_inlet_flow_rate": reduced_inlet_flow_rate,
-        "magnetic_ramp_start": ramp_start,
-        "magnetic_ramp_duration": ramp_duration,
+        "magnetic_ramp_start": case.magnetic_field.ramp_start,
+        "magnetic_ramp_duration": case.magnetic_field.ramp_duration,
         "reference_run_dir": _portable_path(args.reference_run_dir),
         "output": _portable_path(args.output),
         "metrics": report.metrics,
