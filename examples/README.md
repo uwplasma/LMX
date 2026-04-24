@@ -365,6 +365,11 @@ Those examples are the current executable localized-field response entry points:
   - record streamwise wake-deficit, centerline recovery, pressure-excess,
     distortion, and conservation metrics
   - mark the result as an internal response gate, not an external literature validation
+  - if `magnetic_obstacle_reference_observables.csv` exists in the output
+    directory, write an external-reference comparison CSV and PNG/PDF
+    observable-parity plot
+  - otherwise write `magnetic_obstacle_reference_observables_template.csv` so
+    digitized literature or experimental data can be added without changing the script
 - `magnetic_obstacle_regime_scan.py`
   - sweep localized-field obstacle runs over `Bz` scale and forcing
   - write a compact response-map figure over velocity deficit, pressure excess,

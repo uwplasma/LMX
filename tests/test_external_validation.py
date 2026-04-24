@@ -8,6 +8,7 @@ from lmx.external_validation import (
     compare_magnetic_obstacle_reference_observables,
     load_magnetic_obstacle_reference_observables,
     magnetic_obstacle_reference_template_rows,
+    write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
 )
@@ -53,6 +54,25 @@ def test_compare_magnetic_obstacle_reference_observables_writes_publication_tabl
     assert comparison["validation_pass"] is False
     assert "current_proxy_peak" in comparison["extra_lmx_observables"]
     assert table_path.read_text(encoding="utf-8").startswith("observable,lmx_value,reference_value")
+
+
+def test_write_magnetic_obstacle_reference_comparison_plots(tmp_path: Path):
+    comparison = compare_magnetic_obstacle_reference_observables(
+        {
+            "centerline_velocity_deficit_ratio": 0.26,
+            "wake_recovery_ratio": 0.91,
+        },
+        {
+            "centerline_velocity_deficit_ratio": {"value": 0.25, "tolerance": 0.02},
+            "wake_recovery_ratio": {"value": 0.95, "tolerance": 0.02},
+        },
+    )
+
+    paths = write_magnetic_obstacle_reference_comparison_plots(comparison, tmp_path)
+
+    assert [path.suffix for path in paths] == [".png", ".pdf"]
+    assert all(path.exists() for path in paths)
+    assert all(path.stat().st_size > 0 for path in paths)
 
 
 def test_compare_magnetic_obstacle_reference_observables_reports_missing_lmx_observable():

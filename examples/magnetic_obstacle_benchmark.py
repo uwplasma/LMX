@@ -8,12 +8,17 @@ import jax.numpy as jnp
 
 from lmx import (
     build_magnetic_obstacle_rect_extruded_problem,
+    compare_magnetic_obstacle_reference_observables,
+    load_magnetic_obstacle_reference_observables,
     solve_extruded_inductionless,
     validate_magnetic_obstacle_external_readiness,
     validate_magnetic_obstacle_benchmark,
     validate_magnetic_obstacle_literature_slice,
     write_extruded_overview_plots,
     write_magnetic_obstacle_benchmark_plots,
+    write_magnetic_obstacle_reference_comparison_plots,
+    write_magnetic_obstacle_reference_comparison_table,
+    write_magnetic_obstacle_reference_template,
 )
 
 
@@ -28,6 +33,8 @@ FORCING = 2.0
 MAX_STEPS = 24
 COUPLING_ITERATIONS = 10
 POTENTIAL_ITERATIONS = 48
+EXTERNAL_REFERENCE_FILENAME = "magnetic_obstacle_reference_observables.csv"
+EXTERNAL_REFERENCE_TEMPLATE_FILENAME = "magnetic_obstacle_reference_observables_template.csv"
 
 
 def run_magnetic_obstacle_benchmark() -> dict[str, object]:
@@ -75,6 +82,11 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
             case_title="Magnetic-obstacle internal response",
         ),
     ]
+    external_reference_comparison = _write_external_reference_artifacts(
+        external_readiness["observables"],
+        OUTPUT_DIR,
+    )
+    plots.extend(Path(path) for path in external_reference_comparison.get("plots", []))
     summary = {
         "case": "magnetic_obstacle_benchmark",
         "geometry_kind": solution.bundle.geometry_kind,
@@ -90,9 +102,42 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
         "validation": validation,
         "literature_validation": literature_validation,
         "external_readiness": external_readiness,
+        "external_reference_comparison": external_reference_comparison,
     }
     (OUTPUT_DIR / "magnetic_obstacle_benchmark_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary
+
+
+def _write_external_reference_artifacts(lmx_observables: dict[str, float], out_dir: Path) -> dict[str, object]:
+    reference_path = out_dir / EXTERNAL_REFERENCE_FILENAME
+    if not reference_path.exists():
+        template_path = write_magnetic_obstacle_reference_template(out_dir / EXTERNAL_REFERENCE_TEMPLATE_FILENAME)
+        return {
+            "status": "external_reference_csv_missing",
+            "validation_pass": False,
+            "reference_path": reference_path.name,
+            "template_path": template_path.name,
+            "note": (
+                "Fill the template with digitized literature or experimental observables "
+                "to turn this internal response gate into an external-reference comparison."
+            ),
+        }
+
+    reference_observables = load_magnetic_obstacle_reference_observables(reference_path)
+    comparison = compare_magnetic_obstacle_reference_observables(lmx_observables, reference_observables)
+    table_path = write_magnetic_obstacle_reference_comparison_table(
+        comparison,
+        out_dir / "magnetic_obstacle_reference_comparison.csv",
+    )
+    plot_paths = write_magnetic_obstacle_reference_comparison_plots(comparison, out_dir)
+    return {
+        "status": "external_reference_compared",
+        "validation_pass": bool(comparison["validation_pass"]),
+        "reference_path": reference_path.name,
+        "comparison_table": table_path.name,
+        "plots": [path.name for path in plot_paths],
+        "comparison": comparison,
+    }
 
 
 if __name__ == "__main__":

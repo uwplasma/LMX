@@ -141,6 +141,106 @@ def write_magnetic_obstacle_reference_comparison_table(
     return out
 
 
+def write_magnetic_obstacle_reference_comparison_plots(
+    comparison: Mapping[str, object],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "magnetic_obstacle_reference_comparison",
+) -> list[Path]:
+    """Write PNG/PDF plots for a magnetic-obstacle reference comparison.
+
+    The figure is intentionally observable-level rather than field-level: the
+    external magnetic-obstacle references are expected to come from digitized
+    literature or experimental scalar observables first. Field overlays belong
+    in case-specific examples once a fully matched reference dataset exists.
+    """
+
+    import matplotlib.pyplot as plt
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rows = [dict(row) for row in comparison.get("rows", []) if dict(row).get("status") == "compared"]
+    missing_count = int(comparison.get("missing_lmx_observable_count", 0))
+
+    fig, axes = plt.subplots(2, 1, figsize=(8.4, 6.2), constrained_layout=True)
+    if not rows:
+        for ax in axes:
+            ax.axis("off")
+        axes[0].text(
+            0.5,
+            0.5,
+            "No compared magnetic-obstacle observables",
+            ha="center",
+            va="center",
+            fontsize=13,
+            transform=axes[0].transAxes,
+        )
+        axes[1].text(
+            0.5,
+            0.5,
+            f"Missing LMX observables: {missing_count}",
+            ha="center",
+            va="center",
+            fontsize=11,
+            transform=axes[1].transAxes,
+        )
+    else:
+        labels = [_compact_observable_label(str(row["observable"])) for row in rows]
+        x = np.arange(len(rows), dtype=float)
+        lmx_values = np.asarray([float(row["lmx_value"]) for row in rows], dtype=float)
+        reference_values = np.asarray([float(row["reference_value"]) for row in rows], dtype=float)
+        absolute_errors = np.asarray([float(row["absolute_error"]) for row in rows], dtype=float)
+        tolerances = np.asarray([float(row["effective_tolerance"]) for row in rows], dtype=float)
+        pass_flags = [bool(row["validation_pass"]) for row in rows]
+
+        width = 0.36
+        axes[0].bar(x - width / 2.0, reference_values, width=width, label="reference", color="#2f5f8f")
+        axes[0].bar(x + width / 2.0, lmx_values, width=width, label="LMX", color="#d46f2c")
+        axes[0].set_ylabel("observable value")
+        axes[0].set_title("Magnetic-obstacle external-reference observables")
+        axes[0].set_xticks(x, labels)
+        axes[0].legend(frameon=False, ncols=2)
+        axes[0].grid(True, axis="y", alpha=0.25)
+
+        ratios = np.divide(
+            absolute_errors,
+            tolerances,
+            out=np.full_like(absolute_errors, np.inf),
+            where=tolerances > 0.0,
+        )
+        finite = ratios[np.isfinite(ratios)]
+        fallback_height = float(max(2.0, np.max(finite) * 1.15)) if finite.size else 2.0
+        plot_ratios = np.where(np.isfinite(ratios), ratios, fallback_height)
+        colors = ["#2a9d8f" if flag else "#c2410c" for flag in pass_flags]
+        axes[1].bar(x, plot_ratios, color=colors)
+        axes[1].axhline(1.0, color="black", linestyle="--", linewidth=1.0, label="tolerance")
+        axes[1].set_ylabel("|LMX - ref| / tolerance")
+        axes[1].set_xticks(x, labels)
+        axes[1].set_ylim(0.0, max(1.25, float(np.max(plot_ratios)) * 1.18))
+        axes[1].grid(True, axis="y", alpha=0.25)
+        axes[1].legend(frameon=False)
+        if missing_count:
+            axes[1].text(
+                0.99,
+                0.96,
+                f"missing LMX observables: {missing_count}",
+                ha="right",
+                va="top",
+                fontsize=9,
+                transform=axes[1].transAxes,
+            )
+        for xi, ratio in zip(x, ratios, strict=True):
+            if not np.isfinite(ratio):
+                axes[1].text(xi, fallback_height, "inf", ha="center", va="bottom", fontsize=8)
+
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
+    for path in (png_path, pdf_path):
+        fig.savefig(path, dpi=180)
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
 def magnetic_obstacle_reference_template_rows() -> list[dict[str, str]]:
     """Return the scalar-observable CSV template expected for external parity."""
 
@@ -206,3 +306,22 @@ def _parse_float(value: str | None, *, row_number: int, column: str) -> float:
     if not np.isfinite(parsed):
         raise ValueError(f"Magnetic-obstacle reference CSV row {row_number} has a non-finite {column}")
     return parsed
+
+
+def _compact_observable_label(observable: str) -> str:
+    tokens = observable.replace("_", " ").split()
+    lines: list[str] = []
+    current: list[str] = []
+    current_length = 0
+    for token in tokens:
+        proposed_length = current_length + len(token) + (1 if current else 0)
+        if current and proposed_length > 18:
+            lines.append(" ".join(current))
+            current = [token]
+            current_length = len(token)
+        else:
+            current.append(token)
+            current_length = proposed_length
+    if current:
+        lines.append(" ".join(current))
+    return "\n".join(lines)

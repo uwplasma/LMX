@@ -348,6 +348,12 @@ The external parity data contract is now explicit:
   compares LMX readiness observables against those reference rows
 - `write_magnetic_obstacle_reference_comparison_table(...)`
   writes the resulting publication-table-ready CSV
+- `write_magnetic_obstacle_reference_comparison_plots(...)`
+  writes the paired PNG/PDF observable comparison and error/tolerance gate
+- `examples/magnetic_obstacle_benchmark.py`
+  automatically emits those external-reference artifacts when a filled
+  `magnetic_obstacle_reference_observables.csv` is present, and otherwise
+  emits the template while keeping the lane marked open
 
 This closes the bookkeeping gap for external parity. The remaining scientific
 gap is still the actual digitization or generation of a matched external

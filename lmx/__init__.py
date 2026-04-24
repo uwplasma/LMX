@@ -145,6 +145,7 @@ __all__ = [
     "write_q2d_turbulence_observable_plots",
     "load_magnetic_obstacle_reference_observables",
     "magnetic_obstacle_reference_template_rows",
+    "write_magnetic_obstacle_reference_comparison_plots",
     "write_magnetic_obstacle_reference_comparison_table",
     "write_magnetic_obstacle_reference_template",
 ]
@@ -192,6 +193,10 @@ _EXPORTS = {
     "write_magnetic_obstacle_reference_comparison_table": (
         "lmx.external_validation",
         "write_magnetic_obstacle_reference_comparison_table",
+    ),
+    "write_magnetic_obstacle_reference_comparison_plots": (
+        "lmx.external_validation",
+        "write_magnetic_obstacle_reference_comparison_plots",
     ),
     "write_magnetic_obstacle_reference_template": (
         "lmx.external_validation",

@@ -315,9 +315,13 @@ The external-reference contract is now executable rather than implicit:
 schema for digitized observables, and
 `compare_magnetic_obstacle_reference_observables(...)` compares those rows
 against the LMX readiness observables with explicit absolute or relative
-tolerances. This keeps the magnetic-obstacle lane ready for literature data
-without reclassifying the current matched-no-field comparison as external
-validation.
+tolerances. `examples/magnetic_obstacle_benchmark.py` also checks for a filled
+`magnetic_obstacle_reference_observables.csv` in its output directory; when it
+is present, the run writes a publication-ready comparison CSV plus PNG/PDF
+observable parity plots. When it is absent, the run writes the template and
+keeps the validation status explicitly open. This keeps the magnetic-obstacle
+lane ready for literature data without reclassifying the current
+matched-no-field comparison as external validation.
 
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 

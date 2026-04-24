@@ -55,6 +55,13 @@ recovery ratio, pressure-drop proxy, and peak current or Lorentz-force proxy.
 `write_magnetic_obstacle_reference_comparison_table(...)` writes the resulting
 publication-table-ready CSV for the validation docs and later manuscript
 tables.
+`write_magnetic_obstacle_reference_comparison_plots(...)` writes the matching
+PNG/PDF artifact: a reference-vs-LMX observable panel plus an
+error-over-tolerance gate. The executable
+`examples/magnetic_obstacle_benchmark.py` uses this path automatically when a
+filled `magnetic_obstacle_reference_observables.csv` exists in its output
+directory; otherwise it writes the template and leaves the external validation
+status open.
 
 ## Rationale
 

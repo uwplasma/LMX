@@ -9,6 +9,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.compare_magnetic_obstacle_reference_observables)
     assert callable(lmx.load_magnetic_obstacle_reference_observables)
     assert callable(lmx.magnetic_obstacle_reference_template_rows)
+    assert callable(lmx.write_magnetic_obstacle_reference_comparison_plots)
     assert callable(lmx.write_magnetic_obstacle_reference_comparison_table)
     assert callable(lmx.write_magnetic_obstacle_reference_template)
     assert callable(lmx.enable_compilation_cache)

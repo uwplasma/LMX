@@ -164,8 +164,11 @@ refer to the Samper et al. taxonomy.
   `load_magnetic_obstacle_reference_observables(...)`,
   `compare_magnetic_obstacle_reference_observables(...)`,
   `write_magnetic_obstacle_reference_comparison_table(...)`, and
-  `examples/magnetic_obstacle_external_reference_template.py`; the remaining
-  work is scientific data acquisition, not comparison plumbing.
+  `write_magnetic_obstacle_reference_comparison_plots(...)`; the benchmark
+  driver now emits the comparison table and PNG/PDF gate automatically when a
+  filled `magnetic_obstacle_reference_observables.csv` is present, and emits
+  the template otherwise. The remaining work is scientific data acquisition,
+  not comparison plumbing.
 - Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
   tests as verification, then add Sommeria-Moreau-style closure observables and
   literature-facing turbulent energy/decay spectra before making any turbulent
@@ -1022,6 +1025,11 @@ Current localized magnetic-obstacle response lane:
   stronger-inertia obstacle regimes, literature parity on magnetic-obstacle
   observables, a more forceful executable mirror-field pipe response, and
   truly turbulent 3D validation
+- external-reference artifact path:
+  if a filled `magnetic_obstacle_reference_observables.csv` is present,
+  `examples/magnetic_obstacle_benchmark.py` now writes the comparison CSV plus
+  PNG/PDF observable parity gate; if not, it writes the template and leaves the
+  external validation status open
 - current bounded result from `examples/magnetic_obstacle_benchmark.py`:
   `peak_velocity_deficit_ratio ≈ 3.23e-2`,
   `peak_station_velocity_deficit_ratio ≈ 2.87e-2`,

@@ -1169,6 +1169,8 @@ def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
     assert summary["validation"]["reference_kind"] == "matched_no_field_lmx"
     assert summary["validation"]["research_grade_validation_pass"] is False
     assert summary["literature_validation"]["literature_pass"] is False
+    assert summary["external_reference_comparison"]["status"] == "external_reference_csv_missing"
+    assert (tmp_path / "magnetic_obstacle_reference_observables_template.csv").exists()
 
 
 def test_magnetic_obstacle_external_reference_template_writes_summary(tmp_path: Path):
