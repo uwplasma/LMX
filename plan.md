@@ -1499,12 +1499,11 @@ That retained gate now passes for all three retained fringing geometries.
       parsed from the reference filenames; this fixes the previous arbitrary
       unit-forcing scale mismatch and brings dominant velocity/current/Lorentz
       peak ratios to roughly `O(10%)`
-    - the retained paper-slice comparison now uses a `41 x 21` anisotropic
-      mesh and `64` steady steps for Shercliff and Hunt, giving eight
-      Hartmann-layer cells and dropping the dominant velocity/current/Lorentz
-      cuts to roughly `8e-3` to `1.9e-2`; the leading remaining physical
-      offender is the Hunt `potE(z)` shape, while low-signal `potE(y)` / `J_y`
-      cuts stay tracked but demoted
+    - the retained paper-slice comparison now uses a `49 x 37` anisotropic
+      mesh and `64` steady steps for Shercliff and Hunt, giving ten
+      Hartmann-layer cells and six side-layer cells; the dominant
+      velocity/current/Lorentz cuts are now roughly `5e-3` to `1.3e-2`, while
+      low-signal `potE(y)` / `J_y` cuts stay tracked but demoted
   - the main next technical target is not more plotting work; it is a more
     faithful and reviewer-proof fully developed drive path. The pressure-drop
     lane is now the best external-paper overlay; the constant-`Q` lane remains
@@ -1520,10 +1519,10 @@ That retained gate now passes for all three retained fringing geometries.
     normalization
   - the FreeMHD parity examples now write ranked offender tables into their
     summary JSON files; after centerline interpolation and low-signal
-    filtering, the largest current paper-slice offenders are Hunt `potE(z)`,
-    Shercliff Lorentz-y / `J_z`, and Hunt velocity/Lorentz shape cuts, so the
-    next solver patch should target potential-current coupling accuracy before
-    adding new comparison plots
+    filtering, the largest current paper-slice offenders are only the last
+    `O(1.3e-2)` Hunt/Shercliff wall-normal Lorentz-y and velocity-y cuts, so
+    the next solver patch should target residual wall-normal shape accuracy
+    before adding new comparison plots
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed

@@ -27,15 +27,15 @@ CONDUCTING_WALL_CONDUCTIVITY = 5.0e6
 INSULATING_WALL_CONDUCTIVITY = 1.0e-6
 CASE_SETTINGS = {
     "shercliff": {
-        "ny": 41,
-        "nz": 21,
+        "ny": 49,
+        "nz": 37,
         "max_steps": 64,
         "current_reconstruction": "face_averaged",
         "velocity_update_limit": 0.1,
     },
     "hunt": {
-        "ny": 41,
-        "nz": 21,
+        "ny": 49,
+        "nz": 37,
         "max_steps": 64,
         "current_reconstruction": "face_averaged",
         "velocity_update_limit": 0.1,
@@ -60,8 +60,8 @@ def _profile_metrics(
     remove_offset: bool = False,
 ) -> dict[str, object]:
     if remove_offset:
-        simulated_values = simulated_values - simulated_values[simulated_values.shape[0] // 2]
-        reference_values = reference_values - reference_values[reference_values.shape[0] // 2]
+        simulated_values = simulated_values - jnp.mean(simulated_values)
+        reference_values = reference_values - jnp.mean(reference_values)
     comparison = compare_normalized_profiles(
         simulated_coordinate,
         simulated_values,

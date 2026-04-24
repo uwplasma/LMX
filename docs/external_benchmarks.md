@@ -98,23 +98,23 @@ It now runs on case-specific settings rather than a single showcase default:
 
 - Shercliff:
   - analytical pressure gradient `2512.1961 Pa/m`
-  - `41 × 21`, `64` steady steps, `face_averaged` current reconstruction
+  - `49 × 37`, `64` steady steps, `face_averaged` current reconstruction
 - Hunt:
   - analytical pressure gradient `514.2123 Pa/m`
-  - `41 × 21`, `64` steady steps, `face_averaged` current reconstruction
+  - `49 × 37`, `64` steady steps, `face_averaged` current reconstruction
 
 Current retained result on that richer parity lane:
 
 - Shercliff:
-  - velocity: `L2(y) ≈ 1.07e-2`, `L2(z) ≈ 8.25e-3`
-  - potential: `L2(y) ≈ 1.13e0`, `L2(z) ≈ 1.10e-3`
-  - current: `L2(y) ≈ 7.39e-1`, `L2(z) ≈ 1.72e-2`
-  - Lorentz: `L2(y) ≈ 1.89e-2`, `L2(z) ≈ 1.72e-2`
+  - velocity: `L2(y) ≈ 8.49e-3`, `L2(z) ≈ 5.17e-3`
+  - potential: `L2(y) ≈ 8.14e-1`, `L2(z) ≈ 3.51e-4`
+  - current: `L2(y) ≈ 5.25e-1`, `L2(z) ≈ 1.07e-2`
+  - Lorentz: `L2(y) ≈ 1.25e-2`, `L2(z) ≈ 1.07e-2`
 - Hunt:
-  - velocity: `L2(y) ≈ 1.43e-2`, `L2(z) ≈ 1.53e-2`
-  - potential: `L2(y) ≈ 1.11e0`, `L2(z) ≈ 3.37e-2`
-  - current: `L2(y) ≈ 5.57e-1`, `L2(z) ≈ 8.06e-3`
-  - Lorentz: `L2(y) ≈ 1.58e-2`, `L2(z) ≈ 8.06e-3`
+  - velocity: `L2(y) ≈ 1.26e-2`, `L2(z) ≈ 7.70e-3`
+  - potential: `L2(y) ≈ 2.89e-1`, `L2(z) ≈ 1.68e-3`
+  - current: `L2(y) ≈ 5.52e-1`, `L2(z) ≈ 9.80e-3`
+  - Lorentz: `L2(y) ≈ 1.31e-2`, `L2(z) ≈ 9.80e-3`
 
 This is now a useful manuscript-grade external comparison figure because it
 shows much more than one velocity cut, but it also makes the remaining parity
@@ -127,11 +127,10 @@ Switching the Hunt comparison to the conservative face-current
 reconstruction removed the previous dominant `J_z` / `J×B_z` artifact. Driving
 the cases with the analytical pressure gradients also brings the absolute
 velocity, current, and Lorentz peak scales into `O(1-5%)` agreement for the
-dominant cuts. The retained `41 × 21` anisotropic mesh gives eight Hartmann
-layer cells and closes the main velocity/current/Lorentz cuts to about
-`8e-3` to `1.9e-2`; the remaining external-paper blocker is the `potE(z)`
-shape in Hunt and the low-signal `potE(y)` / `J_y` cuts are tracked separately
-rather than treated as leading physics offenders.
+dominant cuts. The retained `49 × 37` anisotropic mesh gives ten Hartmann-layer
+cells and six side-layer cells, closing the main velocity/current/Lorentz cuts
+to about `5e-3` to `1.3e-2`. The low-signal `potE(y)` / `J_y` cuts are tracked
+separately rather than treated as leading physics offenders.
 
 ![LMX vs FreeMHD observable parity](_static/generated/freemhd_closed_channel_observable_parity.png)
 
@@ -158,8 +157,8 @@ mass-flow normalization.
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
 low-signal normalized cuts. That ranking is the triage surface for the next
-solver work: fix the dominant Shercliff/Hunt Lorentz-y and y-velocity-shape
-offenders before adding more FreeMHD comparison figures.
+solver work: fix the last `O(1.3e-2)` Hunt/Shercliff wall-normal
+velocity/Lorentz offenders before adding more FreeMHD comparison figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the
