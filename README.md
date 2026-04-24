@@ -259,6 +259,10 @@ LMX includes three quasi-2D Hartmann-friction validation slices. These are not
 turbulent-duct claims yet. They are deliberately bounded reduced problems that
 check the Q2D time integrator against analytical decay and forced-mode
 solutions before moving to turbulent observables.
+The nonlinear movie lane follows the same SM82 modeling direction used in
+modern quasi-2D MHD duct studies, where Hartmann-layer friction damps a
+two-dimensional core model rather than resolving every three-dimensional
+boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 
 - `examples/q2d_decay_validation.py`: a periodic 2D mode decays under
   diffusion plus Hartmann friction and matches the exact exponential amplitude
@@ -341,11 +345,11 @@ The current summary makes that distinction explicit:
 and `research_grade_validation_pass = false`.
 
 The benchmark summary also now records a literature-readiness block keyed to
-the Cuevas-Smolentsev-Abdou quasi-2D magnetic obstacle study, the
-Votyakov-Zienicke-Kolesnikov constrained-flow study, and the
-Andreev-Kolesnikov-Thess nonuniform-field experiment. LMX currently reports
-the matching observable vocabulary, but the external digitized/reference data
-needed for a true parity claim is still an open lane.
+the Cuevas-Smolentsev-Abdou quasi-2D magnetic-obstacle study, the
+[Votyakov-Zienicke-Kolesnikov constrained-flow study](https://arxiv.org/abs/0704.3700),
+and the Andreev-Kolesnikov-Thess nonuniform-field experiment. LMX currently
+reports the matching observable vocabulary, but the external
+digitized/reference data needed for a true parity claim is still an open lane.
 
 The external-reference contract is now executable rather than implicit:
 `examples/magnetic_obstacle_external_reference_template.py` writes the CSV
