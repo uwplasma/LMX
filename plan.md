@@ -160,6 +160,12 @@ refer to the Samper et al. taxonomy.
   readiness report that emits those observables without calling the matched
   no-field solution an external validation. The remaining blocker is digitized
   or executable external reference data for at least one of those studies.
+  The observable CSV ingestion and comparison contract now exists through
+  `load_magnetic_obstacle_reference_observables(...)`,
+  `compare_magnetic_obstacle_reference_observables(...)`,
+  `write_magnetic_obstacle_reference_comparison_table(...)`, and
+  `examples/magnetic_obstacle_external_reference_template.py`; the remaining
+  work is scientific data acquisition, not comparison plumbing.
 - Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
   tests as verification, then add Sommeria-Moreau-style closure observables and
   literature-facing turbulent energy/decay spectra before making any turbulent

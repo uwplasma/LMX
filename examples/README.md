@@ -346,6 +346,7 @@ Localized-field and mirror-field response:
 
 ```bash
 python examples/magnetic_obstacle_benchmark.py
+python examples/magnetic_obstacle_external_reference_template.py
 python examples/magnetic_obstacle_baseline.py
 python examples/wham_mirror_pipe_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
@@ -365,6 +366,11 @@ Those examples are the current executable localized-field response entry points:
   - write a compact response-map figure over velocity deficit, pressure excess,
     current response, and cross-cut distortion
   - stage the transition from the current baseline toward published magnetic-obstacle cases
+- `magnetic_obstacle_external_reference_template.py`
+  - write the scalar-observable CSV contract for digitized literature or
+    experimental magnetic-obstacle reference data
+  - keep the external validation lane explicit without claiming parity before
+    reference data are present
 - `magnetic_obstacle_baseline.py`
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
   - write the full extruded overview panel

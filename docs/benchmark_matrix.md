@@ -334,6 +334,21 @@ then reports the LMX observables in that vocabulary. This is a readiness gate,
 not a pass/fail parity gate, until digitized reference profiles or executable
 external cases are added.
 
+The external parity data contract is now explicit:
+
+- `examples/magnetic_obstacle_external_reference_template.py`
+  writes the scalar-observable CSV template for digitized references
+- `load_magnetic_obstacle_reference_observables(...)`
+  loads filled CSV files with observable values, units, sources, and tolerances
+- `compare_magnetic_obstacle_reference_observables(...)`
+  compares LMX readiness observables against those reference rows
+- `write_magnetic_obstacle_reference_comparison_table(...)`
+  writes the resulting publication-table-ready CSV
+
+This closes the bookkeeping gap for external parity. The remaining scientific
+gap is still the actual digitization or generation of a matched external
+reference case.
+
 The choice of observables follows the wake/recovery framing used in magnetic-
 obstacle studies such as Cuevas et al., *On the flow past a magnetic obstacle*
 and Votyakov et al., *Constrained flow around a magnetic obstacle*, even

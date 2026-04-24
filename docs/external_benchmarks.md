@@ -27,6 +27,35 @@ For the fully developed duct solver, the meaningful comparison targets are:
 - implementation-specific residual histories
 - source-code-level solver choices in external codes
 
+## Magnetic-obstacle reference contract
+
+LMX now has a concrete external-reference ingestion path for the magnetic-
+obstacle lane. The current executable benchmark still uses a matched no-field
+LMX reference, so it remains an internal response gate. To promote it to an
+external parity gate, fill the template produced by
+`examples/magnetic_obstacle_external_reference_template.py` with digitized
+literature or experimental scalar observables and compare it with
+`compare_magnetic_obstacle_reference_observables(...)`.
+
+Required scalar columns:
+
+- `observable`
+- `value`
+- `tolerance`
+
+Optional columns preserved in the comparison table:
+
+- `relative_tolerance`
+- `units`
+- `source`
+- `note`
+
+The first target observables are centerline velocity-deficit ratio, wake
+recovery ratio, pressure-drop proxy, and peak current or Lorentz-force proxy.
+`write_magnetic_obstacle_reference_comparison_table(...)` writes the resulting
+publication-table-ready CSV for the validation docs and later manuscript
+tables.
+
 ## Rationale
 
 LMX is a clean-room inductionless MHD implementation. External executables are

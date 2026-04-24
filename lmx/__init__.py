@@ -8,6 +8,7 @@ from importlib import import_module
 __all__ = [
     "benchmark_solver",
     "compare_with_reference_outputs",
+    "compare_magnetic_obstacle_reference_observables",
     "generate_layered_duct_mesh",
     "generate_layered_duct_mesh_from_fluid_faces",
     "generate_bent_pipe_mesh",
@@ -137,6 +138,10 @@ __all__ = [
     "write_q2d_decay_plots",
     "write_q2d_forced_plots",
     "write_q2d_wall_bounded_forced_plots",
+    "load_magnetic_obstacle_reference_observables",
+    "magnetic_obstacle_reference_template_rows",
+    "write_magnetic_obstacle_reference_comparison_table",
+    "write_magnetic_obstacle_reference_template",
 ]
 
 
@@ -167,6 +172,26 @@ _EXPORTS = {
     "solve_steady": ("lmx.solvers", "solve_steady"),
     "solve_transient": ("lmx.solvers", "solve_transient"),
     "compare_with_reference_outputs": ("lmx.validation", "compare_with_reference_outputs"),
+    "compare_magnetic_obstacle_reference_observables": (
+        "lmx.external_validation",
+        "compare_magnetic_obstacle_reference_observables",
+    ),
+    "load_magnetic_obstacle_reference_observables": (
+        "lmx.external_validation",
+        "load_magnetic_obstacle_reference_observables",
+    ),
+    "magnetic_obstacle_reference_template_rows": (
+        "lmx.external_validation",
+        "magnetic_obstacle_reference_template_rows",
+    ),
+    "write_magnetic_obstacle_reference_comparison_table": (
+        "lmx.external_validation",
+        "write_magnetic_obstacle_reference_comparison_table",
+    ),
+    "write_magnetic_obstacle_reference_template": (
+        "lmx.external_validation",
+        "write_magnetic_obstacle_reference_template",
+    ),
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
     "build_fringing_autodiff_problem": ("lmx.autodiff", "build_fringing_autodiff_problem"),
     "extruded_rect_response_history": ("lmx.autodiff", "extruded_rect_response_history"),

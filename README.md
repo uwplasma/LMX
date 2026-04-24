@@ -303,6 +303,15 @@ Andreev-Kolesnikov-Thess nonuniform-field experiment. LMX currently reports
 the matching observable vocabulary, but the external digitized/reference data
 needed for a true parity claim is still an open lane.
 
+The external-reference contract is now executable rather than implicit:
+`examples/magnetic_obstacle_external_reference_template.py` writes the CSV
+schema for digitized observables, and
+`compare_magnetic_obstacle_reference_observables(...)` compares those rows
+against the LMX readiness observables with explicit absolute or relative
+tolerances. This keeps the magnetic-obstacle lane ready for literature data
+without reclassifying the current matched-no-field comparison as external
+validation.
+
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
 To push beyond that single bounded point, LMX also now includes

@@ -1115,6 +1115,18 @@ def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
     assert summary["literature_validation"]["literature_pass"] is False
 
 
+def test_magnetic_obstacle_external_reference_template_writes_summary(tmp_path: Path):
+    module = _load_example_module("magnetic_obstacle_external_reference_template.py")
+    module.OUTPUT_DIR = tmp_path
+    module.TEMPLATE_PATH = tmp_path / "template.csv"
+    summary = module.run_magnetic_obstacle_external_reference_template()
+    assert summary["case"] == "magnetic_obstacle_external_reference_template"
+    assert summary["status"] == "template_only_no_external_reference_claim"
+    assert "centerline_velocity_deficit_ratio" in summary["template_observables"]
+    assert (tmp_path / "template.csv").exists()
+    assert (tmp_path / "magnetic_obstacle_external_reference_template_summary.json").exists()
+
+
 def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_regime_scan.py")
     module.OUTPUT_DIR = tmp_path
