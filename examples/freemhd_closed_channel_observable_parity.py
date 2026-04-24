@@ -6,8 +6,8 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from lmx import write_freemhd_observable_parity_plots
-from lmx.freemhd import summarize_observable_offenders
-from lmx.reference_data import extract_processed_profile, load_processed_slice, processed_slice_area_mean
+from lmx.freemhd import compare_side_jet_profiles, summarize_observable_offenders
+from lmx.reference_data import extract_processed_profile, load_closed_channel_analytical, load_processed_slice, processed_slice_area_mean
 from lmx.showcase import solve_closed_channel_benchmark
 from lmx.validation import compare_normalized_profiles, extract_midplane_scalar_profile
 
@@ -151,6 +151,38 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         axis_payload["peak_ratio"] = float(sum(peak_ratios) / len(peak_ratios))
         observables[observable_name] = axis_payload
 
+    final_flow_rate = float(solution.diagnostics.volumetric_flow_rate_history[-1])
+    area = WIDTH * HEIGHT
+    simulated_mean_velocity = final_flow_rate / max(area, 1.0e-20)
+    reference_mean_velocity = processed_slice_area_mean(reference)
+    analytical_reference = load_closed_channel_analytical(case_kind, HA, reference_root=REFERENCE_ROOT)
+    pressure_reference = analytical_reference.pressure_drop
+    applied_pressure_gradient = float(solution.diagnostics.applied_forcing_history[-1])
+    integral_observables = {
+        "simulated_flow_rate": final_flow_rate,
+        "simulated_mean_velocity": simulated_mean_velocity,
+        "reference_mean_velocity": reference_mean_velocity,
+        "mean_velocity_relative_error": abs(simulated_mean_velocity - reference_mean_velocity)
+        / max(abs(reference_mean_velocity), 1.0e-20),
+        "applied_pressure_gradient": applied_pressure_gradient,
+        "reference_pressure_gradient": pressure_reference,
+        "pressure_gradient_relative_error": (
+            None
+            if pressure_reference is None
+            else abs(applied_pressure_gradient - float(pressure_reference)) / max(abs(float(pressure_reference)), 1.0e-20)
+        ),
+    }
+
+    hunt_side_jet = None
+    if case_kind == "hunt":
+        velocity_z = observables["velocity"]["z"]
+        hunt_side_jet = compare_side_jet_profiles(
+            velocity_z["coordinate"],
+            velocity_z["simulated"],
+            velocity_z["coordinate"],
+            velocity_z["reference"],
+        )
+
     return {
         "case_kind": case_kind,
         "ha": HA,
@@ -163,6 +195,8 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         "applied_pressure_gradient": float(solution.diagnostics.applied_forcing_history[-1]),
         "reference_path": reference.path,
         "observables": observables,
+        "integral_observables": integral_observables,
+        "hunt_side_jet": hunt_side_jet,
     }
 
 

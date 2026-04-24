@@ -6,6 +6,8 @@ import subprocess
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
+
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .specs import BoundaryCondition, CaseSpec
 
@@ -156,6 +158,89 @@ def summarize_observable_offenders(
     if top_n is not None:
         return offenders[: max(0, int(top_n))]
     return offenders
+
+
+def side_jet_profile_metrics(
+    coordinate: object,
+    values: object,
+    *,
+    center_exclusion_fraction: float = 0.02,
+) -> dict[str, float]:
+    """Return side-jet peak locations and amplitudes for a Hunt-style profile."""
+
+    coord = np.asarray(coordinate, dtype=float)
+    value = np.asarray(values, dtype=float)
+    if coord.size == 0 or value.size == 0:
+        return {
+            "negative_location": 0.0,
+            "positive_location": 0.0,
+            "negative_value": 0.0,
+            "positive_value": 0.0,
+            "center_value": 0.0,
+            "peak_value": 0.0,
+            "peak_to_center_ratio": 0.0,
+        }
+    order = np.argsort(coord)
+    coord = coord[order]
+    value = value[order]
+    half_width = max(float(np.max(np.abs(coord))), 1.0e-20)
+    center_cut = float(center_exclusion_fraction) * half_width
+    negative_mask = coord <= -center_cut
+    positive_mask = coord >= center_cut
+    if not negative_mask.any():
+        negative_mask = coord <= 0.0
+    if not positive_mask.any():
+        positive_mask = coord >= 0.0
+
+    negative_indices = np.flatnonzero(negative_mask)
+    positive_indices = np.flatnonzero(positive_mask)
+    negative_index = int(negative_indices[np.argmax(value[negative_indices])]) if negative_indices.size else int(np.argmax(value))
+    positive_index = int(positive_indices[np.argmax(value[positive_indices])]) if positive_indices.size else int(np.argmax(value))
+    center_value = float(np.interp(0.0, coord, value))
+    peak_value = float(max(value[negative_index], value[positive_index]))
+    return {
+        "negative_location": float(coord[negative_index]),
+        "positive_location": float(coord[positive_index]),
+        "negative_value": float(value[negative_index]),
+        "positive_value": float(value[positive_index]),
+        "center_value": center_value,
+        "peak_value": peak_value,
+        "peak_to_center_ratio": peak_value / max(abs(center_value), 1.0e-20),
+    }
+
+
+def compare_side_jet_profiles(
+    simulated_coordinate: object,
+    simulated_values: object,
+    reference_coordinate: object,
+    reference_values: object,
+) -> dict[str, object]:
+    """Compare Hunt side-jet observables between a simulation and reference cut."""
+
+    simulated = side_jet_profile_metrics(simulated_coordinate, simulated_values)
+    reference = side_jet_profile_metrics(reference_coordinate, reference_values)
+    location_scale = max(
+        abs(float(reference["negative_location"])),
+        abs(float(reference["positive_location"])),
+        1.0e-20,
+    )
+    peak_scale = max(abs(float(reference["peak_value"])), 1.0e-20)
+    return {
+        "simulated": simulated,
+        "reference": reference,
+        "negative_location_error": abs(float(simulated["negative_location"]) - float(reference["negative_location"])),
+        "positive_location_error": abs(float(simulated["positive_location"]) - float(reference["positive_location"])),
+        "normalized_location_error": max(
+            abs(float(simulated["negative_location"]) - float(reference["negative_location"])),
+            abs(float(simulated["positive_location"]) - float(reference["positive_location"])),
+        )
+        / location_scale,
+        "peak_value_relative_error": abs(float(simulated["peak_value"]) - float(reference["peak_value"])) / peak_scale,
+        "peak_to_center_ratio_error": abs(
+            float(simulated["peak_to_center_ratio"]) - float(reference["peak_to_center_ratio"])
+        )
+        / max(abs(float(reference["peak_to_center_ratio"])), 1.0e-20),
+    }
 
 
 def summarize_profile_error_offenders(

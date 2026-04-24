@@ -5,6 +5,7 @@ import pytest
 from lmx.freemhd import (
     build_case_from_freemhd_reference,
     candidate_u_paths,
+    compare_side_jet_profiles,
     infer_initial_velocity_x,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
@@ -16,6 +17,7 @@ from lmx.freemhd import (
     infer_uniform_b0,
     parse_freemhd_execution_seconds,
     run_freemhd_demo,
+    side_jet_profile_metrics,
     summarize_observable_offenders,
     summarize_profile_error_offenders,
     summarize_runtime_offenders,
@@ -23,6 +25,21 @@ from lmx.freemhd import (
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_side_jet_profile_metrics_and_comparison_capture_peak_locations():
+    coordinate = [-1.0, -0.7, 0.0, 0.7, 1.0]
+    reference = [0.0, 1.4, 1.0, 1.4, 0.0]
+    simulated = [0.0, 1.2, 1.0, 1.3, 0.0]
+
+    metrics = side_jet_profile_metrics(coordinate, reference)
+    assert metrics["negative_location"] == pytest.approx(-0.7)
+    assert metrics["positive_location"] == pytest.approx(0.7)
+    assert metrics["peak_to_center_ratio"] == pytest.approx(1.4)
+
+    comparison = compare_side_jet_profiles(coordinate, simulated, coordinate, reference)
+    assert comparison["normalized_location_error"] == pytest.approx(0.0)
+    assert comparison["peak_value_relative_error"] == pytest.approx((1.4 - 1.3) / 1.4)
 
 
 def test_inference_helpers_read_case_zero_and_latesttime_fallbacks(tmp_path: Path):

@@ -91,6 +91,8 @@ That example compares normalized midplane profiles of:
 - gauge-shifted electric potential `potE - potE(center)`
 - cut-aligned current components `J_y` and `J_z`
 - streamwise Lorentz force `J×B_x`
+- Hunt side-jet peak location, peak amplitude, and peak-to-center ratio
+- integral flow-rate, mean-velocity, and pressure-gradient observables
 
 for Shercliff and Hunt against the processed slice CSV files in
 `/Users/rogerio/local/tests/freemhd_test_cases/FreeMHDPaperAllFigures/ClosedChannel`.
@@ -184,9 +186,13 @@ cuts, so reference-grid studies must record both profile error and conditioning
 
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
-low-signal normalized cuts. That ranking is the triage surface for the next
-solver work: fix the last `O(1.3e-2)` Hunt/Shercliff wall-normal
-velocity/Lorentz offenders before adding more FreeMHD comparison figures.
+low-signal normalized cuts. It also stores the Hunt side-jet location and
+peak-to-center diagnostics, plus flow-rate and pressure-gradient errors, so
+the next high-Ha Hunt ladder can distinguish shape error, side-layer placement
+error, drive error, and current-closure error. That ranking is the triage
+surface for the next solver work: fix the last `O(1.3e-2)` Hunt/Shercliff
+wall-normal velocity/Lorentz offenders before adding more FreeMHD comparison
+figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the

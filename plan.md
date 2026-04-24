@@ -141,6 +141,12 @@ refer to the Samper et al. taxonomy.
   reference cuts on `Q`, `phi`, `J`, `J×B`, side-jet peak location, and
   pressure-gradient proxy, then accept only if the side cut converges rather
   than being visually peak-matched.
+  The observable-parity artifact now includes the missing scalar gates for this
+  campaign: Hunt side-jet peak locations and peak-to-center ratio, plus
+  flow-rate, mean-velocity, and pressure-gradient errors. The remaining work is
+  to run the heavier mesh ladder and use those recorded observables to decide
+  whether the blocker is mesh placement, drive formulation, current closure, or
+  momentum coupling.
 - Magnetic-obstacle external validation: replace the current matched no-field
   LMX reference with published localized-field cases, including the
   Cuevas-Smolentsev-Abdou quasi-2D magnetic-obstacle study and the Votyakov
