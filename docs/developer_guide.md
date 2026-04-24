@@ -145,7 +145,7 @@ The release workflow should be promoted in stages:
   - run `python -m pytest -m "unit or validation"`
   - keep the lane below five minutes
 - docs CI:
-  - install `.[dev,docs]`
+  - install `.[docs]`
   - run `python -m sphinx -W -b html docs docs/_build/html`
 - manual release validation:
   - run physics/regression suites

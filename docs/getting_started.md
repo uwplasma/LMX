@@ -23,7 +23,13 @@ Development install:
 ```bash
 git clone https://github.com/uwplasma/LMX
 cd LMX
-python -m pip install -e '.[dev,plotting,docs,extras]'
+python -m pip install -e '.[dev]'
+```
+
+Documentation install:
+
+```bash
+python -m pip install -e '.[docs]'
 ```
 
 LMX supports Python `3.10+`. On Python `3.10`, TOML parsing falls back

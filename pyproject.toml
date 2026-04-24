@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,12 +12,12 @@ license = "MIT"
 dependencies = [
   "jax",
   "jaxlib",
+  "matplotlib",
   "numpy",
-  "scipy>=1.10",
+  "scipy",
   "tomli; python_version < '3.11'",
 ]
 classifiers = [
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -27,22 +27,15 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
-  "matplotlib>=3.9",
-  "pytest>=8.0",
-  "pytest-cov>=7.0",
-]
-plotting = [
-  "matplotlib>=3.9",
-]
-extras = [
-  "lineax>=0.0.8",
-  "interpax>=0.3.6",
+  "pytest",
+  "lineax",
+  "interpax",
 ]
 docs = [
-  "sphinx>=8.0",
-  "myst-parser>=3.0",
-  "furo>=2024.1.29",
-  "sphinx-copybutton>=0.5",
+  "sphinx",
+  "myst-parser",
+  "furo",
+  "sphinx-copybutton",
 ]
 
 [project.scripts]

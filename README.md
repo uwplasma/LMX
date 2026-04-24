@@ -39,10 +39,16 @@ cd LMX
 python -m pip install -e .
 ```
 
-Full development install:
+Development install:
 
 ```bash
-python -m pip install -e '.[dev,plotting,docs,extras]'
+python -m pip install -e '.[dev]'
+```
+
+Documentation install:
+
+```bash
+python -m pip install -e '.[docs]'
 ```
 
 LMX supports Python `3.10+`, falls back to `tomli` on Python `3.10`, and works
