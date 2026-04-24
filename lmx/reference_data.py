@@ -141,6 +141,94 @@ def load_processed_slice(
     )
 
 
+def _processed_field_column(reference: ProcessedSliceReference, field_name: str, component: int | None) -> jnp.ndarray:
+    column_name = field_name if component is None else f"{field_name}:{component}"
+    try:
+        return reference.columns[column_name]
+    except KeyError as exc:
+        available = ", ".join(sorted(reference.columns))
+        raise KeyError(f"Processed slice {reference.path} has no column {column_name!r}; available columns: {available}") from exc
+
+
+def _fill_missing_structured_values(grid: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
+    if not np.isnan(grid).any():
+        return grid
+    filled = np.array(grid, copy=True)
+    for row_index in range(filled.shape[0]):
+        row = filled[row_index, :]
+        valid = np.isfinite(row)
+        if valid.sum() >= 2:
+            filled[row_index, :] = np.interp(z, z[valid], row[valid])
+        elif valid.sum() == 1:
+            filled[row_index, :] = row[valid][0]
+    for column_index in range(filled.shape[1]):
+        column = filled[:, column_index]
+        valid = np.isfinite(column)
+        if valid.sum() >= 2:
+            filled[:, column_index] = np.interp(y, y[valid], column[valid])
+        elif valid.sum() == 1:
+            filled[:, column_index] = column[valid][0]
+    if np.isnan(filled).any():
+        fallback = float(np.nanmean(filled)) if np.isfinite(filled).any() else 0.0
+        filled = np.where(np.isfinite(filled), filled, fallback)
+    return filled
+
+
+def processed_slice_field_grid(
+    reference: ProcessedSliceReference,
+    *,
+    field_name: str,
+    component: int | None = None,
+) -> dict[str, jnp.ndarray]:
+    """Return a structured ``(y, z)`` grid from a processed FreeMHD slice.
+
+    ParaView/OpenFOAM slice exports can contain duplicated points at block
+    interfaces and may not be ordered as a tensor grid. This helper averages
+    duplicate point values before assembling a structured grid for quadrature,
+    plotting, and reference-derived flow-rate targets.
+    """
+
+    points_y = np.asarray(reference.columns["Points:1"], dtype=float)
+    points_z = np.asarray(reference.columns["Points:2"], dtype=float)
+    values = np.asarray(_processed_field_column(reference, field_name, component), dtype=float)
+    y = np.unique(points_y)
+    z = np.unique(points_z)
+    y_index = {float(value): index for index, value in enumerate(y)}
+    z_index = {float(value): index for index, value in enumerate(z)}
+    accumulator = np.zeros((y.size, z.size), dtype=float)
+    counts = np.zeros((y.size, z.size), dtype=float)
+    for point_y, point_z, value in zip(points_y, points_z, values, strict=True):
+        iy = y_index[float(point_y)]
+        iz = z_index[float(point_z)]
+        accumulator[iy, iz] += float(value)
+        counts[iy, iz] += 1.0
+    grid = np.divide(accumulator, counts, out=np.full_like(accumulator, np.nan), where=counts > 0.0)
+    grid = _fill_missing_structured_values(grid, y, z)
+    return {"y": jnp.asarray(y), "z": jnp.asarray(z), "value": jnp.asarray(grid)}
+
+
+def processed_slice_area_mean(
+    reference: ProcessedSliceReference,
+    *,
+    field_name: str = "U",
+    component: int | None = 0,
+) -> float:
+    """Compute an area-weighted mean over a processed ``y-z`` slice."""
+
+    grid = processed_slice_field_grid(reference, field_name=field_name, component=component)
+    y = np.asarray(grid["y"], dtype=float)
+    z = np.asarray(grid["z"], dtype=float)
+    values = np.asarray(grid["value"], dtype=float)
+    if y.size < 2 or z.size < 2:
+        return float(np.mean(values)) if values.size else 0.0
+    area = (float(y[-1]) - float(y[0])) * (float(z[-1]) - float(z[0]))
+    if area <= 0.0:
+        return float(np.mean(values))
+    integral_z = np.trapezoid(values, z, axis=1)
+    integral = float(np.trapezoid(integral_z, y))
+    return integral / area
+
+
 def _unique_plane_profile(profile_coord: jnp.ndarray, values: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
     coord_np = np.asarray(profile_coord, dtype=float)
     values_np = np.asarray(values, dtype=float)

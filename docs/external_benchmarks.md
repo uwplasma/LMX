@@ -148,11 +148,14 @@ constant-flow-rate solve with:
   sizes when the same host is used
 
 The current code now enforces the requested area-weighted mean velocity after
-wall interpolation and limiter application for `inlet_flow_rate` runs. A fresh
-`flow_rate` probe shows that this removes one numerical ambiguity but does not
-close observable parity by itself: the remaining gap is in the coupled
-pressure-gradient/current reconstruction and field-level matching, not only in
-mass-flow normalization.
+wall interpolation and limiter application for `inlet_flow_rate` runs, and
+`processed_slice_area_mean` derives case-specific constant-`Q` targets directly
+from the nonuniform processed FreeMHD slice. This matters because the Ha=20
+paper slices imply different mean speeds for the two wall models
+(`0.97017` for Shercliff and `0.11741` for Hunt). A cheap `25 x 21`
+flow-rate probe with those targets matches the requested mean and recovers the
+right pressure-gradient scale, but the retained publication mesh still needs a
+full constrained-drive parity run before the constant-`Q` lane can be promoted.
 
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting

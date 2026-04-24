@@ -123,6 +123,12 @@ Demonstrated but not yet research-grade validation:
    not plot-level agreement; it is stable profile/integral errors under mesh
    refinement with the retained profile cuts at or below `1.2e-2` and the
    external observable lane trending toward `O(1e-2)`.
+   The first reference-target blocker is closed: `processed_slice_area_mean`
+   reconstructs nonuniform processed slice grids, averages duplicate slice
+   points, and computes area-weighted FreeMHD targets. This exposes that Ha=20
+   Shercliff and Hunt constant-flow slices use different mean speeds
+   (`0.97017` and `0.11741`), so the next retained run must use case-specific
+   targets rather than a shared visual-scaling velocity.
 2. Make boundary-layer meshing first-class.
    Add a documented mesh ladder for Hartmann and side layers with at least
    8-10 cells across the thinnest layer in high-Ha validation runs, smooth
@@ -1516,12 +1522,15 @@ That retained gate now passes for all three retained fringing geometries.
   - the first constant-`Q` hardening step is now in place: the fully developed
     solver projects `inlet_flow_rate` runs back to the requested area-weighted
     mean velocity after wall interpolation and limiter application
-  - a fresh `flow_rate` paper-slice probe confirms that this closes the
-    volumetric-flow drift but does not close field-level parity by itself:
-    Shercliff improves on the `y` velocity cut but worsens on the `z` velocity
-    cut, and Hunt remains outside the target error band; the next fix must
-    target the coupled pressure-gradient/current reconstruction, not only mass
-    normalization
+  - the reference-target side of the constant-`Q` lane is now explicit:
+    processed FreeMHD slices are reconstructed as nonuniform `y-z` grids and
+    area-integrated to recover case-specific mean velocities. The Ha=20
+    Shercliff slice gives `0.97017`; the Hunt slice gives `0.11741`, so using a
+    shared `0.9725` target was invalid for Hunt. A cheap `25 x 21` probe with
+    the recovered targets matches the requested mean and applied forcing scale
+    (`2372` for Shercliff, `498` for Hunt), but retained-mesh field parity
+    still needs a dedicated constrained-drive run before the lane can be
+    marked research-grade.
   - the FreeMHD parity examples now write ranked offender tables into their
     summary JSON files; after centerline interpolation and low-signal
     filtering, the largest current paper-slice offenders are only the last

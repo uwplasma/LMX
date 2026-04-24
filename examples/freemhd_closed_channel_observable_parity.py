@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from lmx import write_freemhd_observable_parity_plots
 from lmx.freemhd import summarize_observable_offenders
-from lmx.reference_data import extract_processed_profile, load_processed_slice
+from lmx.reference_data import extract_processed_profile, load_processed_slice, processed_slice_area_mean
 from lmx.showcase import solve_closed_channel_benchmark
 from lmx.validation import compare_normalized_profiles, extract_midplane_scalar_profile
 
@@ -43,7 +43,7 @@ CASE_SETTINGS = {
 }
 INITIAL_PROFILE = "analytic"
 DRIVE_MODE = "pressure_gradient"
-FLOW_RATE_TARGET_MEAN_VELOCITY = 0.9725
+FLOW_RATE_TARGET_MEAN_VELOCITY: float | None = None
 
 
 def _max_abs(value: jnp.ndarray) -> float:
@@ -85,6 +85,12 @@ def _profile_metrics(
 
 def _observable_record(case_kind: str) -> dict[str, object]:
     settings = CASE_SETTINGS[case_kind]
+    reference = load_processed_slice(case_kind, HA, x_slice=X_SLICE, reference_root=REFERENCE_ROOT)
+    target_mean_velocity = (
+        float(FLOW_RATE_TARGET_MEAN_VELOCITY)
+        if FLOW_RATE_TARGET_MEAN_VELOCITY is not None
+        else processed_slice_area_mean(reference)
+    )
     _, solution, _ = solve_closed_channel_benchmark(
         case_kind,
         ha=HA,
@@ -101,12 +107,11 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         insulating_wall_conductivity=INSULATING_WALL_CONDUCTIVITY,
         max_steps=settings["max_steps"],
         drive_mode=DRIVE_MODE,
-        target_mean_velocity=FLOW_RATE_TARGET_MEAN_VELOCITY,
+        target_mean_velocity=target_mean_velocity,
         initial_profile=INITIAL_PROFILE,
         current_reconstruction=settings["current_reconstruction"],
         velocity_update_limit=settings["velocity_update_limit"],
     )
-    reference = load_processed_slice(case_kind, HA, x_slice=X_SLICE, reference_root=REFERENCE_ROOT)
     observable_specs = {
         "velocity": {
             "y": (solution.state.u, "U", 0, (0.0, 0.0), False),
@@ -152,7 +157,8 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         "x_slice": X_SLICE,
         "initial_profile": INITIAL_PROFILE,
         "drive_mode": DRIVE_MODE,
-        "target_mean_velocity": FLOW_RATE_TARGET_MEAN_VELOCITY if DRIVE_MODE == "flow_rate" else None,
+        "target_mean_velocity": target_mean_velocity if DRIVE_MODE == "flow_rate" else None,
+        "target_mean_velocity_source": "processed_slice_area_mean" if DRIVE_MODE == "flow_rate" and FLOW_RATE_TARGET_MEAN_VELOCITY is None else "configured",
         "settings": settings,
         "applied_pressure_gradient": float(solution.diagnostics.applied_forcing_history[-1]),
         "reference_path": reference.path,
@@ -175,6 +181,10 @@ def run_freemhd_closed_channel_observable_parity() -> dict[str, object]:
         "initial_profile": INITIAL_PROFILE,
         "drive_mode": DRIVE_MODE,
         "target_mean_velocity": FLOW_RATE_TARGET_MEAN_VELOCITY if DRIVE_MODE == "flow_rate" else None,
+        "target_mean_velocity_by_case": {
+            str(record["case_kind"]): record["target_mean_velocity"] for record in records if DRIVE_MODE == "flow_rate"
+        },
+        "target_mean_velocity_source": "processed_slice_area_mean" if DRIVE_MODE == "flow_rate" and FLOW_RATE_TARGET_MEAN_VELOCITY is None else "configured",
         "settings": CASE_SETTINGS,
         "geometry": {"width": WIDTH, "height": HEIGHT, "wall_thickness": WALL_THICKNESS, "wall_cells": WALL_CELLS},
         "material": {

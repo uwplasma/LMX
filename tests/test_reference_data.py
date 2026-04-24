@@ -13,6 +13,8 @@ from lmx.reference_data import (
     load_hunt_analytical,
     load_processed_slice,
     load_shercliff_analytical,
+    processed_slice_area_mean,
+    processed_slice_field_grid,
 )
 
 
@@ -78,6 +80,49 @@ def test_extract_processed_profile_returns_requested_field_component(tmp_path: P
     assert y_profile["value"].tolist() == pytest.approx([40.0, 20.0, 50.0])
     assert z_profile["coordinate"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
     assert z_profile["value"].tolist() == pytest.approx([0.1, 0.2, 0.3])
+
+
+def test_processed_slice_field_grid_averages_duplicate_points(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "Points:1,Points:2,U:0",
+                "0.0,0.0,1.0",
+                "0.0,1.0,2.0",
+                "1.0,0.0,3.0",
+                "1.0,1.0,5.0",
+                "1.0,1.0,7.0",
+            ]
+        )
+    )
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+    grid = processed_slice_field_grid(reference, field_name="U", component=0)
+
+    assert grid["y"].tolist() == pytest.approx([0.0, 1.0])
+    assert grid["z"].tolist() == pytest.approx([0.0, 1.0])
+    assert grid["value"].ravel().tolist() == pytest.approx([1.0, 2.0, 3.0, 6.0])
+    assert processed_slice_area_mean(reference) == pytest.approx(3.0)
+
+
+def test_processed_slice_area_mean_uses_nonuniform_quadrature(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    y_values = [-1.0, -0.25, 1.0]
+    z_values = [-2.0, 0.0, 2.0]
+    rows = ["Points:1,Points:2,U:0"]
+    for point_y in y_values:
+        for point_z in z_values:
+            rows.append(f"{point_y},{point_z},{2.0 + point_y + 0.5 * point_z}")
+    rows.append("-0.25,0.0,1.75")
+    path.write_text("\n".join(rows))
+
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+
+    assert processed_slice_area_mean(reference) == pytest.approx(2.0)
 
 
 def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp_path: Path):
