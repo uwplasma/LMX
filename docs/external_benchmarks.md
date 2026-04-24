@@ -175,7 +175,12 @@ that next step. On the bundled Hunt Ha=20 processed slice, the external point
 grid carries about ten Hartmann-layer intervals and about forty-two side-layer
 intervals, while the retained generated LMX mesh carries about ten and six.
 That makes side-layer mesh parity a concrete diagnostic to run before changing
-the fully developed momentum operator again.
+the fully developed momentum operator again. LMX now supports a direct
+`solve_steady(case, mesh=...)` override for that A/B test. The first local
+probe also showed that blindly using processed-slice point coordinates as fluid
+faces can make the solve much more expensive and can worsen the normalized Hunt
+cuts, so reference-grid studies must record both profile error and conditioning
+/ runtime rather than treating external spacing as automatically superior.
 
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting

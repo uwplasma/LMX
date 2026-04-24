@@ -153,6 +153,21 @@ reproduction is the goal. The standalone
 `examples/reference_slice_mesh_diagnostic.py` driver writes a side-by-side
 mesh panel and layer-count JSON for this workflow.
 
+Solver calls can also take a validated mesh override:
+
+```python
+from lmx import generate_layered_duct_mesh_from_fluid_faces, solve_steady
+
+mesh = generate_layered_duct_mesh_from_fluid_faces(...)
+solution = solve_steady(case, mesh=mesh)
+```
+
+Use this path for A/B validation against a known external grid. It bypasses the
+case's generated `ny`/`nz` spacing but keeps the case physics, material fields,
+boundary-condition interpretation, and solver controls. Highly clustered
+external slice coordinates can make the linear systems much more expensive, so
+promote a reference-grid run only after checking both accuracy and runtime.
+
 ## Mesh-resolution guidance
 
 - increase `ny` and `nz` to resolve Hartmann and Shercliff boundary layers

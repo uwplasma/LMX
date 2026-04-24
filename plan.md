@@ -137,6 +137,13 @@ Demonstrated but not yet research-grade validation:
    8-10 cells across the thinnest layer in high-Ha validation runs, smooth
    expansion into the core, no repeated faces, and explicit convergence of
    `Q̃`, profile cuts, current closure, and pressure proxy.
+   The solver now accepts `solve_steady(case, mesh=...)` and
+   `solve_transient(case, mesh=...)` for exact-grid A/B studies. Use that hook to separate
+   generated-mesh error from operator error, but do not promote copied
+   processed-slice spacing without recording runtime and linear-conditioning
+   behavior; the first Hunt hybrid-grid probe increased side-layer resolution
+   but worsened the processed-slice cuts and became substantially more
+   expensive.
 3. Close conservative-current parity.
    Every fully developed and extruded solver family should expose diagnostics
    that can be compared with the FreeMHD-style conservative face-current

@@ -9,7 +9,7 @@ from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.physics import build_material_fields, magnetic_field_components, magnetic_ramp_scale
 import lmx.solvers as solvers
-from lmx.mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
+from lmx.mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh, generate_rect_duct_mesh_from_faces
 from lmx.specs import BoundaryCondition, GeometrySpec
 from lmx.solvers import solve_steady, solve_transient
 
@@ -36,6 +36,26 @@ def test_build_mesh_rejects_unsupported_geometry_kind():
 
     with pytest.raises(NotImplementedError, match="not supported"):
         solvers._build_mesh(unsupported)
+
+
+def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    custom_mesh = generate_rect_duct_mesh_from_faces(
+        y_faces=jnp.asarray([-1.0, -0.25, 0.0, 0.25, 1.0]),
+        z_faces=jnp.asarray([-1.0, -0.5, 0.5, 1.0]),
+    )
+
+    def fake_fully_developed_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        updated = jnp.full_like(u_prev, 0.1)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 1.0e-9, 1.0e-9, 1.0, 1.0e-9, 1.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0, 1.0e-9, 1.0e-9
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    solution = solve_steady(case, mesh=custom_mesh)
+
+    assert solution.mesh is custom_mesh
+    assert solution.state.u.shape == custom_mesh.yz_shape
 
 
 def test_build_mesh_uses_magnetic_axis_to_cluster_rect_duct_layers():

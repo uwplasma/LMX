@@ -88,6 +88,7 @@ def _surface_colors(field: np.ndarray, *, cmap: str = "coolwarm", vmax: float = 
 def solve_closed_channel_benchmark(
     case_kind: str,
     *,
+    mesh: StructuredMesh | None = None,
     ha: float = 20.0,
     width: float = 0.2,
     height: float = 0.2,
@@ -166,13 +167,16 @@ def solve_closed_channel_benchmark(
     elif drive_mode != "forcing":
         raise ValueError(f"Unsupported closed-channel benchmark drive mode {drive_mode!r}")
 
+    if mesh is not None:
+        case = replace(case, reference_phi_cell=(mesh.ny // 2, mesh.nz // 2))
+
     initial_state = None
     if initial_profile == "analytic":
         if reference is None:
             reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
-        mesh = _build_mesh(case)
-        y_target = np.asarray(mesh.y_centers, dtype=float)
-        z_target = np.asarray(mesh.z_centers, dtype=float)
+        solve_mesh = _build_mesh(case) if mesh is None else mesh
+        y_target = np.asarray(solve_mesh.y_centers, dtype=float)
+        z_target = np.asarray(solve_mesh.z_centers, dtype=float)
         ref_coord = np.asarray(reference.coordinate, dtype=float)
         ref_y = np.asarray(reference.midplane_y, dtype=float)
         ref_z = np.asarray(reference.midplane_z, dtype=float)
@@ -181,8 +185,8 @@ def solve_closed_channel_benchmark(
         yz_field = np.outer(y_profile, z_profile)
         yz_scale = max(float(np.max(np.abs(yz_field))), 1.0e-12)
         yz_field = yz_field / yz_scale
-        if mesh.fluid_mask is not None:
-            yz_field = np.where(np.asarray(mesh.fluid_mask, dtype=bool), yz_field, 0.0)
+        if solve_mesh.fluid_mask is not None:
+            yz_field = np.where(np.asarray(solve_mesh.fluid_mask, dtype=bool), yz_field, 0.0)
         zeros = np.zeros_like(yz_field)
         initial_state = MHDState(
             u=jnp.asarray(yz_field, dtype=float),
@@ -211,7 +215,7 @@ def solve_closed_channel_benchmark(
             velocity_update_limit=case.time_stepper.velocity_update_limit if velocity_update_limit is None else velocity_update_limit,
         ),
     )
-    solution = solve_steady(case, initial_state=initial_state)
+    solution = solve_steady(case, mesh=mesh, initial_state=initial_state)
     comparison = closed_channel_validation(solution, case_kind, int(ha))
     return case, solution, comparison
 

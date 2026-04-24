@@ -214,8 +214,9 @@ def test_solve_closed_channel_benchmark_supports_flow_rate_and_zero_initial_prof
 
     monkeypatch.setattr(showcase, "make_shercliff_case", lambda **kwargs: fake_case)
 
-    def fake_solve_steady(case, initial_state=None):
+    def fake_solve_steady(case, mesh=None, initial_state=None):
         captured["case"] = case
+        captured["mesh"] = mesh
         captured["initial_state"] = initial_state
         return "solution"
 
@@ -255,8 +256,9 @@ def test_solve_closed_channel_benchmark_supports_reference_pressure_gradient(mon
     monkeypatch.setattr(showcase, "load_shercliff_analytical", lambda ha: reference)
     monkeypatch.setattr(showcase, "_build_mesh", lambda case: _fake_mesh())
 
-    def fake_solve_steady(case, initial_state=None):
+    def fake_solve_steady(case, mesh=None, initial_state=None):
         captured["case"] = case
+        captured["mesh"] = mesh
         captured["initial_state"] = initial_state
         return "solution"
 
@@ -286,7 +288,8 @@ def test_solve_closed_channel_benchmark_builds_hunt_analytic_initial_state(monke
     monkeypatch.setattr(showcase, "load_hunt_analytical", lambda ha: reference)
     monkeypatch.setattr(showcase, "_build_mesh", lambda case: mesh)
 
-    def fake_solve_steady(case, initial_state=None):
+    def fake_solve_steady(case, mesh=None, initial_state=None):
+        captured["mesh"] = mesh
         captured["initial_state"] = initial_state
         return "solution"
 
@@ -300,6 +303,37 @@ def test_solve_closed_channel_benchmark_builds_hunt_analytic_initial_state(monke
     assert np.isfinite(np.asarray(initial_state.u)).all()
     assert np.asarray(initial_state.u).shape == mesh.fluid_mask.shape
     assert np.all(np.asarray(initial_state.u)[~mesh.fluid_mask] == 0.0)
+
+
+def test_solve_closed_channel_benchmark_passes_custom_mesh_to_solver(monkeypatch: pytest.MonkeyPatch):
+    fake_case = showcase.make_hunt_case(ha=20.0, ny=8, nz=8)
+    custom_mesh = _fake_mesh()
+    reference = SimpleNamespace(
+        coordinate=np.linspace(-1.0, 1.0, 5),
+        midplane_y=np.linspace(0.2, 1.0, 5),
+        midplane_z=np.linspace(1.0, 0.2, 5),
+    )
+    captured = {}
+
+    monkeypatch.setattr(showcase, "make_hunt_case", lambda **kwargs: fake_case)
+    monkeypatch.setattr(showcase, "load_hunt_analytical", lambda ha: reference)
+
+    def fake_solve_steady(case, mesh=None, initial_state=None):
+        captured["case"] = case
+        captured["mesh"] = mesh
+        captured["initial_state"] = initial_state
+        return "solution"
+
+    monkeypatch.setattr(showcase, "solve_steady", fake_solve_steady)
+    monkeypatch.setattr(showcase, "closed_channel_validation", lambda solution, case_kind, ha: {"ok": True})
+
+    case, solution, comparison = showcase.solve_closed_channel_benchmark("hunt", mesh=custom_mesh)
+
+    assert solution == "solution"
+    assert comparison == {"ok": True}
+    assert case.reference_phi_cell == (custom_mesh.ny // 2, custom_mesh.nz // 2)
+    assert captured["mesh"] is custom_mesh
+    assert captured["initial_state"].u.shape == (custom_mesh.ny, custom_mesh.nz)
 
 
 def test_solve_closed_channel_benchmark_rejects_invalid_modes_and_profiles():

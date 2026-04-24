@@ -1111,12 +1111,13 @@ def _solve_fully_developed(
     case: CaseSpec,
     logger=None,
     *,
+    mesh: StructuredMesh | None = None,
     initial_state: MHDState | None = None,
     initial_diagnostics: Diagnostics | None = None,
     append_diagnostics: bool = False,
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
-    mesh = _build_mesh(case)
+    mesh = _build_mesh(case) if mesh is None else mesh
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
     reference_mean_velocity = _reference_mean_velocity(case)
@@ -1394,6 +1395,7 @@ def solve_transient(
     case: CaseSpec,
     logger=None,
     *,
+    mesh: StructuredMesh | None = None,
     initial_state: MHDState | None = None,
     initial_diagnostics: Diagnostics | None = None,
     append_diagnostics: bool = False,
@@ -1405,6 +1407,7 @@ def solve_transient(
         return _solve_fully_developed(
             transient_case,
             logger=logger,
+            mesh=mesh,
             initial_state=initial_state,
             initial_diagnostics=initial_diagnostics,
             append_diagnostics=append_diagnostics,
@@ -1417,6 +1420,7 @@ def solve_steady(
     case: CaseSpec,
     logger=None,
     *,
+    mesh: StructuredMesh | None = None,
     initial_state: MHDState | None = None,
     initial_diagnostics: Diagnostics | None = None,
     append_diagnostics: bool = False,
@@ -1428,6 +1432,7 @@ def solve_steady(
         return _solve_fully_developed(
             steady_case,
             logger=logger,
+            mesh=mesh,
             initial_state=initial_state,
             initial_diagnostics=initial_diagnostics,
             append_diagnostics=append_diagnostics,
