@@ -9,7 +9,7 @@ import numpy as np
 from lmx.cases import make_hunt_case, make_shercliff_case
 from lmx.mesh import generate_layered_duct_mesh, generate_layered_duct_mesh_from_fluid_faces, generate_rect_duct_mesh
 from lmx.reference_data import default_closed_channel_reference_root, load_processed_slice, processed_slice_point_mesh
-from lmx.validation import duct_layer_resolution_gate
+from lmx.validation import duct_layer_resolution_gate, duct_mesh_quality_metrics
 
 
 OUTPUT_DIR = Path("artifacts/examples/reference_slice_mesh_diagnostic")
@@ -129,6 +129,8 @@ def run_reference_slice_mesh_diagnostic() -> dict[str, object]:
         "reference_path": reference.path,
         "generated_mesh": _spacing_summary(generated_mesh),
         "reference_point_mesh": _spacing_summary(reference_mesh),
+        "generated_mesh_quality": duct_mesh_quality_metrics(generated_mesh),
+        "reference_point_mesh_quality": duct_mesh_quality_metrics(reference_mesh),
         "generated_layer_gate": duct_layer_resolution_gate(case, generated_mesh),
         "reference_point_layer_gate": duct_layer_resolution_gate(case, reference_mesh),
         "plots": [str(png_path), str(pdf_path)],

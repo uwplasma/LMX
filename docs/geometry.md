@@ -167,6 +167,10 @@ case's generated `ny`/`nz` spacing but keeps the case physics, material fields,
 boundary-condition interpretation, and solver controls. Highly clustered
 external slice coordinates can make the linear systems much more expensive, so
 promote a reference-grid run only after checking both accuracy and runtime.
+`duct_mesh_quality_metrics(...)` records min/max spacing, aspect-ratio proxies,
+and a diffusion-conditioning proxy so validation summaries can distinguish
+well-resolved meshes from over-clustered meshes that are expensive for the
+linear solves.
 
 ## Mesh-resolution guidance
 
@@ -179,6 +183,8 @@ promote a reference-grid run only after checking both accuracy and runtime.
 - use the metrics from `lmx/validation.py`, especially
   `duct_layer_resolution_metrics(...)`, to quantify side/Hartmann layer
   thicknesses and cell counts
+- pair layer-count gates with `duct_mesh_quality_metrics(...)` before copying
+  external slice spacing into production validation runs
 - use `duct_layer_resolution_gate(...)` for publication-facing runs; the
   default gate requires at least eight cells across the Hartmann layer and six
   cells across the side layer before a straight-duct result should be promoted

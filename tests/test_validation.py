@@ -22,6 +22,7 @@ from lmx.validation import (
     combined_profile_error,
     duct_layer_resolution_gate,
     duct_layer_resolution_metrics,
+    duct_mesh_quality_metrics,
     duct_profile_metrics,
     estimate_observed_order,
     extract_midplane_scalar_profile,
@@ -318,6 +319,19 @@ def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
     assert metrics["side_layer_thickness"] > 0.0
     assert metrics["hartmann_layer_cells"] > 0.0
     assert metrics["side_layer_cells"] > 0.0
+
+
+def test_duct_mesh_quality_metrics_reports_spacing_and_condition_proxy():
+    mesh = generate_rect_duct_mesh(width=0.2, height=0.1, ny=8, nz=4, target_ha=20.0, magnetic_axis="y")
+
+    metrics = duct_mesh_quality_metrics(mesh)
+
+    assert metrics["mesh_quality_supported"] is True
+    assert metrics["cell_count"] == mesh.ny * mesh.nz
+    assert metrics["dy_spacing_ratio"] >= 1.0
+    assert metrics["dz_spacing_ratio"] >= 1.0
+    assert metrics["max_cell_aspect_proxy"] >= 1.0
+    assert metrics["diffusion_condition_proxy"] >= 1.0
 
 
 def test_duct_layer_resolution_gate_marks_publication_mesh_readiness():

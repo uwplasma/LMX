@@ -182,6 +182,42 @@ def _cells_across_layer(widths: jnp.ndarray, layer_thickness: float) -> float:
     return float(full_cells + partial_cell)
 
 
+def duct_mesh_quality_metrics(mesh: StructuredMesh) -> dict[str, float | int]:
+    """Return spacing and conditioning proxies for a duct cross-section mesh."""
+
+    dy = jnp.asarray(mesh.dy, dtype=float)
+    dz = jnp.asarray(mesh.dz, dtype=float)
+    if dy.size == 0 or dz.size == 0:
+        return {
+            "ny": int(mesh.ny),
+            "nz": int(mesh.nz),
+            "cell_count": int(mesh.ny * mesh.nz),
+            "mesh_quality_supported": False,
+        }
+    min_dy = float(jnp.min(dy))
+    max_dy = float(jnp.max(dy))
+    min_dz = float(jnp.min(dz))
+    max_dz = float(jnp.max(dz))
+    spacing_floor = 1.0e-30
+    dy_ratio = max_dy / max(min_dy, spacing_floor)
+    dz_ratio = max_dz / max(min_dz, spacing_floor)
+    aspect_ratio = max(max_dy / max(min_dz, spacing_floor), max_dz / max(min_dy, spacing_floor))
+    return {
+        "ny": int(mesh.ny),
+        "nz": int(mesh.nz),
+        "cell_count": int(mesh.ny * mesh.nz),
+        "mesh_quality_supported": True,
+        "min_dy": min_dy,
+        "max_dy": max_dy,
+        "min_dz": min_dz,
+        "max_dz": max_dz,
+        "dy_spacing_ratio": float(dy_ratio),
+        "dz_spacing_ratio": float(dz_ratio),
+        "max_cell_aspect_proxy": float(aspect_ratio),
+        "diffusion_condition_proxy": float(max(dy_ratio, dz_ratio, aspect_ratio) ** 2),
+    }
+
+
 def duct_layer_resolution_metrics(case: CaseSpec, mesh: StructuredMesh) -> dict[str, float]:
     axis = _dominant_magnetic_axis(case)
     ha = case.geometry.target_ha
