@@ -181,6 +181,13 @@ environments and register this repository as a trusted publisher in TestPyPI
 and PyPI. Do not bypass the selected validation-artifact gate for a public
 release.
 
+External executable parity artifacts are portable: when the configured
+FreeMHD reference tree is not available on a runner, the suite writes an
+explicit `skipped` summary instead of failing the packaging workflow. Release
+candidates intended for publication should run the same workflow on a runner
+with `LMX_FREEMHD_INSTALL_DIR` or `LMX_FREEMHD_PROCESSED_ROOT` configured so
+the parity artifact is completed rather than skipped.
+
 ## Test runtime baseline
 
 The latest local evidence pass on this workstation shows:
