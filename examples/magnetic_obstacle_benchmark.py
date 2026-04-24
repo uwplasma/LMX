@@ -70,12 +70,20 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
             solution,
             reference_solution,
             OUTPUT_DIR,
-            case_title="Magnetic-obstacle benchmark comparison",
+            case_title="Magnetic-obstacle internal response",
         ),
     ]
     summary = {
         "case": "magnetic_obstacle_benchmark",
         "geometry_kind": solution.bundle.geometry_kind,
+        "status": "internal_lmx_response_gate",
+        "validation_note": (
+            "The matched reference is the same LMX case with the localized field removed. "
+            "This checks response strength and conservation, but it is not an external "
+            "magnetic-obstacle validation until a literature or experimental reference "
+            "case is matched on geometry, Re, Ha, interaction parameter, wall model, "
+            "field profile, and observables."
+        ),
         "plots": [path.name for path in plots],
         "validation": validation,
         "literature_validation": literature_validation,

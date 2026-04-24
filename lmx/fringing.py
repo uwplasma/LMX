@@ -2013,7 +2013,7 @@ def validate_magnetic_obstacle_baseline(
     *,
     field_ny: int = 81,
     field_nz: int = 81,
-) -> dict[str, float | bool]:
+) -> dict[str, float | bool | str]:
     if solution.problem.case.geometry.kind != "rect_duct":
         raise ValueError("Magnetic-obstacle baseline currently supports rectangular ducts only")
     if solution.problem.case.magnetic_field.kind != "analytic" or solution.problem.case.magnetic_field.fn is None:
@@ -2039,23 +2039,38 @@ def validate_magnetic_obstacle_baseline(
     obstacle_velocity_deficit = float(inlet_reference - mean_velocity[peak_index]) if mean_velocity.size else 0.0
     current_proxy_peak = float(np.max(current_proxy)) if current_proxy.size else 0.0
     field_velocity_correlation = float(_safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity)))
-    validation_pass = bool(
-        field_metrics["rms_divergence"] <= 5.0e-2
-        and validation.max_charge_balance_residual <= 5.0e-2
+    divergence_to_field_ratio = float(field_metrics["rms_divergence"] / max(field_metrics["mean_field_magnitude"], 1.0e-12))
+    field_quality_pass = bool(divergence_to_field_ratio <= 2.5e-2)
+    conservation_pass = bool(
+        validation.max_charge_balance_residual <= 5.0e-2
         and validation.net_boundary_current_residual <= 1.0e-8
         and validation.max_wall_current_leakage <= 1.0e-8
-        and obstacle_velocity_deficit > 1.0e-8
+    )
+    response_observable_pass = bool(
+        obstacle_velocity_deficit > 1.0e-8
         and current_proxy_peak > 1.0e-8
         and field_velocity_correlation < -0.2
     )
+    validation_pass = bool(
+        field_quality_pass
+        and conservation_pass
+        and response_observable_pass
+    )
     return {
         **field_metrics,
+        "divergence_to_field_ratio": divergence_to_field_ratio,
         "obstacle_velocity_deficit": obstacle_velocity_deficit,
         "current_proxy_peak": current_proxy_peak,
         "field_velocity_correlation": field_velocity_correlation,
         "max_charge_balance_residual": float(validation.max_charge_balance_residual),
         "max_wall_current_leakage": float(validation.max_wall_current_leakage),
         "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "field_quality_pass": field_quality_pass,
+        "conservation_pass": conservation_pass,
+        "response_observable_pass": response_observable_pass,
+        "reference_kind": "none",
+        "external_reference_available": False,
+        "research_grade_validation_pass": False,
         "validation_pass": validation_pass,
     }
 
@@ -2066,7 +2081,7 @@ def validate_magnetic_obstacle_benchmark(
     *,
     field_ny: int = 81,
     field_nz: int = 81,
-) -> dict[str, float | bool]:
+) -> dict[str, float | bool | str]:
     if solution.problem.case.geometry.kind != "rect_duct":
         raise ValueError("Magnetic-obstacle benchmark currently supports rectangular ducts only")
     if reference_solution.problem.case.geometry.kind != "rect_duct":
@@ -2077,7 +2092,7 @@ def validate_magnetic_obstacle_benchmark(
     baseline = validate_magnetic_obstacle_baseline(solution, field_ny=field_ny, field_nz=field_nz)
     bundle = solution.bundle
     reference_bundle = reference_solution.bundle
-    divergence_ratio = float(baseline["rms_divergence"] / max(baseline["mean_field_magnitude"], 1.0e-12))
+    divergence_ratio = float(baseline["divergence_to_field_ratio"])
     field_scale = np.asarray(bundle.field_scale, dtype=float)
     mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
     ref_mean_velocity = np.asarray(reference_bundle.mean_velocity, dtype=float)
@@ -2157,6 +2172,10 @@ def validate_magnetic_obstacle_benchmark(
         "y_l2_distortion": y_l2_distortion,
         "z_l2_distortion": z_l2_distortion,
         "peak_crosscut_distortion": peak_crosscut_distortion,
+        "reference_kind": "matched_no_field_lmx",
+        "external_reference_available": False,
+        "internal_response_pass": validation_pass,
+        "research_grade_validation_pass": False,
         "benchmark_pass": validation_pass,
     }
 
@@ -2167,7 +2186,7 @@ def validate_magnetic_obstacle_literature_slice(
     *,
     field_ny: int = 81,
     field_nz: int = 81,
-) -> dict[str, float | bool]:
+) -> dict[str, float | bool | str]:
     benchmark = validate_magnetic_obstacle_benchmark(
         solution,
         reference_solution,
@@ -2180,7 +2199,7 @@ def validate_magnetic_obstacle_literature_slice(
     outlet_station = float(x[-1]) if x.size else 0.0
     recovery_distance = max(float(benchmark["recovery_station"]) - peak_station, 0.0)
     normalized_recovery_distance = recovery_distance / max(outlet_station - peak_station, 1.0e-12)
-    literature_pass = bool(
+    literature_shape_gate = bool(
         benchmark["benchmark_pass"]
         and benchmark["peak_centerline_deficit_ratio"] >= 0.2
         and benchmark["integrated_velocity_deficit_ratio"] >= 1.0e-2
@@ -2194,7 +2213,11 @@ def validate_magnetic_obstacle_literature_slice(
         "outlet_station": outlet_station,
         "recovery_distance": recovery_distance,
         "normalized_recovery_distance": normalized_recovery_distance,
-        "literature_pass": literature_pass,
+        "literature_shape_gate": literature_shape_gate,
+        "external_reference_available": False,
+        "research_grade_validation_pass": False,
+        "literature_status": "internal_lmx_response_only",
+        "literature_pass": False,
     }
 
 

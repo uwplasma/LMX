@@ -249,9 +249,9 @@ matching artifact-producing workflow. The expected pattern is:
 - CI checks the JSON summary and docs build; manual workflows regenerate the
   heavier figures when needed
 
-This is the route for the straight-duct overlays, Benchmark B summaries, Q2D
-panels, magnetic-obstacle panels, WHAM sensitivity figures, bent-pipe
-overview, and future Benchmark E heat-transfer plots.
+This is the route for the straight-duct overlays, 3D fringing-field summaries,
+Q2D panels, localized-field response panels, WHAM sensitivity figures,
+bent-pipe overview, and future heat-transfer plots.
 
 ## Source map
 
@@ -281,10 +281,11 @@ verification/validation practice, not only to internal regression history.
   - provides straight-duct, fringing, and free-surface comparison targets and
     a useful reference implementation baseline
 - [Quasi-two dimensional perturbations in duct flows under transverse magnetic field](https://arxiv.org/abs/2006.03993)
-  - anchors the current Benchmark C Q2D validation direction
+  - anchors the current Q2D Hartmann-friction validation direction
 - [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
 - [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
-  - anchor the wake-deficit / recovery / distortion observables for Benchmark D
+  - anchor the wake-deficit / recovery / distortion observables needed before
+    the magnetic-obstacle lane can be called externally validated
 - [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)
   - supports the broader validation roadmap for curved ducts, magnetic
     obstacles, and 3D liquid-metal benchmark structure

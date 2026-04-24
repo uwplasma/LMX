@@ -213,29 +213,36 @@ The tabulated rectangular lane is exercised by
 `examples/variable_field_tabulated_demo.py` and
 `examples/fringing_tabulated_case.toml`.
 
-### Benchmark C baseline
+### Quasi-2D Hartmann-friction validation
 
-LMX now includes a first Benchmark C baseline as a quasi-2D Hartmann-friction
-decay problem. This is not a turbulent closure yet. It is the first executable
-Q2D validation surface: a 2D mode decays under diffusion plus Hartmann-friction
-drag and is compared against the corresponding analytic exponential decay.
+LMX includes three quasi-2D Hartmann-friction validation slices. These are not
+turbulent-duct claims yet. They are deliberately bounded reduced problems that
+check the Q2D time integrator against analytical decay and forced-mode
+solutions before moving to turbulent observables.
 
-LMX also now includes the first forced Benchmark C slice: a periodic Q2D mode
-driven to a steady state and compared against the corresponding analytic forced
-solution.
+- `examples/q2d_decay_validation.py`: a periodic 2D mode decays under
+  diffusion plus Hartmann friction and matches the exact exponential amplitude
+  history with `L2 ≈ 9.10e-5`
+- `examples/q2d_forced_validation.py`: a periodic forced mode approaches the
+  analytical steady amplitude with `L2 ≈ 4.44e-4`
+- `examples/q2d_wall_bounded_validation.py`: a no-slip rectangular box is
+  forced toward the exact transient Dirichlet solution with `L2 ≈ 4.15e-4`
 
-The next wall-bounded Q2D slice is now also executable: a no-slip duct mode
-forced inside a rectangular box and compared against the exact transient
-Dirichlet solution. That closes the gap between the periodic baseline and the
-first wall-bounded Q2D validation surface.
+<p align="center">
+  <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
+  <img src="docs/_static/generated/q2d_forced_overview.png" alt="Q2D forced-mode validation" width="32%">
+  <img src="docs/_static/generated/q2d_wall_bounded_overview.png" alt="Q2D wall-bounded forced validation" width="32%">
+</p>
 
-### Benchmark D first slice
+### Magnetic-obstacle localized-field response
 
-LMX now includes a stronger executable magnetic-obstacle benchmark on the
-rectangular extruded solver lane. This is still a low-inertia inductionless
-slice, not a turbulent magnetic-obstacle solver, but it now compares the
-obstacle case directly against a matched no-field reference and reports
-normalized response observables rather than only baseline internal metrics.
+LMX includes an executable localized-field response problem on the rectangular
+extruded solver lane. This is currently an internal response and conservation
+gate, not an external magnetic-obstacle validation. The reference in the panel
+below is the same LMX case with the localized magnetic obstacle removed, so the
+comparison checks whether the obstacle produces a measurable velocity deficit,
+pressure response, cross-section distortion, and clean current closure. It does
+not yet prove parity with the magnetic-obstacle literature.
 
 The main driver is `examples/magnetic_obstacle_benchmark.py`. On the current
 bounded case (`24 × 24 × 17`, localized obstacle field, matched no-field
@@ -251,21 +258,25 @@ reference), it reports:
 - `peak_crosscut_distortion ≈ 2.31e-1`
 - `max_charge_balance_residual ≈ 3.98e-13`
 
-That is the current reviewer-facing Benchmark D slice: a real 3D obstacle
-response benchmark with measurable wake deficit, streamwise recovery, pressure
-growth, cross-sectional distortion, and clean conservation.
+The current status is therefore: internal response gate passes, external
+research-grade validation remains open. The next validation step is to match a
+published localized-field case on geometry, wall model, `Re`, `Ha`, interaction
+parameter, field profile, and observables, then compare centerline deficit,
+wake recovery, pressure drop, current closure, and cross-sectional distortion
+without using a matched no-field LMX solution as the only reference.
 
-LMX now also reports a literature-facing validation view on the same case:
-`peak_station ≈ 3.00`, `normalized_recovery_distance ≈ 6.25e-1`, and
-`literature_pass = true` for the current bounded obstacle slice.
+The current summary makes that distinction explicit:
+`reference_kind = matched_no_field_lmx`, `external_reference_available = false`,
+and `research_grade_validation_pass = false`.
 
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
 To push beyond that single bounded point, LMX also now includes
 `examples/magnetic_obstacle_regime_scan.py`, which sweeps obstacle runs over
 field scale and forcing and writes a compact response map. That scan is the
-current bridge from the low-inertia baseline toward stronger-inertia Benchmark
-D cases, while keeping the routine example and test surface bounded.
+current bridge from the low-inertia internal response gate toward the
+published magnetic-obstacle validation cases, while keeping the routine example
+and test surface bounded.
 
 ![LMX magnetic-obstacle regime scan](docs/_static/generated/magnetic_obstacle_regime_scan.png)
 
@@ -330,6 +341,20 @@ testing docs. The current checked ladder runs `Ha = 20` and `Ha = 100` on the
 same normalized `y` and `z` cuts and keeps the reference filenames in the
 summary JSON so the later paper figures remain traceable to the bundled
 analytical datasets.
+
+The ladder agrees well on the retained Hartmann, Shercliff, and Hunt cuts
+except the high-`Ha` Hunt side-layer cut, which remains the most sensitive
+straight-duct parity lane. That cut is dominated by the conducting-wall side
+jets, so small differences in side-layer clustering, wall conductance
+representation, current closure, cell-center-to-wall reconstruction, and
+normalization move the jet peak more than they move the core or Hartmann-layer
+cuts. Increasing the local side-layer resolution and importing processed
+reference spacing did not monotonically improve the error in the current LMX
+operator path; the retained README figure therefore reports the gap explicitly
+instead of peak-matching it away. Closing it requires a dedicated
+mesh-convergence and wall-current reconstruction campaign, with `Q`, `phi`,
+`J`, `J×B`, side-jet location, and pressure-gradient observables compared
+together.
 
 `examples/hartmann_validation_ladder.py` now does the same for the Hartmann
 centerline, including a wall-layer zoom and a checked summary JSON, so the
@@ -436,10 +461,10 @@ The current validation surface includes:
   across all transverse lines, and currently exposes a real high-`Ha`,
   high-`Re` parity gap rather than hiding it behind per-line normalization
 - widened bounded manual fringing campaign at `Ha = 10, 20, 30`, `resolution = 8`
-- a standalone quantitative Benchmark B summary driver for rectangular, layered,
-  and mapped-pipe fringing cases
-- dense duct Benchmark B at `24 × 24 × 33` closes `rect_duct` on raw internal
-  metrics; `layered_duct` now uses symmetry-aware closure metrics because the
+- a standalone quantitative 3D fringing-field summary driver for rectangular,
+  layered, and mapped-pipe cases
+- dense rectangular fringing at `24 × 24 × 33` closes `rect_duct` on raw
+  internal metrics; `layered_duct` now uses symmetry-aware closure metrics because the
   Hunt fringing response is odd/even about the field midplane rather than
   span-minimizing. On the heavier layered closure run at `Ha = 20`,
   `18 × 18 × 21`, the retained layered metrics are

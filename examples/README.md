@@ -289,19 +289,19 @@ Those examples extend the same field API into:
 - a reduced differentiable pressure-drop sensitivity study with respect to
   coil-coil separation
 
-Benchmark C / Q2D baseline:
+Quasi-2D Hartmann-friction decay:
 
 ```bash
 python examples/q2d_decay_validation.py
 ```
 
-That example is the first executable Benchmark C slice:
+That example is the first executable Q2D validation slice:
 
 - solve a periodic quasi-2D Hartmann-friction decay problem
 - compare the numerical final state against the analytic decay
 - write a compact validation figure and summary JSON
 
-Forced Benchmark C / Q2D duct:
+Quasi-2D forced periodic duct:
 
 ```bash
 python examples/q2d_forced_validation.py
@@ -313,7 +313,7 @@ That example upgrades the Q2D lane from decay-only to a forced duct baseline:
 - compare the steady state and approach-to-steady-state against the analytic solution
 - write a compact validation figure and summary JSON
 
-Wall-bounded Benchmark C / Q2D duct:
+Quasi-2D wall-bounded forced duct:
 
 ```bash
 python examples/q2d_wall_bounded_validation.py
@@ -325,7 +325,7 @@ That example moves the Q2D lane from periodic modes to a wall-bounded duct:
 - compare the transient final state against the exact Dirichlet solution
 - write a compact validation figure and summary JSON
 
-First Benchmark D slice:
+Localized-field and mirror-field response:
 
 ```bash
 python examples/magnetic_obstacle_benchmark.py
@@ -334,7 +334,7 @@ python examples/wham_mirror_pipe_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
 ```
 
-Those examples are the current executable Benchmark D entry points:
+Those examples are the current executable localized-field response entry points:
 
 - `magnetic_obstacle_benchmark.py`
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
@@ -342,12 +342,12 @@ Those examples are the current executable Benchmark D entry points:
   - write both the generic extruded overview and a dedicated benchmark panel
   - record streamwise wake-deficit, centerline recovery, pressure-excess,
     distortion, and conservation metrics
-  - also emit a literature-facing recovery/deficit summary on the same bounded case
+  - mark the result as an internal response gate, not an external literature validation
 - `magnetic_obstacle_regime_scan.py`
   - sweep localized-field obstacle runs over `Bz` scale and forcing
   - write a compact response-map figure over velocity deficit, pressure excess,
     current response, and cross-cut distortion
-  - stage the transition from the current baseline toward stronger-inertia Benchmark D cases
+  - stage the transition from the current baseline toward published magnetic-obstacle cases
 - `magnetic_obstacle_baseline.py`
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
   - write the full extruded overview panel

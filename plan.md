@@ -92,26 +92,76 @@ Paper-ready or close to paper-ready:
 - dense internal rectangular Benchmark B fringing conservation metrics
 - layered Benchmark B closure on mirror-aware current/pressure observables
 - Q2D decay, forced, and wall-bounded reduced validation examples
-- magnetic-obstacle bounded response and regime-scan figures as Benchmark D
-  precursors
+- magnetic-obstacle bounded response and regime-scan figures as internal
+  localized-field response precursors, not external validation
 - runtime logging, ETA/progress output, restart, plotting, and artifact-summary
   workflows
 
 Demonstrated but not yet research-grade validation:
 
+- the high-`Ha` Hunt side-layer cut; Hartmann, Shercliff, and retained Hunt
+  cuts meet the current `L2 <= 1.2e-2` target, but the Hunt conducting-wall jet
+  cut remains sensitive to side-layer mesh placement, wall-conductance
+  modeling, conservative current reconstruction, and normalization
 - the physical constant-`Q` / `flow_rate` FreeMHD path for fully developed
   ducts; the pressure-gradient paper-slice lane is now close, but the
   constrained-flow drive still needs the same observable-level parity
 - mapped-pipe external parity against the high-`Ha`, high-`Re` Bühler case;
   this is now explicitly future work, not a blocker for the current closeout
-- full Benchmark C turbulent observables
-- full Benchmark D turbulent or experimentally anchored magnetic-obstacle
-  parity
-- Benchmark E heat-transfer / buoyant-convection
+- quasi-2D turbulent observables beyond the current analytic decay/forced
+  Hartmann-friction checks
+- experimentally or literature-anchored magnetic-obstacle parity; the current
+  case uses a matched no-field LMX reference and now reports
+  `research_grade_validation_pass = false`
+- heat-transfer / buoyant-convection MHD
 - higher-inertia bent-pipe physics beyond the low-De baseline
 - variable-field validation beyond bounded duct/layered/pipe/bent examples
 - solver-faithful CPU strong scaling and memory-model documentation
 - PyPI release automation
+
+### Public naming policy
+
+Public documentation should name validation lanes by physics rather than by
+benchmark letter. Samper et al. letters remain useful internally because they
+map to the fusion V&V ladder, but README and user-facing docs should say:
+
+- `fully developed Hartmann/Shercliff/Hunt duct verification`
+- `3D laminar fringing-field validation`
+- `quasi-2D Hartmann-friction validation`
+- `localized magnetic-obstacle response`
+- `heat-transfer / buoyant-convection MHD`
+
+The benchmark letters can appear in developer plans only when they explicitly
+refer to the Samper et al. taxonomy.
+
+### Current open research-grade blockers
+
+- High-`Ha` Hunt side-layer parity: run a mesh ladder with explicit Hartmann
+  and side-layer cell counts, compare LMX against analytic and processed
+  reference cuts on `Q`, `phi`, `J`, `J×B`, side-jet peak location, and
+  pressure-gradient proxy, then accept only if the side cut converges rather
+  than being visually peak-matched.
+- Magnetic-obstacle external validation: replace the current matched no-field
+  LMX reference with published localized-field cases, including the
+  Cuevas-Smolentsev-Abdou quasi-2D magnetic-obstacle study and the Votyakov
+  constrained-flow JFM case. Required observables are centerline velocity
+  deficit, wake recovery, pressure drop or drag proxy, current closure,
+  cross-sectional distortion, recirculation/vorticity structure where the
+  solver supports it, and mesh/time convergence.
+- Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
+  tests as verification, then add Sommeria-Moreau-style closure observables and
+  literature-facing turbulent energy/decay spectra before making any turbulent
+  claim.
+- Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
+  limit to Dean-vortex observables, secondary-flow intensity, curvature
+  response, and MHD damping trends against curved-duct literature.
+- Variable and tabulated 3D fields: validate interpolation, divergence control,
+  field normalization, pressure-drop response, and autodiff sensitivities
+  against manufactured fields and at least one independent field dataset.
+- Release quality: keep routine tests short, preserve broad `>=95%` coverage,
+  move heavy solver comparisons to manual/release workflows, and require every
+  publication-facing example to write PNG/PDF plus a JSON summary with named
+  gates.
 
 ### Immediate technical sequence
 
@@ -155,10 +205,11 @@ Demonstrated but not yet research-grade validation:
    condition paths, current/forcing/flow-rate modes, and cheap manufactured or
    monkeypatched tests.
 5. Promote only literature-gated capability lanes.
-   Bent pipe, variable-field, Benchmark C, Benchmark D, and Benchmark E should
-   each require one numerical invariant, one physics/literature gate, one
-   artifact-producing example, and one docs entry stating whether the case is
-   verification, validation, or only a capability demo.
+   Bent pipe, variable-field, Q2D Hartmann-friction/turbulence,
+   magnetic-obstacle response, and heat-transfer cases should each require one
+   numerical invariant, one physics/literature gate, one artifact-producing
+   example, and one docs entry stating whether the case is verification,
+   validation, or only a capability demo.
 6. Finish performance and differentiability gates.
    The solver must report progress, ETA, memory-relevant grid sizes, compile
    versus warm runtime, and device placement. Differentiable workflows must
@@ -381,6 +432,10 @@ Target split map:
   - `lmx/fringing/metrics.py`: conservative current/pressure/throughput metrics
   - `lmx/fringing/validation.py`: benchmark gates and literature-facing slices
   - `lmx/fringing/reference.py`: reference comparison helpers and normalizations
+  - `lmx/fringing/obstacles.py`: localized magnetic-obstacle builders,
+    response metrics, and external-reference loaders
+  - `lmx/fringing/wham.py`: WHAM/mirror-field table generation, pipe setup, and
+    pressure-drop sensitivity helpers
 - `lmx/autodiff.py`
   - `lmx/autodiff/objectives.py`: differentiable loss/objective definitions
   - `lmx/autodiff/gradients.py`: gradient/JVP/VJP utilities and checks
@@ -395,6 +450,8 @@ Target split map:
   - `lmx/validation/profiles.py`
   - `lmx/validation/reference.py`
   - `lmx/validation/reports.py`
+  - `lmx/validation/mesh_quality.py`
+  - `lmx/validation/literature.py`
 - `lmx/solvers.py`
   - keep a thin public façade
   - move helper-heavy internals into:
@@ -402,6 +459,7 @@ Target split map:
     - `lmx/solvers/potential.py`
     - `lmx/solvers/diagnostics.py`
     - `lmx/solvers/logging.py`
+    - `lmx/solvers/flow_control.py`
 
 Refactor rules:
 
@@ -409,6 +467,10 @@ Refactor rules:
 - move tests with the code they exercise
 - split only after the behavior is locked by direct tests
 - do not mix refactors with numerical changes in the same patch when possible
+- create thin compatibility imports first, then move one module family per PR or
+  commit so coverage and validation deltas stay attributable
+- keep publication artifact paths stable during the split; only change internals
+  and import façades until the manuscript figures are regenerated successfully
 
 #### Phase 6: autodiff, UQ, and optimization verification
 
@@ -478,21 +540,21 @@ Every example should be classified as one of:
 
 Current target matrix:
 
-- Benchmark A / straight-duct verification
+- Fully developed straight-duct verification
   - `hartmann_example.py`
   - `shercliff_example.py`
   - `hunt_example.py`
   - `straight_duct_profile_comparison.py`
-- Benchmark B / 3D fringing validation
+- 3D laminar fringing-field validation
   - `fringing_benchmark_demo.py`
   - `extruded_validation_campaign.py`
   - `pipe_reference_comparison_demo.py`
   - bent-pipe inductionless baseline
-- Benchmark C / Q2D validation
+- Quasi-2D Hartmann-friction validation
   - `q2d_decay_validation.py`
   - `q2d_forced_validation.py`
   - `q2d_wall_bounded_validation.py`
-- Benchmark D / magnetic-obstacle and mirror-field validation
+- Localized magnetic-obstacle and mirror-field response
   - `magnetic_obstacle_benchmark.py`
   - `magnetic_obstacle_regime_scan.py`
   - `wham_mirror_pipe_demo.py`
@@ -524,17 +586,17 @@ Target manuscript figures:
   - cross-sectional contour panel showing Hartmann and side/Hunt layers
   - optional mesh-inset figure showing boundary-layer clustering for the
     highest-Ha verification case
-- Benchmark B: laminar developing flow in non-uniform magnetic field
+- 3D laminar fringing flow in non-uniform magnetic field
   - rectangular and layered 3D fringing cross-sections plus streamwise history
   - one quantitative summary panel for pressure span, current closure, and
     throughput constancy
   - mapped-pipe comparison figure remains optional until external parity is
     reopened and closed
-- Benchmark C: Q2D validation
+- Quasi-2D Hartmann-friction validation
   - decay/forced/wall-bounded amplitude-versus-time validation panel
   - one asymptotic Q2D figure showing stronger transverse field suppressing
     three-dimensionality in the expected direction
-- Benchmark D: magnetic obstacle / localized-field interaction
+- Magnetic obstacle / localized-field interaction
   - wake-deficit / recovery / cross-cut distortion benchmark panel
   - one regime map or literature-slice comparison figure showing how response
     changes with obstacle strength
@@ -825,7 +887,7 @@ documented together:
 - external reference or experimental source
 - executable driver and committed example inputs
 
-Current Benchmark C baseline:
+Current quasi-2D Hartmann-friction decay lane:
 
 - `examples/q2d_decay_validation.py` now provides the first executable Q2D
   validation surface
@@ -834,46 +896,49 @@ Current Benchmark C baseline:
 - observables:
   final-state `L2/L∞` error and amplitude-decay error against the analytic
   exponential decay
-- remaining work before any turbulent Benchmark C claim:
+- remaining work before any turbulent Q2D claim:
   Q2D duct forcing, wall/friction closures closer to Sommeria-Moreau, and
   literature-anchored turbulent observables
 
-Current forced Benchmark C slice:
+Current quasi-2D forced periodic lane:
 
 - `examples/q2d_forced_validation.py` now adds the first forced Q2D duct
   validation problem
 - observables:
   steady-state `L2/L∞` error and amplitude error against the analytic forced
   solution
-- remaining work before any turbulent Benchmark C claim:
+- remaining work before any turbulent Q2D claim:
   wall-bounded Q2D duct forcing, closure terms closer to the Sommeria-Moreau
   model, and literature-anchored turbulent observables
 - current bounded result from `examples/q2d_forced_validation.py`:
   `l2_error ≈ 4.44e-4`, `linf_error ≈ 4.44e-4`,
   `steady_amplitude_rel_error ≈ 4.44e-4`
 
-Current wall-bounded Benchmark C slice:
+Current quasi-2D wall-bounded forced lane:
 
 - `examples/q2d_wall_bounded_validation.py` now adds the first no-slip Q2D
   duct benchmark
 - observables:
   final-state `L2/L∞` error and amplitude error against the exact Dirichlet
   transient solution
-- remaining work before any turbulent Benchmark C claim:
+- remaining work before any turbulent Q2D claim:
   Sommeria-Moreau-style closures, literature-anchored wall-bounded duct
   observables, and Q2D turbulence
 - current bounded result from `examples/q2d_wall_bounded_validation.py`:
-  `l2_error ≈ 4.89e-4`, `linf_error ≈ 4.89e-4`,
-  `amplitude_rel_error ≈ 4.89e-4`
+  `l2_error ≈ 4.15e-4`, `linf_error ≈ 4.15e-4`,
+  `amplitude_rel_error ≈ 1.42e-4`
 
-Current first Benchmark D slice:
+Current localized magnetic-obstacle response lane:
 
-- `examples/magnetic_obstacle_benchmark.py` now provides the first stronger
-  magnetic-obstacle benchmark on the rectangular extruded lane
+- `examples/magnetic_obstacle_benchmark.py` now provides a stronger
+  localized-field response gate on the rectangular extruded lane
 - observables:
   normalized velocity-deficit ratio, pressure-excess response, centerline-cut
   distortion, current response, and conservation metrics
-- remaining work before any full Benchmark D claim:
+- status:
+  internal matched-no-field LMX response gate only; no external reference is
+  attached yet
+- remaining work before any full magnetic-obstacle validation claim:
   stronger-inertia obstacle regimes, literature parity on magnetic-obstacle
   observables, a more forceful executable mirror-field pipe response, and
   truly turbulent 3D validation
@@ -891,12 +956,14 @@ Current first Benchmark D slice:
   `peak_crosscut_distortion ≈ 2.31e-1`,
   `divergence_to_field_ratio ≈ 1.69e-2`,
   `max_charge_balance_residual ≈ 3.98e-13`,
-  `benchmark_pass = true`
-- current bounded literature-facing slice on the same case:
+  `internal_response_pass = true`,
+  `research_grade_validation_pass = false`
+- current bounded shape summary on the same case:
   `peak_station ≈ 3.00`,
   `recovery_distance ≈ 1.76`,
   `normalized_recovery_distance ≈ 6.25e-1`,
-  `literature_pass = true`
+  `literature_shape_gate = true`,
+  `literature_pass = false`
 - `examples/magnetic_obstacle_regime_scan.py` now stages the next step beyond
   that bounded point by sweeping obstacle cases over field scale and forcing
   and recording how deficit, pressure response, current response, and

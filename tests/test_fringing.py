@@ -619,6 +619,11 @@ def test_magnetic_obstacle_baseline_reports_velocity_deficit():
     assert solution.bundle.geometry_kind == "rect_duct"
     assert validation["obstacle_velocity_deficit"] > 0.0
     assert validation["current_proxy_peak"] > 0.0
+    assert validation["divergence_to_field_ratio"] >= 0.0
+    assert validation["field_quality_pass"] in {True, False}
+    assert validation["reference_kind"] == "none"
+    assert validation["external_reference_available"] is False
+    assert validation["research_grade_validation_pass"] is False
     assert isinstance(validation["validation_pass"], bool)
 
 
@@ -648,6 +653,10 @@ def test_magnetic_obstacle_benchmark_reports_normalized_response():
     assert validation["y_l2_distortion"] > 0.0
     assert validation["z_l2_distortion"] > 0.0
     assert validation["peak_crosscut_distortion"] == pytest.approx(max(validation["y_l2_distortion"], validation["z_l2_distortion"]))
+    assert validation["reference_kind"] == "matched_no_field_lmx"
+    assert validation["external_reference_available"] is False
+    assert validation["internal_response_pass"] == validation["benchmark_pass"]
+    assert validation["research_grade_validation_pass"] is False
     assert isinstance(validation["benchmark_pass"], bool)
 
 
@@ -669,7 +678,11 @@ def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
     assert validation["peak_station"] >= float(solution.bundle.x[0])
     assert validation["recovery_distance"] >= 0.0
     assert 0.0 <= validation["normalized_recovery_distance"] <= 1.0
-    assert isinstance(validation["literature_pass"], bool)
+    assert validation["literature_shape_gate"] in {True, False}
+    assert validation["literature_status"] == "internal_lmx_response_only"
+    assert validation["external_reference_available"] is False
+    assert validation["research_grade_validation_pass"] is False
+    assert validation["literature_pass"] is False
 
 
 def test_poisson_helpers_can_stop_early():

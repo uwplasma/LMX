@@ -230,15 +230,15 @@ the LMX pipe solver into a matching high-`Ha`, high-`Re` regime first.
 
 ## Staged but deferred
 
-- Benchmark C: Q2D turbulent duct flow
-- Benchmark D: turbulent duct flow / magnetic obstacle
-- Benchmark E: natural convection / heat transfer
+- Q2D turbulent duct flow
+- turbulent duct flow / externally validated magnetic obstacle
+- natural convection / heat transfer
 - sudden expansion
 - blanket mock-up / coupled-duct effects
 
 These remain part of the research roadmap, but not the `1.0` solver promise.
 
-Current executable Benchmark C baseline:
+Current executable Q2D Hartmann-friction decay lane:
 
 - `examples/q2d_decay_validation.py`
   - quasi-2D Hartmann-friction decay of a single periodic mode
@@ -248,7 +248,7 @@ Current executable Benchmark C baseline:
   - role:
     first Q2D validation surface before adding turbulent closures
 
-Current forced Benchmark C baseline:
+Current forced Q2D Hartmann-friction lane:
 
 - `examples/q2d_forced_validation.py`
   - forced periodic Q2D Hartmann-friction duct mode
@@ -258,7 +258,7 @@ Current forced Benchmark C baseline:
   - role:
     first forced Q2D duct slice before turbulent closures
 
-Current wall-bounded Benchmark C baseline:
+Current wall-bounded Q2D Hartmann-friction lane:
 
 - `examples/q2d_wall_bounded_validation.py`
   - forced wall-bounded Q2D Hartmann-friction duct mode
@@ -278,21 +278,22 @@ Current bounded result:
 Current bounded wall-bounded result:
 
 - `96 × 96`, `ν = 0.01`, Hartmann-friction `= 2.0`
-- `l2_error ≈ 4.89e-4`
-- `linf_error ≈ 4.89e-4`
-- `amplitude_rel_error ≈ 4.89e-4`
+- `l2_error ≈ 4.15e-4`
+- `linf_error ≈ 4.15e-4`
+- `amplitude_rel_error ≈ 1.42e-4`
 
-Current first Benchmark D slice:
+Current localized magnetic-obstacle response lane:
 
 - `examples/magnetic_obstacle_benchmark.py`
-  - localized-field magnetic-obstacle benchmark on the rectangular extruded
-    inductionless lane, compared directly against a matched no-field reference
+  - localized-field magnetic-obstacle response on the rectangular extruded
+    inductionless lane, compared directly against a matched no-field LMX
+    reference
   - observables:
     normalized velocity-deficit ratio, pressure-excess response, current
     response, centerline-cut distortion, and conservation metrics
   - role:
-    first literature-facing magnetic-obstacle slice before any turbulent
-    Benchmark D claim
+    internal response and conservation gate before any external
+    magnetic-obstacle validation claim
 
 Current bounded result:
 
@@ -312,11 +313,13 @@ Current bounded result:
 - `peak_crosscut_distortion ≈ 2.31e-1`
 - `divergence_to_field_ratio ≈ 1.69e-2`
 - `max_charge_balance_residual ≈ 3.98e-13`
-- `benchmark_pass = true`
+- `internal_response_pass = true`
+- `research_grade_validation_pass = false`
 
-These observables are meant to read closer to the magnetic-obstacle literature:
-streamwise wake deficit, centerline recovery location, pressure response, and
-cross-cut distortion against a matched no-field reference.
+These observables are intentionally chosen to prepare for magnetic-obstacle
+literature comparisons: streamwise wake deficit, centerline recovery location,
+pressure response, and cross-cut distortion. The current reference is still a
+matched no-field LMX run, so it is not an external validation.
 
 The choice of observables follows the wake/recovery framing used in magnetic-
 obstacle studies such as Cuevas et al., *On the flow past a magnetic obstacle*
@@ -324,12 +327,13 @@ and Votyakov et al., *Constrained flow around a magnetic obstacle*, even
 though the current LMX slice is still a bounded low-inertia inductionless case
 rather than a full turbulent or experimental parity benchmark.
 
-Current bounded literature-facing slice:
+Current bounded shape summary:
 
 - `peak_station ≈ 3.00`
 - `recovery_distance ≈ 1.76`
 - `normalized_recovery_distance ≈ 6.25e-1`
-- `literature_pass = true`
+- `literature_shape_gate = true`
+- `literature_pass = false`
 
 Current bounded regime scan:
 
@@ -378,7 +382,7 @@ Current bounded executable tabulated-pipe result:
 - `max_charge_balance_residual ≈ 3.06e-5`
 - `pressure_drop_proxy ≈ 1.86e-11`
 - the nominal-WHAM low-Re response is therefore still too weak to count as a
-  forceful Benchmark D executable comparison case
+  forceful localized-field executable comparison case
 
 ## Additional benchmark targets for the next publication cycle
 
