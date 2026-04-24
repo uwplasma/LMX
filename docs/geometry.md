@@ -137,6 +137,20 @@ Current geometry panel:
 
 ![LMX geometry panel](_static/generated/geometry_gallery.png)
 
+## Reference-Slice Meshes
+
+External-code parity work sometimes needs LMX to use the exact cross-section
+coordinates exported by a processed slice rather than a generated clustered
+mesh. `generate_rect_duct_mesh_from_faces(...)` builds a rectangular mesh from
+explicit `y` and `z` faces, and
+`generate_layered_duct_mesh_from_fluid_faces(...)` wraps explicit fluid-region
+faces with conducting or insulating wall cells. For processed slice CSV files,
+`processed_slice_point_mesh(...)` converts the unique `Points:1` and
+`Points:2` coordinates into a rectangular reference mesh for A/B diagnostics.
+This path is intended for validation and mesh-sensitivity studies; production
+examples should still use the case builders unless exact external-grid
+reproduction is the goal.
+
 ## Mesh-resolution guidance
 
 - increase `ny` and `nz` to resolve Hartmann and Shercliff boundary layers

@@ -57,6 +57,76 @@ class StructuredMesh:
         return (self.ny, self.nz)
 
 
+def _validated_faces(faces: jnp.ndarray, *, name: str) -> jnp.ndarray:
+    values = jnp.asarray(faces, dtype=float)
+    if values.ndim != 1:
+        raise ValueError(f"{name} must be one-dimensional")
+    if values.size < 2:
+        raise ValueError(f"{name} must contain at least two faces")
+    if bool(jnp.any(jnp.diff(values) <= 0.0)):
+        raise ValueError(f"{name} must be strictly increasing")
+    return values
+
+
+def generate_rect_duct_mesh_from_faces(
+    *,
+    y_faces: jnp.ndarray,
+    z_faces: jnp.ndarray,
+    length: float = 1.0,
+    nx: int = 1,
+) -> StructuredMesh:
+    """Build a rectangular duct mesh from explicit cross-section faces."""
+
+    y = _validated_faces(y_faces, name="y_faces")
+    z = _validated_faces(z_faces, name="z_faces")
+    x_faces = jnp.linspace(0.0, length, nx + 1)
+    return StructuredMesh(x_faces=x_faces, y_faces=y, z_faces=z, geometry="rect_duct")
+
+
+def generate_layered_duct_mesh_from_fluid_faces(
+    *,
+    fluid_y_faces: jnp.ndarray,
+    fluid_z_faces: jnp.ndarray,
+    width: float,
+    height: float,
+    length: float = 1.0,
+    nx: int = 1,
+    wall_thickness: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+    wall_cells: tuple[int, int, int, int] = (0, 0, 0, 0),
+) -> StructuredMesh:
+    """Build a layered duct around explicit fluid-region faces."""
+
+    fluid_y = _validated_faces(fluid_y_faces, name="fluid_y_faces")
+    fluid_z = _validated_faces(fluid_z_faces, name="fluid_z_faces")
+    left_t, right_t, bottom_t, top_t = wall_thickness
+    left_c, right_c, bottom_c, top_c = wall_cells
+    if left_c:
+        left_faces = jnp.linspace(float(fluid_y[0]) - left_t, float(fluid_y[0]), left_c + 1)
+        fluid_y = jnp.concatenate([left_faces[:-1], fluid_y])
+    if right_c:
+        right_faces = jnp.linspace(float(fluid_y[-1]), float(fluid_y[-1]) + right_t, right_c + 1)
+        fluid_y = jnp.concatenate([fluid_y, right_faces[1:]])
+    if bottom_c:
+        bottom_faces = jnp.linspace(float(fluid_z[0]) - bottom_t, float(fluid_z[0]), bottom_c + 1)
+        fluid_z = jnp.concatenate([bottom_faces[:-1], fluid_z])
+    if top_c:
+        top_faces = jnp.linspace(float(fluid_z[-1]), float(fluid_z[-1]) + top_t, top_c + 1)
+        fluid_z = jnp.concatenate([fluid_z, top_faces[1:]])
+
+    x_faces = jnp.linspace(0.0, length, nx + 1)
+    yc, zc = jnp.meshgrid(0.5 * (fluid_y[:-1] + fluid_y[1:]), 0.5 * (fluid_z[:-1] + fluid_z[1:]), indexing="ij")
+    half_width = 0.5 * width
+    half_height = 0.5 * height
+    fluid_mask = (jnp.abs(yc) <= half_width) & (jnp.abs(zc) <= half_height)
+    return StructuredMesh(
+        x_faces=x_faces,
+        y_faces=fluid_y,
+        z_faces=fluid_z,
+        geometry="layered_duct",
+        fluid_mask=fluid_mask,
+    )
+
+
 def _clustered_segment(start: float, stop: float, count: int, beta: float = 2.5) -> jnp.ndarray:
     if count <= 1:
         return jnp.asarray([start, stop], dtype=float)

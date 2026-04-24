@@ -1,6 +1,14 @@
+import jax.numpy as jnp
 import pytest
 
-from lmx.mesh import generate_bent_pipe_mesh, generate_layered_duct_mesh, generate_pipe_ogrid_mesh, generate_rect_duct_mesh
+from lmx.mesh import (
+    generate_bent_pipe_mesh,
+    generate_layered_duct_mesh,
+    generate_layered_duct_mesh_from_fluid_faces,
+    generate_pipe_ogrid_mesh,
+    generate_rect_duct_mesh,
+    generate_rect_duct_mesh_from_faces,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -53,3 +61,47 @@ def test_moderate_ha_rect_mesh_clusters_boundary_layers():
     assert float(dz.min()) < float(dz.max())
     assert float(dy.min()) < 0.4 * uniform_spacing
     assert float(dz.min()) < 0.4 * uniform_spacing
+
+
+def test_generate_rect_duct_mesh_from_faces_preserves_explicit_faces():
+    mesh = generate_rect_duct_mesh_from_faces(
+        y_faces=jnp.asarray([-0.1, -0.05, 0.0, 0.1]),
+        z_faces=jnp.asarray([-0.2, 0.0, 0.2]),
+        length=3.0,
+        nx=3,
+    )
+
+    assert mesh.geometry == "rect_duct"
+    assert mesh.nx == 3
+    assert mesh.ny == 3
+    assert mesh.nz == 2
+    assert mesh.y_centers.tolist() == pytest.approx([-0.075, -0.025, 0.05])
+    assert mesh.z_centers.tolist() == pytest.approx([-0.1, 0.1])
+
+
+def test_generate_rect_duct_mesh_from_faces_rejects_invalid_faces():
+    with pytest.raises(ValueError, match="strictly increasing"):
+        generate_rect_duct_mesh_from_faces(y_faces=jnp.asarray([0.0, 0.0]), z_faces=jnp.asarray([0.0, 1.0]))
+    with pytest.raises(ValueError, match="one-dimensional"):
+        generate_rect_duct_mesh_from_faces(y_faces=jnp.ones((2, 2)), z_faces=jnp.asarray([0.0, 1.0]))
+    with pytest.raises(ValueError, match="at least two"):
+        generate_rect_duct_mesh_from_faces(y_faces=jnp.asarray([0.0]), z_faces=jnp.asarray([0.0, 1.0]))
+
+
+def test_generate_layered_duct_mesh_from_fluid_faces_adds_wall_regions():
+    mesh = generate_layered_duct_mesh_from_fluid_faces(
+        fluid_y_faces=jnp.asarray([-0.1, 0.0, 0.1]),
+        fluid_z_faces=jnp.asarray([-0.2, 0.0, 0.2]),
+        width=0.2,
+        height=0.4,
+        wall_thickness=(0.02, 0.04, 0.03, 0.05),
+        wall_cells=(1, 2, 1, 1),
+    )
+
+    assert mesh.geometry == "layered_duct"
+    assert mesh.y_faces.tolist() == pytest.approx([-0.12, -0.1, 0.0, 0.1, 0.12, 0.14])
+    assert mesh.z_faces.tolist() == pytest.approx([-0.23, -0.2, 0.0, 0.2, 0.25])
+    assert mesh.fluid_mask.shape == mesh.yz_shape
+    assert bool(mesh.fluid_mask[1, 1])
+    assert not bool(mesh.fluid_mask[0, 1])
+    assert not bool(mesh.fluid_mask[1, 0])

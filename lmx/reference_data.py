@@ -8,6 +8,8 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
+from .mesh import StructuredMesh, generate_rect_duct_mesh_from_faces
+
 
 @dataclass(frozen=True)
 class ClosedChannelAnalyticalReference:
@@ -227,6 +229,19 @@ def processed_slice_area_mean(
     integral_z = np.trapezoid(values, z, axis=1)
     integral = float(np.trapezoid(integral_z, y))
     return integral / area
+
+
+def processed_slice_point_mesh(
+    reference: ProcessedSliceReference,
+    *,
+    length: float = 1.0,
+    nx: int = 1,
+) -> StructuredMesh:
+    """Build a rectangular mesh whose cross-section faces match slice points."""
+
+    y_faces = jnp.asarray(np.unique(np.asarray(reference.columns["Points:1"], dtype=float)))
+    z_faces = jnp.asarray(np.unique(np.asarray(reference.columns["Points:2"], dtype=float)))
+    return generate_rect_duct_mesh_from_faces(y_faces=y_faces, z_faces=z_faces, length=length, nx=nx)
 
 
 def _unique_plane_profile(profile_coord: jnp.ndarray, values: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:

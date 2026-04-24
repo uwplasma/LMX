@@ -17,6 +17,7 @@ from lmx.reference_data import (
     load_shercliff_analytical,
     processed_slice_area_mean,
     processed_slice_field_grid,
+    processed_slice_point_mesh,
 )
 
 
@@ -158,6 +159,33 @@ def test_processed_slice_area_mean_handles_single_sample(tmp_path: Path):
     reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
 
     assert processed_slice_area_mean(reference) == pytest.approx(4.0)
+
+
+def test_processed_slice_point_mesh_uses_unique_slice_coordinates(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "Points:1,Points:2,U:0",
+                "-0.1,-0.1,0.0",
+                "-0.1,0.0,1.0",
+                "-0.1,0.1,0.0",
+                "0.0,-0.1,1.0",
+                "0.0,0.0,2.0",
+                "0.1,0.1,0.0",
+            ]
+        )
+    )
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+
+    mesh = processed_slice_point_mesh(reference, length=2.0, nx=2)
+
+    assert mesh.geometry == "rect_duct"
+    assert mesh.nx == 2
+    assert mesh.y_faces.tolist() == pytest.approx([-0.1, 0.0, 0.1])
+    assert mesh.z_faces.tolist() == pytest.approx([-0.1, 0.0, 0.1])
 
 
 def test_fill_missing_structured_values_covers_column_and_fallback_paths():

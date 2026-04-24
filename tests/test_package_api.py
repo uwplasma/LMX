@@ -3,6 +3,8 @@ import lmx
 
 def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.generate_rect_duct_mesh)
+    assert callable(lmx.generate_rect_duct_mesh_from_faces)
+    assert callable(lmx.generate_layered_duct_mesh_from_fluid_faces)
     assert callable(lmx.generate_bent_pipe_mesh)
     assert callable(lmx.enable_compilation_cache)
     assert callable(lmx.load_fringing_pipe_profile)
@@ -10,6 +12,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.load_hunt_analytical)
     assert callable(lmx.processed_slice_area_mean)
     assert callable(lmx.processed_slice_field_grid)
+    assert callable(lmx.processed_slice_point_mesh)
     assert callable(lmx.build_hartmann_autodiff_problem)
     assert callable(lmx.build_extruded_response_targets)
     assert callable(lmx.hartmann_mean_velocity_gradients)
