@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 import jax.numpy as jnp
 import numpy as np
@@ -20,75 +20,13 @@ from .physics import build_material_fields
 from .specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, OutputSpec, RegionSpec, SolverConfig, TimeStepperConfig
 from .solvers import solve_steady
 from .validation import validation_summary
-
-
-@dataclass(frozen=True)
-class FringingProfile:
-    x: jnp.ndarray
-    field_scale: jnp.ndarray
-    axis: str
-
-
-@dataclass(frozen=True)
-class ExtrudedFieldBundle:
-    x: jnp.ndarray
-    y: jnp.ndarray
-    z: jnp.ndarray
-    field_scale: jnp.ndarray
-    u: jnp.ndarray
-    v: jnp.ndarray
-    w: jnp.ndarray
-    p: jnp.ndarray
-    phi: jnp.ndarray
-    jx: jnp.ndarray
-    jy: jnp.ndarray
-    jz: jnp.ndarray
-    lorentz_x: jnp.ndarray
-    lorentz_y: jnp.ndarray
-    lorentz_z: jnp.ndarray
-    residual: jnp.ndarray
-    volumetric_flow_rate: jnp.ndarray
-    mean_velocity: jnp.ndarray
-    axial_current: jnp.ndarray
-    wall_current_leakage: jnp.ndarray
-    current_scaled_pressure_proxy: jnp.ndarray
-    charge_balance_residual: jnp.ndarray
-    boundary_current_residual: jnp.ndarray
-    geometry_kind: str
-    solver_kind: str
-
-
-@dataclass(frozen=True)
-class ExtrudedInductionlessProblem:
-    case: CaseSpec
-    profile: FringingProfile
-
-
-@dataclass(frozen=True)
-class ExtrudedInductionlessValidation:
-    station_count: int
-    max_residual: float
-    max_charge_balance_residual: float
-    mean_velocity_span: float
-    volumetric_flow_rate_span: float
-    axial_current_span: float
-    max_wall_current_leakage: float
-    net_boundary_current_residual: float
-    field_mean_velocity_correlation: float
-    axial_current_mirror_residual: float = 0.0
-    peak_velocity_span: float = 0.0
-    pressure_span_range: float = 0.0
-    pressure_span_mirror_residual: float = 0.0
-    center_axial_current: float = 0.0
-    center_pressure_span: float = 0.0
-
-
-@dataclass(frozen=True)
-class ExtrudedInductionlessSolution:
-    problem: ExtrudedInductionlessProblem
-    bundle: ExtrudedFieldBundle
-    station_history: tuple[dict[str, float], ...]
-    validation: ExtrudedInductionlessValidation
+from ._fringing_types import (
+    ExtrudedFieldBundle,
+    ExtrudedInductionlessProblem,
+    ExtrudedInductionlessSolution,
+    ExtrudedInductionlessValidation,
+    FringingProfile,
+)
 
 
 MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {

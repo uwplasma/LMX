@@ -28,13 +28,18 @@ The codebase is organized around a small number of core modules:
   - compatibility facade for analytical and reference-output comparisons
 - `lmx/_validation.py`
   - current validation implementation pending the next extraction
+- `lmx/_fringing_types.py`
+  - stable private data containers for the extruded/fringing solver family
 
 ## Planned module split
 
 The first split stage is in place: the historical public modules remain as
 compatibility facades, while implementation lives in private modules such as
 `lmx/_fringing.py`, `lmx/_autodiff.py`, `lmx/_plotting.py`, `lmx/_solvers.py`,
-and `lmx/_validation.py`. The next stages should extract cohesive
+and `lmx/_validation.py`. The first private extraction is
+`lmx/_fringing_types.py`, which holds the extruded/fringing problem, bundle,
+solution, and validation containers while the public `lmx.fringing` facade
+continues to resolve the same names. The next stages should extract cohesive
 submodules from those private implementations without changing public import
 paths.
 

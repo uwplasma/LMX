@@ -456,6 +456,9 @@ First-stage facade split status:
 - implementation moved behind those facades to `lmx/_fringing.py`,
   `lmx/_autodiff.py`, `lmx/_plotting.py`, `lmx/_solvers.py`, and
   `lmx/_validation.py`
+- the first private extraction is now `lmx/_fringing_types.py`, which holds the
+  fringing profile, field bundle, problem, solution, and validation containers
+  without changing the public `lmx.fringing` facade
 - the next refactor patches should extract cohesive submodules from the private
   implementations while preserving all public import paths and monkeypatchable
   test seams
