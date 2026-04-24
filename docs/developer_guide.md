@@ -142,9 +142,12 @@ surface, the docs lane keeps the documentation badge honest, and the manual
 lane preserves reproducible research artifacts without exhausting routine CI
 runtime.
 
-## Release and publishing roadmap
+## Release and publishing
 
-The release workflow should be promoted in stages:
+The repository has a conservative release workflow in
+`.github/workflows/release.yml`. It is intentionally separate from routine CI:
+normal pushes stay fast, while release candidates run selected validation
+artifact gates before package artifacts are built.
 
 - default push/PR CI:
   - install `.[dev]`
@@ -163,10 +166,20 @@ The release workflow should be promoted in stages:
   - publish to TestPyPI first
   - publish to PyPI from tagged releases using PyPI Trusted Publishing
 
-Do not enable automatic PyPI publishing before the coverage, docs, and release
-validation lanes are stable. The first publish workflow should be conservative:
-manual dispatch or tag-triggered, explicit artifact build, TestPyPI dry run,
-then PyPI release.
+Release workflow behavior:
+
+- `workflow_dispatch` with `publish_target = none` runs the selected
+  validation gate, builds docs, builds the wheel/sdist, checks metadata, and
+  uploads release artifacts.
+- `workflow_dispatch` with `publish_target = testpypi` does the same checks and
+  publishes to TestPyPI through Trusted Publishing.
+- a published GitHub Release runs the same gates and publishes to PyPI through
+  Trusted Publishing.
+
+Before first publication, configure the GitHub `testpypi` and `pypi`
+environments and register this repository as a trusted publisher in TestPyPI
+and PyPI. Do not bypass the selected validation-artifact gate for a public
+release.
 
 ## Test runtime baseline
 

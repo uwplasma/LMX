@@ -8,6 +8,8 @@ out/
 out_*/
 external/
 artifacts/
+build/
+dist/
 docs/_build/
 *.egg-info/
 .DS_Store

@@ -220,9 +220,13 @@ refer to the Samper et al. taxonomy.
    Refactor `fringing`, `autodiff`, `plotting`, `solvers`, and `validation`
    only behind passing tests and stable public import facades.
 8. Add release automation after the gates are real.
-   The publish lane should build sdist/wheel artifacts, run fast tests, docs,
-   coverage, and selected validation artifact checks, publish to TestPyPI
-   first, then PyPI through Trusted Publishing on tagged releases.
+   The first conservative release workflow is now present. It builds
+   sdist/wheel artifacts, installs the wheel in a clean environment, runs fast
+   tests, docs, and selected validation artifact checks, and publishes through
+   Trusted Publishing to TestPyPI on manual dispatch or PyPI on a published
+   GitHub Release. The remaining release-administration step is to configure
+   the `testpypi` and `pypi` GitHub environments and the matching PyPI trusted
+   publisher records before the first public release.
 
 ## Finish-line gates
 
