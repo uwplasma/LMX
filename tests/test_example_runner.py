@@ -1003,6 +1003,53 @@ def test_freemhd_closed_channel_observable_parity_writes_summary(tmp_path: Path,
     assert (tmp_path / "freemhd_closed_channel_observable_parity_summary.json").exists()
 
 
+def test_freemhd_closed_channel_flow_rate_parity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("freemhd_closed_channel_flow_rate_parity.py")
+    module.OUTPUT_DIR = tmp_path
+
+    def fake_record(case_kind, **kwargs):
+        assert kwargs["drive_mode"] == "flow_rate"
+        return {
+            "case_kind": case_kind,
+            "drive_mode": "flow_rate",
+            "target_mean_velocity": 0.1 if case_kind == "shercliff" else 0.2,
+            "observables": {
+                name: {
+                    "y": {
+                        "coordinate": [-1.0, 0.0, 1.0],
+                        "reference": [0.0, 1.0, 0.0],
+                        "simulated": [0.0, 0.99, 0.0],
+                        "l2_error": 1.0e-2,
+                        "linf_error": 1.0e-2,
+                    },
+                    "z": {
+                        "coordinate": [-1.0, 0.0, 1.0],
+                        "reference": [0.0, 1.0, 0.0],
+                        "simulated": [0.0, 0.99, 0.0],
+                        "l2_error": 1.0e-2,
+                        "linf_error": 1.0e-2,
+                    },
+                    "peak_ratio": 1.0,
+                }
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+        }
+
+    monkeypatch.setattr(module.observable, "_observable_record", fake_record)
+    monkeypatch.setattr(
+        module,
+        "write_freemhd_observable_parity_plots",
+        lambda records, out_dir, case_title, output_stem: [
+            Path(out_dir) / f"{output_stem}.png",
+            Path(out_dir) / f"{output_stem}.pdf",
+        ],
+    )
+    summary = module.run_freemhd_closed_channel_flow_rate_parity()
+    assert summary["case"] == "freemhd_closed_channel_flow_rate_parity"
+    assert summary["target_mean_velocity_by_case"] == {"shercliff": 0.1, "hunt": 0.2}
+    assert (tmp_path / "freemhd_closed_channel_flow_rate_parity_summary.json").exists()
+
+
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_forced_validation.py")
     module.OUTPUT_DIR = tmp_path

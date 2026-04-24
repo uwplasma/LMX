@@ -2238,6 +2238,7 @@ def write_freemhd_observable_parity_plots(
     out_dir: str | Path,
     *,
     case_title: str,
+    output_stem: str = "freemhd_closed_channel_observable_parity",
 ) -> list[Path]:
     _set_plot_style()
     out_dir = Path(out_dir)
@@ -2291,8 +2292,8 @@ def write_freemhd_observable_parity_plots(
             if row_index == 0 and column_index == 3:
                 ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.30), ncol=2, fontsize=9.5)
 
-    png_path = out_dir / "freemhd_closed_channel_observable_parity.png"
-    pdf_path = out_dir / "freemhd_closed_channel_observable_parity.pdf"
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
     fig.savefig(png_path, bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)

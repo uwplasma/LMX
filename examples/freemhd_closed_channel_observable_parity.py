@@ -83,12 +83,19 @@ def _profile_metrics(
     }
 
 
-def _observable_record(case_kind: str) -> dict[str, object]:
-    settings = CASE_SETTINGS[case_kind]
+def _observable_record(
+    case_kind: str,
+    *,
+    drive_mode: str = DRIVE_MODE,
+    initial_profile: str = INITIAL_PROFILE,
+    flow_rate_target_mean_velocity: float | None = FLOW_RATE_TARGET_MEAN_VELOCITY,
+    case_settings: dict[str, dict[str, object]] = CASE_SETTINGS,
+) -> dict[str, object]:
+    settings = case_settings[case_kind]
     reference = load_processed_slice(case_kind, HA, x_slice=X_SLICE, reference_root=REFERENCE_ROOT)
     target_mean_velocity = (
-        float(FLOW_RATE_TARGET_MEAN_VELOCITY)
-        if FLOW_RATE_TARGET_MEAN_VELOCITY is not None
+        float(flow_rate_target_mean_velocity)
+        if flow_rate_target_mean_velocity is not None
         else processed_slice_area_mean(reference)
     )
     _, solution, _ = solve_closed_channel_benchmark(
@@ -106,9 +113,9 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         conducting_wall_conductivity=CONDUCTING_WALL_CONDUCTIVITY,
         insulating_wall_conductivity=INSULATING_WALL_CONDUCTIVITY,
         max_steps=settings["max_steps"],
-        drive_mode=DRIVE_MODE,
+        drive_mode=drive_mode,
         target_mean_velocity=target_mean_velocity,
-        initial_profile=INITIAL_PROFILE,
+        initial_profile=initial_profile,
         current_reconstruction=settings["current_reconstruction"],
         velocity_update_limit=settings["velocity_update_limit"],
     )
@@ -187,10 +194,14 @@ def _observable_record(case_kind: str) -> dict[str, object]:
         "case_kind": case_kind,
         "ha": HA,
         "x_slice": X_SLICE,
-        "initial_profile": INITIAL_PROFILE,
-        "drive_mode": DRIVE_MODE,
-        "target_mean_velocity": target_mean_velocity if DRIVE_MODE == "flow_rate" else None,
-        "target_mean_velocity_source": "processed_slice_area_mean" if DRIVE_MODE == "flow_rate" and FLOW_RATE_TARGET_MEAN_VELOCITY is None else "configured",
+        "initial_profile": initial_profile,
+        "drive_mode": drive_mode,
+        "target_mean_velocity": target_mean_velocity if drive_mode == "flow_rate" else None,
+        "target_mean_velocity_source": (
+            "processed_slice_area_mean"
+            if drive_mode == "flow_rate" and flow_rate_target_mean_velocity is None
+            else "configured"
+        ),
         "settings": settings,
         "applied_pressure_gradient": float(solution.diagnostics.applied_forcing_history[-1]),
         "reference_path": reference.path,

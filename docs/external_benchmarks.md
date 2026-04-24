@@ -149,6 +149,38 @@ constant-flow-rate solve with:
 - explicit comparison of compile time, warm runtime, and memory-relevant grid
   sizes when the same host is used
 
+LMX now has a dedicated constant-flow artifact driver:
+
+```bash
+python examples/freemhd_closed_channel_flow_rate_parity.py
+```
+
+It uses the processed FreeMHD slice to infer a case-specific target mean
+velocity, runs the constrained `inlet_flow_rate` formulation, and writes a
+separate `freemhd_closed_channel_flow_rate_parity` figure/summary. Keeping
+this separate from the pressure-gradient artifact prevents a visually clean
+pressure-gradient run from hiding constrained-drive errors.
+
+Current retained constant-flow result:
+
+- Shercliff:
+  - target mean velocity: `0.970171`
+  - mean-velocity relative error: `1.60e-15`
+  - pressure-gradient relative error: `1.74e-2`
+- Hunt:
+  - target mean velocity: `0.117413`
+  - mean-velocity relative error: `1.54e-15`
+  - pressure-gradient relative error: `1.08e-2`
+  - side-jet location error: `0.0` on the retained processed-slice cut
+
+The constrained-drive path therefore now hits the requested flow rate exactly
+on the retained mesh. The remaining parity gap is not a gross constant-`Q`
+constraint failure; it is the same `O(1.3e-2)` wall-normal velocity/Lorentz
+shape offender seen in the pressure-gradient lane, with a secondary
+`O(1e-2)` pressure-gradient discrepancy.
+
+![LMX vs FreeMHD constant-flow parity](_static/generated/freemhd_closed_channel_flow_rate_parity.png)
+
 The current code now enforces the requested area-weighted mean velocity after
 wall interpolation and limiter application for `inlet_flow_rate` runs, and
 `processed_slice_area_mean` derives case-specific constant-`Q` targets directly

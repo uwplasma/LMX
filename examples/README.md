@@ -29,6 +29,8 @@ python examples/shercliff_showcase.py
 python examples/hunt_showcase.py
 python examples/straight_duct_profile_comparison.py
 python examples/freemhd_closed_channel_parity.py
+python examples/freemhd_closed_channel_observable_parity.py
+python examples/freemhd_closed_channel_flow_rate_parity.py
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
@@ -439,6 +441,12 @@ midplane profiles of `u`, gauge-shifted `potE`, cut-aligned `J`, and
 current reconstructions, and writes a publication-ready panel plus JSON
 summary. This remains a heavier manual artifact-generation lane than the
 transient parity example.
+
+`freemhd_closed_channel_flow_rate_parity.py` uses the same processed slices but
+switches to the constrained `inlet_flow_rate` formulation. It derives
+case-specific target mean velocities from the slice data and writes a separate
+constant-flow figure/summary so constrained-drive parity is not hidden by the
+pressure-gradient artifact.
 
 `reference_slice_mesh_diagnostic.py` compares the generated LMX straight-duct
 mesh against the processed-slice point grid used by the external paper data.

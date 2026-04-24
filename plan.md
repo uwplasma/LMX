@@ -106,6 +106,8 @@ Demonstrated but not yet research-grade validation:
 - the physical constant-`Q` / `flow_rate` FreeMHD path for fully developed
   ducts; the pressure-gradient paper-slice lane is now close, but the
   constrained-flow drive still needs the same observable-level parity
+  (`examples/freemhd_closed_channel_flow_rate_parity.py` now isolates this
+  lane as a separate artifact with case-specific target mean velocities)
 - mapped-pipe external parity against the high-`Ha`, high-`Re` Bühler case;
   this is now explicitly future work, not a blocker for the current closeout
 - quasi-2D turbulent observables beyond the current analytic decay/forced
