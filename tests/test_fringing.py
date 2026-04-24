@@ -548,6 +548,12 @@ def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle
     assert bent_solution.bundle.geometry_kind == "bent_pipe"
     assert jnp.isfinite(bent_solution.bundle.u).all()
     assert validation["dean_number"] >= 0.0
+    assert validation["dean_vortex_observables_available"] is True
+    assert validation["secondary_flow_rms_ratio"] >= 0.0
+    assert validation["secondary_flow_peak_ratio"] >= 0.0
+    assert np.isfinite(validation["normalized_velocity_centroid_shift"])
+    assert np.isfinite(validation["inner_outer_velocity_ratio"])
+    assert validation["research_grade_dean_validation_pass"] is False
     assert validation["cross_section_l2_error"] <= 0.2
     assert isinstance(validation["validation_pass"], bool)
 

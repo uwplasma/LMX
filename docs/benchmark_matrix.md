@@ -463,6 +463,14 @@ Current bounded low-De baseline:
 - `centerline_l2_error = 0`
 - `max_charge_balance_residual ≈ 2.15e-2`
 - `volumetric_flow_rate_span ≈ 1.14e-9`
+- newly reported Dean/curvature observables:
+  `secondary_flow_rms_ratio ≈ 6.16e-18`,
+  `secondary_flow_peak_ratio ≈ 1.71e-17`,
+  `normalized_velocity_centroid_shift = 0`, and
+  `inner_outer_velocity_ratio = 1.0`
+- full Dean-vortex research validation remains open until the secondary-flow
+  structure and curvature-shift observables are compared against a curved-duct
+  reference dataset
 - spatially varying magnetic fields
   - baseline: manufactured divergence-free field verification
     plus executable rectangular `extruded_inductionless` validation through

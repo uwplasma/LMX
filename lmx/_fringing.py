@@ -1891,6 +1891,7 @@ def validate_bent_pipe_low_de_baseline(
     mid_index = int(bent_bundle.u.shape[0] // 2)
     bent_mid = bent_bundle.u[mid_index]
     straight_mid = straight_bundle.u[mid_index]
+    bent_secondary_mid = jnp.sqrt(bent_bundle.v[mid_index] ** 2 + bent_bundle.w[mid_index] ** 2)
     reference_norm = jnp.maximum(jnp.linalg.norm(straight_mid), 1.0e-12)
     cross_section_l2_error = float(jnp.linalg.norm(bent_mid - straight_mid) / reference_norm)
 
@@ -1899,6 +1900,23 @@ def validate_bent_pipe_low_de_baseline(
     _, straight_cut = _signed_pipe_cut(straight_mid, r, theta_index=0)
     cut_norm = jnp.maximum(jnp.linalg.norm(straight_cut), 1.0e-12)
     centerline_l2_error = float(jnp.linalg.norm(bent_cut - straight_cut) / cut_norm)
+    axial_scale = float(jnp.maximum(jnp.mean(jnp.abs(bent_mid)), 1.0e-12))
+    peak_axial_scale = float(jnp.maximum(jnp.max(jnp.abs(bent_mid)), 1.0e-12))
+    secondary_flow_rms_ratio = float(jnp.sqrt(jnp.mean(bent_secondary_mid**2)) / axial_scale)
+    secondary_flow_peak_ratio = float(jnp.max(bent_secondary_mid) / peak_axial_scale)
+    bent_cut_abs = jnp.abs(bent_cut)
+    straight_cut_abs = jnp.abs(straight_cut)
+    bent_weight = jnp.maximum(jnp.sum(bent_cut_abs), 1.0e-12)
+    straight_weight = jnp.maximum(jnp.sum(straight_cut_abs), 1.0e-12)
+    bent_velocity_centroid = float(jnp.sum(signed_r * bent_cut_abs) / bent_weight)
+    straight_velocity_centroid = float(jnp.sum(signed_r * straight_cut_abs) / straight_weight)
+    velocity_centroid_shift = bent_velocity_centroid - straight_velocity_centroid
+    radius_scale = float(jnp.maximum(jnp.max(jnp.abs(signed_r)), 1.0e-12))
+    normalized_velocity_centroid_shift = float(velocity_centroid_shift / radius_scale)
+    inner_outer_velocity_ratio = float(
+        jnp.max(jnp.abs(bent_cut[signed_r >= 0.0]))
+        / jnp.maximum(jnp.max(jnp.abs(bent_cut[signed_r <= 0.0])), 1.0e-12)
+    )
 
     region = bent_solution.problem.case.regions[0]
     mean_velocity = float(jnp.mean(jnp.abs(bent_bundle.mean_velocity)))
@@ -1923,6 +1941,14 @@ def validate_bent_pipe_low_de_baseline(
         "curvature_ratio": curvature_ratio,
         "reynolds_number": reynolds_number,
         "dean_number": dean_number,
+        "dean_vortex_observables_available": True,
+        "secondary_flow_rms_ratio": secondary_flow_rms_ratio,
+        "secondary_flow_peak_ratio": secondary_flow_peak_ratio,
+        "bent_velocity_centroid": bent_velocity_centroid,
+        "straight_velocity_centroid": straight_velocity_centroid,
+        "velocity_centroid_shift": velocity_centroid_shift,
+        "normalized_velocity_centroid_shift": normalized_velocity_centroid_shift,
+        "inner_outer_velocity_ratio": inner_outer_velocity_ratio,
         "cross_section_l2_error": cross_section_l2_error,
         "centerline_l2_error": centerline_l2_error,
         "throughput_span": throughput_span,
@@ -1933,6 +1959,9 @@ def validate_bent_pipe_low_de_baseline(
         "signed_radius": np.asarray(signed_r, dtype=float).tolist(),
         "bent_centerline_cut": np.asarray(bent_cut, dtype=float).tolist(),
         "straight_centerline_cut": np.asarray(straight_cut, dtype=float).tolist(),
+        "literature_target": "Dean curved-pipe secondary-flow and curvature-response observables",
+        "validation_status": "low_de_straight_pipe_limit_passes_full_dean_vortex_reference_open",
+        "research_grade_dean_validation_pass": False,
     }
 
 

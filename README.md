@@ -189,7 +189,11 @@ On the current bounded example (`Ha = 20`, `R = 0.45`, `R_c = 3.6`,
 machine precision on the local comparison cuts (`cross_section_l2_error = 0`,
 `centerline_l2_error = 0`), while keeping
 `max_charge_balance_residual ≈ 2.15e-2` and
-`volumetric_flow_rate_span ≈ 1.14e-9`.
+`volumetric_flow_rate_span ≈ 1.14e-9`. The summary also reports the
+Dean/curvature observables that will become the higher-inertia gate:
+`secondary_flow_rms_ratio ≈ 6.16e-18`,
+`normalized_velocity_centroid_shift = 0`, and
+`inner_outer_velocity_ratio = 1.0` for this low-De straight-pipe limit.
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 

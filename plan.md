@@ -846,6 +846,12 @@ Current status:
   - `De ≈ 5.19e-7`
   - `cross_section_l2_error = 0`
   - `centerline_l2_error = 0`
+  - `secondary_flow_rms_ratio ≈ 6.16e-18`
+  - `normalized_velocity_centroid_shift = 0`
+  - `inner_outer_velocity_ratio = 1.0`
+- the executable bent-pipe summary now carries the higher-inertia observables
+  needed for Dean-vortex validation; the research-grade gate remains open until
+  those observables are compared with a curved-duct literature dataset
   - `max_charge_balance_residual ≈ 2.15e-2`
   - `volumetric_flow_rate_span ≈ 1.14e-9`
 - the remaining work is the higher-inertia curved-pipe solver path, not the

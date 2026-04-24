@@ -193,3 +193,10 @@ linear solves.
 Current bent-pipe baseline:
 
 ![LMX bent-pipe inductionless baseline](_static/generated/bent_pipe_overview.png)
+
+The bent-pipe summary reports low-De straight-pipe equivalence plus
+Dean/curvature observables (`secondary_flow_rms_ratio`,
+`secondary_flow_peak_ratio`, signed-radius velocity-centroid shift, and
+inner/outer velocity ratio). These observables are present so the same example
+can become the higher-inertia Dean-vortex validation once a curved-duct
+reference dataset is digitized or generated.

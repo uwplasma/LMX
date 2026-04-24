@@ -251,6 +251,8 @@ That example is the current curved-pipe executable lane:
 - solve both on the same fringing-field profile
 - write a bent-pipe geometry-plus-solution panel
 - record low-De equivalence metrics against the straight-pipe limit
+- report Dean/curvature-response observables, including secondary-flow
+  intensity and signed-radius velocity skew, for the future higher-inertia gate
 
 Variable-field validation:
 
