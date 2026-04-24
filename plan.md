@@ -110,8 +110,8 @@ Demonstrated but not yet research-grade validation:
   lane as a separate artifact with case-specific target mean velocities)
 - mapped-pipe external parity against the high-`Ha`, high-`Re` Bühler case;
   this is now explicitly future work, not a blocker for the current closeout
-- quasi-2D turbulent observables beyond the current analytic decay/forced
-  Hartmann-friction checks
+- quasi-2D turbulent parity beyond the current analytic decay/forced
+  Hartmann-friction checks and bounded nonlinear vorticity movie
 - experimentally or literature-anchored magnetic-obstacle parity; the current
   case uses a matched no-field LMX reference and now reports
   `research_grade_validation_pass = false`
@@ -182,25 +182,28 @@ refer to the Samper et al. taxonomy.
   deficit, and response curve before the internal response plot, so this lane
   no longer relies on response curves alone to communicate the physics.
 - Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
-  tests as verification, then add Sommeria-Moreau-style closure observables and
-  literature-facing turbulent energy/decay spectra before making any turbulent
+  tests as verification, then compare the nonlinear Q2D lane with
+  Sommeria-Moreau-style turbulent references before making any turbulent parity
   claim.
-  A deterministic multi-mode Hartmann-friction decay movie now exists through
-  `examples/q2d_turbulence_decay_demo.py`; it gates monotone energy and
-  enstrophy decay, high-wavenumber damping, and spectral-centroid decrease.
-  The open item is still the nonlinear turbulent reference comparison, not
-  movie/post-processing infrastructure.
+  `examples/q2d_turbulence_decay_demo.py` now runs a deterministic nonlinear
+  periodic vorticity solve with Hartmann friction and weak large-scale forcing
+  to `t = 3.0` over 72 frames. It gates finite energy/enstrophy, low CFL,
+  divergence-free velocity, spectral-centroid shift, and
+  `turnover_count ≈ 3.31e-1`. The open item is still the external nonlinear
+  turbulent reference comparison, not movie/post-processing infrastructure.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
-  The low-De example now separates bounded demonstrator acceptance from
-  research-grade charge closure: `max_charge_balance_residual ≈ 2.15e-2`
-  passes the current bounded tolerance (`5e-2`) but fails the research target
-  (`1e-3`). The next curved-pipe validation must reduce or explain that
-  residual while adding a real Dean-vortex reference. A local iteration/mesh
-  probe moved the residual from `2.15e-2` to `1.52e-2` on a `22 × 48 × 17`
-  radial/theta/station grid, so the gap is not closed by simply increasing the
-  potential iteration count.
+  The low-De example now separates global current closure from local mapped-grid
+  closure: `max_wall_current_leakage = 0` and
+  `net_boundary_current_residual = 0`, while the maximum local conservative
+  `|div J|` diagnostic remains `max_charge_balance_residual ≈ 2.15e-2`. That
+  local residual passes the bounded tolerance (`5e-2`) but fails the research
+  target (`1e-3`). The next curved-pipe validation must reduce or explain that
+  local residual while adding a real Dean-vortex reference. A local
+  iteration/mesh probe moved the residual from `2.15e-2` to `1.52e-2` on a
+  `22 × 48 × 17` radial/theta/station grid, so the gap is not closed by simply
+  increasing the potential iteration count.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
   against manufactured fields and at least one independent field dataset.
@@ -1040,8 +1043,8 @@ Current quasi-2D wall-bounded forced lane:
   `dE/dt = P - 2 lambda E` balance for decay, forced periodic, and
   wall-bounded forced cases before any turbulent claim is made
 - remaining work before any turbulent Q2D claim:
-  Sommeria-Moreau-style closures, literature-anchored wall-bounded duct
-  observables, and Q2D turbulence
+  external Sommeria-Moreau-style turbulent spectra/decay references,
+  wall-bounded duct observables, and turbulence-parity tolerances
 - current bounded result from `examples/q2d_wall_bounded_validation.py`:
   `l2_error ≈ 4.15e-4`, `linf_error ≈ 4.15e-4`,
   `amplitude_rel_error ≈ 1.42e-4`
@@ -1066,26 +1069,28 @@ Current localized magnetic-obstacle response lane:
   PNG/PDF observable parity gate; if not, it writes the template and leaves the
   external validation status open
 - current bounded result from `examples/magnetic_obstacle_benchmark.py`:
-  `peak_velocity_deficit_ratio ≈ 3.23e-2`,
-  `peak_station_velocity_deficit_ratio ≈ 2.87e-2`,
-  `integrated_velocity_deficit_ratio ≈ 2.78e-2`,
-  `peak_centerline_deficit_ratio ≈ 3.76e-1`,
-  `recovery_station ≈ 4.76`,
-  `peak_pressure_excess ≈ 5.01e-1`,
-  `pressure_excess_proxy ≈ 1.22e-1`,
-  `current_proxy_peak ≈ 4.56`,
-  `y_l2_distortion ≈ 2.31e-1`,
-  `z_l2_distortion ≈ 2.08e-1`,
-  `peak_crosscut_distortion ≈ 2.31e-1`,
+  `peak_velocity_deficit_ratio ≈ 1.01e-2`,
+  `peak_station_velocity_deficit_ratio ≈ 1.01e-2`,
+  `integrated_velocity_deficit_ratio ≈ 8.40e-3`,
+  `peak_centerline_deficit_ratio ≈ 2.29e-1`,
+  `recovery_station ≈ 3.96`,
+  `peak_pressure_excess ≈ 3.22e-1`,
+  `pressure_excess_proxy ≈ 6.52e-2`,
+  `current_proxy_peak ≈ 1.78`,
+  `y_l2_distortion ≈ 9.37e-2`,
+  `z_l2_distortion ≈ 9.75e-2`,
+  `y_peak_cut_abs_error ≈ 1.72e-1`,
+  `z_peak_cut_abs_error ≈ 1.72e-1`,
+  `peak_crosscut_distortion ≈ 9.75e-2`,
   `divergence_to_field_ratio ≈ 1.69e-2`,
-  `max_charge_balance_residual ≈ 3.98e-13`,
+  `max_charge_balance_residual ≈ 3.02e-12`,
   `internal_response_pass = true`,
   `research_grade_validation_pass = false`
 - current bounded shape summary on the same case:
   `peak_station ≈ 3.00`,
-  `recovery_distance ≈ 1.76`,
-  `normalized_recovery_distance ≈ 6.25e-1`,
-  `literature_shape_gate = true`,
+  `recovery_distance ≈ 9.60e-1`,
+  `normalized_recovery_distance ≈ 3.33e-1`,
+  `literature_shape_gate = false`,
   `literature_pass = false`
 - `examples/magnetic_obstacle_regime_scan.py` now stages the next step beyond
   that bounded point by sweeping obstacle cases over field scale and forcing

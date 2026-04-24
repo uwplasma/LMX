@@ -203,4 +203,8 @@ Dean/curvature observables (`secondary_flow_rms_ratio`,
 `secondary_flow_peak_ratio`, signed-radius velocity-centroid shift, and
 inner/outer velocity ratio). These observables are present so the same example
 can become the higher-inertia Dean-vortex validation once a curved-duct
-reference dataset is digitized or generated.
+reference dataset is digitized or generated. The current global current
+closure is clean (`max_wall_current_leakage = 0` and
+`net_boundary_current_residual = 0`), while the plotted local
+`max_charge_balance_residual` is the maximum mapped-grid `|div J|` diagnostic
+and remains above the research-grade local-closure target.

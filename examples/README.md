@@ -355,12 +355,13 @@ Quasi-2D multi-mode turbulence-observable movie:
 python examples/q2d_turbulence_decay_demo.py
 ```
 
-That example writes a deterministic multi-mode Hartmann-friction decay GIF:
+That example writes a deterministic nonlinear Hartmann-friction vorticity GIF:
 
-- initialize a repeatable multi-mode Q2D field
-- evolve it under diffusion and Hartmann friction
-- gate monotone energy/enstrophy decay, high-wavenumber damping, and spectral
-  centroid decrease
+- initialize a repeatable multi-mode Q2D vorticity field
+- evolve it with pseudo-spectral nonlinear advection, diffusion, Hartmann
+  friction, and weak large-scale forcing
+- gate finite energy/enstrophy, low CFL, divergence-free velocity,
+  spectral-centroid shift, and nonlinear turnover count
 - keep research-grade turbulent parity marked open until matched against a
   published nonlinear turbulent Q2D reference
 

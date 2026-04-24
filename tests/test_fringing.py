@@ -662,6 +662,8 @@ def test_magnetic_obstacle_benchmark_reports_normalized_response():
     assert validation["recovery_station"] >= float(solution.bundle.x[0])
     assert validation["y_l2_distortion"] > 0.0
     assert validation["z_l2_distortion"] > 0.0
+    assert validation["y_peak_cut_abs_error"] >= 0.0
+    assert validation["z_peak_cut_abs_error"] >= 0.0
     assert validation["peak_crosscut_distortion"] == pytest.approx(max(validation["y_l2_distortion"], validation["z_l2_distortion"]))
     assert validation["reference_kind"] == "matched_no_field_lmx"
     assert validation["external_reference_available"] is False

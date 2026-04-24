@@ -2140,6 +2140,15 @@ def validate_magnetic_obstacle_benchmark(
     z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
     y_l2_distortion = float(np.linalg.norm(y_cut - y_cut_ref) / max(np.linalg.norm(y_cut_ref), 1.0e-12))
     z_l2_distortion = float(np.linalg.norm(z_cut - z_cut_ref) / max(np.linalg.norm(z_cut_ref), 1.0e-12))
+    shared_cut_scale = max(
+        float(np.max(np.abs(y_cut_ref))),
+        float(np.max(np.abs(z_cut_ref))),
+        float(np.max(np.abs(y_cut))),
+        float(np.max(np.abs(z_cut))),
+        1.0e-12,
+    )
+    y_peak_cut_abs_error = float(np.max(np.abs(y_cut - y_cut_ref)) / shared_cut_scale)
+    z_peak_cut_abs_error = float(np.max(np.abs(z_cut - z_cut_ref)) / shared_cut_scale)
     peak_crosscut_distortion = max(y_l2_distortion, z_l2_distortion)
 
     center_velocity = np.asarray(bundle.u[:, mid_y, mid_z], dtype=float)
@@ -2187,6 +2196,8 @@ def validate_magnetic_obstacle_benchmark(
         "pressure_excess_proxy": pressure_excess_proxy,
         "y_l2_distortion": y_l2_distortion,
         "z_l2_distortion": z_l2_distortion,
+        "y_peak_cut_abs_error": y_peak_cut_abs_error,
+        "z_peak_cut_abs_error": z_peak_cut_abs_error,
         "peak_crosscut_distortion": peak_crosscut_distortion,
         "reference_kind": "matched_no_field_lmx",
         "external_reference_available": False,

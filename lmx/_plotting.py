@@ -1533,6 +1533,13 @@ def write_magnetic_obstacle_benchmark_plots(
     y_cut_ref = np.asarray(reference_bundle.u[peak_index, :, mid_z], dtype=float)
     z_cut = np.asarray(bundle.u[peak_index, mid_y, :], dtype=float)
     z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
+    shared_cut_scale = max(
+        float(np.max(np.abs(y_cut_ref))),
+        float(np.max(np.abs(z_cut_ref))),
+        float(np.max(np.abs(y_cut))),
+        float(np.max(np.abs(z_cut))),
+        1.0e-12,
+    )
     peak_u = max(float(np.max(np.abs(u_peak))), 1.0e-12)
     center_velocity = np.asarray(bundle.u[:, mid_y, mid_z], dtype=float)
     ref_center_velocity = np.asarray(reference_bundle.u[:, mid_y, mid_z], dtype=float)
@@ -1580,13 +1587,13 @@ def write_magnetic_obstacle_benchmark_plots(
     ax.set_ylabel("y")
 
     ax = axes[1, 1]
-    ax.plot(y, y_cut_ref / max(float(np.max(np.abs(y_cut_ref))), 1.0e-12), color="#64748b", label="reference y-cut")
-    ax.plot(y, y_cut / max(float(np.max(np.abs(y_cut))), 1.0e-12), color="#1d4ed8", linestyle="--", label="field y-cut")
-    ax.plot(z, z_cut_ref / max(float(np.max(np.abs(z_cut_ref))), 1.0e-12), color="#94a3b8", label="reference z-cut")
-    ax.plot(z, z_cut / max(float(np.max(np.abs(z_cut))), 1.0e-12), color="#b45309", linestyle="--", label="field z-cut")
+    ax.plot(y, y_cut_ref / shared_cut_scale, color="#64748b", label="reference y-cut")
+    ax.plot(y, y_cut / shared_cut_scale, color="#1d4ed8", linestyle="--", label="field y-cut")
+    ax.plot(z, z_cut_ref / shared_cut_scale, color="#94a3b8", label="reference z-cut")
+    ax.plot(z, z_cut / shared_cut_scale, color="#b45309", linestyle="--", label="field z-cut")
     ax.set_title("Peak-field centerline cuts")
     ax.set_xlabel("local coordinate")
-    ax.set_ylabel(r"$u/u_{cut,max}$")
+    ax.set_ylabel(r"$u/u_{ref,peak}$")
     ax.legend(loc="lower center", ncol=2, fontsize=9)
 
     png_path = out_dir / "magnetic_obstacle_benchmark.png"

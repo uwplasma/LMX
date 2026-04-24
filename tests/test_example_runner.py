@@ -1157,8 +1157,8 @@ def test_q2d_turbulence_decay_demo_writes_summary_and_movie(tmp_path: Path):
     module.OUTPUT_DIR = tmp_path
     module.NX = 24
     module.NY = 24
-    module.T_FINAL = 4.0e-3
-    module.FRAME_COUNT = 4
+    module.T_FINAL = 1.0
+    module.FRAME_COUNT = 8
     module.FPS = 4
     summary = module.run_q2d_turbulence_decay_demo()
     assert summary["case"] == "q2d_turbulence_decay"

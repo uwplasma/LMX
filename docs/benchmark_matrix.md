@@ -287,14 +287,15 @@ Current wall-bounded Q2D Hartmann-friction lane:
 Current Q2D turbulence-movie readiness lane:
 
 - `examples/q2d_turbulence_decay_demo.py`
-  - deterministic multi-mode Q2D Hartmann-friction decay
+  - deterministic nonlinear periodic Q2D vorticity solve with
+    Hartmann-friction damping and weak large-scale forcing
   - observables:
-    monotone kinetic-energy decay, monotone enstrophy-proxy decay,
-    high-wavenumber energy-fraction decrease, and spectral-centroid decrease
+    kinetic-energy/enstrophy finiteness, low CFL, divergence-free velocity,
+    spectral-centroid shift, and nonlinear turnover count
   - artifact:
     `write_q2d_turbulence_decay_movie(...)` writes a GIF plus poster PNG
   - role:
-    executable turbulence-observable movie before claiming nonlinear turbulent
+    executable nonlinear turbulence-observable movie before claiming turbulent
     parity against published Sommeria-Moreau-style datasets
 
 Current bounded result:
@@ -545,9 +546,11 @@ Current bounded low-De baseline:
 - `cross_section_l2_error = 0`
 - `centerline_l2_error = 0`
 - `max_charge_balance_residual ≈ 2.15e-2`
-- `research_grade_charge_balance_pass = false` because the bounded
-  demonstrator tolerance is `5e-2` while the research-grade closure target is
-  `1e-3`
+- `max_wall_current_leakage = 0`
+- `net_boundary_current_residual = 0`
+- `research_grade_charge_balance_pass = false` because the global current
+  balance is closed but the maximum local mapped-grid `|div J|` diagnostic is
+  still above the `1e-3` local-closure target
 - `volumetric_flow_rate_span ≈ 1.14e-9`
 - newly reported Dean/curvature observables:
   `secondary_flow_rms_ratio ≈ 6.16e-18`,

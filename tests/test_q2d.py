@@ -113,11 +113,13 @@ def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path
 
 
 def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
-    case = build_q2d_turbulence_decay_case(nx=20, ny=20, dt=1.0e-3, t_final=4.0e-3, frame_count=4)
+    case = build_q2d_turbulence_decay_case(nx=24, ny=24, dt=2.0e-3, t_final=1.0, frame_count=8)
     solution = solve_q2d_turbulence_decay(case)
     validation = validate_q2d_turbulence_decay_observables(case, solution)
-    assert solution.frames.shape[0] == 4
+    assert solution.frames.shape[0] == 8
     assert validation["validation_pass"] is True
+    assert validation["turnover_count"] > 0.02
+    assert validation["max_courant"] < 0.45
     assert validation["research_grade_turbulence_validation_pass"] is False
     outputs = write_q2d_turbulence_decay_movie(solution, tmp_path, fps=4)
     assert outputs == [tmp_path / "q2d_turbulence_decay.gif", tmp_path / "q2d_turbulence_decay_poster.png"]

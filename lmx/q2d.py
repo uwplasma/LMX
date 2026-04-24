@@ -98,12 +98,14 @@ class Q2DTurbulenceDecayCase:
     ny: int = 96
     lx: float = 2.0
     ly: float = 2.0
-    viscosity: float = 0.006
-    hartmann_friction: float = 0.35
-    amplitude: float = 1.0
-    dt: float = 5.0e-4
-    t_final: float = 0.18
-    frame_count: int = 24
+    viscosity: float = 8.0e-4
+    hartmann_friction: float = 0.08
+    amplitude: float = 6.0
+    forcing_amplitude: float = 0.08
+    forcing_wavenumber: int = 4
+    dt: float = 2.0e-3
+    t_final: float = 3.0
+    frame_count: int = 72
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,10 @@ class Q2DTurbulenceDecaySolution:
     frames: np.ndarray
     kinetic_energy: np.ndarray
     enstrophy_proxy: np.ndarray
+    velocity_rms: np.ndarray
+    max_courant: np.ndarray
+    divergence_linf: np.ndarray
+    turnover_count: float
     initial_spectrum: dict[str, list[float]]
     final_spectrum: dict[str, list[float]]
 
@@ -153,12 +159,14 @@ def build_q2d_turbulence_decay_case(
     ny: int = 96,
     lx: float = 2.0,
     ly: float = 2.0,
-    viscosity: float = 0.006,
-    hartmann_friction: float = 0.35,
-    amplitude: float = 1.0,
-    dt: float = 5.0e-4,
-    t_final: float = 0.18,
-    frame_count: int = 24,
+    viscosity: float = 8.0e-4,
+    hartmann_friction: float = 0.08,
+    amplitude: float = 6.0,
+    forcing_amplitude: float = 0.08,
+    forcing_wavenumber: int = 4,
+    dt: float = 2.0e-3,
+    t_final: float = 3.0,
+    frame_count: int = 72,
 ) -> Q2DTurbulenceDecayCase:
     return Q2DTurbulenceDecayCase(
         nx=nx,
@@ -168,6 +176,8 @@ def build_q2d_turbulence_decay_case(
         viscosity=viscosity,
         hartmann_friction=hartmann_friction,
         amplitude=amplitude,
+        forcing_amplitude=forcing_amplitude,
+        forcing_wavenumber=forcing_wavenumber,
         dt=dt,
         t_final=t_final,
         frame_count=frame_count,
@@ -276,6 +286,125 @@ def _q2d_multimode_initial_condition(case: Q2DTurbulenceDecayCase, xx: np.ndarra
     return case.amplitude * field
 
 
+def _q2d_vorticity_forcing(case: Q2DTurbulenceDecayCase, xx: np.ndarray, yy: np.ndarray) -> np.ndarray:
+    kf = max(1, int(case.forcing_wavenumber))
+    forcing = (
+        np.sin(2.0 * np.pi * kf * xx / case.lx)
+        + 0.7 * np.cos(2.0 * np.pi * kf * yy / case.ly + 0.35)
+        + 0.45 * np.sin(2.0 * np.pi * (kf + 1) * (xx + yy) / max(case.lx + case.ly, 1.0e-12))
+    )
+    forcing -= float(np.mean(forcing))
+    forcing /= max(float(np.max(np.abs(forcing))), 1.0e-12)
+    return float(case.forcing_amplitude) * forcing
+
+
+def _q2d_spectral_operators(nx: int, ny: int, lx: float, ly: float) -> tuple[np.ndarray, ...]:
+    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=lx / max(nx, 1))
+    ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=ly / max(ny, 1))
+    kkx, kky = np.meshgrid(kx, ky, indexing="ij")
+    k2 = kkx**2 + kky**2
+    inv_k2 = np.zeros_like(k2)
+    nonzero = k2 > 0.0
+    inv_k2[nonzero] = 1.0 / k2[nonzero]
+    kx_index = np.fft.fftfreq(nx) * nx
+    ky_index = np.fft.fftfreq(ny) * ny
+    ix, iy = np.meshgrid(kx_index, ky_index, indexing="ij")
+    dealias = (np.abs(ix) <= nx / 3.0) & (np.abs(iy) <= ny / 3.0)
+    return kkx, kky, k2, inv_k2, dealias
+
+
+def _q2d_velocity_from_vorticity(
+    omega: np.ndarray,
+    *,
+    kkx: np.ndarray,
+    kky: np.ndarray,
+    inv_k2: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    omega_hat = np.fft.fft2(omega)
+    psi_hat = omega_hat * inv_k2
+    u = np.fft.ifft2(1j * kky * psi_hat).real
+    v = np.fft.ifft2(-1j * kkx * psi_hat).real
+    return u, v, omega_hat
+
+
+def _q2d_nonlinear_rhs(
+    omega: np.ndarray,
+    *,
+    forcing_hat: np.ndarray,
+    kkx: np.ndarray,
+    kky: np.ndarray,
+    k2: np.ndarray,
+    inv_k2: np.ndarray,
+    dealias: np.ndarray,
+    viscosity: float,
+    hartmann_friction: float,
+) -> np.ndarray:
+    u, v, omega_hat = _q2d_velocity_from_vorticity(omega, kkx=kkx, kky=kky, inv_k2=inv_k2)
+    omega_x = np.fft.ifft2(1j * kkx * omega_hat).real
+    omega_y = np.fft.ifft2(1j * kky * omega_hat).real
+    advective_hat = np.fft.fft2(u * omega_x + v * omega_y)
+    advective_hat = np.where(dealias, advective_hat, 0.0)
+    rhs_hat = -advective_hat - float(viscosity) * k2 * omega_hat - float(hartmann_friction) * omega_hat + forcing_hat
+    rhs_hat[0, 0] = 0.0
+    return np.fft.ifft2(rhs_hat).real
+
+
+def _q2d_rk4_step(
+    omega: np.ndarray,
+    *,
+    dt: float,
+    forcing_hat: np.ndarray,
+    kkx: np.ndarray,
+    kky: np.ndarray,
+    k2: np.ndarray,
+    inv_k2: np.ndarray,
+    dealias: np.ndarray,
+    viscosity: float,
+    hartmann_friction: float,
+) -> np.ndarray:
+    rhs_kwargs = {
+        "forcing_hat": forcing_hat,
+        "kkx": kkx,
+        "kky": kky,
+        "k2": k2,
+        "inv_k2": inv_k2,
+        "dealias": dealias,
+        "viscosity": viscosity,
+        "hartmann_friction": hartmann_friction,
+    }
+    k1 = _q2d_nonlinear_rhs(omega, **rhs_kwargs)
+    k2_rhs = _q2d_nonlinear_rhs(omega + 0.5 * dt * k1, **rhs_kwargs)
+    k3 = _q2d_nonlinear_rhs(omega + 0.5 * dt * k2_rhs, **rhs_kwargs)
+    k4 = _q2d_nonlinear_rhs(omega + dt * k3, **rhs_kwargs)
+    updated = omega + (dt / 6.0) * (k1 + 2.0 * k2_rhs + 2.0 * k3 + k4)
+    updated -= float(np.mean(updated))
+    return updated
+
+
+def _q2d_record_vorticity_state(
+    omega: np.ndarray,
+    *,
+    dt: float,
+    dx: float,
+    dy: float,
+    kkx: np.ndarray,
+    kky: np.ndarray,
+    inv_k2: np.ndarray,
+) -> tuple[float, float, float, float, float]:
+    u, v, _ = _q2d_velocity_from_vorticity(omega, kkx=kkx, kky=kky, inv_k2=inv_k2)
+    speed_squared = u**2 + v**2
+    kinetic_energy = 0.5 * float(np.mean(speed_squared))
+    enstrophy = 0.5 * float(np.mean(omega**2))
+    velocity_rms = float(np.sqrt(max(float(np.mean(speed_squared)), 0.0)))
+    max_speed = float(np.max(np.sqrt(speed_squared))) if speed_squared.size else 0.0
+    max_courant = max_speed * float(dt) / max(min(float(dx), float(dy)), 1.0e-12)
+    u_hat = np.fft.fft2(u)
+    v_hat = np.fft.fft2(v)
+    divergence = np.fft.ifft2(1j * kkx * u_hat + 1j * kky * v_hat).real
+    divergence_linf = float(np.max(np.abs(divergence))) if divergence.size else 0.0
+    return kinetic_energy, enstrophy, velocity_rms, max_courant, divergence_linf
+
+
 def solve_q2d_decay(case: Q2DDecayCase) -> Q2DDecaySolution:
     x = np.linspace(0.0, case.lx, case.nx, endpoint=False)
     y = np.linspace(0.0, case.ly, case.ny, endpoint=False)
@@ -312,11 +441,13 @@ def solve_q2d_decay(case: Q2DDecayCase) -> Q2DDecaySolution:
 
 
 def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDecaySolution:
-    """Evolve a deterministic multi-mode Q2D field under diffusion and Hartmann friction.
+    """Evolve a deterministic nonlinear Q2D vorticity field with Hartmann friction.
 
-    This is a turbulence-observable readiness problem rather than a nonlinear
-    turbulent DNS. It produces the movie/spectral diagnostics needed before
-    matching a published turbulent Q2D reference case.
+    The equation is the periodic vorticity form of the Sommeria-Moreau shallow
+    core model with viscosity, linear Hartmann drag, and weak deterministic
+    large-scale forcing. It is intentionally compact so that CI can exercise the
+    nonlinear branch while the README example can run long enough to show
+    vortex interaction rather than single-mode diffusion.
     """
 
     x = np.linspace(0.0, case.lx, case.nx, endpoint=False)
@@ -325,6 +456,10 @@ def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDec
     dx = float(case.lx / case.nx)
     dy = float(case.ly / case.ny)
     field = _q2d_multimode_initial_condition(case, xx, yy)
+    forcing = _q2d_vorticity_forcing(case, xx, yy)
+    kkx, kky, k2, inv_k2, dealias = _q2d_spectral_operators(case.nx, case.ny, case.lx, case.ly)
+    forcing_hat = np.where(dealias, np.fft.fft2(forcing), 0.0)
+    forcing_hat[0, 0] = 0.0
     steps = max(1, int(round(case.t_final / case.dt)))
     frame_count = max(2, min(int(case.frame_count), steps + 1))
     frame_indices = np.unique(np.linspace(0, steps, frame_count, dtype=int))
@@ -332,18 +467,58 @@ def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDec
     frame_times: list[float] = []
     kinetic_energy: list[float] = []
     enstrophy_proxy: list[float] = []
+    velocity_rms: list[float] = []
+    max_courant: list[float] = []
+    divergence_linf: list[float] = []
+    turnover_count = 0.0
+    previous_rms = 0.0
 
     def _record(step: int, values: np.ndarray) -> None:
         frames.append(values.copy())
         frame_times.append(step * case.dt)
-        kinetic_energy.append(0.5 * float(np.mean(values**2)))
-        grad_x, grad_y = np.gradient(values, dx, dy, edge_order=1)
-        enstrophy_proxy.append(0.5 * float(np.mean(grad_x**2 + grad_y**2)))
+        ke, enstrophy, rms, cfl, div_linf = _q2d_record_vorticity_state(
+            values,
+            dt=case.dt,
+            dx=dx,
+            dy=dy,
+            kkx=kkx,
+            kky=kky,
+            inv_k2=inv_k2,
+        )
+        kinetic_energy.append(ke)
+        enstrophy_proxy.append(enstrophy)
+        velocity_rms.append(rms)
+        max_courant.append(cfl)
+        divergence_linf.append(div_linf)
 
     frame_index_set = set(int(index) for index in frame_indices.tolist())
     _record(0, field)
+    previous_rms = velocity_rms[-1]
     for step in range(1, steps + 1):
-        field = field + case.dt * (case.viscosity * _periodic_laplacian(field, dx=dx, dy=dy) - case.hartmann_friction * field)
+        field = _q2d_rk4_step(
+            field,
+            dt=case.dt,
+            forcing_hat=forcing_hat,
+            kkx=kkx,
+            kky=kky,
+            k2=k2,
+            inv_k2=inv_k2,
+            dealias=dealias,
+            viscosity=case.viscosity,
+            hartmann_friction=case.hartmann_friction,
+        )
+        ke, _, rms, _, _ = _q2d_record_vorticity_state(
+            field,
+            dt=case.dt,
+            dx=dx,
+            dy=dy,
+            kkx=kkx,
+            kky=kky,
+            inv_k2=inv_k2,
+        )
+        _ = ke
+        turnover_count += 0.5 * (previous_rms + rms) * case.dt / max(min(case.lx, case.ly), 1.0e-12)
+        previous_rms = rms
         if step in frame_index_set:
             _record(step, field)
 
@@ -354,6 +529,10 @@ def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDec
         frames=np.asarray(frames, dtype=float),
         kinetic_energy=np.asarray(kinetic_energy, dtype=float),
         enstrophy_proxy=np.asarray(enstrophy_proxy, dtype=float),
+        velocity_rms=np.asarray(velocity_rms, dtype=float),
+        max_courant=np.asarray(max_courant, dtype=float),
+        divergence_linf=np.asarray(divergence_linf, dtype=float),
+        turnover_count=float(turnover_count),
         initial_spectrum=q2d_energy_spectrum(frames[0] - float(np.mean(frames[0])), lx=case.lx, ly=case.ly),
         final_spectrum=q2d_energy_spectrum(frames[-1] - float(np.mean(frames[-1])), lx=case.lx, ly=case.ly),
     )
@@ -793,16 +972,18 @@ def validate_q2d_turbulence_decay_observables(
     case: Q2DTurbulenceDecayCase,
     solution: Q2DTurbulenceDecaySolution,
 ) -> dict[str, float | bool | str]:
-    """Validate bounded Q2D spectral-decay observables for the movie lane."""
+    """Validate bounded nonlinear Q2D spectral observables for the movie lane."""
 
     energy = np.asarray(solution.kinetic_energy, dtype=float)
     enstrophy = np.asarray(solution.enstrophy_proxy, dtype=float)
     if energy.size < 2 or enstrophy.size < 2:
         raise ValueError("Q2D turbulence-decay validation requires at least two frames")
-    energy_monotone = bool(np.all(np.diff(energy) <= 1.0e-12))
-    enstrophy_monotone = bool(np.all(np.diff(enstrophy) <= 1.0e-12))
+    finite_energy = bool(np.all(np.isfinite(energy)) and np.all(energy >= -1.0e-14))
+    finite_enstrophy = bool(np.all(np.isfinite(enstrophy)) and np.all(enstrophy >= -1.0e-14))
     energy_decay_ratio = float(energy[-1] / max(energy[0], 1.0e-20))
     enstrophy_decay_ratio = float(enstrophy[-1] / max(enstrophy[0], 1.0e-20))
+    energy_variation_ratio = float((np.max(energy) - np.min(energy)) / max(np.mean(energy), 1.0e-20))
+    enstrophy_variation_ratio = float((np.max(enstrophy) - np.min(enstrophy)) / max(np.mean(enstrophy), 1.0e-20))
 
     initial_energy = np.asarray(solution.initial_spectrum["energy"], dtype=float)
     final_energy = np.asarray(solution.final_spectrum["energy"], dtype=float)
@@ -821,33 +1002,38 @@ def validate_q2d_turbulence_decay_observables(
         if final_energy.size
         else 0.0
     )
-    high_k_fraction_decreases = bool(final_high_k_fraction <= initial_high_k_fraction + 1.0e-12)
     initial_spectral_centroid = float(np.sum(wavenumber * initial_energy) / max(np.sum(initial_energy), 1.0e-20)) if initial_energy.size else 0.0
     final_spectral_centroid = float(np.sum(wavenumber * final_energy) / max(np.sum(final_energy), 1.0e-20)) if final_energy.size else 0.0
-    spectral_centroid_decreases = bool(final_spectral_centroid <= initial_spectral_centroid + 1.0e-12)
+    spectral_centroid_shift = float(abs(final_spectral_centroid - initial_spectral_centroid))
+    max_courant = float(np.max(solution.max_courant)) if solution.max_courant.size else 0.0
+    max_divergence_linf = float(np.max(solution.divergence_linf)) if solution.divergence_linf.size else 0.0
+    nonlinear_activity_pass = bool(float(solution.turnover_count) >= 0.12 and spectral_centroid_shift > 1.0e-3)
     validation_pass = bool(
-        energy_monotone
-        and enstrophy_monotone
-        and high_k_fraction_decreases
-        and spectral_centroid_decreases
-        and energy_decay_ratio < 1.0
-        and enstrophy_decay_ratio < 1.0
+        finite_energy
+        and finite_enstrophy
+        and max_courant < 0.45
+        and max_divergence_linf < 1.0e-9
+        and nonlinear_activity_pass
+        and solution.frames.shape[0] >= 8
     )
     return {
         "energy_decay_ratio": energy_decay_ratio,
         "enstrophy_decay_ratio": enstrophy_decay_ratio,
+        "energy_variation_ratio": energy_variation_ratio,
+        "enstrophy_variation_ratio": enstrophy_variation_ratio,
         "initial_high_k_energy_fraction": initial_high_k_fraction,
         "final_high_k_energy_fraction": final_high_k_fraction,
         "initial_spectral_centroid": initial_spectral_centroid,
         "final_spectral_centroid": final_spectral_centroid,
-        "energy_monotone": energy_monotone,
-        "enstrophy_monotone": enstrophy_monotone,
-        "high_k_fraction_decreases": high_k_fraction_decreases,
-        "spectral_centroid_decreases": spectral_centroid_decreases,
+        "spectral_centroid_shift": spectral_centroid_shift,
+        "max_courant": max_courant,
+        "max_divergence_linf": max_divergence_linf,
+        "turnover_count": float(solution.turnover_count),
+        "nonlinear_activity_pass": nonlinear_activity_pass,
         "frame_count": int(solution.frames.shape[0]),
         "validation_pass": validation_pass,
-        "literature_target": "Sommeria-Moreau quasi-2D turbulence spectral decay and Hartmann-friction damping",
-        "validation_status": "multimode_q2d_movie_available_external_turbulent_reference_open",
+        "literature_target": "Sommeria-Moreau quasi-2D turbulence with Hartmann-friction damping",
+        "validation_status": "nonlinear_q2d_movie_available_external_turbulent_reference_open",
         "research_grade_turbulence_validation_pass": False,
     }
 
@@ -856,7 +1042,7 @@ def write_q2d_turbulence_decay_movie(
     solution: Q2DTurbulenceDecaySolution,
     out_dir: str | Path,
     *,
-    title: str = "Q2D Hartmann-friction multi-mode decay",
+    title: str = "Q2D nonlinear Hartmann-friction turbulence slice",
     fps: int = 10,
 ) -> list[Path]:
     """Write a GIF movie and poster for a Q2D multi-mode decay solution."""
@@ -876,7 +1062,7 @@ def write_q2d_turbulence_decay_movie(
     ax.set_xlabel("y")
     ax.set_ylabel("x")
     ax.set_aspect("equal")
-    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="u' proxy")
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="vorticity")
 
     def _update(index: int):
         image.set_array(frames[index].ravel())

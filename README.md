@@ -194,12 +194,15 @@ Dean/curvature observables that will become the higher-inertia gate:
 `secondary_flow_rms_ratio ≈ 6.16e-18`,
 `normalized_velocity_centroid_shift = 0`, and
 `inner_outer_velocity_ratio = 1.0` for this low-De straight-pipe limit.
-The charge-balance number is within the bounded demonstrator tolerance
-(`5e-2`) but above the research-grade closure target (`1e-3`), so the JSON
-summary records `research_grade_charge_balance_pass = false`. A local
-mesh/iteration probe lowered the residual only to `≈ 1.52e-2`, so the remaining
-curved-pipe gate needs a formulation/diagnostic fix and a Dean-vortex reference,
-not just a longer low-De run.
+The reported `max_charge_balance_residual` is a maximum local conservative
+`|div J|` diagnostic on the cylindrical mapped grid, not a net current-leakage
+measure. The same run has `max_wall_current_leakage = 0` and
+`net_boundary_current_residual = 0`, so global charge closure is clean, while
+local mapped-grid closure remains above the research-grade target. The JSON
+summary therefore records `research_grade_charge_balance_pass = false`. A local
+mesh/iteration probe lowered the local residual only to `≈ 1.52e-2`, so the
+remaining curved-pipe gate needs a formulation/diagnostic fix and a Dean-vortex
+reference, not just a longer low-De run.
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 
@@ -271,11 +274,14 @@ solutions before moving to turbulent observables.
   observables for the future turbulent Q2D validation lane. The companion
   `q2d_turbulence_observables` panel plots the wall-bounded field, shell energy
   spectrum, and energy/dissipation proxies without claiming turbulent parity.
-- `examples/q2d_turbulence_decay_demo.py`: a deterministic multi-mode Q2D
-  Hartmann-friction decay movie. It is a turbulence-observable readiness gate,
-  not nonlinear turbulent parity. The current movie has monotone energy and
-  enstrophy decay, high-wavenumber energy fraction dropping from `≈ 9.11e-2`
-  to `≈ 5.83e-2`, and spectral centroid dropping from `≈ 7.98` to `≈ 7.46`.
+- `examples/q2d_turbulence_decay_demo.py`: a deterministic nonlinear periodic
+  Q2D vorticity movie with Hartmann-friction damping and weak large-scale
+  forcing. It runs to `t = 3.0` with `72` frames, giving visible vortex
+  interaction rather than single-mode diffusion. The current movie has
+  `turnover_count ≈ 3.31e-1`, `max_courant ≈ 5.23e-2`, spectral centroid
+  shift `≈ 8.63e-1`, and divergence `≈ 2.74e-14`. This is a bounded SM82-style
+  nonlinear physics gate; external turbulent parity remains open until matched
+  to a published turbulent Q2D reference dataset.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -304,18 +310,24 @@ not yet prove parity with the magnetic-obstacle literature.
 ![LMX magnetic-obstacle setup and response](docs/_static/generated/magnetic_obstacle_schematic.png)
 
 The main driver is `examples/magnetic_obstacle_benchmark.py`. On the current
-bounded case (`24 × 24 × 17`, localized obstacle field, matched no-field
+bounded case (`40 × 40 × 25`, localized obstacle field, matched no-field
 reference), it reports:
 
-- `peak_velocity_deficit_ratio ≈ 3.23e-2`
-- `peak_centerline_deficit_ratio ≈ 3.76e-1`
-- `integrated_velocity_deficit_ratio ≈ 2.78e-2`
-- `recovery_station ≈ 4.76`
-- `peak_pressure_excess ≈ 5.01e-1`
-- `pressure_excess_proxy ≈ 1.22e-1`
-- `current_proxy_peak ≈ 4.56`
-- `peak_crosscut_distortion ≈ 2.31e-1`
-- `max_charge_balance_residual ≈ 3.98e-13`
+- `peak_velocity_deficit_ratio ≈ 1.01e-2`
+- `peak_centerline_deficit_ratio ≈ 2.29e-1`
+- `integrated_velocity_deficit_ratio ≈ 8.40e-3`
+- `recovery_station ≈ 3.96`
+- `peak_pressure_excess ≈ 3.22e-1`
+- `pressure_excess_proxy ≈ 6.52e-2`
+- `current_proxy_peak ≈ 1.78`
+- `peak_crosscut_distortion ≈ 9.75e-2`
+- `y_peak_cut_abs_error ≈ 1.72e-1`
+- `z_peak_cut_abs_error ≈ 1.72e-1`
+- `max_charge_balance_residual ≈ 3.02e-12`
+
+The peak-field centerline cuts in the figure use one shared reference scale
+instead of per-line normalization, so the centerline deficit and transverse
+distortion are visible rather than normalized away.
 
 The current status is therefore: internal response gate passes, external
 research-grade validation remains open. The next validation step is to match a
@@ -586,13 +598,15 @@ hidden in the figures:
   a digitized or executable external reference is filled into
   `magnetic_obstacle_reference_observables.csv`
 - the Q2D lane has modal decay, forced-mode, wall-bounded, energy-budget, and
-  spectrum diagnostics plus a multi-mode decay movie; turbulent parity remains
-  open until those observables are compared with published nonlinear Q2D
-  turbulent data
+  spectrum diagnostics plus a longer nonlinear vorticity movie; turbulent
+  parity remains open until those observables are compared with published
+  nonlinear Q2D turbulent data
 - the bent-pipe section is currently a low-De straight-pipe-limit check; the
-  higher-inertia Dean-vortex gate remains open, and the charge-balance residual
-  `≈ 2.15e-2` passes only the bounded demonstrator tolerance, not the
-  research-grade `1e-3` closure target
+  higher-inertia Dean-vortex gate remains open. Global current closure is clean
+  (`max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`), but
+  the maximum local mapped-grid `|div J|` residual `≈ 2.15e-2` passes only the
+  bounded demonstrator tolerance, not the research-grade `1e-3` local-closure
+  target
 - the tabulated-field rectangular lane now passes both table-node and
   solver-point manufactured-field reconstruction; WHAM-like 3D field response
   remains a separate open validation lane because the current pipe solve is
