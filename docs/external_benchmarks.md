@@ -152,10 +152,13 @@ wall interpolation and limiter application for `inlet_flow_rate` runs, and
 `processed_slice_area_mean` derives case-specific constant-`Q` targets directly
 from the nonuniform processed FreeMHD slice. This matters because the Ha=20
 paper slices imply different mean speeds for the two wall models
-(`0.97017` for Shercliff and `0.11741` for Hunt). A cheap `25 x 21`
-flow-rate probe with those targets matches the requested mean and recovers the
-right pressure-gradient scale, but the retained publication mesh still needs a
-full constrained-drive parity run before the constant-`Q` lane can be promoted.
+(`0.97017` for Shercliff and `0.11741` for Hunt). On the retained `49 x 37`
+mesh, the constrained-flow solve now matches the requested mean exactly and
+gives velocity-cut errors of `8.49e-3` / `5.20e-3` for Shercliff and
+`1.26e-2` / `7.70e-3` for Hunt. A follow-up Hunt `57 x 43` run improved the
+side cut but worsened the wall-normal cut, so the remaining `O(1.3e-2)` Hunt
+shape mismatch should be treated as a solver/observable-parity issue rather
+than a basic layer-cell-count issue.
 
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting

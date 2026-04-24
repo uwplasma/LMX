@@ -127,8 +127,11 @@ Demonstrated but not yet research-grade validation:
    reconstructs nonuniform processed slice grids, averages duplicate slice
    points, and computes area-weighted FreeMHD targets. This exposes that Ha=20
    Shercliff and Hunt constant-flow slices use different mean speeds
-   (`0.97017` and `0.11741`), so the next retained run must use case-specific
-   targets rather than a shared visual-scaling velocity.
+   (`0.97017` and `0.11741`), so retained runs must use case-specific targets
+   rather than a shared visual-scaling velocity. The retained `49 x 37`
+   constrained-flow run now matches mean flow exactly and gives Shercliff
+   velocity cuts of `8.49e-3` / `5.20e-3` and Hunt cuts of `1.26e-2` /
+   `7.70e-3`; Hunt-y remains the last slightly-above-target cut.
 2. Make boundary-layer meshing first-class.
    Add a documented mesh ladder for Hartmann and side layers with at least
    8-10 cells across the thinnest layer in high-Ha validation runs, smooth
@@ -1526,11 +1529,13 @@ That retained gate now passes for all three retained fringing geometries.
     processed FreeMHD slices are reconstructed as nonuniform `y-z` grids and
     area-integrated to recover case-specific mean velocities. The Ha=20
     Shercliff slice gives `0.97017`; the Hunt slice gives `0.11741`, so using a
-    shared `0.9725` target was invalid for Hunt. A cheap `25 x 21` probe with
-    the recovered targets matches the requested mean and applied forcing scale
-    (`2372` for Shercliff, `498` for Hunt), but retained-mesh field parity
-    still needs a dedicated constrained-drive run before the lane can be
-    marked research-grade.
+    shared `0.9725` target was invalid for Hunt. The retained `49 x 37`
+    constrained-flow run now matches the requested mean exactly and gives
+    velocity profile cuts of `8.49e-3` / `5.20e-3` for Shercliff and
+    `1.26e-2` / `7.70e-3` for Hunt. A focused Hunt `57 x 43` run improved the
+    side cut to `4.80e-3` but worsened the wall-normal cut to `1.71e-2`, so
+    this is no longer a simple layer-cell-count issue; the next fix should
+    target the Hunt wall-normal shape/forcing-current coupling.
   - the FreeMHD parity examples now write ranked offender tables into their
     summary JSON files; after centerline interpolation and low-signal
     filtering, the largest current paper-slice offenders are only the last
