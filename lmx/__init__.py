@@ -138,6 +138,7 @@ __all__ = [
     "write_q2d_decay_plots",
     "write_q2d_forced_plots",
     "write_q2d_wall_bounded_forced_plots",
+    "write_q2d_turbulence_observable_plots",
     "load_magnetic_obstacle_reference_observables",
     "magnetic_obstacle_reference_template_rows",
     "write_magnetic_obstacle_reference_comparison_table",
@@ -300,6 +301,7 @@ _EXPORTS = {
     "write_q2d_decay_plots": ("lmx.q2d", "write_q2d_decay_plots"),
     "write_q2d_forced_plots": ("lmx.q2d", "write_q2d_forced_plots"),
     "write_q2d_wall_bounded_forced_plots": ("lmx.q2d", "write_q2d_wall_bounded_forced_plots"),
+    "write_q2d_turbulence_observable_plots": ("lmx.q2d", "write_q2d_turbulence_observable_plots"),
 }
 
 

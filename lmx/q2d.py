@@ -466,6 +466,12 @@ def q2d_turbulence_readiness_metrics(
         if total_spectral_energy > 0.0
         else 0.0
     )
+    positive = (spectrum_wavenumber > 0.0) & (spectrum_energy > 0.0)
+    spectrum_log_slope = 0.0
+    if int(np.count_nonzero(positive)) >= 2:
+        log_k = np.log(spectrum_wavenumber[positive])
+        log_energy = np.log(spectrum_energy[positive])
+        spectrum_log_slope = float(np.polyfit(log_k, log_energy, 1)[0])
     return {
         "kinetic_energy": kinetic_energy,
         "fluctuation_kinetic_energy": fluctuation_kinetic_energy,
@@ -473,6 +479,7 @@ def q2d_turbulence_readiness_metrics(
         "hartmann_dissipation_proxy": hartmann_dissipation_proxy,
         "viscous_dissipation_proxy": viscous_dissipation_proxy,
         "spectrum_peak_wavenumber": float(spectrum_wavenumber[peak_index]) if spectrum_wavenumber.size else 0.0,
+        "spectrum_log_slope": spectrum_log_slope,
         "high_wavenumber_energy_fraction": high_k_energy_fraction,
         "spectrum": spectrum,
         "literature_target": "Sommeria-Moreau quasi-2D turbulence observables",
@@ -504,6 +511,94 @@ def q2d_turbulence_observables(
         viscosity=viscosity,
         hartmann_friction=hartmann_friction,
     )
+
+
+def write_q2d_turbulence_observable_plots(
+    field: np.ndarray,
+    out_dir: str | Path,
+    *,
+    lx: float,
+    ly: float,
+    viscosity: float,
+    hartmann_friction: float,
+    title: str = "Q2D turbulence-observable readiness gate",
+) -> list[Path]:
+    """Write a publication-facing panel for Q2D spectral observables."""
+
+    values = np.asarray(field, dtype=float)
+    if values.ndim != 2:
+        raise ValueError("Q2D turbulence observable plots expect a 2D field")
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    metrics = q2d_turbulence_observables(
+        values,
+        lx=lx,
+        ly=ly,
+        viscosity=viscosity,
+        hartmann_friction=hartmann_friction,
+    )
+    spectrum = metrics["spectrum"]
+    wavenumber = np.asarray(spectrum["wavenumber"], dtype=float)
+    energy = np.asarray(spectrum["energy"], dtype=float)
+    x_edges = np.linspace(0.0, lx, values.shape[0] + 1)
+    y_edges = np.linspace(0.0, ly, values.shape[1] + 1)
+    vmax = max(float(np.max(np.abs(values))), 1.0e-12)
+
+    fig, axes = plt.subplots(1, 3, figsize=(15.0, 4.8), constrained_layout=True)
+    fig.suptitle(title, fontsize=16)
+
+    image = axes[0].pcolormesh(y_edges, x_edges, values, shading="auto", cmap="RdBu_r", vmin=-vmax, vmax=vmax)
+    axes[0].set_title("Wall-bounded Q2D field")
+    axes[0].set_xlabel("y")
+    axes[0].set_ylabel("x")
+    fig.colorbar(image, ax=axes[0], fraction=0.046, pad=0.04)
+
+    positive = (wavenumber > 0.0) & (energy > 0.0)
+    axes[1].loglog(wavenumber[positive], energy[positive], marker="o", color="#1d4ed8", linewidth=1.8)
+    axes[1].axvline(float(metrics["spectrum_peak_wavenumber"]), color="#b91c1c", linestyle="--", linewidth=1.0)
+    axes[1].set_title("Shell energy spectrum")
+    axes[1].set_xlabel("|k|")
+    axes[1].set_ylabel("E(k)")
+    axes[1].grid(True, which="both", alpha=0.25)
+    axes[1].text(
+        0.04,
+        0.06,
+        f"log-slope = {float(metrics['spectrum_log_slope']):.2f}",
+        transform=axes[1].transAxes,
+        ha="left",
+        va="bottom",
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.9},
+    )
+
+    labels = ["K", "K'", "Z", "Ha diss.", "ν diss."]
+    values_bar = [
+        float(metrics["kinetic_energy"]),
+        float(metrics["fluctuation_kinetic_energy"]),
+        float(metrics["enstrophy_proxy"]),
+        float(metrics["hartmann_dissipation_proxy"]),
+        float(metrics["viscous_dissipation_proxy"]),
+    ]
+    axes[2].bar(labels, values_bar, color=["#0f766e", "#14b8a6", "#f59e0b", "#7c3aed", "#475569"])
+    axes[2].set_yscale("log")
+    axes[2].set_title("Energy and dissipation proxies")
+    axes[2].set_ylabel("proxy magnitude")
+    axes[2].tick_params(axis="x", rotation=25)
+    axes[2].text(
+        0.04,
+        0.96,
+        "not a turbulence parity claim",
+        transform=axes[2].transAxes,
+        ha="left",
+        va="top",
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.9},
+    )
+
+    png = out_dir / "q2d_turbulence_observables.png"
+    pdf = out_dir / "q2d_turbulence_observables.pdf"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    return [png, pdf]
 
 
 def write_q2d_decay_plots(

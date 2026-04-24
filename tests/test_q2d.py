@@ -20,6 +20,7 @@ from lmx.q2d import (
     validate_q2d_wall_bounded_forced_solution,
     write_q2d_decay_plots,
     write_q2d_forced_plots,
+    write_q2d_turbulence_observable_plots,
     write_q2d_wall_bounded_forced_plots,
 )
 
@@ -78,6 +79,22 @@ def test_write_q2d_wall_bounded_plots_writes_png_and_pdf(tmp_path: Path):
     assert outputs[1].exists()
 
 
+def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path):
+    case = build_q2d_wall_bounded_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
+    solution = solve_q2d_wall_bounded_forced(case)
+    outputs = write_q2d_turbulence_observable_plots(
+        solution.field,
+        tmp_path,
+        lx=case.lx,
+        ly=case.ly,
+        viscosity=case.viscosity,
+        hartmann_friction=case.hartmann_friction,
+    )
+    assert outputs == [tmp_path / "q2d_turbulence_observables.png", tmp_path / "q2d_turbulence_observables.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
 def test_q2d_energy_spectrum_identifies_single_mode():
     x = np.linspace(0.0, 2.0, 64, endpoint=False)
     y = np.linspace(0.0, 2.0, 64, endpoint=False)
@@ -108,6 +125,7 @@ def test_q2d_turbulence_observables_report_sommeria_moreau_readiness():
     assert metrics["fluctuation_kinetic_energy"] > 0.0
     assert metrics["enstrophy_proxy"] > 0.0
     assert metrics["spectrum_peak_wavenumber"] > 0.0
+    assert np.isfinite(metrics["spectrum_log_slope"])
     assert 0.0 <= metrics["high_wavenumber_energy_fraction"] <= 1.0
     assert metrics["validation_status"] == "spectral_observables_available_no_turbulent_reference"
     assert metrics["research_grade_turbulence_validation_pass"] is False

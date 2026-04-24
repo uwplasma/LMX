@@ -253,12 +253,19 @@ solutions before moving to turbulent observables.
 - `examples/q2d_wall_bounded_validation.py`: a no-slip rectangular box is
   forced toward the exact transient Dirichlet solution with `L2 ≈ 4.15e-4`
   and writes Sommeria-Moreau-facing energy, enstrophy, dissipation, and
-  spectral observables for the future turbulent Q2D validation lane
+  spectral observables for the future turbulent Q2D validation lane. The
+  companion `q2d_turbulence_observables` panel plots the wall-bounded field,
+  shell energy spectrum, and energy/dissipation proxies without claiming
+  turbulent parity.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
   <img src="docs/_static/generated/q2d_forced_overview.png" alt="Q2D forced-mode validation" width="32%">
   <img src="docs/_static/generated/q2d_wall_bounded_overview.png" alt="Q2D wall-bounded forced validation" width="32%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2d_turbulence_observables.png" alt="Q2D turbulence-observable readiness panel" width="72%">
 </p>
 
 ### Magnetic-obstacle localized-field response

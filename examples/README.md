@@ -340,7 +340,7 @@ That example moves the Q2D lane from periodic modes to a wall-bounded duct:
 - compare the transient final state against the exact Dirichlet solution
 - report Sommeria-Moreau-facing energy, enstrophy, dissipation, and spectrum
   observables for the future turbulent validation gate
-- write a compact validation figure and summary JSON
+- write compact validation, spectrum, energy-budget, and summary artifacts
 
 Localized-field and mirror-field response:
 

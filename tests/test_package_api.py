@@ -116,6 +116,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_q2d_decay_plots)
     assert callable(lmx.write_q2d_forced_plots)
     assert callable(lmx.write_q2d_wall_bounded_forced_plots)
+    assert callable(lmx.write_q2d_turbulence_observable_plots)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__
     assert "write_case_overview_plots" in lmx.__all__

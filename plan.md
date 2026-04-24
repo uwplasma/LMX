@@ -974,7 +974,11 @@ Current quasi-2D wall-bounded forced lane:
 - turbulence-facing observables now emitted:
   scalar kinetic energy, fluctuation kinetic energy, enstrophy proxy,
   Hartmann-friction dissipation proxy, viscous dissipation proxy, shell
-  spectrum, spectral peak, and high-wavenumber energy fraction
+  spectrum, spectral peak, log-spectrum slope, and high-wavenumber energy
+  fraction
+- publication-facing Q2D observable panel now exists through
+  `write_q2d_turbulence_observable_plots(...)`, showing the wall-bounded field,
+  shell spectrum, and energy/dissipation proxy budget
 - remaining work before any turbulent Q2D claim:
   Sommeria-Moreau-style closures, literature-anchored wall-bounded duct
   observables, and Q2D turbulence

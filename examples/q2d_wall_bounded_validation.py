@@ -9,6 +9,7 @@ from lmx import (
     solve_q2d_wall_bounded_forced,
     validate_q2d_wall_bounded_forced_solution,
     write_q2d_wall_bounded_forced_plots,
+    write_q2d_turbulence_observable_plots,
 )
 
 
@@ -34,7 +35,17 @@ def run_q2d_wall_bounded_validation() -> dict[str, object]:
         t_final=T_FINAL,
     )
     solution = solve_q2d_wall_bounded_forced(case)
-    plots = write_q2d_wall_bounded_forced_plots(case, solution, OUTPUT_DIR)
+    plots = [
+        *write_q2d_wall_bounded_forced_plots(case, solution, OUTPUT_DIR),
+        *write_q2d_turbulence_observable_plots(
+            solution.field,
+            OUTPUT_DIR,
+            lx=case.lx,
+            ly=case.ly,
+            viscosity=case.viscosity,
+            hartmann_friction=case.hartmann_friction,
+        ),
+    ]
     validation = validate_q2d_wall_bounded_forced_solution(case, solution)
     turbulence_observables = q2d_turbulence_observables(
         solution.field,

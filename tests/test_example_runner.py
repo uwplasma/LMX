@@ -1079,8 +1079,10 @@ def test_q2d_wall_bounded_validation_writes_summary(tmp_path: Path):
     assert summary["case"] == "q2d_wall_bounded_validation"
     assert summary["validation"]["validation_pass"] is True
     assert summary["turbulence_observables"]["kinetic_energy"] > 0.0
+    assert "q2d_turbulence_observables.png" in summary["plots"]
     assert summary["turbulence_observables"]["research_grade_turbulence_validation_pass"] is False
     assert (tmp_path / "q2d_wall_bounded_overview.png").exists()
+    assert (tmp_path / "q2d_turbulence_observables.png").exists()
     assert (tmp_path / "q2d_wall_bounded_validation_summary.json").exists()
 
 

@@ -268,7 +268,11 @@ Current wall-bounded Q2D Hartmann-friction lane:
   - turbulence-facing observables:
     scalar kinetic energy, fluctuation energy, enstrophy proxy, Hartmann
     friction dissipation proxy, viscous dissipation proxy, shell energy
-    spectrum, spectral peak, and high-wavenumber energy fraction
+    spectrum, spectral peak, log-spectrum slope, and high-wavenumber energy
+    fraction
+  - figure:
+    `write_q2d_turbulence_observable_plots(...)` writes the wall-bounded field,
+    shell spectrum, and energy/dissipation proxy panel used in the docs
   - role:
     first wall-bounded Q2D duct slice before Sommeria-Moreau-style closures
     and literature/experiment turbulent datasets
