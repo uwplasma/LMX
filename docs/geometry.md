@@ -146,8 +146,12 @@ Current geometry panel:
 - use `bent_pipe` for curved-centerline geometry QA and for the current low-De
   inductionless baseline before the full Dean-vortex solver lane is added
 - use the metrics from `lmx/validation.py`, especially
-  `duct_layer_resolution_metrics(...)`, to quantify whether the side and
-  Hartmann layers are resolved enough for a benchmark-quality run
+  `duct_layer_resolution_metrics(...)`, to quantify side/Hartmann layer
+  thicknesses and cell counts
+- use `duct_layer_resolution_gate(...)` for publication-facing runs; the
+  default gate requires at least eight cells across the Hartmann layer and six
+  cells across the side layer before a straight-duct result should be promoted
+  as benchmark-quality
 
 Current bent-pipe baseline:
 

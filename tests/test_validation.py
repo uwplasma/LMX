@@ -20,6 +20,7 @@ from lmx.validation import (
     compare_normalized_profiles,
     compare_with_reference_outputs,
     combined_profile_error,
+    duct_layer_resolution_gate,
     duct_layer_resolution_metrics,
     duct_profile_metrics,
     estimate_observed_order,
@@ -204,6 +205,7 @@ def test_layer_resolution_metrics_reject_unsupported_or_empty_fluid_meshes():
     case = make_hartmann_case(ha=20.0, ny=4, nz=4)
     x_field_case = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
     assert duct_layer_resolution_metrics(x_field_case, _build_mesh(x_field_case)) == {}
+    assert duct_layer_resolution_gate(x_field_case, _build_mesh(x_field_case))["layer_resolution_supported"] is False
 
     empty_mesh = SimpleNamespace(
         y_centers=jnp.asarray([-0.5, 0.5]),
@@ -316,6 +318,19 @@ def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
     assert metrics["side_layer_thickness"] > 0.0
     assert metrics["hartmann_layer_cells"] > 0.0
     assert metrics["side_layer_cells"] > 0.0
+
+
+def test_duct_layer_resolution_gate_marks_publication_mesh_readiness():
+    coarse_case = make_hunt_case(ha=20.0, width=0.2, height=0.2, ny=16, nz=16, wall_cells=2)
+    retained_case = make_hunt_case(ha=20.0, width=0.2, height=0.2, ny=49, nz=49, wall_cells=2)
+
+    coarse_gate = duct_layer_resolution_gate(coarse_case, _build_mesh(coarse_case))
+    retained_gate = duct_layer_resolution_gate(retained_case, _build_mesh(retained_case))
+
+    assert coarse_gate["layer_resolution_pass"] is False
+    assert retained_gate["hartmann_layer_resolution_pass"] is True
+    assert retained_gate["side_layer_resolution_pass"] is True
+    assert retained_gate["layer_resolution_pass"] is True
 
 
 def test_validation_summary_includes_latest_potential_residual():

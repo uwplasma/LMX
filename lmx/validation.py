@@ -210,6 +210,36 @@ def duct_layer_resolution_metrics(case: CaseSpec, mesh: StructuredMesh) -> dict[
     }
 
 
+def duct_layer_resolution_gate(
+    case: CaseSpec,
+    mesh: StructuredMesh,
+    *,
+    min_hartmann_cells: float = 8.0,
+    min_side_cells: float = 6.0,
+) -> dict[str, float | bool]:
+    """Return benchmark-readiness metrics for Hartmann and side layers."""
+
+    metrics = duct_layer_resolution_metrics(case, mesh)
+    if not metrics:
+        return {
+            "layer_resolution_supported": False,
+            "layer_resolution_pass": False,
+            "min_required_hartmann_layer_cells": float(min_hartmann_cells),
+            "min_required_side_layer_cells": float(min_side_cells),
+        }
+    hartmann_pass = metrics["hartmann_layer_cells"] >= min_hartmann_cells
+    side_pass = metrics["side_layer_cells"] >= min_side_cells
+    return {
+        **metrics,
+        "layer_resolution_supported": True,
+        "min_required_hartmann_layer_cells": float(min_hartmann_cells),
+        "min_required_side_layer_cells": float(min_side_cells),
+        "hartmann_layer_resolution_pass": bool(hartmann_pass),
+        "side_layer_resolution_pass": bool(side_pass),
+        "layer_resolution_pass": bool(hartmann_pass and side_pass),
+    }
+
+
 def hartmann_analytic_profile(y: jnp.ndarray, ha: float) -> jnp.ndarray:
     denom = jnp.cosh(ha) - 1.0
     denom = jnp.where(jnp.abs(denom) < 1e-12, 1.0, denom)
