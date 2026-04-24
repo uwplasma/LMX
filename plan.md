@@ -416,13 +416,24 @@ work is now partly architectural. The largest files should be split without
 changing behavior, public API semantics, FreeMHD parity status, or existing
 artifact paths.
 
-Immediate module-size hotspots:
+First-stage facade split status:
 
-- `lmx/fringing.py` (~2900 lines)
-- `lmx/autodiff.py` (~2100 lines)
-- `lmx/plotting.py` (~2000 lines)
-- `lmx/solvers.py` (~1400 lines)
-- `lmx/validation.py` (~1100 lines)
+- `lmx/fringing.py`, `lmx/autodiff.py`, `lmx/plotting.py`, `lmx/solvers.py`,
+  and `lmx/validation.py` are now compatibility facades
+- implementation moved behind those facades to `lmx/_fringing.py`,
+  `lmx/_autodiff.py`, `lmx/_plotting.py`, `lmx/_solvers.py`, and
+  `lmx/_validation.py`
+- the next refactor patches should extract cohesive submodules from the private
+  implementations while preserving all public import paths and monkeypatchable
+  test seams
+
+Immediate implementation-size hotspots after the facade split:
+
+- `lmx/_fringing.py` (~2900 lines)
+- `lmx/_autodiff.py` (~2100 lines)
+- `lmx/_plotting.py` (~2000 lines)
+- `lmx/_solvers.py` (~1400 lines)
+- `lmx/_validation.py` (~1400 lines)
 
 Target split map:
 

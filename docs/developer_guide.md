@@ -17,20 +17,26 @@ The codebase is organized around a small number of core modules:
 - `lmx/linear.py`
   - iterative linear solves
 - `lmx/solvers.py`
-  - steady and transient solver-family implementations
+  - compatibility facade for steady and transient solver-family implementations
+- `lmx/_solvers.py`
+  - current fully developed solver implementation pending the next extraction
 - `lmx/io.py`
   - restart/state bundles and output serialization
 - `lmx/runtime_logging.py`
   - live terminal logging
 - `lmx/validation.py`
-  - analytical and reference-output comparison helpers
+  - compatibility facade for analytical and reference-output comparisons
+- `lmx/_validation.py`
+  - current validation implementation pending the next extraction
 
 ## Planned module split
 
-The current flat layout is still intentional for compatibility, but several
-modules are now too large for long-term maintenance. The split should happen
-only after the relevant behavior is locked by direct tests and artifact
-summaries.
+The first split stage is in place: the historical public modules remain as
+compatibility facades, while implementation lives in private modules such as
+`lmx/_fringing.py`, `lmx/_autodiff.py`, `lmx/_plotting.py`, `lmx/_solvers.py`,
+and `lmx/_validation.py`. The next stages should extract cohesive
+submodules from those private implementations without changing public import
+paths.
 
 Target structure:
 
