@@ -14,6 +14,7 @@ from lmx import (
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
     sample_cross_section_field,
+    tabulated_field_quality_metrics,
     write_tabulated_field_npz,
 )
 from lmx.specs import MagneticFieldSpec
@@ -79,11 +80,13 @@ def run_variable_field_tabulated_demo() -> dict[str, object]:
         case_title="Tabulated-field extruded inductionless duct",
     )
     validation = validate_variable_field_extruded_solution(solution)
+    field_quality = tabulated_field_quality_metrics(TABLE_PATH)
     summary = {
         "case": "variable_field_tabulated",
         "table_path": TABLE_PATH.name,
         "field_plots": [path.name for path in field_plots],
         "extruded_plots": [path.name for path in extruded_plots],
+        "field_quality": field_quality,
         "validation": validation,
     }
     (OUTPUT_DIR / "variable_field_tabulated_summary.json").write_text(json.dumps(summary, indent=2) + "\n")

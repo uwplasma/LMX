@@ -333,6 +333,71 @@ def load_tabulated_field(path: str | Path) -> dict[str, np.ndarray]:
     )
 
 
+def tabulated_field_quality_metrics(path: str | Path) -> dict[str, float | bool | int | str]:
+    """Return interpolation, normalization, and divergence metrics for a field table."""
+
+    data = load_tabulated_field(path)
+    has_x = "x" in data
+    axes = (data["x"], data["y"], data["z"]) if has_x else (data["y"], data["z"])
+    axis_names = ("x", "y", "z") if has_x else ("y", "z")
+    axis_monotonic = all(bool(np.all(np.diff(axis) > 0.0)) for axis in axes)
+    field = np.stack([data["bx"], data["by"], data["bz"]], axis=-1)
+    finite_fraction = float(np.mean(np.isfinite(field)))
+    magnitude = np.linalg.norm(field, axis=-1)
+    mean_field_magnitude = float(np.mean(magnitude))
+    max_field_magnitude = float(np.max(magnitude))
+    normalized_magnitude = magnitude / max(max_field_magnitude, 1.0e-12)
+
+    if has_x:
+        xx, yy, zz = np.meshgrid(data["x"], data["y"], data["z"], indexing="ij")
+        sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
+        dx = float(data["x"][1] - data["x"][0]) if len(data["x"]) > 1 else 1.0
+        dy = float(data["y"][1] - data["y"][0]) if len(data["y"]) > 1 else 1.0
+        dz = float(data["z"][1] - data["z"][0]) if len(data["z"]) > 1 else 1.0
+        divergence = (
+            np.gradient(data["bx"], dx, axis=0)
+            + np.gradient(data["by"], dy, axis=1)
+            + np.gradient(data["bz"], dz, axis=2)
+        )
+    else:
+        yy, zz = np.meshgrid(data["y"], data["z"], indexing="ij")
+        sampled = sample_tabulated_cross_section_field(path, y=yy, z=zz)
+        dy = float(data["y"][1] - data["y"][0]) if len(data["y"]) > 1 else 1.0
+        dz = float(data["z"][1] - data["z"][0]) if len(data["z"]) > 1 else 1.0
+        divergence = np.gradient(data["by"], dy, axis=0) + np.gradient(data["bz"], dz, axis=1)
+
+    node_error = np.asarray(sampled, dtype=float) - field
+    interpolation_node_linf_error = float(np.max(np.abs(node_error)))
+    interpolation_node_l2_error = float(np.linalg.norm(node_error.reshape(-1)) / max(np.linalg.norm(field.reshape(-1)), 1.0e-12))
+    max_abs_divergence = float(np.max(np.abs(divergence)))
+    rms_divergence = float(np.sqrt(np.mean(divergence**2)))
+    divergence_to_field_ratio = rms_divergence / max(mean_field_magnitude, 1.0e-12)
+    validation_pass = bool(
+        axis_monotonic
+        and finite_fraction == 1.0
+        and interpolation_node_linf_error <= 1.0e-10
+        and divergence_to_field_ratio <= 2.5e-1
+        and max_field_magnitude > 0.0
+    )
+    return {
+        "dimension": int(3 if has_x else 2),
+        "axis_names": ",".join(axis_names),
+        "axis_monotonic": axis_monotonic,
+        "cell_count": int(np.prod(magnitude.shape)),
+        "finite_fraction": finite_fraction,
+        "mean_field_magnitude": mean_field_magnitude,
+        "max_field_magnitude": max_field_magnitude,
+        "normalized_magnitude_min": float(np.min(normalized_magnitude)),
+        "normalized_magnitude_max": float(np.max(normalized_magnitude)),
+        "interpolation_node_linf_error": interpolation_node_linf_error,
+        "interpolation_node_l2_error": interpolation_node_l2_error,
+        "max_abs_divergence": max_abs_divergence,
+        "rms_divergence": rms_divergence,
+        "divergence_to_field_ratio": float(divergence_to_field_ratio),
+        "validation_pass": validation_pass,
+    }
+
+
 def sample_tabulated_cross_section_field(
     path: str | Path,
     *,

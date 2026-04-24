@@ -896,6 +896,10 @@ Current status:
   `field_velocity_correlation ≈ -7.52e-1`,
   `current_proxy_change ≈ 8.28e-1`,
   `max_charge_balance_residual ≈ 5.34e-6`
+- tabulated-field quality checks now report interpolation reconstruction,
+  monotonic axes, finite values, normalized field range, and divergence ratio:
+  rectangular table `divergence_to_field_ratio ≈ 4.81e-4`; WHAM-like 3D table
+  `divergence_to_field_ratio ≈ 3.01e-2`
 - the remaining work is broader parity-grade validation on those new
   geometries and generic 3D tabulated fields beyond the current structured
   duct baseline
@@ -1024,8 +1028,8 @@ Current localized magnetic-obstacle response lane:
   field loading and conservation are stable, but the nominal-WHAM low-Re
   response is still weak
   (`field_velocity_correlation ≈ -9.70e-1`,
-  `max_charge_balance_residual ≈ 3.06e-5`,
-  `pressure_drop_proxy ≈ 1.86e-11`)
+  `max_charge_balance_residual ≈ 2.45e-2`,
+  `pressure_drop_proxy ≈ 1.66e-5`)
 
 ## Parallelization work required before manuscript closeout
 

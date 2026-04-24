@@ -11,6 +11,7 @@ from lmx.field_models import (
     sample_tabulated_field_volume,
     sample_wham_mirror_axis_profile,
     sample_wham_mirror_field,
+    tabulated_field_quality_metrics,
     wham_mirror_station_scale,
     write_tabulated_field_npz,
     write_wham_mirror_field_npz,
@@ -58,6 +59,11 @@ def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
     sampled = sample_tabulated_cross_section_field(path, y=field[..., 0] * 0.0 + y[:, None], z=field[..., 0] * 0.0 + z[None, :])
     assert sampled.shape == field.shape
     assert abs(float(sampled[..., 2].mean()) - float(field[..., 2].mean())) < 1.0e-8
+    quality = tabulated_field_quality_metrics(path)
+    assert quality["dimension"] == 2
+    assert quality["axis_monotonic"] is True
+    assert quality["validation_pass"] is True
+    assert quality["interpolation_node_linf_error"] < 1.0e-12
 
 
 def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
@@ -65,13 +71,18 @@ def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
     y = np.linspace(-1.0, 1.0, 7)
     z = np.linspace(-0.5, 0.5, 9)
     xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-    bx = 0.1 * xx
-    by = yy * zz
-    bz = 1.0 + 0.2 * xx - 0.1 * yy
+    bx = np.sin(yy)
+    by = -0.25 * zz
+    bz = 1.0 + 0.25 * yy
     path = write_tabulated_field_npz(tmp_path / "field3d.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz)
     sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
     assert sampled.shape == xx.shape + (3,)
     assert sampled[..., 0] == pytest.approx(bx)
+    quality = tabulated_field_quality_metrics(path)
+    assert quality["dimension"] == 3
+    assert quality["axis_names"] == "x,y,z"
+    assert quality["validation_pass"] is True
+    assert quality["normalized_magnitude_max"] == pytest.approx(1.0)
 
 
 def test_wham_mirror_axis_profile_is_symmetric():

@@ -11,6 +11,7 @@ from lmx import (
     build_fringing_autodiff_problem,
     build_wham_mirror_pipe_extruded_problem,
     sample_tabulated_field_volume,
+    tabulated_field_quality_metrics,
     solve_extruded_inductionless,
     validate_wham_mirror_pipe_baseline,
     wham_mirror_pressure_drop_sensitivity,
@@ -107,6 +108,7 @@ def run_wham_mirror_pipe_demo() -> dict[str, object]:
     )
     solution = solve_extruded_inductionless(problem)
     validation = validate_wham_mirror_pipe_baseline(solution)
+    field_quality = tabulated_field_quality_metrics(table_path)
 
     autodiff_problem = build_fringing_autodiff_problem(
         nx_stations=AUTODIFF_NX_STATIONS,
@@ -182,6 +184,7 @@ def run_wham_mirror_pipe_demo() -> dict[str, object]:
         "case": "wham_mirror_pipe",
         "field_table": table_path.name,
         "plots": [path.name for path in [*field_plots, *overview_plots, *wham_overview]],
+        "field_quality": field_quality,
         "validation": validation,
         "autodiff": autodiff_summary,
     }

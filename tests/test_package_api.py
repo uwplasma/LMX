@@ -88,6 +88,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.make_localized_divergence_free_obstacle_field)
     assert callable(lmx.cross_section_divergence_metrics)
     assert callable(lmx.load_tabulated_field)
+    assert callable(lmx.tabulated_field_quality_metrics)
     assert callable(lmx.sample_tabulated_cross_section_field)
     assert callable(lmx.sample_tabulated_field_volume)
     assert callable(lmx.sample_wham_mirror_field)

@@ -290,6 +290,10 @@ python examples/wham_mirror_pipe_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
 ```
 
+The tabulated-field examples also emit table-quality diagnostics: interpolation
+reconstruction at table nodes, axis monotonicity, finite-value fraction,
+normalized field range, and discrete divergence ratio.
+
 Those examples extend the same field API into:
 
 - layered ducts with wall materials retained in the 3D solve

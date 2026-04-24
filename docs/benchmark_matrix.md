@@ -391,9 +391,11 @@ Current bounded reduced sensitivity result:
 Current bounded executable tabulated-pipe result:
 
 - the field-loading and conservation path is stable
+- the structured 3D field-quality gate passes with zero table-node
+  interpolation error and `divergence_to_field_ratio ≈ 3.01e-2`
 - `field_velocity_correlation ≈ -9.70e-1`
-- `max_charge_balance_residual ≈ 3.06e-5`
-- `pressure_drop_proxy ≈ 1.86e-11`
+- `max_charge_balance_residual ≈ 2.45e-2`
+- `pressure_drop_proxy ≈ 1.66e-5`
 - the nominal-WHAM low-Re response is therefore still too weak to count as a
   forceful localized-field executable comparison case
 
@@ -500,7 +502,9 @@ Current bounded results:
   the analytic rectangular lane, currently
   `field_velocity_correlation ≈ -7.52e-1`,
   `current_proxy_change ≈ 8.28e-1`,
-  `max_charge_balance_residual ≈ 5.34e-6`
+  `max_charge_balance_residual ≈ 5.34e-6`;
+  the table-quality gate reports zero table-node interpolation error and
+  `divergence_to_field_ratio ≈ 4.81e-4`
 - bent-pipe variable-field low-De comparison:
   straight/bent equivalence still satisfies
   `cross_section_l2_error ≈ 8.12e-6`,

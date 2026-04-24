@@ -227,7 +227,16 @@ The same field API now also drives:
 
 The tabulated rectangular lane is exercised by
 `examples/variable_field_tabulated_demo.py` and
-`examples/fringing_tabulated_case.toml`.
+`examples/fringing_tabulated_case.toml`. Its summary now includes a reusable
+tabulated-field quality gate: table-node interpolation error, axis
+monotonicity, finite-value fraction, normalized field magnitude, and discrete
+divergence. The current rectangular table gives zero table-node interpolation
+error and `divergence_to_field_ratio ≈ 4.81e-4`.
+
+<p align="center">
+  <img src="docs/_static/generated/variable_field_tabulated_field_preview.png" alt="Tabulated magnetic field preview" width="48%">
+  <img src="docs/_static/generated/variable_field_tabulated_extruded_overview.png" alt="Tabulated-field extruded duct response" width="48%">
+</p>
 
 ### Quasi-2D Hartmann-friction validation
 
@@ -329,7 +338,11 @@ lane gives `pressure_drop_proxy ≈ 3.85` and `d(Δp)/ds ≈ 2.98e-1`, with a
 smooth monotone pressure-drop trend over the tested separation sweep. The full
 executable tabulated-pipe solve remains a stable field-loading and conservation
 baseline, but its nominal-WHAM low-Re response is still much weaker than the
-rectangular magnetic-obstacle benchmark above.
+rectangular magnetic-obstacle benchmark above. The WHAM table quality gate
+passes on the structured 3D field with zero table-node interpolation error and
+`divergence_to_field_ratio ≈ 3.01e-2`; the flow-response validation remains
+open because the full solve still has no measurable centerline velocity
+deficit at the nominal low-Re settings.
 
 ![LMX WHAM-like mirror pressure sensitivity](docs/_static/generated/autodiff_wham_pressure_sensitivity.png)
 

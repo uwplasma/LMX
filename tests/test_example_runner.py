@@ -596,6 +596,7 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
             "d_pressure_drop_d_separation": -0.1,
         },
     )
+    monkeypatch.setattr(module, "tabulated_field_quality_metrics", lambda path: {"validation_pass": True, "dimension": 3})
     monkeypatch.setattr(module, "validate_wham_mirror_pipe_baseline", lambda solution: {"validation_pass": True, "pressure_drop_proxy": 1.0})
     monkeypatch.setattr(module, "sample_tabulated_field_volume", lambda *args, **kwargs: np.zeros((module.FIELD_NY, module.FIELD_NZ, 3)))
     monkeypatch.setattr(module, "write_cross_section_field_plots", lambda **kwargs: [tmp_path / "field_preview.png"])
@@ -610,6 +611,7 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
     assert summary["case"] == "wham_mirror_pipe"
     assert "field_preview.png" in summary["plots"]
     assert "wham_mirror_overview.png" in summary["plots"]
+    assert summary["field_quality"]["dimension"] == 3
     assert (tmp_path / "wham_mirror_pipe_summary.json").exists()
 
 
@@ -856,6 +858,8 @@ def test_variable_field_tabulated_demo_writes_summary(tmp_path: Path):
     module.NX_STATIONS = 9
     summary = module.run_variable_field_tabulated_demo()
     assert summary["case"] == "variable_field_tabulated"
+    assert summary["field_quality"]["validation_pass"] is True
+    assert summary["field_quality"]["interpolation_node_linf_error"] < 1.0e-10
     assert (tmp_path / "extruded_overview.png").exists()
     assert (tmp_path / "variable_field_tabulated_summary.json").exists()
     assert (tmp_path / "tabulated_rect_field.npz").exists()
