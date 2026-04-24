@@ -10,14 +10,18 @@ from lmx.q2d import (
     build_q2d_forced_case,
     build_q2d_wall_bounded_forced_case,
     q2d_energy_spectrum,
+    q2d_modal_energy_budget,
     q2d_turbulence_observables,
     q2d_turbulence_readiness_metrics,
     solve_q2d_decay,
     solve_q2d_forced,
     solve_q2d_wall_bounded_forced,
     validate_q2d_decay_solution,
+    validate_q2d_decay_energy_budget,
     validate_q2d_forced_solution,
+    validate_q2d_forced_energy_budget,
     validate_q2d_wall_bounded_forced_solution,
+    validate_q2d_wall_bounded_energy_budget,
     write_q2d_decay_plots,
     write_q2d_forced_plots,
     write_q2d_turbulence_observable_plots,
@@ -32,8 +36,11 @@ def test_q2d_decay_validation_passes_on_baseline_case():
     case = build_q2d_decay_case(nx=48, ny=48, dt=2.5e-4, t_final=0.04)
     solution = solve_q2d_decay(case)
     validation = validate_q2d_decay_solution(case, solution)
+    energy_budget = validate_q2d_decay_energy_budget(case, solution)
     assert validation["l2_error"] < 5.0e-2
     assert validation["validation_pass"] is True
+    assert energy_budget["relative_budget_l2"] < 6.0e-2
+    assert energy_budget["validation_pass"] is True
 
 
 def test_write_q2d_decay_plots_writes_png_and_pdf(tmp_path: Path):
@@ -49,8 +56,11 @@ def test_q2d_forced_validation_passes_on_baseline_case():
     case = build_q2d_forced_case(nx=48, ny=48, dt=2.5e-4, t_final=0.08)
     solution = solve_q2d_forced(case)
     validation = validate_q2d_forced_solution(case, solution)
+    energy_budget = validate_q2d_forced_energy_budget(case, solution)
     assert validation["l2_error"] < 7.0e-2
     assert validation["validation_pass"] is True
+    assert energy_budget["relative_budget_l2"] < 6.0e-2
+    assert energy_budget["validation_pass"] is True
 
 
 def test_write_q2d_forced_plots_writes_png_and_pdf(tmp_path: Path):
@@ -66,8 +76,11 @@ def test_q2d_wall_bounded_validation_passes_on_baseline_case():
     case = build_q2d_wall_bounded_forced_case(nx=48, ny=48, dt=2.5e-4, t_final=0.08)
     solution = solve_q2d_wall_bounded_forced(case)
     validation = validate_q2d_wall_bounded_forced_solution(case, solution)
+    energy_budget = validate_q2d_wall_bounded_energy_budget(case, solution)
     assert validation["l2_error"] < 8.0e-2
     assert validation["validation_pass"] is True
+    assert energy_budget["relative_budget_l2"] < 6.0e-2
+    assert energy_budget["validation_pass"] is True
 
 
 def test_write_q2d_wall_bounded_plots_writes_png_and_pdf(tmp_path: Path):
@@ -141,4 +154,28 @@ def test_q2d_turbulence_metrics_reject_non_2d_fields():
             ly=1.0,
             viscosity=0.01,
             hartmann_friction=2.0,
+        )
+
+
+def test_q2d_modal_energy_budget_rejects_malformed_inputs():
+    with pytest.raises(ValueError, match="matching 1D"):
+        q2d_modal_energy_budget(
+            time=np.zeros((2, 2)),
+            amplitude=np.zeros(4),
+            decay_rate=1.0,
+            mode_mean_square=0.25,
+        )
+    with pytest.raises(ValueError, match="at least three"):
+        q2d_modal_energy_budget(
+            time=np.asarray([0.0, 1.0]),
+            amplitude=np.asarray([1.0, 0.5]),
+            decay_rate=1.0,
+            mode_mean_square=0.25,
+        )
+    with pytest.raises(ValueError, match="strictly increasing"):
+        q2d_modal_energy_budget(
+            time=np.asarray([0.0, 1.0, 1.0]),
+            amplitude=np.asarray([1.0, 0.8, 0.7]),
+            decay_rate=1.0,
+            mode_mean_square=0.25,
         )

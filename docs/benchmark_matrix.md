@@ -244,7 +244,7 @@ Current executable Q2D Hartmann-friction decay lane:
   - quasi-2D Hartmann-friction decay of a single periodic mode
   - observables:
     final-state `L2/L∞` error and amplitude-decay error against the analytic
-    exponential decay
+    exponential decay, plus the modal Q2D energy-budget residual
   - role:
     first Q2D validation surface before adding turbulent closures
 
@@ -254,7 +254,7 @@ Current forced Q2D Hartmann-friction lane:
   - forced periodic Q2D Hartmann-friction duct mode
   - observables:
     steady-state `L2/L∞` error and steady-amplitude error against the analytic
-    forced solution
+    forced solution, plus the modal production-dissipation residual
   - role:
     first forced Q2D duct slice before turbulent closures
 
@@ -264,7 +264,7 @@ Current wall-bounded Q2D Hartmann-friction lane:
   - forced wall-bounded Q2D Hartmann-friction duct mode
   - observables:
     final-state `L2/L∞` error and amplitude error against the exact transient
-    Dirichlet solution
+    Dirichlet solution, plus the wall-bounded modal energy-budget residual
   - turbulence-facing observables:
     scalar kinetic energy, fluctuation energy, enstrophy proxy, Hartmann
     friction dissipation proxy, viscous dissipation proxy, shell energy
@@ -283,6 +283,7 @@ Current bounded result:
 - `l2_error ≈ 4.44e-4`
 - `linf_error ≈ 4.44e-4`
 - `steady_amplitude_rel_error ≈ 4.44e-4`
+- `relative_budget_l2 ≈ 5.60e-4`
 
 Current bounded wall-bounded result:
 
@@ -290,6 +291,7 @@ Current bounded wall-bounded result:
 - `l2_error ≈ 4.15e-4`
 - `linf_error ≈ 4.15e-4`
 - `amplitude_rel_error ≈ 1.42e-4`
+- `relative_budget_l2 ≈ 5.12e-4`
 
 Current localized magnetic-obstacle response lane:
 

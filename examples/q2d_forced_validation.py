@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lmx import build_q2d_forced_case, solve_q2d_forced, validate_q2d_forced_solution, write_q2d_forced_plots
+from lmx import (
+    build_q2d_forced_case,
+    solve_q2d_forced,
+    validate_q2d_forced_energy_budget,
+    validate_q2d_forced_solution,
+    write_q2d_forced_plots,
+)
 
 
 OUTPUT_DIR = Path("artifacts/examples/q2d_forced_validation")
@@ -30,10 +36,12 @@ def run_q2d_forced_validation() -> dict[str, object]:
     solution = solve_q2d_forced(case)
     plots = write_q2d_forced_plots(case, solution, OUTPUT_DIR)
     validation = validate_q2d_forced_solution(case, solution)
+    energy_budget = validate_q2d_forced_energy_budget(case, solution)
     summary = {
         "case": "q2d_forced_validation",
         "plots": [path.name for path in plots],
         "validation": validation,
+        "energy_budget": energy_budget,
     }
     (OUTPUT_DIR / "q2d_forced_validation_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

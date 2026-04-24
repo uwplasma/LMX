@@ -282,6 +282,9 @@ verification/validation practice, not only to internal regression history.
     a useful reference implementation baseline
 - [Quasi-two dimensional perturbations in duct flows under transverse magnetic field](https://arxiv.org/abs/2006.03993)
   - anchors the current Q2D Hartmann-friction validation direction
+  - the current decay, forced, and wall-bounded Q2D summaries now include the
+    modal energy balance `dE/dt = P - 2 lambda E` as a reduced-model closure
+    gate before turbulent spectra are claimed
   - the current wall-bounded Q2D summary now emits energy, enstrophy,
     dissipation, and shell-spectrum observables, but the turbulence gate remains
     open until those quantities are compared with published turbulent Q2D data

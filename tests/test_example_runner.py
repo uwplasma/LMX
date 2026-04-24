@@ -894,6 +894,7 @@ def test_q2d_decay_validation_writes_summary(tmp_path: Path):
     summary = module.run_q2d_decay_validation()
     assert summary["case"] == "q2d_decay_validation"
     assert summary["validation"]["validation_pass"] is True
+    assert summary["energy_budget"]["validation_pass"] is True
     assert (tmp_path / "q2d_decay_overview.png").exists()
     assert (tmp_path / "q2d_decay_validation_summary.json").exists()
 
@@ -1127,6 +1128,7 @@ def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     summary = module.run_q2d_forced_validation()
     assert summary["case"] == "q2d_forced_validation"
     assert summary["validation"]["validation_pass"] is True
+    assert summary["energy_budget"]["validation_pass"] is True
     assert (tmp_path / "q2d_forced_overview.png").exists()
     assert (tmp_path / "q2d_forced_validation_summary.json").exists()
 
@@ -1140,6 +1142,7 @@ def test_q2d_wall_bounded_validation_writes_summary(tmp_path: Path):
     summary = module.run_q2d_wall_bounded_validation()
     assert summary["case"] == "q2d_wall_bounded_validation"
     assert summary["validation"]["validation_pass"] is True
+    assert summary["energy_budget"]["validation_pass"] is True
     assert summary["turbulence_observables"]["kinetic_energy"] > 0.0
     assert "q2d_turbulence_observables.png" in summary["plots"]
     assert summary["turbulence_observables"]["research_grade_turbulence_validation_pass"] is False

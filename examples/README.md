@@ -318,6 +318,7 @@ That example is the first executable Q2D validation slice:
 
 - solve a periodic quasi-2D Hartmann-friction decay problem
 - compare the numerical final state against the analytic decay
+- report the modal energy-budget residual for the Sommeria-Moreau reduced model
 - write a compact validation figure and summary JSON
 
 Quasi-2D forced periodic duct:
@@ -330,6 +331,7 @@ That example upgrades the Q2D lane from decay-only to a forced duct baseline:
 
 - solve a periodic Hartmann-friction mode driven toward a steady state
 - compare the steady state and approach-to-steady-state against the analytic solution
+- report the modal production-dissipation residual
 - write a compact validation figure and summary JSON
 
 Quasi-2D wall-bounded forced duct:
@@ -342,6 +344,7 @@ That example moves the Q2D lane from periodic modes to a wall-bounded duct:
 
 - solve a no-slip forced Q2D Hartmann-friction mode in a rectangular box
 - compare the transient final state against the exact Dirichlet solution
+- report the wall-bounded modal energy-budget residual
 - report Sommeria-Moreau-facing energy, enstrophy, dissipation, and spectrum
   observables for the future turbulent validation gate
 - write compact validation, spectrum, energy-budget, and summary artifacts

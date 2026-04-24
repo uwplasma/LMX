@@ -1004,6 +1004,10 @@ Current quasi-2D wall-bounded forced lane:
 - publication-facing Q2D observable panel now exists through
   `write_q2d_turbulence_observable_plots(...)`, showing the wall-bounded field,
   shell spectrum, and energy/dissipation proxy budget
+- Q2D validation summaries now also include a modal energy-balance gate:
+  `q2d_modal_energy_budget(...)` checks the reduced
+  `dE/dt = P - 2 lambda E` balance for decay, forced periodic, and
+  wall-bounded forced cases before any turbulent claim is made
 - remaining work before any turbulent Q2D claim:
   Sommeria-Moreau-style closures, literature-anchored wall-bounded duct
   observables, and Q2D turbulence

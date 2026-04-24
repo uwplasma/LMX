@@ -247,16 +247,18 @@ solutions before moving to turbulent observables.
 
 - `examples/q2d_decay_validation.py`: a periodic 2D mode decays under
   diffusion plus Hartmann friction and matches the exact exponential amplitude
-  history with `L2 ≈ 9.10e-5`
+  history with `L2 ≈ 9.10e-5`; the modal energy budget closes with relative
+  residual `≈ 5.18e-4`
 - `examples/q2d_forced_validation.py`: a periodic forced mode approaches the
-  analytical steady amplitude with `L2 ≈ 4.44e-4`
+  analytical steady amplitude with `L2 ≈ 4.44e-4`; the production-dissipation
+  budget closes with relative residual `≈ 5.60e-4`
 - `examples/q2d_wall_bounded_validation.py`: a no-slip rectangular box is
   forced toward the exact transient Dirichlet solution with `L2 ≈ 4.15e-4`
-  and writes Sommeria-Moreau-facing energy, enstrophy, dissipation, and
-  spectral observables for the future turbulent Q2D validation lane. The
-  companion `q2d_turbulence_observables` panel plots the wall-bounded field,
-  shell energy spectrum, and energy/dissipation proxies without claiming
-  turbulent parity.
+  and energy-budget residual `≈ 5.12e-4`; it writes
+  Sommeria-Moreau-facing energy, enstrophy, dissipation, and spectral
+  observables for the future turbulent Q2D validation lane. The companion
+  `q2d_turbulence_observables` panel plots the wall-bounded field, shell energy
+  spectrum, and energy/dissipation proxies without claiming turbulent parity.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">

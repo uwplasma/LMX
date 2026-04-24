@@ -391,6 +391,119 @@ def validate_q2d_wall_bounded_forced_solution(
     }
 
 
+def q2d_modal_energy_budget(
+    *,
+    time: np.ndarray,
+    amplitude: np.ndarray,
+    decay_rate: float,
+    mode_mean_square: float,
+    mode_peak: float = 1.0,
+    forcing_amplitude: float = 0.0,
+    relative_tolerance: float = 6.0e-2,
+) -> dict[str, float | bool]:
+    """Check the modal Q2D energy budget.
+
+    For a single Q2D mode, ``dE/dt = P - 2 lambda E`` where ``lambda`` is the
+    viscous-plus-Hartmann decay rate and ``P`` is the modal forcing production.
+    This is the compact Sommeria-Moreau-facing closure used by the validation
+    examples before adding turbulent reference spectra.
+    """
+
+    time_values = np.asarray(time, dtype=float)
+    amplitude_values = np.asarray(amplitude, dtype=float)
+    if time_values.ndim != 1 or amplitude_values.ndim != 1 or time_values.size != amplitude_values.size:
+        raise ValueError("Q2D modal energy budget expects matching 1D time and amplitude arrays")
+    if time_values.size < 3:
+        raise ValueError("Q2D modal energy budget requires at least three samples")
+    if not np.all(np.diff(time_values) > 0.0):
+        raise ValueError("Q2D modal energy budget requires strictly increasing time")
+    coefficient = amplitude_values / max(abs(float(mode_peak)), 1.0e-12)
+    mean_square = max(float(mode_mean_square), 1.0e-20)
+    energy = 0.5 * mean_square * coefficient**2
+    production = float(forcing_amplitude) * mean_square * coefficient
+    dissipation = 2.0 * float(decay_rate) * energy
+    derivative = np.gradient(energy, time_values, edge_order=2)
+    residual = derivative - (production - dissipation)
+    interior = slice(1, -1)
+    scale = max(float(np.linalg.norm((production - dissipation)[interior])), 1.0e-20)
+    relative_l2 = float(np.linalg.norm(residual[interior]) / scale)
+    return {
+        "initial_energy": float(energy[0]),
+        "final_energy": float(energy[-1]),
+        "peak_production": float(np.max(np.abs(production))),
+        "peak_dissipation": float(np.max(np.abs(dissipation))),
+        "relative_budget_l2": relative_l2,
+        "max_abs_budget_residual": float(np.max(np.abs(residual[interior]))),
+        "validation_pass": bool(relative_l2 <= relative_tolerance and np.all(energy >= -1.0e-14)),
+        "literature_target": "Sommeria-Moreau Q2D modal energy balance",
+    }
+
+
+def validate_q2d_decay_energy_budget(
+    case: Q2DDecayCase,
+    solution: Q2DDecaySolution,
+) -> dict[str, float | bool]:
+    mode_mean_square, mode_peak = _periodic_mode_statistics(
+        nx=case.nx,
+        ny=case.ny,
+        lx=case.lx,
+        ly=case.ly,
+        mode_x=case.mode_x,
+        mode_y=case.mode_y,
+    )
+    return q2d_modal_energy_budget(
+        time=solution.time,
+        amplitude=solution.amplitude_numeric,
+        decay_rate=solution.decay_rate,
+        mode_mean_square=mode_mean_square,
+        mode_peak=mode_peak,
+    )
+
+
+def validate_q2d_forced_energy_budget(
+    case: Q2DForcedCase,
+    solution: Q2DForcedSolution,
+) -> dict[str, float | bool]:
+    mode_mean_square, mode_peak = _periodic_mode_statistics(
+        nx=case.nx,
+        ny=case.ny,
+        lx=case.lx,
+        ly=case.ly,
+        mode_x=case.mode_x,
+        mode_y=case.mode_y,
+    )
+    return q2d_modal_energy_budget(
+        time=solution.time,
+        amplitude=solution.amplitude_numeric,
+        decay_rate=solution.decay_rate,
+        mode_mean_square=mode_mean_square,
+        mode_peak=mode_peak,
+        forcing_amplitude=case.forcing_amplitude,
+    )
+
+
+def validate_q2d_wall_bounded_energy_budget(
+    case: Q2DWallBoundedForcedCase,
+    solution: Q2DWallBoundedForcedSolution,
+) -> dict[str, float | bool]:
+    mode_mean_square, mode_peak = _wall_mode_statistics(
+        nx=case.nx,
+        ny=case.ny,
+        lx=case.lx,
+        ly=case.ly,
+        mode_x=case.mode_x,
+        mode_y=case.mode_y,
+    )
+    return q2d_modal_energy_budget(
+        time=solution.time,
+        amplitude=solution.amplitude_numeric,
+        decay_rate=solution.decay_rate,
+        mode_mean_square=mode_mean_square,
+        mode_peak=mode_peak,
+        forcing_amplitude=case.forcing_amplitude,
+    )
+
+
 def q2d_energy_spectrum(
     field: np.ndarray,
     *,
@@ -492,6 +605,46 @@ def q2d_turbulence_readiness_metrics(
         "validation_status": "spectral_observables_available_no_turbulent_reference",
         "research_grade_turbulence_validation_pass": False,
     }
+
+
+def _periodic_mode_statistics(
+    *,
+    nx: int,
+    ny: int,
+    lx: float,
+    ly: float,
+    mode_x: int,
+    mode_y: int,
+) -> tuple[float, float]:
+    x = np.linspace(0.0, lx, nx, endpoint=False)
+    y = np.linspace(0.0, ly, ny, endpoint=False)
+    xx, yy = np.meshgrid(x, y, indexing="ij")
+    mode = np.sin(2.0 * np.pi * mode_x * xx / lx) * np.sin(2.0 * np.pi * mode_y * yy / ly)
+    return float(np.mean(mode**2)), max(float(np.max(np.abs(mode))), 1.0e-12)
+
+
+def _wall_mode_statistics(
+    *,
+    nx: int,
+    ny: int,
+    lx: float,
+    ly: float,
+    mode_x: int,
+    mode_y: int,
+) -> tuple[float, float]:
+    x = np.linspace(0.0, lx, nx)
+    y = np.linspace(0.0, ly, ny)
+    xx, yy = np.meshgrid(x, y, indexing="ij")
+    mode = _wall_mode_shape(
+        amplitude=1.0,
+        lx=lx,
+        ly=ly,
+        mode_x=mode_x,
+        mode_y=mode_y,
+        xx=xx,
+        yy=yy,
+    )
+    return float(np.mean(mode**2)), max(float(np.max(np.abs(mode))), 1.0e-12)
 
 
 def q2d_turbulence_observables(

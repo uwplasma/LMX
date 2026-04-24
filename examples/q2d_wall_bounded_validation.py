@@ -7,6 +7,7 @@ from lmx import (
     build_q2d_wall_bounded_forced_case,
     q2d_turbulence_observables,
     solve_q2d_wall_bounded_forced,
+    validate_q2d_wall_bounded_energy_budget,
     validate_q2d_wall_bounded_forced_solution,
     write_q2d_wall_bounded_forced_plots,
     write_q2d_turbulence_observable_plots,
@@ -47,6 +48,7 @@ def run_q2d_wall_bounded_validation() -> dict[str, object]:
         ),
     ]
     validation = validate_q2d_wall_bounded_forced_solution(case, solution)
+    energy_budget = validate_q2d_wall_bounded_energy_budget(case, solution)
     turbulence_observables = q2d_turbulence_observables(
         solution.field,
         lx=case.lx,
@@ -58,6 +60,7 @@ def run_q2d_wall_bounded_validation() -> dict[str, object]:
         "case": "q2d_wall_bounded_validation",
         "plots": [path.name for path in plots],
         "validation": validation,
+        "energy_budget": energy_budget,
         "turbulence_observables": turbulence_observables,
     }
     (OUTPUT_DIR / "q2d_wall_bounded_validation_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
