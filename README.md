@@ -115,6 +115,7 @@ For larger scaling studies, use:
 
 ```bash
 python examples/strong_scaling_demo.py --output artifacts/examples/strong_scaling_cpu
+python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output artifacts/examples/extruded_solve_scaling
 python examples/strong_scaling_demo.py --remote-host office --output artifacts/examples/strong_scaling_full
 ```
 
@@ -432,6 +433,14 @@ the two-GPU path keeps the cleaner strong-scaling trend on the larger fixed
 problem.
 
 ![LMX strong scaling](docs/_static/generated/strong_scaling.png)
+
+For solver-faithful profiling, run the same example with
+`--benchmark-kind extruded_solve --profile`. That path invokes the actual
+rectangular `solve_extruded_inductionless(...)` projection loop and writes
+grid size, memory estimates, warm cell-updates per second, and optional JAX
+trace directories. The current committed figure remains the sharded
+`extruded3d` operator panel because the production projection loop does not
+yet have explicit multi-device domain decomposition.
 
 The autodiff panel summarizes two things: the mean velocity and its sensitivity
 to Hartmann number on the left, and a simple inverse-design loop recovering the

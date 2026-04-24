@@ -27,6 +27,7 @@ def _run_worker(
     nz: int,
     iterations: int,
     repeats: int,
+    profile_dir: Path | None = None,
     env: dict[str, str] | None = None,
 ) -> dict[str, object]:
     command = [
@@ -49,6 +50,7 @@ def _run_worker(
         str(repeats),
         "--output",
         str(output_path),
+        *(["--profile-dir", str(profile_dir)] if profile_dir is not None else []),
     ]
     worker_env = os.environ.copy()
     if env is not None:
@@ -71,6 +73,7 @@ def run_local_cpu_scaling(
     iterations: int,
     repeats: int,
     python_executable: str,
+    profile_dir: Path | None = None,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
@@ -92,6 +95,7 @@ def run_local_cpu_scaling(
             iterations=iterations,
             repeats=repeats,
             env=env,
+            profile_dir=profile_dir / f"cpu_{count}" if profile_dir is not None else None,
         )
         records.append(record)
     return records
@@ -168,12 +172,17 @@ def run_remote_gpu_scaling(
     iterations: int,
     repeats: int,
     python_executable: str = "python3",
+    profile_dir: Path | None = None,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(repo_root=repo_root, remote_host=remote_host, remote_dir=remote_dir)
     local_records: list[dict[str, object]] = []
     for count in device_counts:
         visible_devices = _default_visible_devices(remote_host, count)
         remote_json = f"{remote_dir}/artifacts/strong_scaling/gpu_{count}.json"
+        profile_arg = ""
+        if profile_dir is not None:
+            remote_profile = Path(remote_dir) / "artifacts" / "strong_scaling" / f"profile_gpu_{count}"
+            profile_arg = f" --profile-dir {shlex.quote(str(remote_profile))}"
         remote_command = (
             f"cd {shlex.quote(remote_dir)} && "
             f"PYTHONPATH={shlex.quote(remote_dir)} CUDA_VISIBLE_DEVICES={shlex.quote(visible_devices)} JAX_PLATFORMS=cuda "
@@ -181,6 +190,7 @@ def run_remote_gpu_scaling(
             f"--benchmark-kind {shlex.quote(benchmark_kind)} --platform GPU --num-devices {count} "
             f"{'' if nx is None else f'--nx {nx} '}--ny {ny} --nz {nz} "
             f"--iterations {iterations} --repeats {repeats} --output {shlex.quote(remote_json)}"
+            f"{profile_arg}"
         )
         subprocess.run(["ssh", remote_host, remote_command], check=True)
         local_output = out_dir / f"gpu_{count}.json"
@@ -203,6 +213,7 @@ def run_strong_scaling_demo(
     python_executable: str = sys.executable,
     remote_host: str | None = None,
     remote_dir: str = "/home/rjorge/tmp/lmx_scaling_repo",
+    profile_dir: Path | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -217,6 +228,7 @@ def run_strong_scaling_demo(
         iterations=cpu_iterations,
         repeats=repeats,
         python_executable=python_executable,
+        profile_dir=profile_dir,
     )
     if remote_host is not None:
         records.extend(
@@ -232,6 +244,7 @@ def run_strong_scaling_demo(
                 nz=gpu_problem[2],
                 iterations=gpu_iterations,
                 repeats=repeats,
+                profile_dir=profile_dir,
             )
         )
 
@@ -247,7 +260,7 @@ def run_strong_scaling_demo(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the LMX strong-scaling demo.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/examples/strong_scaling"))
-    parser.add_argument("--benchmark-kind", choices=("stencil2d", "extruded3d"), default="extruded3d")
+    parser.add_argument("--benchmark-kind", choices=("stencil2d", "extruded3d", "extruded_solve"), default="extruded3d")
     parser.add_argument("--python", type=str, default=sys.executable)
     parser.add_argument("--remote-host", type=str, default=None)
     parser.add_argument("--remote-dir", type=str, default="/home/rjorge/tmp/lmx_scaling_repo")
@@ -263,6 +276,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-nx", type=int, default=6144)
     parser.add_argument("--gpu-ny", type=int, default=96)
     parser.add_argument("--gpu-nz", type=int, default=96)
+    parser.add_argument("--profile", action="store_true", help="Collect a JAX trace for the first repeat of each worker.")
     args = parser.parse_args(argv)
 
     shared_iterations = args.iterations
@@ -273,19 +287,32 @@ def main(argv: list[str] | None = None) -> int:
     if gpu_iterations is None:
         gpu_iterations = 2048
 
+    cpu_problem = (args.cpu_nx, args.cpu_ny, args.cpu_nz)
+    gpu_problem = (args.gpu_nx, args.gpu_ny, args.gpu_nz)
+    if args.benchmark_kind == "extruded_solve":
+        if cpu_problem == (2048, 64, 64):
+            cpu_problem = (48, 24, 24)
+        if gpu_problem == (6144, 96, 96):
+            gpu_problem = (96, 32, 32)
+        if args.iterations is None and args.cpu_iterations is None:
+            cpu_iterations = 12
+        if args.iterations is None and args.gpu_iterations is None:
+            gpu_iterations = 12
+
     run_strong_scaling_demo(
         out_dir=args.output,
         benchmark_kind=args.benchmark_kind,
         cpu_counts=tuple(int(value) for value in args.cpu_counts.split(",") if value),
         gpu_counts=tuple(int(value) for value in args.gpu_counts.split(",") if value),
-        cpu_problem=(args.cpu_nx, args.cpu_ny, args.cpu_nz),
-        gpu_problem=(args.gpu_nx, args.gpu_ny, args.gpu_nz),
+        cpu_problem=cpu_problem,
+        gpu_problem=gpu_problem,
         cpu_iterations=cpu_iterations,
         gpu_iterations=gpu_iterations,
         python_executable=args.python,
         remote_host=args.remote_host,
         remote_dir=args.remote_dir,
         repeats=args.repeats,
+        profile_dir=args.output / "profiles" if args.profile else None,
     )
     return 0
 

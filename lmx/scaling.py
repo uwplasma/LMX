@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import json
 import platform
 import time
@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
+from .fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
 from .mesh import generate_rect_duct_mesh
 
 
@@ -30,6 +31,12 @@ class StrongScalingRecord:
     jax_version: str
     nx: int | None = None
     benchmark_kind: str = "stencil2d"
+    operator_path: str = "synthetic_stencil2d"
+    total_cells: int | None = None
+    cell_updates: int | None = None
+    warm_cell_updates_per_second: float | None = None
+    memory_bytes_estimate: int | None = None
+    profile_path: str | None = None
 
 
 def _build_operator_problem(ny: int, nz: int) -> tuple[np.ndarray, ...]:
@@ -64,6 +71,32 @@ def _build_extruded_operator_problem(nx: int, ny: int, nz: int) -> tuple[np.ndar
     w = (0.08 * np.sin(np.pi * xx) * np.cos(np.pi * yy)).astype(np.float32)
     phi = (0.1 * np.cos(0.5 * np.pi * xx) * np.sin(np.pi * yy) * np.sin(np.pi * zz)).astype(np.float32)
     return u, v, w, phi, forcing, sigma
+
+
+def _array_nbytes(array: object) -> int:
+    shape = getattr(array, "shape", ())
+    dtype = getattr(array, "dtype", np.dtype(float))
+    try:
+        return int(np.prod(shape, dtype=np.int64) * np.dtype(dtype).itemsize)
+    except TypeError:
+        return 0
+
+
+def _bundle_memory_bytes(bundle: object) -> int:
+    fields = (
+        "u",
+        "v",
+        "w",
+        "p",
+        "phi",
+        "jx",
+        "jy",
+        "jz",
+        "lorentz_x",
+        "lorentz_y",
+        "lorentz_z",
+    )
+    return sum(_array_nbytes(getattr(bundle, name, None)) for name in fields)
 
 
 def _row_or_replicated_sharding(mesh: Mesh, shape: tuple[int, ...], num_devices: int) -> NamedSharding:
@@ -167,6 +200,11 @@ def benchmark_sharded_stencil(
         mean_seconds=sum(timings) / len(timings),
         python_version=platform.python_version(),
         jax_version=jax.__version__,
+        operator_path="synthetic_stencil2d",
+        total_cells=ny * nz,
+        cell_updates=ny * nz * iterations,
+        warm_cell_updates_per_second=(ny * nz * iterations) / max(min(timings[1:] or timings), 1.0e-20),
+        memory_bytes_estimate=sum(_array_nbytes(array) for array in (field, potential, forcing)),
     )
 
 
@@ -225,6 +263,114 @@ def benchmark_sharded_extruded_operator(
         python_version=platform.python_version(),
         jax_version=jax.__version__,
         benchmark_kind="extruded3d",
+        operator_path="sharded_extruded_operator_surrogate",
+        total_cells=nx * ny * nz,
+        cell_updates=nx * ny * nz * iterations,
+        warm_cell_updates_per_second=(nx * ny * nz * iterations) / max(min(timings[1:] or timings), 1.0e-20),
+        memory_bytes_estimate=sum(_array_nbytes(array) for array in (u, v, w, phi, forcing, sigma)),
+    )
+
+
+def benchmark_extruded_inductionless_solve(
+    *,
+    nx: int = 48,
+    ny: int = 24,
+    nz: int = 24,
+    ha_peak: float = 20.0,
+    max_steps: int = 12,
+    potential_iterations: int = 24,
+    coupling_iterations: int = 4,
+    repeats: int = 2,
+    num_devices: int | None = None,
+    profile_dir: str | Path | None = None,
+) -> StrongScalingRecord:
+    """Benchmark the executable rectangular ``extruded_inductionless`` solve path.
+
+    This is intentionally solver-faithful rather than a synthetic sharded
+    stencil. It records the number of visible devices for the launched worker,
+    but the current solver path does not yet perform explicit multi-device
+    domain decomposition.
+    """
+
+    devices = jax.devices()
+    if not devices:
+        raise RuntimeError("No JAX devices are available for scaling benchmark.")
+    if num_devices is None:
+        num_devices = len(devices)
+    if num_devices < 1 or num_devices > len(devices):
+        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
+
+    problem = build_square_duct_extruded_problem(
+        ha_peak=ha_peak,
+        nx_stations=nx,
+        ny=ny,
+        nz=nz,
+    )
+    case = replace(
+        problem.case,
+        time_stepper=replace(
+            problem.case.time_stepper,
+            max_steps=max_steps,
+            potential_iterations=potential_iterations,
+        ),
+        solver=replace(
+            problem.case.solver,
+            coupling_iterations=coupling_iterations,
+        ),
+    )
+    problem = replace(problem, case=case)
+    outer_steps = max(2, min(max_steps, max(6, coupling_iterations * 2)))
+
+    timings: list[float] = []
+    last_bundle = None
+    profile_path: Path | None = None
+    for repeat_index in range(repeats):
+        trace_started = False
+        if profile_dir is not None and repeat_index == 0:
+            profile_path = Path(profile_dir)
+            profile_path.mkdir(parents=True, exist_ok=True)
+            try:
+                jax.profiler.start_trace(str(profile_path))
+                trace_started = True
+            except Exception:
+                trace_started = False
+        start = time.perf_counter()
+        try:
+            solution = solve_extruded_inductionless(problem)
+            jax.block_until_ready((solution.bundle.u, solution.bundle.phi, solution.bundle.jx))
+        finally:
+            if trace_started:
+                try:
+                    jax.profiler.stop_trace()
+                except Exception:
+                    pass
+        timings.append(time.perf_counter() - start)
+        last_bundle = solution.bundle
+
+    total_cells = nx * ny * nz
+    cell_updates = total_cells * outer_steps
+    warm_seconds = min(timings[1:] or timings)
+    return StrongScalingRecord(
+        backend=jax.default_backend(),
+        device_kind=devices[0].device_kind,
+        num_devices=num_devices,
+        nx=nx,
+        ny=ny,
+        nz=nz,
+        iterations=outer_steps,
+        repeats=repeats,
+        cold_seconds=timings[0],
+        warm_seconds=warm_seconds,
+        mean_seconds=sum(timings) / len(timings),
+        python_version=platform.python_version(),
+        jax_version=jax.__version__,
+        benchmark_kind="extruded_solve",
+        operator_path="solve_extruded_inductionless",
+        total_cells=total_cells,
+        cell_updates=cell_updates,
+        warm_cell_updates_per_second=cell_updates / max(warm_seconds, 1.0e-20),
+        memory_bytes_estimate=_bundle_memory_bytes(last_bundle) if last_bundle is not None else None,
+        profile_path=str(profile_path) if profile_path is not None else None,
     )
 
 

@@ -118,3 +118,66 @@ def test_run_strong_scaling_worker_covers_stencil_branch(monkeypatch, tmp_path: 
     payload = json.loads(output_path.read_text())
     assert payload["benchmark_kind"] == "stencil2d"
     assert payload["num_devices"] == 2
+
+
+def test_run_strong_scaling_worker_covers_solver_faithful_branch(monkeypatch, tmp_path: Path):
+    def fake_benchmark_extruded_inductionless_solve(**kwargs):
+        assert kwargs["nx"] == 12
+        assert kwargs["ny"] == 10
+        assert kwargs["nz"] == 8
+        assert kwargs["max_steps"] == 6
+        assert kwargs["repeats"] == 1
+        assert kwargs["num_devices"] == 1
+        assert kwargs["profile_dir"] == tmp_path / "profile"
+        return StrongScalingRecord(
+            backend="cpu",
+            device_kind="cpu",
+            num_devices=1,
+            ny=10,
+            nz=8,
+            iterations=6,
+            repeats=1,
+            cold_seconds=0.5,
+            warm_seconds=0.5,
+            mean_seconds=0.5,
+            python_version="3.x",
+            jax_version="0.x",
+            nx=12,
+            benchmark_kind="extruded_solve",
+            operator_path="solve_extruded_inductionless",
+        )
+
+    monkeypatch.setattr(
+        run_strong_scaling_worker,
+        "benchmark_extruded_inductionless_solve",
+        fake_benchmark_extruded_inductionless_solve,
+    )
+    output_path = tmp_path / "worker_solve.json"
+
+    rc = run_strong_scaling_worker.main(
+        [
+            "--benchmark-kind",
+            "extruded_solve",
+            "--nx",
+            "12",
+            "--ny",
+            "10",
+            "--nz",
+            "8",
+            "--iterations",
+            "6",
+            "--repeats",
+            "1",
+            "--num-devices",
+            "1",
+            "--profile-dir",
+            str(tmp_path / "profile"),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert rc == 0
+    payload = json.loads(output_path.read_text())
+    assert payload["benchmark_kind"] == "extruded_solve"
+    assert payload["operator_path"] == "solve_extruded_inductionless"

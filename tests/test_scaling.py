@@ -1,7 +1,9 @@
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 from jax.sharding import Mesh, NamedSharding
@@ -13,6 +15,7 @@ from lmx.scaling import (
     _factor_device_mesh,
     _row_or_replicated_sharding,
     _two_axis_mesh_and_sharding,
+    benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
     benchmark_sharded_stencil,
     write_scaling_report,
@@ -53,11 +56,59 @@ def test_benchmark_sharded_extruded_operator_runs_on_single_device():
     assert record.ny == 12
     assert record.nz == 10
     assert record.benchmark_kind == "extruded3d"
+    assert record.operator_path == "sharded_extruded_operator_surrogate"
+    assert record.total_cells == 16 * 12 * 10
 
 
 def test_benchmark_sharded_extruded_operator_rejects_invalid_device_count():
     with pytest.raises(ValueError):
         benchmark_sharded_extruded_operator(nx=16, ny=12, nz=10, iterations=1, repeats=1, num_devices=max(2, len(jax.devices()) + 1))
+
+
+def test_benchmark_extruded_inductionless_solve_records_solver_path(monkeypatch: pytest.MonkeyPatch):
+    calls = []
+
+    def fake_solve(problem):
+        calls.append(problem)
+        shape = (
+            problem.case.geometry.nx,
+            problem.case.geometry.ny,
+            problem.case.geometry.nz,
+        )
+        bundle = SimpleNamespace(
+            u=jnp.ones(shape),
+            v=jnp.zeros(shape),
+            w=jnp.zeros(shape),
+            p=jnp.zeros(shape),
+            phi=jnp.zeros(shape),
+            jx=jnp.zeros(shape),
+            jy=jnp.zeros(shape),
+            jz=jnp.zeros(shape),
+            lorentz_x=jnp.zeros(shape),
+            lorentz_y=jnp.zeros(shape),
+            lorentz_z=jnp.zeros(shape),
+        )
+        return SimpleNamespace(bundle=bundle)
+
+    monkeypatch.setattr(scaling, "solve_extruded_inductionless", fake_solve)
+
+    record = benchmark_extruded_inductionless_solve(
+        nx=6,
+        ny=5,
+        nz=4,
+        max_steps=3,
+        potential_iterations=2,
+        coupling_iterations=1,
+        repeats=1,
+        num_devices=1,
+    )
+
+    assert calls
+    assert record.benchmark_kind == "extruded_solve"
+    assert record.operator_path == "solve_extruded_inductionless"
+    assert record.total_cells == 6 * 5 * 4
+    assert record.cell_updates == 6 * 5 * 4 * record.iterations
+    assert record.memory_bytes_estimate is not None and record.memory_bytes_estimate > 0
 
 
 def test_default_visible_devices_uses_highest_indices(monkeypatch: pytest.MonkeyPatch):

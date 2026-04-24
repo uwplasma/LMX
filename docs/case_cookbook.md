@@ -119,11 +119,14 @@ Hartmann or Hunt solve and matching overview plots.
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
 JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
 python examples/strong_scaling_demo.py --remote-host office --output ./artifacts/examples/strong_scaling
+python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
 ```
 
 Routine CLI runs inherit the active JAX backend from the shell, while
 `examples/strong_scaling_demo.py` is the main path for explicit
-CPU and GPU scaling studies.
+CPU and GPU scaling studies. Use `--benchmark-kind extruded_solve` for the
+actual rectangular `extruded_inductionless` projection path, and the default
+`extruded3d` mode for the explicitly sharded dense-operator scaling panel.
 
 ## Restart
 

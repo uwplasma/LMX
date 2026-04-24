@@ -216,6 +216,13 @@ refer to the Samper et al. taxonomy.
    carry finite-difference gradient checks, JIT/eager agreement, batched
    objective consistency, and at least one pressure-drop or field-design
    inverse problem.
+   The scaling lane now has a separate `extruded_solve` benchmark kind that
+   invokes the real rectangular `solve_extruded_inductionless(...)` projection
+   path, records memory-relevant grid data and warm cell-update throughput, and
+   can write JAX traces. The remaining performance blocker is algorithmic:
+   explicit domain decomposition or a `shard_map`/halo path is still needed
+   before the production projection loop can support final multi-device strong
+   scaling claims.
 7. Split large modules after behavior is locked.
    Refactor `fringing`, `autodiff`, `plotting`, `solvers`, and `validation`
    only behind passing tests and stable public import facades.

@@ -37,16 +37,24 @@ cross-device communication, compile overhead, or kernel launch overhead.
 
 ## What is benchmarked
 
-The strong-scaling workflow benchmarks a fixed-iteration coupled operator on
-the same global cross-section while increasing the number of devices:
+The strong-scaling workflow now has two explicit benchmark kinds:
 
-- local CPU runs use logical CPU devices via `XLA_FLAGS`
-- multi-GPU runs use JAX sharding over the first mesh dimension
+- `extruded_solve`
+  - runs the actual rectangular `solve_extruded_inductionless(...)` path
+  - records grid size, estimated array memory, warm cell-updates per second,
+    and optional JAX trace directory
+  - is the solver-faithful timing gate for release candidates
+- `extruded3d`
+  - runs the sharded fixed-iteration MHD operator surrogate used for the
+    current strong-scaling figure
+  - keeps explicit multi-device sharding over the fixed global grid
+  - remains useful for CPU/GPU sharding studies while the production solver
+    is still being moved toward explicit domain decomposition
 
-The benchmark applies repeated viscous, electric-potential, and Lorentz-like
-updates on a structured cross-section. It is still a kernel benchmark rather
-than a fully domain-decomposed 3D fringing solver, but it is closer to the
-arithmetic mix of the current solver family than the earlier Jacobi-only path.
+This distinction matters for publication claims. `extruded_solve` is the
+research-code runtime evidence because it uses the same projection loop as the
+examples. `extruded3d` is the scaling-algorithm evidence because it exposes the
+current multi-device sharding behavior on a denser fixed operator.
 
 ## Run the benchmark
 
@@ -54,6 +62,17 @@ Local CPU only:
 
 ```bash
 python examples/strong_scaling_demo.py --output artifacts/examples/strong_scaling_cpu
+```
+
+Solver-faithful rectangular `extruded_inductionless` timing with a JAX trace:
+
+```bash
+python examples/strong_scaling_demo.py \
+  --benchmark-kind extruded_solve \
+  --cpu-counts 1,2,4 \
+  --repeats 2 \
+  --profile \
+  --output artifacts/examples/extruded_solve_scaling
 ```
 
 Local CPU plus a remote GPU host reachable over SSH:
@@ -67,6 +86,7 @@ python examples/strong_scaling_demo.py \
 The example writes:
 
 - raw JSON timing records
+- optional JAX trace directories under `profiles/`
 - `strong_scaling_summary.json`
 - `strong_scaling.png`
 - `strong_scaling.pdf`
@@ -150,6 +170,11 @@ host devices. The next CPU scaling benchmark should therefore move closer to
 the executable `extruded_inductionless` projection loop or a higher-intensity
 3D operator path rather than relying on the present host-device sharding curve
 alone.
+
+That solver-faithful entry point is now available as
+`--benchmark-kind extruded_solve`. Until the production projection loop has
+explicit multi-device domain decomposition, treat `extruded_solve` device-count
+sweeps as backend/runtime diagnostics rather than final strong-scaling claims.
 
 ## Recent compatibility and platform validation
 

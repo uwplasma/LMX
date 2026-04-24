@@ -31,6 +31,7 @@ python examples/straight_duct_profile_comparison.py
 python examples/freemhd_closed_channel_parity.py
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
+python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
 python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
 python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
 python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
@@ -113,8 +114,14 @@ Strong scaling:
 
 ```bash
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
+python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
 python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output ./artifacts/examples/strong_scaling_full
 ```
+
+Use `--benchmark-kind extruded_solve` when the timing evidence needs to follow
+the executable rectangular `solve_extruded_inductionless(...)` projection path.
+The default `extruded3d` benchmark remains the explicitly sharded dense-operator
+path used for strong-scaling panels.
 
 Standard CLI runs can also select the execution backend directly:
 
