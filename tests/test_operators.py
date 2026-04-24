@@ -29,6 +29,17 @@ def test_gradient_of_linear_field():
     assert jnp.allclose(gz[2:-2, 2:-2], -3.0, atol=5e-2)
 
 
+def test_gradient_preserves_float32_field_dtype_on_float64_mesh():
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=8, nz=8)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    field = (0.25 * y - 0.5 * z).astype(jnp.float32)
+
+    gy, gz = gradient_scalar(field, mesh)
+
+    assert gy.dtype == field.dtype
+    assert gz.dtype == field.dtype
+
+
 def test_gradient_of_linear_field_on_clustered_mesh_is_exact_near_boundaries():
     mesh = generate_layered_duct_mesh(
         width=2.0,

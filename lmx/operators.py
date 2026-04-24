@@ -40,12 +40,14 @@ def center_spacing_z(mesh: StructuredMesh) -> jnp.ndarray:
 
 
 def gradient_scalar(field: jnp.ndarray, mesh: StructuredMesh) -> tuple[jnp.ndarray, jnp.ndarray]:
-    delta_y = center_spacing_y(mesh)
-    delta_z = center_spacing_z(mesh)
+    y_centers = mesh.y_centers.astype(field.dtype)
+    z_centers = mesh.z_centers.astype(field.dtype)
+    delta_y = center_spacing_y(mesh).astype(field.dtype)
+    delta_z = center_spacing_z(mesh).astype(field.dtype)
     fy = jnp.zeros_like(field)
     fz = jnp.zeros_like(field)
-    fy = fy.at[1:-1, :].set((field[2:, :] - field[:-2, :]) / (mesh.y_centers[2:, None] - mesh.y_centers[:-2, None]))
-    fz = fz.at[:, 1:-1].set((field[:, 2:] - field[:, :-2]) / (mesh.z_centers[None, 2:] - mesh.z_centers[None, :-2]))
+    fy = fy.at[1:-1, :].set((field[2:, :] - field[:-2, :]) / (y_centers[2:, None] - y_centers[:-2, None]))
+    fz = fz.at[:, 1:-1].set((field[:, 2:] - field[:, :-2]) / (z_centers[None, 2:] - z_centers[None, :-2]))
     if field.shape[0] > 1:
         fy = fy.at[0, :].set((field[1, :] - field[0, :]) / delta_y[0])
         fy = fy.at[-1, :].set((field[-1, :] - field[-2, :]) / delta_y[-1])

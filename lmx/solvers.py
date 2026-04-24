@@ -569,12 +569,13 @@ def _enforce_velocity_bc(
     *,
     interpolate_direct_fluid_walls: bool = False,
 ) -> jnp.ndarray:
-    u = jnp.where(fluid_mask, u, 0.0)
+    zero = jnp.asarray(0.0, dtype=u.dtype)
+    u = jnp.where(fluid_mask, u, zero)
     if not interpolate_direct_fluid_walls:
-        u = u.at[0, :].set(0.0)
-        u = u.at[-1, :].set(0.0)
-        u = u.at[:, 0].set(0.0)
-        u = u.at[:, -1].set(0.0)
+        u = u.at[0, :].set(zero)
+        u = u.at[-1, :].set(zero)
+        u = u.at[:, 0].set(zero)
+        u = u.at[:, -1].set(zero)
         return u
     direct_west = fluid_mask[0, :]
     direct_east = fluid_mask[-1, :]
@@ -586,13 +587,13 @@ def _enforce_velocity_bc(
         west_scale = jnp.where(
             direct_west,
             west_ratio * fluid_mask[1, :].astype(u.dtype),
-            0.0,
-        )
+            zero,
+        ).astype(u.dtype)
         east_scale = jnp.where(
             direct_east,
             east_ratio * fluid_mask[-2, :].astype(u.dtype),
-            0.0,
-        )
+            zero,
+        ).astype(u.dtype)
         u = u.at[0, :].set(jnp.where(direct_west, west_scale * u[1, :], u[0, :]))
         u = u.at[-1, :].set(jnp.where(direct_east, east_scale * u[-2, :], u[-1, :]))
     if u.shape[1] > 1:
@@ -601,13 +602,13 @@ def _enforce_velocity_bc(
         south_scale = jnp.where(
             direct_south,
             south_ratio * fluid_mask[:, 1].astype(u.dtype),
-            0.0,
-        )
+            zero,
+        ).astype(u.dtype)
         north_scale = jnp.where(
             direct_north,
             north_ratio * fluid_mask[:, -2].astype(u.dtype),
-            0.0,
-        )
+            zero,
+        ).astype(u.dtype)
         u = u.at[:, 0].set(jnp.where(direct_south, south_scale * u[:, 1], u[:, 0]))
         u = u.at[:, -1].set(jnp.where(direct_north, north_scale * u[:, -2], u[:, -1]))
     return u
