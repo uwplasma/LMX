@@ -217,6 +217,9 @@ refer to the Samper et al. taxonomy.
    behavior; the first Hunt hybrid-grid probe increased side-layer resolution
    but worsened the processed-slice cuts and became substantially more
    expensive.
+   The layer gate now reports Hartmann/side-layer cell ratios, cell deficits,
+   and a minimum mesh-refinement factor, so high-`Ha` failures can be classified
+   as mesh under-resolution before changing solver physics.
 3. Close conservative-current parity.
    Every fully developed and extruded solver family should expose diagnostics
    that can be compared with the FreeMHD-style conservative face-current

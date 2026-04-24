@@ -262,14 +262,25 @@ def duct_layer_resolution_gate(
             "layer_resolution_pass": False,
             "min_required_hartmann_layer_cells": float(min_hartmann_cells),
             "min_required_side_layer_cells": float(min_side_cells),
+            "hartmann_layer_cell_ratio": 0.0,
+            "side_layer_cell_ratio": 0.0,
+            "minimum_mesh_refinement_factor": 0.0,
         }
     hartmann_pass = metrics["hartmann_layer_cells"] >= min_hartmann_cells
     side_pass = metrics["side_layer_cells"] >= min_side_cells
+    hartmann_ratio = metrics["hartmann_layer_cells"] / max(float(min_hartmann_cells), 1.0e-20)
+    side_ratio = metrics["side_layer_cells"] / max(float(min_side_cells), 1.0e-20)
+    limiting_ratio = min(hartmann_ratio, side_ratio)
     return {
         **metrics,
         "layer_resolution_supported": True,
         "min_required_hartmann_layer_cells": float(min_hartmann_cells),
         "min_required_side_layer_cells": float(min_side_cells),
+        "hartmann_layer_cell_deficit": max(float(min_hartmann_cells) - metrics["hartmann_layer_cells"], 0.0),
+        "side_layer_cell_deficit": max(float(min_side_cells) - metrics["side_layer_cells"], 0.0),
+        "hartmann_layer_cell_ratio": float(hartmann_ratio),
+        "side_layer_cell_ratio": float(side_ratio),
+        "minimum_mesh_refinement_factor": 1.0 / max(float(limiting_ratio), 1.0e-20),
         "hartmann_layer_resolution_pass": bool(hartmann_pass),
         "side_layer_resolution_pass": bool(side_pass),
         "layer_resolution_pass": bool(hartmann_pass and side_pass),

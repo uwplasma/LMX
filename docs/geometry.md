@@ -189,6 +189,10 @@ linear solves.
   default gate requires at least eight cells across the Hartmann layer and six
   cells across the side layer before a straight-duct result should be promoted
   as benchmark-quality
+- inspect `hartmann_layer_cell_ratio`, `side_layer_cell_ratio`, and
+  `minimum_mesh_refinement_factor` when a high-`Ha` comparison fails; ratios
+  below one indicate an under-resolved layer rather than a solver-physics
+  parity claim
 
 Current bent-pipe baseline:
 

@@ -206,7 +206,9 @@ def test_layer_resolution_metrics_reject_unsupported_or_empty_fluid_meshes():
     case = make_hartmann_case(ha=20.0, ny=4, nz=4)
     x_field_case = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
     assert duct_layer_resolution_metrics(x_field_case, _build_mesh(x_field_case)) == {}
-    assert duct_layer_resolution_gate(x_field_case, _build_mesh(x_field_case))["layer_resolution_supported"] is False
+    unsupported_gate = duct_layer_resolution_gate(x_field_case, _build_mesh(x_field_case))
+    assert unsupported_gate["layer_resolution_supported"] is False
+    assert unsupported_gate["minimum_mesh_refinement_factor"] == pytest.approx(0.0)
 
     empty_mesh = SimpleNamespace(
         y_centers=jnp.asarray([-0.5, 0.5]),
@@ -342,9 +344,14 @@ def test_duct_layer_resolution_gate_marks_publication_mesh_readiness():
     retained_gate = duct_layer_resolution_gate(retained_case, _build_mesh(retained_case))
 
     assert coarse_gate["layer_resolution_pass"] is False
+    assert coarse_gate["minimum_mesh_refinement_factor"] > 1.0
+    assert coarse_gate["hartmann_layer_cell_ratio"] < 1.0 or coarse_gate["side_layer_cell_ratio"] < 1.0
     assert retained_gate["hartmann_layer_resolution_pass"] is True
     assert retained_gate["side_layer_resolution_pass"] is True
     assert retained_gate["layer_resolution_pass"] is True
+    assert retained_gate["hartmann_layer_cell_deficit"] == pytest.approx(0.0)
+    assert retained_gate["side_layer_cell_deficit"] == pytest.approx(0.0)
+    assert retained_gate["minimum_mesh_refinement_factor"] <= 1.0
 
 
 def test_validation_summary_includes_latest_potential_residual():
