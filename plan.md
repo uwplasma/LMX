@@ -38,9 +38,10 @@ Ship a research-grade `1.0` inductionless MHD code with:
 3. Harden and extend the first true `extruded_inductionless` solver slice into
    a broader production 3D family.
 4. Extend the differentiable lane beyond the shipped Hartmann example set.
-5. Replace the current branch-sensitive straight-duct manuscript lane with a
-   more faithful validation path if the remaining Shercliff/Hunt error plateau
-   stays above the accepted `L2 <= 1.2e-2` release target.
+5. Close the last straight-duct external-parity deltas: the pressure-gradient
+   FreeMHD paper-slice lane is now near the accepted `L2 <= 1.2e-2` target,
+   while the constant-`Q` / `flow_rate` path still needs a faithful constrained
+   drive update.
 
 ## Evidence pass and closeout sequence
 
@@ -85,6 +86,9 @@ Paper-ready or close to paper-ready:
   interface/coefficient-jump cases
 - retained Hartmann/Shercliff/Hunt analytical profile overlays at the accepted
   `L2 <= 1.2e-2` release target for the current reader-facing cuts
+- pressure-gradient FreeMHD paper-slice observable parity for straight ducts,
+  with dominant velocity/current/Lorentz cuts now at roughly `5e-3` to
+  `1.3e-2` on the retained boundary-layer-resolved mesh
 - dense internal rectangular Benchmark B fringing conservation metrics
 - layered Benchmark B closure on mirror-aware current/pressure observables
 - Q2D decay, forced, and wall-bounded reduced validation examples
@@ -95,8 +99,9 @@ Paper-ready or close to paper-ready:
 
 Demonstrated but not yet research-grade validation:
 
-- FreeMHD paper-slice observable parity for fully developed ducts, especially
-  the physical constant-`Q` / `flow_rate` path and `potE`, `J`, `J×B` cuts
+- the physical constant-`Q` / `flow_rate` FreeMHD path for fully developed
+  ducts; the pressure-gradient paper-slice lane is now close, but the
+  constrained-flow drive still needs the same observable-level parity
 - mapped-pipe external parity against the high-`Ha`, high-`Re` Bühler case;
   this is now explicitly future work, not a blocker for the current closeout
 - full Benchmark C turbulent observables
