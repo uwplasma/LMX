@@ -31,6 +31,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Parity output: `{payload['parity_output'] or '-'}`",
     ]
     metrics = payload.get("parity_report", {}).get("metrics", {})
+    observable_gate = payload.get("parity_report", {}).get("observable_gate", {})
     if metrics:
         lines.extend(
             [
@@ -40,6 +41,18 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
                 f"- Max velocity-profile L2: `{metrics.get('reference_sample_y_l2_error', '-')}`",
                 f"- Max secondary-profile L2: `{metrics.get('reference_sample_z_l2_error', '-')}`",
                 f"- Max U abs diff: `{metrics.get('u_max_abs_diff', '-')}`",
+            ]
+        )
+    if observable_gate:
+        lines.extend(
+            [
+                "",
+                "## Observable Gate",
+                "",
+                f"- Research-grade pass: `{observable_gate.get('research_grade_validation_pass', '-')}`",
+                f"- Offenders: `{observable_gate.get('observable_offender_count', '-')}`",
+                f"- Missing observables: `{observable_gate.get('missing_observable_count', '-')}`",
+                f"- Low-signal cuts: `{observable_gate.get('low_signal_count', '-')}`",
             ]
         )
     path.write_text("\n".join(lines) + "\n")
@@ -107,6 +120,7 @@ def run_suite(
     y_errors: list[float] = []
     z_errors: list[float] = []
     u_diffs: list[float] = []
+    observable_gate: dict[str, Any] | None = None
 
     if has_transient_reference:
         from examples import freemhd_closed_channel_parity as transient
@@ -130,6 +144,9 @@ def run_suite(
         observable.REFERENCE_ROOT = processed_root
         observable_summary = observable.run_freemhd_closed_channel_observable_parity()
         summary["runs"]["closed_channel_observable_parity"] = observable_summary
+        gate = observable_summary.get("observable_gate")
+        if isinstance(gate, dict):
+            observable_gate = gate
         summary["parity_output"] = str(observable.OUTPUT_DIR / "freemhd_closed_channel_observable_parity_summary.json")
         records = list(observable_summary.get("records", []))
         y_value = _observable_max_l2(records, axis="y")
@@ -144,6 +161,8 @@ def run_suite(
         "reference_sample_z_l2_error": max(z_errors) if z_errors else None,
         "u_max_abs_diff": max(u_diffs) if u_diffs else None,
     }
+    if observable_gate is not None:
+        summary["parity_report"]["observable_gate"] = observable_gate
     return summary
 
 

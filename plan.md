@@ -260,7 +260,9 @@ refer to the Samper et al. taxonomy.
    Trusted Publishing to TestPyPI on manual dispatch or PyPI on a published
    GitHub Release. The remaining release-administration step is to configure
    the `testpypi` and `pypi` GitHub environments and the matching PyPI trusted
-   publisher records before the first public release.
+   publisher records before the first public release. The FreeMHD parity
+   release summary now carries the field-level `observable_gate`, so release
+   reports expose missing-observable and over-target counts directly.
 
 ## Finish-line gates
 

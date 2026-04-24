@@ -47,3 +47,31 @@ def test_observable_max_l2_reads_nested_axis_payloads():
 
     assert run_freemhd_parity_suite._observable_max_l2(records, axis="y") == 0.03
     assert run_freemhd_parity_suite._observable_max_l2(records, axis="z") == 0.02
+
+
+def test_freemhd_parity_markdown_includes_observable_gate(tmp_path: Path):
+    path = tmp_path / "summary.md"
+    run_freemhd_parity_suite._write_markdown(
+        path,
+        {
+            "status": "completed",
+            "reason": "",
+            "case_dir": "/tmp/reference",
+            "sample_output": "/tmp/sample",
+            "parity_output": "/tmp/parity",
+            "parity_report": {
+                "metrics": {"reference_sample_y_l2_error": 0.02},
+                "observable_gate": {
+                    "research_grade_validation_pass": False,
+                    "observable_offender_count": 3,
+                    "missing_observable_count": 0,
+                    "low_signal_count": 1,
+                },
+            },
+        },
+    )
+
+    text = path.read_text()
+    assert "## Observable Gate" in text
+    assert "Research-grade pass: `False`" in text
+    assert "Offenders: `3`" in text

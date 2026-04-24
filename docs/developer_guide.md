@@ -164,6 +164,7 @@ artifact gates before package artifacts are built.
 - manual release validation:
   - run physics/regression suites
   - regenerate selected validation artifacts
+  - summarize FreeMHD observable-gate pass/fail counts in the release report
   - run broad branch coverage with `--cov-fail-under=95`
 - packaging:
   - build sdist and wheel artifacts

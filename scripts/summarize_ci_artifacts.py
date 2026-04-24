@@ -43,6 +43,10 @@ class ParitySummary:
     reference_sample_y_l2_error: float | None = None
     reference_sample_z_l2_error: float | None = None
     u_max_abs_diff: float | None = None
+    observable_gate_pass: bool | None = None
+    observable_offender_count: int | None = None
+    missing_observable_count: int | None = None
+    low_signal_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -134,6 +138,12 @@ def summarize_parity_report(report_path: str | Path) -> ParitySummary:
     payload = _load_json(report_path)
     parity_report = payload.get("parity_report", {})
     metrics = parity_report.get("metrics", {})
+    observable_gate = parity_report.get("observable_gate", {})
+    if not observable_gate and isinstance(payload.get("runs"), dict):
+        processed_run = payload["runs"].get("closed_channel_observable_parity")
+        if isinstance(processed_run, dict):
+            observable_gate = processed_run.get("observable_gate", {})
+    observable_gate = observable_gate if isinstance(observable_gate, dict) else {}
     return ParitySummary(
         status=str(payload.get("status", "")),
         reason=str(payload.get("reason", "")),
@@ -147,6 +157,18 @@ def summarize_parity_report(report_path: str | Path) -> ParitySummary:
             None if "reference_sample_z_l2_error" not in metrics else float(metrics["reference_sample_z_l2_error"])
         ),
         u_max_abs_diff=None if "u_max_abs_diff" not in metrics else float(metrics["u_max_abs_diff"]),
+        observable_gate_pass=(
+            None
+            if "research_grade_validation_pass" not in observable_gate
+            else bool(observable_gate["research_grade_validation_pass"])
+        ),
+        observable_offender_count=(
+            None if "observable_offender_count" not in observable_gate else int(observable_gate["observable_offender_count"])
+        ),
+        missing_observable_count=(
+            None if "missing_observable_count" not in observable_gate else int(observable_gate["missing_observable_count"])
+        ),
+        low_signal_count=None if "low_signal_count" not in observable_gate else int(observable_gate["low_signal_count"]),
     )
 
 
@@ -278,6 +300,26 @@ def render_markdown(
                 f"- U max abs diff: `{'-' if parity.u_max_abs_diff is None else f'{parity.u_max_abs_diff:.6g}'}`",
                 f"- Sample Y L2: `{'-' if parity.reference_sample_y_l2_error is None else f'{parity.reference_sample_y_l2_error:.6g}'}`",
                 f"- Sample Z L2: `{'-' if parity.reference_sample_z_l2_error is None else f'{parity.reference_sample_z_l2_error:.6g}'}`",
+                (
+                    "- Observable gate pass: `-`"
+                    if parity.observable_gate_pass is None
+                    else f"- Observable gate pass: `{'yes' if parity.observable_gate_pass else 'no'}`"
+                ),
+                (
+                    "- Observable offenders: `-`"
+                    if parity.observable_offender_count is None
+                    else f"- Observable offenders: `{parity.observable_offender_count}`"
+                ),
+                (
+                    "- Missing observables: `-`"
+                    if parity.missing_observable_count is None
+                    else f"- Missing observables: `{parity.missing_observable_count}`"
+                ),
+                (
+                    "- Low-signal cuts: `-`"
+                    if parity.low_signal_count is None
+                    else f"- Low-signal cuts: `{parity.low_signal_count}`"
+                ),
                 "",
             ]
         )

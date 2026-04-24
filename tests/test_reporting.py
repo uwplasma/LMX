@@ -103,6 +103,12 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
               "u_max_abs_diff": 0.01,
               "reference_sample_y_l2_error": 0.02,
               "reference_sample_z_l2_error": 0.03
+            },
+            "observable_gate": {
+              "research_grade_validation_pass": false,
+              "observable_offender_count": 2,
+              "missing_observable_count": 0,
+              "low_signal_count": 1
             }
           }
         }
@@ -155,6 +161,9 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
     assert "Combined L2" in summary["markdown"]
     assert "## Benchmark" in summary["markdown"]
     assert "## External Reference Parity" in summary["markdown"]
+    assert "Observable gate pass" in summary["markdown"]
+    assert summary["parity"]["observable_gate_pass"] is False
+    assert summary["parity"]["observable_offender_count"] == 2
     assert "## Time Convergence" in summary["markdown"]
     assert "## Control Sweep" in summary["markdown"]
     assert "## Control Grid" in summary["markdown"]
@@ -214,6 +223,7 @@ def test_summarize_parity_report(tmp_path: Path):
     summary = summarize_parity_report(path)
     assert summary.status == "skipped"
     assert summary.reason == "reference-case-unavailable"
+    assert summary.observable_gate_pass is None
 
 
 def test_summarize_sweep_report(tmp_path: Path):
