@@ -937,6 +937,66 @@ def write_cross_section_field_plots(
     return [png, pdf]
 
 
+def write_tabulated_field_reconstruction_plots(
+    *,
+    y: np.ndarray,
+    z: np.ndarray,
+    reference_field: np.ndarray,
+    tabulated_field: np.ndarray,
+    out_dir: str | Path,
+    title: str = "Tabulated-field reconstruction against analytic reference",
+) -> list[Path]:
+    """Write a diagnostic panel comparing table interpolation with reference values."""
+
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    y_values = np.asarray(y, dtype=float)
+    z_values = np.asarray(z, dtype=float)
+    reference = np.asarray(reference_field, dtype=float)
+    sampled = np.asarray(tabulated_field, dtype=float)
+    if reference.shape != sampled.shape or reference.ndim != 3 or reference.shape[-1] != 3:
+        raise ValueError("reference_field and tabulated_field must have matching (..., 3) shapes")
+    if reference.shape[:2] != (y_values.size, z_values.size):
+        raise ValueError("field shapes must match the y/z coordinate lengths")
+
+    ref_bmag = np.linalg.norm(reference, axis=-1)
+    sampled_bmag = np.linalg.norm(sampled, axis=-1)
+    magnitude_error = sampled_bmag - ref_bmag
+    component_error = sampled[..., 2] - reference[..., 2]
+    bmag_scale = max(float(np.max(np.abs(ref_bmag))), 1.0e-12)
+    err_scale = max(float(np.max(np.abs(magnitude_error))), 1.0e-12)
+    bz_err_scale = max(float(np.max(np.abs(component_error))), 1.0e-12)
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.0, 8.8), constrained_layout=True)
+    fig.suptitle(title, fontsize=18)
+
+    panels = [
+        (axes[0, 0], ref_bmag, r"analytic $|B|$", "viridis", None),
+        (axes[0, 1], sampled_bmag, r"tabulated $|B|$ at solver points", "viridis", None),
+        (axes[1, 0], magnitude_error / bmag_scale, r"relative $|B|$ error", "RdBu_r", max(err_scale / bmag_scale, 1.0e-12)),
+        (axes[1, 1], component_error / bmag_scale, r"relative $B_z$ error", "RdBu_r", max(bz_err_scale / bmag_scale, 1.0e-12)),
+    ]
+    for ax, values, label, cmap, symmetric_scale in panels:
+        if symmetric_scale is None:
+            image = ax.pcolormesh(z_values, y_values, values, shading="auto", cmap=cmap)
+        else:
+            scale = max(float(symmetric_scale), 1.0e-12)
+            image = ax.pcolormesh(z_values, y_values, values, shading="auto", cmap=cmap, vmin=-scale, vmax=scale)
+        ax.set_title(label)
+        ax.set_xlabel("z")
+        ax.set_ylabel("y")
+        ax.set_aspect("equal")
+        plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+
+    png = out_dir / "tabulated_field_reconstruction.png"
+    pdf = out_dir / "tabulated_field_reconstruction.pdf"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    return [png, pdf]
+
+
 def write_bent_pipe_overview_plots(
     solution,
     out_dir: Path,
@@ -1531,6 +1591,155 @@ def write_magnetic_obstacle_benchmark_plots(
 
     png_path = out_dir / "magnetic_obstacle_benchmark.png"
     pdf_path = out_dir / "magnetic_obstacle_benchmark.pdf"
+    fig.savefig(png_path, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
+
+
+def write_magnetic_obstacle_schematic_plots(
+    solution,
+    reference_solution,
+    out_dir: str | Path,
+    *,
+    case_title: str = "Magnetic-obstacle localized-field setup",
+) -> list[Path]:
+    """Write a setup-first magnetic-obstacle panel for docs and README use."""
+
+    _set_plot_style()
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    bundle = solution.bundle
+    reference_bundle = reference_solution.bundle
+    x = np.asarray(bundle.x, dtype=float)
+    y = np.asarray(bundle.y, dtype=float)
+    z = np.asarray(bundle.z, dtype=float)
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    if x.size == 0 or y.size == 0 or z.size == 0:
+        raise ValueError("Magnetic-obstacle schematic requires non-empty x/y/z coordinates")
+    y_edges = _centers_to_edges(y)
+    z_edges = _centers_to_edges(z)
+    peak_index = int(np.argmax(field_scale))
+    peak_x = float(x[peak_index])
+
+    yy, zz = np.meshgrid(y, z, indexing="ij")
+    field_fn = solution.problem.case.magnetic_field.fn
+    if field_fn is None:
+        bmag_cross = np.ones_like(yy)
+    else:
+        field_cross = np.asarray(field_fn(jnp.asarray(yy), jnp.asarray(zz)), dtype=float)
+        bmag_cross = np.linalg.norm(field_cross, axis=-1)
+    bmag_cross = bmag_cross / max(float(np.max(np.abs(bmag_cross))), 1.0e-12)
+
+    x_dense = np.linspace(float(x[0]), float(x[-1]), 120)
+    z_dense = np.linspace(float(z_edges[0]), float(z_edges[-1]), 80)
+    xx_dense, zz_dense = np.meshgrid(x_dense, z_dense, indexing="ij")
+    axial_scale = np.interp(x_dense, x, field_scale / max(float(np.max(field_scale)), 1.0e-12))
+    obstacle_sheet = axial_scale[:, None] * np.exp(-((zz_dense / max(0.32 * (z_edges[-1] - z_edges[0]), 1.0e-12)) ** 2))
+
+    u_peak = np.asarray(bundle.u[peak_index], dtype=float)
+    u_ref_peak = np.asarray(reference_bundle.u[peak_index], dtype=float)
+    u_norm = u_peak / max(float(np.max(np.abs(u_peak))), 1.0e-12)
+    deficit = np.maximum((u_ref_peak - u_peak) / np.maximum(np.abs(u_ref_peak), 1.0e-12), 0.0)
+    deficit_scale = max(float(np.max(deficit)), 1.0e-12)
+    center_y = int(u_peak.shape[0] // 2)
+    center_z = int(u_peak.shape[1] // 2)
+    center_deficit = np.maximum(
+        (np.asarray(reference_bundle.u[:, center_y, center_z], dtype=float) - np.asarray(bundle.u[:, center_y, center_z], dtype=float))
+        / np.maximum(np.abs(np.asarray(reference_bundle.u[:, center_y, center_z], dtype=float)), 1.0e-12),
+        0.0,
+    )
+
+    fig = plt.figure(figsize=(14.2, 8.6), constrained_layout=True)
+    grid = fig.add_gridspec(2, 2, width_ratios=[1.25, 1.0], height_ratios=[1.0, 1.0])
+    ax3d = fig.add_subplot(grid[0, 0], projection="3d")
+    ax_diagram = fig.add_subplot(grid[0, 1])
+    ax_deficit = fig.add_subplot(grid[1, 0])
+    ax_response = fig.add_subplot(grid[1, 1])
+    fig.suptitle(case_title, fontsize=18)
+
+    cmap_field = plt.cm.viridis
+    cmap_velocity = plt.cm.magma
+    norm_unit = colors.Normalize(vmin=0.0, vmax=1.0)
+
+    # Transparent duct shell.
+    x0, x1 = float(x[0]), float(x[-1])
+    y0, y1 = float(y_edges[0]), float(y_edges[-1])
+    z0, z1 = float(z_edges[0]), float(z_edges[-1])
+    for y_face in (y0, y1):
+        xx_box, zz_box = np.meshgrid([x0, x1], [z0, z1], indexing="ij")
+        ax3d.plot_surface(xx_box, np.full_like(xx_box, y_face), zz_box, color="#cbd5e1", alpha=0.08, linewidth=0.0, shade=False)
+    for z_face in (z0, z1):
+        xx_box, yy_box = np.meshgrid([x0, x1], [y0, y1], indexing="ij")
+        ax3d.plot_surface(xx_box, yy_box, np.full_like(xx_box, z_face), color="#cbd5e1", alpha=0.08, linewidth=0.0, shade=False)
+    for yy_edge in (y0, y1):
+        for zz_edge in (z0, z1):
+            ax3d.plot([x0, x1], [yy_edge, yy_edge], [zz_edge, zz_edge], color="#64748b", linewidth=0.8, alpha=0.8)
+    for xx_edge in (x0, x1):
+        for yy_edge in (y0, y1):
+            ax3d.plot([xx_edge, xx_edge], [yy_edge, yy_edge], [z0, z1], color="#64748b", linewidth=0.8, alpha=0.8)
+        for zz_edge in (z0, z1):
+            ax3d.plot([xx_edge, xx_edge], [y0, y1], [zz_edge, zz_edge], color="#64748b", linewidth=0.8, alpha=0.8)
+
+    ax3d.plot_surface(
+        xx_dense,
+        np.zeros_like(xx_dense),
+        zz_dense,
+        facecolors=cmap_field(norm_unit(obstacle_sheet)),
+        linewidth=0.0,
+        antialiased=False,
+        shade=False,
+        alpha=0.70,
+    )
+    yy_plane, zz_plane = np.meshgrid(y, z, indexing="ij")
+    ax3d.plot_surface(
+        np.full_like(yy_plane, peak_x),
+        yy_plane,
+        zz_plane,
+        facecolors=cmap_velocity(norm_unit(u_norm)),
+        linewidth=0.0,
+        antialiased=False,
+        shade=False,
+        alpha=0.98,
+    )
+    ax3d.quiver(x0, 0.0, z1 + 0.12 * (z1 - z0), x1 - x0, 0.0, 0.0, color="#111827", arrow_length_ratio=0.08, linewidth=2.0)
+    ax3d.text(0.5 * (x0 + x1), 0.0, z1 + 0.20 * (z1 - z0), "flow direction", ha="center", color="#111827", fontsize=10)
+    ax3d.set_title("Duct, localized magnetic field, and velocity slice")
+    ax3d.set_xlabel("x")
+    ax3d.set_ylabel("y")
+    ax3d.set_zlabel("z")
+    ax3d.view_init(elev=24, azim=-58)
+    ax3d.set_box_aspect((x1 - x0, y1 - y0, z1 - z0))
+
+    image = ax_diagram.pcolormesh(x_dense, z_dense, obstacle_sheet.T, shading="auto", cmap="viridis", vmin=0.0, vmax=1.0)
+    ax_diagram.add_patch(Rectangle((x0, z0), x1 - x0, z1 - z0, fill=False, edgecolor="#111827", linewidth=1.4))
+    ax_diagram.axvline(peak_x, color="#f8fafc", linestyle="--", linewidth=1.2)
+    ax_diagram.annotate("localized B obstacle", xy=(peak_x, 0.0), xytext=(x0 + 0.12 * (x1 - x0), z1 - 0.15 * (z1 - z0)), arrowprops={"arrowstyle": "->", "color": "#111827"}, color="#111827")
+    ax_diagram.annotate("u_x inlet", xy=(x0 + 0.18 * (x1 - x0), z0 + 0.18 * (z1 - z0)), xytext=(x0 + 0.02 * (x1 - x0), z0 + 0.18 * (z1 - z0)), arrowprops={"arrowstyle": "->", "color": "#111827"}, color="#111827")
+    ax_diagram.set_title("Centerplane field diagram")
+    ax_diagram.set_xlabel("x")
+    ax_diagram.set_ylabel("z")
+    fig.colorbar(image, ax=ax_diagram, fraction=0.046, pad=0.04, label=r"$B/B_{max}$")
+
+    im_def = ax_deficit.pcolormesh(z_edges, y_edges, deficit / deficit_scale, shading="auto", cmap="magma", vmin=0.0, vmax=1.0)
+    ax_deficit.contour(z, y, u_norm, levels=np.linspace(0.2, 0.95, 5), colors="white", linewidths=0.7, alpha=0.8)
+    ax_deficit.set_title(f"Velocity deficit at peak field (x={peak_x:.2f})")
+    ax_deficit.set_xlabel("z")
+    ax_deficit.set_ylabel("y")
+    ax_deficit.set_aspect("equal")
+    fig.colorbar(im_def, ax=ax_deficit, fraction=0.046, pad=0.04, label="normalized deficit")
+
+    ax_response.plot(x, field_scale / max(float(np.max(field_scale)), 1.0e-12), color="#1d4ed8", label=r"$B/B_{max}$")
+    ax_response.plot(x, center_deficit, color="#dc2626", label="centerline velocity deficit")
+    ax_response.axvline(peak_x, color="#64748b", linestyle=":", linewidth=1.0, label="peak field")
+    ax_response.set_title("Obstacle response")
+    ax_response.set_xlabel("x")
+    ax_response.set_ylabel("normalized response")
+    ax_response.legend(loc="upper right")
+
+    png_path = out_dir / "magnetic_obstacle_schematic.png"
+    pdf_path = out_dir / "magnetic_obstacle_schematic.pdf"
     fig.savefig(png_path, bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)

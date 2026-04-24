@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,13 +23,20 @@ from lmx.plotting import (
     write_interface_verification_plots,
     write_freemhd_parity_plots,
     write_magnetic_obstacle_regime_plots,
+    write_magnetic_obstacle_schematic_plots,
     write_operator_verification_plots,
     write_strong_scaling_plots,
+    write_tabulated_field_reconstruction_plots,
     write_wham_mirror_overview_plots,
     write_transient_movies,
 )
 from lmx.field_models import write_tabulated_field_npz
-from lmx.fringing import build_bent_pipe_extruded_problem, build_pipe_ogrid_extruded_problem, solve_extruded_inductionless
+from lmx.fringing import (
+    build_bent_pipe_extruded_problem,
+    build_magnetic_obstacle_rect_extruded_problem,
+    build_pipe_ogrid_extruded_problem,
+    solve_extruded_inductionless,
+)
 from lmx.solvers import _build_mesh
 
 
@@ -466,6 +474,24 @@ def test_write_cross_section_field_plots_writes_png_and_pdf(tmp_path: Path):
     assert outputs[1].exists()
 
 
+def test_write_tabulated_field_reconstruction_plots_writes_png_and_pdf(tmp_path: Path):
+    y = np.linspace(-1.0, 1.0, 9)
+    z = np.linspace(-1.0, 1.0, 11)
+    yy, zz = np.meshgrid(y, z, indexing="ij")
+    reference = np.stack([np.zeros_like(yy), 0.2 * yy, 1.0 + 0.1 * zz], axis=-1)
+    sampled = reference + 1.0e-4
+    outputs = write_tabulated_field_reconstruction_plots(
+        y=y,
+        z=z,
+        reference_field=reference,
+        tabulated_field=sampled,
+        out_dir=tmp_path,
+    )
+    assert outputs == [tmp_path / "tabulated_field_reconstruction.png", tmp_path / "tabulated_field_reconstruction.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
 def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
     bent_problem = build_bent_pipe_extruded_problem(ha_peak=4.0, bend_radius=4.0, bend_angle=1.0, nx_stations=4, nr=4, ntheta=12)
     straight_problem = build_pipe_ogrid_extruded_problem(
@@ -481,6 +507,25 @@ def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
 
     outputs = write_bent_pipe_overview_plots(bent_solution, tmp_path, straight_solution=straight_solution)
     assert outputs == [tmp_path / "bent_pipe_overview.png", tmp_path / "bent_pipe_overview.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_write_magnetic_obstacle_schematic_plots_writes_png_and_pdf(tmp_path: Path):
+    problem = build_magnetic_obstacle_rect_extruded_problem(base_bz=4.0, ny=6, nz=6, nx_stations=5)
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=3, potential_iterations=8),
+            solver=replace(problem.case.solver, coupling_iterations=3),
+        ),
+    )
+    solution = solve_extruded_inductionless(problem)
+    reference_problem = replace(problem, profile=replace(problem.profile, field_scale=jnp.zeros_like(problem.profile.field_scale)))
+    reference_solution = solve_extruded_inductionless(reference_problem)
+    outputs = write_magnetic_obstacle_schematic_plots(solution, reference_solution, tmp_path)
+    assert outputs == [tmp_path / "magnetic_obstacle_schematic.png", tmp_path / "magnetic_obstacle_schematic.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
 

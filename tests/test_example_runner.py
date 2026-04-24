@@ -1174,6 +1174,7 @@ def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
     module.COUPLING_ITERATIONS = 6
     summary = module.run_magnetic_obstacle_benchmark()
     assert summary["case"] == "magnetic_obstacle_benchmark"
+    assert (tmp_path / "magnetic_obstacle_schematic.png").exists()
     assert (tmp_path / "magnetic_obstacle_benchmark.png").exists()
     assert (tmp_path / "magnetic_obstacle_benchmark_summary.json").exists()
     assert "literature_validation" in summary

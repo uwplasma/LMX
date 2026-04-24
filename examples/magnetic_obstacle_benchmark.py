@@ -16,6 +16,7 @@ from lmx import (
     validate_magnetic_obstacle_literature_slice,
     write_extruded_overview_plots,
     write_magnetic_obstacle_benchmark_plots,
+    write_magnetic_obstacle_schematic_plots,
     write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
@@ -74,6 +75,12 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
     literature_validation = validate_magnetic_obstacle_literature_slice(solution, reference_solution)
     external_readiness = validate_magnetic_obstacle_external_readiness(solution)
     plots = [
+        *write_magnetic_obstacle_schematic_plots(
+            solution,
+            reference_solution,
+            OUTPUT_DIR,
+            case_title="Magnetic-obstacle localized-field setup and response",
+        ),
         *write_extruded_overview_plots(solution, OUTPUT_DIR, case_title="Magnetic-obstacle benchmark"),
         *write_magnetic_obstacle_benchmark_plots(
             solution,

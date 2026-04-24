@@ -11,6 +11,7 @@ from lmx.field_models import (
     sample_tabulated_field_volume,
     sample_wham_mirror_axis_profile,
     sample_wham_mirror_field,
+    tabulated_cross_section_reconstruction_metrics,
     tabulated_field_quality_metrics,
     wham_mirror_station_scale,
     write_tabulated_field_npz,
@@ -64,6 +65,30 @@ def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
     assert quality["axis_monotonic"] is True
     assert quality["validation_pass"] is True
     assert quality["interpolation_node_linf_error"] < 1.0e-12
+
+
+def test_tabulated_cross_section_reconstruction_metrics_compare_solver_points(tmp_path):
+    field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.0, base_bz=8.0, perturbation=0.1)
+    y, z, field = sample_cross_section_field(field_fn, width=2.0, height=1.0, ny=41, nz=41)
+    path = write_tabulated_field_npz(
+        tmp_path / "field.npz",
+        y=y,
+        z=z,
+        bx=field[..., 0],
+        by=field[..., 1],
+        bz=field[..., 2],
+    )
+    solver_y = np.linspace(-0.95, 0.95, 13)
+    solver_z = np.linspace(-0.45, 0.45, 11)
+    metrics = tabulated_cross_section_reconstruction_metrics(
+        path,
+        reference_field_fn=field_fn,
+        y=solver_y,
+        z=solver_z,
+    )
+    assert metrics["sample_count"] == 13 * 11
+    assert metrics["relative_l2_error"] < 1.0e-3
+    assert metrics["validation_pass"] is True
 
 
 def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):

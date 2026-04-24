@@ -231,12 +231,18 @@ The tabulated rectangular lane is exercised by
 tabulated-field quality gate: table-node interpolation error, axis
 monotonicity, finite-value fraction, normalized field magnitude, and discrete
 divergence. The current rectangular table gives zero table-node interpolation
-error and `divergence_to_field_ratio ≈ 4.81e-4`.
+error and `divergence_to_field_ratio ≈ 4.81e-4`. The README artifact now also
+checks the field at the actual solver cross-section points against the
+manufactured analytic field, giving `relative_l2_error ≈ 1.92e-5` and
+`relative_linf_error ≈ 4.18e-5`; this is the relevant gate for judging whether
+the tabulated field used by the extruded solve matches the expected values.
 
 <p align="center">
   <img src="docs/_static/generated/variable_field_tabulated_field_preview.png" alt="Tabulated magnetic field preview" width="48%">
-  <img src="docs/_static/generated/variable_field_tabulated_extruded_overview.png" alt="Tabulated-field extruded duct response" width="48%">
+  <img src="docs/_static/generated/variable_field_tabulated_reconstruction.png" alt="Tabulated magnetic field reconstruction against analytic reference" width="48%">
 </p>
+
+![Tabulated-field extruded duct response](docs/_static/generated/variable_field_tabulated_extruded_overview.png)
 
 ### Quasi-2D Hartmann-friction validation
 
@@ -279,6 +285,8 @@ below is the same LMX case with the localized magnetic obstacle removed, so the
 comparison checks whether the obstacle produces a measurable velocity deficit,
 pressure response, cross-section distortion, and clean current closure. It does
 not yet prove parity with the magnetic-obstacle literature.
+
+![LMX magnetic-obstacle setup and response](docs/_static/generated/magnetic_obstacle_schematic.png)
 
 The main driver is `examples/magnetic_obstacle_benchmark.py`. On the current
 bounded case (`24 × 24 × 17`, localized obstacle field, matched no-field
@@ -549,6 +557,29 @@ The current validation surface includes:
   `pressure_span_mirror_residual ≈ 2.67e-5`,
   `center_axial_current ≈ -8.10e-8`, and
   `center_pressure_span ≈ 9.56e-6`
+
+The remaining research-grade blockers are tracked explicitly rather than
+hidden in the figures:
+
+- high-`Ha` Hunt side-layer parity is not closed yet; the current analytical
+  ladder has Hunt `Ha = 100` side-layer `z_l2 ≈ 3.26e-2`, above the retained
+  `1.2e-2` target, so the next run is a side-layer mesh and observable ladder
+  rather than visual peak matching
+- the magnetic-obstacle section is an internal response/conservation gate until
+  a digitized or executable external reference is filled into
+  `magnetic_obstacle_reference_observables.csv`
+- the Q2D lane has modal decay, forced-mode, wall-bounded, energy-budget, and
+  spectrum diagnostics; turbulent parity remains open until those observables
+  are compared with published Q2D turbulent data and a turbulence movie is
+  generated from that run
+- the bent-pipe section is currently a low-De straight-pipe-limit check; the
+  higher-inertia Dean-vortex gate remains open, and the charge-balance residual
+  `≈ 2.15e-2` is recorded as a bounded example metric rather than a full
+  curved-pipe research validation
+- the tabulated-field rectangular lane now passes both table-node and
+  solver-point manufactured-field reconstruction; WHAM-like 3D field response
+  remains a separate open validation lane because the current pipe solve is
+  stable but still weak-response
 
 The widened bounded manual campaign is intentionally stricter than the release
 gate. On the current tree it confirms the 3D fringing set at `Ha = 10, 20, 30`

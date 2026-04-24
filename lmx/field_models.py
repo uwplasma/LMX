@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 import warnings
 from pathlib import Path
@@ -395,6 +396,62 @@ def tabulated_field_quality_metrics(path: str | Path) -> dict[str, float | bool 
         "rms_divergence": rms_divergence,
         "divergence_to_field_ratio": float(divergence_to_field_ratio),
         "validation_pass": validation_pass,
+    }
+
+
+def tabulated_cross_section_reconstruction_metrics(
+    path: str | Path,
+    *,
+    reference_field_fn: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    y: np.ndarray,
+    z: np.ndarray,
+    relative_l2_tolerance: float = 2.0e-3,
+    relative_linf_tolerance: float = 1.0e-2,
+) -> dict[str, float | bool | int | str]:
+    """Compare a 2D tabulated field against a manufactured reference field.
+
+    The generic table-node interpolation check in
+    :func:`tabulated_field_quality_metrics` proves that the NPZ payload is
+    internally self-consistent. This check is stricter for validation examples:
+    it samples the table at the actual solver or diagnostic points and compares
+    those values against the analytic field used to generate the table.
+    """
+
+    y_values = np.asarray(y, dtype=float)
+    z_values = np.asarray(z, dtype=float)
+    yy, zz = np.meshgrid(y_values, z_values, indexing="ij")
+    sampled = np.asarray(sample_tabulated_cross_section_field(path, y=yy, z=zz), dtype=float)
+    reference = np.asarray(reference_field_fn(jnp.asarray(yy), jnp.asarray(zz)), dtype=float)
+    error = sampled - reference
+    reference_norm = max(float(np.linalg.norm(reference.reshape(-1))), 1.0e-12)
+    reference_abs = max(float(np.max(np.abs(reference))), 1.0e-12)
+    relative_l2_error = float(np.linalg.norm(error.reshape(-1)) / reference_norm)
+    relative_linf_error = float(np.max(np.abs(error)) / reference_abs)
+    magnitude_error = np.linalg.norm(sampled, axis=-1) - np.linalg.norm(reference, axis=-1)
+    magnitude_scale = max(float(np.max(np.linalg.norm(reference, axis=-1))), 1.0e-12)
+    magnitude_relative_linf_error = float(np.max(np.abs(magnitude_error)) / magnitude_scale)
+    component_linf_errors = {
+        f"{name}_relative_linf_error": float(
+            np.max(np.abs(error[..., index])) / max(float(np.max(np.abs(reference[..., index]))), 1.0e-12)
+        )
+        for index, name in enumerate(("bx", "by", "bz"))
+    }
+    validation_pass = bool(
+        relative_l2_error <= relative_l2_tolerance
+        and relative_linf_error <= relative_linf_tolerance
+        and np.all(np.isfinite(sampled))
+        and np.all(np.isfinite(reference))
+    )
+    return {
+        "sample_count": int(sampled.shape[0] * sampled.shape[1]),
+        "relative_l2_error": relative_l2_error,
+        "relative_linf_error": relative_linf_error,
+        "magnitude_relative_linf_error": magnitude_relative_linf_error,
+        "relative_l2_tolerance": float(relative_l2_tolerance),
+        "relative_linf_tolerance": float(relative_linf_tolerance),
+        "validation_pass": validation_pass,
+        "validation_status": "tabulated_field_matches_manufactured_reference_at_solver_points",
+        **component_linf_errors,
     }
 
 

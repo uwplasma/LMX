@@ -169,6 +169,11 @@ refer to the Samper et al. taxonomy.
   filled `magnetic_obstacle_reference_observables.csv` is present, and emits
   the template otherwise. The remaining work is scientific data acquisition,
   not comparison plumbing.
+  A setup-first schematic artifact now exists in
+  `examples/magnetic_obstacle_benchmark.py` and the README. It shows the duct,
+  flow direction, localized field sheet, velocity slice, cross-sectional
+  deficit, and response curve before the internal response plot, so this lane
+  no longer relies on response curves alone to communicate the physics.
 - Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
   tests as verification, then add Sommeria-Moreau-style closure observables and
   literature-facing turbulent energy/decay spectra before making any turbulent
@@ -179,6 +184,12 @@ refer to the Samper et al. taxonomy.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
   against manufactured fields and at least one independent field dataset.
+  The rectangular tabulated-field lane now includes a solver-point
+  manufactured-field reconstruction gate in addition to table-node
+  interpolation. The current README artifact reports `relative_l2_error ≈
+  1.92e-5` and `relative_linf_error ≈ 4.18e-5`; the remaining open item is
+  external 3D field-response validation, especially for the WHAM-like pipe
+  response, not structured-table interpolation.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

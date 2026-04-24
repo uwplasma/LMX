@@ -367,6 +367,13 @@ and Votyakov et al., *Constrained flow around a magnetic obstacle*, even
 though the current LMX slice is still a bounded low-inertia inductionless case
 rather than a full turbulent or experimental parity benchmark.
 
+The magnetic-obstacle example now also emits
+`magnetic_obstacle_schematic.png/pdf`. That figure is deliberately setup-first:
+it shows the rectangular duct, flow direction, localized field sheet, peak-field
+velocity slice, cross-sectional deficit, and streamwise response before the
+matched no-field comparison panel. This keeps the README and docs from showing
+only response curves without the physical configuration.
+
 Current bounded shape summary:
 
 - `peak_station ≈ 3.00`
@@ -401,6 +408,18 @@ Current tabulated-field / mirror-field extension:
   - writes the table in solver streamwise coordinates, `x ∈ [0, L]`, while
     recording the offset back to the centered coil frame; this prevents
     unintended tabulated-field extrapolation in the downstream half of the pipe
+
+The rectangular tabulated-field example now has two separate gates:
+
+- table self-consistency from `tabulated_field_quality_metrics(...)`
+- solver-point reconstruction from
+  `tabulated_cross_section_reconstruction_metrics(...)`
+
+The current manufactured-field run has solver-point
+`relative_l2_error ≈ 1.92e-5` and `relative_linf_error ≈ 4.18e-5`, so the
+visible tabulated-field response differences in the README are not an
+interpolation mismatch. The remaining tabulated-field research gap is external
+3D field-response validation, not the structured rectangular table.
   - observables:
     field/velocity anticorrelation, pressure-drop proxy, current response, and
     conservation metrics

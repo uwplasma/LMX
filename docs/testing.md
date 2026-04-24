@@ -294,12 +294,27 @@ verification/validation practice, not only to internal regression history.
 - [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
   - anchor the wake-deficit / recovery / distortion observables needed before
     the magnetic-obstacle lane can be called externally validated
+  - the current example now writes a setup schematic plus internal response
+    panel; tests assert the artifact exists, but research-grade status remains
+    false until the external reference CSV is filled with matched published or
+    experimental observables
 - [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)
   - supports the broader validation roadmap for curved ducts, magnetic
     obstacles, and 3D liquid-metal benchmark structure
 - [A research framework for writing differentiable PDE discretizations in JAX](https://arxiv.org/abs/2111.05218)
   - anchors the autodiff verification philosophy for gradient, optimization,
     and differentiable-operator tests
+
+The tabulated-field tests now separate two failure modes:
+
+- table-node interpolation and divergence quality through
+  `tabulated_field_quality_metrics(...)`
+- solver-point reconstruction against a manufactured analytic field through
+  `tabulated_cross_section_reconstruction_metrics(...)`
+
+The latter is the gate that protects the README tabulated-field extruded solve
+from silently using a table that differs from the expected magnetic field at
+the actual solve points.
 
 ## Artifact-producing verification examples
 
