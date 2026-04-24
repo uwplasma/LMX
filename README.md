@@ -11,6 +11,11 @@ fully developed duct solvers, a 3D `extruded_inductionless` fringing-field
 solver lane, restartable CLI workflows, strong-scaling tooling, and
 differentiable workflows for sensitivity analysis and inverse design.
 
+<p align="center">
+  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="49%">
+  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt startup movie" width="49%">
+</p>
+
 ## Why use LMX
 
 - Fully developed Hartmann, Shercliff, and Hunt workflows
@@ -366,7 +371,7 @@ embedded only inside the broader comparison figure.
 ### 2D and 3D startup movies
 
 These README assets are generated from `examples/readme_showcase_demo.py` and
-show Hunt startup in 2D and 3D over `t = 0` to `t = 2 ms`. Hunt flow uses a
+show Hunt startup in 2D and 3D over `t = 0` to `t = 3 ms`. Hunt flow uses a
 layered duct with conducting side walls and insulating Hartmann walls, so the
 startup sequence develops thin Hartmann layers at the insulating walls and
 the characteristic Hunt side jets along the conducting walls. The run starts
@@ -376,7 +381,7 @@ timesteps are written to the GIF. The 2D panel carries the transient `y`- and
 movie, while the 3D panel shows a streamwise-velocity profile slab embedded
 inside the duct so the evolving Hunt profile can be read in the full geometry.
 The README regeneration path uses a bounded `57 × 57` cross-section with
-`dt = 1e-5 s`, `t_final = 2e-3 s`, `coupling_iterations = 8`, and
+`dt = 1e-5 s`, `t_final = 3e-3 s`, `coupling_iterations = 8`, and
 `potential_iterations = 80`, plus `8` wall cells on the Hunt geometry. Heavy example reruns now also populate a local
 JAX compilation cache under `artifacts/jax_cache` so repeated runs on the same
 host do not pay the full cold-compile cost every time.

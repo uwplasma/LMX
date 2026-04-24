@@ -380,6 +380,8 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
         include_2d: bool = True,
         include_3d: bool = True,
         symmetry_average_axes=(),
+        view_elev: float = 18.0,
+        view_azim: float = -68.0,
     ):
         outputs = []
         if include_2d:

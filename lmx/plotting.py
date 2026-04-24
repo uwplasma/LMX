@@ -495,6 +495,8 @@ def write_transient_movies(
     include_3d: bool = True,
     symmetry_average_axes: tuple[str, ...] = (),
     profile_fluid_only: bool = True,
+    view_elev: float = 18.0,
+    view_azim: float = -68.0,
 ) -> list[Path]:
     if not frames:
         return []
@@ -791,7 +793,7 @@ def write_transient_movies(
             ax3d.set_xlim(0.0, 1.01 * x_extent)
             ax3d.set_ylim(float(mesh.z_faces[0]) - 0.14 * (mesh.z_faces[-1] - mesh.z_faces[0]), float(mesh.z_faces[-1]))
             ax3d.set_zlim(float(mesh.y_faces[0]), float(mesh.y_faces[-1]))
-            ax3d.view_init(elev=14, azim=-90)
+            ax3d.view_init(elev=view_elev, azim=view_azim)
             ax3d.set_box_aspect((5.6, 1.25, 1.25))
             ax3d.grid(False)
             ax3d.set_xticks([])

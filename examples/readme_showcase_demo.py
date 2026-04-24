@@ -35,7 +35,7 @@ def run_readme_showcase_demo(
     movie_ny: int = 57,
     movie_nz: int = 57,
     movie_dt: float = 1.0e-5,
-    movie_t_final: float = 2.0e-3,
+    movie_t_final: float = 3.0e-3,
     movie_fps: int = 12,
     movie_view: str = "both",
     movie_coupling_iterations: int = 8,
@@ -122,6 +122,8 @@ def run_readme_showcase_demo(
             include_2d=include_2d,
             include_3d=include_3d,
             symmetry_average_axes=("y", "z") if movie_case_kind in {"hunt", "shercliff", "hartmann"} else (),
+            view_elev=20.0,
+            view_azim=-64.0,
         )
 
     summary = {
@@ -144,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--movie-ny", type=int, default=57)
     parser.add_argument("--movie-nz", type=int, default=57)
     parser.add_argument("--movie-dt", type=float, default=1.0e-5)
-    parser.add_argument("--movie-t-final", type=float, default=2.0e-3)
+    parser.add_argument("--movie-t-final", type=float, default=3.0e-3)
     parser.add_argument("--movie-fps", type=int, default=12)
     parser.add_argument("--movie-view", choices=("both", "2d", "3d"), default="both")
     parser.add_argument("--movie-coupling-iterations", type=int, default=8)
