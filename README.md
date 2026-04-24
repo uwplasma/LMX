@@ -479,8 +479,11 @@ problem.
 For solver-faithful profiling, run the same example with
 `--benchmark-kind extruded_solve --profile`. That path invokes the actual
 rectangular `solve_extruded_inductionless(...)` projection loop and writes
-grid size, memory estimates, warm cell-updates per second, and optional JAX
-trace directories. The current committed figure remains the sharded
+grid size, memory estimates, warm cell-updates per second, optional JAX trace
+directories, `strong_scaling_table.csv`, and
+`strong_scaling_diagnostics.json`. The table records speedup, parallel
+efficiency, memory, profiler coverage, and whether each row is solver-faithful.
+The current committed figure remains the sharded
 `extruded3d` operator panel because the production projection loop does not
 yet have explicit multi-device domain decomposition.
 

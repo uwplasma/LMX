@@ -12,6 +12,7 @@ import tarfile
 import tempfile
 
 from lmx.plotting import write_strong_scaling_plots
+from lmx.scaling import summarize_strong_scaling_records, write_strong_scaling_summary_table
 
 
 def _run_worker(
@@ -249,9 +250,16 @@ def run_strong_scaling_demo(
         )
 
     plots = write_strong_scaling_plots(records, out_dir, case_title="LMX strong scaling")
+    table_path = write_strong_scaling_summary_table(records, out_dir / "strong_scaling_table.csv")
+    diagnostics = summarize_strong_scaling_records(records)
+    diagnostics_path = out_dir / "strong_scaling_diagnostics.json"
+    diagnostics_path.write_text(json.dumps(diagnostics, indent=2))
     summary = {
         "records": records,
         "plots": [path.name for path in plots],
+        "table": table_path.name,
+        "diagnostics": diagnostics,
+        "diagnostics_path": diagnostics_path.name,
     }
     (out_dir / "strong_scaling_summary.json").write_text(json.dumps(summary, indent=2))
     return summary

@@ -237,10 +237,14 @@ refer to the Samper et al. taxonomy.
    The scaling lane now has a separate `extruded_solve` benchmark kind that
    invokes the real rectangular `solve_extruded_inductionless(...)` projection
    path, records memory-relevant grid data and warm cell-update throughput, and
-   can write JAX traces. The remaining performance blocker is algorithmic:
-   explicit domain decomposition or a `shard_map`/halo path is still needed
-   before the production projection loop can support final multi-device strong
-   scaling claims.
+   can write JAX traces. It also writes a compact
+   `strong_scaling_table.csv` plus JSON diagnostics with fixed-problem speedup,
+   parallel efficiency, memory, profiler coverage, and a solver-faithful flag
+   so CI/release gates can distinguish real projection-loop timing evidence
+   from surrogate scaling evidence. The remaining performance blocker is
+   algorithmic: explicit domain decomposition or a `shard_map`/halo path is
+   still needed before the production projection loop can support final
+   multi-device strong scaling claims.
 7. Split large modules after behavior is locked.
    Refactor `fringing`, `autodiff`, `plotting`, `solvers`, and `validation`
    only behind passing tests and stable public import facades.

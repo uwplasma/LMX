@@ -123,7 +123,10 @@ python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output ./
 Use `--benchmark-kind extruded_solve` when the timing evidence needs to follow
 the executable rectangular `solve_extruded_inductionless(...)` projection path.
 The default `extruded3d` benchmark remains the explicitly sharded dense-operator
-path used for strong-scaling panels.
+path used for strong-scaling panels. Each run writes raw timing JSON, plots,
+`strong_scaling_table.csv`, and `strong_scaling_diagnostics.json`; the table is
+the shortest artifact for checking solver-faithful rows, speedup, efficiency,
+memory, and profiler coverage.
 
 Standard CLI runs can also select the execution backend directly:
 

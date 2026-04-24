@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import asdict, dataclass, replace
 import json
 import platform
 import time
 from pathlib import Path
+from typing import Any, Mapping, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -37,6 +39,144 @@ class StrongScalingRecord:
     warm_cell_updates_per_second: float | None = None
     memory_bytes_estimate: int | None = None
     profile_path: str | None = None
+
+
+StrongScalingRecordLike = StrongScalingRecord | Mapping[str, object]
+
+
+_SCALING_TABLE_COLUMNS = (
+    "benchmark_kind",
+    "operator_path",
+    "backend",
+    "device_kind",
+    "num_devices",
+    "nx",
+    "ny",
+    "nz",
+    "iterations",
+    "warm_seconds",
+    "speedup",
+    "parallel_efficiency",
+    "warm_mcell_updates_per_second",
+    "memory_mib",
+    "profile_path",
+    "solver_faithful",
+)
+
+
+def _record_mapping(record: StrongScalingRecordLike) -> dict[str, Any]:
+    if isinstance(record, StrongScalingRecord):
+        return asdict(record)
+    return dict(record)
+
+
+def _float_or_none(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_none(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
+    return (
+        record.get("benchmark_kind", "stencil2d"),
+        record.get("operator_path", "synthetic_stencil2d"),
+        record.get("backend", ""),
+        record.get("device_kind", ""),
+        record.get("nx"),
+        record.get("ny"),
+        record.get("nz"),
+        record.get("iterations"),
+    )
+
+
+def summarize_strong_scaling_records(records: Sequence[StrongScalingRecordLike]) -> dict[str, object]:
+    """Return derived strong-scaling diagnostics for JSON summaries and CI gates.
+
+    The raw benchmark records intentionally stay close to the timing worker
+    output. This helper adds fixed-problem speedup, parallel efficiency,
+    throughput, memory, and solver-path flags without changing the benchmark
+    itself. Records are grouped by backend, device kind, operator path, grid,
+    and iteration count so CPU and GPU studies are not mixed.
+    """
+
+    normalized = [_record_mapping(record) for record in records]
+    grouped: dict[tuple[object, ...], list[dict[str, Any]]] = {}
+    for record in normalized:
+        grouped.setdefault(_scaling_group_key(record), []).append(record)
+
+    rows: list[dict[str, object]] = []
+    for _, group_records in sorted(grouped.items(), key=lambda item: tuple(str(value) for value in item[0])):
+        sorted_records = sorted(group_records, key=lambda row: (_int_or_none(row.get("num_devices")) or 0, str(row.get("backend", ""))))
+        baseline = sorted_records[0]
+        baseline_devices = max(_int_or_none(baseline.get("num_devices")) or 1, 1)
+        baseline_warm = max(_float_or_none(baseline.get("warm_seconds")) or 0.0, 1.0e-20)
+        for record in sorted_records:
+            num_devices = max(_int_or_none(record.get("num_devices")) or 1, 1)
+            warm_seconds = max(_float_or_none(record.get("warm_seconds")) or 0.0, 1.0e-20)
+            speedup = baseline_warm / warm_seconds
+            device_ratio = num_devices / baseline_devices
+            cell_rate = _float_or_none(record.get("warm_cell_updates_per_second"))
+            memory_bytes = _float_or_none(record.get("memory_bytes_estimate"))
+            operator_path = str(record.get("operator_path", ""))
+            rows.append(
+                {
+                    "benchmark_kind": str(record.get("benchmark_kind", "")),
+                    "operator_path": operator_path,
+                    "backend": str(record.get("backend", "")),
+                    "device_kind": str(record.get("device_kind", "")),
+                    "num_devices": num_devices,
+                    "nx": _int_or_none(record.get("nx")),
+                    "ny": _int_or_none(record.get("ny")),
+                    "nz": _int_or_none(record.get("nz")),
+                    "iterations": _int_or_none(record.get("iterations")),
+                    "warm_seconds": warm_seconds,
+                    "speedup": speedup,
+                    "parallel_efficiency": speedup / max(device_ratio, 1.0e-20),
+                    "warm_mcell_updates_per_second": None if cell_rate is None else cell_rate / 1.0e6,
+                    "memory_mib": None if memory_bytes is None else memory_bytes / (1024.0**2),
+                    "profile_path": str(record.get("profile_path") or ""),
+                    "solver_faithful": operator_path == "solve_extruded_inductionless",
+                }
+            )
+
+    solver_faithful_count = sum(1 for row in rows if row["solver_faithful"])
+    profiled_count = sum(1 for row in rows if row["profile_path"])
+    best_speedup = max((float(row["speedup"]) for row in rows), default=0.0)
+    best_parallel_efficiency = max((float(row["parallel_efficiency"]) for row in rows), default=0.0)
+    return {
+        "record_count": len(rows),
+        "solver_faithful_record_count": solver_faithful_count,
+        "profiled_record_count": profiled_count,
+        "best_speedup": best_speedup,
+        "best_parallel_efficiency": best_parallel_efficiency,
+        "validation_status": "solver_faithful_records_present" if solver_faithful_count else "surrogate_only",
+        "rows": rows,
+    }
+
+
+def write_strong_scaling_summary_table(records: Sequence[StrongScalingRecordLike], path: str | Path) -> Path:
+    """Write a compact CSV table with derived strong-scaling diagnostics."""
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = summarize_strong_scaling_records(records)["rows"]
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_SCALING_TABLE_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)  # type: ignore[arg-type]
+    return path
 
 
 def _build_operator_problem(ny: int, nz: int) -> tuple[np.ndarray, ...]:

@@ -10,6 +10,7 @@ from jax.sharding import Mesh, NamedSharding
 
 import lmx.scaling as scaling
 from lmx.scaling import (
+    StrongScalingRecord,
     _build_extruded_operator_problem,
     _build_operator_problem,
     _factor_device_mesh,
@@ -18,7 +19,9 @@ from lmx.scaling import (
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
     benchmark_sharded_stencil,
+    summarize_strong_scaling_records,
     write_scaling_report,
+    write_strong_scaling_summary_table,
 )
 from examples.strong_scaling_demo import _default_visible_devices
 
@@ -41,6 +44,55 @@ def test_write_scaling_report_writes_json(tmp_path: Path):
 
     assert path.exists()
     assert '"num_devices": 1' in path.read_text()
+
+
+def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path):
+    baseline = StrongScalingRecord(
+        backend="cpu",
+        device_kind="cpu",
+        num_devices=1,
+        nx=8,
+        ny=6,
+        nz=4,
+        iterations=5,
+        repeats=2,
+        cold_seconds=11.0,
+        warm_seconds=10.0,
+        mean_seconds=10.5,
+        python_version="3.12",
+        jax_version="0.test",
+        benchmark_kind="extruded_solve",
+        operator_path="solve_extruded_inductionless",
+        total_cells=192,
+        cell_updates=960,
+        warm_cell_updates_per_second=96.0,
+        memory_bytes_estimate=2 * 1024 * 1024,
+        profile_path="profiles/cpu_1",
+    )
+    two_device = {
+        **baseline.__dict__,
+        "num_devices": 2,
+        "cold_seconds": 6.0,
+        "warm_seconds": 5.0,
+        "mean_seconds": 5.5,
+        "profile_path": None,
+    }
+
+    summary = summarize_strong_scaling_records([baseline, two_device])
+    table = write_strong_scaling_summary_table([baseline, two_device], tmp_path / "strong_scaling_table.csv")
+
+    assert summary["validation_status"] == "solver_faithful_records_present"
+    assert summary["solver_faithful_record_count"] == 2
+    assert summary["profiled_record_count"] == 1
+    assert summary["best_speedup"] == pytest.approx(2.0)
+    rows = summary["rows"]
+    assert rows[0]["speedup"] == pytest.approx(1.0)
+    assert rows[1]["speedup"] == pytest.approx(2.0)
+    assert rows[1]["parallel_efficiency"] == pytest.approx(1.0)
+    assert rows[0]["warm_mcell_updates_per_second"] == pytest.approx(9.6e-5)
+    assert rows[0]["memory_mib"] == pytest.approx(2.0)
+    assert table.exists()
+    assert "parallel_efficiency" in table.read_text()
 
 
 def test_benchmark_sharded_stencil_rejects_invalid_device_count():

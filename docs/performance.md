@@ -88,8 +88,18 @@ The example writes:
 - raw JSON timing records
 - optional JAX trace directories under `profiles/`
 - `strong_scaling_summary.json`
+- `strong_scaling_diagnostics.json`
+- `strong_scaling_table.csv`
 - `strong_scaling.png`
 - `strong_scaling.pdf`
+
+`strong_scaling_table.csv` is the compact artifact intended for CI/release
+review. It reports fixed-problem speedup, parallel efficiency, warm
+Mcell-updates/s, estimated array memory, profiler-trace availability, and
+whether each row came from the actual `solve_extruded_inductionless` path. The
+JSON diagnostics carry the same rows plus summary counters, so release gates can
+reject surrogate-only timing evidence when a solver-faithful scaling claim is
+being made.
 
 ## Backend selection for CLI runs
 
