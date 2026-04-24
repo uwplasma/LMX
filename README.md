@@ -194,6 +194,12 @@ Dean/curvature observables that will become the higher-inertia gate:
 `secondary_flow_rms_ratio ≈ 6.16e-18`,
 `normalized_velocity_centroid_shift = 0`, and
 `inner_outer_velocity_ratio = 1.0` for this low-De straight-pipe limit.
+The charge-balance number is within the bounded demonstrator tolerance
+(`5e-2`) but above the research-grade closure target (`1e-3`), so the JSON
+summary records `research_grade_charge_balance_pass = false`. A local
+mesh/iteration probe lowered the residual only to `≈ 1.52e-2`, so the remaining
+curved-pipe gate needs a formulation/diagnostic fix and a Dean-vortex reference,
+not just a longer low-De run.
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 
@@ -585,8 +591,8 @@ hidden in the figures:
   turbulent data
 - the bent-pipe section is currently a low-De straight-pipe-limit check; the
   higher-inertia Dean-vortex gate remains open, and the charge-balance residual
-  `≈ 2.15e-2` is recorded as a bounded example metric rather than a full
-  curved-pipe research validation
+  `≈ 2.15e-2` passes only the bounded demonstrator tolerance, not the
+  research-grade `1e-3` closure target
 - the tabulated-field rectangular lane now passes both table-node and
   solver-point manufactured-field reconstruction; WHAM-like 3D field response
   remains a separate open validation lane because the current pipe solve is

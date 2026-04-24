@@ -1866,12 +1866,15 @@ def validate_bent_pipe_low_de_baseline(
     max_charge_balance_residual = float(bent_solution.validation.max_charge_balance_residual)
     max_wall_current_leakage = float(bent_solution.validation.max_wall_current_leakage)
     net_boundary_current_residual = float(bent_solution.validation.net_boundary_current_residual)
+    bounded_charge_balance_tolerance = 5.0e-2
+    research_grade_charge_balance_tolerance = 1.0e-3
+    research_grade_charge_balance_pass = bool(max_charge_balance_residual <= research_grade_charge_balance_tolerance)
     validation_pass = bool(
         dean_number <= 10.0
         and cross_section_l2_error <= 0.08
         and centerline_l2_error <= 0.08
         and throughput_span <= 1.0e-3
-        and max_charge_balance_residual <= 5.0e-2
+        and max_charge_balance_residual <= bounded_charge_balance_tolerance
         and max_wall_current_leakage <= 1.0e-8
         and net_boundary_current_residual <= 1.0e-8
     )
@@ -1891,6 +1894,9 @@ def validate_bent_pipe_low_de_baseline(
         "centerline_l2_error": centerline_l2_error,
         "throughput_span": throughput_span,
         "max_charge_balance_residual": max_charge_balance_residual,
+        "bounded_charge_balance_tolerance": bounded_charge_balance_tolerance,
+        "research_grade_charge_balance_tolerance": research_grade_charge_balance_tolerance,
+        "research_grade_charge_balance_pass": research_grade_charge_balance_pass,
         "max_wall_current_leakage": max_wall_current_leakage,
         "net_boundary_current_residual": net_boundary_current_residual,
         "validation_pass": validation_pass,

@@ -193,6 +193,14 @@ refer to the Samper et al. taxonomy.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
+  The low-De example now separates bounded demonstrator acceptance from
+  research-grade charge closure: `max_charge_balance_residual ≈ 2.15e-2`
+  passes the current bounded tolerance (`5e-2`) but fails the research target
+  (`1e-3`). The next curved-pipe validation must reduce or explain that
+  residual while adding a real Dean-vortex reference. A local iteration/mesh
+  probe moved the residual from `2.15e-2` to `1.52e-2` on a `22 × 48 × 17`
+  radial/theta/station grid, so the gap is not closed by simply increasing the
+  potential iteration count.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
   against manufactured fields and at least one independent field dataset.

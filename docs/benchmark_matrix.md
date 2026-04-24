@@ -545,6 +545,9 @@ Current bounded low-De baseline:
 - `cross_section_l2_error = 0`
 - `centerline_l2_error = 0`
 - `max_charge_balance_residual ≈ 2.15e-2`
+- `research_grade_charge_balance_pass = false` because the bounded
+  demonstrator tolerance is `5e-2` while the research-grade closure target is
+  `1e-3`
 - `volumetric_flow_rate_span ≈ 1.14e-9`
 - newly reported Dean/curvature observables:
   `secondary_flow_rms_ratio ≈ 6.16e-18`,

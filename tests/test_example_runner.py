@@ -819,6 +819,7 @@ def test_bent_pipe_inductionless_demo_writes_summary(tmp_path: Path):
     assert "validation" in summary
     assert summary["validation"]["dean_vortex_observables_available"] is True
     assert summary["validation"]["research_grade_dean_validation_pass"] is False
+    assert "research_grade_charge_balance_pass" in summary["validation"]
     assert (tmp_path / "bent_pipe_overview.png").exists()
     assert (tmp_path / "bent_pipe_inductionless_summary.json").exists()
 
