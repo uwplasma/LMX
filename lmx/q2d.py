@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from matplotlib import animation
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -91,6 +92,32 @@ class Q2DWallBoundedForcedSolution:
     steady_amplitude: float
 
 
+@dataclass(frozen=True)
+class Q2DTurbulenceDecayCase:
+    nx: int = 96
+    ny: int = 96
+    lx: float = 2.0
+    ly: float = 2.0
+    viscosity: float = 0.006
+    hartmann_friction: float = 0.35
+    amplitude: float = 1.0
+    dt: float = 5.0e-4
+    t_final: float = 0.18
+    frame_count: int = 24
+
+
+@dataclass(frozen=True)
+class Q2DTurbulenceDecaySolution:
+    x: np.ndarray
+    y: np.ndarray
+    time: np.ndarray
+    frames: np.ndarray
+    kinetic_energy: np.ndarray
+    enstrophy_proxy: np.ndarray
+    initial_spectrum: dict[str, list[float]]
+    final_spectrum: dict[str, list[float]]
+
+
 def build_q2d_decay_case(
     *,
     nx: int = 96,
@@ -117,6 +144,33 @@ def build_q2d_decay_case(
         amplitude=amplitude,
         dt=dt,
         t_final=t_final,
+    )
+
+
+def build_q2d_turbulence_decay_case(
+    *,
+    nx: int = 96,
+    ny: int = 96,
+    lx: float = 2.0,
+    ly: float = 2.0,
+    viscosity: float = 0.006,
+    hartmann_friction: float = 0.35,
+    amplitude: float = 1.0,
+    dt: float = 5.0e-4,
+    t_final: float = 0.18,
+    frame_count: int = 24,
+) -> Q2DTurbulenceDecayCase:
+    return Q2DTurbulenceDecayCase(
+        nx=nx,
+        ny=ny,
+        lx=lx,
+        ly=ly,
+        viscosity=viscosity,
+        hartmann_friction=hartmann_friction,
+        amplitude=amplitude,
+        dt=dt,
+        t_final=t_final,
+        frame_count=frame_count,
     )
 
 
@@ -201,6 +255,27 @@ def _wall_mode_shape(*, amplitude: float, lx: float, ly: float, mode_x: int, mod
     return amplitude * np.sin(mode_x * np.pi * xx / lx) * np.sin(mode_y * np.pi * yy / ly)
 
 
+def _q2d_multimode_initial_condition(case: Q2DTurbulenceDecayCase, xx: np.ndarray, yy: np.ndarray) -> np.ndarray:
+    modes = (
+        (1, 2, 1.00, 0.15),
+        (2, 1, -0.75, 1.20),
+        (3, 2, 0.45, 2.10),
+        (2, 4, -0.32, 0.70),
+        (5, 3, 0.20, 2.70),
+        (4, 5, -0.14, 1.80),
+        (8, 5, 0.10, 0.40),
+        (10, 7, -0.07, 2.40),
+    )
+    field = np.zeros_like(xx, dtype=float)
+    for mode_x, mode_y, weight, phase in modes:
+        field += weight * np.sin(2.0 * np.pi * mode_x * xx / case.lx + phase) * np.cos(
+            2.0 * np.pi * mode_y * yy / case.ly - 0.5 * phase
+        )
+    field -= float(np.mean(field))
+    field /= max(float(np.max(np.abs(field))), 1.0e-12)
+    return case.amplitude * field
+
+
 def solve_q2d_decay(case: Q2DDecayCase) -> Q2DDecaySolution:
     x = np.linspace(0.0, case.lx, case.nx, endpoint=False)
     y = np.linspace(0.0, case.ly, case.ny, endpoint=False)
@@ -233,6 +308,54 @@ def solve_q2d_decay(case: Q2DDecayCase) -> Q2DDecaySolution:
         amplitude_numeric=amplitude_numeric,
         amplitude_analytic=amplitude_analytic,
         decay_rate=float(decay_rate),
+    )
+
+
+def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDecaySolution:
+    """Evolve a deterministic multi-mode Q2D field under diffusion and Hartmann friction.
+
+    This is a turbulence-observable readiness problem rather than a nonlinear
+    turbulent DNS. It produces the movie/spectral diagnostics needed before
+    matching a published turbulent Q2D reference case.
+    """
+
+    x = np.linspace(0.0, case.lx, case.nx, endpoint=False)
+    y = np.linspace(0.0, case.ly, case.ny, endpoint=False)
+    xx, yy = np.meshgrid(x, y, indexing="ij")
+    dx = float(case.lx / case.nx)
+    dy = float(case.ly / case.ny)
+    field = _q2d_multimode_initial_condition(case, xx, yy)
+    steps = max(1, int(round(case.t_final / case.dt)))
+    frame_count = max(2, min(int(case.frame_count), steps + 1))
+    frame_indices = np.unique(np.linspace(0, steps, frame_count, dtype=int))
+    frames: list[np.ndarray] = []
+    frame_times: list[float] = []
+    kinetic_energy: list[float] = []
+    enstrophy_proxy: list[float] = []
+
+    def _record(step: int, values: np.ndarray) -> None:
+        frames.append(values.copy())
+        frame_times.append(step * case.dt)
+        kinetic_energy.append(0.5 * float(np.mean(values**2)))
+        grad_x, grad_y = np.gradient(values, dx, dy, edge_order=1)
+        enstrophy_proxy.append(0.5 * float(np.mean(grad_x**2 + grad_y**2)))
+
+    frame_index_set = set(int(index) for index in frame_indices.tolist())
+    _record(0, field)
+    for step in range(1, steps + 1):
+        field = field + case.dt * (case.viscosity * _periodic_laplacian(field, dx=dx, dy=dy) - case.hartmann_friction * field)
+        if step in frame_index_set:
+            _record(step, field)
+
+    return Q2DTurbulenceDecaySolution(
+        x=x,
+        y=y,
+        time=np.asarray(frame_times, dtype=float),
+        frames=np.asarray(frames, dtype=float),
+        kinetic_energy=np.asarray(kinetic_energy, dtype=float),
+        enstrophy_proxy=np.asarray(enstrophy_proxy, dtype=float),
+        initial_spectrum=q2d_energy_spectrum(frames[0] - float(np.mean(frames[0])), lx=case.lx, ly=case.ly),
+        final_spectrum=q2d_energy_spectrum(frames[-1] - float(np.mean(frames[-1])), lx=case.lx, ly=case.ly),
     )
 
 
@@ -664,6 +787,122 @@ def q2d_turbulence_observables(
         viscosity=viscosity,
         hartmann_friction=hartmann_friction,
     )
+
+
+def validate_q2d_turbulence_decay_observables(
+    case: Q2DTurbulenceDecayCase,
+    solution: Q2DTurbulenceDecaySolution,
+) -> dict[str, float | bool | str]:
+    """Validate bounded Q2D spectral-decay observables for the movie lane."""
+
+    energy = np.asarray(solution.kinetic_energy, dtype=float)
+    enstrophy = np.asarray(solution.enstrophy_proxy, dtype=float)
+    if energy.size < 2 or enstrophy.size < 2:
+        raise ValueError("Q2D turbulence-decay validation requires at least two frames")
+    energy_monotone = bool(np.all(np.diff(energy) <= 1.0e-12))
+    enstrophy_monotone = bool(np.all(np.diff(enstrophy) <= 1.0e-12))
+    energy_decay_ratio = float(energy[-1] / max(energy[0], 1.0e-20))
+    enstrophy_decay_ratio = float(enstrophy[-1] / max(enstrophy[0], 1.0e-20))
+
+    initial_energy = np.asarray(solution.initial_spectrum["energy"], dtype=float)
+    final_energy = np.asarray(solution.final_spectrum["energy"], dtype=float)
+    wavenumber = np.asarray(solution.initial_spectrum["wavenumber"], dtype=float)
+    active = initial_energy > max(float(np.max(initial_energy)) * 1.0e-12, 1.0e-30) if initial_energy.size else np.asarray([], dtype=bool)
+    active_wavenumber = wavenumber[active] if wavenumber.size and active.size else np.asarray([], dtype=float)
+    cutoff = 0.5 * float(np.max(active_wavenumber)) if active_wavenumber.size else 0.0
+    high_k = wavenumber >= cutoff
+    initial_high_k_fraction = (
+        float(np.sum(initial_energy[high_k]) / max(np.sum(initial_energy), 1.0e-20))
+        if initial_energy.size
+        else 0.0
+    )
+    final_high_k_fraction = (
+        float(np.sum(final_energy[high_k]) / max(np.sum(final_energy), 1.0e-20))
+        if final_energy.size
+        else 0.0
+    )
+    high_k_fraction_decreases = bool(final_high_k_fraction <= initial_high_k_fraction + 1.0e-12)
+    initial_spectral_centroid = float(np.sum(wavenumber * initial_energy) / max(np.sum(initial_energy), 1.0e-20)) if initial_energy.size else 0.0
+    final_spectral_centroid = float(np.sum(wavenumber * final_energy) / max(np.sum(final_energy), 1.0e-20)) if final_energy.size else 0.0
+    spectral_centroid_decreases = bool(final_spectral_centroid <= initial_spectral_centroid + 1.0e-12)
+    validation_pass = bool(
+        energy_monotone
+        and enstrophy_monotone
+        and high_k_fraction_decreases
+        and spectral_centroid_decreases
+        and energy_decay_ratio < 1.0
+        and enstrophy_decay_ratio < 1.0
+    )
+    return {
+        "energy_decay_ratio": energy_decay_ratio,
+        "enstrophy_decay_ratio": enstrophy_decay_ratio,
+        "initial_high_k_energy_fraction": initial_high_k_fraction,
+        "final_high_k_energy_fraction": final_high_k_fraction,
+        "initial_spectral_centroid": initial_spectral_centroid,
+        "final_spectral_centroid": final_spectral_centroid,
+        "energy_monotone": energy_monotone,
+        "enstrophy_monotone": enstrophy_monotone,
+        "high_k_fraction_decreases": high_k_fraction_decreases,
+        "spectral_centroid_decreases": spectral_centroid_decreases,
+        "frame_count": int(solution.frames.shape[0]),
+        "validation_pass": validation_pass,
+        "literature_target": "Sommeria-Moreau quasi-2D turbulence spectral decay and Hartmann-friction damping",
+        "validation_status": "multimode_q2d_movie_available_external_turbulent_reference_open",
+        "research_grade_turbulence_validation_pass": False,
+    }
+
+
+def write_q2d_turbulence_decay_movie(
+    solution: Q2DTurbulenceDecaySolution,
+    out_dir: str | Path,
+    *,
+    title: str = "Q2D Hartmann-friction multi-mode decay",
+    fps: int = 10,
+) -> list[Path]:
+    """Write a GIF movie and poster for a Q2D multi-mode decay solution."""
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    frames = np.asarray(solution.frames, dtype=float)
+    if frames.ndim != 3:
+        raise ValueError("Q2D turbulence-decay movie expects frames with shape (time, nx, ny)")
+    x_edges = _centers_to_edges_1d(solution.x)
+    y_edges = _centers_to_edges_1d(solution.y)
+    vmax = max(float(np.max(np.abs(frames))), 1.0e-12)
+
+    fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
+    image = ax.pcolormesh(y_edges, x_edges, frames[0], shading="auto", cmap="RdBu_r", vmin=-vmax, vmax=vmax)
+    ax.set_title(f"{title}\nt = {solution.time[0]:.3f}")
+    ax.set_xlabel("y")
+    ax.set_ylabel("x")
+    ax.set_aspect("equal")
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="u' proxy")
+
+    def _update(index: int):
+        image.set_array(frames[index].ravel())
+        ax.set_title(f"{title}\nt = {solution.time[index]:.3f}")
+        return (image,)
+
+    movie = animation.FuncAnimation(fig, _update, frames=frames.shape[0], interval=1000.0 / max(fps, 1), blit=False)
+    gif_path = out_dir / "q2d_turbulence_decay.gif"
+    poster_path = out_dir / "q2d_turbulence_decay_poster.png"
+    writer = animation.PillowWriter(fps=max(int(fps), 1))
+    movie.save(gif_path, writer=writer)
+    _update(frames.shape[0] - 1)
+    fig.savefig(poster_path, bbox_inches="tight")
+    plt.close(fig)
+    return [gif_path, poster_path]
+
+
+def _centers_to_edges_1d(values: np.ndarray) -> np.ndarray:
+    data = np.asarray(values, dtype=float)
+    if data.size <= 1:
+        center = float(data[0]) if data.size else 0.0
+        return np.asarray([center - 0.5, center + 0.5], dtype=float)
+    midpoints = 0.5 * (data[1:] + data[:-1])
+    first = data[0] - 0.5 * (data[1] - data[0])
+    last = data[-1] + 0.5 * (data[-1] - data[-2])
+    return np.concatenate([[first], midpoints, [last]])
 
 
 def write_q2d_turbulence_observable_plots(

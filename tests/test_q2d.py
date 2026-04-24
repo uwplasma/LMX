@@ -8,6 +8,7 @@ import pytest
 from lmx.q2d import (
     build_q2d_decay_case,
     build_q2d_forced_case,
+    build_q2d_turbulence_decay_case,
     build_q2d_wall_bounded_forced_case,
     q2d_energy_spectrum,
     q2d_modal_energy_budget,
@@ -15,15 +16,18 @@ from lmx.q2d import (
     q2d_turbulence_readiness_metrics,
     solve_q2d_decay,
     solve_q2d_forced,
+    solve_q2d_turbulence_decay,
     solve_q2d_wall_bounded_forced,
     validate_q2d_decay_solution,
     validate_q2d_decay_energy_budget,
     validate_q2d_forced_solution,
     validate_q2d_forced_energy_budget,
+    validate_q2d_turbulence_decay_observables,
     validate_q2d_wall_bounded_forced_solution,
     validate_q2d_wall_bounded_energy_budget,
     write_q2d_decay_plots,
     write_q2d_forced_plots,
+    write_q2d_turbulence_decay_movie,
     write_q2d_turbulence_observable_plots,
     write_q2d_wall_bounded_forced_plots,
 )
@@ -104,6 +108,19 @@ def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path
         hartmann_friction=case.hartmann_friction,
     )
     assert outputs == [tmp_path / "q2d_turbulence_observables.png", tmp_path / "q2d_turbulence_observables.pdf"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
+    case = build_q2d_turbulence_decay_case(nx=20, ny=20, dt=1.0e-3, t_final=4.0e-3, frame_count=4)
+    solution = solve_q2d_turbulence_decay(case)
+    validation = validate_q2d_turbulence_decay_observables(case, solution)
+    assert solution.frames.shape[0] == 4
+    assert validation["validation_pass"] is True
+    assert validation["research_grade_turbulence_validation_pass"] is False
+    outputs = write_q2d_turbulence_decay_movie(solution, tmp_path, fps=4)
+    assert outputs == [tmp_path / "q2d_turbulence_decay.gif", tmp_path / "q2d_turbulence_decay_poster.png"]
     assert outputs[0].exists()
     assert outputs[1].exists()
 

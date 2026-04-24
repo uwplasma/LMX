@@ -214,6 +214,13 @@ external gap. On the latest bounded pipe-reference comparison:
 That is enough to say the comparison is quantitative, but not enough to call it
 parity closure.
 
+The same status now applies to the straight Hunt `Ha = 100` analytical
+side-layer cut. A local mesh/settings probe increased the case from `37 × 37`
+to `49 × 81`, raised wall cells and iteration budgets, and switched the drive
+between forcing, pressure-gradient, and flow-rate modes. The `z`-cut stayed
+near `O(3e-2)`, so the next parity work is wall-current/operator/reference
+observable agreement, not a cosmetic plot or simple resolution change.
+
 The underlying reason is now clearer from the bundled FreeMHD reference set:
 the mapped-pipe comparison files correspond to the Bühler fringing-pipe case
 at `Ha = 2000`, `Re = 20000`, while the current LMX `pipe_ogrid`
@@ -277,6 +284,19 @@ Current wall-bounded Q2D Hartmann-friction lane:
     first wall-bounded Q2D duct slice before Sommeria-Moreau-style closures
     and literature/experiment turbulent datasets
 
+Current Q2D turbulence-movie readiness lane:
+
+- `examples/q2d_turbulence_decay_demo.py`
+  - deterministic multi-mode Q2D Hartmann-friction decay
+  - observables:
+    monotone kinetic-energy decay, monotone enstrophy-proxy decay,
+    high-wavenumber energy-fraction decrease, and spectral-centroid decrease
+  - artifact:
+    `write_q2d_turbulence_decay_movie(...)` writes a GIF plus poster PNG
+  - role:
+    executable turbulence-observable movie before claiming nonlinear turbulent
+    parity against published Sommeria-Moreau-style datasets
+
 Current bounded result:
 
 - `96 × 96`, `ν = 0.01`, Hartmann-friction `= 2.0`
@@ -292,6 +312,16 @@ Current bounded wall-bounded result:
 - `linf_error ≈ 4.15e-4`
 - `amplitude_rel_error ≈ 1.42e-4`
 - `relative_budget_l2 ≈ 5.12e-4`
+
+Current bounded multi-mode Q2D movie result:
+
+- `96 × 96`, `ν = 0.006`, Hartmann-friction `= 0.35`
+- `energy_decay_ratio ≈ 7.51e-1`
+- `enstrophy_decay_ratio ≈ 6.30e-1`
+- high-wavenumber energy fraction drops from `≈ 9.11e-2` to `≈ 5.83e-2`
+- spectral centroid drops from `≈ 7.98` to `≈ 7.46`
+- `research_grade_turbulence_validation_pass = false` until an external
+  nonlinear turbulent reference is matched
 
 Current localized magnetic-obstacle response lane:
 

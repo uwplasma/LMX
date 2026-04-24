@@ -265,6 +265,11 @@ solutions before moving to turbulent observables.
   observables for the future turbulent Q2D validation lane. The companion
   `q2d_turbulence_observables` panel plots the wall-bounded field, shell energy
   spectrum, and energy/dissipation proxies without claiming turbulent parity.
+- `examples/q2d_turbulence_decay_demo.py`: a deterministic multi-mode Q2D
+  Hartmann-friction decay movie. It is a turbulence-observable readiness gate,
+  not nonlinear turbulent parity. The current movie has monotone energy and
+  enstrophy decay, high-wavenumber energy fraction dropping from `≈ 9.11e-2`
+  to `≈ 5.83e-2`, and spectral centroid dropping from `≈ 7.98` to `≈ 7.46`.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -274,6 +279,10 @@ solutions before moving to turbulent observables.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_turbulence_observables.png" alt="Q2D turbulence-observable readiness panel" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2d_turbulence_decay.gif" alt="Q2D multi-mode Hartmann-friction decay movie" width="54%">
 </p>
 
 ### Magnetic-obstacle localized-field response
@@ -563,15 +572,17 @@ hidden in the figures:
 
 - high-`Ha` Hunt side-layer parity is not closed yet; the current analytical
   ladder has Hunt `Ha = 100` side-layer `z_l2 ≈ 3.26e-2`, above the retained
-  `1.2e-2` target, so the next run is a side-layer mesh and observable ladder
-  rather than visual peak matching
+  `1.2e-2` target. A local probe with `49 × 81` resolution and alternate
+  forcing/pressure-gradient/flow-rate drives left this cut near `3e-2`, so the
+  next work item is operator/wall-current/reference-observable parity rather
+  than visual peak matching
 - the magnetic-obstacle section is an internal response/conservation gate until
   a digitized or executable external reference is filled into
   `magnetic_obstacle_reference_observables.csv`
 - the Q2D lane has modal decay, forced-mode, wall-bounded, energy-budget, and
-  spectrum diagnostics; turbulent parity remains open until those observables
-  are compared with published Q2D turbulent data and a turbulence movie is
-  generated from that run
+  spectrum diagnostics plus a multi-mode decay movie; turbulent parity remains
+  open until those observables are compared with published nonlinear Q2D
+  turbulent data
 - the bent-pipe section is currently a low-De straight-pipe-limit check; the
   higher-inertia Dean-vortex gate remains open, and the charge-balance residual
   `≈ 2.15e-2` is recorded as a bounded example metric rather than a full

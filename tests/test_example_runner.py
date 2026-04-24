@@ -1151,6 +1151,22 @@ def test_q2d_wall_bounded_validation_writes_summary(tmp_path: Path):
     assert (tmp_path / "q2d_wall_bounded_validation_summary.json").exists()
 
 
+def test_q2d_turbulence_decay_demo_writes_summary_and_movie(tmp_path: Path):
+    module = _load_example_module("q2d_turbulence_decay_demo.py")
+    module.OUTPUT_DIR = tmp_path
+    module.NX = 24
+    module.NY = 24
+    module.T_FINAL = 4.0e-3
+    module.FRAME_COUNT = 4
+    module.FPS = 4
+    summary = module.run_q2d_turbulence_decay_demo()
+    assert summary["case"] == "q2d_turbulence_decay"
+    assert summary["validation"]["validation_pass"] is True
+    assert summary["validation"]["research_grade_turbulence_validation_pass"] is False
+    assert (tmp_path / "q2d_turbulence_decay.gif").exists()
+    assert (tmp_path / "q2d_turbulence_decay_summary.json").exists()
+
+
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_baseline.py")
     module.OUTPUT_DIR = tmp_path

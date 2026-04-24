@@ -149,6 +149,13 @@ refer to the Samper et al. taxonomy.
   to run the heavier mesh ladder and use those recorded observables to decide
   whether the blocker is mesh placement, drive formulation, current closure, or
   momentum coupling.
+  Latest local probe: increasing the Hunt `Ha = 100` mesh from `37 × 37` to
+  `49 × 81` and raising wall cells/iterations improved the Hartmann cut but
+  left the side-layer cut near `z_l2 ≈ 3.0e-2`. Switching the same baseline
+  between forcing, pressure-gradient, and flow-rate drive left the side-layer
+  error unchanged at `≈ 3.26e-2`. The next blocker is therefore
+  operator/wall-current/reference-observable parity, not a simple resolution or
+  drive-setting problem.
 - Magnetic-obstacle external validation: replace the current matched no-field
   LMX reference with published localized-field cases, including the
   Cuevas-Smolentsev-Abdou quasi-2D magnetic-obstacle study and the Votyakov
@@ -178,6 +185,11 @@ refer to the Samper et al. taxonomy.
   tests as verification, then add Sommeria-Moreau-style closure observables and
   literature-facing turbulent energy/decay spectra before making any turbulent
   claim.
+  A deterministic multi-mode Hartmann-friction decay movie now exists through
+  `examples/q2d_turbulence_decay_demo.py`; it gates monotone energy and
+  enstrophy decay, high-wavenumber damping, and spectral-centroid decrease.
+  The open item is still the nonlinear turbulent reference comparison, not
+  movie/post-processing infrastructure.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.

@@ -290,6 +290,9 @@ verification/validation practice, not only to internal regression history.
   - the current wall-bounded Q2D summary now emits energy, enstrophy,
     dissipation, and shell-spectrum observables, but the turbulence gate remains
     open until those quantities are compared with published turbulent Q2D data
+  - the current multi-mode Q2D decay movie adds monotone energy/enstrophy,
+    high-wavenumber damping, and spectral-centroid checks, while still keeping
+    nonlinear turbulent parity explicitly open
 - [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
 - [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
   - anchor the wake-deficit / recovery / distortion observables needed before

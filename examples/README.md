@@ -349,6 +349,21 @@ That example moves the Q2D lane from periodic modes to a wall-bounded duct:
   observables for the future turbulent validation gate
 - write compact validation, spectrum, energy-budget, and summary artifacts
 
+Quasi-2D multi-mode turbulence-observable movie:
+
+```bash
+python examples/q2d_turbulence_decay_demo.py
+```
+
+That example writes a deterministic multi-mode Hartmann-friction decay GIF:
+
+- initialize a repeatable multi-mode Q2D field
+- evolve it under diffusion and Hartmann friction
+- gate monotone energy/enstrophy decay, high-wavenumber damping, and spectral
+  centroid decrease
+- keep research-grade turbulent parity marked open until matched against a
+  published nonlinear turbulent Q2D reference
+
 Localized-field and mirror-field response:
 
 ```bash
