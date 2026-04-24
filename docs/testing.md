@@ -49,6 +49,8 @@ Heavier validation remains available for manual or release-time execution:
 - regression snapshots
 - heavier physics suites
 - benchmark artifact generation
+- Q2D decay, forced, and wall-bounded reduced-model artifacts with modal
+  energy-budget gates
 - extended coverage collection
 
 The main post-`1.0` manual entry point is:

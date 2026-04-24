@@ -55,6 +55,13 @@ jobs:
           python scripts/run_convergence_suite.py --output artifacts/release/convergence --cases hartmann --ha 5 --resolutions 8,16,32
           python scripts/run_time_convergence_suite.py --output artifacts/release/time_convergence --cases hartmann --ha 5 --resolution 16 --dts 0.004,0.002,0.001
           python scripts/run_freemhd_parity_suite.py --output artifacts/release/freemhd_parity
+          python examples/q2d_decay_validation.py
+          python examples/q2d_forced_validation.py
+          python examples/q2d_wall_bounded_validation.py
+          mkdir -p artifacts/release/q2d
+          cp -R artifacts/examples/q2d_decay_validation artifacts/release/q2d/
+          cp -R artifacts/examples/q2d_forced_validation artifacts/release/q2d/
+          cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/release/q2d/
 
       - name: Build release validation summary
         run: |

@@ -165,6 +165,8 @@ artifact gates before package artifacts are built.
   - run physics/regression suites
   - regenerate selected validation artifacts
   - summarize FreeMHD observable-gate pass/fail counts in the release report
+  - archive Q2D decay, forced, and wall-bounded reduced-model artifacts with
+    modal energy-budget gates
   - run broad branch coverage with `--cov-fail-under=95`
 - packaging:
   - build sdist and wheel artifacts

@@ -129,6 +129,24 @@ jobs:
           NUMEXPR_NUM_THREADS: "1"
         run: python scripts/run_freemhd_parity_suite.py --output artifacts/freemhd_parity
 
+      - name: Run Q2D reduced-model artifact suite
+        env:
+          MPLBACKEND: Agg
+          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          python examples/q2d_decay_validation.py
+          python examples/q2d_forced_validation.py
+          python examples/q2d_wall_bounded_validation.py
+          mkdir -p artifacts/q2d
+          cp -R artifacts/examples/q2d_decay_validation artifacts/q2d/
+          cp -R artifacts/examples/q2d_forced_validation artifacts/q2d/
+          cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/q2d/
+
       - name: Build validation summary
         run: |
           python scripts/summarize_ci_artifacts.py \
@@ -148,6 +166,7 @@ jobs:
             artifacts/time_convergence
             artifacts/control_sweep
             artifacts/freemhd_parity
+            artifacts/q2d
 
   coverage:
     if: github.event_name == 'workflow_dispatch'
