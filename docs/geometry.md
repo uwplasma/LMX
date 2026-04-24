@@ -149,7 +149,9 @@ faces with conducting or insulating wall cells. For processed slice CSV files,
 `Points:2` coordinates into a rectangular reference mesh for A/B diagnostics.
 This path is intended for validation and mesh-sensitivity studies; production
 examples should still use the case builders unless exact external-grid
-reproduction is the goal.
+reproduction is the goal. The standalone
+`examples/reference_slice_mesh_diagnostic.py` driver writes a side-by-side
+mesh panel and layer-count JSON for this workflow.
 
 ## Mesh-resolution guidance
 

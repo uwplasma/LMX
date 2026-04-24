@@ -170,6 +170,13 @@ therefore focus on a fully implicit face-current momentum operator, including
 off-diagonal EMF terms, or a direct OpenFOAM-mesh reproduction, not on limiter
 tuning or diagonal-only reaction splitting.
 
+`examples/reference_slice_mesh_diagnostic.py` is the mesh-isolation driver for
+that next step. On the bundled Hunt Ha=20 processed slice, the external point
+grid carries about ten Hartmann-layer intervals and about forty-two side-layer
+intervals, while the retained generated LMX mesh carries about ten and six.
+That makes side-layer mesh parity a concrete diagnostic to run before changing
+the fully developed momentum operator again.
+
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
 low-signal normalized cuts. That ranking is the triage surface for the next

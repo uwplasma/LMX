@@ -391,6 +391,7 @@ python examples/shercliff_showcase.py
 python examples/hunt_showcase.py
 python examples/straight_duct_profile_comparison.py
 python examples/freemhd_closed_channel_parity.py
+python examples/reference_slice_mesh_diagnostic.py
 ```
 
 They are parameter-driven Python files rather than argparse front ends:
@@ -431,3 +432,8 @@ midplane profiles of `u`, gauge-shifted `potE`, cut-aligned `J`, and
 current reconstructions, and writes a publication-ready panel plus JSON
 summary. This remains a heavier manual artifact-generation lane than the
 transient parity example.
+
+`reference_slice_mesh_diagnostic.py` compares the generated LMX straight-duct
+mesh against the processed-slice point grid used by the external paper data.
+It writes a side-by-side mesh panel and layer-resolution JSON so mesh
+discretization can be separated from solver and observable-parity errors.

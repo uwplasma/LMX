@@ -1551,6 +1551,12 @@ That retained gate now passes for all three retained fringing geometries.
     operator, including off-diagonal EMF terms, or an OpenFOAM-grid
     reproduction of the exact-BL mesh so discretization differences can be
     isolated.
+  - the new reference-slice mesh diagnostic now exposes a concrete mesh
+    discrepancy for Hunt Ha=20: the bundled external processed-slice point grid
+    has roughly ten Hartmann-layer intervals and forty-two side-layer
+    intervals, while the retained generated LMX mesh has roughly ten and six.
+    Before another momentum-operator patch, run the parity case on a
+    reference-like side-layer grid and separate mesh error from operator error.
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed
