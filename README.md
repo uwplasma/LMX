@@ -345,6 +345,12 @@ paired reduced differentiable study is
 mirror topology as a stationwise field profile and differentiates a
 pressure-drop proxy with respect to coil separation.
 
+The WHAM table is generated in the same streamwise coordinate frame used by
+the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
+centers the mirror coils in physical coordinates. This avoids silent tabulated
+field extrapolation at the downstream half of the pipe and is recorded in the
+example summary JSON.
+
 The executable WHAM lane is useful today for field loading, geometry context,
 and conservation auditing. The new overview figure shows exactly that: the pipe
 passes across the mirror field, the centerplane field contours are sampled from

@@ -53,9 +53,10 @@ AUTODIFF_AXIAL_LOOPS = 4
 
 def run_wham_mirror_pipe_demo() -> dict[str, object]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    x_field = np.linspace(-0.5 * PIPE_LENGTH, 0.5 * PIPE_LENGTH, FIELD_NX)
+    x_field = np.linspace(0.0, PIPE_LENGTH, FIELD_NX)
     y_field = np.linspace(-PIPE_RADIUS, PIPE_RADIUS, FIELD_NY)
     z_field = np.linspace(-PIPE_RADIUS, PIPE_RADIUS, FIELD_NZ)
+    coil_frame_x_offset = -0.5 * PIPE_LENGTH
     table_path = write_wham_mirror_field_npz(
         OUTPUT_DIR / "wham_mirror_field.npz",
         x=x_field,
@@ -67,6 +68,7 @@ def run_wham_mirror_pipe_demo() -> dict[str, object]:
         outer_radius=COIL_OUTER_RADIUS,
         radial_loops=RADIAL_LOOPS,
         axial_loops=AXIAL_LOOPS,
+        x_offset=coil_frame_x_offset,
     )
 
     problem = build_wham_mirror_pipe_extruded_problem(
@@ -78,11 +80,11 @@ def run_wham_mirror_pipe_demo() -> dict[str, object]:
         nx_stations=NX_STATIONS,
         forcing=FORCING,
     )
-    centered_x = jnp.linspace(-0.5 * PIPE_LENGTH, 0.5 * PIPE_LENGTH, NX_STATIONS)
+    solver_x = jnp.linspace(0.0, PIPE_LENGTH, NX_STATIONS)
     centerline_field = np.asarray(
         sample_tabulated_field_volume(
             table_path,
-            x=np.asarray(centered_x, dtype=float),
+            x=np.asarray(solver_x, dtype=float),
             y=np.zeros(NX_STATIONS, dtype=float),
             z=np.zeros(NX_STATIONS, dtype=float),
         ),
@@ -92,7 +94,7 @@ def run_wham_mirror_pipe_demo() -> dict[str, object]:
     centerline_scale = centerline_bmag / max(float(np.max(centerline_bmag)), 1.0e-12)
     problem = replace(
         problem,
-        profile=replace(problem.profile, x=centered_x, field_scale=jnp.asarray(centerline_scale, dtype=float)),
+        profile=replace(problem.profile, x=solver_x, field_scale=jnp.asarray(centerline_scale, dtype=float)),
         case=replace(
             problem.case,
             time_stepper=replace(
@@ -183,6 +185,13 @@ def run_wham_mirror_pipe_demo() -> dict[str, object]:
     summary = {
         "case": "wham_mirror_pipe",
         "field_table": table_path.name,
+        "field_coordinate_frame": {
+            "solver_x_min": float(x_field[0]),
+            "solver_x_max": float(x_field[-1]),
+            "coil_frame_x_offset": float(coil_frame_x_offset),
+            "coil_frame_x_min": float(x_field[0] + coil_frame_x_offset),
+            "coil_frame_x_max": float(x_field[-1] + coil_frame_x_offset),
+        },
         "plots": [path.name for path in [*field_plots, *overview_plots, *wham_overview]],
         "field_quality": field_quality,
         "validation": validation,

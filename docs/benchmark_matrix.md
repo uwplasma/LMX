@@ -396,6 +396,9 @@ Current tabulated-field / mirror-field extension:
 - `examples/wham_mirror_pipe_demo.py`
   - writes a tabulated WHAM-like mirror field with `magpylib_jax`
   - solves the current low-Re inductionless pipe baseline through that field
+  - writes the table in solver streamwise coordinates, `x ∈ [0, L]`, while
+    recording the offset back to the centered coil frame; this prevents
+    unintended tabulated-field extrapolation in the downstream half of the pipe
   - observables:
     field/velocity anticorrelation, pressure-drop proxy, current response, and
     conservation metrics
@@ -416,6 +419,8 @@ Current bounded reduced sensitivity result:
 Current bounded executable tabulated-pipe result:
 
 - the field-loading and conservation path is stable
+- the WHAM field table is now aligned with the solver coordinate frame and the
+  summary records `coil_frame_x_offset` for reproducibility
 - the structured 3D field-quality gate passes with zero table-node
   interpolation error and `divergence_to_field_ratio ≈ 3.01e-2`
 - `field_velocity_correlation ≈ -9.70e-1`

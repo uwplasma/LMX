@@ -118,3 +118,27 @@ def test_write_wham_mirror_field_npz_round_trip(tmp_path):
     assert set(payload) == {"x", "y", "z", "bx", "by", "bz"}
     sampled = np.asarray(sample_wham_mirror_field(*np.meshgrid(x, y, z, indexing="ij"), coil_separation=1.2, radial_loops=3, axial_loops=2))
     assert sampled.shape == (5, 4, 4, 3)
+
+    solver_x = np.linspace(0.0, 0.6, 5)
+    shifted_path = write_wham_mirror_field_npz(
+        tmp_path / "wham_shifted_field.npz",
+        x=solver_x,
+        y=y,
+        z=z,
+        coil_separation=1.2,
+        radial_loops=3,
+        axial_loops=2,
+        x_offset=-0.3,
+    )
+    shifted_payload = load_tabulated_field(shifted_path)
+    shifted_reference = np.asarray(
+        sample_wham_mirror_field(
+            *np.meshgrid(solver_x - 0.3, y, z, indexing="ij"),
+            coil_separation=1.2,
+            radial_loops=3,
+            axial_loops=2,
+        )
+    )
+    assert shifted_payload["x"][0] == pytest.approx(0.0)
+    assert shifted_payload["x"][-1] == pytest.approx(0.6)
+    assert shifted_payload["bz"] == pytest.approx(shifted_reference[..., 2])

@@ -1058,6 +1058,10 @@ Current localized magnetic-obstacle response lane:
   distortion strengthen across the small regime map
 - `examples/wham_mirror_pipe_demo.py` now adds a tabulated WHAM-like mirror
   field on the pipe lane using `magpylib_jax`
+- the executable WHAM pipe demo now writes the tabulated field on the same
+  `x ∈ [0, L]` streamwise coordinate used by the solver and records the
+  centered-coil offset, closing a tabulated-field coordinate-frame mismatch
+  that could otherwise extrapolate the downstream half of the pipe
 - `examples/autodiff_wham_pressure_sensitivity.py` now adds the first
   coil-separation sensitivity study for pressure-drop proxy on that mirror
   topology

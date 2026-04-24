@@ -578,7 +578,10 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
     module = _load_example_module("wham_mirror_pipe_demo.py")
 
     monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path)
+    captured_field_kwargs = {}
+
     def fake_write_wham_mirror_field_npz(path, **kwargs):
+        captured_field_kwargs.update(kwargs)
         target = Path(path)
         target.write_bytes(b"npz")
         return target
@@ -612,6 +615,11 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
     assert "field_preview.png" in summary["plots"]
     assert "wham_mirror_overview.png" in summary["plots"]
     assert summary["field_quality"]["dimension"] == 3
+    assert captured_field_kwargs["x"][0] == pytest.approx(0.0)
+    assert captured_field_kwargs["x"][-1] == pytest.approx(module.PIPE_LENGTH)
+    assert captured_field_kwargs["x_offset"] == pytest.approx(-0.5 * module.PIPE_LENGTH)
+    assert summary["field_coordinate_frame"]["solver_x_min"] == pytest.approx(0.0)
+    assert summary["field_coordinate_frame"]["coil_frame_x_min"] == pytest.approx(-0.5 * module.PIPE_LENGTH)
     assert (tmp_path / "wham_mirror_pipe_summary.json").exists()
 
 

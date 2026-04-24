@@ -388,6 +388,8 @@ Those examples are the current executable localized-field response entry points:
   - write a tabulated WHAM-like mirror field
   - solve a straight pipe crossing that 3D field
   - export the field preview, a 3D WHAM overview figure, and the pipe-response overview
+  - generate the field table on the solver streamwise axis and record the
+    `coil_frame_x_offset` used to center the mirror coils
 - `autodiff_wham_pressure_sensitivity.py`
   - treat the same mirror topology as a differentiable stationwise profile
   - compute pressure-drop sensitivity with respect to coil separation
