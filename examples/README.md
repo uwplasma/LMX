@@ -332,6 +332,8 @@ That example moves the Q2D lane from periodic modes to a wall-bounded duct:
 
 - solve a no-slip forced Q2D Hartmann-friction mode in a rectangular box
 - compare the transient final state against the exact Dirichlet solution
+- report Sommeria-Moreau-facing energy, enstrophy, dissipation, and spectrum
+  observables for the future turbulent validation gate
 - write a compact validation figure and summary JSON
 
 Localized-field and mirror-field response:

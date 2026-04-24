@@ -5,6 +5,7 @@ from pathlib import Path
 
 from lmx import (
     build_q2d_wall_bounded_forced_case,
+    q2d_turbulence_observables,
     solve_q2d_wall_bounded_forced,
     validate_q2d_wall_bounded_forced_solution,
     write_q2d_wall_bounded_forced_plots,
@@ -35,10 +36,18 @@ def run_q2d_wall_bounded_validation() -> dict[str, object]:
     solution = solve_q2d_wall_bounded_forced(case)
     plots = write_q2d_wall_bounded_forced_plots(case, solution, OUTPUT_DIR)
     validation = validate_q2d_wall_bounded_forced_solution(case, solution)
+    turbulence_observables = q2d_turbulence_observables(
+        solution.field,
+        lx=case.lx,
+        ly=case.ly,
+        viscosity=case.viscosity,
+        hartmann_friction=case.hartmann_friction,
+    )
     summary = {
         "case": "q2d_wall_bounded_validation",
         "plots": [path.name for path in plots],
         "validation": validation,
+        "turbulence_observables": turbulence_observables,
     }
     (OUTPUT_DIR / "q2d_wall_bounded_validation_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

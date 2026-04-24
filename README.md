@@ -239,6 +239,8 @@ solutions before moving to turbulent observables.
   analytical steady amplitude with `L2 ≈ 4.44e-4`
 - `examples/q2d_wall_bounded_validation.py`: a no-slip rectangular box is
   forced toward the exact transient Dirichlet solution with `L2 ≈ 4.15e-4`
+  and writes Sommeria-Moreau-facing energy, enstrophy, dissipation, and
+  spectral observables for the future turbulent Q2D validation lane
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">

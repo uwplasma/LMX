@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from lmx.q2d import (
     build_q2d_decay_case,
     build_q2d_forced_case,
     build_q2d_wall_bounded_forced_case,
+    q2d_energy_spectrum,
+    q2d_turbulence_observables,
+    q2d_turbulence_readiness_metrics,
     solve_q2d_decay,
     solve_q2d_forced,
     solve_q2d_wall_bounded_forced,
@@ -72,3 +76,51 @@ def test_write_q2d_wall_bounded_plots_writes_png_and_pdf(tmp_path: Path):
     assert outputs == [tmp_path / "q2d_wall_bounded_overview.png", tmp_path / "q2d_wall_bounded_overview.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
+
+
+def test_q2d_energy_spectrum_identifies_single_mode():
+    x = np.linspace(0.0, 2.0, 64, endpoint=False)
+    y = np.linspace(0.0, 2.0, 64, endpoint=False)
+    xx, yy = np.meshgrid(x, y, indexing="ij")
+    field = np.sin(2.0 * np.pi * xx / 2.0) * np.sin(2.0 * np.pi * yy / 2.0)
+
+    spectrum = q2d_energy_spectrum(field, lx=2.0, ly=2.0, bins=12)
+
+    assert len(spectrum["wavenumber"]) == 12
+    assert len(spectrum["counts"]) == 12
+    assert max(spectrum["energy"]) > 0.0
+    assert sum(spectrum["counts"]) == field.size
+
+
+def test_q2d_turbulence_observables_report_sommeria_moreau_readiness():
+    case = build_q2d_wall_bounded_forced_case(nx=40, ny=40, dt=5.0e-4, t_final=0.04)
+    solution = solve_q2d_wall_bounded_forced(case)
+
+    metrics = q2d_turbulence_observables(
+        solution.field,
+        lx=case.lx,
+        ly=case.ly,
+        viscosity=case.viscosity,
+        hartmann_friction=case.hartmann_friction,
+    )
+
+    assert metrics["kinetic_energy"] > 0.0
+    assert metrics["fluctuation_kinetic_energy"] > 0.0
+    assert metrics["enstrophy_proxy"] > 0.0
+    assert metrics["spectrum_peak_wavenumber"] > 0.0
+    assert 0.0 <= metrics["high_wavenumber_energy_fraction"] <= 1.0
+    assert metrics["validation_status"] == "spectral_observables_available_no_turbulent_reference"
+    assert metrics["research_grade_turbulence_validation_pass"] is False
+
+
+def test_q2d_turbulence_metrics_reject_non_2d_fields():
+    with pytest.raises(ValueError, match="2D field"):
+        q2d_energy_spectrum(np.zeros((4, 4, 2)), lx=1.0, ly=1.0)
+    with pytest.raises(ValueError, match="2D field"):
+        q2d_turbulence_readiness_metrics(
+            np.zeros((4, 4, 2)),
+            lx=1.0,
+            ly=1.0,
+            viscosity=0.01,
+            hartmann_friction=2.0,
+        )

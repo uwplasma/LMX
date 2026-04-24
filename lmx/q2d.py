@@ -391,6 +391,121 @@ def validate_q2d_wall_bounded_forced_solution(
     }
 
 
+def q2d_energy_spectrum(
+    field: np.ndarray,
+    *,
+    lx: float,
+    ly: float,
+    bins: int = 16,
+) -> dict[str, list[float]]:
+    """Return an isotropic shell spectrum for a scalar Q2D field.
+
+    The returned shell energies are integrated over Fourier modes in each
+    radial wavenumber bin. This is intentionally lightweight: it provides the
+    spectral observables needed for validation summaries without committing the
+    solver to one turbulent-spectrum normalization convention.
+    """
+
+    values = np.asarray(field, dtype=float)
+    if values.ndim != 2:
+        raise ValueError("Q2D energy spectrum expects a 2D field")
+    if bins < 1:
+        raise ValueError("Q2D energy spectrum requires at least one bin")
+    nx, ny = values.shape
+    spectrum_density = 0.5 * np.abs(np.fft.fft2(values)) ** 2 / max(nx * ny, 1) ** 2
+    kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=lx / max(nx, 1))
+    ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=ly / max(ny, 1))
+    kkx, kky = np.meshgrid(kx, ky, indexing="ij")
+    k_mag = np.sqrt(kkx**2 + kky**2)
+    max_k = float(np.max(k_mag)) if k_mag.size else 0.0
+    edges = np.linspace(0.0, max_k, max(2, bins + 1))
+    shell_energy = np.zeros(edges.size - 1, dtype=float)
+    shell_counts = np.zeros(edges.size - 1, dtype=int)
+    for index in range(shell_energy.size):
+        if index == shell_energy.size - 1:
+            mask = (k_mag >= edges[index]) & (k_mag <= edges[index + 1])
+        else:
+            mask = (k_mag >= edges[index]) & (k_mag < edges[index + 1])
+        shell_energy[index] = float(np.sum(spectrum_density[mask]))
+        shell_counts[index] = int(np.count_nonzero(mask))
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return {"wavenumber": centers.tolist(), "energy": shell_energy.tolist(), "counts": shell_counts.tolist()}
+
+
+def q2d_turbulence_readiness_metrics(
+    field: np.ndarray,
+    *,
+    lx: float,
+    ly: float,
+    viscosity: float,
+    hartmann_friction: float,
+) -> dict[str, object]:
+    """Compute Sommeria-Moreau-facing observables for future Q2D tests."""
+
+    values = np.asarray(field, dtype=float)
+    if values.ndim != 2:
+        raise ValueError("Q2D turbulence readiness metrics expect a 2D field")
+    dx = lx / max(values.shape[0] - 1, 1)
+    dy = ly / max(values.shape[1] - 1, 1)
+    grad_x, grad_y = np.gradient(values, dx, dy, edge_order=1)
+    fluctuation = values - float(np.mean(values))
+    kinetic_energy = 0.5 * float(np.mean(values**2))
+    fluctuation_kinetic_energy = 0.5 * float(np.mean(fluctuation**2))
+    enstrophy_proxy = 0.5 * float(np.mean(grad_x**2 + grad_y**2))
+    hartmann_dissipation_proxy = float(hartmann_friction) * float(np.mean(values**2))
+    viscous_dissipation_proxy = 2.0 * float(viscosity) * enstrophy_proxy
+    spectrum = q2d_energy_spectrum(fluctuation, lx=lx, ly=ly)
+    spectrum_energy = np.asarray(spectrum["energy"], dtype=float)
+    spectrum_wavenumber = np.asarray(spectrum["wavenumber"], dtype=float)
+    total_spectral_energy = float(np.sum(spectrum_energy))
+    peak_index = int(np.argmax(spectrum_energy)) if spectrum_energy.size else 0
+    high_k_cutoff = float(np.percentile(spectrum_wavenumber, 75.0)) if spectrum_wavenumber.size else 0.0
+    high_k_mask = spectrum_wavenumber >= high_k_cutoff
+    high_k_energy_fraction = (
+        float(np.sum(spectrum_energy[high_k_mask]) / total_spectral_energy)
+        if total_spectral_energy > 0.0
+        else 0.0
+    )
+    return {
+        "kinetic_energy": kinetic_energy,
+        "fluctuation_kinetic_energy": fluctuation_kinetic_energy,
+        "enstrophy_proxy": enstrophy_proxy,
+        "hartmann_dissipation_proxy": hartmann_dissipation_proxy,
+        "viscous_dissipation_proxy": viscous_dissipation_proxy,
+        "spectrum_peak_wavenumber": float(spectrum_wavenumber[peak_index]) if spectrum_wavenumber.size else 0.0,
+        "high_wavenumber_energy_fraction": high_k_energy_fraction,
+        "spectrum": spectrum,
+        "literature_target": "Sommeria-Moreau quasi-2D turbulence observables",
+        "required_next_observables": [
+            "energy_decay_exponent_or_rate",
+            "energy_spectrum_slope",
+            "inverse_cascade_or_large-scale-condensate trend",
+            "Hartmann-friction damping trend",
+        ],
+        "validation_status": "spectral_observables_available_no_turbulent_reference",
+        "research_grade_turbulence_validation_pass": False,
+    }
+
+
+def q2d_turbulence_observables(
+    field: np.ndarray,
+    *,
+    lx: float,
+    ly: float,
+    viscosity: float,
+    hartmann_friction: float,
+) -> dict[str, object]:
+    """Compatibility alias for Q2D turbulence-readiness observables."""
+
+    return q2d_turbulence_readiness_metrics(
+        field,
+        lx=lx,
+        ly=ly,
+        viscosity=viscosity,
+        hartmann_friction=hartmann_friction,
+    )
+
+
 def write_q2d_decay_plots(
     case: Q2DDecayCase,
     solution: Q2DDecaySolution,

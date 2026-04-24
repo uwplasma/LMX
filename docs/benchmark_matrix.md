@@ -265,8 +265,13 @@ Current wall-bounded Q2D Hartmann-friction lane:
   - observables:
     final-state `L2/L∞` error and amplitude error against the exact transient
     Dirichlet solution
+  - turbulence-facing observables:
+    scalar kinetic energy, fluctuation energy, enstrophy proxy, Hartmann
+    friction dissipation proxy, viscous dissipation proxy, shell energy
+    spectrum, spectral peak, and high-wavenumber energy fraction
   - role:
     first wall-bounded Q2D duct slice before Sommeria-Moreau-style closures
+    and literature/experiment turbulent datasets
 
 Current bounded result:
 

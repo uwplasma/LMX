@@ -955,6 +955,10 @@ Current quasi-2D wall-bounded forced lane:
 - observables:
   final-state `L2/L∞` error and amplitude error against the exact Dirichlet
   transient solution
+- turbulence-facing observables now emitted:
+  scalar kinetic energy, fluctuation kinetic energy, enstrophy proxy,
+  Hartmann-friction dissipation proxy, viscous dissipation proxy, shell
+  spectrum, spectral peak, and high-wavenumber energy fraction
 - remaining work before any turbulent Q2D claim:
   Sommeria-Moreau-style closures, literature-anchored wall-bounded duct
   observables, and Q2D turbulence
