@@ -247,13 +247,17 @@ cuts, so reference-grid studies must record both profile error and conditioning
 
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
-low-signal normalized cuts. It also stores the Hunt side-jet location and
-peak-to-center diagnostics, plus flow-rate and pressure-gradient errors, so
-the next high-Ha Hunt ladder can distinguish shape error, side-layer placement
-error, drive error, and current-closure error. That ranking is the triage
-surface for the next solver work: fix the last `O(1.3e-2)` Hunt/Shercliff
-wall-normal velocity/Lorentz offenders before adding more FreeMHD comparison
-figures.
+low-signal normalized cuts. It also writes an `observable_gate` block with the
+required observables, required axes, missing-observable count, offender count,
+and a single `research_grade_validation_pass` boolean. That gate is based on
+physical observables, not plot pixels, and is the field-level contract for
+future CI/release validation. The same summary stores the Hunt side-jet
+location and peak-to-center diagnostics, plus flow-rate and pressure-gradient
+errors, so the next high-Ha Hunt ladder can distinguish shape error,
+side-layer placement error, drive error, and current-closure error. That
+ranking is the triage surface for the next solver work: fix the last
+`O(1.3e-2)` Hunt/Shercliff wall-normal velocity/Lorentz offenders before
+adding more FreeMHD comparison figures.
 
 Mapped-pipe external parity remains documented but deferred. The bundled pipe
 reference corresponds to a high-`Ha`, high-`Re` fringing-pipe case, while the

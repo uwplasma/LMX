@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from examples import freemhd_closed_channel_observable_parity as observable
 from lmx import write_freemhd_observable_parity_plots
-from lmx.freemhd import summarize_observable_offenders
+from lmx.freemhd import summarize_observable_gate, summarize_observable_offenders
 
 
 OUTPUT_DIR = Path("artifacts/examples/freemhd_closed_channel_flow_rate_parity")
@@ -53,6 +53,7 @@ def run_freemhd_closed_channel_flow_rate_parity(
         ),
         "settings": CASE_SETTINGS,
         "records": records,
+        "observable_gate": summarize_observable_gate(records, l2_target=1.0e-2),
         "top_observable_offenders": summarize_observable_offenders(records, l2_target=1.0e-2, top_n=8),
         "plots": [path.name for path in plots],
     }

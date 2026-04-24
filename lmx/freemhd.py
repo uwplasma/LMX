@@ -160,6 +160,60 @@ def summarize_observable_offenders(
     return offenders
 
 
+def summarize_observable_gate(
+    records: list[dict[str, object]],
+    *,
+    l2_target: float = 1.0e-2,
+    required_observables: tuple[str, ...] = ("velocity", "potential", "current", "lorentz"),
+    required_axes: tuple[str, ...] = ("y", "z"),
+    min_reference_peak_fraction: float = 1.0e-3,
+) -> dict[str, object]:
+    """Summarize whether a FreeMHD parity artifact has the required observables.
+
+    The gate is intentionally based on physical outputs rather than image
+    similarity: each case must carry the requested midplane cuts and every
+    non-low-signal cut must stay below the configured normalized L2 target.
+    """
+
+    missing: list[dict[str, str]] = []
+    for record in records:
+        case_kind = str(record.get("case_kind", ""))
+        observables = record.get("observables", {})
+        if not isinstance(observables, dict):
+            observables = {}
+        for observable_name in required_observables:
+            payload = observables.get(observable_name)
+            if not isinstance(payload, dict):
+                missing.append({"case_kind": case_kind, "observable": observable_name, "axis": "*"})
+                continue
+            for axis in required_axes:
+                if not isinstance(payload.get(axis), dict):
+                    missing.append({"case_kind": case_kind, "observable": observable_name, "axis": axis})
+
+    ranked = summarize_observable_offenders(
+        records,
+        l2_target=l2_target,
+        min_reference_peak_fraction=min_reference_peak_fraction,
+    )
+    offender_count = sum(1 for item in ranked if item["status"] == "offender")
+    low_signal_count = sum(1 for item in ranked if item["status"] == "low_signal")
+    pass_count = sum(1 for item in ranked if item["status"] == "pass")
+    return {
+        "case_count": len(records),
+        "cases": sorted(str(record.get("case_kind", "")) for record in records),
+        "l2_target": float(l2_target),
+        "required_observables": list(required_observables),
+        "required_axes": list(required_axes),
+        "observable_pass_count": pass_count,
+        "observable_offender_count": offender_count,
+        "low_signal_count": low_signal_count,
+        "missing_observable_count": len(missing),
+        "missing_observables": missing,
+        "top_observable_offenders": ranked[:8],
+        "research_grade_validation_pass": offender_count == 0 and len(missing) == 0,
+    }
+
+
 def side_jet_profile_metrics(
     coordinate: object,
     values: object,

@@ -6,7 +6,7 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from lmx import write_freemhd_observable_parity_plots
-from lmx.freemhd import compare_side_jet_profiles, summarize_observable_offenders
+from lmx.freemhd import compare_side_jet_profiles, summarize_observable_gate, summarize_observable_offenders
 from lmx.reference_data import extract_processed_profile, load_closed_channel_analytical, load_processed_slice, processed_slice_area_mean
 from lmx.showcase import solve_closed_channel_benchmark
 from lmx.validation import compare_normalized_profiles, extract_midplane_scalar_profile
@@ -240,6 +240,7 @@ def run_freemhd_closed_channel_observable_parity() -> dict[str, object]:
             "insulating_wall_conductivity": INSULATING_WALL_CONDUCTIVITY,
         },
         "records": records,
+        "observable_gate": summarize_observable_gate(records, l2_target=1.0e-2),
         "top_observable_offenders": summarize_observable_offenders(records, l2_target=1.0e-2, top_n=8),
         "plots": [path.name for path in plots],
     }

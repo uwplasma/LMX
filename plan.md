@@ -200,6 +200,11 @@ refer to the Samper et al. taxonomy.
    constrained-flow run now matches mean flow exactly and gives Shercliff
    velocity cuts of `8.49e-3` / `5.20e-3` and Hunt cuts of `1.26e-2` /
    `7.70e-3`; Hunt-y remains the last slightly-above-target cut.
+   The FreeMHD observable summaries now also include an explicit
+   `observable_gate` with required observables, required axes,
+   missing-observable count, offender count, and
+   `research_grade_validation_pass`, so release/manual validation can fail on
+   physical observable gaps instead of depending on plot inspection.
 2. Make boundary-layer meshing first-class.
    Add a documented mesh ladder for Hartmann and side layers with at least
    8-10 cells across the thinnest layer in high-Ha validation runs, smooth

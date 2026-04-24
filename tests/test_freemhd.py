@@ -18,6 +18,7 @@ from lmx.freemhd import (
     parse_freemhd_execution_seconds,
     run_freemhd_demo,
     side_jet_profile_metrics,
+    summarize_observable_gate,
     summarize_observable_offenders,
     summarize_profile_error_offenders,
     summarize_runtime_offenders,
@@ -383,6 +384,15 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
     assert observable_offenders[0]["axis"] == "y"
     assert observable_offenders[0]["status"] == "offender"
     assert observable_offenders[-1]["status"] == "low_signal"
+
+    observable_gate = summarize_observable_gate(observable_records, l2_target=1.0e-2)
+    assert observable_gate["research_grade_validation_pass"] is False
+    assert observable_gate["observable_offender_count"] == 3
+    assert observable_gate["low_signal_count"] == 1
+    assert observable_gate["missing_observable_count"] == 1
+    assert observable_gate["missing_observables"] == [
+        {"case_kind": "shercliff", "observable": "lorentz", "axis": "*"}
+    ]
 
     profile_records = [
         {
