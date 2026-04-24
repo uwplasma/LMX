@@ -91,6 +91,49 @@ class ExtrudedInductionlessSolution:
     validation: ExtrudedInductionlessValidation
 
 
+MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
+    "cuevas_smolentsev_abdou_q2d": {
+        "label": "Cuevas, Smolentsev, Abdou quasi-2D magnetic obstacle",
+        "url": "https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA",
+        "model_class": "quasi_2d_rectangular_channel",
+        "required_observables": [
+            "centerline_velocity_deficit",
+            "wake_recovery",
+            "pressure_drop_or_drag_proxy",
+            "current_closure",
+            "vorticity_or_recirculation_structure",
+        ],
+    },
+    "votyakov_zienicke_kolesnikov_jfm": {
+        "label": "Votyakov, Zienicke, Kolesnikov constrained magnetic obstacle",
+        "url": "https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0",
+        "model_class": "3d_rectangular_channel_with_experimental_comparison",
+        "required_observables": [
+            "centerline_velocity_deficit",
+            "wake_recovery",
+            "pressure_drop",
+            "cross_sectional_distortion",
+            "recirculation_topology",
+        ],
+    },
+    "andreev_kolesnikov_thess_experiment": {
+        "label": "Andreev, Kolesnikov, Thess nonuniform-field channel experiment",
+        "url": "https://doi.org/10.1063/1.2213639",
+        "model_class": "rectangular_channel_experiment",
+        "required_observables": [
+            "ultrasound_velocity_profiles",
+            "magnet_position_response",
+            "pressure_drop",
+            "wake_structure",
+        ],
+    },
+}
+
+
+def magnetic_obstacle_literature_reference_cases() -> dict[str, dict[str, object]]:
+    return {key: {**value} for key, value in MAGNETIC_OBSTACLE_LITERATURE_REFERENCES.items()}
+
+
 def _broadcast_station_profile(values: jnp.ndarray, ny: int, nz: int) -> jnp.ndarray:
     return jnp.broadcast_to(jnp.asarray(values, dtype=float)[:, None, None], (values.shape[0], ny, nz))
 
@@ -2218,6 +2261,71 @@ def validate_magnetic_obstacle_literature_slice(
         "research_grade_validation_pass": False,
         "literature_status": "internal_lmx_response_only",
         "literature_pass": False,
+    }
+
+
+def validate_magnetic_obstacle_external_readiness(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    reference_case: str = "votyakov_zienicke_kolesnikov_jfm",
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, object]:
+    """Report literature-facing magnetic-obstacle observables without claiming parity."""
+
+    references = magnetic_obstacle_literature_reference_cases()
+    if reference_case not in references:
+        available = ", ".join(sorted(references))
+        raise ValueError(f"Unknown magnetic-obstacle reference case {reference_case!r}; available: {available}")
+    baseline = validate_magnetic_obstacle_baseline(solution, field_ny=field_ny, field_nz=field_nz)
+    bundle = solution.bundle
+    x = np.asarray(bundle.x, dtype=float)
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    pressure_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
+    inlet_velocity = float(mean_velocity[0]) if mean_velocity.size else 0.0
+    center_velocity_deficit = float(inlet_velocity - mean_velocity[peak_index]) if mean_velocity.size else 0.0
+    centerline_deficit_ratio = center_velocity_deficit / max(abs(inlet_velocity), 1.0e-20)
+    recovery_ratio = float(mean_velocity[-1] / max(abs(inlet_velocity), 1.0e-20)) if mean_velocity.size else 0.0
+    integrated_pressure_proxy = (
+        float(np.trapezoid(pressure_proxy, x) / max(float(x[-1] - x[0]), 1.0e-12))
+        if pressure_proxy.size > 1 and x.size > 1
+        else 0.0
+    )
+    observable_payload = {
+        "centerline_velocity_deficit": center_velocity_deficit,
+        "centerline_velocity_deficit_ratio": centerline_deficit_ratio,
+        "wake_recovery_ratio": recovery_ratio,
+        "pressure_drop_proxy": integrated_pressure_proxy,
+        "current_proxy_peak": float(baseline["current_proxy_peak"]),
+        "field_velocity_correlation": float(baseline["field_velocity_correlation"]),
+        "max_charge_balance_residual": float(baseline["max_charge_balance_residual"]),
+    }
+    measured_observables = sorted(observable_payload)
+    required_observables = list(references[reference_case]["required_observables"])
+    missing_observables = [
+        observable
+        for observable in required_observables
+        if observable
+        not in {
+            "centerline_velocity_deficit",
+            "wake_recovery",
+            "pressure_drop_or_drag_proxy",
+            "pressure_drop",
+            "current_closure",
+        }
+    ]
+    return {
+        "reference_case": reference_case,
+        "reference": references[reference_case],
+        "measured_observables": measured_observables,
+        "required_observables": required_observables,
+        "missing_observables": missing_observables,
+        "observables": observable_payload,
+        "external_reference_available": False,
+        "research_grade_validation_pass": False,
+        "validation_status": "literature_target_registered_no_digitized_reference",
     }
 
 

@@ -36,6 +36,8 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.validate_magnetic_obstacle_baseline)
     assert callable(lmx.validate_magnetic_obstacle_benchmark)
     assert callable(lmx.validate_magnetic_obstacle_literature_slice)
+    assert callable(lmx.magnetic_obstacle_literature_reference_cases)
+    assert callable(lmx.validate_magnetic_obstacle_external_readiness)
     assert callable(lmx.validate_wham_mirror_pipe_baseline)
     assert callable(lmx.build_square_duct_extruded_problem)
     assert callable(lmx.build_fringing_autodiff_problem)

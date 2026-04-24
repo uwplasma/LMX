@@ -321,6 +321,14 @@ literature comparisons: streamwise wake deficit, centerline recovery location,
 pressure response, and cross-cut distortion. The current reference is still a
 matched no-field LMX run, so it is not an external validation.
 
+The code now exposes `magnetic_obstacle_literature_reference_cases()` and
+`validate_magnetic_obstacle_external_readiness(...)`. These register the
+Cuevas-Smolentsev-Abdou quasi-2D target, the Votyakov-Zienicke-Kolesnikov
+constrained-flow target, and the Andreev-Kolesnikov-Thess experimental target,
+then reports the LMX observables in that vocabulary. This is a readiness gate,
+not a pass/fail parity gate, until digitized reference profiles or executable
+external cases are added.
+
 The choice of observables follows the wake/recovery framing used in magnetic-
 obstacle studies such as Cuevas et al., *On the flow past a magnetic obstacle*
 and Votyakov et al., *Constrained flow around a magnetic obstacle*, even

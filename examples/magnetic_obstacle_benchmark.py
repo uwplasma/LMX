@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from lmx import (
     build_magnetic_obstacle_rect_extruded_problem,
     solve_extruded_inductionless,
+    validate_magnetic_obstacle_external_readiness,
     validate_magnetic_obstacle_benchmark,
     validate_magnetic_obstacle_literature_slice,
     write_extruded_overview_plots,
@@ -64,6 +65,7 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
     reference_solution = solve_extruded_inductionless(reference_problem)
     validation = validate_magnetic_obstacle_benchmark(solution, reference_solution)
     literature_validation = validate_magnetic_obstacle_literature_slice(solution, reference_solution)
+    external_readiness = validate_magnetic_obstacle_external_readiness(solution)
     plots = [
         *write_extruded_overview_plots(solution, OUTPUT_DIR, case_title="Magnetic-obstacle benchmark"),
         *write_magnetic_obstacle_benchmark_plots(
@@ -87,6 +89,7 @@ def run_magnetic_obstacle_benchmark() -> dict[str, object]:
         "plots": [path.name for path in plots],
         "validation": validation,
         "literature_validation": literature_validation,
+        "external_readiness": external_readiness,
     }
     (OUTPUT_DIR / "magnetic_obstacle_benchmark_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

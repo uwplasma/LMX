@@ -22,6 +22,7 @@ from lmx.fringing import (
     _variable_coefficient_poisson_jacobi_3d,
     _variable_coefficient_poisson_sparse_3d,
     clone_case_with_field,
+    magnetic_obstacle_literature_reference_cases,
     run_extruded_inductionless_slice,
     run_fringing_station_sweep,
     solve_extruded_inductionless,
@@ -30,6 +31,7 @@ from lmx.fringing import (
     validate_extruded_inductionless_solution,
     validate_magnetic_obstacle_benchmark,
     validate_magnetic_obstacle_baseline,
+    validate_magnetic_obstacle_external_readiness,
     validate_magnetic_obstacle_literature_slice,
     validate_wham_mirror_pipe_baseline,
     validate_variable_field_pipe_solution,
@@ -674,6 +676,8 @@ def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
     reference_problem = replace(problem, profile=replace(problem.profile, field_scale=jnp.zeros_like(problem.profile.field_scale)))
     reference_solution = solve_extruded_inductionless(reference_problem)
     validation = validate_magnetic_obstacle_literature_slice(solution, reference_solution, field_ny=41, field_nz=41)
+    references = magnetic_obstacle_literature_reference_cases()
+    readiness = validate_magnetic_obstacle_external_readiness(solution, field_ny=41, field_nz=41)
 
     assert validation["peak_station"] >= float(solution.bundle.x[0])
     assert validation["recovery_distance"] >= 0.0
@@ -683,6 +687,11 @@ def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
     assert validation["external_reference_available"] is False
     assert validation["research_grade_validation_pass"] is False
     assert validation["literature_pass"] is False
+    assert "votyakov_zienicke_kolesnikov_jfm" in references
+    assert readiness["reference_case"] == "votyakov_zienicke_kolesnikov_jfm"
+    assert "centerline_velocity_deficit_ratio" in readiness["observables"]
+    assert readiness["external_reference_available"] is False
+    assert readiness["research_grade_validation_pass"] is False
 
 
 def test_poisson_helpers_can_stop_early():

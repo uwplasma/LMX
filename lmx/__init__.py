@@ -239,6 +239,8 @@ _EXPORTS = {
     "validate_magnetic_obstacle_baseline": ("lmx.fringing", "validate_magnetic_obstacle_baseline"),
     "validate_magnetic_obstacle_benchmark": ("lmx.fringing", "validate_magnetic_obstacle_benchmark"),
     "validate_magnetic_obstacle_literature_slice": ("lmx.fringing", "validate_magnetic_obstacle_literature_slice"),
+    "magnetic_obstacle_literature_reference_cases": ("lmx.fringing", "magnetic_obstacle_literature_reference_cases"),
+    "validate_magnetic_obstacle_external_readiness": ("lmx.fringing", "validate_magnetic_obstacle_external_readiness"),
     "validate_wham_mirror_pipe_baseline": ("lmx.fringing", "validate_wham_mirror_pipe_baseline"),
     "make_divergence_free_cross_section_field": ("lmx.field_models", "make_divergence_free_cross_section_field"),
     "make_localized_divergence_free_obstacle_field": ("lmx.field_models", "make_localized_divergence_free_obstacle_field"),

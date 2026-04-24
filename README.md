@@ -281,6 +281,13 @@ The current summary makes that distinction explicit:
 `reference_kind = matched_no_field_lmx`, `external_reference_available = false`,
 and `research_grade_validation_pass = false`.
 
+The benchmark summary also now records a literature-readiness block keyed to
+the Cuevas-Smolentsev-Abdou quasi-2D magnetic obstacle study, the
+Votyakov-Zienicke-Kolesnikov constrained-flow study, and the
+Andreev-Kolesnikov-Thess nonuniform-field experiment. LMX currently reports
+the matching observable vocabulary, but the external digitized/reference data
+needed for a true parity claim is still an open lane.
+
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
 To push beyond that single bounded point, LMX also now includes

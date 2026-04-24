@@ -156,6 +156,10 @@ refer to the Samper et al. taxonomy.
   deficit, wake recovery, pressure drop or drag proxy, current closure,
   cross-sectional distortion, recirculation/vorticity structure where the
   solver supports it, and mesh/time convergence.
+  The code now has a named literature-reference registry and an external
+  readiness report that emits those observables without calling the matched
+  no-field solution an external validation. The remaining blocker is digitized
+  or executable external reference data for at least one of those studies.
 - Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
   tests as verification, then add Sommeria-Moreau-style closure observables and
   literature-facing turbulent energy/decay spectra before making any turbulent
