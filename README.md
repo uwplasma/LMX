@@ -572,6 +572,7 @@ Useful entry points:
 - `examples/freemhd_closed_channel_parity.py`: fresh LMX versus FreeMHD transient parity and runtime comparison on the same host
 - `examples/freemhd_closed_channel_observable_parity.py`: pressure-gradient-driven `u`, gauge-shifted `potE`, `J`, and `J×B_x` parity against the bundled FreeMHD paper slices with case-specific validated settings
 - `examples/freemhd_closed_channel_flow_rate_parity.py`: constrained-flow-rate parity against the same processed FreeMHD slices, including case-specific target mean velocities
+- `examples/freemhd_observable_mesh_ladder.py`: manual mesh/settings ladder for the remaining FreeMHD observable offenders
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

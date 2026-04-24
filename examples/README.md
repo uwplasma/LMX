@@ -31,6 +31,7 @@ python examples/straight_duct_profile_comparison.py
 python examples/freemhd_closed_channel_parity.py
 python examples/freemhd_closed_channel_observable_parity.py
 python examples/freemhd_closed_channel_flow_rate_parity.py
+python examples/freemhd_observable_mesh_ladder.py
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
@@ -464,6 +465,12 @@ switches to the constrained `inlet_flow_rate` formulation. It derives
 case-specific target mean velocities from the slice data and writes a separate
 constant-flow figure/summary so constrained-drive parity is not hidden by the
 pressure-gradient artifact.
+
+`freemhd_observable_mesh_ladder.py` runs the same field-level observable gate
+over a small retained/refined mesh ladder. It writes a JSON summary, CSV table,
+and PNG/PDF panel that report offender counts, worst over-target L2, and
+Hartmann/side-layer cell-readiness ratios. Use it before changing solver
+physics so mesh under-resolution and operator errors are separated.
 
 `reference_slice_mesh_diagnostic.py` compares the generated LMX straight-duct
 mesh against the processed-slice point grid used by the external paper data.

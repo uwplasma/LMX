@@ -190,6 +190,19 @@ separate `freemhd_closed_channel_flow_rate_parity` figure/summary. Keeping
 this separate from the pressure-gradient artifact prevents a visually clean
 pressure-gradient run from hiding constrained-drive errors.
 
+For mesh/settings triage, use:
+
+```bash
+python examples/freemhd_observable_mesh_ladder.py
+```
+
+That driver runs the field-level parity gate over a retained/refined mesh
+ladder and writes `freemhd_observable_mesh_ladder.csv` plus PNG/PDF plots of
+worst over-target L2, offender count, and Hartmann/side-layer readiness ratios.
+It is the preferred manual artifact before changing the fully developed
+momentum operator, because it separates mesh under-resolution from
+solver-physics errors.
+
 Current retained constant-flow result:
 
 - Shercliff:

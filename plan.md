@@ -205,6 +205,11 @@ refer to the Samper et al. taxonomy.
    missing-observable count, offender count, and
    `research_grade_validation_pass`, so release/manual validation can fail on
    physical observable gaps instead of depending on plot inspection.
+   A dedicated manual mesh/settings ladder now exists in
+   `examples/freemhd_observable_mesh_ladder.py`; it reports offender counts,
+   worst over-target L2, and Hartmann/side-layer readiness ratios so the
+   remaining wall-normal velocity/Lorentz gaps can be triaged before another
+   solver-physics change.
 2. Make boundary-layer meshing first-class.
    Add a documented mesh ladder for Hartmann and side layers with at least
    8-10 cells across the thinnest layer in high-Ha validation runs, smooth

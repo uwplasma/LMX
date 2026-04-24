@@ -9,7 +9,7 @@ from lmx import write_freemhd_observable_parity_plots
 from lmx.freemhd import compare_side_jet_profiles, summarize_observable_gate, summarize_observable_offenders
 from lmx.reference_data import extract_processed_profile, load_closed_channel_analytical, load_processed_slice, processed_slice_area_mean
 from lmx.showcase import solve_closed_channel_benchmark
-from lmx.validation import compare_normalized_profiles, extract_midplane_scalar_profile
+from lmx.validation import compare_normalized_profiles, duct_layer_resolution_gate, extract_midplane_scalar_profile
 
 
 OUTPUT_DIR = Path("artifacts/examples/freemhd_closed_channel_observable_parity")
@@ -98,7 +98,7 @@ def _observable_record(
         if flow_rate_target_mean_velocity is not None
         else processed_slice_area_mean(reference)
     )
-    _, solution, _ = solve_closed_channel_benchmark(
+    case, solution, _comparison = solve_closed_channel_benchmark(
         case_kind,
         ha=HA,
         width=WIDTH,
@@ -203,6 +203,7 @@ def _observable_record(
             else "configured"
         ),
         "settings": settings,
+        "layer_resolution": duct_layer_resolution_gate(case, solution.mesh),
         "applied_pressure_gradient": float(solution.diagnostics.applied_forcing_history[-1]),
         "reference_path": reference.path,
         "observables": observables,

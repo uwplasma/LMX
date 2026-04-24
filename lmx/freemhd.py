@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import os
 import re
 import subprocess
@@ -212,6 +213,129 @@ def summarize_observable_gate(
         "top_observable_offenders": ranked[:8],
         "research_grade_validation_pass": offender_count == 0 and len(missing) == 0,
     }
+
+
+def _observable_ladder_layer_summary(records: list[dict[str, object]]) -> dict[str, float | bool]:
+    layer_gates = [record.get("layer_resolution") for record in records if isinstance(record.get("layer_resolution"), dict)]
+    if not layer_gates:
+        return {
+            "layer_resolution_available": False,
+            "min_hartmann_layer_cells": 0.0,
+            "min_side_layer_cells": 0.0,
+            "min_hartmann_layer_cell_ratio": 0.0,
+            "min_side_layer_cell_ratio": 0.0,
+            "max_minimum_mesh_refinement_factor": 0.0,
+        }
+
+    def values(key: str) -> list[float]:
+        return [float(gate[key]) for gate in layer_gates if key in gate and gate[key] is not None]
+
+    hartmann_cells = values("hartmann_layer_cells")
+    side_cells = values("side_layer_cells")
+    hartmann_ratios = values("hartmann_layer_cell_ratio")
+    side_ratios = values("side_layer_cell_ratio")
+    refinement_factors = values("minimum_mesh_refinement_factor")
+    return {
+        "layer_resolution_available": True,
+        "min_hartmann_layer_cells": min(hartmann_cells) if hartmann_cells else 0.0,
+        "min_side_layer_cells": min(side_cells) if side_cells else 0.0,
+        "min_hartmann_layer_cell_ratio": min(hartmann_ratios) if hartmann_ratios else 0.0,
+        "min_side_layer_cell_ratio": min(side_ratios) if side_ratios else 0.0,
+        "max_minimum_mesh_refinement_factor": max(refinement_factors) if refinement_factors else 0.0,
+    }
+
+
+def summarize_observable_ladder_levels(
+    levels: list[dict[str, object]],
+    *,
+    l2_target: float = 1.0e-2,
+) -> dict[str, object]:
+    """Summarize a mesh/settings ladder for FreeMHD observable parity.
+
+    Each level must contain a ``label`` and a ``records`` list matching the
+    payload emitted by the closed-channel observable parity example. The result
+    is intentionally scalar and table-friendly so manual validation runs can
+    identify whether the remaining gap is controlled by mesh readiness or by
+    solver/observable physics.
+    """
+
+    rows: list[dict[str, object]] = []
+    for level in levels:
+        label = str(level.get("label", "level"))
+        records = list(level.get("records", [])) if isinstance(level.get("records", []), list) else []
+        ranked = summarize_observable_offenders(records, l2_target=l2_target)
+        gate = summarize_observable_gate(records, l2_target=l2_target)
+        offenders = [item for item in ranked if item["status"] == "offender"]
+        top = offenders[0] if offenders else (ranked[0] if ranked else {})
+        layer_summary = _observable_ladder_layer_summary(records)
+        rows.append(
+            {
+                "label": label,
+                "case_count": gate["case_count"],
+                "research_grade_validation_pass": gate["research_grade_validation_pass"],
+                "observable_offender_count": gate["observable_offender_count"],
+                "missing_observable_count": gate["missing_observable_count"],
+                "low_signal_count": gate["low_signal_count"],
+                "max_offender_l2_error": float(top.get("l2_error", 0.0)) if offenders else 0.0,
+                "max_offender_target_ratio": float(top.get("target_ratio", 0.0)) if offenders else 0.0,
+                "top_offender_case": str(top.get("case_kind", "")),
+                "top_offender_observable": str(top.get("observable", "")),
+                "top_offender_axis": str(top.get("axis", "")),
+                **layer_summary,
+            }
+        )
+
+    best_row = None
+    if rows:
+        best_row = min(
+            rows,
+            key=lambda row: (
+                int(row["missing_observable_count"]),
+                int(row["observable_offender_count"]),
+                float(row["max_offender_target_ratio"]),
+                -float(row["min_hartmann_layer_cell_ratio"]),
+                -float(row["min_side_layer_cell_ratio"]),
+            ),
+        )
+    return {
+        "level_count": len(rows),
+        "l2_target": float(l2_target),
+        "best_level_label": None if best_row is None else best_row["label"],
+        "best_level": best_row,
+        "rows": rows,
+    }
+
+
+def write_observable_ladder_table(summary: dict[str, object], path: str | Path) -> Path:
+    """Write a CSV table from ``summarize_observable_ladder_levels`` output."""
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = list(summary.get("rows", []))
+    fieldnames = [
+        "label",
+        "case_count",
+        "research_grade_validation_pass",
+        "observable_offender_count",
+        "missing_observable_count",
+        "low_signal_count",
+        "max_offender_l2_error",
+        "max_offender_target_ratio",
+        "top_offender_case",
+        "top_offender_observable",
+        "top_offender_axis",
+        "layer_resolution_available",
+        "min_hartmann_layer_cells",
+        "min_side_layer_cells",
+        "min_hartmann_layer_cell_ratio",
+        "min_side_layer_cell_ratio",
+        "max_minimum_mesh_refinement_factor",
+    ]
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)  # type: ignore[arg-type]
+    return path
 
 
 def side_jet_profile_metrics(

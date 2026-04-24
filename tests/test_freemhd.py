@@ -18,10 +18,12 @@ from lmx.freemhd import (
     parse_freemhd_execution_seconds,
     run_freemhd_demo,
     side_jet_profile_metrics,
+    summarize_observable_ladder_levels,
     summarize_observable_gate,
     summarize_observable_offenders,
     summarize_profile_error_offenders,
     summarize_runtime_offenders,
+    write_observable_ladder_table,
 )
 
 
@@ -416,6 +418,58 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
     assert runtime_offenders[0]["case_kind"] == "hunt"
     assert runtime_offenders[0]["status"] == "offender"
     assert runtime_offenders[1]["status"] == "pass"
+
+
+def test_observable_ladder_summary_ranks_mesh_and_offender_progress(tmp_path: Path):
+    good_record = {
+        "case_kind": "hunt",
+        "observables": {
+            name: {
+                "y": {"l2_error": 8.0e-3, "linf_error": 1.0e-2, "reference_peak_abs": 1.0},
+                "z": {"l2_error": 7.0e-3, "linf_error": 9.0e-3, "reference_peak_abs": 1.0},
+            }
+            for name in ("velocity", "potential", "current", "lorentz")
+        },
+        "layer_resolution": {
+            "hartmann_layer_cells": 10.0,
+            "side_layer_cells": 7.0,
+            "hartmann_layer_cell_ratio": 1.25,
+            "side_layer_cell_ratio": 1.1,
+            "minimum_mesh_refinement_factor": 0.9,
+        },
+    }
+    bad_record = {
+        **good_record,
+        "observables": {
+            name: {
+                "y": {"l2_error": 2.0e-2, "linf_error": 3.0e-2, "reference_peak_abs": 1.0},
+                "z": {"l2_error": 9.0e-3, "linf_error": 1.0e-2, "reference_peak_abs": 1.0},
+            }
+            for name in ("velocity", "potential", "current", "lorentz")
+        },
+        "layer_resolution": {
+            "hartmann_layer_cells": 4.0,
+            "side_layer_cells": 3.0,
+            "hartmann_layer_cell_ratio": 0.5,
+            "side_layer_cell_ratio": 0.5,
+            "minimum_mesh_refinement_factor": 2.0,
+        },
+    }
+
+    summary = summarize_observable_ladder_levels(
+        [
+            {"label": "coarse", "records": [bad_record]},
+            {"label": "refined", "records": [good_record]},
+        ]
+    )
+    table = write_observable_ladder_table(summary, tmp_path / "ladder.csv")
+
+    assert summary["best_level_label"] == "refined"
+    assert summary["rows"][0]["observable_offender_count"] == 4
+    assert summary["rows"][0]["max_minimum_mesh_refinement_factor"] == pytest.approx(2.0)
+    assert summary["rows"][1]["research_grade_validation_pass"] is True
+    assert table.exists()
+    assert "top_offender_observable" in table.read_text()
 
 
 def test_build_case_from_freemhd_reference_covers_hartmann_velocity_mode_and_errors(tmp_path: Path):

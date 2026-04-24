@@ -1056,6 +1056,60 @@ def test_freemhd_closed_channel_flow_rate_parity_writes_summary(tmp_path: Path, 
     assert (tmp_path / "freemhd_closed_channel_flow_rate_parity_summary.json").exists()
 
 
+def test_freemhd_observable_mesh_ladder_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("freemhd_observable_mesh_ladder.py")
+    module.OUTPUT_DIR = tmp_path
+
+    def fake_record(case_kind, **kwargs):
+        level_settings = kwargs["case_settings"][case_kind]
+        l2 = 8.0e-3 if level_settings["ny"] > 10 else 2.0e-2
+        ratio = 1.2 if level_settings["ny"] > 10 else 0.5
+        return {
+            "case_kind": case_kind,
+            "observables": {
+                name: {
+                    "y": {
+                        "coordinate": [-1.0, 0.0, 1.0],
+                        "reference": [0.0, 1.0, 0.0],
+                        "simulated": [0.0, 1.0 - l2, 0.0],
+                        "l2_error": l2,
+                        "linf_error": l2,
+                        "reference_peak_abs": 1.0,
+                    },
+                    "z": {
+                        "coordinate": [-1.0, 0.0, 1.0],
+                        "reference": [0.0, 1.0, 0.0],
+                        "simulated": [0.0, 0.995, 0.0],
+                        "l2_error": 5.0e-3,
+                        "linf_error": 5.0e-3,
+                        "reference_peak_abs": 1.0,
+                    },
+                }
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+            "layer_resolution": {
+                "hartmann_layer_cells": 8.0 * ratio,
+                "side_layer_cells": 6.0 * ratio,
+                "hartmann_layer_cell_ratio": ratio,
+                "side_layer_cell_ratio": ratio,
+                "minimum_mesh_refinement_factor": 1.0 / ratio,
+            },
+        }
+
+    monkeypatch.setattr(module.observable, "_observable_record", fake_record)
+    ladder = (
+        {"label": "coarse", "case_settings": {"shercliff": {"ny": 8}, "hunt": {"ny": 8}}},
+        {"label": "refined", "case_settings": {"shercliff": {"ny": 12}, "hunt": {"ny": 12}}},
+    )
+
+    summary = module.run_freemhd_observable_mesh_ladder(out_dir=tmp_path, ladder=ladder)
+
+    assert summary["case"] == "freemhd_observable_mesh_ladder"
+    assert summary["best_level_label"] == "refined"
+    assert "freemhd_observable_mesh_ladder.png" in summary["plots"]
+    assert (tmp_path / "freemhd_observable_mesh_ladder_summary.json").exists()
+
+
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2d_forced_validation.py")
     module.OUTPUT_DIR = tmp_path
