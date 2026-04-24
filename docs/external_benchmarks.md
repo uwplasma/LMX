@@ -160,6 +160,16 @@ side cut but worsened the wall-normal cut, so the remaining `O(1.3e-2)` Hunt
 shape mismatch should be treated as a solver/observable-parity issue rather
 than a basic layer-cell-count issue.
 
+The latest targeted solver probes ruled out two tempting but weak fixes. The
+Hunt limiter has no measurable effect on the retained velocity shape, and the
+`hybrid_face_lorentz` path is numerically identical to `face_averaged` for the
+straight-duct velocity profile. A face-current-diagonal implicit reaction
+prototype was also rejected: it was neutral on the cheap Hunt flow-rate probe
+and regressed the small Hunt validation gate. The remaining parity work should
+therefore focus on a fully implicit face-current momentum operator, including
+off-diagonal EMF terms, or a direct OpenFOAM-mesh reproduction, not on limiter
+tuning or diagonal-only reaction splitting.
+
 The observable-parity summary JSON now ranks offenders across velocity,
 gauge-shifted potential, current, and Lorentz-force cuts while demoting
 low-signal normalized cuts. That ranking is the triage surface for the next

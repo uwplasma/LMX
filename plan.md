@@ -1542,6 +1542,15 @@ That retained gate now passes for all three retained fringing geometries.
     `O(1.3e-2)` Hunt/Shercliff wall-normal Lorentz-y and velocity-y cuts, so
     the next solver patch should target residual wall-normal shape accuracy
     before adding new comparison plots
+  - a targeted Hunt probe ruled out velocity limiter tuning and the
+    `hybrid_face_lorentz` selector as useful fixes; both leave the
+    wall-normal shape essentially unchanged. A face-current-diagonal implicit
+    reaction prototype was rejected because it was neutral on the cheap Hunt
+    flow-rate probe and regressed the small Hunt validation gate. The next
+    research-grade fix needs either a fully implicit face-current momentum
+    operator, including off-diagonal EMF terms, or an OpenFOAM-grid
+    reproduction of the exact-BL mesh so discretization differences can be
+    isolated.
 - On the current workstation, those new bundled-reference physics regressions
   are the main reason the broad `pytest tests -m 'unit or validation'` lane no
   longer fits comfortably inside the historical five-minute guard. The changed
