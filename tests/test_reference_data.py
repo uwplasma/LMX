@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from lmx.reference_data import (
+    _fill_missing_structured_values,
     default_closed_channel_reference_root,
     default_fringing_pipe_reference_root,
     extract_processed_profile,
@@ -123,6 +125,55 @@ def test_processed_slice_area_mean_uses_nonuniform_quadrature(tmp_path: Path):
     reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
 
     assert processed_slice_area_mean(reference) == pytest.approx(2.0)
+
+
+def test_processed_slice_grid_fills_missing_values_and_reports_bad_field(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "Points:1,Points:2,U:0",
+                "0.0,0.0,1.0",
+                "0.0,1.0,3.0",
+                "1.0,0.0,5.0",
+            ]
+        )
+    )
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+
+    grid = processed_slice_field_grid(reference, field_name="U", component=0)
+
+    assert grid["value"].ravel().tolist() == pytest.approx([1.0, 3.0, 5.0, 5.0])
+    with pytest.raises(KeyError, match="available columns"):
+        processed_slice_field_grid(reference, field_name="missing")
+
+
+def test_processed_slice_area_mean_handles_single_sample(tmp_path: Path):
+    closed_channel_root = tmp_path / "ClosedChannel"
+    closed_channel_root.mkdir(parents=True)
+    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
+    path.write_text("Points:1,Points:2,U:0\n0.0,0.0,4.0\n")
+    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+
+    assert processed_slice_area_mean(reference) == pytest.approx(4.0)
+
+
+def test_fill_missing_structured_values_covers_column_and_fallback_paths():
+    filled = _fill_missing_structured_values(
+        grid=np.asarray([[1.0, np.nan], [np.nan, np.nan], [5.0, np.nan]]),
+        y=np.asarray([0.0, 1.0, 2.0]),
+        z=np.asarray([0.0, 1.0]),
+    )
+    fallback = _fill_missing_structured_values(
+        grid=np.asarray([[np.nan]]),
+        y=np.asarray([0.0]),
+        z=np.asarray([0.0]),
+    )
+
+    assert filled.ravel().tolist() == pytest.approx([1.0, 1.0, 3.0, 3.0, 5.0, 5.0])
+    assert fallback.ravel().tolist() == pytest.approx([0.0])
 
 
 def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp_path: Path):
