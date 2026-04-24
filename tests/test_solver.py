@@ -9,7 +9,7 @@ from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.physics import build_material_fields, magnetic_field_components, magnetic_ramp_scale
 import lmx.solvers as solvers
-from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
+from lmx.mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.specs import BoundaryCondition, GeometrySpec
 from lmx.solvers import solve_steady, solve_transient
 
@@ -325,6 +325,24 @@ def test_inlet_speed_reads_tuple_components_by_axis():
     assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="x"), case) == pytest.approx(1.0)
     assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="y"), case) == pytest.approx(2.0)
     assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="z"), case) == pytest.approx(3.0)
+    assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_velocity", value=0.35, axis="x"), case) == pytest.approx(0.35)
+    zero_area_case = replace(case, geometry=replace(case.geometry, width=0.0))
+    assert solvers._inlet_speed(BoundaryCondition("inlet", "inlet_flow_rate", value=1.0, axis="x"), zero_area_case) is None
+
+
+def test_enforce_velocity_bc_handles_degenerate_direct_wall_axes():
+    mesh = StructuredMesh(
+        x_faces=jnp.asarray([0.0, 1.0]),
+        y_faces=jnp.asarray([-0.5, 0.5]),
+        z_faces=jnp.asarray([-0.5, 0.5]),
+    )
+    u = jnp.asarray([[2.0]])
+    fluid_mask = jnp.asarray([[True]])
+
+    result = solvers._enforce_velocity_bc(u, mesh, fluid_mask, interpolate_direct_fluid_walls=True)
+
+    assert result.shape == (1, 1)
+    assert float(result[0, 0]) == pytest.approx(2.0)
 
 
 def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
@@ -1841,6 +1859,34 @@ def test_solver_logging_helpers_and_footer_are_emitted():
     )
     solution = solve_steady(case)
     logger.emit_footer(solution)
+    assert calls == ["header", "step", "footer"]
+
+
+def test_solve_steady_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+
+    class Logger:
+        def emit_header(self, **kwargs):
+            calls.append("header")
+
+        def emit_step(self, record):
+            calls.append("step")
+
+        def emit_footer(self, solution):
+            calls.append("footer")
+
+    def fake_case_step(**kwargs):
+        u_prev = kwargs["u_previous"]
+        updated = jnp.full_like(u_prev, 0.1)
+        zeros = jnp.zeros_like(updated)
+        return updated, zeros, zeros, zeros, zeros, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, float(jnp.mean(updated)), 0.0, 0.0, 0.0
+
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_case_step)
+    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    case = replace(case, time_stepper=replace(case.time_stepper, max_steps=1))
+
+    solve_steady(case, logger=Logger())
+
     assert calls == ["header", "step", "footer"]
 
 
