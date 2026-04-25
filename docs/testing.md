@@ -121,6 +121,11 @@ pass. It keeps high-`Ha` Hunt side-layer parity, external magnetic-obstacle
 reference data, Q2D turbulent parity, and higher-inertia Dean-vortex validation
 explicitly open.
 
+For a manuscript-grade release, add `--strict-research-grade`. That strict mode
+fails until the deferred lanes above have real passing external or
+literature-anchored gates, so a package release cannot be confused with a full
+research-validation claim.
+
 That driver produces Benchmark A artifacts, Benchmark B gate summaries, and a
 combined JSON/CSV/Markdown report for the current documented thresholds.
 When run from the source tree it uses the bundled closed-channel reference

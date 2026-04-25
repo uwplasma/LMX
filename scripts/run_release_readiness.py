@@ -257,12 +257,16 @@ def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2
     deferred.extend(bent_deferred)
     blockers = [gate.name for gate in gates if not gate.passed]
     pyproject = _load_pyproject(root_path)
+    research_grade_ready = not blockers and not deferred
     return {
         "case": "release_readiness",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "version": pyproject.get("project", {}).get("version"),
         "release_ready": not blockers,
+        "release_class": "research_grade" if research_grade_ready else "bounded",
+        "research_grade_ready": research_grade_ready,
         "blockers": blockers,
+        "research_blockers": deferred,
         "deferred_research_lanes": deferred,
         "gates": [asdict(gate) for gate in gates],
     }
@@ -280,12 +284,19 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path("."), help="Repository root.")
     parser.add_argument("--output", type=Path, default=Path("artifacts/release/release_readiness.json"))
     parser.add_argument("--target-l2", type=float, default=1.2e-2)
+    parser.add_argument(
+        "--strict-research-grade",
+        action="store_true",
+        help="Exit nonzero when any deferred research lane remains open.",
+    )
     args = parser.parse_args()
     report = evaluate_release_readiness(args.root, target_l2=args.target_l2)
     write_release_readiness_report(report, args.output)
     print(json.dumps(report, indent=2))
     if not report["release_ready"]:
         raise SystemExit(1)
+    if args.strict_research_grade and not report["research_grade_ready"]:
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

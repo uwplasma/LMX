@@ -215,6 +215,18 @@ Hunt side-layer parity, external magnetic-obstacle reference data, and
 higher-inertia Dean-vortex validation are listed as deferred research lanes
 instead of being silently treated as solved.
 
+For manuscript/research-grade release candidates, run the strict form:
+
+```bash
+python scripts/run_release_readiness.py \
+  --strict-research-grade \
+  --output artifacts/release/release_readiness.json
+```
+
+That mode exits nonzero if any deferred research lane remains open. Use it for a
+paper claim; use the default bounded gate for package releases that explicitly
+publish the remaining research blockers.
+
 ## Test runtime baseline
 
 The latest local evidence pass on this workstation shows:

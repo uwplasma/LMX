@@ -130,7 +130,10 @@ def test_release_readiness_passes_bounded_release_and_tracks_deferred_lanes(tmp_
     report = evaluate_release_readiness(tmp_path)
 
     assert report["release_ready"] is True
+    assert report["release_class"] == "bounded"
+    assert report["research_grade_ready"] is False
     assert report["blockers"] == []
+    assert report["research_blockers"] == report["deferred_research_lanes"]
     assert any("High-Ha Hunt side-layer" in item for item in report["deferred_research_lanes"])
     assert any("Magnetic-obstacle" in item for item in report["deferred_research_lanes"])
     assert any("Bent-pipe" in item for item in report["deferred_research_lanes"])
@@ -198,6 +201,9 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
     report = evaluate_release_readiness(tmp_path)
 
     assert report["release_ready"] is True
+    assert report["release_class"] == "research_grade"
+    assert report["research_grade_ready"] is True
+    assert report["research_blockers"] == []
     assert report["deferred_research_lanes"] == []
 
 
@@ -210,6 +216,7 @@ def test_release_readiness_main_writes_report(tmp_path: Path, monkeypatch: pytes
 
     payload = json.loads(output.read_text())
     assert payload["release_ready"] is True
+    assert payload["release_class"] == "bounded"
 
 
 def test_release_readiness_main_exits_on_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -223,3 +230,31 @@ def test_release_readiness_main_exits_on_blocker(tmp_path: Path, monkeypatch: py
 
     payload = json.loads(output.read_text())
     assert payload["release_ready"] is False
+
+
+def test_release_readiness_main_strict_research_grade_exits_on_deferred_lane(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _write_release_fixture(tmp_path)
+    output = tmp_path / "artifacts/release/readiness.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_release_readiness.py",
+            "--root",
+            str(tmp_path),
+            "--output",
+            str(output),
+            "--strict-research-grade",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 2
+    payload = json.loads(output.read_text())
+    assert payload["release_ready"] is True
+    assert payload["research_grade_ready"] is False
