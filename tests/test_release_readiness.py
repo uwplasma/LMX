@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
-from scripts.run_release_readiness import evaluate_release_readiness, write_release_readiness_report
+import pytest
+
+from scripts.run_release_readiness import evaluate_release_readiness, main, write_release_readiness_report
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -144,3 +147,79 @@ def test_release_readiness_fails_missing_public_artifact(tmp_path: Path):
 
     assert report["release_ready"] is False
     assert "required_public_artifacts" in report["blockers"]
+
+
+def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_path: Path):
+    _write_release_fixture(tmp_path)
+    static = tmp_path / "docs/_static/generated"
+    _write_json(static / "straight_duct_validation_ladder_summary.json", {"hunt": [{"ha": 100, "z_l2_error": 0.006}]})
+    _write_json(
+        static / "q2d_turbulence_decay_summary.json",
+        {
+            "validation": {
+                "validation_pass": True,
+                "frame_count": 72,
+                "turnover_count": 0.33,
+                "max_courant": 0.05,
+                "max_divergence_linf": 1.0e-14,
+                "research_grade_turbulence_validation_pass": True,
+            }
+        },
+    )
+    _write_json(
+        static / "magnetic_obstacle_benchmark_summary.json",
+        {
+            "validation": {
+                "benchmark_pass": True,
+                "conservation_pass": True,
+                "peak_centerline_deficit_ratio": 0.2,
+                "peak_crosscut_distortion": 0.1,
+                "max_charge_balance_residual": 1.0e-12,
+                "research_grade_validation_pass": True,
+            }
+        },
+    )
+    _write_json(
+        static / "bent_pipe_inductionless_summary.json",
+        {
+            "validation": {
+                "validation_pass": True,
+                "cross_section_l2_error": 0.0,
+                "centerline_l2_error": 0.0,
+                "max_charge_balance_residual": 1.0e-12,
+                "max_wall_current_leakage": 0.0,
+                "net_boundary_current_residual": 0.0,
+                "research_grade_charge_balance_pass": True,
+                "research_grade_dean_validation_pass": True,
+            }
+        },
+    )
+
+    report = evaluate_release_readiness(tmp_path)
+
+    assert report["release_ready"] is True
+    assert report["deferred_research_lanes"] == []
+
+
+def test_release_readiness_main_writes_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _write_release_fixture(tmp_path)
+    output = tmp_path / "artifacts/release/readiness.json"
+    monkeypatch.setattr(sys, "argv", ["run_release_readiness.py", "--root", str(tmp_path), "--output", str(output)])
+
+    main()
+
+    payload = json.loads(output.read_text())
+    assert payload["release_ready"] is True
+
+
+def test_release_readiness_main_exits_on_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _write_release_fixture(tmp_path)
+    (tmp_path / "docs/_static/generated/strong_scaling.png").unlink()
+    output = tmp_path / "artifacts/release/readiness.json"
+    monkeypatch.setattr(sys, "argv", ["run_release_readiness.py", "--root", str(tmp_path), "--output", str(output)])
+
+    with pytest.raises(SystemExit):
+        main()
+
+    payload = json.loads(output.read_text())
+    assert payload["release_ready"] is False

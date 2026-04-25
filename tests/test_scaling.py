@@ -11,9 +11,12 @@ from jax.sharding import Mesh, NamedSharding
 import lmx.scaling as scaling
 from lmx.scaling import (
     StrongScalingRecord,
+    _array_nbytes,
     _build_extruded_operator_problem,
     _build_operator_problem,
     _factor_device_mesh,
+    _float_or_none,
+    _int_or_none,
     _row_or_replicated_sharding,
     _two_axis_mesh_and_sharding,
     benchmark_extruded_inductionless_solve,
@@ -193,6 +196,19 @@ def test_factor_device_mesh_prefers_near_square_factoring():
     assert _factor_device_mesh(1) == (1, 1)
     assert _factor_device_mesh(4) == (2, 2)
     assert _factor_device_mesh(6) == (2, 3)
+    assert _factor_device_mesh(0) == (1, 0)
+
+
+def test_scaling_helpers_handle_missing_and_invalid_values():
+    class InvalidArray:
+        shape = (2,)
+        dtype = object()
+
+    assert _float_or_none(None) is None
+    assert _float_or_none("not-a-float") is None
+    assert _int_or_none(None) is None
+    assert _int_or_none("not-an-int") is None
+    assert _array_nbytes(InvalidArray()) == 0
 
 
 def test_row_or_replicated_sharding_covers_row_and_replicated_paths():
