@@ -36,8 +36,27 @@ The `1.0` release is aiming for:
 
 - stable Hartmann analytical acceptance across representative meshes
 - stable Shercliff analytical acceptance across representative meshes
-- Hunt validation that is judged from profile and integral observables, not from
-  ad hoc scalar trace tuning
+- Hunt validation that is judged from literature-matched wall modeling,
+  profile errors, and integral observables, not from ad hoc scalar trace tuning
+- low-De bent-pipe current closure that is locally conservative, not only
+  globally balanced
+
+The latest closure details are collected in [](closure_notes.md). That page is
+the audit trail for the two recent blockers: Hunt `Ha = 100` side-layer
+agreement and bent-pipe local `div J`.
+
+## Recently Closed Release Lanes
+
+| Lane | Closure evidence |
+| --- | --- |
+| Hunt `Ha = 100` side-layer | Thin-wall reference model `t_w=0.001`, `sigma_w/sigma=5`, `c=0.05`; retained `z_l2 = 2.89e-3` |
+| Bent-pipe low-De charge closure | Conservative mapped-pipe potential sign fixed; retained `max_charge_balance_residual = 2.16e-12` |
+| Reader-facing straight-duct profiles | Hartmann, Shercliff, and Hunt retained cuts below `L2 <= 1.2e-2` |
+| Bounded release readiness | `scripts/run_release_readiness.py` reports no hard blockers |
+
+The strict research-grade deferred lanes remain external Q2D turbulence
+parity, external magnetic-obstacle reference data, and higher-inertia
+Dean-vortex bent-pipe validation.
 
 ## Combined validation workflow
 

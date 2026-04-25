@@ -160,6 +160,38 @@ between Cartesian and pipe-local frames only at the assembly boundaries; the
 rest of the control-volume bookkeeping remains metric-aware inside
 `lmx/fringing.py`.
 
+### Mapped-pipe electric-potential sign convention
+
+The mapped-pipe sparse electric operator represents
+
+$$
+-\nabla\cdot\left(\sigma\nabla\phi\right),
+$$
+
+while the EMF source helper assembles
+
+$$
+\nabla\cdot\left(\sigma(\mathbf{u}\times\mathbf{B})\right).
+$$
+
+Because the inductionless current is
+
+$$
+\mathbf{J} = \sigma\left(-\nabla\phi + \mathbf{u}\times\mathbf{B}\right),
+$$
+
+local charge closure requires
+
+$$
+-\nabla\cdot\left(\sigma\nabla\phi\right)
+= -\nabla\cdot\left(\sigma(\mathbf{u}\times\mathbf{B})\right)
+$$
+
+for this discrete operator sign convention. The bent-pipe low-De charge
+closure now uses that sign and verifies it with a direct conservative-flux
+regression test. This changed the public bent-pipe local charge residual from
+`O(1e-2)` to `2.16e-12`; see [](closure_notes.md) for the full audit trail.
+
 ## Linear solver backends
 
 Low-level iterative linear solver helpers are implemented in `lmx/linear.py`.

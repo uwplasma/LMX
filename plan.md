@@ -99,6 +99,9 @@ Paper-ready or close to paper-ready:
   localized-field response precursors, not external validation
 - runtime logging, ETA/progress output, restart, plotting, and artifact-summary
   workflows
+- reviewer-facing closure notes in `docs/closure_notes.md`, including the
+  equations, wall models, boundary conditions, numerical choices, and acceptance
+  metrics behind the closed release lanes
 
 Demonstrated but not yet research-grade validation:
 

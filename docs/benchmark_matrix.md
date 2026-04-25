@@ -3,6 +3,10 @@
 This page defines the benchmark ladder for the first LMX paper and `1.0`
 release.
 
+For the detailed audit trail behind the currently closed release lanes,
+including equations, wall models, boundary conditions, numerical choices, and
+failed alternatives, see [](closure_notes.md).
+
 ## Mandatory now: Benchmark A
 
 ### A1. Hartmann / insulating-duct style validation

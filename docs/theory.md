@@ -157,6 +157,32 @@ Those are the concrete diagnostics needed to harden inlet/outlet handling and
 external-wall current closure, which are the places where inductionless MHD
 solvers most often lose charge conservation in practice.
 
+### Hunt wall model used by the accepted analytical ladder
+
+The public Hunt validation ladder uses explicit conducting Hartmann-wall
+layers and insulating side-wall layers. For the retained `Ha = 100` analytical
+comparison, the wall model is matched to the bundled FreeMHD/Ni reference
+files through the thin-wall conductance ratio
+
+$$
+c = \frac{\sigma_w t_w}{\sigma a}.
+$$
+
+The accepted values are:
+
+$$
+t_w = 0.001,\qquad \sigma_w/\sigma = 5,\qquad a = 0.1,
+\qquad c = 0.05.
+$$
+
+This is a modeling assumption, not just a numerical parameter. A thicker
+explicit solid wall with reduced conductivity can preserve the scalar
+conductance ratio but still redistribute electric potential and current over a
+different finite wall volume. The retained validation therefore uses the
+physical thin-wall thickness and conductivity ratio from the reference files.
+The full closure rationale and failed thick-wall probes are recorded in
+[](closure_notes.md).
+
 ## Charge conservation and compatibility projection
 
 The discrete potential equation must satisfy a zero-net-source compatibility

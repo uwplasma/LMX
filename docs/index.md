@@ -44,6 +44,7 @@ testing
 
 benchmark_matrix
 validation_report
+closure_notes
 performance
 autodiff
 fringing
