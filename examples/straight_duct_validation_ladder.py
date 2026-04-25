@@ -14,10 +14,12 @@ JAX_CACHE_DIR = Path("artifacts/jax_cache")
 HA_VALUES = (20.0, 100.0)
 WIDTH = 0.2
 HEIGHT = 0.2
-NY = 37
-NZ = 37
-WALL_CELLS = 6
-WALL_THICKNESS = 0.02
+SHERCLIFF_NY = 45
+SHERCLIFF_NZ = 45
+HUNT_NY = 49
+HUNT_NZ = 49
+WALL_CELLS = 2
+WALL_THICKNESS = 0.001
 COUPLING_ITERATIONS = 16
 POTENTIAL_ITERATIONS = 200
 MAX_STEPS = 96
@@ -25,7 +27,7 @@ VELOCITY_UPDATE_LIMIT = 5.0e-2
 POTENTIAL_TOLERANCE = 1.0e-8
 
 FLUID_CONDUCTIVITY = 1.0
-CONDUCTING_WALL_CONDUCTIVITY = 0.25
+CONDUCTING_WALL_CONDUCTIVITY = 5.0
 INSULATING_WALL_CONDUCTIVITY = 1.0e-12
 DENSITY = 1.0
 VISCOSITY = 1.0
@@ -56,8 +58,8 @@ def run_straight_duct_validation_ladder(
             ha=ha,
             width=WIDTH,
             height=HEIGHT,
-            ny=NY,
-            nz=NZ,
+            ny=SHERCLIFF_NY,
+            nz=SHERCLIFF_NZ,
             fluid_conductivity=FLUID_CONDUCTIVITY,
             density=DENSITY,
             viscosity=VISCOSITY,
@@ -67,6 +69,7 @@ def run_straight_duct_validation_ladder(
             velocity_update_limit=VELOCITY_UPDATE_LIMIT,
             current_reconstruction="face_averaged",
             potential_tolerance=POTENTIAL_TOLERANCE,
+            initial_profile="zero",
         )
         shercliff_records.append(
             {
@@ -83,8 +86,8 @@ def run_straight_duct_validation_ladder(
             ha=ha,
             width=WIDTH,
             height=HEIGHT,
-            ny=NY,
-            nz=NZ,
+            ny=HUNT_NY,
+            nz=HUNT_NZ,
             wall_cells=WALL_CELLS,
             wall_thickness=WALL_THICKNESS,
             fluid_conductivity=FLUID_CONDUCTIVITY,
@@ -98,6 +101,7 @@ def run_straight_duct_validation_ladder(
             velocity_update_limit=VELOCITY_UPDATE_LIMIT,
             current_reconstruction="face_averaged",
             potential_tolerance=POTENTIAL_TOLERANCE,
+            initial_profile="zero",
         )
         hunt_records.append(
             {
@@ -140,6 +144,17 @@ def run_straight_duct_validation_ladder(
         "hunt": _serialize(hunt_records),
         "outputs": [path.name for path in outputs],
         "comparison_method": "normalized analytical comparison with no-slip wall reconstruction at the duct boundaries",
+        "initial_profile": "zero",
+        "mesh": {
+            "shercliff": {"ny": SHERCLIFF_NY, "nz": SHERCLIFF_NZ},
+            "hunt": {"ny": HUNT_NY, "nz": HUNT_NZ},
+        },
+        "hunt_wall_model": {
+            "wall_thickness": WALL_THICKNESS,
+            "conducting_wall_conductivity": CONDUCTING_WALL_CONDUCTIVITY,
+            "fluid_conductivity": FLUID_CONDUCTIVITY,
+            "conductance_ratio": CONDUCTING_WALL_CONDUCTIVITY * WALL_THICKNESS / (FLUID_CONDUCTIVITY * (0.5 * HEIGHT)),
+        },
     }
     (out_dir / "straight_duct_validation_ladder_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary

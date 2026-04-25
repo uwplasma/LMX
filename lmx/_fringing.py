@@ -2647,8 +2647,11 @@ def _solve_extruded_projection(
                 r_centers=r,
                 dtheta=dtheta,
             )
+            # The sparse pipe operator represents -div(sigma grad(phi)); J is
+            # sigma(-grad(phi) + u x B), so the potential must cancel the EMF
+            # divergence with the opposite sign.
             phi, _, _, _ = _pipe_poisson_sparse_3d(
-                emf_rhs,
+                -emf_rhs,
                 sigma,
                 dx=dx,
                 r_faces=r_faces,

@@ -117,9 +117,8 @@ current bounded `1.0` gate requires package metadata, workflow scaffolding,
 public README/docs artifacts, retained straight-duct analytical overlays,
 nonlinear Q2D movie diagnostics, magnetic-obstacle internal response,
 low-De bent-pipe global current closure, and tabulated-field reconstruction to
-pass. It keeps high-`Ha` Hunt side-layer parity, external magnetic-obstacle
-reference data, Q2D turbulent parity, and higher-inertia Dean-vortex validation
-explicitly open.
+pass. It keeps external magnetic-obstacle reference data, Q2D turbulent parity,
+and higher-inertia Dean-vortex validation explicitly open.
 
 For a manuscript-grade release, add `--strict-research-grade`. That strict mode
 fails until the deferred lanes above have real passing external or
@@ -365,8 +364,9 @@ The first explicit examples following this pattern are:
   Shercliff / Hunt literature-facing straight-duct panel, including no-slip
   wall reconstruction when comparing cell-centered profiles against the
   analytical wall-to-wall curves; the current release target is
-  `L2 <= 1.2e-2` on the retained cuts, and the current bounded `37 × 37`
-  artifact meets it for Hartmann, Shercliff, and Hunt
+  `L2 <= 1.2e-2` on the retained cuts, and the current bounded
+  `45 × 45` Shercliff / `49 × 49` Hunt wall-model artifact meets it from zero
+  initial conditions
 - `examples/hartmann_validation_ladder.py` for the bounded Hartmann multi-`Ha`
   literature ladder, with the same stable summary-JSON pattern used by the
   manuscript-facing straight-duct figures

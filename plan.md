@@ -86,6 +86,9 @@ Paper-ready or close to paper-ready:
   interface/coefficient-jump cases
 - retained Hartmann/Shercliff/Hunt analytical profile overlays at the accepted
   `L2 <= 1.2e-2` release target for the current reader-facing cuts
+- high-`Ha` Hunt side-layer analytical parity on the retained thin-wall
+  FreeMHD/Ni reference model, with broader wall-model ladders left for future
+  sensitivity studies rather than as a release blocker
 - pressure-gradient FreeMHD paper-slice observable parity for straight ducts,
   with dominant velocity/current/Lorentz cuts now at roughly `5e-3` to
   `1.3e-2` on the retained boundary-layer-resolved mesh
@@ -99,10 +102,6 @@ Paper-ready or close to paper-ready:
 
 Demonstrated but not yet research-grade validation:
 
-- the high-`Ha` Hunt side-layer cut; Hartmann, Shercliff, and retained Hunt
-  cuts meet the current `L2 <= 1.2e-2` target, but the Hunt conducting-wall jet
-  cut remains sensitive to side-layer mesh placement, wall-conductance
-  modeling, conservative current reconstruction, and normalization
 - the physical constant-`Q` / `flow_rate` FreeMHD path for fully developed
   ducts; the pressure-gradient paper-slice lane is now close, but the
   constrained-flow drive still needs the same observable-level parity
@@ -149,19 +148,18 @@ refer to the Samper et al. taxonomy.
   to run the heavier mesh ladder and use those recorded observables to decide
   whether the blocker is mesh placement, drive formulation, current closure, or
   momentum coupling.
-  Latest local probe: increasing the Hunt `Ha = 100` mesh from `37 × 37` to
-  `49 × 81` and raising wall cells/iterations improved the Hartmann cut but
-  left the side-layer cut near `z_l2 ≈ 3.0e-2`. Switching the same baseline
-  between forcing, pressure-gradient, and flow-rate drive left the side-layer
-  error unchanged at `≈ 3.26e-2`. The next blocker is therefore
-  operator/wall-current/reference-observable parity, not a simple resolution or
-  drive-setting problem. A follow-up mesh-only probe with `81 × 81` and
-  `97 × 97` fluid grids confirmed this: `81 × 81` reached nominal
-  Hartmann/side-layer cell counts but worsened to `z_l2 ≈ 1.25e-1`, and
-  `97 × 97` met the layer-cell gate but became ill-conditioned
-  (`z_l2 ≈ 4.36e-1`). The high-Ha Hunt lane should therefore shift to the
-  conservative wall-current/operator audit before another blind resolution
-  increase.
+  Latest local probe: the main mismatch was the explicit wall model, not just
+  fluid-grid resolution. The FreeMHD/Ni Hunt analytical files use a thin
+  conducting Hartmann-wall model (`tw = 0.001`, `sigma_w / sigma = 5`,
+  conductance ratio `c = 0.05`). The older LMX ladder preserved only the
+  conductance ratio with a much thicker explicit solid wall (`0.02`) and lower
+  wall conductivity, which left the Hunt `Ha = 100` side cut near
+  `z_l2 ≈ 3.26e-2`. Switching the retained validation case to the literature
+  wall model gives `y_l2 ≈ 4.42e-3`, `z_l2 ≈ 2.89e-3` on a `49 × 49` fluid
+  grid. Blind mesh-only increases remain unreliable: `65 × 65` and `81 × 81`
+  with the high-Ha segmented mesh worsened the side cut despite higher nominal
+  layer-cell counts. The accepted gate is now literature-matched wall
+  conductance/thickness plus measured profile error, not cell count alone.
 - Magnetic-obstacle external validation: replace the current matched no-field
   LMX reference with published localized-field cases, including the
   Cuevas-Smolentsev-Abdou quasi-2D magnetic-obstacle study and the Votyakov
@@ -201,18 +199,16 @@ refer to the Samper et al. taxonomy.
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
   The low-De example now separates global current closure from local mapped-grid
-  closure: `max_wall_current_leakage = 0` and
-  `net_boundary_current_residual = 0`, while the maximum local conservative
-  `|div J|` diagnostic remains `max_charge_balance_residual ≈ 2.15e-2`. That
-  local residual passes the bounded tolerance (`5e-2`) but fails the research
-  target (`1e-3`). The next curved-pipe validation must reduce or explain that
-  local residual while adding a real Dean-vortex reference. A local
-  iteration/mesh probe stayed at `O(10^-2)` on both the default
-  `18 × 40 × 15` grid and a refined `22 × 48 × 17` radial/theta/station grid,
-  so the gap is not closed by simply increasing the potential iteration count.
-  The next step is a mapped cylindrical current-balance audit: compare the
-  conservative flux divergence, weighted cell-volume residual, boundary flux
-  residual, and sparse potential residual station by station before promoting
+  closure and passes both: `max_wall_current_leakage = 0`,
+  `net_boundary_current_residual = 0`, and
+  `max_charge_balance_residual ≈ 2.16e-12`. The root cause was a sign
+  inconsistency in the mapped-pipe conservative electric-potential solve:
+  the sparse matrix represents `-div(sigma grad phi)` while the EMF helper
+  returns `div(sigma u×B)`, so the pipe branch must solve against the negative
+  EMF divergence. A direct regression test now verifies that the pipe sparse
+  potential cancels conservative EMF divergence to machine precision. The next
+  curved-pipe validation should add a real Dean-vortex reference before
+  promoting
   any higher-inertia Dean-vortex run.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
@@ -921,14 +917,14 @@ Current status:
   - `De ≈ 5.19e-7`
   - `cross_section_l2_error = 0`
   - `centerline_l2_error = 0`
-  - `secondary_flow_rms_ratio ≈ 6.16e-18`
+  - `secondary_flow_rms_ratio ≈ 6.38e-18`
   - `normalized_velocity_centroid_shift = 0`
   - `inner_outer_velocity_ratio = 1.0`
 - the executable bent-pipe summary now carries the higher-inertia observables
   needed for Dean-vortex validation; the research-grade gate remains open until
   those observables are compared with a curved-duct literature dataset
-  - `max_charge_balance_residual ≈ 2.15e-2`
-  - `volumetric_flow_rate_span ≈ 1.14e-9`
+  - `max_charge_balance_residual ≈ 2.16e-12`
+  - `volumetric_flow_rate_span ≈ 3.30e-11`
 - the remaining work is the higher-inertia curved-pipe solver path, not the
   geometry-construction-side
 

@@ -28,6 +28,9 @@ release.
 - literature target:
   - Samper et al. Table I conducting-wall square-duct cases at `Ha = 500,
     5000, 10000, 15000` with Hartmann-wall conductance ratio `cw = 0.01`
+  - bundled FreeMHD/Ni closed-channel analytical files for Shercliff and Hunt
+    at `Ha = 20, 100, 1000`, including Hunt thin-wall conductance ratio
+    `c = 0.05`
 - observables:
   - matched `y` and `z` profiles
   - current-density profiles
@@ -214,12 +217,14 @@ external gap. On the latest bounded pipe-reference comparison:
 That is enough to say the comparison is quantitative, but not enough to call it
 parity closure.
 
-The same status now applies to the straight Hunt `Ha = 100` analytical
-side-layer cut. A local mesh/settings probe increased the case from `37 × 37`
-to `49 × 81`, raised wall cells and iteration budgets, and switched the drive
-between forcing, pressure-gradient, and flow-rate modes. The `z`-cut stayed
-near `O(3e-2)`, so the next parity work is wall-current/operator/reference
-observable agreement, not a cosmetic plot or simple resolution change.
+The straight Hunt `Ha = 100` analytical side-layer cut is now closed for the
+public profile ladder when the explicit wall model matches the bundled
+FreeMHD/Ni reference (`wall_thickness = 0.001`, `sigma_w / sigma = 5`,
+`c = 0.05`). The retained `49 × 49` run gives `z_l2 ≈ 2.89e-3`. Mesh-only
+increases with the older thick-wall approximation, and later `65 × 65` /
+`81 × 81` probes on the high-Ha segmented mesh, did not improve monotonically;
+the validation gate is therefore the literature-matched wall model plus
+measured profile error rather than nominal layer-cell count alone.
 
 The underlying reason is now clearer from the bundled FreeMHD reference set:
 the mapped-pipe comparison files correspond to the Bühler fringing-pipe case
@@ -545,15 +550,15 @@ Current bounded low-De baseline:
 - `De ≈ 5.19e-7`
 - `cross_section_l2_error = 0`
 - `centerline_l2_error = 0`
-- `max_charge_balance_residual ≈ 2.15e-2`
+- `max_charge_balance_residual ≈ 2.16e-12`
 - `max_wall_current_leakage = 0`
 - `net_boundary_current_residual = 0`
-- `research_grade_charge_balance_pass = false` because the global current
-  balance is closed but the maximum local mapped-grid `|div J|` diagnostic is
-  still above the `1e-3` local-closure target
-- `volumetric_flow_rate_span ≈ 1.14e-9`
+- `research_grade_charge_balance_pass = true`; the conservative mapped-pipe
+  electric-potential solve now cancels the EMF divergence to local
+  `|div J| < 1e-3`
+- `volumetric_flow_rate_span ≈ 3.30e-11`
 - newly reported Dean/curvature observables:
-  `secondary_flow_rms_ratio ≈ 6.16e-18`,
+  `secondary_flow_rms_ratio ≈ 6.38e-18`,
   `secondary_flow_peak_ratio ≈ 1.71e-17`,
   `normalized_velocity_centroid_shift = 0`, and
   `inner_outer_velocity_ratio = 1.0`

@@ -188,21 +188,19 @@ On the current bounded example (`Ha = 20`, `R = 0.45`, `R_c = 3.6`,
 `15 × 18 × 40`), the bent-pipe baseline matches the straight-pipe reference to
 machine precision on the local comparison cuts (`cross_section_l2_error = 0`,
 `centerline_l2_error = 0`), while keeping
-`max_charge_balance_residual ≈ 2.15e-2` and
-`volumetric_flow_rate_span ≈ 1.14e-9`. The summary also reports the
+`max_charge_balance_residual ≈ 2.16e-12` and
+`volumetric_flow_rate_span ≈ 3.30e-11`. The summary also reports the
 Dean/curvature observables that will become the higher-inertia gate:
-`secondary_flow_rms_ratio ≈ 6.16e-18`,
+`secondary_flow_rms_ratio ≈ 6.38e-18`,
 `normalized_velocity_centroid_shift = 0`, and
 `inner_outer_velocity_ratio = 1.0` for this low-De straight-pipe limit.
 The reported `max_charge_balance_residual` is a maximum local conservative
 `|div J|` diagnostic on the cylindrical mapped grid, not a net current-leakage
 measure. The same run has `max_wall_current_leakage = 0` and
-`net_boundary_current_residual = 0`, so global charge closure is clean, while
-local mapped-grid closure remains above the research-grade target. The JSON
-summary therefore records `research_grade_charge_balance_pass = false`. A local
-mesh/iteration probe lowered the local residual only to `≈ 1.52e-2`, so the
-remaining curved-pipe gate needs a formulation/diagnostic fix and a Dean-vortex
-reference, not just a longer low-De run.
+`net_boundary_current_residual = 0`; after the conservative pipe-potential sign
+fix, the JSON summary records `research_grade_charge_balance_pass = true`. The
+remaining curved-pipe gate is now higher-inertia Dean-vortex validation, not
+low-De current closure.
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 
@@ -432,11 +430,12 @@ shows the Hartmann centerline together with a wall-layer zoom, then the
 Shercliff and Hunt `y` and `z` cuts against the same bundled analytical
 references used by the validation utilities. The artifact is generated
 directly from `examples/straight_duct_profile_comparison.py`, which uses a
-bounded `37 × 37` cross-section with no-slip wall reconstruction when matching
-cell-centered LMX profiles against analytical wall-to-wall curves. With the
-corrected implicit Lorentz reaction split, the retained cuts now meet the
-manuscript-facing `L2 <= 1.2e-2` target: Hartmann `1.15e-2`, Shercliff
-`7.46e-3 / 7.22e-3`, and Hunt `8.96e-3 / 5.99e-3`.
+bounded `49 × 49` cross-section with zero initial velocity, no-slip wall
+reconstruction, and the Hunt thin-wall conductance model
+(`wall_thickness = 0.001`, `sigma_w / sigma = 5`, `c = 0.05`) used by the
+bundled analytical files. The retained cuts meet the manuscript-facing
+`L2 <= 1.2e-2` target: Hartmann `1.15e-2`, Shercliff
+`7.46e-3 / 7.22e-3`, and Hunt `8.54e-3 / 4.86e-3`.
 
 ![LMX straight-duct analytical comparison](docs/_static/generated/analytic_velocity_profiles.png)
 
@@ -445,21 +444,18 @@ now writes the bounded Shercliff/Hunt multi-`Ha` validation panel used in the
 testing docs. The current checked ladder runs `Ha = 20` and `Ha = 100` on the
 same normalized `y` and `z` cuts and keeps the reference filenames in the
 summary JSON so the later paper figures remain traceable to the bundled
-analytical datasets.
+analytical datasets. It starts from zero velocity and uses `45 × 45` fluid
+cells for Shercliff and `49 × 49` for the thin-wall Hunt case.
 
-The ladder agrees well on the retained Hartmann, Shercliff, and Hunt cuts
-except the high-`Ha` Hunt side-layer cut, which remains the most sensitive
-straight-duct parity lane. That cut is dominated by the conducting-wall side
-jets, so small differences in side-layer clustering, wall conductance
-representation, current closure, cell-center-to-wall reconstruction, and
-normalization move the jet peak more than they move the core or Hartmann-layer
-cuts. Increasing the local side-layer resolution and importing processed
-reference spacing did not monotonically improve the error in the current LMX
-operator path; the retained README figure therefore reports the gap explicitly
-instead of peak-matching it away. Closing it requires a dedicated
-mesh-convergence and wall-current reconstruction campaign, with `Q`, `phi`,
-`J`, `J×B`, side-jet location, and pressure-gradient observables compared
-together.
+The ladder now closes the retained Shercliff and Hunt `Ha = 20, 100` profile
+cuts under the `1.2e-2` target when the explicit Hunt wall matches the thin-wall
+reference model. The `Ha = 100` row reports Shercliff
+`y/z L2 = 4.89e-3 / 7.93e-3` and Hunt
+`y/z L2 = 4.42e-3 / 2.89e-3`. The high-`Ha` Hunt side-layer remains the most
+sensitive diagnostic: blind mesh-only increases to `65 × 65` and `81 × 81` did
+not improve monotonically even when nominal layer-cell counts increased. The
+documented acceptance criterion is therefore the literature-matched wall model
+and measured profile error, not nominal layer-cell count alone.
 
 `examples/hartmann_validation_ladder.py` now does the same for the Hartmann
 centerline, including a wall-layer zoom and a checked summary JSON, so the
@@ -592,14 +588,16 @@ The current validation surface includes:
 The remaining research-grade blockers are tracked explicitly rather than
 hidden in the figures:
 
-- high-`Ha` Hunt side-layer parity is not closed yet; the current analytical
-  ladder has Hunt `Ha = 100` side-layer `z_l2 ≈ 3.26e-2`, above the retained
-  `1.2e-2` target. A local probe with `49 × 81` resolution and alternate
-  forcing/pressure-gradient/flow-rate drives left this cut near `3e-2`, so the
-  next work item is operator/wall-current/reference-observable parity rather
-  than visual peak matching. A heavier mesh-only probe with `81 × 81` and
-  `97 × 97` fluid grids did not close the gap; the `97 × 97` case met the
-  nominal layer-cell gate but became ill-conditioned and worsened the cut
+- high-`Ha` Hunt side-layer parity is closed for the public analytical
+  overlay after matching the thin-wall reference model used by the FreeMHD/Ni
+  files (`wall_thickness = 0.001`, `sigma_w / sigma = 5`,
+  conductance ratio `c = 0.05`). The retained `49 × 49` case gives Hunt
+  `Ha = 100` errors below the `1.2e-2` target. Blind mesh-only increases with
+  the older thick-wall approximation and with the same high-Ha segmented mesh
+  were not reliable; `81 × 81` and `97 × 97` runs met or approached nominal
+  layer-cell counts but worsened the side cut. The documented gate is therefore
+  the literature-matched wall model plus measured profile error, not nominal
+  layer-cell count alone
 - the magnetic-obstacle section is an internal response/conservation gate until
   a digitized or executable external reference is filled into
   `magnetic_obstacle_reference_observables.csv`
@@ -607,14 +605,11 @@ hidden in the figures:
   spectrum diagnostics plus a longer nonlinear vorticity movie; turbulent
   parity remains open until those observables are compared with published
   nonlinear Q2D turbulent data
-- the bent-pipe section is currently a low-De straight-pipe-limit check; the
-  higher-inertia Dean-vortex gate remains open. Global current closure is clean
-  (`max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`), but
-  the maximum local mapped-grid `|div J|` residual `≈ 2.15e-2` passes only the
-  bounded demonstrator tolerance, not the research-grade `1e-3` local-closure
-  target. A refined local probe stayed at `O(10^-2)`, so this needs a mapped
-  cylindrical current-balance diagnostic/solver fix before any Dean-vortex
-  validation claim
+- the bent-pipe low-De current-closure blocker is closed
+  (`max_charge_balance_residual ≈ 2.16e-12`,
+  `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The
+  remaining bent-pipe research lane is higher-inertia Dean-vortex parity with
+  a curved-duct reference dataset
 - the tabulated-field rectangular lane now passes both table-node and
   solver-point manufactured-field reconstruction; WHAM-like 3D field response
   remains a separate open validation lane because the current pipe solve is

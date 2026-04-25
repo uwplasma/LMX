@@ -17,6 +17,9 @@ from lmx.fringing import (
     build_variable_field_pipe_ogrid_extruded_problem,
     build_wham_mirror_pipe_extruded_problem,
     _cross_section_mesh,
+    _pipe_conservative_current_diagnostics_3d,
+    _pipe_conservative_emf_rhs_3d,
+    _pipe_poisson_sparse_3d,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
     _variable_coefficient_poisson_jacobi_3d,
@@ -481,6 +484,56 @@ def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
     assert float(jnp.max(jnp.abs(solution.bundle.u[:, -1, :]))) > 0.0
     assert solution.validation.max_charge_balance_residual < 0.5
     assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
+
+
+def test_pipe_sparse_potential_cancels_conservative_emf_divergence():
+    nx, nr, ntheta = 4, 5, 12
+    dx = 0.3
+    r_faces = jnp.linspace(0.0, 0.4, nr + 1)
+    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    dtheta = 2.0 * jnp.pi / ntheta
+    x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
+    r = r_centers[None, :, None]
+    theta = jnp.linspace(0.0, 2.0 * jnp.pi, ntheta, endpoint=False)[None, None, :]
+    sigma = jnp.ones((nx, nr, ntheta))
+    uxb_x = jnp.broadcast_to(0.03 * jnp.sin(jnp.pi * x) * jnp.cos(theta), sigma.shape)
+    uxb_r = jnp.broadcast_to(0.02 * r * jnp.cos(2.0 * theta), sigma.shape)
+    uxb_theta = jnp.broadcast_to(0.01 * jnp.sin(theta) * (1.0 + x), sigma.shape)
+
+    emf_rhs = _pipe_conservative_emf_rhs_3d(
+        sigma,
+        uxb_x,
+        uxb_r,
+        uxb_theta,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=float(dtheta),
+    )
+    phi, residual, _, _ = _pipe_poisson_sparse_3d(
+        -emf_rhs,
+        sigma,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=float(dtheta),
+        iterations=40,
+        tolerance=1.0e-12,
+    )
+    div_j = _pipe_conservative_current_diagnostics_3d(
+        sigma,
+        phi,
+        uxb_x,
+        uxb_r,
+        uxb_theta,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=float(dtheta),
+    )[0]
+
+    assert residual < 1.0e-10
+    assert float(jnp.max(jnp.abs(div_j))) < 1.0e-10
 
 
 def test_wham_mirror_pipe_baseline_reports_finite_metrics(tmp_path):
