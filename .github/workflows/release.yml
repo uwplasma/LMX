@@ -58,10 +58,12 @@ jobs:
           python examples/q2d_decay_validation.py
           python examples/q2d_forced_validation.py
           python examples/q2d_wall_bounded_validation.py
+          python examples/q2d_turbulence_decay_demo.py
           mkdir -p artifacts/release/q2d
           cp -R artifacts/examples/q2d_decay_validation artifacts/release/q2d/
           cp -R artifacts/examples/q2d_forced_validation artifacts/release/q2d/
           cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/release/q2d/
+          cp -R artifacts/examples/q2d_turbulence_decay artifacts/release/q2d/
 
       - name: Build release validation summary
         run: |
@@ -70,6 +72,7 @@ jobs:
             --parity-summary artifacts/release/freemhd_parity/summary.json \
             --output-json artifacts/release/summary-report.json \
             --output-md artifacts/release/summary-report.md
+          python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
 
       - name: Upload validation artifacts
         uses: actions/upload-artifact@v4

@@ -167,6 +167,8 @@ artifact gates before package artifacts are built.
   - summarize FreeMHD observable-gate pass/fail counts in the release report
   - archive Q2D decay, forced, and wall-bounded reduced-model artifacts with
     modal energy-budget gates
+  - run `python scripts/run_release_readiness.py` to check the bounded release
+    gates and list deferred research lanes separately from release blockers
   - run broad branch coverage with `--cov-fail-under=95`
 - packaging:
   - build sdist and wheel artifacts
@@ -195,6 +197,23 @@ explicit `skipped` summary instead of failing the packaging workflow. Release
 candidates intended for publication should run the same workflow on a runner
 with `LMX_FREEMHD_INSTALL_DIR` or `LMX_FREEMHD_PROCESSED_ROOT` configured so
 the parity artifact is completed rather than skipped.
+
+Local release dry-run:
+
+```bash
+python -m pip install --upgrade build twine
+rm -rf dist build lmx.egg-info
+python -m build
+python -m twine check dist/*
+python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
+```
+
+The release-readiness report is intentionally conservative: missing artifacts,
+metadata regressions, failed bounded profile gates, or failed internal
+conservation gates block the release. Known research gaps such as high-`Ha`
+Hunt side-layer parity, external magnetic-obstacle reference data, and
+higher-inertia Dean-vortex validation are listed as deferred research lanes
+instead of being silently treated as solved.
 
 ## Test runtime baseline
 

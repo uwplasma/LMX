@@ -105,6 +105,22 @@ python scripts/run_full_validation_exercise.py \
   --write-plot
 ```
 
+For release candidates, run the bounded release-status gate after regenerating
+the selected public artifacts:
+
+```bash
+python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
+```
+
+That report separates hard release blockers from deferred research lanes. The
+current bounded `1.0` gate requires package metadata, workflow scaffolding,
+public README/docs artifacts, retained straight-duct analytical overlays,
+nonlinear Q2D movie diagnostics, magnetic-obstacle internal response,
+low-De bent-pipe global current closure, and tabulated-field reconstruction to
+pass. It keeps high-`Ha` Hunt side-layer parity, external magnetic-obstacle
+reference data, Q2D turbulent parity, and higher-inertia Dean-vortex validation
+explicitly open.
+
 That driver produces Benchmark A artifacts, Benchmark B gate summaries, and a
 combined JSON/CSV/Markdown report for the current documented thresholds.
 When run from the source tree it uses the bundled closed-channel reference
