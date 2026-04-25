@@ -5,6 +5,8 @@ from pathlib import Path
 
 from lmx import enable_compilation_cache
 from lmx.showcase import solve_closed_channel_benchmark, write_closed_channel_validation_ladder_figure
+from lmx.solvers import _build_mesh
+from lmx.validation import duct_layer_resolution_gate
 
 
 OUTPUT_DIR = Path("artifacts/examples/straight_duct_validation_ladder")
@@ -29,6 +31,16 @@ DENSITY = 1.0
 VISCOSITY = 1.0
 
 
+def _layer_resolution_summary(case: object) -> dict[str, object]:
+    try:
+        return dict(duct_layer_resolution_gate(case, _build_mesh(case)))  # type: ignore[arg-type]
+    except Exception:
+        return {
+            "layer_resolution_supported": False,
+            "layer_resolution_pass": False,
+        }
+
+
 def run_straight_duct_validation_ladder(
     *,
     out_dir: Path = OUTPUT_DIR,
@@ -39,7 +51,7 @@ def run_straight_duct_validation_ladder(
     shercliff_records: list[dict[str, object]] = []
     hunt_records: list[dict[str, object]] = []
     for ha in HA_VALUES:
-        _, _, shercliff_comparison = solve_closed_channel_benchmark(
+        shercliff_case, _, shercliff_comparison = solve_closed_channel_benchmark(
             "shercliff",
             ha=ha,
             width=WIDTH,
@@ -62,10 +74,11 @@ def run_straight_duct_validation_ladder(
                 "y_profile": shercliff_comparison.y_profile,
                 "z_profile": shercliff_comparison.z_profile,
                 "reference_path": getattr(shercliff_comparison, "reference_path", ""),
+                "layer_resolution": _layer_resolution_summary(shercliff_case),
             }
         )
 
-        _, _, hunt_comparison = solve_closed_channel_benchmark(
+        hunt_case, _, hunt_comparison = solve_closed_channel_benchmark(
             "hunt",
             ha=ha,
             width=WIDTH,
@@ -92,6 +105,7 @@ def run_straight_duct_validation_ladder(
                 "y_profile": hunt_comparison.y_profile,
                 "z_profile": hunt_comparison.z_profile,
                 "reference_path": getattr(hunt_comparison, "reference_path", ""),
+                "layer_resolution": _layer_resolution_summary(hunt_case),
             }
         )
 
@@ -114,6 +128,7 @@ def run_straight_duct_validation_ladder(
                     "y_linf_error": y_comp.linf_error,
                     "z_l2_error": z_comp.l2_error,
                     "z_linf_error": z_comp.linf_error,
+                    "layer_resolution": record["layer_resolution"],
                 }
             )
         return payload

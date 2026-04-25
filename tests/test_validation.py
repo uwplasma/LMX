@@ -354,6 +354,17 @@ def test_duct_layer_resolution_gate_marks_publication_mesh_readiness():
     assert retained_gate["minimum_mesh_refinement_factor"] <= 1.0
 
 
+def test_duct_layer_resolution_gate_tolerates_exact_threshold_roundoff():
+    case = make_hunt_case(ha=100.0, width=0.2, height=0.2, ny=81, nz=81, wall_cells=12, wall_thickness=0.02)
+
+    gate = duct_layer_resolution_gate(case, _build_mesh(case))
+
+    assert gate["hartmann_layer_cells"] == pytest.approx(8.0)
+    assert gate["hartmann_layer_resolution_pass"] is True
+    assert gate["side_layer_resolution_pass"] is True
+    assert gate["layer_resolution_pass"] is True
+
+
 def test_validation_summary_includes_latest_potential_residual():
     case = make_hartmann_case(ha=5.0, ny=12, nz=12)
     solution = _synthetic_solution(case)

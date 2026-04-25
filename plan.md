@@ -155,7 +155,13 @@ refer to the Samper et al. taxonomy.
   between forcing, pressure-gradient, and flow-rate drive left the side-layer
   error unchanged at `≈ 3.26e-2`. The next blocker is therefore
   operator/wall-current/reference-observable parity, not a simple resolution or
-  drive-setting problem.
+  drive-setting problem. A follow-up mesh-only probe with `81 × 81` and
+  `97 × 97` fluid grids confirmed this: `81 × 81` reached nominal
+  Hartmann/side-layer cell counts but worsened to `z_l2 ≈ 1.25e-1`, and
+  `97 × 97` met the layer-cell gate but became ill-conditioned
+  (`z_l2 ≈ 4.36e-1`). The high-Ha Hunt lane should therefore shift to the
+  conservative wall-current/operator audit before another blind resolution
+  increase.
 - Magnetic-obstacle external validation: replace the current matched no-field
   LMX reference with published localized-field cases, including the
   Cuevas-Smolentsev-Abdou quasi-2D magnetic-obstacle study and the Votyakov
@@ -201,9 +207,13 @@ refer to the Samper et al. taxonomy.
   local residual passes the bounded tolerance (`5e-2`) but fails the research
   target (`1e-3`). The next curved-pipe validation must reduce or explain that
   local residual while adding a real Dean-vortex reference. A local
-  iteration/mesh probe moved the residual from `2.15e-2` to `1.52e-2` on a
-  `22 × 48 × 17` radial/theta/station grid, so the gap is not closed by simply
-  increasing the potential iteration count.
+  iteration/mesh probe stayed at `O(10^-2)` on both the default
+  `18 × 40 × 15` grid and a refined `22 × 48 × 17` radial/theta/station grid,
+  so the gap is not closed by simply increasing the potential iteration count.
+  The next step is a mapped cylindrical current-balance audit: compare the
+  conservative flux divergence, weighted cell-volume residual, boundary flux
+  residual, and sparse potential residual station by station before promoting
+  any higher-inertia Dean-vortex run.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
   against manufactured fields and at least one independent field dataset.

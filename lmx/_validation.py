@@ -252,6 +252,7 @@ def duct_layer_resolution_gate(
     *,
     min_hartmann_cells: float = 8.0,
     min_side_cells: float = 6.0,
+    cell_tolerance: float = 1.0e-9,
 ) -> dict[str, float | bool]:
     """Return benchmark-readiness metrics for Hartmann and side layers."""
 
@@ -266,8 +267,10 @@ def duct_layer_resolution_gate(
             "side_layer_cell_ratio": 0.0,
             "minimum_mesh_refinement_factor": 0.0,
         }
-    hartmann_pass = metrics["hartmann_layer_cells"] >= min_hartmann_cells
-    side_pass = metrics["side_layer_cells"] >= min_side_cells
+    # Cell counts come from partial-cell geometric integration, so exact
+    # threshold cases can land at 7.99999999999999 rather than 8.0.
+    hartmann_pass = metrics["hartmann_layer_cells"] + cell_tolerance >= min_hartmann_cells
+    side_pass = metrics["side_layer_cells"] + cell_tolerance >= min_side_cells
     hartmann_ratio = metrics["hartmann_layer_cells"] / max(float(min_hartmann_cells), 1.0e-20)
     side_ratio = metrics["side_layer_cells"] / max(float(min_side_cells), 1.0e-20)
     limiting_ratio = min(hartmann_ratio, side_ratio)

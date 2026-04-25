@@ -597,7 +597,9 @@ hidden in the figures:
   `1.2e-2` target. A local probe with `49 × 81` resolution and alternate
   forcing/pressure-gradient/flow-rate drives left this cut near `3e-2`, so the
   next work item is operator/wall-current/reference-observable parity rather
-  than visual peak matching
+  than visual peak matching. A heavier mesh-only probe with `81 × 81` and
+  `97 × 97` fluid grids did not close the gap; the `97 × 97` case met the
+  nominal layer-cell gate but became ill-conditioned and worsened the cut
 - the magnetic-obstacle section is an internal response/conservation gate until
   a digitized or executable external reference is filled into
   `magnetic_obstacle_reference_observables.csv`
@@ -610,7 +612,9 @@ hidden in the figures:
   (`max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`), but
   the maximum local mapped-grid `|div J|` residual `≈ 2.15e-2` passes only the
   bounded demonstrator tolerance, not the research-grade `1e-3` local-closure
-  target
+  target. A refined local probe stayed at `O(10^-2)`, so this needs a mapped
+  cylindrical current-balance diagnostic/solver fix before any Dean-vortex
+  validation claim
 - the tabulated-field rectangular lane now passes both table-node and
   solver-point manufactured-field reconstruction; WHAM-like 3D field response
   remains a separate open validation lane because the current pipe solve is
