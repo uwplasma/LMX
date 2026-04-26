@@ -1455,12 +1455,12 @@ That retained gate now passes for all three retained fringing geometries.
     before explicit device/shard placement, which avoids single-device
     allocation spikes on the large multi-GPU cases
   - the current long-axial CPU probe on this host is:
-    `2048 × 64 × 64`, `1024` iterations, `1/2/4/8`
+    `8192 × 64 × 64`, `256` iterations, `1/2/4`
   - the current large remote GPU probe on `office` is:
-    `6144 × 96 × 96`, `2048` iterations, `1/2`
+    `6144 × 96 × 96`, `4096` iterations, `1/2`
   - current probe warm runtimes are:
-    - CPU: `96.8449 s`, `75.2597 s`, `69.0905 s`, `68.1907 s`
-    - GPU: `40.0537 s`, `32.0196 s`
+    - CPU: `80.5495 s`, `74.6580 s`, `65.5038 s`
+    - GPU: `78.5812 s`, `46.8238 s`
   - the long-axial CPU benchmark is better than the shorter square-like CPU
     benchmark, but still flattens beyond `4` host devices on this machine
   - the resized remote GPU benchmark now scales without the earlier OOM path
@@ -1779,11 +1779,11 @@ That retained gate now passes for all three retained fringing geometries.
   hygiene step is to trim or reclassify the slow physics subset so the routine
   lane is honest about its runtime again.
 - The current longer strong-scaling artifact now uses:
-  - CPU: `2048×64×64`, `1024` iterations
+  - CPU: `8192×64×64`, `256` iterations
   - GPU: `6144×96×96`, `4096` iterations
   - warm runtime points:
-    - CPU: `79.45 s`, `68.68 s`, `64.09 s` at `1, 2, 4`
-    - GPU: `78.58 s`, `62.52 s` at `1, 2`
+    - CPU: `80.55 s`, `74.66 s`, `65.50 s` at `1, 2, 4`
+    - GPU: `78.58 s`, `46.82 s` at `1, 2`
   - current interpretation:
     - the host CPU path improves through `4` logical devices
     - the remote two-GPU path still shows the cleaner fixed-problem scaling

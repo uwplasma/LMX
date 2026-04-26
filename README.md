@@ -506,7 +506,7 @@ are not limited by a coarse axial sweep.
 The scaling panel below is a fixed-problem strong-scaling benchmark for a dense
 structured-grid `extruded3d` inductionless MHD operator. Solid lines are
 measured warm runtimes and speedups; the dashed line is ideal linear speedup.
-The current figure uses a `2048×64×64` CPU case with `1024` operator
+The current figure uses an `8192×64×64` CPU case with `256` operator
 iterations and a `6144×96×96` GPU case with `4096` operator iterations, so the
 device curves come from minute-scale kernels instead of short smoke tests. The
 CPU panel is limited to `1, 2, 4` devices, which is where the current host
@@ -514,8 +514,8 @@ still shows a meaningful reduction in warm runtime.
 
 Measured warm-runtime points:
 
-- CPU: `79.45 s`, `68.68 s`, `64.09 s` at `1, 2, 4`
-- GPU: `78.58 s`, `62.52 s` at `1, 2`
+- CPU: `80.55 s`, `74.66 s`, `65.50 s` at `1, 2, 4`
+- GPU: `78.58 s`, `46.82 s` at `1, 2`
 
 On this workstation the CPU curve improves through `4` logical devices, while
 the two-GPU path keeps the cleaner strong-scaling trend on the larger fixed

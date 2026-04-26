@@ -2053,8 +2053,9 @@ def write_strong_scaling_plots(
     for values in groups.values():
         values.sort(key=lambda item: int(item["num_devices"]))
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
-    fig.suptitle(case_title, fontsize=16)
+    fig, axes = plt.subplots(1, 2, figsize=(10.6, 5.2), constrained_layout=False)
+    fig.subplots_adjust(left=0.08, right=0.98, bottom=0.23, top=0.82, wspace=0.30)
+    fig.suptitle(case_title, fontsize=15, y=0.96)
     palette = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed"]
 
     legend_handles: list[Line2D] = []
@@ -2080,7 +2081,7 @@ def write_strong_scaling_plots(
                 label = f"{platform_label} ({shape_text})"
             else:
                 suffix = "" if not benchmark_kind else f", {benchmark_kind}"
-                label = f"{platform_label} ({shape_text}, {int(iteration_value)} iters{suffix})"
+                label = f"{platform_label}: {shape_text}, {int(iteration_value)} iters{suffix}"
 
         axes[0].plot(device_counts, runtimes, marker="o", color=color, label=label)
         axes[1].plot(device_counts, speedup, marker="o", color=color, label=label)
@@ -2099,13 +2100,13 @@ def write_strong_scaling_plots(
     legend_handles.append(Line2D([0], [0], color="#64748b", linestyle="--", label="Ideal linear speedup"))
     legend_labels.append("Ideal linear speedup")
 
-    axes[0].set_title("Warm runtime")
+    axes[0].set_title("Warm runtime", fontsize=13)
     axes[0].set_xlabel("Device count")
     axes[0].set_ylabel("Runtime [s]")
     axes[0].set_xscale("log", base=2)
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
-    axes[1].set_title("Strong-scaling speedup")
+    axes[1].set_title("Strong-scaling speedup", fontsize=13)
     axes[1].set_xlabel("Device count")
     axes[1].set_ylabel("Warm-runtime speedup")
     axes[1].set_xscale("log", base=2)
@@ -2114,10 +2115,11 @@ def write_strong_scaling_plots(
     fig.legend(
         legend_handles,
         legend_labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.92),
-        ncol=max(1, min(3, len(legend_handles))),
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=2,
         frameon=True,
+        fontsize=9.5,
     )
 
     png_path = out_dir / "strong_scaling.png"

@@ -134,7 +134,7 @@ ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/
 The current scaling artifact is stored under
 `docs/_static/generated/strong_scaling.png` and is generated from:
 
-- a local CPU sweep on a fixed `2048 x 64 x 64` extruded operator with `1024`
+- a local CPU sweep on a fixed `8192 x 64 x 64` extruded operator with `256`
   iterations
 - a remote GPU sweep on a fixed `6144 x 96 x 96` extruded operator with `4096`
   iterations
@@ -149,17 +149,17 @@ the actual strong-scaling interpretation.
 Observed warm-runtime points from that artifact:
 
 - CPU:
-  - `1` device: `79.4471 s`
-  - `2` devices: `68.6761 s`
-  - `4` devices: `64.0858 s`
+  - `1` device: `80.5495 s`
+  - `2` devices: `74.6580 s`
+  - `4` devices: `65.5038 s`
 - GPU:
-  - `1` GPU: `78.5845 s`
-  - `2` GPUs: `62.5184 s`
+  - `1` GPU: `78.5812 s`
+  - `2` GPUs: `46.8238 s`
 
 The CPU sweep is reported as measured rather than idealized. On this
 workstation, the denser operator improves through `4` logical CPU devices,
 which is still consistent with a memory-bandwidth and communication limit on
-the host path beyond that range. The remote GPU path shows about `1.26x`
+the host path beyond that range. The remote GPU path shows about `1.68x`
 speedup from `1` to `2` GPUs on the larger fixed problem.
 
 This is also the point where the current JAX implementation strategy matters.
