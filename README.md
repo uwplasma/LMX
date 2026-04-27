@@ -12,8 +12,9 @@ solver lane, restartable CLI workflows, strong-scaling tooling, and
 differentiable workflows for sensitivity analysis and inverse design.
 
 <p align="center">
-  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="49%">
-  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt startup movie" width="49%">
+  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt boundary-layer formation movie" width="32%">
+  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt boundary-layer formation movie" width="32%">
+  <img src="docs/_static/generated/q2d_turbulence_decay.gif" alt="LMX Q2D turbulence movie" width="32%">
 </p>
 
 ## Why use LMX
