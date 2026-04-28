@@ -1,0 +1,146 @@
+# Executable External-Code Audit
+
+This note records which independent codes can be used to generate validation
+data for the open LMX lanes. The external checkouts live outside the LMX source
+tree under `/Users/rogerio/local/tests/lmx_external_codes`; they are validation
+tools, not LMX dependencies.
+
+## Codes Checked
+
+| Code | Local checkout | Commit | Result |
+| --- | --- | --- | --- |
+| FreeMHD | `/Users/rogerio/local/tests/lmx_external_codes/FreeMHD` | `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` | Runnable through the existing Docker wrapper; use Linux containers rather than native macOS builds. |
+| Q2DmhdFoam | `/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam` | `e13c6659e403d96a7b52b6cc65fc0260260b0b79` | Compiles and runs in `opencfd/openfoam-default:2206` after small OpenFOAM 2206 API updates in the external clone. |
+| MHD_Solvers_OpenFOAM | `/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM` | `32786d4ff40b9bc87bc81099ec8458230b38aabe` | `mhdEpotFoam` compiles and runs in `opencfd/openfoam-default:2206` after a small include fix in the external clone. |
+
+## FreeMHD
+
+FreeMHD remains the main independent finite-volume baseline for closed-channel,
+layered-wall, fringing, free-surface, and multi-region liquid-metal cases. The
+local Docker wrapper at `/Users/rogerio/local/tests/freemhd_install` was rerun
+with two MPI ranks:
+
+```bash
+cd /Users/rogerio/local/tests/freemhd_install
+./run_hunt.sh 2
+```
+
+The run completed, wrote sampled line data, reconstructed fields, and generated
+ParaView-ready VTK outputs under
+`/Users/rogerio/local/tests/freemhd_install/freemhd_output/hunt`. The output
+contains velocity, pressure, electric potential, magnetic field, and Lorentz
+force fields in the liquid and wall regions. That is enough to support:
+
+- straight-duct Shercliff/Hunt observable parity;
+- constant-flow-rate and pressure-gradient drive comparisons;
+- layered-wall electric-potential and current-closure comparisons;
+- fringing-field pressure-drop and profile comparisons when the matching
+  FreeMHD paper case is run or the processed paper slices are used.
+
+The full FreeMHD repository includes an OpenFOAM source tree. On a
+case-insensitive macOS filesystem, the checkout reports filename collisions in
+OpenFOAM files whose names differ only by case. That makes native builds from
+this checkout unreliable on macOS. The supported path for validation is the
+Linux Docker image.
+
+## Q2DmhdFoam
+
+Q2DmhdFoam is the strongest executable candidate for the quasi-2D turbulence
+lane because it implements a Sommeria-Moreau-style reduced model and includes
+validation folders for Shercliff, Tagawa, Vetcha 2009, and Smolentsev 2013
+cases.
+
+The solver did not compile unmodified against OpenFOAM 2206. The external clone
+needed these compatibility edits:
+
+- add `$(LIB_SRC)/meshTools/lnInclude` and `-lmeshTools` to `Make/options`;
+- use `mesh.setFluxRequired(p.name())` instead of the older
+  `mesh.schemesDict().setFluxRequired(...)`;
+- replace the old `fvc::ddtPhiCorr(rUA, U, phi)` call with the OpenFOAM 2206
+  form `fvc::interpolate(rUA) * fvc::ddtCorr(U, phi)`.
+
+After those external-clone edits, the solver compiled in
+`opencfd/openfoam-default:2206`. A short `liquidMetalChannel` tutorial run was
+then executed with temporary case-dictionary fixes for OpenFOAM 2206:
+
+- add the missing `Ubar`, `fd`, `epsSteady`, and `ssCriteria` entries;
+- replace `BiCGStab` with `PBiCGStab`;
+- provide a default corrected Laplacian scheme for the pressure equation.
+
+The tutorial completed to `t = 2` with finite continuity errors and wrote
+OpenFOAM time directories. This makes Q2DmhdFoam a practical external generator
+for Q2D energy/enstrophy/spectrum and wall-bounded channel observables. The next
+LMX task is not solver discovery; it is to select one Q2DmhdFoam validation case
+and export the same scalar observables used by
+`q2d_turbulence_reference_observables.csv`.
+
+## MHD_Solvers_OpenFOAM
+
+MHD_Solvers_OpenFOAM is a useful independent path for one-way, low magnetic
+Reynolds number MHD with electric-potential coupling, conducting walls, and
+turbulence examples. Its companion benchmark paper includes laminar conjugate
+duct flow, backward-facing step flow, multiphase cavity flow, rising bubble, and
+turbulent conjugate duct flow.
+
+`mhdEpotFoam` did not compile unmodified against OpenFOAM 2206 because the
+solver's local `CorrectPhi.H` file shadowed OpenFOAM's header. Changing the
+solver include from quoted to angle-bracket form in the external clone let the
+solver compile:
+
+```cpp
+#include <CorrectPhi.H>
+```
+
+A short run of the bundled `Examples/mhdEpotFoam` case was then executed after
+temporary case-file fixes:
+
+- repair a malformed final comment in `controlDict`;
+- shorten the runtime to three steps;
+- replace `BiCGStab` with `PBiCGStab`;
+- move `PotERefCell` / `PotERefValue` into the `PIMPLE` dictionary;
+- add a `PotEFinal` solver block.
+
+The case ran through `t = 0.15`, solving velocity, pressure, and electric
+potential. This makes the code useful for external magnetic-obstacle and
+one-way-MHD comparison cases, provided the case dictionaries are modernized and
+the reference observables are exported with the same definitions as LMX.
+
+## Validation-Lane Decisions
+
+- High-Ha Hunt side-layer parity should stay anchored to the analytical
+  FreeMHD/Ni wall-model slices and FreeMHD processed paper data. The executable
+  FreeMHD path is available for reruns, but the decisive issue is matching wall
+  conductance, wall thickness, drive formulation, and layer-focused meshes.
+- Magnetic-obstacle external validation can be closed with either a modernized
+  MHD_Solvers_OpenFOAM case or a digitized literature dataset. The best first
+  target is a quasi-2D localized-field case with centerline velocity deficit,
+  wake recovery, pressure-drop or drag proxy, and current/Lorentz-force
+  observables.
+- Q2D turbulence parity can be closed with Q2DmhdFoam, using its
+  Sommeria-Moreau and Smolentsev/Vetcha validation cases to produce energy,
+  enstrophy, spectral-centroid, and high-wavenumber energy-fraction references.
+- Bent-pipe Dean-vortex validation is still the least served by MHD-specific
+  external code. OpenFOAM can generate hydrodynamic curved-pipe baselines, but
+  the research-grade path should use literature Dean-vortex observables or a
+  carefully constructed OpenFOAM curved-pipe case before adding magnetic
+  damping.
+
+## Literature Anchors
+
+- FreeMHD: Wynne et al., *FreeMHD: Validation and verification of the
+  open-source, multi-domain, multi-phase solver for electrically conductive
+  flows*, Physics of Plasmas 32, 2025.
+- OpenFOAM MHD benchmark: Blishchik, van der Lans, and Kenjereš, *An extensive
+  numerical benchmark of the various magnetohydrodynamic flows*, International
+  Journal of Heat and Fluid Flow 90, 2021.
+- Q2D model: Sommeria and Moreau, *Why, how, and when, MHD turbulence becomes
+  two-dimensional*, Journal of Fluid Mechanics 118, 1982.
+- Q2D validation cases: Smolentsev, Vetcha, and Abdou 2013-style breeder-flow
+  stability/transition observables as staged in Q2DmhdFoam.
+- Magnetic obstacle: Cuevas, Smolentsev, and Abdou, *On the flow past a
+  magnetic obstacle*, Journal of Fluid Mechanics 553, 2006, plus the Votyakov
+  magnetic-obstacle wake and constrained-flow papers.
+- Dean vortices: curved-pipe and curved-duct benchmark literature should be
+  used for secondary-flow intensity, vortex-center location, axial-velocity
+  skew, and pressure-loss observables before any MHD damping claim.
+

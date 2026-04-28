@@ -140,6 +140,18 @@ refer to the Samper et al. taxonomy.
 
 ### Current open research-grade blockers
 
+- External executable-code audit:
+  FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
+  tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the
+  local Docker/OpenFOAM environment. FreeMHD is runnable through
+  `/Users/rogerio/local/tests/freemhd_install` and was rerun for the Hunt demo
+  with two MPI ranks, producing line samples and VTK fields. Q2DmhdFoam compiles
+  and runs in `opencfd/openfoam-default:2206` after small OpenFOAM 2206 API
+  patches in the external clone; this is the executable path for the Q2D
+  turbulence external-reference lane. MHD_Solvers_OpenFOAM `mhdEpotFoam`
+  compiles and runs after a small header-include compatibility patch; this is
+  the executable path for one-way-MHD / magnetic-obstacle case construction.
+  The detailed audit is now in `docs/executable_external_code_audit.md`.
 - High-`Ha` Hunt side-layer parity: run a mesh ladder with explicit Hartmann
   and side-layer cell counts, compare LMX against analytic and processed
   reference cuts on `Q`, `phi`, `J`, `J×B`, side-jet peak location, and

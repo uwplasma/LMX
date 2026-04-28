@@ -49,6 +49,7 @@ performance
 autodiff
 fringing
 external_benchmarks
+executable_external_code_audit
 research_directions
 ```
 
