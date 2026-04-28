@@ -284,7 +284,9 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   `turnover_count ≈ 3.31e-1`, `max_courant ≈ 5.23e-2`, spectral centroid
   shift `≈ 8.63e-1`, and divergence `≈ 2.74e-14`. This is a bounded SM82-style
   nonlinear physics gate; external turbulent parity remains open until matched
-  to a published turbulent Q2D reference dataset.
+  to a published turbulent Q2D reference dataset. If a filled
+  `q2d_turbulence_reference_observables.csv` is present, the example writes the
+  scalar comparison table and PNG/PDF tolerance-gate plots automatically.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -605,12 +607,14 @@ hidden in the figures:
 - the Q2D lane has modal decay, forced-mode, wall-bounded, energy-budget, and
   spectrum diagnostics plus a longer nonlinear vorticity movie; turbulent
   parity remains open until those observables are compared with published
-  nonlinear Q2D turbulent data
+  nonlinear Q2D turbulent data. The external-reference CSV contract now exists
+  in `examples/q2d_turbulence_external_reference_template.py`
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
   `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The
   remaining bent-pipe research lane is higher-inertia Dean-vortex parity with
-  a curved-duct reference dataset
+  a curved-duct reference dataset. The external-reference CSV contract now
+  exists in `examples/dean_vortex_external_reference_template.py`
 - the tabulated-field rectangular lane now passes both table-node and
   solver-point manufactured-field reconstruction; WHAM-like 3D field response
   remains a separate open validation lane because the current pipe solve is

@@ -63,6 +63,50 @@ filled `magnetic_obstacle_reference_observables.csv` exists in its output
 directory; otherwise it writes the template and leaves the external validation
 status open.
 
+## Q2D turbulence reference contract
+
+The Q2D turbulence lane now uses the same scalar-observable contract as the
+magnetic-obstacle lane. The current nonlinear Q2D movie is still an internal
+SM82/Sommeria-Moreau-style physics gate, but the example can be promoted to an
+external turbulent parity check by adding a filled
+`q2d_turbulence_reference_observables.csv` file to its output directory.
+
+Generate the template with:
+
+```bash
+python examples/q2d_turbulence_external_reference_template.py
+```
+
+or run the movie example and fill the template it emits:
+
+```bash
+python examples/q2d_turbulence_decay_demo.py
+```
+
+The first required observables are energy-decay ratio, enstrophy-decay ratio,
+final spectral centroid, final high-wavenumber energy fraction, and turnover
+count. When the CSV is present, the movie example writes a
+publication-table-ready comparison CSV plus PNG/PDF tolerance-gate plots.
+
+## Dean-vortex reference contract
+
+The bent-pipe lane is closed only for the low-De straight-pipe-equivalence and
+charge-closure gate. Higher-inertia Dean-vortex validation requires external
+curved-pipe or curved-duct observables. The contract for that comparison is now
+also executable:
+
+```bash
+python examples/dean_vortex_external_reference_template.py
+python examples/bent_pipe_inductionless_demo.py
+```
+
+If `dean_vortex_reference_observables.csv` is present in the bent-pipe example
+output directory, the example compares secondary-flow RMS ratio, secondary-flow
+peak ratio, normalized axial-velocity centroid shift, inner/outer axial-speed
+ratio, and pressure-loss proxy against the reference rows and writes the
+matching table and plots. Until a matched higher-inertia reference is filled,
+this remains a validation lane, not a completed research-grade claim.
+
 ## Rationale
 
 LMX is a clean-room inductionless MHD implementation. External executables are

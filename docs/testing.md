@@ -313,6 +313,9 @@ verification/validation practice, not only to internal regression history.
   - the current multi-mode Q2D decay movie adds monotone energy/enstrophy,
     high-wavenumber damping, and spectral-centroid checks, while still keeping
     nonlinear turbulent parity explicitly open
+  - `examples/q2d_turbulence_external_reference_template.py` now writes the
+    observable CSV contract used by the movie example when matched turbulent
+    reference data are available
 - [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
 - [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
   - anchor the wake-deficit / recovery / distortion observables needed before
@@ -323,7 +326,10 @@ verification/validation practice, not only to internal regression history.
     experimental observables
 - [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)
   - supports the broader validation roadmap for curved ducts, magnetic
-    obstacles, and 3D liquid-metal benchmark structure
+    obstacles, and higher-inertia 3D cases
+  - `examples/dean_vortex_external_reference_template.py` now writes the
+    scalar-observable CSV contract for future higher-inertia curved-pipe or
+    curved-duct Dean-vortex validation
 - [A research framework for writing differentiable PDE discretizations in JAX](https://arxiv.org/abs/2111.05218)
   - anchors the autodiff verification philosophy for gradient, optimization,
     and differentiable-operator tests

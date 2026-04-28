@@ -820,8 +820,20 @@ def test_bent_pipe_inductionless_demo_writes_summary(tmp_path: Path):
     assert summary["validation"]["dean_vortex_observables_available"] is True
     assert summary["validation"]["research_grade_dean_validation_pass"] is False
     assert "research_grade_charge_balance_pass" in summary["validation"]
+    assert summary["external_reference_comparison"]["status"] == "external_reference_csv_missing"
     assert (tmp_path / "bent_pipe_overview.png").exists()
+    assert (tmp_path / "dean_vortex_reference_observables_template.csv").exists()
     assert (tmp_path / "bent_pipe_inductionless_summary.json").exists()
+
+
+def test_dean_vortex_external_reference_template_writes_summary(tmp_path: Path):
+    module = _load_example_module("dean_vortex_external_reference_template.py")
+    module.OUTPUT_DIR = tmp_path
+    summary = module.run_dean_vortex_external_reference_template()
+    assert summary["case"] == "dean_vortex_external_reference_template"
+    assert summary["status"] == "template_only_no_external_reference_claim"
+    assert (tmp_path / "dean_vortex_reference_observables.csv").exists()
+    assert (tmp_path / "dean_vortex_external_reference_template_summary.json").exists()
 
 
 def test_variable_field_validation_writes_summary(tmp_path: Path):
@@ -1164,8 +1176,20 @@ def test_q2d_turbulence_decay_demo_writes_summary_and_movie(tmp_path: Path):
     assert summary["case"] == "q2d_turbulence_decay"
     assert summary["validation"]["validation_pass"] is True
     assert summary["validation"]["research_grade_turbulence_validation_pass"] is False
+    assert summary["external_reference_comparison"]["status"] == "external_reference_csv_missing"
     assert (tmp_path / "q2d_turbulence_decay.gif").exists()
+    assert (tmp_path / "q2d_turbulence_reference_observables_template.csv").exists()
     assert (tmp_path / "q2d_turbulence_decay_summary.json").exists()
+
+
+def test_q2d_turbulence_external_reference_template_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2d_turbulence_external_reference_template.py")
+    module.OUTPUT_DIR = tmp_path
+    summary = module.run_q2d_turbulence_external_reference_template()
+    assert summary["case"] == "q2d_turbulence_external_reference_template"
+    assert summary["status"] == "template_only_no_external_reference_claim"
+    assert (tmp_path / "q2d_turbulence_reference_observables.csv").exists()
+    assert (tmp_path / "q2d_turbulence_external_reference_template_summary.json").exists()
 
 
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):

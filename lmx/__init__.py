@@ -9,6 +9,7 @@ __all__ = [
     "benchmark_solver",
     "compare_with_reference_outputs",
     "compare_magnetic_obstacle_reference_observables",
+    "compare_scalar_reference_observables",
     "generate_layered_duct_mesh",
     "generate_layered_duct_mesh_from_fluid_faces",
     "generate_bent_pipe_mesh",
@@ -155,10 +156,18 @@ __all__ = [
     "write_q2d_turbulence_observable_plots",
     "write_q2d_turbulence_decay_movie",
     "load_magnetic_obstacle_reference_observables",
+    "load_scalar_reference_observables",
+    "q2d_turbulence_reference_template_rows",
+    "dean_vortex_reference_template_rows",
     "magnetic_obstacle_reference_template_rows",
+    "write_dean_vortex_reference_template",
     "write_magnetic_obstacle_reference_comparison_plots",
     "write_magnetic_obstacle_reference_comparison_table",
     "write_magnetic_obstacle_reference_template",
+    "write_q2d_turbulence_reference_template",
+    "write_scalar_reference_comparison_plots",
+    "write_scalar_reference_comparison_table",
+    "write_scalar_reference_template",
 ]
 
 
@@ -193,13 +202,33 @@ _EXPORTS = {
         "lmx.external_validation",
         "compare_magnetic_obstacle_reference_observables",
     ),
+    "compare_scalar_reference_observables": (
+        "lmx.external_validation",
+        "compare_scalar_reference_observables",
+    ),
+    "load_scalar_reference_observables": (
+        "lmx.external_validation",
+        "load_scalar_reference_observables",
+    ),
     "load_magnetic_obstacle_reference_observables": (
         "lmx.external_validation",
         "load_magnetic_obstacle_reference_observables",
     ),
+    "q2d_turbulence_reference_template_rows": (
+        "lmx.external_validation",
+        "q2d_turbulence_reference_template_rows",
+    ),
+    "dean_vortex_reference_template_rows": (
+        "lmx.external_validation",
+        "dean_vortex_reference_template_rows",
+    ),
     "magnetic_obstacle_reference_template_rows": (
         "lmx.external_validation",
         "magnetic_obstacle_reference_template_rows",
+    ),
+    "write_dean_vortex_reference_template": (
+        "lmx.external_validation",
+        "write_dean_vortex_reference_template",
     ),
     "write_magnetic_obstacle_reference_comparison_table": (
         "lmx.external_validation",
@@ -212,6 +241,22 @@ _EXPORTS = {
     "write_magnetic_obstacle_reference_template": (
         "lmx.external_validation",
         "write_magnetic_obstacle_reference_template",
+    ),
+    "write_q2d_turbulence_reference_template": (
+        "lmx.external_validation",
+        "write_q2d_turbulence_reference_template",
+    ),
+    "write_scalar_reference_comparison_table": (
+        "lmx.external_validation",
+        "write_scalar_reference_comparison_table",
+    ),
+    "write_scalar_reference_comparison_plots": (
+        "lmx.external_validation",
+        "write_scalar_reference_comparison_plots",
+    ),
+    "write_scalar_reference_template": (
+        "lmx.external_validation",
+        "write_scalar_reference_template",
     ),
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
     "build_fringing_autodiff_problem": ("lmx.autodiff", "build_fringing_autodiff_problem"),

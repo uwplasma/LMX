@@ -1,0 +1,6 @@
+observable,value,tolerance,relative_tolerance,units,source,note
+secondary_flow_rms_ratio,,,0.15,dimensionless,curved-duct or curved-pipe literature/reference solver,RMS secondary-flow speed normalized by axial speed.
+secondary_flow_peak_ratio,,,0.15,dimensionless,curved-duct or curved-pipe literature/reference solver,Peak secondary-flow speed normalized by peak axial speed.
+normalized_velocity_centroid_shift,,,0.15,dimensionless,curved-duct or curved-pipe literature/reference solver,Axial-velocity centroid displacement normalized by pipe radius.
+inner_outer_velocity_ratio,,,0.10,dimensionless,curved-duct or curved-pipe literature/reference solver,Outer-wall to inner-wall axial-speed ratio on the diameter cut.
+pressure_loss_proxy,,,0.15,case-specific,curved-duct or curved-pipe literature/reference solver,Use the same nondimensional pressure-loss convention as the reference.

@@ -27,9 +27,12 @@ REQUIRED_ARTIFACTS = (
     "readme_hunt_startup_2d_poster.png",
     "readme_hunt_startup_3d_poster.png",
     "q2d_turbulence_decay_poster.png",
+    "q2d_turbulence_reference_observables_template.csv",
     "magnetic_obstacle_benchmark.png",
     "magnetic_obstacle_schematic.png",
+    "magnetic_obstacle_reference_observables_template.csv",
     "bent_pipe_overview.png",
+    "dean_vortex_reference_observables_template.csv",
     "variable_field_tabulated_reconstruction.png",
     "strong_scaling.png",
 )

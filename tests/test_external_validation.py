@@ -6,11 +6,19 @@ import pytest
 
 from lmx.external_validation import (
     compare_magnetic_obstacle_reference_observables,
+    compare_scalar_reference_observables,
+    dean_vortex_reference_template_rows,
     load_magnetic_obstacle_reference_observables,
+    load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
+    q2d_turbulence_reference_template_rows,
+    write_dean_vortex_reference_template,
     write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
+    write_q2d_turbulence_reference_template,
+    write_scalar_reference_comparison_plots,
+    write_scalar_reference_comparison_table,
 )
 
 
@@ -105,3 +113,47 @@ def test_magnetic_obstacle_reference_csv_rejects_missing_columns(tmp_path: Path)
 
     with pytest.raises(ValueError, match="missing required columns"):
         load_magnetic_obstacle_reference_observables(path)
+
+
+def test_scalar_reference_helpers_cover_q2d_and_dean_templates(tmp_path: Path):
+    q2d_path = write_q2d_turbulence_reference_template(tmp_path / "q2d.csv")
+    dean_path = write_dean_vortex_reference_template(tmp_path / "dean.csv")
+
+    assert "final_spectral_centroid" in q2d_path.read_text(encoding="utf-8")
+    assert "secondary_flow_rms_ratio" in dean_path.read_text(encoding="utf-8")
+    assert any(row["observable"] == "turnover_count" for row in q2d_turbulence_reference_template_rows())
+    assert any(row["observable"] == "inner_outer_velocity_ratio" for row in dean_vortex_reference_template_rows())
+
+
+def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):
+    reference_path = tmp_path / "reference.csv"
+    reference_path.write_text(
+        "observable,value,tolerance,relative_tolerance,units,source\n"
+        "energy_decay_ratio,0.75,0.01,0.05,dimensionless,Sommeria-Moreau digitized figure\n"
+        "final_spectral_centroid,7.2,0.1,,1/m,Reference spectrum\n",
+        encoding="utf-8",
+    )
+    reference = load_scalar_reference_observables(reference_path, context="Q2D turbulence reference CSV")
+    comparison = compare_scalar_reference_observables(
+        {
+            "energy_decay_ratio": 0.76,
+            "final_spectral_centroid": 7.6,
+            "turnover_count": 0.4,
+        },
+        reference,
+    )
+    table_path = write_scalar_reference_comparison_table(comparison, tmp_path / "comparison.csv")
+    plot_paths = write_scalar_reference_comparison_plots(
+        comparison,
+        tmp_path,
+        output_stem="comparison",
+        title="Scalar external-reference observables",
+        no_data_label="No compared observables",
+    )
+
+    assert comparison["compared_observable_count"] == 2
+    assert comparison["passed_observable_count"] == 1
+    assert comparison["validation_pass"] is False
+    assert "turnover_count" in comparison["extra_lmx_observables"]
+    assert table_path.exists()
+    assert [path.suffix for path in plot_paths] == [".png", ".pdf"]

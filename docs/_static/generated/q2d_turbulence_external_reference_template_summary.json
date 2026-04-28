@@ -1,0 +1,6 @@
+{
+  "case": "q2d_turbulence_external_reference_template",
+  "status": "template_only_no_external_reference_claim",
+  "template": "q2d_turbulence_reference_observables.csv",
+  "notes": "Fill this CSV with matched Sommeria-Moreau-style turbulent observables before claiming external Q2D turbulence parity."
+}

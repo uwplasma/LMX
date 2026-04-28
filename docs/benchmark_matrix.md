@@ -307,6 +307,20 @@ Current Q2D turbulence-movie readiness lane:
     executable nonlinear turbulence-observable movie before claiming turbulent
     parity against published Sommeria-Moreau-style datasets
 
+The Q2D external-reference data contract is now explicit:
+
+- `examples/q2d_turbulence_external_reference_template.py`
+  writes the scalar-observable CSV template for matched turbulent references
+- `examples/q2d_turbulence_decay_demo.py`
+  writes the same template when no reference CSV is present
+- when `q2d_turbulence_reference_observables.csv` is present, the movie example
+  writes a publication-table-ready comparison CSV plus PNG/PDF tolerance-gate
+  plots for energy decay, enstrophy decay, spectral centroid, high-wavenumber
+  energy fraction, and turnover count
+
+This closes the comparison-plumbing gap for Q2D turbulence. The scientific gap
+remains the matched external turbulent dataset.
+
 Current bounded result:
 
 - `96 × 96`, `ν = 0.01`, Hartmann-friction `= 2.0`
@@ -569,6 +583,21 @@ Current bounded low-De baseline:
 - full Dean-vortex research validation remains open until the secondary-flow
   structure and curvature-shift observables are compared against a curved-duct
   reference dataset
+
+The Dean-vortex external-reference data contract is now explicit:
+
+- `examples/dean_vortex_external_reference_template.py`
+  writes the scalar-observable CSV template for higher-inertia curved-pipe or
+  curved-duct references
+- `examples/bent_pipe_inductionless_demo.py`
+  writes the same template when no reference CSV is present
+- when `dean_vortex_reference_observables.csv` is present, the bent-pipe
+  example writes a publication-table-ready comparison CSV plus PNG/PDF
+  tolerance-gate plots for secondary-flow intensity, centroid shift,
+  inner/outer velocity ratio, and pressure-loss proxy
+
+This closes the comparison-plumbing gap for Dean-vortex validation. The
+scientific gap remains a matched higher-inertia reference case.
 - spatially varying magnetic fields
   - baseline: manufactured divergence-free field verification
     plus executable rectangular `extruded_inductionless` validation through

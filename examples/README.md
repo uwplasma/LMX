@@ -257,6 +257,20 @@ That example is the current curved-pipe executable lane:
 - record low-De equivalence metrics against the straight-pipe limit
 - report Dean/curvature-response observables, including secondary-flow
   intensity and signed-radius velocity skew, for the future higher-inertia gate
+- write `dean_vortex_reference_observables_template.csv` when no external
+  reference is present
+- if `dean_vortex_reference_observables.csv` exists in the output directory,
+  write a publication-table-ready comparison CSV and PNG/PDF tolerance-gate plot
+
+Dean-vortex external-reference template:
+
+```bash
+python examples/dean_vortex_external_reference_template.py
+```
+
+That example writes only the scalar-observable contract needed to turn the
+low-De curved-pipe lane into a higher-inertia Dean-vortex validation once a
+matched literature or reference-solver dataset is available.
 
 Variable-field validation:
 
@@ -364,6 +378,19 @@ That example writes a deterministic nonlinear Hartmann-friction vorticity GIF:
   spectral-centroid shift, and nonlinear turnover count
 - keep research-grade turbulent parity marked open until matched against a
   published nonlinear turbulent Q2D reference
+- write `q2d_turbulence_reference_observables_template.csv` when no external
+  turbulent reference is present
+- if `q2d_turbulence_reference_observables.csv` exists in the output directory,
+  write a publication-table-ready comparison CSV and PNG/PDF tolerance-gate plot
+
+Q2D turbulence external-reference template:
+
+```bash
+python examples/q2d_turbulence_external_reference_template.py
+```
+
+That example writes only the scalar-observable contract needed to promote the
+nonlinear movie/readiness gate into a literature-backed turbulent parity gate.
 
 Localized-field and mirror-field response:
 

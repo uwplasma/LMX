@@ -14,43 +14,51 @@ from typing import Mapping
 import numpy as np
 
 
-MAGNETIC_OBSTACLE_REFERENCE_COLUMNS = ("observable", "value", "tolerance")
+SCALAR_REFERENCE_COLUMNS = ("observable", "value", "tolerance")
+MAGNETIC_OBSTACLE_REFERENCE_COLUMNS = SCALAR_REFERENCE_COLUMNS
 
 
-def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, dict[str, float | str]]:
-    """Load scalar magnetic-obstacle reference observables from CSV.
+def load_scalar_reference_observables(
+    path: str | Path,
+    *,
+    context: str = "Scalar reference CSV",
+) -> dict[str, dict[str, float | str]]:
+    """Load scalar literature/experimental observables from CSV.
 
     Required columns are ``observable``, ``value``, and ``tolerance``. Optional
-    columns such as ``units``, ``source``, and ``note`` are preserved in each
-    record. Tolerances are interpreted as absolute tolerances unless a row also
-    supplies ``relative_tolerance``.
+    metadata columns such as ``relative_tolerance``, ``units``, ``source``, and
+    ``note`` are preserved. This generic loader is used by the magnetic-
+    obstacle, Q2D turbulence, and Dean-vortex external-reference contracts.
     """
 
     source = Path(path)
     with source.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         fieldnames = tuple(reader.fieldnames or ())
-        missing = [column for column in MAGNETIC_OBSTACLE_REFERENCE_COLUMNS if column not in fieldnames]
+        missing = [column for column in SCALAR_REFERENCE_COLUMNS if column not in fieldnames]
         if missing:
             missing_text = ", ".join(missing)
-            raise ValueError(f"Magnetic-obstacle reference CSV is missing required columns: {missing_text}")
+            raise ValueError(f"{context} is missing required columns: {missing_text}")
         records: dict[str, dict[str, float | str]] = {}
         for row_number, row in enumerate(reader, start=2):
             observable = (row.get("observable") or "").strip()
             if not observable:
-                raise ValueError(f"Magnetic-obstacle reference CSV row {row_number} has an empty observable")
-            value = _parse_float(row.get("value"), row_number=row_number, column="value")
-            tolerance = _parse_float(row.get("tolerance"), row_number=row_number, column="tolerance")
+                raise ValueError(f"{context} row {row_number} has an empty observable")
+            value = _parse_float(row.get("value"), row_number=row_number, column="value", context=context)
+            tolerance = _parse_float(row.get("tolerance"), row_number=row_number, column="tolerance", context=context)
             if tolerance < 0.0:
-                raise ValueError(f"Magnetic-obstacle reference CSV row {row_number} has a negative tolerance")
+                raise ValueError(f"{context} row {row_number} has a negative tolerance")
             payload: dict[str, float | str] = {"value": value, "tolerance": tolerance}
             relative_text = (row.get("relative_tolerance") or "").strip()
             if relative_text:
-                relative_tolerance = _parse_float(relative_text, row_number=row_number, column="relative_tolerance")
+                relative_tolerance = _parse_float(
+                    relative_text,
+                    row_number=row_number,
+                    column="relative_tolerance",
+                    context=context,
+                )
                 if relative_tolerance < 0.0:
-                    raise ValueError(
-                        f"Magnetic-obstacle reference CSV row {row_number} has a negative relative_tolerance"
-                    )
+                    raise ValueError(f"{context} row {row_number} has a negative relative_tolerance")
                 payload["relative_tolerance"] = relative_tolerance
             for key, item in row.items():
                 if key not in {"observable", "value", "tolerance", "relative_tolerance"} and item:
@@ -59,11 +67,13 @@ def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, 
     return records
 
 
-def compare_magnetic_obstacle_reference_observables(
+def compare_scalar_reference_observables(
     lmx_observables: Mapping[str, float],
     reference_observables: Mapping[str, Mapping[str, float | str]],
+    *,
+    missing_status: str = "missing_lmx_observable",
 ) -> dict[str, object]:
-    """Compare LMX magnetic-obstacle observables with loaded reference rows."""
+    """Compare scalar LMX observables with loaded reference rows."""
 
     rows: list[dict[str, float | str | bool]] = []
     compared = 0
@@ -73,7 +83,7 @@ def compare_magnetic_obstacle_reference_observables(
             rows.append(
                 {
                     "observable": observable,
-                    "status": "missing_lmx_observable",
+                    "status": missing_status,
                     "validation_pass": False,
                 }
             )
@@ -101,22 +111,23 @@ def compare_magnetic_obstacle_reference_observables(
                 "source": str(reference.get("source", "")),
             }
         )
-    missing_reference_observables = sorted(set(lmx_observables) - set(reference_observables))
+    extra_observables = sorted(set(lmx_observables) - set(reference_observables))
+    missing_count = sum(1 for row in rows if row["status"] == missing_status)
     return {
         "compared_observable_count": compared,
         "passed_observable_count": passed,
-        "missing_lmx_observable_count": sum(1 for row in rows if row["status"] == "missing_lmx_observable"),
-        "extra_lmx_observables": missing_reference_observables,
+        "missing_lmx_observable_count": missing_count,
+        "extra_lmx_observables": extra_observables,
         "rows": rows,
         "validation_pass": bool(compared > 0 and passed == compared and all(row["validation_pass"] for row in rows)),
     }
 
 
-def write_magnetic_obstacle_reference_comparison_table(
+def write_scalar_reference_comparison_table(
     comparison: Mapping[str, object],
     path: str | Path,
 ) -> Path:
-    """Write a CSV table from ``compare_magnetic_obstacle_reference_observables``."""
+    """Write a publication-ready scalar-observable comparison CSV."""
 
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -141,19 +152,15 @@ def write_magnetic_obstacle_reference_comparison_table(
     return out
 
 
-def write_magnetic_obstacle_reference_comparison_plots(
+def write_scalar_reference_comparison_plots(
     comparison: Mapping[str, object],
     output_dir: str | Path,
     *,
-    output_stem: str = "magnetic_obstacle_reference_comparison",
+    output_stem: str,
+    title: str,
+    no_data_label: str,
 ) -> list[Path]:
-    """Write PNG/PDF plots for a magnetic-obstacle reference comparison.
-
-    The figure is intentionally observable-level rather than field-level: the
-    external magnetic-obstacle references are expected to come from digitized
-    literature or experimental scalar observables first. Field overlays belong
-    in case-specific examples once a fully matched reference dataset exists.
-    """
+    """Write PNG/PDF scalar-observable comparison plots."""
 
     import matplotlib.pyplot as plt
 
@@ -169,7 +176,7 @@ def write_magnetic_obstacle_reference_comparison_plots(
         axes[0].text(
             0.5,
             0.5,
-            "No compared magnetic-obstacle observables",
+            no_data_label,
             ha="center",
             va="center",
             fontsize=13,
@@ -197,7 +204,7 @@ def write_magnetic_obstacle_reference_comparison_plots(
         axes[0].bar(x - width / 2.0, reference_values, width=width, label="reference", color="#2f5f8f")
         axes[0].bar(x + width / 2.0, lmx_values, width=width, label="LMX", color="#d46f2c")
         axes[0].set_ylabel("observable value")
-        axes[0].set_title("Magnetic-obstacle external-reference observables")
+        axes[0].set_title(title)
         axes[0].set_xticks(x, labels)
         axes[0].legend(frameon=False, ncols=2)
         axes[0].grid(True, axis="y", alpha=0.25)
@@ -239,6 +246,72 @@ def write_magnetic_obstacle_reference_comparison_plots(
         fig.savefig(path, dpi=180)
     plt.close(fig)
     return [png_path, pdf_path]
+
+
+def write_scalar_reference_template(path: str | Path, rows: list[dict[str, str]]) -> Path:
+    """Write a scalar-observable external-reference CSV template."""
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    columns = ("observable", "value", "tolerance", "relative_tolerance", "units", "source", "note")
+    with out.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        writer.writerows(rows)
+    return out
+
+
+def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, dict[str, float | str]]:
+    """Load scalar magnetic-obstacle reference observables from CSV.
+
+    Required columns are ``observable``, ``value``, and ``tolerance``. Optional
+    columns such as ``units``, ``source``, and ``note`` are preserved in each
+    record. Tolerances are interpreted as absolute tolerances unless a row also
+    supplies ``relative_tolerance``.
+    """
+
+    return load_scalar_reference_observables(path, context="Magnetic-obstacle reference CSV")
+
+
+def compare_magnetic_obstacle_reference_observables(
+    lmx_observables: Mapping[str, float],
+    reference_observables: Mapping[str, Mapping[str, float | str]],
+) -> dict[str, object]:
+    """Compare LMX magnetic-obstacle observables with loaded reference rows."""
+
+    return compare_scalar_reference_observables(lmx_observables, reference_observables)
+
+
+def write_magnetic_obstacle_reference_comparison_table(
+    comparison: Mapping[str, object],
+    path: str | Path,
+) -> Path:
+    """Write a CSV table from ``compare_magnetic_obstacle_reference_observables``."""
+
+    return write_scalar_reference_comparison_table(comparison, path)
+
+
+def write_magnetic_obstacle_reference_comparison_plots(
+    comparison: Mapping[str, object],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "magnetic_obstacle_reference_comparison",
+) -> list[Path]:
+    """Write PNG/PDF plots for a magnetic-obstacle reference comparison.
+
+    The figure is intentionally observable-level rather than field-level: the
+    external magnetic-obstacle references are expected to come from digitized
+    literature or experimental scalar observables first. Field overlays belong
+    in case-specific examples once a fully matched reference dataset exists.
+    """
+
+    return write_scalar_reference_comparison_plots(
+        comparison,
+        output_dir,
+        output_stem=output_stem,
+        title="Magnetic-obstacle external-reference observables",
+        no_data_label="No compared magnetic-obstacle observables",
+    )
 
 
 def magnetic_obstacle_reference_template_rows() -> list[dict[str, str]]:
@@ -287,24 +360,132 @@ def magnetic_obstacle_reference_template_rows() -> list[dict[str, str]]:
 def write_magnetic_obstacle_reference_template(path: str | Path) -> Path:
     """Write the external magnetic-obstacle observable CSV template."""
 
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    rows = magnetic_obstacle_reference_template_rows()
-    columns = ("observable", "value", "tolerance", "relative_tolerance", "units", "source", "note")
-    with out.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
-        writer.writeheader()
-        writer.writerows(rows)
-    return out
+    return write_scalar_reference_template(path, magnetic_obstacle_reference_template_rows())
 
 
-def _parse_float(value: str | None, *, row_number: int, column: str) -> float:
+def q2d_turbulence_reference_template_rows() -> list[dict[str, str]]:
+    """Return scalar-observable rows for external Q2D turbulent parity."""
+
+    return [
+        {
+            "observable": "energy_decay_ratio",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.10",
+            "units": "dimensionless",
+            "source": "digitized Sommeria-Moreau-style turbulent reference",
+            "note": "Final-to-initial kinetic-energy ratio at matched Hartmann friction and time.",
+        },
+        {
+            "observable": "enstrophy_decay_ratio",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "dimensionless",
+            "source": "digitized Sommeria-Moreau-style turbulent reference",
+            "note": "Final-to-initial enstrophy proxy ratio at matched parameters.",
+        },
+        {
+            "observable": "final_spectral_centroid",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.10",
+            "units": "1/length",
+            "source": "digitized spectrum or reference output",
+            "note": "Shell-energy spectral centroid at the final compared time.",
+        },
+        {
+            "observable": "final_high_k_energy_fraction",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "dimensionless",
+            "source": "digitized spectrum or reference output",
+            "note": "Fraction of shell energy above the documented high-wavenumber cutoff.",
+        },
+        {
+            "observable": "turnover_count",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.10",
+            "units": "dimensionless",
+            "source": "reference runtime diagnostics",
+            "note": "Integrated eddy-turnover proxy over the compared interval.",
+        },
+    ]
+
+
+def dean_vortex_reference_template_rows() -> list[dict[str, str]]:
+    """Return scalar-observable rows for higher-inertia Dean-vortex parity."""
+
+    return [
+        {
+            "observable": "secondary_flow_rms_ratio",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "dimensionless",
+            "source": "curved-duct or curved-pipe literature/reference solver",
+            "note": "RMS secondary-flow speed normalized by axial speed.",
+        },
+        {
+            "observable": "secondary_flow_peak_ratio",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "dimensionless",
+            "source": "curved-duct or curved-pipe literature/reference solver",
+            "note": "Peak secondary-flow speed normalized by peak axial speed.",
+        },
+        {
+            "observable": "normalized_velocity_centroid_shift",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "dimensionless",
+            "source": "curved-duct or curved-pipe literature/reference solver",
+            "note": "Axial-velocity centroid displacement normalized by pipe radius.",
+        },
+        {
+            "observable": "inner_outer_velocity_ratio",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.10",
+            "units": "dimensionless",
+            "source": "curved-duct or curved-pipe literature/reference solver",
+            "note": "Outer-wall to inner-wall axial-speed ratio on the diameter cut.",
+        },
+        {
+            "observable": "pressure_loss_proxy",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "case-specific",
+            "source": "curved-duct or curved-pipe literature/reference solver",
+            "note": "Use the same nondimensional pressure-loss convention as the reference.",
+        },
+    ]
+
+
+def write_q2d_turbulence_reference_template(path: str | Path) -> Path:
+    """Write the external Q2D turbulence observable CSV template."""
+
+    return write_scalar_reference_template(path, q2d_turbulence_reference_template_rows())
+
+
+def write_dean_vortex_reference_template(path: str | Path) -> Path:
+    """Write the external Dean-vortex observable CSV template."""
+
+    return write_scalar_reference_template(path, dean_vortex_reference_template_rows())
+
+
+def _parse_float(value: str | None, *, row_number: int, column: str, context: str = "Scalar reference CSV") -> float:
     text = (value or "").strip()
     if not text:
-        raise ValueError(f"Magnetic-obstacle reference CSV row {row_number} has an empty {column}")
+        raise ValueError(f"{context} row {row_number} has an empty {column}")
     parsed = float(text)
     if not np.isfinite(parsed):
-        raise ValueError(f"Magnetic-obstacle reference CSV row {row_number} has a non-finite {column}")
+        raise ValueError(f"{context} row {row_number} has a non-finite {column}")
     return parsed
 
 

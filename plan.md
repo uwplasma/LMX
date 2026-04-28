@@ -198,6 +198,11 @@ refer to the Samper et al. taxonomy.
   divergence-free velocity, spectral-centroid shift, and
   `turnover_count ≈ 3.31e-1`. The open item is still the external nonlinear
   turbulent reference comparison, not movie/post-processing infrastructure.
+  The scalar external-reference contract is now in place through
+  `examples/q2d_turbulence_external_reference_template.py`; if a filled
+  `q2d_turbulence_reference_observables.csv` is present, the turbulence movie
+  example writes the comparison table and PNG/PDF tolerance-gate plots
+  automatically.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
@@ -213,6 +218,10 @@ refer to the Samper et al. taxonomy.
   curved-pipe validation should add a real Dean-vortex reference before
   promoting
   any higher-inertia Dean-vortex run.
+  The scalar external-reference contract is now in place through
+  `examples/dean_vortex_external_reference_template.py`; if a filled
+  `dean_vortex_reference_observables.csv` is present, the bent-pipe example
+  writes the comparison table and PNG/PDF tolerance-gate plots automatically.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
   against manufactured fields and at least one independent field dataset.
