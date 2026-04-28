@@ -12,9 +12,9 @@ solver lane, restartable CLI workflows, strong-scaling tooling, and
 differentiable workflows for sensitivity analysis and inverse design.
 
 <p align="center">
-  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt boundary-layer formation movie" width="32%">
-  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt boundary-layer formation movie" width="32%">
-  <img src="docs/_static/generated/q2d_turbulence_decay.gif" alt="LMX Q2D turbulence movie" width="32%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt boundary-layer formation movie" width="32%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt boundary-layer formation movie" width="32%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif" alt="LMX Q2D turbulence movie" width="32%">
 </p>
 
 ## Why use LMX
@@ -297,7 +297,7 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 </p>
 
 <p align="center">
-  <img src="docs/_static/generated/q2d_turbulence_decay.gif" alt="Q2D multi-mode Hartmann-friction decay movie" width="54%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif" alt="Q2D multi-mode Hartmann-friction decay movie" width="54%">
 </p>
 
 ### Magnetic-obstacle localized-field response
@@ -484,8 +484,8 @@ JAX compilation cache under `artifacts/jax_cache` so repeated runs on the same
 host do not pay the full cold-compile cost every time.
 
 <p align="center">
-  <img src="docs/_static/generated/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">
-  <img src="docs/_static/generated/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt startup movie" width="48%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="48%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt startup movie" width="48%">
 </p>
 
 ### Fringing-field response

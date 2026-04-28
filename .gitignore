@@ -11,6 +11,8 @@ artifacts/
 build/
 dist/
 docs/_build/
+docs/_static/generated/*.gif
+docs/_static/generated/*.pdf
 *.egg-info/
 .DS_Store
 .vscode/settings.json

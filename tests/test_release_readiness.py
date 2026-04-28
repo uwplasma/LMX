@@ -40,9 +40,9 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
     for name in (
         "analytic_velocity_profiles.png",
         "closed_channel_validation_ladder.png",
-        "readme_hunt_startup_2d.gif",
-        "readme_hunt_startup_3d.gif",
-        "q2d_turbulence_decay.gif",
+        "readme_hunt_startup_2d_poster.png",
+        "readme_hunt_startup_3d_poster.png",
+        "q2d_turbulence_decay_poster.png",
         "magnetic_obstacle_benchmark.png",
         "magnetic_obstacle_schematic.png",
         "bent_pipe_overview.png",
@@ -50,6 +50,28 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
         "strong_scaling.png",
     ):
         (static / name).write_bytes(b"artifact")
+    _write_json(
+        static / "readme_media_manifest.json",
+        {
+            "media": [
+                {
+                    "name": "readme_hunt_startup_2d.gif",
+                    "url": "https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif",
+                    "poster": "readme_hunt_startup_2d_poster.png",
+                },
+                {
+                    "name": "readme_hunt_startup_3d.gif",
+                    "url": "https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_3d.gif",
+                    "poster": "readme_hunt_startup_3d_poster.png",
+                },
+                {
+                    "name": "q2d_turbulence_decay.gif",
+                    "url": "https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif",
+                    "poster": "q2d_turbulence_decay_poster.png",
+                },
+            ]
+        },
+    )
     _write_json(
         static / "straight_duct_profile_comparison_summary.json",
         {

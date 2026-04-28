@@ -23,9 +23,10 @@ class ReleaseGate:
 REQUIRED_ARTIFACTS = (
     "analytic_velocity_profiles.png",
     "closed_channel_validation_ladder.png",
-    "readme_hunt_startup_2d.gif",
-    "readme_hunt_startup_3d.gif",
-    "q2d_turbulence_decay.gif",
+    "readme_media_manifest.json",
+    "readme_hunt_startup_2d_poster.png",
+    "readme_hunt_startup_3d_poster.png",
+    "q2d_turbulence_decay_poster.png",
     "magnetic_obstacle_benchmark.png",
     "magnetic_obstacle_schematic.png",
     "bent_pipe_overview.png",
@@ -59,6 +60,42 @@ def _required_artifact_gate(root: Path) -> ReleaseGate:
         not missing,
         required=list(REQUIRED_ARTIFACTS),
         missing=missing,
+    )
+
+
+def _readme_media_gate(root: Path) -> ReleaseGate:
+    static_dir = _static_dir(root)
+    manifest_path = static_dir / "readme_media_manifest.json"
+    try:
+        manifest = _load_json(manifest_path)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        return _gate("readme_external_media_manifest", False, error=str(exc))
+    media = manifest.get("media", [])
+    required_names = {
+        "readme_hunt_startup_2d.gif",
+        "readme_hunt_startup_3d.gif",
+        "q2d_turbulence_decay.gif",
+    }
+    seen_names = {str(item.get("name", "")) for item in media if isinstance(item, dict)}
+    missing_names = sorted(required_names - seen_names)
+    missing_posters: list[str] = []
+    invalid_urls: list[str] = []
+    for item in media:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url", ""))
+        poster = str(item.get("poster", ""))
+        if not url.startswith("https://github.com/uwplasma/LMX/releases/download/"):
+            invalid_urls.append(url)
+        if poster and not (static_dir / poster).exists():
+            missing_posters.append(poster)
+    passed = not missing_names and not missing_posters and not invalid_urls
+    return _gate(
+        "readme_external_media_manifest",
+        passed,
+        missing_names=missing_names,
+        missing_posters=missing_posters,
+        invalid_urls=invalid_urls,
     )
 
 
@@ -236,6 +273,7 @@ def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2
         _packaging_gate(root_path),
         _workflow_gate(root_path),
         _required_artifact_gate(root_path),
+        _readme_media_gate(root_path),
     ]
     deferred: list[str] = []
     straight_gate, straight_deferred = _straight_duct_gate(root_path, target_l2=target_l2)
