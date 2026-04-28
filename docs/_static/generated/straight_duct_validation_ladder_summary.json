@@ -1,0 +1,141 @@
+{
+  "case": "straight_duct_validation_ladder",
+  "ha_values": [
+    20.0,
+    100.0
+  ],
+  "shercliff": [
+    {
+      "ha": 20.0,
+      "reference_path": "/Users/rogerio/local/tests/LMX/external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/AnalyticalSolutions/Shercliff_Analytical_Ha20_PresDrop2512.1961.txt",
+      "y_l2_error": 0.005628254507861848,
+      "y_linf_error": 0.032749890355248994,
+      "z_l2_error": 0.0054072540426548426,
+      "z_linf_error": 0.010025014711318447,
+      "layer_resolution": {
+        "hartmann_layer_thickness": 0.004999999999999999,
+        "side_layer_thickness": 0.022360679774997897,
+        "hartmann_layer_cells": 8.999999999999996,
+        "side_layer_cells": 7.000000000000001,
+        "min_hartmann_spacing": 0.0001259559599613158,
+        "min_side_spacing": 0.0010911981617358069,
+        "layer_resolution_supported": true,
+        "min_required_hartmann_layer_cells": 8.0,
+        "min_required_side_layer_cells": 6.0,
+        "hartmann_layer_cell_deficit": 0.0,
+        "side_layer_cell_deficit": 0.0,
+        "hartmann_layer_cell_ratio": 1.1249999999999996,
+        "side_layer_cell_ratio": 1.1666666666666667,
+        "minimum_mesh_refinement_factor": 0.8888888888888893,
+        "hartmann_layer_resolution_pass": true,
+        "side_layer_resolution_pass": true,
+        "layer_resolution_pass": true
+      }
+    },
+    {
+      "ha": 100.0,
+      "reference_path": "/Users/rogerio/local/tests/LMX/external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/AnalyticalSolutions/Shercliff_Analytical_Ha100_PresDrop10643.158.txt",
+      "y_l2_error": 0.004888881329419568,
+      "y_linf_error": 0.04721290771275177,
+      "z_l2_error": 0.007928226883287592,
+      "z_linf_error": 0.01917573639267045,
+      "layer_resolution": {
+        "hartmann_layer_thickness": 0.0010000000000000002,
+        "side_layer_thickness": 0.010000000000000004,
+        "hartmann_layer_cells": 4.9999999999999964,
+        "side_layer_cells": 5.000000000000006,
+        "min_hartmann_spacing": 0.00019999999999997797,
+        "min_side_spacing": 0.0014680865107435104,
+        "layer_resolution_supported": true,
+        "min_required_hartmann_layer_cells": 8.0,
+        "min_required_side_layer_cells": 6.0,
+        "hartmann_layer_cell_deficit": 3.0000000000000036,
+        "side_layer_cell_deficit": 0.9999999999999938,
+        "hartmann_layer_cell_ratio": 0.6249999999999996,
+        "side_layer_cell_ratio": 0.8333333333333344,
+        "minimum_mesh_refinement_factor": 1.6000000000000012,
+        "hartmann_layer_resolution_pass": false,
+        "side_layer_resolution_pass": false,
+        "layer_resolution_pass": false
+      }
+    }
+  ],
+  "hunt": [
+    {
+      "ha": 20.0,
+      "reference_path": "/Users/rogerio/local/tests/LMX/external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/AnalyticalSolutions/Hunt_Analytical_Ha20_db0.05_PresDrop514.2123.txt",
+      "y_l2_error": 0.005310209963156999,
+      "y_linf_error": 0.026614345613800938,
+      "z_l2_error": 0.0031605437376915307,
+      "z_linf_error": 0.0079054627884928,
+      "layer_resolution": {
+        "hartmann_layer_thickness": 0.005000000000000001,
+        "side_layer_thickness": 0.0223606797749979,
+        "hartmann_layer_cells": 9.999999999999998,
+        "side_layer_cells": 8.000000000000002,
+        "min_hartmann_spacing": 9.159159882259071e-05,
+        "min_side_spacing": 0.000780095987124918,
+        "layer_resolution_supported": true,
+        "min_required_hartmann_layer_cells": 8.0,
+        "min_required_side_layer_cells": 6.0,
+        "hartmann_layer_cell_deficit": 0.0,
+        "side_layer_cell_deficit": 0.0,
+        "hartmann_layer_cell_ratio": 1.2499999999999998,
+        "side_layer_cell_ratio": 1.3333333333333337,
+        "minimum_mesh_refinement_factor": 0.8000000000000002,
+        "hartmann_layer_resolution_pass": true,
+        "side_layer_resolution_pass": true,
+        "layer_resolution_pass": true
+      }
+    },
+    {
+      "ha": 100.0,
+      "reference_path": "/Users/rogerio/local/tests/LMX/external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/ClosedChannel/AnalyticalSolutions/Hunt_Analytical_Ha100_db0.05_PresDrop6152.0146.txt",
+      "y_l2_error": 0.004419958985749597,
+      "y_linf_error": 0.03739951618788606,
+      "z_l2_error": 0.002890419309878799,
+      "z_linf_error": 0.012179382545051104,
+      "layer_resolution": {
+        "hartmann_layer_thickness": 0.0010000000000000007,
+        "side_layer_thickness": 0.010000000000000004,
+        "hartmann_layer_cells": 4.999999999999999,
+        "side_layer_cells": 5.000000000000007,
+        "min_hartmann_spacing": 0.00019999999999999185,
+        "min_side_spacing": 0.0012332475241447483,
+        "layer_resolution_supported": true,
+        "min_required_hartmann_layer_cells": 8.0,
+        "min_required_side_layer_cells": 6.0,
+        "hartmann_layer_cell_deficit": 3.000000000000001,
+        "side_layer_cell_deficit": 0.9999999999999929,
+        "hartmann_layer_cell_ratio": 0.6249999999999999,
+        "side_layer_cell_ratio": 0.8333333333333345,
+        "minimum_mesh_refinement_factor": 1.6000000000000003,
+        "hartmann_layer_resolution_pass": false,
+        "side_layer_resolution_pass": false,
+        "layer_resolution_pass": false
+      }
+    }
+  ],
+  "outputs": [
+    "closed_channel_validation_ladder.png",
+    "closed_channel_validation_ladder.pdf"
+  ],
+  "comparison_method": "normalized analytical comparison with no-slip wall reconstruction at the duct boundaries",
+  "initial_profile": "zero",
+  "mesh": {
+    "shercliff": {
+      "ny": 45,
+      "nz": 45
+    },
+    "hunt": {
+      "ny": 49,
+      "nz": 49
+    }
+  },
+  "hunt_wall_model": {
+    "wall_thickness": 0.001,
+    "conducting_wall_conductivity": 5.0,
+    "fluid_conductivity": 1.0,
+    "conductance_ratio": 0.049999999999999996
+  }
+}

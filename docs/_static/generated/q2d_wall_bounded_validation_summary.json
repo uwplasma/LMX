@@ -1,0 +1,92 @@
+{
+  "case": "q2d_wall_bounded_validation",
+  "plots": [
+    "q2d_wall_bounded_overview.png",
+    "q2d_wall_bounded_overview.pdf",
+    "q2d_turbulence_observables.png",
+    "q2d_turbulence_observables.pdf"
+  ],
+  "validation": {
+    "decay_rate": 2.049348022005447,
+    "steady_amplitude": 0.48796006791536656,
+    "l2_error": 0.000415152063186026,
+    "linf_error": 0.0004151520631858514,
+    "amplitude_rel_error": 0.00014166724297754585,
+    "validation_pass": true
+  },
+  "turbulence_observables": {
+    "kinetic_energy": 0.003298394115009437,
+    "fluctuation_kinetic_energy": 0.0011769604719465852,
+    "enstrophy_proxy": 0.016613537160745366,
+    "hartmann_dissipation_proxy": 0.013193576460037748,
+    "viscous_dissipation_proxy": 0.00033227074321490733,
+    "spectrum_peak_wavenumber": 6.664324407237549,
+    "spectrum_log_slope": -9.658698794054612,
+    "high_wavenumber_energy_fraction": 1.0722470281694049e-13,
+    "spectrum": {
+      "wavenumber": [
+        6.664324407237549,
+        19.992973221712646,
+        33.32162203618775,
+        46.65027085066284,
+        59.978919665137944,
+        73.30756847961304,
+        86.63621729408814,
+        99.96486610856323,
+        113.29351492303834,
+        126.62216373751343,
+        139.95081255198852,
+        153.27946136646364,
+        166.60811018093872,
+        179.9367589954138,
+        193.26540780988893,
+        206.59405662436404
+      ],
+      "energy": [
+        0.001174485272355267,
+        2.1298573167723745e-06,
+        2.46603214924659e-07,
+        6.136511769683597e-08,
+        2.418891304076419e-08,
+        7.192102545025972e-09,
+        3.324941813445635e-09,
+        1.5778318904425553e-09,
+        8.236570951119808e-10,
+        2.1836886151683628e-10,
+        4.72767970233079e-11,
+        8.497550569261135e-13,
+        1.0959219860911883e-16,
+        1.5316589503905042e-17,
+        1.267649283914342e-18,
+        2.279943482044393e-20
+      ],
+      "counts": [
+        57,
+        164,
+        284,
+        380,
+        532,
+        608,
+        740,
+        828,
+        988,
+        1060,
+        1200,
+        1018,
+        632,
+        408,
+        232,
+        85
+      ]
+    },
+    "literature_target": "Sommeria-Moreau quasi-2D turbulence observables",
+    "required_next_observables": [
+      "energy_decay_exponent_or_rate",
+      "energy_spectrum_slope",
+      "inverse_cascade_or_large-scale-condensate trend",
+      "Hartmann-friction damping trend"
+    ],
+    "validation_status": "spectral_observables_available_no_turbulent_reference",
+    "research_grade_turbulence_validation_pass": false
+  }
+}

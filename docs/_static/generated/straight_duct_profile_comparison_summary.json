@@ -1,0 +1,32 @@
+{
+  "case": "straight_duct_profile_comparison",
+  "ha": 20.0,
+  "hartmann": {
+    "l2_error": 0.011476715394447208,
+    "linf_error": 0.03430123498225768
+  },
+  "shercliff": {
+    "y_l2_error": 0.007461588369527085,
+    "y_linf_error": 0.0346361926647355,
+    "z_l2_error": 0.00721825301528383,
+    "z_linf_error": 0.013330094347031696
+  },
+  "hunt": {
+    "y_l2_error": 0.008536084794390249,
+    "y_linf_error": 0.0414769322842643,
+    "z_l2_error": 0.0048558128982843585,
+    "z_linf_error": 0.01125257584789785
+  },
+  "outputs": [
+    "analytic_velocity_profiles.png",
+    "analytic_velocity_profiles.pdf"
+  ],
+  "comparison_method": "normalized analytical comparison with no-slip wall reconstruction at the duct boundaries",
+  "initial_profile": "zero",
+  "hunt_wall_model": {
+    "wall_thickness": 0.001,
+    "conducting_wall_conductivity": 5.0,
+    "fluid_conductivity": 1.0,
+    "conductance_ratio": 0.049999999999999996
+  }
+}

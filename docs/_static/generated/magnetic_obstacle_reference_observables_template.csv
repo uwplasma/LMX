@@ -1,0 +1,5 @@
+observable,value,tolerance,relative_tolerance,units,source,note
+centerline_velocity_deficit_ratio,,,0.10,dimensionless,digitized literature or experiment,Peak or station-matched centerline wake deficit.
+wake_recovery_ratio,,,0.10,dimensionless,digitized literature or experiment,Downstream recovery metric at the documented outlet or recovery station.
+pressure_drop_proxy,,,0.15,case-specific,digitized literature or experiment,Use the same nondimensionalization as the reference paper.
+current_proxy_peak,,,0.15,case-specific,digitized literature or experiment,Peak induced-current or Lorentz-force proxy if directly available.

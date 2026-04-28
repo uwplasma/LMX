@@ -1,0 +1,28 @@
+{
+  "case": "q2d_turbulence_decay",
+  "media": [
+    "q2d_turbulence_decay.gif",
+    "q2d_turbulence_decay_poster.png"
+  ],
+  "validation": {
+    "energy_decay_ratio": 0.47707799991780525,
+    "enstrophy_decay_ratio": 0.4266240643590707,
+    "energy_variation_ratio": 0.7412324678418905,
+    "enstrophy_variation_ratio": 0.8570331163144366,
+    "initial_high_k_energy_fraction": 0.09109634893660852,
+    "final_high_k_energy_fraction": 0.028180939245248428,
+    "initial_spectral_centroid": 7.980785009027717,
+    "final_spectral_centroid": 7.117645500595693,
+    "spectral_centroid_shift": 0.8631395084320239,
+    "max_courant": 0.05234552620681659,
+    "max_divergence_linf": 2.7394287175895764e-14,
+    "turnover_count": 0.3312918376699193,
+    "nonlinear_activity_pass": true,
+    "frame_count": 72,
+    "validation_pass": true,
+    "literature_target": "Sommeria-Moreau quasi-2D turbulence with Hartmann-friction damping",
+    "validation_status": "nonlinear_q2d_movie_available_external_turbulent_reference_open",
+    "research_grade_turbulence_validation_pass": false
+  },
+  "notes": "Deterministic nonlinear periodic Q2D vorticity movie with Hartmann-friction damping and weak large-scale forcing. This is a bounded SM82-style physics gate; it is not an external turbulent parity claim until matched to a published turbulent reference."
+}

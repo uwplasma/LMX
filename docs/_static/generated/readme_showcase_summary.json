@@ -1,0 +1,13 @@
+{
+  "case": "readme_showcase_demo",
+  "movie_case_kind": "hunt",
+  "geometry": null,
+  "movie_outputs": [
+    "readme_hunt_startup_2d_poster.png",
+    "readme_hunt_startup_2d_poster.pdf",
+    "readme_hunt_startup_3d_poster.png",
+    "readme_hunt_startup_3d_poster.pdf",
+    "readme_hunt_startup_2d.gif",
+    "readme_hunt_startup_3d.gif"
+  ]
+}
