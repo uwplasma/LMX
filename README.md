@@ -420,10 +420,14 @@ design multiplier on the parsed WHAM coil field; it gives
 `Δp ≈ 26.5 kPa`, `Re ≈ 2.48e5`, and peak `Ha ≈ 904`. This is a realistic
 engineering preview. The same example now also runs a centerline transient
 pressure-velocity solve with turbulent pipe-friction closure, local MHD drag,
-and bend losses to `t = 90 s`; the retained run settles to
+and bend losses to `t = 15 s`; the retained run settles to
 `U_mean ≈ 0.200 m/s` and `Δp ≈ 26.4 kPa`. This moves the WHAM blanket lane
 beyond a static startup visualization, but it is still not a resolved 3D
-secondary-flow or turbulence validation.
+secondary-flow or turbulence validation. The same script also writes a
+field-scale sweep at fixed flow rate; the retained cases give terminal pressure
+drops of `≈ 6.7`, `15.0`, `26.5`, and `41.4 kPa` for field multipliers
+`4`, `6`, `8`, and `10`, with the MHD contribution following the expected
+`B_\perp^2` scaling.
 
 The solver-facing geometry handoff is `examples/wham_blanket_mesh_demo.py`.
 It converts the approved route into a mapped circular-pipe O-grid and writes a
@@ -500,6 +504,8 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
 
 ![LMX WHAM blanket transient pressure-velocity solve](docs/_static/generated/wham_blanket_transient_flow.png)
+
+![LMX WHAM blanket pressure sweep](docs/_static/generated/wham_blanket_pressure_sweep.png)
 
 ![LMX WHAM blanket differentiable pressure-drop study](docs/_static/generated/wham_blanket_autodiff_research.png)
 
@@ -767,7 +773,7 @@ Useful entry points:
 - `examples/wham_blanket_mesh_demo.py`: mapped circular-pipe O-grid and ParaView mesh for the approved WHAM blanket route
 - `examples/wham_blanket_field_on_mesh_demo.py`: WHAM field sampling and local streamwise/transverse projections on the mapped blanket mesh
 - `examples/wham_blanket_current_closure_demo.py`: conservative local `φ/J` current-closure gate on the mapped blanket mesh
-- `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, steady sections, and startup movie
+- `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, pressure sweep, steady sections, and 15 s transient movie
 - `examples/wham_blanket_autodiff_research_demo.py`: differentiable WHAM blanket pressure-drop sensitivity and field-scale inverse-design study
 
 ## Documentation

@@ -18,6 +18,7 @@ The examples are explicit templates for research workflows. They show how to:
 - sample magnetic fields on mapped centerline-pipe meshes before solver runs
 - validate analytic cross-sectional magnetic fields before using them in runs
 - generate publication-ready verification figures with checked JSON summaries
+- write reduced WHAM blanket pressure-sweep figures for manuscript planning
 
 ## Quick examples
 

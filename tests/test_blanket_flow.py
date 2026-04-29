@@ -16,6 +16,7 @@ from lmx.blanket_flow import (
     write_wham_blanket_autodiff_research_plots,
     write_wham_blanket_flow_movie,
     write_wham_blanket_flow_plots,
+    write_wham_blanket_pressure_sweep_plots,
     write_wham_blanket_transient_flow_movie,
     write_wham_blanket_transient_flow_plots,
 )
@@ -70,6 +71,28 @@ def test_write_wham_blanket_flow_artifacts(tmp_path: Path):
     assert (tmp_path / "wham_blanket_flow.gif").exists()
     assert (tmp_path / "wham_blanket_flow_poster.png").exists()
     assert all(path.exists() for path in [*plot_outputs, *movie_outputs])
+
+
+def test_write_wham_blanket_pressure_sweep_artifacts(tmp_path: Path):
+    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
+    centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=10)
+    flows = [
+        solve_wham_blanket_reduced_flow(
+            centerline,
+            geometry=geometry,
+            settings=BlanketFlowSettings(mean_velocity=0.08, field_scale=scale, cross_section_points=17),
+            field_sampler=_uniform_field,
+        )
+        for scale in (0.5, 1.0, 1.5)
+    ]
+
+    outputs = write_wham_blanket_pressure_sweep_plots(flows, tmp_path)
+
+    assert (tmp_path / "wham_blanket_pressure_sweep.png").exists()
+    assert (tmp_path / "wham_blanket_pressure_sweep_summary.json").exists()
+    assert (tmp_path / "wham_blanket_pressure_sweep_data.csv").exists()
+    assert flows[-1]["metrics"]["pressure_drop_kpa"] > flows[0]["metrics"]["pressure_drop_kpa"]
+    assert all(path.exists() for path in outputs)
 
 
 def test_solve_wham_blanket_transient_flow_reaches_bounded_steady_state(tmp_path: Path):

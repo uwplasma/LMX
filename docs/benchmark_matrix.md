@@ -509,8 +509,8 @@ interpolation mismatch. The remaining tabulated-field research gap is external
     pipe-friction closure
   - observables:
     cumulative pressure drop, hydraulic/MHD/bend pressure components, sampled
-    transverse field, Hartmann number, local velocity-section previews, and
-    station/history CSV
+    transverse field, Hartmann number, field-scale pressure sweep, local
+    velocity-section previews, and station/history CSV
 - `examples/wham_blanket_autodiff_research_demo.py`
   - differentiates the same reduced pressure budget with respect to coil
     separation, field multiplier, and mean velocity
@@ -523,6 +523,8 @@ interpolation mismatch. The remaining tabulated-field research gap is external
 ![WHAM blanket conservative current closure](_static/generated/wham_blanket_current_closure.png)
 
 ![WHAM blanket centerline pressure-velocity transient](_static/generated/wham_blanket_transient_flow.png)
+
+![WHAM blanket field-scale pressure sweep](_static/generated/wham_blanket_pressure_sweep.png)
 
 ![WHAM blanket differentiable pressure-drop study](_static/generated/wham_blanket_autodiff_research.png)
 

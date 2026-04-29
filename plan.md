@@ -302,9 +302,13 @@ refer to the Samper et al. taxonomy.
   exists in `solve_wham_blanket_transient_flow(...)` and
   `examples/wham_blanket_flow_demo.py`: a centerline transient with turbulent
   Darcy-friction closure, local MHD drag, bend losses, and a route
-  incompressibility projection. The README movie now runs to `t = 90 s` and
+  incompressibility projection. The README movie now runs to `t = 15 s` and
   shows filling plus steady-state approach (`U_mean ≈ 0.200 m/s`,
-  `Delta p ≈ 26.4 kPa`) rather than only startup. The remaining research-grade
+  `Delta p ≈ 26.4 kPa`) rather than only startup. The same example writes a
+  fixed-flow pressure sweep over field multipliers `4`, `6`, `8`, and `10`
+  with terminal drops `≈ 6.7`, `15.0`, `26.5`, and `41.4 kPa`, documenting
+  the expected inductionless `B_perp^2` pressure scaling along station. The
+  remaining research-grade
   WHAM blocker is still the resolved 3D curved-pipe pressure-velocity/current
   solve with secondary-flow/turbulence validation.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,

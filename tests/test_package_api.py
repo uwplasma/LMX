@@ -24,6 +24,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_wham_blanket_autodiff_research_plots)
     assert callable(lmx.write_wham_blanket_flow_movie)
     assert callable(lmx.write_wham_blanket_flow_plots)
+    assert callable(lmx.write_wham_blanket_pressure_sweep_plots)
     assert callable(lmx.write_wham_blanket_flow_summary)
     assert callable(lmx.write_wham_blanket_transient_flow_movie)
     assert callable(lmx.write_wham_blanket_transient_flow_plots)

@@ -9,7 +9,7 @@ not a replacement for the future full curved-pipe MHD solve.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
@@ -65,7 +65,7 @@ class BlanketTransientFlowSettings:
     pressure_drive_factor: float = 1.0
     initial_velocity: float = 0.0
     time_step: float = 0.20
-    final_time: float = 90.0
+    final_time: float = 15.0
     axial_diffusivity: float = 5.0e-4
     incompressibility_projection: float = 0.92
     frame_count: int = 72
@@ -232,7 +232,9 @@ def solve_wham_blanket_transient_flow(
     pressure_history[0] = 0.0
     residual_history[0] = 1.0
     courant_history[0] = 0.0
-    frame_indices = np.unique(np.linspace(0, step_count, max(int(opts.frame_count), 3), dtype=int))
+    frame_fraction = np.linspace(0.0, 1.0, max(int(opts.frame_count), 3)) ** 1.35
+    frame_indices = np.unique(np.rint(step_count * frame_fraction).astype(int))
+    frame_indices = np.unique(np.concatenate([frame_indices, [0, step_count]]))
     velocity_frames: list[np.ndarray] = []
     pressure_frames: list[np.ndarray] = []
     time_frames: list[float] = []
@@ -721,6 +723,99 @@ def write_wham_blanket_flow_plots(
         pressure=pressure,
         total_gradient=total_gradient,
     )
+    return [png, pdf, summary, csv]
+
+
+def write_wham_blanket_pressure_sweep_plots(
+    flows: Sequence[dict[str, object]],
+    out_dir: str | Path,
+    *,
+    filename_stem: str = "wham_blanket_pressure_sweep",
+) -> list[Path]:
+    """Write cumulative pressure-drop comparisons for multiple blanket runs.
+
+    The intended use is a manuscript-facing parameter sweep: keep the same
+    route, material, and flow rate, then vary the magnetic-field multiplier or
+    another operating point and compare cumulative pressure drop along station.
+    """
+
+    runs = list(flows)
+    if not runs:
+        raise ValueError("at least one WHAM blanket flow is required")
+    runs = sorted(runs, key=lambda item: float(item["settings"].field_scale))
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    _set_flow_plot_style()
+
+    field_scales = np.asarray([float(flow["settings"].field_scale) for flow in runs], dtype=float)
+    pressure_drops = np.asarray([float(flow["metrics"]["pressure_drop_kpa"]) for flow in runs], dtype=float)
+    hydraulic_drops = np.asarray([float(flow["metrics"]["hydraulic_pressure_drop_pa"]) / 1000.0 for flow in runs], dtype=float)
+    mhd_drops = np.asarray([float(flow["metrics"]["mhd_pressure_drop_pa"]) / 1000.0 for flow in runs], dtype=float)
+    curvature_drops = np.asarray([float(flow["metrics"]["curvature_pressure_drop_pa"]) / 1000.0 for flow in runs], dtype=float)
+    peak_ha = np.asarray([float(flow["metrics"]["peak_hartmann_number"]) for flow in runs], dtype=float)
+    norm = colors.Normalize(vmin=float(np.min(field_scales)), vmax=float(np.max(field_scales)))
+    cmap = plt.get_cmap("viridis")
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.4, 5.4), constrained_layout=True)
+    ax_station, ax_scale = axes
+    for flow, scale in zip(runs, field_scales, strict=True):
+        station = np.asarray(flow["station"], dtype=float)
+        pressure = np.asarray(flow["cumulative_pressure_drop"], dtype=float) / 1000.0
+        ax_station.plot(
+            station,
+            pressure,
+            linewidth=2.2,
+            color=cmap(norm(scale)),
+            label=fr"$B$ scale {scale:g}",
+        )
+    ax_station.set_title("Cumulative pressure drop along blanket route")
+    ax_station.set_xlabel("station s [m]")
+    ax_station.set_ylabel(r"$\Delta p(s)$ [kPa]")
+    ax_station.legend(loc="upper left", fontsize=8)
+
+    width = 0.18 * max(float(np.ptp(field_scales)), 1.0)
+    ax_scale.bar(field_scales, hydraulic_drops, width=width, color="#2563eb", alpha=0.65, label="pipe friction")
+    ax_scale.bar(field_scales, mhd_drops, width=width, bottom=hydraulic_drops, color="#0f766e", alpha=0.70, label="MHD")
+    ax_scale.bar(
+        field_scales,
+        curvature_drops,
+        width=width,
+        bottom=hydraulic_drops + mhd_drops,
+        color="#f97316",
+        alpha=0.70,
+        label="bend loss",
+    )
+    ax_scale.plot(field_scales, pressure_drops, color="#111827", marker="o", linewidth=2.2, label="total")
+    if np.any(field_scales > 0.0) and np.any(mhd_drops > 0.0):
+        ref_index = int(np.argmax(mhd_drops > 0.0))
+        base_non_mhd = hydraulic_drops[ref_index] + curvature_drops[ref_index]
+        quadratic = base_non_mhd + mhd_drops[ref_index] * (field_scales / max(field_scales[ref_index], 1.0e-12)) ** 2
+        ax_scale.plot(field_scales, quadratic, color="#64748b", linestyle="--", linewidth=1.6, label=r"$B_\perp^2$ trend")
+    ax_scale.set_title("Pressure-budget scaling")
+    ax_scale.set_xlabel("magnetic-field multiplier")
+    ax_scale.set_ylabel(r"terminal $\Delta p$ [kPa]")
+    ax_scale.legend(loc="upper left", fontsize=8)
+    ax_ha = ax_scale.twinx()
+    ax_ha.plot(field_scales, peak_ha, color="#7c3aed", marker="s", linestyle=":", linewidth=1.4, label="peak Ha")
+    ax_ha.set_ylabel("peak Hartmann number", color="#7c3aed")
+    ax_ha.tick_params(axis="y", labelcolor="#7c3aed")
+
+    velocity = float(runs[0]["settings"].mean_velocity)
+    radius = float(runs[0]["geometry"].pipe_radius)
+    fig.suptitle(
+        f"WHAM blanket pressure sweep at U={velocity:.2f} m/s, R={radius:.2f} m",
+        fontsize=16,
+    )
+    png = out / f"{filename_stem}.png"
+    pdf = out / f"{filename_stem}.pdf"
+    summary = out / f"{filename_stem}_summary.json"
+    csv = out / f"{filename_stem}_data.csv"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+
+    summary.write_text(json.dumps(_json_pressure_sweep_summary(runs, [png.name, pdf.name, csv.name]), indent=2) + "\n", encoding="utf-8")
+    _write_pressure_sweep_csv(csv, runs)
     return [png, pdf, summary, csv]
 
 
@@ -1369,6 +1464,32 @@ def _json_transient_summary(transient: dict[str, object], artifacts: list[str]) 
     }
 
 
+def _json_pressure_sweep_summary(flows: Sequence[dict[str, object]], artifacts: list[str]) -> dict[str, object]:
+    field_scales = [float(flow["settings"].field_scale) for flow in flows]
+    return {
+        "case": "wham_blanket_pressure_sweep",
+        "geometry": asdict(flows[0]["geometry"]),
+        "properties": asdict(flows[0]["properties"]),
+        "field_scales": field_scales,
+        "mean_velocity_m_per_s": float(flows[0]["settings"].mean_velocity),
+        "pressure_drop_kpa": [float(flow["metrics"]["pressure_drop_kpa"]) for flow in flows],
+        "hydraulic_pressure_drop_kpa": [float(flow["metrics"]["hydraulic_pressure_drop_pa"]) / 1000.0 for flow in flows],
+        "mhd_pressure_drop_kpa": [float(flow["metrics"]["mhd_pressure_drop_pa"]) / 1000.0 for flow in flows],
+        "curvature_pressure_drop_kpa": [float(flow["metrics"]["curvature_pressure_drop_pa"]) / 1000.0 for flow in flows],
+        "peak_hartmann_number": [float(flow["metrics"]["peak_hartmann_number"]) for flow in flows],
+        "artifacts": artifacts,
+        "model_equation": (
+            "Delta p(s) = integral_0^s [ f_D*rho*U^2/(2D) + "
+            "C_m*sigma*U*B_perp^2 + distributed K_b*rho*U^2/2 bend loss ] ds"
+        ),
+        "manuscript_observable": (
+            "Cumulative pressure drop along the blanket route and terminal "
+            "pressure scaling with magnetic-field strength. For fixed U and "
+            "geometry, the inductionless MHD term scales with B_perp^2."
+        ),
+    }
+
+
 def _write_station_csv(
     path: Path,
     *,
@@ -1381,6 +1502,39 @@ def _write_station_csv(
     rows = ["station_m,b_perp_t,hartmann,pressure_drop_pa,total_pressure_gradient_pa_per_m"]
     for values in zip(station, b_perp, hartmann, pressure, total_gradient, strict=True):
         rows.append(",".join(f"{float(value):.12e}" for value in values))
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def _write_pressure_sweep_csv(path: Path, flows: Sequence[dict[str, object]]) -> None:
+    rows = [
+        "field_scale,station_m,b_perp_t,hartmann,total_pressure_drop_pa,"
+        "hydraulic_pressure_drop_pa,mhd_pressure_drop_pa,curvature_pressure_drop_pa,total_pressure_gradient_pa_per_m"
+    ]
+    for flow in flows:
+        scale = float(flow["settings"].field_scale)
+        station = np.asarray(flow["station"], dtype=float)
+        hydraulic_gradient = np.asarray(flow["pressure_gradient_hydraulic"], dtype=float)
+        mhd_gradient = np.asarray(flow["pressure_gradient_mhd"], dtype=float)
+        curvature_gradient = np.asarray(flow["pressure_gradient_curvature"], dtype=float)
+        total_gradient = np.asarray(flow["pressure_gradient_total"], dtype=float)
+        cumulative_hydraulic = _cumulative_trapezoid(hydraulic_gradient, station)
+        cumulative_mhd = _cumulative_trapezoid(mhd_gradient, station)
+        cumulative_curvature = _cumulative_trapezoid(curvature_gradient, station)
+        total_pressure = np.asarray(flow["cumulative_pressure_drop"], dtype=float)
+        b_perp = np.asarray(flow["b_perp"], dtype=float)
+        hartmann = np.asarray(flow["hartmann"], dtype=float)
+        for values in zip(
+            station,
+            b_perp,
+            hartmann,
+            total_pressure,
+            cumulative_hydraulic,
+            cumulative_mhd,
+            cumulative_curvature,
+            total_gradient,
+            strict=True,
+        ):
+            rows.append(f"{scale:.12e}," + ",".join(f"{float(value):.12e}" for value in values))
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 

@@ -82,6 +82,11 @@
       "generator": "examples/wham_blanket_flow_demo.py"
     },
     {
+      "name": "wham_blanket_pressure_sweep.png",
+      "kind": "WHAM blanket cumulative pressure and field-strength sweep",
+      "generator": "examples/wham_blanket_flow_demo.py"
+    },
+    {
       "name": "wham_blanket_autodiff_research.png",
       "kind": "WHAM blanket differentiable pressure-design study",
       "generator": "examples/wham_blanket_autodiff_research_demo.py"

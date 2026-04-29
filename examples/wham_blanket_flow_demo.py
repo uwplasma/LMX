@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 import shutil
 
@@ -13,6 +14,7 @@ from lmx.blanket_flow import (
     solve_wham_blanket_reduced_flow,
     solve_wham_blanket_transient_flow,
     write_wham_blanket_flow_plots,
+    write_wham_blanket_pressure_sweep_plots,
     write_wham_blanket_transient_flow_movie,
     write_wham_blanket_transient_flow_plots,
 )
@@ -40,6 +42,7 @@ ELECTRICAL_CONDUCTIVITY = 7.9e5
 # representation. FIELD_SCALE is an explicit design-field multiplier so the
 # pipe, which is outside the central-cell envelope, sees a visible MHD response.
 FIELD_SCALE = 8.0
+FIELD_SCALE_SWEEP = (4.0, 6.0, 8.0, 10.0)
 MHD_DRAG_FACTOR = 0.35
 BEND_LOSS_COEFFICIENT = 0.35
 
@@ -48,7 +51,7 @@ BEND_POINTS = 144
 CROSS_SECTION_POINTS = 55
 TRANSIENT_PRESSURE_DRIVE_FACTOR = 1.10
 TRANSIENT_TIME_STEP = 0.05
-TRANSIENT_FINAL_TIME = 90.0
+TRANSIENT_FINAL_TIME = 15.0
 TRANSIENT_FRAMES = 72
 MOVIE_FPS = 12
 
@@ -116,6 +119,20 @@ def run_wham_blanket_flow_demo() -> dict[str, object]:
         settings=settings,
         coil_parameters=coil_parameters,
     )
+    sweep_flows = []
+    for field_scale in FIELD_SCALE_SWEEP:
+        if abs(float(field_scale) - float(settings.field_scale)) < 1.0e-12:
+            sweep_flows.append(flow)
+            continue
+        sweep_flows.append(
+            solve_wham_blanket_reduced_flow(
+                centerline,
+                geometry=geometry,
+                properties=properties,
+                settings=replace(settings, field_scale=float(field_scale)),
+                coil_parameters=coil_parameters,
+            )
+        )
     transient = solve_wham_blanket_transient_flow(
         flow,
         settings=BlanketTransientFlowSettings(
@@ -126,6 +143,7 @@ def run_wham_blanket_flow_demo() -> dict[str, object]:
         ),
     )
     plot_outputs = write_wham_blanket_flow_plots(flow, OUTPUT_DIR)
+    sweep_outputs = write_wham_blanket_pressure_sweep_plots(sweep_flows, OUTPUT_DIR)
     transient_plot_outputs = write_wham_blanket_transient_flow_plots(transient, OUTPUT_DIR)
     movie_outputs = write_wham_blanket_transient_flow_movie(
         transient,
@@ -134,7 +152,7 @@ def run_wham_blanket_flow_demo() -> dict[str, object]:
     )
 
     copied = []
-    for output in [*plot_outputs, *transient_plot_outputs, *movie_outputs]:
+    for output in [*plot_outputs, *sweep_outputs, *transient_plot_outputs, *movie_outputs]:
         if output.suffix.lower() in {".png", ".gif", ".json", ".csv"}:
             target = DOCS_OUTPUT_DIR / output.name
             shutil.copy2(output, target)
@@ -145,6 +163,9 @@ def run_wham_blanket_flow_demo() -> dict[str, object]:
         "docs_artifacts": copied,
         "metrics": flow["metrics"],
         "transient_metrics": transient["metrics"],
+        "pressure_sweep_kpa": {
+            str(float(item["settings"].field_scale)): float(item["metrics"]["pressure_drop_kpa"]) for item in sweep_flows
+        },
         "model_limitations": (
             "The steady panel is a fixed-flow pressure budget. The movie and "
             "transient panel use a centerline pressure/velocity solve with "

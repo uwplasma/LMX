@@ -86,6 +86,7 @@ __all__ = [
     "write_centerline_pipe_mesh_preview",
     "write_wham_blanket_flow_movie",
     "write_wham_blanket_flow_plots",
+    "write_wham_blanket_pressure_sweep_plots",
     "write_wham_blanket_flow_summary",
     "write_wham_blanket_transient_flow_movie",
     "write_wham_blanket_transient_flow_plots",
@@ -235,6 +236,10 @@ _EXPORTS = {
     ),
     "write_wham_blanket_flow_movie": ("lmx.blanket_flow", "write_wham_blanket_flow_movie"),
     "write_wham_blanket_flow_plots": ("lmx.blanket_flow", "write_wham_blanket_flow_plots"),
+    "write_wham_blanket_pressure_sweep_plots": (
+        "lmx.blanket_flow",
+        "write_wham_blanket_pressure_sweep_plots",
+    ),
     "write_wham_blanket_flow_summary": ("lmx.blanket_flow", "write_wham_blanket_flow_summary"),
     "write_wham_blanket_transient_flow_movie": (
         "lmx.blanket_flow",

@@ -42,6 +42,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `variable_field_tabulated_reconstruction.png` | `examples/variable_field_tabulated_demo.py` | Tabulated-field interpolation/reconstruction gate |
 | `wham_blanket_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket pressure budget and local sections |
 | `wham_blanket_transient_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket centerline pressure-velocity transient to steady state |
+| `wham_blanket_pressure_sweep.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket cumulative pressure drop and field-strength scaling |
 | `wham_blanket_autodiff_research.png` | `examples/wham_blanket_autodiff_research_demo.py` | WHAM pressure sensitivity and field-scale inverse design |
 | `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
 

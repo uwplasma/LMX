@@ -254,14 +254,20 @@ approximations at fixed flow rate.
 The same example now also runs a centerline pressure-velocity transient with a
 turbulent Darcy-friction closure, local `σ U B_\perp^2` MHD drag, bend losses,
 and an incompressibility projection along the pipe. The retained movie and
-diagnostic panel run to `t = 90 s`, beyond filling/startup, and settle to
+diagnostic panel run to `t = 15 s`, beyond filling/startup, and settle to
 `U_mean ≈ 0.200 m/s` with `Δp ≈ 26.4 kPa`. This is the first executable
 curved-route pressure/velocity gate. It does not yet resolve 3D secondary
 flows, cross-section turbulence, heat transfer, or induced magnetic field.
+For manuscript planning, the same example also writes a pressure-drop sweep at
+fixed flow rate; the current field multipliers `4`, `6`, `8`, and `10` produce
+terminal pressure drops of `≈ 6.7`, `15.0`, `26.5`, and `41.4 kPa`, with the
+MHD term following the expected `B_\perp^2` trend.
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](_static/generated/wham_blanket_flow.png)
 
 ![LMX WHAM blanket transient pressure-velocity solve](_static/generated/wham_blanket_transient_flow.png)
+
+![LMX WHAM blanket pressure sweep](_static/generated/wham_blanket_pressure_sweep.png)
 
 ![LMX WHAM blanket reduced-flow movie](_static/generated/wham_blanket_flow.gif)
 
