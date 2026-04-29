@@ -60,6 +60,12 @@ higher-inertia Dean-vortex bent-pipe validation. The Q2D lane now has an
 executable Q2DmhdFoam/Vetcha ingestion artifact; it is still not a matched LMX
 turbulence parity claim.
 
+The closure criteria and execution order for those three lanes are now tracked
+in [](research_grade_closure_plan.md). That page defines the external-reference
+provenance, physics gates, convergence checks, publication artifacts, and
+strict release-readiness conditions needed before any lane can be marked
+research-grade closed.
+
 The executable external-code audit now has a generated map that separates
 available solver/data paths from completed observable-level parity:
 

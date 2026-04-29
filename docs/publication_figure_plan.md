@@ -111,3 +111,8 @@ release blocker. The paper-ready flag remains false because three strict
 research lanes still require external or resolved validation: magnetic-obstacle
 external observables, Q2D turbulent parity, and higher-inertia Dean-vortex
 curved-pipe validation.
+
+The executable closure plan for those lanes is maintained in
+[](research_grade_closure_plan.md). Publication figures should be promoted from
+the bounded manifest to paper-ready status only after that plan's external
+reference, convergence, and physics gates pass.
