@@ -287,6 +287,12 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   to a published turbulent Q2D reference dataset. If a filled
   `q2d_turbulence_reference_observables.csv` is present, the example writes the
   scalar comparison table and PNG/PDF tolerance-gate plots automatically.
+- `examples/q2dmhdfoam_external_reference_adapter.py`: ingests local
+  Q2DmhdFoam validation outputs from the external checkout, including tepot
+  line-profile samples, Vetcha 2009 digitized line cuts, and the lid-driven
+  turbulence spectral-summary file. This closes the data-ingestion part of the
+  Q2D external lane; matched LMX-vs-Q2DmhdFoam turbulent parity remains a
+  separate validation gate.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -296,6 +302,10 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 
 <p align="center">
   <img src="docs/_static/generated/q2d_turbulence_observables.png" alt="Q2D turbulence-observable readiness panel" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2dmhdfoam_external_reference.png" alt="Q2DmhdFoam external reference adapter panel" width="72%">
 </p>
 
 <p align="center">
@@ -610,7 +620,10 @@ hidden in the figures:
   spectrum diagnostics plus a longer nonlinear vorticity movie; turbulent
   parity remains open until those observables are compared with published
   nonlinear Q2D turbulent data. The external-reference CSV contract now exists
-  in `examples/q2d_turbulence_external_reference_template.py`
+  in `examples/q2d_turbulence_external_reference_template.py`, and
+  `examples/q2dmhdfoam_external_reference_adapter.py` now wires local
+  Q2DmhdFoam/Vetcha outputs into profile and turbulence-observable artifacts
+  without calling them matched LMX parity
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
   `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The
@@ -658,6 +671,7 @@ Useful entry points:
 - `examples/freemhd_closed_channel_flow_rate_parity.py`: constrained-flow-rate parity against the same processed FreeMHD slices, including case-specific target mean velocities
 - `examples/freemhd_observable_mesh_ladder.py`: manual mesh/settings ladder for the remaining FreeMHD observable offenders
 - `examples/external_validation_readiness_panel.py`: executable external-code validation map for the remaining open lanes
+- `examples/q2dmhdfoam_external_reference_adapter.py`: Q2DmhdFoam/Vetcha external Q2D reference-data adapter
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

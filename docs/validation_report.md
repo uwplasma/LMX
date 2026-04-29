@@ -54,14 +54,18 @@ agreement and bent-pipe local `div J`.
 | Reader-facing straight-duct profiles | Hartmann, Shercliff, and Hunt retained cuts below `L2 <= 1.2e-2` |
 | Bounded release readiness | `scripts/run_release_readiness.py` reports no hard blockers |
 
-The strict research-grade deferred lanes remain external Q2D turbulence
-parity, external magnetic-obstacle reference data, and higher-inertia
-Dean-vortex bent-pipe validation.
+The strict research-grade deferred lanes remain matched external Q2D
+turbulence parity, external magnetic-obstacle reference data, and
+higher-inertia Dean-vortex bent-pipe validation. The Q2D lane now has an
+executable Q2DmhdFoam/Vetcha ingestion artifact; it is still not a matched LMX
+turbulence parity claim.
 
 The executable external-code audit now has a generated map that separates
 available solver/data paths from completed observable-level parity:
 
 ![LMX executable external-code validation map](_static/generated/external_validation_readiness.png)
+
+![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
 ## Combined validation workflow
 

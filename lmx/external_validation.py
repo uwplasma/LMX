@@ -7,9 +7,11 @@ into repeatable validation gates and publication-ready comparison tables.
 
 from __future__ import annotations
 
+import ast
 import csv
+import re
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Sequence
 
 import numpy as np
 
@@ -288,10 +290,10 @@ def external_validation_readiness_rows() -> list[dict[str, object]]:
         {
             "lane": "Q2D turbulence parity",
             "external_code": "Q2DmhdFoam",
-            "score": 2.0,
-            "status": "compiled and smoke-run",
-            "observables": "energy, enstrophy, spectra, turnover count",
-            "next_step": "export Smolentsev/Vetcha observable CSV",
+            "score": 2.5,
+            "status": "external adapter wired",
+            "observables": "profiles, energy, enstrophy, spectra, turnover count",
+            "next_step": "run matched LMX-vs-Q2DmhdFoam turbulent case",
         },
         {
             "lane": "Magnetic-obstacle validation",
@@ -452,6 +454,295 @@ def write_external_validation_readiness_panel(
         fig.savefig(path, dpi=180, bbox_inches="tight")
     plt.close(fig)
     return paths
+
+
+def load_q2dmhdfoam_line_profile(
+    path: str | Path,
+    *,
+    coordinate_column: int = 0,
+    velocity_column: int = -1,
+    coordinate_half_width: float | None = None,
+) -> dict[str, object]:
+    """Load a Q2DmhdFoam line-sampled velocity profile.
+
+    Q2DmhdFoam validation files commonly store ``coordinate, theta, Ux`` or
+    ``coordinate, Ux`` columns. The loader normalizes the coordinate to
+    ``[-1, 1]`` while preserving the raw coordinate and velocity arrays.
+    Filename tokens such as ``lineSampled_theta_Ux_250_500_1e6`` are parsed as
+    Hartmann, Reynolds, and Grashof metadata when present.
+    """
+
+    source = Path(path)
+    data = np.loadtxt(source)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    if data.shape[1] < 2:
+        raise ValueError(f"Q2DmhdFoam line profile {source} needs at least two columns")
+
+    coordinate = np.asarray(data[:, coordinate_column], dtype=float)
+    velocity = np.asarray(data[:, velocity_column], dtype=float)
+    finite = np.isfinite(coordinate) & np.isfinite(velocity)
+    if finite.sum() < 3:
+        raise ValueError(f"Q2DmhdFoam line profile {source} has fewer than three finite samples")
+
+    coordinate = coordinate[finite]
+    velocity = velocity[finite]
+    order = np.argsort(coordinate)
+    coordinate = coordinate[order]
+    velocity = velocity[order]
+
+    span = float(np.max(coordinate) - np.min(coordinate))
+    if span <= 0.0:
+        raise ValueError(f"Q2DmhdFoam line profile {source} has zero coordinate span")
+    half_width = float(coordinate_half_width) if coordinate_half_width is not None else 0.5 * span
+    if half_width <= 0.0:
+        raise ValueError("coordinate_half_width must be positive")
+    center = 0.5 * float(np.max(coordinate) + np.min(coordinate))
+    position = (coordinate - center) / half_width
+    metadata = _q2dmhdfoam_conditions_from_name(source.name)
+
+    return {
+        "source_path": str(source),
+        "label": _q2dmhdfoam_profile_label(source.name, metadata),
+        "position": position,
+        "raw_coordinate": coordinate,
+        "velocity": velocity,
+        "sample_count": int(position.size),
+        **metadata,
+    }
+
+
+def q2dmhdfoam_profile_observables(profile: Mapping[str, object]) -> dict[str, float | str | int]:
+    """Compute scalar observables from one Q2DmhdFoam profile.
+
+    The returned metrics are intentionally code-agnostic: they summarize
+    normalized shape, symmetry, wall gradients, and edge damping so they can be
+    compared with future LMX Q2D runs or digitized reference curves.
+    """
+
+    x = np.asarray(profile["position"], dtype=float)
+    u = np.asarray(profile["velocity"], dtype=float)
+    if x.ndim != 1 or u.ndim != 1 or x.size != u.size:
+        raise ValueError("Q2DmhdFoam profile observables require matching 1D position and velocity arrays")
+    if x.size < 3:
+        raise ValueError("Q2DmhdFoam profile observables require at least three samples")
+
+    order = np.argsort(x)
+    x = x[order]
+    u = u[order]
+    span = float(np.max(x) - np.min(x))
+    if span <= 0.0:
+        raise ValueError("Q2DmhdFoam profile position span must be positive")
+    mean_velocity = float(np.trapezoid(u, x) / span)
+    normalization = mean_velocity if abs(mean_velocity) > 1.0e-30 else float(np.max(np.abs(u)))
+    if abs(normalization) <= 1.0e-30:
+        normalized = np.zeros_like(u)
+    else:
+        normalized = u / normalization
+    peak = float(np.max(u))
+    trough = float(np.min(u))
+    peak_to_mean = float(peak / mean_velocity) if abs(mean_velocity) > 1.0e-30 else float("nan")
+    mirrored = np.interp(-x, x, normalized)
+    symmetry_l2 = float(np.sqrt(np.mean((normalized - mirrored) ** 2)))
+    edge_count = max(1, min(8, x.size // 12))
+    edge_velocity = float(0.5 * (np.mean(normalized[:edge_count]) + np.mean(normalized[-edge_count:])))
+    wall_gradient_proxy = float(np.max(np.abs(np.gradient(normalized, x)))) if x.size >= 4 else 0.0
+    center_velocity = float(np.interp(0.0, x, normalized))
+
+    result: dict[str, float | str | int] = {
+        "label": str(profile.get("label", "Q2DmhdFoam profile")),
+        "sample_count": int(x.size),
+        "mean_velocity": mean_velocity,
+        "peak_velocity": peak,
+        "trough_velocity": trough,
+        "peak_to_mean_velocity": peak_to_mean,
+        "center_normalized_velocity": center_velocity,
+        "edge_normalized_velocity": edge_velocity,
+        "symmetry_l2": symmetry_l2,
+        "wall_gradient_proxy": wall_gradient_proxy,
+    }
+    for key in ("hartmann", "reynolds", "grashof", "source_path"):
+        if key in profile:
+            value = profile[key]
+            result[key] = float(value) if isinstance(value, (int, float, np.floating)) else str(value)
+    return result
+
+
+def write_q2dmhdfoam_profile_observable_table(
+    records: Sequence[Mapping[str, float | str | int]],
+    path: str | Path,
+) -> Path:
+    """Write scalar Q2DmhdFoam profile observables to CSV."""
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    columns = [
+        "label",
+        "hartmann",
+        "reynolds",
+        "grashof",
+        "sample_count",
+        "mean_velocity",
+        "peak_velocity",
+        "trough_velocity",
+        "peak_to_mean_velocity",
+        "center_normalized_velocity",
+        "edge_normalized_velocity",
+        "symmetry_l2",
+        "wall_gradient_proxy",
+        "source_path",
+    ]
+    with out.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for record in records:
+            writer.writerow({column: record.get(column, "") for column in columns})
+    return out
+
+
+def load_q2dmhdfoam_lid_driven_observables(path: str | Path) -> dict[str, float | int | str]:
+    """Load turbulence-summary observables emitted by Q2DmhdFoam lid-driven runs."""
+
+    source = Path(path)
+    text = source.read_text(encoding="utf-8")
+    weak = _parse_q2dmhdfoam_list_payload(text, "Weak turbulence")
+    strong = _parse_q2dmhdfoam_list_payload(text, "Strong turbulence")
+
+    result: dict[str, float | int | str] = {"source_path": str(source)}
+    if weak:
+        weak_arr = np.asarray(weak, dtype=float)
+        if weak_arr.ndim != 2 or weak_arr.shape[1] < 2:
+            raise ValueError(f"{source} has malformed weak-turbulence rows")
+        peak = weak_arr[:, 1]
+        result.update(
+            {
+                "weak_mode_count": int(weak_arr.shape[0]),
+                "weak_peak_over_max_max": float(np.max(peak)),
+                "weak_peak_over_max_mean": float(np.mean(peak)),
+                "weak_dominant_wavenumber": float(weak_arr[int(np.argmax(peak)), 0]),
+                "weak_weighted_wavenumber": float(np.sum(weak_arr[:, 0] * peak) / max(np.sum(peak), 1.0e-30)),
+            }
+        )
+    if strong:
+        strong_arr = np.asarray(strong, dtype=float)
+        if strong_arr.ndim != 2 or strong_arr.shape[1] < 3:
+            raise ValueError(f"{source} has malformed strong-turbulence rows")
+        strong_peak = strong_arr[:, 1]
+        result.update(
+            {
+                "strong_mode_count": int(strong_arr.shape[0]),
+                "strong_peak_over_max_max": float(np.max(strong_peak)),
+                "strong_avg_over_max_max": float(np.max(strong_arr[:, 2])),
+                "strong_dominant_wavenumber": float(strong_arr[int(np.argmax(strong_peak)), 0]),
+            }
+        )
+    return result
+
+
+def write_q2dmhdfoam_external_reference_panel(
+    profiles: Sequence[Mapping[str, object]],
+    profile_observables: Sequence[Mapping[str, float | str | int]],
+    output_dir: str | Path,
+    *,
+    turbulence_observables: Mapping[str, float | int | str] | None = None,
+    output_stem: str = "q2dmhdfoam_external_reference",
+) -> list[Path]:
+    """Write a publication-facing Q2DmhdFoam external-reference panel."""
+
+    import matplotlib.pyplot as plt
+
+    if not profiles:
+        raise ValueError("At least one Q2DmhdFoam profile is required")
+    if len(profiles) != len(profile_observables):
+        raise ValueError("profiles and profile_observables must have the same length")
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(2, 2, figsize=(13.6, 8.6), constrained_layout=True)
+    colors = plt.cm.viridis(np.linspace(0.08, 0.92, len(profiles)))
+
+    for color, profile, observables in zip(colors, profiles, profile_observables, strict=True):
+        x = np.asarray(profile["position"], dtype=float)
+        u = np.asarray(profile["velocity"], dtype=float)
+        mean_velocity = float(observables["mean_velocity"])
+        u_norm = u / mean_velocity if abs(mean_velocity) > 1.0e-30 else u
+        axes[0, 0].plot(x, u_norm, color=color, linewidth=1.8, label=str(observables["label"]))
+    axes[0, 0].set_title("External line-profile reference curves")
+    axes[0, 0].set_xlabel("normalized line coordinate")
+    axes[0, 0].set_ylabel(r"$U / \overline{U}$")
+    axes[0, 0].grid(True, alpha=0.25)
+    axes[0, 0].legend(frameon=False, fontsize=7.5, ncols=1, loc="upper right")
+
+    labels = [f"{idx + 1}" for idx in range(len(profile_observables))]
+    x_idx = np.arange(len(profile_observables), dtype=float)
+    axes[0, 1].bar(
+        x_idx,
+        [float(row["peak_to_mean_velocity"]) for row in profile_observables],
+        color=colors,
+        edgecolor="#1f2937",
+        linewidth=0.5,
+    )
+    axes[0, 1].set_title("Shape observable")
+    axes[0, 1].set_ylabel(r"$U_{max} / \overline{U}$")
+    axes[0, 1].set_xticks(x_idx, labels)
+    axes[0, 1].set_xlabel("profile id (legend order)")
+    axes[0, 1].grid(True, axis="y", alpha=0.25)
+
+    axes[1, 0].bar(
+        x_idx,
+        [float(row["symmetry_l2"]) for row in profile_observables],
+        color=colors,
+        edgecolor="#1f2937",
+        linewidth=0.5,
+    )
+    axes[1, 0].set_title("Profile asymmetry metric")
+    axes[1, 0].set_ylabel(r"$L_2(U(x)-U(-x))$")
+    axes[1, 0].set_xticks(x_idx, labels)
+    axes[1, 0].set_xlabel("profile id (legend order)")
+    axes[1, 0].grid(True, axis="y", alpha=0.25)
+
+    axes[1, 1].axis("off")
+    turbulence_observables = dict(turbulence_observables or {})
+    note = (
+        "Adapter status: external data are wired into LMX artifacts; "
+        "matched LMX parity remains a separate validation gate."
+    )
+    if turbulence_observables:
+        lines = ["Q2DmhdFoam lid-driven turbulence summary"]
+        for key in (
+            "weak_mode_count",
+            "weak_peak_over_max_max",
+            "weak_dominant_wavenumber",
+            "strong_mode_count",
+            "strong_peak_over_max_max",
+            "strong_avg_over_max_max",
+        ):
+            if key in turbulence_observables:
+                value = turbulence_observables[key]
+                if isinstance(value, float):
+                    lines.append(f"{key}: {value:.4g}")
+                else:
+                    lines.append(f"{key}: {value}")
+        lines.extend(["", note])
+        axes[1, 1].text(0.03, 0.95, "\n".join(lines), va="top", fontsize=10, transform=axes[1, 1].transAxes)
+    else:
+        axes[1, 1].text(
+            0.5,
+            0.5,
+            "No Q2DmhdFoam turbulence summary found",
+            ha="center",
+            va="center",
+            fontsize=11,
+            transform=axes[1, 1].transAxes,
+        )
+
+    fig.suptitle("Executable Q2DmhdFoam reference-data adapter", fontsize=15, fontweight="bold")
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
+    for path in (png_path, pdf_path):
+        fig.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    return [png_path, pdf_path]
 
 
 def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, dict[str, float | str]]:
@@ -670,6 +961,33 @@ def write_dean_vortex_reference_template(path: str | Path) -> Path:
     """Write the external Dean-vortex observable CSV template."""
 
     return write_scalar_reference_template(path, dean_vortex_reference_template_rows())
+
+
+def _q2dmhdfoam_conditions_from_name(name: str) -> dict[str, float]:
+    match = re.search(r"lineSampled_theta_Ux_([0-9.eE+-]+)_([0-9.eE+-]+)_([0-9.eE+-]+)", name)
+    if not match:
+        return {}
+    return {
+        "hartmann": float(match.group(1)),
+        "reynolds": float(match.group(2)),
+        "grashof": float(match.group(3)),
+    }
+
+
+def _q2dmhdfoam_profile_label(name: str, metadata: Mapping[str, float]) -> str:
+    if {"hartmann", "reynolds", "grashof"} <= set(metadata):
+        return f"Ha={metadata['hartmann']:g}, Re={metadata['reynolds']:g}, Gr={metadata['grashof']:g}"
+    return Path(name).stem.replace("_", " ")
+
+
+def _parse_q2dmhdfoam_list_payload(text: str, label: str) -> list[list[float]]:
+    match = re.search(rf"{re.escape(label)}\s*:\s*(\[[^\n\r]*\])", text)
+    if not match:
+        return []
+    payload = ast.literal_eval(match.group(1))
+    if not isinstance(payload, list):
+        raise ValueError(f"{label} payload must be a list")
+    return payload
 
 
 def _parse_float(value: str | None, *, row_number: int, column: str, context: str = "Scalar reference CSV") -> float:

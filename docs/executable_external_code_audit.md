@@ -78,8 +78,16 @@ then executed with temporary case-dictionary fixes for OpenFOAM 2206:
 The tutorial completed to `t = 2` with finite continuity errors and wrote
 OpenFOAM time directories. This makes Q2DmhdFoam a practical external generator
 for Q2D energy/enstrophy/spectrum and wall-bounded channel observables. The next
-LMX task is not solver discovery; it is to select one Q2DmhdFoam validation case
-and export the same scalar observables used by
+LMX task is no longer solver discovery or raw-data ingestion. The repository
+now includes `examples/q2dmhdfoam_external_reference_adapter.py`, which reads
+the local Q2DmhdFoam tepot profile samples, Vetcha 2009 digitized line cuts,
+and lid-driven turbulence spectral-summary output, then writes CSV observables
+and a docs panel:
+
+![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
+
+The remaining Q2D blocker is a matched LMX-vs-Q2DmhdFoam turbulent case using
+the same energy, enstrophy, spectrum, and turnover observables as
 `q2d_turbulence_reference_observables.csv`.
 
 ## MHD_Solvers_OpenFOAM

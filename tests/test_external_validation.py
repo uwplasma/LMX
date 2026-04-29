@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from lmx.external_validation import (
@@ -9,9 +10,12 @@ from lmx.external_validation import (
     compare_scalar_reference_observables,
     dean_vortex_reference_template_rows,
     external_validation_readiness_rows,
+    load_q2dmhdfoam_lid_driven_observables,
+    load_q2dmhdfoam_line_profile,
     load_magnetic_obstacle_reference_observables,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
+    q2dmhdfoam_profile_observables,
     q2d_turbulence_reference_template_rows,
     summarize_external_validation_readiness,
     write_dean_vortex_reference_template,
@@ -19,6 +23,8 @@ from lmx.external_validation import (
     write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
+    write_q2dmhdfoam_external_reference_panel,
+    write_q2dmhdfoam_profile_observable_table,
     write_q2d_turbulence_reference_template,
     write_scalar_reference_comparison_plots,
     write_scalar_reference_comparison_table,
@@ -126,6 +132,50 @@ def test_scalar_reference_helpers_cover_q2d_and_dean_templates(tmp_path: Path):
     assert "secondary_flow_rms_ratio" in dean_path.read_text(encoding="utf-8")
     assert any(row["observable"] == "turnover_count" for row in q2d_turbulence_reference_template_rows())
     assert any(row["observable"] == "inner_outer_velocity_ratio" for row in dean_vortex_reference_template_rows())
+
+
+def test_q2dmhdfoam_line_profile_observables_and_panel(tmp_path: Path):
+    profile_path = tmp_path / "lineSampled_theta_Ux_250_500_1e6"
+    x = np.linspace(0.0, 0.15, 21)
+    theta = np.zeros_like(x)
+    velocity = 1.0 - 0.35 * ((x - 0.075) / 0.075) ** 2
+    np.savetxt(profile_path, np.column_stack([x, theta, velocity]))
+
+    profile = load_q2dmhdfoam_line_profile(profile_path)
+    observables = q2dmhdfoam_profile_observables(profile)
+    table = write_q2dmhdfoam_profile_observable_table([observables], tmp_path / "profiles.csv")
+    paths = write_q2dmhdfoam_external_reference_panel(
+        [profile],
+        [observables],
+        tmp_path,
+        turbulence_observables={"weak_mode_count": 2, "weak_peak_over_max_max": 0.2},
+    )
+
+    assert profile["hartmann"] == pytest.approx(250.0)
+    assert profile["reynolds"] == pytest.approx(500.0)
+    assert profile["grashof"] == pytest.approx(1.0e6)
+    assert observables["symmetry_l2"] < 1.0e-12
+    assert observables["peak_to_mean_velocity"] > 1.0
+    assert "peak_to_mean_velocity" in table.read_text(encoding="utf-8")
+    assert [path.suffix for path in paths] == [".png", ".pdf"]
+    assert all(path.exists() for path in paths)
+
+
+def test_q2dmhdfoam_lid_driven_summary_parser(tmp_path: Path):
+    summary_path = tmp_path / "IDM_output_U.txt"
+    summary_path.write_text(
+        "-1.4\n"
+        "Weak turbulence:[[1.0, 0.15], [2.0, 0.10]]\n"
+        "Strong turbulence:[[0.5, 0.12, 0.04]].\n",
+        encoding="utf-8",
+    )
+
+    observables = load_q2dmhdfoam_lid_driven_observables(summary_path)
+
+    assert observables["weak_mode_count"] == 2
+    assert observables["weak_dominant_wavenumber"] == pytest.approx(1.0)
+    assert observables["strong_mode_count"] == 1
+    assert observables["strong_avg_over_max_max"] == pytest.approx(0.04)
 
 
 def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):

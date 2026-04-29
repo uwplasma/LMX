@@ -216,7 +216,10 @@ refer to the Samper et al. taxonomy.
   `examples/q2d_turbulence_external_reference_template.py`; if a filled
   `q2d_turbulence_reference_observables.csv` is present, the turbulence movie
   example writes the comparison table and PNG/PDF tolerance-gate plots
-  automatically.
+  automatically. `examples/q2dmhdfoam_external_reference_adapter.py` now also
+  ingests executable Q2DmhdFoam/Vetcha outputs into profile, spectral-summary,
+  CSV, and PNG/PDF artifacts. The remaining blocker is the matched
+  LMX-vs-Q2DmhdFoam turbulent run, not external-data parsing.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
@@ -1075,8 +1078,10 @@ Current quasi-2D wall-bounded forced lane:
   `dE/dt = P - 2 lambda E` balance for decay, forced periodic, and
   wall-bounded forced cases before any turbulent claim is made
 - remaining work before any turbulent Q2D claim:
-  external Sommeria-Moreau-style turbulent spectra/decay references,
-  wall-bounded duct observables, and turbulence-parity tolerances
+  matched LMX-vs-Q2DmhdFoam turbulent spectra/decay references,
+  wall-bounded duct observables, and turbulence-parity tolerances. The external
+  Q2DmhdFoam/Vetcha adapter is now in-tree and writes
+  `q2dmhdfoam_external_reference.png`, so data ingestion is no longer a blocker.
 - current bounded result from `examples/q2d_wall_bounded_validation.py`:
   `l2_error ≈ 4.15e-4`, `linf_error ≈ 4.15e-4`,
   `amplitude_rel_error ≈ 1.42e-4`

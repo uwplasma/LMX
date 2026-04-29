@@ -71,6 +71,7 @@ python examples/autodiff_wham_pressure_sensitivity.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py
+python examples/q2dmhdfoam_external_reference_adapter.py
 python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_regime_scan.py
 python examples/magnetic_obstacle_baseline.py

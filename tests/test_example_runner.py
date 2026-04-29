@@ -1192,6 +1192,46 @@ def test_q2d_turbulence_external_reference_template_writes_summary(tmp_path: Pat
     assert (tmp_path / "q2d_turbulence_external_reference_template_summary.json").exists()
 
 
+def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2dmhdfoam_external_reference_adapter.py")
+    root = tmp_path / "Q2DmhdFoam"
+    sample_dir = root / "FFT2_validation" / "tepot" / "samples"
+    sample_dir.mkdir(parents=True)
+    x = np.linspace(0.0, 0.15, 17)
+    u = 1.0 - 0.3 * ((x - 0.075) / 0.075) ** 2
+    np.savetxt(sample_dir / "lineSampled_theta_Ux_250_500_1e6", np.column_stack([x, np.zeros_like(x), u]))
+    vetcha = root / "FFT2_validation" / "vetcha2009" / "vetcha2009_Ha50_Re1e4.csv"
+    vetcha.parent.mkdir(parents=True)
+    vetcha.write_text(
+        "Gr5e6,,Gr5e7,,Gr1e8,\n"
+        "X,Y,X,Y,X,Y\n"
+        "-1,0.2,-1,0.3,-1,0.4\n"
+        "0,1.0,0,1.1,0,1.2\n"
+        "1,0.2,1,0.3,1,0.4\n",
+        encoding="utf-8",
+    )
+    turbulence = root / "run" / "lidDriven" / "IDM_output_U.txt"
+    turbulence.parent.mkdir(parents=True)
+    turbulence.write_text(
+        "Weak turbulence:[[1.0, 0.15], [2.0, 0.10]]\n"
+        "Strong turbulence:[[0.5, 0.12, 0.04]].\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_q2dmhdfoam_external_reference_adapter(
+        out_dir=tmp_path / "out",
+        q2dmhdfoam_root=root,
+    )
+
+    assert summary["case"] == "q2dmhdfoam_external_reference_adapter"
+    assert summary["status"] == "external_reference_artifacts_written"
+    assert summary["profile_count"] == 4
+    assert "q2dmhdfoam_external_reference.png" in summary["plots"]
+    assert (tmp_path / "out" / "q2dmhdfoam_external_profile_observables.csv").exists()
+    assert (tmp_path / "out" / "q2dmhdfoam_lid_driven_turbulence_observables.csv").exists()
+    assert (tmp_path / "out" / "q2dmhdfoam_external_reference_summary.json").exists()
+
+
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_baseline.py")
     module.OUTPUT_DIR = tmp_path

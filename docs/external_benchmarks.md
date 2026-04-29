@@ -79,6 +79,21 @@ SM82/Sommeria-Moreau-style physics gate, but the example can be promoted to an
 external turbulent parity check by adding a filled
 `q2d_turbulence_reference_observables.csv` file to its output directory.
 
+The external-data ingestion path is now executable:
+
+```bash
+python examples/q2dmhdfoam_external_reference_adapter.py
+```
+
+That adapter reads the local Q2DmhdFoam validation checkout, writes normalized
+profile observables from the tepot validation samples, includes the digitized
+Vetcha 2009 line cuts when present, and extracts lid-driven turbulence
+spectral-summary observables. This is a reference-data artifact, not an LMX
+parity claim; the next gate is a matched LMX-vs-Q2DmhdFoam turbulent case with
+the same scalar observables.
+
+![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
+
 Generate the template with:
 
 ```bash

@@ -15,10 +15,10 @@
     {
       "lane": "Q2D turbulence parity",
       "external_code": "Q2DmhdFoam",
-      "score": 2.0,
-      "status": "compiled and smoke-run",
-      "observables": "energy, enstrophy, spectra, turnover count",
-      "next_step": "export Smolentsev/Vetcha observable CSV"
+      "score": 2.5,
+      "status": "external adapter wired",
+      "observables": "profiles, energy, enstrophy, spectra, turnover count",
+      "next_step": "run matched LMX-vs-Q2DmhdFoam turbulent case"
     },
     {
       "lane": "Magnetic-obstacle validation",
