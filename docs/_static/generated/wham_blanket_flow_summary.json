@@ -37,6 +37,8 @@
     "peak_hartmann_number": 903.7476853800713,
     "mean_hartmann_number": 589.8761844061665,
     "peak_interaction_parameter": 6.58677321636965,
+    "peak_dean_number": 90554.06448729067,
+    "peak_dean_skew_strength": 0.06106256298044647,
     "pressure_drop_pa": 26525.345551119655,
     "pressure_drop_kpa": 26.525345551119656,
     "hydraulic_pressure_drop_pa": 80.51443804893293,
@@ -49,5 +51,5 @@
     "wham_blanket_flow.pdf"
   ],
   "model_equation": "Delta p = integral [ f_D*rho*U^2/(2D) + C_m*sigma*U*B_perp^2 + distributed K_b*rho*U^2/2 bend loss ] ds",
-  "model_limitations": "Fixed-flow-rate reduced pipe model; velocity profiles are local Hartmann-layer approximations and do not yet resolve full curved-pipe secondary flow, turbulence, heat transfer, or induced magnetic field."
+  "model_limitations": "Fixed-flow-rate reduced pipe model; velocity profiles are local Hartmann-layer approximations with a bounded Dean-skew preview in curved sections. The model does not yet resolve full curved-pipe secondary flow, turbulence, heat transfer, or induced magnetic field."
 }

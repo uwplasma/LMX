@@ -423,7 +423,10 @@ pressure-velocity solve with turbulent pipe-friction closure, local MHD drag,
 and bend losses to `t = 15 s`; the retained run settles to
 `U_mean ≈ 0.200 m/s` and `Δp ≈ 26.4 kPa`. This moves the WHAM blanket lane
 beyond a static startup visualization, but it is still not a resolved 3D
-secondary-flow or turbulence validation. The same script also writes a
+secondary-flow or turbulence validation. The movie and transient panel now also
+track a bend-probe Dean-skew diagnostic; at `s ≈ 4.11 m`, the retained reduced
+model gives `U_outboard / U_inboard ≈ 1.078`, consistent with the expected
+outward axial-velocity shift in a curved pipe. The same script also writes a
 field-scale sweep at fixed flow rate; the retained cases give terminal pressure
 drops of `≈ 6.7`, `15.0`, `26.5`, and `41.4 kPa` for field multipliers
 `4`, `6`, `8`, and `10`, with the MHD contribution following the expected

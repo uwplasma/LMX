@@ -51,6 +51,7 @@ autodiff
 fringing
 external_benchmarks
 executable_external_code_audit
+publication_figure_plan
 research_directions
 ```
 

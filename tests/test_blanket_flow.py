@@ -47,6 +47,8 @@ def test_solve_wham_blanket_reduced_flow_pressure_budget_and_profiles():
     assert flow["pressure_drop"] > 0.0
     assert flow["metrics"]["peak_hartmann_number"] > 0.0
     assert flow["metrics"]["mhd_pressure_fraction"] > 0.0
+    assert flow["metrics"]["peak_dean_number"] > 0.0
+    assert flow["metrics"]["peak_dean_skew_strength"] > 0.0
     assert flow["velocity_sections"].shape[0] == flow["station"].size
     profile = flow["velocity_sections"][0]
     assert np.nanmean(profile) == pytest.approx(settings.mean_velocity, rel=2.0e-2)
@@ -114,7 +116,10 @@ def test_solve_wham_blanket_transient_flow_reaches_bounded_steady_state(tmp_path
 
     assert transient["metrics"]["final_mean_velocity_m_per_s"] > 0.0
     assert transient["metrics"]["final_pressure_drop_kpa"] > 0.0
+    assert transient["metrics"]["final_bend_outboard_velocity_m_per_s"] > transient["metrics"]["final_bend_inboard_velocity_m_per_s"]
     assert transient["velocity_frames"].shape[0] >= 3
+    assert transient["bend_inboard_velocity_history"].shape == transient["time"].shape
+    assert transient["bend_outboard_velocity_history"].shape == transient["time"].shape
     assert (tmp_path / "wham_blanket_transient_flow.png").exists()
     assert (tmp_path / "wham_blanket_flow.gif").exists()
     assert all(path.exists() for path in [*plot_outputs, *movie_outputs])

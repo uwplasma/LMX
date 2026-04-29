@@ -258,6 +258,10 @@ diagnostic panel run to `t = 15 s`, beyond filling/startup, and settle to
 `U_mean ≈ 0.200 m/s` with `Δp ≈ 26.4 kPa`. This is the first executable
 curved-route pressure/velocity gate. It does not yet resolve 3D secondary
 flows, cross-section turbulence, heat transfer, or induced magnetic field.
+The bend-probe diagnostic uses a bounded Dean-skew preview: at `s ≈ 4.11 m`,
+the current reduced run gives `U_outboard / U_inboard ≈ 1.078`, so the inboard
+side of the bend is slightly slower than the outboard side while the transient
+develops.
 For manuscript planning, the same example also writes a pressure-drop sweep at
 fixed flow rate; the current field multipliers `4`, `6`, `8`, and `10` produce
 terminal pressure drops of `≈ 6.7`, `15.0`, `26.5`, and `41.4 kPa`, with the

@@ -110,6 +110,14 @@ def solve_wham_blanket_reduced_flow(
     reynolds = props.density * mean_velocity * diameter / max(props.dynamic_viscosity, 1.0e-30)
     hartmann = b_perp * radius * np.sqrt(props.electrical_conductivity / max(props.dynamic_viscosity, 1.0e-30))
     interaction = props.electrical_conductivity * b_perp**2 * radius / max(props.density * mean_velocity, 1.0e-30)
+    dean_number = reynolds * np.sqrt(np.maximum(radius * curvature, 0.0))
+    dean_skew_strength = _dean_skew_strength(
+        curvature=curvature,
+        radius=radius,
+        reynolds=float(reynolds),
+        hartmann=hartmann,
+        interaction=interaction,
+    )
 
     friction_factor = _darcy_friction_factor(reynolds)
     hydraulic_gradient = friction_factor * props.density * mean_velocity**2 / max(2.0 * diameter, 1.0e-30)
@@ -140,8 +148,9 @@ def solve_wham_blanket_reduced_flow(
                 radius=radius,
                 hartmann_number=float(ha),
                 mean_velocity=mean_velocity,
+                dean_skew_strength=float(skew),
             )
-            for ha in hartmann
+            for ha, skew in zip(hartmann, dean_skew_strength, strict=True)
         ],
         axis=0,
     )
@@ -160,6 +169,8 @@ def solve_wham_blanket_reduced_flow(
         "b_perp": b_perp,
         "hartmann": hartmann,
         "interaction_parameter": interaction,
+        "dean_number": dean_number,
+        "dean_skew_strength": dean_skew_strength,
         "reynolds": float(reynolds),
         "friction_factor": float(friction_factor),
         "pressure_gradient_hydraulic": hydraulic_gradient_profile,
@@ -177,6 +188,8 @@ def solve_wham_blanket_reduced_flow(
             b_perp=b_perp,
             hartmann=hartmann,
             interaction=interaction,
+            dean_number=dean_number,
+            dean_skew_strength=dean_skew_strength,
             pressure=cumulative_pressure,
             hydraulic_gradient=hydraulic_gradient_profile,
             mhd_gradient=mhd_gradient,
@@ -223,15 +236,23 @@ def solve_wham_blanket_transient_flow(
     step_count = max(1, int(np.ceil(float(opts.final_time) / dt)))
     time = np.linspace(0.0, step_count * dt, step_count + 1)
     velocity = np.full_like(station, max(float(opts.initial_velocity), 0.0), dtype=float)
+    bend_probe_index = _bend_probe_index(curvature)
+    base_inboard_velocity, base_outboard_velocity = _section_inboard_outboard_means(flow, bend_probe_index)
+    target_velocity = max(float(flow_settings.mean_velocity), 1.0e-12)
 
     mean_history = np.empty(step_count + 1, dtype=float)
     pressure_history = np.empty(step_count + 1, dtype=float)
     residual_history = np.empty(step_count + 1, dtype=float)
     courant_history = np.empty(step_count + 1, dtype=float)
+    bend_inboard_history = np.empty(step_count + 1, dtype=float)
+    bend_outboard_history = np.empty(step_count + 1, dtype=float)
     mean_history[0] = float(np.mean(velocity))
     pressure_history[0] = 0.0
     residual_history[0] = 1.0
     courant_history[0] = 0.0
+    bend_scale = float(velocity[bend_probe_index]) / target_velocity
+    bend_inboard_history[0] = bend_scale * base_inboard_velocity
+    bend_outboard_history[0] = bend_scale * base_outboard_velocity
     frame_fraction = np.linspace(0.0, 1.0, max(int(opts.frame_count), 3)) ** 1.35
     frame_indices = np.unique(np.rint(step_count * frame_fraction).astype(int))
     frame_indices = np.unique(np.concatenate([frame_indices, [0, step_count]]))
@@ -302,6 +323,9 @@ def solve_wham_blanket_transient_flow(
         pressure_history[step] = float(pressure_curve[-1])
         residual_history[step] = delta / max(abs(mean_velocity), 1.0e-12)
         courant_history[step] = float(np.max(velocity) * dt / max(float(np.min(np.diff(station))), 1.0e-12))
+        bend_scale = float(velocity[bend_probe_index]) / target_velocity
+        bend_inboard_history[step] = bend_scale * base_inboard_velocity
+        bend_outboard_history[step] = bend_scale * base_outboard_velocity
         if step in frame_indices:
             velocity_frames.append(velocity.copy())
             pressure_frames.append(pressure_curve)
@@ -332,6 +356,10 @@ def solve_wham_blanket_transient_flow(
         "pressure_drop_history": pressure_history,
         "relative_update_history": residual_history,
         "courant_history": courant_history,
+        "bend_probe_index": int(bend_probe_index),
+        "bend_probe_station_m": float(station[bend_probe_index]),
+        "bend_inboard_velocity_history": bend_inboard_history,
+        "bend_outboard_velocity_history": bend_outboard_history,
         "frame_time": np.asarray(time_frames, dtype=float),
         "velocity_frames": np.asarray(velocity_frames, dtype=float),
         "pressure_frames": np.asarray(pressure_frames, dtype=float),
@@ -346,6 +374,12 @@ def solve_wham_blanket_transient_flow(
             "target_static_mean_velocity_m_per_s": float(flow_settings.mean_velocity),
             "final_peak_velocity_m_per_s": float(np.max(velocity)),
             "final_min_velocity_m_per_s": float(np.min(velocity)),
+            "bend_probe_station_m": float(station[bend_probe_index]),
+            "final_bend_inboard_velocity_m_per_s": float(bend_inboard_history[-1]),
+            "final_bend_outboard_velocity_m_per_s": float(bend_outboard_history[-1]),
+            "final_bend_outboard_to_inboard_ratio": float(
+                bend_outboard_history[-1] / max(bend_inboard_history[-1], 1.0e-12)
+            ),
             "final_pressure_drop_kpa": final_pressure / 1000.0,
             "pressure_drive_kpa": pressure_drive / 1000.0,
             "steady_relative_update": steady_residual,
@@ -883,6 +917,8 @@ def write_wham_blanket_transient_flow_plots(
     mean_velocity = np.asarray(transient["velocity_mean_history"], dtype=float)
     pressure_drop = np.asarray(transient["pressure_drop_history"], dtype=float) / 1000.0
     residual = np.asarray(transient["relative_update_history"], dtype=float)
+    bend_inboard = np.asarray(transient["bend_inboard_velocity_history"], dtype=float)
+    bend_outboard = np.asarray(transient["bend_outboard_velocity_history"], dtype=float)
     final_velocity = np.asarray(transient["final_velocity"], dtype=float)
     final_pressure = np.asarray(transient["final_pressure_curve"], dtype=float) / 1000.0
     target_velocity = float(base_flow["settings"].mean_velocity)
@@ -890,8 +926,10 @@ def write_wham_blanket_transient_flow_plots(
 
     fig, axes = plt.subplots(2, 2, figsize=(13.4, 8.2), constrained_layout=True)
     axes[0, 0].plot(time, mean_velocity, color="#0f766e", linewidth=2.2, label="mean")
+    axes[0, 0].plot(time, bend_inboard, color="#2563eb", linewidth=1.6, label="bend inboard")
+    axes[0, 0].plot(time, bend_outboard, color="#f97316", linewidth=1.6, label="bend outboard")
     axes[0, 0].axhline(target_velocity, color="#111827", linestyle="--", label="static target")
-    axes[0, 0].set_title("Centerline transient velocity")
+    axes[0, 0].set_title("Transient velocity and bend skew")
     axes[0, 0].set_xlabel("time [s]")
     axes[0, 0].set_ylabel("mean velocity [m/s]")
     axes[0, 0].legend(loc="best")
@@ -1131,6 +1169,7 @@ def _local_velocity_profile(
     radius: float,
     hartmann_number: float,
     mean_velocity: float,
+    dean_skew_strength: float = 0.0,
 ) -> np.ndarray:
     r = np.sqrt(a**2 + b**2)
     poiseuille = np.clip(2.0 * (1.0 - (r / radius) ** 2), 0.0, None)
@@ -1149,11 +1188,37 @@ def _local_velocity_profile(
     )
     mhd_shape = np.clip(hartmann_layer * side_boost, 0.0, None)
     shape = (1.0 - blend) * poiseuille + blend * mhd_shape
+    skew = float(np.clip(dean_skew_strength, -0.35, 0.35))
+    if abs(skew) > 0.0:
+        outboard_coordinate = np.clip(a / max(radius, 1.0e-12), -1.0, 1.0)
+        shape *= np.clip(1.0 + skew * outboard_coordinate, 0.2, None)
     shape = np.where(mask, shape, np.nan)
     mean_shape = float(np.nanmean(shape))
     if not np.isfinite(mean_shape) or mean_shape <= 0.0:
         return np.where(mask, mean_velocity, np.nan)
     return mean_velocity * shape / mean_shape
+
+
+def _dean_skew_strength(
+    *,
+    curvature: np.ndarray,
+    radius: float,
+    reynolds: float,
+    hartmann: np.ndarray,
+    interaction: np.ndarray,
+) -> np.ndarray:
+    """Reduced axial-velocity skew from curved-pipe inertia.
+
+    Positive values make the local outboard side of the bend faster than the
+    inboard side. The cap keeps this as a visual/diagnostic preview; a full
+    Dean-vortex/MHD secondary-flow solve remains the research-grade target.
+    """
+
+    curvature_response = np.sqrt(np.maximum(float(radius) * np.asarray(curvature, dtype=float), 0.0))
+    dean = max(float(reynolds), 0.0) * curvature_response
+    inertial_drive = np.tanh(dean / 5.0e3)
+    mhd_suppression = 1.0 / (1.0 + np.asarray(hartmann, dtype=float) / 800.0 + np.asarray(interaction, dtype=float) / 8.0)
+    return np.clip(0.18 * inertial_drive * mhd_suppression, 0.0, 0.18)
 
 
 def _blanket_flow_metrics(
@@ -1162,6 +1227,8 @@ def _blanket_flow_metrics(
     b_perp: np.ndarray,
     hartmann: np.ndarray,
     interaction: np.ndarray,
+    dean_number: np.ndarray,
+    dean_skew_strength: np.ndarray,
     pressure: np.ndarray,
     hydraulic_gradient: np.ndarray,
     mhd_gradient: np.ndarray,
@@ -1186,6 +1253,8 @@ def _blanket_flow_metrics(
         "peak_hartmann_number": float(np.max(hartmann)),
         "mean_hartmann_number": float(np.mean(hartmann)),
         "peak_interaction_parameter": float(np.max(interaction)),
+        "peak_dean_number": float(np.max(dean_number)),
+        "peak_dean_skew_strength": float(np.max(dean_skew_strength)),
         "pressure_drop_pa": float(pressure[-1]),
         "pressure_drop_kpa": float(pressure[-1] / 1000.0),
         "hydraulic_pressure_drop_pa": hydraulic_drop,
@@ -1193,6 +1262,26 @@ def _blanket_flow_metrics(
         "curvature_pressure_drop_pa": curvature_drop,
         "mhd_pressure_fraction": float(mhd_drop / max(float(pressure[-1]), 1.0e-12)),
     }
+
+
+def _bend_probe_index(curvature: np.ndarray) -> int:
+    curve = np.asarray(curvature, dtype=float)
+    if curve.size == 0 or float(np.max(curve)) <= 0.0:
+        return 0
+    return int(np.argmax(curve))
+
+
+def _section_inboard_outboard_means(flow: dict[str, object], index: int) -> tuple[float, float]:
+    a = np.asarray(flow["cross_section_a"], dtype=float)
+    velocity = np.asarray(flow["velocity_sections"], dtype=float)[index]
+    radius = float(flow["geometry"].pipe_radius)
+    finite = np.isfinite(velocity)
+    inboard_mask = finite & (a <= -0.35 * radius)
+    outboard_mask = finite & (a >= 0.35 * radius)
+    fallback = float(np.nanmean(velocity))
+    inboard = float(np.nanmean(np.where(inboard_mask, velocity, np.nan))) if np.any(inboard_mask) else fallback
+    outboard = float(np.nanmean(np.where(outboard_mask, velocity, np.nan))) if np.any(outboard_mask) else fallback
+    return inboard, outboard
 
 
 def _representative_station_indices(b_perp: np.ndarray) -> tuple[int, int, int]:
@@ -1336,11 +1425,12 @@ def _render_transient_movie_frame(
 ) -> Image.Image:
     _set_flow_plot_style()
     base_flow = transient["base_flow"]
-    fig = plt.figure(figsize=(8.4, 5.0), dpi=115, constrained_layout=True)
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.24, 0.94, 0.94])
+    fig = plt.figure(figsize=(10.8, 5.0), dpi=115, constrained_layout=True)
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.12, 0.88, 0.90, 0.88])
     ax3d = fig.add_subplot(gs[0, 0], projection="3d")
     ax_section = fig.add_subplot(gs[0, 1])
     ax_history = fig.add_subplot(gs[0, 2])
+    ax_bend = fig.add_subplot(gs[0, 3])
 
     centerline = base_flow["centerline"]
     geometry = base_flow["geometry"]
@@ -1355,7 +1445,7 @@ def _render_transient_movie_frame(
     collection.set_array(0.5 * (velocity[:-1] + velocity[1:]))
     ax3d.add_collection(collection)
     _draw_simple_coils(ax3d, geometry)
-    selected = _transient_selected_station_index(velocity, station)
+    selected = int(transient.get("bend_probe_index", _transient_selected_station_index(velocity, station)))
     ax3d.scatter([x[selected]], [y[selected]], [z[selected]], color="#111827", s=34)
     ax3d.set_title("curved-pipe velocity")
     ax3d.set_xlabel("x [m]")
@@ -1390,6 +1480,27 @@ def _render_transient_movie_frame(
         f"dp = {pressure_history[history_index]:.2f} kPa\n"
         f"frame {frame_index + 1}/{frame_count}",
         transform=ax_history.transAxes,
+        va="top",
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": "#cbd5e1"},
+        fontsize=8,
+    )
+
+    inboard_history = np.asarray(transient["bend_inboard_velocity_history"], dtype=float)
+    outboard_history = np.asarray(transient["bend_outboard_velocity_history"], dtype=float)
+    ratio = outboard_history[history_index] / max(inboard_history[history_index], 1.0e-12)
+    ax_bend.plot(time, inboard_history, color="#2563eb", linewidth=2.0, label="inboard")
+    ax_bend.plot(time, outboard_history, color="#f97316", linewidth=2.0, label="outboard")
+    ax_bend.axvline(time_value, color="#111827", linewidth=1.0)
+    ax_bend.set_title("bend cross-section skew")
+    ax_bend.set_xlabel("time [s]")
+    ax_bend.set_ylabel("velocity [m/s]")
+    ax_bend.legend(loc="lower right", fontsize=8)
+    ax_bend.text(
+        0.04,
+        0.94,
+        f"s = {float(transient['bend_probe_station_m']):.2f} m\n"
+        f"Uout/Uin = {ratio:.3f}",
+        transform=ax_bend.transAxes,
         va="top",
         bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": "#cbd5e1"},
         fontsize=8,
@@ -1431,7 +1542,8 @@ def _json_summary(flow: dict[str, object], artifacts: list[str]) -> dict[str, ob
         ),
         "model_limitations": (
             "Fixed-flow-rate reduced pipe model; velocity profiles are local "
-            "Hartmann-layer approximations and do not yet resolve full curved-pipe "
+            "Hartmann-layer approximations with a bounded Dean-skew preview in "
+            "curved sections. The model does not yet resolve full curved-pipe "
             "secondary flow, turbulence, heat transfer, or induced magnetic field."
         ),
     }
@@ -1457,9 +1569,10 @@ def _json_transient_summary(transient: dict[str, object], artifacts: list[str]) 
         ),
         "model_limitations": (
             "Unsteady centerline pressure/velocity closure with turbulent pipe "
-            "friction and local MHD drag. It advances velocity and pressure in "
-            "time on the curved route, but it does not resolve 3D secondary "
-            "flows, cross-section turbulence, heat transfer, or induced magnetic field."
+            "friction, local MHD drag, and a bounded Dean-skew cross-section "
+            "diagnostic. It advances velocity and pressure in time on the curved "
+            "route, but it does not resolve 3D secondary flows, cross-section "
+            "turbulence, heat transfer, or induced magnetic field."
         ),
     }
 
@@ -1539,10 +1652,15 @@ def _write_pressure_sweep_csv(path: Path, flows: Sequence[dict[str, object]]) ->
 
 
 def _write_transient_history_csv(path: Path, transient: dict[str, object]) -> None:
-    rows = ["time_s,mean_velocity_m_per_s,pressure_drop_pa,relative_update,courant"]
+    rows = [
+        "time_s,mean_velocity_m_per_s,bend_inboard_velocity_m_per_s,"
+        "bend_outboard_velocity_m_per_s,pressure_drop_pa,relative_update,courant"
+    ]
     for values in zip(
         np.asarray(transient["time"], dtype=float),
         np.asarray(transient["velocity_mean_history"], dtype=float),
+        np.asarray(transient["bend_inboard_velocity_history"], dtype=float),
+        np.asarray(transient["bend_outboard_velocity_history"], dtype=float),
         np.asarray(transient["pressure_drop_history"], dtype=float),
         np.asarray(transient["relative_update_history"], dtype=float),
         np.asarray(transient["courant_history"], dtype=float),
