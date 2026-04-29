@@ -264,6 +264,12 @@ refer to the Samper et al. taxonomy.
   panel, station CSV/JSON, and startup GIF. This closes the immediate
   visualization/engineering-estimate request while keeping the full turbulent
   curved-pipe MHD solve and external validation explicitly open.
+  The geometry-to-solver handoff is now staged through
+  `generate_centerline_pipe_mesh(...)`, `centerline_pipe_mesh_quality_metrics(...)`,
+  and `examples/wham_blanket_mesh_demo.py`. The approved WHAM blanket route can
+  now be exported as a mapped circular-pipe O-grid (`VTU`) with station-spacing,
+  radius-preservation, periodic-closure, and cell-count gates. The remaining
+  work is operator integration on that generalized centerline mesh.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

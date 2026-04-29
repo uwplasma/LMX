@@ -2,7 +2,9 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.mesh import (
+    centerline_pipe_mesh_quality_metrics,
     generate_bent_pipe_mesh,
+    generate_centerline_pipe_mesh,
     generate_layered_duct_mesh,
     generate_layered_duct_mesh_from_fluid_faces,
     generate_pipe_ogrid_mesh,
@@ -50,6 +52,43 @@ def test_bent_pipe_points_follow_curved_centerline():
     assert float(start[1]) == pytest.approx(0.0)
     assert float(end[0]) > 0.0
     assert float(end[1]) > 0.0
+
+
+def test_centerline_pipe_mesh_follows_arbitrary_route():
+    centerline = {
+        "x": jnp.asarray([0.0, 0.6, 0.8, 0.8]),
+        "y": jnp.asarray([0.0, 0.0, 0.4, 0.9]),
+        "z": jnp.asarray([0.0, 0.0, 0.1, 0.1]),
+    }
+
+    mesh = generate_centerline_pipe_mesh(centerline, tube_radius=0.08, nx=8, nr=5, ntheta=12)
+    metrics = centerline_pipe_mesh_quality_metrics(mesh)
+
+    assert mesh.geometry == "centerline_pipe"
+    assert mesh.point_coordinates is not None
+    assert mesh.point_coordinates.shape == (9, 6, 13, 3)
+    assert metrics["validation_pass"] is True
+    assert metrics["cell_count"] == 8 * 5 * 12
+    assert metrics["max_radius_error"] < 1.0e-6
+    assert metrics["max_theta_closure_error"] < 1.0e-6
+
+
+def test_centerline_pipe_mesh_rejects_invalid_centerline():
+    with pytest.raises(ValueError, match="at least three"):
+        generate_centerline_pipe_mesh(
+            {"x": jnp.asarray([0.0, 1.0]), "y": jnp.asarray([0.0, 0.0]), "z": jnp.asarray([0.0, 0.0])},
+            tube_radius=0.1,
+        )
+    with pytest.raises(ValueError, match="strictly increasing"):
+        generate_centerline_pipe_mesh(
+            {
+                "x": jnp.asarray([0.0, 1.0, 2.0]),
+                "y": jnp.asarray([0.0, 0.0, 0.0]),
+                "z": jnp.asarray([0.0, 0.0, 0.0]),
+                "station": jnp.asarray([0.0, 0.0, 1.0]),
+            },
+            tube_radius=0.1,
+        )
 
 
 def test_moderate_ha_rect_mesh_clusters_boundary_layers():

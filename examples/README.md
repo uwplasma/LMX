@@ -405,6 +405,7 @@ python examples/magnetic_obstacle_external_reference_template.py
 python examples/magnetic_obstacle_baseline.py
 python examples/wham_mirror_pipe_demo.py
 python examples/wham_blanket_geometry_preview.py
+python examples/wham_blanket_mesh_demo.py
 python examples/wham_blanket_flow_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
 ```
@@ -447,6 +448,10 @@ Those examples are the current executable localized-field response entry points:
   - build a circular liquid-metal blanket pipe route around the WHAM central-cell envelope
   - show the mirror coils, central-cell clearance, inlet leg, U-bend, and return leg
   - write PNG/PDF geometry-review artifacts plus JSON dimensions before any solve is claimed
+- `wham_blanket_mesh_demo.py`
+  - convert the approved centerline into a mapped circular-pipe O-grid
+  - write a ParaView-ready `VTU` mesh and mesh-QA JSON summary
+  - check station spacing, radius preservation, periodic closure, finite coordinates, and cell count
 - `wham_blanket_flow_demo.py`
   - reuse the approved WHAM blanket route
   - sample the WHAM mirror field along the curved centerline

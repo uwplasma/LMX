@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from math import cos, pi, sin
 
 import jax.numpy as jnp
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -454,3 +455,152 @@ def generate_bent_pipe_mesh(
         geometry="bent_pipe",
         point_coordinates=point_coordinates,
     )
+
+
+def generate_centerline_pipe_mesh(
+    centerline: dict[str, np.ndarray | jnp.ndarray],
+    *,
+    tube_radius: float,
+    nx: int | None = None,
+    nr: int = 24,
+    ntheta: int = 64,
+    geometry: str = "centerline_pipe",
+) -> StructuredMesh:
+    """Build a mapped circular-pipe O-grid along an arbitrary 3D centerline.
+
+    This mesh is intended for geometry QA, VTK export, and future mapped-pipe
+    solver work. Existing extruded solver paths still use `pipe_ogrid` and the
+    single-radius `bent_pipe` branch until the generalized centerline metrics
+    are promoted into the operator stack.
+    """
+
+    if tube_radius <= 0.0:
+        raise ValueError("tube_radius must be positive")
+    station, coordinates = _validated_centerline_arrays(centerline)
+    station_count = int(nx) + 1 if nx is not None else station.size
+    if station_count < 3:
+        raise ValueError("centerline pipe mesh requires at least three stations")
+    s_faces = np.linspace(float(station[0]), float(station[-1]), station_count)
+    center = np.column_stack([np.interp(s_faces, station, coordinates[:, axis]) for axis in range(3)])
+    tangent = _centerline_tangent(center, s_faces)
+    normal, binormal = _centerline_frames(tangent)
+
+    r_faces = np.asarray(_clustered_segment(0.0, tube_radius, nr, beta=2.0), dtype=float)
+    theta_faces = np.linspace(0.0, 2.0 * pi, ntheta + 1)
+    points = np.empty((station_count, r_faces.size, theta_faces.size, 3), dtype=float)
+    for station_index in range(station_count):
+        for radial_index, radius in enumerate(r_faces):
+            points[station_index, radial_index, :, :] = (
+                center[station_index]
+                + radius * np.cos(theta_faces)[:, None] * normal[station_index]
+                + radius * np.sin(theta_faces)[:, None] * binormal[station_index]
+            )
+
+    return StructuredMesh(
+        x_faces=jnp.asarray(s_faces),
+        y_faces=jnp.asarray(r_faces),
+        z_faces=jnp.asarray(theta_faces),
+        geometry=geometry,
+        point_coordinates=jnp.asarray(points),
+    )
+
+
+def centerline_pipe_mesh_quality_metrics(mesh: StructuredMesh) -> dict[str, float | int | bool | str]:
+    """Return geometric quality metrics for a mapped centerline-pipe mesh."""
+
+    if mesh.point_coordinates is None:
+        raise ValueError("centerline pipe mesh quality requires point_coordinates")
+    points = np.asarray(mesh.point_coordinates, dtype=float)
+    if points.ndim != 4 or points.shape[-1] != 3:
+        raise ValueError("point_coordinates must have shape (nx+1, nr+1, ntheta+1, 3)")
+    center = points[:, 0, 0, :]
+    station_edges = np.linalg.norm(np.diff(center, axis=0), axis=1)
+    target_radius = float(mesh.y_faces[-1])
+    outer = points[:, -1, :, :]
+    outer_radius = np.linalg.norm(outer - center[:, None, :], axis=-1)
+    radius_error = np.abs(outer_radius - target_radius)
+    theta_closure = np.linalg.norm(points[:, :, 0, :] - points[:, :, -1, :], axis=-1)
+    radial_edges = np.linalg.norm(np.diff(points[:, :, :-1, :], axis=1), axis=-1)
+    theta_edges = np.linalg.norm(np.diff(points[:, -1, :, :], axis=1), axis=-1)
+    finite_fraction = float(np.mean(np.isfinite(points)))
+    station_positive = bool(np.all(station_edges > 0.0))
+    max_radius_error = float(np.max(radius_error))
+    max_theta_closure_error = float(np.max(theta_closure))
+    validation_pass = bool(
+        finite_fraction == 1.0
+        and station_positive
+        and max_radius_error <= max(1.0e-7, 1.0e-6 * target_radius)
+        and max_theta_closure_error <= max(1.0e-7, 1.0e-6 * target_radius)
+    )
+    return {
+        "geometry": mesh.geometry,
+        "station_count": int(points.shape[0]),
+        "radial_face_count": int(points.shape[1]),
+        "theta_face_count": int(points.shape[2]),
+        "cell_count": int((points.shape[0] - 1) * (points.shape[1] - 1) * (points.shape[2] - 1)),
+        "finite_fraction": finite_fraction,
+        "station_positive": station_positive,
+        "path_length": float(np.sum(station_edges)),
+        "min_station_spacing": float(np.min(station_edges)) if station_edges.size else 0.0,
+        "max_station_spacing": float(np.max(station_edges)) if station_edges.size else 0.0,
+        "target_radius": target_radius,
+        "max_radius_error": max_radius_error,
+        "rms_radius_error": float(np.sqrt(np.mean(radius_error**2))),
+        "max_theta_closure_error": max_theta_closure_error,
+        "min_radial_edge": float(np.min(radial_edges)) if radial_edges.size else 0.0,
+        "min_outer_theta_edge": float(np.min(theta_edges)) if theta_edges.size else 0.0,
+        "validation_pass": validation_pass,
+    }
+
+
+def _validated_centerline_arrays(
+    centerline: dict[str, np.ndarray | jnp.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    x = np.asarray(centerline["x"], dtype=float)
+    y = np.asarray(centerline["y"], dtype=float)
+    z = np.asarray(centerline["z"], dtype=float)
+    if not (x.shape == y.shape == z.shape):
+        raise ValueError("centerline x, y, and z arrays must have the same shape")
+    if x.ndim != 1 or x.size < 3:
+        raise ValueError("centerline arrays must be one-dimensional with at least three points")
+    coordinates = np.column_stack([x, y, z])
+    if "station" in centerline:
+        station = np.asarray(centerline["station"], dtype=float)
+        if station.shape != x.shape:
+            raise ValueError("centerline station array must match x/y/z shape")
+    else:
+        station = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(coordinates, axis=0), axis=1))])
+    if np.any(np.diff(station) <= 0.0):
+        raise ValueError("centerline station must be strictly increasing")
+    if not np.all(np.isfinite(coordinates)) or not np.all(np.isfinite(station)):
+        raise ValueError("centerline coordinates and station must be finite")
+    return station, coordinates
+
+
+def _centerline_tangent(center: np.ndarray, station: np.ndarray) -> np.ndarray:
+    tangent = np.gradient(center, station, axis=0)
+    return tangent / np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1.0e-14)
+
+
+def _fallback_normal(tangent: np.ndarray) -> np.ndarray:
+    reference = np.array([0.0, 0.0, 1.0])
+    if abs(float(np.dot(reference, tangent))) > 0.94:
+        reference = np.array([0.0, 1.0, 0.0])
+    normal = np.cross(reference, tangent)
+    return normal / max(float(np.linalg.norm(normal)), 1.0e-14)
+
+
+def _centerline_frames(tangent: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    normal = np.empty_like(tangent)
+    binormal = np.empty_like(tangent)
+    normal[0] = _fallback_normal(tangent[0])
+    binormal[0] = np.cross(tangent[0], normal[0])
+    binormal[0] /= max(float(np.linalg.norm(binormal[0])), 1.0e-14)
+    for index in range(1, tangent.shape[0]):
+        projected = normal[index - 1] - np.dot(normal[index - 1], tangent[index]) * tangent[index]
+        if np.linalg.norm(projected) <= 1.0e-12:
+            projected = _fallback_normal(tangent[index])
+        normal[index] = projected / max(float(np.linalg.norm(projected)), 1.0e-14)
+        binormal[index] = np.cross(tangent[index], normal[index])
+        binormal[index] /= max(float(np.linalg.norm(binormal[index])), 1.0e-14)
+    return normal, binormal

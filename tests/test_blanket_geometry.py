@@ -8,8 +8,10 @@ from lmx.blanket_geometry import (
     build_wham_blanket_centerline,
     tube_surface_from_centerline,
     wham_blanket_clearance_metrics,
+    write_centerline_pipe_mesh_preview,
     write_wham_blanket_geometry_preview,
 )
+from lmx.mesh import generate_centerline_pipe_mesh
 
 
 pytestmark = pytest.mark.unit
@@ -60,4 +62,18 @@ def test_write_wham_blanket_geometry_preview_outputs_artifacts(tmp_path: Path):
     assert "wham_blanket_geometry_preview.png" in names
     assert "wham_blanket_geometry_preview.pdf" in names
     assert "wham_blanket_geometry_preview_summary.json" in names
+    assert all(path.exists() for path in outputs)
+
+
+def test_write_centerline_pipe_mesh_preview_outputs_artifacts(tmp_path: Path):
+    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.75, entry_length=0.8, central_cell_radius=0.35)
+    centerline = build_wham_blanket_centerline(geometry, straight_points=10, bend_points=18)
+    mesh = generate_centerline_pipe_mesh(centerline, tube_radius=geometry.pipe_radius, nx=8, nr=4, ntheta=12)
+
+    outputs = write_centerline_pipe_mesh_preview(mesh, tmp_path, filename_stem="mesh_preview")
+
+    names = {path.name for path in outputs}
+    assert "mesh_preview.png" in names
+    assert "mesh_preview.pdf" in names
+    assert "mesh_preview_summary.json" in names
     assert all(path.exists() for path in outputs)

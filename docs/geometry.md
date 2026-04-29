@@ -249,3 +249,21 @@ external validation remain future work.
 ![LMX WHAM blanket reduced-flow pressure and steady sections](_static/generated/wham_blanket_flow.png)
 
 ![LMX WHAM blanket reduced-flow movie](_static/generated/wham_blanket_flow.gif)
+
+## WHAM blanket mapped-pipe mesh
+
+`examples/wham_blanket_mesh_demo.py` promotes the approved geometry from a
+surface route into a mapped circular-pipe O-grid. The low-level reusable API is
+`generate_centerline_pipe_mesh(...)`, with QA from
+`centerline_pipe_mesh_quality_metrics(...)` and a mesh panel from
+`write_centerline_pipe_mesh_preview(...)`. The example also writes
+`wham_blanket_centerline_pipe_mesh.vtu` in the artifact directory for ParaView
+inspection.
+
+The retained preview mesh has `65` stations, `18 × 48` cross-section cells,
+`55,296` volume cells, nearly uniform `Δs ≈ 0.114 m`, and roundoff-level radius
+and periodic-closure errors. This closes the geometry handoff needed before
+the generalized curved-pipe MHD operator can be promoted into a real blanket
+solve.
+
+![LMX WHAM blanket mapped pipe mesh](_static/generated/wham_blanket_mesh_preview.png)

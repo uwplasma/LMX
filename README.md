@@ -420,6 +420,12 @@ design multiplier on the parsed WHAM coil field; it gives
 engineering preview and movie generator, not yet a full turbulent
 curved-pipe validation.
 
+The solver-facing geometry handoff is `examples/wham_blanket_mesh_demo.py`.
+It converts the approved route into a mapped circular-pipe O-grid and writes a
+ParaView-ready `VTU` mesh plus a QA panel. The current preview mesh has `65`
+stations, `18 × 48` cross-section cells, `55,296` cells total, nearly uniform
+`Δs ≈ 0.114 m`, and radius/periodic-closure errors at roundoff.
+
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
@@ -450,6 +456,8 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM-like mirror pressure sensitivity](docs/_static/generated/autodiff_wham_pressure_sensitivity.png)
 
 ![LMX WHAM blanket pipe geometry preview](docs/_static/generated/wham_blanket_geometry_preview.png)
+
+![LMX WHAM blanket mapped pipe mesh](docs/_static/generated/wham_blanket_mesh_preview.png)
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
 
@@ -714,6 +722,7 @@ Useful entry points:
 - `examples/variable_field_geometry_demo.py`: Python-native geometry and field editing
 - `examples/wham_coil_model_field_adapter.py`: WHAM coil-script to tabulated-field adapter
 - `examples/wham_blanket_geometry_preview.py`: circular blanket pipe route around the WHAM central cell before simulation
+- `examples/wham_blanket_mesh_demo.py`: mapped circular-pipe O-grid and ParaView mesh for the approved WHAM blanket route
 - `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, steady sections, and startup movie
 
 ## Documentation

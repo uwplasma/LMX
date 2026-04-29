@@ -1,0 +1,27 @@
+{
+  "case": "wham_blanket_mesh_preview",
+  "metrics": {
+    "geometry": "wham_blanket_centerline_pipe",
+    "station_count": 65,
+    "radial_face_count": 19,
+    "theta_face_count": 49,
+    "cell_count": 55296,
+    "finite_fraction": 1.0,
+    "station_positive": true,
+    "path_length": 7.32549599579633,
+    "min_station_spacing": 0.11441107550124935,
+    "max_station_spacing": 0.11449064868724745,
+    "target_radius": 0.12,
+    "max_radius_error": 1.249000902703301e-16,
+    "rms_radius_error": 2.792715598712566e-17,
+    "max_theta_closure_error": 2.9391523179536474e-17,
+    "min_radial_edge": 0.0012181350342690045,
+    "min_outer_theta_edge": 0.015696751015234205,
+    "validation_pass": true
+  },
+  "artifacts": [
+    "wham_blanket_mesh_preview.png",
+    "wham_blanket_mesh_preview.pdf"
+  ],
+  "notes": "Mapped centerline-pipe mesh QA artifact; no MHD solve is claimed by this mesh preview."
+}
