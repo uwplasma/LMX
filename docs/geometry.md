@@ -105,6 +105,8 @@ drivers in:
 - `examples/bent_pipe_preview.py`
 - `examples/bent_pipe_inductionless_demo.py`
 - `examples/wham_blanket_geometry_preview.py`
+- `examples/wham_blanket_mesh_demo.py`
+- `examples/wham_blanket_field_on_mesh_demo.py`
 - `examples/readme_showcase_demo.py`
 
 ```bash
@@ -115,6 +117,8 @@ python examples/geometry_panel_demo.py --output artifacts/examples/geometry_pane
 python examples/bent_pipe_preview.py
 python examples/bent_pipe_inductionless_demo.py
 python examples/wham_blanket_geometry_preview.py
+python examples/wham_blanket_mesh_demo.py
+python examples/wham_blanket_field_on_mesh_demo.py
 python examples/readme_showcase_demo.py --output docs/_static/generated
 # optional Hartmann alternative for wall-layer startup media
 python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
@@ -128,6 +132,7 @@ Those drivers write:
 - 3D wireframe previews of the extruded mesh
 - centerline-following previews for bent pipes
 - a circular WHAM blanket pipe route around the central-cell clearance envelope
+- a mapped WHAM blanket pipe mesh and local magnetic-field projection QA panel
 - `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
   - README-ready media, including bounded 2D/3D startup GIFs
@@ -267,3 +272,25 @@ the generalized curved-pipe MHD operator can be promoted into a real blanket
 solve.
 
 ![LMX WHAM blanket mapped pipe mesh](_static/generated/wham_blanket_mesh_preview.png)
+
+## WHAM field sampling on the mapped blanket mesh
+
+`examples/wham_blanket_field_on_mesh_demo.py` is the solver-facing field
+handoff after the mapped pipe mesh. The reusable API is
+`sample_wham_field_on_centerline_pipe_mesh(...)` for WHAM-like fields,
+`sample_field_on_centerline_pipe_mesh(...)` for arbitrary vector fields,
+`centerline_pipe_frames(...)` for local frame recovery, and
+`write_centerline_field_preview(...)` for QA artifacts. It samples the global
+field on every mapped mesh point and projects it into local streamwise
+`B_s` and transverse `B_\perp` components before any conservative electric
+potential/current assembly.
+
+The retained WHAM blanket mesh-field run uses the same `65` station,
+`18 × 48` cross-section mesh as the mesh preview. It passes finite-value
+checks, reports peak centerline `B_\perp ≈ 3.60e-1 T`, negligible streamwise
+field on the centerline (`max |B_s|/|B| ≈ 3.4e-15`), and
+`max_cross_section_relative_b_span ≈ 2.28`. This does not claim a full MHD
+blanket solve; it closes the coordinate-frame and field-data handoff needed
+before the generalized curved-pipe `φ`, `J`, and pressure solver is promoted.
+
+![LMX WHAM field sampled on the mapped blanket pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)

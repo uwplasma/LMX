@@ -426,6 +426,16 @@ ParaView-ready `VTU` mesh plus a QA panel. The current preview mesh has `65`
 stations, `18 × 48` cross-section cells, `55,296` cells total, nearly uniform
 `Δs ≈ 0.114 m`, and radius/periodic-closure errors at roundoff.
 
+The next solver-facing handoff is
+`examples/wham_blanket_field_on_mesh_demo.py`. It samples the parsed
+WHAM-like mirror field on every point of that mapped pipe mesh, projects the
+global vector field into local streamwise and transverse components, and writes
+centerline/cross-section QA artifacts. In the current retained configuration,
+the mesh-field handoff passes finite-value checks, gives peak centerline
+`B_\perp ≈ 3.60e-1 T`, has negligible streamwise component
+(`max |B_s|/|B| ≈ 3.4e-15`), and records the largest cross-section field span
+for the future conservative `φ/J` curved-pipe solve.
+
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
@@ -458,6 +468,8 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM blanket pipe geometry preview](docs/_static/generated/wham_blanket_geometry_preview.png)
 
 ![LMX WHAM blanket mapped pipe mesh](docs/_static/generated/wham_blanket_mesh_preview.png)
+
+![LMX WHAM blanket field sampled on mapped pipe mesh](docs/_static/generated/wham_blanket_field_on_mesh.png)
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
 
@@ -723,6 +735,7 @@ Useful entry points:
 - `examples/wham_coil_model_field_adapter.py`: WHAM coil-script to tabulated-field adapter
 - `examples/wham_blanket_geometry_preview.py`: circular blanket pipe route around the WHAM central cell before simulation
 - `examples/wham_blanket_mesh_demo.py`: mapped circular-pipe O-grid and ParaView mesh for the approved WHAM blanket route
+- `examples/wham_blanket_field_on_mesh_demo.py`: WHAM field sampling and local streamwise/transverse projections on the mapped blanket mesh
 - `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, steady sections, and startup movie
 
 ## Documentation

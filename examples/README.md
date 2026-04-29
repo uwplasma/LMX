@@ -15,6 +15,7 @@ The examples are explicit templates for research workflows. They show how to:
 - prescribe variable magnetic fields directly from Python
 - customize geometry objects before a solve and preview them in 3D
 - preview bent-pipe geometries before solver support lands
+- sample magnetic fields on mapped centerline-pipe meshes before solver runs
 - validate analytic cross-sectional magnetic fields before using them in runs
 - generate publication-ready verification figures with checked JSON summaries
 
@@ -69,6 +70,10 @@ python examples/variable_field_tabulated_demo.py
 python examples/wham_coil_model_field_adapter.py
 python examples/wham_mirror_pipe_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
+python examples/wham_blanket_geometry_preview.py
+python examples/wham_blanket_mesh_demo.py
+python examples/wham_blanket_field_on_mesh_demo.py
+python examples/wham_blanket_flow_demo.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py

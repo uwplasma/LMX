@@ -270,6 +270,14 @@ refer to the Samper et al. taxonomy.
   now be exported as a mapped circular-pipe O-grid (`VTU`) with station-spacing,
   radius-preservation, periodic-closure, and cell-count gates. The remaining
   work is operator integration on that generalized centerline mesh.
+  The field-coordinate handoff is now staged through `lmx.centerline_fields`
+  and `examples/wham_blanket_field_on_mesh_demo.py`: WHAM-like or arbitrary
+  vector fields can be sampled on every mapped-pipe mesh point, projected into
+  local `B_s`, `B_n`, `B_b`, and `B_\perp`, and written as PNG/PDF/CSV/JSON QA
+  artifacts. The retained WHAM blanket run passes finite-field checks with
+  peak centerline `B_\perp ≈ 3.60e-1 T` and negligible centerline streamwise
+  field. The next step is conservative `phi/J` and pressure assembly on this
+  generalized centerline mesh.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

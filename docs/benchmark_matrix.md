@@ -490,6 +490,15 @@ interpolation mismatch. The remaining tabulated-field research gap is external
   - treats the same mirror topology as a differentiable stationwise profile
   - observables:
     pressure-drop proxy and `d(Δp)/ds` with respect to coil separation
+- `examples/wham_blanket_field_on_mesh_demo.py`
+  - samples the WHAM-like mirror field on the approved mapped blanket-pipe mesh
+  - projects the global vector field into local streamwise and transverse
+    components before conservative `phi/J` assembly
+  - observables:
+    finite-value fraction, peak/mean centerline `B_\perp`, streamwise-field
+    leakage, and cross-section field variation
+
+![WHAM blanket field sampled on mapped pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
 
 Current bounded reduced sensitivity result:
 
