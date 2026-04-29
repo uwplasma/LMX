@@ -287,6 +287,17 @@ refer to the Samper et al. taxonomy.
   field now gives a conservative streamwise `J×B` pressure-drop proxy of
   `≈ 6.97 kPa`. The next step is pressure/velocity assembly on this
   generalized centerline mesh.
+  A differentiable reduced pressure-budget research gate is now staged through
+  `blanket_pressure_budget_from_transverse_field(...)`,
+  `wham_blanket_pressure_drop_sensitivity(...)`, and
+  `examples/wham_blanket_autodiff_research_demo.py`. It differentiates the
+  fixed-flow-rate WHAM blanket pressure estimate with respect to coil
+  separation, field multiplier, and mean velocity, and writes a
+  publication-facing pressure/sensitivity/inverse-design figure. The retained
+  point gives `Delta p ≈ 26.5 kPa`, `d(Delta p)/ds ≈ 13.1 kPa/m`, and a
+  field multiplier of `≈ 6.94` for a `20 kPa` target. This closes the
+  immediate differentiable blanket-design question while leaving the full
+  curved-pipe pressure-velocity/turbulence solve open.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

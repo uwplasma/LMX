@@ -318,3 +318,22 @@ current field gives a streamwise `J×B` pressure-drop proxy of `≈ 6.97 kPa`,
 which is now available separately from the reduced `σ U B_\perp^2` estimate.
 
 ![LMX WHAM conservative current closure on the mapped blanket pipe](_static/generated/wham_blanket_current_closure.png)
+
+## WHAM blanket differentiable pressure-drop study
+
+`examples/wham_blanket_autodiff_research_demo.py` reuses the approved blanket
+route, WHAM-like field sampling, PbLi-like properties, and reduced
+fixed-flow-rate pressure budget, but evaluates the budget with JAX arrays. The
+same reduced model is then differentiated with respect to coil separation,
+field multiplier, and mean velocity. This answers bounded design questions
+before the full curved-pipe pressure-velocity solver is promoted.
+
+The retained study reports `Delta p ≈ 26.5 kPa` at `U = 0.20 m/s`,
+`R = 0.12 m`, field multiplier `8.0`, and coil separation `1.96 m`. The local
+autodiff sensitivity is `d(Delta p)/ds ≈ 13.1 kPa/m`. A simple Newton update
+using `d(Delta p)/d(field_scale)` reduces the field multiplier to `≈ 6.94` to
+hit a `20 kPa` pressure-drop target at fixed flow rate. The result is a
+research-design gate and publication-ready pressure/sensitivity figure; it is
+not a claim of turbulent curved-pipe validation.
+
+![LMX WHAM blanket differentiable pressure-drop study](_static/generated/wham_blanket_autodiff_research.png)

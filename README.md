@@ -446,6 +446,15 @@ relative to the EMF-divergence source: the current retained run has
 leakage, zero net boundary-current residual, and a conservative `J×B`
 pressure-drop proxy of `≈ 6.97 kPa`.
 
+`examples/wham_blanket_autodiff_research_demo.py` uses the same route and
+pressure model as the movie, but keeps the pressure budget differentiable. The
+current run answers two design questions directly: at the reference separation
+`s = 1.96 m`, the reduced fixed-flow pressure drop is `≈ 26.5 kPa` and
+`d(Δp)/ds ≈ 13.1 kPa/m`; at fixed flow rate, reducing the field multiplier
+from `8.0` to `≈ 6.94` hits a `20 kPa` pressure-drop target in the reduced
+model. This is a differentiable design/sensitivity gate, not yet the full
+curved-pipe pressure-velocity solver.
+
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
@@ -484,6 +493,8 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM blanket conservative current closure](docs/_static/generated/wham_blanket_current_closure.png)
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
+
+![LMX WHAM blanket differentiable pressure-drop study](docs/_static/generated/wham_blanket_autodiff_research.png)
 
 <p align="center">
   <img src="docs/_static/generated/wham_blanket_flow.gif" alt="LMX WHAM blanket reduced-flow movie" width="72%">
@@ -750,6 +761,7 @@ Useful entry points:
 - `examples/wham_blanket_field_on_mesh_demo.py`: WHAM field sampling and local streamwise/transverse projections on the mapped blanket mesh
 - `examples/wham_blanket_current_closure_demo.py`: conservative local `φ/J` current-closure gate on the mapped blanket mesh
 - `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, steady sections, and startup movie
+- `examples/wham_blanket_autodiff_research_demo.py`: differentiable WHAM blanket pressure-drop sensitivity and field-scale inverse-design study
 
 ## Documentation
 

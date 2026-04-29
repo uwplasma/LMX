@@ -503,12 +503,27 @@ interpolation mismatch. The remaining tabulated-field research gap is external
   - observables:
     dimensional and relative `div J`, wall-current leakage, boundary-current
     residual, axial-current span, and reconstructed current magnitude
+- `examples/wham_blanket_flow_demo.py`
+  - evaluates the approved route with a fixed-flow-rate PbLi-like reduced
+    pressure budget and writes the pressure plot plus startup GIF
+  - observables:
+    cumulative pressure drop, hydraulic/MHD/bend pressure components, sampled
+    transverse field, Hartmann number, local velocity-section previews, and
+    station CSV
+- `examples/wham_blanket_autodiff_research_demo.py`
+  - differentiates the same reduced pressure budget with respect to coil
+    separation, field multiplier, and mean velocity
+  - observables:
+    local pressure sensitivity, pressure-drop elasticities, separation sweep,
+    and field-scale inverse-design trajectory for a target pressure drop
 
 ![WHAM blanket field sampled on mapped pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
 
 ![WHAM blanket conservative current closure](_static/generated/wham_blanket_current_closure.png)
 
-Current bounded reduced sensitivity result:
+![WHAM blanket differentiable pressure-drop study](_static/generated/wham_blanket_autodiff_research.png)
+
+Current bounded WHAM mirror-pipe reduced sensitivity result:
 
 - reference separation `s = 1.96 m`
 - `pressure_drop_proxy ≈ 3.85`
@@ -516,6 +531,16 @@ Current bounded reduced sensitivity result:
 - sweep trend:
   monotone pressure-drop growth over `s = 1.5 … 2.2 m`, then flattening near
   the largest tested separation
+
+Current bounded WHAM blanket reduced sensitivity/design result:
+
+- reference separation `s = 1.96 m`
+- reduced fixed-flow `Delta p ≈ 26.5 kPa`
+- `d(Delta p)/ds ≈ 13.1 kPa/m`
+- field multiplier `≈ 6.94` reaches a `20 kPa` target at fixed flow rate
+- status:
+  differentiable pressure-budget design gate closed; full curved-pipe
+  pressure-velocity/turbulence validation remains open
 
 Current bounded executable tabulated-pipe result:
 

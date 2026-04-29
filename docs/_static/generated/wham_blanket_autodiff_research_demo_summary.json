@@ -1,0 +1,20 @@
+{
+  "case": "wham_blanket_autodiff_research",
+  "docs_artifacts": [
+    "wham_blanket_autodiff_research.png",
+    "wham_blanket_autodiff_research_summary.json",
+    "wham_blanket_autodiff_research_station_data.csv",
+    "wham_blanket_autodiff_research_design_data.csv"
+  ],
+  "pressure_drop_kpa": 26.525344848632812,
+  "d_pressure_drop_d_coil_separation_kpa_per_m": 13.08905859375,
+  "d_pressure_drop_d_field_scale_kpa": 6.59493408203125,
+  "d_pressure_drop_d_mean_velocity_kpa_per_m_per_s": 133.25415625,
+  "elasticity_coil_separation": 0.9671713709831238,
+  "elasticity_field_scale": 1.9890210628509521,
+  "elasticity_mean_velocity": 1.0047308206558228,
+  "target_pressure_drop_kpa": 20.0,
+  "target_field_scale": 6.940667629241943,
+  "target_pressure_drop_error_kpa": 0.001667022705078125,
+  "model_limitations": "Differentiable reduced fixed-flow-rate pressure-budget model; it is a research-design gate for field/geometry sensitivity before the full curved-pipe pressure-velocity solver is promoted."
+}

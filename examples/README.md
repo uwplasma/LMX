@@ -75,6 +75,7 @@ python examples/wham_blanket_mesh_demo.py
 python examples/wham_blanket_field_on_mesh_demo.py
 python examples/wham_blanket_current_closure_demo.py
 python examples/wham_blanket_flow_demo.py
+python examples/wham_blanket_autodiff_research_demo.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py
@@ -414,6 +415,7 @@ python examples/wham_blanket_geometry_preview.py
 python examples/wham_blanket_mesh_demo.py
 python examples/wham_blanket_flow_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
+python examples/wham_blanket_autodiff_research_demo.py
 ```
 
 Those examples are the current executable localized-field response entry points:
@@ -465,6 +467,13 @@ Those examples are the current executable localized-field response entry points:
     local MHD drag, and bend loss
   - write steady velocity sections, station pressure data, a JSON summary, and
     a compact startup GIF
+- `wham_blanket_autodiff_research_demo.py`
+  - reuse the same blanket route and reduced fixed-flow pressure budget
+  - compute autodiff sensitivities with respect to coil separation, field
+    multiplier, and mean velocity
+  - answer a bounded inverse-design question by finding the field multiplier
+    that hits a target pressure drop at fixed flow rate
+  - write a pressure/sensitivity/inverse-design panel and JSON summaries
 - `autodiff_wham_pressure_sensitivity.py`
   - treat the same mirror topology as a differentiable stationwise profile
   - compute pressure-drop sensitivity with respect to coil separation

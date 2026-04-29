@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 
+import jax
+import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
@@ -165,6 +167,294 @@ def solve_wham_blanket_reduced_flow(
             radius=radius,
         ),
     }
+
+
+def blanket_pressure_budget_from_transverse_field(
+    station: jnp.ndarray,
+    b_perp: jnp.ndarray,
+    curvature: jnp.ndarray,
+    *,
+    pipe_radius: float | jnp.ndarray,
+    mean_velocity: float | jnp.ndarray,
+    density: float | jnp.ndarray,
+    dynamic_viscosity: float | jnp.ndarray,
+    electrical_conductivity: float | jnp.ndarray,
+    mhd_drag_factor: float | jnp.ndarray = 0.35,
+    bend_loss_coefficient: float | jnp.ndarray = 0.35,
+) -> dict[str, jnp.ndarray]:
+    """Differentiable fixed-flow pressure budget from a transverse-field trace."""
+
+    station = jnp.asarray(station, dtype=jnp.float32)
+    b_perp = jnp.asarray(b_perp, dtype=jnp.float32)
+    curvature = jnp.asarray(curvature, dtype=jnp.float32)
+    radius = jnp.asarray(pipe_radius, dtype=jnp.float32)
+    velocity = jnp.asarray(mean_velocity, dtype=jnp.float32)
+    rho = jnp.asarray(density, dtype=jnp.float32)
+    mu = jnp.asarray(dynamic_viscosity, dtype=jnp.float32)
+    sigma = jnp.asarray(electrical_conductivity, dtype=jnp.float32)
+    diameter = 2.0 * radius
+    reynolds = rho * velocity * diameter / jnp.maximum(mu, 1.0e-30)
+    friction_factor = _darcy_friction_factor_jax(reynolds)
+    hydraulic_gradient = friction_factor * rho * velocity**2 / jnp.maximum(2.0 * diameter, 1.0e-30)
+    hydraulic_gradient_profile = jnp.full_like(station, hydraulic_gradient)
+    mhd_gradient = jnp.asarray(mhd_drag_factor, dtype=jnp.float32) * sigma * velocity * b_perp**2
+    curvature_integral = _trapz_jax(curvature, station)
+    curvature_gradient = jnp.where(
+        curvature_integral > 1.0e-14,
+        jnp.asarray(bend_loss_coefficient, dtype=jnp.float32)
+        * 0.5
+        * rho
+        * velocity**2
+        * curvature
+        / jnp.maximum(curvature_integral, 1.0e-30),
+        jnp.zeros_like(station),
+    )
+    total_gradient = hydraulic_gradient_profile + mhd_gradient + curvature_gradient
+    cumulative_pressure = _cumulative_trapezoid_jax(total_gradient, station)
+    hartmann = b_perp * radius * jnp.sqrt(sigma / jnp.maximum(mu, 1.0e-30))
+    interaction = sigma * b_perp**2 * radius / jnp.maximum(rho * velocity, 1.0e-30)
+    return {
+        "station": station,
+        "b_perp": b_perp,
+        "hartmann": hartmann,
+        "interaction_parameter": interaction,
+        "pressure_gradient_hydraulic": hydraulic_gradient_profile,
+        "pressure_gradient_mhd": mhd_gradient,
+        "pressure_gradient_curvature": curvature_gradient,
+        "pressure_gradient_total": total_gradient,
+        "cumulative_pressure_drop": cumulative_pressure,
+        "pressure_drop": cumulative_pressure[-1],
+        "hydraulic_pressure_drop": _trapz_jax(hydraulic_gradient_profile, station),
+        "mhd_pressure_drop": _trapz_jax(mhd_gradient, station),
+        "curvature_pressure_drop": _trapz_jax(curvature_gradient, station),
+        "reynolds_number": reynolds,
+        "friction_factor": friction_factor,
+    }
+
+
+def wham_blanket_pressure_drop_history(
+    centerline: dict[str, np.ndarray] | None = None,
+    *,
+    geometry: WhamBlanketLoop | None = None,
+    properties: LiquidMetalProperties | None = None,
+    settings: BlanketFlowSettings | None = None,
+    coil_parameters: dict[str, float | int] | None = None,
+    coil_separation: float | jnp.ndarray | None = None,
+    field_scale: float | jnp.ndarray | None = None,
+    mean_velocity: float | jnp.ndarray | None = None,
+) -> dict[str, jnp.ndarray]:
+    """Differentiable WHAM blanket pressure history for sensitivity studies."""
+
+    spec = geometry or WhamBlanketLoop()
+    props = properties or LiquidMetalProperties()
+    opts = settings or BlanketFlowSettings()
+    params = dict(coil_parameters or {})
+    route = centerline or build_wham_blanket_centerline(spec)
+    points_np = _centerline_points(route)
+    station = jnp.asarray(route["station"], dtype=jnp.float32)
+    points = jnp.asarray(points_np, dtype=jnp.float32)
+    tangent = jnp.asarray(_centerline_tangent(points_np), dtype=jnp.float32)
+    curvature = jnp.asarray(_centerline_curvature(points_np, np.asarray(route["station"], dtype=float)), dtype=jnp.float32)
+    separation = jnp.asarray(
+        spec.coil_separation if coil_separation is None else coil_separation,
+        dtype=jnp.float32,
+    )
+    field_multiplier = jnp.asarray(opts.field_scale if field_scale is None else field_scale, dtype=jnp.float32)
+    velocity = jnp.asarray(opts.mean_velocity if mean_velocity is None else mean_velocity, dtype=jnp.float32)
+    field = field_multiplier * sample_wham_mirror_field(
+        points[:, 0],
+        points[:, 1],
+        points[:, 2],
+        coil_separation=separation,
+        current_scale=float(params.get("current_scale", 100323.62459546926)),
+        inner_radius=float(params.get("inner_radius", spec.coil_inner_radius)),
+        outer_radius=float(params.get("outer_radius", spec.coil_outer_radius)),
+        coil_axial_thickness=float(params.get("coil_axial_thickness", spec.coil_axial_thickness)),
+        radial_loops=int(params.get("radial_loops", opts.radial_loops)),
+        axial_loops=int(params.get("axial_loops", opts.axial_loops)),
+    )
+    field_parallel = jnp.sum(field * tangent, axis=1)
+    field_perp = field - field_parallel[:, None] * tangent
+    b_perp = jnp.linalg.norm(field_perp, axis=1)
+    budget = blanket_pressure_budget_from_transverse_field(
+        station,
+        b_perp,
+        curvature,
+        pipe_radius=spec.pipe_radius,
+        mean_velocity=velocity,
+        density=props.density,
+        dynamic_viscosity=props.dynamic_viscosity,
+        electrical_conductivity=props.electrical_conductivity,
+        mhd_drag_factor=opts.mhd_drag_factor,
+        bend_loss_coefficient=opts.bend_loss_coefficient,
+    )
+    return {
+        **budget,
+        "field": field,
+        "b_magnitude": jnp.linalg.norm(field, axis=1),
+        "tangent": tangent,
+        "curvature": curvature,
+        "coil_separation": separation,
+        "field_scale": field_multiplier,
+        "mean_velocity": velocity,
+    }
+
+
+def wham_blanket_pressure_drop_sensitivity(
+    centerline: dict[str, np.ndarray] | None = None,
+    *,
+    geometry: WhamBlanketLoop | None = None,
+    properties: LiquidMetalProperties | None = None,
+    settings: BlanketFlowSettings | None = None,
+    coil_parameters: dict[str, float | int] | None = None,
+    coil_separation: float | None = None,
+    field_scale: float | None = None,
+    mean_velocity: float | None = None,
+) -> dict[str, jnp.ndarray]:
+    """Return autodiff sensitivities of WHAM blanket pressure drop."""
+
+    spec = geometry or WhamBlanketLoop()
+    opts = settings or BlanketFlowSettings()
+    reference_separation = spec.coil_separation if coil_separation is None else float(coil_separation)
+    reference_field_scale = opts.field_scale if field_scale is None else float(field_scale)
+    reference_velocity = opts.mean_velocity if mean_velocity is None else float(mean_velocity)
+
+    def objective(separation_value, field_scale_value, velocity_value):
+        return wham_blanket_pressure_drop_history(
+            centerline,
+            geometry=geometry,
+            properties=properties,
+            settings=opts,
+            coil_parameters=coil_parameters,
+            coil_separation=separation_value,
+            field_scale=field_scale_value,
+            mean_velocity=velocity_value,
+        )["pressure_drop"]
+
+    pressure_drop = objective(reference_separation, reference_field_scale, reference_velocity)
+    gradients = jax.grad(objective, argnums=(0, 1, 2))(reference_separation, reference_field_scale, reference_velocity)
+    history = wham_blanket_pressure_drop_history(
+        centerline,
+        geometry=geometry,
+        properties=properties,
+        settings=opts,
+        coil_parameters=coil_parameters,
+        coil_separation=reference_separation,
+        field_scale=reference_field_scale,
+        mean_velocity=reference_velocity,
+    )
+    safe_pressure = jnp.maximum(jnp.abs(pressure_drop), 1.0e-30)
+    return {
+        **history,
+        "pressure_drop": pressure_drop,
+        "pressure_drop_kpa": pressure_drop / 1000.0,
+        "d_pressure_drop_d_coil_separation": gradients[0],
+        "d_pressure_drop_d_field_scale": gradients[1],
+        "d_pressure_drop_d_mean_velocity": gradients[2],
+        "elasticity_coil_separation": gradients[0] * jnp.asarray(reference_separation, dtype=jnp.float32) / safe_pressure,
+        "elasticity_field_scale": gradients[1] * jnp.asarray(reference_field_scale, dtype=jnp.float32) / safe_pressure,
+        "elasticity_mean_velocity": gradients[2] * jnp.asarray(reference_velocity, dtype=jnp.float32) / safe_pressure,
+    }
+
+
+def write_wham_blanket_autodiff_research_plots(
+    study: dict[str, object],
+    out_dir: str | Path,
+    *,
+    filename_stem: str = "wham_blanket_autodiff_research",
+) -> list[Path]:
+    """Write pressure-drop sensitivity and inverse-design panels."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    _set_flow_plot_style()
+    reference = study["reference"]
+    separation_sweep = np.asarray(study["separation_sweep"], dtype=float)
+    separation_pressure = np.asarray(study["separation_pressure_drop_kpa"], dtype=float)
+    field_history = list(study["field_scale_design_history"])
+    station = np.asarray(reference["station"], dtype=float)
+    pressure = np.asarray(reference["cumulative_pressure_drop"], dtype=float) / 1000.0
+    hydraulic = _cumulative_trapezoid(np.asarray(reference["pressure_gradient_hydraulic"], dtype=float), station) / 1000.0
+    mhd = _cumulative_trapezoid(np.asarray(reference["pressure_gradient_mhd"], dtype=float), station) / 1000.0
+    curvature = _cumulative_trapezoid(np.asarray(reference["pressure_gradient_curvature"], dtype=float), station) / 1000.0
+    elasticities = [
+        float(reference["elasticity_coil_separation"]),
+        float(reference["elasticity_field_scale"]),
+        float(reference["elasticity_mean_velocity"]),
+    ]
+    labels = ["coil separation", "field scale", "mean velocity"]
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.6, 8.4), constrained_layout=True)
+    axes[0, 0].plot(station, pressure, color="#111827", linewidth=2.2, label="total")
+    axes[0, 0].plot(station, hydraulic, color="#2563eb", linestyle=":", label="pipe friction")
+    axes[0, 0].plot(station, mhd, color="#0f766e", linestyle="-.", label="MHD")
+    axes[0, 0].plot(station, curvature, color="#f97316", linestyle="--", label="bend")
+    axes[0, 0].set_title("Differentiable pressure budget")
+    axes[0, 0].set_xlabel("station s [m]")
+    axes[0, 0].set_ylabel(r"cumulative $\Delta p$ [kPa]")
+    axes[0, 0].legend(loc="upper left", fontsize=8)
+
+    axes[0, 1].plot(separation_sweep, separation_pressure, marker="o", color="#0f766e", label="evaluated")
+    reference_separation = float(reference["coil_separation"])
+    reference_pressure = float(reference["pressure_drop"] / 1000.0)
+    slope = float(reference["d_pressure_drop_d_coil_separation"] / 1000.0)
+    tangent = reference_pressure + slope * (separation_sweep - reference_separation)
+    axes[0, 1].plot(separation_sweep, tangent, color="#7c3aed", linestyle="--", label="autodiff tangent")
+    axes[0, 1].axvline(reference_separation, color="#111827", linestyle=":", linewidth=1.0)
+    axes[0, 1].set_title("Local coil-spacing pressure sensitivity")
+    axes[0, 1].set_xlabel("coil separation [m]")
+    axes[0, 1].set_ylabel(r"$\Delta p$ [kPa]")
+    axes[0, 1].legend(loc="best", fontsize=8)
+
+    colors_bar = ["#2563eb" if value < 0 else "#b91c1c" for value in elasticities]
+    axes[1, 0].bar(labels, elasticities, color=colors_bar, alpha=0.88)
+    axes[1, 0].axhline(0.0, color="#111827", linewidth=0.9)
+    axes[1, 0].set_title("Autodiff pressure-drop elasticities")
+    axes[1, 0].set_ylabel(r"$d\log(\Delta p)/d\log(q)$")
+    axes[1, 0].tick_params(axis="x", rotation=18)
+
+    steps = np.asarray([item["step"] for item in field_history], dtype=float)
+    field_scale = np.asarray([item["field_scale"] for item in field_history], dtype=float)
+    pressure_history = np.asarray([item["pressure_drop_kpa"] for item in field_history], dtype=float)
+    target = float(study["target_pressure_drop_kpa"])
+    axes[1, 1].plot(steps, pressure_history, marker="o", color="#0f766e", label=r"$\Delta p$")
+    axes[1, 1].axhline(target, color="#b91c1c", linestyle="--", label="target")
+    ax_scale = axes[1, 1].twinx()
+    ax_scale.plot(steps, field_scale, marker="s", color="#7c3aed", label="field scale")
+    axes[1, 1].set_title("Inverse design: field multiplier for target pressure")
+    axes[1, 1].set_xlabel("Newton update")
+    axes[1, 1].set_ylabel(r"$\Delta p$ [kPa]", color="#0f766e")
+    ax_scale.set_ylabel("field multiplier", color="#7c3aed")
+    axes[1, 1].tick_params(axis="y", labelcolor="#0f766e")
+    ax_scale.tick_params(axis="y", labelcolor="#7c3aed")
+    handles = axes[1, 1].get_lines() + ax_scale.get_lines()
+    axes[1, 1].legend(handles, [line.get_label() for line in handles], loc="best", fontsize=8)
+
+    fig.suptitle("LMX WHAM blanket differentiable pressure-drop research study", fontsize=17)
+    png = out / f"{filename_stem}.png"
+    pdf = out / f"{filename_stem}.pdf"
+    summary = out / f"{filename_stem}_summary.json"
+    station_csv = out / f"{filename_stem}_station_data.csv"
+    design_csv = out / f"{filename_stem}_design_data.csv"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    summary.write_text(json.dumps(_json_ready_study(study, [png.name]), indent=2) + "\n", encoding="utf-8")
+    _write_autodiff_station_csv(
+        station_csv,
+        station=station,
+        total_pressure=pressure,
+        hydraulic_pressure=hydraulic,
+        mhd_pressure=mhd,
+        curvature_pressure=curvature,
+    )
+    _write_autodiff_design_csv(
+        design_csv,
+        separation_sweep=separation_sweep,
+        separation_pressure=separation_pressure,
+        field_history=field_history,
+    )
+    return [png, pdf, summary, station_csv, design_csv]
 
 
 def write_wham_blanket_flow_plots(
@@ -624,6 +914,42 @@ def _write_station_csv(
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
+def _write_autodiff_station_csv(
+    path: Path,
+    *,
+    station: np.ndarray,
+    total_pressure: np.ndarray,
+    hydraulic_pressure: np.ndarray,
+    mhd_pressure: np.ndarray,
+    curvature_pressure: np.ndarray,
+) -> None:
+    rows = ["station_m,total_pressure_kpa,hydraulic_pressure_kpa,mhd_pressure_kpa,curvature_pressure_kpa"]
+    for values in zip(station, total_pressure, hydraulic_pressure, mhd_pressure, curvature_pressure, strict=True):
+        rows.append(",".join(f"{float(value):.12e}" for value in values))
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def _write_autodiff_design_csv(
+    path: Path,
+    *,
+    separation_sweep: np.ndarray,
+    separation_pressure: np.ndarray,
+    field_history: list[dict[str, object]],
+) -> None:
+    rows = ["kind,index,input_value,pressure_drop_kpa,gradient_kpa"]
+    for index, (separation, pressure) in enumerate(zip(separation_sweep, separation_pressure, strict=True)):
+        rows.append(f"separation,{index},{float(separation):.12e},{float(pressure):.12e},nan")
+    for item in field_history:
+        rows.append(
+            "field_scale,"
+            f"{int(item['step'])},"
+            f"{float(item['field_scale']):.12e},"
+            f"{float(item['pressure_drop_kpa']):.12e},"
+            f"{float(item.get('d_pressure_drop_d_field_scale_kpa', np.nan)):.12e}"
+        )
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
 def _draw_simple_coils(ax, geometry: WhamBlanketLoop) -> None:
     theta = np.linspace(0.0, 2.0 * np.pi, 96)
     for zc in (-0.5 * geometry.coil_separation, 0.5 * geometry.coil_separation):
@@ -674,6 +1000,81 @@ def _trapz(values: np.ndarray, coordinate: np.ndarray) -> float:
     if values.size < 2:
         return 0.0
     return float(np.trapezoid(values, coordinate))
+
+
+def _cumulative_trapezoid_jax(values: jnp.ndarray, coordinate: jnp.ndarray) -> jnp.ndarray:
+    values = jnp.asarray(values)
+    coordinate = jnp.asarray(coordinate)
+    increments = 0.5 * (values[:-1] + values[1:]) * jnp.diff(coordinate)
+    return jnp.concatenate([jnp.zeros((1,), dtype=values.dtype), jnp.cumsum(increments)])
+
+
+def _trapz_jax(values: jnp.ndarray, coordinate: jnp.ndarray) -> jnp.ndarray:
+    values = jnp.asarray(values)
+    coordinate = jnp.asarray(coordinate)
+    return jnp.where(
+        values.size < 2,
+        jnp.asarray(0.0, dtype=values.dtype),
+        jnp.sum(0.5 * (values[:-1] + values[1:]) * jnp.diff(coordinate)),
+    )
+
+
+def _darcy_friction_factor_jax(reynolds: jnp.ndarray) -> jnp.ndarray:
+    re = jnp.maximum(jnp.asarray(reynolds), 1.0e-12)
+    return jnp.where(re < 2300.0, 64.0 / re, 0.3164 / re**0.25)
+
+
+def _json_ready_study(study: dict[str, object], artifacts: list[str]) -> dict[str, object]:
+    reference = study["reference"]
+    return {
+        "case": study.get("case", "wham_blanket_autodiff_research"),
+        "research_questions": _json_ready(study.get("research_questions", [])),
+        "reference": {
+            "coil_separation_m": float(reference["coil_separation"]),
+            "field_scale": float(reference["field_scale"]),
+            "mean_velocity_m_per_s": float(reference["mean_velocity"]),
+            "pressure_drop_kpa": float(reference["pressure_drop"] / 1000.0),
+            "hydraulic_pressure_drop_kpa": float(reference["hydraulic_pressure_drop"] / 1000.0),
+            "mhd_pressure_drop_kpa": float(reference["mhd_pressure_drop"] / 1000.0),
+            "curvature_pressure_drop_kpa": float(reference["curvature_pressure_drop"] / 1000.0),
+            "d_pressure_drop_d_coil_separation_kpa_per_m": float(reference["d_pressure_drop_d_coil_separation"] / 1000.0),
+            "d_pressure_drop_d_field_scale_kpa": float(reference["d_pressure_drop_d_field_scale"] / 1000.0),
+            "d_pressure_drop_d_mean_velocity_kpa_per_m_per_s": float(reference["d_pressure_drop_d_mean_velocity"] / 1000.0),
+            "elasticity_coil_separation": float(reference["elasticity_coil_separation"]),
+            "elasticity_field_scale": float(reference["elasticity_field_scale"]),
+            "elasticity_mean_velocity": float(reference["elasticity_mean_velocity"]),
+        },
+        "separation_sweep_m": _json_ready(study["separation_sweep"]),
+        "separation_pressure_drop_kpa": _json_ready(study["separation_pressure_drop_kpa"]),
+        "target_pressure_drop_kpa": float(study["target_pressure_drop_kpa"]),
+        "field_scale_design_history": _json_ready(study["field_scale_design_history"]),
+        "artifacts": artifacts,
+        "source_data_artifacts": [
+            "wham_blanket_autodiff_research_station_data.csv",
+            "wham_blanket_autodiff_research_design_data.csv",
+        ],
+        "model_equation": (
+            "Delta p = integral [ f_D*rho*U^2/(2D) + C_m*sigma*U*B_perp^2 "
+            "+ distributed K_b*rho*U^2/2 bend loss ] ds"
+        ),
+        "model_status": "differentiable_reduced_fixed_flow_rate_pressure_budget",
+    }
+
+
+def _json_ready(value):
+    if isinstance(value, dict):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if hasattr(value, "shape") and hasattr(value, "tolist"):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
 
 
 def _set_flow_plot_style() -> None:
