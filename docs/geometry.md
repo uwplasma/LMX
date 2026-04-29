@@ -104,6 +104,7 @@ drivers in:
 - `examples/geometry_panel_demo.py`
 - `examples/bent_pipe_preview.py`
 - `examples/bent_pipe_inductionless_demo.py`
+- `examples/wham_blanket_geometry_preview.py`
 - `examples/readme_showcase_demo.py`
 
 ```bash
@@ -113,6 +114,7 @@ python examples/variable_field_geometry_demo.py --output artifacts/examples/vari
 python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
 python examples/bent_pipe_preview.py
 python examples/bent_pipe_inductionless_demo.py
+python examples/wham_blanket_geometry_preview.py
 python examples/readme_showcase_demo.py --output docs/_static/generated
 # optional Hartmann alternative for wall-layer startup media
 python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
@@ -125,6 +127,7 @@ Those drivers write:
 - cross-sectional material maps
 - 3D wireframe previews of the extruded mesh
 - centerline-following previews for bent pipes
+- a circular WHAM blanket pipe route around the central-cell clearance envelope
 - `PNG` and `PDF` outputs
 - optional short benchmark solves and post-run overview plots in the same output tree
   - README-ready media, including bounded 2D/3D startup GIFs
@@ -208,3 +211,18 @@ current closure are clean (`max_charge_balance_residual ≈ 2.16e-12`,
 `max_wall_current_leakage = 0`, and `net_boundary_current_residual = 0`) after
 the conservative mapped-pipe potential solve was corrected to cancel
 `div(sigma u×B)`.
+
+## WHAM blanket pipe route preview
+
+`examples/wham_blanket_geometry_preview.py` is the geometry-review entry point
+for a liquid-metal blanket concept around WHAM. It uses the public
+`WhamBlanketLoop`, `build_wham_blanket_centerline(...)`,
+`tube_surface_from_centerline(...)`, and
+`write_wham_blanket_geometry_preview(...)` helpers. The first route is a
+circular pipe in the mirror midplane: it enters from negative `x`, bends around
+the central-cell clearance envelope, and returns on the opposite side. This is
+not yet a solver mesh or validation claim; it records the route, path length,
+pipe radius, coil separation, and tube-to-cell clearance before the mapped-pipe
+simulation is built.
+
+![LMX WHAM blanket pipe geometry preview](_static/generated/wham_blanket_geometry_preview.png)

@@ -7,6 +7,8 @@ from importlib import import_module
 
 __all__ = [
     "benchmark_solver",
+    "WhamBlanketLoop",
+    "build_wham_blanket_centerline",
     "compare_with_reference_outputs",
     "compare_magnetic_obstacle_reference_observables",
     "compare_scalar_reference_observables",
@@ -64,6 +66,9 @@ __all__ = [
     "benchmark_sharded_stencil",
     "summarize_strong_scaling_records",
     "write_benchmark_report",
+    "tube_surface_from_centerline",
+    "wham_blanket_clearance_metrics",
+    "write_wham_blanket_geometry_preview",
     "write_scaling_report",
     "write_strong_scaling_summary_table",
     "solve_case_snapshots",
@@ -181,6 +186,11 @@ __all__ = [
 
 
 _EXPORTS = {
+    "WhamBlanketLoop": ("lmx.blanket_geometry", "WhamBlanketLoop"),
+    "build_wham_blanket_centerline": ("lmx.blanket_geometry", "build_wham_blanket_centerline"),
+    "tube_surface_from_centerline": ("lmx.blanket_geometry", "tube_surface_from_centerline"),
+    "wham_blanket_clearance_metrics": ("lmx.blanket_geometry", "wham_blanket_clearance_metrics"),
+    "write_wham_blanket_geometry_preview": ("lmx.blanket_geometry", "write_wham_blanket_geometry_preview"),
     "benchmark_solver": ("lmx.benchmarks", "benchmark_solver"),
     "write_benchmark_report": ("lmx.benchmarks", "write_benchmark_report"),
     "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),

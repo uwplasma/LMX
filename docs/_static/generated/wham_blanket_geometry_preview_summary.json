@@ -1,0 +1,29 @@
+{
+  "case": "wham_blanket_geometry_preview",
+  "geometry": {
+    "pipe_radius": 0.12,
+    "bend_radius": 0.9,
+    "entry_length": 1.35,
+    "central_cell_radius": 0.42,
+    "coil_separation": 1.96,
+    "coil_inner_radius": 0.043,
+    "coil_outer_radius": 0.365,
+    "coil_axial_thickness": 0.1144,
+    "z_offset": 0.0
+  },
+  "metrics": {
+    "path_length": 7.327391696874631,
+    "pipe_radius": 0.12,
+    "bend_radius": 0.9,
+    "entry_length": 1.35,
+    "central_cell_radius": 0.42,
+    "centerline_to_cell_clearance": 0.4799999999999999,
+    "tube_to_cell_clearance": 0.35999999999999993,
+    "coil_separation": 1.96
+  },
+  "artifacts": [
+    "wham_blanket_geometry_preview.png",
+    "wham_blanket_geometry_preview.pdf"
+  ],
+  "notes": "Geometry-only design review: a circular pipe enters from the negative-x side, wraps around the WHAM central-cell envelope in the z=0 midplane, and returns. No MHD solve is claimed by this artifact."
+}

@@ -3,6 +3,10 @@ import lmx
 
 def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.generate_rect_duct_mesh)
+    assert callable(lmx.build_wham_blanket_centerline)
+    assert callable(lmx.tube_surface_from_centerline)
+    assert callable(lmx.wham_blanket_clearance_metrics)
+    assert callable(lmx.write_wham_blanket_geometry_preview)
     assert callable(lmx.generate_rect_duct_mesh_from_faces)
     assert callable(lmx.generate_layered_duct_mesh_from_fluid_faces)
     assert callable(lmx.generate_bent_pipe_mesh)

@@ -251,6 +251,13 @@ refer to the Samper et al. taxonomy.
   artifact. The remaining open item is external 3D field-response validation,
   especially for the WHAM-like pipe response, not structured-table
   interpolation or coil-script ingestion.
+  A geometry-only WHAM blanket preprocessing lane now exists through
+  `lmx.blanket_geometry` and `examples/wham_blanket_geometry_preview.py`. It
+  builds a circular pipe route that enters, bends around the central-cell
+  clearance envelope, and returns on the opposite side. The next step is design
+  review of that route, then promotion of the approved centerline into a
+  mapped-pipe mesh, tabulated WHAM field sampling along the curved pipe, and a
+  pressure-drop/current-closure validation gate.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

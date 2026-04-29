@@ -404,6 +404,7 @@ python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_external_reference_template.py
 python examples/magnetic_obstacle_baseline.py
 python examples/wham_mirror_pipe_demo.py
+python examples/wham_blanket_geometry_preview.py
 python examples/autodiff_wham_pressure_sensitivity.py
 ```
 
@@ -441,6 +442,10 @@ Those examples are the current executable localized-field response entry points:
   - export the field preview, a 3D WHAM overview figure, and the pipe-response overview
   - generate the field table on the solver streamwise axis and record the
     `coil_frame_x_offset` used to center the mirror coils
+- `wham_blanket_geometry_preview.py`
+  - build a circular liquid-metal blanket pipe route around the WHAM central-cell envelope
+  - show the mirror coils, central-cell clearance, inlet leg, U-bend, and return leg
+  - write PNG/PDF geometry-review artifacts plus JSON dimensions before any solve is claimed
 - `autodiff_wham_pressure_sensitivity.py`
   - treat the same mirror topology as a differentiable stationwise profile
   - compute pressure-drop sensitivity with respect to coil separation

@@ -401,6 +401,14 @@ paired reduced differentiable study is
 mirror topology as a stationwise field profile and differentiates a
 pressure-drop proxy with respect to coil separation.
 
+The next blanket-design preprocessing step is
+`examples/wham_blanket_geometry_preview.py`. It builds a circular pipe route
+for a liquid-metal blanket loop around the WHAM central cell: the pipe enters
+from one side, wraps around the central-cell clearance envelope in the mirror
+midplane, and returns on the opposite side. This artifact is geometry-only, so
+it is meant for route and clearance review before the mapped-pipe mesh and MHD
+solve are committed.
+
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
@@ -429,6 +437,8 @@ open because the full solve still has no measurable centerline velocity
 deficit at the nominal low-Re settings.
 
 ![LMX WHAM-like mirror pressure sensitivity](docs/_static/generated/autodiff_wham_pressure_sensitivity.png)
+
+![LMX WHAM blanket pipe geometry preview](docs/_static/generated/wham_blanket_geometry_preview.png)
 
 ### Straight-duct setup
 
@@ -686,6 +696,7 @@ Useful entry points:
 - `examples/autodiff_extruded_trajectory_demo.py`: deeper extruded autodiff target matching
 - `examples/variable_field_geometry_demo.py`: Python-native geometry and field editing
 - `examples/wham_coil_model_field_adapter.py`: WHAM coil-script to tabulated-field adapter
+- `examples/wham_blanket_geometry_preview.py`: circular blanket pipe route around the WHAM central cell before simulation
 
 ## Documentation
 
