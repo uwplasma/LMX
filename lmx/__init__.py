@@ -10,6 +10,7 @@ __all__ = [
     "compare_with_reference_outputs",
     "compare_magnetic_obstacle_reference_observables",
     "compare_scalar_reference_observables",
+    "external_validation_readiness_rows",
     "generate_layered_duct_mesh",
     "generate_layered_duct_mesh_from_fluid_faces",
     "generate_bent_pipe_mesh",
@@ -161,6 +162,8 @@ __all__ = [
     "dean_vortex_reference_template_rows",
     "magnetic_obstacle_reference_template_rows",
     "write_dean_vortex_reference_template",
+    "summarize_external_validation_readiness",
+    "write_external_validation_readiness_panel",
     "write_magnetic_obstacle_reference_comparison_plots",
     "write_magnetic_obstacle_reference_comparison_table",
     "write_magnetic_obstacle_reference_template",
@@ -206,6 +209,10 @@ _EXPORTS = {
         "lmx.external_validation",
         "compare_scalar_reference_observables",
     ),
+    "external_validation_readiness_rows": (
+        "lmx.external_validation",
+        "external_validation_readiness_rows",
+    ),
     "load_scalar_reference_observables": (
         "lmx.external_validation",
         "load_scalar_reference_observables",
@@ -229,6 +236,14 @@ _EXPORTS = {
     "write_dean_vortex_reference_template": (
         "lmx.external_validation",
         "write_dean_vortex_reference_template",
+    ),
+    "summarize_external_validation_readiness": (
+        "lmx.external_validation",
+        "summarize_external_validation_readiness",
+    ),
+    "write_external_validation_readiness_panel": (
+        "lmx.external_validation",
+        "write_external_validation_readiness_panel",
     ),
     "write_magnetic_obstacle_reference_comparison_table": (
         "lmx.external_validation",

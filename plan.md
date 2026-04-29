@@ -151,7 +151,9 @@ refer to the Samper et al. taxonomy.
   turbulence external-reference lane. MHD_Solvers_OpenFOAM `mhdEpotFoam`
   compiles and runs after a small header-include compatibility patch; this is
   the executable path for one-way-MHD / magnetic-obstacle case construction.
-  The detailed audit is now in `docs/executable_external_code_audit.md`.
+  The detailed audit is now in `docs/executable_external_code_audit.md`, and
+  `examples/external_validation_readiness_panel.py` generates the README/docs
+  panel that tracks ready, runnable/data, and still-open lanes.
 - High-`Ha` Hunt side-layer parity: run a mesh ladder with explicit Hartmann
   and side-layer cell counts, compare LMX against analytic and processed
   reference cuts on `Q`, `phi`, `J`, `J×B`, side-jet peak location, and

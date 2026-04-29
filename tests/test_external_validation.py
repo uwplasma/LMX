@@ -8,11 +8,14 @@ from lmx.external_validation import (
     compare_magnetic_obstacle_reference_observables,
     compare_scalar_reference_observables,
     dean_vortex_reference_template_rows,
+    external_validation_readiness_rows,
     load_magnetic_obstacle_reference_observables,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
     q2d_turbulence_reference_template_rows,
+    summarize_external_validation_readiness,
     write_dean_vortex_reference_template,
+    write_external_validation_readiness_panel,
     write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
@@ -157,3 +160,24 @@ def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Pa
     assert "turnover_count" in comparison["extra_lmx_observables"]
     assert table_path.exists()
     assert [path.suffix for path in plot_paths] == [".png", ".pdf"]
+
+
+def test_external_validation_readiness_rows_cover_open_lanes():
+    rows = external_validation_readiness_rows()
+    summary = summarize_external_validation_readiness(rows)
+    lane_names = {str(row["lane"]) for row in rows}
+
+    assert "Q2D turbulence parity" in lane_names
+    assert "Magnetic-obstacle validation" in lane_names
+    assert "Dean-vortex bent-pipe parity" in lane_names
+    assert summary["lane_count"] == len(rows)
+    assert summary["research_grade_validation_pass"] is False
+    assert summary["runnable_or_data_lane_count"] >= 4
+
+
+def test_write_external_validation_readiness_panel(tmp_path: Path):
+    paths = write_external_validation_readiness_panel(external_validation_readiness_rows(), tmp_path)
+
+    assert [path.suffix for path in paths] == [".png"]
+    assert all(path.exists() for path in paths)
+    assert all(path.stat().st_size > 0 for path in paths)

@@ -591,6 +591,8 @@ The current validation surface includes:
 The remaining research-grade blockers are tracked explicitly rather than
 hidden in the figures:
 
+![LMX executable external-code validation map](docs/_static/generated/external_validation_readiness.png)
+
 - high-`Ha` Hunt side-layer parity is closed for the public analytical
   overlay after matching the thin-wall reference model used by the FreeMHD/Ni
   files (`wall_thickness = 0.001`, `sigma_w / sigma = 5`,
@@ -655,6 +657,7 @@ Useful entry points:
 - `examples/freemhd_closed_channel_observable_parity.py`: pressure-gradient-driven `u`, gauge-shifted `potE`, `J`, and `J×B_x` parity against the bundled FreeMHD paper slices with case-specific validated settings
 - `examples/freemhd_closed_channel_flow_rate_parity.py`: constrained-flow-rate parity against the same processed FreeMHD slices, including case-specific target mean velocities
 - `examples/freemhd_observable_mesh_ladder.py`: manual mesh/settings ladder for the remaining FreeMHD observable offenders
+- `examples/external_validation_readiness_panel.py`: executable external-code validation map for the remaining open lanes
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

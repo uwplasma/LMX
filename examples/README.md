@@ -32,6 +32,7 @@ python examples/freemhd_closed_channel_parity.py
 python examples/freemhd_closed_channel_observable_parity.py
 python examples/freemhd_closed_channel_flow_rate_parity.py
 python examples/freemhd_observable_mesh_ladder.py
+python examples/external_validation_readiness_panel.py
 python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
 python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
 python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling

@@ -58,6 +58,11 @@ The strict research-grade deferred lanes remain external Q2D turbulence
 parity, external magnetic-obstacle reference data, and higher-inertia
 Dean-vortex bent-pipe validation.
 
+The executable external-code audit now has a generated map that separates
+available solver/data paths from completed observable-level parity:
+
+![LMX executable external-code validation map](_static/generated/external_validation_readiness.png)
+
 ## Combined validation workflow
 
 The top-level executable validation driver is:

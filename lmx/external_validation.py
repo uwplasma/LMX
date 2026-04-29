@@ -16,6 +16,7 @@ import numpy as np
 
 SCALAR_REFERENCE_COLUMNS = ("observable", "value", "tolerance")
 MAGNETIC_OBSTACLE_REFERENCE_COLUMNS = SCALAR_REFERENCE_COLUMNS
+EXTERNAL_VALIDATION_READY_SCORE = 3.0
 
 
 def load_scalar_reference_observables(
@@ -261,6 +262,198 @@ def write_scalar_reference_template(path: str | Path, rows: list[dict[str, str]]
     return out
 
 
+def external_validation_readiness_rows() -> list[dict[str, object]]:
+    """Return the current external-code readiness matrix for open lanes.
+
+    The score is intentionally coarse:
+
+    - ``0``: no external path identified;
+    - ``1``: literature or code path identified, but not executable here;
+    - ``2``: executable code or processed data are available, but the LMX
+      observable parity gate still needs filled reference rows or case
+      construction;
+    - ``3``: executable or processed external data are already wired into an
+      LMX validation artifact.
+    """
+
+    return [
+        {
+            "lane": "Straight-duct Hunt/Shercliff parity",
+            "external_code": "FreeMHD Docker + paper slices",
+            "score": 3.0,
+            "status": "wired artifact",
+            "observables": "u, phi, J, JxB, Q, pressure-gradient proxy",
+            "next_step": "keep heavier constant-Q ladder as manual artifact",
+        },
+        {
+            "lane": "Q2D turbulence parity",
+            "external_code": "Q2DmhdFoam",
+            "score": 2.0,
+            "status": "compiled and smoke-run",
+            "observables": "energy, enstrophy, spectra, turnover count",
+            "next_step": "export Smolentsev/Vetcha observable CSV",
+        },
+        {
+            "lane": "Magnetic-obstacle validation",
+            "external_code": "MHD_Solvers_OpenFOAM + literature",
+            "score": 2.0,
+            "status": "compiled and smoke-run",
+            "observables": "deficit, wake recovery, pressure/drag, J/Lorentz",
+            "next_step": "modernize obstacle case or digitize Votyakov/Cuevas",
+        },
+        {
+            "lane": "Fringing mapped-pipe parity",
+            "external_code": "FreeMHD paper pipe slices",
+            "score": 2.0,
+            "status": "processed data available",
+            "observables": "tap pressure drop, profile distortion, potential",
+            "next_step": "deferred mesh/operator parity campaign",
+        },
+        {
+            "lane": "Dean-vortex bent-pipe parity",
+            "external_code": "OpenFOAM curved-pipe + Dean literature",
+            "score": 1.0,
+            "status": "reference path identified",
+            "observables": "secondary-flow intensity, centroid shift, pressure loss",
+            "next_step": "construct hydrodynamic curved-pipe reference",
+        },
+        {
+            "lane": "Variable/tabulated 3D fields",
+            "external_code": "manufactured fields + WHAM coil data",
+            "score": 1.5,
+            "status": "internal manufactured gate",
+            "observables": "interpolation error, div B, pressure response, autodiff",
+            "next_step": "add independent measured or code-generated 3D field data",
+        },
+    ]
+
+
+def summarize_external_validation_readiness(
+    rows: list[Mapping[str, object]] | None = None,
+    *,
+    ready_score: float = EXTERNAL_VALIDATION_READY_SCORE,
+) -> dict[str, object]:
+    """Summarize which external-validation lanes are ready or still open."""
+
+    records = list(external_validation_readiness_rows() if rows is None else rows)
+    ready_lanes = [str(row["lane"]) for row in records if float(row["score"]) >= ready_score]
+    runnable_lanes = [str(row["lane"]) for row in records if float(row["score"]) >= 2.0]
+    open_lanes = [str(row["lane"]) for row in records if float(row["score"]) < ready_score]
+    return {
+        "lane_count": len(records),
+        "ready_lane_count": len(ready_lanes),
+        "runnable_or_data_lane_count": len(runnable_lanes),
+        "open_lane_count": len(open_lanes),
+        "ready_lanes": ready_lanes,
+        "runnable_or_data_lanes": runnable_lanes,
+        "open_lanes": open_lanes,
+        "research_grade_validation_pass": bool(records and len(open_lanes) == 0),
+    }
+
+
+def write_external_validation_readiness_panel(
+    rows: list[Mapping[str, object]] | None,
+    output_dir: str | Path,
+    *,
+    output_stem: str = "external_validation_readiness",
+    write_pdf: bool = False,
+) -> list[Path]:
+    """Write a publication-style readiness panel for external validation lanes."""
+
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    records = list(external_validation_readiness_rows() if rows is None else rows)
+    if not records:
+        raise ValueError("At least one external validation readiness row is required")
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    labels = [str(row["lane"]) for row in records]
+    scores = np.asarray([float(row["score"]) for row in records], dtype=float)
+    y = np.arange(len(records), dtype=float)
+    colors = [_readiness_color(score) for score in scores]
+
+    fig = plt.figure(figsize=(13.8, 9.2), constrained_layout=True)
+    grid = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.35])
+    ax = fig.add_subplot(grid[0, 0])
+    ax_table = fig.add_subplot(grid[1, 0])
+
+    ax.barh(y, scores, color=colors, edgecolor="#1f2937", linewidth=0.6)
+    ax.axvline(EXTERNAL_VALIDATION_READY_SCORE, color="#111827", linestyle="--", linewidth=1.0)
+    ax.set_yticks(y, labels)
+    ax.invert_yaxis()
+    ax.set_xlim(0.0, EXTERNAL_VALIDATION_READY_SCORE + 0.25)
+    ax.set_xlabel("external validation readiness")
+    ax.set_title("External validation readiness by lane")
+    ax.set_xticks([0, 1, 2, 3], ["none", "identified", "runnable/data", "wired"])
+    ax.grid(True, axis="x", alpha=0.25)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    legend_handles = [
+        Patch(facecolor="#c2410c", edgecolor="#1f2937", label="open reference"),
+        Patch(facecolor="#d97706", edgecolor="#1f2937", label="runnable/data path"),
+        Patch(facecolor="#2a9d8f", edgecolor="#1f2937", label="wired artifact"),
+    ]
+    ax.legend(handles=legend_handles, loc="lower right", frameon=False, fontsize=9, ncols=3)
+
+    ax_table.axis("off")
+    row_text = []
+    for row in records:
+        row_text.append(
+            [
+                _wrap_text(str(row["lane"]), 24),
+                _wrap_text(str(row["external_code"]), 25),
+                _wrap_text(str(row["observables"]), 34),
+                _wrap_text(str(row["next_step"]), 34),
+            ]
+        )
+    table = ax_table.table(
+        cellText=row_text,
+        colLabels=["lane", "external source", "observable gate", "next validation artifact"],
+        loc="center",
+        cellLoc="left",
+        colLoc="left",
+        colWidths=[0.22, 0.23, 0.27, 0.28],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8.0)
+    table.scale(1.0, 2.4)
+    for (row_idx, _col_idx), cell in table.get_celld().items():
+        cell.set_edgecolor("#d1d5db")
+        if row_idx == 0:
+            cell.set_facecolor("#111827")
+            cell.get_text().set_color("white")
+            cell.get_text().set_weight("bold")
+        else:
+            cell.set_facecolor("#f8fafc" if row_idx % 2 else "white")
+
+    summary = summarize_external_validation_readiness(records)
+    fig.suptitle("LMX executable external-code validation map", fontsize=15, fontweight="bold")
+    fig.text(
+        0.01,
+        0.01,
+        (
+            f"Ready lanes: {summary['ready_lane_count']}/{summary['lane_count']} | "
+            f"runnable/data lanes: {summary['runnable_or_data_lane_count']}/{summary['lane_count']} | "
+            "routine CI does not require external executables"
+        ),
+        fontsize=8.5,
+        color="#374151",
+    )
+
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
+    paths = [png_path]
+    if write_pdf:
+        paths.append(pdf_path)
+    for path in paths:
+        fig.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    return paths
+
+
 def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, dict[str, float | str]]:
     """Load scalar magnetic-obstacle reference observables from CSV.
 
@@ -503,6 +696,33 @@ def _compact_observable_label(observable: str) -> str:
         else:
             current.append(token)
             current_length = proposed_length
+    if current:
+        lines.append(" ".join(current))
+    return "\n".join(lines)
+
+
+def _readiness_color(score: float) -> str:
+    if score >= EXTERNAL_VALIDATION_READY_SCORE:
+        return "#2a9d8f"
+    if score >= 2.0:
+        return "#d97706"
+    return "#c2410c"
+
+
+def _wrap_text(text: str, width: int) -> str:
+    words = text.split()
+    lines: list[str] = []
+    current: list[str] = []
+    length = 0
+    for word in words:
+        proposed = length + len(word) + (1 if current else 0)
+        if current and proposed > width:
+            lines.append(" ".join(current))
+            current = [word]
+            length = len(word)
+        else:
+            current.append(word)
+            length = proposed
     if current:
         lines.append(" ".join(current))
     return "\n".join(lines)
