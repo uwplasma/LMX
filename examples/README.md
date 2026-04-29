@@ -77,6 +77,7 @@ python examples/wham_blanket_field_on_mesh_demo.py
 python examples/wham_blanket_current_closure_demo.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
+python examples/publication_figure_campaign.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py

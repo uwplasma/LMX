@@ -45,6 +45,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `wham_blanket_pressure_sweep.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket cumulative pressure drop and field-strength scaling |
 | `wham_blanket_autodiff_research.png` | `examples/wham_blanket_autodiff_research_demo.py` | WHAM pressure sensitivity and field-scale inverse design |
 | `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
+| `publication_figure_campaign_summary.json` | `examples/publication_figure_campaign.py` | Manuscript figure manifest, status table, and remaining figure gaps |
 
 ![LMX straight-duct analytical profile overlay](_static/generated/analytic_velocity_profiles.png)
 
@@ -60,6 +61,7 @@ python examples/readme_showcase_demo.py --output docs/_static/generated --skip-g
 python examples/q2d_turbulence_decay_demo.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
+python examples/publication_figure_campaign.py
 python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
 ```
 

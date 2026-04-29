@@ -58,7 +58,8 @@ liquid-metal MHD literature:
   collect already-existing plotting functions into a reproducible manuscript
   campaign without making examples too large.
 - `examples/publication_figure_campaign.py`: a bounded default campaign that
-  regenerates all tracked manuscript figures and writes one summary JSON.
+  records all tracked manuscript figures, optionally refreshes the fast WHAM
+  figure family, and writes one summary JSON plus a CSV table.
 - `examples/publication_heavy_campaign.py`: opt-in heavy campaign for external
   FreeMHD/Q2D/HIMAG reruns, high-Ha mesh ladders, and scaling figures.
 - A common figure-summary schema containing case name, equations, boundary
@@ -93,11 +94,20 @@ over a mesh/`De`/`Ha` ladder.
 1. Keep the current WHAM pressure and movie artifacts with the bend
    inboard/outboard velocity diagnostic now present in the movie, transient
    panel, CSV, and JSON summary.
-2. Add `examples/publication_figure_campaign.py` to regenerate the bounded
-   figure set already available in the repository.
+2. Keep `examples/publication_figure_campaign.py` as the bounded manifest gate
+   for all currently available manuscript artifacts.
 3. Add the combined WHAM overview panel and nondimensional pressure-sweep plots
    versus `Ha`, `N`, `De`, and `B^2`.
 4. Add external-data adapters and heavy rerun scripts for magnetic obstacle,
    Q2D turbulence, and curved-pipe Dean validation.
 5. Promote each closed figure family into CI/release gates only after the
    runtime remains bounded and the external-reference provenance is recorded.
+
+## Current Bounded Manifest
+
+The bounded manifest currently tracks 11 manuscript-facing figure families.
+All tracked artifacts and summary files are present, so the manifest is not a
+release blocker. The paper-ready flag remains false because three strict
+research lanes still require external or resolved validation: magnetic-obstacle
+external observables, Q2D turbulent parity, and higher-inertia Dean-vortex
+curved-pipe validation.

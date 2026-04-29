@@ -209,6 +209,9 @@ __all__ = [
     "write_scalar_reference_comparison_plots",
     "write_scalar_reference_comparison_table",
     "write_scalar_reference_template",
+    "publication_figure_campaign_summary",
+    "publication_figure_rows",
+    "write_publication_figure_manifest",
 ]
 
 
@@ -386,6 +389,15 @@ _EXPORTS = {
     "write_scalar_reference_template": (
         "lmx.external_validation",
         "write_scalar_reference_template",
+    ),
+    "publication_figure_campaign_summary": (
+        "lmx.publication",
+        "publication_figure_campaign_summary",
+    ),
+    "publication_figure_rows": ("lmx.publication", "publication_figure_rows"),
+    "write_publication_figure_manifest": (
+        "lmx.publication",
+        "write_publication_figure_manifest",
     ),
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
     "build_fringing_autodiff_problem": ("lmx.autodiff", "build_fringing_autodiff_problem"),
