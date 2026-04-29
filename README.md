@@ -12,9 +12,10 @@ solver lane, restartable CLI workflows, strong-scaling tooling, and
 differentiable workflows for sensitivity analysis and inverse design.
 
 <p align="center">
-  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt boundary-layer formation movie" width="32%">
-  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt boundary-layer formation movie" width="32%">
-  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif" alt="LMX Q2D turbulence movie" width="32%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt boundary-layer formation movie" width="24%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt boundary-layer formation movie" width="24%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif" alt="LMX Q2D turbulence movie" width="24%">
+  <img src="docs/_static/generated/wham_blanket_flow.gif" alt="LMX WHAM blanket reduced-flow movie" width="24%">
 </p>
 
 ## Why use LMX

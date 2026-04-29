@@ -44,6 +44,7 @@ testing
 
 benchmark_matrix
 validation_report
+media
 closure_notes
 performance
 autodiff

@@ -112,6 +112,11 @@ the selected public artifacts:
 python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
 ```
 
+The README/docs media inventory is documented in `docs/media.md` and enforced
+through `docs/_static/generated/readme_media_manifest.json`. Large landing-page
+GIFs stay as GitHub release assets; compact posters, figures, CSV summaries,
+and the WHAM blanket flow GIF stay in the repository.
+
 That report separates hard release blockers from deferred research lanes. The
 current bounded `1.0` gate requires package metadata, workflow scaffolding,
 public README/docs artifacts, retained straight-duct analytical overlays,

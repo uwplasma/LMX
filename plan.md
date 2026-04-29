@@ -302,6 +302,11 @@ refer to the Samper et al. taxonomy.
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named
   gates.
+  The README/docs media gate now also has a documented manifest and gallery in
+  `docs/media.md`. Large landing-page GIFs stay in GitHub release assets,
+  compact local media such as the WHAM blanket flow GIF stay in
+  `docs/_static/generated`, and `scripts/run_release_readiness.py` checks both
+  release-hosted movies and local figure/media artifacts before a release.
 
 ### Immediate technical sequence
 

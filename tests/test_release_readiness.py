@@ -72,9 +72,22 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
                     "url": "https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif",
                     "poster": "q2d_turbulence_decay_poster.png",
                 },
-            ]
+            ],
+            "local_media": [
+                {
+                    "name": "wham_blanket_flow.gif",
+                    "path": "docs/_static/generated/wham_blanket_flow.gif",
+                    "poster": "wham_blanket_flow_poster.png",
+                }
+            ],
+            "figures": [
+                {"name": "analytic_velocity_profiles.png"},
+                {"name": "strong_scaling.png"},
+            ],
         },
     )
+    (static / "wham_blanket_flow.gif").write_bytes(b"artifact")
+    (static / "wham_blanket_flow_poster.png").write_bytes(b"artifact")
     _write_json(
         static / "straight_duct_profile_comparison_summary.json",
         {
@@ -175,6 +188,18 @@ def test_release_readiness_fails_missing_public_artifact(tmp_path: Path):
 
     assert report["release_ready"] is False
     assert "required_public_artifacts" in report["blockers"]
+
+
+def test_release_readiness_fails_missing_manifest_media(tmp_path: Path):
+    _write_release_fixture(tmp_path)
+    (tmp_path / "docs/_static/generated/wham_blanket_flow.gif").unlink()
+
+    report = evaluate_release_readiness(tmp_path)
+    gate = next(item for item in report["gates"] if item["name"] == "readme_external_media_manifest")
+
+    assert report["release_ready"] is False
+    assert "readme_external_media_manifest" in report["blockers"]
+    assert gate["details"]["missing_local_media"] == ["wham_blanket_flow.gif"]
 
 
 def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_path: Path):

@@ -82,6 +82,8 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
     seen_names = {str(item.get("name", "")) for item in media if isinstance(item, dict)}
     missing_names = sorted(required_names - seen_names)
     missing_posters: list[str] = []
+    missing_local_media: list[str] = []
+    missing_figures: list[str] = []
     invalid_urls: list[str] = []
     for item in media:
         if not isinstance(item, dict):
@@ -92,12 +94,29 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
             invalid_urls.append(url)
         if poster and not (static_dir / poster).exists():
             missing_posters.append(poster)
-    passed = not missing_names and not missing_posters and not invalid_urls
+    for item in manifest.get("local_media", []):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", ""))
+        poster = str(item.get("poster", ""))
+        if name and not (static_dir / name).exists():
+            missing_local_media.append(name)
+        if poster and not (static_dir / poster).exists():
+            missing_posters.append(poster)
+    for item in manifest.get("figures", []):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", ""))
+        if name and not (static_dir / name).exists():
+            missing_figures.append(name)
+    passed = not missing_names and not missing_posters and not missing_local_media and not missing_figures and not invalid_urls
     return _gate(
         "readme_external_media_manifest",
         passed,
         missing_names=missing_names,
         missing_posters=missing_posters,
+        missing_local_media=missing_local_media,
+        missing_figures=missing_figures,
         invalid_urls=invalid_urls,
     )
 

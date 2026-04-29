@@ -24,5 +24,67 @@
       "poster": "q2d_turbulence_decay_poster.png",
       "generator": "examples/q2d_turbulence_decay_demo.py"
     }
+  ],
+  "local_media": [
+    {
+      "name": "wham_blanket_flow.gif",
+      "kind": "WHAM blanket reduced-flow movie",
+      "path": "docs/_static/generated/wham_blanket_flow.gif",
+      "poster": "wham_blanket_flow_poster.png",
+      "generator": "examples/wham_blanket_flow_demo.py",
+      "status": "tracked locally because it is compact and tied to the WHAM blanket docs section"
+    }
+  ],
+  "figures": [
+    {
+      "name": "analytic_velocity_profiles.png",
+      "kind": "straight-duct analytical profile overlay",
+      "generator": "examples/straight_duct_profile_comparison.py"
+    },
+    {
+      "name": "closed_channel_validation_ladder.png",
+      "kind": "Hartmann/Shercliff/Hunt validation ladder",
+      "generator": "examples/hartmann_validation_ladder.py"
+    },
+    {
+      "name": "q2d_turbulence_observables.png",
+      "kind": "Q2D nonlinear observable readiness panel",
+      "generator": "examples/q2d_wall_bounded_validation.py"
+    },
+    {
+      "name": "magnetic_obstacle_schematic.png",
+      "kind": "magnetic-obstacle setup schematic",
+      "generator": "examples/magnetic_obstacle_benchmark.py"
+    },
+    {
+      "name": "magnetic_obstacle_benchmark.png",
+      "kind": "magnetic-obstacle internal response panel",
+      "generator": "examples/magnetic_obstacle_benchmark.py"
+    },
+    {
+      "name": "bent_pipe_overview.png",
+      "kind": "bent-pipe geometry and low-De response panel",
+      "generator": "examples/bent_pipe_inductionless_demo.py"
+    },
+    {
+      "name": "variable_field_tabulated_reconstruction.png",
+      "kind": "tabulated-field reconstruction gate",
+      "generator": "examples/variable_field_tabulated_demo.py"
+    },
+    {
+      "name": "wham_blanket_flow.png",
+      "kind": "WHAM blanket reduced pressure and local sections",
+      "generator": "examples/wham_blanket_flow_demo.py"
+    },
+    {
+      "name": "wham_blanket_autodiff_research.png",
+      "kind": "WHAM blanket differentiable pressure-design study",
+      "generator": "examples/wham_blanket_autodiff_research_demo.py"
+    },
+    {
+      "name": "strong_scaling.png",
+      "kind": "solver-facing strong-scaling summary",
+      "generator": "scripts/run_strong_scaling_worker.py"
+    }
   ]
 }
