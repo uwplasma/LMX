@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from lmx.publication import publication_figure_campaign_summary
+
 try:  # pragma: no cover - Python 3.10 fallback
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
@@ -118,6 +120,24 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
         missing_local_media=missing_local_media,
         missing_figures=missing_figures,
         invalid_urls=invalid_urls,
+    )
+
+
+def _publication_figure_manifest_gate(root: Path) -> ReleaseGate:
+    try:
+        summary = publication_figure_campaign_summary(_static_dir(root))
+    except Exception as exc:  # pragma: no cover - defensive release reporting
+        return _gate("publication_figure_manifest", False, error=str(exc))
+    return _gate(
+        "publication_figure_manifest",
+        not bool(summary.get("release_blocking", True)),
+        figure_count=int(summary.get("figure_count", 0)),
+        artifact_count=int(summary.get("artifact_count", 0)),
+        summary_count=int(summary.get("summary_count", 0)),
+        missing_artifacts=list(summary.get("missing_artifacts", [])),
+        missing_summaries=list(summary.get("missing_summaries", [])),
+        external_or_resolved_validation_open=list(summary.get("external_or_resolved_validation_open", [])),
+        paper_ready=bool(summary.get("paper_ready")),
     )
 
 
@@ -296,6 +316,7 @@ def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2
         _workflow_gate(root_path),
         _required_artifact_gate(root_path),
         _readme_media_gate(root_path),
+        _publication_figure_manifest_gate(root_path),
     ]
     deferred: list[str] = []
     straight_gate, straight_deferred = _straight_duct_gate(root_path, target_l2=target_l2)

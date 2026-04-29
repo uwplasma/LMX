@@ -6,6 +6,7 @@ import sys
 
 import pytest
 
+from lmx.publication import PUBLICATION_FIGURE_SPECS
 from scripts.run_release_readiness import evaluate_release_readiness, main, write_release_readiness_report
 
 
@@ -53,6 +54,11 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
         "strong_scaling.png",
     ):
         (static / name).write_bytes(b"artifact")
+    for spec in PUBLICATION_FIGURE_SPECS:
+        if not (static / spec.artifact).exists():
+            (static / spec.artifact).write_bytes(b"artifact")
+        if not (static / spec.summary).exists():
+            _write_json(static / spec.summary, {"validation": {"validation_pass": True, "value": 1.0}})
     _write_json(
         static / "readme_media_manifest.json",
         {
@@ -200,6 +206,18 @@ def test_release_readiness_fails_missing_manifest_media(tmp_path: Path):
     assert report["release_ready"] is False
     assert "readme_external_media_manifest" in report["blockers"]
     assert gate["details"]["missing_local_media"] == ["wham_blanket_flow.gif"]
+
+
+def test_release_readiness_fails_missing_publication_manifest_artifact(tmp_path: Path):
+    _write_release_fixture(tmp_path)
+    (tmp_path / "docs/_static/generated/q2d_turbulence_observables.png").unlink()
+
+    report = evaluate_release_readiness(tmp_path)
+    gate = next(item for item in report["gates"] if item["name"] == "publication_figure_manifest")
+
+    assert report["release_ready"] is False
+    assert "publication_figure_manifest" in report["blockers"]
+    assert gate["details"]["missing_artifacts"] == ["q2d_turbulence_observables.png"]
 
 
 def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_path: Path):
