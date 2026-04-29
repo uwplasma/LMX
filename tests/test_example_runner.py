@@ -648,6 +648,51 @@ def test_autodiff_wham_pressure_sensitivity_writes_summary(tmp_path: Path, monke
     assert (tmp_path / "autodiff_wham_pressure_sensitivity_summary.json").exists()
 
 
+def test_wham_coil_model_field_adapter_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module = _load_example_module("wham_coil_model_field_adapter.py")
+    script = tmp_path / "coil_model_WHAM.py"
+    script.write_text(
+        "dz_HF = 14.3e-3 * 8\n"
+        "r_in_HF = 0.5*86e-3\n"
+        "r_out_HF = 0.5*730e-3\n"
+        "nz = 8\n"
+        "nr = 310\n"
+        "I_coil = 2000 * 17.0 / 17.51\n"
+        "HF1.position = (0,0,-0.98)\n"
+        "HF2 = HF1.copy(position=(0,0,0.98))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "COIL_MODEL_SCRIPT", script)
+    monkeypatch.setattr(module, "CONTOUR_X", np.linspace(0.0, 0.2, 5))
+    monkeypatch.setattr(module, "CONTOUR_Z", np.linspace(-0.3, 0.3, 7))
+
+    def fake_write_field(path, **kwargs):
+        path = Path(path)
+        x = np.asarray(kwargs["x"])
+        y = np.asarray(kwargs["y"])
+        z = np.asarray(kwargs["z"])
+        xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+        field = np.stack([0.0 * xx, 0.0 * yy, 1.0 + 0.0 * zz], axis=-1)
+        np.savez(path, x=x, y=y, z=z, bx=field[..., 0], by=field[..., 1], bz=field[..., 2])
+        return path
+
+    def fake_sample_field(x, y, z, **kwargs):
+        return np.stack([0.0 * np.asarray(x), 0.0 * np.asarray(y), 1.0 + 0.0 * np.asarray(z)], axis=-1)
+
+    monkeypatch.setattr(module, "write_wham_mirror_field_npz", fake_write_field)
+    monkeypatch.setattr(module, "sample_wham_mirror_field", fake_sample_field)
+    monkeypatch.setattr(module, "tabulated_field_quality_metrics", lambda path: {"validation_pass": True, "dimension": 3})
+
+    summary = module.run_wham_coil_model_field_adapter(out_dir=tmp_path, coil_model_script=script)
+
+    assert summary["case"] == "wham_coil_model_field_adapter"
+    assert summary["status"] == "wham_script_ingested"
+    assert summary["parameters"]["coil_separation"] == pytest.approx(1.96)
+    assert "wham_coil_model_field_adapter.png" in summary["plots"]
+    assert (tmp_path / "wham_coil_model_field_adapter_summary.json").exists()
+
+
 def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("fringing_benchmark_demo.py")
 

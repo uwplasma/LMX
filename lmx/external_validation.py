@@ -321,11 +321,11 @@ def external_validation_readiness_rows() -> list[dict[str, object]]:
         },
         {
             "lane": "Variable/tabulated 3D fields",
-            "external_code": "manufactured fields + WHAM coil data",
-            "score": 1.5,
-            "status": "internal manufactured gate",
+            "external_code": "WHAM coil-model script + manufactured fields",
+            "score": 2.0,
+            "status": "external field script wired",
             "observables": "interpolation error, div B, pressure response, autodiff",
-            "next_step": "add independent measured or code-generated 3D field data",
+            "next_step": "add matched field-response validation data",
         },
     ]
 

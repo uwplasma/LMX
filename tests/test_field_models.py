@@ -4,6 +4,7 @@ import numpy as np
 from lmx.field_models import (
     cross_section_divergence_metrics,
     load_tabulated_field,
+    load_wham_coil_model_script,
     make_localized_divergence_free_obstacle_field,
     make_divergence_free_cross_section_field,
     sample_cross_section_field,
@@ -167,3 +168,29 @@ def test_write_wham_mirror_field_npz_round_trip(tmp_path):
     assert shifted_payload["x"][0] == pytest.approx(0.0)
     assert shifted_payload["x"][-1] == pytest.approx(0.6)
     assert shifted_payload["bz"] == pytest.approx(shifted_reference[..., 2])
+
+
+def test_load_wham_coil_model_script_extracts_reduced_loop_parameters(tmp_path):
+    script = tmp_path / "coil_model.py"
+    script.write_text(
+        "dz_HF = 14.3e-3 * 8\n"
+        "r_in_HF = 0.5*86e-3\n"
+        "r_out_HF = 0.5*730e-3\n"
+        "nz = 8\n"
+        "nr = 310\n"
+        "I_coil = 2000 * 17.0 / 17.51\n"
+        "HF1.position = (0,0,-0.98)\n"
+        "HF2 = HF1.copy(position=(0,0,0.98))\n",
+        encoding="utf-8",
+    )
+
+    params = load_wham_coil_model_script(script, radial_loops=31, axial_loops=4)
+
+    assert params["coil_separation"] == pytest.approx(1.96)
+    assert params["inner_radius"] == pytest.approx(0.043)
+    assert params["outer_radius"] == pytest.approx(0.365)
+    assert params["source_radial_loops"] == 310
+    assert params["source_axial_loops"] == 8
+    assert params["radial_loops"] == 31
+    assert params["axial_loops"] == 4
+    assert params["current_scale"] == pytest.approx(params["source_ampere_turns"] / (31 * 4))

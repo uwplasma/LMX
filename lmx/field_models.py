@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ast
 from collections.abc import Callable
 import json
+import re
 import warnings
 from pathlib import Path
 
@@ -20,6 +22,60 @@ try:
     import magpylib_jax as magpy
 except Exception:  # pragma: no cover - optional dependency in nonstandard environments.
     magpy = None
+
+
+def load_wham_coil_model_script(
+    path: str | Path,
+    *,
+    radial_loops: int | None = None,
+    axial_loops: int | None = None,
+    preserve_ampere_turns: bool = True,
+) -> dict[str, float | int | str | bool]:
+    """Parse the WHAM coil-model script into LMX field-generation parameters.
+
+    The attached WHAM script defines two high-field coils with circular-current
+    loops. This parser extracts the physical dimensions and coil-center
+    separation while allowing examples to use a reduced loop count. When
+    ``preserve_ampere_turns`` is true, the reduced loop current is scaled to
+    keep total ampere-turns approximately fixed.
+    """
+
+    source = Path(path)
+    text = source.read_text(encoding="utf-8")
+    env = _safe_numeric_assignments(text)
+    required = ("dz_HF", "r_in_HF", "r_out_HF", "nz", "nr", "I_coil")
+    missing = [name for name in required if name not in env]
+    if missing:
+        raise ValueError(f"WHAM coil model is missing required assignments: {', '.join(missing)}")
+
+    coil_centers = _wham_coil_centers_from_script(text)
+    source_radial_loops = int(round(float(env["nr"])))
+    source_axial_loops = int(round(float(env["nz"])))
+    requested_radial_loops = source_radial_loops if radial_loops is None else max(int(radial_loops), 1)
+    requested_axial_loops = source_axial_loops if axial_loops is None else max(int(axial_loops), 1)
+    source_loop_current = float(env["I_coil"])
+    source_ampere_turns = source_loop_current * source_radial_loops * source_axial_loops
+    if preserve_ampere_turns:
+        current_scale = source_ampere_turns / (requested_radial_loops * requested_axial_loops)
+    else:
+        current_scale = source_loop_current
+    return {
+        "source_path": str(source),
+        "coil_axial_thickness": float(env["dz_HF"]),
+        "inner_radius": float(env["r_in_HF"]),
+        "outer_radius": float(env["r_out_HF"]),
+        "source_radial_loops": source_radial_loops,
+        "source_axial_loops": source_axial_loops,
+        "source_loop_current": source_loop_current,
+        "source_ampere_turns": source_ampere_turns,
+        "coil_center_negative": float(min(coil_centers)),
+        "coil_center_positive": float(max(coil_centers)),
+        "coil_separation": float(abs(max(coil_centers) - min(coil_centers))),
+        "radial_loops": requested_radial_loops,
+        "axial_loops": requested_axial_loops,
+        "current_scale": float(current_scale),
+        "preserve_ampere_turns": bool(preserve_ampere_turns),
+    }
 
 
 def make_divergence_free_cross_section_field(
@@ -523,3 +579,53 @@ def _interpolate_tabulated_field_3d(
         sampled = np.asarray(interpolator(points), dtype=float).reshape(np.asarray(x).shape)
         components.append(sampled)
     return np.stack(components, axis=-1)
+
+
+def _safe_numeric_assignments(text: str) -> dict[str, float]:
+    tree = ast.parse(text)
+    env: dict[str, float] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            continue
+        try:
+            env[node.targets[0].id] = _eval_numeric_ast(node.value, env)
+        except ValueError:
+            continue
+    return env
+
+
+def _eval_numeric_ast(node: ast.AST, env: dict[str, float]) -> float:
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.Name) and node.id in env:
+        return float(env[node.id])
+    if isinstance(node, ast.UnaryOp):
+        value = _eval_numeric_ast(node.operand, env)
+        if isinstance(node.op, ast.USub):
+            return -value
+        if isinstance(node.op, ast.UAdd):
+            return value
+    if isinstance(node, ast.BinOp):
+        left = _eval_numeric_ast(node.left, env)
+        right = _eval_numeric_ast(node.right, env)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right
+        if isinstance(node.op, ast.Pow):
+            return left**right
+    raise ValueError("unsupported nonnumeric expression")
+
+
+def _wham_coil_centers_from_script(text: str) -> tuple[float, float]:
+    direct = re.search(r"HF1\.position\s*=\s*\([^,]+,\s*[^,]+,\s*([^)]+)\)", text)
+    copied = re.search(r"HF2\s*=\s*HF1\.copy\(position\s*=\s*\([^,]+,\s*[^,]+,\s*([^)]+)\)\)", text)
+    if not direct or not copied:
+        raise ValueError("WHAM coil model must define HF1.position and HF2 copy position")
+    return float(direct.group(1).strip()), float(copied.group(1).strip())

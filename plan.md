@@ -245,9 +245,12 @@ refer to the Samper et al. taxonomy.
   The rectangular tabulated-field lane now includes a solver-point
   manufactured-field reconstruction gate in addition to table-node
   interpolation. The current README artifact reports `relative_l2_error ≈
-  1.92e-5` and `relative_linf_error ≈ 4.18e-5`; the remaining open item is
-  external 3D field-response validation, especially for the WHAM-like pipe
-  response, not structured-table interpolation.
+  1.92e-5` and `relative_linf_error ≈ 4.18e-5`.
+  `examples/wham_coil_model_field_adapter.py` now parses the attached WHAM
+  coil script into reduced-loop `magpylib_jax` parameters and a tabulated-field
+  artifact. The remaining open item is external 3D field-response validation,
+  especially for the WHAM-like pipe response, not structured-table
+  interpolation or coil-script ingestion.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named
@@ -1135,6 +1138,9 @@ Current localized magnetic-obstacle response lane:
   distortion strengthen across the small regime map
 - `examples/wham_mirror_pipe_demo.py` now adds a tabulated WHAM-like mirror
   field on the pipe lane using `magpylib_jax`
+- `examples/wham_coil_model_field_adapter.py` now parses the attached WHAM
+  coil-model script, preserves total ampere-turns under a reduced loop count,
+  and writes a field-contour/data-ingestion artifact for the docs
 - the executable WHAM pipe demo now writes the tabulated field on the same
   `x ∈ [0, L]` streamwise coordinate used by the solver and records the
   centered-coil offset, closing a tabulated-field coordinate-frame mismatch

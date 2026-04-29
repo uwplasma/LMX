@@ -66,6 +66,7 @@ python examples/variable_field_extruded_demo.py
 python examples/variable_field_layered_demo.py
 python examples/variable_field_bent_pipe_demo.py
 python examples/variable_field_tabulated_demo.py
+python examples/wham_coil_model_field_adapter.py
 python examples/wham_mirror_pipe_demo.py
 python examples/autodiff_wham_pressure_sensitivity.py
 python examples/q2d_decay_validation.py
@@ -320,6 +321,8 @@ Those examples extend the same field API into:
 - curved pipes validated against the straight-pipe low-De limit under the same field
 - reusable machine-readable summaries of field and conservation metrics
 - a tabulated-field duct run that also matches the TOML/CLI path
+- a WHAM coil-script adapter that converts the external coil script into a
+  reduced-loop tabulated-field artifact
 - a tabulated WHAM-like mirror field written to disk and reused by a pipe solve
 - a reduced differentiable pressure-drop sensitivity study with respect to
   coil-coil separation

@@ -123,6 +123,7 @@ __all__ = [
     "cross_section_divergence_metrics",
     "save_cross_section_divergence_report",
     "load_tabulated_field",
+    "load_wham_coil_model_script",
     "tabulated_field_quality_metrics",
     "tabulated_cross_section_reconstruction_metrics",
     "sample_tabulated_cross_section_field",
@@ -392,6 +393,7 @@ _EXPORTS = {
     "cross_section_divergence_metrics": ("lmx.field_models", "cross_section_divergence_metrics"),
     "save_cross_section_divergence_report": ("lmx.field_models", "save_cross_section_divergence_report"),
     "load_tabulated_field": ("lmx.field_models", "load_tabulated_field"),
+    "load_wham_coil_model_script": ("lmx.field_models", "load_wham_coil_model_script"),
     "tabulated_field_quality_metrics": ("lmx.field_models", "tabulated_field_quality_metrics"),
     "tabulated_cross_section_reconstruction_metrics": (
         "lmx.field_models",

@@ -456,6 +456,15 @@ Current bounded regime scan:
 
 Current tabulated-field / mirror-field extension:
 
+- `examples/wham_coil_model_field_adapter.py`
+  - parses the attached WHAM coil-model script into LMX field parameters
+  - preserves total ampere-turns under a reduced loop count for bounded
+    docs/example runtime
+  - writes the field-contour artifact now used to document the independent
+    3D field-data ingestion path
+
+![WHAM coil-model field adapter](_static/generated/wham_coil_model_field_adapter.png)
+
 - `examples/wham_mirror_pipe_demo.py`
   - writes a tabulated WHAM-like mirror field with `magpylib_jax`
   - solves the current low-Re inductionless pipe baseline through that field

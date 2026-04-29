@@ -387,8 +387,12 @@ and test surface bounded.
 ![LMX magnetic-obstacle regime scan](docs/_static/generated/magnetic_obstacle_regime_scan.png)
 
 LMX now also includes a tabulated WHAM-like mirror-field pipe lane and a
-matching differentiable pressure-drop sensitivity study. The executable driver
-is `examples/wham_mirror_pipe_demo.py`: it writes the tabulated 3D field,
+matching differentiable pressure-drop sensitivity study. The coil-model adapter
+is `examples/wham_coil_model_field_adapter.py`: it parses the attached WHAM
+coil script, preserves its total ampere-turns under a reduced loop count, and
+writes a reproducible tabulated-field artifact plus a field-contour panel. The
+executable pipe driver is `examples/wham_mirror_pipe_demo.py`: it writes the
+tabulated 3D field,
 solves the pipe crossing that field, and exports the field preview plus a
 dedicated WHAM overview showing the mirror coils, centerplane field contours,
 the pipe location, and the solved velocity cross-section at peak field. The
@@ -402,6 +406,8 @@ the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
 field extrapolation at the downstream half of the pipe and is recorded in the
 example summary JSON.
+
+![LMX WHAM coil-model field adapter](docs/_static/generated/wham_coil_model_field_adapter.png)
 
 The executable WHAM lane is useful today for field loading, geometry context,
 and conservation auditing. The new overview figure shows exactly that: the pipe
@@ -679,6 +685,7 @@ Useful entry points:
 - `examples/autodiff_sensitivity_demo.py`: Hartmann sensitivities
 - `examples/autodiff_extruded_trajectory_demo.py`: deeper extruded autodiff target matching
 - `examples/variable_field_geometry_demo.py`: Python-native geometry and field editing
+- `examples/wham_coil_model_field_adapter.py`: WHAM coil-script to tabulated-field adapter
 
 ## Documentation
 
