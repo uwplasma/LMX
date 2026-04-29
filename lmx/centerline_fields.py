@@ -359,6 +359,7 @@ def solve_centerline_pipe_current_closure(
         "J_r": np.asarray(j_r, dtype=float),
         "J_theta": np.asarray(j_theta, dtype=float),
         "div_J": np.asarray(div_j, dtype=float),
+        "cell_area": np.asarray(cell_area, dtype=float),
         "axial_current": np.asarray(axial_current, dtype=float),
         "wall_current_leakage": np.asarray(wall_current_leakage, dtype=float),
         "boundary_current_residual": np.asarray(boundary_current_residual, dtype=float),
@@ -367,6 +368,7 @@ def solve_centerline_pipe_current_closure(
         "potential_iterations": int(iteration_count),
     }
     closure["metrics"] = centerline_current_closure_metrics(closure)
+    closure["pressure_metrics"] = centerline_current_pressure_metrics(closure)
     return closure
 
 
@@ -413,6 +415,39 @@ def centerline_current_closure_metrics(closure: dict[str, object]) -> dict[str, 
     }
 
 
+def centerline_current_pressure_metrics(closure: dict[str, object]) -> dict[str, float | int | bool | str]:
+    """Return a streamwise pressure proxy from conservative ``J x B`` fields."""
+
+    station = np.asarray(closure["station"], dtype=float)
+    j_r = np.asarray(closure["J_r"], dtype=float)
+    j_theta = np.asarray(closure["J_theta"], dtype=float)
+    b_r = np.asarray(closure["B_r"], dtype=float)
+    b_theta = np.asarray(closure["B_theta"], dtype=float)
+    cell_area = np.asarray(closure["cell_area"], dtype=float)
+    lorentz_s = j_r * b_theta - j_theta * b_r
+    area = np.maximum(np.sum(cell_area), 1.0e-30)
+    area_mean_lorentz_s = np.sum(lorentz_s * cell_area[None, :, :], axis=(1, 2)) / area
+    pressure_gradient = -area_mean_lorentz_s
+    if station.size > 1:
+        positive_pressure_gradient = np.maximum(pressure_gradient, 0.0)
+        pressure_drop = float(np.trapezoid(positive_pressure_gradient, station))
+        signed_pressure_drop = float(np.trapezoid(pressure_gradient, station))
+    else:
+        pressure_drop = 0.0
+        signed_pressure_drop = 0.0
+    return {
+        "case": "centerline_pipe_jxb_pressure_proxy",
+        "station_count": int(station.size),
+        "max_abs_lorentz_s": float(np.max(np.abs(lorentz_s))) if lorentz_s.size else 0.0,
+        "max_abs_area_mean_lorentz_s": float(np.max(np.abs(area_mean_lorentz_s))) if area_mean_lorentz_s.size else 0.0,
+        "mean_pressure_gradient": float(np.mean(pressure_gradient)) if pressure_gradient.size else 0.0,
+        "mhd_pressure_drop_proxy_pa": pressure_drop,
+        "signed_mhd_pressure_drop_proxy_pa": signed_pressure_drop,
+        "mhd_pressure_drop_proxy_kpa": pressure_drop / 1000.0,
+        "validation_pass": bool(np.all(np.isfinite(pressure_gradient))),
+    }
+
+
 def write_centerline_current_closure_preview(
     closure: dict[str, object],
     out_dir: str | Path,
@@ -426,6 +461,7 @@ def write_centerline_current_closure_preview(
     out.mkdir(parents=True, exist_ok=True)
     _set_field_plot_style()
     metrics = centerline_current_closure_metrics(closure)
+    pressure_metrics = centerline_current_pressure_metrics(closure)
     station = np.asarray(closure["station"], dtype=float)
     r = np.asarray(closure["r"], dtype=float)
     theta = np.asarray(closure["theta"], dtype=float)
@@ -461,7 +497,7 @@ def write_centerline_current_closure_preview(
 
     _plot_polar_cell_contour(ax_phi, r, theta, phi[peak_index], title=f"Potential at peak current, s = {station[peak_index]:.2f} m", label=r"$\phi$")
     _plot_polar_cell_contour(ax_current, r, theta, current[peak_index], title="Current magnitude at peak current", label=r"$|J|$")
-    _plot_current_metrics(ax_text, metrics)
+    _plot_current_metrics(ax_text, metrics, pressure_metrics)
     fig.suptitle(title, fontsize=17)
 
     png = out / f"{filename_stem}.png"
@@ -472,7 +508,11 @@ def write_centerline_current_closure_preview(
     fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
     summary.write_text(
-        json.dumps({"metrics": metrics, "artifacts": [png.name, pdf.name, csv_path.name]}, indent=2) + "\n",
+        json.dumps(
+            {"metrics": metrics, "pressure_metrics": pressure_metrics, "artifacts": [png.name, pdf.name, csv_path.name]},
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
     _write_current_closure_csv(csv_path, station, charge_by_station, axial)
@@ -649,7 +689,11 @@ def _plot_field_metrics(ax, metrics: dict[str, float | int | bool | str]) -> Non
     )
 
 
-def _plot_current_metrics(ax, metrics: dict[str, float | int | bool | str]) -> None:
+def _plot_current_metrics(
+    ax,
+    metrics: dict[str, float | int | bool | str],
+    pressure_metrics: dict[str, float | int | bool | str],
+) -> None:
     ax.axis("off")
     lines = [
         "Current-closure gates",
@@ -663,6 +707,7 @@ def _plot_current_metrics(ax, metrics: dict[str, float | int | bool | str]) -> N
         f"axial-current span: {metrics['axial_current_span']:.3e}",
         f"potential residual: {metrics['potential_residual']:.3e}",
         f"potential iterations: {metrics['potential_iterations']}",
+        f"JxB dp proxy: {pressure_metrics['mhd_pressure_drop_proxy_kpa']:.3e} kPa",
         f"validation pass: {metrics['validation_pass']}",
         "",
         "Interpretation",

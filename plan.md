@@ -283,8 +283,10 @@ refer to the Samper et al. taxonomy.
   `J`, and reports dimensional and relative charge-balance gates. The retained
   WHAM blanket run has `max |div J| ≈ 1.08e-2`, but relative to the
   EMF-divergence source this is `≈ 3.21e-9`; wall-current leakage and net
-  boundary-current residual are both zero. The next step is pressure/velocity
-  assembly on this generalized centerline mesh.
+  boundary-current residual are both zero. The same reconstructed current
+  field now gives a conservative streamwise `J×B` pressure-drop proxy of
+  `≈ 6.97 kPa`. The next step is pressure/velocity assembly on this
+  generalized centerline mesh.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

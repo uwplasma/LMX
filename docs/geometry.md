@@ -313,6 +313,8 @@ PbLi-like electrical conductivity. It records dimensional
 `max |div J| ≈ 1.08e-2`, but the physically meaningful solver gate is the
 residual relative to the EMF-divergence source: `relative |div J| ≈ 3.21e-9`
 and `charge_balance_to_current_scale ≈ 2.05e-8`, with zero wall-current
-leakage and zero net boundary-current residual.
+leakage and zero net boundary-current residual. The same reconstructed
+current field gives a streamwise `J×B` pressure-drop proxy of `≈ 6.97 kPa`,
+which is now available separately from the reduced `σ U B_\perp^2` estimate.
 
 ![LMX WHAM conservative current closure on the mapped blanket pipe](_static/generated/wham_blanket_current_closure.png)

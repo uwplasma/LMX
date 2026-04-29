@@ -443,7 +443,8 @@ mapped local pipe coordinates, and reconstructs `J`. Because this is a
 dimensional PbLi-scale current solve, the relevant gate is the residual
 relative to the EMF-divergence source: the current retained run has
 `max |div J| ≈ 1.08e-2`, `relative |div J| ≈ 3.21e-9`, zero wall-current
-leakage, and zero net boundary-current residual.
+leakage, zero net boundary-current residual, and a conservative `J×B`
+pressure-drop proxy of `≈ 6.97 kPa`.
 
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that

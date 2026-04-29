@@ -6,6 +6,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.build_wham_blanket_centerline)
     assert callable(lmx.centerline_field_quality_metrics)
     assert callable(lmx.centerline_current_closure_metrics)
+    assert callable(lmx.centerline_current_pressure_metrics)
     assert callable(lmx.centerline_pipe_frames)
     assert callable(lmx.generate_centerline_pipe_mesh)
     assert callable(lmx.centerline_pipe_mesh_quality_metrics)

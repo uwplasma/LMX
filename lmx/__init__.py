@@ -13,6 +13,7 @@ __all__ = [
     "build_wham_blanket_centerline",
     "centerline_field_quality_metrics",
     "centerline_current_closure_metrics",
+    "centerline_current_pressure_metrics",
     "centerline_pipe_mesh_quality_metrics",
     "centerline_pipe_frames",
     "compare_with_reference_outputs",
@@ -217,6 +218,7 @@ _EXPORTS = {
     "write_wham_blanket_flow_summary": ("lmx.blanket_flow", "write_wham_blanket_flow_summary"),
     "centerline_field_quality_metrics": ("lmx.centerline_fields", "centerline_field_quality_metrics"),
     "centerline_current_closure_metrics": ("lmx.centerline_fields", "centerline_current_closure_metrics"),
+    "centerline_current_pressure_metrics": ("lmx.centerline_fields", "centerline_current_pressure_metrics"),
     "centerline_pipe_frames": ("lmx.centerline_fields", "centerline_pipe_frames"),
     "sample_field_on_centerline_pipe_mesh": ("lmx.centerline_fields", "sample_field_on_centerline_pipe_mesh"),
     "sample_wham_field_on_centerline_pipe_mesh": (

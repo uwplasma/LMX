@@ -125,6 +125,7 @@ def run_wham_blanket_current_closure_demo() -> dict[str, object]:
             "electrical_conductivity": ELECTRICAL_CONDUCTIVITY,
         },
         "metrics": closure["metrics"],
+        "pressure_metrics": closure["pressure_metrics"],
         "artifacts": [path.name for path in plot_outputs],
         "notes": (
             "Conservative current-closure gate on the mapped WHAM blanket pipe. "
@@ -142,6 +143,7 @@ def run_wham_blanket_current_closure_demo() -> dict[str, object]:
     print(f"max_charge_balance_residual = {metrics['max_charge_balance_residual']:.3e}")
     print(f"relative_charge_balance_residual = {metrics['relative_charge_balance_residual']:.3e}")
     print(f"net_boundary_current_residual = {metrics['net_boundary_current_residual']:.3e}")
+    print(f"mhd_pressure_drop_proxy = {closure['pressure_metrics']['mhd_pressure_drop_proxy_kpa']:.3e} kPa")
     print(f"validation_pass = {metrics['validation_pass']}")
     return summary
 

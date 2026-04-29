@@ -5,6 +5,7 @@ import numpy as np
 from lmx.centerline_fields import (
     centerline_field_quality_metrics,
     centerline_current_closure_metrics,
+    centerline_current_pressure_metrics,
     centerline_pipe_frames,
     sample_field_on_centerline_pipe_mesh,
     solve_centerline_pipe_current_closure,
@@ -77,10 +78,13 @@ def test_centerline_current_closure_cancels_emf_divergence(tmp_path: Path):
         potential_tolerance=1.0e-11,
     )
     metrics = centerline_current_closure_metrics(closure)
+    pressure_metrics = centerline_current_pressure_metrics(closure)
 
     assert metrics["validation_pass"] is True
     assert metrics["max_charge_balance_residual"] < 1.0e-8
     assert metrics["net_boundary_current_residual"] < 1.0e-8
+    assert pressure_metrics["validation_pass"] is True
+    assert pressure_metrics["mhd_pressure_drop_proxy_pa"] >= 0.0
 
     outputs = write_centerline_current_closure_preview(closure, tmp_path, filename_stem="current_closure")
     output_names = {path.name for path in outputs}

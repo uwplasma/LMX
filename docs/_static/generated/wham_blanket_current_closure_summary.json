@@ -16,6 +16,17 @@
     "potential_iterations": 1,
     "validation_pass": true
   },
+  "pressure_metrics": {
+    "case": "centerline_pipe_jxb_pressure_proxy",
+    "station_count": 48,
+    "max_abs_lorentz_s": 28772.00225681102,
+    "max_abs_area_mean_lorentz_s": 8204.933780164698,
+    "mean_pressure_gradient": 685.3329211212146,
+    "mhd_pressure_drop_proxy_pa": 6967.743316771183,
+    "signed_mhd_pressure_drop_proxy_pa": 5032.929708540776,
+    "mhd_pressure_drop_proxy_kpa": 6.967743316771183,
+    "validation_pass": true
+  },
   "artifacts": [
     "wham_blanket_current_closure.png",
     "wham_blanket_current_closure.pdf",
