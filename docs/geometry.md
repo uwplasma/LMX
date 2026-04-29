@@ -107,6 +107,7 @@ drivers in:
 - `examples/wham_blanket_geometry_preview.py`
 - `examples/wham_blanket_mesh_demo.py`
 - `examples/wham_blanket_field_on_mesh_demo.py`
+- `examples/wham_blanket_current_closure_demo.py`
 - `examples/readme_showcase_demo.py`
 
 ```bash
@@ -119,6 +120,7 @@ python examples/bent_pipe_inductionless_demo.py
 python examples/wham_blanket_geometry_preview.py
 python examples/wham_blanket_mesh_demo.py
 python examples/wham_blanket_field_on_mesh_demo.py
+python examples/wham_blanket_current_closure_demo.py
 python examples/readme_showcase_demo.py --output docs/_static/generated
 # optional Hartmann alternative for wall-layer startup media
 python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
@@ -294,3 +296,23 @@ blanket solve; it closes the coordinate-frame and field-data handoff needed
 before the generalized curved-pipe `φ`, `J`, and pressure solver is promoted.
 
 ![LMX WHAM field sampled on the mapped blanket pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
+
+## WHAM conservative current closure on the mapped blanket mesh
+
+`examples/wham_blanket_current_closure_demo.py` is the first conservative
+`phi/J` gate on the approved mapped blanket route. It uses the sampled
+WHAM-like field, prescribes a streamwise pipe velocity profile, solves the
+inductionless potential equation using the same conservative pipe current
+operators as the extruded solver, and reconstructs `J_s`, `J_r`, and
+`J_theta`. This is still not a full curved-pipe momentum or turbulence solve;
+it gates electric-potential/current assembly before the pressure-velocity
+operator is promoted to the generalized centerline mesh.
+
+The retained run uses a bounded `48 × 14 × 36` mapped-pipe mesh with
+PbLi-like electrical conductivity. It records dimensional
+`max |div J| ≈ 1.08e-2`, but the physically meaningful solver gate is the
+residual relative to the EMF-divergence source: `relative |div J| ≈ 3.21e-9`
+and `charge_balance_to_current_scale ≈ 2.05e-8`, with zero wall-current
+leakage and zero net boundary-current residual.
+
+![LMX WHAM conservative current closure on the mapped blanket pipe](_static/generated/wham_blanket_current_closure.png)

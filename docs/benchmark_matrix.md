@@ -497,8 +497,16 @@ interpolation mismatch. The remaining tabulated-field research gap is external
   - observables:
     finite-value fraction, peak/mean centerline `B_\perp`, streamwise-field
     leakage, and cross-section field variation
+- `examples/wham_blanket_current_closure_demo.py`
+  - solves the conservative inductionless potential/current closure on a
+    bounded mapped-pipe mesh for a prescribed streamwise velocity profile
+  - observables:
+    dimensional and relative `div J`, wall-current leakage, boundary-current
+    residual, axial-current span, and reconstructed current magnitude
 
 ![WHAM blanket field sampled on mapped pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
+
+![WHAM blanket conservative current closure](_static/generated/wham_blanket_current_closure.png)
 
 Current bounded reduced sensitivity result:
 

@@ -436,6 +436,15 @@ the mesh-field handoff passes finite-value checks, gives peak centerline
 (`max |B_s|/|B| ≈ 3.4e-15`), and records the largest cross-section field span
 for the future conservative `φ/J` curved-pipe solve.
 
+`examples/wham_blanket_current_closure_demo.py` then exercises that next
+`φ/J` gate without claiming a full momentum solve. It prescribes a streamwise
+pipe profile, solves the conservative inductionless potential equation on the
+mapped local pipe coordinates, and reconstructs `J`. Because this is a
+dimensional PbLi-scale current solve, the relevant gate is the residual
+relative to the EMF-divergence source: the current retained run has
+`max |div J| ≈ 1.08e-2`, `relative |div J| ≈ 3.21e-9`, zero wall-current
+leakage, and zero net boundary-current residual.
+
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
@@ -470,6 +479,8 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM blanket mapped pipe mesh](docs/_static/generated/wham_blanket_mesh_preview.png)
 
 ![LMX WHAM blanket field sampled on mapped pipe mesh](docs/_static/generated/wham_blanket_field_on_mesh.png)
+
+![LMX WHAM blanket conservative current closure](docs/_static/generated/wham_blanket_current_closure.png)
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
 
@@ -736,6 +747,7 @@ Useful entry points:
 - `examples/wham_blanket_geometry_preview.py`: circular blanket pipe route around the WHAM central cell before simulation
 - `examples/wham_blanket_mesh_demo.py`: mapped circular-pipe O-grid and ParaView mesh for the approved WHAM blanket route
 - `examples/wham_blanket_field_on_mesh_demo.py`: WHAM field sampling and local streamwise/transverse projections on the mapped blanket mesh
+- `examples/wham_blanket_current_closure_demo.py`: conservative local `φ/J` current-closure gate on the mapped blanket mesh
 - `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, steady sections, and startup movie
 
 ## Documentation

@@ -233,6 +233,252 @@ def write_centerline_field_preview(
     return [png, pdf, summary, csv_path]
 
 
+def solve_centerline_pipe_current_closure(
+    sample: dict[str, object],
+    *,
+    mean_velocity: float = 0.2,
+    conductivity: float = 7.9e5,
+    potential_iterations: int = 250,
+    potential_tolerance: float = 1.0e-10,
+) -> dict[str, object]:
+    """Solve the conservative inductionless current-closure diagnostic.
+
+    This diagnostic reuses the finite-volume pipe current operators from the
+    current extruded solver path. It treats the mapped centerline mesh as a
+    locally circular pipe with station coordinate ``s`` and solves for the
+    potential that cancels ``div(sigma u x B)`` for a prescribed streamwise
+    velocity profile. It is a current-closure gate, not a full momentum solve.
+    """
+
+    from ._fringing import (
+        _pipe_conservative_current_diagnostics_3d,
+        _pipe_conservative_current_fluxes_3d,
+        _pipe_conservative_emf_rhs_3d,
+        _pipe_poisson_sparse_3d,
+        _station_axial_current_from_fluxes,
+    )
+    import jax.numpy as jnp
+
+    mesh = sample["mesh"]
+    if not isinstance(mesh, StructuredMesh):
+        raise ValueError("current closure sample must include the source StructuredMesh")
+    station_faces = np.asarray(mesh.x_faces, dtype=float)
+    r_faces = np.asarray(mesh.y_faces, dtype=float)
+    theta_faces = np.asarray(mesh.z_faces, dtype=float)
+    if station_faces.size < 3 or r_faces.size < 3 or theta_faces.size < 3:
+        raise ValueError("current closure requires at least two cells in each mapped direction")
+    ds = float(np.mean(np.diff(station_faces)))
+    dtheta = float(np.mean(np.diff(theta_faces)))
+    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    theta_centers = 0.5 * (theta_faces[:-1] + theta_faces[1:])
+
+    b_s = _face_sample_to_cells(np.asarray(sample["B_s"], dtype=float))
+    b_n = _face_sample_to_cells(np.asarray(sample["B_n"], dtype=float))
+    b_b = _face_sample_to_cells(np.asarray(sample["B_b"], dtype=float))
+    theta = theta_centers[None, None, :]
+    b_r = b_n * np.cos(theta) + b_b * np.sin(theta)
+    b_theta = -b_n * np.sin(theta) + b_b * np.cos(theta)
+    velocity = _parabolic_pipe_velocity_profile(
+        r_centers,
+        theta_centers,
+        station_count=station_faces.size - 1,
+        mean_velocity=mean_velocity,
+        pipe_radius=float(r_faces[-1]),
+    )
+    uxb_s = np.zeros_like(velocity)
+    uxb_r = -velocity * b_theta
+    uxb_theta = velocity * b_r
+
+    sigma = jnp.full(velocity.shape, float(conductivity), dtype=float)
+    r_faces_j = jnp.asarray(r_faces, dtype=float)
+    r_centers_j = jnp.asarray(r_centers, dtype=float)
+    uxb_s_j = jnp.asarray(uxb_s, dtype=float)
+    uxb_r_j = jnp.asarray(uxb_r, dtype=float)
+    uxb_theta_j = jnp.asarray(uxb_theta, dtype=float)
+    emf_rhs = _pipe_conservative_emf_rhs_3d(
+        sigma,
+        uxb_s_j,
+        uxb_r_j,
+        uxb_theta_j,
+        dx=ds,
+        r_faces=r_faces_j,
+        r_centers=r_centers_j,
+        dtheta=dtheta,
+    )
+    phi, residual, iteration_count, initial_residual = _pipe_poisson_sparse_3d(
+        -emf_rhs,
+        sigma,
+        dx=ds,
+        r_faces=r_faces_j,
+        r_centers=r_centers_j,
+        dtheta=dtheta,
+        iterations=int(potential_iterations),
+        tolerance=float(potential_tolerance),
+    )
+    flux_s, flux_r, flux_theta = _pipe_conservative_current_fluxes_3d(
+        sigma,
+        phi,
+        uxb_s_j,
+        uxb_r_j,
+        uxb_theta_j,
+        dx=ds,
+        r_faces=r_faces_j,
+        r_centers=r_centers_j,
+        dtheta=dtheta,
+    )
+    div_j, wall_current_leakage, boundary_current_residual = _pipe_conservative_current_diagnostics_3d(
+        sigma,
+        phi,
+        uxb_s_j,
+        uxb_r_j,
+        uxb_theta_j,
+        dx=ds,
+        r_faces=r_faces_j,
+        r_centers=r_centers_j,
+        dtheta=dtheta,
+    )
+    dr = jnp.diff(r_faces_j)
+    cell_area = r_centers_j[:, None] * dr[:, None] * dtheta
+    axial_current = _station_axial_current_from_fluxes(flux_s, cell_area)
+    j_s = 0.5 * (flux_s[1:] + flux_s[:-1])
+    j_r = 0.5 * (flux_r[:, 1:, :] + flux_r[:, :-1, :])
+    j_theta = 0.5 * (flux_theta + jnp.roll(flux_theta, 1, axis=2))
+    station_centers = 0.5 * (station_faces[:-1] + station_faces[1:])
+    closure = {
+        "case": "centerline_pipe_current_closure",
+        "mesh": mesh,
+        "station": station_centers,
+        "r": r_centers,
+        "theta": theta_centers,
+        "velocity": velocity,
+        "B_s": b_s,
+        "B_r": b_r,
+        "B_theta": b_theta,
+        "phi": np.asarray(phi, dtype=float),
+        "J_s": np.asarray(j_s, dtype=float),
+        "J_r": np.asarray(j_r, dtype=float),
+        "J_theta": np.asarray(j_theta, dtype=float),
+        "div_J": np.asarray(div_j, dtype=float),
+        "axial_current": np.asarray(axial_current, dtype=float),
+        "wall_current_leakage": np.asarray(wall_current_leakage, dtype=float),
+        "boundary_current_residual": np.asarray(boundary_current_residual, dtype=float),
+        "potential_residual": float(residual),
+        "potential_initial_residual": float(initial_residual),
+        "potential_iterations": int(iteration_count),
+    }
+    closure["metrics"] = centerline_current_closure_metrics(closure)
+    return closure
+
+
+def centerline_current_closure_metrics(closure: dict[str, object]) -> dict[str, float | int | bool | str]:
+    """Return scalar gates for the mapped-pipe current-closure diagnostic."""
+
+    div_j = np.asarray(closure["div_J"], dtype=float)
+    j_s = np.asarray(closure["J_s"], dtype=float)
+    j_r = np.asarray(closure["J_r"], dtype=float)
+    j_theta = np.asarray(closure["J_theta"], dtype=float)
+    wall = np.asarray(closure["wall_current_leakage"], dtype=float)
+    boundary = np.asarray(closure["boundary_current_residual"], dtype=float)
+    axial = np.asarray(closure["axial_current"], dtype=float)
+    max_current = float(np.max(np.sqrt(j_s**2 + j_r**2 + j_theta**2))) if j_s.size else 0.0
+    max_div = float(np.max(np.abs(div_j))) if div_j.size else 0.0
+    residual = float(closure["potential_residual"])
+    initial_residual = float(closure["potential_initial_residual"])
+    relative_charge_balance = max_div / max(abs(initial_residual), 1.0e-30)
+    r_scale = float(np.max(np.asarray(closure["r"], dtype=float))) if np.asarray(closure["r"]).size else 1.0
+    charge_to_current_scale = max_div * max(r_scale, 1.0e-30) / max(max_current, 1.0e-30)
+    validation_pass = bool(
+        np.isfinite(max_div)
+        and np.isfinite(max_current)
+        and relative_charge_balance <= 1.0e-8
+        and charge_to_current_scale <= 1.0e-7
+        and float(np.max(np.abs(boundary))) <= 1.0e-7
+    )
+    return {
+        "case": str(closure.get("case", "centerline_pipe_current_closure")),
+        "station_count": int(np.asarray(closure["station"]).size),
+        "max_charge_balance_residual": max_div,
+        "mean_charge_balance_residual": float(np.mean(np.abs(div_j))) if div_j.size else 0.0,
+        "relative_charge_balance_residual": float(relative_charge_balance),
+        "charge_balance_to_current_scale": float(charge_to_current_scale),
+        "max_current_magnitude": max_current,
+        "mean_current_magnitude": float(np.mean(np.sqrt(j_s**2 + j_r**2 + j_theta**2))) if j_s.size else 0.0,
+        "max_wall_current_leakage": float(np.max(np.abs(wall))) if wall.size else 0.0,
+        "net_boundary_current_residual": float(np.max(np.abs(boundary))) if boundary.size else 0.0,
+        "axial_current_span": float(np.max(axial) - np.min(axial)) if axial.size else 0.0,
+        "potential_initial_residual": initial_residual,
+        "potential_residual": residual,
+        "potential_iterations": int(closure["potential_iterations"]),
+        "validation_pass": validation_pass,
+    }
+
+
+def write_centerline_current_closure_preview(
+    closure: dict[str, object],
+    out_dir: str | Path,
+    *,
+    filename_stem: str = "centerline_pipe_current_closure",
+    title: str = "Mapped pipe conservative current-closure diagnostic",
+) -> list[Path]:
+    """Write current-closure plots and JSON/CSV diagnostics."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    _set_field_plot_style()
+    metrics = centerline_current_closure_metrics(closure)
+    station = np.asarray(closure["station"], dtype=float)
+    r = np.asarray(closure["r"], dtype=float)
+    theta = np.asarray(closure["theta"], dtype=float)
+    div_j = np.asarray(closure["div_J"], dtype=float)
+    phi = np.asarray(closure["phi"], dtype=float)
+    current = np.sqrt(
+        np.asarray(closure["J_s"], dtype=float) ** 2
+        + np.asarray(closure["J_r"], dtype=float) ** 2
+        + np.asarray(closure["J_theta"], dtype=float) ** 2
+    )
+    charge_by_station = np.max(np.abs(div_j), axis=(1, 2))
+    relative_charge_by_station = charge_by_station / max(abs(float(closure["potential_initial_residual"])), 1.0e-30)
+    peak_index = int(np.argmax(current.max(axis=(1, 2))))
+
+    fig = plt.figure(figsize=(13.2, 7.2), constrained_layout=True)
+    gs = fig.add_gridspec(2, 3, width_ratios=[1.05, 1.0, 0.86])
+    ax_charge = fig.add_subplot(gs[0, 0])
+    ax_axial = fig.add_subplot(gs[1, 0])
+    ax_phi = fig.add_subplot(gs[0, 1])
+    ax_current = fig.add_subplot(gs[1, 1])
+    ax_text = fig.add_subplot(gs[:, 2])
+
+    ax_charge.semilogy(station, np.maximum(relative_charge_by_station, 1.0e-30), color="#b91c1c", linewidth=2.0)
+    ax_charge.set_xlabel("station s [m]")
+    ax_charge.set_ylabel(r"relative max $|\nabla\cdot J|$")
+    ax_charge.set_title("Local charge-balance residual relative to EMF source")
+
+    axial = np.asarray(closure["axial_current"], dtype=float)
+    ax_axial.plot(station, axial, color="#0f766e", linewidth=2.0)
+    ax_axial.set_xlabel("station s [m]")
+    ax_axial.set_ylabel(r"$\int J_s\,dA$")
+    ax_axial.set_title("Stationwise axial current")
+
+    _plot_polar_cell_contour(ax_phi, r, theta, phi[peak_index], title=f"Potential at peak current, s = {station[peak_index]:.2f} m", label=r"$\phi$")
+    _plot_polar_cell_contour(ax_current, r, theta, current[peak_index], title="Current magnitude at peak current", label=r"$|J|$")
+    _plot_current_metrics(ax_text, metrics)
+    fig.suptitle(title, fontsize=17)
+
+    png = out / f"{filename_stem}.png"
+    pdf = out / f"{filename_stem}.pdf"
+    summary = out / f"{filename_stem}_summary.json"
+    csv_path = out / f"{filename_stem}_station_data.csv"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    summary.write_text(
+        json.dumps({"metrics": metrics, "artifacts": [png.name, pdf.name, csv_path.name]}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    _write_current_closure_csv(csv_path, station, charge_by_station, axial)
+    return [png, pdf, summary, csv_path]
+
+
 def _centerline_points(mesh: StructuredMesh) -> np.ndarray:
     if mesh.point_coordinates is None:
         raise ValueError("centerline field sampling requires mesh.point_coordinates")
@@ -263,6 +509,34 @@ def _sample_in_chunks(
             raise ValueError("field_sampler must return an array with shape (n_points, 3)")
         chunks.append(sampled)
     return np.concatenate(chunks, axis=0)
+
+
+def _face_sample_to_cells(values: np.ndarray) -> np.ndarray:
+    if values.ndim != 3:
+        raise ValueError("face-sampled field component must be three-dimensional")
+    return 0.125 * (
+        values[:-1, :-1, :-1]
+        + values[1:, :-1, :-1]
+        + values[:-1, 1:, :-1]
+        + values[:-1, :-1, 1:]
+        + values[1:, 1:, :-1]
+        + values[1:, :-1, 1:]
+        + values[:-1, 1:, 1:]
+        + values[1:, 1:, 1:]
+    )
+
+
+def _parabolic_pipe_velocity_profile(
+    r_centers: np.ndarray,
+    theta_centers: np.ndarray,
+    *,
+    station_count: int,
+    mean_velocity: float,
+    pipe_radius: float,
+) -> np.ndarray:
+    radius = float(pipe_radius)
+    base = 2.0 * float(mean_velocity) * np.maximum(1.0 - (r_centers / max(radius, 1.0e-30)) ** 2, 0.0)
+    return np.broadcast_to(base[None, :, None], (station_count, r_centers.size, theta_centers.size)).copy()
 
 
 def _set_field_plot_style() -> None:
@@ -320,6 +594,28 @@ def _plot_peak_section(ax, points: np.ndarray, b_mag: np.ndarray, peak_index: in
     cbar.set_label(r"$|B|$ [T]")
 
 
+def _plot_polar_cell_contour(
+    ax,
+    r: np.ndarray,
+    theta: np.ndarray,
+    values: np.ndarray,
+    *,
+    title: str,
+    label: str,
+) -> None:
+    rr = r[:, None]
+    tt = theta[None, :]
+    y = rr * np.cos(tt)
+    z = rr * np.sin(tt)
+    contour = ax.contourf(y, z, values, levels=18, cmap="coolwarm")
+    ax.set_aspect("equal")
+    ax.set_xlabel("local normal radius [m]")
+    ax.set_ylabel("local binormal radius [m]")
+    ax.set_title(title)
+    cbar = plt.colorbar(contour, ax=ax, shrink=0.9, pad=0.02)
+    cbar.set_label(label)
+
+
 def _plot_field_metrics(ax, metrics: dict[str, float | int | bool | str]) -> None:
     ax.axis("off")
     lines = [
@@ -353,6 +649,41 @@ def _plot_field_metrics(ax, metrics: dict[str, float | int | bool | str]) -> Non
     )
 
 
+def _plot_current_metrics(ax, metrics: dict[str, float | int | bool | str]) -> None:
+    ax.axis("off")
+    lines = [
+        "Current-closure gates",
+        f"max |div J|: {metrics['max_charge_balance_residual']:.3e}",
+        f"mean |div J|: {metrics['mean_charge_balance_residual']:.3e}",
+        f"relative |div J|: {metrics['relative_charge_balance_residual']:.3e}",
+        f"scaled |div J|: {metrics['charge_balance_to_current_scale']:.3e}",
+        f"max |J|: {metrics['max_current_magnitude']:.3e}",
+        f"wall leakage: {metrics['max_wall_current_leakage']:.3e}",
+        f"boundary residual: {metrics['net_boundary_current_residual']:.3e}",
+        f"axial-current span: {metrics['axial_current_span']:.3e}",
+        f"potential residual: {metrics['potential_residual']:.3e}",
+        f"potential iterations: {metrics['potential_iterations']}",
+        f"validation pass: {metrics['validation_pass']}",
+        "",
+        "Interpretation",
+        "This solves the conservative",
+        "inductionless potential equation for",
+        "a prescribed streamwise pipe profile.",
+        "It gates phi/J assembly before any",
+        "curved-pipe momentum validation claim.",
+    ]
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(lines),
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=10,
+        bbox={"boxstyle": "round,pad=0.45", "facecolor": "#f8fafc", "edgecolor": "#cbd5e1"},
+    )
+
+
 def _equal_3d_axes(ax, xyz: np.ndarray) -> None:
     mins = np.min(xyz, axis=0)
     maxs = np.max(xyz, axis=0)
@@ -370,4 +701,17 @@ def _write_centerline_csv(path: Path, station: np.ndarray, b_s: np.ndarray, b_pe
         writer = csv.writer(handle)
         writer.writerow(["station_m", "B_s_T", "B_perp_T", "B_magnitude_T"])
         for row in zip(station, b_s, b_perp, b_mag, strict=True):
+            writer.writerow([f"{value:.12e}" for value in row])
+
+
+def _write_current_closure_csv(
+    path: Path,
+    station: np.ndarray,
+    charge_by_station: np.ndarray,
+    axial_current: np.ndarray,
+) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["station_m", "max_abs_div_j", "axial_current"])
+        for row in zip(station, charge_by_station, axial_current, strict=True):
             writer.writerow([f"{value:.12e}" for value in row])

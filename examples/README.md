@@ -73,6 +73,7 @@ python examples/autodiff_wham_pressure_sensitivity.py
 python examples/wham_blanket_geometry_preview.py
 python examples/wham_blanket_mesh_demo.py
 python examples/wham_blanket_field_on_mesh_demo.py
+python examples/wham_blanket_current_closure_demo.py
 python examples/wham_blanket_flow_demo.py
 python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
