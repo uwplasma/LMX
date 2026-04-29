@@ -77,6 +77,11 @@
       "generator": "examples/wham_blanket_flow_demo.py"
     },
     {
+      "name": "wham_blanket_transient_flow.png",
+      "kind": "WHAM blanket centerline pressure-velocity transient",
+      "generator": "examples/wham_blanket_flow_demo.py"
+    },
+    {
       "name": "wham_blanket_autodiff_research.png",
       "kind": "WHAM blanket differentiable pressure-design study",
       "generator": "examples/wham_blanket_autodiff_research_demo.py"

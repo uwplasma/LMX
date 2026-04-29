@@ -298,6 +298,15 @@ refer to the Samper et al. taxonomy.
   field multiplier of `≈ 6.94` for a `20 kPa` target. This closes the
   immediate differentiable blanket-design question while leaving the full
   curved-pipe pressure-velocity/turbulence solve open.
+  The first pressure/velocity follow-up beyond the static design gate now
+  exists in `solve_wham_blanket_transient_flow(...)` and
+  `examples/wham_blanket_flow_demo.py`: a centerline transient with turbulent
+  Darcy-friction closure, local MHD drag, bend losses, and a route
+  incompressibility projection. The README movie now runs to `t = 90 s` and
+  shows filling plus steady-state approach (`U_mean ≈ 0.200 m/s`,
+  `Delta p ≈ 26.4 kPa`) rather than only startup. The remaining research-grade
+  WHAM blocker is still the resolved 3D curved-pipe pressure-velocity/current
+  solve with secondary-flow/turbulence validation.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

@@ -463,10 +463,12 @@ Those examples are the current executable localized-field response entry points:
 - `wham_blanket_flow_demo.py`
   - reuse the approved WHAM blanket route
   - sample the WHAM mirror field along the curved centerline
-  - estimate fixed-flow-rate liquid-metal pressure drop from pipe friction,
-    local MHD drag, and bend loss
-  - write steady velocity sections, station pressure data, a JSON summary, and
-    a compact startup GIF
+  - estimate fixed-flow-rate liquid-metal pressure drop and then run a
+    centerline pressure-velocity transient with turbulent pipe-friction
+    closure, local MHD drag, bend losses, and route incompressibility projection
+  - write steady velocity sections, station/history pressure data, JSON
+    summaries, a transient pressure-velocity panel, and a longer GIF that
+    reaches steady flow
 - `wham_blanket_autodiff_research_demo.py`
   - reuse the same blanket route and reduced fixed-flow pressure budget
   - compute autodiff sensitivities with respect to coil separation, field

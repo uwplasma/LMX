@@ -53,6 +53,26 @@ class BlanketFlowSettings:
     cross_section_points: int = 61
 
 
+@dataclass(frozen=True)
+class BlanketTransientFlowSettings:
+    """Unsteady centerline-flow settings for the WHAM blanket preview.
+
+    This is a stationwise pressure/velocity model with turbulent pipe-friction
+    closure, local MHD drag, and distributed bend losses. It is intended as the
+    next solver-facing WHAM blanket gate beyond static pressure budgeting.
+    """
+
+    pressure_drive_factor: float = 1.0
+    initial_velocity: float = 0.0
+    time_step: float = 0.20
+    final_time: float = 90.0
+    axial_diffusivity: float = 5.0e-4
+    incompressibility_projection: float = 0.92
+    frame_count: int = 72
+    steady_window: int = 18
+    steady_relative_tolerance: float = 2.0e-3
+
+
 def solve_wham_blanket_reduced_flow(
     centerline: dict[str, np.ndarray] | None = None,
     *,
@@ -166,6 +186,174 @@ def solve_wham_blanket_reduced_flow(
             mean_velocity=mean_velocity,
             radius=radius,
         ),
+    }
+
+
+def solve_wham_blanket_transient_flow(
+    flow: dict[str, object],
+    *,
+    settings: BlanketTransientFlowSettings | None = None,
+) -> dict[str, object]:
+    """Run a stationwise transient pressure/velocity model on a WHAM blanket route.
+
+    The model advances the local streamwise mean velocity along the curved
+    centerline under a prescribed pump pressure. Losses are reconstructed from
+    turbulent/laminar Darcy friction, local inductionless MHD drag, and bend
+    curvature. It is still a reduced centerline solver, but it exercises an
+    actual time-dependent pressure/velocity closure rather than only a static
+    pressure-budget postprocess.
+    """
+
+    opts = settings or BlanketTransientFlowSettings()
+    station = np.asarray(flow["station"], dtype=float)
+    b_perp = np.asarray(flow["b_perp"], dtype=float)
+    curvature = np.asarray(flow["curvature"], dtype=float)
+    geometry = flow["geometry"]
+    properties = flow["properties"]
+    flow_settings = flow["settings"]
+    radius = float(geometry.pipe_radius)
+    diameter = 2.0 * radius
+    rho = float(properties.density)
+    mu = float(properties.dynamic_viscosity)
+    sigma = float(properties.electrical_conductivity)
+    length = max(float(station[-1] - station[0]), 1.0e-12)
+    pressure_drive = float(flow["pressure_drop"]) * float(opts.pressure_drive_factor)
+    drive_gradient = pressure_drive / length
+    dt = max(float(opts.time_step), 1.0e-9)
+    step_count = max(1, int(np.ceil(float(opts.final_time) / dt)))
+    time = np.linspace(0.0, step_count * dt, step_count + 1)
+    velocity = np.full_like(station, max(float(opts.initial_velocity), 0.0), dtype=float)
+
+    mean_history = np.empty(step_count + 1, dtype=float)
+    pressure_history = np.empty(step_count + 1, dtype=float)
+    residual_history = np.empty(step_count + 1, dtype=float)
+    courant_history = np.empty(step_count + 1, dtype=float)
+    mean_history[0] = float(np.mean(velocity))
+    pressure_history[0] = 0.0
+    residual_history[0] = 1.0
+    courant_history[0] = 0.0
+    frame_indices = np.unique(np.linspace(0, step_count, max(int(opts.frame_count), 3), dtype=int))
+    velocity_frames: list[np.ndarray] = []
+    pressure_frames: list[np.ndarray] = []
+    time_frames: list[float] = []
+    if 0 in frame_indices:
+        losses0 = _blanket_loss_gradients_for_velocity(
+            velocity,
+            station=station,
+            b_perp=b_perp,
+            curvature=curvature,
+            radius=radius,
+            density=rho,
+            dynamic_viscosity=mu,
+            electrical_conductivity=sigma,
+            mhd_drag_factor=float(flow_settings.mhd_drag_factor),
+            bend_loss_coefficient=float(flow_settings.bend_loss_coefficient),
+        )
+        velocity_frames.append(velocity.copy())
+        pressure_frames.append(_cumulative_trapezoid(losses0["total"], station))
+        time_frames.append(0.0)
+
+    for step in range(1, step_count + 1):
+        losses = _blanket_loss_gradients_for_velocity(
+            velocity,
+            station=station,
+            b_perp=b_perp,
+            curvature=curvature,
+            radius=radius,
+            density=rho,
+            dynamic_viscosity=mu,
+            electrical_conductivity=sigma,
+            mhd_drag_factor=float(flow_settings.mhd_drag_factor),
+            bend_loss_coefficient=float(flow_settings.bend_loss_coefficient),
+        )
+        d2u_ds2 = _centerline_second_derivative(velocity, station)
+        mhd_linear = float(flow_settings.mhd_drag_factor) * sigma * b_perp**2 / max(rho, 1.0e-30)
+        nonlinear_loss = losses["hydraulic"] + losses["curvature"]
+        nonlinear_coeff = np.divide(
+            nonlinear_loss,
+            max(rho, 1.0e-30) * np.maximum(np.abs(velocity), 1.0e-12),
+            out=np.zeros_like(velocity),
+            where=np.abs(velocity) > 1.0e-12,
+        )
+        source = drive_gradient / max(rho, 1.0e-30) + float(opts.axial_diffusivity) * d2u_ds2
+        denominator = 1.0 + dt * mhd_linear + dt * np.maximum(nonlinear_coeff, 0.0)
+        next_velocity = np.maximum((velocity + dt * source) / np.maximum(denominator, 1.0e-12), 0.0)
+        projection = float(np.clip(opts.incompressibility_projection, 0.0, 1.0))
+        next_velocity = (1.0 - projection) * next_velocity + projection * float(np.mean(next_velocity))
+        delta = float(np.max(np.abs(next_velocity - velocity)))
+        velocity = next_velocity
+        updated_losses = _blanket_loss_gradients_for_velocity(
+            velocity,
+            station=station,
+            b_perp=b_perp,
+            curvature=curvature,
+            radius=radius,
+            density=rho,
+            dynamic_viscosity=mu,
+            electrical_conductivity=sigma,
+            mhd_drag_factor=float(flow_settings.mhd_drag_factor),
+            bend_loss_coefficient=float(flow_settings.bend_loss_coefficient),
+        )
+        pressure_curve = _cumulative_trapezoid(updated_losses["total"], station)
+        mean_velocity = float(np.mean(velocity))
+        mean_history[step] = mean_velocity
+        pressure_history[step] = float(pressure_curve[-1])
+        residual_history[step] = delta / max(abs(mean_velocity), 1.0e-12)
+        courant_history[step] = float(np.max(velocity) * dt / max(float(np.min(np.diff(station))), 1.0e-12))
+        if step in frame_indices:
+            velocity_frames.append(velocity.copy())
+            pressure_frames.append(pressure_curve)
+            time_frames.append(float(time[step]))
+
+    final_losses = _blanket_loss_gradients_for_velocity(
+        velocity,
+        station=station,
+        b_perp=b_perp,
+        curvature=curvature,
+        radius=radius,
+        density=rho,
+        dynamic_viscosity=mu,
+        electrical_conductivity=sigma,
+        mhd_drag_factor=float(flow_settings.mhd_drag_factor),
+        bend_loss_coefficient=float(flow_settings.bend_loss_coefficient),
+    )
+    window = min(max(int(opts.steady_window), 2), residual_history.size)
+    steady_residual = float(np.max(residual_history[-window:]))
+    final_pressure = float(pressure_history[-1])
+    return {
+        "case": "wham_blanket_centerline_transient_pressure_velocity",
+        "base_flow": flow,
+        "settings": opts,
+        "time": time,
+        "station": station,
+        "velocity_mean_history": mean_history,
+        "pressure_drop_history": pressure_history,
+        "relative_update_history": residual_history,
+        "courant_history": courant_history,
+        "frame_time": np.asarray(time_frames, dtype=float),
+        "velocity_frames": np.asarray(velocity_frames, dtype=float),
+        "pressure_frames": np.asarray(pressure_frames, dtype=float),
+        "final_velocity": velocity,
+        "final_pressure_curve": _cumulative_trapezoid(final_losses["total"], station),
+        "final_loss_gradients": final_losses,
+        "pressure_drive_pa": pressure_drive,
+        "drive_gradient_pa_per_m": drive_gradient,
+        "metrics": {
+            "model_status": "centerline_transient_pressure_velocity_turbulent_closure",
+            "final_mean_velocity_m_per_s": float(np.mean(velocity)),
+            "target_static_mean_velocity_m_per_s": float(flow_settings.mean_velocity),
+            "final_peak_velocity_m_per_s": float(np.max(velocity)),
+            "final_min_velocity_m_per_s": float(np.min(velocity)),
+            "final_pressure_drop_kpa": final_pressure / 1000.0,
+            "pressure_drive_kpa": pressure_drive / 1000.0,
+            "steady_relative_update": steady_residual,
+            "steady_state_reached": bool(steady_residual <= float(opts.steady_relative_tolerance)),
+            "max_courant": float(np.max(courant_history)),
+            "max_pseudo_courant": float(np.max(courant_history)),
+            "simulated_time_s": float(time[-1]),
+            "frame_count": int(len(time_frames)),
+            "turbulent_closure": "Darcy friction uses laminar 64/Re below Re=2300 and Blasius 0.3164/Re^0.25 above.",
+        },
     }
 
 
@@ -583,6 +771,118 @@ def write_wham_blanket_flow_movie(
     return [gif, poster]
 
 
+def write_wham_blanket_transient_flow_plots(
+    transient: dict[str, object],
+    out_dir: str | Path,
+    *,
+    filename_stem: str = "wham_blanket_transient_flow",
+) -> list[Path]:
+    """Write transient pressure/velocity diagnostics for the blanket route."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    _set_flow_plot_style()
+    base_flow = transient["base_flow"]
+    station = np.asarray(transient["station"], dtype=float)
+    time = np.asarray(transient["time"], dtype=float)
+    mean_velocity = np.asarray(transient["velocity_mean_history"], dtype=float)
+    pressure_drop = np.asarray(transient["pressure_drop_history"], dtype=float) / 1000.0
+    residual = np.asarray(transient["relative_update_history"], dtype=float)
+    final_velocity = np.asarray(transient["final_velocity"], dtype=float)
+    final_pressure = np.asarray(transient["final_pressure_curve"], dtype=float) / 1000.0
+    target_velocity = float(base_flow["settings"].mean_velocity)
+    pressure_reference = float(base_flow["pressure_drop"]) / 1000.0
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.4, 8.2), constrained_layout=True)
+    axes[0, 0].plot(time, mean_velocity, color="#0f766e", linewidth=2.2, label="mean")
+    axes[0, 0].axhline(target_velocity, color="#111827", linestyle="--", label="static target")
+    axes[0, 0].set_title("Centerline transient velocity")
+    axes[0, 0].set_xlabel("time [s]")
+    axes[0, 0].set_ylabel("mean velocity [m/s]")
+    axes[0, 0].legend(loc="best")
+
+    axes[0, 1].plot(time, pressure_drop, color="#b91c1c", linewidth=2.2, label="loss")
+    axes[0, 1].axhline(pressure_reference, color="#111827", linestyle="--", label="steady budget")
+    axes[0, 1].set_title("Pressure drop approaches steady budget")
+    axes[0, 1].set_xlabel("time [s]")
+    axes[0, 1].set_ylabel(r"$\Delta p$ [kPa]")
+    axes[0, 1].legend(loc="best")
+
+    axes[1, 0].plot(station, final_velocity, color="#0f766e", linewidth=2.2)
+    axes[1, 0].axhline(float(np.mean(final_velocity)), color="#111827", linestyle=":")
+    axes[1, 0].set_title("Steady stationwise velocity")
+    axes[1, 0].set_xlabel("station s [m]")
+    axes[1, 0].set_ylabel("velocity [m/s]")
+
+    axes[1, 1].semilogy(time[1:], np.maximum(residual[1:], 1.0e-16), color="#7c3aed", linewidth=2.2)
+    axes[1, 1].axhline(float(transient["settings"].steady_relative_tolerance), color="#111827", linestyle="--")
+    axes[1, 1].set_title("Steady-state update residual")
+    axes[1, 1].set_xlabel("time [s]")
+    axes[1, 1].set_ylabel("relative update")
+    ax_pressure = axes[1, 1].twinx()
+    ax_pressure.plot(station, final_pressure, color="#64748b", alpha=0.45, linewidth=1.2)
+    ax_pressure.set_ylabel("final cumulative pressure [kPa]", color="#64748b")
+    ax_pressure.tick_params(axis="y", labelcolor="#64748b")
+
+    metrics = transient["metrics"]
+    fig.suptitle(
+        "WHAM blanket centerline pressure-velocity transient "
+        f"(steady={metrics['steady_state_reached']}, t={metrics['simulated_time_s']:.0f} s)",
+        fontsize=16,
+    )
+    png = out / f"{filename_stem}.png"
+    pdf = out / f"{filename_stem}.pdf"
+    summary = out / f"{filename_stem}_summary.json"
+    csv = out / f"{filename_stem}_history.csv"
+    fig.savefig(png, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    summary.write_text(json.dumps(_json_transient_summary(transient, [png.name, pdf.name, csv.name]), indent=2) + "\n", encoding="utf-8")
+    _write_transient_history_csv(csv, transient)
+    return [png, pdf, summary, csv]
+
+
+def write_wham_blanket_transient_flow_movie(
+    transient: dict[str, object],
+    out_dir: str | Path,
+    *,
+    filename_stem: str = "wham_blanket_flow",
+    fps: int = 12,
+) -> list[Path]:
+    """Write a longer GIF showing filling, acceleration, and steady-state flow."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    frames = []
+    frame_time = np.asarray(transient["frame_time"], dtype=float)
+    velocity_frames = np.asarray(transient["velocity_frames"], dtype=float)
+    pressure_frames = np.asarray(transient["pressure_frames"], dtype=float)
+    for frame_index, time_value in enumerate(frame_time):
+        image = _render_transient_movie_frame(
+            transient,
+            velocity=velocity_frames[frame_index],
+            pressure=pressure_frames[frame_index],
+            time_value=float(time_value),
+            frame_index=frame_index,
+            frame_count=len(frame_time),
+        )
+        frames.append(image)
+
+    gif = out / f"{filename_stem}.gif"
+    poster = out / f"{filename_stem}_poster.png"
+    frames[-1].save(poster)
+    duration_ms = max(int(1000 / max(int(fps), 1)), 20)
+    frames[0].save(
+        gif,
+        save_all=True,
+        append_images=frames[1:],
+        duration=duration_ms,
+        loop=0,
+        optimize=True,
+    )
+    return [gif, poster]
+
+
 def write_wham_blanket_flow_summary(
     flow: dict[str, object],
     path: str | Path,
@@ -663,6 +963,61 @@ def _darcy_friction_factor(reynolds: float) -> float:
     if reynolds < 2300.0:
         return 64.0 / reynolds
     return 0.3164 / reynolds**0.25
+
+
+def _darcy_friction_factor_array(reynolds: np.ndarray) -> np.ndarray:
+    re = np.maximum(np.asarray(reynolds, dtype=float), 1.0e-12)
+    return np.where(re < 2300.0, 64.0 / re, 0.3164 / re**0.25)
+
+
+def _blanket_loss_gradients_for_velocity(
+    velocity: np.ndarray,
+    *,
+    station: np.ndarray,
+    b_perp: np.ndarray,
+    curvature: np.ndarray,
+    radius: float,
+    density: float,
+    dynamic_viscosity: float,
+    electrical_conductivity: float,
+    mhd_drag_factor: float,
+    bend_loss_coefficient: float,
+) -> dict[str, np.ndarray]:
+    u = np.asarray(velocity, dtype=float)
+    diameter = 2.0 * float(radius)
+    abs_u = np.abs(u)
+    reynolds = density * abs_u * diameter / max(dynamic_viscosity, 1.0e-30)
+    friction = _darcy_friction_factor_array(reynolds)
+    hydraulic = friction * density * u * abs_u / max(2.0 * diameter, 1.0e-30)
+    mhd = mhd_drag_factor * electrical_conductivity * u * np.asarray(b_perp, dtype=float) ** 2
+    curvature_integral = _trapz(np.asarray(curvature, dtype=float), np.asarray(station, dtype=float))
+    if curvature_integral > 1.0e-14:
+        bend = (
+            bend_loss_coefficient
+            * 0.5
+            * density
+            * u
+            * abs_u
+            * np.asarray(curvature, dtype=float)
+            / curvature_integral
+        )
+    else:
+        bend = np.zeros_like(u)
+    return {
+        "hydraulic": hydraulic,
+        "mhd": mhd,
+        "curvature": bend,
+        "total": hydraulic + mhd + bend,
+        "reynolds": reynolds,
+        "friction_factor": friction,
+    }
+
+
+def _centerline_second_derivative(values: np.ndarray, coordinate: np.ndarray) -> np.ndarray:
+    if values.size < 3:
+        return np.zeros_like(values)
+    first = np.gradient(values, coordinate, edge_order=1)
+    return np.gradient(first, coordinate, edge_order=1)
 
 
 def _cross_section_grid(radius: float, points: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -875,6 +1230,94 @@ def _render_movie_frame(
     return image
 
 
+def _render_transient_movie_frame(
+    transient: dict[str, object],
+    *,
+    velocity: np.ndarray,
+    pressure: np.ndarray,
+    time_value: float,
+    frame_index: int,
+    frame_count: int,
+) -> Image.Image:
+    _set_flow_plot_style()
+    base_flow = transient["base_flow"]
+    fig = plt.figure(figsize=(8.4, 5.0), dpi=115, constrained_layout=True)
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.24, 0.94, 0.94])
+    ax3d = fig.add_subplot(gs[0, 0], projection="3d")
+    ax_section = fig.add_subplot(gs[0, 1])
+    ax_history = fig.add_subplot(gs[0, 2])
+
+    centerline = base_flow["centerline"]
+    geometry = base_flow["geometry"]
+    station = np.asarray(transient["station"], dtype=float)
+    x = np.asarray(centerline["x"], dtype=float)
+    y = np.asarray(centerline["y"], dtype=float)
+    z = np.asarray(centerline["z"], dtype=float)
+    points = np.column_stack([x, y, z])
+    segments = np.stack([points[:-1], points[1:]], axis=1)
+    vmax = max(float(np.nanmax(np.asarray(transient["velocity_frames"], dtype=float))), 1.0e-12)
+    collection = Line3DCollection(segments, cmap="turbo", norm=colors.Normalize(vmin=0.0, vmax=vmax), linewidth=5.0)
+    collection.set_array(0.5 * (velocity[:-1] + velocity[1:]))
+    ax3d.add_collection(collection)
+    _draw_simple_coils(ax3d, geometry)
+    selected = _transient_selected_station_index(velocity, station)
+    ax3d.scatter([x[selected]], [y[selected]], [z[selected]], color="#111827", s=34)
+    ax3d.set_title("curved-pipe velocity")
+    ax3d.set_xlabel("x [m]")
+    ax3d.set_ylabel("y [m]")
+    ax3d.set_zlabel("")
+    ax3d.view_init(elev=25, azim=-44)
+    _set_route_limits(ax3d, x, y, z, geometry)
+
+    scale = velocity / max(float(base_flow["settings"].mean_velocity), 1.0e-12)
+    section_flow = {**base_flow, "velocity_sections": np.asarray(base_flow["velocity_sections"], dtype=float) * scale[:, None, None]}
+    _plot_velocity_section(ax_section, section_flow, selected, title=f"s={station[selected]:.2f} m")
+
+    time = np.asarray(transient["time"], dtype=float)
+    mean_history = np.asarray(transient["velocity_mean_history"], dtype=float)
+    pressure_history = np.asarray(transient["pressure_drop_history"], dtype=float) / 1000.0
+    history_index = int(np.clip(np.searchsorted(time, time_value), 0, len(time) - 1))
+    ax_history.plot(time, mean_history, color="#0f766e", linewidth=2.0, label="mean U")
+    ax_history.axvline(time_value, color="#111827", linewidth=1.0)
+    ax_history.set_xlabel("time [s]")
+    ax_history.set_ylabel("mean U [m/s]", color="#0f766e")
+    ax_history.tick_params(axis="y", labelcolor="#0f766e")
+    ax_pressure = ax_history.twinx()
+    ax_pressure.plot(time, pressure_history, color="#b91c1c", linewidth=1.7, label=r"$\Delta p$")
+    ax_pressure.set_ylabel(r"$\Delta p$ [kPa]", color="#b91c1c")
+    ax_pressure.tick_params(axis="y", labelcolor="#b91c1c")
+    ax_history.set_title("approach to steady state")
+    ax_history.text(
+        0.04,
+        0.94,
+        f"t = {time_value:.1f} s\n"
+        f"Umean = {mean_history[history_index]:.3f} m/s\n"
+        f"dp = {pressure_history[history_index]:.2f} kPa\n"
+        f"frame {frame_index + 1}/{frame_count}",
+        transform=ax_history.transAxes,
+        va="top",
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": "#cbd5e1"},
+        fontsize=8,
+    )
+
+    fig.suptitle("LMX WHAM blanket centerline pressure-velocity transient", fontsize=13)
+    fig.canvas.draw()
+    width, height = fig.canvas.get_width_height()
+    rgba = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8).reshape(height, width, 4)
+    image = Image.fromarray(rgba).convert("P", palette=Image.ADAPTIVE, colors=128)
+    plt.close(fig)
+    return image
+
+
+def _transient_selected_station_index(velocity: np.ndarray, station: np.ndarray) -> int:
+    active = np.where(velocity >= 0.5 * max(float(np.max(velocity)), 1.0e-12))[0]
+    if active.size == 0:
+        return 0
+    if active[-1] < len(station) - 2:
+        return int(active[-1])
+    return int(np.argmax(velocity))
+
+
 def _flow_front(station: np.ndarray, front_station: float, *, width: float) -> np.ndarray:
     return 1.0 / (1.0 + np.exp((station - front_station) / max(width, 1.0e-12)))
 
@@ -899,6 +1342,33 @@ def _json_summary(flow: dict[str, object], artifacts: list[str]) -> dict[str, ob
     }
 
 
+def _json_transient_summary(transient: dict[str, object], artifacts: list[str]) -> dict[str, object]:
+    base_flow = transient["base_flow"]
+    return {
+        "case": "wham_blanket_centerline_transient_pressure_velocity",
+        "base_case": base_flow["case"],
+        "geometry": asdict(base_flow["geometry"]),
+        "properties": asdict(base_flow["properties"]),
+        "steady_settings": asdict(base_flow["settings"]),
+        "transient_settings": asdict(transient["settings"]),
+        "metrics": transient["metrics"],
+        "pressure_drive_pa": float(transient["pressure_drive_pa"]),
+        "drive_gradient_pa_per_m": float(transient["drive_gradient_pa_per_m"]),
+        "artifacts": artifacts,
+        "model_equation": (
+            "rho dU/dt = dp_drive/ds - [f_D*rho*U|U|/(2D) + "
+            "C_m*sigma*U*B_perp^2 + distributed K_b*rho*U|U|/2 bend loss] "
+            "+ rho*nu_s*d2U/ds2"
+        ),
+        "model_limitations": (
+            "Unsteady centerline pressure/velocity closure with turbulent pipe "
+            "friction and local MHD drag. It advances velocity and pressure in "
+            "time on the curved route, but it does not resolve 3D secondary "
+            "flows, cross-section turbulence, heat transfer, or induced magnetic field."
+        ),
+    }
+
+
 def _write_station_csv(
     path: Path,
     *,
@@ -910,6 +1380,20 @@ def _write_station_csv(
 ) -> None:
     rows = ["station_m,b_perp_t,hartmann,pressure_drop_pa,total_pressure_gradient_pa_per_m"]
     for values in zip(station, b_perp, hartmann, pressure, total_gradient, strict=True):
+        rows.append(",".join(f"{float(value):.12e}" for value in values))
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def _write_transient_history_csv(path: Path, transient: dict[str, object]) -> None:
+    rows = ["time_s,mean_velocity_m_per_s,pressure_drop_pa,relative_update,courant"]
+    for values in zip(
+        np.asarray(transient["time"], dtype=float),
+        np.asarray(transient["velocity_mean_history"], dtype=float),
+        np.asarray(transient["pressure_drop_history"], dtype=float),
+        np.asarray(transient["relative_update_history"], dtype=float),
+        np.asarray(transient["courant_history"], dtype=float),
+        strict=True,
+    ):
         rows.append(",".join(f"{float(value):.12e}" for value in values))
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 

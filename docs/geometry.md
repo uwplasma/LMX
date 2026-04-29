@@ -249,11 +249,19 @@ The current reference run uses `U = 0.20 m/s`, `R = 0.12 m`, and an explicit
 high-field design multiplier on the parsed WHAM coil field. It reports
 `Δp ≈ 26.5 kPa`, `Re ≈ 2.48e5`, peak `Ha ≈ 904`, and a pressure budget
 dominated by the MHD term. The cross-sections are local Hartmann-layer
-approximations at fixed flow rate. This is a realistic pre-solver blanket
-estimate and visualization; full turbulent curved-pipe secondary flow and
-external validation remain future work.
+approximations at fixed flow rate.
+
+The same example now also runs a centerline pressure-velocity transient with a
+turbulent Darcy-friction closure, local `σ U B_\perp^2` MHD drag, bend losses,
+and an incompressibility projection along the pipe. The retained movie and
+diagnostic panel run to `t = 90 s`, beyond filling/startup, and settle to
+`U_mean ≈ 0.200 m/s` with `Δp ≈ 26.4 kPa`. This is the first executable
+curved-route pressure/velocity gate. It does not yet resolve 3D secondary
+flows, cross-section turbulence, heat transfer, or induced magnetic field.
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](_static/generated/wham_blanket_flow.png)
+
+![LMX WHAM blanket transient pressure-velocity solve](_static/generated/wham_blanket_transient_flow.png)
 
 ![LMX WHAM blanket reduced-flow movie](_static/generated/wham_blanket_flow.gif)
 

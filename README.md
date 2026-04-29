@@ -418,8 +418,12 @@ computes a fixed-flow-rate pressure budget with pipe friction, local
 reference point uses `U = 0.20 m/s`, `R = 0.12 m`, and an explicit high-field
 design multiplier on the parsed WHAM coil field; it gives
 `Δp ≈ 26.5 kPa`, `Re ≈ 2.48e5`, and peak `Ha ≈ 904`. This is a realistic
-engineering preview and movie generator, not yet a full turbulent
-curved-pipe validation.
+engineering preview. The same example now also runs a centerline transient
+pressure-velocity solve with turbulent pipe-friction closure, local MHD drag,
+and bend losses to `t = 90 s`; the retained run settles to
+`U_mean ≈ 0.200 m/s` and `Δp ≈ 26.4 kPa`. This moves the WHAM blanket lane
+beyond a static startup visualization, but it is still not a resolved 3D
+secondary-flow or turbulence validation.
 
 The solver-facing geometry handoff is `examples/wham_blanket_mesh_demo.py`.
 It converts the approved route into a mapped circular-pipe O-grid and writes a
@@ -494,6 +498,8 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM blanket conservative current closure](docs/_static/generated/wham_blanket_current_closure.png)
 
 ![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
+
+![LMX WHAM blanket transient pressure-velocity solve](docs/_static/generated/wham_blanket_transient_flow.png)
 
 ![LMX WHAM blanket differentiable pressure-drop study](docs/_static/generated/wham_blanket_autodiff_research.png)
 

@@ -17,7 +17,7 @@ and posters exist, and that the core publication-facing figures are present.
 | 2D Hunt startup GIF | GitHub release asset | `examples/readme_showcase_demo.py --movie-view 2d` | Boundary-layer startup from flat plug flow |
 | 3D Hunt startup GIF | GitHub release asset | `examples/readme_showcase_demo.py --movie-view 3d` | 3D profile-slab view of the same transient |
 | Q2D turbulence GIF | GitHub release asset | `examples/q2d_turbulence_decay_demo.py` | Nonlinear SM82-style movie gate, external turbulent parity still open |
-| WHAM blanket flow GIF | Tracked local docs asset | `examples/wham_blanket_flow_demo.py` | Reduced fixed-flow blanket route movie |
+| WHAM blanket flow GIF | Tracked local docs asset | `examples/wham_blanket_flow_demo.py` | Centerline pressure-velocity transient to steady flow |
 
 <p align="center">
   <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt startup movie" width="45%">
@@ -41,6 +41,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `bent_pipe_overview.png` | `examples/bent_pipe_inductionless_demo.py` | Curved-pipe geometry and low-De response |
 | `variable_field_tabulated_reconstruction.png` | `examples/variable_field_tabulated_demo.py` | Tabulated-field interpolation/reconstruction gate |
 | `wham_blanket_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket pressure budget and local sections |
+| `wham_blanket_transient_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket centerline pressure-velocity transient to steady state |
 | `wham_blanket_autodiff_research.png` | `examples/wham_blanket_autodiff_research_demo.py` | WHAM pressure sensitivity and field-scale inverse design |
 | `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
 

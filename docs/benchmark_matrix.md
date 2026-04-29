@@ -504,12 +504,13 @@ interpolation mismatch. The remaining tabulated-field research gap is external
     dimensional and relative `div J`, wall-current leakage, boundary-current
     residual, axial-current span, and reconstructed current magnitude
 - `examples/wham_blanket_flow_demo.py`
-  - evaluates the approved route with a fixed-flow-rate PbLi-like reduced
-    pressure budget and writes the pressure plot plus startup GIF
+  - evaluates the approved route with a fixed-flow-rate PbLi-like pressure
+    budget and a centerline pressure-velocity transient with turbulent
+    pipe-friction closure
   - observables:
     cumulative pressure drop, hydraulic/MHD/bend pressure components, sampled
     transverse field, Hartmann number, local velocity-section previews, and
-    station CSV
+    station/history CSV
 - `examples/wham_blanket_autodiff_research_demo.py`
   - differentiates the same reduced pressure budget with respect to coil
     separation, field multiplier, and mean velocity
@@ -520,6 +521,8 @@ interpolation mismatch. The remaining tabulated-field research gap is external
 ![WHAM blanket field sampled on mapped pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
 
 ![WHAM blanket conservative current closure](_static/generated/wham_blanket_current_closure.png)
+
+![WHAM blanket centerline pressure-velocity transient](_static/generated/wham_blanket_transient_flow.png)
 
 ![WHAM blanket differentiable pressure-drop study](_static/generated/wham_blanket_autodiff_research.png)
 

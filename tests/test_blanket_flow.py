@@ -7,13 +7,17 @@ import pytest
 
 from lmx.blanket_flow import (
     BlanketFlowSettings,
+    BlanketTransientFlowSettings,
     LiquidMetalProperties,
     blanket_pressure_budget_from_transverse_field,
     solve_wham_blanket_reduced_flow,
+    solve_wham_blanket_transient_flow,
     wham_blanket_pressure_drop_sensitivity,
     write_wham_blanket_autodiff_research_plots,
     write_wham_blanket_flow_movie,
     write_wham_blanket_flow_plots,
+    write_wham_blanket_transient_flow_movie,
+    write_wham_blanket_transient_flow_plots,
 )
 from lmx.blanket_geometry import WhamBlanketLoop, build_wham_blanket_centerline
 
@@ -65,6 +69,31 @@ def test_write_wham_blanket_flow_artifacts(tmp_path: Path):
     assert (tmp_path / "wham_blanket_flow_station_data.csv").exists()
     assert (tmp_path / "wham_blanket_flow.gif").exists()
     assert (tmp_path / "wham_blanket_flow_poster.png").exists()
+    assert all(path.exists() for path in [*plot_outputs, *movie_outputs])
+
+
+def test_solve_wham_blanket_transient_flow_reaches_bounded_steady_state(tmp_path: Path):
+    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
+    centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=10)
+    flow = solve_wham_blanket_reduced_flow(
+        centerline,
+        geometry=geometry,
+        settings=BlanketFlowSettings(mean_velocity=0.08, cross_section_points=17),
+        field_sampler=_uniform_field,
+    )
+
+    transient = solve_wham_blanket_transient_flow(
+        flow,
+        settings=BlanketTransientFlowSettings(time_step=0.05, final_time=3.0, frame_count=4),
+    )
+    plot_outputs = write_wham_blanket_transient_flow_plots(transient, tmp_path)
+    movie_outputs = write_wham_blanket_transient_flow_movie(transient, tmp_path, fps=4)
+
+    assert transient["metrics"]["final_mean_velocity_m_per_s"] > 0.0
+    assert transient["metrics"]["final_pressure_drop_kpa"] > 0.0
+    assert transient["velocity_frames"].shape[0] >= 3
+    assert (tmp_path / "wham_blanket_transient_flow.png").exists()
+    assert (tmp_path / "wham_blanket_flow.gif").exists()
     assert all(path.exists() for path in [*plot_outputs, *movie_outputs])
 
 
