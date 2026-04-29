@@ -258,6 +258,12 @@ refer to the Samper et al. taxonomy.
   review of that route, then promotion of the approved centerline into a
   mapped-pipe mesh, tabulated WHAM field sampling along the curved pipe, and a
   pressure-drop/current-closure validation gate.
+  The first reduced-flow follow-up now exists through `lmx.blanket_flow` and
+  `examples/wham_blanket_flow_demo.py`. It samples the WHAM field along the
+  approved centerline and writes a fixed-flow-rate PbLi-like pressure-budget
+  panel, station CSV/JSON, and startup GIF. This closes the immediate
+  visualization/engineering-estimate request while keeping the full turbulent
+  curved-pipe MHD solve and external validation explicitly open.
 - Release quality: keep routine tests short, preserve broad `>=95%` coverage,
   move heavy solver comparisons to manual/release workflows, and require every
   publication-facing example to write PNG/PDF plus a JSON summary with named

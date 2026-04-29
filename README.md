@@ -409,6 +409,17 @@ midplane, and returns on the opposite side. This artifact is geometry-only, so
 it is meant for route and clearance review before the mapped-pipe mesh and MHD
 solve are committed.
 
+The first blanket-flow artifact is
+`examples/wham_blanket_flow_demo.py`. It keeps the approved route, samples the
+WHAM mirror field along the curved centerline, uses PbLi-like properties, and
+computes a fixed-flow-rate pressure budget with pipe friction, local
+`σ U B_\perp^2` MHD drag, and a distributed bend-loss term. The current
+reference point uses `U = 0.20 m/s`, `R = 0.12 m`, and an explicit high-field
+design multiplier on the parsed WHAM coil field; it gives
+`Δp ≈ 26.5 kPa`, `Re ≈ 2.48e5`, and peak `Ha ≈ 904`. This is a realistic
+engineering preview and movie generator, not yet a full turbulent
+curved-pipe validation.
+
 The WHAM table is generated in the same streamwise coordinate frame used by
 the extruded solver, `x ∈ [0, L]`, with an explicit `coil_frame_x_offset` that
 centers the mirror coils in physical coordinates. This avoids silent tabulated
@@ -439,6 +450,12 @@ deficit at the nominal low-Re settings.
 ![LMX WHAM-like mirror pressure sensitivity](docs/_static/generated/autodiff_wham_pressure_sensitivity.png)
 
 ![LMX WHAM blanket pipe geometry preview](docs/_static/generated/wham_blanket_geometry_preview.png)
+
+![LMX WHAM blanket reduced-flow pressure and steady sections](docs/_static/generated/wham_blanket_flow.png)
+
+<p align="center">
+  <img src="docs/_static/generated/wham_blanket_flow.gif" alt="LMX WHAM blanket reduced-flow movie" width="72%">
+</p>
 
 ### Straight-duct setup
 
@@ -697,6 +714,7 @@ Useful entry points:
 - `examples/variable_field_geometry_demo.py`: Python-native geometry and field editing
 - `examples/wham_coil_model_field_adapter.py`: WHAM coil-script to tabulated-field adapter
 - `examples/wham_blanket_geometry_preview.py`: circular blanket pipe route around the WHAM central cell before simulation
+- `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, steady sections, and startup movie
 
 ## Documentation
 

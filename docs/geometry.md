@@ -226,3 +226,26 @@ pipe radius, coil separation, and tube-to-cell clearance before the mapped-pipe
 simulation is built.
 
 ![LMX WHAM blanket pipe geometry preview](_static/generated/wham_blanket_geometry_preview.png)
+
+## WHAM blanket reduced-flow preview
+
+`examples/wham_blanket_flow_demo.py` is the first flow-facing artifact for the
+approved route. It uses the same centerline and a fixed-flow-rate engineering
+model with PbLi-like properties. The sampled WHAM field enters through the
+local transverse field `B_\perp`, and the pressure budget is
+
+```text
+Δp = ∫ [ f_D ρ U²/(2D) + C_m σ U B_\perp² + K_b ρ U² κ/(2∫κ ds) ] ds .
+```
+
+The current reference run uses `U = 0.20 m/s`, `R = 0.12 m`, and an explicit
+high-field design multiplier on the parsed WHAM coil field. It reports
+`Δp ≈ 26.5 kPa`, `Re ≈ 2.48e5`, peak `Ha ≈ 904`, and a pressure budget
+dominated by the MHD term. The cross-sections are local Hartmann-layer
+approximations at fixed flow rate. This is a realistic pre-solver blanket
+estimate and visualization; full turbulent curved-pipe secondary flow and
+external validation remain future work.
+
+![LMX WHAM blanket reduced-flow pressure and steady sections](_static/generated/wham_blanket_flow.png)
+
+![LMX WHAM blanket reduced-flow movie](_static/generated/wham_blanket_flow.gif)

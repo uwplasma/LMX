@@ -1,0 +1,53 @@
+{
+  "case": "wham_blanket_reduced_flow",
+  "geometry": {
+    "pipe_radius": 0.12,
+    "bend_radius": 0.9,
+    "entry_length": 1.35,
+    "central_cell_radius": 0.42,
+    "coil_separation": 1.96,
+    "coil_inner_radius": 0.043,
+    "coil_outer_radius": 0.365,
+    "coil_axial_thickness": 0.1144,
+    "z_offset": 0.0
+  },
+  "properties": {
+    "density": 9300.0,
+    "dynamic_viscosity": 0.0018,
+    "electrical_conductivity": 790000.0,
+    "label": "PbLi-like liquid metal"
+  },
+  "settings": {
+    "mean_velocity": 0.2,
+    "field_scale": 8.0,
+    "mhd_drag_factor": 0.35,
+    "bend_loss_coefficient": 0.35,
+    "radial_loops": 12,
+    "axial_loops": 4,
+    "cross_section_points": 55
+  },
+  "metrics": {
+    "model_status": "reduced_fixed_flow_rate_pressure_budget",
+    "mean_velocity_m_per_s": 0.2,
+    "flow_rate_m3_per_s": 0.009047786842338604,
+    "reynolds_number": 248000.0,
+    "darcy_friction_factor": 0.01417828019087004,
+    "peak_b_perp_t": 0.3594915270805359,
+    "mean_b_perp_t": 0.23464014763305602,
+    "peak_hartmann_number": 903.7476853800713,
+    "mean_hartmann_number": 589.8761844061665,
+    "peak_interaction_parameter": 6.58677321636965,
+    "pressure_drop_pa": 26525.345551119655,
+    "pressure_drop_kpa": 26.525345551119656,
+    "hydraulic_pressure_drop_pa": 80.51443804893293,
+    "mhd_pressure_drop_pa": 26379.731113070688,
+    "curvature_pressure_drop_pa": 65.1,
+    "mhd_pressure_fraction": 0.9945103660282827
+  },
+  "artifacts": [
+    "wham_blanket_flow.png",
+    "wham_blanket_flow.pdf"
+  ],
+  "model_equation": "Delta p = integral [ f_D*rho*U^2/(2D) + C_m*sigma*U*B_perp^2 + distributed K_b*rho*U^2/2 bend loss ] ds",
+  "model_limitations": "Fixed-flow-rate reduced pipe model; velocity profiles are local Hartmann-layer approximations and do not yet resolve full curved-pipe secondary flow, turbulence, heat transfer, or induced magnetic field."
+}
