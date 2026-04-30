@@ -65,6 +65,11 @@
             "generator": "examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py"
         },
         {
+            "name": "q2dmhdfoam_lmx_turbulence_match_audit.png",
+            "kind": "Q2DmhdFoam-to-LMX nonlinear Q2D match audit",
+            "generator": "examples/q2dmhdfoam_lmx_turbulence_match_audit.py"
+        },
+        {
             "name": "q2dmhdfoam_lid_driven_vtk.png",
             "kind": "Q2DmhdFoam lid-driven VTK field-ingestion artifact",
             "generator": "examples/q2dmhdfoam_lid_driven_vtk_artifact.py"

@@ -92,6 +92,7 @@ python examples/q2d_decay_validation.py
 python examples/q2d_forced_validation.py
 python examples/q2d_wall_bounded_validation.py
 python examples/q2dmhdfoam_external_reference_adapter.py
+python examples/q2dmhdfoam_lmx_turbulence_match_audit.py
 python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_regime_scan.py
 python examples/magnetic_obstacle_baseline.py
@@ -427,6 +428,20 @@ lid-driven spectral summary. It writes a PNG/PDF panel, summary JSON, and GIF
 for the README. The summary intentionally records `matched_parity = false`
 until a Q2DmhdFoam case is run with the same geometry, forcing, Hartmann
 friction, integration time, and observable definitions as the LMX case.
+
+Q2DmhdFoam-to-LMX nonlinear Q2D match audit:
+
+```bash
+python examples/q2dmhdfoam_lmx_turbulence_match_audit.py
+```
+
+That example scans local Q2DmhdFoam case dictionaries and writes JSON, CSV,
+PNG, and PDF artifacts that show which strict parity gates pass before any
+external run is allowed to fill `q2d_turbulence_reference_observables.csv`. The
+current local `lidDriven`, `muck_q2d_FFT`, and `muck_q2d` cases are useful
+executable evidence, but the audit keeps the nonlinear Q2D parity lane open
+because topology, forcing, Hartmann friction, timestep window, or observable
+definitions are not all matched to the LMX SM82-style movie case.
 
 Q2DmhdFoam generic VTK field ingestion:
 

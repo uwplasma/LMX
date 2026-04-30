@@ -42,6 +42,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `closed_channel_validation_ladder.png` | `examples/hartmann_validation_ladder.py` | Hartmann/Shercliff/Hunt mesh and Ha ladder |
 | `q2d_turbulence_observables.png` | `examples/q2d_wall_bounded_validation.py` | Q2D energy, spectrum, and observable readiness |
 | `q2d_lmx_q2dmhdfoam_turbulence_comparison.png` | `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py` | LMX nonlinear Q2D observables alongside Q2DmhdFoam lid-driven spectral-summary evidence |
+| `q2dmhdfoam_lmx_turbulence_match_audit.png` | `examples/q2dmhdfoam_lmx_turbulence_match_audit.py` | Case-dictionary audit preventing unmatched Q2DmhdFoam runs from being promoted to strict nonlinear Q2D parity |
 | `q2dmhdfoam_docker_reference.png` | `examples/q2dmhdfoam_docker_reference_validation.py` | Docker-rerun Q2DmhdFoam external executable gate |
 | `q2dmhdfoam_lid_driven_vtk.png` | `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` | Generic Q2DmhdFoam Docker rerun VTK ingestion and field observables |
 | `q2d_lmx_q2dmhdfoam_lid_driven_parity.png` | `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py` | Matched isothermal side-wall LMX/Q2DmhdFoam field-observable comparison |
@@ -85,6 +86,7 @@ python examples/readme_showcase_demo.py --output docs/_static/generated --skip-g
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 3d
 python examples/q2d_turbulence_decay_demo.py
 python examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py
+python examples/q2dmhdfoam_lmx_turbulence_match_audit.py
 python examples/q2dmhdfoam_docker_reference_validation.py
 python examples/q2dmhdfoam_lid_driven_vtk_artifact.py
 python examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py

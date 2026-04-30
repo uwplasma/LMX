@@ -11,6 +11,7 @@ from lmx.external_validation import (
     compare_scalar_reference_observables,
     dean_vortex_reference_template_rows,
     external_validation_readiness_rows,
+    audit_q2dmhdfoam_lmx_turbulence_match,
     load_q2dmhdfoam_force_coefficients,
     load_q2dmhdfoam_docker_reference_profile,
     load_q2dmhdfoam_lid_driven_cell_field,
@@ -21,6 +22,7 @@ from lmx.external_validation import (
     load_magnetic_obstacle_reference_observables,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
+    q2dmhdfoam_case_manifest,
     q2dmhdfoam_docker_reference_observables,
     q2dmhdfoam_cell_velocity_observables,
     q2dmhdfoam_profile_observables,
@@ -34,6 +36,7 @@ from lmx.external_validation import (
     write_magnetic_obstacle_reference_template,
     write_q2dmhdfoam_docker_reference_panel,
     write_q2dmhdfoam_external_reference_panel,
+    write_q2dmhdfoam_lmx_turbulence_match_audit,
     write_q2dmhdfoam_profile_observable_table,
     write_q2dmhdfoam_timeseries_observable_table,
     write_q2dmhdfoam_vtk_velocity_panel,
@@ -361,6 +364,30 @@ def test_q2dmhdfoam_lid_driven_cell_field_observables(tmp_path: Path):
     assert observables["reference_gate"] == "q2dmhdfoam_cell_field_observables"
 
 
+def test_q2dmhdfoam_case_manifest_and_match_audit(tmp_path: Path):
+    case_dir = _write_fake_q2dmhdfoam_case(tmp_path / "muck_q2d_FFT")
+
+    manifest = q2dmhdfoam_case_manifest(case_dir)
+    audit = audit_q2dmhdfoam_lmx_turbulence_match(case_dir)
+    paths = write_q2dmhdfoam_lmx_turbulence_match_audit([audit], tmp_path / "audit")
+
+    assert manifest["application"] == "Q2DmhdFoam"
+    assert manifest["has_cylinder_obstacle"] is True
+    assert manifest["has_inlet_outlet"] is True
+    assert manifest["has_empty_hartmann_walls"] is True
+    assert manifest["hartmann_friction_nonzero"] is False
+    assert manifest["probe_count"] == 2
+    assert manifest["total_cell_count"] == 12
+    assert audit["strict_admissible"] is False
+    assert audit["decision"] == "not_admissible_for_strict_csv"
+    assert {"topology", "hartmann_friction", "forcing", "observables"} <= set(audit["blockers"])
+    assert [path.suffix for path in paths] == [".json", ".csv", ".png", ".pdf"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in paths)
+    assert "not_admissible_for_strict_csv" in (tmp_path / "audit" / "q2dmhdfoam_lmx_turbulence_match_audit.csv").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):
     reference_path = tmp_path / "reference.csv"
     reference_path.write_text(
@@ -414,3 +441,41 @@ def test_write_external_validation_readiness_panel(tmp_path: Path):
     assert [path.suffix for path in paths] == [".png"]
     assert all(path.exists() for path in paths)
     assert all(path.stat().st_size > 0 for path in paths)
+
+
+def _write_fake_q2dmhdfoam_case(case_dir: Path) -> Path:
+    (case_dir / "system").mkdir(parents=True)
+    (case_dir / "constant" / "polyMesh").mkdir(parents=True)
+    (case_dir / "0").mkdir(parents=True)
+    (case_dir / "system" / "controlDict").write_text(
+        "application Q2DmhdFoam;\n"
+        "endTime 100;\n"
+        "deltaT 10;\n"
+        "writeInterval 20;\n"
+        "functions { probes { probeLocations ((0 0 0) (1 0 0)); } }\n",
+        encoding="utf-8",
+    )
+    (case_dir / "constant" / "transportProperties").write_text(
+        "nu nu [0 2 -1 0 0 0 0] 2.0e-7;\n"
+        "rho0 rho0 [1 -3 0 0 0 0 0] 9800;\n"
+        "sigma sigma [-1 -3 3 0 0 2 0] 7.8e5;\n"
+        "q0 q0 [1 -1 -3 0 0 0 0] 0;\n"
+        "a a [0 1 0 0 0 0 0] 1;\n"
+        "b b [0 1 0 0 0 0 0] 1;\n"
+        "Ubar Ubar [0 1 -1 0 0 0 0] (0 0 0);\n",
+        encoding="utf-8",
+    )
+    (case_dir / "0" / "B").write_text("internalField uniform 0;\n", encoding="utf-8")
+    (case_dir / "constant" / "polyMesh" / "blockMeshDict").write_text(
+        "vertices ((0 0 0) (1 0 0) (1 1 0) (0 1 0) (0 0 0.1) (1 0 0.1) (1 1 0.1) (0 1 0.1));\n"
+        "blocks (hex (0 1 2 3 4 5 6 7) (3 4 1) simpleGrading (1 1 1));\n"
+        "patches (\n"
+        "patch xinlet ((0 4 7 3))\n"
+        "patch xoutlet ((1 2 6 5))\n"
+        "patch sideWalls ((0 1 5 4) (3 7 6 2))\n"
+        "empty hartmannWalls ((0 3 2 1) (4 5 6 7))\n"
+        "patch cylinder ((0 1 2 3))\n"
+        ");\n",
+        encoding="utf-8",
+    )
+    return case_dir

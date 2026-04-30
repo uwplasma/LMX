@@ -1335,6 +1335,413 @@ def _read_openfoam_vector_internal_field(path: Path) -> np.ndarray:
     return np.asarray(rows, dtype=float)
 
 
+def q2dmhdfoam_case_manifest(case_dir: str | Path) -> dict[str, object]:
+    """Return a compact physical/numerical manifest for a Q2DmhdFoam case.
+
+    The manifest is intentionally based on case dictionaries rather than solver
+    output. It is used to decide whether an external Q2DmhdFoam run can be
+    promoted into a strict LMX-vs-Q2DmhdFoam Q2D turbulence reference.
+    """
+
+    root = Path(case_dir)
+    control = _read_text_if_exists(root / "system" / "controlDict")
+    transport = _read_text_if_exists(root / "constant" / "transportProperties")
+    b_field = _read_text_if_exists(root / "0" / "B")
+    mesh = _read_text_if_exists(root / "constant" / "polyMesh" / "blockMeshDict")
+    if not mesh:
+        mesh = _read_text_if_exists(root / "constant" / "polyMesh.org" / "blockMeshDict")
+    patch_types = _q2dmhdfoam_patch_types(mesh)
+    vertices = _q2dmhdfoam_vertices(mesh)
+    cells = _q2dmhdfoam_block_cell_counts(mesh)
+    b_internal = _openfoam_internal_uniform_scalar(b_field)
+    ubar = _openfoam_dimensioned_vector(transport, "Ubar")
+    ubar_magnitude = float(np.linalg.norm(ubar))
+    q0 = _openfoam_dimensioned_scalar(transport, "q0")
+    nu = _openfoam_dimensioned_scalar(transport, "nu")
+    rho0 = _openfoam_dimensioned_scalar(transport, "rho0")
+    sigma = _openfoam_dimensioned_scalar(transport, "sigma")
+    a = _openfoam_dimensioned_scalar(transport, "a")
+    b = _openfoam_dimensioned_scalar(transport, "b")
+    if vertices.size:
+        domain = {
+            "x_min": float(np.min(vertices[:, 0])),
+            "x_max": float(np.max(vertices[:, 0])),
+            "y_min": float(np.min(vertices[:, 1])),
+            "y_max": float(np.max(vertices[:, 1])),
+            "z_min": float(np.min(vertices[:, 2])),
+            "z_max": float(np.max(vertices[:, 2])),
+        }
+    else:
+        domain = {}
+    return {
+        "case_dir": str(root),
+        "case_name": root.name,
+        "application": _openfoam_word(control, "application"),
+        "end_time": _openfoam_scalar_assignment(control, "endTime"),
+        "delta_t": _openfoam_scalar_assignment(control, "deltaT"),
+        "write_interval": _openfoam_scalar_assignment(control, "writeInterval"),
+        "probe_count": _q2dmhdfoam_probe_count(control),
+        "nu": nu,
+        "rho0": rho0,
+        "sigma": sigma,
+        "a": a,
+        "b": b,
+        "q0": q0,
+        "ubar": [float(value) for value in ubar],
+        "ubar_magnitude": ubar_magnitude,
+        "magnetic_field_internal": b_internal,
+        "hartmann_friction_nonzero": bool(abs(b_internal) > 0.0),
+        "thermal_forcing_nonzero": bool(abs(q0) > 0.0),
+        "forced_mean_flow": bool(ubar_magnitude > 0.0),
+        "patch_types": patch_types,
+        "patch_names": sorted(patch_types),
+        "has_cylinder_obstacle": "cylinder" in patch_types,
+        "has_inlet_outlet": "xinlet" in patch_types or "xoutlet" in patch_types,
+        "has_side_walls": "sideWalls" in patch_types,
+        "has_empty_hartmann_walls": patch_types.get("hartmannWalls") == "empty",
+        "has_cyclic_patch": any(kind == "cyclic" for kind in patch_types.values()),
+        "domain": domain,
+        "block_count": len(cells),
+        "total_cell_count": int(sum(np.prod(count) for count in cells)) if cells else 0,
+    }
+
+
+def audit_q2dmhdfoam_lmx_turbulence_match(
+    case_dir: str | Path,
+    *,
+    lmx_case: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Audit whether a Q2DmhdFoam case can close strict LMX Q2D parity.
+
+    The current strict target is the LMX periodic Sommeria-Moreau-style
+    nonlinear vorticity solve used by the README movie. A Q2DmhdFoam case must
+    match topology, forcing, Hartmann friction, time window, and observables
+    before it is allowed to populate ``q2d_turbulence_reference_observables``.
+    """
+
+    manifest = q2dmhdfoam_case_manifest(case_dir)
+    target = dict(lmx_case or _default_lmx_q2d_turbulence_target())
+    gates = [
+        _audit_gate(
+            "application",
+            "Q2DmhdFoam",
+            manifest.get("application") == "Q2DmhdFoam",
+            str(manifest.get("application", "")),
+        ),
+        _audit_gate(
+            "topology",
+            "periodic box, no inlet/outlet, no obstacle",
+            not bool(manifest["has_inlet_outlet"]) and not bool(manifest["has_cylinder_obstacle"]) and bool(manifest["has_cyclic_patch"]),
+            _topology_label(manifest),
+        ),
+        _audit_gate(
+            "hartmann_friction",
+            "nonzero Hartmann friction matching LMX alpha",
+            bool(manifest["hartmann_friction_nonzero"]),
+            f"B={float(manifest['magnetic_field_internal']):.6g}",
+        ),
+        _audit_gate(
+            "forcing",
+            str(target["forcing_kind"]),
+            False,
+            _forcing_label(manifest),
+        ),
+        _audit_gate(
+            "time_window",
+            f"dt={target['dt']}, t_final={target['t_final']}",
+            _close_or_missing(manifest.get("delta_t"), float(target["dt"])) and _close_or_missing(manifest.get("end_time"), float(target["t_final"])),
+            f"dt={manifest.get('delta_t')}, endTime={manifest.get('end_time')}",
+        ),
+        _audit_gate(
+            "observables",
+            "energy, enstrophy, spectrum, turnover, force/probe histories",
+            False,
+            f"probe_count={manifest.get('probe_count')}; no energy/enstrophy contract in case dictionaries",
+        ),
+    ]
+    blockers = [gate["criterion"] for gate in gates if not gate["passed"]]
+    strict_admissible = not blockers
+    return {
+        "case": "q2dmhdfoam_lmx_turbulence_match_audit",
+        "case_name": manifest["case_name"],
+        "manifest": manifest,
+        "lmx_target": target,
+        "gate_results": gates,
+        "blockers": blockers,
+        "strict_admissible": strict_admissible,
+        "matched_parity": False,
+        "strict_blocker_closed": False,
+        "decision": "admissible_for_strict_csv" if strict_admissible else "not_admissible_for_strict_csv",
+        "required_next_step": (
+            "Either create a Q2DmhdFoam case with the same periodic topology, "
+            "Hartmann friction, deterministic forcing, timestep window, and "
+            "energy/enstrophy/spectrum observables as the LMX SM82 case, or add "
+            "the corresponding LMX inlet/outlet obstacle/cavity physics before "
+            "using the existing Q2DmhdFoam outputs as strict turbulence parity."
+        ),
+    }
+
+
+def write_q2dmhdfoam_lmx_turbulence_match_audit(
+    audits: Sequence[Mapping[str, object]],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "q2dmhdfoam_lmx_turbulence_match_audit",
+) -> list[Path]:
+    """Write JSON/CSV/PNG/PDF artifacts for Q2DmhdFoam-vs-LMX match audits."""
+
+    import matplotlib.pyplot as plt
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    audit_rows = [dict(audit) for audit in audits]
+    json_path = out_dir / f"{output_stem}.json"
+    csv_path = out_dir / f"{output_stem}.csv"
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
+    json_path.write_text(json.dumps({"case": output_stem, "audits": audit_rows}, indent=2) + "\n", encoding="utf-8")
+    _write_q2dmhdfoam_match_audit_csv(audit_rows, csv_path)
+
+    criteria = sorted({str(gate["criterion"]) for audit in audit_rows for gate in audit.get("gate_results", [])})
+    if not criteria:
+        criteria = ["no gates"]
+    matrix = np.zeros((len(audit_rows), len(criteria)), dtype=float)
+    for row_index, audit in enumerate(audit_rows):
+        by_name = {str(gate["criterion"]): bool(gate["passed"]) for gate in audit.get("gate_results", [])}
+        for column_index, criterion in enumerate(criteria):
+            matrix[row_index, column_index] = 1.0 if by_name.get(criterion, False) else 0.0
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.2, 5.4), constrained_layout=True)
+    image = axes[0].imshow(matrix, vmin=0.0, vmax=1.0, cmap="RdYlGn", aspect="auto")
+    axes[0].set_yticks(np.arange(len(audit_rows)), [str(audit.get("case_name", f"case {idx+1}")) for idx, audit in enumerate(audit_rows)])
+    axes[0].set_xticks(np.arange(len(criteria)), criteria, rotation=35, ha="right")
+    axes[0].set_title("Strict Q2D parity admissibility gates")
+    for row in range(matrix.shape[0]):
+        for column in range(matrix.shape[1]):
+            axes[0].text(column, row, "pass" if matrix[row, column] > 0.5 else "open", ha="center", va="center", fontsize=8)
+    fig.colorbar(image, ax=axes[0], ticks=[0, 1], fraction=0.046, pad=0.04)
+
+    axes[1].axis("off")
+    lines = ["Decision summary"]
+    for audit in audit_rows:
+        blockers = list(audit.get("blockers", []))
+        lines.append("")
+        lines.append(f"{audit.get('case_name')}: {audit.get('decision')}")
+        lines.append(f"open gates: {', '.join(map(str, blockers)) if blockers else 'none'}")
+    lines.extend(
+        [
+            "",
+            "No row is promoted into q2d_turbulence_reference_observables.csv unless all strict gates pass.",
+        ]
+    )
+    axes[1].text(0.02, 0.98, "\n".join(lines), va="top", fontsize=10.0, transform=axes[1].transAxes)
+    fig.suptitle("Q2DmhdFoam-to-LMX nonlinear Q2D match audit", fontsize=15, fontweight="bold")
+    for path in (png_path, pdf_path):
+        fig.savefig(path, dpi=185, bbox_inches="tight")
+    plt.close(fig)
+    return [json_path, csv_path, png_path, pdf_path]
+
+
+def _write_q2dmhdfoam_match_audit_csv(audits: Sequence[Mapping[str, object]], path: Path) -> None:
+    columns = [
+        "case_name",
+        "criterion",
+        "passed",
+        "expected",
+        "observed",
+        "decision",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for audit in audits:
+            for gate in audit.get("gate_results", []):
+                writer.writerow(
+                    {
+                        "case_name": audit.get("case_name", ""),
+                        "criterion": gate.get("criterion", ""),
+                        "passed": gate.get("passed", ""),
+                        "expected": gate.get("expected", ""),
+                        "observed": gate.get("observed", ""),
+                        "decision": audit.get("decision", ""),
+                    }
+                )
+
+
+def _default_lmx_q2d_turbulence_target() -> dict[str, object]:
+    return {
+        "model": "periodic_sommeria_moreau_vorticity",
+        "geometry_kind": "periodic_box",
+        "lx": 2.0,
+        "ly": 2.0,
+        "viscosity": 8.0e-4,
+        "hartmann_friction": 0.08,
+        "forcing_kind": "deterministic_periodic_vorticity_forcing",
+        "dt": 2.0e-3,
+        "t_final": 3.0,
+        "required_observables": [
+            "energy_decay_ratio",
+            "enstrophy_decay_ratio",
+            "final_spectral_centroid",
+            "final_high_k_energy_fraction",
+            "turnover_count",
+        ],
+    }
+
+
+def _audit_gate(criterion: str, expected: str, passed: bool, observed: str) -> dict[str, object]:
+    return {
+        "criterion": criterion,
+        "expected": expected,
+        "observed": observed,
+        "passed": bool(passed),
+    }
+
+
+def _topology_label(manifest: Mapping[str, object]) -> str:
+    flags = []
+    if manifest.get("has_cylinder_obstacle"):
+        flags.append("cylinder")
+    if manifest.get("has_inlet_outlet"):
+        flags.append("inlet/outlet")
+    if manifest.get("has_side_walls"):
+        flags.append("sideWalls")
+    if manifest.get("has_cyclic_patch"):
+        flags.append("cyclic")
+    if manifest.get("has_empty_hartmann_walls"):
+        flags.append("empty_hartmannWalls")
+    return ", ".join(flags) if flags else "no recognized topology flags"
+
+
+def _forcing_label(manifest: Mapping[str, object]) -> str:
+    pieces = []
+    if manifest.get("thermal_forcing_nonzero"):
+        pieces.append(f"thermal q0={float(manifest.get('q0', 0.0)):.6g}")
+    if manifest.get("forced_mean_flow"):
+        pieces.append(f"mean-flow Ubar={float(manifest.get('ubar_magnitude', 0.0)):.6g}")
+    if not pieces:
+        pieces.append("no q0/Ubar forcing in dictionaries")
+    return ", ".join(pieces)
+
+
+def _close_or_missing(value: object, target: float, *, rel_tol: float = 1.0e-8, abs_tol: float = 1.0e-12) -> bool:
+    if value is None:
+        return False
+    try:
+        return bool(abs(float(value) - target) <= max(abs_tol, rel_tol * max(abs(target), 1.0)))
+    except (TypeError, ValueError):
+        return False
+
+
+def _read_text_if_exists(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+def _strip_cpp_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//.*", "", text)
+
+
+def _openfoam_word(text: str, key: str) -> str:
+    clean = _strip_cpp_comments(text)
+    match = re.search(r"\b" + re.escape(key) + r"\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", clean)
+    return match.group(1) if match else ""
+
+
+def _openfoam_scalar_assignment(text: str, key: str) -> float | None:
+    clean = _strip_cpp_comments(text)
+    match = re.search(r"\b" + re.escape(key) + r"\s+(" + FLOAT_PATTERN + r")\s*;", clean)
+    return float(match.group(1)) if match else None
+
+
+def _openfoam_dimensioned_scalar(text: str, key: str) -> float:
+    clean = _strip_cpp_comments(text)
+    pattern = (
+        r"\b"
+        + re.escape(key)
+        + r"\s+(?:[A-Za-z_][A-Za-z0-9_]*\s+)?(?:\[[^\]]+\]\s+)?("
+        + FLOAT_PATTERN
+        + r")\s*;"
+    )
+    match = re.search(pattern, clean)
+    return float(match.group(1)) if match else 0.0
+
+
+def _openfoam_dimensioned_vector(text: str, key: str) -> np.ndarray:
+    clean = _strip_cpp_comments(text)
+    pattern = (
+        r"\b"
+        + re.escape(key)
+        + r"\s+(?:[A-Za-z_][A-Za-z0-9_]*\s+)?(?:\[[^\]]+\]\s+)?\(("
+        + FLOAT_PATTERN
+        + r")\s+("
+        + FLOAT_PATTERN
+        + r")\s+("
+        + FLOAT_PATTERN
+        + r")\)\s*;"
+    )
+    match = re.search(pattern, clean)
+    if not match:
+        return np.zeros(3, dtype=float)
+    return np.asarray([float(match.group(1)), float(match.group(2)), float(match.group(3))], dtype=float)
+
+
+def _openfoam_internal_uniform_scalar(text: str) -> float:
+    clean = _strip_cpp_comments(text)
+    match = re.search(r"\binternalField\s+uniform\s+(" + FLOAT_PATTERN + r")\s*;", clean)
+    return float(match.group(1)) if match else 0.0
+
+
+def _q2dmhdfoam_patch_types(mesh_text: str) -> dict[str, str]:
+    clean = _strip_cpp_comments(mesh_text)
+    patch_types: dict[str, str] = {}
+    for kind, name in re.findall(r"\b(patch|wall|empty|cyclic|symmetryPlane)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", clean):
+        patch_types[name] = kind
+    return patch_types
+
+
+def _q2dmhdfoam_vertices(mesh_text: str) -> np.ndarray:
+    clean = _strip_cpp_comments(mesh_text)
+    match = re.search(r"\bvertices\s*\((.*?)\)\s*;", clean, flags=re.S)
+    if not match:
+        return np.empty((0, 3), dtype=float)
+    rows = [
+        (float(x), float(y), float(z))
+        for x, y, z in re.findall(
+            r"\((" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\)",
+            match.group(1),
+        )
+    ]
+    return np.asarray(rows, dtype=float) if rows else np.empty((0, 3), dtype=float)
+
+
+def _q2dmhdfoam_block_cell_counts(mesh_text: str) -> list[tuple[int, int, int]]:
+    clean = _strip_cpp_comments(mesh_text)
+    return [
+        (int(nx), int(ny), int(nz))
+        for nx, ny, nz in re.findall(
+            r"\bhex\s*\([^)]+\)\s*\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\)",
+            clean,
+        )
+    ]
+
+
+def _q2dmhdfoam_probe_count(control_text: str) -> int:
+    clean = _strip_cpp_comments(control_text)
+    match = re.search(r"\bprobeLocations\s*\((.*?)\)\s*;", clean, flags=re.S)
+    if not match:
+        return 0
+    return len(
+        re.findall(
+            r"\((" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\)",
+            match.group(1),
+        )
+    )
+
+
 def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, dict[str, float | str]]:
     """Load scalar magnetic-obstacle reference observables from CSV.
 

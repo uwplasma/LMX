@@ -1,0 +1,396 @@
+{
+  "case": "q2dmhdfoam_lmx_turbulence_match_audit",
+  "status": "strict_match_audit_written",
+  "q2dmhdfoam_root": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam",
+  "audited_cases": [
+    "run/lidDriven",
+    "run/muck_q2d_FFT",
+    "run/muck_q2d"
+  ],
+  "missing_cases": [],
+  "case_count": 3,
+  "strict_admissible_cases": [],
+  "all_strict_admissible": false,
+  "strict_blocker_closed": false,
+  "matched_parity": false,
+  "artifacts": [
+    "q2dmhdfoam_lmx_turbulence_match_audit.json",
+    "q2dmhdfoam_lmx_turbulence_match_audit.csv",
+    "q2dmhdfoam_lmx_turbulence_match_audit.png",
+    "q2dmhdfoam_lmx_turbulence_match_audit.pdf"
+  ],
+  "docs_artifacts": [
+    "q2dmhdfoam_lmx_turbulence_match_audit.json",
+    "q2dmhdfoam_lmx_turbulence_match_audit.csv",
+    "q2dmhdfoam_lmx_turbulence_match_audit.png",
+    "q2dmhdfoam_lmx_turbulence_match_audit.pdf"
+  ],
+  "audits": [
+    {
+      "case": "q2dmhdfoam_lmx_turbulence_match_audit",
+      "case_name": "lidDriven",
+      "manifest": {
+        "case_dir": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven",
+        "case_name": "lidDriven",
+        "application": "Q2DmhdFoam",
+        "end_time": 1000000.0,
+        "delta_t": 0.1,
+        "write_interval": 10.0,
+        "probe_count": 0,
+        "nu": 2.27e-07,
+        "rho0": 9486.0,
+        "sigma": 789000.0,
+        "a": 0.02,
+        "b": 0.02,
+        "q0": 0.0,
+        "ubar": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "ubar_magnitude": 0.0,
+        "magnetic_field_internal": 0.07836231295243112,
+        "hartmann_friction_nonzero": true,
+        "thermal_forcing_nonzero": false,
+        "forced_mean_flow": false,
+        "patch_types": {},
+        "patch_names": [],
+        "has_cylinder_obstacle": false,
+        "has_inlet_outlet": false,
+        "has_side_walls": false,
+        "has_empty_hartmann_walls": false,
+        "has_cyclic_patch": false,
+        "domain": {
+          "x_min": 0.0,
+          "x_max": 0.0,
+          "y_min": 0.0,
+          "y_max": 0.0,
+          "z_min": 0.0,
+          "z_max": 0.04
+        },
+        "block_count": 0,
+        "total_cell_count": 0
+      },
+      "lmx_target": {
+        "model": "periodic_sommeria_moreau_vorticity",
+        "geometry_kind": "periodic_box",
+        "lx": 2.0,
+        "ly": 2.0,
+        "viscosity": 0.0008,
+        "hartmann_friction": 0.08,
+        "forcing_kind": "deterministic_periodic_vorticity_forcing",
+        "dt": 0.002,
+        "t_final": 3.0,
+        "required_observables": [
+          "energy_decay_ratio",
+          "enstrophy_decay_ratio",
+          "final_spectral_centroid",
+          "final_high_k_energy_fraction",
+          "turnover_count"
+        ]
+      },
+      "gate_results": [
+        {
+          "criterion": "application",
+          "expected": "Q2DmhdFoam",
+          "observed": "Q2DmhdFoam",
+          "passed": true
+        },
+        {
+          "criterion": "topology",
+          "expected": "periodic box, no inlet/outlet, no obstacle",
+          "observed": "no recognized topology flags",
+          "passed": false
+        },
+        {
+          "criterion": "hartmann_friction",
+          "expected": "nonzero Hartmann friction matching LMX alpha",
+          "observed": "B=0.0783623",
+          "passed": true
+        },
+        {
+          "criterion": "forcing",
+          "expected": "deterministic_periodic_vorticity_forcing",
+          "observed": "no q0/Ubar forcing in dictionaries",
+          "passed": false
+        },
+        {
+          "criterion": "time_window",
+          "expected": "dt=0.002, t_final=3.0",
+          "observed": "dt=0.1, endTime=1000000.0",
+          "passed": false
+        },
+        {
+          "criterion": "observables",
+          "expected": "energy, enstrophy, spectrum, turnover, force/probe histories",
+          "observed": "probe_count=0; no energy/enstrophy contract in case dictionaries",
+          "passed": false
+        }
+      ],
+      "blockers": [
+        "topology",
+        "forcing",
+        "time_window",
+        "observables"
+      ],
+      "strict_admissible": false,
+      "matched_parity": false,
+      "strict_blocker_closed": false,
+      "decision": "not_admissible_for_strict_csv",
+      "required_next_step": "Either create a Q2DmhdFoam case with the same periodic topology, Hartmann friction, deterministic forcing, timestep window, and energy/enstrophy/spectrum observables as the LMX SM82 case, or add the corresponding LMX inlet/outlet obstacle/cavity physics before using the existing Q2DmhdFoam outputs as strict turbulence parity."
+    },
+    {
+      "case": "q2dmhdfoam_lmx_turbulence_match_audit",
+      "case_name": "muck_q2d_FFT",
+      "manifest": {
+        "case_dir": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d_FFT",
+        "case_name": "muck_q2d_FFT",
+        "application": "Q2DmhdFoam",
+        "end_time": 200000.0,
+        "delta_t": 10.0,
+        "write_interval": 10000.0,
+        "probe_count": 65536,
+        "nu": 2.186592e-07,
+        "rho0": 9838.6622,
+        "sigma": 789165.141408,
+        "a": 1.0,
+        "b": 1.0,
+        "q0": 0.0,
+        "ubar": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "ubar_magnitude": 0.0,
+        "magnetic_field_internal": 0.0,
+        "hartmann_friction_nonzero": false,
+        "thermal_forcing_nonzero": false,
+        "forced_mean_flow": false,
+        "patch_types": {
+          "xinlet": "patch",
+          "xoutlet": "patch",
+          "sideWalls": "patch",
+          "hartmannWalls": "empty",
+          "cylinder": "patch"
+        },
+        "patch_names": [
+          "cylinder",
+          "hartmannWalls",
+          "sideWalls",
+          "xinlet",
+          "xoutlet"
+        ],
+        "has_cylinder_obstacle": true,
+        "has_inlet_outlet": true,
+        "has_side_walls": true,
+        "has_empty_hartmann_walls": true,
+        "has_cyclic_patch": false,
+        "domain": {
+          "x_min": 0.0,
+          "x_max": 4.0,
+          "y_min": 0.0,
+          "y_max": 2.0,
+          "z_min": 0.0,
+          "z_max": 0.02
+        },
+        "block_count": 8,
+        "total_cell_count": 15920
+      },
+      "lmx_target": {
+        "model": "periodic_sommeria_moreau_vorticity",
+        "geometry_kind": "periodic_box",
+        "lx": 2.0,
+        "ly": 2.0,
+        "viscosity": 0.0008,
+        "hartmann_friction": 0.08,
+        "forcing_kind": "deterministic_periodic_vorticity_forcing",
+        "dt": 0.002,
+        "t_final": 3.0,
+        "required_observables": [
+          "energy_decay_ratio",
+          "enstrophy_decay_ratio",
+          "final_spectral_centroid",
+          "final_high_k_energy_fraction",
+          "turnover_count"
+        ]
+      },
+      "gate_results": [
+        {
+          "criterion": "application",
+          "expected": "Q2DmhdFoam",
+          "observed": "Q2DmhdFoam",
+          "passed": true
+        },
+        {
+          "criterion": "topology",
+          "expected": "periodic box, no inlet/outlet, no obstacle",
+          "observed": "cylinder, inlet/outlet, sideWalls, empty_hartmannWalls",
+          "passed": false
+        },
+        {
+          "criterion": "hartmann_friction",
+          "expected": "nonzero Hartmann friction matching LMX alpha",
+          "observed": "B=0",
+          "passed": false
+        },
+        {
+          "criterion": "forcing",
+          "expected": "deterministic_periodic_vorticity_forcing",
+          "observed": "no q0/Ubar forcing in dictionaries",
+          "passed": false
+        },
+        {
+          "criterion": "time_window",
+          "expected": "dt=0.002, t_final=3.0",
+          "observed": "dt=10.0, endTime=200000.0",
+          "passed": false
+        },
+        {
+          "criterion": "observables",
+          "expected": "energy, enstrophy, spectrum, turnover, force/probe histories",
+          "observed": "probe_count=65536; no energy/enstrophy contract in case dictionaries",
+          "passed": false
+        }
+      ],
+      "blockers": [
+        "topology",
+        "hartmann_friction",
+        "forcing",
+        "time_window",
+        "observables"
+      ],
+      "strict_admissible": false,
+      "matched_parity": false,
+      "strict_blocker_closed": false,
+      "decision": "not_admissible_for_strict_csv",
+      "required_next_step": "Either create a Q2DmhdFoam case with the same periodic topology, Hartmann friction, deterministic forcing, timestep window, and energy/enstrophy/spectrum observables as the LMX SM82 case, or add the corresponding LMX inlet/outlet obstacle/cavity physics before using the existing Q2DmhdFoam outputs as strict turbulence parity."
+    },
+    {
+      "case": "q2dmhdfoam_lmx_turbulence_match_audit",
+      "case_name": "muck_q2d",
+      "manifest": {
+        "case_dir": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d",
+        "case_name": "muck_q2d",
+        "application": "Q2DmhdFoam",
+        "end_time": 500000.0,
+        "delta_t": 10.0,
+        "write_interval": 5000.0,
+        "probe_count": 3,
+        "nu": 2.186592e-07,
+        "rho0": 9838.6622,
+        "sigma": 789165.141408,
+        "a": 1.0,
+        "b": 1.0,
+        "q0": 0.0,
+        "ubar": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "ubar_magnitude": 0.0,
+        "magnetic_field_internal": 0.0,
+        "hartmann_friction_nonzero": false,
+        "thermal_forcing_nonzero": false,
+        "forced_mean_flow": false,
+        "patch_types": {
+          "xinlet": "patch",
+          "xoutlet": "patch",
+          "sideWalls": "patch",
+          "hartmannWalls": "empty",
+          "cylinder": "patch"
+        },
+        "patch_names": [
+          "cylinder",
+          "hartmannWalls",
+          "sideWalls",
+          "xinlet",
+          "xoutlet"
+        ],
+        "has_cylinder_obstacle": true,
+        "has_inlet_outlet": true,
+        "has_side_walls": true,
+        "has_empty_hartmann_walls": true,
+        "has_cyclic_patch": false,
+        "domain": {
+          "x_min": 0.0,
+          "x_max": 4.0,
+          "y_min": 0.0,
+          "y_max": 2.0,
+          "z_min": 0.0,
+          "z_max": 0.02
+        },
+        "block_count": 8,
+        "total_cell_count": 15920
+      },
+      "lmx_target": {
+        "model": "periodic_sommeria_moreau_vorticity",
+        "geometry_kind": "periodic_box",
+        "lx": 2.0,
+        "ly": 2.0,
+        "viscosity": 0.0008,
+        "hartmann_friction": 0.08,
+        "forcing_kind": "deterministic_periodic_vorticity_forcing",
+        "dt": 0.002,
+        "t_final": 3.0,
+        "required_observables": [
+          "energy_decay_ratio",
+          "enstrophy_decay_ratio",
+          "final_spectral_centroid",
+          "final_high_k_energy_fraction",
+          "turnover_count"
+        ]
+      },
+      "gate_results": [
+        {
+          "criterion": "application",
+          "expected": "Q2DmhdFoam",
+          "observed": "Q2DmhdFoam",
+          "passed": true
+        },
+        {
+          "criterion": "topology",
+          "expected": "periodic box, no inlet/outlet, no obstacle",
+          "observed": "cylinder, inlet/outlet, sideWalls, empty_hartmannWalls",
+          "passed": false
+        },
+        {
+          "criterion": "hartmann_friction",
+          "expected": "nonzero Hartmann friction matching LMX alpha",
+          "observed": "B=0",
+          "passed": false
+        },
+        {
+          "criterion": "forcing",
+          "expected": "deterministic_periodic_vorticity_forcing",
+          "observed": "no q0/Ubar forcing in dictionaries",
+          "passed": false
+        },
+        {
+          "criterion": "time_window",
+          "expected": "dt=0.002, t_final=3.0",
+          "observed": "dt=10.0, endTime=500000.0",
+          "passed": false
+        },
+        {
+          "criterion": "observables",
+          "expected": "energy, enstrophy, spectrum, turnover, force/probe histories",
+          "observed": "probe_count=3; no energy/enstrophy contract in case dictionaries",
+          "passed": false
+        }
+      ],
+      "blockers": [
+        "topology",
+        "hartmann_friction",
+        "forcing",
+        "time_window",
+        "observables"
+      ],
+      "strict_admissible": false,
+      "matched_parity": false,
+      "strict_blocker_closed": false,
+      "decision": "not_admissible_for_strict_csv",
+      "required_next_step": "Either create a Q2DmhdFoam case with the same periodic topology, Hartmann friction, deterministic forcing, timestep window, and energy/enstrophy/spectrum observables as the LMX SM82 case, or add the corresponding LMX inlet/outlet obstacle/cavity physics before using the existing Q2DmhdFoam outputs as strict turbulence parity."
+    }
+  ],
+  "notes": "This audit prevents unmatched Q2DmhdFoam outputs from being used as the strict LMX nonlinear Q2D turbulence reference. A case can be promoted only after topology, forcing, Hartmann friction, timestep window, and observable definitions are all matched."
+}

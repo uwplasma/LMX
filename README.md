@@ -321,6 +321,12 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   is the current publication-facing Q2D comparison artifact, but it records
   `matched_parity = false` because the archived Q2DmhdFoam lid-driven case is
   not the same physical case as the periodic LMX SM82-style run.
+- `examples/q2dmhdfoam_lmx_turbulence_match_audit.py`: reads the available
+  Q2DmhdFoam case dictionaries and records whether any case can be promoted to
+  the strict nonlinear Q2D turbulence parity CSV. The current local cases are
+  executable evidence, but the audit rejects them for strict parity because
+  topology, forcing, Hartmann friction, timestep window, or observable
+  definitions do not match the LMX SM82-style movie case.
 - `docker/q2dmhdfoam` and
   `examples/q2dmhdfoam_docker_reference_validation.py`: build Q2DmhdFoam in a
   foam-extend 4.1 container, run the `Q2DfullyDeveloped` reference case with
@@ -371,6 +377,10 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 
 <p align="center">
   <img src="docs/_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.png" alt="LMX and Q2DmhdFoam Q2D turbulence-observable comparison" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2dmhdfoam_lmx_turbulence_match_audit.png" alt="Q2DmhdFoam-to-LMX Q2D turbulence match audit" width="72%">
 </p>
 
 <p align="center">
@@ -814,9 +824,9 @@ bounded instead of marking failed external-validation lanes as research-grade.
 The final strict-blocker probe is kept in the README because it is the release
 guard against over-claiming. It records that a low-resolution magnetic-obstacle
 reverse-flow candidate did not survive the current-resolution rerun, that the
-available Q2DmhdFoam outputs are not matched to the LMX turbulence example, and
-that the current bent-pipe result is still a low-De current-closure baseline
-rather than a Dean-vortex validation.
+Q2DmhdFoam match audit rejects the available external Q2D cases for strict
+nonlinear turbulence parity, and that the current bent-pipe result is still a
+low-De current-closure baseline rather than a Dean-vortex validation.
 
 ![LMX strict blocker closure attempt](docs/_static/generated/research_grade_strict_blocker_attempt.png)
 
@@ -847,7 +857,10 @@ rather than a Dean-vortex validation.
   geometry/forcing-matched isothermal side-wall Q2DmhdFoam comparison now
   exists in `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it uses
   cell-centered OpenFOAM fields and graded-cell area weights. Area-weighted
-  mean speed, speed RMS, and peak vorticity now pass at the `20%` tolerance
+  mean speed, speed RMS, and peak vorticity now pass at the `20%` tolerance.
+  `examples/q2dmhdfoam_lmx_turbulence_match_audit.py` records this distinction
+  case-by-case and prevents unmatched Q2DmhdFoam outputs from silently filling
+  the strict reference CSV
   after the LMX cross-grid was increased to `201 × 201`; this closes the
   side-wall comparison but not the separate turbulent parity claim
 - the bent-pipe low-De current-closure blocker is closed
@@ -903,6 +916,7 @@ Useful entry points:
 - `examples/q2dmhdfoam_docker_reference_validation.py`: Docker-rerun Q2DmhdFoam VTK/profile validation artifact
 - `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`: matched side-wall LMX/Q2DmhdFoam field-observable comparison
 - `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py`: LMX Q2D movie plus Q2DmhdFoam spectral-summary comparison artifact
+- `examples/q2dmhdfoam_lmx_turbulence_match_audit.py`: strict admissibility audit for local Q2DmhdFoam cases before promoting them to nonlinear Q2D parity data
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

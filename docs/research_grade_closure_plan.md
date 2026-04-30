@@ -134,7 +134,10 @@ renaming an internal proxy as validation.
   literature (`https://arxiv.org/abs/2006.15468`,
   `https://arxiv.org/abs/2006.11550`).
   The current candidate table records the locally available Q2DmhdFoam spectral
-  summary; the matched energy/enstrophy/turnover bundle remains open.
+  summary. `examples/q2dmhdfoam_lmx_turbulence_match_audit.py` now records that
+  the local `lidDriven`, `muck_q2d_FFT`, and `muck_q2d` dictionaries are not
+  strict-admissible for the current LMX SM82-style movie case, so the matched
+  energy/enstrophy/turnover bundle remains open.
 - Curved-pipe and Dean-vortex targets should be anchored first to hydrodynamic
   Dean-flow literature and OpenFOAM baselines, then to MHD damping trends once
   the secondary-flow state is resolved.
@@ -164,12 +167,16 @@ friction model must be explicit.
    matched bounded/turbulent case. The current Docker gate already runs
    `Q2DfullyDeveloped`; the strict parity case must match the LMX turbulence
    geometry, forcing, friction, and observables.
-2. Export velocity/vorticity fields, energy, enstrophy, spectra, and runtime
+2. Before promoting a run, pass
+   `examples/q2dmhdfoam_lmx_turbulence_match_audit.py`. This audit is the
+   guardrail against silently using an external case with the wrong topology,
+   forcing, Hartmann friction, timestep window, or observable contract.
+3. Export velocity/vorticity fields, energy, enstrophy, spectra, and runtime
    diagnostics into a stable CSV/NPZ bundle.
-3. Extend `examples/q2dmhdfoam_external_reference_adapter.py` if needed so it
+4. Extend `examples/q2dmhdfoam_external_reference_adapter.py` if needed so it
    writes `q2d_turbulence_reference_observables.csv` directly for the matched
    case.
-4. Run `examples/q2d_turbulence_decay_demo.py` with the filled CSV present so
+5. Run `examples/q2d_turbulence_decay_demo.py` with the filled CSV present so
    it emits the comparison table and tolerance plot.
 
 ### Required Observables

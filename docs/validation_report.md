@@ -133,11 +133,21 @@ identical.
 
 ![LMX/Q2DmhdFoam Q2D turbulence-observable comparison](_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.png)
 
+The Q2DmhdFoam-to-LMX match audit reads the available case dictionaries before
+any output is promoted into `q2d_turbulence_reference_observables.csv`. The
+current local `lidDriven`, `muck_q2d_FFT`, and `muck_q2d` cases are executable
+evidence, but not strict nonlinear Q2D turbulence parity cases: they differ
+from the LMX SM82 movie in topology, forcing, Hartmann friction, timestep
+window, or observable contract.
+
+![Q2DmhdFoam-to-LMX nonlinear Q2D match audit](_static/generated/q2dmhdfoam_lmx_turbulence_match_audit.png)
+
 The latest strict closure attempt keeps the research-grade tag blocked. The
 magnetic-obstacle escalation did not retain a Votyakov-scale reverse-flow
-signal on the current grid, the available Q2DmhdFoam outputs are not matched to
-the LMX turbulence case, and the current bent-pipe example remains a low-De
-current-closure baseline rather than a Dean-vortex validation:
+signal on the current grid, the Q2DmhdFoam match audit rejects the available
+external Q2D cases for strict nonlinear turbulence parity, and the current
+bent-pipe example remains a low-De current-closure baseline rather than a
+Dean-vortex validation:
 
 ![LMX strict blocker closure attempt](_static/generated/research_grade_strict_blocker_attempt.png)
 

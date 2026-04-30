@@ -234,6 +234,8 @@ __all__ = [
     "load_q2dmhdfoam_vtk_vector_field",
     "load_q2dmhdfoam_lid_driven_cell_field",
     "load_scalar_reference_observables",
+    "audit_q2dmhdfoam_lmx_turbulence_match",
+    "q2dmhdfoam_case_manifest",
     "q2dmhdfoam_docker_reference_observables",
     "q2dmhdfoam_profile_observables",
     "q2dmhdfoam_vtk_velocity_observables",
@@ -251,6 +253,7 @@ __all__ = [
     "write_q2dmhdfoam_external_reference_panel",
     "write_q2dmhdfoam_profile_observable_table",
     "write_q2dmhdfoam_timeseries_observable_table",
+    "write_q2dmhdfoam_lmx_turbulence_match_audit",
     "write_q2dmhdfoam_vtk_velocity_panel",
     "write_q2d_turbulence_reference_template",
     "write_scalar_reference_comparison_plots",
@@ -428,6 +431,14 @@ _EXPORTS = {
         "lmx.external_validation",
         "load_q2dmhdfoam_lid_driven_cell_field",
     ),
+    "audit_q2dmhdfoam_lmx_turbulence_match": (
+        "lmx.external_validation",
+        "audit_q2dmhdfoam_lmx_turbulence_match",
+    ),
+    "q2dmhdfoam_case_manifest": (
+        "lmx.external_validation",
+        "q2dmhdfoam_case_manifest",
+    ),
     "q2dmhdfoam_profile_observables": (
         "lmx.external_validation",
         "q2dmhdfoam_profile_observables",
@@ -495,6 +506,10 @@ _EXPORTS = {
     "write_q2dmhdfoam_timeseries_observable_table": (
         "lmx.external_validation",
         "write_q2dmhdfoam_timeseries_observable_table",
+    ),
+    "write_q2dmhdfoam_lmx_turbulence_match_audit": (
+        "lmx.external_validation",
+        "write_q2dmhdfoam_lmx_turbulence_match_audit",
     ),
     "write_q2dmhdfoam_vtk_velocity_panel": (
         "lmx.external_validation",

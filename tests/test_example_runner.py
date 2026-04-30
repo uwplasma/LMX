@@ -1338,6 +1338,57 @@ def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
     assert (tmp_path / "out" / "q2dmhdfoam_external_reference_summary.json").exists()
 
 
+def test_q2dmhdfoam_lmx_turbulence_match_audit_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2dmhdfoam_lmx_turbulence_match_audit.py")
+    root = tmp_path / "Q2DmhdFoam"
+    case_dir = root / "run" / "muck_q2d_FFT"
+    (case_dir / "system").mkdir(parents=True)
+    (case_dir / "constant" / "polyMesh").mkdir(parents=True)
+    (case_dir / "0").mkdir(parents=True)
+    (case_dir / "system" / "controlDict").write_text(
+        "application Q2DmhdFoam;\n"
+        "endTime 100;\n"
+        "deltaT 10;\n"
+        "writeInterval 20;\n"
+        "functions { probes { probeLocations ((0 0 0) (1 0 0)); } }\n",
+        encoding="utf-8",
+    )
+    (case_dir / "constant" / "transportProperties").write_text(
+        "nu nu [0 2 -1 0 0 0 0] 2.0e-7;\n"
+        "rho0 rho0 [1 -3 0 0 0 0 0] 9800;\n"
+        "sigma sigma [-1 -3 3 0 0 2 0] 7.8e5;\n"
+        "q0 q0 [1 -1 -3 0 0 0 0] 0;\n"
+        "a a [0 1 0 0 0 0 0] 1;\n"
+        "b b [0 1 0 0 0 0 0] 1;\n"
+        "Ubar Ubar [0 1 -1 0 0 0 0] (0 0 0);\n",
+        encoding="utf-8",
+    )
+    (case_dir / "0" / "B").write_text("internalField uniform 0;\n", encoding="utf-8")
+    (case_dir / "constant" / "polyMesh" / "blockMeshDict").write_text(
+        "vertices ((0 0 0) (1 0 0) (1 1 0) (0 1 0) (0 0 0.1) (1 0 0.1) (1 1 0.1) (0 1 0.1));\n"
+        "blocks (hex (0 1 2 3 4 5 6 7) (3 4 1) simpleGrading (1 1 1));\n"
+        "patches (patch xinlet ((0 4 7 3)) patch xoutlet ((1 2 6 5)) patch sideWalls ((0 1 5 4)) empty hartmannWalls ((0 3 2 1)) patch cylinder ((0 1 2 3)));\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_q2dmhdfoam_lmx_turbulence_match_audit(
+        out_dir=tmp_path / "out",
+        q2dmhdfoam_root=root,
+        case_relative_paths=(Path("run/muck_q2d_FFT"),),
+        docs_output_dir=tmp_path / "docs",
+        copy_to_docs=True,
+    )
+
+    assert summary["case"] == "q2dmhdfoam_lmx_turbulence_match_audit"
+    assert summary["status"] == "strict_match_audit_written"
+    assert summary["strict_blocker_closed"] is False
+    assert summary["audits"][0]["decision"] == "not_admissible_for_strict_csv"
+    assert (tmp_path / "out" / "q2dmhdfoam_lmx_turbulence_match_audit.png").exists()
+    assert (tmp_path / "out" / "q2dmhdfoam_lmx_turbulence_match_audit.csv").exists()
+    assert (tmp_path / "docs" / "q2dmhdfoam_lmx_turbulence_match_audit.png").exists()
+    assert (tmp_path / "docs" / "q2dmhdfoam_lmx_turbulence_match_audit_summary.json").exists()
+
+
 def test_q2dmhdfoam_docker_reference_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("q2dmhdfoam_docker_reference_validation.py")
     docker_output = tmp_path / "docker_out"

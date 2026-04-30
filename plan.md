@@ -484,7 +484,12 @@ refer to the Samper et al. taxonomy.
   side-wall observable gate: area-weighted mean speed, speed RMS, and peak
   vorticity now pass at the retained 20% tolerance. The remaining Q2D
   scientific task is therefore the genuinely turbulent matched case, not the
-  isothermal side-wall field-observable comparison.
+  isothermal side-wall field-observable comparison. The case-dictionary guardrail
+  now lives in `examples/q2dmhdfoam_lmx_turbulence_match_audit.py`: the local
+  `lidDriven`, `muck_q2d_FFT`, and `muck_q2d` cases are executable evidence but
+  are rejected for strict nonlinear Q2D parity because topology, forcing,
+  Hartmann friction, timestep window, or observable definitions do not all
+  match the LMX SM82-style movie case.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
