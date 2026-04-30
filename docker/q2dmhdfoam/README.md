@@ -24,6 +24,7 @@ docker run --rm --platform linux/amd64 \
   -e CASE_RELATIVE_PATH=run/lidDriven \
   -e RANKS=2 \
   -e FORCE_END_TIME=1 \
+  -e ZERO_THERMAL=1 \
   -e END_TIME=0.1 \
   -e WRITE_CONTROL=timeStep \
   -e WRITE_INTERVAL=1 \
@@ -35,6 +36,11 @@ docker run --rm --platform linux/amd64 \
 Generic cases export VTK and logs but do not claim LMX parity by themselves.
 The strict Q2D turbulence lane still requires a matched LMX case and a filled
 `q2d_turbulence_reference_observables.csv`.
+
+Set `ZERO_THERMAL=1` for lid-driven velocity-only comparisons. That switch
+zeros `g`, `beta`, `DeltaT`, `q0`, and the initial `T` field so a Q2DmhdFoam
+legacy case with thermal/buoyant initialization is not compared against a pure
+LMX side-wall cavity.
 
 For old Q2DmhdFoam case folders, the runner performs two compatibility fixes:
 it supplies a zero-gravity `constant/g` file when the case omits it, and it

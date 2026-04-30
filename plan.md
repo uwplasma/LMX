@@ -305,12 +305,13 @@ refer to the Samper et al. taxonomy.
   `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` parses the resulting VTK
   field, writes velocity/vorticity observables, and produces a docs panel. The
   first geometry/forcing-matched side-wall LMX comparison now lives in
-  `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`. It compares the same
-  `run/lidDriven` field and passes speed RMS, mean wall-normal velocity, and
-  peak vorticity at the retained 20% tolerance, but the mean-speed observable
-  remains about 31% low. The open scientific task is therefore narrower:
-  align the side-wall cavity mesh/operator/observable definition and then run
-  the genuinely turbulent matched case before claiming Q2D parity.
+  `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`. It uses an isothermal
+  `run/lidDriven` rerun generated with `ZERO_THERMAL=1` and passes speed RMS,
+  mean wall-normal velocity, and peak vorticity at the retained 20% tolerance,
+  but the mean-speed observable remains about 31% low. The open scientific task
+  is therefore narrower: align the side-wall cavity mesh/operator/observable
+  definition and then run the genuinely turbulent matched case before claiming
+  Q2D parity.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.

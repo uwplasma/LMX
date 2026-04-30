@@ -58,8 +58,8 @@ The strict research-grade deferred lanes remain matched external Q2D
 turbulence parity, external magnetic-obstacle reference data, and
 higher-inertia Dean-vortex bent-pipe validation. The Q2D lane now has an
 executable Q2DmhdFoam/Vetcha ingestion artifact and a first geometry/forcing
-matched side-wall comparison; it is still not a turbulent parity claim because
-the retained mean-speed observable remains outside tolerance.
+matched isothermal side-wall comparison; it is still not a turbulent parity
+claim because the retained mean-speed observable remains outside tolerance.
 
 The closure criteria and execution order for those three lanes are now tracked
 in [](research_grade_closure_plan.md). That page defines the external-reference
@@ -97,12 +97,13 @@ parity claim.
 
 ![Q2DmhdFoam lid-driven VTK field ingestion](_static/generated/q2dmhdfoam_lid_driven_vtk.png)
 
-The first matched LMX-vs-Q2DmhdFoam side-wall Q2D comparison uses the same
-`run/lidDriven` field as the VTK artifact. LMX matches speed RMS, mean
-wall-normal velocity, and peak vorticity within the retained 20% observable
-tolerance. The mean-speed observable is still about 31% low, so this artifact
-is a strict-offender tracker and mesh/numerics target, not a closed
-research-grade turbulent validation.
+The first matched LMX-vs-Q2DmhdFoam side-wall Q2D comparison uses an
+isothermal `run/lidDriven` rerun with `ZERO_THERMAL=1`, which zeros gravity,
+thermal expansion, heat input, and the initial temperature field before
+solving. LMX matches speed RMS, mean wall-normal velocity, and peak vorticity
+within the retained 20% observable tolerance. The mean-speed observable is
+still about 31% low, so this artifact is a strict-offender tracker and
+mesh/numerics target, not a closed research-grade turbulent validation.
 
 ![LMX/Q2DmhdFoam matched side-wall Q2D comparison](_static/generated/q2d_lmx_q2dmhdfoam_lid_driven_parity.png)
 

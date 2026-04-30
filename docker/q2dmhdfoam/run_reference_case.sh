@@ -82,6 +82,49 @@ if [[ -f 0/theta && ! -f 0/T ]]; then
     perl -0pi -e 's/object\s+theta;/object      T;/g' 0/T
     perl -0pi -e 's/\btheta\b/T/g' system/fvSolution system/fvSchemes system/controlDict 2>/dev/null || true
 fi
+if [[ "${ZERO_THERMAL:-0}" == "1" ]]; then
+    perl -0pi -e 's/(value\s+)\([^;]+\);/${1}(0 0 0);/g' constant/g 2>/dev/null || true
+    perl -0pi -e 's/(beta\s+beta\s+\[[^\]]+\]\s+)[^;]+;/${1}0;/g' constant/transportProperties 2>/dev/null || true
+    perl -0pi -e 's/(DeltaT\s+DeltaT\s+\[[^\]]+\]\s+)[^;]+;/${1}0;/g' constant/transportProperties 2>/dev/null || true
+    perl -0pi -e 's/(q0\s+q0\s+\[[^\]]+\]\s+)[^;]+;/${1}0;/g' constant/transportProperties 2>/dev/null || true
+    if [[ -f 0/T ]]; then
+        python - <<'PY'
+import re
+
+path = "0/T"
+with open(path, "r") as handle:
+    text = handle.read()
+index = text.find("boundaryField")
+boundary = text[index:] if index >= 0 else "boundaryField\n{\n}\n"
+boundary = re.sub(r"value\s+uniform\s+[^;]+;", "value           uniform 0;", boundary)
+with open(path, "w") as handle:
+    handle.write(
+    """/*--------------------------------*- C++ -*----------------------------------*\\
+| =========                 |                                                 |
+| \\\\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\\\    /   O peration     | Version:     4.1                                |
+|   \\\\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\\\/     M anipulation  |                                                 |
+\\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 0;
+
+"""
+    + boundary
+)
+PY
+    fi
+fi
 if [[ "${FORCE_END_TIME:-}" == "1" ]]; then
     perl -0pi -e 's/stopAt\s+writeNow;/stopAt          endTime;/g' system/controlDict
 fi
@@ -135,6 +178,7 @@ else
   "status": "external_reference_case_complete_no_profile_extraction",
   "final_time": ${LATEST_TIME:-null},
   "rank_count": ${RANKS},
+  "zero_thermal_forcing": ${ZERO_THERMAL:-0},
   "source": "Q2DmhdFoam foam-extend 4.1 generic runner"
 }
 EOF

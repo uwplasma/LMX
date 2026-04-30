@@ -20,7 +20,7 @@ from lmx import (
 
 OUTPUT_DIR = Path("artifacts/examples/q2d_lmx_q2dmhdfoam_lid_driven_parity")
 DOCS_OUTPUT_DIR = Path("docs/_static/generated")
-Q2DMHDFOAM_OUTPUT_DIR = Path("artifacts/external/q2dmhdfoam_lid_driven_smoke")
+Q2DMHDFOAM_OUTPUT_DIR = Path("artifacts/external/q2dmhdfoam_lid_driven_isothermal")
 COPY_TO_DOCS = True
 
 NX = 201
@@ -54,7 +54,8 @@ def run_q2d_lmx_q2dmhdfoam_lid_driven_parity(
             "run_command": (
                 "docker run --rm --platform linux/amd64 "
                 "-e CASE_RELATIVE_PATH=run/lidDriven -e RANKS=2 "
-                "-e FORCE_END_TIME=1 -e END_TIME=1.0 -e DELTA_T=0.005 "
+                "-e FORCE_END_TIME=1 -e ZERO_THERMAL=1 "
+                "-e END_TIME=1.0 -e DELTA_T=0.005 "
                 "-e WRITE_CONTROL=timeStep -e WRITE_INTERVAL=20 -e EXTRACT_PROFILE=0 "
                 f"-v $PWD/{q2dmhdfoam_output_dir}:/output lmx-q2dmhdfoam:fe41"
             ),
