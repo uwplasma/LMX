@@ -7,6 +7,7 @@
   "vetcha_digitized_profile_count": 3,
   "profile_observable_table": "q2dmhdfoam_external_profile_observables.csv",
   "turbulence_observable_table": "q2dmhdfoam_lid_driven_turbulence_observables.csv",
+  "timeseries_observable_table": "q2dmhdfoam_timeseries_observables.csv",
   "plots": [
     "q2dmhdfoam_external_reference.png",
     "q2dmhdfoam_external_reference.pdf"
@@ -169,5 +170,92 @@
     "strong_avg_over_max_max": 0.04534148843133362,
     "strong_dominant_wavenumber": 0.5
   },
+  "force_observables": [
+    {
+      "source_path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d/forcesCo/250000/forceCoeffs.dat",
+      "sample_count": 34139,
+      "tail_sample_count": 8535,
+      "time_start": 250007.278,
+      "time_end": 500000.0,
+      "duration": 249992.722,
+      "cd_tail_mean": 2.11524816199918,
+      "cd_tail_rms": 0.03346922315758911,
+      "cl_tail_mean": 0.02329279898905112,
+      "cl_tail_rms": 0.5893535103162831,
+      "cm_tail_mean": -10.470478401932045,
+      "cm_tail_rms": 0.16567265454951555,
+      "cd_drift": -0.022819419000000174,
+      "cl_drift": 0.52072536319,
+      "record_kind": "force_coefficients"
+    },
+    {
+      "source_path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d/forcesCo/0/forceCoeffs.dat",
+      "sample_count": 35020,
+      "tail_sample_count": 8755,
+      "time_start": 9.140767824,
+      "time_end": 250000.0,
+      "duration": 249990.859232176,
+      "cd_tail_mean": 2.133374745188007,
+      "cd_tail_rms": 0.057783558925786675,
+      "cl_tail_mean": 0.013907337407073783,
+      "cl_tail_rms": 0.7745406769088583,
+      "cm_tail_mean": -10.560204988648772,
+      "cm_tail_rms": 0.28602861671560215,
+      "cd_drift": 0.12467233500000008,
+      "cl_drift": 1.7124744325999999,
+      "record_kind": "force_coefficients"
+    }
+  ],
+  "probe_observables": [
+    {
+      "source_path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d_FFT/postProcessing/probes/0/U",
+      "sample_count": 22,
+      "probe_count": 65536,
+      "time_start": 0.0,
+      "time_end": 500000.0,
+      "duration": 500000.0,
+      "speed_tail_mean": 0.00022813613589083993,
+      "speed_tail_rms": 6.0525058048638664e-05,
+      "speed_peak": 0.00036740390958340635,
+      "streamwise_tail_mean": 0.00021929996308816385,
+      "transverse_tail_rms": 3.9802479531750194e-05,
+      "record_kind": "probe_velocity_history"
+    },
+    {
+      "source_path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/Ha_14_2/postProcessing/probes/0/U",
+      "sample_count": 7,
+      "probe_count": 65536,
+      "time_start": 0.0,
+      "time_end": 500000.0,
+      "duration": 500000.0,
+      "speed_tail_mean": 0.00023249826750838806,
+      "speed_tail_rms": 5.576472905627309e-05,
+      "speed_peak": 0.0003327291495129092,
+      "streamwise_tail_mean": 0.00022562966797846343,
+      "transverse_tail_rms": 3.195117896863368e-05,
+      "record_kind": "probe_velocity_history"
+    },
+    {
+      "source_path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/postProcessing/probes/0/U",
+      "sample_count": 3,
+      "probe_count": 65536,
+      "time_start": 0.0,
+      "time_end": 130.0,
+      "duration": 130.0,
+      "speed_tail_mean": 0.012001367725986221,
+      "speed_tail_rms": 0.01029551007515979,
+      "speed_peak": 0.06823114094684263,
+      "streamwise_tail_mean": 5.216024233117627e-05,
+      "transverse_tail_rms": 0.007736255373837712,
+      "record_kind": "probe_velocity_history"
+    }
+  ],
+  "docs_artifacts": [
+    "q2dmhdfoam_external_profile_observables.csv",
+    "q2dmhdfoam_external_reference.png",
+    "q2dmhdfoam_external_reference.pdf",
+    "q2dmhdfoam_lid_driven_turbulence_observables.csv",
+    "q2dmhdfoam_timeseries_observables.csv"
+  ],
   "notes": "This adapter wires executable Q2DmhdFoam and digitized Vetcha data into LMX validation artifacts. It is a reference-data ingestion step, not yet a matched LMX-vs-Q2DmhdFoam turbulence parity claim."
 }

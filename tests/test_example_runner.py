@@ -275,7 +275,7 @@ def _load_example_module(filename: str):
     return module
 
 
-def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path):
+def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     plot_module = _load_example_module("plot_npz_results.py")
     save_calls: list[Path] = []
 
@@ -284,7 +284,7 @@ def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path):
         path.write_bytes(b"gif")
         save_calls.append(path)
 
-    plot_module.animation.FuncAnimation.save = fake_save
+    monkeypatch.setattr(plot_module.animation.FuncAnimation, "save", fake_save)
 
     y_faces = np.linspace(-1.0, 1.0, 4)
     z_faces = np.linspace(-1.0, 1.0, 4)
@@ -1266,6 +1266,7 @@ def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
     summary = module.run_q2dmhdfoam_external_reference_adapter(
         out_dir=tmp_path / "out",
         q2dmhdfoam_root=root,
+        copy_to_docs=False,
     )
 
     assert summary["case"] == "q2dmhdfoam_external_reference_adapter"

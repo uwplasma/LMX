@@ -10,8 +10,10 @@ from lmx.external_validation import (
     compare_scalar_reference_observables,
     dean_vortex_reference_template_rows,
     external_validation_readiness_rows,
+    load_q2dmhdfoam_force_coefficients,
     load_q2dmhdfoam_lid_driven_observables,
     load_q2dmhdfoam_line_profile,
+    load_q2dmhdfoam_probe_velocity_history,
     load_magnetic_obstacle_reference_observables,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
@@ -25,6 +27,7 @@ from lmx.external_validation import (
     write_magnetic_obstacle_reference_template,
     write_q2dmhdfoam_external_reference_panel,
     write_q2dmhdfoam_profile_observable_table,
+    write_q2dmhdfoam_timeseries_observable_table,
     write_q2d_turbulence_reference_template,
     write_scalar_reference_comparison_plots,
     write_scalar_reference_comparison_table,
@@ -176,6 +179,36 @@ def test_q2dmhdfoam_lid_driven_summary_parser(tmp_path: Path):
     assert observables["weak_dominant_wavenumber"] == pytest.approx(1.0)
     assert observables["strong_mode_count"] == 1
     assert observables["strong_avg_over_max_max"] == pytest.approx(0.04)
+
+
+def test_q2dmhdfoam_force_and_probe_history_parsers(tmp_path: Path):
+    force_path = tmp_path / "forceCoeffs.dat"
+    force_path.write_text(
+        "# Time Cd Cl Cm\n"
+        "0 2.0 0.4 -1.0\n"
+        "1 2.2 0.2 -1.1\n"
+        "2 2.4 0.0 -1.2\n"
+        "3 2.6 -0.2 -1.3\n",
+        encoding="utf-8",
+    )
+    probe_path = tmp_path / "U"
+    probe_path.write_text(
+        "# Probe 0 (0 0 0)\n"
+        "0 (1 0 0) (0 1 0)\n"
+        "1 (2 0 0) (0 2 0)\n"
+        "2 (3 0 0) (0 3 0)\n",
+        encoding="utf-8",
+    )
+
+    force = load_q2dmhdfoam_force_coefficients(force_path, tail_fraction=0.5)
+    probe = load_q2dmhdfoam_probe_velocity_history(probe_path)
+    table = write_q2dmhdfoam_timeseries_observable_table([force, probe], tmp_path / "timeseries.csv")
+
+    assert force["cd_tail_mean"] == pytest.approx(2.5)
+    assert force["cl_tail_mean"] == pytest.approx(-0.1)
+    assert probe["probe_count"] == 2
+    assert probe["speed_peak"] == pytest.approx(3.0)
+    assert "cd_tail_mean" in table.read_text(encoding="utf-8")
 
 
 def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):

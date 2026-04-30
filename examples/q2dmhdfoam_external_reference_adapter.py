@@ -3,19 +3,24 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+import shutil
 
 import numpy as np
 
 from lmx import (
+    load_q2dmhdfoam_force_coefficients,
     load_q2dmhdfoam_lid_driven_observables,
     load_q2dmhdfoam_line_profile,
+    load_q2dmhdfoam_probe_velocity_history,
     q2dmhdfoam_profile_observables,
     write_q2dmhdfoam_external_reference_panel,
     write_q2dmhdfoam_profile_observable_table,
+    write_q2dmhdfoam_timeseries_observable_table,
 )
 
 
 OUTPUT_DIR = Path("artifacts/examples/q2dmhdfoam_external_reference")
+DOCS_OUTPUT_DIR = Path("docs/_static/generated")
 Q2DMHDFOAM_ROOT = Path("/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam")
 PROFILE_SAMPLE_PATTERNS = (
     "FFT2_validation/tepot/samples/lineSampled_theta_Ux_*",
@@ -23,17 +28,30 @@ PROFILE_SAMPLE_PATTERNS = (
 )
 VETCHA_DIGITIZED_PROFILE = Path("FFT2_validation/vetcha2009/vetcha2009_Ha50_Re1e4.csv")
 LID_DRIVEN_TURBULENCE_SUMMARY = Path("run/lidDriven/IDM_output_U.txt")
+FORCE_COEFFICIENT_FILES = (
+    Path("run/muck_q2d/forcesCo/250000/forceCoeffs.dat"),
+    Path("run/muck_q2d/forcesCo/0/forceCoeffs.dat"),
+)
+PROBE_HISTORY_FILES = (
+    Path("run/muck_q2d_FFT/postProcessing/probes/0/U"),
+    Path("run/Ha_14_2/postProcessing/probes/0/U"),
+    Path("run/lidDriven/postProcessing/probes/0/U"),
+)
 OUTPUT_STEM = "q2dmhdfoam_external_reference"
+COPY_TO_DOCS = True
 
 
 def run_q2dmhdfoam_external_reference_adapter(
     *,
     out_dir: Path = OUTPUT_DIR,
     q2dmhdfoam_root: Path = Q2DMHDFOAM_ROOT,
+    docs_output_dir: Path = DOCS_OUTPUT_DIR,
+    copy_to_docs: bool = COPY_TO_DOCS,
 ) -> dict[str, object]:
     """Ingest local Q2DmhdFoam outputs into an LMX validation artifact."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    docs_output_dir.mkdir(parents=True, exist_ok=True)
     root = Path(q2dmhdfoam_root)
     if not root.exists():
         summary = {
@@ -70,13 +88,36 @@ def run_q2dmhdfoam_external_reference_adapter(
             out_dir / "q2dmhdfoam_lid_driven_turbulence_observables.csv",
         )
 
+    force_observables = _collect_force_observables(root)
+    probe_observables = _collect_probe_observables(root)
+    timeseries_table = None
+    if force_observables or probe_observables:
+        timeseries_table = write_q2dmhdfoam_timeseries_observable_table(
+            [*force_observables, *probe_observables],
+            out_dir / "q2dmhdfoam_timeseries_observables.csv",
+        )
+
     plots = write_q2dmhdfoam_external_reference_panel(
         profiles,
         profile_observables,
         out_dir,
         turbulence_observables=turbulence_observables,
+        force_observables=force_observables,
+        probe_observables=probe_observables,
         output_stem=OUTPUT_STEM,
     )
+    copied: list[str] = []
+    copy_candidates = [table_path, *(plots or [])]
+    if turbulence_table:
+        copy_candidates.append(turbulence_table)
+    if timeseries_table:
+        copy_candidates.append(timeseries_table)
+    if copy_to_docs:
+        for path in copy_candidates:
+            target = docs_output_dir / path.name
+            shutil.copy2(path, target)
+            copied.append(target.name)
+
     summary = {
         "case": "q2dmhdfoam_external_reference_adapter",
         "status": "external_reference_artifacts_written",
@@ -86,9 +127,13 @@ def run_q2dmhdfoam_external_reference_adapter(
         "vetcha_digitized_profile_count": len(vetcha_profiles),
         "profile_observable_table": table_path.name,
         "turbulence_observable_table": turbulence_table.name if turbulence_table else None,
+        "timeseries_observable_table": timeseries_table.name if timeseries_table else None,
         "plots": [path.name for path in plots],
         "profile_observables": profile_observables,
         "turbulence_observables": turbulence_observables,
+        "force_observables": force_observables,
+        "probe_observables": probe_observables,
+        "docs_artifacts": copied,
         "notes": (
             "This adapter wires executable Q2DmhdFoam and digitized Vetcha data "
             "into LMX validation artifacts. It is a reference-data ingestion "
@@ -99,6 +144,8 @@ def run_q2dmhdfoam_external_reference_adapter(
         json.dumps(summary, indent=2) + "\n",
         encoding="utf-8",
     )
+    if copy_to_docs:
+        shutil.copy2(out_dir / "q2dmhdfoam_external_reference_summary.json", docs_output_dir / "q2dmhdfoam_external_reference_summary.json")
     return summary
 
 
@@ -140,6 +187,28 @@ def _load_vetcha_digitized_profiles(path: Path) -> list[dict[str, object]]:
             }
         )
     return profiles
+
+
+def _collect_force_observables(root: Path) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for relative in FORCE_COEFFICIENT_FILES:
+        path = root / relative
+        if path.exists():
+            record = dict(load_q2dmhdfoam_force_coefficients(path))
+            record["record_kind"] = "force_coefficients"
+            records.append(record)
+    return records
+
+
+def _collect_probe_observables(root: Path) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for relative in PROBE_HISTORY_FILES:
+        path = root / relative
+        if path.exists():
+            record = dict(load_q2dmhdfoam_probe_velocity_history(path))
+            record["record_kind"] = "probe_velocity_history"
+            records.append(record)
+    return records
 
 
 def _write_turbulence_observables_csv(observables: dict[str, object], path: Path) -> Path:

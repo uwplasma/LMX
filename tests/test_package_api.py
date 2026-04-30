@@ -108,6 +108,13 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_magnetic_obstacle_benchmark_plots)
     assert callable(lmx.write_magnetic_obstacle_regime_plots)
     assert callable(lmx.write_bent_pipe_overview_plots)
+    assert callable(lmx.bayat_rezai_dean_velocity)
+    assert callable(lmx.bayat_rezai_lateral_reynolds)
+    assert callable(lmx.compare_dean_velocity_points)
+    assert callable(lmx.dean_number_from_reynolds)
+    assert callable(lmx.dean_secondary_flow_field)
+    assert callable(lmx.dean_velocity_reference_rows)
+    assert callable(lmx.write_dean_literature_validation_plots)
     assert callable(lmx.write_geometry_gallery_plots)
     assert callable(lmx.write_geometry_preview_plots)
     assert callable(lmx.write_cross_section_field_plots)
@@ -174,6 +181,9 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_q2d_turbulence_observable_plots)
     assert callable(lmx.write_q2d_turbulence_decay_movie)
     assert callable(lmx.write_magnetic_obstacle_schematic_plots)
+    assert callable(lmx.load_q2dmhdfoam_force_coefficients)
+    assert callable(lmx.load_q2dmhdfoam_probe_velocity_history)
+    assert callable(lmx.write_q2dmhdfoam_timeseries_observable_table)
     assert callable(lmx.write_tabulated_field_reconstruction_plots)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__

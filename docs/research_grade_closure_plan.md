@@ -309,6 +309,18 @@ shortcut:
 Because these three checks remain open, a research-grade release tag is blocked
 even when bounded release readiness is green.
 
+Follow-up support work now adds:
+
+- richer Q2DmhdFoam ingestion of force coefficients and probe histories, so the
+  external Q2D artifact has profile, spectral, force, and time-history
+  observables ready for a matched LMX run;
+- a Dean-flow literature validation artifact based on the Bayat-Rezai
+  `V_De = 0.031 (nu / s) De^1.63` correlation and a reduced two-cell
+  secondary-flow field for plotting and design QA.
+
+These artifacts close data/model-preparation gaps, not the strict solved-case
+parity requirements.
+
 ### Phase 1: External Data Acquisition
 
 - Q2D: produce one matched Q2DmhdFoam turbulent reference bundle and convert it

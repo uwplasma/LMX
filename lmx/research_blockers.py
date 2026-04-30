@@ -205,6 +205,7 @@ def _q2d_turbulence_attempt(audit: Mapping[str, Any]) -> StrictBlockerAttempt:
 
 def _dean_vortex_attempt(static_root: Path) -> StrictBlockerAttempt:
     summary = _load_json(static_root / "bent_pipe_inductionless_summary.json")
+    literature_summary = _load_json(static_root / "dean_literature_validation_summary.json")
     validation = summary.get("validation", {})
     dean_number = _safe_float(summary.get("dean_number"), default=_safe_float(validation.get("dean_number")))
     peak = _safe_float(validation.get("secondary_flow_peak_ratio"))
@@ -223,7 +224,8 @@ def _dean_vortex_attempt(static_root: Path) -> StrictBlockerAttempt:
         key_result=(
             "current retained example remains a low-De straight-pipe-equivalence "
             f"gate (De={dean_number:.3e}, secondary_flow_peak_ratio={peak:.3e}); "
-            "it does not resolve the Dean-vortex topology."
+            "it does not resolve the Dean-vortex topology. "
+            f"Bayat-Rezai literature gate present={bool(literature_summary.get('validation_pass'))}."
         ),
         release_decision=decision,
         required_next_step=(
@@ -276,7 +278,8 @@ def _plot_q2d_attempt(ax: Any, summary: Mapping[str, Any]) -> None:
     audit_rows = summary.get("external_data_audit", {}).get("rows", [])
     q2d = next((row for row in audit_rows if row.get("lane") == "q2d_turbulence_external_parity"), {})
     available = 1.0 if q2d.get("path_exists") else 0.0
-    evidence = min(float(q2d.get("available_evidence_file_count", 0) or 0) / 5.0, 1.0)
+    evidence_total = max(float(q2d.get("evidence_file_count", 0) or 0), 1.0)
+    evidence = min(float(q2d.get("available_evidence_file_count", 0) or 0) / evidence_total, 1.0)
     matched = 1.0 if q2d.get("matched_reference_csv_exists") else 0.0
     ax.bar(
         ["checkout", "evidence", "matched\nCSV"],

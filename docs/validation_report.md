@@ -87,6 +87,16 @@ current-closure baseline rather than a Dean-vortex validation:
 
 ![LMX strict blocker closure attempt](_static/generated/research_grade_strict_blocker_attempt.png)
 
+Two blocker-support artifacts were added after that audit. The Q2DmhdFoam
+adapter now ingests saved force coefficients and probe histories in addition to
+profile and spectral summaries, and the Dean-flow literature gate records the
+Bayat-Rezai correlation plus a reduced two-cell secondary-flow field. These
+artifacts strengthen the external-data and model-reference side of the open
+lanes; they do not change the strict closure status until matched LMX solved
+physics is compared against the references.
+
+![LMX Dean-flow literature validation](_static/generated/dean_literature_validation.png)
+
 ## Combined validation workflow
 
 The top-level executable validation driver is:

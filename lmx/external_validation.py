@@ -290,9 +290,9 @@ def external_validation_readiness_rows() -> list[dict[str, object]]:
         {
             "lane": "Q2D turbulence parity",
             "external_code": "Q2DmhdFoam",
-            "score": 2.5,
+            "score": 2.7,
             "status": "external adapter wired",
-            "observables": "profiles, energy, enstrophy, spectra, turnover count",
+            "observables": "profiles, force coefficients, probes, spectra, turnover count",
             "next_step": "run matched LMX-vs-Q2DmhdFoam turbulent case",
         },
         {
@@ -313,11 +313,11 @@ def external_validation_readiness_rows() -> list[dict[str, object]]:
         },
         {
             "lane": "Dean-vortex bent-pipe parity",
-            "external_code": "OpenFOAM curved-pipe + Dean literature",
-            "score": 1.0,
-            "status": "reference path identified",
+            "external_code": "Bayat-Rezai Dean literature + OpenFOAM curved-pipe path",
+            "score": 2.0,
+            "status": "literature gate wired",
             "observables": "secondary-flow intensity, centroid shift, pressure loss",
-            "next_step": "construct hydrodynamic curved-pipe reference",
+            "next_step": "construct solved hydrodynamic curved-pipe reference",
         },
         {
             "lane": "Variable/tabulated 3D fields",
@@ -639,12 +639,105 @@ def load_q2dmhdfoam_lid_driven_observables(path: str | Path) -> dict[str, float 
     return result
 
 
+def load_q2dmhdfoam_force_coefficients(path: str | Path, *, tail_fraction: float = 0.25) -> dict[str, float | str]:
+    """Load Q2DmhdFoam force-coefficient history and return tail statistics."""
+
+    source = Path(path)
+    data = np.loadtxt(source, comments="#")
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    if data.shape[1] < 4:
+        raise ValueError(f"Q2DmhdFoam force coefficient file {source} needs Time, Cd, Cl, Cm columns")
+    finite = np.all(np.isfinite(data[:, :4]), axis=1)
+    data = data[finite]
+    if data.shape[0] < 3:
+        raise ValueError(f"Q2DmhdFoam force coefficient file {source} has fewer than three finite rows")
+    start = max(0, int(np.floor((1.0 - float(tail_fraction)) * data.shape[0])))
+    tail = data[start:, :]
+    time = data[:, 0]
+    duration = float(time[-1] - time[0])
+    return {
+        "source_path": str(source),
+        "sample_count": int(data.shape[0]),
+        "tail_sample_count": int(tail.shape[0]),
+        "time_start": float(time[0]),
+        "time_end": float(time[-1]),
+        "duration": duration,
+        "cd_tail_mean": float(np.mean(tail[:, 1])),
+        "cd_tail_rms": float(np.sqrt(np.mean((tail[:, 1] - np.mean(tail[:, 1])) ** 2))),
+        "cl_tail_mean": float(np.mean(tail[:, 2])),
+        "cl_tail_rms": float(np.sqrt(np.mean((tail[:, 2] - np.mean(tail[:, 2])) ** 2))),
+        "cm_tail_mean": float(np.mean(tail[:, 3])),
+        "cm_tail_rms": float(np.sqrt(np.mean((tail[:, 3] - np.mean(tail[:, 3])) ** 2))),
+        "cd_drift": float(tail[-1, 1] - tail[0, 1]) if tail.shape[0] > 1 else 0.0,
+        "cl_drift": float(tail[-1, 2] - tail[0, 2]) if tail.shape[0] > 1 else 0.0,
+    }
+
+
+def load_q2dmhdfoam_probe_velocity_history(path: str | Path) -> dict[str, float | int | str]:
+    """Load an OpenFOAM probes U file and return velocity-history observables."""
+
+    source = Path(path)
+    rows: list[list[float]] = []
+    for line in source.read_text(encoding="utf-8", errors="ignore").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        values = [float(item) for item in re.findall(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", stripped)]
+        if len(values) >= 4:
+            rows.append(values)
+    if len(rows) < 3:
+        raise ValueError(f"Q2DmhdFoam probe history {source} has fewer than three numeric rows")
+    data = np.asarray(rows, dtype=float)
+    time = data[:, 0]
+    vectors = data[:, 1:]
+    probe_count = vectors.shape[1] // 3
+    if probe_count < 1:
+        raise ValueError(f"Q2DmhdFoam probe history {source} has no vector probes")
+    vectors = vectors[:, : 3 * probe_count].reshape(data.shape[0], probe_count, 3)
+    speed = np.linalg.norm(vectors, axis=2)
+    tail_start = max(0, int(0.75 * speed.shape[0]))
+    tail_speed = speed[tail_start:, :]
+    return {
+        "source_path": str(source),
+        "sample_count": int(speed.shape[0]),
+        "probe_count": int(probe_count),
+        "time_start": float(time[0]),
+        "time_end": float(time[-1]),
+        "duration": float(time[-1] - time[0]),
+        "speed_tail_mean": float(np.mean(tail_speed)),
+        "speed_tail_rms": float(np.sqrt(np.mean((tail_speed - np.mean(tail_speed)) ** 2))),
+        "speed_peak": float(np.max(speed)),
+        "streamwise_tail_mean": float(np.mean(vectors[tail_start:, :, 0])),
+        "transverse_tail_rms": float(np.sqrt(np.mean(vectors[tail_start:, :, 1:] ** 2))),
+    }
+
+
+def write_q2dmhdfoam_timeseries_observable_table(
+    records: Sequence[Mapping[str, float | str | int]],
+    path: str | Path,
+) -> Path:
+    """Write Q2DmhdFoam force/probe time-history observables to CSV."""
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    columns = sorted({key for record in records for key in record})
+    with out.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for record in records:
+            writer.writerow({column: record.get(column, "") for column in columns})
+    return out
+
+
 def write_q2dmhdfoam_external_reference_panel(
     profiles: Sequence[Mapping[str, object]],
     profile_observables: Sequence[Mapping[str, float | str | int]],
     output_dir: str | Path,
     *,
     turbulence_observables: Mapping[str, float | int | str] | None = None,
+    force_observables: Sequence[Mapping[str, float | int | str]] | None = None,
+    probe_observables: Sequence[Mapping[str, float | int | str]] | None = None,
     output_stem: str = "q2dmhdfoam_external_reference",
 ) -> list[Path]:
     """Write a publication-facing Q2DmhdFoam external-reference panel."""
@@ -707,7 +800,9 @@ def write_q2dmhdfoam_external_reference_panel(
         "Adapter status: external data are wired into LMX artifacts; "
         "matched LMX parity remains a separate validation gate."
     )
-    if turbulence_observables:
+    force_observables = list(force_observables or [])
+    probe_observables = list(probe_observables or [])
+    if turbulence_observables or force_observables or probe_observables:
         lines = ["Q2DmhdFoam lid-driven turbulence summary"]
         for key in (
             "weak_mode_count",
@@ -723,6 +818,26 @@ def write_q2dmhdfoam_external_reference_panel(
                     lines.append(f"{key}: {value:.4g}")
                 else:
                     lines.append(f"{key}: {value}")
+        if force_observables:
+            force = dict(force_observables[0])
+            lines.extend(
+                [
+                    "",
+                    "Cylinder/duct force tail statistics",
+                    f"Cd mean: {float(force.get('cd_tail_mean', 0.0)):.4g}",
+                    f"Cl rms: {float(force.get('cl_tail_rms', 0.0)):.4g}",
+                ]
+            )
+        if probe_observables:
+            probe = dict(probe_observables[0])
+            lines.extend(
+                [
+                    "",
+                    "Probe velocity history",
+                    f"speed tail mean: {float(probe.get('speed_tail_mean', 0.0)):.4g}",
+                    f"transverse tail rms: {float(probe.get('transverse_tail_rms', 0.0)):.4g}",
+                ]
+            )
         lines.extend(["", note])
         axes[1, 1].text(0.03, 0.95, "\n".join(lines), va="top", fontsize=10, transform=axes[1, 1].transAxes)
     else:

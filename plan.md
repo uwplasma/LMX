@@ -223,8 +223,12 @@ refer to the Samper et al. taxonomy.
   example writes the comparison table and PNG/PDF tolerance-gate plots
   automatically. `examples/q2dmhdfoam_external_reference_adapter.py` now also
   ingests executable Q2DmhdFoam/Vetcha outputs into profile, spectral-summary,
-  CSV, and PNG/PDF artifacts. The remaining blocker is the matched
-  LMX-vs-Q2DmhdFoam turbulent run, not external-data parsing.
+  CSV, and PNG/PDF artifacts. The adapter now also ingests Q2DmhdFoam
+  force-coefficient and probe-velocity histories and writes
+  `q2dmhdfoam_timeseries_observables.csv`, so the next matched run can compare
+  time-history statistics rather than only static line profiles. The remaining
+  blocker is the matched LMX-vs-Q2DmhdFoam turbulent run, not external-data
+  parsing.
   Latest strict closure attempt: the local Q2DmhdFoam lid-driven/Vetcha/
   cylinder outputs are useful evidence, but they do not match the current LMX
   periodic SM82-style turbulence example. The next real step is either a
@@ -248,6 +252,12 @@ refer to the Samper et al. taxonomy.
   `examples/dean_vortex_external_reference_template.py`; if a filled
   `dean_vortex_reference_observables.csv` is present, the bent-pipe example
   writes the comparison table and PNG/PDF tolerance-gate plots automatically.
+  `examples/dean_literature_validation.py` now adds the Bayat-Rezai
+  low-Dean-number correlation gate for average Dean velocity and writes a
+  reduced two-cell secondary-flow visualization plus
+  `dean_literature_reference_observables.csv`. This closes the literature
+  correlation/test-data side of the lane, but it is not a solved curved-pipe
+  parity result.
   Latest strict closure attempt: the retained bent-pipe example remains a
   low-De current-closure baseline (`De ≈ 5.19e-7`) with negligible secondary
   flow. This lane needs a no-field Dean-flow reference with resolved secondary

@@ -206,6 +206,17 @@ low-De current closure.
 
 ![LMX bent-pipe inductionless baseline](docs/_static/generated/bent_pipe_overview.png)
 
+LMX also now ships a separate Dean-flow literature gate based on the
+Bayat-Rezai semi-empirical correlation for average Dean velocity,
+`V_De = 0.031 (nu / s) De^1.63`, validated in that work through the
+low-Dean-number range up to about `De = 30`.
+This closes the correlation/reference-data side of the curved-pipe lane and
+provides a reduced two-cell secondary-flow field for plotting and design QA.
+It does not by itself mark the current inductionless bent-pipe solver as a
+resolved Dean-vortex validation.
+
+![LMX Dean-flow literature validation](docs/_static/generated/dean_literature_validation.png)
+
 The panel is meant to be read left to right, then top to bottom:
 
 - the 3D slab shows the curved centerline and the local mid-bend profile plane
@@ -291,9 +302,11 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 - `examples/q2dmhdfoam_external_reference_adapter.py`: ingests local
   Q2DmhdFoam validation outputs from the external checkout, including tepot
   line-profile samples, Vetcha 2009 digitized line cuts, and the lid-driven
-  turbulence spectral-summary file. This closes the data-ingestion part of the
-  Q2D external lane; matched LMX-vs-Q2DmhdFoam turbulent parity remains a
-  separate validation gate.
+  turbulence spectral-summary file. It now also ingests saved Q2DmhdFoam
+  cylinder/duct force coefficients and probe histories, so the external data
+  artifact contains profile, spectrum, force, and time-history observables.
+  This closes the data-ingestion part of the Q2D external lane; matched
+  LMX-vs-Q2DmhdFoam turbulent parity remains a separate validation gate.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -732,14 +745,16 @@ rather than a Dean-vortex validation.
   nonlinear Q2D turbulent data. The external-reference CSV contract now exists
   in `examples/q2d_turbulence_external_reference_template.py`, and
   `examples/q2dmhdfoam_external_reference_adapter.py` now wires local
-  Q2DmhdFoam/Vetcha outputs into profile and turbulence-observable artifacts
-  without calling them matched LMX parity
+  Q2DmhdFoam/Vetcha outputs into profile, turbulence, force-coefficient, and
+  probe-history observable artifacts without calling them matched LMX parity
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
   `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The
   remaining bent-pipe research lane is higher-inertia Dean-vortex parity with
   a curved-duct reference dataset. The external-reference CSV contract now
-  exists in `examples/dean_vortex_external_reference_template.py`
+  exists in `examples/dean_vortex_external_reference_template.py`, and the
+  Dean literature-gate artifact documents the Bayat-Rezai correlation and
+  reduced secondary-flow field used for the next solved-physics step
 - the tabulated-field rectangular lane now passes both table-node and
   solver-point manufactured-field reconstruction; WHAM-like 3D field response
   remains a separate open validation lane because the current pipe solve is

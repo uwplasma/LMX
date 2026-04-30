@@ -138,7 +138,7 @@ def research_grade_external_data_audit(
         _dean_external_audit(static_root, external_root),
         _freemhd_context_audit(freemhd_root),
     ]
-    available_rows = [row for row in rows if row["path_exists"]]
+    available_rows = [row for row in rows if row.get("source_or_processed_artifact_exists", row["path_exists"])]
     matched_rows = [row for row in rows if row.get("matched_reference_csv_exists")]
     return {
         "case": "research_grade_external_data_audit",
@@ -244,8 +244,11 @@ def _q2d_external_audit(static_root: Path, external_root: Path) -> dict[str, Any
         root / "run/lidDriven/IDM_output_U.txt",
         root / "run/lidDriven/lidDrivenFFT_U.png",
         root / "run/lidDriven/lidDrivenFieldProfile_U.png",
+        root / "run/muck_q2d/forcesCo/250000/forceCoeffs.dat",
+        root / "run/muck_q2d_FFT/postProcessing/probes/0/U",
         static_root / "q2dmhdfoam_external_reference_summary.json",
         static_root / "q2dmhdfoam_lid_driven_turbulence_observables.csv",
+        static_root / "q2dmhdfoam_timeseries_observables.csv",
     ]
     return _audit_row(
         lane="q2d_turbulence_external_parity",
@@ -254,7 +257,7 @@ def _q2d_external_audit(static_root: Path, external_root: Path) -> dict[str, Any
         evidence=evidence,
         matched_reference_csv=static_root / "q2d_turbulence_reference_observables.csv",
         closure_summary=static_root / "q2d_turbulence_decay_summary.json",
-        next_step="Run a matched LMX-vs-Q2DmhdFoam turbulent case and export energy/enstrophy/spectrum observables.",
+        next_step="Run a matched LMX-vs-Q2DmhdFoam turbulent case and export energy/enstrophy/spectrum/force/probe observables.",
     )
 
 
@@ -283,16 +286,19 @@ def _dean_external_audit(static_root: Path, external_root: Path) -> dict[str, An
     evidence = [
         static_root / "dean_vortex_external_reference_template_summary.json",
         static_root / "bent_pipe_inductionless_summary.json",
+        static_root / "dean_literature_validation_summary.json",
+        static_root / "dean_literature_reference_observables.csv",
+        static_root / "dean_literature_validation.png",
         fallback_root / "Examples/mhdEpotFoam/readme.txt",
     ]
     return _audit_row(
         lane="dean_vortex_higher_inertia_validation",
-        source="Dean-vortex literature plus a future OpenFOAM curved-pipe reference case",
+        source="Bayat-Rezai Dean literature gate plus a future OpenFOAM curved-pipe reference case",
         path=root,
         evidence=evidence,
         matched_reference_csv=static_root / "dean_vortex_reference_observables.csv",
         closure_summary=static_root / "bent_pipe_inductionless_summary.json",
-        next_step="Acquire or generate secondary-flow, velocity-skew, centroid-shift, and pressure-loss observables.",
+        next_step="Use the Bayat-Rezai gate to construct/acquire solved secondary-flow, velocity-skew, centroid-shift, and pressure-loss observables.",
     )
 
 
@@ -338,6 +344,7 @@ def _audit_row(
         "matched_reference_csv_exists": matched_exists,
         "closure_summary": str(closure_summary) if closure_summary else "",
         "closure_summary_exists": closure_summary_exists,
+        "source_or_processed_artifact_exists": bool(path.exists() or any(item["exists"] for item in evidence_rows)),
         "ready_for_strict_closure_claim": bool(matched_exists and closure_summary_exists),
         "next_step": next_step,
     }
