@@ -62,13 +62,19 @@ renaming an internal proxy as validation.
   Votyakov/Zienicke/Kolesnikov-type observables: centerline deficit, wake
   recovery, pressure or drag proxy, current/Lorentz-force proxy, and vortex
   topology when the model supports recirculation.
+  The current candidate table digitizes the Votyakov figure 7(a)
+  minimum-centerline-velocity target only; it is not a matched closure file.
 - Q2D turbulence targets should be anchored to Sommeria-Moreau, Vetcha-
   Smolentsev-Abdou, and Potherat-style observables: kinetic energy, enstrophy,
   spectra, Hartmann friction, turnover count, wall-layer response, and
   instability or transient-growth metrics.
+  The current candidate table records the locally available Q2DmhdFoam spectral
+  summary; the matched energy/enstrophy/turnover bundle remains open.
 - Curved-pipe and Dean-vortex targets should be anchored first to hydrodynamic
   Dean-flow literature and OpenFOAM baselines, then to MHD damping trends once
   the secondary-flow state is resolved.
+  The current candidate table is a contract with open values because the present
+  LMX curved-pipe result is still a low-De charge-closure baseline.
 
 ## Lane 1: External Q2D Turbulence Parity
 
@@ -273,6 +279,12 @@ The local external-code/data inputs are audited by
 `examples/research_grade_external_data_audit.py`. That artifact checks which
 external checkouts, processed reference files, and matched reference CSVs are
 actually present before a lane can be promoted from open to closed.
+`examples/research_grade_external_target_figures.py` now writes
+`research_grade_external_targets.png` plus three `*_candidate.csv` files:
+`magnetic_obstacle_reference_observables_candidate.csv`,
+`q2d_turbulence_reference_observables_candidate.csv`, and
+`dean_vortex_reference_observables_candidate.csv`. These are target-acquisition
+artifacts for the paper and next runs, not strict validation inputs.
 
 ### Phase 1: External Data Acquisition
 

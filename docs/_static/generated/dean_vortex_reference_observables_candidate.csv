@@ -1,0 +1,6 @@
+observable,value,tolerance,relative_tolerance,units,source,note
+secondary_flow_rms_ratio,,,0.15,dimensionless,Dean curved-pipe/duct literature or matched OpenFOAM curved-pipe run,"Strict value open. Current LMX low-De baseline is De=5.194e-07, not a higher-inertia Dean-vortex reference."
+secondary_flow_peak_ratio,,,0.15,dimensionless,Dean curved-pipe/duct literature or matched OpenFOAM curved-pipe run,Strict value open until the resolved secondary-flow or external curved-pipe reference is available.
+normalized_velocity_centroid_shift,,,0.15,dimensionless,Dean curved-pipe/duct literature or matched OpenFOAM curved-pipe run,Strict value open; this should measure axial-speed skew toward the outer bend.
+inner_outer_velocity_ratio,,,0.10,dimensionless,Dean curved-pipe/duct literature or matched OpenFOAM curved-pipe run,Strict value open; compare outer/inner axial-speed cut in the bend.
+pressure_loss_proxy,,,0.15,case-specific,Dean curved-pipe/duct literature or matched OpenFOAM curved-pipe run,Strict value open; use the same nondimensional pressure-loss convention as the reference.

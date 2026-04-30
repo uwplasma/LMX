@@ -1,0 +1,3 @@
+observable,value,tolerance,relative_tolerance,units,source,note
+minimum_centerline_velocity_ratio,-0.13,0.03,0.20,dimensionless,"Approximate digitization of Votyakov et al. Fig. 7(a), N > 15 plateau","Candidate target only; requires matched magnetic field, Re, N, kappa, and inertia-capable LMX run before strict comparison."
+normalized_recovery_distance,,,0.15,dimensionless,Votyakov/Cuevas centerline or matched external solver,Not filled from Fig. 7(a); requires centerline profile digitization or external run output.

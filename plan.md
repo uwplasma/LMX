@@ -381,6 +381,12 @@ refer to the Samper et al. taxonomy.
    numerical invariant, one physics/literature gate, one artifact-producing
    example, and one docs entry stating whether the case is verification,
    validation, or only a capability demo.
+   The current strict-lane target pass adds
+   `examples/research_grade_external_target_figures.py`, which writes
+   publication-facing target plots and `*_candidate.csv` tables for the
+   magnetic-obstacle, Q2D turbulence, and Dean-vortex lanes. Those candidate
+   tables are acquisition/planning artifacts only; the strict filenames remain
+   reserved for matched LMX/external comparisons.
 6. Finish performance and differentiability gates.
    The solver must report progress, ETA, memory-relevant grid sizes, compile
    versus warm runtime, and device placement. Differentiable workflows must

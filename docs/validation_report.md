@@ -71,6 +71,12 @@ available solver/data paths from completed observable-level parity:
 
 ![LMX executable external-code validation map](_static/generated/external_validation_readiness.png)
 
+The current target-acquisition panel records candidate observables for the
+remaining strict lanes. It is evidence for the next validation runs, not a
+replacement for matched reference CSVs:
+
+![LMX strict external validation targets](_static/generated/research_grade_external_targets.png)
+
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
 ## Combined validation workflow

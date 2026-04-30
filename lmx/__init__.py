@@ -214,6 +214,8 @@ __all__ = [
     "research_grade_external_data_audit",
     "research_grade_closure_rows",
     "research_grade_closure_status",
+    "write_research_grade_external_target_panel",
+    "write_research_grade_external_target_tables",
     "write_publication_figure_manifest",
     "write_research_grade_external_data_audit",
     "write_research_grade_closure_status",
@@ -411,6 +413,14 @@ _EXPORTS = {
     "research_grade_closure_status": (
         "lmx.research_closure",
         "research_grade_closure_status",
+    ),
+    "write_research_grade_external_target_panel": (
+        "lmx.research_figures",
+        "write_research_grade_external_target_panel",
+    ),
+    "write_research_grade_external_target_tables": (
+        "lmx.research_figures",
+        "write_research_grade_external_target_tables",
     ),
     "write_publication_figure_manifest": (
         "lmx.publication",

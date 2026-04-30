@@ -33,6 +33,8 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.research_grade_external_data_audit)
     assert callable(lmx.research_grade_closure_rows)
     assert callable(lmx.research_grade_closure_status)
+    assert callable(lmx.write_research_grade_external_target_panel)
+    assert callable(lmx.write_research_grade_external_target_tables)
     assert callable(lmx.write_publication_figure_manifest)
     assert callable(lmx.write_research_grade_external_data_audit)
     assert callable(lmx.write_research_grade_closure_status)

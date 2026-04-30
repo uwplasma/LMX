@@ -1,0 +1,26 @@
+{
+  "case": "research_grade_external_targets",
+  "status": "publication_targets_generated_no_strict_closure",
+  "plots": [
+    "research_grade_external_targets.png",
+    "research_grade_external_targets.pdf"
+  ],
+  "tables": [
+    "magnetic_obstacle_votyakov_fig7a_digitized.csv",
+    "magnetic_obstacle_reference_observables_candidate.csv",
+    "q2d_turbulence_reference_observables_candidate.csv",
+    "dean_vortex_reference_observables_candidate.csv",
+    "research_grade_external_targets_summary.json"
+  ],
+  "docs_artifacts": [
+    "magnetic_obstacle_votyakov_fig7a_digitized.csv",
+    "magnetic_obstacle_reference_observables_candidate.csv",
+    "q2d_turbulence_reference_observables_candidate.csv",
+    "dean_vortex_reference_observables_candidate.csv",
+    "research_grade_external_targets_summary.json",
+    "research_grade_external_targets.png",
+    "research_grade_external_targets.pdf",
+    "research_grade_external_targets_example_summary.json"
+  ],
+  "notes": "These figures document external targets and current gaps. They do not fill the strict matched reference CSVs used by release readiness."
+}

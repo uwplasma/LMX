@@ -695,6 +695,15 @@ hidden in the figures:
 
 ![LMX executable external-code validation map](docs/_static/generated/external_validation_readiness.png)
 
+The current target panel records the strongest available external evidence for
+the open lanes without counting it as closure. The candidate CSVs are useful for
+manuscript planning and follow-on runs, but release readiness still requires the
+matched strict files `magnetic_obstacle_reference_observables.csv`,
+`q2d_turbulence_reference_observables.csv`, and
+`dean_vortex_reference_observables.csv`.
+
+![LMX strict external validation targets](docs/_static/generated/research_grade_external_targets.png)
+
 - high-`Ha` Hunt side-layer parity is closed for the public analytical
   overlay after matching the thin-wall reference model used by the FreeMHD/Ni
   files (`wall_thickness = 0.001`, `sigma_w / sigma = 5`,
