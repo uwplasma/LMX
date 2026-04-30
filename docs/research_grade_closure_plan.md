@@ -234,7 +234,11 @@ The matched case must record:
 3. If executable parity is not immediately available, digitize published
    centerline/crosscut/pressure or drag observables and record the digitization
    metadata.
-4. Fill `magnetic_obstacle_reference_observables.csv` and rerun
+4. Use `examples/magnetic_obstacle_votyakov_curve_validation.py` to check the
+   full digitized Votyakov reverse-flow curve before reducing it to one scalar
+   gate. The current artifact extracts onset and high-`N` plateau observables
+   and shows that LMX remains in positive through-flow.
+5. Fill `magnetic_obstacle_reference_observables.csv` and rerun
    `examples/magnetic_obstacle_benchmark.py`.
 
 ### Required Observables
@@ -243,6 +247,8 @@ The matched case must record:
 - `wake_recovery_ratio`
 - `minimum_centerline_velocity_ratio`, matching the Votyakov et al. figure-7
   observable for magnetic-obstacle reverse-flow onset when that dataset is used
+- `reverse_flow_onset_interaction_parameter` and high-`N` plateau minimum
+  centerline velocity when the full Votyakov Fig. 7(a)-style curve is used
 - `normalized_recovery_distance`
 - `pressure_drop_proxy`
 - `current_proxy_peak`

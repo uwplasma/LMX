@@ -171,6 +171,15 @@ external-code parity case before this lane can close.
 
 ![LMX magnetic-obstacle Votyakov strict attempt](_static/generated/magnetic_obstacle_reference_comparison.png)
 
+`examples/magnetic_obstacle_votyakov_curve_validation.py` now also renders the
+full digitized Votyakov curve used by that scalar gate. It extracts reverse-flow
+onset and high-interaction-parameter plateau observables and compares the
+plateau to the current LMX localized-field response. This makes the open
+physics explicit: current closure is clean, but the retained magnetic-obstacle
+case is not an inertial recirculating obstacle solve.
+
+![LMX magnetic-obstacle Votyakov curve comparison](_static/generated/magnetic_obstacle_votyakov_curve_comparison.png)
+
 The Dean-vortex lane has the same explicit-offender treatment. The current
 low-De bent-pipe solve has conservative charge closure and no spurious
 secondary flow. The Bayat-Rezai strict attempt uses a moderate-De target for

@@ -226,6 +226,7 @@ __all__ = [
     "write_q2d_turbulence_observable_plots",
     "write_q2d_turbulence_decay_movie",
     "load_magnetic_obstacle_reference_observables",
+    "load_magnetic_obstacle_votyakov_digitized_curve",
     "load_q2dmhdfoam_force_coefficients",
     "load_q2dmhdfoam_docker_reference_profile",
     "load_q2dmhdfoam_line_profile",
@@ -243,12 +244,14 @@ __all__ = [
     "q2d_turbulence_reference_template_rows",
     "dean_vortex_reference_template_rows",
     "magnetic_obstacle_reference_template_rows",
+    "magnetic_obstacle_votyakov_curve_observables",
     "write_dean_vortex_reference_template",
     "summarize_external_validation_readiness",
     "write_external_validation_readiness_panel",
     "write_magnetic_obstacle_reference_comparison_plots",
     "write_magnetic_obstacle_reference_comparison_table",
     "write_magnetic_obstacle_reference_template",
+    "write_magnetic_obstacle_votyakov_curve_comparison",
     "write_q2dmhdfoam_docker_reference_panel",
     "write_q2dmhdfoam_external_reference_panel",
     "write_q2dmhdfoam_profile_observable_table",
@@ -403,6 +406,10 @@ _EXPORTS = {
         "lmx.external_validation",
         "load_magnetic_obstacle_reference_observables",
     ),
+    "load_magnetic_obstacle_votyakov_digitized_curve": (
+        "lmx.external_validation",
+        "load_magnetic_obstacle_votyakov_digitized_curve",
+    ),
     "load_q2dmhdfoam_line_profile": (
         "lmx.external_validation",
         "load_q2dmhdfoam_line_profile",
@@ -467,6 +474,10 @@ _EXPORTS = {
         "lmx.external_validation",
         "magnetic_obstacle_reference_template_rows",
     ),
+    "magnetic_obstacle_votyakov_curve_observables": (
+        "lmx.external_validation",
+        "magnetic_obstacle_votyakov_curve_observables",
+    ),
     "write_dean_vortex_reference_template": (
         "lmx.external_validation",
         "write_dean_vortex_reference_template",
@@ -490,6 +501,10 @@ _EXPORTS = {
     "write_magnetic_obstacle_reference_template": (
         "lmx.external_validation",
         "write_magnetic_obstacle_reference_template",
+    ),
+    "write_magnetic_obstacle_votyakov_curve_comparison": (
+        "lmx.external_validation",
+        "write_magnetic_obstacle_votyakov_curve_comparison",
     ),
     "write_q2dmhdfoam_external_reference_panel": (
         "lmx.external_validation",

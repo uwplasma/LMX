@@ -90,6 +90,11 @@
       "generator": "examples/magnetic_obstacle_benchmark.py"
     },
     {
+      "name": "magnetic_obstacle_votyakov_curve_comparison.png",
+      "kind": "Votyakov magnetic-obstacle reverse-flow curve comparison",
+      "generator": "examples/magnetic_obstacle_votyakov_curve_validation.py"
+    },
+    {
       "name": "bent_pipe_overview.png",
       "kind": "bent-pipe geometry and low-De response panel",
       "generator": "examples/bent_pipe_inductionless_demo.py"

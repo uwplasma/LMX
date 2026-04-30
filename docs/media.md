@@ -49,6 +49,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `magnetic_obstacle_schematic.png` | `examples/magnetic_obstacle_benchmark.py` | Localized-field geometry and response setup |
 | `magnetic_obstacle_benchmark.png` | `examples/magnetic_obstacle_benchmark.py` | Internal matched no-field response gate |
 | `magnetic_obstacle_reference_comparison.png` | `examples/magnetic_obstacle_votyakov_strict_attempt.py` | Digitized Votyakov centerline target comparison; currently a strict mismatch |
+| `magnetic_obstacle_votyakov_curve_comparison.png` | `examples/magnetic_obstacle_votyakov_curve_validation.py` | Full digitized Votyakov reverse-flow curve and current LMX localized-field mismatch |
 | `bent_pipe_overview.png` | `examples/bent_pipe_inductionless_demo.py` | Curved-pipe geometry and low-De response |
 | `dean_vortex_reference_comparison.png` | `examples/dean_vortex_bayat_rezai_strict_attempt.py` | Bayat-Rezai moderate-De secondary-flow target comparison; currently a strict mismatch |
 | `variable_field_tabulated_reconstruction.png` | `examples/variable_field_tabulated_demo.py` | Tabulated-field interpolation/reconstruction gate |
@@ -90,6 +91,7 @@ python examples/q2dmhdfoam_lmx_turbulence_match_audit.py
 python examples/q2dmhdfoam_docker_reference_validation.py
 python examples/q2dmhdfoam_lid_driven_vtk_artifact.py
 python examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py
+python examples/magnetic_obstacle_votyakov_curve_validation.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
 python examples/li_aln_wall_stack_phase0_2.py

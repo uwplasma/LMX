@@ -1597,6 +1597,50 @@ def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(tmp_
     assert patched["external_reference_comparison"]["status"] == "external_reference_compared"
 
 
+def test_magnetic_obstacle_votyakov_curve_validation_writes_artifacts(tmp_path: Path):
+    module = _load_example_module("magnetic_obstacle_votyakov_curve_validation.py")
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    digitized = docs_dir / "magnetic_obstacle_votyakov_fig7a_digitized.csv"
+    digitized.write_text(
+        "series,N,ux_min\n"
+        "experiment_Ha140,4.0,0.08\n"
+        "experiment_Ha140,5.0,0.0\n"
+        "experiment_Ha140,16.0,-0.12\n"
+        "experiment_Ha140,25.0,-0.14\n",
+        encoding="utf-8",
+    )
+    benchmark = docs_dir / "magnetic_obstacle_benchmark_summary.json"
+    benchmark.write_text(
+        json.dumps(
+            {
+                "external_readiness": {
+                    "observables": {
+                        "minimum_centerline_velocity_ratio": 0.99,
+                        "pressure_drop_proxy": 0.4,
+                        "max_charge_balance_residual": 1.0e-12,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = module.run_magnetic_obstacle_votyakov_curve_validation(
+        out_dir=tmp_path / "out",
+        docs_output_dir=docs_dir,
+        digitized_curve_path=digitized,
+        benchmark_summary_path=benchmark,
+    )
+
+    assert summary["status"] == "literature_curve_compared_mismatch"
+    assert summary["strict_blocker_closed"] is False
+    assert summary["absolute_gap_to_plateau"] > 1.0
+    assert (docs_dir / "magnetic_obstacle_votyakov_curve_comparison.png").exists()
+    assert (docs_dir / "magnetic_obstacle_votyakov_curve_comparison_observables.csv").exists()
+    assert (docs_dir / "magnetic_obstacle_votyakov_curve_validation_summary.json").exists()
+
+
 def test_research_grade_closure_dashboard_writes_docs_artifacts(tmp_path: Path):
     module = _load_example_module("research_grade_closure_dashboard.py")
     docs_dir = tmp_path / "docs"

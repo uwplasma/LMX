@@ -485,6 +485,7 @@ Localized-field and mirror-field response:
 python examples/magnetic_obstacle_benchmark.py
 python examples/magnetic_obstacle_external_reference_template.py
 python examples/magnetic_obstacle_votyakov_strict_attempt.py
+python examples/magnetic_obstacle_votyakov_curve_validation.py
 python examples/magnetic_obstacle_baseline.py
 python examples/wham_mirror_pipe_demo.py
 python examples/wham_blanket_geometry_preview.py
@@ -524,6 +525,11 @@ Those examples are the current executable localized-field response entry points:
   - write the strict reference CSV and the failed observable comparison panel
   - document that the current reduced case does not yet reproduce the
     recirculating negative centerline velocity required by the literature case
+- `magnetic_obstacle_votyakov_curve_validation.py`
+  - read the full digitized Votyakov Fig. 7(a)-style curve
+  - extract reverse-flow onset and high-`N` plateau observables
+  - write a curve-level PNG/PDF/CSV artifact showing that the current LMX
+    localized-field response remains outside the inertial recirculating regime
 - `magnetic_obstacle_baseline.py`
   - solve a rectangular extruded duct with a localized analytic magnetic obstacle
   - write the full extruded overview panel

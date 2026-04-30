@@ -1,0 +1,52 @@
+{
+  "case": "magnetic_obstacle_votyakov_curve_validation",
+  "status": "literature_curve_compared_mismatch",
+  "strict_blocker_closed": false,
+  "digitized_curve": "docs/_static/generated/magnetic_obstacle_votyakov_fig7a_digitized.csv",
+  "benchmark_summary": "docs/_static/generated/magnetic_obstacle_benchmark_summary.json",
+  "derived_reference_observables": [
+    {
+      "series": "experiment_Ha140",
+      "sample_count": 14,
+      "reverse_flow_onset_interaction_parameter": 4.666666666666667,
+      "plateau_minimum_centerline_velocity_ratio": -0.137,
+      "plateau_std": 0.01058300524425836,
+      "high_interaction_minimum_ratio": -0.151,
+      "high_interaction_parameter": 34.0
+    },
+    {
+      "series": "simulation_Re100",
+      "sample_count": 8,
+      "reverse_flow_onset_interaction_parameter": 5.2,
+      "plateau_minimum_centerline_velocity_ratio": -0.137,
+      "plateau_std": 0.008981462390204982,
+      "high_interaction_minimum_ratio": -0.148,
+      "high_interaction_parameter": 36.0
+    },
+    {
+      "series": "simulation_Re196",
+      "sample_count": 4,
+      "reverse_flow_onset_interaction_parameter": 5.1891891891891895,
+      "plateau_minimum_centerline_velocity_ratio": -0.124,
+      "plateau_std": 0.0,
+      "high_interaction_minimum_ratio": -0.124,
+      "high_interaction_parameter": 16.0
+    }
+  ],
+  "lmx_minimum_centerline_velocity_ratio": 0.9975211034129313,
+  "target_plateau_minimum_centerline_velocity_ratio": -0.137,
+  "absolute_gap_to_plateau": 1.1345211034129314,
+  "plots": [
+    "magnetic_obstacle_votyakov_curve_comparison.png",
+    "magnetic_obstacle_votyakov_curve_comparison.pdf"
+  ],
+  "tables": [
+    "magnetic_obstacle_votyakov_curve_comparison_observables.csv"
+  ],
+  "docs_artifacts": [
+    "magnetic_obstacle_votyakov_curve_comparison_observables.csv",
+    "magnetic_obstacle_votyakov_curve_comparison.png",
+    "magnetic_obstacle_votyakov_curve_comparison.pdf"
+  ],
+  "notes": "This is a literature-curve diagnostic, not a closed validation. Votyakov reverse-flow onset and high-N plateau require inertial recirculating magnetic-obstacle physics, while the current LMX localized-field gate remains a conservative inductionless response solve."
+}

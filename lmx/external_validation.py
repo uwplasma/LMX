@@ -1862,6 +1862,199 @@ def write_magnetic_obstacle_reference_template(path: str | Path) -> Path:
     return write_scalar_reference_template(path, magnetic_obstacle_reference_template_rows())
 
 
+def load_magnetic_obstacle_votyakov_digitized_curve(path: str | Path) -> list[dict[str, float | str]]:
+    """Load digitized Votyakov magnetic-obstacle Fig. 7(a)-style curves.
+
+    The expected CSV columns are ``series``, ``N``, and ``ux_min``. ``N`` is the
+    interaction parameter and ``ux_min`` is the minimum streamwise centerline
+    velocity normalized by the upstream velocity.
+    """
+
+    source = Path(path)
+    rows: list[dict[str, float | str]] = []
+    with source.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or ())
+        missing = {"series", "N", "ux_min"} - fieldnames
+        if missing:
+            raise ValueError(f"Votyakov digitized curve is missing columns: {', '.join(sorted(missing))}")
+        for row_number, row in enumerate(reader, start=2):
+            series = str(row.get("series", "")).strip()
+            if not series:
+                raise ValueError(f"Votyakov digitized curve row {row_number} has an empty series")
+            rows.append(
+                {
+                    "series": series,
+                    "interaction_parameter": _parse_float(row.get("N"), row_number=row_number, column="N", context="Votyakov digitized curve"),
+                    "minimum_centerline_velocity_ratio": _parse_float(
+                        row.get("ux_min"),
+                        row_number=row_number,
+                        column="ux_min",
+                        context="Votyakov digitized curve",
+                    ),
+                }
+            )
+    if not rows:
+        raise ValueError(f"Votyakov digitized curve {source} has no data rows")
+    return rows
+
+
+def magnetic_obstacle_votyakov_curve_observables(
+    records: Sequence[Mapping[str, float | str]],
+    *,
+    plateau_min_interaction: float = 15.0,
+) -> list[dict[str, float | str]]:
+    """Reduce digitized Votyakov curves to onset and plateau observables."""
+
+    by_series: dict[str, list[tuple[float, float]]] = {}
+    for record in records:
+        series = str(record["series"])
+        n_value = float(record["interaction_parameter"])
+        u_min = float(record["minimum_centerline_velocity_ratio"])
+        by_series.setdefault(series, []).append((n_value, u_min))
+    observables: list[dict[str, float | str]] = []
+    for series, pairs in sorted(by_series.items()):
+        pairs = sorted(pairs)
+        n_values = np.asarray([item[0] for item in pairs], dtype=float)
+        u_values = np.asarray([item[1] for item in pairs], dtype=float)
+        plateau_mask = n_values >= plateau_min_interaction
+        plateau_values = u_values[plateau_mask] if np.any(plateau_mask) else u_values[-min(3, u_values.size) :]
+        observables.append(
+            {
+                "series": series,
+                "sample_count": int(u_values.size),
+                "reverse_flow_onset_interaction_parameter": _zero_crossing(n_values, u_values),
+                "plateau_minimum_centerline_velocity_ratio": float(np.mean(plateau_values)),
+                "plateau_std": float(np.std(plateau_values)),
+                "high_interaction_minimum_ratio": float(u_values[-1]),
+                "high_interaction_parameter": float(n_values[-1]),
+            }
+        )
+    return observables
+
+
+def write_magnetic_obstacle_votyakov_curve_comparison(
+    records: Sequence[Mapping[str, float | str]],
+    lmx_observables: Mapping[str, float],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "magnetic_obstacle_votyakov_curve_comparison",
+    target_series: str = "experiment_Ha140",
+    plateau_min_interaction: float = 15.0,
+) -> list[Path]:
+    """Write a literature-curve magnetic-obstacle comparison panel and CSV."""
+
+    import matplotlib.pyplot as plt
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    derived = magnetic_obstacle_votyakov_curve_observables(
+        records,
+        plateau_min_interaction=plateau_min_interaction,
+    )
+    csv_path = out_dir / f"{output_stem}_observables.csv"
+    columns = (
+        "series",
+        "sample_count",
+        "reverse_flow_onset_interaction_parameter",
+        "plateau_minimum_centerline_velocity_ratio",
+        "plateau_std",
+        "high_interaction_minimum_ratio",
+        "high_interaction_parameter",
+    )
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for row in derived:
+            writer.writerow({column: row.get(column, "") for column in columns})
+
+    by_series: dict[str, list[tuple[float, float]]] = {}
+    for record in records:
+        by_series.setdefault(str(record["series"]), []).append(
+            (
+                float(record["interaction_parameter"]),
+                float(record["minimum_centerline_velocity_ratio"]),
+            )
+        )
+    target = next((row for row in derived if row["series"] == target_series), derived[0])
+    reference_value = float(target["plateau_minimum_centerline_velocity_ratio"])
+    reference_std = float(target["plateau_std"])
+    lmx_value = float(lmx_observables.get("minimum_centerline_velocity_ratio", np.nan))
+    lmx_charge = float(lmx_observables.get("max_charge_balance_residual", np.nan))
+    lmx_pressure = float(lmx_observables.get("pressure_drop_proxy", np.nan))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.4, 5.1), constrained_layout=True)
+    colors = {
+        "experiment_Ha140": "#1f77b4",
+        "simulation_Re196": "#d62728",
+        "simulation_Re100": "#2ca02c",
+    }
+    max_interaction = max(float(row["high_interaction_parameter"]) for row in derived)
+    for series, pairs in sorted(by_series.items()):
+        pairs = sorted(pairs)
+        axes[0].plot(
+            [item[0] for item in pairs],
+            [item[1] for item in pairs],
+            marker="o",
+            linewidth=1.8,
+            markersize=4.0,
+            color=colors.get(series),
+            label=series.replace("_", " "),
+        )
+    axes[0].axhline(0.0, color="black", linewidth=0.9, linestyle="--")
+    axes[0].axvspan(plateau_min_interaction, max_interaction, color="#f1f5f9", alpha=0.8)
+    axes[0].set_xlabel("interaction parameter N")
+    axes[0].set_ylabel("min centerline velocity / upstream velocity")
+    axes[0].set_title("Digitized Votyakov magnetic-obstacle reverse-flow curve")
+    axes[0].grid(True, alpha=0.25)
+    axes[0].legend(frameon=False, fontsize=8.5)
+
+    labels = [f"{target_series.replace('_', ' ')}\nN >= {plateau_min_interaction:g}", "LMX current\nlocalized-field gate"]
+    axes[1].bar([0, 1], [reference_value, lmx_value], yerr=[reference_std, 0.0], color=["#1f77b4", "#c2410c"], capsize=4)
+    axes[1].axhline(0.0, color="black", linewidth=0.9, linestyle="--")
+    axes[1].set_xticks([0, 1], labels)
+    axes[1].set_ylabel("min centerline velocity ratio")
+    axes[1].set_title("Strict observable mismatch")
+    axes[1].set_ylim(min(reference_value - 0.08, -0.22), max(lmx_value + 0.12, 1.08))
+    axes[1].grid(True, axis="y", alpha=0.25)
+    for x_pos, value in enumerate([reference_value, lmx_value]):
+        axes[1].text(x_pos, value + 0.03, f"{value:.3g}", ha="center", va="bottom", fontsize=9)
+    axes[1].text(
+        0.03,
+        0.97,
+        (
+            "Open physics: inertial recirculation\n"
+            "and wake topology are not in this\n"
+            "current localized-field response gate.\n"
+            f"p proxy={lmx_pressure:.3g}; charge={lmx_charge:.1e}"
+        ),
+        transform=axes[1].transAxes,
+        fontsize=8.5,
+        va="top",
+        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.9},
+    )
+    fig.suptitle("Magnetic-obstacle literature target versus current LMX response", fontsize=14.5, fontweight="bold")
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
+    for path in (png_path, pdf_path):
+        fig.savefig(path, dpi=185, bbox_inches="tight")
+    plt.close(fig)
+    return [csv_path, png_path, pdf_path]
+
+
+def _zero_crossing(x: np.ndarray, y: np.ndarray) -> float:
+    for idx in range(y.size - 1):
+        y0 = float(y[idx])
+        y1 = float(y[idx + 1])
+        if y0 == 0.0:
+            return float(x[idx])
+        if y0 * y1 < 0.0 or y1 == 0.0:
+            x0 = float(x[idx])
+            x1 = float(x[idx + 1])
+            return float(x0 - y0 * (x1 - x0) / (y1 - y0))
+    return float("nan")
+
+
 def q2d_turbulence_reference_template_rows() -> list[dict[str, str]]:
     """Return scalar-observable rows for external Q2D turbulent parity."""
 

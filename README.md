@@ -458,10 +458,17 @@ current benchmark against the digitized Votyakov centerline target. That target
 requires reverse centerline velocity in the magnetic-obstacle recirculation
 regime; the present reduced LMX case stays positive, so the strict lane has
 moved from template-only to an explicit external-observable mismatch.
+`examples/magnetic_obstacle_votyakov_curve_validation.py` extends that check
+from one scalar to the full digitized Votyakov Fig. 7(a)-style curve. It
+extracts reverse-flow onset and high-`N` plateau observables, then shows that
+the current LMX localized-field response stays near positive through-flow
+instead of entering the recirculating obstacle regime.
 
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
 
 ![LMX magnetic-obstacle Votyakov strict attempt](docs/_static/generated/magnetic_obstacle_reference_comparison.png)
+
+![LMX magnetic-obstacle Votyakov curve comparison](docs/_static/generated/magnetic_obstacle_votyakov_curve_comparison.png)
 
 To push beyond that single bounded point, LMX also now includes
 `examples/magnetic_obstacle_regime_scan.py`, which sweeps obstacle runs over

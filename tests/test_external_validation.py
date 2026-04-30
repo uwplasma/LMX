@@ -20,8 +20,10 @@ from lmx.external_validation import (
     load_q2dmhdfoam_probe_velocity_history,
     load_q2dmhdfoam_vtk_vector_field,
     load_magnetic_obstacle_reference_observables,
+    load_magnetic_obstacle_votyakov_digitized_curve,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
+    magnetic_obstacle_votyakov_curve_observables,
     q2dmhdfoam_case_manifest,
     q2dmhdfoam_docker_reference_observables,
     q2dmhdfoam_cell_velocity_observables,
@@ -34,6 +36,7 @@ from lmx.external_validation import (
     write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
+    write_magnetic_obstacle_votyakov_curve_comparison,
     write_q2dmhdfoam_docker_reference_panel,
     write_q2dmhdfoam_external_reference_panel,
     write_q2dmhdfoam_lmx_turbulence_match_audit,
@@ -129,6 +132,40 @@ def test_magnetic_obstacle_reference_template_has_required_columns(tmp_path: Pat
     assert {"observable", "value", "tolerance", "relative_tolerance"} <= set(template_rows[0])
     assert "centerline_velocity_deficit_ratio" in text
     assert "pressure_drop_proxy" in text
+
+
+def test_magnetic_obstacle_votyakov_curve_loader_and_panel(tmp_path: Path):
+    curve_path = tmp_path / "votyakov.csv"
+    curve_path.write_text(
+        "series,N,ux_min\n"
+        "experiment_Ha140,4.0,0.08\n"
+        "experiment_Ha140,5.0,0.0\n"
+        "experiment_Ha140,16.0,-0.12\n"
+        "experiment_Ha140,25.0,-0.14\n"
+        "simulation_Re100,4.0,0.1\n"
+        "simulation_Re100,6.0,-0.03\n"
+        "simulation_Re100,16.0,-0.11\n",
+        encoding="utf-8",
+    )
+
+    records = load_magnetic_obstacle_votyakov_digitized_curve(curve_path)
+    observables = magnetic_obstacle_votyakov_curve_observables(records)
+    paths = write_magnetic_obstacle_votyakov_curve_comparison(
+        records,
+        {
+            "minimum_centerline_velocity_ratio": 0.99,
+            "pressure_drop_proxy": 0.4,
+            "max_charge_balance_residual": 1.0e-12,
+        },
+        tmp_path,
+    )
+
+    experiment = next(row for row in observables if row["series"] == "experiment_Ha140")
+    assert len(records) == 7
+    assert experiment["reverse_flow_onset_interaction_parameter"] == pytest.approx(5.0)
+    assert experiment["plateau_minimum_centerline_velocity_ratio"] == pytest.approx(-0.13)
+    assert [path.suffix for path in paths] == [".csv", ".png", ".pdf"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in paths)
 
 
 def test_magnetic_obstacle_reference_csv_rejects_missing_columns(tmp_path: Path):

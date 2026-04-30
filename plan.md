@@ -415,8 +415,12 @@ refer to the Samper et al. taxonomy.
   `write_magnetic_obstacle_reference_comparison_plots(...)`; the benchmark
   driver now emits the comparison table and PNG/PDF gate automatically when a
   filled `magnetic_obstacle_reference_observables.csv` is present, and emits
-  the template otherwise. The remaining work is scientific data acquisition,
-  not comparison plumbing.
+  the template otherwise. The full Votyakov Fig. 7(a)-style curve diagnostic
+  now lives in `examples/magnetic_obstacle_votyakov_curve_validation.py`; it
+  extracts reverse-flow onset and high-`N` plateau observables from the
+  digitized curve and compares them to the current LMX localized-field
+  response. The remaining work is therefore an inertia-capable matched solve or
+  external-code parity run, not comparison plumbing.
   A setup-first schematic artifact now exists in
   `examples/magnetic_obstacle_benchmark.py` and the README. It shows the duct,
   flow direction, localized field sheet, velocity slice, cross-sectional
@@ -1482,6 +1486,13 @@ Current localized magnetic-obstacle response lane:
   the lane from template-only to a quantified mismatch and confirms that the
   next closure step is an inertia-capable, geometry-matched magnetic-obstacle
   solve or external-code parity run, not plot cleanup.
+- full Votyakov curve diagnostic:
+  `examples/magnetic_obstacle_votyakov_curve_validation.py` renders the
+  digitized reverse-flow curve, records onset and plateau observables, and
+  compares the high-`N` plateau to the current LMX response. The retained plot
+  shows the same blocker over the full literature curve: LMX keeps positive
+  through-flow where the reference curve has recirculating negative centerline
+  velocity.
 - current bounded result from `examples/magnetic_obstacle_benchmark.py`:
   `peak_velocity_deficit_ratio ≈ 1.01e-2`,
   `peak_station_velocity_deficit_ratio ≈ 1.01e-2`,
