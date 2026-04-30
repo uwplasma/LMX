@@ -1,0 +1,61 @@
+{
+  "case": "magnetic_obstacle_votyakov_strict_attempt",
+  "status": "external_reference_compared_mismatch",
+  "strict_blocker_closed": false,
+  "reference_source": "Votyakov et al. magnetic-obstacle centerline digitization",
+  "benchmark_summary": "magnetic_obstacle_benchmark_summary.json",
+  "external_reference_comparison": {
+    "status": "external_reference_compared",
+    "validation_pass": false,
+    "reference_path": "magnetic_obstacle_reference_observables.csv",
+    "comparison_table": "magnetic_obstacle_reference_comparison.csv",
+    "plots": [
+      "magnetic_obstacle_reference_comparison.png",
+      "magnetic_obstacle_reference_comparison.pdf"
+    ],
+    "comparison": {
+      "compared_observable_count": 1,
+      "passed_observable_count": 0,
+      "missing_lmx_observable_count": 0,
+      "extra_lmx_observables": [
+        "centerline_velocity_deficit",
+        "centerline_velocity_deficit_ratio",
+        "current_proxy_peak",
+        "field_velocity_correlation",
+        "max_charge_balance_residual",
+        "minimum_centerline_velocity",
+        "minimum_velocity_station",
+        "normalized_recovery_distance",
+        "peak_field_station",
+        "pressure_drop_proxy",
+        "recovery_station",
+        "wake_recovery_ratio"
+      ],
+      "rows": [
+        {
+          "observable": "minimum_centerline_velocity_ratio",
+          "lmx_value": 0.9975211034129313,
+          "reference_value": -0.13,
+          "absolute_error": 1.1275211034129313,
+          "effective_tolerance": 0.03,
+          "relative_error": 8.673239257022548,
+          "validation_pass": false,
+          "status": "compared",
+          "units": "dimensionless",
+          "source": "Approximate digitization of Votyakov et al. Fig. 7(a), N > 15 plateau"
+        }
+      ],
+      "validation_pass": false
+    },
+    "comparison_source": "Postprocessed from magnetic_obstacle_benchmark_summary.json using the digitized Votyakov Fig. 7(a) candidate target."
+  },
+  "notes": "The current LMX localized-field reduced case does not reproduce the negative centerline velocity required by the Votyakov recirculation target. This artifact narrows the magnetic-obstacle lane from template-only to an explicit external-observable mismatch.",
+  "docs_artifacts": [
+    "magnetic_obstacle_reference_observables.csv",
+    "magnetic_obstacle_reference_comparison.csv",
+    "magnetic_obstacle_reference_comparison.png",
+    "magnetic_obstacle_reference_comparison.pdf",
+    "magnetic_obstacle_benchmark_summary.json",
+    "magnetic_obstacle_votyakov_strict_attempt_summary.json"
+  ]
+}

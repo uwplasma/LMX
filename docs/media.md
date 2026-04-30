@@ -47,6 +47,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `q2d_lmx_q2dmhdfoam_lid_driven_parity.png` | `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py` | Matched isothermal side-wall LMX/Q2DmhdFoam field-observable comparison and current mean-speed offender |
 | `magnetic_obstacle_schematic.png` | `examples/magnetic_obstacle_benchmark.py` | Localized-field geometry and response setup |
 | `magnetic_obstacle_benchmark.png` | `examples/magnetic_obstacle_benchmark.py` | Internal matched no-field response gate |
+| `magnetic_obstacle_reference_comparison.png` | `examples/magnetic_obstacle_votyakov_strict_attempt.py` | Digitized Votyakov centerline target comparison; currently a strict mismatch |
 | `bent_pipe_overview.png` | `examples/bent_pipe_inductionless_demo.py` | Curved-pipe geometry and low-De response |
 | `variable_field_tabulated_reconstruction.png` | `examples/variable_field_tabulated_demo.py` | Tabulated-field interpolation/reconstruction gate |
 | `wham_blanket_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket pressure budget and local sections |

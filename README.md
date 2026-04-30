@@ -434,8 +434,15 @@ observable parity plots. When it is absent, the run writes the template and
 keeps the validation status explicitly open. This keeps the magnetic-obstacle
 lane ready for literature data without reclassifying the current
 matched-no-field comparison as external validation.
+`examples/magnetic_obstacle_votyakov_strict_attempt.py` now post-processes the
+current benchmark against the digitized Votyakov centerline target. That target
+requires reverse centerline velocity in the magnetic-obstacle recirculation
+regime; the present reduced LMX case stays positive, so the strict lane has
+moved from template-only to an explicit external-observable mismatch.
 
 ![LMX magnetic-obstacle benchmark](docs/_static/generated/magnetic_obstacle_benchmark.png)
+
+![LMX magnetic-obstacle Votyakov strict attempt](docs/_static/generated/magnetic_obstacle_reference_comparison.png)
 
 To push beyond that single bounded point, LMX also now includes
 `examples/magnetic_obstacle_regime_scan.py`, which sweeps obstacle runs over

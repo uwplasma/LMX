@@ -1478,6 +1478,44 @@ def test_magnetic_obstacle_external_reference_template_writes_summary(tmp_path: 
     assert (tmp_path / "magnetic_obstacle_external_reference_template_summary.json").exists()
 
 
+def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(tmp_path: Path):
+    module = _load_example_module("magnetic_obstacle_votyakov_strict_attempt.py")
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    benchmark_summary = {
+        "case": "magnetic_obstacle_benchmark",
+        "external_readiness": {
+            "observables": {
+                "minimum_centerline_velocity_ratio": 0.98,
+                "pressure_drop_proxy": 0.2,
+            }
+        },
+    }
+    benchmark_path = docs_dir / "magnetic_obstacle_benchmark_summary.json"
+    benchmark_path.write_text(json.dumps(benchmark_summary, indent=2) + "\n", encoding="utf-8")
+    candidate_path = docs_dir / "magnetic_obstacle_reference_observables_candidate.csv"
+    candidate_path.write_text(
+        "observable,value,tolerance,relative_tolerance,units,source,note\n"
+        "minimum_centerline_velocity_ratio,-0.13,0.03,0.20,dimensionless,Votyakov digitized,target\n"
+        "normalized_recovery_distance,,,0.15,dimensionless,Votyakov,unfilled\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_magnetic_obstacle_votyakov_strict_attempt(
+        out_dir=tmp_path / "out",
+        docs_output_dir=docs_dir,
+        benchmark_summary_path=benchmark_path,
+        candidate_reference_path=candidate_path,
+    )
+
+    assert summary["status"] == "external_reference_compared_mismatch"
+    assert summary["strict_blocker_closed"] is False
+    assert summary["external_reference_comparison"]["validation_pass"] is False
+    assert (docs_dir / "magnetic_obstacle_reference_observables.csv").exists()
+    patched = json.loads((docs_dir / "magnetic_obstacle_benchmark_summary.json").read_text(encoding="utf-8"))
+    assert patched["external_reference_comparison"]["status"] == "external_reference_compared"
+
+
 def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_regime_scan.py")
     module.OUTPUT_DIR = tmp_path

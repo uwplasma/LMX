@@ -248,7 +248,17 @@ def _magnetic_obstacle_gate(root: Path) -> tuple[ReleaseGate, list[str]]:
     )
     deferred = []
     if not bool(validation.get("research_grade_validation_pass")):
-        deferred.append("Magnetic-obstacle lane is still an internal matched-no-field response gate until external observables are filled.")
+        comparison = summary.get("external_reference_comparison", {})
+        if comparison.get("status") == "external_reference_compared":
+            deferred.append(
+                "Magnetic-obstacle external observables are now compared, but the "
+                "Votyakov-style centerline/reverse-flow target still fails."
+            )
+        else:
+            deferred.append(
+                "Magnetic-obstacle lane is still an internal matched-no-field "
+                "response gate until external observables are filled."
+            )
     return (
         _gate(
             "magnetic_obstacle_internal_response",

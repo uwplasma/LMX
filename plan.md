@@ -1283,6 +1283,16 @@ Current localized magnetic-obstacle response lane:
   `examples/magnetic_obstacle_benchmark.py` now writes the comparison CSV plus
   PNG/PDF observable parity gate; if not, it writes the template and leaves the
   external validation status open
+- strict Votyakov attempt:
+  `examples/magnetic_obstacle_votyakov_strict_attempt.py` filters the filled
+  digitized Fig. 7(a) centerline target into the strict reference CSV contract
+  and compares it to the current LMX readiness observables. The reference
+  requires negative centerline velocity in the recirculating magnetic-obstacle
+  regime, while the current reduced LMX case stays positive
+  (`minimum_centerline_velocity_ratio ≈ 0.998` versus `-0.13`). This upgrades
+  the lane from template-only to a quantified mismatch and confirms that the
+  next closure step is an inertia-capable, geometry-matched magnetic-obstacle
+  solve or external-code parity run, not plot cleanup.
 - current bounded result from `examples/magnetic_obstacle_benchmark.py`:
   `peak_velocity_deficit_ratio ≈ 1.01e-2`,
   `peak_station_velocity_deficit_ratio ≈ 1.01e-2`,

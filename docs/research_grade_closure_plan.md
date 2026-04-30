@@ -410,6 +410,11 @@ parity requirements.
   the side-wall offender and a matched nonlinear case are closed.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
+  The first digitized Votyakov Fig. 7(a) centerline target is now wired through
+  `examples/magnetic_obstacle_votyakov_strict_attempt.py`; it compares the
+  current positive LMX minimum centerline velocity ratio (`≈ 0.998`) with the
+  recirculating target (`≈ -0.13`) and leaves the lane open as an explicit
+  physics mismatch rather than a missing-data placeholder.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-
   pipe baseline before adding magnetic damping.
 

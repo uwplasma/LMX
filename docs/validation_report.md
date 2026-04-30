@@ -133,6 +133,18 @@ artifacts strengthen the external-data and model-reference side of the open
 lanes; they do not change the strict closure status until matched LMX solved
 physics is compared against the references.
 
+A third support artifact now makes the magnetic-obstacle gap quantitative
+instead of template-only. `examples/magnetic_obstacle_votyakov_strict_attempt.py`
+filters the filled Votyakov Fig. 7(a) centerline digitization into the strict
+reference CSV and compares it against the current LMX readiness observables.
+The current reduced LMX case has positive minimum centerline velocity
+(`≈ 0.998 U_0`), while the digitized recirculating target is negative
+(`≈ -0.13 U_0`). The failure is therefore a physics/modeling gap: LMX still
+needs a geometry-matched, inertia-capable magnetic-obstacle solve or a matched
+external-code parity case before this lane can close.
+
+![LMX magnetic-obstacle Votyakov strict attempt](_static/generated/magnetic_obstacle_reference_comparison.png)
+
 ![LMX Dean-flow literature validation](_static/generated/dean_literature_validation.png)
 
 ## Combined validation workflow
