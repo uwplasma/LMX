@@ -233,6 +233,11 @@ refer to the Samper et al. taxonomy.
   cylinder outputs are useful evidence, but they do not match the current LMX
   periodic SM82-style turbulence example. The next real step is either a
   matched Q2DmhdFoam run or a corresponding LMX lid-driven/cylinder case.
+  Q2DmhdFoam is a foam-extend 4.1 solver; a direct compile attempt in the
+  OpenFOAM-v2206 container reaches link-time incompatibilities, so the matched
+  external rerun should be done in a foam-extend 4.1 container or through an
+  intentional solver port rather than by treating it as an OpenFOAM-v2206
+  tutorial.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.

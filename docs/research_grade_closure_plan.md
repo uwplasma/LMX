@@ -325,6 +325,11 @@ parity requirements.
 
 - Q2D: produce one matched Q2DmhdFoam turbulent reference bundle and convert it
   into `q2d_turbulence_reference_observables.csv`.
+  The local Q2DmhdFoam source is a foam-extend 4.1 solver, not a drop-in
+  OpenFOAM-v2206 solver. A direct `wmake` attempt inside the existing
+  OpenFOAM-v2206 container fails at link time, so the reproducible external
+  rerun path should use a foam-extend 4.1 container or a deliberate solver port
+  before generating the matched turbulent dataset.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-
