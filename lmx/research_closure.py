@@ -302,11 +302,14 @@ def _lane_status(
 def _q2d_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[str, Any]:
     q2d_summary = _load_json(root / "q2d_turbulence_decay_summary.json")
     sidewall_summary = _load_json(root / "q2d_lmx_q2dmhdfoam_lid_driven_parity_summary.json")
+    match_audit = _load_json(root / "q2dmhdfoam_lmx_turbulence_match_audit_summary.json")
     row = _closure_row_by_lane(closure, "q2d_turbulence_external_parity")
     validation = _validation_payload(q2d_summary)
     sidewall_closed = bool(sidewall_summary.get("strict_blocker_closed", False))
     reference_csv_exists = bool(row.get("reference_csv_exists", False))
     closed = bool(row.get("closed", False))
+    audited_cases = int(match_audit.get("case_count", 0) or 0)
+    strict_admissible_cases = list(match_audit.get("strict_admissible_cases", []))
     return {
         "lane": "q2d_turbulence_external_parity",
         "final_decision": "closed" if closed else "defer_strict_turbulent_parity",
@@ -315,34 +318,38 @@ def _q2d_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[str, 
         "measured_offender": (
             "q2d_turbulence_reference_observables.csv present"
             if reference_csv_exists
-            else "q2d_turbulence_reference_observables.csv absent"
+            else f"reference CSV absent; {audited_cases} Q2DmhdFoam cases audited, {len(strict_admissible_cases)} strict-admissible"
         ),
-        "evidence_artifact": "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
+        "evidence_artifact": "q2dmhdfoam_lmx_turbulence_match_audit.png",
         "required_next_physics": (
             "Run Q2DmhdFoam and LMX on the same nonlinear Q2D turbulent case, "
             "with identical forcing, domain, Hartmann friction, and time window."
         ),
         "why_not_closed": (
-            "The side-wall field-observable gate is closed, but the nonlinear "
-            "turbulent parity target is a different physical case."
+            "The side-wall field-observable gate is closed, but the match audit "
+            "rejects the available external cases as different physical cases."
         ),
         "selected_metrics": {
             "frame_count": validation.get("frame_count"),
             "turnover_count": validation.get("turnover_count"),
             "max_courant": validation.get("max_courant"),
             "support_gate_closed": sidewall_closed,
+            "audited_q2dmhdfoam_case_count": audited_cases,
+            "strict_admissible_case_count": len(strict_admissible_cases),
         },
     }
 
 
 def _magnetic_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[str, Any]:
     summary = _load_json(root / "magnetic_obstacle_votyakov_strict_attempt_summary.json")
+    curve_summary = _load_json(root / "magnetic_obstacle_votyakov_curve_validation_summary.json")
     benchmark = _load_json(root / "magnetic_obstacle_benchmark_summary.json")
     row = _closure_row_by_lane(closure, "magnetic_obstacle_external_validation")
     comparison_row = _first_comparison_row(summary)
     lmx_value = comparison_row.get("lmx_value")
     reference_value = comparison_row.get("reference_value")
     relative_error = comparison_row.get("relative_error")
+    plateau_gap = curve_summary.get("absolute_gap_to_plateau")
     closed = bool(row.get("closed", False))
     return {
         "lane": "magnetic_obstacle_external_validation",
@@ -351,9 +358,9 @@ def _magnetic_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[
         "blocking_observable": "minimum_centerline_velocity_ratio",
         "measured_offender": (
             f"LMX={_format_metric(lmx_value)}, Votyakov={_format_metric(reference_value)}, "
-            f"relative_error={_format_metric(relative_error)}"
+            f"relative_error={_format_metric(relative_error)}, plateau_gap={_format_metric(plateau_gap)}"
         ),
-        "evidence_artifact": "magnetic_obstacle_reference_comparison.png",
+        "evidence_artifact": "magnetic_obstacle_votyakov_curve_comparison.png",
         "required_next_physics": (
             "Add or couple an inertia-capable localized-field magnetic-obstacle "
             "solve, or run a geometry-matched external code case and compare "
@@ -367,6 +374,10 @@ def _magnetic_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[
             "peak_centerline_deficit_ratio": _validation_payload(benchmark).get("peak_centerline_deficit_ratio"),
             "max_charge_balance_residual": _validation_payload(benchmark).get("max_charge_balance_residual"),
             "external_validation_pass": _external_comparison_validation(summary),
+            "target_plateau_minimum_centerline_velocity_ratio": curve_summary.get(
+                "target_plateau_minimum_centerline_velocity_ratio"
+            ),
+            "absolute_gap_to_plateau": plateau_gap,
         },
     }
 
