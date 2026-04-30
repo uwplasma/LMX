@@ -1,9 +1,9 @@
 {
   "case": "publication_figure_campaign",
-  "generated_at_utc": "2026-04-30T20:22:51.763037+00:00",
-  "figure_count": 12,
-  "artifact_count": 12,
-  "summary_count": 12,
+  "generated_at_utc": "2026-04-30T21:41:25.046695+00:00",
+  "figure_count": 13,
+  "artifact_count": 13,
+  "summary_count": 13,
   "missing_artifacts": [],
   "missing_summaries": [],
   "status_counts": {
@@ -11,6 +11,7 @@
     "ready_with_documented_offenders": 1,
     "reduced_design_gate": 2,
     "ready_reduced_autodiff": 1,
+    "ready_reduced_wall_stack": 1,
     "external_reference_open": 2,
     "resolved_dean_validation_open": 1,
     "ready_internal_gate": 1,
@@ -143,6 +144,30 @@
         "pressure_drop_kpa": 26.525344848632812,
         "hydraulic_pressure_drop_kpa": 0.08051440864801407,
         "mhd_pressure_drop_kpa": 26.379735946655273
+      }
+    },
+    {
+      "family": "li_aln_wall_stack",
+      "artifact": "li_aln_wall_stack_phase0_2.png",
+      "summary": "li_aln_wall_stack_phase0_2_summary.json",
+      "generator": "examples/li_aln_wall_stack_phase0_2.py",
+      "reference": "Thin-wall conductance, coated-wall leakage, and Li/AlN wall-stack study plan",
+      "manuscript_role": "Li/AlN unit audit, nested-wall QA, reduced conductance sweep, and pinhole sensitivity",
+      "readiness_status": "ready_reduced_wall_stack",
+      "required_next_step": "Add true multilayer geometry and FreeMHD/code-to-code limiting-case comparisons.",
+      "artifact_path": "docs/_static/generated/li_aln_wall_stack_phase0_2.png",
+      "summary_path": "docs/_static/generated/li_aln_wall_stack_phase0_2_summary.json",
+      "artifact_exists": true,
+      "summary_exists": true,
+      "selected_metrics": {
+        "hartmann_number": 8944.27190999916,
+        "reynolds_number": 2500.0,
+        "magnetic_reynolds_number": 0.008042477193189871,
+        "inductionless_assumption_pass": true,
+        "wall_layer_count": 2,
+        "wall_mesh_resolution_pass": true,
+        "max_c_eff_10pct": 0.1,
+        "max_pinhole_10pct": 1.0
       }
     },
     {

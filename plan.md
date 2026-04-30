@@ -168,9 +168,11 @@ refer to the Samper et al. taxonomy.
   `c_eff = (1-f_p)c_AlN + f_p c_metal`, effective AlN+metal stack with
   separate tangential `c_parallel` and normal `g_perp`, and true
   fluid|AlN|metal multilayer geometry once implemented. The first code layer is
-  reduced and differentiable (`lmx.wall_models`), with validated conductance
-  utilities, equivalent-layer checks, pinhole interpolation, and nested-layer
-  mesh QA. The full geometry lane must add arbitrary wall layers per side,
+  reduced and differentiable (`lmx.wall_models` plus `lmx.wall_study`), with
+  validated conductance utilities, equivalent-layer checks, pinhole
+  interpolation, nested-layer mesh QA, and a Phase 0-2 Li/AlN artifact in
+  `examples/li_aln_wall_stack_phase0_2.py`. The full geometry lane must add
+  arbitrary wall layers per side,
   layer-specific conductivities/thicknesses/cells, interface-current
   diagnostics, and FreeMHD/code-to-code comparison cases.
 - AlN wall-stack study deliverables:
@@ -348,12 +350,15 @@ refer to the Samper et al. taxonomy.
   `studies/li_aln_wall_mhd/results/processed/`, figures under
   `studies/li_aln_wall_mhd/figures/`, and the report material under
   `studies/li_aln_wall_mhd/report/`.
-  Immediate actions: wire the study into docs navigation; add unit tests for
-  material/nondimensional helpers; add reduced wall-stack example inputs; add
-  mesh QA for nested wall layers; add CSV/JSON schema checks for diagnostics;
-  run the first `c_AlN` sweep; compare limiting cases to FreeMHD where the
-  layered-wall physics matches; and generate the first report-ready geometry,
-  mesh, conductance-sweep, and sensitivity figures.
+  Phase 0-2 status: implemented as a bounded reduced electrical-performance
+  lane. The public API now exposes material/unit helpers, nested wall-layer
+  setup, the reduced summary, and artifact writing; the example writes JSON,
+  CSV, and PNG outputs under `studies/li_aln_wall_mhd/results/processed/phase0_2`
+  and copies the docs figure to `docs/_static/generated`. Remaining actions:
+  add full multilayer geometry, add layer-interface current-continuity
+  diagnostics, compare limiting cases to FreeMHD where the layered-wall physics
+  matches, run Phase 3 mesh and limiting-case ladders, and generate the
+  report-ready geometry, mesh, threshold, and autodiff-sensitivity figures.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the
@@ -462,6 +467,12 @@ refer to the Samper et al. taxonomy.
   It supplies missing legacy `constant/g`, patches `theta` to `T`, allows
   explicit `WRITE_CONTROL`/`WRITE_INTERVAL` for short smoke runs, captures logs
   on failure, and has run `run/lidDriven` with two MPI ranks to `t ≈ 1.0`.
+  A second two-rank smoke run of `run/muck_q2d_FFT` completed through the same
+  container with `ZERO_THERMAL=1`, `END_TIME=100`, `DELTA_T=10`, and VTK export;
+  this proves access to an executable Q2DmhdFoam cylinder/duct turbulence
+  evidence case, but it is still not the strict parity CSV because its domain,
+  forcing, probes, and time window are not matched to the current LMX nonlinear
+  SM82 movie.
   `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` parses the resulting VTK
   field, writes velocity/vorticity observables, and produces a docs panel. The
   first geometry/forcing-matched side-wall LMX comparison now lives in

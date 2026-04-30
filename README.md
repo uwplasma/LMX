@@ -741,6 +741,25 @@ throughput variation stabilize.
 
 ![LMX autodiff summary](docs/_static/generated/autodiff_summary.png)
 
+## Li/AlN Wall-Stack Study
+
+The first Li/AlN wall-stack lane is a reduced MHD electrical-performance study,
+not a material-compatibility claim. It audits liquid-lithium units, converts
+dynamic viscosity to kinematic viscosity at the input boundary, reports `Ha`,
+`Re`, `N`, and `Rm`, checks the inductionless assumption, and sweeps reduced
+AlN conductance and pinhole/shunt fraction. The model separates tangential
+thin-wall conductance from normal leakage through a coating so the user can
+screen whether an AlN-like electrical barrier behaves close to the ideal
+insulator limit before attempting a full multilayer solve.
+
+Run the Phase 0-2 artifact with:
+
+```bash
+python examples/li_aln_wall_stack_phase0_2.py
+```
+
+![LMX Li/AlN wall-stack Phase 0-2 reduced study](docs/_static/generated/li_aln_wall_stack_phase0_2.png)
+
 ## Validation status
 
 The current validation surface includes:
@@ -898,6 +917,7 @@ Useful entry points:
 - `examples/wham_blanket_current_closure_demo.py`: conservative local `φ/J` current-closure gate on the mapped blanket mesh
 - `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, pressure sweep, steady sections, and 15 s transient movie
 - `examples/wham_blanket_autodiff_research_demo.py`: differentiable WHAM blanket pressure-drop sensitivity and field-scale inverse-design study
+- `examples/li_aln_wall_stack_phase0_2.py`: reduced Li/AlN unit audit, nested-wall QA, conductance sweep, and pinhole-sensitivity artifact
 - `examples/publication_figure_campaign.py`: bounded manuscript-figure manifest with artifact status, references, metrics, and remaining gaps
 - `examples/research_grade_closure_status.py`: strict Q2D turbulence, magnetic-obstacle, and Dean-vortex closure-status manifest
 - `examples/research_grade_external_data_audit.py`: local external-code/data audit for the remaining strict blockers

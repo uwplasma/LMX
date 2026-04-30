@@ -202,6 +202,13 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_q2dmhdfoam_timeseries_observable_table)
     assert callable(lmx.write_q2dmhdfoam_vtk_velocity_panel)
     assert callable(lmx.write_tabulated_field_reconstruction_plots)
+    assert lmx.DEFAULT_LI_ALN_CASE.name == "li_aln_rectangular_wall_stack_phase0_2"
+    assert callable(lmx.LithiumMaterial)
+    assert callable(lmx.WallStackStudyCase)
+    assert callable(lmx.li_aln_phase0_2_summary)
+    assert callable(lmx.li_aln_unit_audit)
+    assert callable(lmx.li_aln_wall_layers)
+    assert callable(lmx.write_li_aln_phase0_2_artifacts)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__
     assert "write_case_overview_plots" in lmx.__all__

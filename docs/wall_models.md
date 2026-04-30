@@ -88,6 +88,40 @@ while the full geometry lane will add arbitrary layers per side, interface
 current-continuity diagnostics, layer-focused meshes, and FreeMHD/code-to-code
 comparison cases.
 
+## Li/AlN Phase 0-2 Reduced Study
+
+The first Li/AlN wall-stack lane is executable through:
+
+```bash
+python examples/li_aln_wall_stack_phase0_2.py
+```
+
+The example writes a unit audit, nested-wall mesh QA, conductance/pinhole CSV
+tables, and a report-ready figure under
+`studies/li_aln_wall_mhd/results/processed/phase0_2`. It also copies the public
+figure and summary into `docs/_static/generated`.
+
+![Li/AlN wall-stack Phase 0-2 reduced study](_static/generated/li_aln_wall_stack_phase0_2.png)
+
+The default case records liquid-lithium `mu`, `rho`, computed `nu`, `Ha`, `Re`,
+`N`, and `Rm`, and it uses an inductionless velocity scale with
+`Rm < 1e-2`. The response scalar is a reduced current-closure/Lorentz-drag
+proxy that increases with effective wall conductance. It is a design-screening
+quantity for electrical wall performance, not a substitute for a solved
+multilayer velocity-current field.
+
+The Phase 0-2 acceptance gates are:
+
+- the viscosity convention is explicit and converted to kinematic viscosity at
+  the input boundary;
+- `Rm` is reported and the inductionless assumption is checked;
+- each nested wall layer carries thickness, conductivity, and cell count;
+- the reduced model separates tangential conductance `c_parallel` from normal
+  leakage `g_perp`;
+- `f_p = 0` returns the intact-coating limit and increasing `f_p` moves toward
+  the metal-shunt limit;
+- the summary explicitly states that it makes no material-compatibility claim.
+
 ## Literature Anchors
 
 - Shercliff and Hunt rectangular-duct solutions define the insulating and

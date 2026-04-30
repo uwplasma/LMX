@@ -19,6 +19,8 @@ The examples are explicit templates for research workflows. They show how to:
 - validate analytic cross-sectional magnetic fields before using them in runs
 - generate publication-ready verification figures with checked JSON summaries
 - write reduced WHAM blanket pressure-sweep figures for manuscript planning
+- run the reduced Li/AlN wall-stack Phase 0-2 unit, mesh-QA, conductance, and
+  pinhole-sensitivity artifact
 
 ## Quick examples
 
@@ -77,6 +79,7 @@ python examples/wham_blanket_field_on_mesh_demo.py
 python examples/wham_blanket_current_closure_demo.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
+python examples/li_aln_wall_stack_phase0_2.py
 python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py

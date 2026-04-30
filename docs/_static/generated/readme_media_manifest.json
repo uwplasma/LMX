@@ -115,6 +115,11 @@
       "generator": "examples/wham_blanket_autodiff_research_demo.py"
     },
     {
+      "name": "li_aln_wall_stack_phase0_2.png",
+      "kind": "Li/AlN wall-stack unit audit and reduced conductance study",
+      "generator": "examples/li_aln_wall_stack_phase0_2.py"
+    },
+    {
       "name": "strong_scaling.png",
       "kind": "solver-facing strong-scaling summary",
       "generator": "scripts/run_strong_scaling_worker.py"

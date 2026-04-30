@@ -86,6 +86,16 @@ PUBLICATION_FIGURE_SPECS: tuple[PublicationFigureSpec, ...] = (
         required_next_step="Repeat with the resolved curved-pipe operator once available.",
     ),
     PublicationFigureSpec(
+        family="li_aln_wall_stack",
+        artifact="li_aln_wall_stack_phase0_2.png",
+        summary="li_aln_wall_stack_phase0_2_summary.json",
+        generator="examples/li_aln_wall_stack_phase0_2.py",
+        reference="Thin-wall conductance, coated-wall leakage, and Li/AlN wall-stack study plan",
+        manuscript_role="Li/AlN unit audit, nested-wall QA, reduced conductance sweep, and pinhole sensitivity",
+        readiness_status="ready_reduced_wall_stack",
+        required_next_step="Add true multilayer geometry and FreeMHD/code-to-code limiting-case comparisons.",
+    ),
+    PublicationFigureSpec(
         family="magnetic_obstacle",
         artifact="magnetic_obstacle_benchmark.png",
         summary="magnetic_obstacle_benchmark_summary.json",
@@ -258,6 +268,20 @@ def _selected_metrics(family: str, summary: Mapping[str, Any]) -> dict[str, Any]
         }
     if family == "wham_blanket_autodiff":
         return _numeric_subset(summary.get("reference", {}), limit=6)
+    if family == "li_aln_wall_stack":
+        audit = summary.get("unit_audit", {})
+        mesh = summary.get("wall_stack", {}).get("mesh_resolution", {})
+        thresholds = summary.get("thresholds", {})
+        return {
+            "hartmann_number": audit.get("hartmann_number"),
+            "reynolds_number": audit.get("reynolds_number"),
+            "magnetic_reynolds_number": audit.get("magnetic_reynolds_number"),
+            "inductionless_assumption_pass": audit.get("inductionless_assumption_pass"),
+            "wall_layer_count": mesh.get("layer_count"),
+            "wall_mesh_resolution_pass": mesh.get("resolution_pass"),
+            "max_c_eff_10pct": thresholds.get("max_effective_conductance_ratio_for_10pct_deviation"),
+            "max_pinhole_10pct": thresholds.get("max_pinhole_fraction_for_10pct_deviation"),
+        }
     if family == "strong_scaling":
         return {
             "record_count": len(summary.get("records", [])),
