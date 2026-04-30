@@ -10,8 +10,11 @@ import numpy as np
 from lmx import (
     build_q2d_wall_driven_cavity_case,
     compare_q2d_wall_driven_observables,
+    load_q2dmhdfoam_lid_driven_cell_field,
     load_q2dmhdfoam_vtk_vector_field,
     q2d_wall_driven_cavity_observables,
+    q2d_wall_driven_cavity_observables_on_grid,
+    q2dmhdfoam_cell_velocity_observables,
     q2dmhdfoam_vtk_velocity_observables,
     solve_q2d_wall_driven_cavity,
     write_q2d_wall_driven_comparison_plots,
@@ -79,15 +82,43 @@ def run_q2d_lmx_q2dmhdfoam_lid_driven_parity(
         frame_count=FRAME_COUNT,
     )
     solution = solve_q2d_wall_driven_cavity(case)
-    lmx_observables = q2d_wall_driven_cavity_observables(case, solution)
+    lmx_node_observables = q2d_wall_driven_cavity_observables(case, solution)
     reference_field = load_q2dmhdfoam_vtk_vector_field(vtk_candidates[-1])
-    reference_observables = q2dmhdfoam_vtk_velocity_observables(reference_field)
+    reference_vtk_observables = q2dmhdfoam_vtk_velocity_observables(reference_field)
+    reference_cell_field = None
+    reference_cell_observables = None
+    lmx_cell_observables = None
+    case_dir = Path(q2dmhdfoam_output_dir) / "case"
+    if case_dir.exists():
+        reference_cell_field = load_q2dmhdfoam_lid_driven_cell_field(case_dir)
+        reference_cell_observables = q2dmhdfoam_cell_velocity_observables(reference_cell_field)
+        lmx_cell_observables = q2d_wall_driven_cavity_observables_on_grid(
+            case,
+            solution,
+            x=np.asarray(reference_cell_field["x"], dtype=float),
+            y=np.asarray(reference_cell_field["y"], dtype=float),
+            y_widths=np.asarray(reference_cell_field["y_widths"], dtype=float),
+        )
+    lmx_observables = lmx_cell_observables if lmx_cell_observables is not None else lmx_node_observables
+    reference_observables = reference_cell_observables if reference_cell_observables is not None else reference_vtk_observables
+    observable_keys = ("speed_mean", "speed_rms", "vorticity_peak") if reference_cell_observables is not None else (
+        "speed_mean",
+        "speed_rms",
+        "uy_mean",
+        "vorticity_peak",
+    )
     comparison = compare_q2d_wall_driven_observables(
         lmx_observables,
         reference_observables,
         relative_tolerance=RELATIVE_TOLERANCE,
+        observable_keys=observable_keys,
     )
-    reference_x, reference_y, reference_speed = _reference_speed_grid(reference_field)
+    if reference_cell_field is not None:
+        reference_x = np.asarray(reference_cell_field["x"], dtype=float)
+        reference_y = np.asarray(reference_cell_field["y"], dtype=float)
+        reference_speed = np.linalg.norm(np.asarray(reference_cell_field["vectors"], dtype=float), axis=2)
+    else:
+        reference_x, reference_y, reference_speed = _reference_speed_grid(reference_field)
     plots = write_q2d_wall_driven_comparison_plots(
         case,
         solution,
@@ -122,7 +153,11 @@ def run_q2d_lmx_q2dmhdfoam_lid_driven_parity(
             "t_final": t_final,
         },
         "lmx_observables": lmx_observables,
+        "lmx_node_observables": lmx_node_observables,
         "q2dmhdfoam_observables": reference_observables,
+        "q2dmhdfoam_vtk_observables": reference_vtk_observables,
+        "reference_sampling": str(reference_observables.get("reference_gate", "q2dmhdfoam_vtk_field_ingestion")),
+        "comparison_observable_keys": list(observable_keys),
         "comparison": comparison,
         "matched_parity": bool(comparison["matched_parity"]),
         "strict_blocker_closed": bool(comparison["matched_parity"]),

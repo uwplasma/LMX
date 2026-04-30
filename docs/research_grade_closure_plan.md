@@ -403,10 +403,11 @@ parity requirements.
   `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` for field-level velocity and
   vorticity observables. The matching LMX side-wall comparison now exists in
   `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it uses an isothermal
-  `run/lidDriven` rerun with `ZERO_THERMAL=1`, passes three of four retained
-  field observables, and keeps the mean-speed mismatch as the current strict
-  offender. This is still not a turbulent parity claim until the side-wall
-  offender and a matched nonlinear case are closed.
+  `run/lidDriven` rerun with `ZERO_THERMAL=1`. The current strict table reads
+  cell-centered OpenFOAM fields and applies graded-cell area weights. Speed RMS
+  and peak vorticity pass, while the area-weighted mean-speed mismatch remains
+  the current strict offender. This is still not a turbulent parity claim until
+  the side-wall offender and a matched nonlinear case are closed.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-

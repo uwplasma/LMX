@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from matplotlib import animation
 import matplotlib.pyplot as plt
@@ -1309,18 +1309,75 @@ def q2d_wall_driven_cavity_observables(
     }
 
 
+def q2d_wall_driven_cavity_observables_on_grid(
+    case: Q2DWallDrivenCavityCase,
+    solution: Q2DWallDrivenCavitySolution,
+    *,
+    x: np.ndarray,
+    y: np.ndarray,
+    y_widths: np.ndarray | None = None,
+) -> dict[str, float | int | str | bool]:
+    """Return LMX side-wall observables interpolated to an external cell grid."""
+
+    x_target = np.asarray(x, dtype=float)
+    y_target = np.asarray(y, dtype=float)
+    ux = _interpolate_q2d_field_to_grid(solution.ux_frames[-1], solution.x, solution.y, x_target, y_target)
+    uy = _interpolate_q2d_field_to_grid(solution.uy_frames[-1], solution.x, solution.y, x_target, y_target)
+    omega = _interpolate_q2d_field_to_grid(solution.vorticity_frames[-1], solution.x, solution.y, x_target, y_target)
+    speed = np.sqrt(ux**2 + uy**2)
+    weights = np.ones((1, y_target.size), dtype=float) if y_widths is None else np.asarray(y_widths, dtype=float)[None, :]
+    if weights.shape[1] != y_target.size:
+        raise ValueError("y_widths must have one entry per target y coordinate")
+    denominator = max(float(np.sum(weights) * x_target.size), 1.0e-300)
+    return {
+        "sample_count": int(speed.size),
+        "speed_mean": float(np.sum(speed * weights) / denominator),
+        "speed_max": float(np.max(speed)),
+        "speed_rms": float(np.sqrt(np.sum(speed**2 * weights) / denominator)),
+        "ux_mean": float(np.sum(ux * weights) / denominator),
+        "uy_mean": float(np.sum(uy * weights) / denominator),
+        "vorticity_peak": float(np.max(np.abs(omega))),
+        "max_courant": float(np.max(solution.max_courant)) if solution.max_courant.size else 0.0,
+        "max_divergence_linf": float(np.max(solution.divergence_linf)) if solution.divergence_linf.size else 0.0,
+        "frame_count": int(solution.time.size),
+        "final_time": float(solution.time[-1]),
+        "right_wall_velocity": float(case.right_wall_velocity),
+        "hartmann_friction": float(case.hartmann_friction),
+        "viscosity": float(case.viscosity),
+        "validation_pass": bool(
+            np.all(np.isfinite(speed))
+            and np.all(np.isfinite(omega))
+            and float(np.max(solution.max_courant)) < 0.4
+            and float(np.max(solution.divergence_linf)) < 1.0e-9
+        ),
+        "sampling": "interpolated_external_cell_grid",
+        "literature_target": "Sommeria-Moreau/Q2DmhdFoam side-wall-driven Hartmann-friction cavity",
+    }
+
+
+def _interpolate_q2d_field_to_grid(
+    field: np.ndarray,
+    x_source: np.ndarray,
+    y_source: np.ndarray,
+    x_target: np.ndarray,
+    y_target: np.ndarray,
+) -> np.ndarray:
+    y_interpolated = np.vstack([np.interp(y_target, y_source, field[index, :]) for index in range(field.shape[0])])
+    return np.vstack([np.interp(x_target, x_source, y_interpolated[:, index]) for index in range(y_interpolated.shape[1])]).T
+
+
 def compare_q2d_wall_driven_observables(
     lmx_observables: Mapping[str, float | int | str | bool],
     reference_observables: Mapping[str, float | int | str | bool],
     *,
     relative_tolerance: float = 0.20,
+    observable_keys: Sequence[str] = ("speed_mean", "speed_rms", "uy_mean", "vorticity_peak"),
 ) -> dict[str, object]:
     """Compare compact LMX and Q2DmhdFoam side-wall-driven observables."""
 
-    keys = ("speed_mean", "speed_rms", "uy_mean", "vorticity_peak")
     rows: list[dict[str, float | str | bool]] = []
     passed = 0
-    for key in keys:
+    for key in observable_keys:
         lmx_value = float(lmx_observables[key])
         reference_value = float(reference_observables[key])
         absolute_error = abs(lmx_value - reference_value)
@@ -1400,7 +1457,7 @@ def write_q2d_wall_driven_comparison_plots(
             vmin=0.0,
             vmax=vmax_speed,
         )
-        axes[0, 1].set_title("Q2DmhdFoam VTK speed")
+        axes[0, 1].set_title("Q2DmhdFoam reference speed")
         fig.colorbar(im1, ax=axes[0, 1], fraction=0.046, pad=0.04, label="|U| [m/s]")
     else:
         im1 = axes[0, 1].pcolormesh(x_edges, y_edges, vorticity.T, shading="auto", cmap="RdBu_r", vmin=-vmax_vort, vmax=vmax_vort)

@@ -100,10 +100,12 @@ parity claim.
 The first matched LMX-vs-Q2DmhdFoam side-wall Q2D comparison uses an
 isothermal `run/lidDriven` rerun with `ZERO_THERMAL=1`, which zeros gravity,
 thermal expansion, heat input, and the initial temperature field before
-solving. LMX matches speed RMS, mean wall-normal velocity, and peak vorticity
-within the retained 20% observable tolerance. The mean-speed observable is
-still about 31% low, so this artifact is a strict-offender tracker and
-mesh/numerics target, not a closed research-grade turbulent validation.
+solving. The strict observable table reads cell-centered OpenFOAM fields and
+uses the graded mesh cell widths for area weighting. LMX matches speed RMS and
+peak vorticity within the retained 20% observable tolerance. The area-weighted
+mean speed is still about 24% low, so this artifact is a strict-offender
+tracker and mesh/numerics target, not a closed research-grade turbulent
+validation.
 
 ![LMX/Q2DmhdFoam matched side-wall Q2D comparison](_static/generated/q2d_lmx_q2dmhdfoam_lid_driven_parity.png)
 

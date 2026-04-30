@@ -21,6 +21,25 @@
     "t_final": 0.9919375299
   },
   "lmx_observables": {
+    "sample_count": 14800,
+    "speed_mean": 0.002037431050410235,
+    "speed_max": 0.08705602095284455,
+    "speed_rms": 0.007413532291515439,
+    "ux_mean": 9.649669504544283e-06,
+    "uy_mean": 6.639287378519091e-05,
+    "vorticity_peak": 455.1462848449627,
+    "max_courant": 0.25,
+    "max_divergence_linf": 2.1316282072803006e-14,
+    "frame_count": 48,
+    "final_time": 0.992,
+    "right_wall_velocity": 0.1,
+    "hartmann_friction": 0.017025,
+    "viscosity": 2.27e-07,
+    "validation_pass": true,
+    "sampling": "interpolated_external_cell_grid",
+    "literature_target": "Sommeria-Moreau/Q2DmhdFoam side-wall-driven Hartmann-friction cavity"
+  },
+  "lmx_node_observables": {
     "sample_count": 20301,
     "speed_mean": 0.002262260875464384,
     "speed_max": 0.1,
@@ -41,6 +60,22 @@
     "literature_target": "Sommeria-Moreau/Q2DmhdFoam side-wall-driven Hartmann-friction cavity"
   },
   "q2dmhdfoam_observables": {
+    "source_path": "artifacts/external/q2dmhdfoam_lid_driven_isothermal/case/0.9919375299",
+    "sample_count": 14800,
+    "x_min": 0.0001,
+    "x_max": 0.039900000000000005,
+    "y_min": -0.019885238665020483,
+    "y_max": 0.019885238665020483,
+    "speed_mean": 0.002684861802254571,
+    "speed_max": 0.08503356666238568,
+    "speed_rms": 0.007972843716722489,
+    "ux_mean": 7.711885604755527e-07,
+    "uy_mean": 1.710121582055079e-06,
+    "vorticity_peak": 486.915749999,
+    "reference_gate": "q2dmhdfoam_cell_field_observables",
+    "weighting": "cell_area"
+  },
+  "q2dmhdfoam_vtk_observables": {
     "source_path": "artifacts/external/q2dmhdfoam_lid_driven_isothermal/VTK/lmx_q2dmhdfoam_case_600.vtk",
     "sample_count": 30150,
     "x_min": 0.0,
@@ -57,47 +92,44 @@
     "vorticity_peak": 857.616,
     "reference_gate": "q2dmhdfoam_vtk_field_ingestion"
   },
+  "reference_sampling": "q2dmhdfoam_cell_field_observables",
+  "comparison_observable_keys": [
+    "speed_mean",
+    "speed_rms",
+    "vorticity_peak"
+  ],
   "comparison": {
     "rows": [
       {
         "observable": "speed_mean",
-        "lmx_value": 0.002262260875464384,
-        "reference_value": 0.0032575462573318794,
-        "absolute_error": 0.0009952853818674954,
-        "relative_error": 0.3055322329275816,
+        "lmx_value": 0.002037431050410235,
+        "reference_value": 0.002684861802254571,
+        "absolute_error": 0.000647430751844336,
+        "relative_error": 0.24114118324476366,
         "relative_tolerance": 0.2,
         "validation_pass": false
       },
       {
         "observable": "speed_rms",
-        "lmx_value": 0.009130300943734158,
-        "reference_value": 0.010353286928870171,
-        "absolute_error": 0.0012229859851360138,
-        "relative_error": 0.1181253831308117,
-        "relative_tolerance": 0.2,
-        "validation_pass": true
-      },
-      {
-        "observable": "uy_mean",
-        "lmx_value": 0.00031666389359542895,
-        "reference_value": 0.0003273355906036883,
-        "absolute_error": 1.0671697008259344e-05,
-        "relative_error": 0.03260170086784049,
+        "lmx_value": 0.007413532291515439,
+        "reference_value": 0.007972843716722489,
+        "absolute_error": 0.00055931142520705,
+        "relative_error": 0.07015206180875375,
         "relative_tolerance": 0.2,
         "validation_pass": true
       },
       {
         "observable": "vorticity_peak",
-        "lmx_value": 861.1843889210718,
-        "reference_value": 857.616,
-        "absolute_error": 3.5683889210718007,
-        "relative_error": 0.004160823633271535,
+        "lmx_value": 455.1462848449627,
+        "reference_value": 486.915749999,
+        "absolute_error": 31.769465154037334,
+        "relative_error": 0.06524632886511184,
         "relative_tolerance": 0.2,
         "validation_pass": true
       }
     ],
-    "compared_observable_count": 4,
-    "passed_observable_count": 3,
+    "compared_observable_count": 3,
+    "passed_observable_count": 2,
     "relative_tolerance": 0.2,
     "validation_pass": false,
     "matched_parity": false,

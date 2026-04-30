@@ -206,6 +206,7 @@ __all__ = [
     "validate_q2d_wall_bounded_energy_budget",
     "validate_q2d_turbulence_decay_observables",
     "q2d_wall_driven_cavity_observables",
+    "q2d_wall_driven_cavity_observables_on_grid",
     "compare_q2d_wall_driven_observables",
     "q2d_modal_energy_budget",
     "q2d_energy_spectrum",
@@ -224,10 +225,12 @@ __all__ = [
     "load_q2dmhdfoam_lid_driven_observables",
     "load_q2dmhdfoam_probe_velocity_history",
     "load_q2dmhdfoam_vtk_vector_field",
+    "load_q2dmhdfoam_lid_driven_cell_field",
     "load_scalar_reference_observables",
     "q2dmhdfoam_docker_reference_observables",
     "q2dmhdfoam_profile_observables",
     "q2dmhdfoam_vtk_velocity_observables",
+    "q2dmhdfoam_cell_velocity_observables",
     "q2d_turbulence_reference_template_rows",
     "dean_vortex_reference_template_rows",
     "magnetic_obstacle_reference_template_rows",
@@ -404,6 +407,10 @@ _EXPORTS = {
         "lmx.external_validation",
         "load_q2dmhdfoam_vtk_vector_field",
     ),
+    "load_q2dmhdfoam_lid_driven_cell_field": (
+        "lmx.external_validation",
+        "load_q2dmhdfoam_lid_driven_cell_field",
+    ),
     "q2dmhdfoam_profile_observables": (
         "lmx.external_validation",
         "q2dmhdfoam_profile_observables",
@@ -415,6 +422,10 @@ _EXPORTS = {
     "q2dmhdfoam_vtk_velocity_observables": (
         "lmx.external_validation",
         "q2dmhdfoam_vtk_velocity_observables",
+    ),
+    "q2dmhdfoam_cell_velocity_observables": (
+        "lmx.external_validation",
+        "q2dmhdfoam_cell_velocity_observables",
     ),
     "q2d_turbulence_reference_template_rows": (
         "lmx.external_validation",
@@ -665,6 +676,7 @@ _EXPORTS = {
     "validate_q2d_wall_bounded_energy_budget": ("lmx.q2d", "validate_q2d_wall_bounded_energy_budget"),
     "validate_q2d_turbulence_decay_observables": ("lmx.q2d", "validate_q2d_turbulence_decay_observables"),
     "q2d_wall_driven_cavity_observables": ("lmx.q2d", "q2d_wall_driven_cavity_observables"),
+    "q2d_wall_driven_cavity_observables_on_grid": ("lmx.q2d", "q2d_wall_driven_cavity_observables_on_grid"),
     "compare_q2d_wall_driven_observables": ("lmx.q2d", "compare_q2d_wall_driven_observables"),
     "q2d_modal_energy_budget": ("lmx.q2d", "q2d_modal_energy_budget"),
     "q2d_energy_spectrum": ("lmx.q2d", "q2d_energy_spectrum"),

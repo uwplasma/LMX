@@ -13,6 +13,7 @@ from lmx.external_validation import (
     external_validation_readiness_rows,
     load_q2dmhdfoam_force_coefficients,
     load_q2dmhdfoam_docker_reference_profile,
+    load_q2dmhdfoam_lid_driven_cell_field,
     load_q2dmhdfoam_lid_driven_observables,
     load_q2dmhdfoam_line_profile,
     load_q2dmhdfoam_probe_velocity_history,
@@ -21,6 +22,7 @@ from lmx.external_validation import (
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
     q2dmhdfoam_docker_reference_observables,
+    q2dmhdfoam_cell_velocity_observables,
     q2dmhdfoam_profile_observables,
     q2dmhdfoam_vtk_velocity_observables,
     q2d_turbulence_reference_template_rows,
@@ -282,6 +284,81 @@ def test_q2dmhdfoam_vtk_vector_field_and_panel(tmp_path: Path):
     assert observables["vorticity_peak"] == pytest.approx(4.0)
     assert [path.suffix for path in paths] == [".png", ".pdf"]
     assert all(path.exists() for path in paths)
+
+
+def test_q2dmhdfoam_lid_driven_cell_field_observables(tmp_path: Path):
+    case_dir = tmp_path / "case"
+    poly_mesh = case_dir / "constant" / "polyMesh"
+    time_dir = case_dir / "1.0"
+    poly_mesh.mkdir(parents=True)
+    time_dir.mkdir(parents=True)
+    (poly_mesh / "blockMeshDict").write_text(
+        "\n".join(
+            [
+                "x 2.0;",
+                "y 1.0;",
+                "yNeg -1.0;",
+                "yBL 0.5;",
+                "yNegBL -0.5;",
+                "Nx 2;",
+                "Ny 1;",
+                "NyBL 1;",
+                "Gy 1;",
+                "GyInv 1;",
+                "GyBL 1;",
+                "GyBLinv 1;",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (time_dir / "U").write_text(
+        "internalField nonuniform List<vector>\n"
+        "8\n"
+        "(\n"
+        "(1 0 0)\n"
+        "(2 0 0)\n"
+        "(3 0 0)\n"
+        "(4 0 0)\n"
+        "(0 1 0)\n"
+        "(0 2 0)\n"
+        "(0 3 0)\n"
+        "(0 4 0)\n"
+        ")\n"
+        ";\n",
+        encoding="utf-8",
+    )
+    (time_dir / "vorticity").write_text(
+        "internalField nonuniform List<vector>\n"
+        "8\n"
+        "(\n"
+        "(0 0 1)\n"
+        "(0 0 2)\n"
+        "(0 0 3)\n"
+        "(0 0 4)\n"
+        "(0 0 5)\n"
+        "(0 0 6)\n"
+        "(0 0 7)\n"
+        "(0 0 8)\n"
+        ")\n"
+        ";\n",
+        encoding="utf-8",
+    )
+
+    field = load_q2dmhdfoam_lid_driven_cell_field(case_dir)
+    observables = q2dmhdfoam_cell_velocity_observables(field)
+
+    assert field["vectors"].shape == (4, 2, 3)
+    assert field["arrays"]["vorticity"].shape == (4, 2, 3)
+    assert field["x_width"] == pytest.approx(1.0)
+    assert np.asarray(field["y_widths"]).sum() == pytest.approx(2.0)
+    assert observables["sample_count"] == 8
+    assert observables["speed_mean"] == pytest.approx(2.5)
+    assert observables["speed_rms"] == pytest.approx(np.sqrt(7.5))
+    assert observables["ux_mean"] == pytest.approx(1.25)
+    assert observables["uy_mean"] == pytest.approx(1.25)
+    assert observables["vorticity_peak"] == pytest.approx(8.0)
+    assert observables["reference_gate"] == "q2dmhdfoam_cell_field_observables"
 
 
 def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):

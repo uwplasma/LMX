@@ -20,6 +20,7 @@ import numpy as np
 SCALAR_REFERENCE_COLUMNS = ("observable", "value", "tolerance")
 MAGNETIC_OBSTACLE_REFERENCE_COLUMNS = SCALAR_REFERENCE_COLUMNS
 EXTERNAL_VALIDATION_READY_SCORE = 3.0
+FLOAT_PATTERN = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 
 
 def load_scalar_reference_observables(
@@ -968,6 +969,76 @@ def q2dmhdfoam_vtk_velocity_observables(field: Mapping[str, object]) -> dict[str
     }
 
 
+def load_q2dmhdfoam_lid_driven_cell_field(case_dir: str | Path) -> dict[str, object]:
+    """Load cell-centered velocity/vorticity from a Q2DmhdFoam lid-driven case.
+
+    The VTK files emitted by ``foamToVTK`` are useful for visualization, but
+    their point arrays are not area-weighted on the graded OpenFOAM mesh. This
+    loader reads the reconstructed OpenFOAM time directory directly and returns
+    the cell centers, cell widths, velocity, and optional vorticity used for
+    scalar parity observables.
+    """
+
+    root = Path(case_dir)
+    latest = _latest_openfoam_time_dir(root)
+    variables = _openfoam_scalar_assignments(root / "constant" / "polyMesh" / "blockMeshDict")
+    nx = int(round(float(variables["Nx"])))
+    x_length = float(variables["x"])
+    x = (np.arange(nx, dtype=float) + 0.5) * x_length / max(nx, 1)
+    y, y_widths = _q2dmhdfoam_lid_driven_y_cells(variables)
+    velocity = _read_openfoam_vector_internal_field(latest / "U").reshape(len(y), nx, 3)
+    arrays: dict[str, np.ndarray] = {}
+    vorticity_path = latest / "vorticity"
+    if vorticity_path.exists():
+        arrays["vorticity"] = _read_openfoam_vector_internal_field(vorticity_path).reshape(len(y), nx, 3)
+    return {
+        "source_path": str(latest),
+        "x": x,
+        "y": y,
+        "x_width": float(x_length / max(nx, 1)),
+        "y_widths": y_widths,
+        "vectors": velocity,
+        "arrays": arrays,
+        "sample_count": int(velocity.shape[0] * velocity.shape[1]),
+    }
+
+
+def q2dmhdfoam_cell_velocity_observables(field: Mapping[str, object]) -> dict[str, float | int | str]:
+    """Compute area-weighted velocity observables from Q2DmhdFoam cell data."""
+
+    vectors = np.asarray(field["vectors"], dtype=float)
+    if vectors.ndim != 3 or vectors.shape[2] < 2:
+        raise ValueError("Q2DmhdFoam cell observables require a (ny, nx, component) vector array")
+    y_widths = np.asarray(field["y_widths"], dtype=float)
+    if y_widths.ndim != 1 or y_widths.size != vectors.shape[0]:
+        raise ValueError("Q2DmhdFoam cell observables require one y-width per cell row")
+    weights = y_widths[:, None]
+    denominator = max(float(np.sum(weights) * vectors.shape[1]), 1.0e-300)
+    speed = np.linalg.norm(vectors[:, :, : min(3, vectors.shape[2])], axis=2)
+    arrays = field.get("arrays", {})
+    vorticity_peak = float("nan")
+    if isinstance(arrays, Mapping) and "vorticity" in arrays:
+        vort = np.asarray(arrays["vorticity"], dtype=float)
+        if vort.shape[:2] == vectors.shape[:2]:
+            vorticity_peak = float(np.max(np.linalg.norm(vort[:, :, : min(3, vort.shape[2])], axis=2)))
+    return {
+        "source_path": str(field.get("source_path", "")),
+        "sample_count": int(field.get("sample_count", vectors.shape[0] * vectors.shape[1])),
+        "x_min": float(np.min(np.asarray(field["x"], dtype=float))),
+        "x_max": float(np.max(np.asarray(field["x"], dtype=float))),
+        "y_min": float(np.min(np.asarray(field["y"], dtype=float))),
+        "y_max": float(np.max(np.asarray(field["y"], dtype=float))),
+        "speed_mean": float(np.sum(speed * weights) / denominator),
+        "speed_max": float(np.max(speed)),
+        "speed_rms": float(np.sqrt(np.sum(speed**2 * weights) / denominator)),
+        "ux_mean": float(np.sum(vectors[:, :, 0] * weights) / denominator),
+        "uy_mean": float(np.sum(vectors[:, :, 1] * weights) / denominator),
+        "vorticity_peak": vorticity_peak,
+        "reference_gate": "q2dmhdfoam_cell_field_observables",
+        "weighting": "cell_area",
+    }
+
+
 def write_q2dmhdfoam_vtk_velocity_panel(
     field: Mapping[str, object],
     observables: Mapping[str, float | int | str],
@@ -1183,6 +1254,85 @@ def write_q2dmhdfoam_external_reference_panel(
         fig.savefig(path, dpi=180, bbox_inches="tight")
     plt.close(fig)
     return [png_path, pdf_path]
+
+
+def _latest_openfoam_time_dir(case_dir: Path) -> Path:
+    candidates: list[tuple[float, Path]] = []
+    for path in case_dir.iterdir():
+        if not path.is_dir():
+            continue
+        try:
+            value = float(path.name)
+        except ValueError:
+            continue
+        candidates.append((value, path))
+    if not candidates:
+        raise ValueError(f"No numeric OpenFOAM time directories found under {case_dir}")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def _openfoam_scalar_assignments(path: Path) -> dict[str, float]:
+    result: dict[str, float] = {}
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(r"^\s*([A-Za-z][A-Za-z0-9_]*)\s+(" + FLOAT_PATTERN + r")\s*;", re.MULTILINE)
+    for match in pattern.finditer(text):
+        result[match.group(1)] = float(match.group(2))
+    return result
+
+
+def _q2dmhdfoam_lid_driven_y_cells(variables: Mapping[str, float]) -> tuple[np.ndarray, np.ndarray]:
+    segments = (
+        (variables["yNeg"], variables["yNegBL"], int(round(variables["NyBL"])), variables["GyBL"]),
+        (variables["yNegBL"], 0.0, int(round(variables["Ny"])), variables["Gy"]),
+        (0.0, variables["yBL"], int(round(variables["Ny"])), variables["GyInv"]),
+        (variables["yBL"], variables["y"], int(round(variables["NyBL"])), variables["GyBLinv"]),
+    )
+    centers: list[float] = []
+    widths: list[float] = []
+    for start, end, count, ratio in segments:
+        segment_centers, segment_widths = _graded_cell_centers(float(start), float(end), int(count), float(ratio))
+        centers.extend(segment_centers)
+        widths.extend(segment_widths)
+    return np.asarray(centers, dtype=float), np.asarray(widths, dtype=float)
+
+
+def _graded_cell_centers(start: float, end: float, count: int, ratio: float) -> tuple[list[float], list[float]]:
+    if count <= 0:
+        return [], []
+    length = end - start
+    if abs(ratio - 1.0) <= 1.0e-12 or count == 1:
+        widths = [length / count] * count
+    else:
+        per_cell_ratio = ratio ** (1.0 / (count - 1))
+        first = length * (1.0 - per_cell_ratio) / (1.0 - per_cell_ratio**count)
+        widths = [first * per_cell_ratio**index for index in range(count)]
+    centers: list[float] = []
+    position = start
+    for width in widths:
+        centers.append(position + 0.5 * width)
+        position += width
+    return centers, widths
+
+
+def _read_openfoam_vector_internal_field(path: Path) -> np.ndarray:
+    text = path.read_text(encoding="utf-8")
+    match = re.search(
+        r"internalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
+        text,
+        re.S,
+    )
+    if not match:
+        raise ValueError(f"{path} does not contain a nonuniform List<vector> internalField")
+    rows = [
+        (float(x), float(y), float(z))
+        for x, y, z in re.findall(
+            r"\((" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\)",
+            match.group(1),
+        )
+    ]
+    if not rows:
+        raise ValueError(f"{path} contained no vector rows")
+    return np.asarray(rows, dtype=float)
 
 
 def load_magnetic_obstacle_reference_observables(path: str | Path) -> dict[str, dict[str, float | str]]:

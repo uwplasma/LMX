@@ -17,6 +17,7 @@ from lmx.q2d import (
     q2d_turbulence_observables,
     q2d_turbulence_readiness_metrics,
     q2d_wall_driven_cavity_observables,
+    q2d_wall_driven_cavity_observables_on_grid,
     solve_q2d_decay,
     solve_q2d_forced,
     solve_q2d_turbulence_decay,
@@ -152,6 +153,35 @@ def test_q2d_wall_driven_cavity_comparison_gate_and_plot(tmp_path: Path):
     assert outputs == [tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png", tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
+
+
+def test_q2d_wall_driven_cavity_external_grid_observables():
+    case = build_q2d_wall_driven_cavity_case(nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5)
+    solution = solve_q2d_wall_driven_cavity(case)
+
+    observables = q2d_wall_driven_cavity_observables_on_grid(
+        case,
+        solution,
+        x=np.linspace(0.002, 0.038, 9),
+        y=np.asarray([-0.018, -0.008, 0.004, 0.016]),
+        y_widths=np.asarray([0.004, 0.012, 0.012, 0.012]),
+    )
+    comparison = compare_q2d_wall_driven_observables(
+        observables,
+        {
+            "speed_mean": observables["speed_mean"],
+            "speed_rms": observables["speed_rms"],
+            "vorticity_peak": observables["vorticity_peak"],
+        },
+        relative_tolerance=1.0e-12,
+        observable_keys=("speed_mean", "speed_rms", "vorticity_peak"),
+    )
+
+    assert observables["sample_count"] == 36
+    assert observables["validation_pass"] is True
+    assert observables["sampling"] == "interpolated_external_cell_grid"
+    assert comparison["matched_parity"] is True
+    assert comparison["passed_observable_count"] == 3
 
 
 def test_q2d_energy_spectrum_identifies_single_mode():

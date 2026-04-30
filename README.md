@@ -328,10 +328,11 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   turbulence validation.
 - `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`: runs the LMX
   side-wall-driven Q2D cavity against an isothermal `run/lidDriven` Q2DmhdFoam
-  VTK field generated with `ZERO_THERMAL=1`. The first matched observable table
-  passes speed RMS, mean wall-normal velocity, and peak vorticity; the
-  remaining mean-speed mismatch is retained as the current Q2D external-parity
-  offender rather than hidden by visual rescaling.
+  run generated with `ZERO_THERMAL=1`. The strict table now uses
+  cell-centered OpenFOAM fields and graded-cell area weights rather than VTK
+  point samples. Speed RMS and peak vorticity pass; the area-weighted mean
+  speed remains about `24%` low at the retained `20%` gate and is kept as the
+  current Q2D external-parity offender rather than hidden by visual rescaling.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -796,9 +797,10 @@ rather than a Dean-vortex validation.
   side-by-side observable plot and README movie, but still marks the strict
   parity gate open until a matched Q2DmhdFoam case is run. The first
   geometry/forcing-matched isothermal side-wall Q2DmhdFoam comparison now
-  exists in `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it passes three
-  of four retained field observables, with mean speed still outside the `20%`
-  tolerance, so it is an offender-tracking artifact rather than a closed
+  exists in `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it uses
+  cell-centered OpenFOAM fields and graded-cell area weights. Speed RMS and
+  peak vorticity pass, while area-weighted mean speed is still outside the
+  `20%` tolerance, so it is an offender-tracking artifact rather than a closed
   turbulence claim
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
