@@ -27,7 +27,7 @@ Q2DMHDFOAM_OUTPUT_DIR = Path("artifacts/external/q2dmhdfoam_lid_driven_isotherma
 COPY_TO_DOCS = True
 
 NX = 201
-NY = 101
+NY = 201
 VISCOSITY = 2.27e-7
 HARTMANN_FRICTION = 1.7025e-2
 RIGHT_WALL_VELOCITY = 0.1
@@ -165,9 +165,10 @@ def run_q2d_lmx_q2dmhdfoam_lid_driven_parity(
         "observable_table": comparison_table.name,
         "docs_artifacts": copied,
         "notes": (
-            "This is the first matched geometry/forcing LMX-vs-Q2DmhdFoam "
-            "side-wall Q2D comparison. Any failed observable remains an "
-            "offender for the strict turbulence/parity lane."
+            "This matched geometry/forcing LMX-vs-Q2DmhdFoam side-wall Q2D "
+            "comparison uses cell-centered OpenFOAM observables when the "
+            "reconstructed case is available. It is a side-wall field gate; "
+            "nonlinear turbulent Q2D parity remains a separate lane."
         ),
     }
     summary_path_out = out_dir / "q2d_lmx_q2dmhdfoam_lid_driven_parity_summary.json"

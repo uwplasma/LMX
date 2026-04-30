@@ -338,9 +338,10 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   side-wall-driven Q2D cavity against an isothermal `run/lidDriven` Q2DmhdFoam
   run generated with `ZERO_THERMAL=1`. The strict table now uses
   cell-centered OpenFOAM fields and graded-cell area weights rather than VTK
-  point samples. Speed RMS and peak vorticity pass; the area-weighted mean
-  speed remains about `24%` low at the retained `20%` gate and is kept as the
-  current Q2D external-parity offender rather than hidden by visual rescaling.
+  point samples. The retained `201 × 201` LMX run now passes area-weighted mean
+  speed, speed RMS, and peak vorticity at the `20%` gate. This closes the
+  matched side-wall comparison, while the genuinely turbulent Q2D parity lane
+  remains separate.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -813,10 +814,10 @@ rather than a Dean-vortex validation.
   parity gate open until a matched Q2DmhdFoam case is run. The first
   geometry/forcing-matched isothermal side-wall Q2DmhdFoam comparison now
   exists in `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it uses
-  cell-centered OpenFOAM fields and graded-cell area weights. Speed RMS and
-  peak vorticity pass, while area-weighted mean speed is still outside the
-  `20%` tolerance, so it is an offender-tracking artifact rather than a closed
-  turbulence claim
+  cell-centered OpenFOAM fields and graded-cell area weights. Area-weighted
+  mean speed, speed RMS, and peak vorticity now pass at the `20%` tolerance
+  after the LMX cross-grid was increased to `201 × 201`; this closes the
+  side-wall comparison but not the separate turbulent parity claim
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
   `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The

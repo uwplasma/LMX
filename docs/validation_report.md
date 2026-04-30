@@ -58,8 +58,9 @@ The strict research-grade deferred lanes remain matched external Q2D
 turbulence parity, external magnetic-obstacle reference data, and
 higher-inertia Dean-vortex bent-pipe validation. The Q2D lane now has an
 executable Q2DmhdFoam/Vetcha ingestion artifact and a first geometry/forcing
-matched isothermal side-wall comparison; it is still not a turbulent parity
-claim because the retained mean-speed observable remains outside tolerance.
+matched isothermal side-wall comparison; that side-wall comparison now passes
+its retained cell-centered observables, but it is still not a turbulent parity
+claim.
 
 The closure criteria and execution order for those three lanes are now tracked
 in [](research_grade_closure_plan.md). That page defines the external-reference
@@ -102,10 +103,11 @@ isothermal `run/lidDriven` rerun with `ZERO_THERMAL=1`, which zeros gravity,
 thermal expansion, heat input, and the initial temperature field before
 solving. The strict observable table reads cell-centered OpenFOAM fields and
 uses the graded mesh cell widths for area weighting. LMX matches speed RMS and
-peak vorticity within the retained 20% observable tolerance. The area-weighted
-mean speed is still about 24% low, so this artifact is a strict-offender
-tracker and mesh/numerics target, not a closed research-grade turbulent
-validation.
+peak vorticity within the retained 20% observable tolerance. After increasing
+the LMX cross-grid to `201 × 201`, the area-weighted mean-speed observable also
+passes. This closes the matched side-wall field-observable gate; the separate
+research-grade turbulent parity lane still requires a matched nonlinear
+Q2DmhdFoam/LMX case.
 
 ![LMX/Q2DmhdFoam matched side-wall Q2D comparison](_static/generated/q2d_lmx_q2dmhdfoam_lid_driven_parity.png)
 

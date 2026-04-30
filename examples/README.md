@@ -442,11 +442,13 @@ python examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py
 ```
 
 That example solves the LMX side-wall-driven Q2D cavity and compares compact
-field observables against an isothermal Q2DmhdFoam `run/lidDriven` VTK output
-produced by the Docker runner with `ZERO_THERMAL=1`. It writes a PNG/PDF panel,
-CSV observable table, and summary JSON. The current artifact passes speed RMS,
-mean wall-normal velocity, and peak vorticity, but keeps the mean-speed
-mismatch as an open parity offender.
+field observables against an isothermal Q2DmhdFoam `run/lidDriven` output
+produced by the Docker runner with `ZERO_THERMAL=1`. It reads cell-centered
+OpenFOAM fields when the reconstructed case directory is present, applies the
+graded-cell area weights, and writes a PNG/PDF panel, CSV observable table, and
+summary JSON. The current artifact passes area-weighted mean speed, speed RMS,
+and peak vorticity at the retained tolerance; turbulent Q2D parity remains a
+separate lane.
 
 Q2D turbulence external-reference template:
 

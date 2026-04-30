@@ -309,11 +309,11 @@ refer to the Samper et al. taxonomy.
   `run/lidDriven` rerun generated with `ZERO_THERMAL=1`. The strict comparison
   now reads cell-centered OpenFOAM fields directly and applies the graded
   wall-layer cell widths as area weights instead of relying on VTK point
-  samples. Speed RMS and peak vorticity pass at the retained 20% tolerance, but
-  the area-weighted mean-speed observable remains about 24% low. The open
-  scientific task is therefore narrower: align the side-wall cavity
-  mesh/operator/observable definition and then run the genuinely turbulent
-  matched case before claiming Q2D parity.
+  samples. Increasing the LMX cross-grid to `201 × 201` closes the retained
+  side-wall observable gate: area-weighted mean speed, speed RMS, and peak
+  vorticity now pass at the retained 20% tolerance. The remaining Q2D
+  scientific task is therefore the genuinely turbulent matched case, not the
+  isothermal side-wall field-observable comparison.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.

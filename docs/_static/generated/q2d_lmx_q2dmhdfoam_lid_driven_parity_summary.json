@@ -13,7 +13,7 @@
   },
   "lmx_case": {
     "nx": 201,
-    "ny": 101,
+    "ny": 201,
     "viscosity": 2.27e-07,
     "hartmann_friction": 0.017025,
     "right_wall_velocity": 0.1,
@@ -22,14 +22,14 @@
   },
   "lmx_observables": {
     "sample_count": 14800,
-    "speed_mean": 0.002037431050410235,
-    "speed_max": 0.08705602095284455,
-    "speed_rms": 0.007413532291515439,
-    "ux_mean": 9.649669504544283e-06,
-    "uy_mean": 6.639287378519091e-05,
-    "vorticity_peak": 455.1462848449627,
+    "speed_mean": 0.0022262437483658143,
+    "speed_max": 0.0866982787042518,
+    "speed_rms": 0.007655623795509366,
+    "ux_mean": 5.082378131644273e-06,
+    "uy_mean": 6.56291853503282e-05,
+    "vorticity_peak": 474.41712306663146,
     "max_courant": 0.25,
-    "max_divergence_linf": 2.1316282072803006e-14,
+    "max_divergence_linf": 3.430589146091734e-14,
     "frame_count": 48,
     "final_time": 0.992,
     "right_wall_velocity": 0.1,
@@ -40,17 +40,17 @@
     "literature_target": "Sommeria-Moreau/Q2DmhdFoam side-wall-driven Hartmann-friction cavity"
   },
   "lmx_node_observables": {
-    "sample_count": 20301,
-    "speed_mean": 0.002262260875464384,
+    "sample_count": 40401,
+    "speed_mean": 0.002456794682422447,
     "speed_max": 0.1,
-    "speed_rms": 0.009130300943734158,
-    "ux_mean": 9.631161704502281e-06,
-    "uy_mean": 0.00031666389359542895,
-    "vorticity_peak": 861.1843889210718,
-    "kinetic_energy_final": 4.168119766157642e-05,
-    "enstrophy_final": 338.4261797003437,
+    "speed_rms": 0.009330223686976363,
+    "ux_mean": 5.207929636681665e-06,
+    "uy_mean": 0.00031500472970006873,
+    "vorticity_peak": 922.2755467343451,
+    "kinetic_energy_final": 4.3526537024507406e-05,
+    "enstrophy_final": 363.70614530076506,
     "max_courant": 0.25,
-    "max_divergence_linf": 2.1316282072803006e-14,
+    "max_divergence_linf": 3.430589146091734e-14,
     "frame_count": 48,
     "final_time": 0.992,
     "right_wall_velocity": 0.1,
@@ -102,41 +102,41 @@
     "rows": [
       {
         "observable": "speed_mean",
-        "lmx_value": 0.002037431050410235,
+        "lmx_value": 0.0022262437483658143,
         "reference_value": 0.002684861802254571,
-        "absolute_error": 0.000647430751844336,
-        "relative_error": 0.24114118324476366,
+        "absolute_error": 0.0004586180538887568,
+        "relative_error": 0.1708162608234209,
         "relative_tolerance": 0.2,
-        "validation_pass": false
+        "validation_pass": true
       },
       {
         "observable": "speed_rms",
-        "lmx_value": 0.007413532291515439,
+        "lmx_value": 0.007655623795509366,
         "reference_value": 0.007972843716722489,
-        "absolute_error": 0.00055931142520705,
-        "relative_error": 0.07015206180875375,
+        "absolute_error": 0.0003172199212131228,
+        "relative_error": 0.039787550400339086,
         "relative_tolerance": 0.2,
         "validation_pass": true
       },
       {
         "observable": "vorticity_peak",
-        "lmx_value": 455.1462848449627,
+        "lmx_value": 474.41712306663146,
         "reference_value": 486.915749999,
-        "absolute_error": 31.769465154037334,
-        "relative_error": 0.06524632886511184,
+        "absolute_error": 12.498626932368552,
+        "relative_error": 0.025668972368205836,
         "relative_tolerance": 0.2,
         "validation_pass": true
       }
     ],
     "compared_observable_count": 3,
-    "passed_observable_count": 2,
+    "passed_observable_count": 3,
     "relative_tolerance": 0.2,
-    "validation_pass": false,
-    "matched_parity": false,
-    "status": "matched_side_wall_observable_offenders"
+    "validation_pass": true,
+    "matched_parity": true,
+    "status": "matched_side_wall_observable_comparison"
   },
-  "matched_parity": false,
-  "strict_blocker_closed": false,
+  "matched_parity": true,
+  "strict_blocker_closed": true,
   "plots": [
     "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
     "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf"
@@ -147,5 +147,5 @@
     "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
     "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf"
   ],
-  "notes": "This is the first matched geometry/forcing LMX-vs-Q2DmhdFoam side-wall Q2D comparison. Any failed observable remains an offender for the strict turbulence/parity lane."
+  "notes": "This matched geometry/forcing LMX-vs-Q2DmhdFoam side-wall Q2D comparison uses cell-centered OpenFOAM observables when the reconstructed case is available. It is a side-wall field gate; nonlinear turbulent Q2D parity remains a separate lane."
 }

@@ -405,9 +405,10 @@ parity requirements.
   `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it uses an isothermal
   `run/lidDriven` rerun with `ZERO_THERMAL=1`. The current strict table reads
   cell-centered OpenFOAM fields and applies graded-cell area weights. Speed RMS
-  and peak vorticity pass, while the area-weighted mean-speed mismatch remains
-  the current strict offender. This is still not a turbulent parity claim until
-  the side-wall offender and a matched nonlinear case are closed.
+  and peak vorticity pass, and the area-weighted mean-speed observable now also
+  passes after increasing the LMX cross-grid to `201 × 201`. This closes the
+  isothermal side-wall comparison, but it is still not a turbulent parity claim
+  until a matched nonlinear case is closed.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
   The first digitized Votyakov Fig. 7(a) centerline target is now wired through
