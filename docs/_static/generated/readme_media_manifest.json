@@ -64,6 +64,11 @@
             "kind": "LMX/Q2DmhdFoam Q2D turbulence-observable comparison",
             "generator": "examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py"
         },
+        {
+            "name": "q2dmhdfoam_lid_driven_vtk.png",
+            "kind": "Q2DmhdFoam lid-driven VTK field-ingestion artifact",
+            "generator": "examples/q2dmhdfoam_lid_driven_vtk_artifact.py"
+        },
     {
       "name": "magnetic_obstacle_schematic.png",
       "kind": "magnetic-obstacle setup schematic",

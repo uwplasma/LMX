@@ -415,6 +415,18 @@ for the README. The summary intentionally records `matched_parity = false`
 until a Q2DmhdFoam case is run with the same geometry, forcing, Hartmann
 friction, integration time, and observable definitions as the LMX case.
 
+Q2DmhdFoam generic VTK field ingestion:
+
+```bash
+python examples/q2dmhdfoam_lid_driven_vtk_artifact.py
+```
+
+That example reads the VTK field produced by
+`docker/q2dmhdfoam` for `CASE_RELATIVE_PATH=run/lidDriven`, computes velocity
+and vorticity observables, and writes a PNG/PDF panel plus CSV table. It is an
+external-code execution and post-processing gate; it does not claim matched LMX
+turbulence parity.
+
 Q2D turbulence external-reference template:
 
 ```bash

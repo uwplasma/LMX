@@ -397,7 +397,12 @@ parity requirements.
   OpenFOAM-v2206 container fails at link time. The reproducible runner now
   lives in `docker/q2dmhdfoam` and has already produced a steady
   `Q2DfullyDeveloped` VTK/profile bundle; the remaining work is a matched
-  turbulent case, not basic solver execution.
+  turbulent case, not basic solver execution. The runner also executes
+  non-default checked-out cases through `CASE_RELATIVE_PATH`; `run/lidDriven`
+  now runs in MPI, exports VTK, and feeds
+  `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` for field-level velocity and
+  vorticity observables. This is a post-processing/executable-code gate, not a
+  parity claim until the LMX and Q2DmhdFoam cases share the same physics.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-

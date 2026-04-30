@@ -218,9 +218,11 @@ __all__ = [
     "load_q2dmhdfoam_line_profile",
     "load_q2dmhdfoam_lid_driven_observables",
     "load_q2dmhdfoam_probe_velocity_history",
+    "load_q2dmhdfoam_vtk_vector_field",
     "load_scalar_reference_observables",
     "q2dmhdfoam_docker_reference_observables",
     "q2dmhdfoam_profile_observables",
+    "q2dmhdfoam_vtk_velocity_observables",
     "q2d_turbulence_reference_template_rows",
     "dean_vortex_reference_template_rows",
     "magnetic_obstacle_reference_template_rows",
@@ -234,6 +236,7 @@ __all__ = [
     "write_q2dmhdfoam_external_reference_panel",
     "write_q2dmhdfoam_profile_observable_table",
     "write_q2dmhdfoam_timeseries_observable_table",
+    "write_q2dmhdfoam_vtk_velocity_panel",
     "write_q2d_turbulence_reference_template",
     "write_scalar_reference_comparison_plots",
     "write_scalar_reference_comparison_table",
@@ -392,6 +395,10 @@ _EXPORTS = {
         "lmx.external_validation",
         "load_q2dmhdfoam_probe_velocity_history",
     ),
+    "load_q2dmhdfoam_vtk_vector_field": (
+        "lmx.external_validation",
+        "load_q2dmhdfoam_vtk_vector_field",
+    ),
     "q2dmhdfoam_profile_observables": (
         "lmx.external_validation",
         "q2dmhdfoam_profile_observables",
@@ -399,6 +406,10 @@ _EXPORTS = {
     "q2dmhdfoam_docker_reference_observables": (
         "lmx.external_validation",
         "q2dmhdfoam_docker_reference_observables",
+    ),
+    "q2dmhdfoam_vtk_velocity_observables": (
+        "lmx.external_validation",
+        "q2dmhdfoam_vtk_velocity_observables",
     ),
     "q2d_turbulence_reference_template_rows": (
         "lmx.external_validation",
@@ -451,6 +462,10 @@ _EXPORTS = {
     "write_q2dmhdfoam_timeseries_observable_table": (
         "lmx.external_validation",
         "write_q2dmhdfoam_timeseries_observable_table",
+    ),
+    "write_q2dmhdfoam_vtk_velocity_panel": (
+        "lmx.external_validation",
+        "write_q2dmhdfoam_vtk_velocity_panel",
     ),
     "write_q2d_turbulence_reference_template": (
         "lmx.external_validation",

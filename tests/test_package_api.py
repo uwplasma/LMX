@@ -186,7 +186,10 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_q2dmhdfoam_docker_reference_panel)
     assert callable(lmx.load_q2dmhdfoam_force_coefficients)
     assert callable(lmx.load_q2dmhdfoam_probe_velocity_history)
+    assert callable(lmx.load_q2dmhdfoam_vtk_vector_field)
+    assert callable(lmx.q2dmhdfoam_vtk_velocity_observables)
     assert callable(lmx.write_q2dmhdfoam_timeseries_observable_table)
+    assert callable(lmx.write_q2dmhdfoam_vtk_velocity_panel)
     assert callable(lmx.write_tabulated_field_reconstruction_plots)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__

@@ -1348,6 +1348,45 @@ def test_q2dmhdfoam_docker_reference_validation_writes_summary(tmp_path: Path):
     assert (tmp_path / "out" / "q2dmhdfoam_docker_reference_observables.csv").exists()
 
 
+def test_q2dmhdfoam_lid_driven_vtk_artifact_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2dmhdfoam_lid_driven_vtk_artifact.py")
+    docker_output = tmp_path / "docker_out"
+    vtk_dir = docker_output / "VTK"
+    vtk_dir.mkdir(parents=True)
+    (docker_output / "summary.json").write_text(
+        json.dumps({"case": "run/lidDriven", "status": "external_reference_case_complete_no_profile_extraction", "final_time": 1.0}),
+        encoding="utf-8",
+    )
+    (vtk_dir / "sample.vtk").write_text(
+        "# vtk DataFile Version 2.0\n"
+        "sample\n"
+        "ASCII\n"
+        "DATASET UNSTRUCTURED_GRID\n"
+        "POINTS 4 float\n"
+        "0 0 0 1 0 0 0 1 0 1 1 0\n"
+        "POINT_DATA 4\n"
+        "FIELD attributes 2\n"
+        "vorticity 3 4 float\n"
+        "0 0 1 0 0 2 0 0 3 0 0 4\n"
+        "U 3 4 float\n"
+        "0 0 0 1 0 0 0 1 0 1 1 0\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_q2dmhdfoam_lid_driven_vtk_artifact(
+        out_dir=tmp_path / "out",
+        docker_output_dir=docker_output,
+        copy_to_docs=False,
+    )
+
+    assert summary["case"] == "q2dmhdfoam_lid_driven_vtk_artifact"
+    assert summary["status"] == "external_vtk_artifacts_written"
+    assert summary["matched_lmx_parity"] is False
+    assert "q2dmhdfoam_lid_driven_vtk.png" in summary["plots"]
+    assert (tmp_path / "out" / "q2dmhdfoam_lid_driven_vtk.png").exists()
+    assert (tmp_path / "out" / "q2dmhdfoam_lid_driven_vtk_observables.csv").exists()
+
+
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_baseline.py")
     module.OUTPUT_DIR = tmp_path

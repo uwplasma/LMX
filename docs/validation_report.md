@@ -87,6 +87,15 @@ plumbing; it remains separate from the stricter matched turbulent parity gate.
 
 ![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
 
+The same container can run non-default Q2DmhdFoam cases through
+`CASE_RELATIVE_PATH`. The lid-driven smoke below was rerun from the pinned
+Q2DmhdFoam checkout, exported through `foamToVTK`, parsed without a VTK
+dependency, and reduced to field observables. This is executable external-code
+evidence and a post-processing gate; it is not yet a matched LMX turbulence
+parity claim.
+
+![Q2DmhdFoam lid-driven VTK field ingestion](_static/generated/q2dmhdfoam_lid_driven_vtk.png)
+
 The current LMX/Q2DmhdFoam Q2D comparison artifact overlays the LMX nonlinear
 SM82-style movie observables with the available Q2DmhdFoam lid-driven spectral
 summary. It is useful for manuscript planning and parser testing, but its

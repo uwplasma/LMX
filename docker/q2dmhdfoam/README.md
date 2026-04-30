@@ -24,8 +24,9 @@ docker run --rm --platform linux/amd64 \
   -e CASE_RELATIVE_PATH=run/lidDriven \
   -e RANKS=2 \
   -e FORCE_END_TIME=1 \
-  -e END_TIME=100 \
-  -e WRITE_INTERVAL=50 \
+  -e END_TIME=0.1 \
+  -e WRITE_CONTROL=timeStep \
+  -e WRITE_INTERVAL=1 \
   -e EXTRACT_PROFILE=0 \
   -v "$PWD/artifacts/external/q2dmhdfoam_lid_driven:/output" \
   lmx-q2dmhdfoam:fe41
@@ -34,6 +35,12 @@ docker run --rm --platform linux/amd64 \
 Generic cases export VTK and logs but do not claim LMX parity by themselves.
 The strict Q2D turbulence lane still requires a matched LMX case and a filled
 `q2d_turbulence_reference_observables.csv`.
+
+For old Q2DmhdFoam case folders, the runner performs two compatibility fixes:
+it supplies a zero-gravity `constant/g` file when the case omits it, and it
+captures logs plus case dictionaries under `/output/case` even if the external
+solver fails. `WRITE_CONTROL` and `WRITE_INTERVAL` can be set explicitly for
+short smoke runs so that `reconstructPar` has a written time directory.
 
 Outputs:
 

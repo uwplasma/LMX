@@ -16,11 +16,13 @@ from lmx.external_validation import (
     load_q2dmhdfoam_lid_driven_observables,
     load_q2dmhdfoam_line_profile,
     load_q2dmhdfoam_probe_velocity_history,
+    load_q2dmhdfoam_vtk_vector_field,
     load_magnetic_obstacle_reference_observables,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
     q2dmhdfoam_docker_reference_observables,
     q2dmhdfoam_profile_observables,
+    q2dmhdfoam_vtk_velocity_observables,
     q2d_turbulence_reference_template_rows,
     summarize_external_validation_readiness,
     write_dean_vortex_reference_template,
@@ -32,6 +34,7 @@ from lmx.external_validation import (
     write_q2dmhdfoam_external_reference_panel,
     write_q2dmhdfoam_profile_observable_table,
     write_q2dmhdfoam_timeseries_observable_table,
+    write_q2dmhdfoam_vtk_velocity_panel,
     write_q2d_turbulence_reference_template,
     write_scalar_reference_comparison_plots,
     write_scalar_reference_comparison_table,
@@ -248,6 +251,35 @@ def test_q2dmhdfoam_docker_reference_profile_and_panel(tmp_path: Path):
     assert profile["hartmann"] == pytest.approx(50.0)
     assert observables["steady_state_reached"] is True
     assert observables["flow_rate_relative_error"] == pytest.approx(1.0e-8)
+    assert [path.suffix for path in paths] == [".png", ".pdf"]
+    assert all(path.exists() for path in paths)
+
+
+def test_q2dmhdfoam_vtk_vector_field_and_panel(tmp_path: Path):
+    vtk_path = tmp_path / "sample.vtk"
+    vtk_path.write_text(
+        "# vtk DataFile Version 2.0\n"
+        "sample\n"
+        "ASCII\n"
+        "DATASET UNSTRUCTURED_GRID\n"
+        "POINTS 4 float\n"
+        "0 0 0 1 0 0 0 1 0 1 1 0\n"
+        "POINT_DATA 4\n"
+        "FIELD attributes 2\n"
+        "vorticity 3 4 float\n"
+        "0 0 1 0 0 2 0 0 3 0 0 4\n"
+        "U 3 4 float\n"
+        "0 0 0 1 0 0 0 1 0 1 1 0\n",
+        encoding="utf-8",
+    )
+
+    field = load_q2dmhdfoam_vtk_vector_field(vtk_path)
+    observables = q2dmhdfoam_vtk_velocity_observables(field)
+    paths = write_q2dmhdfoam_vtk_velocity_panel(field, observables, tmp_path)
+
+    assert field["point_count"] == 4
+    assert observables["speed_max"] == pytest.approx(np.sqrt(2.0))
+    assert observables["vorticity_peak"] == pytest.approx(4.0)
     assert [path.suffix for path in paths] == [".png", ".pdf"]
     assert all(path.exists() for path in paths)
 

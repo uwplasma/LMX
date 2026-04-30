@@ -298,6 +298,15 @@ refer to the Samper et al. taxonomy.
   steady state at `Ha ≈ 50` with flow-rate relative error `≈ 6.29e-8`; because
   the tutorial is a mixed-convection fully developed case, it closes executable
   rerun reproducibility but not the stricter matched turbulent parity gate.
+  The same runner now also supports `CASE_RELATIVE_PATH` for non-default cases.
+  It supplies missing legacy `constant/g`, patches `theta` to `T`, allows
+  explicit `WRITE_CONTROL`/`WRITE_INTERVAL` for short smoke runs, captures logs
+  on failure, and has run `run/lidDriven` with two MPI ranks to `t ≈ 1.0`.
+  `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` parses the resulting VTK
+  field, writes velocity/vorticity observables, and produces a docs panel. The
+  open scientific task remains matching geometry, forcing, friction, time
+  horizon, and observables between LMX and Q2DmhdFoam before claiming turbulent
+  parity.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.

@@ -77,6 +77,14 @@ a fully developed mixed-convection case.
 
 ![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
 
+The same runner now supports non-default checked-out cases via
+`CASE_RELATIVE_PATH`. Legacy `theta` dictionaries are patched to `T`, missing
+`constant/g` files are supplied as zero gravity, and failed runs copy logs into
+the output directory. A bounded `run/lidDriven` rerun has produced ParaView VTK
+and a field-observable panel:
+
+![Q2DmhdFoam lid-driven VTK field ingestion](_static/generated/q2dmhdfoam_lid_driven_vtk.png)
+
 The repository also includes `examples/q2dmhdfoam_external_reference_adapter.py`,
 which reads the local Q2DmhdFoam tepot profile samples, Vetcha 2009 digitized
 line cuts, and lid-driven turbulence spectral-summary output, then writes CSV

@@ -866,6 +866,195 @@ def write_q2dmhdfoam_docker_reference_panel(
     return paths
 
 
+def load_q2dmhdfoam_vtk_vector_field(
+    vtk_path: str | Path,
+    *,
+    field_name: str = "U",
+    data_kind: str = "point",
+) -> dict[str, object]:
+    """Load an ASCII foamToVTK vector field from a Q2DmhdFoam rerun.
+
+    The external Docker runner writes legacy ASCII VTK files. This parser only
+    targets the FIELD-array layout emitted by `foamToVTK -ascii`; it is enough
+    for validation dashboards without adding a hard dependency on VTK/PyVista.
+    """
+
+    source = Path(vtk_path)
+    tokens = source.read_text(encoding="utf-8").split()
+    points_index = _require_token(tokens, "POINTS", source)
+    point_count = int(tokens[points_index + 1])
+    point_start = points_index + 3
+    point_stop = point_start + 3 * point_count
+    if point_stop > len(tokens):
+        raise ValueError(f"VTK file {source} ended before all POINTS were read")
+    points = np.asarray(tokens[point_start:point_stop], dtype=float).reshape(point_count, 3)
+
+    marker = "POINT_DATA" if data_kind == "point" else "CELL_DATA"
+    data_index = _require_token(tokens, marker, source)
+    tuple_count = int(tokens[data_index + 1])
+    field_index = data_index + 2
+    if tokens[field_index] != "FIELD":
+        field_index = _require_token(tokens[data_index + 2 :], "FIELD", source) + data_index + 2
+    array_count = int(tokens[field_index + 2])
+    arrays: dict[str, np.ndarray] = {}
+    cursor = field_index + 3
+    for _ in range(array_count):
+        if cursor + 4 > len(tokens):
+            raise ValueError(f"VTK file {source} ended inside FIELD metadata")
+        name = tokens[cursor]
+        component_count = int(tokens[cursor + 1])
+        local_tuple_count = int(tokens[cursor + 2])
+        dtype_name = tokens[cursor + 3]
+        value_count = component_count * local_tuple_count
+        cursor += 4
+        values = tokens[cursor : cursor + value_count]
+        if len(values) != value_count:
+            raise ValueError(f"VTK file {source} ended inside FIELD array {name}")
+        if dtype_name.lower().startswith("int"):
+            array = np.asarray(values, dtype=int)
+        else:
+            array = np.asarray(values, dtype=float)
+        arrays[name] = array.reshape(local_tuple_count, component_count)
+        cursor += value_count
+    if field_name not in arrays:
+        raise ValueError(f"VTK file {source} does not contain FIELD array {field_name!r}")
+    field = np.asarray(arrays[field_name], dtype=float)
+    if data_kind == "point" and field.shape[0] != point_count:
+        raise ValueError(f"Point FIELD array {field_name!r} has {field.shape[0]} rows but POINTS has {point_count}")
+    if data_kind != "point" and field.shape[0] != tuple_count:
+        raise ValueError(f"Cell FIELD array {field_name!r} has {field.shape[0]} rows but {marker} has {tuple_count}")
+    return {
+        "source_path": str(source),
+        "data_kind": data_kind,
+        "field_name": field_name,
+        "points": points,
+        "vectors": field,
+        "arrays": arrays,
+        "tuple_count": int(tuple_count),
+        "point_count": int(point_count),
+    }
+
+
+def q2dmhdfoam_vtk_velocity_observables(field: Mapping[str, object]) -> dict[str, float | int | str]:
+    """Compute compact velocity observables from a Q2DmhdFoam VTK vector field."""
+
+    vectors = np.asarray(field["vectors"], dtype=float)
+    if vectors.ndim != 2 or vectors.shape[1] < 2:
+        raise ValueError("Q2DmhdFoam VTK velocity observables require a vector array with at least two components")
+    speed = np.linalg.norm(vectors[:, : min(3, vectors.shape[1])], axis=1)
+    points = np.asarray(field["points"], dtype=float)
+    arrays = field.get("arrays", {})
+    vorticity_peak = float("nan")
+    if isinstance(arrays, Mapping) and "vorticity" in arrays:
+        vort = np.asarray(arrays["vorticity"], dtype=float)
+        if vort.shape[0] == vectors.shape[0]:
+            vorticity_peak = float(np.max(np.linalg.norm(vort[:, : min(3, vort.shape[1])], axis=1)))
+    return {
+        "source_path": str(field.get("source_path", "")),
+        "sample_count": int(vectors.shape[0]),
+        "x_min": float(np.min(points[:, 0])),
+        "x_max": float(np.max(points[:, 0])),
+        "y_min": float(np.min(points[:, 1])),
+        "y_max": float(np.max(points[:, 1])),
+        "z_min": float(np.min(points[:, 2])),
+        "z_max": float(np.max(points[:, 2])),
+        "speed_mean": float(np.mean(speed)),
+        "speed_max": float(np.max(speed)),
+        "speed_rms": float(np.sqrt(np.mean(speed**2))),
+        "ux_mean": float(np.mean(vectors[:, 0])),
+        "uy_mean": float(np.mean(vectors[:, 1])),
+        "vorticity_peak": vorticity_peak,
+        "reference_gate": "q2dmhdfoam_vtk_field_ingestion",
+    }
+
+
+def write_q2dmhdfoam_vtk_velocity_panel(
+    field: Mapping[str, object],
+    observables: Mapping[str, float | int | str],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "q2dmhdfoam_lid_driven_vtk",
+) -> list[Path]:
+    """Write a publication-facing panel for a Q2DmhdFoam VTK velocity field."""
+
+    import matplotlib.pyplot as plt
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    points = np.asarray(field["points"], dtype=float)
+    vectors = np.asarray(field["vectors"], dtype=float)
+    x_grid, y_grid, ux_grid, uy_grid, speed_grid = _point_vector_grid(points, vectors)
+    x_mid = 0.5 * (float(x_grid[0]) + float(x_grid[-1]))
+    y_mid = 0.5 * (float(y_grid[0]) + float(y_grid[-1]))
+    x_index = int(np.argmin(np.abs(x_grid - x_mid)))
+    y_index = int(np.argmin(np.abs(y_grid - y_mid)))
+    peak = max(float(np.nanmax(speed_grid)), 1.0e-30)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.8, 9.0), constrained_layout=True)
+    image = axes[0, 0].pcolormesh(x_grid, y_grid, speed_grid, shading="auto", cmap="magma")
+    axes[0, 0].set_title("Q2DmhdFoam velocity magnitude")
+    axes[0, 0].set_xlabel("x [m]")
+    axes[0, 0].set_ylabel("y [m]")
+    axes[0, 0].set_aspect("equal")
+    fig.colorbar(image, ax=axes[0, 0], fraction=0.046, pad=0.04, label="|U| [m/s]")
+
+    stride_x = max(1, len(x_grid) // 24)
+    stride_y = max(1, len(y_grid) // 18)
+    axes[0, 1].pcolormesh(x_grid, y_grid, speed_grid / peak, shading="auto", cmap="Blues", vmin=0.0, vmax=1.0)
+    axes[0, 1].quiver(
+        x_grid[::stride_x],
+        y_grid[::stride_y],
+        ux_grid[::stride_y, ::stride_x],
+        uy_grid[::stride_y, ::stride_x],
+        color="#111827",
+        width=0.0028,
+        scale=3.2 * peak,
+    )
+    axes[0, 1].set_title("Velocity direction over normalized speed")
+    axes[0, 1].set_xlabel("x [m]")
+    axes[0, 1].set_ylabel("y [m]")
+    axes[0, 1].set_aspect("equal")
+
+    axes[1, 0].plot(x_grid, uy_grid[y_index, :] / peak, color="#0f766e", linewidth=2.0, label=r"$U_y/U_{max}$ at mid-y")
+    axes[1, 0].plot(y_grid, ux_grid[:, x_index] / peak, color="#b45309", linewidth=2.0, label=r"$U_x/U_{max}$ at mid-x")
+    axes[1, 0].set_title("Centerline velocity components")
+    axes[1, 0].set_xlabel("coordinate [m]")
+    axes[1, 0].set_ylabel("normalized component")
+    axes[1, 0].grid(True, alpha=0.25)
+    axes[1, 0].legend(frameon=False)
+
+    axes[1, 1].axis("off")
+    rows = [
+        ("case", "Q2DmhdFoam generic VTK"),
+        ("samples", f"{int(observables['sample_count']):d}"),
+        ("domain x", f"{float(observables['x_min']):.3g} .. {float(observables['x_max']):.3g} m"),
+        ("domain y", f"{float(observables['y_min']):.3g} .. {float(observables['y_max']):.3g} m"),
+        ("mean |U|", f"{float(observables['speed_mean']):.4g} m/s"),
+        ("max |U|", f"{float(observables['speed_max']):.4g} m/s"),
+        ("rms |U|", f"{float(observables['speed_rms']):.4g} m/s"),
+        ("peak |omega|", f"{float(observables['vorticity_peak']):.4g} 1/s"),
+    ]
+    table = axes[1, 1].table(cellText=rows, colLabels=("observable", "value"), cellLoc="left", colLoc="left", loc="center")
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    for (row, _column), cell in table.get_celld().items():
+        cell.set_edgecolor("#cbd5e1")
+        if row == 0:
+            cell.set_facecolor("#0f172a")
+            cell.get_text().set_color("white")
+            cell.get_text().set_weight("bold")
+        elif row % 2 == 0:
+            cell.set_facecolor("#f8fafc")
+    axes[1, 1].set_title("Executable external-code field observables")
+
+    fig.suptitle("Q2DmhdFoam lid-driven rerun: VTK field ingestion", fontsize=15.0, fontweight="bold")
+    paths = [out_dir / f"{output_stem}.png", out_dir / f"{output_stem}.pdf"]
+    for path in paths:
+        fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+    return paths
+
+
 def write_q2dmhdfoam_external_reference_panel(
     profiles: Sequence[Mapping[str, object]],
     profile_observables: Sequence[Mapping[str, float | str | int]],
@@ -1230,6 +1419,45 @@ def write_dean_vortex_reference_template(path: str | Path) -> Path:
     """Write the external Dean-vortex observable CSV template."""
 
     return write_scalar_reference_template(path, dean_vortex_reference_template_rows())
+
+
+def _require_token(tokens: Sequence[str], token: str, source: Path) -> int:
+    items = tokens if isinstance(tokens, list) else list(tokens)
+    try:
+        return items.index(token)
+    except ValueError as exc:
+        raise ValueError(f"VTK file {source} does not contain token {token!r}") from exc
+
+
+def _point_vector_grid(points: np.ndarray, vectors: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    coords = np.asarray(points, dtype=float)
+    values = np.asarray(vectors, dtype=float)
+    if coords.ndim != 2 or coords.shape[1] != 3:
+        raise ValueError("Q2DmhdFoam VTK grid conversion expects point coordinates with shape (n, 3)")
+    if values.ndim != 2 or values.shape[0] != coords.shape[0] or values.shape[1] < 2:
+        raise ValueError("Q2DmhdFoam VTK grid conversion expects matching point-vector rows")
+
+    z_values = np.unique(coords[:, 2])
+    z_target = z_values[int(np.argmin(np.abs(z_values - float(np.median(z_values)))))]
+    z_tolerance = max(1.0e-12, 10.0 * np.finfo(float).eps * max(1.0, abs(float(z_target))))
+    z_mask = np.abs(coords[:, 2] - z_target) <= z_tolerance
+    section = coords[z_mask]
+    section_values = values[z_mask]
+    x_unique = np.unique(section[:, 0])
+    y_unique = np.unique(section[:, 1])
+    if x_unique.size < 2 or y_unique.size < 2:
+        raise ValueError("Q2DmhdFoam VTK point field does not define a 2D section")
+
+    ux = np.full((y_unique.size, x_unique.size), np.nan, dtype=float)
+    uy = np.full_like(ux, np.nan)
+    speed = np.full_like(ux, np.nan)
+    ix = np.searchsorted(x_unique, section[:, 0])
+    iy = np.searchsorted(y_unique, section[:, 1])
+    magnitudes = np.linalg.norm(section_values[:, : min(3, section_values.shape[1])], axis=1)
+    ux[iy, ix] = section_values[:, 0]
+    uy[iy, ix] = section_values[:, 1]
+    speed[iy, ix] = magnitudes
+    return x_unique, y_unique, ux, uy, speed
 
 
 def _q2dmhdfoam_conditions_from_name(name: str) -> dict[str, float]:

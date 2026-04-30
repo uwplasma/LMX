@@ -321,6 +321,11 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   flow-rate relative error `≈ 6.29e-8`. This is an executable external-code
   gate; the profile is a mixed-convection fully developed case and is therefore
   not used as a symmetric turbulence-parity claim.
+- `examples/q2dmhdfoam_lid_driven_vtk_artifact.py`: ingests the VTK field from
+  a generic Docker rerun of `run/lidDriven`, computes velocity and vorticity
+  observables, and writes a field-level panel. This verifies non-default
+  Q2DmhdFoam case execution and VTK ingestion; it is still not a matched LMX
+  turbulence validation.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -338,6 +343,10 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 
 <p align="center">
   <img src="docs/_static/generated/q2dmhdfoam_docker_reference.png" alt="Docker-rerun Q2DmhdFoam reference panel" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2dmhdfoam_lid_driven_vtk.png" alt="Q2DmhdFoam lid-driven VTK field ingestion panel" width="72%">
 </p>
 
 <p align="center">
