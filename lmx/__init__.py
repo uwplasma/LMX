@@ -211,9 +211,11 @@ __all__ = [
     "write_scalar_reference_template",
     "publication_figure_campaign_summary",
     "publication_figure_rows",
+    "research_grade_external_data_audit",
     "research_grade_closure_rows",
     "research_grade_closure_status",
     "write_publication_figure_manifest",
+    "write_research_grade_external_data_audit",
     "write_research_grade_closure_status",
 ]
 
@@ -398,6 +400,10 @@ _EXPORTS = {
         "publication_figure_campaign_summary",
     ),
     "publication_figure_rows": ("lmx.publication", "publication_figure_rows"),
+    "research_grade_external_data_audit": (
+        "lmx.research_closure",
+        "research_grade_external_data_audit",
+    ),
     "research_grade_closure_rows": (
         "lmx.research_closure",
         "research_grade_closure_rows",
@@ -409,6 +415,10 @@ _EXPORTS = {
     "write_publication_figure_manifest": (
         "lmx.publication",
         "write_publication_figure_manifest",
+    ),
+    "write_research_grade_external_data_audit": (
+        "lmx.research_closure",
+        "write_research_grade_external_data_audit",
     ),
     "write_research_grade_closure_status": (
         "lmx.research_closure",

@@ -5,8 +5,10 @@ import pytest
 
 from lmx.research_closure import (
     RESEARCH_CLOSURE_LANES,
+    research_grade_external_data_audit,
     research_grade_closure_rows,
     research_grade_closure_status,
+    write_research_grade_external_data_audit,
     write_research_grade_closure_status,
 )
 
@@ -89,3 +91,49 @@ def test_write_research_grade_closure_status(tmp_path: Path):
     assert (out_dir / "research_grade_closure_status.csv").exists()
     assert summary["lane_count"] == len(RESEARCH_CLOSURE_LANES)
     assert summary["strict_research_blocking"] is True
+
+
+def test_research_grade_external_data_audit_reports_available_inputs(tmp_path: Path):
+    static_dir = tmp_path / "generated"
+    external_root = tmp_path / "external"
+    freemhd_root = tmp_path / "freemhd"
+    _write_open_static(static_dir)
+    (external_root / "Q2DmhdFoam/run/lidDriven").mkdir(parents=True)
+    (external_root / "Q2DmhdFoam/run/lidDriven/IDM_output_U.txt").write_text("Weak turbulence:[]\n")
+    (external_root / "MHD_Solvers_OpenFOAM/solvers/mhdEpotFoam").mkdir(parents=True)
+    (external_root / "MHD_Solvers_OpenFOAM/solvers/mhdEpotFoam/mhdEpotFoam.C").write_text("// solver\n")
+    (freemhd_root / "FreeMHDPaperAllFigures/ClosedChannel").mkdir(parents=True)
+    (freemhd_root / "freemhd_paper.pdf").write_bytes(b"%PDF")
+
+    audit = research_grade_external_data_audit(
+        static_dir=static_dir,
+        external_codes_root=external_root,
+        freemhd_cases_root=freemhd_root,
+    )
+    q2d = next(row for row in audit["rows"] if row["lane"] == "q2d_turbulence_external_parity")
+    magnetic = next(row for row in audit["rows"] if row["lane"] == "magnetic_obstacle_external_validation")
+
+    assert audit["source_count"] == 4
+    assert audit["strict_closure"]["closed_lane_count"] == 0
+    assert q2d["path_exists"] is True
+    assert q2d["matched_reference_csv_exists"] is False
+    assert magnetic["available_evidence_file_count"] >= 2
+
+
+def test_write_research_grade_external_data_audit(tmp_path: Path):
+    static_dir = tmp_path / "generated"
+    external_root = tmp_path / "external"
+    out_dir = tmp_path / "out"
+    _write_open_static(static_dir)
+
+    output = write_research_grade_external_data_audit(
+        out_dir,
+        static_dir=static_dir,
+        external_codes_root=external_root,
+        freemhd_cases_root=tmp_path / "freemhd",
+    )
+    summary = json.loads(output.read_text(encoding="utf-8"))
+
+    assert output.exists()
+    assert summary["case"] == "research_grade_external_data_audit"
+    assert summary["matched_reference_csv_count"] == 0

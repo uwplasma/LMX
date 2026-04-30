@@ -266,6 +266,11 @@ run reports `0/3` strict lanes closed:
 - Magnetic obstacle: external observables open.
 - Dean vortex: resolved secondary-flow physics open.
 
+The local external-code/data inputs are audited by
+`examples/research_grade_external_data_audit.py`. That artifact checks which
+external checkouts, processed reference files, and matched reference CSVs are
+actually present before a lane can be promoted from open to closed.
+
 ### Phase 1: External Data Acquisition
 
 - Q2D: produce one matched Q2DmhdFoam turbulent reference bundle and convert it

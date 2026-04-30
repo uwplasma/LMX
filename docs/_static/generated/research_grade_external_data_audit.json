@@ -1,0 +1,147 @@
+{
+  "case": "research_grade_external_data_audit",
+  "generated_at_utc": "2026-04-30T00:57:20.724813+00:00",
+  "rows": [
+    {
+      "lane": "q2d_turbulence_external_parity",
+      "source": "Q2DmhdFoam local checkout and adapter artifacts",
+      "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam",
+      "path_exists": true,
+      "evidence_files": [
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/lidDrivenFFT_U.png",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/lidDrivenFieldProfile_U.png",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/q2dmhdfoam_external_reference_summary.json",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/q2dmhdfoam_lid_driven_turbulence_observables.csv",
+          "exists": true
+        }
+      ],
+      "evidence_file_count": 5,
+      "available_evidence_file_count": 5,
+      "matched_reference_csv": "docs/_static/generated/q2d_turbulence_reference_observables.csv",
+      "matched_reference_csv_exists": false,
+      "closure_summary": "docs/_static/generated/q2d_turbulence_decay_summary.json",
+      "closure_summary_exists": true,
+      "ready_for_strict_closure_claim": false,
+      "next_step": "Run a matched LMX-vs-Q2DmhdFoam turbulent case and export energy/enstrophy/spectrum observables."
+    },
+    {
+      "lane": "magnetic_obstacle_external_validation",
+      "source": "MHD_Solvers_OpenFOAM plus Cuevas/Votyakov/Andreev literature targets",
+      "path": "/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM",
+      "path_exists": true,
+      "evidence_files": [
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM/solvers/mhdEpotFoam/mhdEpotFoam.C",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM/Examples/mhdEpotFoam/readme.txt",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/magnetic_obstacle_external_reference_template_summary.json",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/magnetic_obstacle_benchmark_summary.json",
+          "exists": true
+        }
+      ],
+      "evidence_file_count": 4,
+      "available_evidence_file_count": 4,
+      "matched_reference_csv": "docs/_static/generated/magnetic_obstacle_reference_observables.csv",
+      "matched_reference_csv_exists": false,
+      "closure_summary": "docs/_static/generated/magnetic_obstacle_benchmark_summary.json",
+      "closure_summary_exists": true,
+      "ready_for_strict_closure_claim": false,
+      "next_step": "Fill or generate centerline-deficit, wake-recovery, pressure, and current/Lorentz observables."
+    },
+    {
+      "lane": "dean_vortex_higher_inertia_validation",
+      "source": "Dean-vortex literature plus a future OpenFOAM curved-pipe reference case",
+      "path": "/Users/rogerio/local/tests/lmx_external_codes/OpenFOAM-curved-pipe",
+      "path_exists": false,
+      "evidence_files": [
+        {
+          "path": "docs/_static/generated/dean_vortex_external_reference_template_summary.json",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/bent_pipe_inductionless_summary.json",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM/Examples/mhdEpotFoam/readme.txt",
+          "exists": true
+        }
+      ],
+      "evidence_file_count": 3,
+      "available_evidence_file_count": 3,
+      "matched_reference_csv": "docs/_static/generated/dean_vortex_reference_observables.csv",
+      "matched_reference_csv_exists": false,
+      "closure_summary": "docs/_static/generated/bent_pipe_inductionless_summary.json",
+      "closure_summary_exists": true,
+      "ready_for_strict_closure_claim": false,
+      "next_step": "Acquire or generate secondary-flow, velocity-skew, centroid-shift, and pressure-loss observables."
+    },
+    {
+      "lane": "straight_duct_and_fringing_context",
+      "source": "FreeMHD processed paper slices and local Docker rerun context",
+      "path": "/Users/rogerio/local/tests/freemhd_test_cases",
+      "path_exists": true,
+      "evidence_files": [
+        {
+          "path": "/Users/rogerio/local/tests/freemhd_test_cases/FreeMHDPaperAllFigures/ClosedChannel/hunt_exactBL_Ha100_XSlice1m_4.12s.csv",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/freemhd_test_cases/FreeMHDPaperAllFigures/ClosedChannel/shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE_XSlice1m_3.94s.csv",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/freemhd_test_cases/freemhd_paper.pdf",
+          "exists": true
+        }
+      ],
+      "evidence_file_count": 3,
+      "available_evidence_file_count": 3,
+      "matched_reference_csv": "",
+      "matched_reference_csv_exists": false,
+      "closure_summary": "",
+      "closure_summary_exists": false,
+      "ready_for_strict_closure_claim": false,
+      "next_step": "Keep using these files as context for closed straight-duct and deferred fringing parity campaigns."
+    }
+  ],
+  "source_count": 4,
+  "available_source_count": 3,
+  "matched_reference_csv_count": 0,
+  "strict_closure": {
+    "closed_lane_count": 0,
+    "lane_count": 3,
+    "open_lanes": [
+      "q2d_turbulence_external_parity",
+      "magnetic_obstacle_external_validation",
+      "dean_vortex_higher_inertia_validation"
+    ],
+    "research_grade_ready": false
+  },
+  "notes": "This audit records available external-code and digitized-data inputs. It does not turn templates or unmatched outputs into validation claims.",
+  "docs_artifacts": [
+    "research_grade_external_data_audit.json"
+  ]
+}

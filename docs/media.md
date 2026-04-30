@@ -47,6 +47,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
 | `publication_figure_campaign_summary.json` | `examples/publication_figure_campaign.py` | Manuscript figure manifest, status table, and remaining figure gaps |
 | `research_grade_closure_status.json` | `examples/research_grade_closure_status.py` | Strict research-blocker closure status, physics gates, and next artifacts |
+| `research_grade_external_data_audit.json` | `examples/research_grade_external_data_audit.py` | Local external-code/data inputs available for strict blocker closure |
 
 ![LMX straight-duct analytical profile overlay](_static/generated/analytic_velocity_profiles.png)
 
@@ -64,6 +65,7 @@ python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
 python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
+python examples/research_grade_external_data_audit.py
 python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
 ```
 

@@ -114,6 +114,74 @@ def write_research_grade_closure_status(
     return [json_path, csv_path]
 
 
+def research_grade_external_data_audit(
+    *,
+    static_dir: str | Path | None = None,
+    external_codes_root: str | Path | None = None,
+    freemhd_cases_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Return a local audit of external data needed by strict blockers.
+
+    The audit is intentionally observational: it records which external code
+    outputs and reference CSVs are present locally without promoting any lane to
+    research-grade closure. Closure remains controlled by
+    :func:`research_grade_closure_status`.
+    """
+
+    static_root = _static_dir(static_dir)
+    external_root = _external_codes_root(external_codes_root)
+    freemhd_root = _freemhd_cases_root(freemhd_cases_root)
+    closure = research_grade_closure_status(static_root)
+    rows = [
+        _q2d_external_audit(static_root, external_root),
+        _magnetic_obstacle_external_audit(static_root, external_root),
+        _dean_external_audit(static_root, external_root),
+        _freemhd_context_audit(freemhd_root),
+    ]
+    available_rows = [row for row in rows if row["path_exists"]]
+    matched_rows = [row for row in rows if row.get("matched_reference_csv_exists")]
+    return {
+        "case": "research_grade_external_data_audit",
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "rows": rows,
+        "source_count": len(rows),
+        "available_source_count": len(available_rows),
+        "matched_reference_csv_count": len(matched_rows),
+        "strict_closure": {
+            "closed_lane_count": closure["closed_lane_count"],
+            "lane_count": closure["lane_count"],
+            "open_lanes": closure["open_lanes"],
+            "research_grade_ready": closure["research_grade_ready"],
+        },
+        "notes": (
+            "This audit records available external-code and digitized-data inputs. "
+            "It does not turn templates or unmatched outputs into validation claims."
+        ),
+    }
+
+
+def write_research_grade_external_data_audit(
+    out_dir: str | Path,
+    *,
+    static_dir: str | Path | None = None,
+    external_codes_root: str | Path | None = None,
+    freemhd_cases_root: str | Path | None = None,
+    filename_stem: str = "research_grade_external_data_audit",
+) -> Path:
+    """Write the strict-blocker external-data audit as JSON."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = research_grade_external_data_audit(
+        static_dir=static_dir,
+        external_codes_root=external_codes_root,
+        freemhd_cases_root=freemhd_cases_root,
+    )
+    json_path = out / f"{filename_stem}.json"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    return json_path
+
+
 def _lane_row(
     spec: ResearchClosureLaneSpec,
     summary: Mapping[str, Any],
@@ -170,6 +238,111 @@ def _lane_status(
     return "external_data_acquisition_open"
 
 
+def _q2d_external_audit(static_root: Path, external_root: Path) -> dict[str, Any]:
+    root = external_root / "Q2DmhdFoam"
+    evidence = [
+        root / "run/lidDriven/IDM_output_U.txt",
+        root / "run/lidDriven/lidDrivenFFT_U.png",
+        root / "run/lidDriven/lidDrivenFieldProfile_U.png",
+        static_root / "q2dmhdfoam_external_reference_summary.json",
+        static_root / "q2dmhdfoam_lid_driven_turbulence_observables.csv",
+    ]
+    return _audit_row(
+        lane="q2d_turbulence_external_parity",
+        source="Q2DmhdFoam local checkout and adapter artifacts",
+        path=root,
+        evidence=evidence,
+        matched_reference_csv=static_root / "q2d_turbulence_reference_observables.csv",
+        closure_summary=static_root / "q2d_turbulence_decay_summary.json",
+        next_step="Run a matched LMX-vs-Q2DmhdFoam turbulent case and export energy/enstrophy/spectrum observables.",
+    )
+
+
+def _magnetic_obstacle_external_audit(static_root: Path, external_root: Path) -> dict[str, Any]:
+    root = external_root / "MHD_Solvers_OpenFOAM"
+    evidence = [
+        root / "solvers/mhdEpotFoam/mhdEpotFoam.C",
+        root / "Examples/mhdEpotFoam/readme.txt",
+        static_root / "magnetic_obstacle_external_reference_template_summary.json",
+        static_root / "magnetic_obstacle_benchmark_summary.json",
+    ]
+    return _audit_row(
+        lane="magnetic_obstacle_external_validation",
+        source="MHD_Solvers_OpenFOAM plus Cuevas/Votyakov/Andreev literature targets",
+        path=root,
+        evidence=evidence,
+        matched_reference_csv=static_root / "magnetic_obstacle_reference_observables.csv",
+        closure_summary=static_root / "magnetic_obstacle_benchmark_summary.json",
+        next_step="Fill or generate centerline-deficit, wake-recovery, pressure, and current/Lorentz observables.",
+    )
+
+
+def _dean_external_audit(static_root: Path, external_root: Path) -> dict[str, Any]:
+    root = external_root / "OpenFOAM-curved-pipe"
+    fallback_root = external_root / "MHD_Solvers_OpenFOAM"
+    evidence = [
+        static_root / "dean_vortex_external_reference_template_summary.json",
+        static_root / "bent_pipe_inductionless_summary.json",
+        fallback_root / "Examples/mhdEpotFoam/readme.txt",
+    ]
+    return _audit_row(
+        lane="dean_vortex_higher_inertia_validation",
+        source="Dean-vortex literature plus a future OpenFOAM curved-pipe reference case",
+        path=root,
+        evidence=evidence,
+        matched_reference_csv=static_root / "dean_vortex_reference_observables.csv",
+        closure_summary=static_root / "bent_pipe_inductionless_summary.json",
+        next_step="Acquire or generate secondary-flow, velocity-skew, centroid-shift, and pressure-loss observables.",
+    )
+
+
+def _freemhd_context_audit(freemhd_root: Path) -> dict[str, Any]:
+    evidence = [
+        freemhd_root / "FreeMHDPaperAllFigures/ClosedChannel/hunt_exactBL_Ha100_XSlice1m_4.12s.csv",
+        freemhd_root / "FreeMHDPaperAllFigures/ClosedChannel/shercliff_Ha100_ConstantQ_OutletZeroGradientInletCodedUxBpotE_XSlice1m_3.94s.csv",
+        freemhd_root / "freemhd_paper.pdf",
+    ]
+    return _audit_row(
+        lane="straight_duct_and_fringing_context",
+        source="FreeMHD processed paper slices and local Docker rerun context",
+        path=freemhd_root,
+        evidence=evidence,
+        matched_reference_csv=None,
+        closure_summary=None,
+        next_step="Keep using these files as context for closed straight-duct and deferred fringing parity campaigns.",
+    )
+
+
+def _audit_row(
+    *,
+    lane: str,
+    source: str,
+    path: Path,
+    evidence: list[Path],
+    matched_reference_csv: Path | None,
+    closure_summary: Path | None,
+    next_step: str,
+) -> dict[str, Any]:
+    evidence_rows = [{"path": str(item), "exists": item.exists()} for item in evidence]
+    matched_exists = bool(matched_reference_csv and matched_reference_csv.exists())
+    closure_summary_exists = bool(closure_summary and closure_summary.exists())
+    return {
+        "lane": lane,
+        "source": source,
+        "path": str(path),
+        "path_exists": path.exists(),
+        "evidence_files": evidence_rows,
+        "evidence_file_count": len(evidence_rows),
+        "available_evidence_file_count": sum(1 for item in evidence_rows if item["exists"]),
+        "matched_reference_csv": str(matched_reference_csv) if matched_reference_csv else "",
+        "matched_reference_csv_exists": matched_exists,
+        "closure_summary": str(closure_summary) if closure_summary else "",
+        "closure_summary_exists": closure_summary_exists,
+        "ready_for_strict_closure_claim": bool(matched_exists and closure_summary_exists),
+        "next_step": next_step,
+    }
+
+
 def _validation_payload(summary: Mapping[str, Any]) -> Mapping[str, Any]:
     payload = summary.get("validation")
     if isinstance(payload, Mapping):
@@ -219,6 +392,20 @@ def _static_dir(static_dir: str | Path | None) -> Path:
     if static_dir is not None:
         return Path(static_dir)
     return Path(__file__).resolve().parents[1] / "docs" / "_static" / "generated"
+
+
+def _external_codes_root(external_codes_root: str | Path | None) -> Path:
+    if external_codes_root is not None:
+        return Path(external_codes_root)
+    local_root = Path("/Users/rogerio/local/tests/lmx_external_codes")
+    return local_root if local_root.exists() else Path("lmx_external_codes")
+
+
+def _freemhd_cases_root(freemhd_cases_root: str | Path | None) -> Path:
+    if freemhd_cases_root is not None:
+        return Path(freemhd_cases_root)
+    local_root = Path("/Users/rogerio/local/tests/freemhd_test_cases")
+    return local_root if local_root.exists() else Path("freemhd_test_cases")
 
 
 def _load_json(path: Path) -> Mapping[str, Any]:

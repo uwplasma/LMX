@@ -780,6 +780,7 @@ Useful entry points:
 - `examples/wham_blanket_autodiff_research_demo.py`: differentiable WHAM blanket pressure-drop sensitivity and field-scale inverse-design study
 - `examples/publication_figure_campaign.py`: bounded manuscript-figure manifest with artifact status, references, metrics, and remaining gaps
 - `examples/research_grade_closure_status.py`: strict Q2D turbulence, magnetic-obstacle, and Dean-vortex closure-status manifest
+- `examples/research_grade_external_data_audit.py`: local external-code/data audit for the remaining strict blockers
 
 ## Documentation
 
