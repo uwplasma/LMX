@@ -704,6 +704,15 @@ matched strict files `magnetic_obstacle_reference_observables.csv`,
 
 ![LMX strict external validation targets](docs/_static/generated/research_grade_external_targets.png)
 
+The final strict-blocker probe is kept in the README because it is the release
+guard against over-claiming. It records that a low-resolution magnetic-obstacle
+reverse-flow candidate did not survive the current-resolution rerun, that the
+available Q2DmhdFoam outputs are not matched to the LMX turbulence example, and
+that the current bent-pipe result is still a low-De current-closure baseline
+rather than a Dean-vortex validation.
+
+![LMX strict blocker closure attempt](docs/_static/generated/research_grade_strict_blocker_attempt.png)
+
 - high-`Ha` Hunt side-layer parity is closed for the public analytical
   overlay after matching the thin-wall reference model used by the FreeMHD/Ni
   files (`wall_thickness = 0.001`, `sigma_w / sigma = 5`,

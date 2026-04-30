@@ -34,6 +34,7 @@ REQUIRED_ARTIFACTS = (
     "magnetic_obstacle_benchmark.png",
     "magnetic_obstacle_schematic.png",
     "magnetic_obstacle_reference_observables_template.csv",
+    "research_grade_strict_blocker_attempt.png",
     "bent_pipe_overview.png",
     "dean_vortex_reference_observables_template.csv",
     "variable_field_tabulated_reconstruction.png",

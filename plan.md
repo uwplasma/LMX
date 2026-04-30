@@ -202,6 +202,11 @@ refer to the Samper et al. taxonomy.
   flow direction, localized field sheet, velocity slice, cross-sectional
   deficit, and response curve before the internal response plot, so this lane
   no longer relies on response curves alone to communicate the physics.
+  Latest strict closure attempt: a low-resolution `base_bz = 105` scan produced
+  a Votyakov-scale candidate reverse-flow signal (`min u/u_ref ≈ -0.14`), but
+  the current `40 × 40 × 25` benchmark rerun at the same field scale gave
+  `min u/u_ref ≈ 0.997`. That result blocks a research-grade claim until a
+  matched inertial/localized magnetic-obstacle case is built and converged.
 - Quasi-2D turbulence: keep the current decay/forced/wall-bounded analytic
   tests as verification, then compare the nonlinear Q2D lane with
   Sommeria-Moreau-style turbulent references before making any turbulent parity
@@ -220,6 +225,10 @@ refer to the Samper et al. taxonomy.
   ingests executable Q2DmhdFoam/Vetcha outputs into profile, spectral-summary,
   CSV, and PNG/PDF artifacts. The remaining blocker is the matched
   LMX-vs-Q2DmhdFoam turbulent run, not external-data parsing.
+  Latest strict closure attempt: the local Q2DmhdFoam lid-driven/Vetcha/
+  cylinder outputs are useful evidence, but they do not match the current LMX
+  periodic SM82-style turbulence example. The next real step is either a
+  matched Q2DmhdFoam run or a corresponding LMX lid-driven/cylinder case.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.
@@ -239,6 +248,10 @@ refer to the Samper et al. taxonomy.
   `examples/dean_vortex_external_reference_template.py`; if a filled
   `dean_vortex_reference_observables.csv` is present, the bent-pipe example
   writes the comparison table and PNG/PDF tolerance-gate plots automatically.
+  Latest strict closure attempt: the retained bent-pipe example remains a
+  low-De current-closure baseline (`De ≈ 5.19e-7`) with negligible secondary
+  flow. This lane needs a no-field Dean-flow reference with resolved secondary
+  velocity before any MHD damping or pressure-loss parity claim.
 - Variable and tabulated 3D fields: validate interpolation, divergence control,
   field normalization, pressure-drop response, and autodiff sensitivities
   against manufactured fields and at least one independent field dataset.

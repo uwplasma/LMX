@@ -286,6 +286,29 @@ actually present before a lane can be promoted from open to closed.
 `dean_vortex_reference_observables_candidate.csv`. These are target-acquisition
 artifacts for the paper and next runs, not strict validation inputs.
 
+The latest strict closure attempt is also generated and archived as
+`research_grade_strict_blocker_attempt.*`. It is a release guard, not a solver
+shortcut:
+
+![Strict blocker closure attempt](_static/generated/research_grade_strict_blocker_attempt.png)
+
+- Magnetic obstacle: a low-resolution scan near `base_bz = 105` produced a
+  Votyakov-scale reverse-flow candidate (`min u/u_ref ≈ -0.14`), but the
+  current `40 × 40 × 25` rerun at the same field scale gave
+  `min u/u_ref ≈ 0.997`. The candidate is therefore not converged and cannot be
+  used as external validation.
+- Q2D turbulence: local Q2DmhdFoam evidence exists, but the available lid-
+  driven/Vetcha/cylinder outputs are not matched to the current LMX periodic
+  SM82-style turbulence example. The strict
+  `q2d_turbulence_reference_observables.csv` remains absent.
+- Dean vortex: the current bent-pipe result is a low-De current-closure gate
+  (`De ≈ 5.19e-7`) with negligible secondary flow. It cannot validate
+  higher-inertia Dean vortices until LMX has a resolved secondary-flow model
+  and a matched curved-pipe reference.
+
+Because these three checks remain open, a research-grade release tag is blocked
+even when bounded release readiness is green.
+
 ### Phase 1: External Data Acquisition
 
 - Q2D: produce one matched Q2DmhdFoam turbulent reference bundle and convert it

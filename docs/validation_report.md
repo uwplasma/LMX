@@ -79,6 +79,14 @@ replacement for matched reference CSVs:
 
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
+The latest strict closure attempt keeps the research-grade tag blocked. The
+magnetic-obstacle escalation did not retain a Votyakov-scale reverse-flow
+signal on the current grid, the available Q2DmhdFoam outputs are not matched to
+the LMX turbulence case, and the current bent-pipe example remains a low-De
+current-closure baseline rather than a Dean-vortex validation:
+
+![LMX strict blocker closure attempt](_static/generated/research_grade_strict_blocker_attempt.png)
+
 ## Combined validation workflow
 
 The top-level executable validation driver is:
