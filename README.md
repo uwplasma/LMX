@@ -786,6 +786,12 @@ comparison, and the strict closure status in one panel.
 
 ![LMX strict research-grade validation closure dashboard](docs/_static/generated/research_grade_closure_dashboard.png)
 
+The final disposition artifact is the last-push audit. It records the measured
+offender and required next physics for each strict lane and keeps the release
+bounded instead of marking failed external-validation lanes as research-grade.
+
+![LMX final strict research-lane disposition](docs/_static/generated/research_grade_final_disposition.png)
+
 The final strict-blocker probe is kept in the README because it is the release
 guard against over-claiming. It records that a low-resolution magnetic-obstacle
 reverse-flow candidate did not survive the current-resolution rerun, that the

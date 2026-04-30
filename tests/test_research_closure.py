@@ -8,8 +8,10 @@ from lmx.research_closure import (
     research_grade_external_data_audit,
     research_grade_closure_rows,
     research_grade_closure_status,
+    research_grade_final_disposition,
     write_research_grade_external_data_audit,
     write_research_grade_closure_status,
+    write_research_grade_final_disposition,
 )
 
 
@@ -91,6 +93,77 @@ def test_write_research_grade_closure_status(tmp_path: Path):
     assert (out_dir / "research_grade_closure_status.csv").exists()
     assert summary["lane_count"] == len(RESEARCH_CLOSURE_LANES)
     assert summary["strict_research_blocking"] is True
+
+
+def test_research_grade_final_disposition_records_deferred_lanes(tmp_path: Path):
+    static_dir = tmp_path / "generated"
+    _write_open_static(static_dir)
+    _write_json(
+        static_dir / "q2d_lmx_q2dmhdfoam_lid_driven_parity_summary.json",
+        {"strict_blocker_closed": True},
+    )
+    _write_json(
+        static_dir / "magnetic_obstacle_votyakov_strict_attempt_summary.json",
+        {
+            "external_reference_comparison": {
+                "validation_pass": False,
+                "comparison": {
+                    "rows": [
+                        {
+                            "observable": "minimum_centerline_velocity_ratio",
+                            "lmx_value": 0.98,
+                            "reference_value": -0.13,
+                            "relative_error": 8.5,
+                        }
+                    ]
+                },
+            }
+        },
+    )
+    _write_json(
+        static_dir / "dean_vortex_bayat_rezai_strict_attempt_summary.json",
+        {
+            "current_lmx_dean_number": 1.0e-6,
+            "reference_dean_number": 20.0,
+            "external_reference_comparison": {
+                "validation_pass": False,
+                "comparison": {
+                    "rows": [
+                        {
+                            "observable": "secondary_flow_rms_ratio",
+                            "lmx_value": 0.0,
+                            "reference_value": 0.04,
+                        },
+                        {
+                            "observable": "secondary_flow_peak_ratio",
+                            "lmx_value": 0.0,
+                            "reference_value": 0.08,
+                        },
+                    ]
+                },
+            },
+        },
+    )
+
+    summary = research_grade_final_disposition(static_dir)
+
+    assert summary["final_push_complete"] is True
+    assert summary["research_grade_ready"] is False
+    assert summary["deferred_lane_count"] == 3
+    assert any(row["final_decision"] == "defer_strict_turbulent_parity" for row in summary["rows"])
+
+
+def test_write_research_grade_final_disposition(tmp_path: Path):
+    static_dir = tmp_path / "generated"
+    out_dir = tmp_path / "out"
+    _write_open_static(static_dir)
+
+    outputs = write_research_grade_final_disposition(out_dir, static_dir=static_dir)
+    summary = json.loads((out_dir / "research_grade_final_disposition.json").read_text(encoding="utf-8"))
+
+    assert [path.suffix for path in outputs] == [".json", ".csv", ".png"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+    assert summary["case"] == "research_grade_final_disposition"
 
 
 def test_research_grade_external_data_audit_reports_available_inputs(tmp_path: Path):

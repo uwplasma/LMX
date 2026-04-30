@@ -254,6 +254,7 @@ __all__ = [
     "research_grade_external_data_audit",
     "research_grade_closure_rows",
     "research_grade_closure_status",
+    "research_grade_final_disposition",
     "strict_blocker_closure_attempt_summary",
     "write_research_grade_closure_dashboard",
     "write_research_grade_external_target_panel",
@@ -261,6 +262,7 @@ __all__ = [
     "write_publication_figure_manifest",
     "write_research_grade_external_data_audit",
     "write_research_grade_closure_status",
+    "write_research_grade_final_disposition",
     "write_strict_blocker_closure_attempt",
 ]
 
@@ -517,6 +519,10 @@ _EXPORTS = {
         "lmx.research_closure",
         "research_grade_closure_status",
     ),
+    "research_grade_final_disposition": (
+        "lmx.research_closure",
+        "research_grade_final_disposition",
+    ),
     "strict_blocker_closure_attempt_summary": (
         "lmx.research_blockers",
         "strict_blocker_closure_attempt_summary",
@@ -548,6 +554,10 @@ _EXPORTS = {
     "write_research_grade_closure_status": (
         "lmx.research_closure",
         "write_research_grade_closure_status",
+    ),
+    "write_research_grade_final_disposition": (
+        "lmx.research_closure",
+        "write_research_grade_final_disposition",
     ),
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
     "build_fringing_autodiff_problem": ("lmx.autodiff", "build_fringing_autodiff_problem"),

@@ -123,6 +123,11 @@
       "name": "research_grade_closure_dashboard.png",
       "kind": "strict research-grade validation closure dashboard",
       "generator": "examples/research_grade_closure_dashboard.py"
+    },
+    {
+      "name": "research_grade_final_disposition.png",
+      "kind": "final strict-lane disposition with measured offenders",
+      "generator": "examples/research_grade_final_lane_disposition.py"
     }
   ]
 }

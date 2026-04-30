@@ -61,6 +61,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `research_grade_external_data_audit.json` | `examples/research_grade_external_data_audit.py` | Local external-code/data inputs available for strict blocker closure |
 | `research_grade_external_targets.png` | `examples/research_grade_external_target_figures.py` | Literature/external-code target panel for magnetic-obstacle, Q2D turbulence, and Dean-vortex strict lanes |
 | `research_grade_closure_dashboard.png` | `examples/research_grade_closure_dashboard.py` | Reviewer-facing strict closure dashboard for closed support gates and open blockers |
+| `research_grade_final_disposition.png` | `examples/research_grade_final_lane_disposition.py` | Last-push strict-lane disposition with measured offenders and required next physics |
 
 ![LMX straight-duct analytical profile overlay](_static/generated/analytic_velocity_profiles.png)
 
@@ -69,6 +70,8 @@ and posters exist, and that the core publication-facing figures are present.
 ![LMX strict external validation targets](_static/generated/research_grade_external_targets.png)
 
 ![LMX strict research-grade validation closure dashboard](_static/generated/research_grade_closure_dashboard.png)
+
+![LMX final strict research-lane disposition](_static/generated/research_grade_final_disposition.png)
 
 ## Regeneration Commands
 
@@ -89,6 +92,7 @@ python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py
 python examples/research_grade_external_target_figures.py
 python examples/research_grade_closure_dashboard.py
+python examples/research_grade_final_lane_disposition.py
 python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
 ```
 

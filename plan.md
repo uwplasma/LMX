@@ -194,6 +194,166 @@ refer to the Samper et al. taxonomy.
   wall-conductance extensions, FreeMHD closed-channel validation files, and the
   Samper fusion-MHD V&V ladder; external-code comparisons should use FreeMHD
   for layered wall ducts where the physics matches.
+- Full Li/AlN wall-stack study step ledger:
+  The attached collaborator plan is now part of the active LMX roadmap. The
+  full text is retained verbatim in `studies/li_aln_wall_mhd/plan.md`; this
+  top-level ledger is the implementation contract that must stay synchronized
+  with code, tests, examples, docs, and publication artifacts.
+  Decision boundary: the study answers inductionless MHD performance only. It
+  can rank wall electrical models by current closure, Lorentz drag,
+  wall-current leakage, pressure-gradient proxy, sensitivity, and degradation
+  threshold. It must not claim AlN/lithium compatibility, corrosion resistance,
+  dissolution resistance, wetting, coating adhesion, thermal-cycling survival,
+  crack formation, additive-manufacturing quality, irradiation response,
+  tritium permeation, free-surface behavior, high-`Rm` induction, or turbulent
+  qualification unless separate evidence is added.
+  Core question: for a prescribed lithium duct, magnetic field, target flow,
+  and temperature, determine how low the effective wall conductance must remain
+  for AlN-like insulation to approach the ideal-insulator limit, and quantify
+  how performance degrades when AlN becomes conductive, pinholed, cracked, or
+  bypassed by a metal substrate.
+  Candidate wall models to implement and keep labeled in every artifact:
+  Model A, perfect insulator; Model B, bare conducting metal; Model C,
+  finite-conductivity or degraded AlN; Model D, smooth pinhole/effective
+  conductance `c_eff = (1 - f_p) c_AlN + f_p c_metal`; Model E, effective
+  AlN+metal stack with tangential `c_parallel` separated from normal leakage
+  `g_perp`; Model F, true `fluid | AlN | metal` multilayer walls with
+  layer-specific thickness, conductivity, cells, masks, interfaces, and
+  residual diagnostics.
+  Nondimensional groups: every case summary must record wall conductance `c`,
+  effective conductance `c_eff`, tangential conductance `c_parallel`, normal
+  leakage `g_perp`, Hartmann number `Ha = B0 a sqrt(sigma_Li / (rho_Li nu_Li))`,
+  Reynolds number `Re = U a / nu_Li`, interaction parameter
+  `N = sigma_Li B0^2 a / (rho_Li U)`, magnetic Reynolds number
+  `Rm = mu0 sigma_Li U a`, and the viscosity convention. LMX public inputs must
+  use kinematic viscosity `nu`; real-fluid summaries should also report
+  dynamic viscosity `mu`, density `rho`, and the conversion `nu = mu / rho`.
+  Required input structure: production cases need one reproducible YAML, JSON,
+  TOML, or Python configuration that states geometry, lithium properties,
+  wall-material properties, magnetic field, target flow or pressure-gradient
+  drive, wall-layer meshes, region names, output paths, and diagnostics. The
+  geometry block must cover fluid half-width, aspect ratio, wall thickness,
+  AlN thickness, metal substrate thickness, cells in fluid and every layer,
+  wall-layer refinement, axial stations for extruded cases, and side-specific
+  material assignments.
+  Required material data: lithium temperature, `sigma_Li`, `rho_Li`, `mu`,
+  computed `nu`, and optional uncertainty ranges; wall material name,
+  conductivity, thickness, temperature dependence if available, model type, and
+  whether the number represents tangential surface conductance or normal
+  through-coating leakage. Required baseline materials are ideal insulator,
+  liquid lithium, finite/degraded AlN, 316L, Inconel 625, molybdenum, optional
+  tungsten, and optional vanadium alloy.
+  Required magnetic-field and flow inputs: uniform fields, tabulated fields,
+  WHAM-like 3D fields, fringing fields, and field-normalization metadata; target
+  mean velocity or flow rate, pressure-gradient/forcing choice, transient or
+  steady solve settings, fixed-flow constraints, and output cadence.
+  Required code additions: unit-consistent material helpers; reduced
+  differentiable wall-stack conductance utilities; pinhole/degradation model;
+  nested wall-layer mesh QA; fixed-flow forcing wrapper; scalar objectives for
+  pressure-gradient proxy, Lorentz power, wall leakage, current norms,
+  flattening, and threshold functions; finite-difference checks for autodiff;
+  true multilayer rectangular walls if the reduced model cannot answer the
+  requested question; and optional extruded/fringing multilayer support.
+  Phase 0, repository preparation: record branch, commit, environment, hardware,
+  dependency versions, test status, docs status, validation artifact status, and
+  known deviations. Baseline validations must include Hartmann, Shercliff, Hunt,
+  conservative charge closure, interface-current residuals, wall-leakage
+  residuals, restart/reproducibility, plotting, and release-readiness gates.
+  Phase 1, unit and property audit: standardize viscosity as kinematic `nu`,
+  confirm all `Ha`, `Re`, `N`, `Rm`, `c`, `c_eff`, `c_parallel`, and `g_perp`
+  definitions, verify dynamic-to-kinematic conversion helpers, and add tests
+  that fail if density is double-counted or omitted.
+  Phase 2, model implementation: implement the reduced wall models first, then
+  multilayer walls only where required. Tests must cover ideal-insulator and
+  bare-metal limits, equivalent-layer reductions, pinhole endpoints, smooth
+  pinhole interpolation, layer-order sensitivity, per-side wall stacks,
+  JAX/autodiff compatibility, and differentiability of scalar objectives.
+  Phase 3, verification and numerical convergence: run mesh ladders in the
+  fluid, Hartmann layers, side layers, AlN layer, metal layer, and axial
+  fringing direction. Acceptance requires stable mean velocity, flow rate,
+  pressure-gradient proxy, Lorentz power, peak current density, wall leakage,
+  charge residual, and interface-current residual. Limiting cases must verify
+  `c -> 0`, large `c`, `f_p = 0`, `f_p = 1`, identical stacked layers, zero
+  magnetic field, zero wall conductance, and substrate irrelevance behind an
+  intact ideal insulator.
+  Phase 4, main rectangular-duct sweep: run a baseline lithium rectangular duct
+  at selected `Ha`, target `U`, temperature, geometry, and wall stack. Sweep
+  `c_AlN = 0, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1,
+  1, 10`, refine near transitions, sweep `Ha`, sweep lithium temperature or
+  property uncertainty, and sweep target velocity/flow rate. Output fields and
+  scalar tables for every retained case.
+  Phase 5, degradation thresholds: compute `c_crit`, `sigma_AlN,crit`,
+  `t_AlN,min`, `g_perp,crit`, and `f_p,max` for 5%, 10%, and 25% deviation
+  from the ideal-insulator metric. Threshold metrics must include required
+  forcing, pressure-gradient proxy, Lorentz power, wall-current leakage, peak
+  current density, current closure, and velocity flattening.
+  Phase 6, AlN/metal stack comparison: compare ideal AlN over metal,
+  finite-conductivity AlN over metal, pinholed AlN over metal, effective
+  AlN+metal stack, true multilayer AlN/metal when implemented, and bare-metal
+  references. Required conclusions are whether the substrate matters for intact
+  AlN, whether it matters for degraded/pinholed AlN, and whether the result is
+  controlled primarily by AlN integrity rather than substrate choice.
+  Phase 7, extruded/fringing-field study: rerun representative wall models in
+  axially varying or WHAM-like fields after rectangular validation. Required
+  stationwise outputs are flow rate, mean velocity, pressure/forcing proxy,
+  Lorentz power, peak and mean current density, wall leakage, charge residual,
+  interface residual, field strength, and region-resolved current closure.
+  Field snapshots must include inlet, peak-field, downstream, and transition
+  stations.
+  Phase 8, autodiff sensitivity and inverse design: define smooth objectives
+  for required forcing, Lorentz power, wall leakage, peak current density,
+  threshold margin, and pressure-drop proxy. Compute gradients with respect to
+  `B0`, `U`, `sigma_Li`, `sigma_AlN`, `t_AlN`, `c_AlN`, `f_p`, `g_perp`, and
+  selected geometry parameters. Report normalized sensitivities
+  `(p / Q) dQ/dp`, validate gradients against finite differences, and include
+  inverse-design plots for minimum AlN thickness, maximum allowed pinhole
+  fraction, and field/flow limits.
+  Phase 9, final reporting: produce a reproducible archive with inputs,
+  code-version metadata, scalar CSVs, JSON summaries, field outputs, figures,
+  docs pages, and a final MHD ranking. The final wording must explicitly say
+  that LMX predicts MHD electrical-performance trends only and that materials
+  qualification remains external.
+  Required diagnostic definitions: area-weighted mean velocity, volumetric flow
+  rate, pressure-gradient or forcing proxy, Lorentz power, mean current density,
+  peak current density, wall-current leakage, charge-conservation residual,
+  interface-current residual, and velocity-flattening metric. Each definition
+  must state its units, normalization, region mask, and whether it is
+  dimensional or nondimensional.
+  Required tables: simulation matrix; material-property assumptions;
+  verification and validation; mesh convergence; wall-model ranking; AlN
+  degradation thresholds; autodiff sensitivities; extruded/fringing-field
+  results. Tables must include model label, geometry, `Ha`, `Re`, `N`, `Rm`,
+  `c`, `c_eff`, `g_perp`, target `U`, temperature, mesh summary, pressure or
+  forcing metric, Lorentz power, current-density metrics, leakage, residuals,
+  convergence flag, and confidence level.
+  Required plots: labeled rectangular duct and wall-stack geometry; mesh with
+  boundary-layer and wall-layer zooms; representative velocity, electric
+  potential, current-density, Lorentz-force, and leakage maps; conductance
+  sweeps on logarithmic axes; `Ha` sweeps; pinhole-fraction sweeps; substrate
+  comparison bars; sensitivity tornado plots; inverse-design threshold plots;
+  extruded/fringing station maps; pressure/forcing along the duct; and
+  side-by-side ideal-insulator, degraded-AlN, pinholed-AlN, AlN+metal, and
+  bare-metal comparisons.
+  Acceptance criteria: all nondimensional numbers documented; baseline
+  Hartmann/Shercliff/Hunt validations pass; mesh convergence is recorded;
+  limiting cases behave correctly; charge and interface residuals remain below
+  declared tolerances; autodiff gradients pass finite-difference checks; no
+  figure claims material compatibility; and the final ranking separates ideal
+  insulation, finite-conductivity AlN, pinhole model, effective stack,
+  multilayer model, and bare metal.
+  Repository layout: keep the full plan in `studies/li_aln_wall_mhd/plan.md`,
+  inputs under `studies/li_aln_wall_mhd/inputs/`, scripts under
+  `studies/li_aln_wall_mhd/scripts/`, raw outputs under
+  `studies/li_aln_wall_mhd/results/raw/`, processed tables under
+  `studies/li_aln_wall_mhd/results/processed/`, figures under
+  `studies/li_aln_wall_mhd/figures/`, and the report material under
+  `studies/li_aln_wall_mhd/report/`.
+  Immediate actions: wire the study into docs navigation; add unit tests for
+  material/nondimensional helpers; add reduced wall-stack example inputs; add
+  mesh QA for nested wall layers; add CSV/JSON schema checks for diagnostics;
+  run the first `c_AlN` sweep; compare limiting cases to FreeMHD where the
+  layered-wall physics matches; and generate the first report-ready geometry,
+  mesh, conductance-sweep, and sensitivity figures.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the

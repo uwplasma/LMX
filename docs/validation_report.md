@@ -86,6 +86,13 @@ nonlinear turbulent Q2D parity lane remains open.
 
 ![LMX strict research-grade validation closure dashboard](_static/generated/research_grade_closure_dashboard.png)
 
+The final strict-lane disposition records the last-push decision without
+over-claiming. It keeps the three strict lanes deferred, names the blocking
+observable for each one, and points to the next physics required before a
+research-grade tag can be justified:
+
+![LMX final strict research-lane disposition](_static/generated/research_grade_final_disposition.png)
+
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
 The Q2DmhdFoam executable path is now reproducible through

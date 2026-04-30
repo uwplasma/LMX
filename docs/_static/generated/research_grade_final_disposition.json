@@ -1,0 +1,65 @@
+{
+  "case": "research_grade_final_disposition",
+  "generated_at_utc": "2026-04-30T21:05:32.622553+00:00",
+  "lane_count": 3,
+  "closed_lane_count": 0,
+  "deferred_lane_count": 3,
+  "research_grade_ready": false,
+  "final_push_complete": true,
+  "final_push_decision": "bounded_release_only_strict_lanes_deferred",
+  "rows": [
+    {
+      "lane": "q2d_turbulence_external_parity",
+      "final_decision": "defer_strict_turbulent_parity",
+      "support_gate": "matched_sidewall_q2dmhdfoam_closed",
+      "blocking_observable": "matched nonlinear turbulent energy/enstrophy/spectrum/turnover CSV",
+      "measured_offender": "q2d_turbulence_reference_observables.csv absent",
+      "evidence_artifact": "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
+      "required_next_physics": "Run Q2DmhdFoam and LMX on the same nonlinear Q2D turbulent case, with identical forcing, domain, Hartmann friction, and time window.",
+      "why_not_closed": "The side-wall field-observable gate is closed, but the nonlinear turbulent parity target is a different physical case.",
+      "selected_metrics": {
+        "frame_count": 72,
+        "turnover_count": 0.3312918376699193,
+        "max_courant": 0.05234552620681659,
+        "support_gate_closed": true
+      }
+    },
+    {
+      "lane": "magnetic_obstacle_external_validation",
+      "final_decision": "defer_inertia_capable_localized_field_solver",
+      "support_gate": "internal_localized_field_response_closed",
+      "blocking_observable": "minimum_centerline_velocity_ratio",
+      "measured_offender": "LMX=0.9975, Votyakov=-0.13, relative_error=8.673",
+      "evidence_artifact": "magnetic_obstacle_reference_comparison.png",
+      "required_next_physics": "Add or couple an inertia-capable localized-field magnetic-obstacle solve, or run a geometry-matched external code case and compare centerline velocity, wake recovery, pressure/drag, current, and Lorentz observables.",
+      "why_not_closed": "The current reduced LMX case remains positive on the centerline, while the digitized Votyakov target is recirculating.",
+      "selected_metrics": {
+        "peak_centerline_deficit_ratio": 0.22853445098954248,
+        "max_charge_balance_residual": 3.0163805481153716e-12,
+        "external_validation_pass": false
+      }
+    },
+    {
+      "lane": "dean_vortex_higher_inertia_validation",
+      "final_decision": "defer_resolved_secondary_flow_solver",
+      "support_gate": "low_de_charge_closure_closed",
+      "blocking_observable": "secondary_flow_rms_ratio and secondary_flow_peak_ratio",
+      "measured_offender": "rms LMX=6.376e-18, target=0.04134; peak LMX=1.732e-17, target=0.0801",
+      "evidence_artifact": "dean_vortex_reference_comparison.png",
+      "required_next_physics": "Add resolved secondary velocity/pressure coupling for higher-De curved-pipe flow or compare against a geometry-matched external curved-pipe solve.",
+      "why_not_closed": "The current bent-pipe solver is a low-De current-closure baseline and does not generate Dean secondary vortices.",
+      "selected_metrics": {
+        "current_lmx_dean_number": 5.193759475033141e-07,
+        "reference_dean_number": 20.0,
+        "research_grade_charge_balance_pass": true,
+        "external_validation_pass": false
+      }
+    }
+  ],
+  "notes": "The final push is evidence-based. Lanes that failed external or physics gates remain deferred rather than being reclassified as research-grade closure.",
+  "docs_artifacts": [
+    "research_grade_final_disposition.json",
+    "research_grade_final_disposition.csv",
+    "research_grade_final_disposition.png"
+  ]
+}

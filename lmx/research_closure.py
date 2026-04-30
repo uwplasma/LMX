@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import json
 from pathlib import Path
+import textwrap
 from typing import Any, Mapping
 
 
@@ -112,6 +113,66 @@ def write_research_grade_closure_status(
     json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     _write_rows_csv(csv_path, summary["rows"])
     return [json_path, csv_path]
+
+
+def research_grade_final_disposition(static_dir: str | Path | None = None) -> dict[str, Any]:
+    """Return the final evidence-based disposition for strict open lanes.
+
+    This is intentionally stricter than release readiness. A lane can only be
+    marked ``closed`` by :func:`research_grade_closure_status`; this helper
+    records whether the final local push produced closure or a documented
+    future-work decision with the measured offender.
+    """
+
+    root = _static_dir(static_dir)
+    closure = research_grade_closure_status(root)
+    rows = [
+        _q2d_final_disposition(root, closure),
+        _magnetic_final_disposition(root, closure),
+        _dean_final_disposition(root, closure),
+    ]
+    closed_rows = [row for row in rows if row["final_decision"] == "closed"]
+    deferred_rows = [row for row in rows if row["final_decision"] != "closed"]
+    return {
+        "case": "research_grade_final_disposition",
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "lane_count": len(rows),
+        "closed_lane_count": len(closed_rows),
+        "deferred_lane_count": len(deferred_rows),
+        "research_grade_ready": bool(closure["research_grade_ready"]),
+        "final_push_complete": True,
+        "final_push_decision": (
+            "strict_research_grade_ready"
+            if closure["research_grade_ready"]
+            else "bounded_release_only_strict_lanes_deferred"
+        ),
+        "rows": rows,
+        "notes": (
+            "The final push is evidence-based. Lanes that failed external or "
+            "physics gates remain deferred rather than being reclassified as "
+            "research-grade closure."
+        ),
+    }
+
+
+def write_research_grade_final_disposition(
+    out_dir: str | Path,
+    *,
+    static_dir: str | Path | None = None,
+    filename_stem: str = "research_grade_final_disposition",
+) -> list[Path]:
+    """Write JSON, CSV, and PNG artifacts for the final strict-lane disposition."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = research_grade_final_disposition(static_dir)
+    json_path = out / f"{filename_stem}.json"
+    csv_path = out / f"{filename_stem}.csv"
+    png_path = out / f"{filename_stem}.png"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    _write_final_disposition_csv(csv_path, summary["rows"])
+    _write_final_disposition_plot(png_path, summary)
+    return [json_path, csv_path, png_path]
 
 
 def research_grade_external_data_audit(
@@ -238,6 +299,114 @@ def _lane_status(
     return "external_data_acquisition_open"
 
 
+def _q2d_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[str, Any]:
+    q2d_summary = _load_json(root / "q2d_turbulence_decay_summary.json")
+    sidewall_summary = _load_json(root / "q2d_lmx_q2dmhdfoam_lid_driven_parity_summary.json")
+    row = _closure_row_by_lane(closure, "q2d_turbulence_external_parity")
+    validation = _validation_payload(q2d_summary)
+    sidewall_closed = bool(sidewall_summary.get("strict_blocker_closed", False))
+    reference_csv_exists = bool(row.get("reference_csv_exists", False))
+    closed = bool(row.get("closed", False))
+    return {
+        "lane": "q2d_turbulence_external_parity",
+        "final_decision": "closed" if closed else "defer_strict_turbulent_parity",
+        "support_gate": "matched_sidewall_q2dmhdfoam_closed" if sidewall_closed else "support_gate_open",
+        "blocking_observable": "matched nonlinear turbulent energy/enstrophy/spectrum/turnover CSV",
+        "measured_offender": (
+            "q2d_turbulence_reference_observables.csv present"
+            if reference_csv_exists
+            else "q2d_turbulence_reference_observables.csv absent"
+        ),
+        "evidence_artifact": "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
+        "required_next_physics": (
+            "Run Q2DmhdFoam and LMX on the same nonlinear Q2D turbulent case, "
+            "with identical forcing, domain, Hartmann friction, and time window."
+        ),
+        "why_not_closed": (
+            "The side-wall field-observable gate is closed, but the nonlinear "
+            "turbulent parity target is a different physical case."
+        ),
+        "selected_metrics": {
+            "frame_count": validation.get("frame_count"),
+            "turnover_count": validation.get("turnover_count"),
+            "max_courant": validation.get("max_courant"),
+            "support_gate_closed": sidewall_closed,
+        },
+    }
+
+
+def _magnetic_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[str, Any]:
+    summary = _load_json(root / "magnetic_obstacle_votyakov_strict_attempt_summary.json")
+    benchmark = _load_json(root / "magnetic_obstacle_benchmark_summary.json")
+    row = _closure_row_by_lane(closure, "magnetic_obstacle_external_validation")
+    comparison_row = _first_comparison_row(summary)
+    lmx_value = comparison_row.get("lmx_value")
+    reference_value = comparison_row.get("reference_value")
+    relative_error = comparison_row.get("relative_error")
+    closed = bool(row.get("closed", False))
+    return {
+        "lane": "magnetic_obstacle_external_validation",
+        "final_decision": "closed" if closed else "defer_inertia_capable_localized_field_solver",
+        "support_gate": "internal_localized_field_response_closed",
+        "blocking_observable": "minimum_centerline_velocity_ratio",
+        "measured_offender": (
+            f"LMX={_format_metric(lmx_value)}, Votyakov={_format_metric(reference_value)}, "
+            f"relative_error={_format_metric(relative_error)}"
+        ),
+        "evidence_artifact": "magnetic_obstacle_reference_comparison.png",
+        "required_next_physics": (
+            "Add or couple an inertia-capable localized-field magnetic-obstacle "
+            "solve, or run a geometry-matched external code case and compare "
+            "centerline velocity, wake recovery, pressure/drag, current, and Lorentz observables."
+        ),
+        "why_not_closed": (
+            "The current reduced LMX case remains positive on the centerline, "
+            "while the digitized Votyakov target is recirculating."
+        ),
+        "selected_metrics": {
+            "peak_centerline_deficit_ratio": _validation_payload(benchmark).get("peak_centerline_deficit_ratio"),
+            "max_charge_balance_residual": _validation_payload(benchmark).get("max_charge_balance_residual"),
+            "external_validation_pass": _external_comparison_validation(summary),
+        },
+    }
+
+
+def _dean_final_disposition(root: Path, closure: Mapping[str, Any]) -> dict[str, Any]:
+    summary = _load_json(root / "dean_vortex_bayat_rezai_strict_attempt_summary.json")
+    bent = _load_json(root / "bent_pipe_inductionless_summary.json")
+    row = _closure_row_by_lane(closure, "dean_vortex_higher_inertia_validation")
+    comparison_rows = _comparison_rows(summary)
+    rms_row = next((item for item in comparison_rows if item.get("observable") == "secondary_flow_rms_ratio"), {})
+    peak_row = next((item for item in comparison_rows if item.get("observable") == "secondary_flow_peak_ratio"), {})
+    validation = _validation_payload(bent)
+    closed = bool(row.get("closed", False))
+    return {
+        "lane": "dean_vortex_higher_inertia_validation",
+        "final_decision": "closed" if closed else "defer_resolved_secondary_flow_solver",
+        "support_gate": "low_de_charge_closure_closed",
+        "blocking_observable": "secondary_flow_rms_ratio and secondary_flow_peak_ratio",
+        "measured_offender": (
+            f"rms LMX={_format_metric(rms_row.get('lmx_value'))}, target={_format_metric(rms_row.get('reference_value'))}; "
+            f"peak LMX={_format_metric(peak_row.get('lmx_value'))}, target={_format_metric(peak_row.get('reference_value'))}"
+        ),
+        "evidence_artifact": "dean_vortex_reference_comparison.png",
+        "required_next_physics": (
+            "Add resolved secondary velocity/pressure coupling for higher-De curved-pipe flow "
+            "or compare against a geometry-matched external curved-pipe solve."
+        ),
+        "why_not_closed": (
+            "The current bent-pipe solver is a low-De current-closure baseline "
+            "and does not generate Dean secondary vortices."
+        ),
+        "selected_metrics": {
+            "current_lmx_dean_number": summary.get("current_lmx_dean_number"),
+            "reference_dean_number": summary.get("reference_dean_number"),
+            "research_grade_charge_balance_pass": validation.get("research_grade_charge_balance_pass"),
+            "external_validation_pass": _external_comparison_validation(summary),
+        },
+    }
+
+
 def _q2d_external_audit(static_root: Path, external_root: Path) -> dict[str, Any]:
     root = external_root / "Q2DmhdFoam"
     evidence = [
@@ -318,6 +487,160 @@ def _freemhd_context_audit(freemhd_root: Path) -> dict[str, Any]:
         closure_summary=None,
         next_step="Keep using these files as context for closed straight-duct and deferred fringing parity campaigns.",
     )
+
+
+def _closure_row_by_lane(closure: Mapping[str, Any], lane: str) -> Mapping[str, Any]:
+    for row in closure.get("rows", []):
+        if isinstance(row, Mapping) and row.get("lane") == lane:
+            return row
+    return {}
+
+
+def _first_comparison_row(summary: Mapping[str, Any]) -> Mapping[str, Any]:
+    rows = _comparison_rows(summary)
+    return rows[0] if rows else {}
+
+
+def _comparison_rows(summary: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    external = summary.get("external_reference_comparison")
+    if isinstance(external, Mapping):
+        comparison = external.get("comparison")
+        if isinstance(comparison, Mapping):
+            rows = comparison.get("rows", [])
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, Mapping)]
+    return []
+
+
+def _external_comparison_validation(summary: Mapping[str, Any]) -> bool:
+    external = summary.get("external_reference_comparison")
+    if isinstance(external, Mapping):
+        return bool(external.get("validation_pass", False))
+    return False
+
+
+def _format_metric(value: Any) -> str:
+    if isinstance(value, (int, float)):
+        return f"{float(value):.4g}"
+    return "missing"
+
+
+def _write_final_disposition_csv(path: Path, rows: list[Mapping[str, Any]]) -> None:
+    columns = [
+        "lane",
+        "final_decision",
+        "support_gate",
+        "blocking_observable",
+        "measured_offender",
+        "evidence_artifact",
+        "required_next_physics",
+        "why_not_closed",
+        "selected_metrics_json",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    **{column: row.get(column, "") for column in columns if column != "selected_metrics_json"},
+                    "selected_metrics_json": json.dumps(row.get("selected_metrics", {}), sort_keys=True),
+                }
+            )
+
+
+def _write_final_disposition_plot(path: Path, summary: Mapping[str, Any]) -> None:
+    import matplotlib.pyplot as plt
+
+    rows = [row for row in summary.get("rows", []) if isinstance(row, Mapping)]
+    if not rows:
+        rows = [
+            {
+                "lane": "strict_research_lanes",
+                "final_decision": "no_rows",
+                "blocking_observable": "No strict-lane rows were available.",
+                "measured_offender": "missing closure summary",
+                "required_next_physics": "Regenerate the closure status artifacts.",
+                "why_not_closed": "No lane evidence was found.",
+            }
+        ]
+    fig_height = 2.0 + 1.25 * len(rows)
+    fig, ax = plt.subplots(figsize=(13.6, fig_height))
+    ax.axis("off")
+    colors = {
+        "closed": "#dcfce7",
+        "defer_strict_turbulent_parity": "#ffedd5",
+        "defer_inertia_capable_localized_field_solver": "#fee2e2",
+        "defer_resolved_secondary_flow_solver": "#fee2e2",
+    }
+    table_rows = []
+    for row in rows:
+        decision = str(row.get("final_decision", "open"))
+        table_rows.append(
+            [
+                _wrap_final_disposition_cell(_lane_title(str(row.get("lane", ""))), width=24),
+                _wrap_final_disposition_cell(decision.replace("_", " "), width=22),
+                _wrap_final_disposition_cell(_plot_safe_disposition_text(row.get("blocking_observable", "")), width=25),
+                _wrap_final_disposition_cell(_plot_safe_disposition_text(row.get("measured_offender", "")), width=28),
+                _wrap_final_disposition_cell(_plot_safe_disposition_text(row.get("required_next_physics", "")), width=40),
+            ]
+        )
+    table = ax.table(
+        cellText=table_rows,
+        colLabels=["Lane", "Decision", "Blocking observable", "Measured offender", "Required next physics"],
+        cellLoc="left",
+        colLoc="left",
+        colWidths=[0.19, 0.16, 0.18, 0.22, 0.25],
+        bbox=[0.0, 0.02, 1.0, 0.80],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8.1)
+    for (row_index, column_index), cell in table.get_celld().items():
+        cell.set_edgecolor("#cbd5e1")
+        cell.set_linewidth(0.7)
+        cell.set_height(0.16 if row_index == 0 else 0.24)
+        if row_index == 0:
+            cell.set_facecolor("#0f172a")
+            cell.get_text().set_color("white")
+            cell.get_text().set_weight("bold")
+        else:
+            decision = str(rows[row_index - 1].get("final_decision", "open"))
+            cell.set_facecolor(colors.get(decision, "#f8fafc") if column_index == 1 else "#ffffff")
+            if column_index == 0:
+                cell.get_text().set_weight("bold")
+    title = "Final strict research-lane disposition"
+    subtitle = "Evidence-based last-push result: strict blockers remain deferred unless their physics/external gates pass."
+    ax.text(0.0, 0.98, title, fontsize=15, fontweight="bold", transform=ax.transAxes)
+    ax.text(0.0, 0.91, subtitle, fontsize=9.5, color="#475569", transform=ax.transAxes)
+    fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _wrap_final_disposition_cell(value: str, *, width: int) -> str:
+    return "\n".join(textwrap.wrap(value, width=width, break_long_words=False, break_on_hyphens=True))
+
+
+def _plot_safe_disposition_text(value: Any) -> str:
+    text = str(value)
+    replacements = {
+        "q2d_turbulence_reference_observables.csv": "Q2D turbulent reference CSV",
+        "minimum_centerline_velocity_ratio": "minimum centerline velocity ratio",
+        "secondary_flow_rms_ratio": "secondary-flow RMS ratio",
+        "secondary_flow_peak_ratio": "secondary-flow peak ratio",
+        "energy/enstrophy/spectrum/turnover": "energy, enstrophy, spectrum, turnover",
+        "pressure/drag": "pressure or drag",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text.replace("_", " ")
+
+
+def _lane_title(lane: str) -> str:
+    return {
+        "q2d_turbulence_external_parity": "Q2D turbulence external parity",
+        "magnetic_obstacle_external_validation": "Magnetic-obstacle external validation",
+        "dean_vortex_higher_inertia_validation": "Higher-inertia Dean-vortex validation",
+    }.get(lane, lane.replace("_", " "))
 
 
 def _audit_row(
