@@ -1278,6 +1278,46 @@ def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
     assert (tmp_path / "out" / "q2dmhdfoam_external_reference_summary.json").exists()
 
 
+def test_q2dmhdfoam_docker_reference_validation_writes_summary(tmp_path: Path):
+    module = _load_example_module("q2dmhdfoam_docker_reference_validation.py")
+    docker_output = tmp_path / "docker_out"
+    docker_output.mkdir()
+    (docker_output / "profile.csv").write_text(
+        "y,y_over_b,ux,ux_over_mean,ux_over_peak\n"
+        "-1.0,-1.0,0.0,0.0,0.0\n"
+        "-0.5,-0.5,1.0,1.0,0.5\n"
+        "0.0,0.0,2.0,2.0,1.0\n"
+        "0.5,0.5,1.0,1.0,0.5\n"
+        "1.0,1.0,0.0,0.0,0.0\n",
+        encoding="utf-8",
+    )
+    (docker_output / "summary.json").write_text(
+        json.dumps(
+            {
+                "case": "Q2DmhdFoam/Q2DfullyDeveloped",
+                "status": "external_reference_case_complete",
+                "hartmann": 50.0,
+                "rank_count": 2,
+                "cell_count": 20,
+                "flow_rate_relative_error": 1.0e-8,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = module.run_q2dmhdfoam_docker_reference_validation(
+        out_dir=tmp_path / "out",
+        docker_output_dir=docker_output,
+        copy_to_docs=False,
+    )
+
+    assert summary["case"] == "q2dmhdfoam_docker_reference_validation"
+    assert summary["status"] == "external_reference_artifacts_written"
+    assert "q2dmhdfoam_docker_reference.png" in summary["plots"]
+    assert (tmp_path / "out" / "q2dmhdfoam_docker_reference.png").exists()
+    assert (tmp_path / "out" / "q2dmhdfoam_docker_reference_observables.csv").exists()
+
+
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_baseline.py")
     module.OUTPUT_DIR = tmp_path

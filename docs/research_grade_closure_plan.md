@@ -95,8 +95,10 @@ friction model must be explicit.
 
 ### External Reference Path
 
-1. Re-run or refresh Q2DmhdFoam in its OpenFOAM 2206 container for one matched
-   bounded case.
+1. Use `docker/q2dmhdfoam` to run Q2DmhdFoam in foam-extend 4.1 for one
+   matched bounded/turbulent case. The current Docker gate already runs
+   `Q2DfullyDeveloped`; the strict parity case must match the LMX turbulence
+   geometry, forcing, friction, and observables.
 2. Export velocity/vorticity fields, energy, enstrophy, spectra, and runtime
    diagnostics into a stable CSV/NPZ bundle.
 3. Extend `examples/q2dmhdfoam_external_reference_adapter.py` if needed so it
@@ -327,9 +329,10 @@ parity requirements.
   into `q2d_turbulence_reference_observables.csv`.
   The local Q2DmhdFoam source is a foam-extend 4.1 solver, not a drop-in
   OpenFOAM-v2206 solver. A direct `wmake` attempt inside the existing
-  OpenFOAM-v2206 container fails at link time, so the reproducible external
-  rerun path should use a foam-extend 4.1 container or a deliberate solver port
-  before generating the matched turbulent dataset.
+  OpenFOAM-v2206 container fails at link time. The reproducible runner now
+  lives in `docker/q2dmhdfoam` and has already produced a steady
+  `Q2DfullyDeveloped` VTK/profile bundle; the remaining work is a matched
+  turbulent case, not basic solver execution.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-

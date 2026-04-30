@@ -79,6 +79,14 @@ replacement for matched reference CSVs:
 
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
+The Q2DmhdFoam executable path is now reproducible through
+`docker/q2dmhdfoam`. The container builds the foam-extend 4.1 solver, runs the
+fully developed reference case with MPI, exports VTK fields, and writes the
+profile/summary artifact shown below. This closes the external-code rerun
+plumbing; it remains separate from the stricter matched turbulent parity gate.
+
+![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
+
 The latest strict closure attempt keeps the research-grade tag blocked. The
 magnetic-obstacle escalation did not retain a Votyakov-scale reverse-flow
 signal on the current grid, the available Q2DmhdFoam outputs are not matched to

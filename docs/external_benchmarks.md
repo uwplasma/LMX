@@ -114,6 +114,22 @@ the same scalar observables.
 
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
+The external executable path is also reproducible through Docker:
+
+```bash
+docker build --platform linux/amd64 -t lmx-q2dmhdfoam:fe41 docker/q2dmhdfoam
+docker run --rm --platform linux/amd64 -e RANKS=2 \
+  -v "$PWD/artifacts/external/q2dmhdfoam_reference:/output" \
+  lmx-q2dmhdfoam:fe41
+python examples/q2dmhdfoam_docker_reference_validation.py
+```
+
+This produces VTK fields, `profile.csv`, `summary.json`, and the panel below
+from a steady `Q2DfullyDeveloped` rerun. It closes the runnable external-code
+gate but remains distinct from a matched turbulence-parity benchmark.
+
+![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
+
 Generate the template with:
 
 ```bash

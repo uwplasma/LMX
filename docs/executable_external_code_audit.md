@@ -18,7 +18,7 @@ python examples/external_validation_readiness_panel.py
 | Code | Local checkout | Commit | Result |
 | --- | --- | --- | --- |
 | FreeMHD | `/Users/rogerio/local/tests/lmx_external_codes/FreeMHD` | `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` | Runnable through the existing Docker wrapper; use Linux containers rather than native macOS builds. |
-| Q2DmhdFoam | `/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam` | `e13c6659e403d96a7b52b6cc65fc0260260b0b79` | Compiles and runs in `opencfd/openfoam-default:2206` after small OpenFOAM 2206 API updates in the external clone. |
+| Q2DmhdFoam | `/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam` | `e13c6659e403d96a7b52b6cc65fc0260260b0b79` | Compiles and runs through `docker/q2dmhdfoam` in foam-extend 4.1; OpenFOAM-v2206 remains a porting path rather than the primary runner. |
 | MHD_Solvers_OpenFOAM | `/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM` | `32786d4ff40b9bc87bc81099ec8458230b38aabe` | `mhdEpotFoam` compiles and runs in `opencfd/openfoam-default:2206` after a small include fix in the external clone. |
 
 ## FreeMHD
@@ -58,31 +58,29 @@ lane because it implements a Sommeria-Moreau-style reduced model and includes
 validation folders for Shercliff, Tagawa, Vetcha 2009, and Smolentsev 2013
 cases.
 
-The solver did not compile unmodified against OpenFOAM 2206. The external clone
-needed these compatibility edits:
+The reproducible execution path now lives in `docker/q2dmhdfoam`. It builds the
+upstream Q2DmhdFoam commit inside `foamscience/foam-extend-4.1-openmpi` and
+applies the foam-extend 4.1 API compatibility patch required by the local build:
 
-- add `$(LIB_SRC)/meshTools/lnInclude` and `-lmeshTools` to `Make/options`;
-- use `mesh.setFluxRequired(p.name())` instead of the older
-  `mesh.schemesDict().setFluxRequired(...)`;
-- replace the old `fvc::ddtPhiCorr(rUA, U, phi)` call with the OpenFOAM 2206
-  form `fvc::interpolate(rUA) * fvc::ddtCorr(U, phi)`.
+- use `mesh.schemesDict().setFluxRequired(p.name())` for pressure-flux
+  registration;
+- replace `fvc::interpolate(rUA) * fvc::ddtCorr(U, phi)` with foam-extend's
+  `fvc::ddtPhiCorr(rUA, U, phi)`.
 
-After those external-clone edits, the solver compiled in
-`opencfd/openfoam-default:2206`. A short `liquidMetalChannel` tutorial run was
-then executed with temporary case-dictionary fixes for OpenFOAM 2206:
+The container then runs `Q2DfullyDeveloped` with two MPI ranks, reconstructs the
+field, exports ASCII VTK for ParaView, and writes `profile.csv` plus
+`summary.json`. The generated run reached the steady-state marker at
+`t = 5972.73`, `Ha ≈ 50`, with flow-rate relative error `≈ 6.29e-8`.
+This is an executable external-code gate and a VTK/profile generator. It is not
+yet the matched LMX-vs-Q2DmhdFoam turbulent parity claim because the tutorial is
+a fully developed mixed-convection case.
 
-- add the missing `Ubar`, `fd`, `epsSteady`, and `ssCriteria` entries;
-- replace `BiCGStab` with `PBiCGStab`;
-- provide a default corrected Laplacian scheme for the pressure equation.
+![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
 
-The tutorial completed to `t = 2` with finite continuity errors and wrote
-OpenFOAM time directories. This makes Q2DmhdFoam a practical external generator
-for Q2D energy/enstrophy/spectrum and wall-bounded channel observables. The next
-LMX task is no longer solver discovery or raw-data ingestion. The repository
-now includes `examples/q2dmhdfoam_external_reference_adapter.py`, which reads
-the local Q2DmhdFoam tepot profile samples, Vetcha 2009 digitized line cuts,
-and lid-driven turbulence spectral-summary output, then writes CSV observables
-and a docs panel:
+The repository also includes `examples/q2dmhdfoam_external_reference_adapter.py`,
+which reads the local Q2DmhdFoam tepot profile samples, Vetcha 2009 digitized
+line cuts, and lid-driven turbulence spectral-summary output, then writes CSV
+observables and a docs panel:
 
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 

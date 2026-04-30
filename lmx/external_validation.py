@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import csv
+import json
 import re
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -728,6 +729,141 @@ def write_q2dmhdfoam_timeseries_observable_table(
         for record in records:
             writer.writerow({column: record.get(column, "") for column in columns})
     return out
+
+
+def load_q2dmhdfoam_docker_reference_profile(
+    profile_csv: str | Path,
+    summary_json: str | Path | None = None,
+) -> dict[str, object]:
+    """Load the Docker-generated Q2DmhdFoam fully developed reference profile.
+
+    The Docker runner writes a compact CSV extracted from a foam-extend 4.1
+    Q2DmhdFoam tutorial rerun. The loader keeps the raw dimensional coordinate
+    and velocity, and exposes ``position`` as ``y / b`` so it can reuse the
+    generic Q2DmhdFoam profile-observable utilities.
+    """
+
+    source = Path(profile_csv)
+    with source.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+    if len(rows) < 3:
+        raise ValueError(f"Q2DmhdFoam Docker profile {source} has fewer than three rows")
+
+    y = np.asarray([float(row["y"]) for row in rows], dtype=float)
+    position = np.asarray([float(row["y_over_b"]) for row in rows], dtype=float)
+    velocity = np.asarray([float(row["ux"]) for row in rows], dtype=float)
+    finite = np.isfinite(y) & np.isfinite(position) & np.isfinite(velocity)
+    if finite.sum() < 3:
+        raise ValueError(f"Q2DmhdFoam Docker profile {source} has fewer than three finite samples")
+    order = np.argsort(position[finite])
+
+    summary: dict[str, object] = {}
+    if summary_json is not None:
+        summary_path = Path(summary_json)
+        if summary_path.exists():
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    hartmann = float(summary["hartmann"]) if "hartmann" in summary else float("nan")
+    label = f"Docker Q2DmhdFoam Ha={hartmann:.3g}" if np.isfinite(hartmann) else "Docker Q2DmhdFoam"
+
+    return {
+        "source_path": str(source),
+        "summary_path": str(summary_json) if summary_json is not None else "",
+        "label": label,
+        "position": position[finite][order],
+        "raw_coordinate": y[finite][order],
+        "velocity": velocity[finite][order],
+        "sample_count": int(finite.sum()),
+        "hartmann": hartmann,
+        "summary": summary,
+    }
+
+
+def q2dmhdfoam_docker_reference_observables(profile: Mapping[str, object]) -> dict[str, float | str | int | bool]:
+    """Return executable-run observables for the Docker Q2DmhdFoam gate."""
+
+    observables = dict(q2dmhdfoam_profile_observables(profile))
+    summary = dict(profile.get("summary", {}) if isinstance(profile.get("summary", {}), Mapping) else {})
+    for key in (
+        "final_time",
+        "rank_count",
+        "cell_count",
+        "flow_rate_relative_error",
+        "target_mean_velocity",
+        "magnetic_field",
+    ):
+        if key in summary:
+            value = summary[key]
+            observables[key] = float(value) if isinstance(value, (int, float, np.floating)) else str(value)
+    observables["steady_state_reached"] = summary.get("status") == "external_reference_case_complete"
+    observables["reference_gate"] = "q2dmhdfoam_docker_fully_developed"
+    return observables
+
+
+def write_q2dmhdfoam_docker_reference_panel(
+    profile: Mapping[str, object],
+    observables: Mapping[str, float | str | int | bool],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "q2dmhdfoam_docker_reference",
+) -> list[Path]:
+    """Write a publication-facing panel for the Docker Q2DmhdFoam rerun."""
+
+    import matplotlib.pyplot as plt
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    x = np.asarray(profile["position"], dtype=float)
+    u = np.asarray(profile["velocity"], dtype=float)
+    mean_velocity = float(observables["mean_velocity"])
+    u_norm = u / mean_velocity if abs(mean_velocity) > 1.0e-30 else u
+    summary = dict(profile.get("summary", {}) if isinstance(profile.get("summary", {}), Mapping) else {})
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.2, 4.5), constrained_layout=True)
+    axes[0].plot(x, u_norm, color="#0f766e", linewidth=2.2)
+    axes[0].axvline(0.0, color="#64748b", linewidth=1.0, linestyle="--", alpha=0.65)
+    axes[0].set_title("Q2DmhdFoam fully developed profile")
+    axes[0].set_xlabel(r"$y / b$")
+    axes[0].set_ylabel(r"$U_x / \overline{U}_x$")
+    axes[0].grid(True, alpha=0.25)
+
+    axes[1].axis("off")
+    rows = [
+        ("container", "foam-extend 4.1 + Q2DmhdFoam"),
+        ("case", str(summary.get("case", "Q2DfullyDeveloped"))),
+        ("status", str(summary.get("status", "unknown"))),
+        ("Ha", f"{float(observables.get('hartmann', float('nan'))):.3g}"),
+        ("MPI ranks", f"{int(float(observables.get('rank_count', 1))):d}"),
+        ("cells", f"{int(float(observables.get('cell_count', 0))):d}"),
+        ("flow-rate error", f"{float(observables.get('flow_rate_relative_error', float('nan'))):.2e}"),
+        ("symmetry L2", f"{float(observables.get('symmetry_l2', float('nan'))):.3g}"),
+    ]
+    table = axes[1].table(
+        cellText=rows,
+        colLabels=("observable", "value"),
+        cellLoc="left",
+        colLoc="left",
+        loc="center",
+        bbox=(0.0, 0.08, 1.0, 0.84),
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    for (row, column), cell in table.get_celld().items():
+        cell.set_edgecolor("#cbd5e1")
+        if row == 0:
+            cell.set_facecolor("#0f172a")
+            cell.get_text().set_color("white")
+            cell.get_text().set_weight("bold")
+        elif row % 2 == 0:
+            cell.set_facecolor("#f8fafc")
+    axes[1].set_title("Executable external-code gate")
+
+    fig.suptitle("Docker-rerun Q2DmhdFoam reference artifact", fontsize=14.5, fontweight="bold")
+    paths = [out_dir / f"{output_stem}.png", out_dir / f"{output_stem}.pdf"]
+    for path in paths:
+        fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+    return paths
 
 
 def write_q2dmhdfoam_external_reference_panel(

@@ -247,12 +247,13 @@ def _q2d_external_audit(static_root: Path, external_root: Path) -> dict[str, Any
         root / "run/muck_q2d/forcesCo/250000/forceCoeffs.dat",
         root / "run/muck_q2d_FFT/postProcessing/probes/0/U",
         static_root / "q2dmhdfoam_external_reference_summary.json",
+        static_root / "q2dmhdfoam_docker_reference_validation_summary.json",
         static_root / "q2dmhdfoam_lid_driven_turbulence_observables.csv",
         static_root / "q2dmhdfoam_timeseries_observables.csv",
     ]
     return _audit_row(
         lane="q2d_turbulence_external_parity",
-        source="Q2DmhdFoam local checkout and adapter artifacts",
+        source="Q2DmhdFoam local checkout, Docker rerun, and adapter artifacts",
         path=root,
         evidence=evidence,
         matched_reference_csv=static_root / "q2d_turbulence_reference_observables.csv",

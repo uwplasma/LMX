@@ -36,6 +36,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `analytic_velocity_profiles.png` | `examples/straight_duct_profile_comparison.py` | Analytical Hunt/Shercliff overlays |
 | `closed_channel_validation_ladder.png` | `examples/hartmann_validation_ladder.py` | Hartmann/Shercliff/Hunt mesh and Ha ladder |
 | `q2d_turbulence_observables.png` | `examples/q2d_wall_bounded_validation.py` | Q2D energy, spectrum, and observable readiness |
+| `q2dmhdfoam_docker_reference.png` | `examples/q2dmhdfoam_docker_reference_validation.py` | Docker-rerun Q2DmhdFoam external executable gate |
 | `magnetic_obstacle_schematic.png` | `examples/magnetic_obstacle_benchmark.py` | Localized-field geometry and response setup |
 | `magnetic_obstacle_benchmark.png` | `examples/magnetic_obstacle_benchmark.py` | Internal matched no-field response gate |
 | `bent_pipe_overview.png` | `examples/bent_pipe_inductionless_demo.py` | Curved-pipe geometry and low-De response |
@@ -64,6 +65,7 @@ Use the bounded local commands below before a release or manuscript-figure pass:
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 2d
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 3d
 python examples/q2d_turbulence_decay_demo.py
+python examples/q2dmhdfoam_docker_reference_validation.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
 python examples/publication_figure_campaign.py

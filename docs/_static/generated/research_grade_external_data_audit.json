@@ -1,10 +1,10 @@
 {
   "case": "research_grade_external_data_audit",
-  "generated_at_utc": "2026-04-30T01:07:30.083791+00:00",
+  "generated_at_utc": "2026-04-30T16:34:08.027452+00:00",
   "rows": [
     {
       "lane": "q2d_turbulence_external_parity",
-      "source": "Q2DmhdFoam local checkout and adapter artifacts",
+      "source": "Q2DmhdFoam local checkout, Docker rerun, and adapter artifacts",
       "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam",
       "path_exists": true,
       "evidence_files": [
@@ -21,22 +21,39 @@
           "exists": true
         },
         {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d/forcesCo/250000/forceCoeffs.dat",
+          "exists": true
+        },
+        {
+          "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/muck_q2d_FFT/postProcessing/probes/0/U",
+          "exists": true
+        },
+        {
           "path": "docs/_static/generated/q2dmhdfoam_external_reference_summary.json",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/q2dmhdfoam_docker_reference_validation_summary.json",
           "exists": true
         },
         {
           "path": "docs/_static/generated/q2dmhdfoam_lid_driven_turbulence_observables.csv",
           "exists": true
+        },
+        {
+          "path": "docs/_static/generated/q2dmhdfoam_timeseries_observables.csv",
+          "exists": true
         }
       ],
-      "evidence_file_count": 5,
-      "available_evidence_file_count": 5,
+      "evidence_file_count": 9,
+      "available_evidence_file_count": 9,
       "matched_reference_csv": "docs/_static/generated/q2d_turbulence_reference_observables.csv",
       "matched_reference_csv_exists": false,
       "closure_summary": "docs/_static/generated/q2d_turbulence_decay_summary.json",
       "closure_summary_exists": true,
+      "source_or_processed_artifact_exists": true,
       "ready_for_strict_closure_claim": false,
-      "next_step": "Run a matched LMX-vs-Q2DmhdFoam turbulent case and export energy/enstrophy/spectrum observables."
+      "next_step": "Run a matched LMX-vs-Q2DmhdFoam turbulent case and export energy/enstrophy/spectrum/force/probe observables."
     },
     {
       "lane": "magnetic_obstacle_external_validation",
@@ -67,12 +84,13 @@
       "matched_reference_csv_exists": false,
       "closure_summary": "docs/_static/generated/magnetic_obstacle_benchmark_summary.json",
       "closure_summary_exists": true,
+      "source_or_processed_artifact_exists": true,
       "ready_for_strict_closure_claim": false,
       "next_step": "Fill or generate centerline-deficit, wake-recovery, pressure, and current/Lorentz observables."
     },
     {
       "lane": "dean_vortex_higher_inertia_validation",
-      "source": "Dean-vortex literature plus a future OpenFOAM curved-pipe reference case",
+      "source": "Bayat-Rezai Dean literature gate plus a future OpenFOAM curved-pipe reference case",
       "path": "/Users/rogerio/local/tests/lmx_external_codes/OpenFOAM-curved-pipe",
       "path_exists": false,
       "evidence_files": [
@@ -85,18 +103,31 @@
           "exists": true
         },
         {
+          "path": "docs/_static/generated/dean_literature_validation_summary.json",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/dean_literature_reference_observables.csv",
+          "exists": true
+        },
+        {
+          "path": "docs/_static/generated/dean_literature_validation.png",
+          "exists": true
+        },
+        {
           "path": "/Users/rogerio/local/tests/lmx_external_codes/MHD_Solvers_OpenFOAM/Examples/mhdEpotFoam/readme.txt",
           "exists": true
         }
       ],
-      "evidence_file_count": 3,
-      "available_evidence_file_count": 3,
+      "evidence_file_count": 6,
+      "available_evidence_file_count": 6,
       "matched_reference_csv": "docs/_static/generated/dean_vortex_reference_observables.csv",
       "matched_reference_csv_exists": false,
       "closure_summary": "docs/_static/generated/bent_pipe_inductionless_summary.json",
       "closure_summary_exists": true,
+      "source_or_processed_artifact_exists": true,
       "ready_for_strict_closure_claim": false,
-      "next_step": "Acquire or generate secondary-flow, velocity-skew, centroid-shift, and pressure-loss observables."
+      "next_step": "Use the Bayat-Rezai gate to construct/acquire solved secondary-flow, velocity-skew, centroid-shift, and pressure-loss observables."
     },
     {
       "lane": "straight_duct_and_fringing_context",
@@ -123,12 +154,13 @@
       "matched_reference_csv_exists": false,
       "closure_summary": "",
       "closure_summary_exists": false,
+      "source_or_processed_artifact_exists": true,
       "ready_for_strict_closure_claim": false,
       "next_step": "Keep using these files as context for closed straight-duct and deferred fringing parity campaigns."
     }
   ],
   "source_count": 4,
-  "available_source_count": 3,
+  "available_source_count": 4,
   "matched_reference_csv_count": 0,
   "strict_closure": {
     "closed_lane_count": 0,

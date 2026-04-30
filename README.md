@@ -307,6 +307,14 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   artifact contains profile, spectrum, force, and time-history observables.
   This closes the data-ingestion part of the Q2D external lane; matched
   LMX-vs-Q2DmhdFoam turbulent parity remains a separate validation gate.
+- `docker/q2dmhdfoam` and
+  `examples/q2dmhdfoam_docker_reference_validation.py`: build Q2DmhdFoam in a
+  foam-extend 4.1 container, run the `Q2DfullyDeveloped` reference case with
+  MPI, export VTK fields for ParaView, and write a profile/summary panel. The
+  current Docker rerun reaches the steady-state marker at `Ha ≈ 50` with
+  flow-rate relative error `≈ 6.29e-8`. This is an executable external-code
+  gate; the profile is a mixed-convection fully developed case and is therefore
+  not used as a symmetric turbulence-parity claim.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -320,6 +328,10 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 
 <p align="center">
   <img src="docs/_static/generated/q2dmhdfoam_external_reference.png" alt="Q2DmhdFoam external reference adapter panel" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2dmhdfoam_docker_reference.png" alt="Docker-rerun Q2DmhdFoam reference panel" width="72%">
 </p>
 
 <p align="center">
@@ -797,6 +809,7 @@ Useful entry points:
 - `examples/freemhd_observable_mesh_ladder.py`: manual mesh/settings ladder for the remaining FreeMHD observable offenders
 - `examples/external_validation_readiness_panel.py`: executable external-code validation map for the remaining open lanes
 - `examples/q2dmhdfoam_external_reference_adapter.py`: Q2DmhdFoam/Vetcha external Q2D reference-data adapter
+- `examples/q2dmhdfoam_docker_reference_validation.py`: Docker-rerun Q2DmhdFoam VTK/profile validation artifact
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

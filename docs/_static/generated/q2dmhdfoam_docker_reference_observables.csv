@@ -1,0 +1,2 @@
+label,hartmann,reynolds,grashof,sample_count,mean_velocity,peak_velocity,trough_velocity,peak_to_mean_velocity,center_normalized_velocity,edge_normalized_velocity,symmetry_l2,wall_gradient_proxy,source_path
+Docker Q2DmhdFoam Ha=50,49.999994295833005,,,104,0.0010022883286979157,0.005380918,-0.0022691119999999998,5.368632803487209,0.4886514049667385,0.150168859289754,4.8843599802697115,53.473973930069214,artifacts/external/q2dmhdfoam_reference/profile.csv

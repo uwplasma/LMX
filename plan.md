@@ -145,10 +145,11 @@ refer to the Samper et al. taxonomy.
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the
   local Docker/OpenFOAM environment. FreeMHD is runnable through
   `/Users/rogerio/local/tests/freemhd_install` and was rerun for the Hunt demo
-  with two MPI ranks, producing line samples and VTK fields. Q2DmhdFoam compiles
-  and runs in `opencfd/openfoam-default:2206` after small OpenFOAM 2206 API
-  patches in the external clone; this is the executable path for the Q2D
-  turbulence external-reference lane. MHD_Solvers_OpenFOAM `mhdEpotFoam`
+  with two MPI ranks, producing line samples and VTK fields. Q2DmhdFoam now
+  has a reproducible foam-extend 4.1 runner in `docker/q2dmhdfoam`, which
+  builds the solver, runs `Q2DfullyDeveloped` with MPI, exports VTK, and writes
+  profile/summary artifacts. This closes the external executable rerun path but
+  not the matched turbulent parity gate. MHD_Solvers_OpenFOAM `mhdEpotFoam`
   compiles and runs after a small header-include compatibility patch; this is
   the executable path for one-way-MHD / magnetic-obstacle case construction.
   The detailed audit is now in `docs/executable_external_code_audit.md`, and
@@ -237,7 +238,12 @@ refer to the Samper et al. taxonomy.
   OpenFOAM-v2206 container reaches link-time incompatibilities, so the matched
   external rerun should be done in a foam-extend 4.1 container or through an
   intentional solver port rather than by treating it as an OpenFOAM-v2206
-  tutorial.
+  tutorial. A first reproducible foam-extend path is now in `docker/q2dmhdfoam`:
+  it builds Q2DmhdFoam, runs `Q2DfullyDeveloped` with two MPI ranks, exports
+  VTK, and writes `profile.csv`/`summary.json`. The current Docker rerun reaches
+  steady state at `Ha ≈ 50` with flow-rate relative error `≈ 6.29e-8`; because
+  the tutorial is a mixed-convection fully developed case, it closes executable
+  rerun reproducibility but not the stricter matched turbulent parity gate.
 - Bent-pipe higher-inertia physics: extend beyond the low-De straight-pipe
   limit to Dean-vortex observables, secondary-flow intensity, curvature
   response, and MHD damping trends against curved-duct literature.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -11,12 +12,14 @@ from lmx.external_validation import (
     dean_vortex_reference_template_rows,
     external_validation_readiness_rows,
     load_q2dmhdfoam_force_coefficients,
+    load_q2dmhdfoam_docker_reference_profile,
     load_q2dmhdfoam_lid_driven_observables,
     load_q2dmhdfoam_line_profile,
     load_q2dmhdfoam_probe_velocity_history,
     load_magnetic_obstacle_reference_observables,
     load_scalar_reference_observables,
     magnetic_obstacle_reference_template_rows,
+    q2dmhdfoam_docker_reference_observables,
     q2dmhdfoam_profile_observables,
     q2d_turbulence_reference_template_rows,
     summarize_external_validation_readiness,
@@ -25,6 +28,7 @@ from lmx.external_validation import (
     write_magnetic_obstacle_reference_comparison_plots,
     write_magnetic_obstacle_reference_comparison_table,
     write_magnetic_obstacle_reference_template,
+    write_q2dmhdfoam_docker_reference_panel,
     write_q2dmhdfoam_external_reference_panel,
     write_q2dmhdfoam_profile_observable_table,
     write_q2dmhdfoam_timeseries_observable_table,
@@ -209,6 +213,43 @@ def test_q2dmhdfoam_force_and_probe_history_parsers(tmp_path: Path):
     assert probe["probe_count"] == 2
     assert probe["speed_peak"] == pytest.approx(3.0)
     assert "cd_tail_mean" in table.read_text(encoding="utf-8")
+
+
+def test_q2dmhdfoam_docker_reference_profile_and_panel(tmp_path: Path):
+    profile_path = tmp_path / "profile.csv"
+    profile_path.write_text(
+        "y,y_over_b,ux,ux_over_mean,ux_over_peak\n"
+        "-1.0,-1.0,0.0,0.0,0.0\n"
+        "-0.5,-0.5,1.0,1.0,0.5\n"
+        "0.0,0.0,2.0,2.0,1.0\n"
+        "0.5,0.5,1.0,1.0,0.5\n"
+        "1.0,1.0,0.0,0.0,0.0\n",
+        encoding="utf-8",
+    )
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "case": "Q2DmhdFoam/Q2DfullyDeveloped",
+                "status": "external_reference_case_complete",
+                "hartmann": 50.0,
+                "rank_count": 2,
+                "cell_count": 20,
+                "flow_rate_relative_error": 1.0e-8,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    profile = load_q2dmhdfoam_docker_reference_profile(profile_path, summary_path)
+    observables = q2dmhdfoam_docker_reference_observables(profile)
+    paths = write_q2dmhdfoam_docker_reference_panel(profile, observables, tmp_path)
+
+    assert profile["hartmann"] == pytest.approx(50.0)
+    assert observables["steady_state_reached"] is True
+    assert observables["flow_rate_relative_error"] == pytest.approx(1.0e-8)
+    assert [path.suffix for path in paths] == [".png", ".pdf"]
+    assert all(path.exists() for path in paths)
 
 
 def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):

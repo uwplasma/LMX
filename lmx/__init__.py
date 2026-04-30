@@ -198,10 +198,12 @@ __all__ = [
     "write_q2d_turbulence_decay_movie",
     "load_magnetic_obstacle_reference_observables",
     "load_q2dmhdfoam_force_coefficients",
+    "load_q2dmhdfoam_docker_reference_profile",
     "load_q2dmhdfoam_line_profile",
     "load_q2dmhdfoam_lid_driven_observables",
     "load_q2dmhdfoam_probe_velocity_history",
     "load_scalar_reference_observables",
+    "q2dmhdfoam_docker_reference_observables",
     "q2dmhdfoam_profile_observables",
     "q2d_turbulence_reference_template_rows",
     "dean_vortex_reference_template_rows",
@@ -212,6 +214,7 @@ __all__ = [
     "write_magnetic_obstacle_reference_comparison_plots",
     "write_magnetic_obstacle_reference_comparison_table",
     "write_magnetic_obstacle_reference_template",
+    "write_q2dmhdfoam_docker_reference_panel",
     "write_q2dmhdfoam_external_reference_panel",
     "write_q2dmhdfoam_profile_observable_table",
     "write_q2dmhdfoam_timeseries_observable_table",
@@ -349,6 +352,10 @@ _EXPORTS = {
         "lmx.external_validation",
         "load_q2dmhdfoam_force_coefficients",
     ),
+    "load_q2dmhdfoam_docker_reference_profile": (
+        "lmx.external_validation",
+        "load_q2dmhdfoam_docker_reference_profile",
+    ),
     "load_q2dmhdfoam_probe_velocity_history": (
         "lmx.external_validation",
         "load_q2dmhdfoam_probe_velocity_history",
@@ -356,6 +363,10 @@ _EXPORTS = {
     "q2dmhdfoam_profile_observables": (
         "lmx.external_validation",
         "q2dmhdfoam_profile_observables",
+    ),
+    "q2dmhdfoam_docker_reference_observables": (
+        "lmx.external_validation",
+        "q2dmhdfoam_docker_reference_observables",
     ),
     "q2d_turbulence_reference_template_rows": (
         "lmx.external_validation",
@@ -396,6 +407,10 @@ _EXPORTS = {
     "write_q2dmhdfoam_external_reference_panel": (
         "lmx.external_validation",
         "write_q2dmhdfoam_external_reference_panel",
+    ),
+    "write_q2dmhdfoam_docker_reference_panel": (
+        "lmx.external_validation",
+        "write_q2dmhdfoam_docker_reference_panel",
     ),
     "write_q2dmhdfoam_profile_observable_table": (
         "lmx.external_validation",

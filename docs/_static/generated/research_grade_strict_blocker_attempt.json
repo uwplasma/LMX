@@ -1,6 +1,6 @@
 {
   "case": "research_grade_strict_blocker_attempt",
-  "generated_at_utc": "2026-04-30T14:47:22.841826+00:00",
+  "generated_at_utc": "2026-04-30T16:34:38.417678+00:00",
   "release_decision": "do_not_tag_research_grade_release",
   "research_grade_ready": false,
   "strict_open_lanes": [
@@ -23,7 +23,7 @@
       "lane": "q2d_turbulence_external_parity",
       "status": "open_matched_q2dmhdfoam_case_missing",
       "attempted_action": "Audited local Q2DmhdFoam lid-driven, Vetcha, and cylinder/duct outputs against the current LMX periodic SM82-style turbulence example.",
-      "key_result": "8 Q2DmhdFoam evidence files are available, but the strict q2d_turbulence_reference_observables.csv matched to the LMX case is absent.",
+      "key_result": "9 Q2DmhdFoam evidence files are available, but the strict q2d_turbulence_reference_observables.csv matched to the LMX case is absent.",
       "release_decision": "block_research_grade_tag",
       "required_next_step": "Either run a matched Q2DmhdFoam turbulence case with the same geometry, forcing, friction, and observables as LMX, or add the corresponding LMX lid-driven/cylinder case before claiming parity."
     },
@@ -74,7 +74,7 @@
     "rows": [
       {
         "lane": "q2d_turbulence_external_parity",
-        "source": "Q2DmhdFoam local checkout and adapter artifacts",
+        "source": "Q2DmhdFoam local checkout, Docker rerun, and adapter artifacts",
         "path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam",
         "path_exists": true,
         "evidence_files": [
@@ -103,6 +103,10 @@
             "exists": true
           },
           {
+            "path": "docs/_static/generated/q2dmhdfoam_docker_reference_validation_summary.json",
+            "exists": true
+          },
+          {
             "path": "docs/_static/generated/q2dmhdfoam_lid_driven_turbulence_observables.csv",
             "exists": true
           },
@@ -111,8 +115,8 @@
             "exists": true
           }
         ],
-        "evidence_file_count": 8,
-        "available_evidence_file_count": 8,
+        "evidence_file_count": 9,
+        "available_evidence_file_count": 9,
         "matched_reference_csv": "docs/_static/generated/q2d_turbulence_reference_observables.csv",
         "matched_reference_csv_exists": false,
         "closure_summary": "docs/_static/generated/q2d_turbulence_decay_summary.json",
