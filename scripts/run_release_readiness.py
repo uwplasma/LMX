@@ -288,7 +288,14 @@ def _bent_pipe_gate(root: Path) -> tuple[ReleaseGate, list[str]]:
             "Bent-pipe global current closure passes, but local mapped-grid |div J| remains above the research-grade target."
         )
     if not bool(validation.get("research_grade_dean_validation_pass")):
-        deferred.append("Higher-inertia Dean-vortex bent-pipe validation remains open.")
+        comparison = summary.get("external_reference_comparison", {})
+        if comparison.get("status") == "external_reference_compared":
+            deferred.append(
+                "Higher-inertia Dean-vortex target is now compared, but the "
+                "current low-De bent-pipe solve has no resolved secondary flow."
+            )
+        else:
+            deferred.append("Higher-inertia Dean-vortex bent-pipe validation remains open.")
     return (
         _gate(
             "bent_pipe_low_de_gate",

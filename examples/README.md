@@ -264,6 +264,7 @@ Bent-pipe inductionless baseline:
 
 ```bash
 python examples/bent_pipe_inductionless_demo.py
+python examples/dean_vortex_bayat_rezai_strict_attempt.py
 ```
 
 That example is the current curved-pipe executable lane:
@@ -278,6 +279,13 @@ That example is the current curved-pipe executable lane:
   reference is present
 - if `dean_vortex_reference_observables.csv` exists in the output directory,
   write a publication-table-ready comparison CSV and PNG/PDF tolerance-gate plot
+- `dean_vortex_bayat_rezai_strict_attempt.py`
+  - read the current bent-pipe summary and write a moderate-De Bayat-Rezai
+    strict reference CSV
+  - compare the current near-zero low-De secondary-flow observables to the
+    literature target
+  - document that the remaining blocker is a higher-inertia secondary-flow
+    model, not current closure or plot formatting
 
 Dean-vortex external-reference template:
 

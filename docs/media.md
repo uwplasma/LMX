@@ -49,6 +49,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `magnetic_obstacle_benchmark.png` | `examples/magnetic_obstacle_benchmark.py` | Internal matched no-field response gate |
 | `magnetic_obstacle_reference_comparison.png` | `examples/magnetic_obstacle_votyakov_strict_attempt.py` | Digitized Votyakov centerline target comparison; currently a strict mismatch |
 | `bent_pipe_overview.png` | `examples/bent_pipe_inductionless_demo.py` | Curved-pipe geometry and low-De response |
+| `dean_vortex_reference_comparison.png` | `examples/dean_vortex_bayat_rezai_strict_attempt.py` | Bayat-Rezai moderate-De secondary-flow target comparison; currently a strict mismatch |
 | `variable_field_tabulated_reconstruction.png` | `examples/variable_field_tabulated_demo.py` | Tabulated-field interpolation/reconstruction gate |
 | `wham_blanket_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket pressure budget and local sections |
 | `wham_blanket_transient_flow.png` | `examples/wham_blanket_flow_demo.py` | WHAM blanket centerline pressure-velocity transient to steady state |

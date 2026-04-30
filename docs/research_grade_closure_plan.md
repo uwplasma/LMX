@@ -416,7 +416,12 @@ parity requirements.
   recirculating target (`≈ -0.13`) and leaves the lane open as an explicit
   physics mismatch rather than a missing-data placeholder.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-
-  pipe baseline before adding magnetic damping.
+  pipe baseline before adding magnetic damping. The first Bayat-Rezai strict
+  attempt is now wired through
+  `examples/dean_vortex_bayat_rezai_strict_attempt.py`; it compares the current
+  low-De LMX secondary-flow ratios (`O(1e-17)`) against a moderate-De
+  literature target (`secondary_flow_rms_ratio ≈ 4.13e-2`) and leaves the lane
+  open as an explicit higher-inertia secondary-flow mismatch.
 
 ### Phase 2: LMX Matched Runs
 

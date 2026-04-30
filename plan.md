@@ -339,6 +339,13 @@ refer to the Samper et al. taxonomy.
   `dean_literature_reference_observables.csv`. This closes the literature
   correlation/test-data side of the lane, but it is not a solved curved-pipe
   parity result.
+  `examples/dean_vortex_bayat_rezai_strict_attempt.py` now turns that
+  literature correlation into an explicit strict mismatch against the current
+  LMX bent-pipe summary. At the moderate-De target, Bayat-Rezai gives
+  `secondary_flow_rms_ratio ≈ 4.13e-2` and the reduced two-cell field gives
+  `secondary_flow_peak_ratio ≈ 8.01e-2`; the current low-De bent-pipe solve
+  reports `O(1e-17)` for both. This moves the lane from template-only to
+  "external reference compared, secondary-flow model still open."
   Latest strict closure attempt: the retained bent-pipe example remains a
   low-De current-closure baseline (`De ≈ 5.19e-7`) with negligible secondary
   flow. This lane needs a no-field Dean-flow reference with resolved secondary

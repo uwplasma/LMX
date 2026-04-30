@@ -881,6 +881,36 @@ def test_dean_vortex_external_reference_template_writes_summary(tmp_path: Path):
     assert (tmp_path / "dean_vortex_external_reference_template_summary.json").exists()
 
 
+def test_dean_vortex_bayat_rezai_strict_attempt_writes_failed_comparison(tmp_path: Path):
+    module = _load_example_module("dean_vortex_bayat_rezai_strict_attempt.py")
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    bent_summary = {
+        "case": "bent_pipe_inductionless",
+        "validation": {
+            "dean_number": 1.0e-6,
+            "secondary_flow_rms_ratio": 0.0,
+            "secondary_flow_peak_ratio": 0.0,
+            "research_grade_dean_validation_pass": False,
+        },
+    }
+    bent_path = docs_dir / "bent_pipe_inductionless_summary.json"
+    bent_path.write_text(json.dumps(bent_summary, indent=2) + "\n", encoding="utf-8")
+
+    summary = module.run_dean_vortex_bayat_rezai_strict_attempt(
+        out_dir=tmp_path / "out",
+        docs_output_dir=docs_dir,
+        bent_pipe_summary_path=bent_path,
+    )
+
+    assert summary["status"] == "external_reference_compared_mismatch"
+    assert summary["strict_blocker_closed"] is False
+    assert summary["external_reference_comparison"]["validation_pass"] is False
+    assert (docs_dir / "dean_vortex_reference_observables.csv").exists()
+    patched = json.loads((docs_dir / "bent_pipe_inductionless_summary.json").read_text(encoding="utf-8"))
+    assert patched["external_reference_comparison"]["status"] == "external_reference_compared"
+
+
 def test_variable_field_validation_writes_summary(tmp_path: Path):
     module = _load_example_module("variable_field_validation.py")
     module.OUTPUT_DIR = tmp_path

@@ -1,6 +1,6 @@
 {
   "case": "research_grade_closure_status",
-  "generated_at_utc": "2026-04-30T19:52:58.147493+00:00",
+  "generated_at_utc": "2026-04-30T19:59:26.224018+00:00",
   "lane_count": 3,
   "closed_lane_count": 0,
   "open_lane_count": 3,
@@ -81,16 +81,17 @@
       "closed": false,
       "summary_exists": true,
       "external_summary_exists": true,
-      "reference_csv_exists": false,
+      "reference_csv_exists": true,
       "primary_artifact_exists": true,
       "physics_gate_pass": false,
       "external_gate_pass": false,
-      "external_reference_status": "template_only_no_external_reference_claim",
+      "external_reference_status": "external_reference_compared",
       "selected_metrics": {
         "research_grade_charge_balance_pass": true,
         "research_grade_dean_validation_pass": false,
         "secondary_flow_rms_ratio": 6.376057438935102e-18,
-        "secondary_flow_peak_ratio": 1.7315973813368122e-17
+        "secondary_flow_peak_ratio": 1.7315973813368122e-17,
+        "validation_pass": false
       }
     }
   ],

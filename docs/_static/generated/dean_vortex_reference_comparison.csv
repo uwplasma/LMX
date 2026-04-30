@@ -1,0 +1,3 @@
+observable,lmx_value,reference_value,absolute_error,relative_error,effective_tolerance,validation_pass,status,units,source
+secondary_flow_rms_ratio,6.376057438935102e-18,0.04134332411726176,0.04134332411726175,0.9999999999999998,0.006201498617589264,False,compared,dimensionless,"Bayat & Rezai, Scientific Reports 7, 13655 (2017), Eq. 8 and Eq. 9"
+secondary_flow_peak_ratio,1.7315973813368122e-17,0.08009915136933825,0.08009915136933823,0.9999999999999998,0.01201487270540074,False,compared,dimensionless,Bayat-Rezai average Dean velocity projected through the LMX reduced two-cell field

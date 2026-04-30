@@ -145,6 +145,17 @@ external-code parity case before this lane can close.
 
 ![LMX magnetic-obstacle Votyakov strict attempt](_static/generated/magnetic_obstacle_reference_comparison.png)
 
+The Dean-vortex lane has the same explicit-offender treatment. The current
+low-De bent-pipe solve has conservative charge closure and no spurious
+secondary flow. The Bayat-Rezai strict attempt uses a moderate-De target for
+the secondary-flow scale and compares it to the current LMX bent-pipe
+observables. It fails by design: LMX reports near-zero secondary-flow ratios,
+while the target requires `secondary_flow_rms_ratio ≈ 4.13e-2`. This confirms
+that the remaining task is a higher-inertia secondary-flow model or solved
+curved-pipe reference, not another low-De current-closure run.
+
+![LMX Dean-vortex Bayat-Rezai strict attempt](_static/generated/dean_vortex_reference_comparison.png)
+
 ![LMX Dean-flow literature validation](_static/generated/dean_literature_validation.png)
 
 ## Combined validation workflow

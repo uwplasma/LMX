@@ -214,8 +214,16 @@ This closes the correlation/reference-data side of the curved-pipe lane and
 provides a reduced two-cell secondary-flow field for plotting and design QA.
 It does not by itself mark the current inductionless bent-pipe solver as a
 resolved Dean-vortex validation.
+`examples/dean_vortex_bayat_rezai_strict_attempt.py` now makes that gap
+quantitative: at the retained moderate-De target, Bayat-Rezai implies
+`secondary_flow_rms_ratio ≈ 4.13e-2`, while the current low-De LMX bent-pipe
+solve reports `≈ 6.38e-18`. The strict lane therefore remains open until the
+curved-pipe solve has a resolved or explicitly reduced higher-inertia
+secondary-flow model.
 
 ![LMX Dean-flow literature validation](docs/_static/generated/dean_literature_validation.png)
+
+![LMX Dean-vortex Bayat-Rezai strict attempt](docs/_static/generated/dean_vortex_reference_comparison.png)
 
 The panel is meant to be read left to right, then top to bottom:
 
