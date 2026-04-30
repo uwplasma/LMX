@@ -1,0 +1,256 @@
+"""Research-grade closure status helpers for the strict validation lanes."""
+
+from __future__ import annotations
+
+import csv
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+import json
+from pathlib import Path
+from typing import Any, Mapping
+
+
+@dataclass(frozen=True)
+class ResearchClosureLaneSpec:
+    """Static metadata for one strict research-grade validation blocker."""
+
+    lane: str
+    summary: str
+    external_summary: str
+    reference_csv: str
+    primary_artifact: str
+    required_physics_gate: str
+    required_external_gate: str
+    closure_target: str
+    next_step: str
+
+
+RESEARCH_CLOSURE_LANES: tuple[ResearchClosureLaneSpec, ...] = (
+    ResearchClosureLaneSpec(
+        lane="q2d_turbulence_external_parity",
+        summary="q2d_turbulence_decay_summary.json",
+        external_summary="q2dmhdfoam_external_reference_summary.json",
+        reference_csv="q2d_turbulence_reference_observables.csv",
+        primary_artifact="q2d_turbulence_decay_poster.png",
+        required_physics_gate="research_grade_turbulence_validation_pass",
+        required_external_gate="external_reference_compared",
+        closure_target="Matched LMX-vs-Q2DmhdFoam turbulent energy, enstrophy, spectrum, and turnover observables.",
+        next_step="Run a matched Q2DmhdFoam turbulent case and fill q2d_turbulence_reference_observables.csv.",
+    ),
+    ResearchClosureLaneSpec(
+        lane="magnetic_obstacle_external_validation",
+        summary="magnetic_obstacle_benchmark_summary.json",
+        external_summary="magnetic_obstacle_external_reference_template_summary.json",
+        reference_csv="magnetic_obstacle_reference_observables.csv",
+        primary_artifact="magnetic_obstacle_benchmark.png",
+        required_physics_gate="research_grade_validation_pass",
+        required_external_gate="external_reference_compared",
+        closure_target="External centerline deficit, wake recovery, pressure/drag, and current/Lorentz-force parity.",
+        next_step="Modernize an MHD_Solvers_OpenFOAM obstacle case or digitize Votyakov/Cuevas observables.",
+    ),
+    ResearchClosureLaneSpec(
+        lane="dean_vortex_higher_inertia_validation",
+        summary="bent_pipe_inductionless_summary.json",
+        external_summary="dean_vortex_external_reference_template_summary.json",
+        reference_csv="dean_vortex_reference_observables.csv",
+        primary_artifact="bent_pipe_overview.png",
+        required_physics_gate="research_grade_dean_validation_pass",
+        required_external_gate="external_reference_compared",
+        closure_target="Resolved secondary-flow, inboard/outboard skew, and pressure-loss parity for higher-De bend flow.",
+        next_step="Acquire a Dean-flow reference and add a resolved or documented reduced secondary-flow state in LMX.",
+    ),
+)
+
+
+def research_grade_closure_rows(static_dir: str | Path | None = None) -> list[dict[str, Any]]:
+    """Return computed closure rows for the strict research-grade blockers."""
+
+    root = _static_dir(static_dir)
+    rows: list[dict[str, Any]] = []
+    for spec in RESEARCH_CLOSURE_LANES:
+        summary = _load_json(root / spec.summary)
+        external_summary = _load_json(root / spec.external_summary)
+        row = _lane_row(spec, summary, external_summary, root)
+        rows.append(row)
+    return rows
+
+
+def research_grade_closure_status(static_dir: str | Path | None = None) -> dict[str, Any]:
+    """Return a machine-readable status summary for strict closure work."""
+
+    rows = research_grade_closure_rows(static_dir)
+    closed_lanes = [row["lane"] for row in rows if row["closed"]]
+    open_lanes = [row["lane"] for row in rows if not row["closed"]]
+    return {
+        "case": "research_grade_closure_status",
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "lane_count": len(rows),
+        "closed_lane_count": len(closed_lanes),
+        "open_lane_count": len(open_lanes),
+        "closed_lanes": closed_lanes,
+        "open_lanes": open_lanes,
+        "research_grade_ready": bool(rows and not open_lanes),
+        "release_blocking": False,
+        "strict_research_blocking": bool(open_lanes),
+        "rows": rows,
+    }
+
+
+def write_research_grade_closure_status(
+    out_dir: str | Path,
+    *,
+    static_dir: str | Path | None = None,
+    filename_stem: str = "research_grade_closure_status",
+) -> list[Path]:
+    """Write JSON and CSV closure-status artifacts."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = research_grade_closure_status(static_dir)
+    json_path = out / f"{filename_stem}.json"
+    csv_path = out / f"{filename_stem}.csv"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    _write_rows_csv(csv_path, summary["rows"])
+    return [json_path, csv_path]
+
+
+def _lane_row(
+    spec: ResearchClosureLaneSpec,
+    summary: Mapping[str, Any],
+    external_summary: Mapping[str, Any],
+    root: Path,
+) -> dict[str, Any]:
+    validation = _validation_payload(summary)
+    external_comparison = summary.get("external_reference_comparison", {})
+    external_status = str(external_comparison.get("status") or external_summary.get("status") or "missing_external_summary")
+    physics_gate_pass = bool(validation.get(spec.required_physics_gate, False))
+    comparison_pass = bool(external_comparison.get("validation_pass", False))
+    external_gate_pass = external_status == spec.required_external_gate and comparison_pass
+    reference_csv_exists = (root / spec.reference_csv).exists()
+    primary_artifact_exists = (root / spec.primary_artifact).exists()
+    closed = bool(summary and physics_gate_pass and external_gate_pass and reference_csv_exists and primary_artifact_exists)
+    status = (
+        "closed"
+        if closed
+        else _lane_status(spec, summary, external_summary, external_status, physics_gate_pass, external_gate_pass)
+    )
+    return {
+        **asdict(spec),
+        "status": status,
+        "closed": closed,
+        "summary_exists": bool(summary),
+        "external_summary_exists": bool(external_summary),
+        "reference_csv_exists": reference_csv_exists,
+        "primary_artifact_exists": primary_artifact_exists,
+        "physics_gate_pass": physics_gate_pass,
+        "external_gate_pass": external_gate_pass,
+        "external_reference_status": external_status,
+        "selected_metrics": _selected_metrics(spec.lane, validation, external_comparison),
+    }
+
+
+def _lane_status(
+    spec: ResearchClosureLaneSpec,
+    summary: Mapping[str, Any],
+    external_summary: Mapping[str, Any],
+    external_status: str,
+    physics_gate_pass: bool,
+    external_gate_pass: bool,
+) -> str:
+    if physics_gate_pass and external_gate_pass:
+        return "closed"
+    if not summary:
+        return "missing_lmx_summary"
+    if spec.lane == "dean_vortex_higher_inertia_validation" and not physics_gate_pass:
+        return "resolved_secondary_flow_open"
+    if external_status == "external_reference_csv_missing":
+        return "external_reference_observables_open"
+    if external_summary and not external_gate_pass:
+        return "external_adapter_ready_matched_parity_open"
+    return "external_data_acquisition_open"
+
+
+def _validation_payload(summary: Mapping[str, Any]) -> Mapping[str, Any]:
+    payload = summary.get("validation")
+    if isinstance(payload, Mapping):
+        return payload
+    payload = summary.get("turbulence_observables")
+    if isinstance(payload, Mapping):
+        return payload
+    return {}
+
+
+def _selected_metrics(
+    lane: str,
+    validation: Mapping[str, Any],
+    external_comparison: Mapping[str, Any],
+) -> dict[str, Any]:
+    keys_by_lane = {
+        "q2d_turbulence_external_parity": (
+            "frame_count",
+            "turnover_count",
+            "max_courant",
+            "max_divergence_linf",
+        ),
+        "magnetic_obstacle_external_validation": (
+            "peak_centerline_deficit_ratio",
+            "peak_crosscut_distortion",
+            "max_charge_balance_residual",
+            "research_grade_validation_pass",
+        ),
+        "dean_vortex_higher_inertia_validation": (
+            "research_grade_charge_balance_pass",
+            "research_grade_dean_validation_pass",
+            "secondary_flow_rms_ratio",
+            "secondary_flow_peak_ratio",
+        ),
+    }
+    selected: dict[str, Any] = {}
+    for key in keys_by_lane.get(lane, ()):
+        if key in validation:
+            selected[key] = validation[key]
+    for key in ("compared_observable_count", "passed_observable_count", "validation_pass"):
+        if key in external_comparison:
+            selected[key] = external_comparison[key]
+    return selected
+
+
+def _static_dir(static_dir: str | Path | None) -> Path:
+    if static_dir is not None:
+        return Path(static_dir)
+    return Path(__file__).resolve().parents[1] / "docs" / "_static" / "generated"
+
+
+def _load_json(path: Path) -> Mapping[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def _write_rows_csv(path: Path, rows: list[Mapping[str, Any]]) -> None:
+    columns = [
+        "lane",
+        "status",
+        "closed",
+        "physics_gate_pass",
+        "external_gate_pass",
+        "summary_exists",
+        "external_summary_exists",
+        "reference_csv_exists",
+        "primary_artifact_exists",
+        "external_reference_status",
+        "next_step",
+        "selected_metrics_json",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    **{column: row.get(column, "") for column in columns if column != "selected_metrics_json"},
+                    "selected_metrics_json": json.dumps(row.get("selected_metrics", {}), sort_keys=True),
+                }
+            )

@@ -234,7 +234,8 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
                 "max_courant": 0.05,
                 "max_divergence_linf": 1.0e-14,
                 "research_grade_turbulence_validation_pass": True,
-            }
+            },
+            "external_reference_comparison": {"status": "external_reference_compared", "validation_pass": True},
         },
     )
     _write_json(
@@ -247,7 +248,8 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
                 "peak_crosscut_distortion": 0.1,
                 "max_charge_balance_residual": 1.0e-12,
                 "research_grade_validation_pass": True,
-            }
+            },
+            "external_reference_comparison": {"status": "external_reference_compared", "validation_pass": True},
         },
     )
     _write_json(
@@ -262,9 +264,16 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
                 "net_boundary_current_residual": 0.0,
                 "research_grade_charge_balance_pass": True,
                 "research_grade_dean_validation_pass": True,
-            }
+            },
+            "external_reference_comparison": {"status": "external_reference_compared", "validation_pass": True},
         },
     )
+    for name in (
+        "q2d_turbulence_reference_observables.csv",
+        "magnetic_obstacle_reference_observables.csv",
+        "dean_vortex_reference_observables.csv",
+    ):
+        (static / name).write_text("observable,value,tolerance\nx,1,1\n")
 
     report = evaluate_release_readiness(tmp_path)
 

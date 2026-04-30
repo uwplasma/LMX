@@ -1,0 +1,101 @@
+{
+  "case": "research_grade_closure_status",
+  "generated_at_utc": "2026-04-30T00:48:23.161173+00:00",
+  "lane_count": 3,
+  "closed_lane_count": 0,
+  "open_lane_count": 3,
+  "closed_lanes": [],
+  "open_lanes": [
+    "q2d_turbulence_external_parity",
+    "magnetic_obstacle_external_validation",
+    "dean_vortex_higher_inertia_validation"
+  ],
+  "research_grade_ready": false,
+  "release_blocking": false,
+  "strict_research_blocking": true,
+  "rows": [
+    {
+      "lane": "q2d_turbulence_external_parity",
+      "summary": "q2d_turbulence_decay_summary.json",
+      "external_summary": "q2dmhdfoam_external_reference_summary.json",
+      "reference_csv": "q2d_turbulence_reference_observables.csv",
+      "primary_artifact": "q2d_turbulence_decay_poster.png",
+      "required_physics_gate": "research_grade_turbulence_validation_pass",
+      "required_external_gate": "external_reference_compared",
+      "closure_target": "Matched LMX-vs-Q2DmhdFoam turbulent energy, enstrophy, spectrum, and turnover observables.",
+      "next_step": "Run a matched Q2DmhdFoam turbulent case and fill q2d_turbulence_reference_observables.csv.",
+      "status": "external_adapter_ready_matched_parity_open",
+      "closed": false,
+      "summary_exists": true,
+      "external_summary_exists": true,
+      "reference_csv_exists": false,
+      "primary_artifact_exists": true,
+      "physics_gate_pass": false,
+      "external_gate_pass": false,
+      "external_reference_status": "external_reference_artifacts_written",
+      "selected_metrics": {
+        "frame_count": 72,
+        "turnover_count": 0.3312918376699193,
+        "max_courant": 0.05234552620681659,
+        "max_divergence_linf": 2.7394287175895764e-14
+      }
+    },
+    {
+      "lane": "magnetic_obstacle_external_validation",
+      "summary": "magnetic_obstacle_benchmark_summary.json",
+      "external_summary": "magnetic_obstacle_external_reference_template_summary.json",
+      "reference_csv": "magnetic_obstacle_reference_observables.csv",
+      "primary_artifact": "magnetic_obstacle_benchmark.png",
+      "required_physics_gate": "research_grade_validation_pass",
+      "required_external_gate": "external_reference_compared",
+      "closure_target": "External centerline deficit, wake recovery, pressure/drag, and current/Lorentz-force parity.",
+      "next_step": "Modernize an MHD_Solvers_OpenFOAM obstacle case or digitize Votyakov/Cuevas observables.",
+      "status": "external_reference_observables_open",
+      "closed": false,
+      "summary_exists": true,
+      "external_summary_exists": true,
+      "reference_csv_exists": false,
+      "primary_artifact_exists": true,
+      "physics_gate_pass": false,
+      "external_gate_pass": false,
+      "external_reference_status": "external_reference_csv_missing",
+      "selected_metrics": {
+        "peak_centerline_deficit_ratio": 0.22853445098954248,
+        "peak_crosscut_distortion": 0.097457400288691,
+        "max_charge_balance_residual": 3.0163805481153716e-12,
+        "research_grade_validation_pass": false,
+        "validation_pass": false
+      }
+    },
+    {
+      "lane": "dean_vortex_higher_inertia_validation",
+      "summary": "bent_pipe_inductionless_summary.json",
+      "external_summary": "dean_vortex_external_reference_template_summary.json",
+      "reference_csv": "dean_vortex_reference_observables.csv",
+      "primary_artifact": "bent_pipe_overview.png",
+      "required_physics_gate": "research_grade_dean_validation_pass",
+      "required_external_gate": "external_reference_compared",
+      "closure_target": "Resolved secondary-flow, inboard/outboard skew, and pressure-loss parity for higher-De bend flow.",
+      "next_step": "Acquire a Dean-flow reference and add a resolved or documented reduced secondary-flow state in LMX.",
+      "status": "resolved_secondary_flow_open",
+      "closed": false,
+      "summary_exists": true,
+      "external_summary_exists": true,
+      "reference_csv_exists": false,
+      "primary_artifact_exists": true,
+      "physics_gate_pass": false,
+      "external_gate_pass": false,
+      "external_reference_status": "template_only_no_external_reference_claim",
+      "selected_metrics": {
+        "research_grade_charge_balance_pass": true,
+        "research_grade_dean_validation_pass": false,
+        "secondary_flow_rms_ratio": 6.376057438935102e-18,
+        "secondary_flow_peak_ratio": 1.7315973813368122e-17
+      }
+    }
+  ],
+  "docs_artifacts": [
+    "research_grade_closure_status.json",
+    "research_grade_closure_status.csv"
+  ]
+}

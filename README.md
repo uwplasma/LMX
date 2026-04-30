@@ -779,6 +779,7 @@ Useful entry points:
 - `examples/wham_blanket_flow_demo.py`: reduced liquid-metal blanket flow, pressure-drop estimate, pressure sweep, steady sections, and 15 s transient movie
 - `examples/wham_blanket_autodiff_research_demo.py`: differentiable WHAM blanket pressure-drop sensitivity and field-scale inverse-design study
 - `examples/publication_figure_campaign.py`: bounded manuscript-figure manifest with artifact status, references, metrics, and remaining gaps
+- `examples/research_grade_closure_status.py`: strict Q2D turbulence, magnetic-obstacle, and Dean-vortex closure-status manifest
 
 ## Documentation
 

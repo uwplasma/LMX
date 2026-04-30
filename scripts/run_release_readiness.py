@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lmx.publication import publication_figure_campaign_summary
+from lmx.research_closure import research_grade_closure_status
 
 try:  # pragma: no cover - Python 3.10 fallback
     import tomllib
@@ -138,6 +139,22 @@ def _publication_figure_manifest_gate(root: Path) -> ReleaseGate:
         missing_summaries=list(summary.get("missing_summaries", [])),
         external_or_resolved_validation_open=list(summary.get("external_or_resolved_validation_open", [])),
         paper_ready=bool(summary.get("paper_ready")),
+    )
+
+
+def _research_closure_status_gate(root: Path) -> ReleaseGate:
+    try:
+        summary = research_grade_closure_status(_static_dir(root))
+    except Exception as exc:  # pragma: no cover - defensive release reporting
+        return _gate("research_grade_closure_status", False, error=str(exc))
+    return _gate(
+        "research_grade_closure_status",
+        not bool(summary.get("release_blocking", True)),
+        lane_count=int(summary.get("lane_count", 0)),
+        closed_lane_count=int(summary.get("closed_lane_count", 0)),
+        open_lanes=list(summary.get("open_lanes", [])),
+        strict_research_blocking=bool(summary.get("strict_research_blocking", True)),
+        research_grade_ready=bool(summary.get("research_grade_ready")),
     )
 
 
@@ -318,6 +335,8 @@ def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2
         _readme_media_gate(root_path),
         _publication_figure_manifest_gate(root_path),
     ]
+    research_closure_gate = _research_closure_status_gate(root_path)
+    gates.append(research_closure_gate)
     deferred: list[str] = []
     straight_gate, straight_deferred = _straight_duct_gate(root_path, target_l2=target_l2)
     q2d_gate, q2d_deferred = _q2d_gate(root_path)
@@ -336,6 +355,13 @@ def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2
     deferred.extend(q2d_deferred)
     deferred.extend(obstacle_deferred)
     deferred.extend(bent_deferred)
+    closure_open_lanes = list(research_closure_gate.details.get("open_lanes", []))
+    if closure_open_lanes:
+        deferred.append(
+            "Research-grade closure status still has open lanes: "
+            + ", ".join(str(lane) for lane in closure_open_lanes)
+            + "."
+        )
     blockers = [gate.name for gate in gates if not gate.passed]
     pyproject = _load_pyproject(root_path)
     research_grade_ready = not blockers and not deferred
