@@ -498,6 +498,12 @@ refer to the Samper et al. taxonomy.
    magnetic-obstacle, Q2D turbulence, and Dean-vortex lanes. Those candidate
    tables are acquisition/planning artifacts only; the strict filenames remain
    reserved for matched LMX/external comparisons.
+   The follow-on dashboard pass adds
+   `examples/research_grade_closure_dashboard.py`, which writes a
+   publication-facing panel combining the closed Q2DmhdFoam side-wall support
+   gate, the Votyakov magnetic-obstacle mismatch, the Bayat-Rezai Dean-vortex
+   mismatch, and the strict closure ledger. It is documentation evidence only;
+   it must not be interpreted as solved-physics closure for the open lanes.
 6. Finish performance and differentiability gates.
    The solver must report progress, ETA, memory-relevant grid sizes, compile
    versus warm runtime, and device placement. Differentiable workflows must

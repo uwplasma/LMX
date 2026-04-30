@@ -184,11 +184,367 @@ def write_research_grade_external_target_tables(
     return [magnetic_path, candidate_path, q2d_path, dean_path, summary_path]
 
 
+def write_research_grade_closure_dashboard(
+    output_dir: str | Path,
+    *,
+    q2d_sidewall_summary_path: str | Path,
+    magnetic_strict_summary_path: str | Path,
+    dean_strict_summary_path: str | Path,
+    closure_status_path: str | Path,
+    output_stem: str = "research_grade_closure_dashboard",
+) -> list[Path]:
+    """Write a publication-facing dashboard for strict closure status.
+
+    The figure is deliberately conservative: it can show a closed support gate
+    and failed strict comparisons in the same panel without promoting the open
+    lanes to research-grade closure.
+    """
+
+    import matplotlib.pyplot as plt
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    q2d_summary = _load_json(q2d_sidewall_summary_path)
+    magnetic_summary = _load_json(magnetic_strict_summary_path)
+    dean_summary = _load_json(dean_strict_summary_path)
+    closure_summary = _load_json(closure_status_path)
+
+    fig, axes = plt.subplots(2, 2, figsize=(15.8, 10.2), constrained_layout=True)
+    _plot_q2d_sidewall_closure(axes[0, 0], q2d_summary)
+    _plot_magnetic_strict_gap(axes[0, 1], magnetic_summary)
+    _plot_dean_strict_gap(axes[1, 0], dean_summary)
+    _plot_closure_ledger(axes[1, 1], closure_summary)
+    fig.suptitle(
+        "Strict research-grade validation closure dashboard",
+        fontsize=15.5,
+        fontweight="bold",
+    )
+
+    png_path = out_dir / f"{output_stem}.png"
+    pdf_path = out_dir / f"{output_stem}.pdf"
+    for path in (png_path, pdf_path):
+        fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+    summary_path = out_dir / f"{output_stem}_summary.json"
+    summary_path.write_text(
+        json.dumps(
+            _closure_dashboard_summary(
+                q2d_summary,
+                magnetic_summary,
+                dean_summary,
+                closure_summary,
+                plots=[png_path.name, pdf_path.name],
+            ),
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return [png_path, pdf_path, summary_path]
+
+
+def _closure_dashboard_summary(
+    q2d_summary: Mapping[str, object],
+    magnetic_summary: Mapping[str, object],
+    dean_summary: Mapping[str, object],
+    closure_summary: Mapping[str, object],
+    *,
+    plots: list[str],
+) -> dict[str, object]:
+    magnetic_comparison = _external_comparison_payload(magnetic_summary)
+    dean_comparison = _external_comparison_payload(dean_summary)
+    return {
+        "case": "research_grade_closure_dashboard",
+        "status": "strict_research_lanes_documented",
+        "plots": plots,
+        "q2d_sidewall_gate_closed": bool(q2d_summary.get("strict_blocker_closed", False)),
+        "magnetic_obstacle_external_validation_pass": bool(magnetic_comparison.get("validation_pass", False)),
+        "dean_vortex_external_validation_pass": bool(dean_comparison.get("validation_pass", False)),
+        "closed_lane_count": int(closure_summary.get("closed_lane_count", 0) or 0),
+        "lane_count": int(closure_summary.get("lane_count", 0) or 0),
+        "research_grade_ready": bool(closure_summary.get("research_grade_ready", False)),
+        "open_lanes": list(closure_summary.get("open_lanes", [])),
+        "notes": (
+            "This dashboard is a documentation artifact. It shows closed support "
+            "evidence and strict reference mismatches without marking open "
+            "research-grade lanes as closed."
+        ),
+    }
+
+
 def _write_candidate_rows(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=_CANDIDATE_FIELDNAMES, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _plot_q2d_sidewall_closure(ax, summary: Mapping[str, object]) -> None:
+    rows = _direct_comparison_rows(summary)
+    if not rows:
+        _missing_panel(ax, "Q2D side-wall gate", "comparison rows missing")
+        return
+    labels = [_compact_observable_label(str(row.get("observable", ""))) for row in rows]
+    ratios = [
+        _safe_float(row.get("relative_error")) / max(_safe_float(row.get("relative_tolerance")), 1.0e-30)
+        for row in rows
+    ]
+    passes = [bool(row.get("validation_pass", False)) for row in rows]
+    colors = ["#0f766e" if flag else "#b45309" for flag in passes]
+    ax.bar(labels, ratios, color=colors)
+    ax.axhline(1.0, color="#111827", linestyle="--", linewidth=1.0, label="tolerance")
+    ax.set_ylim(0.0, max(1.2, 1.12 * max(ratios)))
+    ax.set_ylabel("relative error / tolerance")
+    ax.set_title("Closed matched side-wall Q2D gate")
+    ax.grid(True, axis="y", alpha=0.24)
+    ax.tick_params(axis="x", rotation=20)
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    status = "closed" if bool(summary.get("strict_blocker_closed", False)) else "open"
+    ax.text(
+        0.03,
+        0.16,
+        (
+            f"support gate: {status}\n"
+            "cell-centered Q2DmhdFoam fields\n"
+            "strict nonlinear turbulence parity remains separate"
+        ),
+        transform=ax.transAxes,
+        fontsize=8,
+        va="bottom",
+        bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+    )
+
+
+def _plot_magnetic_strict_gap(ax, summary: Mapping[str, object]) -> None:
+    rows = _external_comparison_rows(summary)
+    if not rows:
+        _missing_panel(ax, "Magnetic-obstacle strict gate", "external comparison rows missing")
+        return
+    row = rows[0]
+    lmx = _safe_float(row.get("lmx_value"))
+    reference = _safe_float(row.get("reference_value"))
+    tolerance = _safe_float(row.get("effective_tolerance"))
+    ax.bar(["LMX", "Votyakov target"], [lmx, reference], color=["#2563eb", "#dc2626"], width=0.58)
+    ax.axhline(0.0, color="#111827", linewidth=1.0)
+    ax.fill_between(
+        [-0.4, 1.4],
+        [reference - tolerance] * 2,
+        [reference + tolerance] * 2,
+        color="#fecaca",
+        alpha=0.55,
+        label="target tolerance",
+    )
+    ax.set_xlim(-0.45, 1.45)
+    ax.set_ylim(min(-0.25, reference - 3.0 * tolerance), max(1.1, lmx * 1.08))
+    ax.set_ylabel(r"minimum centerline $u_x/U_0$")
+    ax.set_title("Magnetic obstacle: reverse-flow mismatch")
+    ax.grid(True, axis="y", alpha=0.24)
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    rel_error = _safe_float(row.get("relative_error"))
+    ax.text(
+        0.03,
+        0.91,
+        (
+            f"relative error = {rel_error:.2g}\n"
+            f"LMX min = {lmx:.3f}; target = {reference:.2f}\n"
+            "requires inertia-capable localized-field parity"
+        ),
+        transform=ax.transAxes,
+        fontsize=8,
+        va="top",
+        bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+    )
+
+
+def _plot_dean_strict_gap(ax, summary: Mapping[str, object]) -> None:
+    rows = _external_comparison_rows(summary)
+    if not rows:
+        _missing_panel(ax, "Dean-vortex strict gate", "external comparison rows missing")
+        return
+    labels = [_compact_observable_label(str(row.get("observable", ""))) for row in rows]
+    x = np.arange(len(rows), dtype=float)
+    lmx = np.asarray([_safe_float(row.get("lmx_value")) for row in rows], dtype=float)
+    reference = np.asarray([_safe_float(row.get("reference_value")) for row in rows], dtype=float)
+    width = 0.34
+    ax.bar(x - width / 2.0, lmx, width=width, color="#2563eb", label="LMX current")
+    ax.bar(x + width / 2.0, reference, width=width, color="#dc2626", label="Bayat-Rezai target")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=15)
+    ax.set_ylabel("secondary-flow ratio")
+    ax.set_title("Dean vortex: higher-inertia mismatch")
+    ax.grid(True, axis="y", alpha=0.24)
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    ax.set_ylim(0.0, max(0.1, 1.18 * float(np.max(reference))))
+    ax.text(
+        0.03,
+        0.92,
+        (
+            f"current De = {_safe_float(summary.get('current_lmx_dean_number')):.2e}\n"
+            f"target De = {_safe_float(summary.get('reference_dean_number')):.1f}\n"
+            "remaining work is resolved secondary-flow physics"
+        ),
+        transform=ax.transAxes,
+        fontsize=8,
+        va="top",
+        bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+    )
+
+
+def _plot_closure_ledger(ax, closure_summary: Mapping[str, object]) -> None:
+    rows = list(closure_summary.get("rows", []))
+    if not rows:
+        _missing_panel(ax, "Strict closure ledger", "closure status missing")
+        return
+    from matplotlib.patches import FancyBboxPatch
+
+    ax.axis("off")
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_title("Strict closure ledger")
+    headers = [("lane", 0.03), ("physics", 0.34), ("external", 0.50), ("strict status", 0.66)]
+    for label, x in headers:
+        ax.text(x, 0.86, label, transform=ax.transAxes, fontsize=9, weight="bold", color="#0f172a")
+    y_positions = np.linspace(0.70, 0.34, num=max(len(rows), 1))
+    for row, y in zip(rows, y_positions, strict=False):
+        if not isinstance(row, Mapping):
+            continue
+        ax.text(
+            0.03,
+            y,
+            _short_lane_name(str(row.get("lane", ""))),
+            transform=ax.transAxes,
+            fontsize=8.5,
+            va="center",
+        )
+        _draw_badge(ax, 0.34, y, "pass" if bool(row.get("physics_gate_pass", False)) else "open")
+        _draw_badge(ax, 0.50, y, "pass" if bool(row.get("external_gate_pass", False)) else "open")
+        status = "closed" if bool(row.get("closed", False)) else _friendly_status(row)
+        face = "#dcfce7" if status == "closed" else "#ffedd5"
+        patch = FancyBboxPatch(
+            (0.66, y - 0.045),
+            0.31,
+            0.09,
+            boxstyle="round,pad=0.012,rounding_size=0.018",
+            linewidth=1.0,
+            edgecolor="#cbd5e1",
+            facecolor=face,
+            transform=ax.transAxes,
+        )
+        ax.add_patch(patch)
+        ax.text(0.675, y, status, transform=ax.transAxes, fontsize=8, va="center")
+    closed = int(closure_summary.get("closed_lane_count", 0) or 0)
+    total = int(closure_summary.get("lane_count", len(rows)) or len(rows))
+    ax.text(
+        0.0,
+        0.05,
+        (
+            f"strict research-grade lanes closed: {closed}/{total}\n"
+            "bounded release can remain green while these manual research gates stay open"
+        ),
+        transform=ax.transAxes,
+        fontsize=8.5,
+        va="bottom",
+        bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+    )
+
+
+def _draw_badge(ax, x: float, y: float, label: str) -> None:
+    from matplotlib.patches import FancyBboxPatch
+
+    face = "#dcfce7" if label == "pass" else "#fee2e2"
+    patch = FancyBboxPatch(
+        (x, y - 0.035),
+        0.10,
+        0.07,
+        boxstyle="round,pad=0.012,rounding_size=0.018",
+        linewidth=1.0,
+        edgecolor="#cbd5e1",
+        facecolor=face,
+        transform=ax.transAxes,
+    )
+    ax.add_patch(patch)
+    ax.text(x + 0.022, y, label, transform=ax.transAxes, fontsize=8, va="center")
+
+
+def _friendly_status(row: Mapping[str, object]) -> str:
+    lane = str(row.get("lane", ""))
+    status = str(row.get("status", "open"))
+    if lane == "q2d_turbulence_external_parity":
+        return "turbulent parity open"
+    if lane == "magnetic_obstacle_external_validation":
+        return "reverse-flow mismatch"
+    if lane == "dean_vortex_higher_inertia_validation":
+        return "secondary flow open"
+    return status.replace("_", " ")
+
+
+def _missing_panel(ax, title: str, message: str) -> None:
+    ax.axis("off")
+    ax.set_title(title)
+    ax.text(
+        0.5,
+        0.5,
+        message,
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=10,
+        bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
+    )
+
+
+def _direct_comparison_rows(summary: Mapping[str, object]) -> list[Mapping[str, object]]:
+    comparison = summary.get("comparison")
+    if isinstance(comparison, Mapping):
+        rows = comparison.get("rows", [])
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, Mapping)]
+    return []
+
+
+def _external_comparison_rows(summary: Mapping[str, object]) -> list[Mapping[str, object]]:
+    rows = _external_comparison_payload(summary).get("rows", [])
+    if isinstance(rows, list):
+        return [row for row in rows if isinstance(row, Mapping)]
+    return []
+
+
+def _external_comparison_payload(summary: Mapping[str, object]) -> Mapping[str, object]:
+    external = summary.get("external_reference_comparison")
+    if isinstance(external, Mapping):
+        comparison = external.get("comparison")
+        if isinstance(comparison, Mapping):
+            return comparison
+    return {}
+
+
+def _safe_float(value: object, default: float = 0.0) -> float:
+    try:
+        output = float(value)
+    except (TypeError, ValueError):
+        return default
+    return output if np.isfinite(output) else default
+
+
+def _compact_observable_label(label: str) -> str:
+    replacements = {
+        "speed_mean": "mean speed",
+        "speed_rms": "RMS speed",
+        "vorticity_peak": "peak vorticity",
+        "secondary_flow_rms_ratio": "secondary RMS",
+        "secondary_flow_peak_ratio": "secondary peak",
+        "minimum_centerline_velocity_ratio": "min centerline speed",
+    }
+    return replacements.get(label, label.replace("_", " "))
+
+
+def _short_lane_name(lane: str) -> str:
+    replacements = {
+        "q2d_turbulence_external_parity": "Q2D turbulence",
+        "magnetic_obstacle_external_validation": "magnetic obstacle",
+        "dean_vortex_higher_inertia_validation": "Dean vortex",
+    }
+    return replacements.get(lane, lane.replace("_", " "))
 
 
 def _q2d_candidate_rows(summary: Mapping[str, object]) -> list[dict[str, str]]:

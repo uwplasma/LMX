@@ -51,6 +51,7 @@ liquid-metal MHD literature:
 | Bent pipe Dean-vortex validation | Axial velocity contours, outboard shift, secondary-flow streamfunction/vorticity, pressure drop versus `De` and `Ha` | `examples/bent_pipe_inductionless_demo.py`, WHAM blanket flow preview | Add a resolved cross-section secondary-flow state and mesh ladder |
 | Variable/tabulated fields | Interpolation error, `∇·B`, field-line/contour plots, pressure response, autodiff sensitivities to coil parameters | variable-field and WHAM field examples | Add divergence-cleaning comparisons and full sensitivity plots for tabulated fields |
 | Performance and differentiability | CPU/GPU strong scaling, memory, compile time, gradient runtime, optimization trajectory | strong-scaling and autodiff examples | Tie all performance plots to the real operator paths used by the validation figures |
+| Strict closure dashboard | Closed support gates, external strict mismatches, and research-grade closure ledger | `examples/research_grade_closure_dashboard.py` | Replace failed panels with passed solved-physics comparisons as each lane closes |
 
 ## Required Code Features
 
@@ -96,11 +97,13 @@ over a mesh/`De`/`Ha` ladder.
    panel, CSV, and JSON summary.
 2. Keep `examples/publication_figure_campaign.py` as the bounded manifest gate
    for all currently available manuscript artifacts.
-3. Add the combined WHAM overview panel and nondimensional pressure-sweep plots
+3. Keep `examples/research_grade_closure_dashboard.py` as the reviewer-facing
+   closure ledger for strict blockers and support gates.
+4. Add the combined WHAM overview panel and nondimensional pressure-sweep plots
    versus `Ha`, `N`, `De`, and `B^2`.
-4. Add external-data adapters and heavy rerun scripts for magnetic obstacle,
+5. Add external-data adapters and heavy rerun scripts for magnetic obstacle,
    Q2D turbulence, and curved-pipe Dean validation.
-5. Promote each closed figure family into CI/release gates only after the
+6. Promote each closed figure family into CI/release gates only after the
    runtime remains bounded and the external-reference provenance is recorded.
 
 ## Current Bounded Manifest

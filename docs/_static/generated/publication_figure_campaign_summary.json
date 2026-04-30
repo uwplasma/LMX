@@ -1,9 +1,9 @@
 {
   "case": "publication_figure_campaign",
-  "generated_at_utc": "2026-04-29T21:55:23.473396+00:00",
-  "figure_count": 11,
-  "artifact_count": 11,
-  "summary_count": 11,
+  "generated_at_utc": "2026-04-30T20:22:51.763037+00:00",
+  "figure_count": 12,
+  "artifact_count": 12,
+  "summary_count": 12,
   "missing_artifacts": [],
   "missing_summaries": [],
   "status_counts": {
@@ -14,12 +14,14 @@
     "external_reference_open": 2,
     "resolved_dean_validation_open": 1,
     "ready_internal_gate": 1,
-    "ready_bounded_release": 1
+    "ready_bounded_release": 1,
+    "strict_research_blockers_open": 1
   },
   "external_or_resolved_validation_open": [
     "magnetic_obstacle",
     "q2d_turbulence",
-    "bent_pipe_dean"
+    "bent_pipe_dean",
+    "strict_validation_closure_dashboard"
   ],
   "release_blocking": false,
   "paper_ready": false,
@@ -253,6 +255,28 @@
       "selected_metrics": {
         "record_count": 5,
         "plot_count": 2
+      }
+    },
+    {
+      "family": "strict_validation_closure_dashboard",
+      "artifact": "research_grade_closure_dashboard.png",
+      "summary": "research_grade_closure_dashboard_summary.json",
+      "generator": "examples/research_grade_closure_dashboard.py",
+      "reference": "Q2DmhdFoam, Votyakov magnetic-obstacle, and Bayat-Rezai Dean-vortex closure artifacts",
+      "manuscript_role": "Single-panel closure ledger for closed support gates and open strict research blockers",
+      "readiness_status": "strict_research_blockers_open",
+      "required_next_step": "Replace the failed magnetic-obstacle and Dean-vortex panels with passed matched solved-physics comparisons.",
+      "artifact_path": "docs/_static/generated/research_grade_closure_dashboard.png",
+      "summary_path": "docs/_static/generated/research_grade_closure_dashboard_summary.json",
+      "artifact_exists": true,
+      "summary_exists": true,
+      "selected_metrics": {
+        "q2d_sidewall_gate_closed": true,
+        "magnetic_obstacle_external_validation_pass": false,
+        "dean_vortex_external_validation_pass": false,
+        "closed_lane_count": 0,
+        "lane_count": 3,
+        "research_grade_ready": false
       }
     }
   ],

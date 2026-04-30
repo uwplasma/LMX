@@ -79,6 +79,13 @@ replacement for matched reference CSVs:
 
 ![LMX strict external validation targets](_static/generated/research_grade_external_targets.png)
 
+The closure dashboard summarizes the current reviewer-facing state: the matched
+side-wall Q2D support gate is closed, but the strict magnetic-obstacle and
+Dean-vortex comparisons still fail against the external targets and the
+nonlinear turbulent Q2D parity lane remains open.
+
+![LMX strict research-grade validation closure dashboard](_static/generated/research_grade_closure_dashboard.png)
+
 ![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
 
 The Q2DmhdFoam executable path is now reproducible through

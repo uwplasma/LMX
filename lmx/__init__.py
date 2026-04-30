@@ -255,6 +255,7 @@ __all__ = [
     "research_grade_closure_rows",
     "research_grade_closure_status",
     "strict_blocker_closure_attempt_summary",
+    "write_research_grade_closure_dashboard",
     "write_research_grade_external_target_panel",
     "write_research_grade_external_target_tables",
     "write_publication_figure_manifest",
@@ -523,6 +524,10 @@ _EXPORTS = {
     "write_strict_blocker_closure_attempt": (
         "lmx.research_blockers",
         "write_strict_blocker_closure_attempt",
+    ),
+    "write_research_grade_closure_dashboard": (
+        "lmx.research_figures",
+        "write_research_grade_closure_dashboard",
     ),
     "write_research_grade_external_target_panel": (
         "lmx.research_figures",

@@ -81,6 +81,7 @@ python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py
 python examples/research_grade_external_target_figures.py
+python examples/research_grade_closure_dashboard.py
 python examples/research_grade_strict_blocker_probe.py
 python examples/dean_literature_validation.py
 python examples/q2d_decay_validation.py

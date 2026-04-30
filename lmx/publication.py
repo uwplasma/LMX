@@ -135,6 +135,16 @@ PUBLICATION_FIGURE_SPECS: tuple[PublicationFigureSpec, ...] = (
         readiness_status="ready_bounded_release",
         required_next_step="Repeat after each major operator refactor and include compile/runtime split.",
     ),
+    PublicationFigureSpec(
+        family="strict_validation_closure_dashboard",
+        artifact="research_grade_closure_dashboard.png",
+        summary="research_grade_closure_dashboard_summary.json",
+        generator="examples/research_grade_closure_dashboard.py",
+        reference="Q2DmhdFoam, Votyakov magnetic-obstacle, and Bayat-Rezai Dean-vortex closure artifacts",
+        manuscript_role="Single-panel closure ledger for closed support gates and open strict research blockers",
+        readiness_status="strict_research_blockers_open",
+        required_next_step="Replace the failed magnetic-obstacle and Dean-vortex panels with passed matched solved-physics comparisons.",
+    ),
 )
 
 

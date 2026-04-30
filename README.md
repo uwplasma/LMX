@@ -779,6 +779,13 @@ matched strict files `magnetic_obstacle_reference_observables.csv`,
 
 ![LMX strict external validation targets](docs/_static/generated/research_grade_external_targets.png)
 
+The closure dashboard is the compact reviewer-facing ledger for those lanes. It
+keeps the closed Q2D side-wall support gate, the failed Votyakov
+magnetic-obstacle reverse-flow comparison, the failed Bayat-Rezai Dean-vortex
+comparison, and the strict closure status in one panel.
+
+![LMX strict research-grade validation closure dashboard](docs/_static/generated/research_grade_closure_dashboard.png)
+
 The final strict-blocker probe is kept in the README because it is the release
 guard against over-claiming. It records that a low-resolution magnetic-obstacle
 reverse-flow candidate did not survive the current-resolution rerun, that the
@@ -888,6 +895,7 @@ Useful entry points:
 - `examples/publication_figure_campaign.py`: bounded manuscript-figure manifest with artifact status, references, metrics, and remaining gaps
 - `examples/research_grade_closure_status.py`: strict Q2D turbulence, magnetic-obstacle, and Dean-vortex closure-status manifest
 - `examples/research_grade_external_data_audit.py`: local external-code/data audit for the remaining strict blockers
+- `examples/research_grade_closure_dashboard.py`: publication-facing dashboard for closed support gates and remaining strict blockers
 
 ## Documentation
 

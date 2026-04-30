@@ -7,6 +7,7 @@ import pytest
 
 from lmx.research_figures import (
     VOTYAKOV_FIG7A_DIGITIZED,
+    write_research_grade_closure_dashboard,
     write_research_grade_external_target_panel,
     write_research_grade_external_target_tables,
 )
@@ -79,4 +80,98 @@ def test_research_grade_external_target_panel_writes_media(tmp_path: Path):
     )
 
     assert [path.suffix for path in outputs] == [".png", ".pdf"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+
+
+def test_research_grade_closure_dashboard_writes_media_and_summary(tmp_path: Path):
+    q2d = tmp_path / "q2d.json"
+    magnetic = tmp_path / "magnetic.json"
+    dean = tmp_path / "dean.json"
+    closure = tmp_path / "closure.json"
+    _write_json(
+        q2d,
+        {
+            "strict_blocker_closed": True,
+            "comparison": {
+                "rows": [
+                    {
+                        "observable": "speed_mean",
+                        "relative_error": 0.1,
+                        "relative_tolerance": 0.2,
+                        "validation_pass": True,
+                    }
+                ]
+            },
+        },
+    )
+    _write_json(
+        magnetic,
+        {
+            "external_reference_comparison": {
+                "comparison": {
+                    "validation_pass": False,
+                    "rows": [
+                        {
+                            "observable": "minimum_centerline_velocity_ratio",
+                            "lmx_value": 0.98,
+                            "reference_value": -0.13,
+                            "effective_tolerance": 0.03,
+                            "relative_error": 8.5,
+                        }
+                    ],
+                }
+            }
+        },
+    )
+    _write_json(
+        dean,
+        {
+            "current_lmx_dean_number": 1.0e-6,
+            "reference_dean_number": 20.0,
+            "external_reference_comparison": {
+                "comparison": {
+                    "validation_pass": False,
+                    "rows": [
+                        {
+                            "observable": "secondary_flow_rms_ratio",
+                            "lmx_value": 0.0,
+                            "reference_value": 0.04,
+                        }
+                    ],
+                }
+            },
+        },
+    )
+    _write_json(
+        closure,
+        {
+            "closed_lane_count": 0,
+            "lane_count": 3,
+            "research_grade_ready": False,
+            "open_lanes": ["q2d_turbulence_external_parity"],
+            "rows": [
+                {
+                    "lane": "q2d_turbulence_external_parity",
+                    "physics_gate_pass": False,
+                    "external_gate_pass": False,
+                    "closed": False,
+                    "status": "external_adapter_ready_matched_parity_open",
+                }
+            ],
+        },
+    )
+
+    outputs = write_research_grade_closure_dashboard(
+        tmp_path,
+        q2d_sidewall_summary_path=q2d,
+        magnetic_strict_summary_path=magnetic,
+        dean_strict_summary_path=dean,
+        closure_status_path=closure,
+    )
+
+    assert [path.suffix for path in outputs] == [".png", ".pdf", ".json"]
+    summary = json.loads((tmp_path / "research_grade_closure_dashboard_summary.json").read_text(encoding="utf-8"))
+    assert summary["q2d_sidewall_gate_closed"] is True
+    assert summary["magnetic_obstacle_external_validation_pass"] is False
+    assert summary["research_grade_ready"] is False
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)

@@ -1,0 +1,25 @@
+{
+  "case": "research_grade_closure_dashboard",
+  "status": "strict_research_lanes_documented",
+  "plots": [
+    "research_grade_closure_dashboard.png",
+    "research_grade_closure_dashboard.pdf"
+  ],
+  "q2d_sidewall_gate_closed": true,
+  "magnetic_obstacle_external_validation_pass": false,
+  "dean_vortex_external_validation_pass": false,
+  "closed_lane_count": 0,
+  "lane_count": 3,
+  "research_grade_ready": false,
+  "open_lanes": [
+    "q2d_turbulence_external_parity",
+    "magnetic_obstacle_external_validation",
+    "dean_vortex_higher_inertia_validation"
+  ],
+  "notes": "This dashboard is a documentation artifact. It shows closed support evidence and strict reference mismatches without marking open research-grade lanes as closed.",
+  "docs_artifacts": [
+    "research_grade_closure_dashboard.png",
+    "research_grade_closure_dashboard.pdf",
+    "research_grade_closure_dashboard_summary.json"
+  ]
+}

@@ -118,6 +118,11 @@
       "name": "strong_scaling.png",
       "kind": "solver-facing strong-scaling summary",
       "generator": "scripts/run_strong_scaling_worker.py"
+    },
+    {
+      "name": "research_grade_closure_dashboard.png",
+      "kind": "strict research-grade validation closure dashboard",
+      "generator": "examples/research_grade_closure_dashboard.py"
     }
   ]
 }

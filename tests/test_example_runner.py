@@ -1546,6 +1546,90 @@ def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(tmp_
     assert patched["external_reference_comparison"]["status"] == "external_reference_compared"
 
 
+def test_research_grade_closure_dashboard_writes_docs_artifacts(tmp_path: Path):
+    module = _load_example_module("research_grade_closure_dashboard.py")
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "q2d_lmx_q2dmhdfoam_lid_driven_parity_summary.json").write_text(
+        json.dumps(
+            {
+                "strict_blocker_closed": True,
+                "comparison": {
+                    "rows": [
+                        {
+                            "observable": "speed_mean",
+                            "relative_error": 0.1,
+                            "relative_tolerance": 0.2,
+                            "validation_pass": True,
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    for name, payload in {
+        "magnetic_obstacle_votyakov_strict_attempt_summary.json": {
+            "external_reference_comparison": {
+                "comparison": {
+                    "validation_pass": False,
+                    "rows": [
+                        {
+                            "observable": "minimum_centerline_velocity_ratio",
+                            "lmx_value": 0.98,
+                            "reference_value": -0.13,
+                            "effective_tolerance": 0.03,
+                            "relative_error": 8.5,
+                        }
+                    ],
+                }
+            }
+        },
+        "dean_vortex_bayat_rezai_strict_attempt_summary.json": {
+            "current_lmx_dean_number": 1.0e-6,
+            "reference_dean_number": 20.0,
+            "external_reference_comparison": {
+                "comparison": {
+                    "validation_pass": False,
+                    "rows": [
+                        {
+                            "observable": "secondary_flow_rms_ratio",
+                            "lmx_value": 0.0,
+                            "reference_value": 0.04,
+                        }
+                    ],
+                }
+            },
+        },
+        "research_grade_closure_status.json": {
+            "closed_lane_count": 0,
+            "lane_count": 3,
+            "research_grade_ready": False,
+            "open_lanes": ["q2d_turbulence_external_parity"],
+            "rows": [
+                {
+                    "lane": "q2d_turbulence_external_parity",
+                    "physics_gate_pass": False,
+                    "external_gate_pass": False,
+                    "closed": False,
+                    "status": "external_adapter_ready_matched_parity_open",
+                }
+            ],
+        },
+    }.items():
+        (docs_dir / name).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    summary = module.run_research_grade_closure_dashboard(
+        out_dir=tmp_path / "out",
+        docs_output_dir=docs_dir,
+    )
+
+    assert summary["case"] == "research_grade_closure_dashboard"
+    assert summary["research_grade_ready"] is False
+    assert (docs_dir / "research_grade_closure_dashboard.png").exists()
+    assert (docs_dir / "research_grade_closure_dashboard_summary.json").exists()
+
+
 def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_regime_scan.py")
     module.OUTPUT_DIR = tmp_path
