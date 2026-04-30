@@ -2269,18 +2269,36 @@ def validate_magnetic_obstacle_external_readiness(
     pressure_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
     peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
     inlet_velocity = float(mean_velocity[0]) if mean_velocity.size else 0.0
+    minimum_velocity = float(np.min(mean_velocity)) if mean_velocity.size else 0.0
+    min_velocity_index = int(np.argmin(mean_velocity)) if mean_velocity.size else 0
     center_velocity_deficit = float(inlet_velocity - mean_velocity[peak_index]) if mean_velocity.size else 0.0
     centerline_deficit_ratio = center_velocity_deficit / max(abs(inlet_velocity), 1.0e-20)
+    minimum_centerline_velocity_ratio = minimum_velocity / max(abs(inlet_velocity), 1.0e-20)
     recovery_ratio = float(mean_velocity[-1] / max(abs(inlet_velocity), 1.0e-20)) if mean_velocity.size else 0.0
     integrated_pressure_proxy = (
         float(np.trapezoid(pressure_proxy, x) / max(float(x[-1] - x[0]), 1.0e-12))
         if pressure_proxy.size > 1 and x.size > 1
         else 0.0
     )
+    recovery_index = peak_index
+    if mean_velocity.size and x.size:
+        deficit_scale = max(abs(center_velocity_deficit), 1.0e-20)
+        recovery_threshold = inlet_velocity - 0.05 * deficit_scale
+        downstream = np.flatnonzero(mean_velocity[peak_index:] >= recovery_threshold)
+        recovery_index = peak_index + int(downstream[0]) if downstream.size else len(mean_velocity) - 1
+    downstream_length = max(float(x[-1] - x[peak_index]), 1.0e-12) if x.size else 1.0
+    recovery_distance = max(float(x[recovery_index] - x[peak_index]), 0.0) if x.size else 0.0
+    normalized_recovery_distance = recovery_distance / downstream_length
     observable_payload = {
         "centerline_velocity_deficit": center_velocity_deficit,
         "centerline_velocity_deficit_ratio": centerline_deficit_ratio,
+        "minimum_centerline_velocity": minimum_velocity,
+        "minimum_centerline_velocity_ratio": minimum_centerline_velocity_ratio,
+        "minimum_velocity_station": float(x[min_velocity_index]) if x.size else 0.0,
+        "peak_field_station": float(x[peak_index]) if x.size else 0.0,
+        "recovery_station": float(x[recovery_index]) if x.size else 0.0,
         "wake_recovery_ratio": recovery_ratio,
+        "normalized_recovery_distance": normalized_recovery_distance,
         "pressure_drop_proxy": integrated_pressure_proxy,
         "current_proxy_peak": float(baseline["current_proxy_peak"]),
         "field_velocity_correlation": float(baseline["field_velocity_correlation"]),

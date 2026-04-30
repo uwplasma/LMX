@@ -1,5 +1,7 @@
 observable,value,tolerance,relative_tolerance,units,source,note
 centerline_velocity_deficit_ratio,,,0.10,dimensionless,digitized literature or experiment,Peak or station-matched centerline wake deficit.
 wake_recovery_ratio,,,0.10,dimensionless,digitized literature or experiment,Downstream recovery metric at the documented outlet or recovery station.
+minimum_centerline_velocity_ratio,,,0.10,dimensionless,Votyakov et al. JFM 610 figure 7 or matched external solver,Minimum streamwise centerline velocity normalized by the inlet/upstream speed; negative values indicate reverse flow.
+normalized_recovery_distance,,,0.15,dimensionless,digitized literature or matched external solver,Distance from peak field to recovery station normalized by downstream length.
 pressure_drop_proxy,,,0.15,case-specific,digitized literature or experiment,Use the same nondimensionalization as the reference paper.
 current_proxy_peak,,,0.15,case-specific,digitized literature or experiment,Peak induced-current or Lorentz-force proxy if directly available.

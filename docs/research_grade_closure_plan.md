@@ -161,6 +161,9 @@ The matched case must record:
 
 - `centerline_velocity_deficit_ratio`
 - `wake_recovery_ratio`
+- `minimum_centerline_velocity_ratio`, matching the Votyakov et al. figure-7
+  observable for magnetic-obstacle reverse-flow onset when that dataset is used
+- `normalized_recovery_distance`
 - `pressure_drop_proxy`
 - `current_proxy_peak`
 - preferred: Lorentz-force peak, `curl(J x B)` or vorticity-layer proxy,

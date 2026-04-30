@@ -753,6 +753,8 @@ def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
     assert "votyakov_zienicke_kolesnikov_jfm" in references
     assert readiness["reference_case"] == "votyakov_zienicke_kolesnikov_jfm"
     assert "centerline_velocity_deficit_ratio" in readiness["observables"]
+    assert "minimum_centerline_velocity_ratio" in readiness["observables"]
+    assert "normalized_recovery_distance" in readiness["observables"]
     assert readiness["external_reference_available"] is False
     assert readiness["research_grade_validation_pass"] is False
 

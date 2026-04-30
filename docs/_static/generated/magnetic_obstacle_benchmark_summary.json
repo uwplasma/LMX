@@ -108,7 +108,13 @@
       "current_proxy_peak",
       "field_velocity_correlation",
       "max_charge_balance_residual",
+      "minimum_centerline_velocity",
+      "minimum_centerline_velocity_ratio",
+      "minimum_velocity_station",
+      "normalized_recovery_distance",
+      "peak_field_station",
       "pressure_drop_proxy",
+      "recovery_station",
       "wake_recovery_ratio"
     ],
     "required_observables": [
@@ -125,7 +131,13 @@
     "observables": {
       "centerline_velocity_deficit": 2.4128815893583594e-05,
       "centerline_velocity_deficit_ratio": 0.002478896587068671,
+      "minimum_centerline_velocity": 0.009709563190240585,
+      "minimum_centerline_velocity_ratio": 0.9975211034129313,
+      "minimum_velocity_station": 3.0,
+      "peak_field_station": 3.0,
+      "recovery_station": 5.16,
       "wake_recovery_ratio": 1.0,
+      "normalized_recovery_distance": 0.7500000000000001,
       "pressure_drop_proxy": 0.40832688739169964,
       "current_proxy_peak": 1.778514193132694,
       "field_velocity_correlation": -0.8257316271956454,

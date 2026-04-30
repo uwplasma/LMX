@@ -148,7 +148,7 @@ def write_scalar_reference_comparison_table(
         "source",
     ]
     with out.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({column: row.get(column, "") for column in columns})
@@ -258,7 +258,7 @@ def write_scalar_reference_template(path: str | Path, rows: list[dict[str, str]]
     out.parent.mkdir(parents=True, exist_ok=True)
     columns = ("observable", "value", "tolerance", "relative_tolerance", "units", "source", "note")
     with out.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     return out
@@ -819,6 +819,24 @@ def magnetic_obstacle_reference_template_rows() -> list[dict[str, str]]:
             "units": "dimensionless",
             "source": "digitized literature or experiment",
             "note": "Downstream recovery metric at the documented outlet or recovery station.",
+        },
+        {
+            "observable": "minimum_centerline_velocity_ratio",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.10",
+            "units": "dimensionless",
+            "source": "Votyakov et al. JFM 610 figure 7 or matched external solver",
+            "note": "Minimum streamwise centerline velocity normalized by the inlet/upstream speed; negative values indicate reverse flow.",
+        },
+        {
+            "observable": "normalized_recovery_distance",
+            "value": "",
+            "tolerance": "",
+            "relative_tolerance": "0.15",
+            "units": "dimensionless",
+            "source": "digitized literature or matched external solver",
+            "note": "Distance from peak field to recovery station normalized by downstream length.",
         },
         {
             "observable": "pressure_drop_proxy",

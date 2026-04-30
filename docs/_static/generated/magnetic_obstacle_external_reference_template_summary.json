@@ -5,6 +5,8 @@
   "template_observables": [
     "centerline_velocity_deficit_ratio",
     "wake_recovery_ratio",
+    "minimum_centerline_velocity_ratio",
+    "normalized_recovery_distance",
     "pressure_drop_proxy",
     "current_proxy_peak"
   ],
