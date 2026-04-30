@@ -1387,6 +1387,51 @@ def test_q2dmhdfoam_lid_driven_vtk_artifact_writes_summary(tmp_path: Path):
     assert (tmp_path / "out" / "q2dmhdfoam_lid_driven_vtk_observables.csv").exists()
 
 
+def test_q2d_lmx_q2dmhdfoam_lid_driven_parity_writes_artifacts(tmp_path: Path):
+    module = _load_example_module("q2d_lmx_q2dmhdfoam_lid_driven_parity.py")
+    module.NX = 25
+    module.NY = 17
+    module.DT = 1.0e-3
+    module.FRAME_COUNT = 4
+    docker_output = tmp_path / "docker_out"
+    vtk_dir = docker_output / "VTK"
+    vtk_dir.mkdir(parents=True)
+    (docker_output / "summary.json").write_text(
+        json.dumps({"case": "run/lidDriven", "status": "external_reference_case_complete_no_profile_extraction", "final_time": 0.02}),
+        encoding="utf-8",
+    )
+    (vtk_dir / "sample.vtk").write_text(
+        "# vtk DataFile Version 2.0\n"
+        "sample\n"
+        "ASCII\n"
+        "DATASET UNSTRUCTURED_GRID\n"
+        "POINTS 4 float\n"
+        "0 0 0 0.04 0 0 0 -0.02 0 0.04 -0.02 0\n"
+        "POINT_DATA 4\n"
+        "FIELD attributes 2\n"
+        "vorticity 3 4 float\n"
+        "0 0 10 0 0 12 0 0 11 0 0 13\n"
+        "U 3 4 float\n"
+        "0 0.01 0 0 0.1 0 0 0.02 0 0 0.1 0\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_q2d_lmx_q2dmhdfoam_lid_driven_parity(
+        out_dir=tmp_path / "out",
+        docs_output_dir=tmp_path / "docs",
+        q2dmhdfoam_output_dir=docker_output,
+        copy_to_docs=True,
+    )
+
+    assert summary["case"] == "q2d_lmx_q2dmhdfoam_lid_driven_parity"
+    assert summary["status"] == "matched_comparison_written"
+    assert summary["strict_blocker_closed"] is summary["matched_parity"]
+    assert "q2d_lmx_q2dmhdfoam_lid_driven_parity.png" in summary["plots"]
+    assert (tmp_path / "out" / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png").exists()
+    assert (tmp_path / "out" / "q2d_lmx_q2dmhdfoam_lid_driven_observables.csv").exists()
+    assert (tmp_path / "docs" / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png").exists()
+
+
 def test_magnetic_obstacle_baseline_writes_summary(tmp_path: Path):
     module = _load_example_module("magnetic_obstacle_baseline.py")
     module.OUTPUT_DIR = tmp_path

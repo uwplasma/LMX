@@ -44,6 +44,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `q2d_lmx_q2dmhdfoam_turbulence_comparison.png` | `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py` | LMX nonlinear Q2D observables alongside Q2DmhdFoam lid-driven spectral-summary evidence |
 | `q2dmhdfoam_docker_reference.png` | `examples/q2dmhdfoam_docker_reference_validation.py` | Docker-rerun Q2DmhdFoam external executable gate |
 | `q2dmhdfoam_lid_driven_vtk.png` | `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` | Generic Q2DmhdFoam Docker rerun VTK ingestion and field observables |
+| `q2d_lmx_q2dmhdfoam_lid_driven_parity.png` | `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py` | Matched side-wall LMX/Q2DmhdFoam field-observable comparison and current mean-speed offender |
 | `magnetic_obstacle_schematic.png` | `examples/magnetic_obstacle_benchmark.py` | Localized-field geometry and response setup |
 | `magnetic_obstacle_benchmark.png` | `examples/magnetic_obstacle_benchmark.py` | Internal matched no-field response gate |
 | `bent_pipe_overview.png` | `examples/bent_pipe_inductionless_demo.py` | Curved-pipe geometry and low-De response |
@@ -75,6 +76,7 @@ python examples/q2d_turbulence_decay_demo.py
 python examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py
 python examples/q2dmhdfoam_docker_reference_validation.py
 python examples/q2dmhdfoam_lid_driven_vtk_artifact.py
+python examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
 python examples/publication_figure_campaign.py

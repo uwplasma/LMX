@@ -326,6 +326,12 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   observables, and writes a field-level panel. This verifies non-default
   Q2DmhdFoam case execution and VTK ingestion; it is still not a matched LMX
   turbulence validation.
+- `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`: runs the LMX
+  side-wall-driven Q2D cavity against the same `run/lidDriven` Q2DmhdFoam VTK
+  field. The first matched observable table passes speed RMS, mean wall-normal
+  velocity, and peak vorticity; the remaining mean-speed mismatch is retained
+  as the current Q2D external-parity offender rather than hidden by visual
+  rescaling.
 
 <p align="center">
   <img src="docs/_static/generated/q2d_decay_overview.png" alt="Q2D Hartmann-friction decay validation" width="32%">
@@ -347,6 +353,10 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 
 <p align="center">
   <img src="docs/_static/generated/q2dmhdfoam_lid_driven_vtk.png" alt="Q2DmhdFoam lid-driven VTK field ingestion panel" width="72%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2d_lmx_q2dmhdfoam_lid_driven_parity.png" alt="LMX and Q2DmhdFoam matched side-wall Q2D comparison" width="72%">
 </p>
 
 <p align="center">
@@ -784,7 +794,12 @@ rather than a Dean-vortex validation.
   probe-history observable artifacts without calling them matched LMX parity.
   `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py` adds the current
   side-by-side observable plot and README movie, but still marks the strict
-  parity gate open until a matched Q2DmhdFoam case is run
+  parity gate open until a matched Q2DmhdFoam case is run. The first
+  geometry/forcing-matched side-wall Q2DmhdFoam comparison now exists in
+  `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it passes three of four
+  retained field observables, with mean speed still outside the `20%`
+  tolerance, so it is an offender-tracking artifact rather than a closed
+  turbulence claim
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
   `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The
@@ -836,6 +851,7 @@ Useful entry points:
 - `examples/external_validation_readiness_panel.py`: executable external-code validation map for the remaining open lanes
 - `examples/q2dmhdfoam_external_reference_adapter.py`: Q2DmhdFoam/Vetcha external Q2D reference-data adapter
 - `examples/q2dmhdfoam_docker_reference_validation.py`: Docker-rerun Q2DmhdFoam VTK/profile validation artifact
+- `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`: matched side-wall LMX/Q2DmhdFoam field-observable comparison
 - `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py`: LMX Q2D movie plus Q2DmhdFoam spectral-summary comparison artifact
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel

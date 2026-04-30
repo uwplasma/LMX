@@ -69,6 +69,11 @@
             "kind": "Q2DmhdFoam lid-driven VTK field-ingestion artifact",
             "generator": "examples/q2dmhdfoam_lid_driven_vtk_artifact.py"
         },
+        {
+            "name": "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
+            "kind": "LMX/Q2DmhdFoam matched side-wall Q2D comparison",
+            "generator": "examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py"
+        },
     {
       "name": "magnetic_obstacle_schematic.png",
       "kind": "magnetic-obstacle setup schematic",

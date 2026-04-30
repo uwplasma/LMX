@@ -10,14 +10,18 @@ from lmx.q2d import (
     build_q2d_forced_case,
     build_q2d_turbulence_decay_case,
     build_q2d_wall_bounded_forced_case,
+    build_q2d_wall_driven_cavity_case,
+    compare_q2d_wall_driven_observables,
     q2d_energy_spectrum,
     q2d_modal_energy_budget,
     q2d_turbulence_observables,
     q2d_turbulence_readiness_metrics,
+    q2d_wall_driven_cavity_observables,
     solve_q2d_decay,
     solve_q2d_forced,
     solve_q2d_turbulence_decay,
     solve_q2d_wall_bounded_forced,
+    solve_q2d_wall_driven_cavity,
     validate_q2d_decay_solution,
     validate_q2d_decay_energy_budget,
     validate_q2d_forced_solution,
@@ -30,6 +34,7 @@ from lmx.q2d import (
     write_q2d_turbulence_decay_movie,
     write_q2d_turbulence_observable_plots,
     write_q2d_wall_bounded_forced_plots,
+    write_q2d_wall_driven_comparison_plots,
 )
 
 
@@ -123,6 +128,28 @@ def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
     assert validation["research_grade_turbulence_validation_pass"] is False
     outputs = write_q2d_turbulence_decay_movie(solution, tmp_path, fps=4)
     assert outputs == [tmp_path / "q2d_turbulence_decay.gif", tmp_path / "q2d_turbulence_decay_poster.png"]
+    assert outputs[0].exists()
+    assert outputs[1].exists()
+
+
+def test_q2d_wall_driven_cavity_comparison_gate_and_plot(tmp_path: Path):
+    case = build_q2d_wall_driven_cavity_case(nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5)
+    solution = solve_q2d_wall_driven_cavity(case)
+    observables = q2d_wall_driven_cavity_observables(case, solution)
+    reference = {
+        "speed_mean": observables["speed_mean"] * 1.01,
+        "speed_rms": observables["speed_rms"] * 0.99,
+        "uy_mean": observables["uy_mean"] * 1.02,
+        "vorticity_peak": observables["vorticity_peak"] * 0.98,
+    }
+
+    comparison = compare_q2d_wall_driven_observables(observables, reference, relative_tolerance=0.05)
+    outputs = write_q2d_wall_driven_comparison_plots(case, solution, comparison, tmp_path)
+
+    assert observables["validation_pass"] is True
+    assert comparison["matched_parity"] is True
+    assert comparison["passed_observable_count"] == 4
+    assert outputs == [tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png", tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
 

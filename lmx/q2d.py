@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Mapping
 
 from matplotlib import animation
 import matplotlib.pyplot as plt
@@ -90,6 +91,35 @@ class Q2DWallBoundedForcedSolution:
     amplitude_analytic: np.ndarray
     decay_rate: float
     steady_amplitude: float
+
+
+@dataclass(frozen=True)
+class Q2DWallDrivenCavityCase:
+    nx: int = 201
+    ny: int = 101
+    lx: float = 0.04
+    ly: float = 0.04
+    viscosity: float = 2.27e-7
+    hartmann_friction: float = 1.7025e-2
+    right_wall_velocity: float = 0.1
+    dt: float = 5.0e-4
+    t_final: float = 1.0
+    frame_count: int = 48
+
+
+@dataclass(frozen=True)
+class Q2DWallDrivenCavitySolution:
+    x: np.ndarray
+    y: np.ndarray
+    time: np.ndarray
+    streamfunction_frames: np.ndarray
+    vorticity_frames: np.ndarray
+    ux_frames: np.ndarray
+    uy_frames: np.ndarray
+    kinetic_energy: np.ndarray
+    enstrophy: np.ndarray
+    max_courant: np.ndarray
+    divergence_linf: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -242,6 +272,33 @@ def build_q2d_wall_bounded_forced_case(
     )
 
 
+def build_q2d_wall_driven_cavity_case(
+    *,
+    nx: int = 201,
+    ny: int = 101,
+    lx: float = 0.04,
+    ly: float = 0.04,
+    viscosity: float = 2.27e-7,
+    hartmann_friction: float = 1.7025e-2,
+    right_wall_velocity: float = 0.1,
+    dt: float = 5.0e-4,
+    t_final: float = 1.0,
+    frame_count: int = 48,
+) -> Q2DWallDrivenCavityCase:
+    return Q2DWallDrivenCavityCase(
+        nx=nx,
+        ny=ny,
+        lx=lx,
+        ly=ly,
+        viscosity=viscosity,
+        hartmann_friction=hartmann_friction,
+        right_wall_velocity=right_wall_velocity,
+        dt=dt,
+        t_final=t_final,
+        frame_count=frame_count,
+    )
+
+
 def _periodic_laplacian(field: np.ndarray, *, dx: float, dy: float) -> np.ndarray:
     return (
         (np.roll(field, -1, axis=0) - 2.0 * field + np.roll(field, 1, axis=0)) / dx**2
@@ -296,6 +353,66 @@ def _q2d_vorticity_forcing(case: Q2DTurbulenceDecayCase, xx: np.ndarray, yy: np.
     forcing -= float(np.mean(forcing))
     forcing /= max(float(np.max(np.abs(forcing))), 1.0e-12)
     return float(case.forcing_amplitude) * forcing
+
+
+def _q2d_dirichlet_poisson(rhs: np.ndarray, *, dx: float, dy: float) -> np.ndarray:
+    from scipy.fft import dstn, idstn
+
+    values = np.asarray(rhs, dtype=float)
+    nx, ny = values.shape
+    if nx < 1 or ny < 1:
+        return np.zeros_like(values)
+    i = np.arange(1, nx + 1, dtype=float)[:, None]
+    j = np.arange(1, ny + 1, dtype=float)[None, :]
+    eigenvalues = (
+        -4.0 * np.sin(np.pi * i / (2.0 * (nx + 1))) ** 2 / dx**2
+        - 4.0 * np.sin(np.pi * j / (2.0 * (ny + 1))) ** 2 / dy**2
+    )
+    return idstn(dstn(values, type=1, norm="ortho") / eigenvalues, type=1, norm="ortho")
+
+
+def _q2d_wall_driven_apply_vorticity_boundary(
+    omega: np.ndarray,
+    psi: np.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    right_wall_velocity: float,
+) -> None:
+    omega[:, 0] = -2.0 * psi[:, 1] / dy**2
+    omega[:, -1] = -2.0 * psi[:, -2] / dy**2
+    omega[0, :] = -2.0 * psi[1, :] / dx**2
+    omega[-1, :] = -2.0 * psi[-2, :] / dx**2 + 2.0 * right_wall_velocity / dx
+    omega[0, 0] = 0.5 * (omega[1, 0] + omega[0, 1])
+    omega[0, -1] = 0.5 * (omega[1, -1] + omega[0, -2])
+    omega[-1, 0] = 0.5 * (omega[-2, 0] + omega[-1, 1])
+    omega[-1, -1] = 0.5 * (omega[-2, -1] + omega[-1, -2])
+
+
+def _q2d_wall_driven_streamfunction(omega: np.ndarray, *, dx: float, dy: float) -> np.ndarray:
+    psi = np.zeros_like(omega, dtype=float)
+    psi[1:-1, 1:-1] = _q2d_dirichlet_poisson(-omega[1:-1, 1:-1], dx=dx, dy=dy)
+    return psi
+
+
+def _q2d_wall_driven_velocity(
+    psi: np.ndarray,
+    *,
+    dx: float,
+    dy: float,
+    right_wall_velocity: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    ux = np.zeros_like(psi, dtype=float)
+    uy = np.zeros_like(psi, dtype=float)
+    ux[1:-1, 1:-1] = (psi[1:-1, 2:] - psi[1:-1, :-2]) / (2.0 * dy)
+    uy[1:-1, 1:-1] = -(psi[2:, 1:-1] - psi[:-2, 1:-1]) / (2.0 * dx)
+    uy[-1, :] = float(right_wall_velocity)
+    return ux, uy
+
+
+def _q2d_wall_driven_divergence(ux: np.ndarray, uy: np.ndarray, *, dx: float, dy: float) -> float:
+    divergence = (ux[2:, 1:-1] - ux[:-2, 1:-1]) / (2.0 * dx) + (uy[1:-1, 2:] - uy[1:-1, :-2]) / (2.0 * dy)
+    return float(np.max(np.abs(divergence))) if divergence.size else 0.0
 
 
 def _q2d_spectral_operators(nx: int, ny: int, lx: float, ly: float) -> tuple[np.ndarray, ...]:
@@ -626,6 +743,122 @@ def solve_q2d_wall_bounded_forced(case: Q2DWallBoundedForcedCase) -> Q2DWallBoun
         amplitude_analytic=amplitude_analytic,
         decay_rate=float(decay_rate),
         steady_amplitude=float(steady_amplitude),
+    )
+
+
+def solve_q2d_wall_driven_cavity(case: Q2DWallDrivenCavityCase) -> Q2DWallDrivenCavitySolution:
+    """Solve a bounded Q2D side-wall-driven cavity with linear Hartmann drag.
+
+    This is the LMX counterpart to the Q2DmhdFoam `run/lidDriven` smoke case:
+    zero buoyancy, no pressure-driven mean flow, no-slip walls, and an imposed
+    vertical velocity on the right boundary. The vorticity-streamfunction form
+    keeps the velocity divergence-free while preserving a compact CI-scale
+    implementation for external-code parity studies.
+    """
+
+    x = np.linspace(0.0, case.lx, case.nx)
+    y = np.linspace(-0.5 * case.ly, 0.5 * case.ly, case.ny)
+    dx = float(case.lx / max(case.nx - 1, 1))
+    dy = float(case.ly / max(case.ny - 1, 1))
+    omega = np.zeros((case.nx, case.ny), dtype=float)
+    psi = np.zeros_like(omega)
+    steps = max(1, int(round(case.t_final / case.dt)))
+    frame_count = max(2, min(int(case.frame_count), steps + 1))
+    frame_indices = set(int(index) for index in np.unique(np.linspace(0, steps, frame_count, dtype=int)).tolist())
+
+    frame_times: list[float] = []
+    psi_frames: list[np.ndarray] = []
+    omega_frames: list[np.ndarray] = []
+    ux_frames: list[np.ndarray] = []
+    uy_frames: list[np.ndarray] = []
+    kinetic_energy: list[float] = []
+    enstrophy: list[float] = []
+    max_courant: list[float] = []
+    divergence_linf: list[float] = []
+
+    def _record(step: int) -> tuple[np.ndarray, np.ndarray]:
+        nonlocal psi
+        _q2d_wall_driven_apply_vorticity_boundary(
+            omega,
+            psi,
+            dx=dx,
+            dy=dy,
+            right_wall_velocity=case.right_wall_velocity,
+        )
+        psi = _q2d_wall_driven_streamfunction(omega, dx=dx, dy=dy)
+        ux, uy = _q2d_wall_driven_velocity(
+            psi,
+            dx=dx,
+            dy=dy,
+            right_wall_velocity=case.right_wall_velocity,
+        )
+        speed_squared = ux**2 + uy**2
+        frame_times.append(step * case.dt)
+        psi_frames.append(psi.copy())
+        omega_frames.append(omega.copy())
+        ux_frames.append(ux.copy())
+        uy_frames.append(uy.copy())
+        kinetic_energy.append(0.5 * float(np.mean(speed_squared)))
+        enstrophy.append(0.5 * float(np.mean(omega**2)))
+        max_speed = float(np.max(np.sqrt(speed_squared))) if speed_squared.size else 0.0
+        max_courant.append(max_speed * case.dt / max(min(dx, dy), 1.0e-12))
+        divergence_linf.append(_q2d_wall_driven_divergence(ux, uy, dx=dx, dy=dy))
+        return ux, uy
+
+    _record(0)
+    for step in range(1, steps + 1):
+        _q2d_wall_driven_apply_vorticity_boundary(
+            omega,
+            psi,
+            dx=dx,
+            dy=dy,
+            right_wall_velocity=case.right_wall_velocity,
+        )
+        psi = _q2d_wall_driven_streamfunction(omega, dx=dx, dy=dy)
+        ux, uy = _q2d_wall_driven_velocity(
+            psi,
+            dx=dx,
+            dy=dy,
+            right_wall_velocity=case.right_wall_velocity,
+        )
+        interior = omega[1:-1, 1:-1]
+        omega_x = np.where(
+            ux[1:-1, 1:-1] >= 0.0,
+            (interior - omega[:-2, 1:-1]) / dx,
+            (omega[2:, 1:-1] - interior) / dx,
+        )
+        omega_y = np.where(
+            uy[1:-1, 1:-1] >= 0.0,
+            (interior - omega[1:-1, :-2]) / dy,
+            (omega[1:-1, 2:] - interior) / dy,
+        )
+        laplacian = (
+            (omega[2:, 1:-1] - 2.0 * interior + omega[:-2, 1:-1]) / dx**2
+            + (omega[1:-1, 2:] - 2.0 * interior + omega[1:-1, :-2]) / dy**2
+        )
+        omega[1:-1, 1:-1] = interior + case.dt * (
+            -ux[1:-1, 1:-1] * omega_x
+            - uy[1:-1, 1:-1] * omega_y
+            + case.viscosity * laplacian
+            - case.hartmann_friction * interior
+        )
+        if step in frame_indices:
+            _record(step)
+
+    if steps not in frame_indices:
+        _record(steps)
+    return Q2DWallDrivenCavitySolution(
+        x=x,
+        y=y,
+        time=np.asarray(frame_times, dtype=float),
+        streamfunction_frames=np.asarray(psi_frames, dtype=float),
+        vorticity_frames=np.asarray(omega_frames, dtype=float),
+        ux_frames=np.asarray(ux_frames, dtype=float),
+        uy_frames=np.asarray(uy_frames, dtype=float),
+        kinetic_energy=np.asarray(kinetic_energy, dtype=float),
+        enstrophy=np.asarray(enstrophy, dtype=float),
+        max_courant=np.asarray(max_courant, dtype=float),
+        divergence_linf=np.asarray(divergence_linf, dtype=float),
     )
 
 
@@ -1036,6 +1269,185 @@ def validate_q2d_turbulence_decay_observables(
         "validation_status": "nonlinear_q2d_movie_available_external_turbulent_reference_open",
         "research_grade_turbulence_validation_pass": False,
     }
+
+
+def q2d_wall_driven_cavity_observables(
+    case: Q2DWallDrivenCavityCase,
+    solution: Q2DWallDrivenCavitySolution,
+) -> dict[str, float | int | str | bool]:
+    """Return field observables for a side-wall-driven Q2D cavity run."""
+
+    ux = np.asarray(solution.ux_frames[-1], dtype=float)
+    uy = np.asarray(solution.uy_frames[-1], dtype=float)
+    omega = np.asarray(solution.vorticity_frames[-1], dtype=float)
+    speed = np.sqrt(ux**2 + uy**2)
+    return {
+        "sample_count": int(speed.size),
+        "speed_mean": float(np.mean(speed)),
+        "speed_max": float(np.max(speed)),
+        "speed_rms": float(np.sqrt(np.mean(speed**2))),
+        "ux_mean": float(np.mean(ux)),
+        "uy_mean": float(np.mean(uy)),
+        "vorticity_peak": float(np.max(np.abs(omega))),
+        "kinetic_energy_final": float(solution.kinetic_energy[-1]),
+        "enstrophy_final": float(solution.enstrophy[-1]),
+        "max_courant": float(np.max(solution.max_courant)) if solution.max_courant.size else 0.0,
+        "max_divergence_linf": float(np.max(solution.divergence_linf)) if solution.divergence_linf.size else 0.0,
+        "frame_count": int(solution.time.size),
+        "final_time": float(solution.time[-1]),
+        "right_wall_velocity": float(case.right_wall_velocity),
+        "hartmann_friction": float(case.hartmann_friction),
+        "viscosity": float(case.viscosity),
+        "validation_pass": bool(
+            np.all(np.isfinite(speed))
+            and np.all(np.isfinite(omega))
+            and float(np.max(solution.max_courant)) < 0.4
+            and float(np.max(solution.divergence_linf)) < 1.0e-9
+            and abs(float(np.max(speed)) - float(case.right_wall_velocity)) <= 1.0e-10
+        ),
+        "literature_target": "Sommeria-Moreau/Q2DmhdFoam side-wall-driven Hartmann-friction cavity",
+    }
+
+
+def compare_q2d_wall_driven_observables(
+    lmx_observables: Mapping[str, float | int | str | bool],
+    reference_observables: Mapping[str, float | int | str | bool],
+    *,
+    relative_tolerance: float = 0.20,
+) -> dict[str, object]:
+    """Compare compact LMX and Q2DmhdFoam side-wall-driven observables."""
+
+    keys = ("speed_mean", "speed_rms", "uy_mean", "vorticity_peak")
+    rows: list[dict[str, float | str | bool]] = []
+    passed = 0
+    for key in keys:
+        lmx_value = float(lmx_observables[key])
+        reference_value = float(reference_observables[key])
+        absolute_error = abs(lmx_value - reference_value)
+        relative_error = absolute_error / max(abs(reference_value), 1.0e-20)
+        validation_pass = bool(relative_error <= relative_tolerance)
+        passed += int(validation_pass)
+        rows.append(
+            {
+                "observable": key,
+                "lmx_value": lmx_value,
+                "reference_value": reference_value,
+                "absolute_error": absolute_error,
+                "relative_error": relative_error,
+                "relative_tolerance": relative_tolerance,
+                "validation_pass": validation_pass,
+            }
+        )
+    strict_pass = bool(passed == len(rows) and bool(lmx_observables.get("validation_pass", False)))
+    return {
+        "rows": rows,
+        "compared_observable_count": len(rows),
+        "passed_observable_count": passed,
+        "relative_tolerance": relative_tolerance,
+        "validation_pass": strict_pass,
+        "matched_parity": strict_pass,
+        "status": "matched_side_wall_observable_comparison" if strict_pass else "matched_side_wall_observable_offenders",
+    }
+
+
+def write_q2d_wall_driven_comparison_plots(
+    case: Q2DWallDrivenCavityCase,
+    solution: Q2DWallDrivenCavitySolution,
+    comparison: Mapping[str, object],
+    output_dir: str | Path,
+    *,
+    output_stem: str = "q2d_lmx_q2dmhdfoam_lid_driven_parity",
+    reference_speed_grid: np.ndarray | None = None,
+    reference_x: np.ndarray | None = None,
+    reference_y: np.ndarray | None = None,
+) -> list[Path]:
+    """Write a publication-facing matched side-wall Q2D comparison panel."""
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ux = np.asarray(solution.ux_frames[-1], dtype=float)
+    uy = np.asarray(solution.uy_frames[-1], dtype=float)
+    speed = np.sqrt(ux**2 + uy**2)
+    vorticity = np.asarray(solution.vorticity_frames[-1], dtype=float)
+    x_edges = _centers_to_edges_1d(solution.x)
+    y_edges = _centers_to_edges_1d(solution.y)
+    vmax_speed = max(float(np.max(speed)), 1.0e-12)
+    vmax_vort = max(float(np.max(np.abs(vorticity))), 1.0e-12)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.8, 9.0), constrained_layout=True)
+    im0 = axes[0, 0].pcolormesh(
+        solution.x,
+        solution.y,
+        speed.T,
+        shading="auto",
+        cmap="magma",
+        vmin=0.0,
+        vmax=vmax_speed,
+    )
+    axes[0, 0].set_title("LMX wall-driven speed")
+    axes[0, 0].set_xlabel("x [m]")
+    axes[0, 0].set_ylabel("y [m]")
+    axes[0, 0].set_aspect("equal")
+    fig.colorbar(im0, ax=axes[0, 0], fraction=0.046, pad=0.04, label="|U| [m/s]")
+
+    if reference_speed_grid is not None and reference_x is not None and reference_y is not None:
+        im1 = axes[0, 1].pcolormesh(
+            np.asarray(reference_x, dtype=float),
+            np.asarray(reference_y, dtype=float),
+            np.asarray(reference_speed_grid, dtype=float),
+            shading="auto",
+            cmap="magma",
+            vmin=0.0,
+            vmax=vmax_speed,
+        )
+        axes[0, 1].set_title("Q2DmhdFoam VTK speed")
+        fig.colorbar(im1, ax=axes[0, 1], fraction=0.046, pad=0.04, label="|U| [m/s]")
+    else:
+        im1 = axes[0, 1].pcolormesh(x_edges, y_edges, vorticity.T, shading="auto", cmap="RdBu_r", vmin=-vmax_vort, vmax=vmax_vort)
+        axes[0, 1].set_title("LMX vorticity")
+        fig.colorbar(im1, ax=axes[0, 1], fraction=0.046, pad=0.04, label="omega [1/s]")
+    axes[0, 1].set_xlabel("x [m]")
+    axes[0, 1].set_ylabel("y [m]")
+    axes[0, 1].set_aspect("equal")
+
+    kinetic_normalized = solution.kinetic_energy / max(float(np.max(solution.kinetic_energy)), 1.0e-20)
+    enstrophy_normalized = solution.enstrophy / max(float(np.max(solution.enstrophy)), 1.0e-20)
+    axes[1, 0].plot(solution.time, kinetic_normalized, color="#0f766e", linewidth=2.0, label="kinetic energy / max")
+    axes[1, 0].plot(solution.time, enstrophy_normalized, color="#b45309", linewidth=2.0, label="enstrophy / max")
+    axes[1, 0].set_title("LMX transient diagnostics")
+    axes[1, 0].set_xlabel("time [s]")
+    axes[1, 0].set_ylabel("diagnostic")
+    axes[1, 0].grid(True, alpha=0.25)
+    axes[1, 0].legend(frameon=False)
+
+    rows = list(comparison.get("rows", []))
+    labels = [str(row["observable"]).replace("_", "\n") for row in rows]
+    ratios = np.asarray([float(row["relative_error"]) / max(float(row["relative_tolerance"]), 1.0e-20) for row in rows], dtype=float)
+    colors = ["#2a9d8f" if bool(row["validation_pass"]) else "#c2410c" for row in rows]
+    x = np.arange(len(rows), dtype=float)
+    axes[1, 1].bar(x, ratios, color=colors)
+    axes[1, 1].axhline(1.0, color="black", linestyle="--", linewidth=1.0, label="tolerance")
+    axes[1, 1].set_title("LMX vs Q2DmhdFoam observable errors")
+    axes[1, 1].set_xticks(x, labels)
+    axes[1, 1].set_ylabel("relative error / tolerance")
+    axes[1, 1].grid(True, axis="y", alpha=0.25)
+    axes[1, 1].legend(frameon=False)
+    axes[1, 1].text(
+        0.98,
+        0.95,
+        f"matched parity: {bool(comparison.get('matched_parity', False))}",
+        ha="right",
+        va="top",
+        transform=axes[1, 1].transAxes,
+        bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.9},
+    )
+
+    fig.suptitle("LMX/Q2DmhdFoam matched side-wall Q2D comparison", fontsize=15.0, fontweight="bold")
+    paths = [out_dir / f"{output_stem}.png", out_dir / f"{output_stem}.pdf"]
+    for path in paths:
+        fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+    return paths
 
 
 def write_q2d_turbulence_decay_movie(

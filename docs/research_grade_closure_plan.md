@@ -401,8 +401,11 @@ parity requirements.
   non-default checked-out cases through `CASE_RELATIVE_PATH`; `run/lidDriven`
   now runs in MPI, exports VTK, and feeds
   `examples/q2dmhdfoam_lid_driven_vtk_artifact.py` for field-level velocity and
-  vorticity observables. This is a post-processing/executable-code gate, not a
-  parity claim until the LMX and Q2DmhdFoam cases share the same physics.
+  vorticity observables. The matching LMX side-wall comparison now exists in
+  `examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py`; it passes three of four
+  retained field observables and keeps the mean-speed mismatch as the current
+  strict offender. This is still not a turbulent parity claim until the
+  side-wall offender and a matched nonlinear case are closed.
 - Magnetic obstacle: either build a reproducible MHD_Solvers_OpenFOAM localized
   field case or digitize one Votyakov/Cuevas observable set with provenance.
 - Dean: digitize one Dean-flow reference set or generate one OpenFOAM curved-

@@ -427,6 +427,18 @@ and vorticity observables, and writes a PNG/PDF panel plus CSV table. It is an
 external-code execution and post-processing gate; it does not claim matched LMX
 turbulence parity.
 
+LMX/Q2DmhdFoam matched side-wall Q2D field comparison:
+
+```bash
+python examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py
+```
+
+That example solves the LMX side-wall-driven Q2D cavity and compares compact
+field observables against the Q2DmhdFoam `run/lidDriven` VTK output produced by
+the Docker runner. It writes a PNG/PDF panel, CSV observable table, and summary
+JSON. The current artifact passes speed RMS, mean wall-normal velocity, and
+peak vorticity, but keeps the mean-speed mismatch as an open parity offender.
+
 Q2D turbulence external-reference template:
 
 ```bash
