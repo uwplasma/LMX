@@ -777,6 +777,19 @@ python examples/li_aln_wall_stack_phase0_2.py
 
 ![LMX Li/AlN wall-stack Phase 0-2 reduced study](docs/_static/generated/li_aln_wall_stack_phase0_2.png)
 
+The Phase 3-6 reduced campaign extends that executable study to a `B`/velocity
+operating matrix, substrate-conductivity comparisons, AlN degradation sweeps,
+and pinhole thresholds for bounded current-closure deviation. It reports
+tangential conductance and normal leakage separately; these are electrical
+performance gates for MHD design, not statements about compatibility or coating
+survival.
+
+```bash
+python examples/li_aln_wall_stack_phase3_6.py
+```
+
+![LMX Li/AlN wall-stack Phase 3-6 reduced parametric assessment](docs/_static/generated/li_aln_wall_stack_phase3_6.png)
+
 ## Validation status
 
 The current validation surface includes:

@@ -27,6 +27,19 @@ is a reduced electrical-performance gate; true `fluid | AlN | metal`
 multilayer geometry and layer-interface current continuity are still later
 study phases.
 
+Phase 3-6 reduced operating, threshold, substrate, and pinhole sweeps are also
+executable:
+
+```bash
+python examples/li_aln_wall_stack_phase3_6.py
+```
+
+That command writes the bounded operating matrix, substrate-conductivity
+comparison, AlN degradation sweep, and current-closure threshold tables under
+`results/processed/phase3_6`, copies the figure into `figures/`, and publishes
+the docs artifacts under `docs/_static/generated`. The output remains a reduced
+MHD electrical-performance study; it is not a resolved multilayer wall solve.
+
 Out of scope:
 
 - lithium compatibility;

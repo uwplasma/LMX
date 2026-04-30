@@ -1992,3 +1992,27 @@ def test_run_theory_meeting_demo_rejects_unknown_movie_case(tmp_path: Path, monk
 
     with pytest.raises(ValueError, match="Unsupported movie_case"):
         run_theory_meeting_demo(out_dir=tmp_path, movie_case="bad")
+
+
+def test_li_aln_phase3_6_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_wall_stack_phase3_6.py"
+    spec = importlib.util.spec_from_file_location("li_aln_wall_stack_phase3_6_example", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    monkeypatch.setattr(module, "MAGNETIC_FIELDS_T", (1.0,))
+    monkeypatch.setattr(module, "VELOCITIES_M_S", (0.02,))
+    monkeypatch.setattr(module, "ALN_CONDUCTIVITIES_S_M", (1.0e-10, 1.0e-8))
+    monkeypatch.setattr(module, "PINHOLE_FRACTIONS", (0.0, 1.0e-4))
+    summary = module.run_li_aln_wall_stack_phase3_6(
+        output_dir=tmp_path / "phase3_6",
+        figure_dir=tmp_path / "figures",
+        docs_output_dir=tmp_path / "docs",
+    )
+
+    assert summary["material_compatibility_claim"] is False
+    assert (tmp_path / "phase3_6" / "li_aln_wall_stack_phase3_6_summary.json").exists()
+    assert (tmp_path / "phase3_6" / "li_aln_wall_stack_phase3_6.png").exists()
+    assert (tmp_path / "docs" / "li_aln_wall_stack_phase3_6_summary.json").exists()
+    assert (tmp_path / "docs" / "li_aln_wall_stack_phase3_6.png").exists()

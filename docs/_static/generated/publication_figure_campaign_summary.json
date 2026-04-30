@@ -1,9 +1,9 @@
 {
   "case": "publication_figure_campaign",
-  "generated_at_utc": "2026-04-30T21:41:25.046695+00:00",
-  "figure_count": 13,
-  "artifact_count": 13,
-  "summary_count": 13,
+  "generated_at_utc": "2026-04-30T22:35:19.339884+00:00",
+  "figure_count": 14,
+  "artifact_count": 14,
+  "summary_count": 14,
   "missing_artifacts": [],
   "missing_summaries": [],
   "status_counts": {
@@ -11,7 +11,7 @@
     "ready_with_documented_offenders": 1,
     "reduced_design_gate": 2,
     "ready_reduced_autodiff": 1,
-    "ready_reduced_wall_stack": 1,
+    "ready_reduced_wall_stack": 2,
     "external_reference_open": 2,
     "resolved_dean_validation_open": 1,
     "ready_internal_gate": 1,
@@ -168,6 +168,27 @@
         "wall_mesh_resolution_pass": true,
         "max_c_eff_10pct": 0.1,
         "max_pinhole_10pct": 1.0
+      }
+    },
+    {
+      "family": "li_aln_wall_stack_phase3_6",
+      "artifact": "li_aln_wall_stack_phase3_6.png",
+      "summary": "li_aln_wall_stack_phase3_6_summary.json",
+      "generator": "examples/li_aln_wall_stack_phase3_6.py",
+      "reference": "Thin-wall conductance, coated-wall leakage, and Li/AlN wall-stack study plan",
+      "manuscript_role": "Li/AlN operating matrix, substrate ranking, degradation thresholds, and pinhole limits",
+      "readiness_status": "ready_reduced_wall_stack",
+      "required_next_step": "Replace reduced substrate effective-conductance sweep with true multilayer finite-volume geometry.",
+      "artifact_path": "docs/_static/generated/li_aln_wall_stack_phase3_6.png",
+      "summary_path": "docs/_static/generated/li_aln_wall_stack_phase3_6_summary.json",
+      "artifact_exists": true,
+      "summary_exists": true,
+      "selected_metrics": {
+        "operating_point_count": 16,
+        "substrate_row_count": 192,
+        "max_interaction_parameter": 1152000.0,
+        "min_pinhole_threshold": 0.4503236701379116,
+        "material_compatibility_claim": false
       }
     },
     {

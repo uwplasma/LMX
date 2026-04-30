@@ -774,6 +774,18 @@ The work should proceed in phases. Do not run the full production matrix before 
 | 8 | Autodiff sensitivity and inverse design | Quantify gradients and thresholds | AD gradients validated against finite differences |
 | 9 | Final reporting | Produce report and reproducible archive | All deliverables complete |
 
+Current implementation status:
+
+- Phases 0-2 have an executable reduced artifact in
+  `examples/li_aln_wall_stack_phase0_2.py`.
+- Phases 3-6 now have a bounded reduced artifact in
+  `examples/li_aln_wall_stack_phase3_6.py`, covering the operating matrix,
+  AlN degradation thresholds, pinhole limits, and substrate-conductivity
+  comparisons.
+- The true `fluid | AlN | metal` multilayer finite-volume geometry, interface
+  current-continuity diagnostics, and external-code limiting-case comparisons
+  remain the next high-fidelity solver-extension lane.
+
 ---
 
 ## 11. Phase 0: Repository Preparation

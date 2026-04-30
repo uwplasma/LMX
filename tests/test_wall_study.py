@@ -4,10 +4,13 @@ import pytest
 
 from lmx import (
     DEFAULT_LI_ALN_CASE,
+    DEFAULT_SUBSTRATE_CONDUCTIVITIES,
     li_aln_phase0_2_summary,
+    li_aln_phase3_6_summary,
     li_aln_unit_audit,
     li_aln_wall_layers,
     write_li_aln_phase0_2_artifacts,
+    write_li_aln_phase3_6_artifacts,
 )
 
 
@@ -65,4 +68,40 @@ def test_write_li_aln_phase0_2_artifacts(tmp_path: Path):
     )
 
     assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".png"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+
+
+def test_li_aln_phase3_6_summary_reports_operating_and_degradation_thresholds():
+    summary = li_aln_phase3_6_summary(
+        DEFAULT_LI_ALN_CASE,
+        magnetic_fields=(1.0, 2.0),
+        velocities=(0.02, 0.04),
+        aln_conductivities=(1.0e-10, 1.0e-8),
+        pinhole_fractions=(0.0, 1.0e-4, 1.0e-2),
+        tolerances=(0.10,),
+    )
+    thresholds = summary["threshold_rows"]
+    ten_316l = next(row for row in thresholds if row["substrate"] == "316L")
+    ten_moly = next(row for row in thresholds if row["substrate"] == "molybdenum")
+
+    assert summary["material_compatibility_claim"] is False
+    assert summary["phase_status"]["phase_5_degradation_thresholds"] == "complete_for_reduced_tangential_and_normal_thresholds"
+    assert len(summary["operating_rows"]) == 4
+    assert ten_316l["critical_effective_conductance_ratio"] == pytest.approx(1.0 / 9.0)
+    assert ten_316l["minimum_aln_thickness_for_normal_leakage_m"] > 0.0
+    assert ten_316l["maximum_aln_thickness_for_tangential_conductance_m"] > 0.0
+    assert ten_moly["maximum_pinhole_fraction"] < ten_316l["maximum_pinhole_fraction"]
+    assert DEFAULT_SUBSTRATE_CONDUCTIVITIES["molybdenum"] > DEFAULT_SUBSTRATE_CONDUCTIVITIES["316L"]
+
+
+def test_write_li_aln_phase3_6_artifacts(tmp_path: Path):
+    outputs = write_li_aln_phase3_6_artifacts(
+        tmp_path,
+        magnetic_fields=(1.0,),
+        velocities=(0.02,),
+        aln_conductivities=(1.0e-10, 1.0e-8),
+        pinhole_fractions=(0.0, 1.0e-4),
+    )
+
+    assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".csv", ".png"]
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)

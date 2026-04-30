@@ -122,6 +122,37 @@ The Phase 0-2 acceptance gates are:
   the metal-shunt limit;
 - the summary explicitly states that it makes no material-compatibility claim.
 
+## Li/AlN Phase 3-6 Reduced Parametric Study
+
+The bounded Phase 3-6 lane is executable through:
+
+```bash
+python examples/li_aln_wall_stack_phase3_6.py
+```
+
+It writes an operating matrix over magnetic field and velocity, substrate
+comparisons for `316L`, `IN625`, and molybdenum-like conductivities, AlN
+degradation sweeps, and pinhole thresholds for a prescribed reduced
+current-closure deviation. The artifact is deliberately conservative: it keeps
+tangential wall conductance and normal through-layer leakage as separate
+electrical paths, because increasing AlN thickness raises the former but lowers
+the latter.
+
+![Li/AlN wall-stack Phase 3-6 reduced parametric assessment](_static/generated/li_aln_wall_stack_phase3_6.png)
+
+The Phase 3-6 gates are:
+
+- every operating point reports `Ha`, `Re`, `N`, `Rm`, and inductionless status;
+- substrate ranking is based on effective conductance ratio and pinhole
+  fraction, not a hidden material-performance score;
+- degradation thresholds report the maximum effective conductance for a chosen
+  current-closure deviation;
+- normal leakage and tangential conductance bounds are both tabulated;
+- the summary keeps `material_compatibility_claim = false` until separate
+  corrosion, wetting, adhesion, irradiation, and manufacturing evidence exists;
+- true multilayer finite-volume geometry remains the next solver-extension
+  lane, with reduced results serving as limiting-case design checks.
+
 ## Literature Anchors
 
 - Shercliff and Hunt rectangular-duct solutions define the insulating and

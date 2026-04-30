@@ -96,6 +96,16 @@ PUBLICATION_FIGURE_SPECS: tuple[PublicationFigureSpec, ...] = (
         required_next_step="Add true multilayer geometry and FreeMHD/code-to-code limiting-case comparisons.",
     ),
     PublicationFigureSpec(
+        family="li_aln_wall_stack_phase3_6",
+        artifact="li_aln_wall_stack_phase3_6.png",
+        summary="li_aln_wall_stack_phase3_6_summary.json",
+        generator="examples/li_aln_wall_stack_phase3_6.py",
+        reference="Thin-wall conductance, coated-wall leakage, and Li/AlN wall-stack study plan",
+        manuscript_role="Li/AlN operating matrix, substrate ranking, degradation thresholds, and pinhole limits",
+        readiness_status="ready_reduced_wall_stack",
+        required_next_step="Replace reduced substrate effective-conductance sweep with true multilayer finite-volume geometry.",
+    ),
+    PublicationFigureSpec(
         family="magnetic_obstacle",
         artifact="magnetic_obstacle_benchmark.png",
         summary="magnetic_obstacle_benchmark_summary.json",
@@ -281,6 +291,27 @@ def _selected_metrics(family: str, summary: Mapping[str, Any]) -> dict[str, Any]
             "wall_mesh_resolution_pass": mesh.get("resolution_pass"),
             "max_c_eff_10pct": thresholds.get("max_effective_conductance_ratio_for_10pct_deviation"),
             "max_pinhole_10pct": thresholds.get("max_pinhole_fraction_for_10pct_deviation"),
+        }
+    if family == "li_aln_wall_stack_phase3_6":
+        operating = summary.get("operating_rows", [])
+        thresholds = summary.get("threshold_rows", [])
+        substrate_rows = summary.get("substrate_rows", [])
+        n_values = [
+            float(row.get("interaction_parameter", 0.0))
+            for row in operating
+            if isinstance(row, Mapping)
+        ]
+        pinhole_values = [
+            float(row.get("maximum_pinhole_fraction", 0.0))
+            for row in thresholds
+            if isinstance(row, Mapping) and row.get("maximum_pinhole_fraction") is not None
+        ]
+        return {
+            "operating_point_count": len(operating),
+            "substrate_row_count": len(substrate_rows),
+            "max_interaction_parameter": max(n_values) if n_values else None,
+            "min_pinhole_threshold": min(pinhole_values) if pinhole_values else None,
+            "material_compatibility_claim": summary.get("material_compatibility_claim"),
         }
     if family == "strong_scaling":
         return {

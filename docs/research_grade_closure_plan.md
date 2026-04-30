@@ -54,10 +54,14 @@ Minimum model set:
 
 Current implementation status: `lmx.wall_models` provides validated reduced
 stack utilities for tangential conductance, normal leakage, pinhole
-interpolation, equivalent-layer checks, and nested-layer mesh QA. The remaining
-geometry work is to add arbitrary nested wall layers per side, material
-assignment per layer, conservative interface-current diagnostics at every
-layer boundary, and FreeMHD/code-to-code comparisons for layered wall cases.
+interpolation, equivalent-layer checks, and nested-layer mesh QA.
+`examples/li_aln_wall_stack_phase0_2.py` writes the unit, mesh-QA, conductance,
+and pinhole-sensitivity artifact. `examples/li_aln_wall_stack_phase3_6.py`
+writes the bounded operating matrix, substrate comparison, degradation
+thresholds, and pinhole-limit artifact. The remaining geometry work is to add
+arbitrary nested wall layers per side, material assignment per layer,
+conservative interface-current diagnostics at every layer boundary, and
+FreeMHD/code-to-code comparisons for layered wall cases.
 
 Required publication artifacts:
 

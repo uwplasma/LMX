@@ -170,8 +170,10 @@ refer to the Samper et al. taxonomy.
   fluid|AlN|metal multilayer geometry once implemented. The first code layer is
   reduced and differentiable (`lmx.wall_models` plus `lmx.wall_study`), with
   validated conductance utilities, equivalent-layer checks, pinhole
-  interpolation, nested-layer mesh QA, and a Phase 0-2 Li/AlN artifact in
-  `examples/li_aln_wall_stack_phase0_2.py`. The full geometry lane must add
+  interpolation, nested-layer mesh QA, a Phase 0-2 Li/AlN artifact in
+  `examples/li_aln_wall_stack_phase0_2.py`, and a reduced Phase 3-6 operating,
+  threshold, substrate, and pinhole artifact in
+  `examples/li_aln_wall_stack_phase3_6.py`. The full geometry lane must add
   arbitrary wall layers per side,
   layer-specific conductivities/thicknesses/cells, interface-current
   diagnostics, and FreeMHD/code-to-code comparison cases.
@@ -354,11 +356,17 @@ refer to the Samper et al. taxonomy.
   lane. The public API now exposes material/unit helpers, nested wall-layer
   setup, the reduced summary, and artifact writing; the example writes JSON,
   CSV, and PNG outputs under `studies/li_aln_wall_mhd/results/processed/phase0_2`
-  and copies the docs figure to `docs/_static/generated`. Remaining actions:
-  add full multilayer geometry, add layer-interface current-continuity
-  diagnostics, compare limiting cases to FreeMHD where the layered-wall physics
-  matches, run Phase 3 mesh and limiting-case ladders, and generate the
-  report-ready geometry, mesh, threshold, and autodiff-sensitivity figures.
+  and copies the docs figure to `docs/_static/generated`.
+  Phase 3-6 reduced status: implemented as an executable reduced campaign.
+  `examples/li_aln_wall_stack_phase3_6.py` writes the `B`/velocity operating
+  matrix, substrate-conductivity comparison, AlN conductivity/pinhole sweep,
+  and 5/10/25% current-closure deviation thresholds under
+  `studies/li_aln_wall_mhd/results/processed/phase3_6`, with a docs/publication
+  figure in `docs/_static/generated`. Remaining actions: add full multilayer
+  geometry, add layer-interface current-continuity diagnostics, compare
+  limiting cases to FreeMHD where the layered-wall physics matches, run true
+  mesh and limiting-case ladders, and generate the report-ready geometry, mesh,
+  resolved-field, and autodiff-sensitivity figures.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the

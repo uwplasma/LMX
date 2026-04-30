@@ -87,6 +87,13 @@ DEFAULT_LI_ALN_CASE = WallStackStudyCase(
 )
 
 
+DEFAULT_SUBSTRATE_CONDUCTIVITIES: dict[str, float] = {
+    "316L": 1.35e6,
+    "IN625": 0.80e6,
+    "molybdenum": 1.87e7,
+}
+
+
 def li_aln_phase0_2_summary(
     case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
     *,
@@ -190,6 +197,99 @@ def li_aln_phase0_2_summary(
             "true_multilayer_geometry": "planned_solver_extension",
         },
     }
+
+
+def li_aln_phase3_6_summary(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    magnetic_fields: Sequence[float] | None = None,
+    velocities: Sequence[float] | None = None,
+    substrate_conductivities: dict[str, float] | None = None,
+    aln_conductivities: Sequence[float] | None = None,
+    pinhole_fractions: Sequence[float] | None = None,
+    tolerances: Sequence[float] = (0.05, 0.10, 0.25),
+) -> dict[str, object]:
+    """Return Phase 3--6 reduced Li/AlN threshold and substrate sweeps.
+
+    This remains a reduced MHD electrical-performance model. It distinguishes
+    tangential wall conductance from normal leakage so thickness guidance is not
+    overinterpreted: increasing AlN thickness raises tangential conductance but
+    reduces through-layer leakage.
+    """
+
+    b_values = tuple(magnetic_fields or (1.0, 2.0, 4.0))
+    u_values = tuple(velocities or (0.01, 0.02, 0.04))
+    sigma_values = tuple(aln_conductivities or (1.0e-10, 1.0e-9, 1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3))
+    f_values = tuple(pinhole_fractions or (0.0, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1))
+    substrates = dict(substrate_conductivities or DEFAULT_SUBSTRATE_CONDUCTIVITIES)
+    unit_rows = _li_aln_operating_rows(case, magnetic_fields=b_values, velocities=u_values)
+    threshold_rows = _li_aln_threshold_rows(case, substrates, tolerances=tolerances)
+    substrate_rows = _li_aln_substrate_rows(
+        case,
+        substrates,
+        aln_conductivities=sigma_values,
+        pinhole_fractions=f_values,
+        operating_rows=unit_rows,
+    )
+    return {
+        "case": case.name,
+        "scope": "reduced_mhd_electrical_performance_only",
+        "material_compatibility_claim": False,
+        "inputs": _case_payload(case),
+        "phase_status": {
+            "phase_3_case_matrix": "complete_for_reduced_B_U_sweep",
+            "phase_4_parametric_sweeps": "complete_for_reduced_conductance_pinhole_substrate_model",
+            "phase_5_degradation_thresholds": "complete_for_reduced_tangential_and_normal_thresholds",
+            "phase_6_aln_metal_stack_comparison": "complete_for_effective_stack_model_true_multilayer_open",
+            "true_multilayer_geometry": "planned_solver_extension",
+        },
+        "operating_rows": unit_rows,
+        "threshold_rows": threshold_rows,
+        "substrate_rows": substrate_rows,
+        "substrate_conductivities": substrates,
+        "notes": (
+            "Thresholds use c/(1+c) as a reduced current-closure deviation. "
+            "Tangential conductance gives a maximum allowable AlN thickness for a "
+            "given conductivity, while normal leakage gives a minimum thickness. "
+            "Both are reported because they are different electrical paths."
+        ),
+    }
+
+
+def write_li_aln_phase3_6_artifacts(
+    out_dir: str | Path,
+    *,
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    magnetic_fields: Sequence[float] | None = None,
+    velocities: Sequence[float] | None = None,
+    substrate_conductivities: dict[str, float] | None = None,
+    aln_conductivities: Sequence[float] | None = None,
+    pinhole_fractions: Sequence[float] | None = None,
+    filename_stem: str = "li_aln_wall_stack_phase3_6",
+) -> list[Path]:
+    """Write Phase 3--6 Li/AlN wall-study JSON, CSV, and PNG artifacts."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = li_aln_phase3_6_summary(
+        case,
+        magnetic_fields=magnetic_fields,
+        velocities=velocities,
+        substrate_conductivities=substrate_conductivities,
+        aln_conductivities=aln_conductivities,
+        pinhole_fractions=pinhole_fractions,
+    )
+    json_path = out / f"{filename_stem}_summary.json"
+    operating_csv = out / f"{filename_stem}_operating_matrix.csv"
+    thresholds_csv = out / f"{filename_stem}_thresholds.csv"
+    substrate_csv = out / f"{filename_stem}_substrates.csv"
+    png_path = out / f"{filename_stem}.png"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    _write_generic_rows_csv(operating_csv, summary["operating_rows"])
+    _write_generic_rows_csv(thresholds_csv, summary["threshold_rows"])
+    _write_generic_rows_csv(substrate_csv, summary["substrate_rows"])
+    _write_li_aln_phase3_6_plot(png_path, summary)
+    return [json_path, operating_csv, thresholds_csv, substrate_csv, png_path]
 
 
 def li_aln_unit_audit(case: WallStackStudyCase = DEFAULT_LI_ALN_CASE) -> dict[str, float | str | bool]:
@@ -359,6 +459,180 @@ def _write_response_csv(path: Path, rows: Sequence[dict[str, object]]) -> None:
             writer.writerow({column: row.get(column, "") for column in columns})
 
 
+def _li_aln_operating_rows(
+    case: WallStackStudyCase,
+    *,
+    magnetic_fields: Sequence[float],
+    velocities: Sequence[float],
+) -> list[dict[str, float | bool]]:
+    rows: list[dict[str, float | bool]] = []
+    for magnetic_field in magnetic_fields:
+        for velocity in velocities:
+            audit = li_aln_unit_audit(
+                WallStackStudyCase(
+                    **{
+                        **asdict(case),
+                        "lithium": case.lithium,
+                        "magnetic_field": float(magnetic_field),
+                        "velocity": float(velocity),
+                    }
+                )
+            )
+            rows.append(
+                {
+                    "magnetic_field_t": float(magnetic_field),
+                    "velocity_m_s": float(velocity),
+                    "hartmann_number": float(audit["hartmann_number"]),
+                    "reynolds_number": float(audit["reynolds_number"]),
+                    "interaction_parameter": float(audit["interaction_parameter"]),
+                    "magnetic_reynolds_number": float(audit["magnetic_reynolds_number"]),
+                    "inductionless_assumption_pass": bool(audit["inductionless_assumption_pass"]),
+                }
+            )
+    return rows
+
+
+def _li_aln_threshold_rows(
+    case: WallStackStudyCase,
+    substrate_conductivities: dict[str, float],
+    *,
+    tolerances: Sequence[float],
+) -> list[dict[str, float | str | bool | None]]:
+    rows: list[dict[str, float | str | bool | None]] = []
+    sigma_li = case.lithium.electrical_conductivity
+    length = case.length_scale
+    c_aln_intact = wall_conductance_ratio(
+        wall_conductivity=case.intact_aln_conductivity,
+        wall_thickness=case.aln_thickness,
+        fluid_conductivity=sigma_li,
+        length_scale=length,
+    )
+    for tolerance in tolerances:
+        c_crit = _conductance_for_deviation(float(tolerance))
+        sigma_tangential_crit = c_crit * sigma_li * length / case.aln_thickness
+        g_perp_crit = c_crit
+        t_min_normal = case.intact_aln_conductivity * length / (sigma_li * g_perp_crit)
+        t_max_tangential = c_crit * sigma_li * length / case.intact_aln_conductivity
+        for metal_name, metal_sigma in substrate_conductivities.items():
+            metal_c = wall_conductance_ratio(
+                wall_conductivity=metal_sigma,
+                wall_thickness=case.metal_thickness,
+                fluid_conductivity=sigma_li,
+                length_scale=length,
+            )
+            f_p_max = _pinhole_fraction_for_threshold(
+                intact_conductance_ratio=c_aln_intact,
+                metal_conductance_ratio=metal_c,
+                critical_conductance_ratio=c_crit,
+            )
+            rows.append(
+                {
+                    "tolerance_fraction": float(tolerance),
+                    "substrate": metal_name,
+                    "substrate_conductivity_s_m": float(metal_sigma),
+                    "critical_effective_conductance_ratio": c_crit,
+                    "critical_aln_conductivity_for_current_thickness_s_m": sigma_tangential_crit,
+                    "normal_leakage_threshold": g_perp_crit,
+                    "minimum_aln_thickness_for_normal_leakage_m": t_min_normal,
+                    "maximum_aln_thickness_for_tangential_conductance_m": t_max_tangential,
+                    "maximum_pinhole_fraction": f_p_max,
+                    "intact_aln_passes_tangential_threshold": bool(c_aln_intact <= c_crit),
+                    "mhd_performance_only": True,
+                }
+            )
+    return rows
+
+
+def _li_aln_substrate_rows(
+    case: WallStackStudyCase,
+    substrate_conductivities: dict[str, float],
+    *,
+    aln_conductivities: Sequence[float],
+    pinhole_fractions: Sequence[float],
+    operating_rows: Sequence[dict[str, float | bool]],
+) -> list[dict[str, float | str | bool]]:
+    rows: list[dict[str, float | str | bool]] = []
+    sigma_li = case.lithium.electrical_conductivity
+    interaction_values = [float(row["interaction_parameter"]) for row in operating_rows]
+    interaction_ref = max(interaction_values) if interaction_values else li_aln_unit_audit(case)["interaction_parameter"]
+    for metal_name, metal_sigma in substrate_conductivities.items():
+        metal_c = wall_conductance_ratio(
+            wall_conductivity=metal_sigma,
+            wall_thickness=case.metal_thickness,
+            fluid_conductivity=sigma_li,
+            length_scale=case.length_scale,
+        )
+        for aln_sigma in aln_conductivities:
+            c_aln = wall_conductance_ratio(
+                wall_conductivity=float(aln_sigma),
+                wall_thickness=case.aln_thickness,
+                fluid_conductivity=sigma_li,
+                length_scale=case.length_scale,
+            )
+            for f_p in pinhole_fractions:
+                c_eff = effective_pinhole_conductance_ratio(
+                    intact_conductance_ratio=c_aln,
+                    metal_conductance_ratio=metal_c,
+                    pinhole_fraction=float(f_p),
+                )
+                closure = _closure_factor(c_eff)
+                rows.append(
+                    {
+                        "substrate": metal_name,
+                        "substrate_conductivity_s_m": float(metal_sigma),
+                        "aln_conductivity_s_m": float(aln_sigma),
+                        "aln_conductance_ratio": c_aln,
+                        "pinhole_fraction": float(f_p),
+                        "metal_conductance_ratio": metal_c,
+                        "effective_conductance_ratio": c_eff,
+                        "current_closure_proxy": closure,
+                        "worst_case_lorentz_drag_proxy": float(interaction_ref) * closure,
+                        "mhd_performance_only": True,
+                    }
+                )
+    return rows
+
+
+def _conductance_for_deviation(tolerance: float) -> float:
+    if not 0.0 < tolerance < 1.0:
+        raise ValueError("deviation tolerance must lie between 0 and 1")
+    return tolerance / (1.0 - tolerance)
+
+
+def _pinhole_fraction_for_threshold(
+    *,
+    intact_conductance_ratio: float,
+    metal_conductance_ratio: float,
+    critical_conductance_ratio: float,
+) -> float | None:
+    if intact_conductance_ratio > critical_conductance_ratio:
+        return None
+    if metal_conductance_ratio <= intact_conductance_ratio:
+        return 1.0
+    return max(
+        0.0,
+        min(
+            1.0,
+            (critical_conductance_ratio - intact_conductance_ratio)
+            / (metal_conductance_ratio - intact_conductance_ratio),
+        ),
+    )
+
+
+def _write_generic_rows_csv(path: Path, rows: Sequence[object]) -> None:
+    payload = [dict(row) for row in rows]
+    columns: list[str] = []
+    for row in payload:
+        for key in row:
+            if key not in columns:
+                columns.append(key)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for row in payload:
+            writer.writerow({column: row.get(column, "") for column in columns})
+
+
 def _write_li_aln_phase0_2_plot(path: Path, summary: dict[str, object]) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
@@ -426,5 +700,102 @@ def _write_li_aln_phase0_2_plot(path: Path, summary: dict[str, object]) -> None:
     ]
     axes[1, 1].text(0.02, 0.98, "\n".join(lines), va="top", fontsize=10.5, transform=axes[1, 1].transAxes)
     fig.suptitle("Li/AlN wall-stack Phase 0-2 reduced study", fontsize=15.5, fontweight="bold")
+    fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _write_li_aln_phase3_6_plot(path: Path, summary: dict[str, object]) -> None:
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+    import numpy as np
+
+    operating = [dict(row) for row in summary["operating_rows"]]
+    thresholds = [dict(row) for row in summary["threshold_rows"]]
+    substrate_rows = [dict(row) for row in summary["substrate_rows"]]
+    fig, axes = plt.subplots(2, 2, figsize=(13.2, 9.2), constrained_layout=True)
+
+    b_values = sorted({float(row["magnetic_field_t"]) for row in operating})
+    u_values = sorted({float(row["velocity_m_s"]) for row in operating})
+    n_grid = np.full((len(b_values), len(u_values)), np.nan, dtype=float)
+    for row in operating:
+        i = b_values.index(float(row["magnetic_field_t"]))
+        j = u_values.index(float(row["velocity_m_s"]))
+        n_grid[i, j] = float(row["interaction_parameter"])
+    im = axes[0, 0].imshow(n_grid, origin="lower", aspect="auto", cmap="magma", norm=LogNorm())
+    axes[0, 0].set_xticks(np.arange(len(u_values)), [f"{value:.2g}" for value in u_values])
+    axes[0, 0].set_yticks(np.arange(len(b_values)), [f"{value:.2g}" for value in b_values])
+    axes[0, 0].set_xlabel("velocity [m/s]")
+    axes[0, 0].set_ylabel("B [T]")
+    axes[0, 0].set_title("Interaction-parameter matrix")
+    for i in range(n_grid.shape[0]):
+        for j in range(n_grid.shape[1]):
+            color = "white" if n_grid[i, j] < np.nanmax(n_grid) / 4.0 else "#111827"
+            axes[0, 0].text(j, i, f"{n_grid[i, j]:.2g}", ha="center", va="center", color=color, fontsize=8)
+    cbar = fig.colorbar(im, ax=axes[0, 0])
+    cbar.set_label("N")
+
+    ten_pct = [row for row in thresholds if abs(float(row["tolerance_fraction"]) - 0.10) < 1.0e-12]
+    substrates = [str(row["substrate"]) for row in ten_pct]
+    fp = [float(row["maximum_pinhole_fraction"]) if row["maximum_pinhole_fraction"] is not None else 0.0 for row in ten_pct]
+    axes[0, 1].bar(substrates, fp, color="#0f766e")
+    axes[0, 1].set_ylim(0.0, 1.05)
+    axes[0, 1].set_ylabel("max pinhole fraction")
+    axes[0, 1].set_title("10% deviation pinhole limit by substrate")
+    for index, value in enumerate(fp):
+        axes[0, 1].text(index, min(value + 0.025, 1.02), f"{value:.2g}", ha="center", va="bottom", fontsize=9)
+    axes[0, 1].grid(True, axis="y", alpha=0.25)
+
+    grouped: dict[str, list[dict[str, object]]] = {}
+    for row in substrate_rows:
+        if float(row["pinhole_fraction"]) in {0.0, 1.0e-3, 1.0e-2} and str(row["substrate"]) == "316L":
+            grouped.setdefault(f"f={float(row['pinhole_fraction']):.0e}", []).append(row)
+    for label in ("f=0e+00", "f=1e-03", "f=1e-02"):
+        rows = grouped.get(label, [])
+        if not rows:
+            continue
+        ordered = sorted(rows, key=lambda item: float(item["aln_conductivity_s_m"]))
+        axes[1, 0].loglog(
+            [float(row["aln_conductivity_s_m"]) for row in ordered],
+            [float(row["current_closure_proxy"]) for row in ordered],
+            marker="o",
+            linewidth=1.6,
+            label=label,
+        )
+    axes[1, 0].set_xlabel("AlN conductivity [S/m]")
+    axes[1, 0].set_ylabel("current-closure proxy")
+    axes[1, 0].set_title("Degradation sweep for 316L substrate")
+    axes[1, 0].grid(True, which="both", alpha=0.25)
+    axes[1, 0].legend(frameon=False)
+
+    case_payload = dict(summary["inputs"])
+    sigma_li = float(case_payload["lithium"]["electrical_conductivity"])
+    length = float(case_payload["length_scale"])
+    t_current = float(case_payload["aln_thickness"])
+    ccrit = float(ten_pct[0]["critical_effective_conductance_ratio"]) if ten_pct else _conductance_for_deviation(0.10)
+    sigma = np.logspace(-10, -3, 120)
+    tangential_c = sigma * t_current / (sigma_li * length)
+    normal_g = sigma * length / (sigma_li * t_current)
+    axes[1, 1].loglog(
+        sigma,
+        tangential_c / ccrit,
+        color="#b45309",
+        linewidth=2.0,
+        label="tangential c / c_crit",
+    )
+    axes[1, 1].loglog(
+        sigma,
+        normal_g / ccrit,
+        color="#2563eb",
+        linewidth=2.0,
+        label="normal leakage / g_crit",
+    )
+    axes[1, 1].axhline(1.0, color="black", linestyle="--", linewidth=1.0, label="10% threshold")
+    axes[1, 1].set_xlabel("AlN conductivity [S/m]")
+    axes[1, 1].set_ylabel("margin at current thickness")
+    axes[1, 1].set_title("10% electrical margins at t_AlN = 200 microns")
+    axes[1, 1].grid(True, which="both", alpha=0.25)
+    axes[1, 1].legend(frameon=False, fontsize=8.5)
+
+    fig.suptitle("Li/AlN wall-stack Phase 3-6 reduced parametric assessment", fontsize=15.5, fontweight="bold")
     fig.savefig(path, dpi=190, bbox_inches="tight")
     plt.close(fig)

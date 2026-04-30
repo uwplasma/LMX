@@ -211,10 +211,13 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert lmx.DEFAULT_LI_ALN_CASE.name == "li_aln_rectangular_wall_stack_phase0_2"
     assert callable(lmx.LithiumMaterial)
     assert callable(lmx.WallStackStudyCase)
+    assert lmx.DEFAULT_SUBSTRATE_CONDUCTIVITIES["316L"] > 0.0
     assert callable(lmx.li_aln_phase0_2_summary)
+    assert callable(lmx.li_aln_phase3_6_summary)
     assert callable(lmx.li_aln_unit_audit)
     assert callable(lmx.li_aln_wall_layers)
     assert callable(lmx.write_li_aln_phase0_2_artifacts)
+    assert callable(lmx.write_li_aln_phase3_6_artifacts)
     assert "solve_steady" in lmx.__all__
     assert "build_hartmann_autodiff_problem" in lmx.__all__
     assert "write_case_overview_plots" in lmx.__all__
