@@ -307,6 +307,12 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
   artifact contains profile, spectrum, force, and time-history observables.
   This closes the data-ingestion part of the Q2D external lane; matched
   LMX-vs-Q2DmhdFoam turbulent parity remains a separate validation gate.
+- `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py`: runs the LMX
+  nonlinear Q2D movie case and overlays its energy/enstrophy/spectrum
+  observables with the available Q2DmhdFoam lid-driven spectral summary. This
+  is the current publication-facing Q2D comparison artifact, but it records
+  `matched_parity = false` because the archived Q2DmhdFoam lid-driven case is
+  not the same physical case as the periodic LMX SM82-style run.
 - `docker/q2dmhdfoam` and
   `examples/q2dmhdfoam_docker_reference_validation.py`: build Q2DmhdFoam in a
   foam-extend 4.1 container, run the `Q2DfullyDeveloped` reference case with
@@ -335,7 +341,15 @@ boundary-layer detail ([Pothérat, 2020](https://arxiv.org/abs/2006.03993)).
 </p>
 
 <p align="center">
+  <img src="docs/_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.png" alt="LMX and Q2DmhdFoam Q2D turbulence-observable comparison" width="72%">
+</p>
+
+<p align="center">
   <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/q2d_turbulence_decay.gif" alt="Q2D multi-mode Hartmann-friction decay movie" width="54%">
+</p>
+
+<p align="center">
+  <img src="docs/_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.gif" alt="LMX Q2D turbulence comparison movie" width="54%">
 </p>
 
 ### Magnetic-obstacle localized-field response
@@ -758,7 +772,10 @@ rather than a Dean-vortex validation.
   in `examples/q2d_turbulence_external_reference_template.py`, and
   `examples/q2dmhdfoam_external_reference_adapter.py` now wires local
   Q2DmhdFoam/Vetcha outputs into profile, turbulence, force-coefficient, and
-  probe-history observable artifacts without calling them matched LMX parity
+  probe-history observable artifacts without calling them matched LMX parity.
+  `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py` adds the current
+  side-by-side observable plot and README movie, but still marks the strict
+  parity gate open until a matched Q2DmhdFoam case is run
 - the bent-pipe low-De current-closure blocker is closed
   (`max_charge_balance_residual ≈ 2.16e-12`,
   `max_wall_current_leakage = 0`, `net_boundary_current_residual = 0`). The
@@ -810,6 +827,7 @@ Useful entry points:
 - `examples/external_validation_readiness_panel.py`: executable external-code validation map for the remaining open lanes
 - `examples/q2dmhdfoam_external_reference_adapter.py`: Q2DmhdFoam/Vetcha external Q2D reference-data adapter
 - `examples/q2dmhdfoam_docker_reference_validation.py`: Docker-rerun Q2DmhdFoam VTK/profile validation artifact
+- `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py`: LMX Q2D movie plus Q2DmhdFoam spectral-summary comparison artifact
 - `examples/plotting_api_demo.py`: direct import-and-plot post-processing workflow
 - `examples/geometry_panel_demo.py`: geometry previews plus paired geometry/simulation panel
 - `examples/fringing_benchmark_demo.py`: 3D fringing benchmark plots

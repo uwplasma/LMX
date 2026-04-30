@@ -2,7 +2,7 @@
 
 LMX keeps the README and documentation media reproducible without making the
 repository heavy. Large landing-page animations are hosted as GitHub release
-assets. Compact figures, posters, CSV summaries, and the WHAM blanket flow GIF
+assets. Compact figures, posters, CSV summaries, and bounded comparison GIFs
 are tracked under `docs/_static/generated`.
 
 The machine-readable contract is
@@ -17,6 +17,7 @@ and posters exist, and that the core publication-facing figures are present.
 | 2D Hunt startup GIF | GitHub release asset | `examples/readme_showcase_demo.py --movie-view 2d` | Boundary-layer startup from flat plug flow |
 | 3D Hunt startup GIF | GitHub release asset | `examples/readme_showcase_demo.py --movie-view 3d` | 3D profile-slab view of the same transient |
 | Q2D turbulence GIF | GitHub release asset | `examples/q2d_turbulence_decay_demo.py` | Nonlinear SM82-style movie gate, external turbulent parity still open |
+| LMX/Q2DmhdFoam Q2D comparison GIF | Tracked local docs asset | `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py` | LMX Q2D movie with Q2DmhdFoam spectral-summary context; matched parity open |
 | WHAM blanket flow GIF | Tracked local docs asset | `examples/wham_blanket_flow_demo.py` | Centerline pressure-velocity transient to steady flow |
 
 <p align="center">
@@ -29,6 +30,10 @@ and posters exist, and that the core publication-facing figures are present.
   <img src="_static/generated/wham_blanket_flow.gif" alt="LMX WHAM blanket reduced-flow movie" width="45%">
 </p>
 
+<p align="center">
+  <img src="_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.gif" alt="LMX/Q2DmhdFoam Q2D comparison movie" width="54%">
+</p>
+
 ## Publication-Facing Figures
 
 | Artifact | Generator | What It Shows |
@@ -36,6 +41,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `analytic_velocity_profiles.png` | `examples/straight_duct_profile_comparison.py` | Analytical Hunt/Shercliff overlays |
 | `closed_channel_validation_ladder.png` | `examples/hartmann_validation_ladder.py` | Hartmann/Shercliff/Hunt mesh and Ha ladder |
 | `q2d_turbulence_observables.png` | `examples/q2d_wall_bounded_validation.py` | Q2D energy, spectrum, and observable readiness |
+| `q2d_lmx_q2dmhdfoam_turbulence_comparison.png` | `examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py` | LMX nonlinear Q2D observables alongside Q2DmhdFoam lid-driven spectral-summary evidence |
 | `q2dmhdfoam_docker_reference.png` | `examples/q2dmhdfoam_docker_reference_validation.py` | Docker-rerun Q2DmhdFoam external executable gate |
 | `magnetic_obstacle_schematic.png` | `examples/magnetic_obstacle_benchmark.py` | Localized-field geometry and response setup |
 | `magnetic_obstacle_benchmark.png` | `examples/magnetic_obstacle_benchmark.py` | Internal matched no-field response gate |
@@ -65,6 +71,7 @@ Use the bounded local commands below before a release or manuscript-figure pass:
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 2d
 python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 3d
 python examples/q2d_turbulence_decay_demo.py
+python examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py
 python examples/q2dmhdfoam_docker_reference_validation.py
 python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py

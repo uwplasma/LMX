@@ -98,7 +98,7 @@ name = "fluid"
 kind = "fluid"
 conductivity = 1.0
 density = 1.0
-viscosity = 0.01
+viscosity = 0.01  # kinematic viscosity nu [m^2/s]
 
 [[boundary_conditions]]
 name = "y_min_wall"
@@ -325,6 +325,9 @@ conservation histories). The executable TOML path writes those bundles into
 - `conductivity`
 - `density`
 - `viscosity`
+  - kinematic viscosity `nu` in `m^2/s`
+  - if a material source gives dynamic viscosity `mu` in `Pa s`, use
+    `nu = mu / density` before writing the TOML
 - `wall_thickness`
 
 ## `[[boundary_conditions]]`

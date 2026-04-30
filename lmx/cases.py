@@ -10,10 +10,25 @@ from .specs import (
     SolverConfig,
     TimeStepperConfig,
 )
+from .units import magnetic_field_from_hartmann
 
 
 def _ha_to_b(ha: float, length_scale: float, conductivity: float, density: float, viscosity: float) -> float:
-    return ha / (length_scale * ((conductivity / (density * viscosity)) ** 0.5))
+    """Return ``B`` for target ``Ha`` using LMX's kinematic-viscosity convention.
+
+    ``viscosity`` is retained as the public constructor argument for backward
+    compatibility, but it is interpreted as kinematic viscosity ``nu`` in
+    ``m^2/s``.  Dynamic viscosity ``mu`` must be divided by density before
+    calling these case constructors.
+    """
+
+    return magnetic_field_from_hartmann(
+        hartmann=ha,
+        length_scale=length_scale,
+        conductivity=conductivity,
+        density=density,
+        kinematic_viscosity=viscosity,
+    )
 
 
 def _wall_conductivity_from_conductance_ratio(

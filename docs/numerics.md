@@ -36,9 +36,16 @@ differentiable lane.
 
 - conductivity
 - density
-- viscosity
+- kinematic viscosity `nu`
 - fluid/solid masks
 - constant, analytic, and ramped magnetic-field components
+
+The public `RegionSpec.viscosity` field is retained for compatibility, but its
+meaning is kinematic viscosity in `m^2/s`. Dynamic viscosity from a material
+table must be converted with `lmx.dynamic_to_kinematic_viscosity(mu, rho)`
+before building a case. The fully developed and extruded operators use this
+field directly as the diffusion coefficient and divide pressure, body forcing,
+and Lorentz terms by density.
 
 The current magnetic-field entry points are:
 

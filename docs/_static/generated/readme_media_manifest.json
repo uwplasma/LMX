@@ -26,14 +26,22 @@
     }
   ],
   "local_media": [
-    {
-      "name": "wham_blanket_flow.gif",
-      "kind": "WHAM blanket reduced-flow movie",
-      "path": "docs/_static/generated/wham_blanket_flow.gif",
-      "poster": "wham_blanket_flow_poster.png",
-      "generator": "examples/wham_blanket_flow_demo.py",
-      "status": "tracked locally because it is compact and tied to the WHAM blanket docs section"
-    }
+        {
+            "name": "wham_blanket_flow.gif",
+            "kind": "WHAM blanket reduced-flow movie",
+            "path": "docs/_static/generated/wham_blanket_flow.gif",
+            "poster": "wham_blanket_flow_poster.png",
+            "generator": "examples/wham_blanket_flow_demo.py",
+            "status": "tracked locally because it is compact and tied to the WHAM blanket docs section"
+        },
+        {
+            "name": "q2d_lmx_q2dmhdfoam_turbulence_comparison.gif",
+            "kind": "LMX/Q2DmhdFoam Q2D comparison movie",
+            "path": "docs/_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.gif",
+            "poster": "q2d_lmx_q2dmhdfoam_turbulence_comparison.png",
+            "generator": "examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py",
+            "status": "tracked locally as a bounded comparison movie; strict matched turbulent parity remains open"
+        }
   ],
   "figures": [
     {
@@ -46,11 +54,16 @@
       "kind": "Hartmann/Shercliff/Hunt validation ladder",
       "generator": "examples/hartmann_validation_ladder.py"
     },
-    {
-      "name": "q2d_turbulence_observables.png",
-      "kind": "Q2D nonlinear observable readiness panel",
-      "generator": "examples/q2d_wall_bounded_validation.py"
-    },
+        {
+            "name": "q2d_turbulence_observables.png",
+            "kind": "Q2D nonlinear observable readiness panel",
+            "generator": "examples/q2d_wall_bounded_validation.py"
+        },
+        {
+            "name": "q2d_lmx_q2dmhdfoam_turbulence_comparison.png",
+            "kind": "LMX/Q2DmhdFoam Q2D turbulence-observable comparison",
+            "generator": "examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py"
+        },
     {
       "name": "magnetic_obstacle_schematic.png",
       "kind": "magnetic-obstacle setup schematic",

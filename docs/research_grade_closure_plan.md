@@ -12,6 +12,64 @@ parsers, cached summaries, artifact presence, and scalar gates, while heavy
 campaigns regenerate the external data and publication figures when explicitly
 requested.
 
+## Reviewer-Proofing Gates
+
+The following gates address current reviewer concerns before any new
+liquid-lithium or blanket case is promoted:
+
+- `RegionSpec.viscosity` is kinematic viscosity `nu` in `m^2/s`. Dynamic
+  viscosity `mu` from material tables must be converted by `nu = mu / rho`.
+  Every real-fluid case summary must report `mu` when supplied, `rho`, `nu`,
+  `Ha`, `Re`, `N`, `Rm`, wall conductance ratio `c`, and normal leakage ratio
+  `g_perp` where applicable.
+- The default `fully_developed_inductionless` solver is a 2D cross-sectional
+  reduction. It is acceptable for straight fully developed duct studies and
+  wall-conductance sweeps, but it cannot validate general 3D recirculation,
+  entrance effects, heat transfer, or turbulence.
+- The 3D `extruded_inductionless` lane is research-stage until external 3D
+  pressure-velocity-current parity and convergence gates pass.
+- Current conservation is a hard physics gate. A wall-insulation claim is not
+  accepted unless conservative face-current `div J`, charge balance,
+  interface-current residuals, wall leakage, and net boundary current are
+  recorded and within the lane threshold.
+
+## Nested Wall Layers And AlN/Metal Study
+
+The AlN/metal wall-stack study is a separate MHD-performance campaign, not a
+materials-qualification claim. It asks how low an AlN-like wall conductance must
+remain before Lorentz drag, current closure, leakage, and pressure-gradient
+proxy depart from the ideal-insulator limit.
+
+Minimum model set:
+
+- ideal insulating wall;
+- bare conducting metal wall;
+- finite/degraded AlN layer swept by `c_AlN`;
+- smooth pinhole model
+  `c_eff = (1 - f_p)c_AlN + f_p c_metal`;
+- effective AlN+metal stack with tangential `c_parallel` distinguished from
+  normal leakage `g_perp`;
+- true fluid | AlN | metal multilayer geometry after the reduced model is
+  verified.
+
+Current implementation status: `lmx.wall_models` provides validated reduced
+stack utilities for tangential conductance, normal leakage, pinhole
+interpolation, equivalent-layer checks, and nested-layer mesh QA. The remaining
+geometry work is to add arbitrary nested wall layers per side, material
+assignment per layer, conservative interface-current diagnostics at every
+layer boundary, and FreeMHD/code-to-code comparisons for layered wall cases.
+
+Required publication artifacts:
+
+- duct cross-section showing fluid, AlN, and metal regions;
+- mesh panel with layer cell counts and boundary-layer resolution;
+- plots of required forcing, Lorentz power, current leakage, peak current, and
+  flattening versus `c`, `Ha`, temperature, and `f_p`;
+- autodiff-vs-finite-difference gradient parity for smooth wall objectives;
+- threshold maps for `c_crit`, `t_AlN,min`, `g_perp,crit`, and `f_p,max`;
+- final ranking table that explicitly separates MHD conclusions from
+  corrosion, compatibility, adhesion, irradiation, wetting, and printability.
+
 ## Closure Definition
 
 A strict research lane is closed only when all of the following are true:
@@ -54,6 +112,9 @@ renaming an internal proxy as validation.
   reference data. The local checkout is
   `/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam`; the existing
   adapter already ingests profile and turbulence-summary outputs.
+  The public source is `https://github.com/iraola/Q2DmhdFoam`, and the
+  associated report describes its 2D-only scope and perpendicular-field
+  assumption.
 - MHD_Solvers_OpenFOAM is the current executable path for one-way MHD
   electric-potential cases and magnetic-obstacle-style construction. The local
   checkout is
@@ -68,6 +129,10 @@ renaming an internal proxy as validation.
   Smolentsev-Abdou, and Potherat-style observables: kinetic energy, enstrophy,
   spectra, Hartmann friction, turnover count, wall-layer response, and
   instability or transient-growth metrics.
+  Relevant public preprints include Pothérat's quasi-2D duct perturbation work
+  (`https://arxiv.org/abs/2006.03993`) and the effective two-dimensional model
+  literature (`https://arxiv.org/abs/2006.15468`,
+  `https://arxiv.org/abs/2006.11550`).
   The current candidate table records the locally available Q2DmhdFoam spectral
   summary; the matched energy/enstrophy/turnover bundle remains open.
 - Curved-pipe and Dean-vortex targets should be anchored first to hydrodynamic

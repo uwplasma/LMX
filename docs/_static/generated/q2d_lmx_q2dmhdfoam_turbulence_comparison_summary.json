@@ -1,0 +1,58 @@
+{
+  "case": "q2d_lmx_q2dmhdfoam_turbulence_comparison",
+  "lmx_case": {
+    "nx": 96,
+    "ny": 96,
+    "viscosity": 0.0008,
+    "hartmann_friction": 0.08,
+    "dt": 0.002,
+    "t_final": 3.0,
+    "frame_count": 72
+  },
+  "lmx_validation": {
+    "energy_decay_ratio": 0.47707799991780525,
+    "enstrophy_decay_ratio": 0.4266240643590707,
+    "energy_variation_ratio": 0.7412324678418905,
+    "enstrophy_variation_ratio": 0.8570331163144366,
+    "initial_high_k_energy_fraction": 0.09109634893660852,
+    "final_high_k_energy_fraction": 0.028180939245248428,
+    "initial_spectral_centroid": 7.980785009027717,
+    "final_spectral_centroid": 7.117645500595693,
+    "spectral_centroid_shift": 0.8631395084320239,
+    "max_courant": 0.05234552620681659,
+    "max_divergence_linf": 2.7394287175895764e-14,
+    "turnover_count": 0.3312918376699193,
+    "nonlinear_activity_pass": true,
+    "frame_count": 72,
+    "validation_pass": true,
+    "literature_target": "Sommeria-Moreau quasi-2D turbulence with Hartmann-friction damping",
+    "validation_status": "nonlinear_q2d_movie_available_external_turbulent_reference_open",
+    "research_grade_turbulence_validation_pass": false
+  },
+  "q2dmhdfoam_observables": {
+    "source_path": "/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt",
+    "weak_mode_count": 9,
+    "weak_peak_over_max_max": 0.1721910544741928,
+    "weak_peak_over_max_mean": 0.09677375606852585,
+    "weak_dominant_wavenumber": 1.5,
+    "weak_weighted_wavenumber": 2.4610649546844843,
+    "strong_mode_count": 1,
+    "strong_peak_over_max_max": 0.11899557609373689,
+    "strong_avg_over_max_max": 0.04534148843133362,
+    "strong_dominant_wavenumber": 0.5,
+    "status": "q2dmhdfoam_lid_driven_summary_loaded"
+  },
+  "matched_parity": false,
+  "strict_blocker_closed": false,
+  "plots": [
+    "q2d_lmx_q2dmhdfoam_turbulence_comparison.png",
+    "q2d_lmx_q2dmhdfoam_turbulence_comparison.pdf"
+  ],
+  "movie": "q2d_lmx_q2dmhdfoam_turbulence_comparison.gif",
+  "docs_artifacts": [
+    "q2d_lmx_q2dmhdfoam_turbulence_comparison.png",
+    "q2d_lmx_q2dmhdfoam_turbulence_comparison.pdf",
+    "q2d_lmx_q2dmhdfoam_turbulence_comparison.gif"
+  ],
+  "next_step": "Run Q2DmhdFoam and LMX on the same Q2D geometry, forcing, Hartmann friction, integration time, and observable definitions; then fill q2d_turbulence_reference_observables.csv."
+}

@@ -402,6 +402,19 @@ That example writes a deterministic nonlinear Hartmann-friction vorticity GIF:
 - if `q2d_turbulence_reference_observables.csv` exists in the output directory,
   write a publication-table-ready comparison CSV and PNG/PDF tolerance-gate plot
 
+LMX/Q2DmhdFoam Q2D turbulence-observable comparison:
+
+```bash
+python examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py
+```
+
+That example runs the same LMX nonlinear Q2D movie case and overlays its
+energy, enstrophy, and spectral observables with the available Q2DmhdFoam
+lid-driven spectral summary. It writes a PNG/PDF panel, summary JSON, and GIF
+for the README. The summary intentionally records `matched_parity = false`
+until a Q2DmhdFoam case is run with the same geometry, forcing, Hartmann
+friction, integration time, and observable definitions as the LMX case.
+
 Q2D turbulence external-reference template:
 
 ```bash

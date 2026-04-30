@@ -87,6 +87,14 @@ plumbing; it remains separate from the stricter matched turbulent parity gate.
 
 ![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
 
+The current LMX/Q2DmhdFoam Q2D comparison artifact overlays the LMX nonlinear
+SM82-style movie observables with the available Q2DmhdFoam lid-driven spectral
+summary. It is useful for manuscript planning and parser testing, but its
+summary records `matched_parity = false` because the physical cases are not
+identical.
+
+![LMX/Q2DmhdFoam Q2D turbulence-observable comparison](_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.png)
+
 The latest strict closure attempt keeps the research-grade tag blocked. The
 magnetic-obstacle escalation did not retain a Votyakov-scale reverse-flow
 signal on the current grid, the available Q2DmhdFoam outputs are not matched to

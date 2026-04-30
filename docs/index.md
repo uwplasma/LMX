@@ -32,6 +32,7 @@ theory
 numerics
 geometry
 input_reference
+wall_models
 case_cookbook
 testing
 ```

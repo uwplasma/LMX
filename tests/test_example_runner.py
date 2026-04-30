@@ -1237,6 +1237,36 @@ def test_q2d_turbulence_external_reference_template_writes_summary(tmp_path: Pat
     assert (tmp_path / "q2d_turbulence_external_reference_template_summary.json").exists()
 
 
+def test_q2d_lmx_q2dmhdfoam_turbulence_comparison_writes_artifacts(tmp_path: Path):
+    module = _load_example_module("q2d_lmx_q2dmhdfoam_turbulence_comparison.py")
+    module.NX = 24
+    module.NY = 24
+    module.T_FINAL = 1.0
+    module.FRAME_COUNT = 8
+    module.FPS = 4
+    summary_path = tmp_path / "IDM_output_U.txt"
+    summary_path.write_text(
+        "-1.4\n"
+        "Weak turbulence:[[1.0, 0.15], [2.0, 0.10]]\n"
+        "Strong turbulence:[[0.5, 0.12, 0.04]].\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_q2d_lmx_q2dmhdfoam_turbulence_comparison(
+        out_dir=tmp_path / "out",
+        docs_output_dir=tmp_path / "docs",
+        q2dmhdfoam_lid_driven_summary=summary_path,
+    )
+
+    assert summary["case"] == "q2d_lmx_q2dmhdfoam_turbulence_comparison"
+    assert summary["matched_parity"] is False
+    assert summary["strict_blocker_closed"] is False
+    assert summary["q2dmhdfoam_observables"]["weak_mode_count"] == 2
+    assert (tmp_path / "out" / "q2d_lmx_q2dmhdfoam_turbulence_comparison.png").exists()
+    assert (tmp_path / "out" / "q2d_lmx_q2dmhdfoam_turbulence_comparison.gif").exists()
+    assert (tmp_path / "docs" / "q2d_lmx_q2dmhdfoam_turbulence_comparison.png").exists()
+
+
 def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
     module = _load_example_module("q2dmhdfoam_external_reference_adapter.py")
     root = tmp_path / "Q2DmhdFoam"

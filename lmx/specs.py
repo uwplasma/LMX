@@ -32,6 +32,12 @@ MagneticAxisKind = Literal["x", "y", "z"]
 
 @dataclass(frozen=True)
 class RegionSpec:
+    """Material-region specification.
+
+    ``viscosity`` is kinematic viscosity ``nu`` in ``m^2/s``. Dynamic
+    viscosity ``mu`` should be converted before constructing a case.
+    """
+
     name: str
     kind: RegionKind
     conductivity: float

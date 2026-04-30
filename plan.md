@@ -140,6 +140,60 @@ refer to the Samper et al. taxonomy.
 
 ### Current open research-grade blockers
 
+- Reviewer-proofing addendum from collaborator review:
+  The public material convention must stay explicit: `RegionSpec.viscosity`
+  means kinematic viscosity `nu`, not dynamic viscosity `mu`. LMX now exposes
+  conversion and nondimensional helpers in `lmx.units`; all new real-fluid and
+  lithium cases must record `mu`, `rho`, computed `nu`, `Ha`, `Re`, `N`, `Rm`,
+  `c`, and `g_perp` in case summaries. The fully developed default solver must
+  continue to be described as a 2D cross-sectional reduction
+  (`u = u(y,z)`, `phi = phi(y,z)`) for straight ducts. It is valid for
+  Hartmann/Shercliff/Hunt-style comparisons and wall-conductance studies, but
+  it is not a replacement for full 3D recirculation, entrance effects, heat
+  transfer, or turbulence. The 3D `extruded_inductionless` lane must remain
+  clearly labeled as bounded/research-stage until its pressure-velocity-current
+  and external-parity gates pass. Conservation diagnostics (`div J`,
+  charge-balance residuals, interface-current residuals, wall leakage, and net
+  boundary current) remain hard acceptance gates because insulating-wall models
+  are not credible if the discrete solver leaks current numerically.
+- Nested wall-layer and AlN/metal wall-stack campaign:
+  Add a dedicated `studies/li_aln_wall_mhd/` lane based on the attached
+  collaborator plan. The scientific boundary is MHD performance only: LMX can
+  rank electrical wall models and degradation sensitivity, but must not claim
+  lithium compatibility, corrosion resistance, coating adhesion, irradiation
+  tolerance, wetting, thermal cycling, or printability. The minimum model set
+  is:
+  ideal insulator, bare conducting metal, finite/degraded AlN,
+  smooth pinhole/effective model
+  `c_eff = (1-f_p)c_AlN + f_p c_metal`, effective AlN+metal stack with
+  separate tangential `c_parallel` and normal `g_perp`, and true
+  fluid|AlN|metal multilayer geometry once implemented. The first code layer is
+  reduced and differentiable (`lmx.wall_models`), with validated conductance
+  utilities, equivalent-layer checks, pinhole interpolation, and nested-layer
+  mesh QA. The full geometry lane must add arbitrary wall layers per side,
+  layer-specific conductivities/thicknesses/cells, interface-current
+  diagnostics, and FreeMHD/code-to-code comparison cases.
+- AlN wall-stack study deliverables:
+  The complete collaborator-provided study plan is retained in
+  `studies/li_aln_wall_mhd/plan.md`; this section is the active integration
+  checklist.
+  Phase 0 records baseline tests/environment. Phase 1 audits units and
+  nondimensional numbers. Phase 2 implements effective wall conductance,
+  smooth pinhole degradation, fixed-flow forcing, autodiff scalar objectives,
+  and true multilayer walls if missing. Phase 3 performs mesh convergence and
+  limiting cases (`c -> 0`, large `c`, `f_p = 0`, `f_p = 1`, identical layers).
+  Phase 4 runs the rectangular-duct sweeps over `c`, `Ha`, temperature, and
+  target velocity. Phase 5 reports degradation thresholds
+  (`c_crit`, `sigma_AlN,crit`, `t_AlN,min`, `g_perp,crit`, `f_p,max`).
+  Phase 6 compares AlN/metal stacks and substrate sensitivity. Phase 7 repeats
+  selected cases in extruded/fringing fields. Phase 8 validates autodiff
+  gradients against finite differences for smooth objectives. Each phase must
+  write CSV/JSON artifacts, PNG/PDF plots, and a docs page with equations,
+  assumptions, boundary conditions, and limitations.
+  Literature anchors include Shercliff/Hunt rectangular-duct theory, Ni/Tao
+  wall-conductance extensions, FreeMHD closed-channel validation files, and the
+  Samper fusion-MHD V&V ladder; external-code comparisons should use FreeMHD
+  for layered wall ducts where the physics matches.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the

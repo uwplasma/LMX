@@ -52,7 +52,29 @@ where:
 - $\phi$ is electric potential
 - $\mathbf{J}$ is current density
 - $\mathbf{B}$ is the prescribed magnetic field
-- $\rho$, $\mu$, and $\sigma$ are density, dynamic viscosity, and electrical conductivity
+- $\rho$, $\mu$, $\nu=\mu/\rho$, and $\sigma$ are density, dynamic viscosity,
+  kinematic viscosity, and electrical conductivity
+
+LMX input objects store `RegionSpec.viscosity` as the **kinematic viscosity**
+`nu` in `m^2/s`. This matches the solver form used after dividing the momentum
+equation by density:
+
+$$
+\frac{\partial \mathbf{u}}{\partial t}
+= -\frac{1}{\rho}\nabla p + \nu \nabla^2 \mathbf{u}
+  + \frac{1}{\rho}\mathbf{J}\times\mathbf{B}.
+$$
+
+Dynamic viscosity values from material-property tables must be converted before
+case construction:
+
+$$
+\nu=\frac{\mu}{\rho}.
+$$
+
+The helpers in `lmx.units` provide the explicit conversions and compute
+`Ha`, `Re`, `N`, `Rm`, wall conductance ratio `c`, and normal leakage ratio
+`g_perp` using this convention.
 
 These equations are represented in the current source tree by:
 
@@ -115,6 +137,8 @@ $$
 $$
 
 These are the two fields actually advanced by the current default solver.
+The code solves the density-divided form, so the diffusion coefficient passed
+to the linear velocity operator is `nu`, not `mu`.
 
 ## Boundary and interface conditions
 
