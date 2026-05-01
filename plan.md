@@ -45,7 +45,7 @@ Ship a research-grade `1.0` inductionless MHD code with:
 
 Current release-gate status: the bounded release plan is implemented. Routine
 CI now keeps the fast unit/release-readiness gate and runs bounded validation
-artifacts in parallel: low-resolution Hartmann/Shercliff/Hunt solver
+artifacts in parallel: per-case low-resolution Hartmann/Shercliff/Hunt solver
 summaries, Hartmann mesh/time convergence probes, Q2D reduced-model artifacts,
 and the external-reference parity contract. The truly heavy external-code
 regeneration lanes remain manual because they require external solvers or
@@ -1684,11 +1684,11 @@ That retained gate now passes for all three retained fringing geometries.
 - The default push/PR gate now excludes the heaviest `physics` and
   `regression` marker tests from the fast unit job, but bounded physics
   artifacts are back in CI as separate parallel jobs.
-- The latest local timing evidence shows the bounded solver-validation job is
-  roughly three minutes on this workstation, the bounded convergence job is
-  roughly two minutes, and the Q2D artifact job is under ten seconds. They are
-  intentionally split so the total workflow stays below the hard 10-minute
-  wall-clock target.
+- The first GitHub pass of the unsplit artifact jobs was too close to the
+  10-minute target (`~10 min`). The artifact lane is now split into per-case
+  solver-validation jobs, per-resolution mesh-convergence jobs, and a separate
+  time-convergence job so the workflow has real margin instead of a borderline
+  pass.
 - Current combined coverage for `lmx/` and `scripts/` is `95.4%`.
 - The `95%` coverage lift came from live validation behavior, not image or
   smoke-test padding: FreeMHD helper inference, reference-output fallbacks,

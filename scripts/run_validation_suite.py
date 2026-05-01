@@ -28,12 +28,32 @@ from lmx.validation import (
 )
 
 
-def _cases(ha: float, output_dir: Path, resolution: int):
-    return [
-        make_hartmann_case(ha=ha, ny=resolution, nz=resolution, output_dir=str(output_dir / "hartmann")),
-        make_shercliff_case(ha=ha, ny=resolution, nz=resolution, output_dir=str(output_dir / "shercliff")),
-        make_hunt_case(ha=ha, ny=resolution, nz=resolution, wall_cells=2, output_dir=str(output_dir / "hunt")),
-    ]
+def _cases(ha: float, output_dir: Path, resolution: int, case_names: list[str]):
+    builders = {
+        "hartmann": lambda: make_hartmann_case(
+            ha=ha,
+            ny=resolution,
+            nz=resolution,
+            output_dir=str(output_dir / "hartmann"),
+        ),
+        "shercliff": lambda: make_shercliff_case(
+            ha=ha,
+            ny=resolution,
+            nz=resolution,
+            output_dir=str(output_dir / "shercliff"),
+        ),
+        "hunt": lambda: make_hunt_case(
+            ha=ha,
+            ny=resolution,
+            nz=resolution,
+            wall_cells=2,
+            output_dir=str(output_dir / "hunt"),
+        ),
+    }
+    unknown = sorted(set(case_names) - set(builders))
+    if unknown:
+        raise ValueError(f"Unknown validation case(s): {', '.join(unknown)}")
+    return [builders[name]() for name in case_names]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -41,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=Path("artifacts/validation"))
     parser.add_argument("--ha", type=float, default=5.0)
     parser.add_argument("--resolution", type=int, default=16)
+    parser.add_argument("--cases", type=str, default="hartmann,shercliff,hunt")
     parser.add_argument("--reference-root", type=Path, default=None)
     parser.add_argument("--x-slice", type=str, default="1m")
     parser.add_argument("--hartmann-l2-threshold", type=float, default=0.05)
@@ -50,8 +71,9 @@ def main(argv: list[str] | None = None) -> int:
 
     args.output.mkdir(parents=True, exist_ok=True)
     summary: dict[str, dict[str, float | str]] = {}
+    case_names = [case.strip() for case in args.cases.split(",") if case.strip()]
 
-    for case in _cases(args.ha, args.output, args.resolution):
+    for case in _cases(args.ha, args.output, args.resolution, case_names):
         solution = solve_steady(case)
         case_dir = args.output / case.name
         case_dir.mkdir(parents=True, exist_ok=True)
