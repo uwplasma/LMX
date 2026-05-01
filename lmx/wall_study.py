@@ -1,9 +1,10 @@
 """Reduced Li/AlN wall-stack study helpers.
 
-These helpers implement the Phase 0--2 part of the Li/AlN wall-stack plan:
-unit/nondimensional audits, reduced tangential/normal wall conductance models,
-smooth pinhole sweeps, and plot/table artifacts.  They are intentionally
-electrical-performance reductions, not material-compatibility claims.
+These helpers implement the Li/AlN wall-stack plan: unit/nondimensional
+audits, reduced tangential/normal wall conductance models, explicit nested
+wall-layer meshes, solved limiting-case diagnostics, and plot/table artifacts.
+They are intentionally electrical-performance reductions, not
+material-compatibility claims.
 """
 
 from __future__ import annotations
@@ -17,6 +18,17 @@ from typing import Iterable, Sequence
 import numpy as np
 
 from .mesh import StructuredMesh, generate_multilayer_duct_mesh
+from .solvers import solve_steady
+from .specs import (
+    BoundaryCondition,
+    CaseSpec,
+    GeometrySpec,
+    MagneticFieldSpec,
+    OutputSpec,
+    RegionSpec,
+    SolverConfig,
+    TimeStepperConfig,
+)
 from .units import (
     dynamic_to_kinematic_viscosity,
     hartmann_number,
@@ -488,6 +500,200 @@ def write_li_aln_multilayer_mesh_artifacts(
     return [json_path, layer_csv, interface_csv, region_csv, png_path]
 
 
+def li_aln_multilayer_wall_model_stacks(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    wall_model: str = "intact_aln",
+) -> dict[str, tuple[WallLayer, ...]]:
+    """Return explicit wall stacks for one limiting electrical wall model.
+
+    Supported models are ``ideal_insulator``, ``intact_aln``,
+    ``degraded_aln``, and ``bare_metal``.  These are MHD electrical models
+    only; they do not assert coating survival or lithium compatibility.
+    """
+
+    if wall_model == "ideal_insulator":
+        return li_aln_wall_stacks_by_side(case, aln_conductivity=0.0)
+    if wall_model == "intact_aln":
+        return li_aln_wall_stacks_by_side(case, aln_conductivity=case.intact_aln_conductivity)
+    if wall_model == "degraded_aln":
+        return li_aln_wall_stacks_by_side(case, aln_conductivity=case.degraded_aln_conductivity)
+    if wall_model == "bare_metal":
+        metal = WallLayer(
+            case.metal_name,
+            conductivity=float(case.metal_conductivity),
+            thickness=float(case.aln_thickness + case.metal_thickness),
+            cells=int(case.aln_cells + case.metal_cells),
+        )
+        return {side: (metal,) for side in ("left", "right", "bottom", "top")}
+    raise ValueError(f"unsupported Li/AlN wall model {wall_model!r}")
+
+
+def build_li_aln_multilayer_solve_case(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    wall_model: str = "intact_aln",
+    ny: int = 18,
+    nz: int = 18,
+    magnetic_field: float | None = None,
+    velocity: float | None = None,
+    dt: float = 1.0e-3,
+    t_final: float = 1.2e-2,
+    max_steps: int = 12,
+    potential_iterations: int = 80,
+    velocity_update_limit: float = 2.0e-2,
+) -> tuple[CaseSpec, StructuredMesh, dict[str, tuple[WallLayer, ...]]]:
+    """Build a solved explicit Li/AlN/metal limiting-case setup.
+
+    The returned ``CaseSpec`` uses a prescribed flow rate and the returned mesh
+    carries the true material conductivity field through ``mesh.sigma``.
+    """
+
+    if ny <= 0 or nz <= 0:
+        raise ValueError("ny and nz must be positive")
+    if dt <= 0.0 or t_final < 0.0 or max_steps <= 0:
+        raise ValueError("time-step controls must be positive")
+    payload = asdict(case)
+    payload["lithium"] = case.lithium
+    payload["magnetic_field"] = float(case.magnetic_field if magnetic_field is None else magnetic_field)
+    payload["velocity"] = float(case.velocity if velocity is None else velocity)
+    solved_case = WallStackStudyCase(**payload)
+    stacks = li_aln_multilayer_wall_model_stacks(solved_case, wall_model=wall_model)
+    width = 2.0 * solved_case.length_scale
+    height = 2.0 * solved_case.length_scale
+    mesh = generate_multilayer_duct_mesh(
+        width=width,
+        height=height,
+        length=solved_case.length_scale,
+        nx=1,
+        ny=ny,
+        nz=nz,
+        wall_layers=stacks,
+        fluid_conductivity=solved_case.lithium.electrical_conductivity,
+    )
+    flow_rate = float(solved_case.velocity * width * height)
+    solver_case = CaseSpec(
+        name=f"{solved_case.name}_{wall_model}_multilayer_solve",
+        geometry=GeometrySpec(kind="rect_duct", width=width, height=height, length=solved_case.length_scale, ny=ny, nz=nz),
+        regions=(
+            RegionSpec(
+                "fluid",
+                "fluid",
+                solved_case.lithium.electrical_conductivity,
+                solved_case.lithium.density,
+                solved_case.lithium.kinematic_viscosity,
+            ),
+        ),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, solved_case.magnetic_field, 0.0)),
+        boundary_conditions=(
+            BoundaryCondition("walls", "no_slip"),
+            BoundaryCondition("flow_rate", "inlet_flow_rate", value=flow_rate, axis="x"),
+        ),
+        time_stepper=TimeStepperConfig(
+            dt=dt,
+            t_final=t_final,
+            max_steps=max_steps,
+            outer_iterations=2,
+            potential_iterations=potential_iterations,
+            potential_tolerance=1.0e-7,
+            potential_solver="auto",
+            current_reconstruction="hybrid_face_lorentz",
+            steady_tolerance=1.0e-7,
+            steady_potential_tolerance=1.0e-7,
+            relaxation=0.35,
+            velocity_update_limit=velocity_update_limit,
+            velocity_update_limiter="global_scale",
+        ),
+        solver=SolverConfig(
+            kind="fully_developed_inductionless",
+            mode="steady",
+            linear_solver="auto",
+            preconditioner="jacobi",
+            coupling_iterations=4,
+            coupling_tolerance=1.0e-7,
+        ),
+        output=OutputSpec(write_paraview=False, write_csv_profiles=False, write_npz=False, write_json_summary=False),
+        forcing=0.0,
+        initial_velocity=solved_case.velocity,
+        reference_pressure_gradient=-1.0,
+        reference_phi_cell=(mesh.ny // 2, mesh.nz // 2),
+        notes="Explicit Li/AlN/metal multilayer limiting-case solve with prescribed mean flow.",
+    )
+    return solver_case, mesh, stacks
+
+
+def li_aln_multilayer_solve_summary(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    wall_models: Sequence[str] = ("ideal_insulator", "intact_aln", "degraded_aln"),
+    ny: int = 18,
+    nz: int = 18,
+    magnetic_field: float | None = 5.0e-2,
+    velocity: float | None = 1.0e-2,
+    dt: float = 1.0e-3,
+    t_final: float = 1.2e-2,
+    max_steps: int = 12,
+    potential_iterations: int = 80,
+) -> dict[str, object]:
+    """Run bounded solved multilayer wall-model cases and return observables."""
+
+    summary, _ = _li_aln_multilayer_solve_payload(
+        case,
+        wall_models=wall_models,
+        ny=ny,
+        nz=nz,
+        magnetic_field=magnetic_field,
+        velocity=velocity,
+        dt=dt,
+        t_final=t_final,
+        max_steps=max_steps,
+        potential_iterations=potential_iterations,
+        retain_profiles=False,
+    )
+    return summary
+
+
+def write_li_aln_multilayer_solve_artifacts(
+    out_dir: str | Path,
+    *,
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    wall_models: Sequence[str] = ("ideal_insulator", "intact_aln", "degraded_aln"),
+    ny: int = 18,
+    nz: int = 18,
+    magnetic_field: float | None = 5.0e-2,
+    velocity: float | None = 1.0e-2,
+    dt: float = 1.0e-3,
+    t_final: float = 1.2e-2,
+    max_steps: int = 12,
+    potential_iterations: int = 80,
+    filename_stem: str = "li_aln_multilayer_solve",
+) -> list[Path]:
+    """Write solved multilayer limiting-case JSON, CSV, and PNG artifacts."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary, profiles = _li_aln_multilayer_solve_payload(
+        case,
+        wall_models=wall_models,
+        ny=ny,
+        nz=nz,
+        magnetic_field=magnetic_field,
+        velocity=velocity,
+        dt=dt,
+        t_final=t_final,
+        max_steps=max_steps,
+        potential_iterations=potential_iterations,
+        retain_profiles=True,
+    )
+    json_path = out / f"{filename_stem}_summary.json"
+    csv_path = out / f"{filename_stem}_observables.csv"
+    png_path = out / f"{filename_stem}.png"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    _write_generic_rows_csv(csv_path, summary["observable_rows"])
+    _write_li_aln_multilayer_solve_plot(png_path, summary, profiles)
+    return [json_path, csv_path, png_path]
+
+
 def write_li_aln_phase0_2_artifacts(
     out_dir: str | Path,
     *,
@@ -765,6 +971,175 @@ def _write_generic_rows_csv(path: Path, rows: Sequence[object]) -> None:
         writer.writeheader()
         for row in payload:
             writer.writerow({column: row.get(column, "") for column in columns})
+
+
+def _li_aln_multilayer_solve_payload(
+    case: WallStackStudyCase,
+    *,
+    wall_models: Sequence[str],
+    ny: int,
+    nz: int,
+    magnetic_field: float | None,
+    velocity: float | None,
+    dt: float,
+    t_final: float,
+    max_steps: int,
+    potential_iterations: int,
+    retain_profiles: bool,
+) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
+    payload = asdict(case)
+    payload["lithium"] = case.lithium
+    payload["magnetic_field"] = float(case.magnetic_field if magnetic_field is None else magnetic_field)
+    payload["velocity"] = float(case.velocity if velocity is None else velocity)
+    operating_case = WallStackStudyCase(**payload)
+    rows: list[dict[str, float | int | str | bool]] = []
+    profiles: dict[str, dict[str, object]] = {}
+    for wall_model in wall_models:
+        solver_case, mesh, stacks = build_li_aln_multilayer_solve_case(
+            operating_case,
+            wall_model=wall_model,
+            ny=ny,
+            nz=nz,
+            magnetic_field=operating_case.magnetic_field,
+            velocity=operating_case.velocity,
+            dt=dt,
+            t_final=t_final,
+            max_steps=max_steps,
+            potential_iterations=potential_iterations,
+        )
+        solution = solve_steady(solver_case, mesh=mesh)
+        rows.append(_li_aln_multilayer_solution_row(operating_case, wall_model, mesh, stacks, solution))
+        if retain_profiles:
+            profiles[wall_model] = _li_aln_solution_profile(mesh, solution)
+
+    baseline_pressure = next(
+        (abs(float(row["pressure_proxy"])) for row in rows if row["wall_model"] == "ideal_insulator"),
+        abs(float(rows[0]["pressure_proxy"])) if rows else 0.0,
+    )
+    baseline_pressure = max(baseline_pressure, 1.0e-30)
+    for row in rows:
+        row["pressure_proxy_ratio_to_ideal"] = abs(float(row["pressure_proxy"])) / baseline_pressure
+    max_charge = max((float(row["charge_balance_residual"]) for row in rows), default=0.0)
+    max_div = max((float(row["div_current_relative"]) for row in rows), default=0.0)
+    max_interface = max((float(row["interface_current_relative"]) for row in rows), default=0.0)
+    max_mean_error = max((float(row["mean_velocity_error_fraction"]) for row in rows), default=0.0)
+    return (
+        {
+            "case": f"{operating_case.name}_multilayer_solve",
+            "scope": "solved_multilayer_internal_limiting_case",
+            "material_compatibility_claim": False,
+            "external_code_parity_claim": False,
+            "inputs": _case_payload(operating_case),
+            "solver_controls": {
+                "fluid_ny": int(ny),
+                "fluid_nz": int(nz),
+                "dt_s": float(dt),
+                "t_final_s": float(t_final),
+                "max_steps": int(max_steps),
+                "potential_iterations": int(potential_iterations),
+                "wall_models": list(wall_models),
+            },
+            "unit_audit": li_aln_unit_audit(operating_case),
+            "observable_rows": rows,
+            "qa": {
+                "prescribed_flow_rate_pass": bool(max_mean_error <= 1.0e-10),
+                "charge_balance_pass": bool(max_charge <= 1.0e-3),
+                "div_current_bounded_pass": bool(max_div <= 5.0e-2),
+                "interface_current_bounded_pass": bool(max_interface <= 1.5e-1),
+                "max_mean_velocity_error_fraction": max_mean_error,
+                "max_charge_balance_residual": max_charge,
+                "max_div_current_relative": max_div,
+                "max_interface_current_relative": max_interface,
+            },
+            "phase_status": {
+                "true_fluid_aln_metal_geometry": "complete",
+                "solved_current_closure_limiting_case": "complete_internal_gate",
+                "freemhd_limiting_case_comparison": "next_for_matching_layered_wall_physics",
+                "full_physical_high_ha_li_blanket_case": "future_heavy_validation",
+            },
+            "notes": (
+                "This artifact exercises the conservative current and pressure-gradient "
+                "diagnostics on a true explicit Li/AlN/metal mesh. It is a bounded "
+                "solver gate, not a material-compatibility or external-code parity claim."
+            ),
+        },
+        profiles,
+    )
+
+
+def _li_aln_multilayer_solution_row(
+    case: WallStackStudyCase,
+    wall_model: str,
+    mesh: StructuredMesh,
+    stacks: dict[str, Sequence[WallLayer]],
+    solution,
+) -> dict[str, float | int | str | bool]:
+    side_rows = _multilayer_side_rows(case, stacks)
+    tangential = float(np.mean([float(row["tangential_conductance_ratio"]) for row in side_rows]))
+    normal = float(np.mean([float(row["normal_leakage_ratio"]) for row in side_rows]))
+    u = np.asarray(solution.state.u, dtype=float)
+    fluid = np.asarray(mesh.fluid_mask, dtype=bool)
+    target = float(case.velocity)
+    mean_velocity = _area_weighted_fluid_mean(mesh, u, fluid)
+    current_max = _last_history_value(solution.diagnostics.current_max_history)
+    face_current_max = _last_history_value(solution.diagnostics.face_current_max_history)
+    div_current_max = _last_history_value(solution.diagnostics.div_current_max_history)
+    interface_current_residual = _last_history_value(solution.diagnostics.interface_current_residual_history)
+    min_spacing = min(float(np.min(np.asarray(mesh.dy, dtype=float))), float(np.min(np.asarray(mesh.dz, dtype=float))))
+    return {
+        "wall_model": wall_model,
+        "mesh_ny": int(mesh.ny),
+        "mesh_nz": int(mesh.nz),
+        "fluid_cell_count": int(np.sum(fluid)),
+        "solid_cell_count": int(mesh.ny * mesh.nz - int(np.sum(fluid))),
+        "tangential_conductance_ratio": tangential,
+        "normal_leakage_ratio": normal,
+        "target_mean_velocity_m_s": target,
+        "final_mean_velocity_m_s": mean_velocity,
+        "mean_velocity_error_fraction": abs(mean_velocity - target) / max(abs(target), 1.0e-30),
+        "u_peak_m_s": float(np.nanmax(np.where(fluid, np.abs(u), np.nan))),
+        "pressure_proxy": _last_history_value(solution.diagnostics.pressure_proxy_history),
+        "current_scaled_pressure_proxy": _last_history_value(solution.diagnostics.current_scaled_pressure_proxy_history),
+        "volumetric_flow_rate_m3_s": _last_history_value(solution.diagnostics.volumetric_flow_rate_history),
+        "mean_current_magnitude": _last_history_value(solution.diagnostics.mean_current_magnitude_history),
+        "current_max": current_max,
+        "face_current_max": face_current_max,
+        "lorentz_power": _last_history_value(solution.diagnostics.lorentz_power_history),
+        "div_current_max": div_current_max,
+        "div_current_relative": div_current_max * min_spacing / max(abs(face_current_max), 1.0e-30),
+        "charge_balance_residual": _last_history_value(solution.diagnostics.charge_balance_residual_history),
+        "interface_current_residual": interface_current_residual,
+        "interface_current_relative": abs(interface_current_residual) / max(abs(face_current_max), 1.0e-30),
+        "potential_residual": _last_history_value(solution.diagnostics.potential_residual_history),
+        "linear_residual": _last_history_value(solution.diagnostics.linear_residual_history),
+        "solver_time_s": float(solution.state.time),
+        "solver_residual": float(solution.state.residual),
+        "mhd_performance_only": True,
+    }
+
+
+def _area_weighted_fluid_mean(mesh: StructuredMesh, field: np.ndarray, fluid_mask: np.ndarray) -> float:
+    weights = np.asarray(mesh.dy, dtype=float)[:, None] * np.asarray(mesh.dz, dtype=float)[None, :]
+    fluid_weights = np.where(fluid_mask, weights, 0.0)
+    total = max(float(np.sum(fluid_weights)), 1.0e-30)
+    return float(np.sum(np.where(fluid_mask, field, 0.0) * fluid_weights) / total)
+
+
+def _last_history_value(history) -> float:
+    values = np.asarray(history, dtype=float).ravel()
+    if values.size == 0:
+        return float("nan")
+    return float(values[-1])
+
+
+def _li_aln_solution_profile(mesh: StructuredMesh, solution) -> dict[str, object]:
+    return {
+        "mesh": mesh,
+        "u": np.asarray(solution.state.u, dtype=float),
+        "phi": np.asarray(solution.state.phi, dtype=float),
+        "fluid_mask": np.asarray(mesh.fluid_mask, dtype=bool),
+        "region_ids": np.asarray(mesh.region_ids, dtype=int) if mesh.region_ids is not None else None,
+    }
 
 
 def _multilayer_layer_rows(wall_layers: dict[str, Sequence[WallLayer]]) -> list[dict[str, float | int | str | bool]]:
@@ -1056,6 +1431,110 @@ def _write_li_aln_multilayer_mesh_plot(path: Path, mesh: StructuredMesh, summary
     ]
     axes[1, 1].text(0.02, 0.98, "\n".join(text), va="top", fontsize=11.0, transform=axes[1, 1].transAxes)
     fig.suptitle("Li/AlN explicit multilayer wall-stack mesh QA", fontsize=15.5, fontweight="bold")
+    fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _write_li_aln_multilayer_solve_plot(
+    path: Path,
+    summary: dict[str, object],
+    profiles: dict[str, dict[str, object]],
+) -> None:
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+    import numpy as local_np
+
+    rows = [dict(row) for row in summary["observable_rows"]]
+    if not rows:
+        raise ValueError("cannot plot Li/AlN multilayer solve without observable rows")
+    model_names = [str(row["wall_model"]) for row in rows]
+    reference_model = "intact_aln" if "intact_aln" in profiles else next(iter(profiles))
+    profile = profiles[reference_model]
+    mesh = profile["mesh"]
+    u = local_np.asarray(profile["u"], dtype=float)
+    fluid = local_np.asarray(profile["fluid_mask"], dtype=bool)
+    y_faces = local_np.asarray(mesh.y_faces, dtype=float)
+    z_faces = local_np.asarray(mesh.z_faces, dtype=float)
+    y_centers = local_np.asarray(mesh.y_centers, dtype=float)
+    z_centers = local_np.asarray(mesh.z_centers, dtype=float)
+    inputs = dict(summary["inputs"])
+    half_width = float(inputs["length_scale"])
+    half_height = float(inputs["length_scale"])
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.4, 9.2), constrained_layout=True)
+    velocity = local_np.where(fluid, u, local_np.nan)
+    im = axes[0, 0].pcolormesh(y_faces, z_faces, velocity.T, shading="flat", cmap="coolwarm")
+    axes[0, 0].add_patch(
+        Rectangle(
+            (-half_width, -half_height),
+            2.0 * half_width,
+            2.0 * half_height,
+            fill=False,
+            edgecolor="#111827",
+            linewidth=1.2,
+        )
+    )
+    axes[0, 0].set_aspect("equal")
+    axes[0, 0].set_xlabel("y [m]")
+    axes[0, 0].set_ylabel("z [m]")
+    axes[0, 0].set_title(f"Velocity field, {reference_model.replace('_', ' ')}")
+    colorbar = fig.colorbar(im, ax=axes[0, 0])
+    colorbar.set_label("u [m/s]")
+
+    iy = int(local_np.argmin(local_np.abs(y_centers)))
+    iz = int(local_np.argmin(local_np.abs(z_centers)))
+    axes[0, 1].plot(z_centers, velocity[iy, :], color="#2563eb", linewidth=2.0, label="center-y cut")
+    axes[0, 1].plot(y_centers, velocity[:, iz], color="#b45309", linewidth=2.0, label="center-z cut")
+    axes[0, 1].axvline(-half_width, color="#111827", linewidth=0.8, alpha=0.35)
+    axes[0, 1].axvline(half_width, color="#111827", linewidth=0.8, alpha=0.35)
+    axes[0, 1].set_xlabel("cross-section coordinate [m]")
+    axes[0, 1].set_ylabel("u [m/s]")
+    axes[0, 1].set_title("Mid-plane velocity cuts")
+    axes[0, 1].grid(True, alpha=0.25)
+    axes[0, 1].legend(frameon=False, loc="best")
+
+    x = local_np.arange(len(rows))
+    pressure_ratio = local_np.asarray([float(row["pressure_proxy_ratio_to_ideal"]) for row in rows], dtype=float)
+    mean_current = local_np.asarray([float(row["mean_current_magnitude"]) for row in rows], dtype=float)
+    axes[1, 0].bar(x - 0.18, pressure_ratio, width=0.36, color="#0f766e", label="pressure proxy / ideal")
+    current_scale = max(float(local_np.max(mean_current)), 1.0e-30)
+    axes[1, 0].bar(x + 0.18, mean_current / current_scale, width=0.36, color="#7c2d12", label="mean |J| / max")
+    axes[1, 0].set_xticks(x, [name.replace("_", "\n") for name in model_names])
+    axes[1, 0].set_ylabel("normalized response")
+    axes[1, 0].set_title("Wall-model response ranking")
+    axes[1, 0].grid(True, axis="y", alpha=0.25)
+    axes[1, 0].legend(frameon=False, loc="best")
+
+    diagnostics = {
+        "charge": [float(row["charge_balance_residual"]) for row in rows],
+        "local div J": [float(row["div_current_relative"]) for row in rows],
+        "interface J": [float(row["interface_current_relative"]) for row in rows],
+    }
+    width = 0.24
+    offsets = [-width, 0.0, width]
+    colors = ["#2563eb", "#a16207", "#be123c"]
+    for (label, values), offset, color in zip(diagnostics.items(), offsets, colors, strict=True):
+        axes[1, 1].bar(x + offset, local_np.maximum(values, 1.0e-30), width=width, color=color, label=label)
+    axes[1, 1].set_yscale("log")
+    axes[1, 1].set_xticks(x, [name.replace("_", "\n") for name in model_names])
+    axes[1, 1].set_ylabel("normalized residual / diagnostic")
+    axes[1, 1].set_title("Conservative-current diagnostics")
+    axes[1, 1].grid(True, which="both", axis="y", alpha=0.25)
+    axes[1, 1].legend(frameon=False, loc="best")
+
+    audit = dict(summary["unit_audit"])
+    qa = dict(summary["qa"])
+    fig.suptitle(
+        (
+            "Li/AlN explicit multilayer solved wall-stack gate"
+            f" | Ha={float(audit['hartmann_number']):.2g}, "
+            f"Re={float(audit['reynolds_number']):.2g}, "
+            f"charge={float(qa['max_charge_balance_residual']):.1e}, "
+            f"local divJ={float(qa['max_div_current_relative']):.1e}"
+        ),
+        fontsize=15.2,
+        fontweight="bold",
+    )
     fig.savefig(path, dpi=190, bbox_inches="tight")
     plt.close(fig)
 

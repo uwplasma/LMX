@@ -2038,3 +2038,39 @@ def test_li_aln_multilayer_mesh_qa_example_writes_docs_artifacts(tmp_path: Path,
     assert (tmp_path / "multilayer_mesh" / "li_aln_multilayer_mesh_qa.png").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_mesh_qa_summary.json").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_mesh_qa.png").exists()
+
+
+def test_li_aln_multilayer_solve_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_multilayer_solve.py"
+    spec = importlib.util.spec_from_file_location("li_aln_multilayer_solve_example", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def fake_write(out_dir: Path, **kwargs):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "qa": {"charge_balance_pass": True, "interface_current_bounded_pass": True},
+            "observable_rows": [{"wall_model": "intact_aln"}],
+            "material_compatibility_claim": False,
+        }
+        summary_path = out_dir / "li_aln_multilayer_solve_summary.json"
+        csv_path = out_dir / "li_aln_multilayer_solve_observables.csv"
+        png_path = out_dir / "li_aln_multilayer_solve.png"
+        summary_path.write_text(json.dumps(summary), encoding="utf-8")
+        csv_path.write_text("wall_model\nintact_aln\n", encoding="utf-8")
+        png_path.write_bytes(b"plot")
+        return [summary_path, csv_path, png_path]
+
+    monkeypatch.setattr(module, "write_li_aln_multilayer_solve_artifacts", fake_write)
+    summary = module.run_li_aln_multilayer_solve(
+        output_dir=tmp_path / "multilayer_solve",
+        figure_dir=tmp_path / "figures",
+        docs_output_dir=tmp_path / "docs",
+    )
+
+    assert summary["qa"]["charge_balance_pass"] is True
+    assert (tmp_path / "multilayer_solve" / "li_aln_multilayer_solve_summary.json").exists()
+    assert (tmp_path / "multilayer_solve" / "li_aln_multilayer_solve.png").exists()
+    assert (tmp_path / "docs" / "li_aln_multilayer_solve_summary.json").exists()
+    assert (tmp_path / "docs" / "li_aln_multilayer_solve.png").exists()

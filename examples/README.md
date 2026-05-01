@@ -25,6 +25,8 @@ The examples are explicit templates for research workflows. They show how to:
   degradation-threshold, and pinhole-limit artifact
 - generate explicit `fluid | AlN | metal` multilayer mesh QA artifacts with
   aligned interfaces and conductivity fields
+- run explicit multilayer Li/AlN/metal limiting-case solves with
+  conservative-current diagnostics
 
 ## Quick examples
 
@@ -86,6 +88,7 @@ python examples/wham_blanket_autodiff_research_demo.py
 python examples/li_aln_wall_stack_phase0_2.py
 python examples/li_aln_wall_stack_phase3_6.py
 python examples/li_aln_multilayer_mesh_qa.py
+python examples/li_aln_multilayer_solve.py
 python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py

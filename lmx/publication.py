@@ -116,6 +116,16 @@ PUBLICATION_FIGURE_SPECS: tuple[PublicationFigureSpec, ...] = (
         required_next_step="Run solved multilayer limiting cases and compare conservative interface-current diagnostics to FreeMHD/code-to-code cases.",
     ),
     PublicationFigureSpec(
+        family="li_aln_multilayer_solve",
+        artifact="li_aln_multilayer_solve.png",
+        summary="li_aln_multilayer_solve_summary.json",
+        generator="examples/li_aln_multilayer_solve.py",
+        reference="Coated-wall MHD conductance models and conservative interface-current diagnostics",
+        manuscript_role="Explicit multilayer wall-stack solved limiting-case response and current-closure diagnostics",
+        readiness_status="ready_internal_gate",
+        required_next_step="Promote to external-code parity once a matching FreeMHD/OpenFOAM multilayer case is available.",
+    ),
+    PublicationFigureSpec(
         family="magnetic_obstacle",
         artifact="magnetic_obstacle_benchmark.png",
         summary="magnetic_obstacle_benchmark_summary.json",
@@ -333,6 +343,18 @@ def _selected_metrics(family: str, summary: Mapping[str, Any]) -> dict[str, Any]
             "cell_count_pass": qa.get("cell_count_pass"),
             "interface_faces_aligned": qa.get("interface_faces_aligned"),
             "ready_for_current_diagnostics": qa.get("ready_for_conservative_current_diagnostics"),
+        }
+    if family == "li_aln_multilayer_solve":
+        qa = summary.get("qa", {})
+        rows = summary.get("observable_rows", [])
+        return {
+            "wall_model_count": len(rows),
+            "charge_balance_pass": qa.get("charge_balance_pass"),
+            "div_current_bounded_pass": qa.get("div_current_bounded_pass"),
+            "interface_current_bounded_pass": qa.get("interface_current_bounded_pass"),
+            "max_charge_balance_residual": qa.get("max_charge_balance_residual"),
+            "max_div_current_relative": qa.get("max_div_current_relative"),
+            "max_interface_current_relative": qa.get("max_interface_current_relative"),
         }
     if family == "strong_scaling":
         return {

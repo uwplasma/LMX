@@ -375,6 +375,17 @@ refer to the Samper et al. taxonomy.
   now respects explicit mesh conductivity fields, making the next step a solved
   current-closure/pressure-gradient limiting case rather than another geometry
   placeholder.
+  Explicit multilayer solved-gate status: implemented in
+  `examples/li_aln_multilayer_solve.py`. The example runs ideal-insulator,
+  intact-AlN, and degraded-AlN electrical wall models on the explicit
+  `fluid | AlN | metal` finite-volume mesh with a prescribed flow rate and
+  exports pressure proxy, mean current, global charge balance, normalized local
+  current-divergence, and normalized interface-current diagnostics. The
+  default gate passes the bounded conservative-current checks and keeps the
+  bare-metal model as an opt-in stress case because it needs a heavier mesh
+  before it can be treated as validation evidence. Remaining actions: promote a
+  matching FreeMHD/OpenFOAM multilayer limiting case, then repeat the ladder at
+  higher Hartmann number and physical blanket-scale operating points.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the

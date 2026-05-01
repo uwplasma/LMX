@@ -179,6 +179,27 @@ The mesh gate requires:
 - the artifact remains scoped to MHD electrical performance and does not claim
   material compatibility.
 
+## Explicit Multilayer Solved Gate
+
+The first solved multilayer gate uses the explicit mesh in the
+fully-developed inductionless solver:
+
+```bash
+python examples/li_aln_multilayer_solve.py
+```
+
+The case prescribes a mean flow rate, keeps the input viscosity convention
+explicitly kinematic inside `CaseSpec`, and compares the ideal-insulator,
+intact-AlN, and degraded-AlN electrical wall models on the same mesh family.
+The output table records pressure proxy, current magnitude, global charge
+balance, normalized local current divergence, and normalized interface-current
+residual. The default gate is internal: it verifies that conservative-current
+diagnostics remain bounded on a true `fluid | AlN | metal` finite-volume mesh.
+It does not claim FreeMHD/OpenFOAM parity until a matching external multilayer
+case is promoted.
+
+![Li/AlN explicit multilayer solved wall-stack gate](_static/generated/li_aln_multilayer_solve.png)
+
 ## Literature Anchors
 
 - Shercliff and Hunt rectangular-duct solutions define the insulating and

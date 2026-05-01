@@ -1,9 +1,9 @@
 {
   "case": "publication_figure_campaign",
-  "generated_at_utc": "2026-05-01T01:46:11.319847+00:00",
-  "figure_count": 15,
-  "artifact_count": 15,
-  "summary_count": 15,
+  "generated_at_utc": "2026-05-01T02:19:29.106086+00:00",
+  "figure_count": 16,
+  "artifact_count": 16,
+  "summary_count": 16,
   "missing_artifacts": [],
   "missing_summaries": [],
   "status_counts": {
@@ -13,9 +13,9 @@
     "ready_reduced_autodiff": 1,
     "ready_reduced_wall_stack": 2,
     "ready_geometry_gate": 1,
+    "ready_internal_gate": 2,
     "external_reference_open": 2,
     "resolved_dean_validation_open": 1,
-    "ready_internal_gate": 1,
     "ready_bounded_release": 1,
     "strict_research_blockers_open": 1
   },
@@ -212,6 +212,29 @@
         "cell_count_pass": true,
         "interface_faces_aligned": true,
         "ready_for_current_diagnostics": true
+      }
+    },
+    {
+      "family": "li_aln_multilayer_solve",
+      "artifact": "li_aln_multilayer_solve.png",
+      "summary": "li_aln_multilayer_solve_summary.json",
+      "generator": "examples/li_aln_multilayer_solve.py",
+      "reference": "Coated-wall MHD conductance models and conservative interface-current diagnostics",
+      "manuscript_role": "Explicit multilayer wall-stack solved limiting-case response and current-closure diagnostics",
+      "readiness_status": "ready_internal_gate",
+      "required_next_step": "Promote to external-code parity once a matching FreeMHD/OpenFOAM multilayer case is available.",
+      "artifact_path": "docs/_static/generated/li_aln_multilayer_solve.png",
+      "summary_path": "docs/_static/generated/li_aln_multilayer_solve_summary.json",
+      "artifact_exists": true,
+      "summary_exists": true,
+      "selected_metrics": {
+        "wall_model_count": 3,
+        "charge_balance_pass": true,
+        "div_current_bounded_pass": true,
+        "interface_current_bounded_pass": true,
+        "max_charge_balance_residual": 0.000585184838167163,
+        "max_div_current_relative": 0.00018644733813855826,
+        "max_interface_current_relative": 0.08768133820940605
       }
     },
     {

@@ -1,17 +1,24 @@
 from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
+import lmx.wall_study as wall_study
 from lmx import (
     DEFAULT_LI_ALN_CASE,
     DEFAULT_SUBSTRATE_CONDUCTIVITIES,
+    build_li_aln_multilayer_solve_case,
     li_aln_multilayer_mesh_summary,
+    li_aln_multilayer_solve_summary,
+    li_aln_multilayer_wall_model_stacks,
     li_aln_phase0_2_summary,
     li_aln_phase3_6_summary,
     li_aln_unit_audit,
     li_aln_wall_layers,
     li_aln_wall_stacks_by_side,
     write_li_aln_multilayer_mesh_artifacts,
+    write_li_aln_multilayer_solve_artifacts,
     write_li_aln_phase0_2_artifacts,
     write_li_aln_phase3_6_artifacts,
 )
@@ -133,6 +140,104 @@ def test_li_aln_wall_stacks_by_side_supports_degraded_aln():
     assert stacks["left"][0].name == "aln"
     assert stacks["left"][0].conductivity == pytest.approx(DEFAULT_LI_ALN_CASE.degraded_aln_conductivity)
     assert stacks["left"][1].name == DEFAULT_LI_ALN_CASE.metal_name
+
+
+def test_li_aln_multilayer_solve_case_uses_explicit_sigma_and_flow_rate():
+    solver_case, mesh, stacks = build_li_aln_multilayer_solve_case(
+        DEFAULT_LI_ALN_CASE,
+        wall_model="intact_aln",
+        ny=8,
+        nz=6,
+        magnetic_field=0.02,
+        velocity=0.01,
+        max_steps=2,
+    )
+
+    assert solver_case.forcing == 0.0
+    assert solver_case.boundary_conditions[-1].kind == "inlet_flow_rate"
+    assert mesh.sigma is not None
+    assert mesh.fluid_mask is not None
+    assert sorted(stacks) == ["bottom", "left", "right", "top"]
+    assert mesh.yz_shape[0] > 8
+    assert mesh.yz_shape[1] > 6
+
+
+def test_li_aln_multilayer_wall_model_stacks_rank_conductive_limit():
+    intact = li_aln_multilayer_wall_model_stacks(DEFAULT_LI_ALN_CASE, wall_model="intact_aln")
+    bare = li_aln_multilayer_wall_model_stacks(DEFAULT_LI_ALN_CASE, wall_model="bare_metal")
+
+    assert intact["left"][0].name == "aln"
+    assert len(bare["left"]) == 1
+    assert bare["left"][0].conductivity == pytest.approx(DEFAULT_LI_ALN_CASE.metal_conductivity)
+
+
+def test_li_aln_multilayer_solve_summary_tracks_conservation(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(wall_study, "solve_steady", _fake_multilayer_solution)
+
+    summary = li_aln_multilayer_solve_summary(
+        DEFAULT_LI_ALN_CASE,
+        wall_models=("intact_aln", "bare_metal"),
+        ny=4,
+        nz=4,
+        magnetic_field=0.02,
+        velocity=0.01,
+        max_steps=2,
+    )
+
+    assert summary["scope"] == "solved_multilayer_internal_limiting_case"
+    assert summary["external_code_parity_claim"] is False
+    assert summary["qa"]["charge_balance_pass"] is True
+    assert len(summary["observable_rows"]) == 2
+    bare = next(row for row in summary["observable_rows"] if row["wall_model"] == "bare_metal")
+    intact = next(row for row in summary["observable_rows"] if row["wall_model"] == "intact_aln")
+    assert bare["tangential_conductance_ratio"] > intact["tangential_conductance_ratio"]
+
+
+def test_write_li_aln_multilayer_solve_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(wall_study, "solve_steady", _fake_multilayer_solution)
+
+    outputs = write_li_aln_multilayer_solve_artifacts(
+        tmp_path,
+        wall_models=("intact_aln", "bare_metal"),
+        ny=4,
+        nz=4,
+        magnetic_field=0.02,
+        velocity=0.01,
+        max_steps=2,
+    )
+
+    assert [path.suffix for path in outputs] == [".json", ".csv", ".png"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+
+
+def _fake_multilayer_solution(case, *, mesh):
+    fluid = np.asarray(mesh.fluid_mask, dtype=bool)
+    u = np.where(fluid, float(case.initial_velocity), 0.0)
+    zeros = np.zeros(mesh.yz_shape, dtype=float)
+    diagnostics = SimpleNamespace(
+        pressure_proxy_history=np.asarray([1.0]),
+        current_scaled_pressure_proxy_history=np.asarray([1.0]),
+        volumetric_flow_rate_history=np.asarray([float(case.boundary_conditions[-1].value)]),
+        mean_current_magnitude_history=np.asarray([1.0e-3]),
+        current_max_history=np.asarray([2.0e-3]),
+        face_current_max_history=np.asarray([2.5e-3]),
+        lorentz_power_history=np.asarray([1.0e-6]),
+        div_current_max_history=np.asarray([1.0e-4]),
+        charge_balance_residual_history=np.asarray([1.0e-8]),
+        interface_current_residual_history=np.asarray([1.0e-5]),
+        potential_residual_history=np.asarray([1.0e-8]),
+        linear_residual_history=np.asarray([1.0e-8]),
+    )
+    state = SimpleNamespace(
+        u=u,
+        phi=zeros,
+        jy=zeros,
+        jz=zeros,
+        lorentz_x=zeros,
+        time=float(case.time_stepper.t_final),
+        residual=0.0,
+    )
+    return SimpleNamespace(state=state, diagnostics=diagnostics, mesh=mesh, case_name=case.name)
 
 
 def test_write_li_aln_multilayer_mesh_artifacts(tmp_path: Path):

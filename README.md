@@ -793,7 +793,7 @@ python examples/li_aln_wall_stack_phase3_6.py
 The explicit multilayer mesh gate constructs `fluid | AlN | metal` cells with
 faces aligned at every material interface and exports the conductivity field,
 region IDs, layer tables, and interface table. This is the geometry prerequisite
-for conservative current diagnostics and future external-code limiting-case
+for conservative current diagnostics and external-code limiting-case
 comparisons.
 
 ```bash
@@ -801,6 +801,20 @@ python examples/li_aln_multilayer_mesh_qa.py
 ```
 
 ![LMX Li/AlN explicit multilayer wall-stack mesh QA](docs/_static/generated/li_aln_multilayer_mesh_qa.png)
+
+The solved multilayer gate runs the same explicit mesh through the
+fully-developed inductionless solver with a prescribed flow rate. It compares
+ideal-insulator, intact-AlN, and degraded-AlN electrical wall models and reports
+pressure proxy, mean current, global charge balance, normalized local current
+divergence, and interface-current diagnostics. A bare-metal conductive stress
+case is available from the API, but it is not counted in the default bounded
+pass because it requires a heavier mesh before it is a clean validation case.
+
+```bash
+python examples/li_aln_multilayer_solve.py
+```
+
+![LMX Li/AlN explicit multilayer solved wall-stack gate](docs/_static/generated/li_aln_multilayer_solve.png)
 
 ## Validation status
 

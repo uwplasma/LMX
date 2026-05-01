@@ -785,9 +785,14 @@ Current implementation status:
 - The true `fluid | AlN | metal` multilayer rectangular mesh now has an
   executable geometry gate in `examples/li_aln_multilayer_mesh_qa.py`, with
   aligned interfaces, region IDs, and explicit conductivity fields.
-- Solved multilayer limiting cases, interface-current-continuity diagnostics in
-  the promoted case workflow, and external-code limiting-case comparisons
-  remain the next high-fidelity solver-extension lane.
+- Solved multilayer limiting cases now have an internal gate in
+  `examples/li_aln_multilayer_solve.py`. The gate runs ideal-insulator,
+  intact-AlN, and degraded-AlN electrical wall models on the explicit
+  finite-volume mesh and records pressure proxy, current magnitude, charge
+  balance, normalized local current divergence, and normalized interface-current
+  residual.
+- External-code limiting-case comparisons and heavier high-Hartmann-number
+  mesh ladders remain the next high-fidelity solver-extension lane.
 
 ---
 

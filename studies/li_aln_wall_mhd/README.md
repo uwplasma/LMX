@@ -49,8 +49,22 @@ python examples/li_aln_multilayer_mesh_qa.py
 It writes a `fluid | AlN | metal` rectangular mesh with faces aligned at every
 material interface, plus region IDs, conductivity fields, layer tables, and
 interface tables under `results/processed/multilayer_mesh`. This closes the
-geometry placeholder for rectangular wall stacks; solved limiting cases and
-external-code comparisons are the next lane.
+geometry placeholder for rectangular wall stacks.
+
+The first solved multilayer limiting-case gate is:
+
+```bash
+python examples/li_aln_multilayer_solve.py
+```
+
+It runs ideal-insulator, intact-AlN, and degraded-AlN electrical wall models on
+the explicit mesh with a prescribed flow rate. The artifact writes pressure
+proxy, current magnitude, global charge balance, normalized local
+current-divergence, and normalized interface-current residuals under
+`results/processed/multilayer_solve`. A bare-metal stress case remains
+available through the API, but external-code comparisons and heavier
+high-Hartmann-number mesh ladders are the next lane before claiming broader
+validation.
 
 Out of scope:
 

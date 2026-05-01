@@ -140,6 +140,11 @@
       "generator": "examples/li_aln_multilayer_mesh_qa.py"
     },
     {
+      "name": "li_aln_multilayer_solve.png",
+      "kind": "Li/AlN explicit multilayer solved wall-stack gate",
+      "generator": "examples/li_aln_multilayer_solve.py"
+    },
+    {
       "name": "strong_scaling.png",
       "kind": "solver-facing strong-scaling summary",
       "generator": "scripts/run_strong_scaling_worker.py"
