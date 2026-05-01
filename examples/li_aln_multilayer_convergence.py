@@ -1,9 +1,9 @@
-"""Run explicit Li/AlN/metal multilayer wall-stack limiting-case solves.
+"""Run a bounded mesh ladder for explicit Li/AlN/metal wall-stack solves.
 
-The example compares ideal-insulator, intact-AlN, degraded-AlN, and bare-metal
-electrical wall models on the same finite-volume mesh family.  It is a bounded
-MHD electrical-performance gate with conservative current diagnostics; it is
-not a material-compatibility claim and not an external-code parity claim.
+This example is intentionally smaller than a production blanket sweep.  It
+checks whether representative intact-AlN and bare-metal electrical wall limits
+have stable pressure/current observables and bounded conservative-current
+diagnostics as the explicit multilayer mesh is refined.
 """
 
 from __future__ import annotations
@@ -12,23 +12,22 @@ import json
 from pathlib import Path
 import shutil
 
-from lmx import LithiumMaterial, WallStackStudyCase, write_li_aln_multilayer_solve_artifacts
+from lmx import LithiumMaterial, WallStackStudyCase, write_li_aln_multilayer_convergence_artifacts
 
 
-OUTPUT_DIR = Path("studies/li_aln_wall_mhd/results/processed/multilayer_solve")
+OUTPUT_DIR = Path("studies/li_aln_wall_mhd/results/processed/multilayer_convergence")
 FIGURE_DIR = Path("studies/li_aln_wall_mhd/figures")
 DOCS_OUTPUT_DIR = Path("docs/_static/generated")
 COPY_TO_DOCS = True
 
-WALL_MODELS = ("ideal_insulator", "intact_aln", "degraded_aln", "bare_metal")
-FLUID_CELLS_Y = 18
-FLUID_CELLS_Z = 18
+WALL_MODELS = ("intact_aln", "bare_metal")
+RESOLUTIONS = (18, 22, 26)
 MAGNETIC_FIELD_T = 5.0e-2
 MEAN_VELOCITY_M_S = 1.0e-2
 DT_S = 1.0e-3
-T_FINAL_S = 1.2e-2
-MAX_STEPS = 12
-POTENTIAL_ITERATIONS = 80
+T_FINAL_S = 8.0e-3
+MAX_STEPS = 8
+POTENTIAL_ITERATIONS = 60
 
 LITHIUM = LithiumMaterial(
     temperature_c=250.0,
@@ -54,24 +53,23 @@ CASE = WallStackStudyCase(
 )
 
 
-def run_li_aln_multilayer_solve(
+def run_li_aln_multilayer_convergence(
     *,
     output_dir: Path = OUTPUT_DIR,
     figure_dir: Path = FIGURE_DIR,
     docs_output_dir: Path = DOCS_OUTPUT_DIR,
     copy_to_docs: bool = COPY_TO_DOCS,
 ) -> dict[str, object]:
-    """Write solved multilayer limiting-case JSON/CSV/PNG artifacts."""
+    """Write multilayer mesh-ladder JSON/CSV/PNG artifacts."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     figure_dir.mkdir(parents=True, exist_ok=True)
     docs_output_dir.mkdir(parents=True, exist_ok=True)
-    outputs = write_li_aln_multilayer_solve_artifacts(
+    outputs = write_li_aln_multilayer_convergence_artifacts(
         output_dir,
         case=CASE,
         wall_models=WALL_MODELS,
-        ny=FLUID_CELLS_Y,
-        nz=FLUID_CELLS_Z,
+        resolutions=RESOLUTIONS,
         magnetic_field=MAGNETIC_FIELD_T,
         velocity=MEAN_VELOCITY_M_S,
         dt=DT_S,
@@ -79,8 +77,8 @@ def run_li_aln_multilayer_solve(
         max_steps=MAX_STEPS,
         potential_iterations=POTENTIAL_ITERATIONS,
     )
-    summary_path = output_dir / "li_aln_multilayer_solve_summary.json"
-    figure_path = output_dir / "li_aln_multilayer_solve.png"
+    summary_path = output_dir / "li_aln_multilayer_convergence_summary.json"
+    figure_path = output_dir / "li_aln_multilayer_convergence.png"
     figure_copy = figure_dir / figure_path.name
     shutil.copy2(figure_path, figure_copy)
 
@@ -99,11 +97,11 @@ def run_li_aln_multilayer_solve(
     if copy_to_docs:
         shutil.copy2(summary_path, docs_output_dir / summary_path.name)
 
-    print(f"Li/AlN multilayer solve artifacts written to {output_dir}")
-    print(f"charge balance pass = {summary['qa']['charge_balance_pass']}")
-    print(f"interface current pass = {summary['qa']['interface_current_bounded_pass']}")
+    print(f"Li/AlN multilayer convergence artifacts written to {output_dir}")
+    print(f"pressure convergence pass = {summary['qa']['pressure_last_step_relative_change_pass']}")
+    print(f"current convergence pass = {summary['qa']['current_last_step_relative_change_pass']}")
     return summary
 
 
 if __name__ == "__main__":
-    run_li_aln_multilayer_solve()
+    run_li_aln_multilayer_convergence()

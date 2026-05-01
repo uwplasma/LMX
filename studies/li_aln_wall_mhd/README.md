@@ -57,14 +57,26 @@ The first solved multilayer limiting-case gate is:
 python examples/li_aln_multilayer_solve.py
 ```
 
-It runs ideal-insulator, intact-AlN, and degraded-AlN electrical wall models on
-the explicit mesh with a prescribed flow rate. The artifact writes pressure
-proxy, current magnitude, global charge balance, normalized local
-current-divergence, and normalized interface-current residuals under
-`results/processed/multilayer_solve`. A bare-metal stress case remains
-available through the API, but external-code comparisons and heavier
+It runs ideal-insulator, intact-AlN, degraded-AlN, and bare-metal electrical
+wall models on the explicit mesh with a prescribed flow rate. The artifact
+writes pressure proxy, current magnitude, dimensional charge residuals for
+audit, normalized global charge balance, normalized local current-divergence,
+and normalized interface-current residuals under
+`results/processed/multilayer_solve`. External-code comparisons and heavier
 high-Hartmann-number mesh ladders are the next lane before claiming broader
 validation.
+
+The representative solved mesh ladder is:
+
+```bash
+python examples/li_aln_multilayer_convergence.py
+```
+
+It refines the intact-AlN and bare-metal electrical wall limits and writes the
+pressure/current convergence table and figure under
+`results/processed/multilayer_convergence`. This closes the bounded internal
+mesh-ladder gate for the wall-stack study; a matching FreeMHD/OpenFOAM
+limiting-case comparison remains separate.
 
 Out of scope:
 

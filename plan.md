@@ -377,15 +377,21 @@ refer to the Samper et al. taxonomy.
   placeholder.
   Explicit multilayer solved-gate status: implemented in
   `examples/li_aln_multilayer_solve.py`. The example runs ideal-insulator,
-  intact-AlN, and degraded-AlN electrical wall models on the explicit
-  `fluid | AlN | metal` finite-volume mesh with a prescribed flow rate and
-  exports pressure proxy, mean current, global charge balance, normalized local
-  current-divergence, and normalized interface-current diagnostics. The
-  default gate passes the bounded conservative-current checks and keeps the
-  bare-metal model as an opt-in stress case because it needs a heavier mesh
-  before it can be treated as validation evidence. Remaining actions: promote a
-  matching FreeMHD/OpenFOAM multilayer limiting case, then repeat the ladder at
-  higher Hartmann number and physical blanket-scale operating points.
+  intact-AlN, degraded-AlN, and bare-metal electrical wall models on the
+  explicit `fluid | AlN | metal` finite-volume mesh with a prescribed flow rate
+  and exports pressure proxy, mean current, dimensional charge residuals for
+  audit, normalized charge balance, normalized local current-divergence, and
+  normalized interface-current diagnostics. The default gate passes the bounded
+  conservative-current checks. Remaining actions: promote a matching
+  FreeMHD/OpenFOAM multilayer limiting case, then repeat the ladder at higher
+  Hartmann number and physical blanket-scale operating points.
+  Explicit multilayer convergence status: implemented in
+  `examples/li_aln_multilayer_convergence.py` for representative intact-AlN and
+  bare-metal electrical wall limits. The retained 18/22/26-cell ladder reports
+  pressure/current convergence to the finest mesh and normalized charge,
+  local-divergence, and interface-current diagnostics. This closes the bounded
+  internal mesh-ladder gate; the remaining wall-stack validation task is a
+  matched external-code limiting case and heavier high-`Ha` production matrix.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the

@@ -1,9 +1,9 @@
 {
   "case": "publication_figure_campaign",
-  "generated_at_utc": "2026-05-01T02:19:29.106086+00:00",
-  "figure_count": 16,
-  "artifact_count": 16,
-  "summary_count": 16,
+  "generated_at_utc": "2026-05-01T12:28:14.264182+00:00",
+  "figure_count": 17,
+  "artifact_count": 17,
+  "summary_count": 17,
   "missing_artifacts": [],
   "missing_summaries": [],
   "status_counts": {
@@ -13,7 +13,7 @@
     "ready_reduced_autodiff": 1,
     "ready_reduced_wall_stack": 2,
     "ready_geometry_gate": 1,
-    "ready_internal_gate": 2,
+    "ready_internal_gate": 3,
     "external_reference_open": 2,
     "resolved_dean_validation_open": 1,
     "ready_bounded_release": 1,
@@ -228,13 +228,36 @@
       "artifact_exists": true,
       "summary_exists": true,
       "selected_metrics": {
-        "wall_model_count": 3,
+        "wall_model_count": 4,
         "charge_balance_pass": true,
         "div_current_bounded_pass": true,
         "interface_current_bounded_pass": true,
-        "max_charge_balance_residual": 0.000585184838167163,
-        "max_div_current_relative": 0.00018644733813855826,
-        "max_interface_current_relative": 0.08768133820940605
+        "max_charge_balance_relative": 4.909613802060903e-05,
+        "max_charge_balance_residual": 1462.9340752649402,
+        "max_div_current_relative": 0.01167903076781106,
+        "max_interface_current_relative": 0.08839831433256921
+      }
+    },
+    {
+      "family": "li_aln_multilayer_convergence",
+      "artifact": "li_aln_multilayer_convergence.png",
+      "summary": "li_aln_multilayer_convergence_summary.json",
+      "generator": "examples/li_aln_multilayer_convergence.py",
+      "reference": "Coated-wall MHD conductance models and conservative interface-current diagnostics",
+      "manuscript_role": "Representative explicit multilayer mesh ladder for pressure/current observables",
+      "readiness_status": "ready_internal_gate",
+      "required_next_step": "Repeat with the external-code limiting case and the final production high-Ha wall-stack matrix.",
+      "artifact_path": "docs/_static/generated/li_aln_multilayer_convergence.png",
+      "summary_path": "docs/_static/generated/li_aln_multilayer_convergence_summary.json",
+      "artifact_exists": true,
+      "summary_exists": true,
+      "selected_metrics": {
+        "convergence_row_count": 6,
+        "pressure_convergence_pass": true,
+        "current_convergence_pass": true,
+        "max_pressure_last_step_relative_change": 0.06912948271157457,
+        "max_current_last_step_relative_change": 0.061227541950051874,
+        "max_charge_balance_relative": 8.0260549477699e-05
       }
     },
     {

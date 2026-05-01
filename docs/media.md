@@ -61,6 +61,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `li_aln_wall_stack_phase3_6.png` | `examples/li_aln_wall_stack_phase3_6.py` | Li/AlN operating matrix, substrate comparison, degradation thresholds, and pinhole limits |
 | `li_aln_multilayer_mesh_qa.png` | `examples/li_aln_multilayer_mesh_qa.py` | Explicit `fluid | AlN | metal` mesh, aligned interfaces, region IDs, and conductivity field |
 | `li_aln_multilayer_solve.png` | `examples/li_aln_multilayer_solve.py` | Explicit multilayer wall-stack solved limiting-case response and conservative-current diagnostics |
+| `li_aln_multilayer_convergence.png` | `examples/li_aln_multilayer_convergence.py` | Representative explicit multilayer mesh ladder for pressure/current observables |
 | `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
 | `publication_figure_campaign_summary.json` | `examples/publication_figure_campaign.py` | Manuscript figure manifest, status table, and remaining figure gaps |
 | `research_grade_closure_status.json` | `examples/research_grade_closure_status.py` | Strict research-blocker closure status, physics gates, and next artifacts |
@@ -80,6 +81,8 @@ and posters exist, and that the core publication-facing figures are present.
 ![LMX Li/AlN explicit multilayer wall-stack mesh QA](_static/generated/li_aln_multilayer_mesh_qa.png)
 
 ![LMX Li/AlN explicit multilayer solved wall-stack gate](_static/generated/li_aln_multilayer_solve.png)
+
+![LMX Li/AlN explicit multilayer mesh ladder](_static/generated/li_aln_multilayer_convergence.png)
 
 ![LMX strict external validation targets](_static/generated/research_grade_external_targets.png)
 
@@ -107,6 +110,7 @@ python examples/li_aln_wall_stack_phase0_2.py
 python examples/li_aln_wall_stack_phase3_6.py
 python examples/li_aln_multilayer_mesh_qa.py
 python examples/li_aln_multilayer_solve.py
+python examples/li_aln_multilayer_convergence.py
 python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py

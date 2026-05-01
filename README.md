@@ -804,17 +804,30 @@ python examples/li_aln_multilayer_mesh_qa.py
 
 The solved multilayer gate runs the same explicit mesh through the
 fully-developed inductionless solver with a prescribed flow rate. It compares
-ideal-insulator, intact-AlN, and degraded-AlN electrical wall models and reports
-pressure proxy, mean current, global charge balance, normalized local current
-divergence, and interface-current diagnostics. A bare-metal conductive stress
-case is available from the API, but it is not counted in the default bounded
-pass because it requires a heavier mesh before it is a clean validation case.
+ideal-insulator, intact-AlN, degraded-AlN, and bare-metal electrical wall
+models and reports pressure proxy, mean current, normalized global charge
+balance, normalized local current divergence, and normalized interface-current
+diagnostics. Dimensional charge residuals are still exported for audit, but the
+pass/fail gate uses normalized values so conductive-wall stress cases are not
+judged on a mesh-unit-dependent number.
 
 ```bash
 python examples/li_aln_multilayer_solve.py
 ```
 
 ![LMX Li/AlN explicit multilayer solved wall-stack gate](docs/_static/generated/li_aln_multilayer_solve.png)
+
+The representative mesh ladder refines the explicit multilayer solve for
+intact-AlN and bare-metal electrical wall limits. It is a bounded internal
+convergence gate: the retained 22-to-26-cell step changes pressure by at most
+`6.9%` and mean current by at most `6.1%`, while normalized charge and
+interface-current diagnostics remain within the release thresholds.
+
+```bash
+python examples/li_aln_multilayer_convergence.py
+```
+
+![LMX Li/AlN explicit multilayer mesh ladder](docs/_static/generated/li_aln_multilayer_convergence.png)
 
 ## Validation status
 

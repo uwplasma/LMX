@@ -2074,3 +2074,41 @@ def test_li_aln_multilayer_solve_example_writes_docs_artifacts(tmp_path: Path, m
     assert (tmp_path / "multilayer_solve" / "li_aln_multilayer_solve.png").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_solve_summary.json").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_solve.png").exists()
+
+
+def test_li_aln_multilayer_convergence_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_multilayer_convergence.py"
+    spec = importlib.util.spec_from_file_location("li_aln_multilayer_convergence_example", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def fake_write(out_dir: Path, **kwargs):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "qa": {
+                "pressure_last_step_relative_change_pass": True,
+                "current_last_step_relative_change_pass": True,
+            },
+            "convergence_rows": [{"wall_model": "intact_aln"}],
+        }
+        summary_path = out_dir / "li_aln_multilayer_convergence_summary.json"
+        csv_path = out_dir / "li_aln_multilayer_convergence_observables.csv"
+        png_path = out_dir / "li_aln_multilayer_convergence.png"
+        summary_path.write_text(json.dumps(summary), encoding="utf-8")
+        csv_path.write_text("wall_model\nintact_aln\n", encoding="utf-8")
+        png_path.write_bytes(b"plot")
+        return [summary_path, csv_path, png_path]
+
+    monkeypatch.setattr(module, "write_li_aln_multilayer_convergence_artifacts", fake_write)
+    summary = module.run_li_aln_multilayer_convergence(
+        output_dir=tmp_path / "multilayer_convergence",
+        figure_dir=tmp_path / "figures",
+        docs_output_dir=tmp_path / "docs",
+    )
+
+    assert summary["qa"]["pressure_last_step_relative_change_pass"] is True
+    assert (tmp_path / "multilayer_convergence" / "li_aln_multilayer_convergence_summary.json").exists()
+    assert (tmp_path / "multilayer_convergence" / "li_aln_multilayer_convergence.png").exists()
+    assert (tmp_path / "docs" / "li_aln_multilayer_convergence_summary.json").exists()
+    assert (tmp_path / "docs" / "li_aln_multilayer_convergence.png").exists()

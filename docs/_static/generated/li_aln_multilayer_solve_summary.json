@@ -34,7 +34,8 @@
     "wall_models": [
       "ideal_insulator",
       "intact_aln",
-      "degraded_aln"
+      "degraded_aln",
+      "bare_metal"
     ]
   },
   "unit_audit": {
@@ -72,6 +73,7 @@
       "div_current_max": 518.7875068856447,
       "div_current_relative": 0.00018644733813855826,
       "charge_balance_residual": 5.793976409762535e-13,
+      "charge_balance_relative": 2.0823004881571817e-19,
       "interface_current_residual": 12.198614178188318,
       "interface_current_relative": 0.08768133820940605,
       "potential_residual": 0.000660452215284358,
@@ -103,6 +105,7 @@
       "div_current_max": 518.7867818960224,
       "div_current_relative": 0.00018644707767706805,
       "charge_balance_residual": 5.851958501112974e-09,
+      "charge_balance_relative": 2.1031387061027103e-15,
       "interface_current_residual": 12.19861413740528,
       "interface_current_relative": 0.08768133795997439,
       "potential_residual": 0.0006604512919857571,
@@ -134,6 +137,7 @@
       "div_current_max": 492.4348041150626,
       "div_current_relative": 0.00017697524189707892,
       "charge_balance_residual": 0.000585184838167163,
+      "charge_balance_relative": 2.103085066768311e-10,
       "interface_current_residual": 12.196215034580126,
       "interface_current_relative": 0.0876635074506028,
       "potential_residual": 0.000626912794584852,
@@ -142,6 +146,38 @@
       "solver_residual": 5.114168681163555e-05,
       "mhd_performance_only": true,
       "pressure_proxy_ratio_to_ideal": 1.0000501527635846
+    },
+    {
+      "wall_model": "bare_metal",
+      "mesh_ny": 42,
+      "mesh_nz": 42,
+      "fluid_cell_count": 324,
+      "solid_cell_count": 1440,
+      "tangential_conductance_ratio": 0.010125000000000002,
+      "normal_leakage_ratio": 17.578125,
+      "target_mean_velocity_m_s": 0.01,
+      "final_mean_velocity_m_s": 0.009999999999999997,
+      "mean_velocity_error_fraction": 3.469446951953614e-16,
+      "u_peak_m_s": 0.06720748121015602,
+      "pressure_proxy": 13.877494173427609,
+      "current_scaled_pressure_proxy": 37.255757751239074,
+      "volumetric_flow_rate_m3_s": 0.0001,
+      "mean_current_magnitude": 475.19472720988495,
+      "current_max": 2971.72593848804,
+      "face_current_max": 2979.73350704425,
+      "lorentz_power": -0.0012354288192780458,
+      "div_current_max": 348003.99308651185,
+      "div_current_relative": 0.01167903076781106,
+      "charge_balance_residual": 1462.9340752649402,
+      "charge_balance_relative": 4.909613802060903e-05,
+      "interface_current_residual": 263.40341918298645,
+      "interface_current_relative": 0.08839831433256921,
+      "potential_residual": 0.3541947671103669,
+      "linear_residual": 3.5885500074702553e-09,
+      "solver_time_s": 0.012,
+      "solver_residual": 0.006649332529074467,
+      "mhd_performance_only": true,
+      "pressure_proxy_ratio_to_ideal": 78.52300590242423
     }
   ],
   "qa": {
@@ -150,9 +186,10 @@
     "div_current_bounded_pass": true,
     "interface_current_bounded_pass": true,
     "max_mean_velocity_error_fraction": 3.469446951953614e-16,
-    "max_charge_balance_residual": 0.000585184838167163,
-    "max_div_current_relative": 0.00018644733813855826,
-    "max_interface_current_relative": 0.08768133820940605
+    "max_charge_balance_relative": 4.909613802060903e-05,
+    "max_charge_balance_residual": 1462.9340752649402,
+    "max_div_current_relative": 0.01167903076781106,
+    "max_interface_current_relative": 0.08839831433256921
   },
   "phase_status": {
     "true_fluid_aln_metal_geometry": "complete",

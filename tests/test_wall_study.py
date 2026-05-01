@@ -9,6 +9,7 @@ from lmx import (
     DEFAULT_LI_ALN_CASE,
     DEFAULT_SUBSTRATE_CONDUCTIVITIES,
     build_li_aln_multilayer_solve_case,
+    li_aln_multilayer_convergence_summary,
     li_aln_multilayer_mesh_summary,
     li_aln_multilayer_solve_summary,
     li_aln_multilayer_wall_model_stacks,
@@ -18,6 +19,7 @@ from lmx import (
     li_aln_wall_layers,
     li_aln_wall_stacks_by_side,
     write_li_aln_multilayer_mesh_artifacts,
+    write_li_aln_multilayer_convergence_artifacts,
     write_li_aln_multilayer_solve_artifacts,
     write_li_aln_phase0_2_artifacts,
     write_li_aln_phase3_6_artifacts,
@@ -210,6 +212,35 @@ def test_write_li_aln_multilayer_solve_artifacts(tmp_path: Path, monkeypatch: py
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
 
 
+def test_li_aln_multilayer_convergence_summary_tracks_last_step_changes(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(wall_study, "li_aln_multilayer_solve_summary", _fake_convergence_solve_summary)
+
+    summary = li_aln_multilayer_convergence_summary(
+        DEFAULT_LI_ALN_CASE,
+        wall_models=("intact_aln", "bare_metal"),
+        resolutions=(10, 12, 14),
+    )
+
+    assert summary["scope"] == "solved_multilayer_mesh_ladder_internal_gate"
+    assert summary["qa"]["pressure_last_step_relative_change_pass"] is True
+    assert summary["qa"]["current_last_step_relative_change_pass"] is True
+    assert len(summary["convergence_rows"]) == 6
+    assert len(summary["model_rows"]) == 2
+
+
+def test_write_li_aln_multilayer_convergence_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(wall_study, "li_aln_multilayer_solve_summary", _fake_convergence_solve_summary)
+
+    outputs = write_li_aln_multilayer_convergence_artifacts(
+        tmp_path,
+        wall_models=("intact_aln", "bare_metal"),
+        resolutions=(10, 12, 14),
+    )
+
+    assert [path.suffix for path in outputs] == [".json", ".csv", ".png"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+
+
 def _fake_multilayer_solution(case, *, mesh):
     fluid = np.asarray(mesh.fluid_mask, dtype=bool)
     u = np.where(fluid, float(case.initial_velocity), 0.0)
@@ -238,6 +269,25 @@ def _fake_multilayer_solution(case, *, mesh):
         residual=0.0,
     )
     return SimpleNamespace(state=state, diagnostics=diagnostics, mesh=mesh, case_name=case.name)
+
+
+def _fake_convergence_solve_summary(case, *, wall_models, ny, nz, **kwargs):
+    rows = []
+    for model in wall_models:
+        base = 10.0 if model == "bare_metal" else 1.0
+        rows.append(
+            {
+                "wall_model": model,
+                "mesh_ny": int(ny) + 24,
+                "mesh_nz": int(nz) + 24,
+                "pressure_proxy": base * (1.0 + 1.0 / int(ny)),
+                "mean_current_magnitude": base * 2.0 * (1.0 + 0.5 / int(ny)),
+                "charge_balance_relative": 1.0e-5,
+                "div_current_relative": 1.0e-3,
+                "interface_current_relative": 5.0e-2,
+            }
+        )
+    return {"observable_rows": rows}
 
 
 def test_write_li_aln_multilayer_mesh_artifacts(tmp_path: Path):

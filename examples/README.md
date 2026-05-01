@@ -27,6 +27,8 @@ The examples are explicit templates for research workflows. They show how to:
   aligned interfaces and conductivity fields
 - run explicit multilayer Li/AlN/metal limiting-case solves with
   conservative-current diagnostics
+- run a representative explicit multilayer mesh ladder for pressure/current
+  convergence checks
 
 ## Quick examples
 
@@ -89,6 +91,7 @@ python examples/li_aln_wall_stack_phase0_2.py
 python examples/li_aln_wall_stack_phase3_6.py
 python examples/li_aln_multilayer_mesh_qa.py
 python examples/li_aln_multilayer_solve.py
+python examples/li_aln_multilayer_convergence.py
 python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py

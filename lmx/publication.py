@@ -126,6 +126,16 @@ PUBLICATION_FIGURE_SPECS: tuple[PublicationFigureSpec, ...] = (
         required_next_step="Promote to external-code parity once a matching FreeMHD/OpenFOAM multilayer case is available.",
     ),
     PublicationFigureSpec(
+        family="li_aln_multilayer_convergence",
+        artifact="li_aln_multilayer_convergence.png",
+        summary="li_aln_multilayer_convergence_summary.json",
+        generator="examples/li_aln_multilayer_convergence.py",
+        reference="Coated-wall MHD conductance models and conservative interface-current diagnostics",
+        manuscript_role="Representative explicit multilayer mesh ladder for pressure/current observables",
+        readiness_status="ready_internal_gate",
+        required_next_step="Repeat with the external-code limiting case and the final production high-Ha wall-stack matrix.",
+    ),
+    PublicationFigureSpec(
         family="magnetic_obstacle",
         artifact="magnetic_obstacle_benchmark.png",
         summary="magnetic_obstacle_benchmark_summary.json",
@@ -352,9 +362,21 @@ def _selected_metrics(family: str, summary: Mapping[str, Any]) -> dict[str, Any]
             "charge_balance_pass": qa.get("charge_balance_pass"),
             "div_current_bounded_pass": qa.get("div_current_bounded_pass"),
             "interface_current_bounded_pass": qa.get("interface_current_bounded_pass"),
+            "max_charge_balance_relative": qa.get("max_charge_balance_relative"),
             "max_charge_balance_residual": qa.get("max_charge_balance_residual"),
             "max_div_current_relative": qa.get("max_div_current_relative"),
             "max_interface_current_relative": qa.get("max_interface_current_relative"),
+        }
+    if family == "li_aln_multilayer_convergence":
+        qa = summary.get("qa", {})
+        rows = summary.get("convergence_rows", [])
+        return {
+            "convergence_row_count": len(rows),
+            "pressure_convergence_pass": qa.get("pressure_last_step_relative_change_pass"),
+            "current_convergence_pass": qa.get("current_last_step_relative_change_pass"),
+            "max_pressure_last_step_relative_change": qa.get("max_pressure_last_step_relative_change"),
+            "max_current_last_step_relative_change": qa.get("max_current_last_step_relative_change"),
+            "max_charge_balance_relative": qa.get("max_charge_balance_relative"),
         }
     if family == "strong_scaling":
         return {

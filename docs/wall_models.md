@@ -190,15 +190,33 @@ python examples/li_aln_multilayer_solve.py
 
 The case prescribes a mean flow rate, keeps the input viscosity convention
 explicitly kinematic inside `CaseSpec`, and compares the ideal-insulator,
-intact-AlN, and degraded-AlN electrical wall models on the same mesh family.
-The output table records pressure proxy, current magnitude, global charge
-balance, normalized local current divergence, and normalized interface-current
-residual. The default gate is internal: it verifies that conservative-current
-diagnostics remain bounded on a true `fluid | AlN | metal` finite-volume mesh.
-It does not claim FreeMHD/OpenFOAM parity until a matching external multilayer
-case is promoted.
+intact-AlN, degraded-AlN, and bare-metal electrical wall models on the same
+mesh family. The output table records pressure proxy, current magnitude,
+dimensional charge residuals for audit, normalized global charge balance,
+normalized local current divergence, and normalized interface-current residual.
+The default gate is internal: it verifies that conservative-current diagnostics
+remain bounded on a true `fluid | AlN | metal` finite-volume mesh. It does not
+claim FreeMHD/OpenFOAM parity until a matching external multilayer case is
+promoted.
 
 ![Li/AlN explicit multilayer solved wall-stack gate](_static/generated/li_aln_multilayer_solve.png)
+
+## Explicit Multilayer Mesh Ladder
+
+The representative mesh ladder refines the solved multilayer gate for the
+intact-AlN and bare-metal electrical wall limits:
+
+```bash
+python examples/li_aln_multilayer_convergence.py
+```
+
+The ladder records pressure proxy, mean current, normalized charge balance,
+normalized local current divergence, and normalized interface-current residual
+at each retained fluid resolution. It is a bounded internal convergence gate
+for release QA and manuscript planning; it does not replace the future
+FreeMHD/OpenFOAM limiting-case comparison.
+
+![Li/AlN explicit multilayer mesh ladder](_static/generated/li_aln_multilayer_convergence.png)
 
 ## Literature Anchors
 

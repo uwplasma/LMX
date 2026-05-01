@@ -625,7 +625,7 @@ def build_li_aln_multilayer_solve_case(
 def li_aln_multilayer_solve_summary(
     case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
     *,
-    wall_models: Sequence[str] = ("ideal_insulator", "intact_aln", "degraded_aln"),
+    wall_models: Sequence[str] = ("ideal_insulator", "intact_aln", "degraded_aln", "bare_metal"),
     ny: int = 18,
     nz: int = 18,
     magnetic_field: float | None = 5.0e-2,
@@ -657,7 +657,7 @@ def write_li_aln_multilayer_solve_artifacts(
     out_dir: str | Path,
     *,
     case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
-    wall_models: Sequence[str] = ("ideal_insulator", "intact_aln", "degraded_aln"),
+    wall_models: Sequence[str] = ("ideal_insulator", "intact_aln", "degraded_aln", "bare_metal"),
     ny: int = 18,
     nz: int = 18,
     magnetic_field: float | None = 5.0e-2,
@@ -691,6 +691,83 @@ def write_li_aln_multilayer_solve_artifacts(
     json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     _write_generic_rows_csv(csv_path, summary["observable_rows"])
     _write_li_aln_multilayer_solve_plot(png_path, summary, profiles)
+    return [json_path, csv_path, png_path]
+
+
+def li_aln_multilayer_convergence_summary(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    wall_models: Sequence[str] = ("intact_aln", "bare_metal"),
+    resolutions: Sequence[int] = (18, 22, 26),
+    magnetic_field: float | None = 5.0e-2,
+    velocity: float | None = 1.0e-2,
+    dt: float = 1.0e-3,
+    t_final: float = 8.0e-3,
+    max_steps: int = 8,
+    potential_iterations: int = 60,
+) -> dict[str, object]:
+    """Run a bounded mesh ladder for representative multilayer wall models."""
+
+    rows = _li_aln_multilayer_convergence_rows(
+        case,
+        wall_models=wall_models,
+        resolutions=resolutions,
+        magnetic_field=magnetic_field,
+        velocity=velocity,
+        dt=dt,
+        t_final=t_final,
+        max_steps=max_steps,
+        potential_iterations=potential_iterations,
+    )
+    return _li_aln_multilayer_convergence_summary_from_rows(
+        case,
+        rows,
+        wall_models=wall_models,
+        resolutions=resolutions,
+        magnetic_field=magnetic_field,
+        velocity=velocity,
+        dt=dt,
+        t_final=t_final,
+        max_steps=max_steps,
+        potential_iterations=potential_iterations,
+    )
+
+
+def write_li_aln_multilayer_convergence_artifacts(
+    out_dir: str | Path,
+    *,
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    wall_models: Sequence[str] = ("intact_aln", "bare_metal"),
+    resolutions: Sequence[int] = (18, 22, 26),
+    magnetic_field: float | None = 5.0e-2,
+    velocity: float | None = 1.0e-2,
+    dt: float = 1.0e-3,
+    t_final: float = 8.0e-3,
+    max_steps: int = 8,
+    potential_iterations: int = 60,
+    filename_stem: str = "li_aln_multilayer_convergence",
+) -> list[Path]:
+    """Write a bounded multilayer mesh-ladder JSON/CSV/PNG artifact."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = li_aln_multilayer_convergence_summary(
+        case,
+        wall_models=wall_models,
+        resolutions=resolutions,
+        magnetic_field=magnetic_field,
+        velocity=velocity,
+        dt=dt,
+        t_final=t_final,
+        max_steps=max_steps,
+        potential_iterations=potential_iterations,
+    )
+    json_path = out / f"{filename_stem}_summary.json"
+    csv_path = out / f"{filename_stem}_observables.csv"
+    png_path = out / f"{filename_stem}.png"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    _write_generic_rows_csv(csv_path, summary["convergence_rows"])
+    _write_li_aln_multilayer_convergence_plot(png_path, summary)
     return [json_path, csv_path, png_path]
 
 
@@ -1019,7 +1096,8 @@ def _li_aln_multilayer_solve_payload(
     baseline_pressure = max(baseline_pressure, 1.0e-30)
     for row in rows:
         row["pressure_proxy_ratio_to_ideal"] = abs(float(row["pressure_proxy"])) / baseline_pressure
-    max_charge = max((float(row["charge_balance_residual"]) for row in rows), default=0.0)
+    max_charge = max((float(row["charge_balance_relative"]) for row in rows), default=0.0)
+    max_absolute_charge = max((float(row["charge_balance_residual"]) for row in rows), default=0.0)
     max_div = max((float(row["div_current_relative"]) for row in rows), default=0.0)
     max_interface = max((float(row["interface_current_relative"]) for row in rows), default=0.0)
     max_mean_error = max((float(row["mean_velocity_error_fraction"]) for row in rows), default=0.0)
@@ -1043,11 +1121,12 @@ def _li_aln_multilayer_solve_payload(
             "observable_rows": rows,
             "qa": {
                 "prescribed_flow_rate_pass": bool(max_mean_error <= 1.0e-10),
-                "charge_balance_pass": bool(max_charge <= 1.0e-3),
+                "charge_balance_pass": bool(max_charge <= 5.0e-2),
                 "div_current_bounded_pass": bool(max_div <= 5.0e-2),
                 "interface_current_bounded_pass": bool(max_interface <= 1.5e-1),
                 "max_mean_velocity_error_fraction": max_mean_error,
-                "max_charge_balance_residual": max_charge,
+                "max_charge_balance_relative": max_charge,
+                "max_charge_balance_residual": max_absolute_charge,
                 "max_div_current_relative": max_div,
                 "max_interface_current_relative": max_interface,
             },
@@ -1065,6 +1144,157 @@ def _li_aln_multilayer_solve_payload(
         },
         profiles,
     )
+
+
+def _li_aln_multilayer_convergence_rows(
+    case: WallStackStudyCase,
+    *,
+    wall_models: Sequence[str],
+    resolutions: Sequence[int],
+    magnetic_field: float | None,
+    velocity: float | None,
+    dt: float,
+    t_final: float,
+    max_steps: int,
+    potential_iterations: int,
+) -> list[dict[str, float | int | str | bool]]:
+    resolution_values = tuple(int(value) for value in resolutions)
+    if len(resolution_values) < 2:
+        raise ValueError("at least two resolutions are required for convergence")
+    rows: list[dict[str, float | int | str | bool]] = []
+    for resolution in resolution_values:
+        if resolution <= 0:
+            raise ValueError("convergence resolutions must be positive")
+        summary = li_aln_multilayer_solve_summary(
+            case,
+            wall_models=wall_models,
+            ny=resolution,
+            nz=resolution,
+            magnetic_field=magnetic_field,
+            velocity=velocity,
+            dt=dt,
+            t_final=t_final,
+            max_steps=max_steps,
+            potential_iterations=potential_iterations,
+        )
+        for row in summary["observable_rows"]:
+            record = dict(row)
+            record["fluid_resolution"] = resolution
+            record["total_cell_count"] = int(record["mesh_ny"]) * int(record["mesh_nz"])
+            rows.append(record)
+    _add_finest_reference_errors(rows)
+    return rows
+
+
+def _li_aln_multilayer_convergence_summary_from_rows(
+    case: WallStackStudyCase,
+    rows: Sequence[dict[str, float | int | str | bool]],
+    *,
+    wall_models: Sequence[str],
+    resolutions: Sequence[int],
+    magnetic_field: float | None,
+    velocity: float | None,
+    dt: float,
+    t_final: float,
+    max_steps: int,
+    potential_iterations: int,
+) -> dict[str, object]:
+    payload = asdict(case)
+    payload["lithium"] = case.lithium
+    payload["magnetic_field"] = float(case.magnetic_field if magnetic_field is None else magnetic_field)
+    payload["velocity"] = float(case.velocity if velocity is None else velocity)
+    operating_case = WallStackStudyCase(**payload)
+    model_rows = _li_aln_convergence_model_rows(rows)
+    max_pressure_change = max((float(row["last_step_pressure_relative_change"]) for row in model_rows), default=0.0)
+    max_current_change = max((float(row["last_step_current_relative_change"]) for row in model_rows), default=0.0)
+    max_charge = max((float(row["charge_balance_relative"]) for row in rows), default=0.0)
+    max_div = max((float(row["div_current_relative"]) for row in rows), default=0.0)
+    max_interface = max((float(row["interface_current_relative"]) for row in rows), default=0.0)
+    return {
+        "case": f"{operating_case.name}_multilayer_convergence",
+        "scope": "solved_multilayer_mesh_ladder_internal_gate",
+        "material_compatibility_claim": False,
+        "external_code_parity_claim": False,
+        "inputs": _case_payload(operating_case),
+        "solver_controls": {
+            "resolutions": [int(value) for value in resolutions],
+            "wall_models": list(wall_models),
+            "dt_s": float(dt),
+            "t_final_s": float(t_final),
+            "max_steps": int(max_steps),
+            "potential_iterations": int(potential_iterations),
+        },
+        "unit_audit": li_aln_unit_audit(operating_case),
+        "convergence_rows": [dict(row) for row in rows],
+        "model_rows": model_rows,
+        "qa": {
+            "pressure_last_step_relative_change_pass": bool(max_pressure_change <= 0.10),
+            "current_last_step_relative_change_pass": bool(max_current_change <= 0.10),
+            "charge_balance_pass": bool(max_charge <= 5.0e-2),
+            "div_current_bounded_pass": bool(max_div <= 5.0e-2),
+            "interface_current_bounded_pass": bool(max_interface <= 1.5e-1),
+            "max_pressure_last_step_relative_change": max_pressure_change,
+            "max_current_last_step_relative_change": max_current_change,
+            "max_charge_balance_relative": max_charge,
+            "max_div_current_relative": max_div,
+            "max_interface_current_relative": max_interface,
+        },
+        "phase_status": {
+            "mesh_ladder": "complete_for_representative_intact_and_conductive_wall_models",
+            "external_code_limiting_case": "next_for_matching_free_mhd_or_openfoam_case",
+        },
+        "notes": (
+            "This is a bounded internal mesh ladder for representative AlN and "
+            "bare-metal electrical wall limits. It supports release QA and "
+            "manuscript planning, but does not replace external-code parity."
+        ),
+    }
+
+
+def _add_finest_reference_errors(rows: list[dict[str, float | int | str | bool]]) -> None:
+    finest_by_model: dict[str, dict[str, float | int | str | bool]] = {}
+    for row in rows:
+        model = str(row["wall_model"])
+        if model not in finest_by_model or int(row["fluid_resolution"]) > int(finest_by_model[model]["fluid_resolution"]):
+            finest_by_model[model] = row
+    for row in rows:
+        reference = finest_by_model[str(row["wall_model"])]
+        row["pressure_relative_to_finest"] = _relative_gap(row["pressure_proxy"], reference["pressure_proxy"])
+        row["mean_current_relative_to_finest"] = _relative_gap(row["mean_current_magnitude"], reference["mean_current_magnitude"])
+
+
+def _li_aln_convergence_model_rows(
+    rows: Sequence[dict[str, float | int | str | bool]],
+) -> list[dict[str, float | int | str | bool]]:
+    by_model: dict[str, list[dict[str, float | int | str | bool]]] = {}
+    for row in rows:
+        by_model.setdefault(str(row["wall_model"]), []).append(dict(row))
+    output: list[dict[str, float | int | str | bool]] = []
+    for model, model_rows in sorted(by_model.items()):
+        ordered = sorted(model_rows, key=lambda row: int(row["fluid_resolution"]))
+        coarse = ordered[-2]
+        fine = ordered[-1]
+        output.append(
+            {
+                "wall_model": model,
+                "coarse_resolution": int(coarse["fluid_resolution"]),
+                "fine_resolution": int(fine["fluid_resolution"]),
+                "last_step_pressure_relative_change": _relative_gap(coarse["pressure_proxy"], fine["pressure_proxy"]),
+                "last_step_current_relative_change": _relative_gap(coarse["mean_current_magnitude"], fine["mean_current_magnitude"]),
+                "fine_pressure_proxy": float(fine["pressure_proxy"]),
+                "fine_mean_current_magnitude": float(fine["mean_current_magnitude"]),
+                "fine_charge_balance_relative": float(fine["charge_balance_relative"]),
+                "fine_div_current_relative": float(fine["div_current_relative"]),
+                "fine_interface_current_relative": float(fine["interface_current_relative"]),
+            }
+        )
+    return output
+
+
+def _relative_gap(value: object, reference: object) -> float:
+    value_f = float(value)
+    reference_f = float(reference)
+    return abs(value_f - reference_f) / max(abs(reference_f), 1.0e-30)
 
 
 def _li_aln_multilayer_solution_row(
@@ -1086,6 +1316,7 @@ def _li_aln_multilayer_solution_row(
     div_current_max = _last_history_value(solution.diagnostics.div_current_max_history)
     interface_current_residual = _last_history_value(solution.diagnostics.interface_current_residual_history)
     min_spacing = min(float(np.min(np.asarray(mesh.dy, dtype=float))), float(np.min(np.asarray(mesh.dz, dtype=float))))
+    charge_balance_residual = _last_history_value(solution.diagnostics.charge_balance_residual_history)
     return {
         "wall_model": wall_model,
         "mesh_ny": int(mesh.ny),
@@ -1107,7 +1338,8 @@ def _li_aln_multilayer_solution_row(
         "lorentz_power": _last_history_value(solution.diagnostics.lorentz_power_history),
         "div_current_max": div_current_max,
         "div_current_relative": div_current_max * min_spacing / max(abs(face_current_max), 1.0e-30),
-        "charge_balance_residual": _last_history_value(solution.diagnostics.charge_balance_residual_history),
+        "charge_balance_residual": charge_balance_residual,
+        "charge_balance_relative": abs(charge_balance_residual) * min_spacing / max(abs(face_current_max), 1.0e-30),
         "interface_current_residual": interface_current_residual,
         "interface_current_relative": abs(interface_current_residual) / max(abs(face_current_max), 1.0e-30),
         "potential_residual": _last_history_value(solution.diagnostics.potential_residual_history),
@@ -1506,7 +1738,7 @@ def _write_li_aln_multilayer_solve_plot(
     axes[1, 0].legend(frameon=False, loc="best")
 
     diagnostics = {
-        "charge": [float(row["charge_balance_residual"]) for row in rows],
+        "charge": [float(row["charge_balance_relative"]) for row in rows],
         "local div J": [float(row["div_current_relative"]) for row in rows],
         "interface J": [float(row["interface_current_relative"]) for row in rows],
     }
@@ -1529,8 +1761,102 @@ def _write_li_aln_multilayer_solve_plot(
             "Li/AlN explicit multilayer solved wall-stack gate"
             f" | Ha={float(audit['hartmann_number']):.2g}, "
             f"Re={float(audit['reynolds_number']):.2g}, "
-            f"charge={float(qa['max_charge_balance_residual']):.1e}, "
+            f"charge={float(qa['max_charge_balance_relative']):.1e}, "
             f"local divJ={float(qa['max_div_current_relative']):.1e}"
+        ),
+        fontsize=15.2,
+        fontweight="bold",
+    )
+    fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _write_li_aln_multilayer_convergence_plot(path: Path, summary: dict[str, object]) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as local_np
+
+    rows = [dict(row) for row in summary["convergence_rows"]]
+    model_rows = [dict(row) for row in summary["model_rows"]]
+    models = list(dict.fromkeys(str(row["wall_model"]) for row in rows))
+    colors = {"intact_aln": "#2563eb", "bare_metal": "#991b1b", "degraded_aln": "#b45309", "ideal_insulator": "#0f766e"}
+
+    fig, axes = plt.subplots(2, 2, figsize=(13.2, 9.0), constrained_layout=True)
+    for model in models:
+        model_rows_all = sorted([row for row in rows if row["wall_model"] == model], key=lambda row: int(row["fluid_resolution"]))
+        x = local_np.asarray([int(row["fluid_resolution"]) for row in model_rows_all], dtype=float)
+        pressure = local_np.asarray([float(row["pressure_proxy"]) for row in model_rows_all], dtype=float)
+        mean_current = local_np.asarray([float(row["mean_current_magnitude"]) for row in model_rows_all], dtype=float)
+        color = colors.get(model, "#334155")
+        label = model.replace("_", " ")
+        axes[0, 0].plot(x, pressure, marker="o", linewidth=2.0, color=color, label=label)
+        axes[0, 1].plot(x, mean_current, marker="o", linewidth=2.0, color=color, label=label)
+        axes[1, 0].plot(
+            x,
+            local_np.where(
+                local_np.asarray([float(row["pressure_relative_to_finest"]) for row in model_rows_all], dtype=float) > 0.0,
+                local_np.asarray([float(row["pressure_relative_to_finest"]) for row in model_rows_all], dtype=float),
+                local_np.nan,
+            ),
+            marker="o",
+            linewidth=2.0,
+            color=color,
+            label=label,
+        )
+        axes[1, 0].plot(
+            x,
+            local_np.where(
+                local_np.asarray([float(row["mean_current_relative_to_finest"]) for row in model_rows_all], dtype=float) > 0.0,
+                local_np.asarray([float(row["mean_current_relative_to_finest"]) for row in model_rows_all], dtype=float),
+                local_np.nan,
+            ),
+            marker="s",
+            linewidth=1.6,
+            linestyle="--",
+            color=color,
+            alpha=0.75,
+        )
+
+    axes[0, 0].set_xlabel("fluid cells per direction")
+    axes[0, 0].set_ylabel("pressure proxy")
+    axes[0, 0].set_title("Pressure response mesh ladder")
+    axes[0, 0].set_yscale("log")
+    axes[0, 0].grid(True, alpha=0.25)
+    axes[0, 0].legend(frameon=False)
+
+    axes[0, 1].set_xlabel("fluid cells per direction")
+    axes[0, 1].set_ylabel("mean |J|")
+    axes[0, 1].set_title("Current response mesh ladder")
+    axes[0, 1].set_yscale("log")
+    axes[0, 1].grid(True, alpha=0.25)
+    axes[0, 1].legend(frameon=False)
+
+    axes[1, 0].set_yscale("log")
+    axes[1, 0].set_xlabel("fluid cells per direction")
+    axes[1, 0].set_ylabel("relative to finest")
+    axes[1, 0].set_title("Observable convergence to finest retained mesh")
+    axes[1, 0].grid(True, which="both", alpha=0.25)
+
+    x = local_np.arange(len(model_rows))
+    pressure_change = local_np.asarray([float(row["last_step_pressure_relative_change"]) for row in model_rows], dtype=float)
+    current_change = local_np.asarray([float(row["last_step_current_relative_change"]) for row in model_rows], dtype=float)
+    axes[1, 1].bar(x - 0.18, pressure_change, width=0.36, color="#0f766e", label="pressure")
+    axes[1, 1].bar(x + 0.18, current_change, width=0.36, color="#7c2d12", label="mean |J|")
+    axes[1, 1].axhline(0.10, color="#111827", linewidth=1.0, linestyle=":", label="10% gate")
+    axes[1, 1].set_xticks(x, [str(row["wall_model"]).replace("_", "\n") for row in model_rows])
+    axes[1, 1].set_ylim(0.0, max(0.12, float(local_np.max([*pressure_change, *current_change])) * 1.25))
+    axes[1, 1].set_ylabel("last-step relative change")
+    axes[1, 1].set_title("Retained convergence gate")
+    axes[1, 1].grid(True, axis="y", alpha=0.25)
+    axes[1, 1].legend(frameon=False)
+
+    audit = dict(summary["unit_audit"])
+    qa = dict(summary["qa"])
+    fig.suptitle(
+        (
+            "Li/AlN explicit multilayer mesh ladder"
+            f" | Ha={float(audit['hartmann_number']):.2g}, "
+            f"max pressure change={float(qa['max_pressure_last_step_relative_change']):.2g}, "
+            f"max current change={float(qa['max_current_last_step_relative_change']):.2g}"
         ),
         fontsize=15.2,
         fontweight="bold",
