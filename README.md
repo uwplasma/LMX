@@ -11,6 +11,8 @@ fully developed duct solvers, a 3D `extruded_inductionless` fringing-field
 solver lane, restartable CLI workflows, strong-scaling tooling, and
 differentiable workflows for sensitivity analysis and inverse design.
 
+Documentation is available at [lmx.readthedocs.io](https://lmx.readthedocs.io).
+
 <p align="center">
   <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_2d.gif" alt="LMX 2D Hunt boundary-layer formation movie" width="24%">
   <img src="https://github.com/uwplasma/LMX/releases/download/v1.0.2/readme_hunt_startup_3d.gif" alt="LMX 3D Hunt boundary-layer formation movie" width="24%">
