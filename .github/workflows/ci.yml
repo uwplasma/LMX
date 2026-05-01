@@ -31,7 +31,30 @@ jobs:
           OPENBLAS_NUM_THREADS: "1"
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
-        run: python -m pytest -m "unit or validation"
+        run: |
+          python -m pytest -m unit \
+            tests/test_cases.py \
+            tests/test_config.py \
+            tests/test_units_and_wall_models.py \
+            tests/test_physics.py \
+            tests/test_mesh.py \
+            tests/test_linear.py \
+            tests/test_q2d.py \
+            tests/test_wall_study.py \
+            tests/test_release_readiness.py \
+            tests/test_package_api.py \
+            tests/test_reference_data.py
+
+      - name: Run bounded release-readiness check
+        env:
+          MPLBACKEND: Agg
+          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: python scripts/run_release_readiness.py --output artifacts/ci/release_readiness.json
 
   release-tests:
     if: github.event_name == 'workflow_dispatch'

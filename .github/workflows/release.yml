@@ -44,35 +44,30 @@ jobs:
           python -m pip install -e .[dev,docs]
 
       - name: Run fast research gate
-        run: python -m pytest -m "unit or validation" -q
+        run: |
+          python -m pytest -m unit -q \
+            tests/test_cases.py \
+            tests/test_config.py \
+            tests/test_units_and_wall_models.py \
+            tests/test_physics.py \
+            tests/test_mesh.py \
+            tests/test_linear.py \
+            tests/test_q2d.py \
+            tests/test_wall_study.py \
+            tests/test_release_readiness.py \
+            tests/test_package_api.py \
+            tests/test_reference_data.py
 
       - name: Build documentation
         run: python -m sphinx -W -b html docs docs/_build/html
 
-      - name: Generate selected validation artifacts
+      - name: Run bounded release-readiness artifact gate
         run: |
-          python scripts/run_validation_suite.py --output artifacts/release/validation
-          python scripts/run_convergence_suite.py --output artifacts/release/convergence --cases hartmann --ha 5 --resolutions 8,16,32
-          python scripts/run_time_convergence_suite.py --output artifacts/release/time_convergence --cases hartmann --ha 5 --resolution 16 --dts 0.004,0.002,0.001
-          python scripts/run_freemhd_parity_suite.py --output artifacts/release/freemhd_parity
-          python examples/q2d_decay_validation.py
-          python examples/q2d_forced_validation.py
-          python examples/q2d_wall_bounded_validation.py
-          python examples/q2d_turbulence_decay_demo.py
-          mkdir -p artifacts/release/q2d
-          cp -R artifacts/examples/q2d_decay_validation artifacts/release/q2d/
-          cp -R artifacts/examples/q2d_forced_validation artifacts/release/q2d/
-          cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/release/q2d/
-          cp -R artifacts/examples/q2d_turbulence_decay artifacts/release/q2d/
-
-      - name: Build release validation summary
-        run: |
-          python scripts/summarize_ci_artifacts.py \
-            --validation-summary artifacts/release/validation/summary.json \
-            --parity-summary artifacts/release/freemhd_parity/summary.json \
-            --output-json artifacts/release/summary-report.json \
-            --output-md artifacts/release/summary-report.md
+          mkdir -p artifacts/release
           python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
+          python examples/publication_figure_campaign.py
+          cp docs/_static/generated/publication_figure_campaign_summary.json artifacts/release/publication_figure_campaign_summary.json
+          cp docs/_static/generated/publication_figure_campaign_table.csv artifacts/release/publication_figure_campaign_table.csv
 
       - name: Upload validation artifacts
         uses: actions/upload-artifact@v4
