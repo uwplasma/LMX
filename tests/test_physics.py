@@ -8,7 +8,7 @@ import pytest
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.field_models import write_tabulated_field_npz
-from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
+from lmx.mesh import generate_layered_duct_mesh, generate_multilayer_duct_mesh, generate_rect_duct_mesh
 from lmx.physics import _boundary_sides, build_material_fields, magnetic_field_components
 from lmx.reference_data import default_closed_channel_reference_root
 from lmx.specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, RegionSpec, TimeStepperConfig
@@ -24,6 +24,7 @@ from lmx.validation import (
     hartmann_validation,
     write_acceptance_report,
 )
+from lmx.wall_models import WallLayer
 
 
 def _synthetic_solution(case, profile: jnp.ndarray) -> Solution:
@@ -341,3 +342,33 @@ def test_build_material_fields_handles_missing_solid_region_assignment_with_laye
     assert jnp.allclose(fields.conductivity[~fields.fluid_mask], 5.0)
     assert jnp.allclose(fields.density[~fields.fluid_mask], 6.0)
     assert jnp.allclose(fields.viscosity[~fields.fluid_mask], 7.0)
+
+
+@pytest.mark.unit
+def test_build_material_fields_uses_explicit_multilayer_mesh_sigma():
+    mesh = generate_multilayer_duct_mesh(
+        width=1.0,
+        height=1.0,
+        ny=4,
+        nz=4,
+        fluid_conductivity=2.0,
+        wall_layers={
+            "left": (WallLayer("aln", 1.0e-8, 0.01, 1), WallLayer("metal", 7.0, 0.01, 1)),
+            "right": (WallLayer("aln", 1.0e-8, 0.01, 1), WallLayer("metal", 7.0, 0.01, 1)),
+        },
+    )
+    case = CaseSpec(
+        name="explicit_multilayer_sigma",
+        geometry=GeometrySpec(kind="layered_duct", width=1.0, height=1.0, ny=4, nz=4),
+        regions=(RegionSpec(name="fluid", kind="fluid", conductivity=99.0, density=3.0, viscosity=4.0),),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0)),
+        boundary_conditions=(BoundaryCondition("walls", "insulating"),),
+        time_stepper=TimeStepperConfig(dt=0.1, t_final=0.1, max_steps=1),
+    )
+
+    fields = build_material_fields(case, mesh)
+
+    assert fields.conductivity.shape == mesh.yz_shape
+    assert float(fields.conductivity[mesh.region_ids == 0][0]) == pytest.approx(2.0)
+    assert float(fields.conductivity[mesh.region_ids == mesh.region_names.index("left:aln")][0]) == pytest.approx(1.0e-8)
+    assert float(fields.conductivity[mesh.region_ids == mesh.region_names.index("left:metal")][0]) == pytest.approx(7.0)

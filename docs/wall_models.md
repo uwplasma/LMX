@@ -153,6 +153,32 @@ The Phase 3-6 gates are:
 - true multilayer finite-volume geometry remains the next solver-extension
   lane, with reduced results serving as limiting-case design checks.
 
+## Explicit Multilayer Mesh QA
+
+The first true `fluid | AlN | metal` geometry gate is executable through:
+
+```bash
+python examples/li_aln_multilayer_mesh_qa.py
+```
+
+The generated mesh inserts finite-volume faces at the fluid/AlN and AlN/metal
+interfaces on all four sides, fills an explicit electrical-conductivity field,
+and records region IDs. `build_material_fields(...)` now respects
+`mesh.sigma`, so this mesh can be used by the existing conservative
+current-reconstruction path once a solved multilayer wall case is promoted.
+
+![Li/AlN explicit multilayer wall-stack mesh QA](_static/generated/li_aln_multilayer_mesh_qa.png)
+
+The mesh gate requires:
+
+- every material interface is represented by a mesh face;
+- every wall layer has at least the declared minimum cell count;
+- `mesh.sigma` and `mesh.region_ids` are present and shape-consistent;
+- the exported interface table records side, coordinate, inner region, outer
+  region, and alignment status;
+- the artifact remains scoped to MHD electrical performance and does not claim
+  material compatibility.
+
 ## Literature Anchors
 
 - Shercliff and Hunt rectangular-duct solutions define the insulating and

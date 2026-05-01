@@ -59,6 +59,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `wham_blanket_autodiff_research.png` | `examples/wham_blanket_autodiff_research_demo.py` | WHAM pressure sensitivity and field-scale inverse design |
 | `li_aln_wall_stack_phase0_2.png` | `examples/li_aln_wall_stack_phase0_2.py` | Li/AlN unit audit, nested-wall QA, conductance sweep, and pinhole sensitivity |
 | `li_aln_wall_stack_phase3_6.png` | `examples/li_aln_wall_stack_phase3_6.py` | Li/AlN operating matrix, substrate comparison, degradation thresholds, and pinhole limits |
+| `li_aln_multilayer_mesh_qa.png` | `examples/li_aln_multilayer_mesh_qa.py` | Explicit `fluid | AlN | metal` mesh, aligned interfaces, region IDs, and conductivity field |
 | `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
 | `publication_figure_campaign_summary.json` | `examples/publication_figure_campaign.py` | Manuscript figure manifest, status table, and remaining figure gaps |
 | `research_grade_closure_status.json` | `examples/research_grade_closure_status.py` | Strict research-blocker closure status, physics gates, and next artifacts |
@@ -74,6 +75,8 @@ and posters exist, and that the core publication-facing figures are present.
 ![LMX Li/AlN wall-stack Phase 0-2 reduced study](_static/generated/li_aln_wall_stack_phase0_2.png)
 
 ![LMX Li/AlN wall-stack Phase 3-6 reduced parametric assessment](_static/generated/li_aln_wall_stack_phase3_6.png)
+
+![LMX Li/AlN explicit multilayer wall-stack mesh QA](_static/generated/li_aln_multilayer_mesh_qa.png)
 
 ![LMX strict external validation targets](_static/generated/research_grade_external_targets.png)
 
@@ -99,6 +102,7 @@ python examples/wham_blanket_flow_demo.py
 python examples/wham_blanket_autodiff_research_demo.py
 python examples/li_aln_wall_stack_phase0_2.py
 python examples/li_aln_wall_stack_phase3_6.py
+python examples/li_aln_multilayer_mesh_qa.py
 python examples/publication_figure_campaign.py
 python examples/research_grade_closure_status.py
 python examples/research_grade_external_data_audit.py

@@ -790,6 +790,18 @@ python examples/li_aln_wall_stack_phase3_6.py
 
 ![LMX Li/AlN wall-stack Phase 3-6 reduced parametric assessment](docs/_static/generated/li_aln_wall_stack_phase3_6.png)
 
+The explicit multilayer mesh gate constructs `fluid | AlN | metal` cells with
+faces aligned at every material interface and exports the conductivity field,
+region IDs, layer tables, and interface table. This is the geometry prerequisite
+for conservative current diagnostics and future external-code limiting-case
+comparisons.
+
+```bash
+python examples/li_aln_multilayer_mesh_qa.py
+```
+
+![LMX Li/AlN explicit multilayer wall-stack mesh QA](docs/_static/generated/li_aln_multilayer_mesh_qa.png)
+
 ## Validation status
 
 The current validation surface includes:

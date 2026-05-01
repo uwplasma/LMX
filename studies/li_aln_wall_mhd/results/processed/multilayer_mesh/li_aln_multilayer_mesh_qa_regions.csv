@@ -1,0 +1,10 @@
+region_id,name,cell_count,conductivity_s_m,is_fluid
+0,fluid,2304,3200000.0,True
+1,left:aln,276,9.99999993922529e-09,False
+2,left:316L,454,1350000.0,False
+3,right:aln,276,9.99999993922529e-09,False
+4,right:316L,456,1350000.0,False
+5,bottom:aln,268,9.99999993922529e-09,False
+6,bottom:316L,440,1350000.0,False
+7,top:aln,268,9.99999993922529e-09,False
+8,top:316L,442,1350000.0,False

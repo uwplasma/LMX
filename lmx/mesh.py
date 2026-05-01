@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import cos, pi, sin
+from typing import Sequence
 
 import jax.numpy as jnp
 import numpy as np
+
+from .wall_models import WallLayer
 
 
 @dataclass(frozen=True)
@@ -16,6 +19,8 @@ class StructuredMesh:
     point_coordinates: jnp.ndarray | None = None
     fluid_mask: jnp.ndarray | None = None
     sigma: jnp.ndarray | None = None
+    region_ids: jnp.ndarray | None = None
+    region_names: tuple[str, ...] = ()
 
     @property
     def nx(self) -> int:
@@ -382,6 +387,185 @@ def generate_layered_duct_mesh(
         geometry="layered_duct",
         fluid_mask=fluid_mask,
     )
+
+
+_WALL_SIDES = ("left", "right", "bottom", "top")
+
+
+def generate_multilayer_duct_mesh(
+    *,
+    width: float,
+    height: float,
+    length: float = 1.0,
+    nx: int = 1,
+    ny: int = 64,
+    nz: int = 64,
+    wall_layers: dict[str, Sequence[WallLayer]] | None = None,
+    fluid_conductivity: float = 1.0,
+    target_ha: float | None = None,
+    magnetic_axis: str | None = None,
+) -> StructuredMesh:
+    """Build a rectangular duct with explicit nested wall-layer cells.
+
+    ``wall_layers`` maps ``left``, ``right``, ``bottom``, and/or ``top`` to
+    ``WallLayer`` sequences ordered from the fluid outward. Faces are inserted
+    at every layer interface, and ``mesh.sigma``/``mesh.region_ids`` are filled
+    so downstream QA and material-field construction can use the explicit
+    multilayer geometry directly.
+    """
+
+    if width <= 0.0 or height <= 0.0 or length <= 0.0:
+        raise ValueError("width, height, and length must be positive")
+    if ny <= 0 or nz <= 0 or nx <= 0:
+        raise ValueError("nx, ny, and nz must be positive")
+    if fluid_conductivity <= 0.0:
+        raise ValueError("fluid_conductivity must be positive")
+    layers_by_side = _normalized_wall_layers(wall_layers or {})
+    if target_ha and target_ha > 0.0:
+        fluid_mesh = generate_rect_duct_mesh(
+            width=width,
+            height=height,
+            length=length,
+            nx=nx,
+            ny=ny,
+            nz=nz,
+            target_ha=target_ha,
+            magnetic_axis=magnetic_axis,
+        )
+        y_faces = fluid_mesh.y_faces
+        z_faces = fluid_mesh.z_faces
+    else:
+        y_faces = _clustered_segment(-0.5 * width, 0.5 * width, ny, beta=2.0)
+        z_faces = _clustered_segment(-0.5 * height, 0.5 * height, nz, beta=2.0)
+
+    left_faces = _negative_wall_faces(-0.5 * width, layers_by_side["left"])
+    right_faces = _positive_wall_faces(0.5 * width, layers_by_side["right"])
+    bottom_faces = _negative_wall_faces(-0.5 * height, layers_by_side["bottom"])
+    top_faces = _positive_wall_faces(0.5 * height, layers_by_side["top"])
+    if left_faces.size:
+        y_faces = jnp.concatenate([left_faces[:-1], y_faces])
+    if right_faces.size:
+        y_faces = jnp.concatenate([y_faces, right_faces[1:]])
+    if bottom_faces.size:
+        z_faces = jnp.concatenate([bottom_faces[:-1], z_faces])
+    if top_faces.size:
+        z_faces = jnp.concatenate([z_faces, top_faces[1:]])
+
+    x_faces = jnp.linspace(0.0, length, nx + 1)
+    yc, zc = np.meshgrid(
+        np.asarray(0.5 * (y_faces[:-1] + y_faces[1:]), dtype=float),
+        np.asarray(0.5 * (z_faces[:-1] + z_faces[1:]), dtype=float),
+        indexing="ij",
+    )
+    fluid_mask = (np.abs(yc) <= 0.5 * width) & (np.abs(zc) <= 0.5 * height)
+    region_names, region_sigmas, region_ids = _multilayer_region_assignment(
+        yc,
+        zc,
+        width=width,
+        height=height,
+        fluid_mask=fluid_mask,
+        fluid_conductivity=fluid_conductivity,
+        wall_layers=layers_by_side,
+    )
+    sigma = np.asarray(region_sigmas, dtype=float)[region_ids]
+    return StructuredMesh(
+        x_faces=x_faces,
+        y_faces=jnp.asarray(y_faces),
+        z_faces=jnp.asarray(z_faces),
+        geometry="layered_duct",
+        fluid_mask=jnp.asarray(fluid_mask),
+        sigma=jnp.asarray(sigma, dtype=float),
+        region_ids=jnp.asarray(region_ids, dtype=int),
+        region_names=tuple(region_names),
+    )
+
+
+def _normalized_wall_layers(wall_layers: dict[str, Sequence[WallLayer]]) -> dict[str, tuple[WallLayer, ...]]:
+    normalized: dict[str, tuple[WallLayer, ...]] = {}
+    for side in _WALL_SIDES:
+        layers = tuple(wall_layers.get(side, ()))
+        for layer in layers:
+            if layer.thickness <= 0.0:
+                raise ValueError(f"{side} wall layer {layer.name!r} has non-positive thickness")
+            if layer.cells <= 0:
+                raise ValueError(f"{side} wall layer {layer.name!r} must have at least one cell")
+            if layer.conductivity < 0.0:
+                raise ValueError(f"{side} wall layer {layer.name!r} has negative conductivity")
+        normalized[side] = layers
+    unknown = set(wall_layers) - set(_WALL_SIDES)
+    if unknown:
+        raise ValueError(f"unsupported wall side(s): {sorted(unknown)}")
+    return normalized
+
+
+def _negative_wall_faces(inner_boundary: float, layers: Sequence[WallLayer]) -> jnp.ndarray:
+    if not layers:
+        return jnp.asarray([], dtype=float)
+    total = sum(float(layer.thickness) for layer in layers)
+    cursor = float(inner_boundary) - total
+    segments = []
+    for layer in reversed(layers):
+        stop = cursor + float(layer.thickness)
+        segment = jnp.linspace(cursor, stop, int(layer.cells) + 1)
+        segments.append(segment if not segments else segment[1:])
+        cursor = stop
+    return jnp.concatenate(segments)
+
+
+def _positive_wall_faces(inner_boundary: float, layers: Sequence[WallLayer]) -> jnp.ndarray:
+    if not layers:
+        return jnp.asarray([], dtype=float)
+    cursor = float(inner_boundary)
+    segments = []
+    for layer in layers:
+        stop = cursor + float(layer.thickness)
+        segment = jnp.linspace(cursor, stop, int(layer.cells) + 1)
+        segments.append(segment if not segments else segment[1:])
+        cursor = stop
+    return jnp.concatenate(segments)
+
+
+def _multilayer_region_assignment(
+    yc: np.ndarray,
+    zc: np.ndarray,
+    *,
+    width: float,
+    height: float,
+    fluid_mask: np.ndarray,
+    fluid_conductivity: float,
+    wall_layers: dict[str, tuple[WallLayer, ...]],
+) -> tuple[list[str], list[float], np.ndarray]:
+    region_names = ["fluid"]
+    region_sigmas = [float(fluid_conductivity)]
+    region_for_side_layer: dict[tuple[str, int], int] = {}
+    for side in _WALL_SIDES:
+        for index, layer in enumerate(wall_layers[side]):
+            region_for_side_layer[(side, index)] = len(region_names)
+            region_names.append(f"{side}:{layer.name}")
+            region_sigmas.append(float(layer.conductivity))
+
+    region_ids = np.zeros(yc.shape, dtype=int)
+    distances = {
+        "left": np.where(yc < -0.5 * width, -0.5 * width - yc, np.inf),
+        "right": np.where(yc > 0.5 * width, yc - 0.5 * width, np.inf),
+        "bottom": np.where(zc < -0.5 * height, -0.5 * height - zc, np.inf),
+        "top": np.where(zc > 0.5 * height, zc - 0.5 * height, np.inf),
+    }
+    distance_stack = np.stack([distances[side] for side in _WALL_SIDES], axis=0)
+    side_index = np.argmin(distance_stack, axis=0)
+    for side_number, side in enumerate(_WALL_SIDES):
+        side_mask = (~fluid_mask) & (side_index == side_number)
+        if not np.any(side_mask) or not wall_layers[side]:
+            continue
+        distance = distances[side]
+        lower = 0.0
+        for index, layer in enumerate(wall_layers[side]):
+            upper = lower + float(layer.thickness)
+            layer_mask = side_mask & (distance > lower - 1.0e-12) & (distance <= upper + 1.0e-12)
+            region_ids[layer_mask] = region_for_side_layer[(side, index)]
+            lower = upper
+        region_ids[side_mask & (distance > lower)] = region_for_side_layer[(side, len(wall_layers[side]) - 1)]
+    return region_names, region_sigmas, region_ids
 
 
 def generate_pipe_ogrid_mesh(

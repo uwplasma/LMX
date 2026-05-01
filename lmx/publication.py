@@ -106,6 +106,16 @@ PUBLICATION_FIGURE_SPECS: tuple[PublicationFigureSpec, ...] = (
         required_next_step="Replace reduced substrate effective-conductance sweep with true multilayer finite-volume geometry.",
     ),
     PublicationFigureSpec(
+        family="li_aln_multilayer_mesh",
+        artifact="li_aln_multilayer_mesh_qa.png",
+        summary="li_aln_multilayer_mesh_qa_summary.json",
+        generator="examples/li_aln_multilayer_mesh_qa.py",
+        reference="Coated-wall MHD conductance models and conservative interface-current diagnostics",
+        manuscript_role="Explicit fluid-AlN-metal mesh, aligned material interfaces, region IDs, and conductivity field",
+        readiness_status="ready_geometry_gate",
+        required_next_step="Run solved multilayer limiting cases and compare conservative interface-current diagnostics to FreeMHD/code-to-code cases.",
+    ),
+    PublicationFigureSpec(
         family="magnetic_obstacle",
         artifact="magnetic_obstacle_benchmark.png",
         summary="magnetic_obstacle_benchmark_summary.json",
@@ -312,6 +322,17 @@ def _selected_metrics(family: str, summary: Mapping[str, Any]) -> dict[str, Any]
             "max_interaction_parameter": max(n_values) if n_values else None,
             "min_pinhole_threshold": min(pinhole_values) if pinhole_values else None,
             "material_compatibility_claim": summary.get("material_compatibility_claim"),
+        }
+    if family == "li_aln_multilayer_mesh":
+        qa = summary.get("qa", {})
+        mesh = summary.get("mesh", {})
+        return {
+            "ny": mesh.get("ny"),
+            "nz": mesh.get("nz"),
+            "region_count": mesh.get("region_count"),
+            "cell_count_pass": qa.get("cell_count_pass"),
+            "interface_faces_aligned": qa.get("interface_faces_aligned"),
+            "ready_for_current_diagnostics": qa.get("ready_for_conservative_current_diagnostics"),
         }
     if family == "strong_scaling":
         return {

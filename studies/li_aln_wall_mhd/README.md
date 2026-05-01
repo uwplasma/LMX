@@ -40,6 +40,18 @@ comparison, AlN degradation sweep, and current-closure threshold tables under
 the docs artifacts under `docs/_static/generated`. The output remains a reduced
 MHD electrical-performance study; it is not a resolved multilayer wall solve.
 
+The first explicit multilayer geometry gate is:
+
+```bash
+python examples/li_aln_multilayer_mesh_qa.py
+```
+
+It writes a `fluid | AlN | metal` rectangular mesh with faces aligned at every
+material interface, plus region IDs, conductivity fields, layer tables, and
+interface tables under `results/processed/multilayer_mesh`. This closes the
+geometry placeholder for rectangular wall stacks; solved limiting cases and
+external-code comparisons are the next lane.
+
 Out of scope:
 
 - lithium compatibility;

@@ -58,10 +58,12 @@ interpolation, equivalent-layer checks, and nested-layer mesh QA.
 `examples/li_aln_wall_stack_phase0_2.py` writes the unit, mesh-QA, conductance,
 and pinhole-sensitivity artifact. `examples/li_aln_wall_stack_phase3_6.py`
 writes the bounded operating matrix, substrate comparison, degradation
-thresholds, and pinhole-limit artifact. The remaining geometry work is to add
-arbitrary nested wall layers per side, material assignment per layer,
-conservative interface-current diagnostics at every layer boundary, and
-FreeMHD/code-to-code comparisons for layered wall cases.
+thresholds, and pinhole-limit artifact. `examples/li_aln_multilayer_mesh_qa.py`
+writes the first explicit `fluid | AlN | metal` rectangular mesh with aligned
+material-interface faces, region IDs, and conductivity fields. The remaining
+work is to promote this mesh into solved limiting cases, verify conservative
+interface-current diagnostics at every layer boundary, and run FreeMHD/code-to-
+code comparisons for layered wall cases where the physics matches.
 
 Required publication artifacts:
 

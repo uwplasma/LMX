@@ -1,0 +1,9 @@
+side,axis,coordinate_m,distance_from_fluid_m,inner_region,outer_region,face_aligned,mhd_performance_only
+left,y,-0.05,0.0,fluid,aln,True,True
+left,y,-0.0502,0.0002,aln,316L,True,True
+right,y,0.05,0.0,fluid,aln,True,True
+right,y,0.0502,0.0002,aln,316L,True,True
+bottom,z,-0.05,0.0,fluid,aln,True,True
+bottom,z,-0.0502,0.0002,aln,316L,True,True
+top,z,0.05,0.0,fluid,aln,True,True
+top,z,0.0502,0.0002,aln,316L,True,True

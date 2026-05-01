@@ -2016,3 +2016,25 @@ def test_li_aln_phase3_6_example_writes_docs_artifacts(tmp_path: Path, monkeypat
     assert (tmp_path / "phase3_6" / "li_aln_wall_stack_phase3_6.png").exists()
     assert (tmp_path / "docs" / "li_aln_wall_stack_phase3_6_summary.json").exists()
     assert (tmp_path / "docs" / "li_aln_wall_stack_phase3_6.png").exists()
+
+
+def test_li_aln_multilayer_mesh_qa_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_multilayer_mesh_qa.py"
+    spec = importlib.util.spec_from_file_location("li_aln_multilayer_mesh_qa_example", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    monkeypatch.setattr(module, "FLUID_CELLS_Y", 10)
+    monkeypatch.setattr(module, "FLUID_CELLS_Z", 10)
+    summary = module.run_li_aln_multilayer_mesh_qa(
+        output_dir=tmp_path / "multilayer_mesh",
+        figure_dir=tmp_path / "figures",
+        docs_output_dir=tmp_path / "docs",
+    )
+
+    assert summary["qa"]["ready_for_conservative_current_diagnostics"] is True
+    assert (tmp_path / "multilayer_mesh" / "li_aln_multilayer_mesh_qa_summary.json").exists()
+    assert (tmp_path / "multilayer_mesh" / "li_aln_multilayer_mesh_qa.png").exists()
+    assert (tmp_path / "docs" / "li_aln_multilayer_mesh_qa_summary.json").exists()
+    assert (tmp_path / "docs" / "li_aln_multilayer_mesh_qa.png").exists()

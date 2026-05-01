@@ -135,6 +135,11 @@
       "generator": "examples/li_aln_wall_stack_phase3_6.py"
     },
     {
+      "name": "li_aln_multilayer_mesh_qa.png",
+      "kind": "Li/AlN explicit fluid-AlN-metal mesh QA with aligned interfaces",
+      "generator": "examples/li_aln_multilayer_mesh_qa.py"
+    },
+    {
       "name": "strong_scaling.png",
       "kind": "solver-facing strong-scaling summary",
       "generator": "scripts/run_strong_scaling_worker.py"

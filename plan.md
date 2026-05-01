@@ -363,10 +363,18 @@ refer to the Samper et al. taxonomy.
   and 5/10/25% current-closure deviation thresholds under
   `studies/li_aln_wall_mhd/results/processed/phase3_6`, with a docs/publication
   figure in `docs/_static/generated`. Remaining actions: add full multilayer
-  geometry, add layer-interface current-continuity diagnostics, compare
-  limiting cases to FreeMHD where the layered-wall physics matches, run true
-  mesh and limiting-case ladders, and generate the report-ready geometry, mesh,
-  resolved-field, and autodiff-sensitivity figures.
+  solved cases, add layer-interface current-continuity diagnostics to the
+  promoted case workflow, compare limiting cases to FreeMHD where the
+  layered-wall physics matches, run true mesh and limiting-case ladders, and
+  generate the resolved-field and autodiff-sensitivity figures.
+  Explicit multilayer mesh status: implemented for rectangular ducts in
+  `generate_multilayer_duct_mesh(...)` and
+  `examples/li_aln_multilayer_mesh_qa.py`. The artifact inserts faces at the
+  fluid/AlN and AlN/metal interfaces, exports `mesh.sigma`, region IDs, layer
+  tables, interface tables, and a docs figure. `build_material_fields(...)`
+  now respects explicit mesh conductivity fields, making the next step a solved
+  current-closure/pressure-gradient limiting case rather than another geometry
+  placeholder.
 - External executable-code audit:
   FreeMHD, Q2DmhdFoam, and MHD_Solvers_OpenFOAM were cloned outside the LMX
   tree under `/Users/rogerio/local/tests/lmx_external_codes` and tested in the

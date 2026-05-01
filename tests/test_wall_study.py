@@ -5,10 +5,13 @@ import pytest
 from lmx import (
     DEFAULT_LI_ALN_CASE,
     DEFAULT_SUBSTRATE_CONDUCTIVITIES,
+    li_aln_multilayer_mesh_summary,
     li_aln_phase0_2_summary,
     li_aln_phase3_6_summary,
     li_aln_unit_audit,
     li_aln_wall_layers,
+    li_aln_wall_stacks_by_side,
+    write_li_aln_multilayer_mesh_artifacts,
     write_li_aln_phase0_2_artifacts,
     write_li_aln_phase3_6_artifacts,
 )
@@ -102,6 +105,38 @@ def test_write_li_aln_phase3_6_artifacts(tmp_path: Path):
         aln_conductivities=(1.0e-10, 1.0e-8),
         pinhole_fractions=(0.0, 1.0e-4),
     )
+
+    assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".csv", ".png"]
+    assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+
+
+def test_li_aln_multilayer_mesh_summary_tracks_interfaces_and_regions():
+    summary = li_aln_multilayer_mesh_summary(DEFAULT_LI_ALN_CASE, ny=12, nz=10)
+    rows = summary["wall_stack"]["interfaces"]
+    regions = summary["wall_stack"]["regions"]
+
+    assert summary["material_compatibility_claim"] is False
+    assert summary["qa"]["cell_count_pass"] is True
+    assert summary["qa"]["interface_faces_aligned"] is True
+    assert summary["qa"]["ready_for_conservative_current_diagnostics"] is True
+    assert len(rows) == 8
+    assert any(row["inner_region"] == "fluid" and row["outer_region"] == "aln" for row in rows)
+    assert any(row["inner_region"] == "aln" and row["outer_region"] == "316L" for row in rows)
+    assert any(row["name"] == "left:aln" for row in regions)
+    assert any(row["name"] == "right:316L" for row in regions)
+
+
+def test_li_aln_wall_stacks_by_side_supports_degraded_aln():
+    stacks = li_aln_wall_stacks_by_side(DEFAULT_LI_ALN_CASE, aln_conductivity=DEFAULT_LI_ALN_CASE.degraded_aln_conductivity)
+
+    assert sorted(stacks) == ["bottom", "left", "right", "top"]
+    assert stacks["left"][0].name == "aln"
+    assert stacks["left"][0].conductivity == pytest.approx(DEFAULT_LI_ALN_CASE.degraded_aln_conductivity)
+    assert stacks["left"][1].name == DEFAULT_LI_ALN_CASE.metal_name
+
+
+def test_write_li_aln_multilayer_mesh_artifacts(tmp_path: Path):
+    outputs = write_li_aln_multilayer_mesh_artifacts(tmp_path, ny=10, nz=10)
 
     assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".csv", ".png"]
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)

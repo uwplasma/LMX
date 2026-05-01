@@ -7,10 +7,12 @@ from lmx.mesh import (
     generate_centerline_pipe_mesh,
     generate_layered_duct_mesh,
     generate_layered_duct_mesh_from_fluid_faces,
+    generate_multilayer_duct_mesh,
     generate_pipe_ogrid_mesh,
     generate_rect_duct_mesh,
     generate_rect_duct_mesh_from_faces,
 )
+from lmx.wall_models import WallLayer
 
 
 pytestmark = pytest.mark.unit
@@ -144,3 +146,38 @@ def test_generate_layered_duct_mesh_from_fluid_faces_adds_wall_regions():
     assert bool(mesh.fluid_mask[1, 1])
     assert not bool(mesh.fluid_mask[0, 1])
     assert not bool(mesh.fluid_mask[1, 0])
+
+
+def test_generate_multilayer_duct_mesh_aligns_interfaces_and_sigma():
+    wall_layers = {
+        side: (
+            WallLayer("aln", conductivity=1.0e-8, thickness=0.01, cells=2),
+            WallLayer("metal", conductivity=1.0e6, thickness=0.02, cells=2),
+        )
+        for side in ("left", "right", "bottom", "top")
+    }
+
+    mesh = generate_multilayer_duct_mesh(
+        width=1.0,
+        height=1.0,
+        ny=8,
+        nz=8,
+        wall_layers=wall_layers,
+        fluid_conductivity=2.0,
+    )
+
+    assert mesh.fluid_mask is not None
+    assert mesh.sigma is not None
+    assert mesh.region_ids is not None
+    assert mesh.region_names[0] == "fluid"
+    assert "left:aln" in mesh.region_names
+    assert float(mesh.sigma[mesh.region_ids == 0][0]) == pytest.approx(2.0)
+    assert float(mesh.sigma[mesh.region_ids == mesh.region_names.index("left:aln")][0]) == pytest.approx(1.0e-8)
+    assert float(mesh.sigma[mesh.region_ids == mesh.region_names.index("left:metal")][0]) == pytest.approx(1.0e6)
+    y_faces = [float(value) for value in mesh.y_faces]
+    z_faces = [float(value) for value in mesh.z_faces]
+    assert any(abs(value + 0.5) < 1.0e-12 for value in y_faces)
+    assert any(abs(value + 0.51) < 1.0e-12 for value in y_faces)
+    assert any(abs(value - 0.51) < 1.0e-12 for value in y_faces)
+    assert any(abs(value + 0.51) < 1.0e-12 for value in z_faces)
+    assert any(abs(value - 0.51) < 1.0e-12 for value in z_faces)

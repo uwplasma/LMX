@@ -1,9 +1,9 @@
 {
   "case": "publication_figure_campaign",
-  "generated_at_utc": "2026-04-30T22:35:19.339884+00:00",
-  "figure_count": 14,
-  "artifact_count": 14,
-  "summary_count": 14,
+  "generated_at_utc": "2026-05-01T01:46:11.319847+00:00",
+  "figure_count": 15,
+  "artifact_count": 15,
+  "summary_count": 15,
   "missing_artifacts": [],
   "missing_summaries": [],
   "status_counts": {
@@ -12,6 +12,7 @@
     "reduced_design_gate": 2,
     "ready_reduced_autodiff": 1,
     "ready_reduced_wall_stack": 2,
+    "ready_geometry_gate": 1,
     "external_reference_open": 2,
     "resolved_dean_validation_open": 1,
     "ready_internal_gate": 1,
@@ -189,6 +190,28 @@
         "max_interaction_parameter": 1152000.0,
         "min_pinhole_threshold": 0.4503236701379116,
         "material_compatibility_claim": false
+      }
+    },
+    {
+      "family": "li_aln_multilayer_mesh",
+      "artifact": "li_aln_multilayer_mesh_qa.png",
+      "summary": "li_aln_multilayer_mesh_qa_summary.json",
+      "generator": "examples/li_aln_multilayer_mesh_qa.py",
+      "reference": "Coated-wall MHD conductance models and conservative interface-current diagnostics",
+      "manuscript_role": "Explicit fluid-AlN-metal mesh, aligned material interfaces, region IDs, and conductivity field",
+      "readiness_status": "ready_geometry_gate",
+      "required_next_step": "Run solved multilayer limiting cases and compare conservative interface-current diagnostics to FreeMHD/code-to-code cases.",
+      "artifact_path": "docs/_static/generated/li_aln_multilayer_mesh_qa.png",
+      "summary_path": "docs/_static/generated/li_aln_multilayer_mesh_qa_summary.json",
+      "artifact_exists": true,
+      "summary_exists": true,
+      "selected_metrics": {
+        "ny": 72,
+        "nz": 72,
+        "region_count": 9,
+        "cell_count_pass": true,
+        "interface_faces_aligned": true,
+        "ready_for_current_diagnostics": true
       }
     },
     {

@@ -144,6 +144,12 @@ def build_material_fields(case: CaseSpec, mesh: StructuredMesh) -> MaterialField
             density = jnp.where(fluid_mask, density, solid.density or fluid.density or 1.0)
             viscosity = jnp.where(fluid_mask, viscosity, solid.viscosity or fluid.viscosity or 1.0)
 
+    if mesh.sigma is not None:
+        explicit_sigma = jnp.asarray(mesh.sigma, dtype=float)
+        if explicit_sigma.shape != mesh.yz_shape:
+            raise ValueError("mesh.sigma must have the same shape as the mesh cross-section")
+        conductivity = explicit_sigma
+
     return MaterialFields(
         conductivity=conductivity,
         density=density,

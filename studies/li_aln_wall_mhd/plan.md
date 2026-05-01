@@ -782,8 +782,11 @@ Current implementation status:
   `examples/li_aln_wall_stack_phase3_6.py`, covering the operating matrix,
   AlN degradation thresholds, pinhole limits, and substrate-conductivity
   comparisons.
-- The true `fluid | AlN | metal` multilayer finite-volume geometry, interface
-  current-continuity diagnostics, and external-code limiting-case comparisons
+- The true `fluid | AlN | metal` multilayer rectangular mesh now has an
+  executable geometry gate in `examples/li_aln_multilayer_mesh_qa.py`, with
+  aligned interfaces, region IDs, and explicit conductivity fields.
+- Solved multilayer limiting cases, interface-current-continuity diagnostics in
+  the promoted case workflow, and external-code limiting-case comparisons
   remain the next high-fidelity solver-extension lane.
 
 ---

@@ -14,6 +14,9 @@ import json
 from pathlib import Path
 from typing import Iterable, Sequence
 
+import numpy as np
+
+from .mesh import StructuredMesh, generate_multilayer_duct_mesh
 from .units import (
     dynamic_to_kinematic_viscosity,
     hartmann_number,
@@ -354,6 +357,137 @@ def li_aln_wall_layers(case: WallStackStudyCase = DEFAULT_LI_ALN_CASE, *, aln_co
     )
 
 
+def li_aln_wall_stacks_by_side(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    aln_conductivity: float | None = None,
+    metal_conductivity: float | None = None,
+) -> dict[str, tuple[WallLayer, WallLayer]]:
+    """Return fluid-outward AlN/metal layers on all four duct sides."""
+
+    stack = (
+        WallLayer(
+            "aln",
+            conductivity=float(case.intact_aln_conductivity if aln_conductivity is None else aln_conductivity),
+            thickness=float(case.aln_thickness),
+            cells=int(case.aln_cells),
+        ),
+        WallLayer(
+            case.metal_name,
+            conductivity=float(case.metal_conductivity if metal_conductivity is None else metal_conductivity),
+            thickness=float(case.metal_thickness),
+            cells=int(case.metal_cells),
+        ),
+    )
+    return {side: stack for side in ("left", "right", "bottom", "top")}
+
+
+def li_aln_multilayer_mesh_summary(
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    *,
+    ny: int = 48,
+    nz: int = 48,
+    wall_layers: dict[str, Sequence[WallLayer]] | None = None,
+    minimum_cells_per_layer: int = 3,
+) -> dict[str, object]:
+    """Return a true ``fluid | AlN | metal`` rectangular mesh QA summary."""
+
+    stacks = {side: tuple(layers) for side, layers in (wall_layers or li_aln_wall_stacks_by_side(case)).items()}
+    mesh = generate_multilayer_duct_mesh(
+        width=2.0 * case.length_scale,
+        height=2.0 * case.length_scale,
+        length=case.length_scale,
+        nx=1,
+        ny=ny,
+        nz=nz,
+        wall_layers=stacks,
+        fluid_conductivity=case.lithium.electrical_conductivity,
+    )
+    layer_rows = _multilayer_layer_rows(stacks)
+    interface_rows = _multilayer_interface_rows(case, stacks, mesh)
+    side_rows = _multilayer_side_rows(case, stacks)
+    region_rows = _multilayer_region_rows(mesh)
+    interface_aligned = all(bool(row["face_aligned"]) for row in interface_rows)
+    cell_count_pass = all(int(row["cells"]) >= minimum_cells_per_layer for row in layer_rows)
+    return {
+        "case": f"{case.name}_multilayer_mesh",
+        "scope": "explicit_multilayer_geometry_qa_only",
+        "material_compatibility_claim": False,
+        "inputs": _case_payload(case),
+        "mesh": {
+            "geometry": mesh.geometry,
+            "ny": mesh.ny,
+            "nz": mesh.nz,
+            "fluid_ny": int(ny),
+            "fluid_nz": int(nz),
+            "region_count": len(mesh.region_names),
+            "fluid_cell_count": int(region_rows[0]["cell_count"]),
+            "solid_cell_count": int(mesh.ny * mesh.nz - int(region_rows[0]["cell_count"])),
+            "minimum_dy": float(np.min(np.asarray(mesh.dy))),
+            "minimum_dz": float(np.min(np.asarray(mesh.dz))),
+            "maximum_dy": float(np.max(np.asarray(mesh.dy))),
+            "maximum_dz": float(np.max(np.asarray(mesh.dz))),
+        },
+        "wall_stack": {
+            "sides": side_rows,
+            "layers": layer_rows,
+            "interfaces": interface_rows,
+            "regions": region_rows,
+        },
+        "qa": {
+            "minimum_required_cells_per_layer": int(minimum_cells_per_layer),
+            "cell_count_pass": bool(cell_count_pass),
+            "interface_faces_aligned": bool(interface_aligned),
+            "explicit_conductivity_field": bool(mesh.sigma is not None),
+            "explicit_region_ids": bool(mesh.region_ids is not None),
+            "ready_for_conservative_current_diagnostics": bool(cell_count_pass and interface_aligned and mesh.sigma is not None),
+        },
+        "phase_status": {
+            "true_fluid_aln_metal_geometry": "complete_for_rectangular_mesh_qa",
+            "interface_current_diagnostics": "available_when_mesh_is_used_by_solver",
+            "freemhd_limiting_case_comparison": "next",
+        },
+    }
+
+
+def write_li_aln_multilayer_mesh_artifacts(
+    out_dir: str | Path,
+    *,
+    case: WallStackStudyCase = DEFAULT_LI_ALN_CASE,
+    ny: int = 48,
+    nz: int = 48,
+    wall_layers: dict[str, Sequence[WallLayer]] | None = None,
+    filename_stem: str = "li_aln_multilayer_mesh_qa",
+) -> list[Path]:
+    """Write JSON, CSV, and PNG artifacts for the Li/AlN multilayer mesh QA."""
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    stacks = {side: tuple(layers) for side, layers in (wall_layers or li_aln_wall_stacks_by_side(case)).items()}
+    summary = li_aln_multilayer_mesh_summary(case, ny=ny, nz=nz, wall_layers=stacks)
+    mesh = generate_multilayer_duct_mesh(
+        width=2.0 * case.length_scale,
+        height=2.0 * case.length_scale,
+        length=case.length_scale,
+        nx=1,
+        ny=ny,
+        nz=nz,
+        wall_layers=stacks,
+        fluid_conductivity=case.lithium.electrical_conductivity,
+    )
+    json_path = out / f"{filename_stem}_summary.json"
+    layer_csv = out / f"{filename_stem}_layers.csv"
+    interface_csv = out / f"{filename_stem}_interfaces.csv"
+    region_csv = out / f"{filename_stem}_regions.csv"
+    png_path = out / f"{filename_stem}.png"
+    json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    _write_generic_rows_csv(layer_csv, summary["wall_stack"]["layers"])
+    _write_generic_rows_csv(interface_csv, summary["wall_stack"]["interfaces"])
+    _write_generic_rows_csv(region_csv, summary["wall_stack"]["regions"])
+    _write_li_aln_multilayer_mesh_plot(png_path, mesh, summary)
+    return [json_path, layer_csv, interface_csv, region_csv, png_path]
+
+
 def write_li_aln_phase0_2_artifacts(
     out_dir: str | Path,
     *,
@@ -633,6 +767,121 @@ def _write_generic_rows_csv(path: Path, rows: Sequence[object]) -> None:
             writer.writerow({column: row.get(column, "") for column in columns})
 
 
+def _multilayer_layer_rows(wall_layers: dict[str, Sequence[WallLayer]]) -> list[dict[str, float | int | str | bool]]:
+    rows: list[dict[str, float | int | str | bool]] = []
+    for side, layers in wall_layers.items():
+        distance = 0.0
+        for index, layer in enumerate(layers):
+            rows.append(
+                {
+                    "side": side,
+                    "layer_index_fluid_outward": int(index),
+                    "name": layer.name,
+                    "conductivity_s_m": float(layer.conductivity),
+                    "thickness_m": float(layer.thickness),
+                    "cells": int(layer.cells),
+                    "normal_cell_width_m": float(layer.thickness) / int(layer.cells),
+                    "inner_distance_from_fluid_m": distance,
+                    "outer_distance_from_fluid_m": distance + float(layer.thickness),
+                    "mhd_performance_only": True,
+                }
+            )
+            distance += float(layer.thickness)
+    return rows
+
+
+def _multilayer_side_rows(
+    case: WallStackStudyCase,
+    wall_layers: dict[str, Sequence[WallLayer]],
+) -> list[dict[str, float | str | int | bool]]:
+    rows: list[dict[str, float | str | int | bool]] = []
+    for side, layers in wall_layers.items():
+        rows.append(
+            {
+                "side": side,
+                "layer_count": len(layers),
+                "total_thickness_m": sum(float(layer.thickness) for layer in layers),
+                "total_cells": sum(int(layer.cells) for layer in layers),
+                "tangential_conductance_ratio": tangential_stack_conductance_ratio(
+                    layers,
+                    fluid_conductivity=case.lithium.electrical_conductivity,
+                    length_scale=case.length_scale,
+                ),
+                "normal_leakage_ratio": normal_stack_leakage_ratio(
+                    layers,
+                    fluid_conductivity=case.lithium.electrical_conductivity,
+                    length_scale=case.length_scale,
+                ),
+                "mhd_performance_only": True,
+            }
+        )
+    return rows
+
+
+def _multilayer_interface_rows(
+    case: WallStackStudyCase,
+    wall_layers: dict[str, Sequence[WallLayer]],
+    mesh: StructuredMesh,
+) -> list[dict[str, float | str | bool]]:
+    rows: list[dict[str, float | str | bool]] = []
+    y_faces = np.asarray(mesh.y_faces, dtype=float)
+    z_faces = np.asarray(mesh.z_faces, dtype=float)
+    half_width = case.length_scale
+    half_height = case.length_scale
+    for side, layers in wall_layers.items():
+        distance = 0.0
+        axis = "y" if side in {"left", "right"} else "z"
+        faces = y_faces if axis == "y" else z_faces
+        for index, layer in enumerate(layers):
+            if side == "left":
+                coordinate = -half_width - distance
+            elif side == "right":
+                coordinate = half_width + distance
+            elif side == "bottom":
+                coordinate = -half_height - distance
+            else:
+                coordinate = half_height + distance
+            rows.append(
+                {
+                    "side": side,
+                    "axis": axis,
+                    "coordinate_m": coordinate,
+                    "distance_from_fluid_m": distance,
+                    "inner_region": "fluid" if index == 0 else layers[index - 1].name,
+                    "outer_region": layer.name,
+                    "face_aligned": _face_is_aligned(coordinate, faces),
+                    "mhd_performance_only": True,
+                }
+            )
+            distance += float(layer.thickness)
+    return rows
+
+
+def _face_is_aligned(value: float, faces: np.ndarray, *, tolerance: float = 1.0e-8) -> bool:
+    return bool(np.min(np.abs(faces - float(value))) <= tolerance * max(1.0, abs(float(value))))
+
+
+def _multilayer_region_rows(mesh: StructuredMesh) -> list[dict[str, float | int | str | bool]]:
+    if mesh.region_ids is None or mesh.sigma is None:
+        return []
+    region_ids = np.asarray(mesh.region_ids, dtype=int)
+    sigma = np.asarray(mesh.sigma, dtype=float)
+    rows: list[dict[str, float | int | str | bool]] = []
+    for region_id, name in enumerate(mesh.region_names):
+        mask = region_ids == region_id
+        values = sigma[mask]
+        rows.append(
+            {
+                "region_id": int(region_id),
+                "name": name,
+                "cell_count": int(np.sum(mask)),
+                "conductivity_s_m": float(values[0]) if values.size else 0.0,
+                "is_fluid": bool(region_id == 0),
+            }
+        )
+    return rows
+
+
 def _write_li_aln_phase0_2_plot(path: Path, summary: dict[str, object]) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
@@ -700,6 +949,113 @@ def _write_li_aln_phase0_2_plot(path: Path, summary: dict[str, object]) -> None:
     ]
     axes[1, 1].text(0.02, 0.98, "\n".join(lines), va="top", fontsize=10.5, transform=axes[1, 1].transAxes)
     fig.suptitle("Li/AlN wall-stack Phase 0-2 reduced study", fontsize=15.5, fontweight="bold")
+    fig.savefig(path, dpi=190, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _write_li_aln_multilayer_mesh_plot(path: Path, mesh: StructuredMesh, summary: dict[str, object]) -> None:
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+    from matplotlib.patches import Rectangle
+    import numpy as local_np
+
+    y_faces = local_np.asarray(mesh.y_faces, dtype=float)
+    z_faces = local_np.asarray(mesh.z_faces, dtype=float)
+    region_ids = local_np.asarray(mesh.region_ids, dtype=int)
+    sigma = local_np.asarray(mesh.sigma, dtype=float)
+    inputs = dict(summary["inputs"])
+    half_width = float(inputs["length_scale"])
+    half_height = float(inputs["length_scale"])
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.8, 9.0), constrained_layout=True)
+    region_plot = axes[0, 0].pcolormesh(y_faces, z_faces, region_ids.T, shading="flat", cmap="tab20")
+    axes[0, 0].add_patch(
+        Rectangle(
+            (-half_width, -half_height),
+            2.0 * half_width,
+            2.0 * half_height,
+            fill=False,
+            edgecolor="black",
+            linewidth=1.2,
+        )
+    )
+    axes[0, 0].set_aspect("equal")
+    axes[0, 0].set_xlabel("y [m]")
+    axes[0, 0].set_ylabel("z [m]")
+    axes[0, 0].set_title("Explicit fluid | AlN | metal regions")
+    cbar = fig.colorbar(region_plot, ax=axes[0, 0])
+    cbar.set_label("region id")
+
+    sigma_plot = axes[0, 1].pcolormesh(
+        y_faces,
+        z_faces,
+        local_np.maximum(sigma.T, 1.0e-30),
+        shading="flat",
+        cmap="viridis",
+        norm=LogNorm(),
+    )
+    axes[0, 1].add_patch(
+        Rectangle(
+            (-half_width, -half_height),
+            2.0 * half_width,
+            2.0 * half_height,
+            fill=False,
+            edgecolor="white",
+            linewidth=1.0,
+        )
+    )
+    top_wall = max(float(row["total_thickness_m"]) for row in summary["wall_stack"]["sides"])
+    axes[0, 1].set_xlim(-half_width, half_width)
+    axes[0, 1].set_ylim(half_height - 2.0 * float(inputs["aln_thickness"]), half_height + 1.05 * top_wall)
+    axes[0, 1].set_xlabel("y [m]")
+    axes[0, 1].set_ylabel("z [m]")
+    axes[0, 1].set_title("Electrical conductivity field, top-wall zoom")
+    cbar = fig.colorbar(sigma_plot, ax=axes[0, 1])
+    cbar.set_label("sigma [S/m]")
+
+    side_rows = [dict(row) for row in summary["wall_stack"]["sides"]]
+    layer_rows = [dict(row) for row in summary["wall_stack"]["layers"]]
+    sides = [str(row["side"]) for row in side_rows]
+    left_offsets = {side: 0.0 for side in sides}
+    colors = {"aln": "#2563eb", "316L": "#9ca3af", "IN625": "#6b7280", "molybdenum": "#52525b"}
+    for row in layer_rows:
+        side = str(row["side"])
+        thickness = float(row["thickness_m"])
+        name = str(row["name"])
+        axes[1, 0].barh(
+            side,
+            thickness,
+            left=left_offsets[side],
+            color=colors.get(name, "#64748b"),
+            edgecolor="#0f172a",
+            label=name if name not in axes[1, 0].get_legend_handles_labels()[1] else None,
+        )
+        left_offsets[side] += thickness
+    axes[1, 0].set_xlabel("distance from fluid boundary [m]")
+    axes[1, 0].set_title("Wall stack by side")
+    axes[1, 0].grid(True, axis="x", alpha=0.25)
+    axes[1, 0].legend(frameon=False, loc="lower right")
+
+    axes[1, 1].axis("off")
+    qa = summary["qa"]
+    mesh_summary = summary["mesh"]
+    text = [
+        "Mesh QA",
+        f"ny x nz = {int(mesh_summary['ny'])} x {int(mesh_summary['nz'])}",
+        f"fluid cells = {int(mesh_summary['fluid_cell_count'])}",
+        f"solid cells = {int(mesh_summary['solid_cell_count'])}",
+        f"min dy = {float(mesh_summary['minimum_dy']):.3e} m",
+        f"min dz = {float(mesh_summary['minimum_dz']):.3e} m",
+        "",
+        f"cell-count pass = {bool(qa['cell_count_pass'])}",
+        f"interfaces aligned = {bool(qa['interface_faces_aligned'])}",
+        f"explicit sigma = {bool(qa['explicit_conductivity_field'])}",
+        f"ready for current diagnostics = {bool(qa['ready_for_conservative_current_diagnostics'])}",
+        "",
+        "Scope: geometry and MHD electrical performance only.",
+    ]
+    axes[1, 1].text(0.02, 0.98, "\n".join(text), va="top", fontsize=11.0, transform=axes[1, 1].transAxes)
+    fig.suptitle("Li/AlN explicit multilayer wall-stack mesh QA", fontsize=15.5, fontweight="bold")
     fig.savefig(path, dpi=190, bbox_inches="tight")
     plt.close(fig)
 
