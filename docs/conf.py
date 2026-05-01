@@ -5,7 +5,7 @@ from datetime import datetime
 project = "LMX"
 author = "LMX contributors"
 copyright = f"{datetime.now().year}, LMX contributors"
-release = "1.0.2"
+release = "1.1.0"
 
 extensions = [
     "myst_parser",
