@@ -1,3 +1,5 @@
+import importlib.util
+
 import pytest
 import numpy as np
 
@@ -21,6 +23,11 @@ from lmx.field_models import (
 
 
 pytestmark = pytest.mark.unit
+
+
+def _skip_without_magpylib_jax() -> None:
+    if importlib.util.find_spec("magpylib_jax") is None:
+        pytest.skip("magpylib_jax is optional and is not installed in the bounded CI environment")
 
 
 def test_divergence_free_cross_section_field_has_small_discrete_divergence():
@@ -112,6 +119,7 @@ def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
 
 
 def test_wham_mirror_axis_profile_is_symmetric():
+    _skip_without_magpylib_jax()
     x = np.linspace(-0.4, 0.4, 9)
     profile = np.asarray(sample_wham_mirror_axis_profile(x, coil_separation=1.2, radial_loops=4, axial_loops=2), dtype=float)
     assert profile.shape == (9,)
@@ -120,6 +128,7 @@ def test_wham_mirror_axis_profile_is_symmetric():
 
 
 def test_wham_mirror_station_scale_is_normalized():
+    _skip_without_magpylib_jax()
     x = np.linspace(-0.5, 0.5, 11)
     scale = np.asarray(wham_mirror_station_scale(x, coil_separation=1.3, radial_loops=4, axial_loops=2), dtype=float)
     assert scale.shape == (11,)
@@ -128,6 +137,7 @@ def test_wham_mirror_station_scale_is_normalized():
 
 
 def test_write_wham_mirror_field_npz_round_trip(tmp_path):
+    _skip_without_magpylib_jax()
     x = np.linspace(-0.3, 0.3, 5)
     y = np.linspace(-0.1, 0.1, 4)
     z = np.linspace(-0.1, 0.1, 4)

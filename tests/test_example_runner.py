@@ -8,9 +8,17 @@ import pytest
 
 import lmx.example_runner as example_runner
 from lmx.example_runner import run_case_example, run_theory_meeting_demo
+from lmx.reference_data import default_fringing_pipe_reference_root
 
 
 pytestmark = pytest.mark.unit
+
+
+def _fringing_pipe_root_or_skip() -> Path:
+    root = default_fringing_pipe_reference_root()
+    if not root.exists():
+        pytest.skip("optional FreeMHD fringing-pipe reference data are not available")
+    return root
 
 
 def test_run_case_example_writes_hartmann_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -1743,6 +1751,7 @@ def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):
 
 
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
+    _fringing_pipe_root_or_skip()
     module = _load_example_module("pipe_reference_comparison_demo.py")
     summary = module.run_pipe_reference_comparison_demo(
         out_dir=tmp_path,

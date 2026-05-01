@@ -50,6 +50,13 @@ def _synthetic_solution(case, profile: jnp.ndarray) -> Solution:
     )
 
 
+def _closed_channel_root_or_skip() -> Path:
+    root = default_closed_channel_reference_root()
+    if not root.exists():
+        pytest.skip("optional FreeMHD closed-channel reference data are not available")
+    return root
+
+
 @pytest.mark.unit
 def test_hartmann_profile_is_wall_bounded_and_center_peaked():
     case = make_hartmann_case(ha=2.0, ny=12, nz=12)
@@ -174,6 +181,7 @@ def test_small_hartmann_solution_matches_analytic_profile():
 
 @pytest.mark.validation
 def test_small_shercliff_solution_matches_bundled_reference_profiles():
+    reference_root = _closed_channel_root_or_skip()
     case = make_shercliff_case(ha=20.0, ny=10, nz=10)
     case = replace(
         case,
@@ -186,7 +194,7 @@ def test_small_shercliff_solution_matches_bundled_reference_profiles():
         solution,
         "shercliff",
         20,
-        reference_root=default_closed_channel_reference_root(),
+        reference_root=reference_root,
     )
 
     assert comparison.y_profile.l2_error < 0.4
@@ -235,6 +243,7 @@ def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
 
 @pytest.mark.validation
 def test_small_hunt_solution_matches_bundled_reference_profiles():
+    _closed_channel_root_or_skip()
     _, solution, comparison = solve_closed_channel_benchmark(
         "hunt",
         ha=20.0,

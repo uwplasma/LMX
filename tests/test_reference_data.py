@@ -24,6 +24,20 @@ from lmx.reference_data import (
 pytestmark = pytest.mark.unit
 
 
+def _closed_channel_root_or_skip() -> Path:
+    root = default_closed_channel_reference_root()
+    if not root.exists():
+        pytest.skip("optional FreeMHD closed-channel reference data are not available")
+    return root
+
+
+def _fringing_pipe_root_or_skip() -> Path:
+    root = default_fringing_pipe_reference_root()
+    if not root.exists():
+        pytest.skip("optional FreeMHD fringing-pipe reference data are not available")
+    return root
+
+
 def test_load_closed_channel_analytical_parses_axes_and_pressure_drop(tmp_path: Path):
     analytical_root = tmp_path / "ClosedChannel" / "AnalyticalSolutions"
     analytical_root.mkdir(parents=True)
@@ -237,14 +251,14 @@ def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp
 
 
 def test_default_closed_channel_reference_root_resolves_bundled_dataset():
-    root = default_closed_channel_reference_root()
+    root = _closed_channel_root_or_skip()
     assert root.exists()
     assert (root / "AnalyticalSolutions").exists()
     assert any(root.glob("hunt_*Ha20*XSlice1m_*.csv"))
 
 
 def test_load_bundled_reference_data_uses_repo_dataset():
-    root = default_closed_channel_reference_root()
+    root = _closed_channel_root_or_skip()
     analytical = load_closed_channel_analytical("hunt", 20, root)
     processed = load_processed_slice("hunt", 20, reference_root=root)
 
@@ -256,7 +270,7 @@ def test_load_bundled_reference_data_uses_repo_dataset():
 
 
 def test_case_specific_closed_channel_reference_helpers_forward_to_dataset():
-    root = default_closed_channel_reference_root()
+    root = _closed_channel_root_or_skip()
     shercliff = load_shercliff_analytical(20, root)
     hunt = load_hunt_analytical(20, root)
 
@@ -267,13 +281,13 @@ def test_case_specific_closed_channel_reference_helpers_forward_to_dataset():
 
 
 def test_default_fringing_pipe_reference_root_resolves_bundled_dataset():
-    root = default_fringing_pipe_reference_root()
+    root = _fringing_pipe_root_or_skip()
     assert root.exists()
     assert (root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv").exists()
 
 
 def test_load_bundled_fringing_pipe_profile_uses_repo_dataset():
-    root = default_fringing_pipe_reference_root()
+    root = _fringing_pipe_root_or_skip()
     center_path = fringing_pipe_profile_reference_path("center", root)
     reference = load_fringing_pipe_profile("center", root)
 

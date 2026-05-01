@@ -1,4 +1,5 @@
 from pathlib import Path
+import importlib.util
 
 import jax
 import jax.numpy as jnp
@@ -24,6 +25,11 @@ from lmx.blanket_geometry import WhamBlanketLoop, build_wham_blanket_centerline
 
 
 pytestmark = pytest.mark.unit
+
+
+def _skip_without_magpylib_jax() -> None:
+    if importlib.util.find_spec("magpylib_jax") is None:
+        pytest.skip("magpylib_jax is optional and is not installed in the bounded CI environment")
 
 
 def _uniform_field(x, y, z):
@@ -149,6 +155,7 @@ def test_blanket_pressure_budget_is_differentiable():
 
 
 def test_wham_blanket_pressure_sensitivity_works_with_reduced_coils():
+    _skip_without_magpylib_jax()
     geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
     centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=8)
     settings = BlanketFlowSettings(mean_velocity=0.08, field_scale=2.0, radial_loops=2, axial_loops=1)

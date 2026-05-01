@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import importlib.util
 import pytest
 
 from lmx.autodiff import (
@@ -41,6 +42,11 @@ from lmx.fringing import (
 
 
 pytestmark = pytest.mark.unit
+
+
+def _skip_without_magpylib_jax() -> None:
+    if importlib.util.find_spec("magpylib_jax") is None:
+        pytest.skip("magpylib_jax is optional and is not installed in the bounded CI environment")
 
 
 def test_differentiable_hartmann_solution_returns_finite_fields():
@@ -262,6 +268,7 @@ def test_fringing_response_inverse_design_reduces_loss():
 
 
 def test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference():
+    _skip_without_magpylib_jax()
     problem = build_fringing_autodiff_problem(
         nx_stations=9,
         length=1.2,
