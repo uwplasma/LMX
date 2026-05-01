@@ -32,8 +32,8 @@ Ship a research-grade `1.0` inductionless MHD code with:
 
 ## Open items
 
-1. Keep hardening the default fully developed solver family in the manual
-   release-validation lane.
+1. Keep hardening the default fully developed solver family in the bounded
+   CI/release validation lane and the heavier manual external-code lane.
 2. Expand benchmark and physics depth for larger comparison datasets.
 3. Harden and extend the first true `extruded_inductionless` solver slice into
    a broader production 3D family.
@@ -42,6 +42,15 @@ Ship a research-grade `1.0` inductionless MHD code with:
    FreeMHD paper-slice lane is now near the accepted `L2 <= 1.2e-2` target,
    while the constant-`Q` / `flow_rate` path still needs a faithful constrained
    drive update.
+
+Current release-gate status: the bounded release plan is implemented. Routine
+CI now keeps the fast unit/release-readiness gate and runs bounded validation
+artifacts in parallel: low-resolution Hartmann/Shercliff/Hunt solver
+summaries, Hartmann mesh/time convergence probes, Q2D reduced-model artifacts,
+and the external-reference parity contract. The truly heavy external-code
+regeneration lanes remain manual because they require external solvers or
+large local datasets, but their parsers, schemas, and release-readiness status
+are checked in CI/CD.
 
 ## Evidence pass and closeout sequence
 
@@ -635,10 +644,10 @@ refer to the Samper et al. taxonomy.
   remaining research-grade
   WHAM blocker is still the resolved 3D curved-pipe pressure-velocity/current
   solve with secondary-flow/turbulence validation.
-- Release quality: keep routine tests short, preserve broad `>=95%` coverage,
-  move heavy solver comparisons to manual/release workflows, and require every
-  publication-facing example to write PNG/PDF plus a JSON summary with named
-  gates.
+- Release quality: keep routine CI under a 10-minute wall-clock target,
+  preserve broad `>=95%` coverage, split bounded solver comparisons into
+  parallel CI/release jobs, and require every publication-facing example to
+  write PNG/PDF plus a JSON summary with named gates.
   The README/docs media gate now also has a documented manifest and gallery in
   `docs/media.md`. Large landing-page GIFs stay in GitHub release assets,
   compact local media such as the WHAM blanket flow GIF stay in
@@ -1311,8 +1320,10 @@ validation lane with heavier solver runs.
   - remaining coverage work should remove or test historical branches rather
     than hiding them behind low-value integration harnesses
 - Validation runtime discipline
-  - the combined A/B validation exercise is a manual lane rather than a
-    routine sub-five-minute gate
+  - the combined A/B validation exercise remains a manual external-code lane,
+    while bounded Hartmann/Shercliff/Hunt, convergence, Q2D, and
+    external-reference-contract artifacts run in parallel CI/CD below the
+    10-minute wall-clock target
 
 ### Capability roadmap beyond the current geometry set
 
@@ -1665,18 +1676,19 @@ That retained gate now passes for all three retained fringing geometries.
   report/schema behavior rather than analytical acceptance.
 - CI coverage no longer forces `JAX_DISABLE_JIT=1`, because that setting was
   inflating runtime on solver-heavy tests without improving release confidence.
-- Default CI is now being narrowed to a fast ship gate, with benchmark and
-  validation-artifact workflows moved to manual `workflow_dispatch` runs so
-  routine pushes do not consume research-artifact runtime on every change.
-- The default push/PR gate now excludes the heaviest `physics` marker tests;
-  those remain available in a manual workflow-dispatch lane together with
-  benchmark, artifact, and extended coverage runs.
-- The default push/PR gate also excludes the heavier `regression` marker
-  tests, which are now part of the manual release-validation lane together
-  with physics.
-- The latest local default push/PR lane
-  `python -m pytest -m "unit or validation" -q` passes and remains within the
-  hard five-minute guard, but the older sub-minute runtime notes are stale.
+- Default CI now uses a fast ship gate plus parallel bounded artifact jobs
+  instead of one serial heavy lane. Routine pushes regenerate small
+  Hartmann/Shercliff/Hunt, convergence, Q2D, and external-reference-contract
+  artifacts; large external-code campaigns remain manual `workflow_dispatch`
+  lanes.
+- The default push/PR gate now excludes the heaviest `physics` and
+  `regression` marker tests from the fast unit job, but bounded physics
+  artifacts are back in CI as separate parallel jobs.
+- The latest local timing evidence shows the bounded solver-validation job is
+  roughly three minutes on this workstation, the bounded convergence job is
+  roughly two minutes, and the Q2D artifact job is under ten seconds. They are
+  intentionally split so the total workflow stays below the hard 10-minute
+  wall-clock target.
 - Current combined coverage for `lmx/` and `scripts/` is `95.4%`.
 - The `95%` coverage lift came from live validation behavior, not image or
   smoke-test padding: FreeMHD helper inference, reference-output fallbacks,
@@ -2224,12 +2236,12 @@ That retained gate now passes for all three retained fringing geometries.
     intervals, while the retained generated LMX mesh has roughly ten and six.
     Before another momentum-operator patch, run the parity case on a
     reference-like side-layer grid and separate mesh error from operator error.
-- On the current workstation, those new bundled-reference physics regressions
-  are the main reason the broad `pytest tests -m 'unit or validation'` lane no
-  longer fits comfortably inside the historical five-minute guard. The changed
-  surface is still green on targeted validation slices, but the next test
-  hygiene step is to trim or reclassify the slow physics subset so the routine
-  lane is honest about its runtime again.
+- On the current workstation, those bundled-reference physics regressions are
+  the reason the broad `pytest tests -m 'unit or validation'` lane is no longer
+  the right routine gate. The routine CI surface is now explicit: fast unit
+  tests, release-readiness, bounded validation artifacts, bounded convergence,
+  and Q2D artifacts run as separate jobs; heavier external-code regenerations
+  stay manual.
 - The current longer strong-scaling artifact now uses:
   - CPU: `8192×64×64`, `256` iterations
   - GPU: `6144×96×96`, `4096` iterations

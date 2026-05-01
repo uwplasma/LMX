@@ -161,9 +161,9 @@ artifact gates before package artifacts are built.
 - docs CI:
   - install `.[docs]`
   - run `python -m sphinx -W -b html docs docs/_build/html`
-- manual release validation:
+- bounded release validation:
   - run physics/regression suites
-  - regenerate selected validation artifacts
+  - regenerate selected bounded validation artifacts in parallel CI/CD jobs
   - summarize FreeMHD observable-gate pass/fail counts in the release report
   - archive Q2D decay, forced, and wall-bounded reduced-model artifacts with
     modal energy-budget gates
@@ -174,17 +174,21 @@ artifact gates before package artifacts are built.
   - build sdist and wheel artifacts
   - inspect/install the wheel in a clean environment
   - publish to TestPyPI first
-  - publish to PyPI from tagged releases using PyPI Trusted Publishing
+  - publish to PyPI only from an explicit manual release workflow dispatch
+    using PyPI Trusted Publishing
 
 Release workflow behavior:
 
 - `workflow_dispatch` with `publish_target = none` runs the selected
-  validation gate, builds docs, builds the wheel/sdist, checks metadata, and
-  uploads release artifacts.
+  validation gate, bounded solver/convergence/Q2D artifact jobs, docs build,
+  wheel/sdist build, metadata check, and artifact upload.
 - `workflow_dispatch` with `publish_target = testpypi` does the same checks and
   publishes to TestPyPI through Trusted Publishing.
-- a published GitHub Release runs the same gates and publishes to PyPI through
-  Trusted Publishing.
+- `workflow_dispatch` with `publish_target = pypi` does the same checks and
+  publishes to PyPI through Trusted Publishing.
+- a published GitHub Release runs the same gates and build checks, but PyPI
+  publication is intentionally skipped unless the manual `pypi` target is
+  selected.
 
 Before first publication, configure the GitHub `testpypi` and `pypi`
 environments and register this repository as a trusted publisher in TestPyPI
@@ -231,13 +235,13 @@ publish the remaining research blockers.
 
 The latest local evidence pass on this workstation shows:
 
-- default push/PR lane, `python -m pytest -m "unit or validation" -q`:
-  passes and remains inside the five-minute guard
+- default push/PR lane: fast unit/release-readiness checks plus parallel
+  bounded validation-artifact jobs, under the 10-minute wall-clock target
 - broad coverage lane over `lmx/` and `scripts/`: passes at about `95.4%`
   combined line/branch coverage
 
-The hard rule for routine validation is that these lanes must stay under five
-minutes. When a new test exceeds that budget, prefer:
+The hard rule for routine CI/CD is that the parallel workflow must stay under
+10 minutes. When a new test exceeds that budget, prefer:
 
 - synthetic or manufactured-solution fixtures
 - monkeypatched orchestration tests for CLI/reporting/example paths

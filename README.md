@@ -833,10 +833,14 @@ python examples/li_aln_multilayer_convergence.py
 
 The current validation surface includes:
 
-- fast CI under a five-minute routine budget
+- fast CI plus bounded validation-artifact jobs under a 10-minute wall-clock
+  target
 - strict docs build
 - restartable TOML and CLI workflows
 - internal conservation and fringing-physics gates on `rect_duct`, `layered_duct`, and `pipe_ogrid`
+- bounded CI artifacts for low-resolution Hartmann/Shercliff/Hunt solver
+  summaries, Hartmann mesh/time convergence, Q2D reduced-model checks, and
+  external-reference parity contract/schema checks
 - mapped-pipe external comparison now uses one shared velocity normalization
   across all transverse lines, and currently exposes a real high-`Ha`,
   high-`Re` parity gap rather than hiding it behind per-line normalization

@@ -240,8 +240,11 @@ strategy uses:
 - small-mesh real solves for selected solver paths
 - focused autodiff tests on reduced iteration counts
 
-This is how the project maintains the routine five-minute budget while keeping
-coverage at the release target.
+This is how the project keeps the fast unit lane small while preserving
+coverage at the release target. Bounded solver-artifact, convergence, Q2D, and
+external-reference contract jobs now run in parallel CI/CD lanes so the full
+routine workflow remains below the 10-minute wall-clock target without
+serializing every validation solve.
 
 The broad local coverage gate now clears `95%` over `lmx/` and `scripts/`
 without moving long benchmark runs into routine CI. The current preferred order
@@ -256,12 +259,13 @@ for further coverage work is:
 - keep paper-facing examples in `examples/`, then test their summary JSON
   schema and governing observables rather than comparing image pixels
 - leave heavy FreeMHD reruns, high-Ha mesh ladders, and long scaling campaigns
-  in manual or release workflows
+  in explicit manual workflows, while keeping bounded validation artifacts in
+  push and release CI
 
 The manual coverage workflow now enforces the `95%` gate with
-`--cov-fail-under=95`. The default push/PR lane remains the sub-five-minute
-`unit or validation` suite so routine commits do not run the full coverage
-campaign.
+`--cov-fail-under=95`. The default push/PR lane keeps the fast unit suite
+separate from the parallel bounded validation-artifact jobs so routine commits
+exercise real physics gates without rerunning the full coverage campaign.
 
 ## Publication artifact rule
 
@@ -273,8 +277,8 @@ matching artifact-producing workflow. The expected pattern is:
 - the example writes a publication-ready PNG/PDF and a machine-readable JSON
   summary
 - the docs link the figure and state the literature anchor
-- CI checks the JSON summary and docs build; manual workflows regenerate the
-  heavier figures when needed
+- CI checks JSON summaries, bounded validation artifacts, and the docs build;
+  manual workflows regenerate the heavier external-code figures when needed
 
 This is the route for the straight-duct overlays, 3D fringing-field summaries,
 Q2D panels, localized-field response panels, WHAM sensitivity figures,
