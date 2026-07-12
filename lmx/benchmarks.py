@@ -145,13 +145,21 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     )
     acceleration = solver.get("coupling_acceleration")
     if (
-        acceleration not in {"anderson", "none"}
+        acceleration not in {"aitken", "anderson", "none"}
         or (
             acceleration == "anderson"
             and int(solver.get("coupling_history_depth", 0)) < 1
         )
         or float(solver.get("coupling_regularization", -1.0)) < 0.0
         or not 0.0 <= float(solver.get("coupling_damping", math.inf)) <= 1.0
+        or (
+            acceleration == "aitken"
+            and (
+                float(solver.get("coupling_min_relaxation", 0.0)) <= 0.0
+                or float(solver.get("coupling_max_relaxation", 0.0))
+                < float(solver.get("coupling_min_relaxation", 0.0))
+            )
+        )
         or steady_uncertainty_fraction > 0.05
         or float(solver.get("steady_residual_max", math.inf))
         > steady_uncertainty_fraction * reference_uncertainty
@@ -402,6 +410,12 @@ def build_benchmark_b_problem(
             coupling_history_depth=int(spec["solver"]["coupling_history_depth"]),
             coupling_regularization=float(spec["solver"]["coupling_regularization"]),
             coupling_damping=float(spec["solver"]["coupling_damping"]),
+            coupling_min_relaxation=float(
+                spec["solver"].get("coupling_min_relaxation", 0.05)
+            ),
+            coupling_max_relaxation=float(
+                spec["solver"].get("coupling_max_relaxation", 100.0)
+            ),
         ),
         forcing=0.0,
         initial_velocity=1.0,

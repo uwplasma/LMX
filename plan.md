@@ -771,6 +771,13 @@ wall time is acceptable.
     limit and each record's requested coupling tolerance. Continue the tight
     checkpoint until it passes that corrected gate before declaring coarse B2
     independence; the earlier nominal `pass` is diagnostic, not acceptance.
+    Checkpoint-matched 24-update probes then bounded a safer SOLVAX Aitken
+    continuation: relaxation caps `1.5` and `2` decreased monotonically, while
+    caps `3` and `4` developed late oscillations and cap `8` was terminated as
+    dominated. B2 now selects the conservative cap `2`, roughly doubling the
+    local residual decay rate without changing the fixed point. Rerun all four
+    coarse variants at the new runner-inclusive fingerprint; only that rerun
+    may close this package.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and

@@ -401,6 +401,12 @@ independence variant must satisfy its own requested coupling tolerance. A
 tight-tolerance run that merely remains below the looser baseline steady limit
 is not accepted, even when its observable difference is small.
 
+B2 uses SOLVAX's vector Aitken relaxation with a maximum factor of two.
+Checkpoint-matched exact-grid probes found this cap monotone; factors three and
+four developed late oscillations and are rejected. The setting accelerates the
+same fixed-point map and does not alter the governing equations or acceptance
+tolerances.
+
 ## Literature context
 
 The duct benchmark ladder and fringing-region validation targets documented

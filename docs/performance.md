@@ -123,6 +123,13 @@ the exact coarse B2 checkpoint currently needs about 722--723 electric PCG
 iterations per outer update, so reducing Krylov iterations also removes the
 same number of global synchronization points.
 
+At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
+vector Aitken relaxation capped at two. It approximately doubles the local
+residual decay rate while remaining monotone over the probe; caps three and
+four oscillate and are rejected. This reduces continuation time, but it does
+not address the dominant per-update PCG and collective costs targeted by
+multigrid and explicit halos.
+
 ## Run the benchmark
 
 Local CPU only:

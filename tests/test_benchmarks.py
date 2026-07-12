@@ -107,7 +107,7 @@ def test_benchmark_b_field_profile_rejects_degenerate_station_count():
     ("case_id", "expected_shape", "expected_conductance", "expected_acceleration"),
     [
         ("B1-fringing-pipe", (101, 64, 128), 0.027, "anderson"),
-        ("B2-fringing-square", (101, 65, 65), 0.07, "none"),
+        ("B2-fringing-square", (101, 65, 65), 0.07, "aitken"),
     ],
 )
 def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
@@ -127,6 +127,8 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
         assert case.geometry.nz == expected_shape[2]
     assert recovered_conductance == pytest.approx(expected_conductance)
     assert case.solver.coupling_acceleration == expected_acceleration
+    if case_id == "B2-fringing-square":
+        assert case.solver.coupling_max_relaxation == pytest.approx(2.0)
     assert case.initial_velocity == 1.0
     assert case.forcing == 0.0
     assert case.geometry.axial_origin == -15.0
