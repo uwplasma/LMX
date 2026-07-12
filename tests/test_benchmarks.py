@@ -107,7 +107,7 @@ def test_benchmark_b_field_profile_rejects_degenerate_station_count():
     ("case_id", "expected_shape", "expected_conductance", "expected_damping"),
     [
         ("B1-fringing-pipe", (101, 64, 128), 0.027, 1.0),
-        ("B2-fringing-square", (101, 65, 65), 0.07, 0.3),
+        ("B2-fringing-square", (101, 65, 65), 0.07, 0.1),
     ],
 )
 def test_benchmark_b_problem_binds_frozen_nondimensional_contract(

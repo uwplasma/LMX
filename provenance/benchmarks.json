@@ -286,7 +286,7 @@
       "id": "benchmark-b-specification",
       "kind": "repository_document",
       "path": "benchmarks/results/benchmark-b-specification.json",
-      "sha256": "39601d6b49eec66eaa737be923cfdbbab0e295aed32dbfb0834d91b09e029128",
+      "sha256": "784346ff7238ffa2be151f310431c6535fd963ed3fe44be26969f8906ef3cbbd",
       "title": "LMX frozen Benchmark B specifications and extracted ALEX data index"
     },
     {
