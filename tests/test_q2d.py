@@ -57,7 +57,10 @@ def test_write_q2d_decay_plots_writes_png_and_pdf(tmp_path: Path):
     case = build_q2d_decay_case(nx=32, ny=32, dt=5.0e-4, t_final=0.02)
     solution = solve_q2d_decay(case)
     outputs = write_q2d_decay_plots(case, solution, tmp_path)
-    assert outputs == [tmp_path / "q2d_decay_overview.png", tmp_path / "q2d_decay_overview.pdf"]
+    assert outputs == [
+        tmp_path / "q2d_decay_overview.png",
+        tmp_path / "q2d_decay_overview.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -77,7 +80,10 @@ def test_write_q2d_forced_plots_writes_png_and_pdf(tmp_path: Path):
     case = build_q2d_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
     solution = solve_q2d_forced(case)
     outputs = write_q2d_forced_plots(case, solution, tmp_path)
-    assert outputs == [tmp_path / "q2d_forced_overview.png", tmp_path / "q2d_forced_overview.pdf"]
+    assert outputs == [
+        tmp_path / "q2d_forced_overview.png",
+        tmp_path / "q2d_forced_overview.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -97,7 +103,10 @@ def test_write_q2d_wall_bounded_plots_writes_png_and_pdf(tmp_path: Path):
     case = build_q2d_wall_bounded_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
     solution = solve_q2d_wall_bounded_forced(case)
     outputs = write_q2d_wall_bounded_forced_plots(case, solution, tmp_path)
-    assert outputs == [tmp_path / "q2d_wall_bounded_overview.png", tmp_path / "q2d_wall_bounded_overview.pdf"]
+    assert outputs == [
+        tmp_path / "q2d_wall_bounded_overview.png",
+        tmp_path / "q2d_wall_bounded_overview.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -113,13 +122,18 @@ def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path
         viscosity=case.viscosity,
         hartmann_friction=case.hartmann_friction,
     )
-    assert outputs == [tmp_path / "q2d_turbulence_observables.png", tmp_path / "q2d_turbulence_observables.pdf"]
+    assert outputs == [
+        tmp_path / "q2d_turbulence_observables.png",
+        tmp_path / "q2d_turbulence_observables.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
-    case = build_q2d_turbulence_decay_case(nx=24, ny=24, dt=2.0e-3, t_final=1.0, frame_count=8)
+    case = build_q2d_turbulence_decay_case(
+        nx=24, ny=24, dt=2.0e-3, t_final=1.0, frame_count=8
+    )
     solution = solve_q2d_turbulence_decay(case)
     validation = validate_q2d_turbulence_decay_observables(case, solution)
     assert solution.frames.shape[0] == 8
@@ -128,13 +142,18 @@ def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
     assert validation["max_courant"] < 0.45
     assert validation["research_grade_turbulence_validation_pass"] is False
     outputs = write_q2d_turbulence_decay_movie(solution, tmp_path, fps=4)
-    assert outputs == [tmp_path / "q2d_turbulence_decay.gif", tmp_path / "q2d_turbulence_decay_poster.png"]
+    assert outputs == [
+        tmp_path / "q2d_turbulence_decay.gif",
+        tmp_path / "q2d_turbulence_decay_poster.png",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_q2d_wall_driven_cavity_comparison_gate_and_plot(tmp_path: Path):
-    case = build_q2d_wall_driven_cavity_case(nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5)
+    case = build_q2d_wall_driven_cavity_case(
+        nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5
+    )
     solution = solve_q2d_wall_driven_cavity(case)
     observables = q2d_wall_driven_cavity_observables(case, solution)
     reference = {
@@ -144,19 +163,28 @@ def test_q2d_wall_driven_cavity_comparison_gate_and_plot(tmp_path: Path):
         "vorticity_peak": observables["vorticity_peak"] * 0.98,
     }
 
-    comparison = compare_q2d_wall_driven_observables(observables, reference, relative_tolerance=0.05)
-    outputs = write_q2d_wall_driven_comparison_plots(case, solution, comparison, tmp_path)
+    comparison = compare_q2d_wall_driven_observables(
+        observables, reference, relative_tolerance=0.05
+    )
+    outputs = write_q2d_wall_driven_comparison_plots(
+        case, solution, comparison, tmp_path
+    )
 
     assert observables["validation_pass"] is True
     assert comparison["matched_parity"] is True
     assert comparison["passed_observable_count"] == 4
-    assert outputs == [tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png", tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf"]
+    assert outputs == [
+        tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
+        tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_q2d_wall_driven_cavity_external_grid_observables():
-    case = build_q2d_wall_driven_cavity_case(nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5)
+    case = build_q2d_wall_driven_cavity_case(
+        nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5
+    )
     solution = solve_q2d_wall_driven_cavity(case)
 
     observables = q2d_wall_driven_cavity_observables_on_grid(
@@ -216,7 +244,10 @@ def test_q2d_turbulence_observables_report_sommeria_moreau_readiness():
     assert metrics["spectrum_peak_wavenumber"] > 0.0
     assert np.isfinite(metrics["spectrum_log_slope"])
     assert 0.0 <= metrics["high_wavenumber_energy_fraction"] <= 1.0
-    assert metrics["validation_status"] == "spectral_observables_available_no_turbulent_reference"
+    assert (
+        metrics["validation_status"]
+        == "spectral_observables_available_no_turbulent_reference"
+    )
     assert metrics["research_grade_turbulence_validation_pass"] is False
 
 

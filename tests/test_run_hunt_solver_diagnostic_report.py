@@ -23,7 +23,9 @@ def _fake_solution() -> Solution:
         ]
     )
     zeros = jnp.zeros_like(u)
-    state = MHDState(u=u, phi=zeros, jy=zeros, jz=zeros, lorentz_x=zeros, time=0.1, residual=1e-4)
+    state = MHDState(
+        u=u, phi=zeros, jy=zeros, jz=zeros, lorentz_x=zeros, time=0.1, residual=1e-4
+    )
     diagnostics = Diagnostics(
         residual_history=jnp.asarray([1e-4]),
         courant_like=jnp.asarray([0.1]),
@@ -42,37 +44,70 @@ def _fake_solution() -> Solution:
         potential_residual_history=jnp.asarray([1e-3]),
         potential_iterations_history=jnp.asarray([123.0]),
     )
-    return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name="hunt_ha20")
+    return Solution(
+        mesh=mesh, state=state, diagnostics=diagnostics, case_name="hunt_ha20"
+    )
 
 
-def test_hunt_diagnostic_helpers_cover_portable_path_and_pressure_proxy_scaling(tmp_path: Path):
+def test_hunt_diagnostic_helpers_cover_portable_path_and_pressure_proxy_scaling(
+    tmp_path: Path,
+):
     nested = tmp_path / "a" / "b" / "out.json"
     nested.parent.mkdir(parents=True)
     nested.write_text("{}")
 
     assert huntdiag._portable_path(nested, relative_to=tmp_path) == "a/b/out.json"
     assert huntdiag._portable_path(nested, relative_to=tmp_path / "other") == "out.json"
-    assert huntdiag._derive_current_scaled_pressure_proxy_history([], [1.0], [2.0]) == []
+    assert (
+        huntdiag._derive_current_scaled_pressure_proxy_history([], [1.0], [2.0]) == []
+    )
     assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0], [], []) == []
-    assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0, 2.0], [2.0, 4.0], []) == pytest.approx([1.0, 4.0])
-    assert huntdiag._derive_current_scaled_pressure_proxy_history([1.0, 2.0], [2.0], []) == []
+    assert huntdiag._derive_current_scaled_pressure_proxy_history(
+        [1.0, 2.0], [2.0, 4.0], []
+    ) == pytest.approx([1.0, 4.0])
+    assert (
+        huntdiag._derive_current_scaled_pressure_proxy_history([1.0, 2.0], [2.0], [])
+        == []
+    )
 
 
-def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_writes_solver_first_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "sampleDict" / "liquid" / "0.0001").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (run_dir / "postProcessing" / "sampleDict" / "liquid" / "0.0001").mkdir(
+        parents=True
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
+    )
     sample_lines = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
-    (run_dir / "postProcessing" / "sampleDict" / "liquid" / "0.0001" / "centerlineY_potE_U.xy").write_text(sample_lines)
-    (run_dir / "postProcessing" / "sampleDict" / "liquid" / "0.0001" / "centerlineZ_potE_U.xy").write_text(sample_lines)
+    (
+        run_dir
+        / "postProcessing"
+        / "sampleDict"
+        / "liquid"
+        / "0.0001"
+        / "centerlineY_potE_U.xy"
+    ).write_text(sample_lines)
+    (
+        run_dir
+        / "postProcessing"
+        / "sampleDict"
+        / "liquid"
+        / "0.0001"
+        / "centerlineZ_potE_U.xy"
+    ).write_text(sample_lines)
 
     monkeypatch.setattr(huntdiag, "solve_steady", lambda case: _fake_solution())
 
@@ -94,17 +129,35 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert "lmx_solver" in payload
     assert "reference_run" in payload
     assert "comparison" in payload
-    assert payload["lmx_solver"]["diagnostics"]["potential_residual"] == pytest.approx(0.001)
-    assert payload["lmx_solver"]["magnetic_field"]["ramp_duration"] == pytest.approx(2e-4)
+    assert payload["lmx_solver"]["diagnostics"]["potential_residual"] == pytest.approx(
+        0.001
+    )
+    assert payload["lmx_solver"]["magnetic_field"]["ramp_duration"] == pytest.approx(
+        2e-4
+    )
     assert payload["lmx_solver"]["trace"]["time_history"] == []
     assert payload["lmx_solver"]["trace"]["u_max_history"] == []
-    assert payload["lmx_solver"]["trace"]["mean_velocity_history"] == pytest.approx([0.9])
-    assert payload["lmx_solver"]["trace"]["applied_forcing_history"] == pytest.approx([0.3])
-    assert payload["lmx_solver"]["trace"]["pressure_proxy_history"] == pytest.approx([0.4])
-    assert payload["lmx_solver"]["trace"]["current_scaled_pressure_proxy_history"] == pytest.approx([0.4])
-    assert payload["lmx_solver"]["trace"]["raw_update_max_history"] == pytest.approx([0.6])
-    assert payload["lmx_solver"]["trace"]["limiter_scale_history"] == pytest.approx([0.25])
-    assert payload["lmx_solver"]["trace"]["limited_fraction_history"] == pytest.approx([0.125])
+    assert payload["lmx_solver"]["trace"]["mean_velocity_history"] == pytest.approx(
+        [0.9]
+    )
+    assert payload["lmx_solver"]["trace"]["applied_forcing_history"] == pytest.approx(
+        [0.3]
+    )
+    assert payload["lmx_solver"]["trace"]["pressure_proxy_history"] == pytest.approx(
+        [0.4]
+    )
+    assert payload["lmx_solver"]["trace"][
+        "current_scaled_pressure_proxy_history"
+    ] == pytest.approx([0.4])
+    assert payload["lmx_solver"]["trace"]["raw_update_max_history"] == pytest.approx(
+        [0.6]
+    )
+    assert payload["lmx_solver"]["trace"]["limiter_scale_history"] == pytest.approx(
+        [0.25]
+    )
+    assert payload["lmx_solver"]["trace"]["limited_fraction_history"] == pytest.approx(
+        [0.125]
+    )
     assert payload["lmx_solver"]["trace"]["current_max_history"] == [3.0]
     assert payload["lmx_solver"]["trace"]["face_current_max_history"] == [5.0]
     assert payload["lmx_solver"]["trace"]["emf_max_history"] == [2.0]
@@ -114,17 +167,23 @@ def test_hunt_solver_diagnostic_report_writes_solver_first_json(tmp_path: Path, 
     assert payload["comparison"]["sample_combined_l2_error"] < 1e-6
 
 
-def test_hunt_solver_diagnostic_report_accepts_cg_volume_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_accepts_cg_volume_backend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
@@ -152,17 +211,23 @@ def test_hunt_solver_diagnostic_report_accepts_cg_volume_backend(tmp_path: Path,
     assert captured["potential_solver"] == "cg_volume"
 
 
-def test_hunt_solver_diagnostic_report_accepts_current_reconstruction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_accepts_current_reconstruction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
@@ -190,22 +255,30 @@ def test_hunt_solver_diagnostic_report_accepts_current_reconstruction(tmp_path: 
     assert captured["current_reconstruction"] == "face_averaged"
 
 
-def test_hunt_solver_diagnostic_report_accepts_post_update_potential_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_accepts_post_update_potential_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
     def fake_solve(case):
-        captured["post_update_potential_refresh"] = case.time_stepper.post_update_potential_refresh
+        captured["post_update_potential_refresh"] = (
+            case.time_stepper.post_update_potential_refresh
+        )
         return _fake_solution()
 
     monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
@@ -227,17 +300,23 @@ def test_hunt_solver_diagnostic_report_accepts_post_update_potential_refresh(tmp
     assert captured["post_update_potential_refresh"] is True
 
 
-def test_hunt_solver_diagnostic_report_accepts_hybrid_face_lorentz_reconstruction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_accepts_hybrid_face_lorentz_reconstruction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
@@ -265,17 +344,23 @@ def test_hunt_solver_diagnostic_report_accepts_hybrid_face_lorentz_reconstructio
     assert captured["current_reconstruction"] == "hybrid_face_lorentz"
 
 
-def test_hunt_solver_diagnostic_report_adds_inlet_velocity_boundary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_adds_inlet_velocity_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
@@ -303,7 +388,9 @@ def test_hunt_solver_diagnostic_report_adds_inlet_velocity_boundary(tmp_path: Pa
     assert "inlet_velocity" in captured["boundary_kinds"]
 
 
-def test_hunt_solver_diagnostic_report_auto_infers_flow_rate_inlet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_auto_infers_flow_rate_inlet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
     (run_dir / "0" / "liquid" / "U").write_text(
@@ -323,16 +410,20 @@ boundaryField
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
     def fake_solve(case):
         captured["boundary_kinds"] = [bc.kind for bc in case.boundary_conditions]
-        captured["boundary_values"] = [bc.value for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate"]
+        captured["boundary_values"] = [
+            bc.value for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate"
+        ]
         return _fake_solution()
 
     monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
@@ -358,23 +449,31 @@ boundaryField
     assert captured["boundary_values"][0] == pytest.approx(0.47)
 
 
-def test_hunt_solver_diagnostic_report_supports_inlet_flow_rate_drive_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_supports_inlet_flow_rate_drive_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     captured = {}
 
     def fake_solve(case):
         captured["boundary_kinds"] = [bc.kind for bc in case.boundary_conditions]
-        captured["boundary_values"] = [bc.value for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate"]
+        captured["boundary_values"] = [
+            bc.value for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate"
+        ]
         return _fake_solution()
 
     monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
@@ -398,17 +497,23 @@ def test_hunt_solver_diagnostic_report_supports_inlet_flow_rate_drive_mode(tmp_p
     assert captured["boundary_values"][0] == pytest.approx(0.1175 * 4.0)
 
 
-def test_hunt_solver_diagnostic_report_supports_restart_npz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hunt_solver_diagnostic_report_supports_restart_npz(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.1175 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.1175 0 0 );\n"
+    )
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.0001 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "BtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("BtStartTime 1e-5;\nBtDuration 2e-4;\n")
 
     fake_restart = SimpleNamespace(
         path=(tmp_path / "restart_in.npz").resolve(),
@@ -424,10 +529,16 @@ def test_hunt_solver_diagnostic_report_supports_restart_npz(tmp_path: Path, monk
         return _fake_solution()
 
     monkeypatch.setattr(huntdiag, "load_restart_bundle", lambda path: fake_restart)
-    monkeypatch.setattr(huntdiag, "validate_restart_bundle", lambda bundle, mesh, geometry_kind, case_name: None)
+    monkeypatch.setattr(
+        huntdiag,
+        "validate_restart_bundle",
+        lambda bundle, mesh, geometry_kind, case_name: None,
+    )
     monkeypatch.setattr(huntdiag, "_build_mesh", lambda case: SimpleNamespace())
     monkeypatch.setattr(huntdiag, "solve_steady", fake_solve)
-    monkeypatch.setattr(huntdiag, "write_restart_npz", lambda solution, case, path: Path(path))
+    monkeypatch.setattr(
+        huntdiag, "write_restart_npz", lambda solution, case, path: Path(path)
+    )
 
     output = tmp_path / "diagnostics.json"
     restart_out = tmp_path / "restart_out.npz"

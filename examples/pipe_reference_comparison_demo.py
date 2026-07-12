@@ -10,7 +10,10 @@ import numpy as np
 
 from lmx import enable_compilation_cache
 from lmx.fringing import build_pipe_ogrid_extruded_problem, solve_extruded_inductionless
-from lmx.reference_data import default_fringing_pipe_reference_root, load_fringing_pipe_profile
+from lmx.reference_data import (
+    default_fringing_pipe_reference_root,
+    load_fringing_pipe_profile,
+)
 
 JAX_CACHE_DIR = Path("artifacts/jax_cache")
 
@@ -35,6 +38,7 @@ def _replace_fields(obj, **changes):
     for name, value in changes.items():
         setattr(obj, name, value)
     return obj
+
 
 def _extract_pipe_profile(
     bundle,
@@ -81,7 +85,9 @@ def _extract_pipe_profile(
 
     for idx, z_target in enumerate(z_targets):
         r_target = float(np.sqrt(target_x**2 + z_target**2))
-        theta_target = float(np.arctan2(z_target, target_x if abs(target_x) > 1.0e-12 else 1.0e-12))
+        theta_target = float(
+            np.arctan2(z_target, target_x if abs(target_x) > 1.0e-12 else 1.0e-12)
+        )
         if abs(target_x) <= 1.0e-12:
             theta_target = np.pi / 2.0 if z_target >= 0.0 else 3.0 * np.pi / 2.0
         profile[idx] = sample_value(r_target, theta_target)
@@ -111,7 +117,9 @@ def run_pipe_reference_comparison_demo(
         nx_stations=nx_stations,
     )
     case_updates = {
-        "solver": _replace_fields(problem.case.solver, coupling_iterations=coupling_iterations),
+        "solver": _replace_fields(
+            problem.case.solver, coupling_iterations=coupling_iterations
+        ),
     }
     if hasattr(problem.case, "time_stepper"):
         case_updates["time_stepper"] = _replace_fields(
@@ -119,7 +127,9 @@ def run_pipe_reference_comparison_demo(
             max_steps=max_steps,
             potential_iterations=potential_iterations,
         )
-    problem = _replace_fields(problem, case=_replace_fields(problem.case, **case_updates))
+    problem = _replace_fields(
+        problem, case=_replace_fields(problem.case, **case_updates)
+    )
     solution = solve_extruded_inductionless(problem)
 
     reference_profiles = {
@@ -131,23 +141,38 @@ def run_pipe_reference_comparison_demo(
         for profile in reference_profiles.values()
     )
     lmx_velocity_profiles = {
-        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=profile.x_offset_fraction, field_name="u")
+        name: _extract_pipe_profile(
+            solution.bundle, x_offset_fraction=profile.x_offset_fraction, field_name="u"
+        )
         for name, profile in reference_profiles.items()
     }
     lmx_potential_profiles = {
-        name: _extract_pipe_profile(solution.bundle, x_offset_fraction=profile.x_offset_fraction, field_name="phi")
+        name: _extract_pipe_profile(
+            solution.bundle,
+            x_offset_fraction=profile.x_offset_fraction,
+            field_name="phi",
+        )
         for name, profile in reference_profiles.items()
     }
-    lmx_velocity_scale = max(max(np.max(np.abs(profile)), 1.0e-12) for _, profile in lmx_velocity_profiles.values())
+    lmx_velocity_scale = max(
+        max(np.max(np.abs(profile)), 1.0e-12)
+        for _, profile in lmx_velocity_profiles.values()
+    )
 
     _set_style()
     fig, axes = plt.subplots(2, 2, constrained_layout=True)
     fig.suptitle("LMX mapped-pipe reference comparison", fontsize=16)
     colors = {"center": "#0f766e", "negative": "#b45309", "positive": "#1d4ed8"}
-    labels = {"center": "Center line", "negative": "Negative x offset", "positive": "Positive x offset"}
+    labels = {
+        "center": "Center line",
+        "negative": "Negative x offset",
+        "positive": "Positive x offset",
+    }
     summary_profiles: dict[str, dict[str, float]] = {}
 
-    for ax, name in zip(axes.ravel()[:3], ("center", "negative", "positive"), strict=False):
+    for ax, name in zip(
+        axes.ravel()[:3], ("center", "negative", "positive"), strict=False
+    ):
         reference = reference_profiles[name]
         reference_velocity = np.asarray(reference.velocity, dtype=float)
         use_velocity = float(np.max(np.abs(reference_velocity))) > 1.0e-8
@@ -160,7 +185,9 @@ def run_pipe_reference_comparison_demo(
             title_suffix = "velocity"
         else:
             lmx_coord, lmx_profile_raw = lmx_potential_profiles[name]
-            potential_values = np.loadtxt(reference.path, delimiter=",", skiprows=1, usecols=13)
+            potential_values = np.loadtxt(
+                reference.path, delimiter=",", skiprows=1, usecols=13
+            )
             ref_scale = max(float(np.max(np.abs(potential_values))), 1.0e-12)
             ref_profile = potential_values / ref_scale
             lmx_scale = max(float(np.max(np.abs(lmx_profile_raw))), 1.0e-12)
@@ -168,7 +195,9 @@ def run_pipe_reference_comparison_demo(
             metric_prefix = "potential"
             y_label = "Normalized electric potential"
             title_suffix = "potential"
-        interp_profile = np.interp(np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_profile)
+        interp_profile = np.interp(
+            np.asarray(reference.coordinate, dtype=float), lmx_coord, lmx_profile
+        )
         l2_error = float(np.sqrt(np.mean((interp_profile - ref_profile) ** 2)))
         linf_error = float(np.max(np.abs(interp_profile - ref_profile)))
         summary_profiles[name] = {
@@ -176,18 +205,42 @@ def run_pipe_reference_comparison_demo(
             f"{metric_prefix}_normalized_l2_error": l2_error,
             f"{metric_prefix}_normalized_linf_error": linf_error,
         }
-        ax.plot(np.asarray(reference.coordinate, dtype=float), ref_profile, color=colors[name], linewidth=2.2, label="External reference")
-        ax.plot(lmx_coord, lmx_profile, color="#111827", linestyle="--", linewidth=2.0, label="LMX")
-        ax.set_title(f"{labels[name]} {title_suffix}\n$L_2$={l2_error:.3f} | $L_\\infty$={linf_error:.3f}")
+        ax.plot(
+            np.asarray(reference.coordinate, dtype=float),
+            ref_profile,
+            color=colors[name],
+            linewidth=2.2,
+            label="External reference",
+        )
+        ax.plot(
+            lmx_coord,
+            lmx_profile,
+            color="#111827",
+            linestyle="--",
+            linewidth=2.0,
+            label="LMX",
+        )
+        ax.set_title(
+            f"{labels[name]} {title_suffix}\n$L_2$={l2_error:.3f} | $L_\\infty$={linf_error:.3f}"
+        )
         ax.set_xlabel("Normalized transverse coordinate")
         ax.set_ylabel(y_label)
         ax.set_xlim(-1.02, 1.02)
         ax.legend(frameon=False)
 
     x = np.asarray(solution.bundle.x, dtype=float)
-    pressure_span = np.max(np.asarray(solution.bundle.p), axis=(1, 2)) - np.min(np.asarray(solution.bundle.p), axis=(1, 2))
-    axes[1, 1].plot(x, np.asarray(solution.bundle.field_scale), color="#7c3aed", label="Field scale")
-    axes[1, 1].plot(x, np.asarray(solution.bundle.mean_velocity), color="#0f766e", label="Mean velocity")
+    pressure_span = np.max(np.asarray(solution.bundle.p), axis=(1, 2)) - np.min(
+        np.asarray(solution.bundle.p), axis=(1, 2)
+    )
+    axes[1, 1].plot(
+        x, np.asarray(solution.bundle.field_scale), color="#7c3aed", label="Field scale"
+    )
+    axes[1, 1].plot(
+        x,
+        np.asarray(solution.bundle.mean_velocity),
+        color="#0f766e",
+        label="Mean velocity",
+    )
     axes[1, 1].plot(x, pressure_span, color="#b45309", label="Pressure span")
     axes[1, 1].semilogy(
         x,
@@ -230,13 +283,21 @@ def run_pipe_reference_comparison_demo(
         },
         "plots": [png_path.name, pdf_path.name],
     }
-    (out_dir / "pipe_reference_comparison_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (out_dir / "pipe_reference_comparison_summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
     return summary
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Compare the LMX mapped-pipe slice against external fringing-pipe reference profiles.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/pipe_reference_comparison"))
+    parser = argparse.ArgumentParser(
+        description="Compare the LMX mapped-pipe slice against external fringing-pipe reference profiles."
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("artifacts/examples/pipe_reference_comparison"),
+    )
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--nr", type=int, default=18)
     parser.add_argument("--ntheta", type=int, default=48)

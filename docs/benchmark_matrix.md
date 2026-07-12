@@ -9,6 +9,29 @@ failed alternatives, see [](closure_notes.md).
 
 ## Mandatory now: Benchmark A
 
+The canonical Ha=20 cross-code inputs are
+`benchmarks/specs/shercliff-ha20.toml` and
+`benchmarks/specs/hunt-ha20.toml`. They freeze SI properties, the dynamic to
+kinematic viscosity conversion, magnetic field, wall conductance, flow target,
+three Richardson levels plus an independent confirmation level, sampling,
+shared observable scales, and the 1% gates.
+FreeMHD output is compared only after `audit_freemhd_case_against_spec` passes;
+per-profile peak fitting is forbidden.
+
+The current Shercliff/Hunt specification SHA-256 values are
+`778fb5958ccc7fa594bfd3ab4aefbb997ea60a1ee17a6adb83b5cc449008415f` and
+`04f1b9d1a28d9c495ea22f75330e1b7213a35f737ccaae3d1c05c40eaf0beb87`.
+Regenerating the pinned Docker smoke inputs with
+`scripts/materialize_freemhd_benchmark_a.py` produces portable manifest hashes
+`cc5917a2ce9f700571c766ec93818bc3509d51b4ffa6fad916bda19d3cc08ded`
+and `93b2ac1c42d5d6a09176ce6d24a2963ffbe3011c3002aca9ef2739531b3e9b0d`.
+
+The July 2026 audit found that the existing Docker demo inputs are mislabeled
+for this purpose. Although `blockMeshDict` declares `Ha 20`, their physical
+properties and `B=10 T` produce `Ha=1000`. The Hunt demo also has insulating
+conductivity in `solidWalls` and the Shercliff flow target. Those runs remain
+useful Docker workflow checks but are no longer reported as Ha=20 parity.
+
 ### A1. Hartmann / insulating-duct style validation
 
 - solver family: `fully_developed_inductionless`
@@ -42,6 +65,70 @@ failed alternatives, see [](closure_notes.md).
   - integral flow-rate and conservation diagnostics
   - side-layer / jet structure in the conducting-wall case
 
+The high-Ha production entry point is:
+
+```bash
+pip install -e .
+python scripts/run_samper_table_i.py \
+  --linear-solver solvax_pcg \
+  --output artifacts/samper/table-i-summary.json
+```
+
+It uses the canonical `63 x 63 -> 79 x 79 -> 99 x 99` ladder, checkpoints after
+every solve, and compares Q-tilde with both the analytical and published
+numerical columns. Construction, normalization, selection, and failure paths
+run in portable CI; the eight-case production matrix is an external-data lane.
+
+The final Table I campaign uses smooth boundary-layer meshes, exact insulating
+disconnection, dtype-safe volume-scaled CG, a gauge-compatible tensor/SOLVAX
+line inverse, flexible GMRES, bounded-memory Anderson acceleration, and a
+flow-scaled steady target. The accepted iterate is always the state whose
+unaccelerated fixed-point residual was evaluated; acceleration cannot
+manufacture convergence. A 119 x 119 confirmation level is used only when the
+99 x 99 finest change misses or approaches the frozen 0.25% gate.
+
+| case | Ha | finest mesh | flow error | finest change | order | normalized max div(J) | mechanical residual |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Shercliff | 500 | 99 x 99 | 0.241% | 0.134% | 2.01 | 4.37e-8 | 5.96e-5 |
+| Shercliff | 5,000 | 99 x 99 | 0.369% | 0.204% | 2.02 | 7.94e-6 | 2.29e-5 |
+| Shercliff | 10,000 | 99 x 99 | 0.418% | 0.247% | 2.07 | 4.46e-5 | 1.05e-4 |
+| Shercliff | 15,000 | 119 x 119 | 0.300% | 0.139% | 1.96 | 1.86e-4 | 4.22e-5 |
+| Hunt | 500 | 99 x 99 | 0.154% | 0.051% | 1.45 | 6.34e-8 | 7.14e-8 |
+| Hunt | 5,000 | 99 x 99 | 0.325% | 0.096% | 1.29 | 7.38e-6 | 5.41e-7 |
+| Hunt | 10,000 | 99 x 99 | 0.427% | 0.137% | 1.37 | 4.72e-5 | 1.00e-6 |
+| Hunt | 15,000 | 99 x 99 | 0.507% | 0.170% | 1.40 | 1.18e-4 | 9.55e-7 |
+
+All eight rows pass the 1% analytical-flow, 0.25% finest-change, observed-order,
+layer-resolution, strict steady-solver, 0.1% current, and 0.1% power gates.
+Each row is frozen separately in `benchmarks/results/`; their checksums and the
+refreshed Ha=20 FreeMHD/continuum/conservation evidence are combined in
+`benchmarks/results/benchmark-a-acceptance.json`. The combined record passes
+under solver-core fingerprint
+`60c67d073508d36be713148955150074ad556166d48cb8a94df330b7b1be4172`.
+Richardson extrapolation remains a separate diagnostic: the Hunt Lorentz-y
+continuum estimate is above 1% against a processed finite-grid reference whose
+own analytical error floor is quantified, while every raw finest primary gate
+passes.
+
+### Released-SOLVAX PCG promotion evidence
+
+SOLVAX 0.5.1 commit
+`e348c0b4a1b9995c3e33ceb11c04f93e7aa48e63` is the runtime-pinned `auto`
+backend. The tracked x64 CPU comparison passes with field relative difference
+`1.54e-12`, implicit-gradient relative error `1.13e-15`, warm-time ratio
+`0.748`, and compiler temporary-memory ratio `0.625` relative to native CG.
+The RTX A4000 record passes with corresponding values `1.54e-12`, `1.13e-16`,
+`0.230`, and `1.000`; its independently audited transpose residual is
+`2.54e-13`. All eight Table I rows pass, with 119 x 119 confirmation for
+Shercliff Ha=15,000, and the four-level Ha=20 FreeMHD ladder passes at the same
+solver-core fingerprint.
+
+The combined machine-readable record is
+`benchmarks/results/solvax-pcg-acceptance.json`. Its
+`cpu_acceptance_pass` and `m3_promotion_pass` are true, the GPU and Ha=20
+statuses are `accepted`, and the blocker list is empty. Native `cg` remains an
+explicit comparison and one-cycle compatibility backend.
+
 ## Mandatory next: Benchmark B
 
 These are the first nontrivial 3D inductionless targets from the benchmark
@@ -54,7 +141,7 @@ ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Dra
 - literature target:
   - Samper et al. Table II pipe case: `Ha ≈ 6600`, `N ≈ 10700`, `cw ≈ 0.027`
 - required observables:
-  - dimensionless pressure drop between the documented upstream/downstream taps
+  - excess dimensionless axial pressure gradient from the high-N ALEX series
   - axial velocity distortion through the magnetic-field ramp
   - electric-potential redistribution on the wall and across the pipe section
   - mesh convergence of pressure drop and current-closure metrics
@@ -65,10 +152,51 @@ ladder summarized by [Samper et al.](https://www.scipedia.com/wd/images/b/b8/Dra
 - literature target:
   - Samper et al. Table II square-duct case: `Ha ≈ 2900`, `N ≈ 540`, `cw ≈ 0.07`
 - required observables:
-  - dimensionless pressure drop between the documented upstream/downstream taps
+  - excess dimensionless transverse pressure difference between the published A/B taps
   - cross-sectional velocity distortion through the fringing region
   - current-density redistribution and Lorentz-force localization
   - mesh convergence of pressure drop, current closure, and throughput recovery
+
+The pre-production freeze is complete in
+`benchmarks/specs/alex-b1-pipe.toml` and
+`benchmarks/specs/alex-b2-square.toml`. The checksummed extracted anchors are
+`benchmarks/references/alex-b1-pipe.csv` and
+`benchmarks/references/alex-b2-square.csv`; the deterministic index is
+`benchmarks/results/benchmark-b-specification.json`. It records
+`specification_freeze_pass=true` and deliberately includes no production
+results.
+
+The freeze distinguishes the observables shown in the source figures. B1 uses
+the round-duct high-N axial pressure-gradient series (`N=10700`, `Ha=6600`),
+with the downstream fully developed plateau removed. B2 uses the square-duct
+low-N transverse pressure-difference series (`N=540`, `Ha=2900`), with the
+uniform-field/no-field plateau removed as in the extracted Figure 6 curve. Both use the
+published pole-face coordinate `x/L`, where `L` is the pipe radius or duct
+half-width, and a tabulated transverse `B_y(x)` reconstruction that is exactly
+divergence free. Pointwise pressure uncertainties combine digitization
+resolution and marker scatter: `0.002` for B1 and `0.004` for B2. The accessible
+papers do not report a separate instrument uncertainty, which is stated in the
+specification rather than silently invented.
+
+The B2 direct observable samples adjacent A/B wall midpoints at one axial
+cross-section: the top wall along the field and the side wall across it, the
+rectangular analogue of the primary report's explicit 12- and 3-o'clock pipe
+definition. It is not a wall average or an axial pressure drop; either
+substitution can erase the 3D pressure redistribution and is rejected.
+
+Primary sources are the 2015 V&V article, DOI
+[`10.1016/j.fusengdes.2014.04.049`](https://doi.org/10.1016/j.fusengdes.2014.04.049),
+Figures 3-4 and Table II, and the public 1987
+[`ALEX results` report](https://www.osti.gov/servlets/purl/5332375), Figures
+1-7 and Table 1. The frozen builders now construct nondimensional cases with
+`Re=Ha^2/N`, the measured cell-centred field, a fixed-flow pressure Lagrange
+multiplier, direct axial/transverse pressure observables, and explicit nominal
+and confirmation shells that preserve `c_w`. The coarse/medium/fine pipe grids
+use `64/96/128` radial and `128/192/256` azimuthal cells; the square grids use
+`65/97/129` fluid cells per cross-sectional direction. Existing low-Ha
+demonstrations remain non-production evidence. Production begins only after
+the direct pressure observable passes steady/tolerance and thin-wall
+independence checks.
 
 ## Validation gates for Benchmarks A and B
 
@@ -83,13 +211,14 @@ quality gates rather than only against visual agreement:
 - profile agreement
   - normalized velocity/potential/profile errors on matched cuts
 - integral agreement
-  - flow rate, pressure-span surrogate, axial-current span, and Lorentz-power
+  - flow rate, direct pressure loss/difference, axial-current span, and Lorentz-power
     trends under mesh refinement
 - literature observables
   - Benchmark A: dimensionless flow-rate integral `Q̃` against the analytical
     values tabulated by Samper et al.
-  - Benchmark B: dimensionless pressure drop between the documented taps and
-    matched velocity/potential cuts at the reference axial stations
+  - Benchmark B: direct excess axial pressure-loss gradient for B1 and direct
+    excess transverse pressure difference between documented taps for B2,
+    plus matched velocity/potential cuts at the reference axial stations
 - conservation
   - `div J`
   - charge-balance residual
@@ -105,7 +234,7 @@ quality gates rather than only against visual agreement:
   - stable CLI/TOML and Python-driver workflows
   - machine-readable JSON/CSV outputs
   - strict docs build
-  - fast routine test lane under five minutes
+  - complete portable test lane warns at 7.5 minutes and fails at 10 minutes
 
 ## Combined validation exercise
 
@@ -256,7 +385,7 @@ These remain part of the research roadmap, but not the `1.0` solver promise.
 
 Current executable Q2D Hartmann-friction decay lane:
 
-- `examples/q2d_decay_validation.py`
+- `campaigns/q2d/q2d_decay_validation.py`
   - quasi-2D Hartmann-friction decay of a single periodic mode
   - observables:
     final-state `L2/L∞` error and amplitude-decay error against the analytic
@@ -266,7 +395,7 @@ Current executable Q2D Hartmann-friction decay lane:
 
 Current forced Q2D Hartmann-friction lane:
 
-- `examples/q2d_forced_validation.py`
+- `campaigns/q2d/q2d_forced_validation.py`
   - forced periodic Q2D Hartmann-friction duct mode
   - observables:
     steady-state `L2/L∞` error and steady-amplitude error against the analytic
@@ -276,7 +405,7 @@ Current forced Q2D Hartmann-friction lane:
 
 Current wall-bounded Q2D Hartmann-friction lane:
 
-- `examples/q2d_wall_bounded_validation.py`
+- `campaigns/q2d/q2d_wall_bounded_validation.py`
   - forced wall-bounded Q2D Hartmann-friction duct mode
   - observables:
     final-state `L2/L∞` error and amplitude error against the exact transient
@@ -295,7 +424,7 @@ Current wall-bounded Q2D Hartmann-friction lane:
 
 Current Q2D turbulence-movie readiness lane:
 
-- `examples/q2d_turbulence_decay_demo.py`
+- `campaigns/q2d/q2d_turbulence_decay_demo.py`
   - deterministic nonlinear periodic Q2D vorticity solve with
     Hartmann-friction damping and weak large-scale forcing
   - observables:
@@ -309,9 +438,9 @@ Current Q2D turbulence-movie readiness lane:
 
 The Q2D external-reference data contract is now explicit:
 
-- `examples/q2d_turbulence_external_reference_template.py`
+- `campaigns/q2d/q2d_turbulence_external_reference_template.py`
   writes the scalar-observable CSV template for matched turbulent references
-- `examples/q2d_turbulence_decay_demo.py`
+- `campaigns/q2d/q2d_turbulence_decay_demo.py`
   writes the same template when no reference CSV is present
 - when `q2d_turbulence_reference_observables.csv` is present, the movie example
   writes a publication-table-ready comparison CSV plus PNG/PDF tolerance-gate
@@ -349,7 +478,7 @@ Current bounded multi-mode Q2D movie result:
 
 Current localized magnetic-obstacle response lane:
 
-- `examples/magnetic_obstacle_benchmark.py`
+- `campaigns/magnetic_obstacle/magnetic_obstacle_benchmark.py`
   - localized-field magnetic-obstacle response on the rectangular extruded
     inductionless lane, compared directly against a matched no-field LMX
     reference
@@ -396,7 +525,7 @@ external cases are added.
 
 The external parity data contract is now explicit:
 
-- `examples/magnetic_obstacle_external_reference_template.py`
+- `campaigns/magnetic_obstacle/magnetic_obstacle_external_reference_template.py`
   writes the scalar-observable CSV template for digitized references
 - `load_magnetic_obstacle_reference_observables(...)`
   loads filled CSV files with observable values, units, sources, and tolerances
@@ -406,7 +535,7 @@ The external parity data contract is now explicit:
   writes the resulting publication-table-ready CSV
 - `write_magnetic_obstacle_reference_comparison_plots(...)`
   writes the paired PNG/PDF observable comparison and error/tolerance gate
-- `examples/magnetic_obstacle_benchmark.py`
+- `campaigns/magnetic_obstacle/magnetic_obstacle_benchmark.py`
   automatically emits those external-reference artifacts when a filled
   `magnetic_obstacle_reference_observables.csv` is present, and otherwise
   emits the template while keeping the lane marked open
@@ -438,7 +567,7 @@ Current bounded shape summary:
 
 Current bounded regime scan:
 
-- `examples/magnetic_obstacle_regime_scan.py`
+- `campaigns/magnetic_obstacle/magnetic_obstacle_regime_scan.py`
   - sweeps the same localized-field rectangular obstacle case over
     `Bz` scale and forcing
   - writes a four-panel response map over velocity deficit, pressure response,
@@ -456,16 +585,16 @@ Current bounded regime scan:
 
 Current tabulated-field / mirror-field extension:
 
-- `examples/wham_coil_model_field_adapter.py`
+- `campaigns/blanket/wham_coil_model_field_adapter.py`
   - parses the attached WHAM coil-model script into LMX field parameters
   - preserves total ampere-turns under a reduced loop count for bounded
     docs/example runtime
   - writes the field-contour artifact now used to document the independent
     3D field-data ingestion path
 
-![WHAM coil-model field adapter](_static/generated/wham_coil_model_field_adapter.png)
+![WHAM coil-model field adapter](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_coil_model_field_adapter.png)
 
-- `examples/wham_mirror_pipe_demo.py`
+- `campaigns/blanket/wham_mirror_pipe_demo.py`
   - writes a tabulated WHAM-like mirror field with `magpylib_jax`
   - solves the current low-Re inductionless pipe baseline through that field
   - writes the table in solver streamwise coordinates, `x ∈ [0, L]`, while
@@ -486,24 +615,24 @@ interpolation mismatch. The remaining tabulated-field research gap is external
   - observables:
     field/velocity anticorrelation, pressure-drop proxy, current response, and
     conservation metrics
-- `examples/autodiff_wham_pressure_sensitivity.py`
+- `campaigns/autodiff/autodiff_wham_pressure_sensitivity.py`
   - treats the same mirror topology as a differentiable stationwise profile
   - observables:
     pressure-drop proxy and `d(Δp)/ds` with respect to coil separation
-- `examples/wham_blanket_field_on_mesh_demo.py`
+- `campaigns/blanket/wham_blanket_field_on_mesh_demo.py`
   - samples the WHAM-like mirror field on the approved mapped blanket-pipe mesh
   - projects the global vector field into local streamwise and transverse
     components before conservative `phi/J` assembly
   - observables:
     finite-value fraction, peak/mean centerline `B_\perp`, streamwise-field
     leakage, and cross-section field variation
-- `examples/wham_blanket_current_closure_demo.py`
+- `campaigns/blanket/wham_blanket_current_closure_demo.py`
   - solves the conservative inductionless potential/current closure on a
     bounded mapped-pipe mesh for a prescribed streamwise velocity profile
   - observables:
     dimensional and relative `div J`, wall-current leakage, boundary-current
     residual, axial-current span, and reconstructed current magnitude
-- `examples/wham_blanket_flow_demo.py`
+- `campaigns/blanket/wham_blanket_flow_demo.py`
   - evaluates the approved route with a fixed-flow-rate PbLi-like pressure
     budget and a centerline pressure-velocity transient with turbulent
     pipe-friction closure
@@ -511,22 +640,22 @@ interpolation mismatch. The remaining tabulated-field research gap is external
     cumulative pressure drop, hydraulic/MHD/bend pressure components, sampled
     transverse field, Hartmann number, field-scale pressure sweep, local
     velocity-section previews, and station/history CSV
-- `examples/wham_blanket_autodiff_research_demo.py`
+- `campaigns/blanket/wham_blanket_autodiff_research_demo.py`
   - differentiates the same reduced pressure budget with respect to coil
     separation, field multiplier, and mean velocity
   - observables:
     local pressure sensitivity, pressure-drop elasticities, separation sweep,
     and field-scale inverse-design trajectory for a target pressure drop
 
-![WHAM blanket field sampled on mapped pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
+![WHAM blanket field sampled on mapped pipe mesh](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_field_on_mesh.png)
 
-![WHAM blanket conservative current closure](_static/generated/wham_blanket_current_closure.png)
+![WHAM blanket conservative current closure](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_current_closure.png)
 
-![WHAM blanket centerline pressure-velocity transient](_static/generated/wham_blanket_transient_flow.png)
+![WHAM blanket centerline pressure-velocity transient](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_transient_flow.png)
 
-![WHAM blanket field-scale pressure sweep](_static/generated/wham_blanket_pressure_sweep.png)
+![WHAM blanket field-scale pressure sweep](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_pressure_sweep.png)
 
-![WHAM blanket differentiable pressure-drop study](_static/generated/wham_blanket_autodiff_research.png)
+![WHAM blanket differentiable pressure-drop study](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_autodiff_research.png)
 
 Current bounded WHAM mirror-pipe reduced sensitivity result:
 
@@ -611,7 +740,7 @@ than as ad hoc feature work:
 
 - bent-pipe geometry
   - baseline: low-De inductionless straight-pipe-equivalence verification
-    using `examples/bent_pipe_inductionless_demo.py`
+    using `campaigns/fringing/bent_pipe_inductionless_demo.py`
   - inductionless extension: uniform-field bent pipe
   - nonuniform-field extension: fringing-field bent pipe
   - required observables:
@@ -642,10 +771,10 @@ Current bounded low-De baseline:
 
 The Dean-vortex external-reference data contract is now explicit:
 
-- `examples/dean_vortex_external_reference_template.py`
+- `campaigns/fringing/dean_vortex_external_reference_template.py`
   writes the scalar-observable CSV template for higher-inertia curved-pipe or
   curved-duct references
-- `examples/bent_pipe_inductionless_demo.py`
+- `campaigns/fringing/bent_pipe_inductionless_demo.py`
   writes the same template when no reference CSV is present
 - when `dean_vortex_reference_observables.csv` is present, the bent-pipe
   example writes a publication-table-ready comparison CSV plus PNG/PDF
@@ -659,12 +788,12 @@ scientific gap remains a matched higher-inertia reference case.
     plus executable rectangular `extruded_inductionless` validation through
     `examples/variable_field_extruded_demo.py`
   - layered extension:
-    `examples/variable_field_layered_demo.py`
+    `campaigns/fields/variable_field_layered_demo.py`
   - curved-pipe extension:
-    `examples/variable_field_bent_pipe_demo.py`
+    `campaigns/fields/variable_field_bent_pipe_demo.py`
   - tabulated-field extension:
-    `examples/variable_field_tabulated_demo.py` and
-    `examples/fringing_tabulated_case.toml`
+    `campaigns/fields/variable_field_tabulated_demo.py` and
+    `cases/fringing/fringing_tabulated_case.toml`
   - recovery test: reproduce the current fringing benchmarks through the
     generic field-loading path
   - extension: tabulated or analytic 3D fields for ducts and pipes

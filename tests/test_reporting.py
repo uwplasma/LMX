@@ -154,7 +154,9 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
         }
         """
     )
-    summary = build_summary(validation, benchmark, parity, time_convergence, control_sweep, control_grid)
+    summary = build_summary(
+        validation, benchmark, parity, time_convergence, control_sweep, control_grid
+    )
     assert "## Validation" in summary["markdown"]
     assert "Potential residual" in summary["markdown"]
     assert "Potential iterations" in summary["markdown"]

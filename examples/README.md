@@ -1,671 +1,109 @@
-# Examples
+# LMX examples
 
-The examples are explicit templates for research workflows. They show how to:
+`examples/` is the small, supported first-run surface. It contains 11 curated
+workflows; reusable TOML inputs live in `cases/`, and production-size validation,
+figure, and research studies live in `campaigns/`.
 
-- build cases directly in Python
-- run from TOML input files
-- generate plots and movies
-- reproduce canonical Shercliff and Hunt benchmark figures
-- save `.npz` state bundles
-- resume runs from restart files
-- benchmark strong scaling
-- run autodiff sensitivity and inverse-design studies
-- preview geometries and meshes before launching a solve
-- stage fringing-field benchmark workflows for the next solver family
-- prescribe variable magnetic fields directly from Python
-- customize geometry objects before a solve and preview them in 3D
-- preview bent-pipe geometries before solver support lands
-- sample magnetic fields on mapped centerline-pipe meshes before solver runs
-- validate analytic cross-sectional magnetic fields before using them in runs
-- generate publication-ready verification figures with checked JSON summaries
-- write reduced WHAM blanket pressure-sweep figures for manuscript planning
-- run the reduced Li/AlN wall-stack Phase 0-2 unit, mesh-QA, conductance, and
-  pinhole-sensitivity artifact
-- run the reduced Li/AlN wall-stack Phase 3-6 operating, substrate,
-  degradation-threshold, and pinhole-limit artifact
-- generate explicit `fluid | AlN | metal` multilayer mesh QA artifacts with
-  aligned interfaces and conductivity fields
-- run explicit multilayer Li/AlN/metal limiting-case solves with
-  conservative-current diagnostics
-- run a representative explicit multilayer mesh ladder for pressure/current
-  convergence checks
+Every curated workflow has a tested command, an expected artifact contract, and
+an explicit stability label in [`catalog.toml`](catalog.toml). A successful run
+is evidence that the workflow works—not automatically that its physics is
+externally validated.
 
-## Quick examples
+## Curated workflows
 
-```bash
-python examples/hartmann_example.py --ha 20 --output ./artifacts/examples/hartmann
-python examples/shercliff_example.py --ha 20 --output ./artifacts/examples/shercliff
-python examples/hunt_example.py --ha 20 --output ./artifacts/examples/hunt
-python examples/straight_duct_geometry_and_mesh.py
-python examples/shercliff_showcase.py
-python examples/hunt_showcase.py
-python examples/straight_duct_profile_comparison.py
-python examples/freemhd_closed_channel_parity.py
-python examples/freemhd_closed_channel_observable_parity.py
-python examples/freemhd_closed_channel_flow_rate_parity.py
-python examples/freemhd_observable_mesh_ladder.py
-python examples/external_validation_readiness_panel.py
-python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
-python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
-python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
-python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
-python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
-python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
-python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
-python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
-python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
-python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
-python examples/autodiff_extruded_trajectory_demo.py --output ./artifacts/examples/autodiff_extruded_trajectory
-python examples/plotting_api_demo.py --output ./artifacts/examples/plotting_api_demo
-python examples/extruded_summary_figures.py --output ./artifacts/examples/extruded_summary_figures
-python examples/readme_showcase_demo.py --output ./docs/_static/generated
-# optional Hartmann alternative for wall-layer startup media
-python examples/readme_showcase_demo.py --output ./docs/_static/generated --movie-case-kind hartmann
-python examples/readme_showcase_demo.py --output ./docs/_static/generated --skip-geometry --movie-view 2d
-python examples/readme_showcase_demo.py --output ./docs/_static/generated --skip-geometry --movie-view 3d
-python examples/fringing_benchmark_demo.py --output ./artifacts/examples/fringing_benchmark
-python examples/extruded_restart_demo.py --output ./artifacts/examples/extruded_restart_demo
-python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
-python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
-python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
-python examples/geometry_panel_demo.py --output ./artifacts/examples/geometry_panel
-python examples/pipe_reference_comparison_demo.py --output ./artifacts/examples/pipe_reference_comparison
-python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
-python examples/bent_pipe_preview.py
-python examples/bent_pipe_inductionless_demo.py
-python examples/variable_field_validation.py
-python examples/variable_field_extruded_demo.py
-python examples/variable_field_layered_demo.py
-python examples/variable_field_bent_pipe_demo.py
-python examples/variable_field_tabulated_demo.py
-python examples/wham_coil_model_field_adapter.py
-python examples/wham_mirror_pipe_demo.py
-python examples/autodiff_wham_pressure_sensitivity.py
-python examples/wham_blanket_geometry_preview.py
-python examples/wham_blanket_mesh_demo.py
-python examples/wham_blanket_field_on_mesh_demo.py
-python examples/wham_blanket_current_closure_demo.py
-python examples/wham_blanket_flow_demo.py
-python examples/wham_blanket_autodiff_research_demo.py
-python examples/li_aln_wall_stack_phase0_2.py
-python examples/li_aln_wall_stack_phase3_6.py
-python examples/li_aln_multilayer_mesh_qa.py
-python examples/li_aln_multilayer_solve.py
-python examples/li_aln_multilayer_convergence.py
-python examples/publication_figure_campaign.py
-python examples/research_grade_closure_status.py
-python examples/research_grade_external_data_audit.py
-python examples/research_grade_external_target_figures.py
-python examples/research_grade_closure_dashboard.py
-python examples/research_grade_final_lane_disposition.py
-python examples/research_grade_strict_blocker_probe.py
-python examples/dean_literature_validation.py
-python examples/q2d_decay_validation.py
-python examples/q2d_forced_validation.py
-python examples/q2d_wall_bounded_validation.py
-python examples/q2dmhdfoam_external_reference_adapter.py
-python examples/q2dmhdfoam_lmx_turbulence_match_audit.py
-python examples/magnetic_obstacle_benchmark.py
-python examples/magnetic_obstacle_regime_scan.py
-python examples/magnetic_obstacle_baseline.py
-python examples/operator_verification_demo.py
-python examples/operator_clustered_verification_demo.py
-```
+| Journey | Command | Status | What it demonstrates |
+|---|---|---|---|
+| Hartmann CLI | `lmx examples/hartmann_case.toml` | stable | TOML/CLI solve, compact output, diagnostics |
+| Hartmann Python | `python examples/hartmann_example.py` | stable | case construction and steady solve |
+| Hunt Python | `python examples/hunt_example.py` | stable | mixed insulating/conducting walls |
+| Operator verification | `python examples/operator_verification_demo.py` | stable | manufactured gradients/Laplacians and observed order |
+| FreeMHD validation | `python -m examples.freemhd_closed_channel_observable_parity` | external data | matched observable comparison; requires reference data |
+| Fringing benchmark | `python examples/fringing_benchmark_demo.py` | research-stage | bounded extruded solver workflow; Benchmark B remains open |
+| Restart | `python examples/extruded_restart_demo.py` | research-stage | restart and compact extruded output |
+| Custom imposed field | `python examples/variable_field_extruded_demo.py` | research-stage | analytic/tabulated field integration |
+| Differentiable design | `python examples/autodiff_design_demo.py` | research-stage | smooth sensitivity and inverse design |
+| CPU/GPU benchmark | `python examples/strong_scaling_demo.py` | research-stage | cold/warm timing harness; no general scaling claim yet |
+| Experimental reference | `python examples/pipe_reference_comparison_demo.py` | external data | published-reference adapter; Benchmark B remains open |
 
-## Input-file examples
+Most commands accept `--help` and an output directory. Generated results belong
+under `artifacts/`, which is ignored by Git.
+
+## Reusable case files
+
+Fully developed ducts:
 
 ```bash
 lmx examples/hartmann_case.toml
-lmx examples/hartmann_restart_case.toml
-lmx examples/shercliff_case.toml
-lmx examples/hunt_case.toml
-lmx examples/fringing_rect_case.toml
-lmx examples/fringing_tabulated_case.toml
-lmx examples/fringing_layered_case.toml
-lmx examples/fringing_layered_restart_case.toml
-lmx examples/fringing_pipe_case.toml
-lmx run hartmann --ha 20 --verbose
-lmx run hunt --ha 20 --verbosity debug
-lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
-lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
-lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
+lmx cases/ducts/hartmann_restart_case.toml
+lmx cases/ducts/shercliff_case.toml
+lmx cases/ducts/hunt_case.toml
 ```
 
-The example TOML files expose both `verbose = true|false` and
-`verbosity = "quiet" | "normal" | "detailed" | "debug"` in their `[logging]`
-block, so they double as templates for both batch and interactive runs.
-The fringing TOML files now also enable `write_plots = true`, so a plain
-`lmx input.toml` run produces the station-history CSV, NPZ bundle, JSON
-summary, and overview plots without any Python wrapper.
-When run from the source tree, the validation and example workflows also pick
-up the bundled closed-channel reference dataset automatically.
-
-## Replot saved NPZ outputs
+Research-stage extruded/fringing cases:
 
 ```bash
-python examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
+lmx cases/fringing/fringing_rect_case.toml
+lmx cases/fringing/fringing_layered_case.toml
+lmx cases/fringing/fringing_layered_restart_case.toml
+lmx cases/fringing/fringing_tabulated_case.toml
+lmx cases/fringing/fringing_pipe_case.toml
 ```
 
-## Larger-study demos
+The configuration reference is in
+[`docs/input_reference.md`](../docs/input_reference.md); the cookbook covers
+wall models, custom fields, outputs, and restart in
+[`docs/case_cookbook.md`](../docs/case_cookbook.md).
 
-Strong scaling:
+## Research and evidence campaigns
+
+Campaigns are preserved and tested, but intentionally kept out of the first-run
+surface:
+
+| Directory | Purpose |
+|---|---|
+| `campaigns/ducts/` | Benchmark A ladders, profiles, and showcases |
+| `campaigns/freemhd/` | supporting FreeMHD parity and mesh diagnostics |
+| `campaigns/fringing/` | developing-flow, bent-pipe, and Dean studies |
+| `campaigns/autodiff/` | specialized inverse-design and trajectory studies |
+| `campaigns/fields/` | representation-specific imposed-field checks |
+| `campaigns/interfaces/` | discontinuous-conductivity verification |
+| `campaigns/walls/` | Li/AlN multilayer and degradation studies |
+| `campaigns/q2d/` | reduced-model and Q2DmhdFoam work toward Benchmark C |
+| `campaigns/magnetic_obstacle/` | localized-field work toward Benchmark D |
+| `campaigns/blanket/` | explicitly research-stage WHAM blanket studies |
+| `campaigns/publication/` | manuscript figure generation |
+| `campaigns/status/` | validation closure and blocker reports |
+| `campaigns/tutorials/` | verbose geometry, plotting, and theory walkthroughs |
+
+Run a campaign from the repository root, for example:
 
 ```bash
-python examples/strong_scaling_demo.py --output ./artifacts/examples/strong_scaling_cpu
-python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
-python examples/strong_scaling_demo.py --remote-host <your_gpu_host> --output ./artifacts/examples/strong_scaling_full
+python campaigns/ducts/hartmann_validation_ladder.py
+python campaigns/freemhd/freemhd_observable_mesh_ladder.py
+python campaigns/walls/li_aln_multilayer_convergence.py
 ```
 
-Use `--benchmark-kind extruded_solve` when the timing evidence needs to follow
-the executable rectangular `solve_extruded_inductionless(...)` projection path.
-The default `extruded3d` benchmark remains the explicitly sharded dense-operator
-path used for strong-scaling panels. Each run writes raw timing JSON, plots,
-`strong_scaling_table.csv`, and `strong_scaling_diagnostics.json`; the table is
-the shortest artifact for checking solver-faithful rows, speedup, efficiency,
-memory, and profiler coverage.
+The relevant documentation states required external data, runtime tier, and the
+claim the campaign is allowed to support. Templates and qualitative plots are not
+accepted benchmark evidence.
 
-Standard CLI runs can also select the execution backend directly:
+## Artifact and media policy
 
-```bash
-JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
-XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
-ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/hunt_case.toml'
-```
+Compact JSON/CSV observables used by tests may be tracked. Generated fields,
+movies, meshes, and large figures belong in versioned release assets. The current
+65-file bundle is indexed by
+[`provenance/release-assets.json`](../provenance/release-assets.json) and verified
+by `scripts/manage_release_assets.py`.
 
-Autodiff:
+## Adding a workflow
 
-```bash
-python examples/autodiff_design_demo.py --output ./artifacts/examples/autodiff_design
-python examples/autodiff_sensitivity_demo.py --output ./artifacts/examples/autodiff_sensitivity
-python examples/autodiff_profile_design_demo.py --output ./artifacts/examples/autodiff_profile_design
-python examples/autodiff_fringing_design_demo.py --output ./artifacts/examples/autodiff_fringing_design
-python examples/autodiff_fringing_response_demo.py --output ./artifacts/examples/autodiff_fringing_response
-python examples/autodiff_extruded_target_demo.py --output ./artifacts/examples/autodiff_extruded_target
-python examples/autodiff_extruded_field_design_demo.py --output ./artifacts/examples/autodiff_extruded_field_design
-```
+Prefer extending an existing curated journey. A new curated example needs:
 
-The autodiff examples cover:
+1. one clear user question not already answered;
+2. a deterministic command and bounded default runtime;
+3. expected outputs and a documentation link;
+4. unit, physical-verification, and public-workflow tests;
+5. an explicit stable, research-stage, or external-data status in `catalog.toml`.
 
-- a Hartmann-number sensitivity scan of mean velocity
-- a finite-difference cross-check of autodiff gradients
-- inverse recovery of a synthetic forcing parameter from a target profile
-- full-profile inverse design that recovers both forcing and Hartmann number
-- fringing-history inverse design over axial field-profile parameters
-- fringing multi-observable inverse design over axial field-profile parameters
-  using both velocity and current-response targets
-- inverse design against targets generated directly from
-  `solve_extruded_inductionless(...)`, using a direct differentiable
-  rectangular `extruded_inductionless` response model for the default
-  rectangular target workflow
-- field-level inverse design against selected `u`, `phi`, `jy`, and `p`
-  slices from the extruded projection loop
-- projection-trajectory inverse design against selected-station fields and
-  charge-balance histories from the projection iterations
-- `PNG`/`PDF` summary figures
-
-Fringing-field scaffold:
-
-```bash
-python examples/fringing_benchmark_demo.py --geometry-kind rect_duct --ha-peak 20 --ny 12 --nz 12 --nx-stations 11 --max-steps 18 --coupling-iterations 10 --potential-iterations 60 --output ./artifacts/examples/fringing_benchmark
-python examples/fringing_benchmark_demo.py --geometry-kind layered_duct --output ./artifacts/examples/fringing_benchmark_layered
-python examples/fringing_benchmark_demo.py --geometry-kind pipe_ogrid --output ./artifacts/examples/fringing_benchmark_pipe
-python examples/extruded_restart_demo.py --geometry-kind layered_duct --output ./artifacts/examples/extruded_restart_demo
-python examples/extruded_validation_campaign.py --output ./artifacts/examples/extruded_validation_campaign
-```
-
-That example now writes a stacked axial field bundle with `u`, `v`, `w`, `p`,
-`phi`, current, Lorentz, and charge-balance fields through the explicit
-`solve_extruded_inductionless(...)` entry point. Rectangular ducts, layered
-ducts, and mapped pipes all now use the same public path. The mapped-pipe lane
-also has a dedicated external-profile comparison script.
-
-The restart and validation campaign examples extend that same 3D lane:
-
-- `extruded_restart_demo.py`
-  - splits a run into base and resumed stages, then compares the resumed result
-    against a direct run with the same total step count
-- `extruded_validation_campaign.py`
-  - runs the bounded larger-dataset fringing campaign on the
-    `rect_duct,layered_duct,pipe_ogrid` conservation-validation set, writes JSON/CSV, and emits a
-    figure
-- `autodiff_extruded_trajectory_demo.py`
-  - matches selected-station fields and conservation histories across the
-    projection iterations themselves, not just the final extruded state
-- `extruded_summary_figures.py`
-  - writes extra 3D fringing figures and compact summary panels for the
-    rectangular and layered datasets
-- `readme_showcase_demo.py`
-  - regenerates the README media bundle, including the geometry panel
-    and bounded 2D/3D Hunt startup GIFs
-  - supports split refreshes with `--movie-view 2d` or `--movie-view 3d`
-    when only one GIF needs to be updated inside the five-minute local budget
-
-Geometry and mesh preview:
-
-```bash
-python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
-python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
-```
-
-The default path is intentionally preview-only so it stays fast. Add
-`--with-post-run` to append a short steady solve and matching postprocessing
-figures in the same output tree.
-
-Variable field and custom geometry driver:
-
-```bash
-python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
-```
-
-That example is the clearest Python-native template for users who want to:
-
-- define a custom analytic magnetic field callable
-- modify the benchmark constructors with `dataclasses.replace(...)`
-- preview the resulting geometry before running
-- run a short solve and emit the same plots and JSON summaries used elsewhere
-- use LMX as a programmable research driver instead of only through TOML files
-
-Bent-pipe preview:
-
-```bash
-python examples/bent_pipe_preview.py
-```
-
-That example is the preprocessing template for the curved-pipe lane:
-
-- build a mapped constant-radius bend directly from Python
-- write `PNG`/`PDF` previews of the curved centerline and cross-sections
-- record the mesh parameters that should be reused when the bent-pipe solver lane is added
-
-Bent-pipe inductionless baseline:
-
-```bash
-python examples/bent_pipe_inductionless_demo.py
-python examples/dean_vortex_bayat_rezai_strict_attempt.py
-```
-
-That example is the current curved-pipe executable lane:
-
-- build a bent-pipe inductionless problem and the matching straight-pipe reference
-- solve both on the same fringing-field profile
-- write a bent-pipe geometry-plus-solution panel
-- record low-De equivalence metrics against the straight-pipe limit
-- report Dean/curvature-response observables, including secondary-flow
-  intensity and signed-radius velocity skew, for the future higher-inertia gate
-- write `dean_vortex_reference_observables_template.csv` when no external
-  reference is present
-- if `dean_vortex_reference_observables.csv` exists in the output directory,
-  write a publication-table-ready comparison CSV and PNG/PDF tolerance-gate plot
-- `dean_vortex_bayat_rezai_strict_attempt.py`
-  - read the current bent-pipe summary and write a moderate-De Bayat-Rezai
-    strict reference CSV
-  - compare the current near-zero low-De secondary-flow observables to the
-    literature target
-  - document that the remaining blocker is a higher-inertia secondary-flow
-    model, not current closure or plot formatting
-
-Dean-vortex external-reference template:
-
-```bash
-python examples/dean_vortex_external_reference_template.py
-```
-
-That example writes only the scalar-observable contract needed to turn the
-low-De curved-pipe lane into a higher-inertia Dean-vortex validation once a
-matched literature or reference-solver dataset is available.
-
-Variable-field validation:
-
-```bash
-python examples/variable_field_validation.py
-```
-
-That example is the smallest field-QA workflow:
-
-- build an analytic divergence-free cross-sectional magnetic field
-- sample it on a research-sized grid
-- write component and magnitude plots
-- record finite-difference divergence metrics before using that field in a solve
-
-Variable-field extruded solve:
-
-```bash
-python examples/variable_field_extruded_demo.py
-```
-
-That example extends the field-QA lane into an actual 3D solve:
-
-- build an analytic divergence-free magnetic field
-- run the rectangular `extruded_inductionless` solve with that field
-- write the field preview and extruded overview plots
-- record field-divergence and 3D conservation metrics in one summary
-
-Variable-field layered duct and curved pipe:
-
-```bash
-python examples/variable_field_layered_demo.py
-python examples/variable_field_bent_pipe_demo.py
-python examples/variable_field_tabulated_demo.py
-python examples/wham_mirror_pipe_demo.py
-python examples/autodiff_wham_pressure_sensitivity.py
-```
-
-The tabulated-field examples also emit table-quality diagnostics: interpolation
-reconstruction at table nodes, axis monotonicity, finite-value fraction,
-normalized field range, and discrete divergence ratio.
-
-Those examples extend the same field API into:
-
-- layered ducts with wall materials retained in the 3D solve
-- curved pipes validated against the straight-pipe low-De limit under the same field
-- reusable machine-readable summaries of field and conservation metrics
-- a tabulated-field duct run that also matches the TOML/CLI path
-- a WHAM coil-script adapter that converts the external coil script into a
-  reduced-loop tabulated-field artifact
-- a tabulated WHAM-like mirror field written to disk and reused by a pipe solve
-- a reduced differentiable pressure-drop sensitivity study with respect to
-  coil-coil separation
-
-Quasi-2D Hartmann-friction decay:
-
-```bash
-python examples/q2d_decay_validation.py
-```
-
-That example is the first executable Q2D validation slice:
-
-- solve a periodic quasi-2D Hartmann-friction decay problem
-- compare the numerical final state against the analytic decay
-- report the modal energy-budget residual for the Sommeria-Moreau reduced model
-- write a compact validation figure and summary JSON
-
-Quasi-2D forced periodic duct:
-
-```bash
-python examples/q2d_forced_validation.py
-```
-
-That example upgrades the Q2D lane from decay-only to a forced duct baseline:
-
-- solve a periodic Hartmann-friction mode driven toward a steady state
-- compare the steady state and approach-to-steady-state against the analytic solution
-- report the modal production-dissipation residual
-- write a compact validation figure and summary JSON
-
-Quasi-2D wall-bounded forced duct:
-
-```bash
-python examples/q2d_wall_bounded_validation.py
-```
-
-That example moves the Q2D lane from periodic modes to a wall-bounded duct:
-
-- solve a no-slip forced Q2D Hartmann-friction mode in a rectangular box
-- compare the transient final state against the exact Dirichlet solution
-- report the wall-bounded modal energy-budget residual
-- report Sommeria-Moreau-facing energy, enstrophy, dissipation, and spectrum
-  observables for the future turbulent validation gate
-- write compact validation, spectrum, energy-budget, and summary artifacts
-
-Quasi-2D multi-mode turbulence-observable movie:
-
-```bash
-python examples/q2d_turbulence_decay_demo.py
-```
-
-That example writes a deterministic nonlinear Hartmann-friction vorticity GIF:
-
-- initialize a repeatable multi-mode Q2D vorticity field
-- evolve it with pseudo-spectral nonlinear advection, diffusion, Hartmann
-  friction, and weak large-scale forcing
-- gate finite energy/enstrophy, low CFL, divergence-free velocity,
-  spectral-centroid shift, and nonlinear turnover count
-- keep research-grade turbulent parity marked open until matched against a
-  published nonlinear turbulent Q2D reference
-- write `q2d_turbulence_reference_observables_template.csv` when no external
-  turbulent reference is present
-- if `q2d_turbulence_reference_observables.csv` exists in the output directory,
-  write a publication-table-ready comparison CSV and PNG/PDF tolerance-gate plot
-
-LMX/Q2DmhdFoam Q2D turbulence-observable comparison:
-
-```bash
-python examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py
-```
-
-That example runs the same LMX nonlinear Q2D movie case and overlays its
-energy, enstrophy, and spectral observables with the available Q2DmhdFoam
-lid-driven spectral summary. It writes a PNG/PDF panel, summary JSON, and GIF
-for the README. The summary intentionally records `matched_parity = false`
-until a Q2DmhdFoam case is run with the same geometry, forcing, Hartmann
-friction, integration time, and observable definitions as the LMX case.
-
-Q2DmhdFoam-to-LMX nonlinear Q2D match audit:
-
-```bash
-python examples/q2dmhdfoam_lmx_turbulence_match_audit.py
-```
-
-That example scans local Q2DmhdFoam case dictionaries and writes JSON, CSV,
-PNG, and PDF artifacts that show which strict parity gates pass before any
-external run is allowed to fill `q2d_turbulence_reference_observables.csv`. The
-current local `lidDriven`, `muck_q2d_FFT`, and `muck_q2d` cases are useful
-executable evidence, but the audit keeps the nonlinear Q2D parity lane open
-because topology, forcing, Hartmann friction, timestep window, or observable
-definitions are not all matched to the LMX SM82-style movie case.
-
-Q2DmhdFoam generic VTK field ingestion:
-
-```bash
-python examples/q2dmhdfoam_lid_driven_vtk_artifact.py
-```
-
-That example reads the VTK field produced by
-`docker/q2dmhdfoam` for `CASE_RELATIVE_PATH=run/lidDriven`, computes velocity
-and vorticity observables, and writes a PNG/PDF panel plus CSV table. It is an
-external-code execution and post-processing gate; it does not claim matched LMX
-turbulence parity.
-
-LMX/Q2DmhdFoam matched side-wall Q2D field comparison:
-
-```bash
-python examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py
-```
-
-That example solves the LMX side-wall-driven Q2D cavity and compares compact
-field observables against an isothermal Q2DmhdFoam `run/lidDriven` output
-produced by the Docker runner with `ZERO_THERMAL=1`. It reads cell-centered
-OpenFOAM fields when the reconstructed case directory is present, applies the
-graded-cell area weights, and writes a PNG/PDF panel, CSV observable table, and
-summary JSON. The current artifact passes area-weighted mean speed, speed RMS,
-and peak vorticity at the retained tolerance; turbulent Q2D parity remains a
-separate lane.
-
-Q2D turbulence external-reference template:
-
-```bash
-python examples/q2d_turbulence_external_reference_template.py
-```
-
-That example writes only the scalar-observable contract needed to promote the
-nonlinear movie/readiness gate into a literature-backed turbulent parity gate.
-
-Localized-field and mirror-field response:
-
-```bash
-python examples/magnetic_obstacle_benchmark.py
-python examples/magnetic_obstacle_external_reference_template.py
-python examples/magnetic_obstacle_votyakov_strict_attempt.py
-python examples/magnetic_obstacle_votyakov_curve_validation.py
-python examples/magnetic_obstacle_baseline.py
-python examples/wham_mirror_pipe_demo.py
-python examples/wham_blanket_geometry_preview.py
-python examples/wham_blanket_mesh_demo.py
-python examples/wham_blanket_flow_demo.py
-python examples/autodiff_wham_pressure_sensitivity.py
-python examples/wham_blanket_autodiff_research_demo.py
-```
-
-Those examples are the current executable localized-field response entry points:
-
-- `magnetic_obstacle_benchmark.py`
-  - solve a rectangular extruded duct with a localized analytic magnetic obstacle
-  - compare it directly against a matched no-field reference
-  - write both the generic extruded overview and a dedicated benchmark panel
-  - record streamwise wake-deficit, centerline recovery, pressure-excess,
-    distortion, and conservation metrics
-  - mark the result as an internal response gate, not an external literature validation
-  - if `magnetic_obstacle_reference_observables.csv` exists in the output
-    directory, write an external-reference comparison CSV and PNG/PDF
-    observable-parity plot
-  - otherwise write `magnetic_obstacle_reference_observables_template.csv` so
-    digitized literature or experimental data can be added without changing the script
-- `magnetic_obstacle_regime_scan.py`
-  - sweep localized-field obstacle runs over `Bz` scale and forcing
-  - write a compact response-map figure over velocity deficit, pressure excess,
-    current response, and cross-cut distortion
-  - stage the transition from the current baseline toward published magnetic-obstacle cases
-- `magnetic_obstacle_external_reference_template.py`
-  - write the scalar-observable CSV contract for digitized literature or
-    experimental magnetic-obstacle reference data
-  - keep the external validation lane explicit without claiming parity before
-    reference data are present
-- `magnetic_obstacle_votyakov_strict_attempt.py`
-  - read the current benchmark summary and the digitized Votyakov Fig. 7(a)
-    candidate target
-  - write the strict reference CSV and the failed observable comparison panel
-  - document that the current reduced case does not yet reproduce the
-    recirculating negative centerline velocity required by the literature case
-- `magnetic_obstacle_votyakov_curve_validation.py`
-  - read the full digitized Votyakov Fig. 7(a)-style curve
-  - extract reverse-flow onset and high-`N` plateau observables
-  - write a curve-level PNG/PDF/CSV artifact showing that the current LMX
-    localized-field response remains outside the inertial recirculating regime
-- `magnetic_obstacle_baseline.py`
-  - solve a rectangular extruded duct with a localized analytic magnetic obstacle
-  - write the full extruded overview panel
-  - record obstacle-induced velocity deficit, current response, and conservation metrics
-- `wham_mirror_pipe_demo.py`
-  - write a tabulated WHAM-like mirror field
-  - solve a straight pipe crossing that 3D field
-  - export the field preview, a 3D WHAM overview figure, and the pipe-response overview
-  - generate the field table on the solver streamwise axis and record the
-    `coil_frame_x_offset` used to center the mirror coils
-- `wham_blanket_geometry_preview.py`
-  - build a circular liquid-metal blanket pipe route around the WHAM central-cell envelope
-  - show the mirror coils, central-cell clearance, inlet leg, U-bend, and return leg
-  - write PNG/PDF geometry-review artifacts plus JSON dimensions before any solve is claimed
-- `wham_blanket_mesh_demo.py`
-  - convert the approved centerline into a mapped circular-pipe O-grid
-  - write a ParaView-ready `VTU` mesh and mesh-QA JSON summary
-  - check station spacing, radius preservation, periodic closure, finite coordinates, and cell count
-- `wham_blanket_flow_demo.py`
-  - reuse the approved WHAM blanket route
-  - sample the WHAM mirror field along the curved centerline
-  - estimate fixed-flow-rate liquid-metal pressure drop and then run a
-    centerline pressure-velocity transient with turbulent pipe-friction
-    closure, local MHD drag, bend losses, and route incompressibility projection
-  - write steady velocity sections, station/history pressure data, JSON
-    summaries, a transient pressure-velocity panel, and a longer GIF that
-    reaches steady flow
-- `wham_blanket_autodiff_research_demo.py`
-  - reuse the same blanket route and reduced fixed-flow pressure budget
-  - compute autodiff sensitivities with respect to coil separation, field
-    multiplier, and mean velocity
-  - answer a bounded inverse-design question by finding the field multiplier
-    that hits a target pressure drop at fixed flow rate
-  - write a pressure/sensitivity/inverse-design panel and JSON summaries
-- `autodiff_wham_pressure_sensitivity.py`
-  - treat the same mirror topology as a differentiable stationwise profile
-  - compute pressure-drop sensitivity with respect to coil separation
-  - write the three-panel sensitivity figure and summary JSON
-
-Importable plotting API:
-
-```bash
-python examples/plotting_api_demo.py --output ./artifacts/examples/plotting_api_demo
-```
-
-That example is the minimal template for users who want to:
-
-- call the plotting helpers directly from `import lmx`
-- save geometry previews before running
-- write steady-state overview plots after a solve
-- generate transient GIFs from `solve_case_snapshots(...)`
-
-## Teaching goal
-
-The examples are intentionally written with explicit helper functions and
-configuration blocks so that new users can adapt them into custom research
-drivers.
-
-## Straight-duct showcase
-
-These four standalone scripts are the shortest path to the canonical
-Shercliff/Hunt figures:
-
-```bash
-python examples/straight_duct_geometry_and_mesh.py
-python examples/shercliff_showcase.py
-python examples/hunt_showcase.py
-python examples/straight_duct_profile_comparison.py
-python examples/freemhd_closed_channel_parity.py
-python examples/reference_slice_mesh_diagnostic.py
-```
-
-They are parameter-driven Python files rather than argparse front ends:
-
-- edit the configuration block at the top of the file
-- rerun the script
-- inspect the output tree under `artifacts/examples/...`
-
-The shared reusable logic lives in `lmx.showcase`, so the example scripts stay
-teachable without duplicating the geometry setup, solve, and plotting code.
-`straight_duct_profile_comparison.py` writes the straight-duct validation panel
-used in the README and docs, covering Hartmann, Shercliff, and Hunt with
-publication-ready profile overlays, explicit no-slip wall reconstruction in
-the analytical comparison, a release target of `L2 <= 1.2e-2` on the retained
-Shercliff/Hunt cuts, and a checked summary JSON.
-
-`hartmann_validation_ladder.py` writes the bounded Hartmann multi-`Ha`
-validation ladder with a publication-ready centerline / wall-layer panel and a
-checked summary JSON for docs and later paper use.
-
-`straight_duct_validation_ladder.py` writes the bounded straight-duct
-literature ladder used for the numerics/validation docs, comparing Shercliff
-and Hunt `y` and `z` cuts across multiple Hartmann numbers on the same
-normalization and with a checked summary JSON.
-
-`freemhd_closed_channel_parity.py` is the external straight-duct cross-check:
-it reuses fresh Shercliff and Hunt reruns from
-`/Users/rogerio/local/tests/freemhd_install/freemhd_output`, reconstructs
-matching LMX transient cases from the FreeMHD case files, compares normalized
-transverse and vertical cuts, compares `u_max(t)` histories, records FreeMHD
-versus LMX wall times on the same host, and writes a publication-ready parity
-panel plus JSON summary.
-
-`freemhd_closed_channel_observable_parity.py` is the richer field-level
-cross-check against the FreeMHD paper slices. It compares normalized
-midplane profiles of `u`, gauge-shifted `potE`, cut-aligned `J`, and
-`J×B_x` for Shercliff and Hunt, uses case-specific validated settings and
-current reconstructions, and writes a publication-ready panel plus JSON
-summary. This remains a heavier manual artifact-generation lane than the
-transient parity example.
-
-`freemhd_closed_channel_flow_rate_parity.py` uses the same processed slices but
-switches to the constrained `inlet_flow_rate` formulation. It derives
-case-specific target mean velocities from the slice data and writes a separate
-constant-flow figure/summary so constrained-drive parity is not hidden by the
-pressure-gradient artifact.
-
-`freemhd_observable_mesh_ladder.py` runs the same field-level observable gate
-over a small retained/refined mesh ladder. It writes a JSON summary, CSV table,
-and PNG/PDF panel that report offender counts, worst over-target L2, and
-Hartmann/side-layer cell-readiness ratios. Use it before changing solver
-physics so mesh under-resolution and operator errors are separated.
-
-`reference_slice_mesh_diagnostic.py` compares the generated LMX straight-duct
-mesh against the processed-slice point grid used by the external paper data.
-It writes a side-by-side mesh panel and layer-resolution JSON so mesh
-discretization can be separated from solver and observable-parity errors.
+Production sweeps and manuscript tooling belong in `campaigns/`, not in
+`examples/`.

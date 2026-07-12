@@ -36,9 +36,13 @@ def _set_style() -> None:
     )
 
 
-def _build_problem(geometry_kind: str, *, ha_peak: float, ny: int, nz: int, nx_stations: int):
+def _build_problem(
+    geometry_kind: str, *, ha_peak: float, ny: int, nz: int, nx_stations: int
+):
     if geometry_kind == "rect_duct":
-        return build_square_duct_extruded_problem(ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations)
+        return build_square_duct_extruded_problem(
+            ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations
+        )
     if geometry_kind == "layered_duct":
         return build_layered_duct_extruded_problem(
             ha_peak=ha_peak,
@@ -70,7 +74,9 @@ def run_extruded_restart_demo(
     resume_steps: int = 4,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    problem = _build_problem(geometry_kind, ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations)
+    problem = _build_problem(
+        geometry_kind, ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations
+    )
     base_problem = replace(
         problem,
         case=replace(
@@ -89,7 +95,9 @@ def run_extruded_restart_demo(
         problem,
         case=replace(
             problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=split_steps + resume_steps),
+            time_stepper=replace(
+                problem.case.time_stepper, max_steps=split_steps + resume_steps
+            ),
         ),
     )
 
@@ -97,20 +105,32 @@ def run_extruded_restart_demo(
     resumed_dir = out_dir / "resumed"
     direct_dir = out_dir / "direct"
     base_solution = solve_extruded_inductionless(base_problem)
-    base_outputs = write_extruded_solution_outputs(base_solution, base_problem.case, base_dir, write_plots=True)
-    restart_path = write_extruded_restart_npz(base_solution, base_problem.case, base_dir / "restart" / f"{base_problem.case.name}_restart.npz")
+    base_outputs = write_extruded_solution_outputs(
+        base_solution, base_problem.case, base_dir, write_plots=True
+    )
+    restart_path = write_extruded_restart_npz(
+        base_solution,
+        base_problem.case,
+        base_dir / "restart" / f"{base_problem.case.name}_restart.npz",
+    )
     restart_bundle = load_extruded_restart_bundle(restart_path)
     validate_extruded_restart_bundle(restart_bundle, case=resumed_problem.case)
 
-    resumed_solution = solve_extruded_inductionless(resumed_problem, initial_bundle=restart_bundle.bundle)
-    resumed_outputs = write_extruded_solution_outputs(resumed_solution, resumed_problem.case, resumed_dir, write_plots=True)
+    resumed_solution = solve_extruded_inductionless(
+        resumed_problem, initial_bundle=restart_bundle.bundle
+    )
+    resumed_outputs = write_extruded_solution_outputs(
+        resumed_solution, resumed_problem.case, resumed_dir, write_plots=True
+    )
     resumed_restart_path = write_extruded_restart_npz(
         resumed_solution,
         resumed_problem.case,
         resumed_dir / "restart" / f"{resumed_problem.case.name}_restart.npz",
     )
     direct_solution = solve_extruded_inductionless(direct_problem)
-    direct_outputs = write_extruded_solution_outputs(direct_solution, direct_problem.case, direct_dir, write_plots=True)
+    direct_outputs = write_extruded_solution_outputs(
+        direct_solution, direct_problem.case, direct_dir, write_plots=True
+    )
 
     x = np.asarray(direct_solution.bundle.x)
     direct_mean = np.asarray(direct_solution.bundle.mean_velocity)
@@ -125,21 +145,47 @@ def run_extruded_restart_demo(
     fig.suptitle("LMX extruded restart / resume reproducibility", fontsize=16)
 
     axes[0].plot(x, direct_mean, color="#0f766e", label="Direct", linewidth=2.0)
-    axes[0].plot(x, resumed_mean, color="#b45309", linestyle="--", label="Restarted", linewidth=2.0)
+    axes[0].plot(
+        x,
+        resumed_mean,
+        color="#b45309",
+        linestyle="--",
+        label="Restarted",
+        linewidth=2.0,
+    )
     axes[0].set_title("Mean velocity history")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel(r"$\bar{u}$")
     axes[0].legend(frameon=False)
 
-    axes[1].semilogy(x, np.maximum(direct_charge, 1.0e-16), color="#7c3aed", label="Direct")
-    axes[1].semilogy(x, np.maximum(resumed_charge, 1.0e-16), color="#dc2626", linestyle="--", label="Restarted")
+    axes[1].semilogy(
+        x, np.maximum(direct_charge, 1.0e-16), color="#7c3aed", label="Direct"
+    )
+    axes[1].semilogy(
+        x,
+        np.maximum(resumed_charge, 1.0e-16),
+        color="#dc2626",
+        linestyle="--",
+        label="Restarted",
+    )
     axes[1].set_title("Charge-balance residual")
     axes[1].set_xlabel("x")
     axes[1].set_ylabel(r"$\max |\nabla \cdot J|$")
     axes[1].legend(frameon=False)
 
-    axes[2].semilogy(x, np.maximum(mean_difference, 1.0e-16), color="#0891b2", label=r"$|\Delta \bar{u}|$")
-    axes[2].semilogy(x, np.maximum(charge_difference, 1.0e-16), color="#7c3aed", linestyle="--", label=r"$|\Delta \nabla \cdot J|$")
+    axes[2].semilogy(
+        x,
+        np.maximum(mean_difference, 1.0e-16),
+        color="#0891b2",
+        label=r"$|\Delta \bar{u}|$",
+    )
+    axes[2].semilogy(
+        x,
+        np.maximum(charge_difference, 1.0e-16),
+        color="#7c3aed",
+        linestyle="--",
+        label=r"$|\Delta \nabla \cdot J|$",
+    )
     axes[2].set_title("Restart-to-direct difference")
     axes[2].set_xlabel("x")
     axes[2].set_ylabel("Absolute difference")
@@ -158,21 +204,37 @@ def run_extruded_restart_demo(
         "resume_steps": resume_steps,
         "restart_input": str(restart_path),
         "restart_output": str(resumed_restart_path),
-        "base_outputs": {key: [str(path) for path in value] for key, value in base_outputs.items()},
-        "resumed_outputs": {key: [str(path) for path in value] for key, value in resumed_outputs.items()},
-        "direct_outputs": {key: [str(path) for path in value] for key, value in direct_outputs.items()},
+        "base_outputs": {
+            key: [str(path) for path in value] for key, value in base_outputs.items()
+        },
+        "resumed_outputs": {
+            key: [str(path) for path in value] for key, value in resumed_outputs.items()
+        },
+        "direct_outputs": {
+            key: [str(path) for path in value] for key, value in direct_outputs.items()
+        },
         "max_mean_velocity_difference": float(np.max(mean_difference)),
         "max_charge_balance_difference": float(np.max(charge_difference)),
         "plots": [png_path.name, pdf_path.name],
     }
-    (out_dir / "extruded_restart_summary.json").write_text(json.dumps(summary, indent=2))
+    (out_dir / "extruded_restart_summary.json").write_text(
+        json.dumps(summary, indent=2)
+    )
     return summary
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the LMX extruded restart / resume reproducibility demo.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/extruded_restart_demo"))
-    parser.add_argument("--geometry-kind", choices=("rect_duct", "layered_duct", "pipe_ogrid"), default="layered_duct")
+    parser = argparse.ArgumentParser(
+        description="Run the LMX extruded restart / resume reproducibility demo."
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/examples/extruded_restart_demo")
+    )
+    parser.add_argument(
+        "--geometry-kind",
+        choices=("rect_duct", "layered_duct", "pipe_ogrid"),
+        default="layered_duct",
+    )
     parser.add_argument("--ha-peak", type=float, default=10.0)
     parser.add_argument("--ny", type=int, default=6)
     parser.add_argument("--nz", type=int, default=6)

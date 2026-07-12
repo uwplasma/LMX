@@ -238,6 +238,12 @@ def load_run_config(path: str | Path) -> RunConfig:
         time_scheme=str(solver_table.get("time_scheme", "implicit_euler")),
         coupling_iterations=int(solver_table.get("coupling_iterations", 12)),
         coupling_tolerance=float(solver_table.get("coupling_tolerance", 1e-8)),
+        coupling_acceleration=str(solver_table.get("coupling_acceleration", "none")),
+        coupling_min_relaxation=float(solver_table.get("coupling_min_relaxation", 0.05)),
+        coupling_max_relaxation=float(solver_table.get("coupling_max_relaxation", 100.0)),
+        coupling_history_depth=int(solver_table.get("coupling_history_depth", 6)),
+        coupling_regularization=float(solver_table.get("coupling_regularization", 1.0e-8)),
+        coupling_damping=float(solver_table.get("coupling_damping", 1.0)),
     )
     if solver.kind == "reduced_inductionless":
         raise ValueError(

@@ -1,6 +1,10 @@
 import lmx
+import pytest
 
 
+@pytest.mark.filterwarnings(
+    "ignore:.*deprecated at the package root.*:DeprecationWarning"
+)
 def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.generate_rect_duct_mesh)
     assert callable(lmx.build_wham_blanket_centerline)
@@ -138,6 +142,7 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.summarize_observable_ladder_levels)
     assert callable(lmx.write_observable_ladder_table)
     assert callable(lmx.solve_closed_channel_benchmark)
+    assert callable(lmx.fully_developed_power_balance)
     assert callable(lmx.write_lm_duct_geometry_setup_figure)
     assert callable(lmx.write_structured_mesh_figure)
     assert callable(lmx.write_boundary_layer_figure)
@@ -223,8 +228,17 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.write_li_aln_multilayer_mesh_artifacts)
     assert callable(lmx.generate_multilayer_duct_mesh)
     assert "solve_steady" in lmx.__all__
-    assert "build_hartmann_autodiff_problem" in lmx.__all__
-    assert "write_case_overview_plots" in lmx.__all__
+    assert len(lmx.__all__) == 30
+    assert "build_hartmann_autodiff_problem" not in lmx.__all__
+    assert "write_case_overview_plots" not in lmx.__all__
+    assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
+
+
+def test_legacy_root_export_remains_available_with_migration_warning():
+    name = "build_hartmann_autodiff_problem"
+    lmx.__dict__.pop(name, None)
+    with pytest.warns(DeprecationWarning, match="import .* from lmx.autodiff"):
+        assert callable(getattr(lmx, name))
 
 
 def test_lmx_lazy_exports_reject_unknown_name():

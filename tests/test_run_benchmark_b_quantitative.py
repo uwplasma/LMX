@@ -66,11 +66,19 @@ def test_run_benchmark_b_quantitative_writes_outputs(
         },
     )
 
-    exit_code = suite.main(["--output", str(tmp_path / "benchmark_b"), "--include-pipe-reference"])
+    exit_code = suite.main(
+        ["--output", str(tmp_path / "benchmark_b"), "--include-pipe-reference"]
+    )
 
-    payload = json.loads((tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.json").read_text())
-    markdown = (tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.md").read_text()
-    csv_text = (tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.csv").read_text()
+    payload = json.loads(
+        (tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.json").read_text()
+    )
+    markdown = (
+        tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.md"
+    ).read_text()
+    csv_text = (
+        tmp_path / "benchmark_b" / "benchmark_b_quantitative_summary.csv"
+    ).read_text()
 
     assert exit_code == 0
     assert len(payload) == 3
@@ -130,15 +138,23 @@ def test_run_benchmark_b_quantitative_can_limit_geometries(
         ]
     )
 
-    payload = json.loads((tmp_path / "benchmark_b_rect" / "benchmark_b_quantitative_summary.json").read_text())
+    payload = json.loads(
+        (
+            tmp_path / "benchmark_b_rect" / "benchmark_b_quantitative_summary.json"
+        ).read_text()
+    )
     assert exit_code == 0
     assert built == ["rect_duct", "layered_duct"]
     assert [row["geometry_kind"] for row in payload] == ["layered_duct", "rect_duct"]
 
 
-def test_pipe_reference_root_and_replace_fields_cover_dataclass_and_object_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_pipe_reference_root_and_replace_fields_cover_dataclass_and_object_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     assert suite._pipe_reference_root(tmp_path) == tmp_path
-    monkeypatch.setattr(suite, "default_fringing_pipe_reference_root", lambda: tmp_path / "default")
+    monkeypatch.setattr(
+        suite, "default_fringing_pipe_reference_root", lambda: tmp_path / "default"
+    )
     assert suite._pipe_reference_root(None) == tmp_path / "default"
 
     @dataclass
@@ -152,11 +168,19 @@ def test_pipe_reference_root_and_replace_fields_cover_dataclass_and_object_paths
     assert suite._replace_fields(obj, value=3).value == 3
 
 
-def test_pipe_profile_errors_cover_velocity_and_potential_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_pipe_profile_errors_cover_velocity_and_potential_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     pot_path = tmp_path / "potential.csv"
     rows = np.zeros((5, 14))
     rows[:, 13] = np.linspace(-1.0, 1.0, 5)
-    np.savetxt(pot_path, rows, delimiter=",", header=",".join(f"c{i}" for i in range(14)), comments="")
+    np.savetxt(
+        pot_path,
+        rows,
+        delimiter=",",
+        header=",".join(f"c{i}" for i in range(14)),
+        comments="",
+    )
 
     references = {
         "center": SimpleNamespace(
@@ -179,7 +203,9 @@ def test_pipe_profile_errors_cover_velocity_and_potential_paths(monkeypatch: pyt
         ),
     }
 
-    monkeypatch.setattr(suite, "load_fringing_pipe_profile", lambda name, root: references[name])
+    monkeypatch.setattr(
+        suite, "load_fringing_pipe_profile", lambda name, root: references[name]
+    )
 
     def fake_extract(bundle, *, x_offset_fraction, field_name):
         coord = np.linspace(-1.0, 1.0, 5)
@@ -210,20 +236,55 @@ def test_build_problem_rejects_unknown_geometry():
         )
 
 
-def test_build_problem_covers_rect_layered_and_pipe_branches(monkeypatch: pytest.MonkeyPatch):
+def test_build_problem_covers_rect_layered_and_pipe_branches(
+    monkeypatch: pytest.MonkeyPatch,
+):
     base_problem = lambda: SimpleNamespace(
         case=SimpleNamespace(
             solver=SimpleNamespace(coupling_iterations=1),
             time_stepper=SimpleNamespace(max_steps=2, potential_iterations=3),
         )
     )
-    monkeypatch.setattr(suite, "build_square_duct_extruded_problem", lambda **kwargs: base_problem())
-    monkeypatch.setattr(suite, "build_layered_duct_extruded_problem", lambda **kwargs: base_problem())
-    monkeypatch.setattr(suite, "build_pipe_ogrid_extruded_problem", lambda **kwargs: base_problem())
+    monkeypatch.setattr(
+        suite, "build_square_duct_extruded_problem", lambda **kwargs: base_problem()
+    )
+    monkeypatch.setattr(
+        suite, "build_layered_duct_extruded_problem", lambda **kwargs: base_problem()
+    )
+    monkeypatch.setattr(
+        suite, "build_pipe_ogrid_extruded_problem", lambda **kwargs: base_problem()
+    )
 
-    rect = suite._build_problem("rect_duct", ha_peak=20.0, ny=8, nz=10, nx_stations=5, max_steps=7, coupling_iterations=4, potential_iterations=9)
-    layered = suite._build_problem("layered_duct", ha_peak=20.0, ny=8, nz=10, nx_stations=5, max_steps=7, coupling_iterations=4, potential_iterations=9)
-    pipe = suite._build_problem("pipe_ogrid", ha_peak=20.0, ny=8, nz=10, nx_stations=5, max_steps=7, coupling_iterations=4, potential_iterations=9)
+    rect = suite._build_problem(
+        "rect_duct",
+        ha_peak=20.0,
+        ny=8,
+        nz=10,
+        nx_stations=5,
+        max_steps=7,
+        coupling_iterations=4,
+        potential_iterations=9,
+    )
+    layered = suite._build_problem(
+        "layered_duct",
+        ha_peak=20.0,
+        ny=8,
+        nz=10,
+        nx_stations=5,
+        max_steps=7,
+        coupling_iterations=4,
+        potential_iterations=9,
+    )
+    pipe = suite._build_problem(
+        "pipe_ogrid",
+        ha_peak=20.0,
+        ny=8,
+        nz=10,
+        nx_stations=5,
+        max_steps=7,
+        coupling_iterations=4,
+        potential_iterations=9,
+    )
 
     assert rect.case.solver.coupling_iterations == 4
     assert layered.case.time_stepper.max_steps == 7
@@ -243,7 +304,14 @@ def test_row_for_solution_uses_optional_validation_fields():
         net_boundary_current_residual=0.0,
         field_mean_velocity_correlation=-0.9,
     )
-    row = suite._row_for_solution("rect_duct", SimpleNamespace(validation=validation), ha_peak=20.0, ny=8, nz=8, nx_stations=5)
+    row = suite._row_for_solution(
+        "rect_duct",
+        SimpleNamespace(validation=validation),
+        ha_peak=20.0,
+        ny=8,
+        nz=8,
+        nx_stations=5,
+    )
     assert row["axial_current_mirror_residual"] == pytest.approx(0.0)
     assert row["pressure_span_mirror_residual"] == pytest.approx(0.0)
 

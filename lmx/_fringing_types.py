@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import field
 
 import jax.numpy as jnp
 
@@ -47,6 +48,21 @@ class ExtrudedFieldBundle:
     boundary_current_residual: jnp.ndarray
     geometry_kind: str
     solver_kind: str
+    axial_pressure_loss_gradient: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
+    transverse_pressure_difference: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
+    iteration_residual_history: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
+    iteration_component_residual_history: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0, 6))
+    )
+    iteration_pressure_residual_history: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
 
 
 @dataclass(frozen=True)
@@ -76,6 +92,7 @@ class ExtrudedInductionlessValidation:
     pressure_span_mirror_residual: float = 0.0
     center_axial_current: float = 0.0
     center_pressure_span: float = 0.0
+    max_divergence_residual: float = 0.0
 
 
 @dataclass(frozen=True)

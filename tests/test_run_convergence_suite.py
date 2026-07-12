@@ -36,12 +36,20 @@ def test_build_case_rejects_unknown_case(tmp_path: Path):
 
 
 def test_collect_metrics_for_hartmann(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"base": 1.0})
-    monkeypatch.setattr(suite, "hartmann_validation", lambda *args, **kwargs: SimpleNamespace(l2_error=0.1, linf_error=0.2))
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"base": 1.0}
+    )
+    monkeypatch.setattr(
+        suite,
+        "hartmann_validation",
+        lambda *args, **kwargs: SimpleNamespace(l2_error=0.1, linf_error=0.2),
+    )
     monkeypatch.setattr(
         suite,
         "hartmann_acceptance",
-        lambda *args, **kwargs: SimpleNamespace(passed=True, l2_threshold=0.05, linf_threshold=0.1),
+        lambda *args, **kwargs: SimpleNamespace(
+            passed=True, l2_threshold=0.05, linf_threshold=0.1
+        ),
     )
 
     metrics = suite._collect_metrics(
@@ -59,13 +67,23 @@ def test_collect_metrics_for_hartmann(monkeypatch: pytest.MonkeyPatch):
     assert metrics["acceptance_l2_threshold"] == 0.05
 
 
-def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_reference_branch_handles_missing_slice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
     comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
 
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
-    monkeypatch.setattr(suite, "closed_channel_validation", lambda *args, **kwargs: comparison)
-    monkeypatch.setattr(suite, "processed_slice_validation", lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")))
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
+    )
+    monkeypatch.setattr(
+        suite, "closed_channel_validation", lambda *args, **kwargs: comparison
+    )
+    monkeypatch.setattr(
+        suite,
+        "processed_slice_validation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
+    )
 
     metrics = suite._collect_metrics(
         solution=SimpleNamespace(),
@@ -81,15 +99,23 @@ def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, 
     assert "slice_y_l2_error" not in metrics
 
 
-def test_collect_metrics_reference_branch_includes_slice_metrics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_reference_branch_includes_slice_metrics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
     slice_profile = SimpleNamespace(l2_error=0.05, linf_error=0.07)
     comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
     slice_report = SimpleNamespace(y_profile=slice_profile, z_profile=slice_profile)
 
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
-    monkeypatch.setattr(suite, "closed_channel_validation", lambda *args, **kwargs: comparison)
-    monkeypatch.setattr(suite, "processed_slice_validation", lambda *args, **kwargs: slice_report)
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
+    )
+    monkeypatch.setattr(
+        suite, "closed_channel_validation", lambda *args, **kwargs: comparison
+    )
+    monkeypatch.setattr(
+        suite, "processed_slice_validation", lambda *args, **kwargs: slice_report
+    )
 
     metrics = suite._collect_metrics(
         solution=SimpleNamespace(),
@@ -102,7 +128,9 @@ def test_collect_metrics_reference_branch_includes_slice_metrics(tmp_path: Path,
     )
 
     assert metrics["slice_y_l2_error"] == 0.05
-    assert metrics["slice_combined_l2_error"] == pytest.approx(((0.05**2 + 0.05**2) / 2.0) ** 0.5)
+    assert metrics["slice_combined_l2_error"] == pytest.approx(
+        ((0.05**2 + 0.05**2) / 2.0) ** 0.5
+    )
 
 
 def test_observed_orders_ignores_missing_or_none_orders():
@@ -123,7 +151,9 @@ def test_observed_orders_returns_empty_when_spacing_does_not_change():
     assert suite._observed_orders(levels) == {}
 
 
-def test_run_convergence_suite_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+def test_run_convergence_suite_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
     output = tmp_path / "convergence"
 
     monkeypatch.setattr(
@@ -140,13 +170,25 @@ def test_run_convergence_suite_writes_summary(tmp_path: Path, monkeypatch: pytes
             hartmann_linf_threshold=0.1,
         ),
     )
-    monkeypatch.setattr(suite, "_build_case", lambda case_kind, ha, resolution, output_dir: SimpleNamespace(
-        name=f"{case_kind}_ha{int(ha)}",
-        geometry=SimpleNamespace(width=2.0, height=2.0, ny=resolution, nz=resolution),
-        time_stepper=SimpleNamespace(dt=0.001, max_steps=100),
-    ))
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 8.0})
+    monkeypatch.setattr(
+        suite,
+        "_build_case",
+        lambda case_kind, ha, resolution, output_dir: SimpleNamespace(
+            name=f"{case_kind}_ha{int(ha)}",
+            geometry=SimpleNamespace(
+                width=2.0, height=2.0, ny=resolution, nz=resolution
+            ),
+            time_stepper=SimpleNamespace(dt=0.001, max_steps=100),
+        ),
+    )
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 8.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",

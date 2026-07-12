@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -93,7 +93,7 @@ def strict_blocker_closure_attempt_summary(
     ]
     return {
         "case": "research_grade_strict_blocker_attempt",
-        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "release_decision": "do_not_tag_research_grade_release",
         "research_grade_ready": bool(closure.get("research_grade_ready")),
         "strict_open_lanes": list(closure.get("open_lanes", [])),

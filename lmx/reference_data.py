@@ -224,8 +224,6 @@ def processed_slice_area_mean(
     if y.size < 2 or z.size < 2:
         return float(np.mean(values)) if values.size else 0.0
     area = (float(y[-1]) - float(y[0])) * (float(z[-1]) - float(z[0]))
-    if area <= 0.0:
-        return float(np.mean(values))
     integral_z = np.trapezoid(values, z, axis=1)
     integral = float(np.trapezoid(integral_z, y))
     return integral / area

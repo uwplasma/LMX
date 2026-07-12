@@ -74,7 +74,7 @@ The repository also ships a second autodiff example focused on derivative
 verification:
 
 ```bash
-python examples/autodiff_sensitivity_demo.py \
+python campaigns/autodiff/autodiff_sensitivity_demo.py \
   --output artifacts/examples/autodiff_sensitivity
 ```
 
@@ -88,7 +88,7 @@ The repository now also ships a third autodiff example focused on joint
 profile-matching recovery:
 
 ```bash
-python examples/autodiff_profile_design_demo.py \
+python campaigns/autodiff/autodiff_profile_design_demo.py \
   --output artifacts/examples/autodiff_profile_design
 ```
 
@@ -102,19 +102,19 @@ The repository now also ships a fourth autodiff example focused on fringing
 history matching:
 
 ```bash
-python examples/autodiff_fringing_design_demo.py \
+python campaigns/autodiff/autodiff_fringing_design_demo.py \
   --output artifacts/examples/autodiff_fringing_design
 
-python examples/autodiff_fringing_response_demo.py \
+python campaigns/autodiff/autodiff_fringing_response_demo.py \
   --output artifacts/examples/autodiff_fringing_response
 
-python examples/autodiff_extruded_target_demo.py \
+python campaigns/autodiff/autodiff_extruded_target_demo.py \
   --output artifacts/examples/autodiff_extruded_target
 
-python examples/autodiff_extruded_field_design_demo.py \
+python campaigns/autodiff/autodiff_extruded_field_design_demo.py \
   --output artifacts/examples/autodiff_extruded_field_design
 
-python examples/autodiff_extruded_trajectory_demo.py \
+python campaigns/autodiff/autodiff_extruded_trajectory_demo.py \
   --output artifacts/examples/autodiff_extruded_trajectory
 ```
 
@@ -127,9 +127,9 @@ That workflow writes:
 ## Current artifact
 
 The current committed autodiff summary is stored under
-`docs/_static/generated/autodiff_summary.png`.
+`https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/autodiff_summary.png`.
 
-![LMX autodiff summary](_static/generated/autodiff_summary.png)
+![LMX autodiff summary](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/autodiff_summary.png)
 
 The run demonstrates:
 
@@ -152,11 +152,11 @@ of magnitude while the recovered forcing approaches the synthetic target.
     inverse-design utilities
 - `examples/autodiff_design_demo.py`
   - sensitivity scan and inverse-design loop
-- `examples/autodiff_profile_design_demo.py`
+- `campaigns/autodiff/autodiff_profile_design_demo.py`
   - full-profile inverse design over forcing and Hartmann number
-- `examples/autodiff_fringing_design_demo.py`
+- `campaigns/autodiff/autodiff_fringing_design_demo.py`
   - inverse design over fringing-profile parameters and axial response history
-- `examples/autodiff_extruded_field_design_demo.py`
+- `campaigns/autodiff/autodiff_extruded_field_design_demo.py`
   - field-level inverse design over selected extruded 3D slices
 - `lmx/plotting.py`
   - polished sensitivity/inverse summary figure
@@ -251,7 +251,7 @@ station histories:
 Run it with:
 
 ```bash
-python examples/autodiff_extruded_field_design_demo.py \
+python campaigns/autodiff/autodiff_extruded_field_design_demo.py \
   --output artifacts/examples/autodiff_extruded_field_design
 ```
 
@@ -274,7 +274,7 @@ Trajectory-level artifact:
 
 ![LMX extruded trajectory autodiff summary](_static/generated/autodiff_extruded_trajectory.png)
 
-`examples/autodiff_extruded_trajectory_demo.py` is the deepest bounded
+`campaigns/autodiff/autodiff_extruded_trajectory_demo.py` is the deepest bounded
 example in the differentiable fringing lane because it matches fields
 and conservation trajectories across the projection iterations, not
 just final-state outputs.

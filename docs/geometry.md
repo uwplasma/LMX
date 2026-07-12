@@ -65,8 +65,8 @@ resulting research driver explicit.
 
 Analytic spatially varying magnetic fields are currently configured from Python,
 not from TOML. The public examples for that workflow are
-`examples/variable_field_geometry_demo.py` and
-`examples/variable_field_validation.py`.
+`campaigns/fields/variable_field_geometry_demo.py` and
+`campaigns/fields/variable_field_validation.py`.
 
 ```python
 from dataclasses import replace
@@ -99,33 +99,33 @@ This route is the current way to explore:
 LMX ships a dedicated preview utility in `lmx/plotting.py` and complete
 drivers in:
 
-- `examples/geometry_preview_demo.py`
-- `examples/variable_field_geometry_demo.py`
-- `examples/geometry_panel_demo.py`
-- `examples/bent_pipe_preview.py`
-- `examples/bent_pipe_inductionless_demo.py`
-- `examples/wham_blanket_geometry_preview.py`
-- `examples/wham_blanket_mesh_demo.py`
-- `examples/wham_blanket_field_on_mesh_demo.py`
-- `examples/wham_blanket_current_closure_demo.py`
-- `examples/readme_showcase_demo.py`
+- `campaigns/tutorials/geometry_preview_demo.py`
+- `campaigns/fields/variable_field_geometry_demo.py`
+- `campaigns/tutorials/geometry_panel_demo.py`
+- `campaigns/fringing/bent_pipe_preview.py`
+- `campaigns/fringing/bent_pipe_inductionless_demo.py`
+- `campaigns/blanket/wham_blanket_geometry_preview.py`
+- `campaigns/blanket/wham_blanket_mesh_demo.py`
+- `campaigns/blanket/wham_blanket_field_on_mesh_demo.py`
+- `campaigns/blanket/wham_blanket_current_closure_demo.py`
+- `campaigns/tutorials/readme_showcase_demo.py`
 
 ```bash
-python examples/geometry_preview_demo.py --output artifacts/examples/geometry_preview
-python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
-python examples/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
-python examples/geometry_panel_demo.py --output artifacts/examples/geometry_panel
-python examples/bent_pipe_preview.py
-python examples/bent_pipe_inductionless_demo.py
-python examples/wham_blanket_geometry_preview.py
-python examples/wham_blanket_mesh_demo.py
-python examples/wham_blanket_field_on_mesh_demo.py
-python examples/wham_blanket_current_closure_demo.py
-python examples/readme_showcase_demo.py --output docs/_static/generated
+python campaigns/tutorials/geometry_preview_demo.py --output artifacts/examples/geometry_preview
+python campaigns/tutorials/geometry_preview_demo.py --with-post-run --post-case hartmann --output artifacts/examples/geometry_preview_full
+python campaigns/fields/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
+python campaigns/tutorials/geometry_panel_demo.py --output artifacts/examples/geometry_panel
+python campaigns/fringing/bent_pipe_preview.py
+python campaigns/fringing/bent_pipe_inductionless_demo.py
+python campaigns/blanket/wham_blanket_geometry_preview.py
+python campaigns/blanket/wham_blanket_mesh_demo.py
+python campaigns/blanket/wham_blanket_field_on_mesh_demo.py
+python campaigns/blanket/wham_blanket_current_closure_demo.py
+python campaigns/tutorials/readme_showcase_demo.py --output docs/_static/generated
 # optional Hartmann alternative for wall-layer startup media
-python examples/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
-python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 2d
-python examples/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 3d
+python campaigns/tutorials/readme_showcase_demo.py --output docs/_static/generated --movie-case-kind hartmann
+python campaigns/tutorials/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 2d
+python campaigns/tutorials/readme_showcase_demo.py --output docs/_static/generated --skip-geometry --movie-view 3d
 ```
 
 Those drivers write:
@@ -145,7 +145,7 @@ step before longer studies.
 
 Current geometry panel:
 
-![LMX geometry panel](_static/generated/geometry_gallery.png)
+![LMX geometry panel](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/geometry_gallery.png)
 
 ## Reference-Slice Meshes
 
@@ -160,7 +160,7 @@ faces with conducting or insulating wall cells. For processed slice CSV files,
 This path is intended for validation and mesh-sensitivity studies; production
 examples should still use the case builders unless exact external-grid
 reproduction is the goal. The standalone
-`examples/reference_slice_mesh_diagnostic.py` driver writes a side-by-side
+`campaigns/status/reference_slice_mesh_diagnostic.py` driver writes a side-by-side
 mesh panel and layer-count JSON for this workflow.
 
 Solver calls can also take a validated mesh override:
@@ -206,7 +206,7 @@ linear solves.
 
 Current bent-pipe baseline:
 
-![LMX bent-pipe inductionless baseline](_static/generated/bent_pipe_overview.png)
+![LMX bent-pipe inductionless baseline](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/bent_pipe_overview.png)
 
 The bent-pipe summary reports low-De straight-pipe equivalence plus
 Dean/curvature observables (`secondary_flow_rms_ratio`,
@@ -221,7 +221,7 @@ the conservative mapped-pipe potential solve was corrected to cancel
 
 ## WHAM blanket pipe route preview
 
-`examples/wham_blanket_geometry_preview.py` is the geometry-review entry point
+`campaigns/blanket/wham_blanket_geometry_preview.py` is the geometry-review entry point
 for a liquid-metal blanket concept around WHAM. It uses the public
 `WhamBlanketLoop`, `build_wham_blanket_centerline(...)`,
 `tube_surface_from_centerline(...)`, and
@@ -232,11 +232,11 @@ not yet a solver mesh or validation claim; it records the route, path length,
 pipe radius, coil separation, and tube-to-cell clearance before the mapped-pipe
 simulation is built.
 
-![LMX WHAM blanket pipe geometry preview](_static/generated/wham_blanket_geometry_preview.png)
+![LMX WHAM blanket pipe geometry preview](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_geometry_preview.png)
 
 ## WHAM blanket reduced-flow preview
 
-`examples/wham_blanket_flow_demo.py` is the first flow-facing artifact for the
+`campaigns/blanket/wham_blanket_flow_demo.py` is the first flow-facing artifact for the
 approved route. It uses the same centerline and a fixed-flow-rate engineering
 model with PbLi-like properties. The sampled WHAM field enters through the
 local transverse field `B_\perp`, and the pressure budget is
@@ -267,17 +267,17 @@ fixed flow rate; the current field multipliers `4`, `6`, `8`, and `10` produce
 terminal pressure drops of `≈ 6.7`, `15.0`, `26.5`, and `41.4 kPa`, with the
 MHD term following the expected `B_\perp^2` trend.
 
-![LMX WHAM blanket reduced-flow pressure and steady sections](_static/generated/wham_blanket_flow.png)
+![LMX WHAM blanket reduced-flow pressure and steady sections](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_flow.png)
 
-![LMX WHAM blanket transient pressure-velocity solve](_static/generated/wham_blanket_transient_flow.png)
+![LMX WHAM blanket transient pressure-velocity solve](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_transient_flow.png)
 
-![LMX WHAM blanket pressure sweep](_static/generated/wham_blanket_pressure_sweep.png)
+![LMX WHAM blanket pressure sweep](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_pressure_sweep.png)
 
-![LMX WHAM blanket reduced-flow movie](_static/generated/wham_blanket_flow.gif)
+![LMX WHAM blanket reduced-flow movie](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_flow.gif)
 
 ## WHAM blanket mapped-pipe mesh
 
-`examples/wham_blanket_mesh_demo.py` promotes the approved geometry from a
+`campaigns/blanket/wham_blanket_mesh_demo.py` promotes the approved geometry from a
 surface route into a mapped circular-pipe O-grid. The low-level reusable API is
 `generate_centerline_pipe_mesh(...)`, with QA from
 `centerline_pipe_mesh_quality_metrics(...)` and a mesh panel from
@@ -291,11 +291,11 @@ and periodic-closure errors. This closes the geometry handoff needed before
 the generalized curved-pipe MHD operator can be promoted into a real blanket
 solve.
 
-![LMX WHAM blanket mapped pipe mesh](_static/generated/wham_blanket_mesh_preview.png)
+![LMX WHAM blanket mapped pipe mesh](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_mesh_preview.png)
 
 ## WHAM field sampling on the mapped blanket mesh
 
-`examples/wham_blanket_field_on_mesh_demo.py` is the solver-facing field
+`campaigns/blanket/wham_blanket_field_on_mesh_demo.py` is the solver-facing field
 handoff after the mapped pipe mesh. The reusable API is
 `sample_wham_field_on_centerline_pipe_mesh(...)` for WHAM-like fields,
 `sample_field_on_centerline_pipe_mesh(...)` for arbitrary vector fields,
@@ -313,11 +313,11 @@ field on the centerline (`max |B_s|/|B| ≈ 3.4e-15`), and
 blanket solve; it closes the coordinate-frame and field-data handoff needed
 before the generalized curved-pipe `φ`, `J`, and pressure solver is promoted.
 
-![LMX WHAM field sampled on the mapped blanket pipe mesh](_static/generated/wham_blanket_field_on_mesh.png)
+![LMX WHAM field sampled on the mapped blanket pipe mesh](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_field_on_mesh.png)
 
 ## WHAM conservative current closure on the mapped blanket mesh
 
-`examples/wham_blanket_current_closure_demo.py` is the first conservative
+`campaigns/blanket/wham_blanket_current_closure_demo.py` is the first conservative
 `phi/J` gate on the approved mapped blanket route. It uses the sampled
 WHAM-like field, prescribes a streamwise pipe velocity profile, solves the
 inductionless potential equation using the same conservative pipe current
@@ -335,11 +335,11 @@ leakage and zero net boundary-current residual. The same reconstructed
 current field gives a streamwise `J×B` pressure-drop proxy of `≈ 6.97 kPa`,
 which is now available separately from the reduced `σ U B_\perp^2` estimate.
 
-![LMX WHAM conservative current closure on the mapped blanket pipe](_static/generated/wham_blanket_current_closure.png)
+![LMX WHAM conservative current closure on the mapped blanket pipe](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_current_closure.png)
 
 ## WHAM blanket differentiable pressure-drop study
 
-`examples/wham_blanket_autodiff_research_demo.py` reuses the approved blanket
+`campaigns/blanket/wham_blanket_autodiff_research_demo.py` reuses the approved blanket
 route, WHAM-like field sampling, PbLi-like properties, and reduced
 fixed-flow-rate pressure budget, but evaluates the budget with JAX arrays. The
 same reduced model is then differentiated with respect to coil separation,
@@ -354,4 +354,4 @@ hit a `20 kPa` pressure-drop target at fixed flow rate. The result is a
 research-design gate and publication-ready pressure/sensitivity figure; it is
 not a claim of turbulent curved-pipe validation.
 
-![LMX WHAM blanket differentiable pressure-drop study](_static/generated/wham_blanket_autodiff_research.png)
+![LMX WHAM blanket differentiable pressure-drop study](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_autodiff_research.png)

@@ -11,7 +11,7 @@ docker run --rm --platform linux/amd64 \
   -e RANKS=2 \
   -v "$PWD/artifacts/external/q2dmhdfoam_reference:/output" \
   lmx-q2dmhdfoam:fe41
-python examples/q2dmhdfoam_docker_reference_validation.py
+python campaigns/q2d/q2dmhdfoam_docker_reference_validation.py
 ```
 
 The runner can also execute other checked-out Q2DmhdFoam cases for manual

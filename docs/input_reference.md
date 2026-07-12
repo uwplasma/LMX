@@ -146,8 +146,10 @@ side = "max"
   - `rect_duct`
   - `layered_duct`
   - `pipe_ogrid`
-- `width`, `height`, `length`
+- `width`, `height`, `length`, `axial_origin`
   - domain dimensions
+  - `axial_origin` shifts the first axial face; ALEX uses `-15` so solver
+    stations retain the published pole-face coordinate `x/L`
 - `nx`, `ny`, `nz`
   - grid counts
 - `radius`, `nr`, `ntheta`
@@ -160,6 +162,8 @@ side = "max"
   - benchmark Hartmann number used by the case constructors
 - `target_side_layer`
   - optional side-layer tuning input for layered benchmarks
+- `hartmann_layer_cells`
+  - required cells across the mapped-pipe `1/Ha` layer when `target_ha` is set
 
 ## `[magnetic_field]`
 
@@ -187,10 +191,8 @@ side = "max"
   - `steady`
   - `transient`
 - `linear_solver`
-  - `auto`
-  - `cg`
-  - `gmres`
-  - `bicgstab`
+  - `auto` (released SOLVAX PCG), `solvax_pcg`, `cg`, `gmres`, or `bicgstab`
+  - use explicit `cg` to reproduce the retained native comparison path
 - `preconditioner`
   - `none`
   - `jacobi`

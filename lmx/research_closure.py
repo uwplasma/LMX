@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import textwrap
@@ -84,7 +84,7 @@ def research_grade_closure_status(static_dir: str | Path | None = None) -> dict[
     open_lanes = [row["lane"] for row in rows if not row["closed"]]
     return {
         "case": "research_grade_closure_status",
-        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "lane_count": len(rows),
         "closed_lane_count": len(closed_lanes),
         "open_lane_count": len(open_lanes),
@@ -135,7 +135,7 @@ def research_grade_final_disposition(static_dir: str | Path | None = None) -> di
     deferred_rows = [row for row in rows if row["final_decision"] != "closed"]
     return {
         "case": "research_grade_final_disposition",
-        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "lane_count": len(rows),
         "closed_lane_count": len(closed_rows),
         "deferred_lane_count": len(deferred_rows),
@@ -203,7 +203,7 @@ def research_grade_external_data_audit(
     matched_rows = [row for row in rows if row.get("matched_reference_csv_exists")]
     return {
         "case": "research_grade_external_data_audit",
-        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "rows": rows,
         "source_count": len(rows),
         "available_source_count": len(available_rows),

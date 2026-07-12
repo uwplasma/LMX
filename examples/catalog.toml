@@ -1,0 +1,357 @@
+schema_version = 2
+
+[[example]]
+id = "hartmann-cli"
+path = "examples/hartmann_case.toml"
+command = "lmx examples/hartmann_case.toml"
+status = "stable"
+runtime = "portable"
+outputs = ["solution NPZ", "diagnostics JSON", "profile CSV"]
+docs = "docs/getting_started.md"
+
+[[example]]
+id = "hartmann-python"
+path = "examples/hartmann_example.py"
+command = "python examples/hartmann_example.py"
+status = "stable"
+runtime = "portable"
+outputs = ["solution NPZ", "overview plots", "diagnostics JSON"]
+docs = "docs/getting_started.md"
+
+[[example]]
+id = "hunt-python"
+path = "examples/hunt_example.py"
+command = "python examples/hunt_example.py"
+status = "stable"
+runtime = "portable"
+outputs = ["solution NPZ", "overview plots", "diagnostics JSON"]
+docs = "docs/case_cookbook.md"
+
+[[example]]
+id = "operator-verification"
+path = "examples/operator_verification_demo.py"
+command = "python examples/operator_verification_demo.py"
+status = "stable"
+runtime = "portable"
+outputs = ["observed-order JSON", "verification plots"]
+docs = "docs/numerics.md"
+
+[[example]]
+id = "freemhd-validation"
+path = "examples/freemhd_closed_channel_observable_parity.py"
+command = "python -m examples.freemhd_closed_channel_observable_parity"
+status = "external-data"
+runtime = "external"
+outputs = ["matched observable JSON", "comparison plots"]
+docs = "docs/external_benchmarks.md"
+
+[[example]]
+id = "fringing-benchmark"
+path = "examples/fringing_benchmark_demo.py"
+command = "python examples/fringing_benchmark_demo.py"
+status = "research-stage"
+runtime = "portable"
+outputs = ["extruded summary JSON", "station history", "overview plots"]
+docs = "docs/fringing.md"
+
+[[example]]
+id = "restart"
+path = "examples/extruded_restart_demo.py"
+command = "python examples/extruded_restart_demo.py"
+status = "research-stage"
+runtime = "portable"
+outputs = ["restart NPZ", "restart comparison JSON"]
+docs = "docs/case_cookbook.md"
+
+[[example]]
+id = "custom-field"
+path = "examples/variable_field_extruded_demo.py"
+command = "python examples/variable_field_extruded_demo.py"
+status = "research-stage"
+runtime = "portable"
+outputs = ["field reconstruction JSON", "extruded solution summary"]
+docs = "docs/geometry.md"
+
+[[example]]
+id = "differentiable-design"
+path = "examples/autodiff_design_demo.py"
+command = "python examples/autodiff_design_demo.py"
+status = "research-stage"
+runtime = "portable"
+outputs = ["sensitivity JSON", "inverse-design plots"]
+docs = "docs/autodiff.md"
+
+[[example]]
+id = "cpu-gpu-benchmark"
+path = "examples/strong_scaling_demo.py"
+command = "python examples/strong_scaling_demo.py"
+status = "research-stage"
+runtime = "accelerator-optional"
+outputs = ["cold/warm timing JSON", "scaling table and plots"]
+docs = "docs/performance.md"
+
+[[example]]
+id = "experimental-reference"
+path = "examples/pipe_reference_comparison_demo.py"
+command = "python examples/pipe_reference_comparison_demo.py"
+status = "external-data"
+runtime = "external"
+outputs = ["reference comparison JSON", "pressure/profile plots"]
+docs = "docs/external_benchmarks.md"
+
+# Every top-level workflow not curated above has exactly one reviewed M2
+# disposition. These moves are performed in reviewable slices; until then the
+# audit treats this table as the authoritative migration ledger.
+
+[[disposition]]
+id = "autodiff-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/autodiff/"
+status = "complete"
+reason = "Keep specialized design studies without presenting each study as a first-run example."
+paths = [
+  "examples/autodiff_extruded_field_design_demo.py",
+  "examples/autodiff_extruded_target_demo.py",
+  "examples/autodiff_extruded_trajectory_demo.py",
+  "examples/autodiff_fringing_design_demo.py",
+  "examples/autodiff_fringing_response_demo.py",
+  "examples/autodiff_profile_design_demo.py",
+  "examples/autodiff_sensitivity_demo.py",
+  "examples/autodiff_wham_pressure_sensitivity.py",
+]
+
+[[disposition]]
+id = "fringing-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/fringing/"
+status = "complete"
+reason = "Retain developing-flow and Dean evidence as research campaigns until Benchmark B closes."
+paths = [
+  "examples/bent_pipe_inductionless_demo.py",
+  "examples/bent_pipe_preview.py",
+  "examples/dean_literature_validation.py",
+  "examples/dean_vortex_bayat_rezai_strict_attempt.py",
+  "examples/dean_vortex_external_reference_template.py",
+  "examples/extruded_summary_figures.py",
+  "examples/extruded_validation_campaign.py",
+]
+
+[[disposition]]
+id = "external-status-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/status/"
+status = "complete"
+reason = "Status panels are evidence-maintenance tools, not user examples."
+paths = ["examples/external_validation_readiness_panel.py"]
+
+[[disposition]]
+id = "freemhd-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/freemhd/"
+status = "complete"
+reason = "Keep the canonical observable parity example curated and move supporting ladders and diagnostics."
+paths = [
+  "examples/freemhd_closed_channel_flow_rate_parity.py",
+  "examples/freemhd_closed_channel_parity.py",
+  "examples/freemhd_observable_mesh_ladder.py",
+]
+
+[[disposition]]
+id = "fringing-case-files"
+action = "move_to_cases"
+target = "cases/fringing/"
+status = "complete"
+reason = "Reusable configurations are case data consumed by the curated fringing workflow."
+paths = [
+  "examples/fringing_layered_case.toml",
+  "examples/fringing_layered_restart_case.toml",
+  "examples/fringing_pipe_case.toml",
+  "examples/fringing_rect_case.toml",
+  "examples/fringing_tabulated_case.toml",
+]
+
+[[disposition]]
+id = "geometry-reader-merge"
+action = "move_to_campaigns"
+target = "campaigns/tutorials/"
+status = "complete"
+reason = "Preserve detailed geometry galleries as supporting tutorials behind the curated fringing journey."
+paths = [
+  "examples/geometry_panel_demo.py",
+  "examples/geometry_preview_demo.py",
+]
+
+[[disposition]]
+id = "duct-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/ducts/"
+status = "complete"
+reason = "Preserve restart, refinement, Shercliff, and diagnostic studies behind the three curated duct journeys."
+paths = [
+  "examples/hartmann_validation_ladder.py",
+  "examples/hunt_showcase.py",
+  "examples/shercliff_example.py",
+  "examples/shercliff_showcase.py",
+  "examples/straight_duct_geometry_and_mesh.py",
+  "examples/straight_duct_profile_comparison.py",
+  "examples/straight_duct_validation_ladder.py",
+]
+
+[[disposition]]
+id = "duct-case-files"
+action = "move_to_cases"
+target = "cases/ducts/"
+status = "complete"
+reason = "Reusable duct restart, Hunt, and Shercliff configurations are case data, not campaigns."
+paths = [
+  "examples/hartmann_restart_case.toml",
+  "examples/hunt_case.toml",
+  "examples/shercliff_case.toml",
+]
+
+[[disposition]]
+id = "interface-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/interfaces/"
+status = "complete"
+reason = "Interface-conductivity verification belongs with numerical evidence."
+paths = ["examples/interface_conductivity_verification_demo.py"]
+
+[[disposition]]
+id = "wall-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/walls/"
+status = "complete"
+reason = "Retain the full Li/AlN study while exposing only a bounded wall-model journey to users."
+paths = [
+  "examples/li_aln_multilayer_convergence.py",
+  "examples/li_aln_multilayer_mesh_qa.py",
+  "examples/li_aln_multilayer_solve.py",
+  "examples/li_aln_wall_stack_phase0_2.py",
+  "examples/li_aln_wall_stack_phase3_6.py",
+]
+
+[[disposition]]
+id = "magnetic-obstacle-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/magnetic_obstacle/"
+status = "complete"
+reason = "Keep localized-field diagnostics explicitly research-stage until Benchmark D."
+paths = [
+  "examples/magnetic_obstacle_baseline.py",
+  "examples/magnetic_obstacle_benchmark.py",
+  "examples/magnetic_obstacle_external_reference_template.py",
+  "examples/magnetic_obstacle_regime_scan.py",
+  "examples/magnetic_obstacle_votyakov_curve_validation.py",
+  "examples/magnetic_obstacle_votyakov_strict_attempt.py",
+]
+
+[[disposition]]
+id = "operator-reader-merge"
+action = "move_to_campaigns"
+target = "campaigns/tutorials/"
+status = "complete"
+reason = "Preserve the clustered operator study while the curated example remains the first-run verification path."
+paths = ["examples/operator_clustered_verification_demo.py"]
+
+[[disposition]]
+id = "plotting-reader-merge"
+action = "move_to_campaigns"
+target = "campaigns/tutorials/"
+status = "complete"
+reason = "Preserve executable plotting and compact-output tools as supporting tutorials documented by the user guide."
+paths = [
+  "examples/plot_npz_results.py",
+  "examples/plotting_api_demo.py",
+]
+
+[[disposition]]
+id = "publication-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/publication/"
+status = "complete"
+reason = "Manuscript figure generation is maintained campaign tooling."
+paths = ["examples/publication_figure_campaign.py"]
+
+[[disposition]]
+id = "q2d-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/q2d/"
+status = "complete"
+reason = "Retain Q2D verification and cross-code work without promoting Benchmark C prematurely."
+paths = [
+  "examples/q2d_decay_validation.py",
+  "examples/q2d_forced_validation.py",
+  "examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py",
+  "examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py",
+  "examples/q2d_turbulence_decay_demo.py",
+  "examples/q2d_turbulence_external_reference_template.py",
+  "examples/q2d_wall_bounded_validation.py",
+  "examples/q2dmhdfoam_docker_reference_validation.py",
+  "examples/q2dmhdfoam_external_reference_adapter.py",
+  "examples/q2dmhdfoam_lid_driven_vtk_artifact.py",
+  "examples/q2dmhdfoam_lmx_turbulence_match_audit.py",
+]
+
+[[disposition]]
+id = "readme-reader-merge"
+action = "move_to_campaigns"
+target = "campaigns/tutorials/"
+status = "complete"
+reason = "Keep README media generation as campaign tooling rather than a first-run example."
+paths = ["examples/readme_showcase_demo.py"]
+
+[[disposition]]
+id = "research-status-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/status/"
+status = "complete"
+reason = "Closure dashboards and blocker probes are release-evidence tooling."
+paths = [
+  "examples/reference_slice_mesh_diagnostic.py",
+  "examples/research_grade_closure_dashboard.py",
+  "examples/research_grade_closure_status.py",
+  "examples/research_grade_external_data_audit.py",
+  "examples/research_grade_external_target_figures.py",
+  "examples/research_grade_final_lane_disposition.py",
+  "examples/research_grade_strict_blocker_probe.py",
+]
+
+[[disposition]]
+id = "theory-reader-merge"
+action = "move_to_campaigns"
+target = "campaigns/tutorials/"
+status = "complete"
+reason = "Keep the verbose executable walkthrough as a supporting tutorial while theory.md is authoritative."
+paths = ["examples/theory_meeting_demo.py"]
+
+[[disposition]]
+id = "variable-field-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/fields/"
+status = "complete"
+reason = "Keep representation-specific checks behind the curated custom-field journey."
+paths = [
+  "examples/variable_field_bent_pipe_demo.py",
+  "examples/variable_field_geometry_demo.py",
+  "examples/variable_field_layered_demo.py",
+  "examples/variable_field_tabulated_demo.py",
+  "examples/variable_field_validation.py",
+]
+
+[[disposition]]
+id = "blanket-campaigns"
+action = "move_to_campaigns"
+target = "campaigns/blanket/"
+status = "complete"
+reason = "Preserve blanket studies as explicitly research-stage campaign tooling."
+paths = [
+  "examples/wham_blanket_autodiff_research_demo.py",
+  "examples/wham_blanket_current_closure_demo.py",
+  "examples/wham_blanket_field_on_mesh_demo.py",
+  "examples/wham_blanket_flow_demo.py",
+  "examples/wham_blanket_geometry_preview.py",
+  "examples/wham_blanket_mesh_demo.py",
+  "examples/wham_coil_model_field_adapter.py",
+  "examples/wham_mirror_pipe_demo.py",
+]

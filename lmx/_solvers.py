@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-import numpy as np
+from collections.abc import Callable
+from functools import partial
 
 import jax
+import numpy as np
+
 import jax.numpy as jnp
+from jax.scipy.linalg import cho_factor, cho_solve
 
 from .core import Diagnostics, MHDState, Solution
 from .linear import (
+    apply_five_point_operator,
+    apply_poisson_operator,
     five_point_residual_norm,
     poisson_residual_norm,
     solve_five_point_system,
@@ -15,11 +20,450 @@ from .linear import (
     solve_poisson_jacobi_state,
     solve_poisson_lineax,
 )
-from .mesh import StructuredMesh, generate_layered_duct_mesh, generate_rect_duct_mesh
-from .operators import gradient_scalar, laplacian_scalar
+from .mesh import (
+    StructuredMesh,
+    generate_layered_duct_mesh,
+    generate_rect_duct_mesh,
+    generate_rect_duct_mesh_from_faces,
+)
+from .operators import gradient_scalar
 from .physics import build_material_fields, magnetic_field_components
 from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec
+
+try:
+    from solvax import (
+        aitken_relaxation as _solvax_aitken_relaxation,
+        anderson_mixing as _solvax_anderson_mixing,
+        gmres as _solvax_gmres,
+        p_multigrid as _solvax_p_multigrid,
+        tridiagonal_solve as _solvax_tridiagonal_solve,
+    )
+except ImportError:  # pragma: no cover - exercised in minimum installs
+    _solvax_aitken_relaxation = None
+    _solvax_anderson_mixing = None
+    _solvax_gmres = None
+    _solvax_p_multigrid = None
+    _solvax_tridiagonal_solve = None
+
+
+_POTENTIAL_ADDITIVE_LINE_MIN_CELLS = 110
+_POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO = 3.0e4
+_POTENTIAL_COARSE_STRIDE = 8
+_POTENTIAL_INEXACT_COUPLING_TOLERANCE = 1.0e-4
+_POTENTIAL_COUPLING_NORMALIZED_GATE = 1.0e-5
+_LINEAR_RESIDUAL_FLOOR = 1.0e-9
+_MIN_STRICT_POTENTIAL_COUPLING_SOLVES = 3
+_POTENTIAL_FGMRES_RELATIVE_TOLERANCE = 1.0e-12
+
+
+def _coupling_potential_tolerance(
+    requested: float | None,
+    *,
+    velocity_residual: float,
+    coupling_tolerance: float,
+    flexible: bool,
+) -> float | None:
+    """Use an inexact potential solve only while the fixed point is far away."""
+    if (
+        requested is None
+        or flexible
+        or velocity_residual <= 10.0 * coupling_tolerance
+    ):
+        return requested
+    return max(float(requested), _POTENTIAL_INEXACT_COUPLING_TOLERANCE)
+
+
+def _nested_velocity_tolerance(coupling_tolerance: float, dtype) -> float:
+    """Keep the momentum solve below the fixed-point error it supports."""
+    roundoff_floor = 10.0 * float(jnp.finfo(dtype).eps)
+    requested = min(1.0e-10, 0.01 * max(float(coupling_tolerance), 0.0))
+    return max(roundoff_floor, requested)
+
+
+def _potential_y_line_preconditioner(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    anchor: tuple[int, int],
+):
+    if _solvax_tridiagonal_solve is None:
+        return None
+    line_diagonal = diagonal.at[anchor].set(1.0)
+    lower = (-west).at[anchor].set(0.0)
+    upper = (-east).at[anchor].set(0.0)
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        solved = _solvax_tridiagonal_solve(
+            lower,
+            line_diagonal,
+            upper,
+            residual.at[anchor].set(0.0),
+        )
+        return solved.at[anchor].set(0.0)
+
+    return apply
+
+
+def _potential_z_line_preconditioner(
+    diagonal: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+):
+    transposed = _potential_y_line_preconditioner(
+        diagonal.T, south.T, north.T, (anchor[1], anchor[0])
+    )
+    if transposed is None:
+        return None
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        return transposed(residual.T).T
+
+    return apply
+
+
+def _potential_additive_line_preconditioner(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+):
+    if _solvax_tridiagonal_solve is None:
+        return None
+    y_line = _potential_y_line_preconditioner(diagonal, west, east, anchor)
+    anchor_t = (anchor[1], anchor[0])
+    z_diagonal = diagonal.T.at[anchor_t].set(1.0)
+    z_lower = (-south.T).at[anchor_t].set(0.0)
+    z_upper = (-north.T).at[anchor_t].set(0.0)
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        rhs = residual.at[anchor].set(0.0)
+        solved_y = y_line(rhs)
+        solved_z = _solvax_tridiagonal_solve(
+            z_lower,
+            z_diagonal,
+            z_upper,
+            rhs.T,
+        ).T
+        return (0.5 * (solved_y + solved_z)).at[anchor].set(0.0)
+
+    return apply
+
+
+def _potential_deflated_line_preconditioner(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+    *,
+    coarse_stride: int = _POTENTIAL_COARSE_STRIDE,
+):
+    """Combine SPD line solves with an exact Galerkin coarse correction."""
+    if _solvax_p_multigrid is None or coarse_stride < 2:
+        return None
+    mean_y = float(np.asarray(jnp.mean(west + east)))
+    mean_z = float(np.asarray(jnp.mean(south + north)))
+    if mean_y >= 4.0 * max(mean_z, np.finfo(float).tiny):
+        line = _potential_y_line_preconditioner(diagonal, west, east, anchor)
+    elif mean_z >= 4.0 * max(mean_y, np.finfo(float).tiny):
+        line = _potential_z_line_preconditioner(diagonal, south, north, anchor)
+    else:
+        line = _potential_additive_line_preconditioner(
+            diagonal, west, east, south, north, anchor
+        )
+    if line is None:
+        return None
+
+    fine_shape = diagonal.shape
+    coarse_shape = tuple(
+        (size - 1 + coarse_stride - 1) // coarse_stride + 1 for size in fine_shape
+    )
+
+    def prolong(coarse: jnp.ndarray) -> jnp.ndarray:
+        fine = jax.image.resize(coarse, fine_shape, method="linear")
+        return fine.at[anchor].set(0.0)
+
+    coarse_zero = jnp.zeros(coarse_shape, dtype=diagonal.dtype)
+
+    def restrict(fine: jnp.ndarray) -> jnp.ndarray:
+        return jax.linear_transpose(prolong, coarse_zero)(fine)[0]
+
+    def fine_matvec(field: jnp.ndarray) -> jnp.ndarray:
+        return apply_poisson_operator(
+            diagonal, west, east, south, north, field, anchor
+        )
+
+    def coarse_matvec(field: jnp.ndarray) -> jnp.ndarray:
+        return restrict(fine_matvec(prolong(field)))
+
+    coarse_size = coarse_shape[0] * coarse_shape[1]
+    basis = jnp.eye(coarse_size, dtype=diagonal.dtype)
+    coarse_matrix = jax.vmap(
+        lambda column: coarse_matvec(column.reshape(coarse_shape)).reshape(-1)
+    )(basis).T
+    coarse_matrix = 0.5 * (coarse_matrix + coarse_matrix.T)
+    coarse_factors = cho_factor(coarse_matrix, lower=True)
+
+    def coarse_solve(rhs: jnp.ndarray) -> jnp.ndarray:
+        return cho_solve(coarse_factors, rhs.reshape(-1)).reshape(coarse_shape)
+
+    def no_smoothing(_matvec, iterate: jnp.ndarray, _rhs: jnp.ndarray) -> jnp.ndarray:
+        return iterate
+
+    coarse_correction = _solvax_p_multigrid(
+        (fine_matvec,),
+        (restrict,),
+        (prolong,),
+        coarse_solve,
+        smoothers=(no_smoothing,),
+    )
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        line_part = line(residual)
+        coarse_part = coarse_correction(residual - fine_matvec(line_part))
+        corrected = line_part + coarse_part - line(fine_matvec(coarse_part))
+        return corrected.at[anchor].set(0.0)
+
+    return apply
+
+
+@partial(jax.jit, static_argnames=("anchor", "preconditioner"))
+def _solve_potential_fgmres_state(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    anchor: tuple[int, int],
+    *,
+    initial: jnp.ndarray,
+    residual_scale: jnp.ndarray,
+    preconditioner: Callable[[jnp.ndarray], jnp.ndarray],
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Solve the anchored potential system with SOLVAX flexible GMRES."""
+    if _solvax_gmres is None:
+        raise ImportError("SOLVAX flexible GMRES is unavailable")
+    shape = rhs.shape
+
+    def matvec_flat(vector: jnp.ndarray) -> jnp.ndarray:
+        field = vector.reshape(shape)
+        return apply_poisson_operator(
+            diagonal, west, east, south, north, field, anchor
+        ).reshape(-1)
+
+    def precondition_flat(vector: jnp.ndarray) -> jnp.ndarray:
+        return preconditioner(vector.reshape(shape)).reshape(-1)
+
+    solution = _solvax_gmres(
+        matvec_flat,
+        rhs.at[anchor].set(0.0).reshape(-1),
+        x0=initial.at[anchor].set(0.0).reshape(-1),
+        precond=precondition_flat,
+        restart=20,
+        rtol=_POTENTIAL_FGMRES_RELATIVE_TOLERANCE,
+        max_restarts=10,
+    )
+    phi = solution.x.reshape(shape).at[anchor].set(0.0)
+    physical_residual = rhs - apply_five_point_operator(
+        diagonal, west, east, south, north, phi
+    )
+    residual = jnp.max(
+        jnp.abs(physical_residual) / jnp.maximum(residual_scale, 1.0e-30)
+    )
+    return phi, residual, solution.iterations
+
+
+def _potential_fast_diagonalization_preconditioner(
+    mesh: StructuredMesh,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+):
+    """Approximate the tensor-product Poisson inverse by fast diagonalization.
+
+    The volume-scaled uniform-conductivity operator is the generalized
+    Kronecker sum ``Ty (x) Mz + My (x) Tz``.  The mildly stretched z problem
+    is diagonalized, while every resulting y problem is solved by SOLVAX's
+    batched tridiagonal solver.  Avoiding an eigendecomposition in the strongly
+    stretched Hartmann direction is substantially more accurate; outer PCG
+    removes the remaining z-eigensolver roundoff.
+    """
+    if _solvax_tridiagonal_solve is None:
+        return None
+    dy = mesh.dy.astype(west.dtype)
+    dz = mesh.dz.astype(west.dtype)
+    west_y = jnp.mean(west / dz[None, :], axis=1)
+    east_y = jnp.mean(east / dz[None, :], axis=1)
+    south_z = jnp.mean(south / dy[:, None], axis=0)
+    north_z = jnp.mean(north / dy[:, None], axis=0)
+    operator_z = (
+        jnp.diag(south_z + north_z)
+        + jnp.diag(-north_z[:-1], 1)
+        + jnp.diag(-south_z[1:], -1)
+    )
+    inv_sqrt_dz = jax.lax.rsqrt(dz)
+    eigenvectors_z, eigenvalues_z, _ = jnp.linalg.svd(
+        inv_sqrt_dz[:, None] * operator_z * inv_sqrt_dz[None, :]
+    )
+    eigenvalues_z = eigenvalues_z[::-1]
+    eigenvectors_z = eigenvectors_z[:, ::-1]
+    modes_z = inv_sqrt_dz[:, None] * eigenvectors_z
+    line_diagonal = (
+        west_y[:, None]
+        + east_y[:, None]
+        + dy[:, None] * eigenvalues_z[None, :]
+    )
+    line_lower = jnp.broadcast_to(-west_y[:, None], line_diagonal.shape)
+    line_upper = jnp.broadcast_to(-east_y[:, None], line_diagonal.shape)
+    anchor_y = anchor[0]
+    line_diagonal = line_diagonal.at[anchor_y, 0].set(1.0)
+    line_lower = line_lower.at[anchor_y, 0].set(0.0)
+    line_upper = line_upper.at[anchor_y, 0].set(0.0)
+    if anchor_y > 0:
+        line_upper = line_upper.at[anchor_y - 1, 0].set(0.0)
+    if anchor_y + 1 < line_diagonal.shape[0]:
+        line_lower = line_lower.at[anchor_y + 1, 0].set(0.0)
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        # The anchored system replaces one redundant Poisson equation by the
+        # gauge. Restore that omitted row so the unanchored tensor operator
+        # receives a compatible (zero-sum) right-hand side.
+        compatible = residual.at[anchor].set(residual[anchor] - jnp.sum(residual))
+        transformed = compatible @ modes_z
+        transformed = transformed.at[anchor_y, 0].set(0.0)
+        solved_modes = _solvax_tridiagonal_solve(
+            line_lower, line_diagonal, line_upper, transformed
+        )
+        solved = solved_modes @ modes_z.T
+        solved = solved - solved[anchor]
+        return solved.at[anchor].set(0.0)
+
+    return apply
+
+
+def _potential_conducting_rectangle_preconditioner(
+    mesh: StructuredMesh,
+    sigma: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+):
+    """Build the tensor inverse on a contiguous uniform conducting rectangle."""
+    sigma_host = np.asarray(sigma)
+    conductive = sigma_host > 0.0
+    active_y = np.flatnonzero(np.any(conductive, axis=1))
+    active_z = np.flatnonzero(np.any(conductive, axis=0))
+    if not active_y.size or not active_z.size:
+        return None
+    if np.any(np.diff(active_y) != 1) or np.any(np.diff(active_z) != 1):
+        return None
+    y_slice = slice(int(active_y[0]), int(active_y[-1]) + 1)
+    z_slice = slice(int(active_z[0]), int(active_z[-1]) + 1)
+    rectangle = np.zeros_like(conductive)
+    rectangle[y_slice, z_slice] = True
+    positive = sigma_host[conductive]
+    if not np.array_equal(conductive, rectangle) or not np.allclose(
+        positive, positive[0], rtol=1.0e-12, atol=0.0
+    ):
+        return None
+    if not (conductive[anchor] and y_slice.start <= anchor[0] < y_slice.stop):
+        return None
+
+    submesh = generate_rect_duct_mesh_from_faces(
+        y_faces=mesh.y_faces[y_slice.start : y_slice.stop + 1],
+        z_faces=mesh.z_faces[z_slice.start : z_slice.stop + 1],
+        length=float(mesh.x_faces[-1] - mesh.x_faces[0]),
+        nx=mesh.nx,
+    )
+    subanchor = (anchor[0] - y_slice.start, anchor[1] - z_slice.start)
+    subsolve = _potential_fast_diagonalization_preconditioner(
+        submesh,
+        west[y_slice, z_slice],
+        east[y_slice, z_slice],
+        south[y_slice, z_slice],
+        north[y_slice, z_slice],
+        subanchor,
+    )
+    if subsolve is None:
+        return None
+    conductive_array = jnp.asarray(conductive)
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        # Disconnected cells carry unit equations after volume scaling.
+        solved = jnp.where(conductive_array, 0.0, residual)
+        return solved.at[y_slice, z_slice].set(subsolve(residual[y_slice, z_slice]))
+
+    return apply
+
+
+def _select_potential_preconditioner(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+):
+    diagonal_host = np.asarray(diagonal)
+    positive = diagonal_host[diagonal_host > 0.0]
+    diagonal_ratio = float(positive.max() / positive.min()) if positive.size else 1.0
+    if diagonal_ratio >= _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO:
+        deflated = _potential_deflated_line_preconditioner(
+            diagonal, west, east, south, north, anchor
+        )
+        if deflated is not None:
+            return deflated
+    if (
+        min(diagonal.shape) < _POTENTIAL_ADDITIVE_LINE_MIN_CELLS
+        and diagonal_ratio < _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO
+    ):
+        return None
+    return _potential_additive_line_preconditioner(
+        diagonal, west, east, south, north, anchor
+    )
+
+
+def _potential_preconditioner_for_materials(
+    mesh: StructuredMesh,
+    sigma: jnp.ndarray,
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    anchor: tuple[int, int],
+) -> tuple[Callable[[jnp.ndarray], jnp.ndarray] | None, bool]:
+    """Select the strongest valid potential preconditioner for the material map.
+
+    A uniform conducting rectangle may occupy only part of the storage array:
+    exact insulating cells carry disconnected unit equations after volume
+    scaling.  This is the Hunt topology, so requiring every stored cell to
+    conduct would incorrectly bypass the tensor inverse.
+    """
+    preconditioner = _potential_conducting_rectangle_preconditioner(
+        mesh, sigma, west, east, south, north, anchor
+    )
+    if preconditioner is not None:
+        return preconditioner, _solvax_gmres is not None
+
+    preconditioner = _select_potential_preconditioner(
+        diagonal, west, east, south, north, anchor
+    )
+    if preconditioner is None:
+        preconditioner = _potential_additive_line_preconditioner(
+            diagonal, west, east, south, north, anchor
+        )
+    return preconditioner, False
 
 
 def _build_mesh(case: CaseSpec) -> StructuredMesh:
@@ -74,9 +518,13 @@ def _bounded_time_step_count(*, start_time: float, dt: float, t_final: float, ma
 def _interface_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dy[:-1, None]
     right_distance = 0.5 * mesh.dy[1:, None]
-    sigma_left = jnp.maximum(sigma[:-1, :], 1e-12)
-    sigma_right = jnp.maximum(sigma[1:, :], 1e-12)
-    return 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    sigma_left = sigma[:-1, :]
+    sigma_right = sigma[1:, :]
+    connected = (sigma_left > 0.0) & (sigma_right > 0.0)
+    safe_left = jnp.where(connected, sigma_left, 1.0)
+    safe_right = jnp.where(connected, sigma_right, 1.0)
+    resistance = left_distance / safe_left + right_distance / safe_right
+    return jnp.where(connected, 1.0 / jnp.maximum(resistance, 1e-30), 0.0)
 
 
 def _face_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
@@ -89,9 +537,13 @@ def _face_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.n
 def _interface_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
     left_distance = 0.5 * mesh.dz[None, :-1]
     right_distance = 0.5 * mesh.dz[None, 1:]
-    sigma_left = jnp.maximum(sigma[:, :-1], 1e-12)
-    sigma_right = jnp.maximum(sigma[:, 1:], 1e-12)
-    return 1.0 / jnp.maximum(left_distance / sigma_left + right_distance / sigma_right, 1e-12)
+    sigma_left = sigma[:, :-1]
+    sigma_right = sigma[:, 1:]
+    connected = (sigma_left > 0.0) & (sigma_right > 0.0)
+    safe_left = jnp.where(connected, sigma_left, 1.0)
+    safe_right = jnp.where(connected, sigma_right, 1.0)
+    resistance = left_distance / safe_left + right_distance / safe_right
+    return jnp.where(connected, 1.0 / jnp.maximum(resistance, 1e-30), 0.0)
 
 
 def _face_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
@@ -281,13 +733,14 @@ def _volume_scaled_potential_system(
     rhs: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     cell_metric = _cell_metric(mesh)
+    connected = (west + east + south + north) > 0.0
     return (
-        diagonal * cell_metric,
+        jnp.where(connected, diagonal * cell_metric, 1.0),
         west * cell_metric,
         east * cell_metric,
         south * cell_metric,
         north * cell_metric,
-        rhs * cell_metric,
+        jnp.where(connected, rhs * cell_metric, 0.0),
     )
 
 
@@ -303,7 +756,11 @@ def _solve_potential(
     tolerance: float | None = None,
     relaxation: float = 1.0,
     solver: str = "jacobi",
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    initial_phi: jnp.ndarray | None = None,
+    potential_preconditioner: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
+    potential_flexible: bool = False,
+    return_solver_residual: bool = False,
+) -> tuple[jnp.ndarray, ...]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
     conv_y = _face_emf_y(mesh, sigma, uxb_y)
@@ -315,12 +772,17 @@ def _solve_potential(
         + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
     )
     cell_metric = _cell_metric(mesh).astype(rhs.dtype)
-    fluid_weight = jnp.where(fluid_mask, cell_metric, 0.0)
-    fluid_total_weight = jnp.maximum(jnp.sum(fluid_weight), 1.0e-20)
-    rhs_mean = jnp.sum(fluid_weight * rhs) / fluid_total_weight
-    rhs = jnp.where(fluid_mask, rhs - rhs_mean, rhs)
+    conductive_weight = jnp.where(sigma > 0.0, cell_metric, 0.0)
+    conductive_total_weight = jnp.maximum(jnp.sum(conductive_weight), 1.0e-20)
+    rhs_mean = jnp.sum(conductive_weight * rhs) / conductive_total_weight
+    rhs = jnp.where(sigma > 0.0, rhs - rhs_mean, 0.0)
 
     diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
+    warm_start = jnp.zeros_like(rhs) if initial_phi is None else jnp.asarray(initial_phi)
+    if warm_start.shape != rhs.shape:
+        raise ValueError("Potential initial guess must match the potential field shape")
+    use_warm_start = tolerance is not None and solver in {"cg", "cg_volume"}
+    solve_start = warm_start if use_warm_start else jnp.zeros_like(rhs)
     initial_residual = poisson_residual_norm(
         diagonal,
         west,
@@ -328,7 +790,7 @@ def _solve_potential(
         south,
         north,
         rhs,
-        jnp.zeros_like(rhs),
+        solve_start,
         anchor,
     )
     if solver == "jacobi":
@@ -344,6 +806,7 @@ def _solve_potential(
             tolerance=tolerance,
             relaxation=relaxation,
         )
+        solver_residual = residual
     elif solver == "cg":
         phi, residual, iteration_count = solve_poisson_cg_state(
             diagonal,
@@ -355,7 +818,9 @@ def _solve_potential(
             anchor,
             iterations,
             tolerance=tolerance,
+            initial=solve_start,
         )
+        solver_residual = residual
     elif solver == "cg_volume":
         diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled, rhs_scaled = _volume_scaled_potential_system(
             mesh,
@@ -366,17 +831,51 @@ def _solve_potential(
             north,
             rhs,
         )
-        phi, _, iteration_count = solve_poisson_cg_state(
-            diagonal_scaled,
-            west_scaled,
-            east_scaled,
-            south_scaled,
-            north_scaled,
-            rhs_scaled,
-            anchor,
-            iterations,
-            tolerance=tolerance,
+        selected_preconditioner = (
+            potential_preconditioner
+            if potential_preconditioner is not None
+            else _select_potential_preconditioner(
+                diagonal_scaled,
+                west_scaled,
+                east_scaled,
+                south_scaled,
+                north_scaled,
+                anchor,
+            )
         )
+        if potential_flexible and selected_preconditioner is not None:
+            phi, solver_residual, iteration_count = _solve_potential_fgmres_state(
+                diagonal_scaled,
+                west_scaled,
+                east_scaled,
+                south_scaled,
+                north_scaled,
+                rhs_scaled,
+                anchor,
+                # The tensor inverse makes a zero-start solve inexpensive and
+                # keeps the coupled fixed-point map independent of the prior
+                # potential iterate.  An inexact warm start otherwise changes
+                # the map at the residual floor and prevents strict outer
+                # convergence on high-Ha Hunt cases.
+                initial=jnp.zeros_like(solve_start),
+                residual_scale=_cell_metric(mesh),
+                preconditioner=selected_preconditioner,
+            )
+        else:
+            phi, solver_residual, iteration_count = solve_poisson_cg_state(
+                diagonal_scaled,
+                west_scaled,
+                east_scaled,
+                south_scaled,
+                north_scaled,
+                rhs_scaled,
+                anchor,
+                iterations,
+                tolerance=tolerance,
+                initial=solve_start,
+                residual_scale=_cell_metric(mesh),
+                preconditioner=selected_preconditioner,
+            )
         residual = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
     elif solver == "lineax_cg":
         phi, info = solve_poisson_lineax(
@@ -391,10 +890,14 @@ def _solve_potential(
             max_steps=iterations,
         )
         residual = jnp.asarray(info.residual, dtype=rhs.dtype)
+        solver_residual = residual
         iteration_count = jnp.asarray(info.iterations, dtype=jnp.int32)
     else:
         raise ValueError(f"Unsupported potential solver backend {solver!r}")
-    return phi, residual, iteration_count, initial_residual
+    result = (phi, residual, iteration_count, initial_residual)
+    if return_solver_residual:
+        return (*result, solver_residual)
+    return result
 
 
 def _resolve_potential_solver(solver: str, fluid_mask: jnp.ndarray | None) -> str:
@@ -535,21 +1038,20 @@ def _integral_diagnostics(
     conductivity_jump_z = jnp.abs(sigma[:, :-1] - sigma[:, 1:]) > 1e-12
     interface_mask_y = conductivity_jump_y | (fluid_mask[:-1, :] != fluid_mask[1:, :])
     interface_mask_z = conductivity_jump_z | (fluid_mask[:, :-1] != fluid_mask[:, 1:])
-    face_jy_centered = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
-    face_jz_centered = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
-    interface_residual_y = jnp.where(
-        interface_mask_y,
-        jnp.abs(face_jy - 0.5 * (face_jy_centered[:-1, :] + face_jy_centered[1:, :])),
-        0.0,
-    )
-    interface_residual_z = jnp.where(
-        interface_mask_z,
-        jnp.abs(face_jz - 0.5 * (face_jz_centered[:, :-1] + face_jz_centered[:, 1:])),
-        0.0,
-    )
-    interface_current_residual = jnp.maximum(
-        jnp.max(interface_residual_y, initial=0.0),
-        jnp.max(interface_residual_z, initial=0.0),
+    interface_cells = jnp.zeros_like(fluid_mask, dtype=bool)
+    interface_cells = interface_cells.at[:-1, :].set(interface_cells[:-1, :] | interface_mask_y)
+    interface_cells = interface_cells.at[1:, :].set(interface_cells[1:, :] | interface_mask_y)
+    interface_cells = interface_cells.at[:, :-1].set(interface_cells[:, :-1] | interface_mask_z)
+    interface_cells = interface_cells.at[:, 1:].set(interface_cells[:, 1:] | interface_mask_z)
+    # A conservative face is shared by its two neighboring cells, so comparing
+    # that face with a cell-centered average measures a physical gradient, not
+    # a continuity defect.  Instead report the finite-volume current imbalance
+    # in interface-adjacent cells, converted from A/m^3 to an A/m^2 flux scale
+    # with the local characteristic cell length.
+    local_length = jnp.sqrt(cell_metric)
+    interface_current_residual = jnp.max(
+        jnp.where(interface_cells, jnp.abs(div_current) * local_length, 0.0),
+        initial=0.0,
     )
     return (
         volumetric_flow_rate,
@@ -560,6 +1062,107 @@ def _integral_diagnostics(
         gauge_residual,
         interface_current_residual,
     )
+
+
+def fully_developed_power_balance(case: CaseSpec, solution: Solution) -> dict[str, float]:
+    """Return final per-unit-length mechanical and electrical power balances.
+
+    Pressure, Lorentz, viscous, and Joule terms are all dimensional W/m.  The
+    Joule audit reconstructs current in explicit wall cells instead of using
+    the fluid-masked state fields.
+    """
+
+    mesh = solution.mesh
+    materials = build_material_fields(case, mesh)
+    fluid_mask = materials.fluid_mask
+    metric = _cell_metric(mesh).astype(solution.state.u.dtype)
+    fluid_metric = jnp.where(fluid_mask, metric, 0.0)
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=solution.state.time)
+    face_jy, face_jz, emf_y, emf_z = _face_current_components(
+        mesh,
+        materials.conductivity,
+        fluid_mask,
+        solution.state.u,
+        solution.state.phi,
+        by,
+        bz,
+    )
+    conductance_y = _interface_conductance_y(mesh, materials.conductivity)
+    conductance_z = _interface_conductance_z(mesh, materials.conductivity)
+    face_area_y = mesh.dz[None, :]
+    face_area_z = mesh.dy[:, None]
+    joule_dissipation = jnp.sum(
+        face_area_y
+        * jnp.where(conductance_y > 0.0, face_jy**2 / jnp.maximum(conductance_y, 1.0e-30), 0.0)
+    ) + jnp.sum(
+        face_area_z
+        * jnp.where(conductance_z > 0.0, face_jz**2 / jnp.maximum(conductance_z, 1.0e-30), 0.0)
+    )
+    emf_field_y = jnp.where(
+        conductance_y > 0.0, emf_y / jnp.maximum(conductance_y, 1.0e-30), 0.0
+    )
+    emf_field_z = jnp.where(
+        conductance_z > 0.0, emf_z / jnp.maximum(conductance_z, 1.0e-30), 0.0
+    )
+    emf_power = jnp.sum(face_area_y * face_jy * emf_field_y) + jnp.sum(
+        face_area_z * face_jz * emf_field_z
+    )
+    lorentz_work = jnp.sum(fluid_metric * solution.state.lorentz_x * solution.state.u)
+    flow_rate = jnp.sum(fluid_metric * solution.state.u)
+    applied_forcing = (
+        solution.diagnostics.applied_forcing_history[-1]
+        if solution.diagnostics.applied_forcing_history.size
+        else jnp.asarray(case.forcing, dtype=solution.state.u.dtype)
+    )
+    pressure_power = applied_forcing * flow_rate
+
+    dynamic_viscosity = materials.density * materials.viscosity
+    zeros = jnp.zeros_like(dynamic_viscosity)
+    diagonal, west, east, south, north = _velocity_system_coefficients(
+        mesh,
+        dynamic_viscosity,
+        zeros,
+        fluid_mask,
+    )
+    viscous_operator_u = apply_five_point_operator(
+        diagonal * metric,
+        west * metric,
+        east * metric,
+        south * metric,
+        north * metric,
+        solution.state.u,
+    )
+    viscous_dissipation = jnp.sum(solution.state.u * viscous_operator_u)
+    electrical_residual = joule_dissipation + lorentz_work
+    network_electrical_residual = joule_dissipation - emf_power
+    lorentz_transfer_residual = lorentz_work + emf_power
+    mechanical_residual = pressure_power + lorentz_work - viscous_dissipation
+    electrical_scale = jnp.maximum(
+        jnp.maximum(jnp.abs(joule_dissipation), jnp.abs(lorentz_work)), 1.0e-30
+    )
+    mechanical_scale = jnp.maximum(
+        jnp.maximum(jnp.abs(pressure_power), jnp.abs(lorentz_work) + jnp.abs(viscous_dissipation)),
+        1.0e-30,
+    )
+    return {
+        "pressure_power": float(pressure_power),
+        "lorentz_work": float(lorentz_work),
+        "viscous_dissipation": float(viscous_dissipation),
+        "joule_dissipation": float(joule_dissipation),
+        "emf_power": float(emf_power),
+        "electrical_power_residual": float(electrical_residual),
+        "electrical_power_relative_error": float(jnp.abs(electrical_residual) / electrical_scale),
+        "network_electrical_residual": float(network_electrical_residual),
+        "network_electrical_relative_error": float(
+            jnp.abs(network_electrical_residual) / electrical_scale
+        ),
+        "lorentz_transfer_residual": float(lorentz_transfer_residual),
+        "lorentz_transfer_relative_error": float(
+            jnp.abs(lorentz_transfer_residual) / electrical_scale
+        ),
+        "mechanical_power_residual": float(mechanical_residual),
+        "mechanical_power_relative_error": float(jnp.abs(mechanical_residual) / mechanical_scale),
+    }
 
 
 def _enforce_velocity_bc(
@@ -905,6 +1508,7 @@ def _fully_developed_case_step(
     preconditioner: str,
     coupling_iterations: int,
     coupling_tolerance: float,
+    phi_previous: jnp.ndarray | None = None,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -929,6 +1533,7 @@ def _fully_developed_case_step(
     fluid_mask = materials.fluid_mask
     active_mask = fluid_mask
     u_iter = u_previous
+    phi_iter = jnp.zeros_like(u_previous) if phi_previous is None else phi_previous
     dt = case.time_stepper.dt
     fluid_weight = jnp.where(fluid_mask, _cell_metric(mesh).astype(u_previous.dtype), 0.0)
     fluid_total_weight = jnp.maximum(jnp.sum(fluid_weight), 1e-20)
@@ -941,12 +1546,65 @@ def _fully_developed_case_step(
     linear_initial_residual = jnp.asarray(0.0, dtype=u_previous.dtype)
     applied_forcing = forcing
     steady_mode = case.solver.mode == "steady"
+    potential_preconditioner = None
+    potential_flexible = False
+    if potential_solver == "cg_volume":
+        coefficients = _potential_coefficients(mesh, materials.conductivity)
+        scaled = _volume_scaled_potential_system(
+            mesh, *coefficients, jnp.zeros_like(u_previous)
+        )
+        potential_preconditioner, potential_flexible = (
+            _potential_preconditioner_for_materials(
+                mesh,
+                materials.conductivity,
+                *scaled[:5],
+                case.reference_phi_cell,
+            )
+        )
+    acceleration = case.solver.coupling_acceleration
+    if acceleration not in {"none", "aitken", "anderson"}:
+        raise ValueError(f"Unsupported coupling acceleration {acceleration!r}")
+    if (
+        case.solver.coupling_min_relaxation <= 0.0
+        or case.solver.coupling_max_relaxation < case.solver.coupling_min_relaxation
+    ):
+        raise ValueError("Coupling relaxation bounds must satisfy 0 < min <= max")
+    if acceleration == "aitken" and _solvax_aitken_relaxation is None:
+        raise ImportError(
+            "coupling_acceleration='aitken' requires the optional accelerated dependencies; "
+            "install LMX with `pip install lmx[accelerated]`"
+        )
+    if acceleration == "anderson" and _solvax_anderson_mixing is None:
+        raise ImportError(
+            "coupling_acceleration='anderson' requires the optional accelerated dependencies; "
+            "install LMX with `pip install lmx[accelerated]`"
+        )
+    if case.solver.coupling_history_depth < 1:
+        raise ValueError("Anderson coupling history depth must be positive")
+    if case.solver.coupling_regularization < 0.0:
+        raise ValueError("Anderson coupling regularization must be non-negative")
+    if not 0.0 <= case.solver.coupling_damping <= 1.0:
+        raise ValueError("Anderson coupling damping must lie in [0, 1]")
+    previous_fixed_point_residual: jnp.ndarray | None = None
+    coupling_relaxation = jnp.asarray(1.0, dtype=u_previous.dtype)
+    anderson_iterates: list[jnp.ndarray] = []
+    anderson_residuals: list[jnp.ndarray] = []
+    strict_potential_solves = 0
+    velocity_linear_tolerance = _nested_velocity_tolerance(
+        coupling_tolerance, u_previous.dtype
+    )
 
     if case.solver.time_scheme != "implicit_euler" and not steady_mode:
         raise NotImplementedError("fully_developed_inductionless currently supports implicit_euler only")
 
     for _ in range(max(1, coupling_iterations)):
-        phi, potential_residual, potential_iteration_count, potential_initial_residual = _solve_potential(
+        potential_iteration_tolerance = _coupling_potential_tolerance(
+            case.time_stepper.potential_tolerance,
+            velocity_residual=float(velocity_residual),
+            coupling_tolerance=float(coupling_tolerance),
+            flexible=potential_flexible,
+        )
+        potential_result = _solve_potential(
             mesh,
             materials.conductivity,
             fluid_mask,
@@ -955,11 +1613,39 @@ def _fully_developed_case_step(
             bz,
             case.reference_phi_cell,
             case.time_stepper.potential_iterations,
-            tolerance=case.time_stepper.potential_tolerance,
+            tolerance=potential_iteration_tolerance,
             relaxation=case.time_stepper.potential_relaxation,
             solver=potential_solver,
+            initial_phi=phi_iter,
+            potential_preconditioner=potential_preconditioner,
+            potential_flexible=potential_flexible,
+            return_solver_residual=True,
         )
+        requested_potential_tolerance = case.time_stepper.potential_tolerance
+        if (
+            requested_potential_tolerance is not None
+            and potential_iteration_tolerance is not None
+            and potential_iteration_tolerance <= requested_potential_tolerance
+        ):
+            strict_potential_solves += 1
+        if len(potential_result) == 4:  # compatibility for injected legacy backends
+            (
+                phi,
+                potential_residual,
+                potential_iteration_count,
+                potential_initial_residual,
+            ) = potential_result
+            potential_solver_residual = potential_residual
+        else:
+            (
+                phi,
+                potential_residual,
+                potential_iteration_count,
+                potential_initial_residual,
+                potential_solver_residual,
+            ) = potential_result
         phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
+        phi_iter = phi
         magnetic_reaction = jnp.where(
             active_mask,
             materials.conductivity * (by**2 + bz**2) / materials.density,
@@ -994,7 +1680,7 @@ def _fully_developed_case_step(
                 linear_solver=linear_solver,
                 preconditioner=preconditioner,
                 max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
-                tolerance=min(coupling_tolerance, 1e-10),
+                tolerance=velocity_linear_tolerance,
             )
             applied_forcing = forcing
         else:
@@ -1008,7 +1694,7 @@ def _fully_developed_case_step(
                 linear_solver=linear_solver,
                 preconditioner=preconditioner,
                 max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
-                tolerance=min(coupling_tolerance, 1e-10),
+                tolerance=velocity_linear_tolerance,
             )
             u_sensitivity, _, _, sensitivity_initial_residual = _solve_velocity_system(
                 mesh=mesh,
@@ -1019,7 +1705,7 @@ def _fully_developed_case_step(
                 linear_solver=linear_solver,
                 preconditioner=preconditioner,
                 max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
-                tolerance=min(coupling_tolerance, 1e-10),
+                tolerance=velocity_linear_tolerance,
             )
             linear_initial_residual = jnp.maximum(linear_initial_residual, sensitivity_initial_residual)
             mean_base = jnp.sum(fluid_weight * u_base) / fluid_total_weight
@@ -1045,14 +1731,69 @@ def _fully_developed_case_step(
             interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
         )
         u_next = _enforce_target_mean_velocity(u_next, mesh, fluid_mask, target_mean_velocity)
-        velocity_residual = jnp.max(jnp.abs(u_next - u_iter))
-        u_iter = u_next
-        if (
-            float(velocity_residual) <= float(coupling_tolerance)
-            and float(potential_residual) <= float(case.time_stepper.potential_tolerance or coupling_tolerance)
-            and float(linear_residual) <= float(coupling_tolerance)
-        ):
+        fixed_point_residual = u_next - u_iter
+        if acceleration == "aitken" and previous_fixed_point_residual is not None:
+            coupling_relaxation = _solvax_aitken_relaxation(
+                previous_fixed_point_residual,
+                fixed_point_residual,
+                coupling_relaxation,
+                min_relaxation=case.solver.coupling_min_relaxation,
+                max_relaxation=case.solver.coupling_max_relaxation,
+            )
+            u_next = u_iter + coupling_relaxation * fixed_point_residual
+            u_next = _enforce_velocity_bc(
+                jnp.where(fluid_mask, u_next, 0.0),
+                mesh,
+                fluid_mask,
+                interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
+            )
+            u_next = _enforce_target_mean_velocity(
+                u_next, mesh, fluid_mask, target_mean_velocity
+            )
+        elif acceleration == "anderson":
+            anderson_iterates.append(u_iter)
+            anderson_residuals.append(fixed_point_residual)
+            depth = case.solver.coupling_history_depth
+            anderson_iterates = anderson_iterates[-depth:]
+            anderson_residuals = anderson_residuals[-depth:]
+            u_next = _solvax_anderson_mixing(
+                jnp.stack(anderson_iterates),
+                jnp.stack(anderson_residuals),
+                regularization=case.solver.coupling_regularization,
+                damping=case.solver.coupling_damping,
+            )
+            u_next = _enforce_velocity_bc(
+                jnp.where(fluid_mask, u_next, 0.0),
+                mesh,
+                fluid_mask,
+                interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
+            )
+            u_next = _enforce_target_mean_velocity(
+                u_next, mesh, fluid_mask, target_mean_velocity
+            )
+        # Convergence is defined by the unrelaxed fixed-point residual at the
+        # current iterate.  If it passes, retain that certified iterate rather
+        # than returning the subsequently extrapolated Anderson/Aitken point,
+        # whose residual has not been evaluated.  Acceleration is used only to
+        # choose the next iterate when another map evaluation is required.
+        velocity_residual = jnp.max(jnp.abs(fixed_point_residual))
+        velocity_converged = float(velocity_residual) <= float(coupling_tolerance)
+        auxiliary_converged = (
+            strict_potential_solves >= _MIN_STRICT_POTENTIAL_COUPLING_SOLVES
+            and float(potential_residual) <= _POTENTIAL_COUPLING_NORMALIZED_GATE
+            and float(linear_residual)
+            <= max(float(coupling_tolerance), _LINEAR_RESIDUAL_FLOOR)
+        )
+        if velocity_converged and auxiliary_converged:
             break
+        if velocity_converged:
+            # Re-evaluate the auxiliary solves at the certified velocity until
+            # their own gates pass; do not perturb it merely to accumulate the
+            # required strict-solve evidence.
+            previous_fixed_point_residual = None
+            continue
+        previous_fixed_point_residual = fixed_point_residual
+        u_iter = u_next
 
     phi, potential_residual, potential_iteration_count, potential_initial_residual = _solve_potential(
         mesh,
@@ -1066,6 +1807,9 @@ def _fully_developed_case_step(
         tolerance=case.time_stepper.potential_tolerance,
         relaxation=case.time_stepper.potential_relaxation,
         solver=potential_solver,
+        initial_phi=phi_iter,
+        potential_preconditioner=potential_preconditioner,
+        potential_flexible=potential_flexible,
     )
     jy, jz, lorentz = _compute_current_and_lorentz(
         mesh,
@@ -1129,7 +1873,11 @@ def _solve_fully_developed(
         and not _has_uniform_spacing(mesh)
     ):
         potential_solver = "cg_volume"
-    linear_solver = "cg" if case.solver.linear_solver == "auto" else case.solver.linear_solver
+    linear_solver = (
+        "solvax_pcg"
+        if case.solver.linear_solver == "auto"
+        else case.solver.linear_solver
+    )
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError(f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}")
     interpolate_direct_fluid_walls = case.geometry.kind == "rect_duct"
@@ -1205,6 +1953,7 @@ def _solve_fully_developed(
 
     for step_index in range(steps):
         step_time = float(start_time + (step_index + 1) * dt)
+        u_before_step = u
         (
             u,
             phi,
@@ -1235,8 +1984,10 @@ def _solve_fully_developed(
             preconditioner=case.solver.preconditioner,
             coupling_iterations=step_coupling_iterations,
             coupling_tolerance=step_coupling_tolerance,
+            phi_previous=phi,
         )
-        residual_value = float(residual)
+        outer_update = float(jnp.max(jnp.abs(u - u_before_step)))
+        residual_value = max(float(residual), outer_update)
         u_max_value = float(jnp.max(jnp.abs(u)))
         courant_like = float(u_max_value * dt / jnp.min(mesh.dy))
         ohmic = float(jnp.mean(jy**2 + jz**2))
@@ -1339,10 +2090,13 @@ def _solve_fully_developed(
             potential_gate = case.time_stepper.potential_tolerance
         if potential_gate is None:
             potential_gate = case.time_stepper.steady_tolerance
+        linear_gate = max(
+            float(case.time_stepper.steady_tolerance), _LINEAR_RESIDUAL_FLOOR
+        )
         if (
             steady_mode
             and residual_value <= float(case.time_stepper.steady_tolerance)
-            and float(linear_residual) <= float(case.time_stepper.steady_tolerance)
+            and float(linear_residual) <= linear_gate
             and float(potential_residual) <= float(potential_gate)
         ):
             break

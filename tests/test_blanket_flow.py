@@ -29,7 +29,9 @@ pytestmark = pytest.mark.unit
 
 def _skip_without_magpylib_jax() -> None:
     if importlib.util.find_spec("magpylib_jax") is None:
-        pytest.skip("magpylib_jax is optional and is not installed in the bounded CI environment")
+        pytest.skip(
+            "magpylib_jax is optional and is not installed in the bounded CI environment"
+        )
 
 
 def _uniform_field(x, y, z):
@@ -37,10 +39,18 @@ def _uniform_field(x, y, z):
 
 
 def test_solve_wham_blanket_reduced_flow_pressure_budget_and_profiles():
-    geometry = WhamBlanketLoop(pipe_radius=0.08, bend_radius=0.6, entry_length=0.5, central_cell_radius=0.32)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=8, bend_points=12)
-    settings = BlanketFlowSettings(mean_velocity=0.1, field_scale=1.0, cross_section_points=21)
-    properties = LiquidMetalProperties(density=9000.0, dynamic_viscosity=2.0e-3, electrical_conductivity=8.0e5)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.08, bend_radius=0.6, entry_length=0.5, central_cell_radius=0.32
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=8, bend_points=12
+    )
+    settings = BlanketFlowSettings(
+        mean_velocity=0.1, field_scale=1.0, cross_section_points=21
+    )
+    properties = LiquidMetalProperties(
+        density=9000.0, dynamic_viscosity=2.0e-3, electrical_conductivity=8.0e5
+    )
 
     flow = solve_wham_blanket_reduced_flow(
         centerline,
@@ -61,8 +71,12 @@ def test_solve_wham_blanket_reduced_flow_pressure_budget_and_profiles():
 
 
 def test_write_wham_blanket_flow_artifacts(tmp_path: Path):
-    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=10)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=6, bend_points=10
+    )
     flow = solve_wham_blanket_reduced_flow(
         centerline,
         geometry=geometry,
@@ -82,13 +96,19 @@ def test_write_wham_blanket_flow_artifacts(tmp_path: Path):
 
 
 def test_write_wham_blanket_pressure_sweep_artifacts(tmp_path: Path):
-    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=10)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=6, bend_points=10
+    )
     flows = [
         solve_wham_blanket_reduced_flow(
             centerline,
             geometry=geometry,
-            settings=BlanketFlowSettings(mean_velocity=0.08, field_scale=scale, cross_section_points=17),
+            settings=BlanketFlowSettings(
+                mean_velocity=0.08, field_scale=scale, cross_section_points=17
+            ),
             field_sampler=_uniform_field,
         )
         for scale in (0.5, 1.0, 1.5)
@@ -99,13 +119,20 @@ def test_write_wham_blanket_pressure_sweep_artifacts(tmp_path: Path):
     assert (tmp_path / "wham_blanket_pressure_sweep.png").exists()
     assert (tmp_path / "wham_blanket_pressure_sweep_summary.json").exists()
     assert (tmp_path / "wham_blanket_pressure_sweep_data.csv").exists()
-    assert flows[-1]["metrics"]["pressure_drop_kpa"] > flows[0]["metrics"]["pressure_drop_kpa"]
+    assert (
+        flows[-1]["metrics"]["pressure_drop_kpa"]
+        > flows[0]["metrics"]["pressure_drop_kpa"]
+    )
     assert all(path.exists() for path in outputs)
 
 
 def test_solve_wham_blanket_transient_flow_reaches_bounded_steady_state(tmp_path: Path):
-    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=10)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=6, bend_points=10
+    )
     flow = solve_wham_blanket_reduced_flow(
         centerline,
         geometry=geometry,
@@ -115,14 +142,19 @@ def test_solve_wham_blanket_transient_flow_reaches_bounded_steady_state(tmp_path
 
     transient = solve_wham_blanket_transient_flow(
         flow,
-        settings=BlanketTransientFlowSettings(time_step=0.05, final_time=3.0, frame_count=4),
+        settings=BlanketTransientFlowSettings(
+            time_step=0.05, final_time=3.0, frame_count=4
+        ),
     )
     plot_outputs = write_wham_blanket_transient_flow_plots(transient, tmp_path)
     movie_outputs = write_wham_blanket_transient_flow_movie(transient, tmp_path, fps=4)
 
     assert transient["metrics"]["final_mean_velocity_m_per_s"] > 0.0
     assert transient["metrics"]["final_pressure_drop_kpa"] > 0.0
-    assert transient["metrics"]["final_bend_outboard_velocity_m_per_s"] > transient["metrics"]["final_bend_inboard_velocity_m_per_s"]
+    assert (
+        transient["metrics"]["final_bend_outboard_velocity_m_per_s"]
+        > transient["metrics"]["final_bend_inboard_velocity_m_per_s"]
+    )
     assert transient["velocity_frames"].shape[0] >= 3
     assert transient["bend_inboard_velocity_history"].shape == transient["time"].shape
     assert transient["bend_outboard_velocity_history"].shape == transient["time"].shape
@@ -156,9 +188,15 @@ def test_blanket_pressure_budget_is_differentiable():
 
 def test_wham_blanket_pressure_sensitivity_works_with_reduced_coils():
     _skip_without_magpylib_jax()
-    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=6, bend_points=8)
-    settings = BlanketFlowSettings(mean_velocity=0.08, field_scale=2.0, radial_loops=2, axial_loops=1)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=6, bend_points=8
+    )
+    settings = BlanketFlowSettings(
+        mean_velocity=0.08, field_scale=2.0, radial_loops=2, axial_loops=1
+    )
     sensitivity = wham_blanket_pressure_drop_sensitivity(
         centerline,
         geometry=geometry,

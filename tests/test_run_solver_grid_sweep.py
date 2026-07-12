@@ -48,12 +48,22 @@ def test_run_solver_grid_sweep_writes_summary(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"combined_l2_error": 0.255, "y_l2_error": 0.2, "z_l2_error": 0.3},
+        lambda solution, case_kind, ha, **kwargs: {
+            "combined_l2_error": 0.255,
+            "y_l2_error": 0.2,
+            "z_l2_error": 0.3,
+        },
     )
 
     exit_code = suite.main([])

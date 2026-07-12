@@ -22,16 +22,77 @@ the primary acceptance gate, while external solver comparisons add independent
 evidence through matched observables such as velocity, potential, current,
 Lorentz force, pressure proxy, and runtime.
 
-## Fast ship gate
+## Complete ten-minute gate
 
-The routine gate is the fast `unit` / `validation` lane:
+The required local and CI gate runs every collected package test in parallel,
+measures branch coverage over `lmx`, and fails below 95% or after ten minutes:
 
 ```bash
-python -m pytest -m 'unit or validation' -q
+uv run --locked --extra dev python scripts/run_full_test_suite.py
+```
+
+The `dev` extra is part of this full-functionality contract because it includes
+the pinned optional solver backends exercised by integration tests. Minimal
+runtime installs are covered separately, including clear failure behavior when
+an optional backend is not installed.
+
+The runner uses at most four workers, limits BLAS threads inside each worker,
+and keeps JAX preallocation disabled. Override the worker count on smaller or
+larger machines with `--workers`; the wall-clock contract remains controlled by
+`--budget-seconds`. External solvers, optional proprietary/large datasets, and
+multi-accelerator hardware cannot be made portable unit-test dependencies;
+their parsers, schemas, failure modes, and dispatch are covered here, while
+fresh solver/data/hardware comparisons remain explicit external campaigns.
+
+## Reproducible environment and provenance
+
+The committed `uv.lock` resolves runtime, development, documentation, and
+release dependencies across the supported Python range. Recreate the locked
+development environment with:
+
+```bash
+uv sync --locked --extra dev
+```
+
+Project-wide provenance is stored under `provenance/`:
+
+- `environment.json` records the dependency-lock checksum, supported Python
+  endpoints, numerical precision policy, gate budgets, and current source/test
+  inventory;
+- `features.json` maps every package module and public feature to unit,
+  numerical-verification, user-workflow tests, and an honest stability claim;
+- `benchmarks.json` records literature and FreeMHD sources, checksums, current
+  status, observables, acceptance criteria, and runtime lane;
+- `schemas/` defines the machine-readable contract for each manifest.
+
+Regenerate and verify the manifests with:
+
+```bash
+python scripts/manage_provenance.py --write
+python scripts/manage_provenance.py --check
+```
+
+The check fails on a stale dependency lock, repository inventory, local
+reference checksum, missing test node, missing workflow, unmapped package
+module, unknown benchmark source, or schema violation. CI runs the check before
+the complete test gate. Locally held literature PDFs can also be verified
+without copying them into Git:
+
+```bash
+python scripts/manage_provenance.py --check \
+  --external-literature-root /path/to/literature
+```
+
+## Focused development gate
+
+During iteration, run the relevant marker or file subset:
+
+```bash
+python -m pytest -m unit -q
 python -m sphinx -W -b html docs docs/_build/html
 ```
 
-This lane is intentionally kept below five minutes. It covers:
+The complete gate must still be run before merge. Focused checks cover:
 
 - configuration parsing
 - CLI dispatch
@@ -112,10 +173,11 @@ the selected public artifacts:
 python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
 ```
 
-The README/docs media inventory is documented in `docs/media.md` and enforced
-through `docs/_static/generated/readme_media_manifest.json`. Large landing-page
-GIFs stay as GitHub release assets; compact posters, figures, CSV summaries,
-and the WHAM blanket flow GIF stay in the repository.
+The README/docs media inventory is documented in `docs/media.md`. Generated
+files above 128 KiB live in the checksummed `lmx-research-assets-v1` GitHub
+release and are governed by `provenance/release-assets.json`; the portable suite
+verifies manifest drift and deterministic archive construction. Smaller compact
+observables may remain in Git when they are needed by tests or offline docs.
 
 That report separates hard release blockers from deferred research lanes. The
 current bounded `1.0` gate requires package metadata, workflow scaffolding,
@@ -322,7 +384,7 @@ verification/validation practice, not only to internal regression history.
   - the current multi-mode Q2D decay movie adds monotone energy/enstrophy,
     high-wavenumber damping, and spectral-centroid checks, while still keeping
     nonlinear turbulent parity explicitly open
-  - `examples/q2d_turbulence_external_reference_template.py` now writes the
+  - `campaigns/q2d/q2d_turbulence_external_reference_template.py` now writes the
     observable CSV contract used by the movie example when matched turbulent
     reference data are available
 - [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
@@ -336,7 +398,7 @@ verification/validation practice, not only to internal regression history.
 - [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)
   - supports the broader validation roadmap for curved ducts, magnetic
     obstacles, and higher-inertia 3D cases
-  - `examples/dean_vortex_external_reference_template.py` now writes the
+  - `campaigns/fringing/dean_vortex_external_reference_template.py` now writes the
     scalar-observable CSV contract for future higher-inertia curved-pipe or
     curved-duct Dean-vortex validation
 - [A research framework for writing differentiable PDE discretizations in JAX](https://arxiv.org/abs/2111.05218)
@@ -371,21 +433,21 @@ available for documentation and later manuscript figures.
 The first explicit examples following this pattern are:
 - `examples/operator_verification_demo.py` for smooth-grid manufactured
   operator convergence
-- `examples/operator_clustered_verification_demo.py` for clustered
+- `campaigns/tutorials/operator_clustered_verification_demo.py` for clustered
   boundary-layer operator convergence
-- `examples/interface_conductivity_verification_demo.py` for aligned
+- `campaigns/interfaces/interface_conductivity_verification_demo.py` for aligned
   coefficient-jump verification
-- `examples/straight_duct_profile_comparison.py` for the Hartmann /
+- `campaigns/ducts/straight_duct_profile_comparison.py` for the Hartmann /
   Shercliff / Hunt literature-facing straight-duct panel, including no-slip
   wall reconstruction when comparing cell-centered profiles against the
   analytical wall-to-wall curves; the current release target is
   `L2 <= 1.2e-2` on the retained cuts, and the current bounded
   `45 × 45` Shercliff / `49 × 49` Hunt wall-model artifact meets it from zero
   initial conditions
-- `examples/hartmann_validation_ladder.py` for the bounded Hartmann multi-`Ha`
+- `campaigns/ducts/hartmann_validation_ladder.py` for the bounded Hartmann multi-`Ha`
   literature ladder, with the same stable summary-JSON pattern used by the
   manuscript-facing straight-duct figures
-- `examples/straight_duct_validation_ladder.py` for the bounded Shercliff /
+- `campaigns/ducts/straight_duct_validation_ladder.py` for the bounded Shercliff /
   Hunt multi-Ha literature ladder
-- `examples/freemhd_closed_channel_parity.py` for fresh LMX versus FreeMHD
+- `campaigns/freemhd/freemhd_closed_channel_parity.py` for fresh LMX versus FreeMHD
   transient straight-duct parity and runtime comparison on the same host

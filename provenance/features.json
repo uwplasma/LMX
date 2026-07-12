@@ -1,0 +1,359 @@
+{
+  "features": [
+    {
+      "claim": "Users can construct, parse, dispatch, and run supported cases through TOML, Python, and the command line.",
+      "id": "case-config-cli",
+      "modules": [
+        "lmx/__init__.py",
+        "lmx/__main__.py",
+        "lmx/specs.py",
+        "lmx/core.py",
+        "lmx/cases.py",
+        "lmx/config.py",
+        "lmx/cli.py",
+        "lmx/example_runner.py",
+        "lmx/runtime_logging.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_config.py::test_load_run_config_reads_complete_toml"
+        ],
+        "verification": [
+          "tests/test_config.py::test_shipped_example_toml_files_parse"
+        ],
+        "workflow": [
+          "tests/test_cli.py::test_cli_dispatches_direct_toml_run"
+        ]
+      },
+      "title": "Case specifications, TOML configuration, Python API, and CLI",
+      "workflows": [
+        "examples/hartmann_case.toml"
+      ]
+    },
+    {
+      "claim": "Bounded Hartmann, Shercliff, and Hunt duct cases are executable and analytically checked; the 1% FreeMHD parity gate remains open.",
+      "id": "fully-developed-ducts",
+      "modules": [
+        "lmx/_solvers.py",
+        "lmx/solvers.py",
+        "lmx/physics.py",
+        "lmx/_validation.py",
+        "lmx/validation.py",
+        "lmx/mesh.py",
+        "lmx/operators.py",
+        "lmx/linear.py",
+        "lmx/centerline_fields.py",
+        "lmx/jax_setup.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_solver.py::test_hartmann_solver_runs"
+        ],
+        "verification": [
+          "tests/test_operators.py::test_gradient_observed_order_for_smooth_manufactured_solution",
+          "tests/test_physics.py::test_small_hartmann_solution_matches_analytic_profile"
+        ],
+        "workflow": [
+          "tests/test_example_runner.py::test_hartmann_validation_ladder_writes_summary"
+        ]
+      },
+      "title": "Fully developed inductionless duct solver",
+      "workflows": [
+        "campaigns/ducts/hartmann_validation_ladder.py"
+      ]
+    },
+    {
+      "claim": "Supported imposed-field representations are parsed, sampled, and checked for reconstruction or discrete divergence.",
+      "id": "imposed-fields",
+      "modules": [
+        "lmx/field_models.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_field_models.py::test_tabulated_field_npz_round_trip_and_sampling"
+        ],
+        "verification": [
+          "tests/test_field_models.py::test_divergence_free_cross_section_field_has_small_discrete_divergence"
+        ],
+        "workflow": [
+          "tests/test_example_runner.py::test_variable_field_validation_writes_summary"
+        ]
+      },
+      "title": "Uniform, analytic, divergence-free, and tabulated imposed fields",
+      "workflows": [
+        "campaigns/fields/variable_field_validation.py"
+      ]
+    },
+    {
+      "claim": "Electrical wall representations and nondimensional conversions pass limiting-case and equivalent-stack checks in the fully developed envelope.",
+      "id": "wall-models",
+      "modules": [
+        "lmx/units.py",
+        "lmx/wall_models.py",
+        "lmx/wall_study.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_units_and_wall_models.py::test_thin_wall_and_normal_leakage_ratios_are_distinct"
+        ],
+        "verification": [
+          "tests/test_units_and_wall_models.py::test_nested_wall_stack_reduces_to_equivalent_single_layer_for_tangential_conduction"
+        ],
+        "workflow": [
+          "tests/test_wall_study.py::test_write_li_aln_phase0_2_artifacts"
+        ]
+      },
+      "title": "Insulating, conducting, thin-wall, multilayer, and degraded wall models",
+      "workflows": [
+        "campaigns/walls/li_aln_wall_stack_phase0_2.py"
+      ]
+    },
+    {
+      "claim": "Fully developed and extruded solutions round-trip through documented restart and compact output formats.",
+      "id": "restart-and-output",
+      "modules": [
+        "lmx/io.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_io.py::test_write_solution_npz"
+        ],
+        "verification": [
+          "tests/test_solver.py::test_transient_restart_matches_direct_run"
+        ],
+        "workflow": [
+          "tests/test_cli.py::test_run_config_uses_restart_bundle_and_writes_restart_output"
+        ]
+      },
+      "title": "Restart, structured outputs, and field export",
+      "workflows": [
+        "cases/ducts/hartmann_restart_case.toml"
+      ]
+    },
+    {
+      "claim": "Plot and publication helpers produce deterministic documented artifact sets without entering solver kernels.",
+      "id": "visualization-publication",
+      "modules": [
+        "lmx/_plotting.py",
+        "lmx/plotting.py",
+        "lmx/publication.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_plotting.py::test_plot_field_handles_negative_only_field"
+        ],
+        "verification": [
+          "tests/test_publication.py::test_publication_figure_rows_collect_metrics"
+        ],
+        "workflow": [
+          "tests/test_publication.py::test_write_publication_figure_manifest"
+        ]
+      },
+      "title": "Visualization and publication artifact contracts",
+      "workflows": [
+        "campaigns/tutorials/plotting_api_demo.py"
+      ]
+    },
+    {
+      "claim": "Rectangular, layered, mapped-pipe, and bent slices pass bounded internal checks; experimental Benchmark-B validation is open.",
+      "id": "extruded-fringing",
+      "modules": [
+        "lmx/_fringing.py",
+        "lmx/_fringing_types.py",
+        "lmx/fringing.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_fringing.py::test_build_square_duct_extruded_problem_marks_solver_family"
+        ],
+        "verification": [
+          "tests/test_fringing.py::test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle"
+        ],
+        "workflow": [
+          "tests/test_example_runner.py::test_fringing_benchmark_demo_writes_extruded_bundle_summary"
+        ]
+      },
+      "title": "Extruded three-dimensional fringing-field solver",
+      "workflows": [
+        "examples/fringing_benchmark_demo.py"
+      ]
+    },
+    {
+      "claim": "Selected smooth Hartmann and extruded responses differentiate; the full implicit primal/transpose contract remains open.",
+      "id": "differentiation",
+      "modules": [
+        "lmx/_autodiff.py",
+        "lmx/autodiff.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_autodiff.py::test_hartmann_mean_velocity_is_differentiable"
+        ],
+        "verification": [
+          "tests/test_autodiff.py::test_mean_velocity_gradients_match_finite_difference"
+        ],
+        "workflow": [
+          "tests/test_example_runner.py::test_autodiff_profile_design_demo_writes_summary"
+        ]
+      },
+      "title": "Differentiable observables and inverse-design workflows",
+      "workflows": [
+        "campaigns/autodiff/autodiff_profile_design_demo.py"
+      ]
+    },
+    {
+      "claim": "External formats, case inference, and comparison reports are tested; fresh solver/data evidence remains a separate lane.",
+      "id": "external-reference-adapters",
+      "modules": [
+        "lmx/freemhd.py",
+        "lmx/reference_data.py",
+        "lmx/external_validation.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_freemhd.py::test_freemhd_inference_helpers_recover_geometry_materials_and_b0"
+        ],
+        "verification": [
+          "tests/test_freemhd.py::test_observable_ladder_summary_ranks_mesh_and_offender_progress"
+        ],
+        "workflow": [
+          "tests/test_example_runner.py::test_freemhd_closed_channel_observable_parity_writes_summary"
+        ]
+      },
+      "title": "FreeMHD and external-reference ingestion and comparison",
+      "workflows": [
+        "examples/freemhd_closed_channel_observable_parity.py"
+      ]
+    },
+    {
+      "claim": "Analytical decay and bounded forcing checks pass; turbulent Benchmark-C parity is not validated.",
+      "id": "q2d-reduced-models",
+      "modules": [
+        "lmx/q2d.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_q2d.py::test_q2d_energy_spectrum_identifies_single_mode"
+        ],
+        "verification": [
+          "tests/test_q2d.py::test_q2d_decay_validation_passes_on_baseline_case"
+        ],
+        "workflow": [
+          "tests/test_example_runner.py::test_q2d_decay_validation_writes_summary"
+        ]
+      },
+      "title": "Reduced quasi-two-dimensional MHD models",
+      "workflows": [
+        "campaigns/q2d/q2d_decay_validation.py"
+      ]
+    },
+    {
+      "claim": "The reduced correlation and artifact path are checked; higher-inertia three-dimensional validation is open.",
+      "id": "dean-reduced-model",
+      "modules": [
+        "lmx/dean.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_dean.py::test_bayat_rezai_dean_velocity_correlation_matches_dimensionless_form"
+        ],
+        "verification": [
+          "tests/test_dean.py::test_dean_secondary_flow_field_is_scaled_and_finite"
+        ],
+        "workflow": [
+          "tests/test_dean.py::test_dean_literature_validation_rows_and_plots"
+        ]
+      },
+      "title": "Reduced Dean-flow correlation and reporting",
+      "workflows": [
+        "campaigns/fringing/dean_literature_validation.py"
+      ]
+    },
+    {
+      "claim": "Geometry, reduced pressure budgets, and sensitivities are bounded demonstrations rather than coupled blanket validation.",
+      "id": "blanket-reduced-flow",
+      "modules": [
+        "lmx/blanket_flow.py",
+        "lmx/blanket_geometry.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_blanket_geometry.py::test_wham_blanket_centerline_has_clearance_and_monotone_station"
+        ],
+        "verification": [
+          "tests/test_blanket_flow.py::test_solve_wham_blanket_reduced_flow_pressure_budget_and_profiles"
+        ],
+        "workflow": [
+          "tests/test_blanket_flow.py::test_write_wham_blanket_flow_artifacts"
+        ]
+      },
+      "title": "WHAM blanket geometry and reduced pressure-flow model",
+      "workflows": [
+        "campaigns/blanket/wham_blanket_flow_demo.py"
+      ]
+    },
+    {
+      "claim": "Benchmark and sharding harnesses execute; solver-faithful CPU/GPU strong-scaling evidence is open.",
+      "id": "performance-scaling",
+      "modules": [
+        "lmx/benchmarks.py",
+        "lmx/scaling.py"
+      ],
+      "status": "research",
+      "tests": {
+        "unit": [
+          "tests/test_benchmarks.py::test_benchmark_solver_returns_positive_timings"
+        ],
+        "verification": [
+          "tests/test_scaling.py::test_benchmark_extruded_inductionless_solve_records_solver_path"
+        ],
+        "workflow": [
+          "tests/test_scaling.py::test_strong_scaling_summary_table_computes_solver_diagnostics"
+        ]
+      },
+      "title": "Runtime benchmarking and JAX sharding experiments",
+      "workflows": [
+        "examples/strong_scaling_demo.py"
+      ]
+    },
+    {
+      "claim": "Generated status artifacts preserve open and deferred research claims instead of promoting demonstrations silently.",
+      "id": "research-status-reporting",
+      "modules": [
+        "lmx/research_blockers.py",
+        "lmx/research_closure.py",
+        "lmx/research_figures.py",
+        "lmx/showcase.py"
+      ],
+      "status": "stable",
+      "tests": {
+        "unit": [
+          "tests/test_research_closure.py::test_research_grade_closure_status_tracks_open_lanes"
+        ],
+        "verification": [
+          "tests/test_research_blockers.py::test_strict_blocker_closure_attempt_keeps_strict_lanes_open"
+        ],
+        "workflow": [
+          "tests/test_research_figures.py::test_research_grade_closure_dashboard_writes_media_and_summary"
+        ]
+      },
+      "title": "Research-claim status, blocker, and showcase reporting",
+      "workflows": [
+        "campaigns/status/research_grade_closure_dashboard.py"
+      ]
+    }
+  ],
+  "schema_version": 1
+}

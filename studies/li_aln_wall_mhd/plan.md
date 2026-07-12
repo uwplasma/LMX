@@ -777,16 +777,16 @@ The work should proceed in phases. Do not run the full production matrix before 
 Current implementation status:
 
 - Phases 0-2 have an executable reduced artifact in
-  `examples/li_aln_wall_stack_phase0_2.py`.
+  `campaigns/walls/li_aln_wall_stack_phase0_2.py`.
 - Phases 3-6 now have a bounded reduced artifact in
-  `examples/li_aln_wall_stack_phase3_6.py`, covering the operating matrix,
+  `campaigns/walls/li_aln_wall_stack_phase3_6.py`, covering the operating matrix,
   AlN degradation thresholds, pinhole limits, and substrate-conductivity
   comparisons.
 - The true `fluid | AlN | metal` multilayer rectangular mesh now has an
-  executable geometry gate in `examples/li_aln_multilayer_mesh_qa.py`, with
+  executable geometry gate in `campaigns/walls/li_aln_multilayer_mesh_qa.py`, with
   aligned interfaces, region IDs, and explicit conductivity fields.
 - Solved multilayer limiting cases now have an internal gate in
-  `examples/li_aln_multilayer_solve.py`. The gate runs ideal-insulator,
+  `campaigns/walls/li_aln_multilayer_solve.py`. The gate runs ideal-insulator,
   intact-AlN, degraded-AlN, and bare-metal electrical wall models on the
   explicit finite-volume mesh and records pressure proxy, current magnitude,
   dimensional charge residuals for audit, normalized charge balance, normalized
@@ -794,7 +794,7 @@ Current implementation status:
 - External-code limiting-case comparisons and heavier high-Hartmann-number
   mesh ladders remain the next high-fidelity solver-extension lane.
 - The representative solved mesh ladder is implemented in
-  `examples/li_aln_multilayer_convergence.py` for intact-AlN and bare-metal
+  `campaigns/walls/li_aln_multilayer_convergence.py` for intact-AlN and bare-metal
   electrical wall limits. It records pressure/current convergence to the
   finest retained mesh and normalized current-closure diagnostics. A matching
   FreeMHD/OpenFOAM limiting-case comparison remains separate.

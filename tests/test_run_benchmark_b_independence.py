@@ -1,0 +1,128 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts import run_benchmark_b_independence as campaign
+
+
+pytestmark = pytest.mark.unit
+
+
+def test_variant_problem_applies_only_frozen_solver_control_changes():
+    baseline = campaign._variant_problem("B1-fringing-pipe", "coarse", "baseline")
+    tight = campaign._variant_problem("B1-fringing-pipe", "coarse", "tight_tolerance")
+    extended = campaign._variant_problem(
+        "B1-fringing-pipe", "coarse", "extended_iterations"
+    )
+    thin = campaign._variant_problem("B1-fringing-pipe", "coarse", "thin_wall")
+
+    assert tight.case.solver.coupling_tolerance == pytest.approx(
+        0.5 * baseline.case.solver.coupling_tolerance
+    )
+    assert (
+        tight.case.time_stepper.potential_iterations
+        == 2 * baseline.case.time_stepper.potential_iterations
+    )
+    assert (
+        extended.case.solver.coupling_iterations
+        == 2 * baseline.case.solver.coupling_iterations
+    )
+    assert (
+        extended.case.time_stepper.max_steps == 2 * baseline.case.time_stepper.max_steps
+    )
+    assert thin.case.geometry.wall_thickness[0] == pytest.approx(
+        0.5 * baseline.case.geometry.wall_thickness[0]
+    )
+    baseline_conductivity = baseline.case.regions[1].conductivity
+    thin_conductivity = thin.case.regions[1].conductivity
+    assert thin_conductivity == pytest.approx(2.0 * baseline_conductivity)
+
+    with pytest.raises(ValueError, match="Unsupported independence variant"):
+        campaign._variant_problem("B1-fringing-pipe", "coarse", "unknown")
+
+
+def _record(observable, *, residual=1.0e-9):
+    return {
+        "primary_observable": observable,
+        "diagnostics": {
+            "max_residual": residual,
+            "max_divergence_residual": 1.0e-5,
+            "max_charge_balance_residual": 1.0e-5,
+            "volumetric_flow_rate_span": 1.0e-5,
+            "max_wall_current_leakage": 0.0,
+            "net_boundary_current_residual": 0.0,
+        },
+    }
+
+
+def test_comparison_applies_uncertainty_and_thin_wall_gates():
+    records = {
+        "baseline": _record([0.1, 0.2, 0.1]),
+        "tight_tolerance": _record([0.1001, 0.2001, 0.1001]),
+        "extended_iterations": _record([0.1001, 0.1999, 0.1001]),
+        "thin_wall": _record([0.1001, 0.2001, 0.1001]),
+    }
+    comparison = campaign._comparison("B2-fringing-square", records)
+    assert comparison["complete"] is True
+    assert comparison["pass"] is True
+    assert all(comparison["gates"].values())
+
+    records["baseline"] = _record([0.1, 0.2, 0.1], residual=1.0)
+    failed = campaign._comparison("B2-fringing-square", records)
+    assert failed["pass"] is False
+    assert failed["gates"]["steady_residual"] is False
+
+    records["baseline"] = _record([0.1, 0.2, 0.1])
+    records["baseline"]["diagnostics"]["max_divergence_residual"] = 1.0
+    failed = campaign._comparison("B2-fringing-square", records)
+    assert failed["pass"] is False
+    assert failed["gates"]["mass_balance"] is False
+
+    incomplete = campaign._comparison(
+        "B2-fringing-square", {"baseline": records["baseline"]}
+    )
+    assert incomplete["complete"] is False
+    assert "thin_wall" in incomplete["missing_variants"]
+
+
+def test_dry_run_writes_deterministic_campaign_plan(tmp_path: Path):
+    output = tmp_path / "campaign"
+    exit_code = campaign.main(
+        [
+            "--output",
+            str(output),
+            "--cases",
+            "B1-fringing-pipe",
+            "--variants",
+            "baseline",
+            "--dry-run",
+        ]
+    )
+    payload = json.loads((output / "benchmark-b-independence.json").read_text())
+    assert exit_code == 0
+    assert payload["pass"] is False
+    assert payload["cases"] == [
+        {"case_id": "B1-fringing-pipe", "complete": False, "dry_run": True}
+    ]
+
+
+def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
+    output = tmp_path / "campaign"
+    checkpoint = output / "runs" / "B1-fringing-pipe-coarse-baseline.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(json.dumps({"source_fingerprint": "stale"}))
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        campaign.main(
+            [
+                "--output",
+                str(output),
+                "--cases",
+                "B1-fringing-pipe",
+                "--variants",
+                "baseline",
+                "--resume",
+            ]
+        )

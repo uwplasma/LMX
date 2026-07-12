@@ -1,0 +1,72 @@
+schema_version = 1
+id = "A2-hunt-ha20"
+case_kind = "hunt"
+title = "Matched Hunt closed-channel case at Ha=20 and c=0.05"
+
+[reference]
+kind = "FreeMHD processed closed-channel slice plus analytical solution"
+freemhd_commit = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
+processed_slice_pattern = "hunt_exactBL_Ha20_XSlice1m_*.csv"
+analytical_pattern = "Hunt_Analytical_Ha20_db0.05_PresDrop514.2123.txt"
+x_slice = 1.0
+
+[geometry]
+kind = "rectangular_layered_duct"
+width = 0.2
+height = 0.2
+length_scale = 0.1
+wall_thickness = 0.001
+wall_cells = 2
+
+[fluid]
+conductivity = 1.0e6
+density = 1.0e3
+dynamic_viscosity = 1.0
+kinematic_viscosity = 1.0e-3
+
+[magnetic_field]
+kind = "uniform"
+vector = [0.0, 0.2, 0.0]
+hartmann_number = 20.0
+
+[wall]
+model = "conducting_hartmann_insulating_side"
+conducting_sides = ["left", "right"]
+insulating_sides = ["top", "bottom"]
+conducting_wall_conductivity = 5.0e6
+insulating_wall_conductivity = 1.0e-6
+conductance_ratio = 0.05
+
+[drive]
+mode = "inlet_flow_rate"
+target_flow_rate = 0.004696504797325868
+reference_mean_velocity = 0.1174126199331467
+reference_pressure_gradient = 514.2123
+sign_convention = "positive flow and pressure-gradient magnitudes drive positive axial velocity"
+
+[mesh]
+family = "field_aware_structured_cross_section_with_explicit_walls"
+levels = [[37, 29], [49, 37], [65, 49], [85, 63]]
+refinement_ratio_policy = "approximately constant h ratio with h=1/sqrt(ny*nz)"
+minimum_hartmann_layer_cells = 5
+minimum_side_layer_cells = 5
+
+[sampling]
+coordinate_scale = "fluid_half_width"
+x_station = 1.0
+cuts = ["y_midplane", "z_midplane"]
+interpolation = "linear_to_reference_coordinates"
+
+[normalization]
+velocity = "divide both codes by reference_mean_velocity"
+potential = "subtract each area mean, then divide both by reference_mean_velocity*B*length_scale"
+current = "divide both by fluid_conductivity*reference_mean_velocity*B"
+lorentz = "divide both by fluid_conductivity*reference_mean_velocity*B^2"
+per_profile_peak_fitting = false
+
+[acceptance]
+profile_l2_max = 0.01
+pressure_gradient_relative_max = 0.01
+side_jet_location_relative_max = 0.01
+minimum_mesh_levels = 3
+balance_error_fraction_of_observable_tolerance = 0.1

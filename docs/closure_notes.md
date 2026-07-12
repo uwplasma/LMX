@@ -70,7 +70,7 @@ $(x,r,\theta)$ coordinates.
 
 | Lane | Current status | Acceptance evidence |
 | --- | --- | --- |
-| Hartmann/Shercliff/Hunt reader-facing profiles | Closed for bounded release | `docs/_static/generated/analytic_velocity_profiles.png`; all retained cuts are below `L2 <= 1.2e-2` |
+| Hartmann/Shercliff/Hunt reader-facing profiles | Closed for bounded release | `https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/analytic_velocity_profiles.png`; all retained cuts are below `L2 <= 1.2e-2` |
 | Hunt `Ha = 100` side-layer analytical cut | Closed for the public ladder | `docs/_static/generated/straight_duct_validation_ladder_summary.json`; Hunt `Ha=100` has `y_l2 = 4.42e-3`, `z_l2 = 2.89e-3` |
 | Dense rectangular internal fringing slice | Closed as an internal conservation/response gate | `benchmark_b_quantitative_summary.png`; charge and throughput metrics are inside the documented bounded thresholds |
 | Dense layered internal fringing slice | Closed with mirror-aware observables | Odd/even axial-current and pressure-span residuals replace misleading raw spans |
@@ -308,9 +308,9 @@ reference data, and higher-inertia Dean-vortex validation remain deferred.
 Regenerate the main artifacts discussed here:
 
 ```bash
-python examples/straight_duct_profile_comparison.py
-python examples/straight_duct_validation_ladder.py
-python examples/bent_pipe_inductionless_demo.py
+python campaigns/ducts/straight_duct_profile_comparison.py
+python campaigns/ducts/straight_duct_validation_ladder.py
+python campaigns/fringing/bent_pipe_inductionless_demo.py
 ```
 
 Copy regenerated artifacts into the docs static directory if the examples are

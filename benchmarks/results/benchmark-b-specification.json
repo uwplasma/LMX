@@ -1,0 +1,92 @@
+{
+  "benchmark": "B: ALEX 3D laminar fringing-field validation",
+  "cases": [
+    {
+      "combined_uncertainty_absolute": 0.002,
+      "data_path": "benchmarks/references/alex-b1-pipe.csv",
+      "data_sha256": "a687df23973852f32a8c0e9f88fcc0df1725cb518f3fb908ed507f604865cc0d",
+      "id": "B1-fringing-pipe",
+      "mesh_levels": [
+        "coarse",
+        "medium",
+        "fine"
+      ],
+      "numerical_independence": {
+        "coupling_acceleration": "anderson",
+        "coupling_history_depth": 16,
+        "electric_iterations_min": 4000,
+        "electric_tolerance_max": 1e-12,
+        "iteration_factor": 2.0,
+        "iteration_uncertainty_fraction_max": 0.25,
+        "projection_iterations_min": 4000,
+        "projection_tolerance_max": 1e-12,
+        "steady_residual_max": 5e-05,
+        "steady_residual_uncertainty_fraction_max": 0.05,
+        "thin_wall_relative_max": 0.02,
+        "tolerance_factor": 0.5,
+        "tolerance_uncertainty_fraction_max": 0.25
+      },
+      "parameters": {
+        "hartmann_number": 6600.0,
+        "interaction_parameter": 10700.0,
+        "wall_conductance_ratio": 0.027
+      },
+      "primary_observable": "excess axial pressure gradient",
+      "reference_row_count": 16,
+      "source_ids": [
+        "smolentsev-vv",
+        "alex-results-1987"
+      ],
+      "spec_path": "benchmarks/specs/alex-b1-pipe.toml",
+      "spec_sha256": "171e92358389f9590eaef22c9638eb80fd1b17bdbaec1ab86871ef37cdfe2f0e",
+      "tolerances_frozen_before_production": true
+    },
+    {
+      "combined_uncertainty_absolute": 0.004,
+      "data_path": "benchmarks/references/alex-b2-square.csv",
+      "data_sha256": "6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483",
+      "id": "B2-fringing-square",
+      "mesh_levels": [
+        "coarse",
+        "medium",
+        "fine"
+      ],
+      "numerical_independence": {
+        "coupling_acceleration": "anderson",
+        "coupling_history_depth": 16,
+        "electric_iterations_min": 600,
+        "electric_tolerance_max": 1e-12,
+        "iteration_factor": 2.0,
+        "iteration_uncertainty_fraction_max": 0.25,
+        "projection_iterations_min": 4000,
+        "projection_tolerance_max": 1e-12,
+        "steady_residual_max": 5e-05,
+        "steady_residual_uncertainty_fraction_max": 0.05,
+        "thin_wall_relative_max": 0.02,
+        "tolerance_factor": 0.5,
+        "tolerance_uncertainty_fraction_max": 0.25
+      },
+      "parameters": {
+        "hartmann_number": 2900.0,
+        "interaction_parameter": 540.0,
+        "wall_conductance_ratio": 0.07
+      },
+      "primary_observable": "excess transverse pressure difference between published A/B taps",
+      "reference_row_count": 18,
+      "source_ids": [
+        "smolentsev-vv",
+        "alex-results-1987"
+      ],
+      "spec_path": "benchmarks/specs/alex-b2-square.toml",
+      "spec_sha256": "616d0681b9fb998549c94f219216325a6bc39af069a28b88a66aba63a68f992e",
+      "tolerances_frozen_before_production": true
+    }
+  ],
+  "production_blockers": [
+    "Pass steady/tolerance and nominal-versus-confirmation thin-wall independence for both frozen builders.",
+    "Run three meshes and one exactly matched FreeMHD case before accepting Benchmark B."
+  ],
+  "production_results_included": false,
+  "schema_version": 1,
+  "specification_freeze_pass": true
+}

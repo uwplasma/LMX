@@ -9,7 +9,9 @@ from scripts import run_benchmark_suite as suite
 pytestmark = pytest.mark.unit
 
 
-def test_run_benchmark_suite_writes_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+def test_run_benchmark_suite_writes_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
     output = tmp_path / "artifacts" / "benchmark.json"
     recorded: dict[str, object] = {}
 
@@ -29,7 +31,11 @@ def test_run_benchmark_suite_writes_report(tmp_path: Path, monkeypatch: pytest.M
             "repeats": float(repeats),
         },
     )
-    monkeypatch.setattr(suite, "write_benchmark_report", lambda payload, path: recorded.update(payload=payload, path=path) or Path(path))
+    monkeypatch.setattr(
+        suite,
+        "write_benchmark_report",
+        lambda payload, path: recorded.update(payload=payload, path=path) or Path(path),
+    )
 
     exit_code = suite.main()
 

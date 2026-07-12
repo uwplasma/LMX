@@ -93,7 +93,7 @@ comparison cases.
 The first Li/AlN wall-stack lane is executable through:
 
 ```bash
-python examples/li_aln_wall_stack_phase0_2.py
+python campaigns/walls/li_aln_wall_stack_phase0_2.py
 ```
 
 The example writes a unit audit, nested-wall mesh QA, conductance/pinhole CSV
@@ -101,7 +101,7 @@ tables, and a report-ready figure under
 `studies/li_aln_wall_mhd/results/processed/phase0_2`. It also copies the public
 figure and summary into `docs/_static/generated`.
 
-![Li/AlN wall-stack Phase 0-2 reduced study](_static/generated/li_aln_wall_stack_phase0_2.png)
+![Li/AlN wall-stack Phase 0-2 reduced study](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/li_aln_wall_stack_phase0_2.png)
 
 The default case records liquid-lithium `mu`, `rho`, computed `nu`, `Ha`, `Re`,
 `N`, and `Rm`, and it uses an inductionless velocity scale with
@@ -127,7 +127,7 @@ The Phase 0-2 acceptance gates are:
 The bounded Phase 3-6 lane is executable through:
 
 ```bash
-python examples/li_aln_wall_stack_phase3_6.py
+python campaigns/walls/li_aln_wall_stack_phase3_6.py
 ```
 
 It writes an operating matrix over magnetic field and velocity, substrate
@@ -138,7 +138,7 @@ tangential wall conductance and normal through-layer leakage as separate
 electrical paths, because increasing AlN thickness raises the former but lowers
 the latter.
 
-![Li/AlN wall-stack Phase 3-6 reduced parametric assessment](_static/generated/li_aln_wall_stack_phase3_6.png)
+![Li/AlN wall-stack Phase 3-6 reduced parametric assessment](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/li_aln_wall_stack_phase3_6.png)
 
 The Phase 3-6 gates are:
 
@@ -158,7 +158,7 @@ The Phase 3-6 gates are:
 The first true `fluid | AlN | metal` geometry gate is executable through:
 
 ```bash
-python examples/li_aln_multilayer_mesh_qa.py
+python campaigns/walls/li_aln_multilayer_mesh_qa.py
 ```
 
 The generated mesh inserts finite-volume faces at the fluid/AlN and AlN/metal
@@ -167,7 +167,7 @@ and records region IDs. `build_material_fields(...)` now respects
 `mesh.sigma`, so this mesh can be used by the existing conservative
 current-reconstruction path once a solved multilayer wall case is promoted.
 
-![Li/AlN explicit multilayer wall-stack mesh QA](_static/generated/li_aln_multilayer_mesh_qa.png)
+![Li/AlN explicit multilayer wall-stack mesh QA](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/li_aln_multilayer_mesh_qa.png)
 
 The mesh gate requires:
 
@@ -185,7 +185,7 @@ The first solved multilayer gate uses the explicit mesh in the
 fully-developed inductionless solver:
 
 ```bash
-python examples/li_aln_multilayer_solve.py
+python campaigns/walls/li_aln_multilayer_solve.py
 ```
 
 The case prescribes a mean flow rate, keeps the input viscosity convention
@@ -199,7 +199,7 @@ remain bounded on a true `fluid | AlN | metal` finite-volume mesh. It does not
 claim FreeMHD/OpenFOAM parity until a matching external multilayer case is
 promoted.
 
-![Li/AlN explicit multilayer solved wall-stack gate](_static/generated/li_aln_multilayer_solve.png)
+![Li/AlN explicit multilayer solved wall-stack gate](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/li_aln_multilayer_solve.png)
 
 ## Explicit Multilayer Mesh Ladder
 
@@ -207,7 +207,7 @@ The representative mesh ladder refines the solved multilayer gate for the
 intact-AlN and bare-metal electrical wall limits:
 
 ```bash
-python examples/li_aln_multilayer_convergence.py
+python campaigns/walls/li_aln_multilayer_convergence.py
 ```
 
 The ladder records pressure proxy, mean current, normalized charge balance,
@@ -216,7 +216,7 @@ at each retained fluid resolution. It is a bounded internal convergence gate
 for release QA and manuscript planning; it does not replace the future
 FreeMHD/OpenFOAM limiting-case comparison.
 
-![Li/AlN explicit multilayer mesh ladder](_static/generated/li_aln_multilayer_convergence.png)
+![Li/AlN explicit multilayer mesh ladder](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/li_aln_multilayer_convergence.png)
 
 ## Literature Anchors
 

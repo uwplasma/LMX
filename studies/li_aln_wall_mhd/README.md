@@ -16,7 +16,7 @@ Scope:
 Phase 0-2 is now executable from the repository root:
 
 ```bash
-python examples/li_aln_wall_stack_phase0_2.py
+python campaigns/walls/li_aln_wall_stack_phase0_2.py
 ```
 
 That command writes the reduced unit audit, nested wall-layer QA,
@@ -31,7 +31,7 @@ Phase 3-6 reduced operating, threshold, substrate, and pinhole sweeps are also
 executable:
 
 ```bash
-python examples/li_aln_wall_stack_phase3_6.py
+python campaigns/walls/li_aln_wall_stack_phase3_6.py
 ```
 
 That command writes the bounded operating matrix, substrate-conductivity
@@ -43,7 +43,7 @@ MHD electrical-performance study; it is not a resolved multilayer wall solve.
 The first explicit multilayer geometry gate is:
 
 ```bash
-python examples/li_aln_multilayer_mesh_qa.py
+python campaigns/walls/li_aln_multilayer_mesh_qa.py
 ```
 
 It writes a `fluid | AlN | metal` rectangular mesh with faces aligned at every
@@ -54,7 +54,7 @@ geometry placeholder for rectangular wall stacks.
 The first solved multilayer limiting-case gate is:
 
 ```bash
-python examples/li_aln_multilayer_solve.py
+python campaigns/walls/li_aln_multilayer_solve.py
 ```
 
 It runs ideal-insulator, intact-AlN, degraded-AlN, and bare-metal electrical
@@ -69,7 +69,7 @@ validation.
 The representative solved mesh ladder is:
 
 ```bash
-python examples/li_aln_multilayer_convergence.py
+python campaigns/walls/li_aln_multilayer_convergence.py
 ```
 
 It refines the intact-AlN and bare-metal electrical wall limits and writes the

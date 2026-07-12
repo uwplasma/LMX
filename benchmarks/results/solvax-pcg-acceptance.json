@@ -1,0 +1,942 @@
+{
+  "schema_version": 1,
+  "benchmark": "LMX released-SOLVAX PCG promotion acceptance",
+  "implementation": {
+    "lmx_version": "1.1.3",
+    "runner_sha256": "dc977c711b7e889e9cfb18ff495971da84b126df0480dc1e50512021fb1f4930",
+    "solvax_version": "0.5.1",
+    "solver_core_sha256": "b6cd09aaabffbe40f7b361b28760e42c08d1129ac64413b0c587136a7518c383"
+  },
+  "controls": {
+    "coupling_iterations": 512,
+    "linear_solver": "solvax_pcg",
+    "max_steps": 12,
+    "potential_iterations": 4000,
+    "wall_cells": 4,
+    "wall_thickness": 0.01
+  },
+  "sources": [
+    {
+      "path": "artifacts/samper/table-i-solvax-pcg-final.json",
+      "sha256": "ca8dd02ec0ed95ecc6192ccb5c2bfe5c2d55592b5862aa2322e5098dd25d615d"
+    },
+    {
+      "path": "artifacts/samper/table-i-solvax-pcg-shercliff-ha15000-final.json",
+      "sha256": "61d190c6caa482c0e85d5ea178843355cd4ff5a70cb5cbaddf94ee93eada872e"
+    },
+    {
+      "path": "benchmarks/results/solvax-pcg-equivalence-cpu.json",
+      "sha256": "cfe4914d3769821894a5ce6e1ea8ce6d8cfc8389e1412688106269c2e0c5fab7"
+    },
+    {
+      "path": "benchmarks/results/solvax-pcg-equivalence-gpu.json",
+      "sha256": "6cc9a12d4b8706d26bae04d4494ca6621d64288371dcd1de1db9a16b0d53e42d"
+    },
+    {
+      "path": "benchmarks/results/solvax-pcg-ha20/benchmark-a-ha20-continuum-reference.json",
+      "sha256": "af8e729e705e0db2b2bdd360492f0a759488796448a60e2e9a30a34cc41d2110"
+    },
+    {
+      "path": "benchmarks/results/solvax-pcg-ha20/benchmark-a-ha20-power-balance.json",
+      "sha256": "7f85adbda9f972f50028f70dfca63b3f4b605c3e2326c63169d52fda0b691476"
+    },
+    {
+      "path": "benchmarks/results/solvax-pcg-ha20/benchmark-a-ha20-richardson.json",
+      "sha256": "6fb55a899a7930b1dd0de713648d848c412a6842272ae3722463e9fdd85b17c2"
+    }
+  ],
+  "literature_table_i": {
+    "pass": true,
+    "row_count": 8,
+    "records": [
+      {
+        "analytical_flow_rate": 0.001405,
+        "case_kind": "hunt",
+        "finest_level": {
+          "analytical_relative_error": 0.0015405755219731275,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 1.4858221476731987e-14,
+              "div_current_max_normalized": 6.476636424314411e-08,
+              "interface_current_residual_normalized": 2.985772512926685e-11,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 5.316280418228555e-11,
+              "electrical_power_residual": -6.67996474107424e-14,
+              "emf_power": 0.001256510984290793,
+              "joule_dissipation": 0.0012565109842239952,
+              "lorentz_transfer_relative_error": 1.5531610426592631e-15,
+              "lorentz_transfer_residual": -1.951563910473908e-18,
+              "lorentz_work": -0.0012565109842907949,
+              "mechanical_power_relative_error": 7.009080758557495e-08,
+              "mechanical_power_residual": 9.862929681411954e-11,
+              "network_electrical_relative_error": 5.316125102124289e-11,
+              "network_electrical_residual": -6.679769584683193e-14,
+              "pass": true,
+              "pressure_power": 0.0014071645086083722,
+              "viscous_dissipation": 0.00015065342568828055
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 0.0014071645086083722,
+          "solver": {
+            "linear_iterations_used": 88.0,
+            "linear_residual": 2.6363025969248638e-15,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 5.164315228220234e-10,
+            "residual": 2.5480845515166162e-11
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 500,
+        "hartmann_wall_conductance": 0.01,
+        "published_numerical_flow_rate": 0.001401,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0005081806958654321,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 1.4541750408315073,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 1.907e-05,
+        "case_kind": "hunt",
+        "finest_level": {
+          "analytical_relative_error": 0.00324745312209907,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 3.9284135098274245e-15,
+              "div_current_max_normalized": 8.059387936880567e-06,
+              "interface_current_residual_normalized": 1.6064801497161504e-09,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 7.256658529198608e-11,
+              "electrical_power_residual": -1.311606801900761e-15,
+              "emf_power": 1.8074528333161187e-05,
+              "joule_dissipation": 1.807452833184959e-05,
+              "lorentz_transfer_relative_error": 5.623601999285961e-16,
+              "lorentz_transfer_residual": -1.0164395367051604e-20,
+              "lorentz_work": -1.8074528333161197e-05,
+              "mechanical_power_relative_error": 3.8776118865057297e-07,
+              "mechanical_power_residual": -7.418622380131579e-12,
+              "network_electrical_relative_error": 7.256602293178615e-11,
+              "network_electrical_residual": -1.311596637505394e-15,
+              "pass": true,
+              "pressure_power": 1.9131928931038428e-05,
+              "viscous_dissipation": 1.0574080164996113e-06
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 1.9131928931038428e-05,
+          "solver": {
+            "linear_iterations_used": 68.0,
+            "linear_residual": 5.493113098320344e-16,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 3.494659654599307e-09,
+            "residual": 3.664829737967147e-13
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 5000,
+        "hartmann_wall_conductance": 0.01,
+        "published_numerical_flow_rate": 1.896e-05,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0009564124171016078,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 1.2878442139718829,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 5.169e-06,
+        "case_kind": "hunt",
+        "finest_level": {
+          "analytical_relative_error": 0.004271800616058498,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 4.161129020477807e-15,
+              "div_current_max_normalized": 3.753721549118462e-05,
+              "interface_current_residual_normalized": 5.833916396695366e-09,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 2.899534727134272e-10,
+              "electrical_power_residual": -1.4089114057824932e-15,
+              "emf_power": 4.859094780268338e-06,
+              "joule_dissipation": 4.85909477885943e-06,
+              "lorentz_transfer_relative_error": 6.972763327802577e-16,
+              "lorentz_transfer_residual": -3.3881317890172014e-21,
+              "lorentz_work": -4.859094780268342e-06,
+              "mechanical_power_relative_error": 2.9747104635790235e-07,
+              "mechanical_power_residual": -1.5441967375261192e-12,
+              "network_electrical_relative_error": 2.8995277543709446e-10,
+              "network_electrical_residual": -1.4089080176507042e-15,
+              "pass": true,
+              "pressure_power": 5.191080937384406e-06,
+              "viscous_dissipation": 3.3198770131280225e-07
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 5.191080937384406e-06,
+          "solver": {
+            "linear_iterations_used": 59.0,
+            "linear_residual": 1.4563927946458088e-15,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 7.964184775022918e-09,
+            "residual": 1.0185450075609416e-13
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 10000,
+        "hartmann_wall_conductance": 0.01,
+        "published_numerical_flow_rate": 5.139e-06,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0013728210169304054,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 1.3658329488806464,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 2.425e-06,
+        "case_kind": "hunt",
+        "finest_level": {
+          "analytical_relative_error": 0.005069890784701778,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 6.654200632117303e-16,
+              "div_current_max_normalized": 9.475207849423164e-05,
+              "interface_current_residual_normalized": 1.2665526944408978e-08,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 1.7009657083813497e-09,
+              "electrical_power_residual": -3.848694942658413e-15,
+              "emf_power": 2.2626528704807673e-06,
+              "joule_dissipation": 2.2626528666320724e-06,
+              "lorentz_transfer_relative_error": 0.0,
+              "lorentz_transfer_residual": 0.0,
+              "lorentz_work": -2.2626528704807673e-06,
+              "mechanical_power_relative_error": 7.496038815198318e-07,
+              "mechanical_power_residual": -1.8270067760088664e-12,
+              "network_electrical_relative_error": 1.7009657083813497e-09,
+              "network_electrical_residual": -3.848694942658413e-15,
+              "pass": true,
+              "pressure_power": 2.437294485152902e-06,
+              "viscous_dissipation": 1.746434416789106e-07
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 2.437294485152902e-06,
+          "solver": {
+            "linear_iterations_used": 57.0,
+            "linear_residual": 6.589753541554813e-16,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 1.181187021889171e-08,
+            "residual": 4.82820530399512e-14
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 15000,
+        "hartmann_wall_conductance": 0.01,
+        "published_numerical_flow_rate": 2.404e-06,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0016978937363653901,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 1.4034312722533058,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 0.00768,
+        "case_kind": "shercliff",
+        "finest_level": {
+          "analytical_relative_error": 0.0024126999711176745,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 1.1177872605327898e-21,
+              "div_current_max_normalized": 4.797024801746587e-08,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 6.065263119138849e-10,
+              "electrical_power_residual": -2.2809905006471176e-12,
+              "emf_power": 0.003760744514857873,
+              "joule_dissipation": 0.003760744512576882,
+              "lorentz_transfer_relative_error": 1.1531782264943132e-16,
+              "lorentz_transfer_residual": 4.336808689942018e-19,
+              "lorentz_work": -0.0037607445148578724,
+              "mechanical_power_relative_error": 5.957096212011371e-05,
+              "mechanical_power_residual": 4.586088113564188e-07,
+              "network_electrical_relative_error": 6.065264272317075e-10,
+              "network_electrical_residual": -2.2809909343279866e-12,
+              "pass": true,
+              "pressure_power": 0.007698529535778184,
+              "viscous_dissipation": 0.003937326412108955
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 0.007698529535778184,
+          "solver": {
+            "linear_iterations_used": 76.0,
+            "linear_residual": 1.566402132322469e-14,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 1.6882139718404487e-09,
+            "residual": 1.449448651380525e-10
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 500,
+        "hartmann_wall_conductance": 0.0,
+        "published_numerical_flow_rate": 0.007679,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0013363515577458046,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 2.005971746309696,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 0.0007902,
+        "case_kind": "shercliff",
+        "finest_level": {
+          "analytical_relative_error": 0.003645150675782368,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 3.336496007901172e-22,
+              "div_current_max_normalized": 1.2117190250140289e-05,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 3.317669888759298e-08,
+              "electrical_power_residual": -1.3060215018831367e-11,
+              "emf_power": 0.0003936562544417423,
+              "joule_dissipation": 0.0003936562413815272,
+              "lorentz_transfer_relative_error": 1.3770925271123275e-16,
+              "lorentz_transfer_residual": 5.421010862427522e-20,
+              "lorentz_work": -0.00039365625444174224,
+              "mechanical_power_relative_error": 6.558670731528079e-05,
+              "mechanical_power_residual": 5.201553194531016e-08,
+              "network_electrical_relative_error": 3.317669902530223e-08,
+              "network_electrical_residual": -1.3060215073041476e-11,
+              "pass": true,
+              "pressure_power": 0.0007930803980640032,
+              "viscous_dissipation": 0.0003993721280903157
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 0.0007930803980640032,
+          "solver": {
+            "linear_iterations_used": 51.0,
+            "linear_residual": 9.712613357918307e-16,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 1.2817760296442934e-07,
+            "residual": 1.4121569094204672e-11
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 5000,
+        "hartmann_wall_conductance": 0.0,
+        "published_numerical_flow_rate": 0.0007902,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.001962978735954269,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 2.0311570835028476,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 0.0003965,
+        "case_kind": "shercliff",
+        "finest_level": {
+          "analytical_relative_error": 0.004274836438483445,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 4.354119605752221e-23,
+              "div_current_max_normalized": 4.1837916151032844e-05,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 5.510914348116593e-08,
+              "electrical_power_residual": -1.0914415042324183e-11,
+              "emf_power": 0.00019805089233611992,
+              "joule_dissipation": 0.00019805088142170495,
+              "lorentz_transfer_relative_error": 4.1057710963710104e-16,
+              "lorentz_transfer_residual": -8.131516293641283e-20,
+              "lorentz_work": -0.00019805089233612,
+              "mechanical_power_relative_error": 7.523708355654988e-06,
+              "mechanical_power_residual": 2.995902842890504e-09,
+              "network_electrical_relative_error": 5.510914307058882e-08,
+              "network_electrical_residual": -1.091441496100902e-11,
+              "pass": true,
+              "pressure_power": 0.0003981949726478587,
+              "viscous_dissipation": 0.0002001410844088958
+            }
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "q_tilde": 0.0003981949726478587,
+          "solver": {
+            "linear_iterations_used": 46.0,
+            "linear_residual": 5.801878527162344e-16,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 4.005041705455325e-07,
+            "residual": 7.903939438710927e-12
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 10000,
+        "hartmann_wall_conductance": 0.0,
+        "published_numerical_flow_rate": 0.0003965,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0021879706093601925,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 1.9450445509589358,
+          "pass": true
+        }
+      },
+      {
+        "analytical_flow_rate": 0.0002648,
+        "case_kind": "shercliff",
+        "finest_level": {
+          "analytical_relative_error": 0.0030734164463531205,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 1.659414297426683e-22,
+              "div_current_max_normalized": 0.0002093059321320931,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 1.4348577873137998e-07,
+              "electrical_power_residual": -1.8977552764930933e-11,
+              "emf_power": 0.00013226086189669617,
+              "joule_dissipation": 0.00013226084291914327,
+              "lorentz_transfer_relative_error": 1.0246815998109988e-15,
+              "lorentz_transfer_residual": 1.3552527156068805e-19,
+              "lorentz_work": -0.00013226086189669603,
+              "mechanical_power_relative_error": 2.7666791459353133e-05,
+              "mechanical_power_residual": -7.348886058770963e-09,
+              "network_electrical_relative_error": 1.434857797560616e-07,
+              "network_electrical_residual": -1.8977552900456204e-11,
+              "pass": true,
+              "pressure_power": 0.0002656138406749943,
+              "viscous_dissipation": 0.00013336032766435703
+            }
+          },
+          "mesh": [
+            119,
+            119
+          ],
+          "q_tilde": 0.0002656138406749943,
+          "solver": {
+            "linear_iterations_used": 55.0,
+            "linear_residual": 9.13364622890303e-16,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 1.5778013541741834e-06,
+            "residual": 5.204146439957355e-12
+          }
+        },
+        "finest_level_pass": true,
+        "hartmann_number": 15000,
+        "hartmann_wall_conductance": 0.0,
+        "published_numerical_flow_rate": 0.0002648,
+        "refinement": {
+          "analytical_error_monotonic": true,
+          "finest_mesh_change_relative": 0.0011081634721347214,
+          "finest_mesh_change_target": 0.0025,
+          "observed_order_against_analytical": 2.0006056528736846,
+          "pass": true
+        }
+      }
+    ]
+  },
+  "cpu_equivalence": {
+    "schema_version": 1,
+    "benchmark": "LMX native versus released SOLVAX PCG",
+    "acceptance": {
+      "backend_matches_request": true,
+      "forward_equivalent": true,
+      "gradient_verified": true,
+      "memory_regression_within_10_percent": true,
+      "native_residual_pass": true,
+      "solvax_residual_pass": true,
+      "transpose_gradient_verified": true,
+      "transpose_residual_pass": true,
+      "warm_time_regression_within_10_percent": true,
+      "end_to_end_hartmann_pass": true,
+      "backend_promotion_pass": true,
+      "cpu_promotion_pass": true
+    },
+    "comparison": {
+      "field_relative_difference": 1.5383599600866385e-12,
+      "gradient": 4032.4999999999973,
+      "gradient_exact": 4032.500000000002,
+      "gradient_relative_error": 1.1277057678523594e-15,
+      "memory_ratio": 0.6248285113258742,
+      "transpose_gradient": 4032.4999999999964,
+      "transpose_gradient_relative_error": 1.3532469214228312e-15,
+      "warm_time_ratio": 0.7481420970861368
+    },
+    "environment": {
+      "backend": "cpu",
+      "device": "TFRT_CPU_0",
+      "dtype": "float64",
+      "jax_version": "0.6.2",
+      "jaxlib_version": "0.6.2",
+      "jax_raw_backend": "cpu",
+      "platform": "macOS-26.5.1-arm64-arm-64bit",
+      "python_version": "3.10.20"
+    },
+    "implementation": {
+      "benchmark_sha256": "8a8cd6aa338e5c0112edb31c9d3080856aa7af8eac2f14468d07be517c544d48",
+      "linear_sha256": "e44e03ac39c8728ea491d49918f531032ae50ff0eb2a60d8419bd6dc470fc2eb",
+      "lmx_version": "1.1.3",
+      "solvax_version": "0.5.1"
+    },
+    "end_to_end_hartmann": {
+      "acceptance": {
+        "field_equivalent": true,
+        "flow_equivalent": true,
+        "native_balance_pass": true,
+        "power_equivalent": true,
+        "solvax_balance_pass": true,
+        "pass": true
+      },
+      "comparison": {
+        "field_relative_difference": 1.3499563930260952e-12,
+        "flow_relative_difference": 2.739489223025444e-16,
+        "max_power_relative_difference": 1.8270312041078715e-14
+      },
+      "problem": {
+        "case": "hartmann",
+        "ha": 5.0,
+        "grid": [
+          16,
+          16
+        ]
+      },
+      "native": {
+        "final_linear_residual": 2.935380702470093e-12,
+        "final_residual": 7.751475850081846e-10,
+        "flow_rate": 0.40526643262317535,
+        "power_balance": {
+          "pressure_power": 0.40526643262317535,
+          "lorentz_work": -0.09570724680854158,
+          "viscous_dissipation": 0.3095230959884863,
+          "joule_dissipation": 0.09570724680854162,
+          "emf_power": 0.09570724680854172,
+          "electrical_power_residual": 4.163336342344337e-17,
+          "electrical_power_relative_error": 4.3500742954950097e-16,
+          "network_electrical_residual": -9.71445146547012e-17,
+          "network_electrical_relative_error": 1.0150173356155024e-15,
+          "lorentz_transfer_residual": 1.3877787807814457e-16,
+          "lorentz_transfer_relative_error": 1.4500247651650032e-15,
+          "mechanical_power_residual": 3.608982614744516e-05,
+          "mechanical_power_relative_error": 8.905209818105558e-05
+        },
+        "steps": 15
+      },
+      "solvax": {
+        "final_linear_residual": 3.5631491074896243e-13,
+        "final_residual": 7.751475850081846e-10,
+        "flow_rate": 0.40526643262317547,
+        "power_balance": {
+          "pressure_power": 0.40526643262317547,
+          "lorentz_work": -0.09570724680854333,
+          "viscous_dissipation": 0.3095230959884865,
+          "joule_dissipation": 0.09570724680854294,
+          "emf_power": 0.09570724680854341,
+          "electrical_power_residual": -3.885780586188048e-16,
+          "electrical_power_relative_error": 4.060069342461937e-15,
+          "network_electrical_residual": -4.718447854656915e-16,
+          "network_electrical_relative_error": 4.930084201560923e-15,
+          "lorentz_transfer_residual": 8.326672684688674e-17,
+          "lorentz_transfer_relative_error": 8.700148590989865e-16,
+          "mechanical_power_residual": 3.60898261456688e-05,
+          "mechanical_power_relative_error": 8.905209817667237e-05
+        },
+        "steps": 15
+      }
+    },
+    "problem": {
+      "grid": [
+        64,
+        64
+      ],
+      "max_steps": 128,
+      "repeats": 9,
+      "tolerance": 1e-11
+    },
+    "native": {
+      "compile_seconds": 0.07633433400769718,
+      "memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 32768,
+        "generated_code_size_in_bytes": 0,
+        "output_size_in_bytes": 32804,
+        "temp_size_in_bytes": 262408
+      },
+      "warm_median_seconds": 0.0007007920066826046,
+      "warm_samples_seconds": [
+        0.0009615410235710442,
+        0.000714166002580896,
+        0.0007052079890854657,
+        0.0007020830234978348,
+        0.0006999170000199229,
+        0.0007007920066826046,
+        0.0006999580073170364,
+        0.0006996250012889504,
+        0.0007005000079516321
+      ],
+      "iterations": 26,
+      "relative_error": 1.5407601901152532e-12,
+      "residual": 9.592583481975219e-12
+    },
+    "solvax": {
+      "compile_seconds": 0.07627104199491441,
+      "memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 32768,
+        "generated_code_size_in_bytes": 0,
+        "output_size_in_bytes": 32804,
+        "temp_size_in_bytes": 163960
+      },
+      "warm_median_seconds": 0.0005242920015007257,
+      "warm_samples_seconds": [
+        0.0007494580058846623,
+        0.000542958005098626,
+        0.0005262090126052499,
+        0.0005246249784249812,
+        0.0005232090188656002,
+        0.000523041991982609,
+        0.0005237080040387809,
+        0.0005242920015007257,
+        0.0005235830030869693
+      ],
+      "iterations": 30,
+      "relative_error": 3.246308091723015e-14,
+      "residual": 2.3386709302340613e-13
+    },
+    "transpose_audit": {
+      "gradient": 4032.4999999999964,
+      "gradient_exact": 4032.500000000002,
+      "gradient_relative_error": 1.3532469214228312e-15,
+      "iterations": 29,
+      "residual": 2.5378186621928335e-13
+    }
+  },
+  "cpu_acceptance_pass": true,
+  "gpu_equivalence": {
+    "schema_version": 1,
+    "benchmark": "LMX native versus released SOLVAX PCG",
+    "acceptance": {
+      "backend_matches_request": true,
+      "forward_equivalent": true,
+      "gradient_verified": true,
+      "memory_regression_within_10_percent": true,
+      "native_residual_pass": true,
+      "solvax_residual_pass": true,
+      "transpose_gradient_verified": true,
+      "transpose_residual_pass": true,
+      "warm_time_regression_within_10_percent": true,
+      "end_to_end_hartmann_pass": true,
+      "backend_promotion_pass": true,
+      "gpu_promotion_pass": true
+    },
+    "comparison": {
+      "field_relative_difference": 1.5383642712569833e-12,
+      "gradient": 4032.5,
+      "gradient_exact": 4032.5000000000005,
+      "gradient_relative_error": 1.1277057678523596e-16,
+      "memory_ratio": 0.9999213341724354,
+      "transpose_gradient": 4032.5,
+      "transpose_gradient_relative_error": 1.1277057678523596e-16,
+      "warm_time_ratio": 0.23004347883440163
+    },
+    "environment": {
+      "backend": "gpu",
+      "device": "cuda:0",
+      "dtype": "float64",
+      "jax_version": "0.6.2",
+      "jaxlib_version": "0.6.2",
+      "jax_raw_backend": "gpu",
+      "platform": "Linux-6.17.9-76061709-generic-x86_64-with-glibc2.35",
+      "python_version": "3.10.12"
+    },
+    "implementation": {
+      "benchmark_sha256": "8a8cd6aa338e5c0112edb31c9d3080856aa7af8eac2f14468d07be517c544d48",
+      "linear_sha256": "e44e03ac39c8728ea491d49918f531032ae50ff0eb2a60d8419bd6dc470fc2eb",
+      "lmx_version": "1.1.3",
+      "solvax_version": "0.5.1"
+    },
+    "end_to_end_hartmann": {
+      "acceptance": {
+        "field_equivalent": true,
+        "flow_equivalent": true,
+        "native_balance_pass": true,
+        "power_equivalent": true,
+        "solvax_balance_pass": true,
+        "pass": true
+      },
+      "comparison": {
+        "field_relative_difference": 1.349949983147307e-12,
+        "flow_relative_difference": 1.3697446115127384e-15,
+        "max_power_relative_difference": 1.5950272416814623e-14
+      },
+      "problem": {
+        "case": "hartmann",
+        "ha": 5.0,
+        "grid": [
+          16,
+          16
+        ]
+      },
+      "native": {
+        "final_linear_residual": 2.9355316745684697e-12,
+        "final_residual": 7.751477515416383e-10,
+        "flow_rate": 0.4052664326231701,
+        "power_balance": {
+          "pressure_power": 0.4052664326231701,
+          "lorentz_work": -0.09570724680854256,
+          "viscous_dissipation": 0.30952309598847866,
+          "joule_dissipation": 0.0957072468085392,
+          "emf_power": 0.09570724680854258,
+          "electrical_power_residual": -3.3584246494910985e-15,
+          "electrical_power_relative_error": 3.5090599316992734e-14,
+          "network_electrical_residual": -3.372302437298913e-15,
+          "network_electrical_relative_error": 3.5235601793509233e-14,
+          "lorentz_transfer_residual": 1.3877787807814457e-17,
+          "lorentz_transfer_relative_error": 1.450024765164989e-16,
+          "mechanical_power_residual": 3.608982614883294e-05,
+          "mechanical_power_relative_error": 8.905209818448111e-05
+        },
+        "steps": 15
+      },
+      "solvax": {
+        "final_linear_residual": 3.5637341243707377e-13,
+        "final_residual": 7.751478348083651e-10,
+        "flow_rate": 0.40526643262317064,
+        "power_balance": {
+          "pressure_power": 0.40526643262317064,
+          "lorentz_work": -0.09570724680854409,
+          "viscous_dissipation": 0.3095230959884788,
+          "joule_dissipation": 0.09570724680854044,
+          "emf_power": 0.09570724680854409,
+          "electrical_power_residual": -3.649858193455202e-15,
+          "electrical_power_relative_error": 3.81356513238386e-14,
+          "network_electrical_residual": -3.649858193455202e-15,
+          "network_electrical_relative_error": 3.81356513238386e-14,
+          "lorentz_transfer_residual": 0.0,
+          "lorentz_transfer_relative_error": 0.0,
+          "mechanical_power_residual": 3.6089826147722714e-05,
+          "mechanical_power_relative_error": 8.905209818174149e-05
+        },
+        "steps": 15
+      }
+    },
+    "problem": {
+      "grid": [
+        64,
+        64
+      ],
+      "max_steps": 128,
+      "repeats": 9,
+      "tolerance": 1e-11
+    },
+    "native": {
+      "compile_seconds": 0.7024465069989674,
+      "memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 32768,
+        "generated_code_size_in_bytes": 99812,
+        "output_size_in_bytes": 32804,
+        "temp_size_in_bytes": 101696
+      },
+      "warm_median_seconds": 0.006327669019810855,
+      "warm_samples_seconds": [
+        0.007492057018680498,
+        0.006571364996489137,
+        0.006209737999597564,
+        0.006356719008181244,
+        0.006327669019810855,
+        0.006343779998132959,
+        0.005846909974934533,
+        0.005554333998588845,
+        0.0058555270079523325
+      ],
+      "iterations": 26,
+      "relative_error": 1.5407630614597634e-12,
+      "residual": 9.592565046921381e-12
+    },
+    "solvax": {
+      "compile_seconds": 0.5964632329996675,
+      "memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 32768,
+        "generated_code_size_in_bytes": 78564,
+        "output_size_in_bytes": 32804,
+        "temp_size_in_bytes": 101688
+      },
+      "warm_median_seconds": 0.0014556389942299575,
+      "warm_samples_seconds": [
+        0.0025684589927550405,
+        0.0015056350093800575,
+        0.001458257989725098,
+        0.0014667089853901416,
+        0.0014556389942299575,
+        0.0014443060208577663,
+        0.0014390400028787553,
+        0.0014394259778782725,
+        0.0014442950196098536
+      ],
+      "iterations": 30,
+      "relative_error": 3.2461604836832884e-14,
+      "residual": 2.3384865796956566e-13
+    },
+    "transpose_audit": {
+      "gradient": 4032.5,
+      "gradient_exact": 4032.5000000000005,
+      "gradient_relative_error": 1.1277057678523596e-16,
+      "iterations": 29,
+      "residual": 2.5375409913811137e-13
+    },
+    "pass": true,
+    "status": "accepted"
+  },
+  "ha20_freemhd": {
+    "pass": true,
+    "confirmation_level": "confirmation_85x63",
+    "implementation": {
+      "lmx_version": "1.1.3",
+      "runner_sha256": "735599b095c172663a36ebd11571801a07a8be6ba3d99775edb59f910c28b815",
+      "solvax_version": "0.5.1",
+      "solver_core_sha256": "b6cd09aaabffbe40f7b361b28760e42c08d1129ac64413b0c587136a7518c383"
+    },
+    "source_artifact_sha256": "b98fa3cc18ff315a706ec1470b78dccb63e06970eead519345a8aa54a9e4730c",
+    "sources": {
+      "benchmark-a-ha20-continuum-reference.json": "af8e729e705e0db2b2bdd360492f0a759488796448a60e2e9a30a34cc41d2110",
+      "benchmark-a-ha20-power-balance.json": "7f85adbda9f972f50028f70dfca63b3f4b605c3e2326c63169d52fda0b691476",
+      "benchmark-a-ha20-richardson.json": "6fb55a899a7930b1dd0de713648d848c412a6842272ae3722463e9fdd85b17c2"
+    },
+    "cases": {
+      "shercliff": {
+        "pass": true,
+        "primary_errors": {
+          "lorentz_y_l2": 0.004037078669661557,
+          "pressure_gradient_relative": 0.0026603072491389835,
+          "velocity_y_l2": 0.005609758820905592
+        },
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 1.5342837284512256e-19,
+          "div_current_max_normalized": 3.099481437960618e-08,
+          "interface_current_residual_normalized": 0.0
+        },
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 1.0124546196724082e-11,
+          "electrical_power_residual": 4.0466829887009226e-10,
+          "emf_power": 39.96903080919621,
+          "joule_dissipation": 39.96903080960088,
+          "lorentz_transfer_relative_error": 0.0,
+          "lorentz_transfer_residual": 0.0,
+          "lorentz_work": -39.96903080919621,
+          "mechanical_power_relative_error": 1.0939390371069378e-05,
+          "mechanical_power_residual": -0.0010636600246414218,
+          "network_electrical_relative_error": 1.0124546196724082e-11,
+          "network_electrical_residual": 4.0466829887009226e-10,
+          "pressure_power": 97.2310478710171,
+          "viscous_dissipation": 57.263080721845526
+        },
+        "continuum_pass": true,
+        "fine_primary_pass": true,
+        "extrapolated_primary_pass": true
+      },
+      "hunt": {
+        "pass": true,
+        "primary_errors": {
+          "lorentz_y_l2": 0.008589663820157807,
+          "pressure_gradient_relative": 0.0026123822343450884,
+          "velocity_y_l2": 0.005807724526729621
+        },
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 5.389330750804132e-16,
+          "div_current_max_normalized": 3.419722748920183e-08,
+          "interface_current_residual_normalized": 6.72697942446014e-11
+        },
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 8.695993246179058e-12,
+          "electrical_power_residual": 1.3566481271709563e-11,
+          "emf_power": 1.56008415456769,
+          "joule_dissipation": 1.5600841545812556,
+          "lorentz_transfer_relative_error": 5.693144290274023e-16,
+          "lorentz_transfer_residual": 8.881784197001252e-16,
+          "lorentz_work": -1.5600841545676891,
+          "mechanical_power_relative_error": 1.3206595637340608e-09,
+          "mechanical_power_residual": 3.1810616363259214e-09,
+          "network_electrical_relative_error": 8.69542393175003e-12,
+          "network_electrical_residual": 1.3565593093289863e-11,
+          "pressure_power": 2.4086916293035583,
+          "viscous_dissipation": 0.8486074715548075
+        },
+        "continuum_pass": true,
+        "fine_primary_pass": true,
+        "extrapolated_primary_pass": false
+      }
+    },
+    "status": "accepted"
+  },
+  "m3_promotion_pass": true,
+  "promotion_blockers": []
+}

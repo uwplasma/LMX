@@ -21,23 +21,53 @@ def _fringing_pipe_root_or_skip() -> Path:
     return root
 
 
-def test_run_case_example_writes_hartmann_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_run_case_example_writes_hartmann_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     fake_solution = SimpleNamespace(
-        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        state=SimpleNamespace(
+            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
+        ),
         mesh=SimpleNamespace(),
         case_name="hartmann_ha5",
     )
 
     monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
-    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: (out_dir / "hartmann_ha5.vtr").write_text("vtk"))
-    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path.write_text("coord,u\n0,1\n"))
-    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"y" if axis == "y" else "z": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(
+        example_runner,
+        "write_paraview",
+        lambda solution, out_dir: (out_dir / "hartmann_ha5.vtr").write_text("vtk"),
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_profile_csv",
+        lambda path, profile: path.write_text("coord,u\n0,1\n"),
+    )
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {
+            "y" if axis == "y" else "z": [0.0],
+            "u": [1.0],
+        },
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "validation_summary",
+        lambda solution, case_name, ha: {"u_max": 1.0},
+    )
     monkeypatch.setattr(
         example_runner,
         "hartmann_validation",
-        lambda solution, ha: SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.0, linf_error=0.0),
+        lambda solution, ha: SimpleNamespace(
+            coordinate=np.array([0.0]),
+            reference=np.array([1.0]),
+            l2_error=0.0,
+            linf_error=0.0,
+        ),
     )
 
     def fake_write_case_overview_plots(solution, out_dir: Path, **kwargs):
@@ -51,8 +81,14 @@ def test_run_case_example_writes_hartmann_outputs(tmp_path: Path, monkeypatch: p
             path.write_bytes(b"plot")
         return outputs
 
-    monkeypatch.setattr(example_runner, "write_case_overview_plots", fake_write_case_overview_plots)
-    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+    monkeypatch.setattr(
+        example_runner, "write_case_overview_plots", fake_write_case_overview_plots
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_metrics_json",
+        lambda payload, path: path.write_text("{}"),
+    )
 
     report = run_case_example(
         case_kind="hartmann",
@@ -73,14 +109,20 @@ def test_run_case_example_writes_hartmann_outputs(tmp_path: Path, monkeypatch: p
     assert (tmp_path / "hartmann_ha5_centerline.csv").exists()
 
 
-def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_run_theory_meeting_demo_writes_movies_and_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     fake_solution = SimpleNamespace(
-        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        state=SimpleNamespace(
+            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
+        ),
         mesh=SimpleNamespace(),
         case_name="hunt_ha5",
     )
 
-    def fake_run_case_example(*, case_kind: str, ha: float, ny: int, nz: int, out_dir: Path, reference_root):
+    def fake_run_case_example(
+        *, case_kind: str, ha: float, ny: int, nz: int, out_dir: Path, reference_root
+    ):
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         plot_paths = [
@@ -95,7 +137,16 @@ def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monke
         (out_dir / f"{case_kind}_ha{int(ha)}.vtr").write_text("vtk")
         (out_dir / f"{case_kind}_ha{int(ha)}_centerline.csv").write_text("y,u\n0,1\n")
         npz_path = out_dir / f"{case_kind}_ha{int(ha)}_results.npz"
-        np.savez_compressed(npz_path, metadata_json='{"case": "demo"}', y_centers=np.array([0.0]), z_centers=np.array([0.0]), y_faces=np.array([-1.0, 1.0]), z_faces=np.array([-1.0, 1.0]), u=np.array([[1.0]]), phi=np.array([[0.0]]))
+        np.savez_compressed(
+            npz_path,
+            metadata_json='{"case": "demo"}',
+            y_centers=np.array([0.0]),
+            z_centers=np.array([0.0]),
+            y_faces=np.array([-1.0, 1.0]),
+            z_faces=np.array([-1.0, 1.0]),
+            u=np.array([[1.0]]),
+            phi=np.array([[0.0]]),
+        )
         return {
             "case": f"{case_kind}_ha{int(ha)}",
             "ha": ha,
@@ -107,7 +158,16 @@ def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monke
         }
 
     def fake_solve_case_snapshots(case, *, frame_count: int = 12):
-        mesh = type("Mesh", (), {"y_centers": np.array([0.0]), "z_centers": np.array([0.0]), "y_faces": np.array([-1.0, 1.0]), "z_faces": np.array([-1.0, 1.0])})()
+        mesh = type(
+            "Mesh",
+            (),
+            {
+                "y_centers": np.array([0.0]),
+                "z_centers": np.array([0.0]),
+                "y_faces": np.array([-1.0, 1.0]),
+                "z_faces": np.array([-1.0, 1.0]),
+            },
+        )()
         return [
             {
                 "time": 0.0,
@@ -131,7 +191,14 @@ def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monke
             for _ in range(frame_count)
         ]
 
-    def fake_write_transient_movies(frames_payload, movie_dir: Path, *, case_title: str, field_mode: str, output_stem: str):
+    def fake_write_transient_movies(
+        frames_payload,
+        movie_dir: Path,
+        *,
+        case_title: str,
+        field_mode: str,
+        output_stem: str,
+    ):
         movie_dir.mkdir(parents=True, exist_ok=True)
         outputs = [
             movie_dir / f"{output_stem}_2d.gif",
@@ -177,16 +244,31 @@ def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monke
         return path
 
     monkeypatch.setattr(example_runner, "run_case_example", fake_run_case_example)
-    monkeypatch.setattr(example_runner, "solve_case_snapshots", fake_solve_case_snapshots)
-    monkeypatch.setattr(example_runner, "write_transient_movies", fake_write_transient_movies)
+    monkeypatch.setattr(
+        example_runner, "solve_case_snapshots", fake_solve_case_snapshots
+    )
+    monkeypatch.setattr(
+        example_runner, "write_transient_movies", fake_write_transient_movies
+    )
     monkeypatch.setattr(example_runner, "make_hunt_case", fake_make_hunt_case)
     monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
     monkeypatch.setattr(example_runner, "write_paraview", fake_write_paraview)
     monkeypatch.setattr(example_runner, "write_profile_csv", fake_write_profile_csv)
-    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"y" if axis == "y" else "z": [0.0], "u": [1.0]})
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {
+            "y" if axis == "y" else "z": [0.0],
+            "u": [1.0],
+        },
+    )
     monkeypatch.setattr(example_runner, "validation_summary", fake_validation_summary)
-    monkeypatch.setattr(example_runner, "write_case_overview_plots", fake_write_case_overview_plots)
+    monkeypatch.setattr(
+        example_runner, "write_case_overview_plots", fake_write_case_overview_plots
+    )
     monkeypatch.setattr(example_runner, "write_metrics_json", fake_write_metrics_json)
 
     report = run_theory_meeting_demo(
@@ -217,9 +299,13 @@ def test_run_theory_meeting_demo_writes_movies_and_reports(tmp_path: Path, monke
     assert (tmp_path / "shercliff" / "shercliff_startup_3d_poster.pdf").exists()
 
 
-def test_run_theory_meeting_demo_records_hunt_reference_when_available(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_run_theory_meeting_demo_records_hunt_reference_when_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     fake_solution = SimpleNamespace(
-        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        state=SimpleNamespace(
+            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
+        ),
         mesh=SimpleNamespace(),
         case_name="hunt_ha5",
     )
@@ -227,29 +313,68 @@ def test_run_theory_meeting_demo_records_hunt_reference_when_available(tmp_path:
     monkeypatch.setattr(
         example_runner,
         "run_case_example",
-        lambda **kwargs: {"case": "demo", "ha": kwargs["ha"], "output_dir": str(kwargs["out_dir"]), "plots": [], "reference": {"available": False}, "metrics": {}},
+        lambda **kwargs: {
+            "case": "demo",
+            "ha": kwargs["ha"],
+            "output_dir": str(kwargs["out_dir"]),
+            "plots": [],
+            "reference": {"available": False},
+            "metrics": {},
+        },
     )
-    monkeypatch.setattr(example_runner, "solve_case_snapshots", lambda case, frame_count=12: [])
-    monkeypatch.setattr(example_runner, "write_transient_movies", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        example_runner, "solve_case_snapshots", lambda case, frame_count=12: []
+    )
+    monkeypatch.setattr(
+        example_runner, "write_transient_movies", lambda *args, **kwargs: []
+    )
     monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
-    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [out_dir / "hunt_ha5.vtr"])
+    monkeypatch.setattr(
+        example_runner,
+        "write_paraview",
+        lambda solution, out_dir: [out_dir / "hunt_ha5.vtr"],
+    )
+
     def fake_write_profile_csv(path: Path, profile):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("coord,u\n0,1\n")
         return path
 
     monkeypatch.setattr(example_runner, "write_profile_csv", fake_write_profile_csv)
-    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"y" if axis == "y" else "z": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
-    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda *args, **kwargs: [])
-    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {
+            "y" if axis == "y" else "z": [0.0],
+            "u": [1.0],
+        },
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "validation_summary",
+        lambda solution, case_name, ha: {"u_max": 1.0},
+    )
+    monkeypatch.setattr(
+        example_runner, "write_case_overview_plots", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_metrics_json",
+        lambda payload, path: path.write_text("{}"),
+    )
     monkeypatch.setattr(
         example_runner,
         "closed_channel_validation",
         lambda solution, case_kind, ha, reference_root: SimpleNamespace(
-            y_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.1),
-            z_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.2),
+            y_profile=SimpleNamespace(
+                coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.1
+            ),
+            z_profile=SimpleNamespace(
+                coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.2
+            ),
             reference_path="reference/hunt.json",
         ),
     )
@@ -274,7 +399,14 @@ def test_run_theory_meeting_demo_records_hunt_reference_when_available(tmp_path:
 
 
 def _load_example_module(filename: str):
-    module_path = Path(__file__).resolve().parents[1] / "examples" / filename
+    root = Path(__file__).resolve().parents[1]
+    candidates = [root / "examples" / filename]
+    candidates.extend((root / "campaigns").glob(f"*/{filename}"))
+    existing = [path for path in candidates if path.is_file()]
+    assert len(existing) == 1, (
+        f"Expected one workflow named {filename}, found {existing}"
+    )
+    module_path = existing[0]
     spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -283,7 +415,9 @@ def _load_example_module(filename: str):
     return module
 
 
-def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_plot_npz_results_reads_solution_and_movie_npz(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     plot_module = _load_example_module("plot_npz_results.py")
     save_calls: list[Path] = []
 
@@ -319,7 +453,7 @@ def test_plot_npz_results_reads_solution_and_movie_npz(tmp_path: Path, monkeypat
         potential_residual_history=np.array([2e-2, 2e-3]),
     )
 
-    plot_outputs = plot_module.plot_solution_npz(solution_npz, tmp_path / "plots")
+    plot_module.plot_solution_npz(solution_npz, tmp_path / "plots")
     assert (tmp_path / "plots" / "overview_from_npz.png").exists()
     assert (tmp_path / "plots" / "diagnostics_from_npz.png").exists()
 
@@ -346,11 +480,17 @@ def test_geometry_preview_demo_writes_preview_and_optional_post_outputs(
             path.write_bytes(b"post")
         return outputs
 
-    monkeypatch.setattr(module, "write_geometry_preview_plots", fake_write_geometry_preview_plots)
+    monkeypatch.setattr(
+        module, "write_geometry_preview_plots", fake_write_geometry_preview_plots
+    )
     monkeypatch.setattr(module, "solve_steady", fake_solve_steady)
-    monkeypatch.setattr(module, "write_case_overview_plots", fake_write_case_overview_plots)
+    monkeypatch.setattr(
+        module, "write_case_overview_plots", fake_write_case_overview_plots
+    )
 
-    summary = module.write_preview_bundle(out_dir=tmp_path, with_post_run=True, post_case_kind="hartmann")
+    summary = module.write_preview_bundle(
+        out_dir=tmp_path, with_post_run=True, post_case_kind="hartmann"
+    )
     assert summary["with_post_run"] is True
     assert summary["post_case_kind"] == "hartmann"
     assert (tmp_path / "hartmann_geometry" / "geometry_preview.png").exists()
@@ -360,14 +500,19 @@ def test_geometry_preview_demo_writes_preview_and_optional_post_outputs(
     assert (tmp_path / "geometry_preview_summary.json").exists()
 
 
-def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_readme_showcase_demo_writes_media_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("readme_showcase_demo.py")
     captured = {}
 
     monkeypatch.setattr(
         module,
         "run_geometry_panel_demo",
-        lambda *, out_dir: {"plots": ["geometry_gallery.png"], "geometries": {"rect_duct": {}}},
+        lambda *, out_dir: {
+            "plots": ["geometry_gallery.png"],
+            "geometries": {"rect_duct": {}},
+        },
     )
 
     def fake_solve_case_snapshots(case, *args, **kwargs):
@@ -402,7 +547,9 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
 
     monkeypatch.setattr(module, "write_transient_movies", fake_write_transient_movies)
 
-    summary = module.run_readme_showcase_demo(out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5)
+    summary = module.run_readme_showcase_demo(
+        out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5
+    )
 
     assert summary["case"] == "readme_showcase_demo"
     assert summary["movie_case_kind"] == "hunt"
@@ -413,12 +560,33 @@ def test_readme_showcase_demo_writes_media_summary(tmp_path: Path, monkeypatch: 
     assert (tmp_path / "readme_showcase_summary.json").exists()
 
 
-def test_straight_duct_geometry_and_mesh_demo_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_straight_duct_geometry_and_mesh_demo_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("straight_duct_geometry_and_mesh.py")
 
-    monkeypatch.setattr(module, "generate_layered_duct_mesh", lambda **kwargs: SimpleNamespace(ny=4, nz=4, y_faces=np.linspace(-1.0, 1.0, 5), z_faces=np.linspace(-1.0, 1.0, 5), y_centers=np.linspace(-0.75, 0.75, 4), z_centers=np.linspace(-0.75, 0.75, 4)))
-    monkeypatch.setattr(module, "write_lm_duct_geometry_setup_figure", lambda *args, **kwargs: [tmp_path / "lm_duct_geometry_setup.png"])
-    monkeypatch.setattr(module, "write_structured_mesh_figure", lambda *args, **kwargs: [tmp_path / "structured_mesh_ha20.png"])
+    monkeypatch.setattr(
+        module,
+        "generate_layered_duct_mesh",
+        lambda **kwargs: SimpleNamespace(
+            ny=4,
+            nz=4,
+            y_faces=np.linspace(-1.0, 1.0, 5),
+            z_faces=np.linspace(-1.0, 1.0, 5),
+            y_centers=np.linspace(-0.75, 0.75, 4),
+            z_centers=np.linspace(-0.75, 0.75, 4),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "write_lm_duct_geometry_setup_figure",
+        lambda *args, **kwargs: [tmp_path / "lm_duct_geometry_setup.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_structured_mesh_figure",
+        lambda *args, **kwargs: [tmp_path / "structured_mesh_ha20.png"],
+    )
 
     for name in ("lm_duct_geometry_setup.png", "structured_mesh_ha20.png"):
         (tmp_path / name).write_bytes(b"img")
@@ -431,17 +599,55 @@ def test_straight_duct_geometry_and_mesh_demo_writes_summary(tmp_path: Path, mon
     assert (tmp_path / "straight_duct_geometry_and_mesh_summary.json").exists()
 
 
-def test_shercliff_showcase_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_shercliff_showcase_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("shercliff_showcase.py")
 
-    comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=1.0e-3), z_profile=SimpleNamespace(l2_error=2.0e-3))
-    monkeypatch.setattr(module, "solve_closed_channel_benchmark", lambda *args, **kwargs: (SimpleNamespace(name="shercliff_ha20"), SimpleNamespace(), comparison))
-    monkeypatch.setattr(module, "write_boundary_layer_figure", lambda *args, **kwargs: [tmp_path / "boundary_layer_development.png"])
-    monkeypatch.setattr(module, "write_velocity_profile_volume_figure", lambda *args, **kwargs: [tmp_path / "velocity_profile_volume.png"])
-    monkeypatch.setattr(module, "write_annotated_layer_figure", lambda *args, **kwargs: [tmp_path / "annotated_layers.png"])
-    monkeypatch.setattr(module, "write_closed_channel_startup_movies", lambda *args, **kwargs: [tmp_path / "shercliff_startup_2d.gif", tmp_path / "shercliff_startup_3d.gif"])
+    comparison = SimpleNamespace(
+        y_profile=SimpleNamespace(l2_error=1.0e-3),
+        z_profile=SimpleNamespace(l2_error=2.0e-3),
+    )
+    monkeypatch.setattr(
+        module,
+        "solve_closed_channel_benchmark",
+        lambda *args, **kwargs: (
+            SimpleNamespace(name="shercliff_ha20"),
+            SimpleNamespace(),
+            comparison,
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "write_boundary_layer_figure",
+        lambda *args, **kwargs: [tmp_path / "boundary_layer_development.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_velocity_profile_volume_figure",
+        lambda *args, **kwargs: [tmp_path / "velocity_profile_volume.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_annotated_layer_figure",
+        lambda *args, **kwargs: [tmp_path / "annotated_layers.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_closed_channel_startup_movies",
+        lambda *args, **kwargs: [
+            tmp_path / "shercliff_startup_2d.gif",
+            tmp_path / "shercliff_startup_3d.gif",
+        ],
+    )
 
-    for name in ("boundary_layer_development.png", "velocity_profile_volume.png", "annotated_layers.png", "shercliff_startup_2d.gif", "shercliff_startup_3d.gif"):
+    for name in (
+        "boundary_layer_development.png",
+        "velocity_profile_volume.png",
+        "annotated_layers.png",
+        "shercliff_startup_2d.gif",
+        "shercliff_startup_3d.gif",
+    ):
         (tmp_path / name).write_bytes(b"artifact")
 
     summary = module.run_shercliff_showcase(out_dir=tmp_path)
@@ -456,14 +662,50 @@ def test_shercliff_showcase_writes_summary(tmp_path: Path, monkeypatch: pytest.M
 def test_hunt_showcase_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     module = _load_example_module("hunt_showcase.py")
 
-    comparison = SimpleNamespace(y_profile=SimpleNamespace(l2_error=3.0e-3), z_profile=SimpleNamespace(l2_error=4.0e-3))
-    monkeypatch.setattr(module, "solve_closed_channel_benchmark", lambda *args, **kwargs: (SimpleNamespace(name="hunt_ha20"), SimpleNamespace(), comparison))
-    monkeypatch.setattr(module, "write_boundary_layer_figure", lambda *args, **kwargs: [tmp_path / "boundary_layer_development.png"])
-    monkeypatch.setattr(module, "write_velocity_profile_volume_figure", lambda *args, **kwargs: [tmp_path / "velocity_profile_volume.png"])
-    monkeypatch.setattr(module, "write_annotated_layer_figure", lambda *args, **kwargs: [tmp_path / "annotated_layers.png"])
-    monkeypatch.setattr(module, "write_closed_channel_startup_movies", lambda *args, **kwargs: [tmp_path / "hunt_startup_2d.gif", tmp_path / "hunt_startup_3d.gif"])
+    comparison = SimpleNamespace(
+        y_profile=SimpleNamespace(l2_error=3.0e-3),
+        z_profile=SimpleNamespace(l2_error=4.0e-3),
+    )
+    monkeypatch.setattr(
+        module,
+        "solve_closed_channel_benchmark",
+        lambda *args, **kwargs: (
+            SimpleNamespace(name="hunt_ha20"),
+            SimpleNamespace(),
+            comparison,
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "write_boundary_layer_figure",
+        lambda *args, **kwargs: [tmp_path / "boundary_layer_development.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_velocity_profile_volume_figure",
+        lambda *args, **kwargs: [tmp_path / "velocity_profile_volume.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_annotated_layer_figure",
+        lambda *args, **kwargs: [tmp_path / "annotated_layers.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_closed_channel_startup_movies",
+        lambda *args, **kwargs: [
+            tmp_path / "hunt_startup_2d.gif",
+            tmp_path / "hunt_startup_3d.gif",
+        ],
+    )
 
-    for name in ("boundary_layer_development.png", "velocity_profile_volume.png", "annotated_layers.png", "hunt_startup_2d.gif", "hunt_startup_3d.gif"):
+    for name in (
+        "boundary_layer_development.png",
+        "velocity_profile_volume.png",
+        "annotated_layers.png",
+        "hunt_startup_2d.gif",
+        "hunt_startup_3d.gif",
+    ):
         (tmp_path / name).write_bytes(b"artifact")
 
     summary = module.run_hunt_showcase(out_dir=tmp_path)
@@ -474,7 +716,9 @@ def test_hunt_showcase_writes_summary(tmp_path: Path, monkeypatch: pytest.Monkey
     assert (tmp_path / "hunt_showcase_summary.json").exists()
 
 
-def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_straight_duct_profile_comparison_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("straight_duct_profile_comparison.py")
 
     call_count = {"value": 0}
@@ -495,8 +739,16 @@ def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeyp
 
     monkeypatch.setattr(module, "solve_closed_channel_benchmark", fake_solve)
     monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace())
-    monkeypatch.setattr(module, "hartmann_validation", lambda solution, ha: SimpleNamespace(l2_error=5.0e-4, linf_error=7.0e-4))
-    monkeypatch.setattr(module, "write_closed_channel_profile_comparison_figure", lambda *args, **kwargs: [tmp_path / "analytic_velocity_profiles.png"])
+    monkeypatch.setattr(
+        module,
+        "hartmann_validation",
+        lambda solution, ha: SimpleNamespace(l2_error=5.0e-4, linf_error=7.0e-4),
+    )
+    monkeypatch.setattr(
+        module,
+        "write_closed_channel_profile_comparison_figure",
+        lambda *args, **kwargs: [tmp_path / "analytic_velocity_profiles.png"],
+    )
 
     (tmp_path / "analytic_velocity_profiles.png").write_bytes(b"img")
 
@@ -511,7 +763,9 @@ def test_straight_duct_profile_comparison_writes_summary(tmp_path: Path, monkeyp
     assert (tmp_path / "straight_duct_profile_comparison_summary.json").exists()
 
 
-def test_straight_duct_validation_ladder_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_straight_duct_validation_ladder_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("straight_duct_validation_ladder.py")
 
     def fake_solve(case_kind, **kwargs):
@@ -524,7 +778,11 @@ def test_straight_duct_validation_ladder_writes_summary(tmp_path: Path, monkeypa
         return SimpleNamespace(), SimpleNamespace(), comparison
 
     monkeypatch.setattr(module, "solve_closed_channel_benchmark", fake_solve)
-    monkeypatch.setattr(module, "write_closed_channel_validation_ladder_figure", lambda *args, **kwargs: [tmp_path / "closed_channel_validation_ladder.png"])
+    monkeypatch.setattr(
+        module,
+        "write_closed_channel_validation_ladder_figure",
+        lambda *args, **kwargs: [tmp_path / "closed_channel_validation_ladder.png"],
+    )
 
     (tmp_path / "closed_channel_validation_ladder.png").write_bytes(b"img")
     summary = module.run_straight_duct_validation_ladder(out_dir=tmp_path)
@@ -537,16 +795,28 @@ def test_straight_duct_validation_ladder_writes_summary(tmp_path: Path, monkeypa
     assert (tmp_path / "straight_duct_validation_ladder_summary.json").exists()
 
 
-def test_hartmann_validation_ladder_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_hartmann_validation_ladder_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("hartmann_validation_ladder.py")
 
     monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace())
     monkeypatch.setattr(
         module,
         "hartmann_validation",
-        lambda solution, ha: SimpleNamespace(l2_error=ha * 1.0e-4, linf_error=ha * 2.0e-4, coordinate=np.linspace(-1.0, 1.0, 5), simulated=np.linspace(0.0, 1.0, 5), reference=np.linspace(0.0, 1.0, 5)),
+        lambda solution, ha: SimpleNamespace(
+            l2_error=ha * 1.0e-4,
+            linf_error=ha * 2.0e-4,
+            coordinate=np.linspace(-1.0, 1.0, 5),
+            simulated=np.linspace(0.0, 1.0, 5),
+            reference=np.linspace(0.0, 1.0, 5),
+        ),
     )
-    monkeypatch.setattr(module, "write_hartmann_validation_ladder_figure", lambda *args, **kwargs: [tmp_path / "hartmann_validation_ladder.png"])
+    monkeypatch.setattr(
+        module,
+        "write_hartmann_validation_ladder_figure",
+        lambda *args, **kwargs: [tmp_path / "hartmann_validation_ladder.png"],
+    )
 
     (tmp_path / "hartmann_validation_ladder.png").write_bytes(b"img")
     summary = module.run_hartmann_validation_ladder(out_dir=tmp_path)
@@ -560,20 +830,45 @@ def test_hartmann_validation_ladder_writes_summary(tmp_path: Path, monkeypatch: 
     assert (tmp_path / "hartmann_validation_ladder_summary.json").exists()
 
 
-def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_plotting_api_demo_writes_geometry_plots_and_movies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("plotting_api_demo.py")
 
-    monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace(mesh=SimpleNamespace(), case_name=case.name))
-    monkeypatch.setattr(module, "write_geometry_preview_plots", lambda mesh, out_dir, case_title: [out_dir / "geometry_preview.png"])
-    monkeypatch.setattr(module, "write_case_overview_plots", lambda solution, out_dir, case_title: [out_dir / "overview.png"])
-    monkeypatch.setattr(module, "solve_case_snapshots", lambda case, frame_count=12: [{"time": 0.0, "u": np.ones((2, 2)), "mesh": None}])
+    monkeypatch.setattr(
+        module,
+        "solve_steady",
+        lambda case: SimpleNamespace(mesh=SimpleNamespace(), case_name=case.name),
+    )
+    monkeypatch.setattr(
+        module,
+        "write_geometry_preview_plots",
+        lambda mesh, out_dir, case_title: [out_dir / "geometry_preview.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_case_overview_plots",
+        lambda solution, out_dir, case_title: [out_dir / "overview.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "solve_case_snapshots",
+        lambda case, frame_count=12: [
+            {"time": 0.0, "u": np.ones((2, 2)), "mesh": None}
+        ],
+    )
     monkeypatch.setattr(
         module,
         "write_transient_movies",
-        lambda frames, out_dir, case_title, output_stem, fps=18: [out_dir / f"{output_stem}_2d.gif", out_dir / f"{output_stem}_3d.gif"],
+        lambda frames, out_dir, case_title, output_stem, fps=18: [
+            out_dir / f"{output_stem}_2d.gif",
+            out_dir / f"{output_stem}_3d.gif",
+        ],
     )
 
-    summary = module.run_plotting_api_demo(out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5)
+    summary = module.run_plotting_api_demo(
+        out_dir=tmp_path, movie_dt=1.0e-5, movie_t_final=2.0e-5
+    )
 
     assert summary["case"] == "hartmann_ha20"
     assert "geometry_preview.png" in summary["geometry"]
@@ -582,7 +877,9 @@ def test_plotting_api_demo_writes_geometry_plots_and_movies(tmp_path: Path, monk
     assert (tmp_path / "plotting_api_demo_summary.json").exists()
 
 
-def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_wham_mirror_pipe_demo_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("wham_mirror_pipe_demo.py")
 
     monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path)
@@ -594,11 +891,35 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
         target.write_bytes(b"npz")
         return target
 
-    monkeypatch.setattr(module, "write_wham_mirror_field_npz", fake_write_wham_mirror_field_npz)
-    monkeypatch.setattr(module, "build_wham_mirror_pipe_extruded_problem", lambda **kwargs: SimpleNamespace(case=SimpleNamespace(time_stepper=SimpleNamespace(max_steps=8, potential_iterations=16), solver=SimpleNamespace(coupling_iterations=6)), profile=SimpleNamespace(x=np.linspace(-0.2, 0.2, 5))))
-    monkeypatch.setattr(module, "build_fringing_autodiff_problem", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr(module, "replace", lambda obj, **kwargs: SimpleNamespace(**{**obj.__dict__, **kwargs}))
-    monkeypatch.setattr(module, "solve_extruded_inductionless", lambda problem: SimpleNamespace(bundle=SimpleNamespace(), validation=SimpleNamespace()))
+    monkeypatch.setattr(
+        module, "write_wham_mirror_field_npz", fake_write_wham_mirror_field_npz
+    )
+    monkeypatch.setattr(
+        module,
+        "build_wham_mirror_pipe_extruded_problem",
+        lambda **kwargs: SimpleNamespace(
+            case=SimpleNamespace(
+                time_stepper=SimpleNamespace(max_steps=8, potential_iterations=16),
+                solver=SimpleNamespace(coupling_iterations=6),
+            ),
+            profile=SimpleNamespace(x=np.linspace(-0.2, 0.2, 5)),
+        ),
+    )
+    monkeypatch.setattr(
+        module, "build_fringing_autodiff_problem", lambda **kwargs: SimpleNamespace()
+    )
+    monkeypatch.setattr(
+        module,
+        "replace",
+        lambda obj, **kwargs: SimpleNamespace(**{**obj.__dict__, **kwargs}),
+    )
+    monkeypatch.setattr(
+        module,
+        "solve_extruded_inductionless",
+        lambda problem: SimpleNamespace(
+            bundle=SimpleNamespace(), validation=SimpleNamespace()
+        ),
+    )
     monkeypatch.setattr(
         module,
         "wham_mirror_pressure_drop_sensitivity",
@@ -607,12 +928,36 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
             "d_pressure_drop_d_separation": -0.1,
         },
     )
-    monkeypatch.setattr(module, "tabulated_field_quality_metrics", lambda path: {"validation_pass": True, "dimension": 3})
-    monkeypatch.setattr(module, "validate_wham_mirror_pipe_baseline", lambda solution: {"validation_pass": True, "pressure_drop_proxy": 1.0})
-    monkeypatch.setattr(module, "sample_tabulated_field_volume", lambda *args, **kwargs: np.zeros((module.FIELD_NY, module.FIELD_NZ, 3)))
-    monkeypatch.setattr(module, "write_cross_section_field_plots", lambda **kwargs: [tmp_path / "field_preview.png"])
-    monkeypatch.setattr(module, "write_extruded_overview_plots", lambda *args, **kwargs: [tmp_path / "extruded_overview.png"])
-    monkeypatch.setattr(module, "write_wham_mirror_overview_plots", lambda *args, **kwargs: [tmp_path / "wham_mirror_overview.png"])
+    monkeypatch.setattr(
+        module,
+        "tabulated_field_quality_metrics",
+        lambda path: {"validation_pass": True, "dimension": 3},
+    )
+    monkeypatch.setattr(
+        module,
+        "validate_wham_mirror_pipe_baseline",
+        lambda solution: {"validation_pass": True, "pressure_drop_proxy": 1.0},
+    )
+    monkeypatch.setattr(
+        module,
+        "sample_tabulated_field_volume",
+        lambda *args, **kwargs: np.zeros((module.FIELD_NY, module.FIELD_NZ, 3)),
+    )
+    monkeypatch.setattr(
+        module,
+        "write_cross_section_field_plots",
+        lambda **kwargs: [tmp_path / "field_preview.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_extruded_overview_plots",
+        lambda *args, **kwargs: [tmp_path / "extruded_overview.png"],
+    )
+    monkeypatch.setattr(
+        module,
+        "write_wham_mirror_overview_plots",
+        lambda *args, **kwargs: [tmp_path / "wham_mirror_overview.png"],
+    )
     (tmp_path / "field_preview.png").write_bytes(b"img")
     (tmp_path / "extruded_overview.png").write_bytes(b"img")
     (tmp_path / "wham_mirror_overview.png").write_bytes(b"img")
@@ -627,14 +972,20 @@ def test_wham_mirror_pipe_demo_writes_summary(tmp_path: Path, monkeypatch: pytes
     assert captured_field_kwargs["x"][-1] == pytest.approx(module.PIPE_LENGTH)
     assert captured_field_kwargs["x_offset"] == pytest.approx(-0.5 * module.PIPE_LENGTH)
     assert summary["field_coordinate_frame"]["solver_x_min"] == pytest.approx(0.0)
-    assert summary["field_coordinate_frame"]["coil_frame_x_min"] == pytest.approx(-0.5 * module.PIPE_LENGTH)
+    assert summary["field_coordinate_frame"]["coil_frame_x_min"] == pytest.approx(
+        -0.5 * module.PIPE_LENGTH
+    )
     assert (tmp_path / "wham_mirror_pipe_summary.json").exists()
 
 
-def test_autodiff_wham_pressure_sensitivity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_autodiff_wham_pressure_sensitivity_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("autodiff_wham_pressure_sensitivity.py")
     monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path)
-    monkeypatch.setattr(module, "build_fringing_autodiff_problem", lambda **kwargs: SimpleNamespace())
+    monkeypatch.setattr(
+        module, "build_fringing_autodiff_problem", lambda **kwargs: SimpleNamespace()
+    )
     monkeypatch.setattr(
         module,
         "wham_mirror_pressure_drop_sensitivity",
@@ -656,7 +1007,9 @@ def test_autodiff_wham_pressure_sensitivity_writes_summary(tmp_path: Path, monke
     assert (tmp_path / "autodiff_wham_pressure_sensitivity_summary.json").exists()
 
 
-def test_wham_coil_model_field_adapter_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_wham_coil_model_field_adapter_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("wham_coil_model_field_adapter.py")
     script = tmp_path / "coil_model_WHAM.py"
     script.write_text(
@@ -682,17 +1035,28 @@ def test_wham_coil_model_field_adapter_writes_summary(tmp_path: Path, monkeypatc
         z = np.asarray(kwargs["z"])
         xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
         field = np.stack([0.0 * xx, 0.0 * yy, 1.0 + 0.0 * zz], axis=-1)
-        np.savez(path, x=x, y=y, z=z, bx=field[..., 0], by=field[..., 1], bz=field[..., 2])
+        np.savez(
+            path, x=x, y=y, z=z, bx=field[..., 0], by=field[..., 1], bz=field[..., 2]
+        )
         return path
 
     def fake_sample_field(x, y, z, **kwargs):
-        return np.stack([0.0 * np.asarray(x), 0.0 * np.asarray(y), 1.0 + 0.0 * np.asarray(z)], axis=-1)
+        return np.stack(
+            [0.0 * np.asarray(x), 0.0 * np.asarray(y), 1.0 + 0.0 * np.asarray(z)],
+            axis=-1,
+        )
 
     monkeypatch.setattr(module, "write_wham_mirror_field_npz", fake_write_field)
     monkeypatch.setattr(module, "sample_wham_mirror_field", fake_sample_field)
-    monkeypatch.setattr(module, "tabulated_field_quality_metrics", lambda path: {"validation_pass": True, "dimension": 3})
+    monkeypatch.setattr(
+        module,
+        "tabulated_field_quality_metrics",
+        lambda path: {"validation_pass": True, "dimension": 3},
+    )
 
-    summary = module.run_wham_coil_model_field_adapter(out_dir=tmp_path, coil_model_script=script)
+    summary = module.run_wham_coil_model_field_adapter(
+        out_dir=tmp_path, coil_model_script=script
+    )
 
     assert summary["case"] == "wham_coil_model_field_adapter"
     assert summary["status"] == "wham_script_ingested"
@@ -701,41 +1065,74 @@ def test_wham_coil_model_field_adapter_writes_summary(tmp_path: Path, monkeypatc
     assert (tmp_path / "wham_coil_model_field_adapter_summary.json").exists()
 
 
-def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_fringing_benchmark_demo_writes_extruded_bundle_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("fringing_benchmark_demo.py")
 
     monkeypatch.setattr(
         module,
         "build_square_duct_extruded_problem",
         lambda **kwargs: SimpleNamespace(
-            case=SimpleNamespace(name="fringing_case", solver=SimpleNamespace(kind="extruded_inductionless")),
-            profile=SimpleNamespace(x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"),
+            case=SimpleNamespace(
+                name="fringing_case",
+                solver=SimpleNamespace(kind="extruded_inductionless"),
+            ),
+            profile=SimpleNamespace(
+                x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"
+            ),
         ),
     )
     monkeypatch.setattr(
         module,
         "build_layered_duct_extruded_problem",
         lambda **kwargs: SimpleNamespace(
-            case=SimpleNamespace(name="fringing_case_layered", solver=SimpleNamespace(kind="extruded_inductionless")),
-            profile=SimpleNamespace(x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"),
+            case=SimpleNamespace(
+                name="fringing_case_layered",
+                solver=SimpleNamespace(kind="extruded_inductionless"),
+            ),
+            profile=SimpleNamespace(
+                x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"
+            ),
         ),
     )
     monkeypatch.setattr(
         module,
         "build_pipe_ogrid_extruded_problem",
         lambda **kwargs: SimpleNamespace(
-            case=SimpleNamespace(name="fringing_case_pipe", solver=SimpleNamespace(kind="extruded_inductionless")),
-            profile=SimpleNamespace(x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"),
+            case=SimpleNamespace(
+                name="fringing_case_pipe",
+                solver=SimpleNamespace(kind="extruded_inductionless"),
+            ),
+            profile=SimpleNamespace(
+                x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"
+            ),
         ),
     )
     monkeypatch.setattr(
         module,
         "solve_extruded_inductionless",
-            lambda *args, **kwargs: SimpleNamespace(
-                station_history=(
-                    {"x": 0.0, "field_scale": 0.0, "mean_velocity": 1.0, "u_max": 1.1, "pressure_span": 0.3, "axial_current": 0.01, "current_scaled_pressure_proxy": 0.2},
-                    {"x": 1.0, "field_scale": 1.0, "mean_velocity": 0.8, "u_max": 0.9, "pressure_span": 0.2, "axial_current": 0.015, "current_scaled_pressure_proxy": 0.25},
-                ),
+        lambda *args, **kwargs: SimpleNamespace(
+            station_history=(
+                {
+                    "x": 0.0,
+                    "field_scale": 0.0,
+                    "mean_velocity": 1.0,
+                    "u_max": 1.1,
+                    "pressure_span": 0.3,
+                    "axial_current": 0.01,
+                    "current_scaled_pressure_proxy": 0.2,
+                },
+                {
+                    "x": 1.0,
+                    "field_scale": 1.0,
+                    "mean_velocity": 0.8,
+                    "u_max": 0.9,
+                    "pressure_span": 0.2,
+                    "axial_current": 0.015,
+                    "current_scaled_pressure_proxy": 0.25,
+                },
+            ),
             bundle=SimpleNamespace(
                 x=np.array([0.0, 1.0]),
                 y=np.array([-1.0, 1.0]),
@@ -762,7 +1159,9 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(tmp_path: Path, 
         ),
     )
 
-    summary = module.run_fringing_benchmark_demo(out_dir=tmp_path, nx_stations=2, ny=4, nz=4)
+    summary = module.run_fringing_benchmark_demo(
+        out_dir=tmp_path, nx_stations=2, ny=4, nz=4
+    )
     assert summary["case"] == "fringing_case"
     assert "extruded_bundle" in summary
     assert "validation" in summary
@@ -862,18 +1261,22 @@ def test_bent_pipe_preview_writes_summary(tmp_path: Path):
 def test_bent_pipe_inductionless_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("bent_pipe_inductionless_demo.py")
     module.OUTPUT_DIR = tmp_path
-    module.NR = 8
-    module.NTHETA = 24
-    module.NX_STATIONS = 9
-    module.MAX_STEPS = 8
-    module.POTENTIAL_ITERATIONS = 24
+    module.NR = 4
+    module.NTHETA = 8
+    module.NX_STATIONS = 5
+    module.MAX_STEPS = 4
+    module.COUPLING_ITERATIONS = 4
+    module.POTENTIAL_ITERATIONS = 16
     summary = module.run_bent_pipe_inductionless_demo()
     assert summary["geometry_kind"] == "bent_pipe"
     assert "validation" in summary
     assert summary["validation"]["dean_vortex_observables_available"] is True
     assert summary["validation"]["research_grade_dean_validation_pass"] is False
     assert "research_grade_charge_balance_pass" in summary["validation"]
-    assert summary["external_reference_comparison"]["status"] == "external_reference_csv_missing"
+    assert (
+        summary["external_reference_comparison"]["status"]
+        == "external_reference_csv_missing"
+    )
     assert (tmp_path / "bent_pipe_overview.png").exists()
     assert (tmp_path / "dean_vortex_reference_observables_template.csv").exists()
     assert (tmp_path / "bent_pipe_inductionless_summary.json").exists()
@@ -889,7 +1292,9 @@ def test_dean_vortex_external_reference_template_writes_summary(tmp_path: Path):
     assert (tmp_path / "dean_vortex_external_reference_template_summary.json").exists()
 
 
-def test_dean_vortex_bayat_rezai_strict_attempt_writes_failed_comparison(tmp_path: Path):
+def test_dean_vortex_bayat_rezai_strict_attempt_writes_failed_comparison(
+    tmp_path: Path,
+):
     module = _load_example_module("dean_vortex_bayat_rezai_strict_attempt.py")
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
@@ -915,8 +1320,13 @@ def test_dean_vortex_bayat_rezai_strict_attempt_writes_failed_comparison(tmp_pat
     assert summary["strict_blocker_closed"] is False
     assert summary["external_reference_comparison"]["validation_pass"] is False
     assert (docs_dir / "dean_vortex_reference_observables.csv").exists()
-    patched = json.loads((docs_dir / "bent_pipe_inductionless_summary.json").read_text(encoding="utf-8"))
-    assert patched["external_reference_comparison"]["status"] == "external_reference_compared"
+    patched = json.loads(
+        (docs_dir / "bent_pipe_inductionless_summary.json").read_text(encoding="utf-8")
+    )
+    assert (
+        patched["external_reference_comparison"]["status"]
+        == "external_reference_compared"
+    )
 
 
 def test_variable_field_validation_writes_summary(tmp_path: Path):
@@ -972,9 +1382,9 @@ def test_variable_field_tabulated_demo_writes_summary(tmp_path: Path):
 def test_variable_field_bent_pipe_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("variable_field_bent_pipe_demo.py")
     module.OUTPUT_DIR = tmp_path
-    module.NR = 8
-    module.NTHETA = 16
-    module.NX_STATIONS = 9
+    module.NR = 4
+    module.NTHETA = 8
+    module.NX_STATIONS = 5
     summary = module.run_variable_field_bent_pipe_demo()
     assert summary["case"] == "variable_field_bent_pipe"
     assert (tmp_path / "bent_pipe_overview.png").exists()
@@ -1031,12 +1441,19 @@ def test_interface_conductivity_verification_demo_writes_summary(tmp_path: Path)
     assert (tmp_path / "interface_conductivity_verification_summary.json").exists()
 
 
-def test_freemhd_closed_channel_parity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_freemhd_closed_channel_parity_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("freemhd_closed_channel_parity.py")
     module.OUTPUT_DIR = tmp_path
     module.FREEMHD_INSTALL_DIR = tmp_path / "freemhd_install"
     (module.FREEMHD_INSTALL_DIR / "freemhd_output" / "shercliff").mkdir(parents=True)
     (module.FREEMHD_INSTALL_DIR / "freemhd_output" / "hunt").mkdir(parents=True)
+    monkeypatch.setattr(
+        module,
+        "audit_freemhd_case_against_spec",
+        lambda *_args, case_kind, **_kwargs: {"case_kind": case_kind, "matched": True},
+    )
 
     monkeypatch.setattr(
         module,
@@ -1050,14 +1467,25 @@ def test_freemhd_closed_channel_parity_writes_summary(tmp_path: Path, monkeypatc
             "u_max_abs_diff": 1.0e-3,
             "y_l2_error": 5.0e-3,
             "z_l2_error": 4.0e-3,
-            "y_profile": {"coordinate": [-1.0, 0.0, 1.0], "simulated": [0.0, 1.0, 0.0], "reference": [0.0, 1.0, 0.0]},
-            "z_profile": {"coordinate": [-1.0, 0.0, 1.0], "simulated": [0.0, 1.0, 0.0], "reference": [0.0, 1.0, 0.0]},
+            "y_profile": {
+                "coordinate": [-1.0, 0.0, 1.0],
+                "simulated": [0.0, 1.0, 0.0],
+                "reference": [0.0, 1.0, 0.0],
+            },
+            "z_profile": {
+                "coordinate": [-1.0, 0.0, 1.0],
+                "simulated": [0.0, 1.0, 0.0],
+                "reference": [0.0, 1.0, 0.0],
+            },
         },
     )
     monkeypatch.setattr(
         module,
         "write_freemhd_parity_plots",
-        lambda records, out_dir, case_title: [Path(out_dir) / "freemhd_closed_channel_parity.png", Path(out_dir) / "freemhd_closed_channel_parity.pdf"],
+        lambda records, out_dir, case_title: [
+            Path(out_dir) / "freemhd_closed_channel_parity.png",
+            Path(out_dir) / "freemhd_closed_channel_parity.pdf",
+        ],
     )
     (tmp_path / "freemhd_closed_channel_parity.png").write_bytes(b"img")
     (tmp_path / "freemhd_closed_channel_parity.pdf").write_bytes(b"pdf")
@@ -1068,7 +1496,9 @@ def test_freemhd_closed_channel_parity_writes_summary(tmp_path: Path, monkeypatc
     assert (tmp_path / "freemhd_closed_channel_parity_summary.json").exists()
 
 
-def test_freemhd_closed_channel_observable_parity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_freemhd_closed_channel_observable_parity_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("freemhd_closed_channel_observable_parity.py")
     module.OUTPUT_DIR = tmp_path
     monkeypatch.setattr(
@@ -1114,7 +1544,56 @@ def test_freemhd_closed_channel_observable_parity_writes_summary(tmp_path: Path,
     assert (tmp_path / "freemhd_closed_channel_observable_parity_summary.json").exists()
 
 
-def test_freemhd_closed_channel_flow_rate_parity_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_freemhd_continuum_velocity_audit_keeps_shared_scale_and_endpoint_disclosure(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    module = _load_example_module("freemhd_closed_channel_observable_parity.py")
+    analytical = SimpleNamespace(
+        coordinate=np.asarray([-1.0, 0.0, 1.0]),
+        midplane_y=np.asarray([-0.1, 2.0, -0.1]),
+        midplane_z=np.asarray([0.0, 1.0, 0.0]),
+        path="analytical.txt",
+    )
+    monkeypatch.setattr(
+        module, "load_closed_channel_analytical", lambda *args, **kwargs: analytical
+    )
+    observables = {
+        "velocity": {
+            "y": {
+                "coordinate": [-1.0, 0.0, 1.0],
+                "simulated": [0.0, 1.0, 0.0],
+                "reference": [0.0, 0.9, 0.0],
+            },
+            "z": {
+                "coordinate": [-1.0, 0.0, 1.0],
+                "simulated": [0.0, 0.5, 0.0],
+                "reference": [0.0, 0.45, 0.0],
+            },
+        }
+    }
+
+    audit = module._continuum_velocity_audit(
+        "shercliff",
+        observables,
+        ha=20,
+        length_scale=1.0,
+        velocity_scale=2.0,
+        reference_root=Path("references"),
+    )
+
+    assert audit["reference_path"] == "analytical.txt"
+    assert audit["axes"]["y"]["analytical_endpoint_values"] == pytest.approx(
+        [-0.05, -0.05]
+    )
+    assert audit["axes"]["y"]["lmx_no_slip_endpoint_corrected_analytical"][
+        "l2_error"
+    ] == pytest.approx(0.0)
+    assert audit["axes"]["y"]["processed_freemhd_raw_analytical"]["l2_error"] > 0.0
+
+
+def test_freemhd_closed_channel_flow_rate_parity_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("freemhd_closed_channel_flow_rate_parity.py")
     module.OUTPUT_DIR = tmp_path
 
@@ -1161,7 +1640,9 @@ def test_freemhd_closed_channel_flow_rate_parity_writes_summary(tmp_path: Path, 
     assert (tmp_path / "freemhd_closed_channel_flow_rate_parity_summary.json").exists()
 
 
-def test_freemhd_observable_mesh_ladder_writes_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_freemhd_observable_mesh_ladder_writes_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     module = _load_example_module("freemhd_observable_mesh_ladder.py")
     module.OUTPUT_DIR = tmp_path
 
@@ -1203,16 +1684,44 @@ def test_freemhd_observable_mesh_ladder_writes_summary(tmp_path: Path, monkeypat
 
     monkeypatch.setattr(module.observable, "_observable_record", fake_record)
     ladder = (
-        {"label": "coarse", "case_settings": {"shercliff": {"ny": 8}, "hunt": {"ny": 8}}},
-        {"label": "refined", "case_settings": {"shercliff": {"ny": 12}, "hunt": {"ny": 12}}},
+        {
+            "label": "coarse",
+            "case_settings": {"shercliff": {"ny": 8}, "hunt": {"ny": 8}},
+        },
+        {
+            "label": "refined",
+            "case_settings": {"shercliff": {"ny": 12}, "hunt": {"ny": 12}},
+        },
     )
 
-    summary = module.run_freemhd_observable_mesh_ladder(out_dir=tmp_path, ladder=ladder)
+    summary = module.run_freemhd_observable_mesh_ladder(
+        out_dir=tmp_path, ladder=ladder, linear_solver="solvax_pcg"
+    )
 
     assert summary["case"] == "freemhd_observable_mesh_ladder"
+    assert summary["linear_solver"] == "solvax_pcg"
+    assert len(summary["implementation"]["solver_core_sha256"]) == 64
+    assert len(summary["implementation"]["runner_sha256"]) == 64
     assert summary["best_level_label"] == "refined"
     assert "freemhd_observable_mesh_ladder.png" in summary["plots"]
     assert (tmp_path / "freemhd_observable_mesh_ladder_summary.json").exists()
+
+
+def test_freemhd_observable_mesh_ladder_is_derived_from_canonical_specs():
+    module = _load_example_module("freemhd_observable_mesh_ladder.py")
+
+    assert module.DRIVE_MODE == "flow_rate"
+    assert [
+        (
+            level["case_settings"]["shercliff"]["ny"],
+            level["case_settings"]["shercliff"]["nz"],
+        )
+        for level in module.LADDER
+    ] == [(37, 29), (49, 37), (65, 49), (85, 63)]
+    assert all(
+        level["case_settings"]["hunt"]["potential_iterations"] == 2000
+        for level in module.LADDER
+    )
 
 
 def test_q2d_forced_validation_writes_summary(tmp_path: Path):
@@ -1241,7 +1750,10 @@ def test_q2d_wall_bounded_validation_writes_summary(tmp_path: Path):
     assert summary["energy_budget"]["validation_pass"] is True
     assert summary["turbulence_observables"]["kinetic_energy"] > 0.0
     assert "q2d_turbulence_observables.png" in summary["plots"]
-    assert summary["turbulence_observables"]["research_grade_turbulence_validation_pass"] is False
+    assert (
+        summary["turbulence_observables"]["research_grade_turbulence_validation_pass"]
+        is False
+    )
     assert (tmp_path / "q2d_wall_bounded_overview.png").exists()
     assert (tmp_path / "q2d_turbulence_observables.png").exists()
     assert (tmp_path / "q2d_wall_bounded_validation_summary.json").exists()
@@ -1259,7 +1771,10 @@ def test_q2d_turbulence_decay_demo_writes_summary_and_movie(tmp_path: Path):
     assert summary["case"] == "q2d_turbulence_decay"
     assert summary["validation"]["validation_pass"] is True
     assert summary["validation"]["research_grade_turbulence_validation_pass"] is False
-    assert summary["external_reference_comparison"]["status"] == "external_reference_csv_missing"
+    assert (
+        summary["external_reference_comparison"]["status"]
+        == "external_reference_csv_missing"
+    )
     assert (tmp_path / "q2d_turbulence_decay.gif").exists()
     assert (tmp_path / "q2d_turbulence_reference_observables_template.csv").exists()
     assert (tmp_path / "q2d_turbulence_decay_summary.json").exists()
@@ -1272,7 +1787,9 @@ def test_q2d_turbulence_external_reference_template_writes_summary(tmp_path: Pat
     assert summary["case"] == "q2d_turbulence_external_reference_template"
     assert summary["status"] == "template_only_no_external_reference_claim"
     assert (tmp_path / "q2d_turbulence_reference_observables.csv").exists()
-    assert (tmp_path / "q2d_turbulence_external_reference_template_summary.json").exists()
+    assert (
+        tmp_path / "q2d_turbulence_external_reference_template_summary.json"
+    ).exists()
 
 
 def test_q2d_lmx_q2dmhdfoam_turbulence_comparison_writes_artifacts(tmp_path: Path):
@@ -1312,7 +1829,10 @@ def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
     sample_dir.mkdir(parents=True)
     x = np.linspace(0.0, 0.15, 17)
     u = 1.0 - 0.3 * ((x - 0.075) / 0.075) ** 2
-    np.savetxt(sample_dir / "lineSampled_theta_Ux_250_500_1e6", np.column_stack([x, np.zeros_like(x), u]))
+    np.savetxt(
+        sample_dir / "lineSampled_theta_Ux_250_500_1e6",
+        np.column_stack([x, np.zeros_like(x), u]),
+    )
     vetcha = root / "FFT2_validation" / "vetcha2009" / "vetcha2009_Ha50_Re1e4.csv"
     vetcha.parent.mkdir(parents=True)
     vetcha.write_text(
@@ -1342,7 +1862,9 @@ def test_q2dmhdfoam_external_reference_adapter_writes_summary(tmp_path: Path):
     assert summary["profile_count"] == 4
     assert "q2dmhdfoam_external_reference.png" in summary["plots"]
     assert (tmp_path / "out" / "q2dmhdfoam_external_profile_observables.csv").exists()
-    assert (tmp_path / "out" / "q2dmhdfoam_lid_driven_turbulence_observables.csv").exists()
+    assert (
+        tmp_path / "out" / "q2dmhdfoam_lid_driven_turbulence_observables.csv"
+    ).exists()
     assert (tmp_path / "out" / "q2dmhdfoam_external_reference_summary.json").exists()
 
 
@@ -1394,7 +1916,9 @@ def test_q2dmhdfoam_lmx_turbulence_match_audit_writes_summary(tmp_path: Path):
     assert (tmp_path / "out" / "q2dmhdfoam_lmx_turbulence_match_audit.png").exists()
     assert (tmp_path / "out" / "q2dmhdfoam_lmx_turbulence_match_audit.csv").exists()
     assert (tmp_path / "docs" / "q2dmhdfoam_lmx_turbulence_match_audit.png").exists()
-    assert (tmp_path / "docs" / "q2dmhdfoam_lmx_turbulence_match_audit_summary.json").exists()
+    assert (
+        tmp_path / "docs" / "q2dmhdfoam_lmx_turbulence_match_audit_summary.json"
+    ).exists()
 
 
 def test_q2dmhdfoam_docker_reference_validation_writes_summary(tmp_path: Path):
@@ -1443,7 +1967,13 @@ def test_q2dmhdfoam_lid_driven_vtk_artifact_writes_summary(tmp_path: Path):
     vtk_dir = docker_output / "VTK"
     vtk_dir.mkdir(parents=True)
     (docker_output / "summary.json").write_text(
-        json.dumps({"case": "run/lidDriven", "status": "external_reference_case_complete_no_profile_extraction", "final_time": 1.0}),
+        json.dumps(
+            {
+                "case": "run/lidDriven",
+                "status": "external_reference_case_complete_no_profile_extraction",
+                "final_time": 1.0,
+            }
+        ),
         encoding="utf-8",
     )
     (vtk_dir / "sample.vtk").write_text(
@@ -1486,7 +2016,13 @@ def test_q2d_lmx_q2dmhdfoam_lid_driven_parity_writes_artifacts(tmp_path: Path):
     vtk_dir = docker_output / "VTK"
     vtk_dir.mkdir(parents=True)
     (docker_output / "summary.json").write_text(
-        json.dumps({"case": "run/lidDriven", "status": "external_reference_case_complete_no_profile_extraction", "final_time": 0.02}),
+        json.dumps(
+            {
+                "case": "run/lidDriven",
+                "status": "external_reference_case_complete_no_profile_extraction",
+                "final_time": 0.02,
+            }
+        ),
         encoding="utf-8",
     )
     (vtk_dir / "sample.vtk").write_text(
@@ -1551,7 +2087,10 @@ def test_magnetic_obstacle_benchmark_writes_summary(tmp_path: Path):
     assert summary["validation"]["reference_kind"] == "matched_no_field_lmx"
     assert summary["validation"]["research_grade_validation_pass"] is False
     assert summary["literature_validation"]["literature_pass"] is False
-    assert summary["external_reference_comparison"]["status"] == "external_reference_csv_missing"
+    assert (
+        summary["external_reference_comparison"]["status"]
+        == "external_reference_csv_missing"
+    )
     assert (tmp_path / "magnetic_obstacle_reference_observables_template.csv").exists()
 
 
@@ -1564,10 +2103,14 @@ def test_magnetic_obstacle_external_reference_template_writes_summary(tmp_path: 
     assert summary["status"] == "template_only_no_external_reference_claim"
     assert "centerline_velocity_deficit_ratio" in summary["template_observables"]
     assert (tmp_path / "template.csv").exists()
-    assert (tmp_path / "magnetic_obstacle_external_reference_template_summary.json").exists()
+    assert (
+        tmp_path / "magnetic_obstacle_external_reference_template_summary.json"
+    ).exists()
 
 
-def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(tmp_path: Path):
+def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(
+    tmp_path: Path,
+):
     module = _load_example_module("magnetic_obstacle_votyakov_strict_attempt.py")
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
@@ -1581,7 +2124,9 @@ def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(tmp_
         },
     }
     benchmark_path = docs_dir / "magnetic_obstacle_benchmark_summary.json"
-    benchmark_path.write_text(json.dumps(benchmark_summary, indent=2) + "\n", encoding="utf-8")
+    benchmark_path.write_text(
+        json.dumps(benchmark_summary, indent=2) + "\n", encoding="utf-8"
+    )
     candidate_path = docs_dir / "magnetic_obstacle_reference_observables_candidate.csv"
     candidate_path.write_text(
         "observable,value,tolerance,relative_tolerance,units,source,note\n"
@@ -1601,8 +2146,15 @@ def test_magnetic_obstacle_votyakov_strict_attempt_writes_failed_comparison(tmp_
     assert summary["strict_blocker_closed"] is False
     assert summary["external_reference_comparison"]["validation_pass"] is False
     assert (docs_dir / "magnetic_obstacle_reference_observables.csv").exists()
-    patched = json.loads((docs_dir / "magnetic_obstacle_benchmark_summary.json").read_text(encoding="utf-8"))
-    assert patched["external_reference_comparison"]["status"] == "external_reference_compared"
+    patched = json.loads(
+        (docs_dir / "magnetic_obstacle_benchmark_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        patched["external_reference_comparison"]["status"]
+        == "external_reference_compared"
+    )
 
 
 def test_magnetic_obstacle_votyakov_curve_validation_writes_artifacts(tmp_path: Path):
@@ -1645,8 +2197,12 @@ def test_magnetic_obstacle_votyakov_curve_validation_writes_artifacts(tmp_path: 
     assert summary["strict_blocker_closed"] is False
     assert summary["absolute_gap_to_plateau"] > 1.0
     assert (docs_dir / "magnetic_obstacle_votyakov_curve_comparison.png").exists()
-    assert (docs_dir / "magnetic_obstacle_votyakov_curve_comparison_observables.csv").exists()
-    assert (docs_dir / "magnetic_obstacle_votyakov_curve_validation_summary.json").exists()
+    assert (
+        docs_dir / "magnetic_obstacle_votyakov_curve_comparison_observables.csv"
+    ).exists()
+    assert (
+        docs_dir / "magnetic_obstacle_votyakov_curve_validation_summary.json"
+    ).exists()
 
 
 def test_research_grade_closure_dashboard_writes_docs_artifacts(tmp_path: Path):
@@ -1720,7 +2276,9 @@ def test_research_grade_closure_dashboard_writes_docs_artifacts(tmp_path: Path):
             ],
         },
     }.items():
-        (docs_dir / name).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        (docs_dir / name).write_text(
+            json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+        )
 
     summary = module.run_research_grade_closure_dashboard(
         out_dir=tmp_path / "out",
@@ -1750,6 +2308,7 @@ def test_magnetic_obstacle_regime_scan_writes_summary(tmp_path: Path):
     assert (tmp_path / "magnetic_obstacle_regime_scan_summary.json").exists()
 
 
+@pytest.mark.external
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
     _fringing_pipe_root_or_skip()
     module = _load_example_module("pipe_reference_comparison_demo.py")
@@ -1770,7 +2329,16 @@ def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
 
 def test_autodiff_fringing_design_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("autodiff_fringing_design_demo.py")
-    summary = module.run_autodiff_fringing_design_demo(out_dir=tmp_path, steps=4)
+    summary = module.run_autodiff_fringing_design_demo(
+        out_dir=tmp_path,
+        steps=3,
+        nx_stations=7,
+        ny=6,
+        nz=6,
+        macro_iterations=2,
+        potential_iterations=8,
+        velocity_iterations=10,
+    )
     assert "recovered" in summary
     assert (tmp_path / "autodiff_fringing_design.png").exists()
     assert (tmp_path / "autodiff_fringing_design_summary.json").exists()
@@ -1778,7 +2346,16 @@ def test_autodiff_fringing_design_demo_writes_summary(tmp_path: Path):
 
 def test_autodiff_fringing_response_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("autodiff_fringing_response_demo.py")
-    summary = module.run_autodiff_fringing_response_demo(out_dir=tmp_path, steps=4)
+    summary = module.run_autodiff_fringing_response_demo(
+        out_dir=tmp_path,
+        steps=3,
+        nx_stations=7,
+        ny=6,
+        nz=6,
+        macro_iterations=2,
+        potential_iterations=8,
+        velocity_iterations=10,
+    )
     assert "recovered" in summary
     assert (tmp_path / "autodiff_fringing_response.png").exists()
     assert (tmp_path / "autodiff_fringing_response_summary.json").exists()
@@ -1786,7 +2363,9 @@ def test_autodiff_fringing_response_demo_writes_summary(tmp_path: Path):
 
 def test_autodiff_extruded_target_demo_writes_summary(tmp_path: Path):
     module = _load_example_module("autodiff_extruded_target_demo.py")
-    summary = module.run_autodiff_extruded_target_demo(out_dir=tmp_path, ny=4, nz=4, nx_stations=4, steps=4)
+    summary = module.run_autodiff_extruded_target_demo(
+        out_dir=tmp_path, ny=4, nz=4, nx_stations=4, steps=4
+    )
     assert summary["solver_kind"] == "extruded_inductionless"
     assert (tmp_path / "autodiff_extruded_target.png").exists()
     assert (tmp_path / "autodiff_extruded_target_summary.json").exists()
@@ -1797,7 +2376,10 @@ def test_variable_field_geometry_demo_writes_preview_and_run_outputs(
 ):
     module = _load_example_module("variable_field_geometry_demo.py")
 
-    monkeypatch.setattr(module, "_build_mesh", lambda case: SimpleNamespace(geometry=case.geometry.kind))
+    monkeypatch.setattr(
+        module, "_build_mesh", lambda case: SimpleNamespace(geometry=case.geometry.kind)
+    )
+
     def fake_write_geometry_preview_plots(mesh, out_dir: Path, case_title: str):
         out_dir.mkdir(parents=True, exist_ok=True)
         outputs = [out_dir / "geometry_preview.png", out_dir / "geometry_preview.pdf"]
@@ -1805,8 +2387,13 @@ def test_variable_field_geometry_demo_writes_preview_and_run_outputs(
             path.write_bytes(b"preview")
         return outputs
 
-    monkeypatch.setattr(module, "write_geometry_preview_plots", fake_write_geometry_preview_plots)
-    monkeypatch.setattr(module, "solve_steady", lambda case: SimpleNamespace(case_name=case.name))
+    monkeypatch.setattr(
+        module, "write_geometry_preview_plots", fake_write_geometry_preview_plots
+    )
+    monkeypatch.setattr(
+        module, "solve_steady", lambda case: SimpleNamespace(case_name=case.name)
+    )
+
     def fake_write_case_overview_plots(solution, out_dir: Path, case_title: str):
         out_dir.mkdir(parents=True, exist_ok=True)
         outputs = [out_dir / "overview.png", out_dir / "overview.pdf"]
@@ -1814,8 +2401,14 @@ def test_variable_field_geometry_demo_writes_preview_and_run_outputs(
             path.write_bytes(b"plot")
         return outputs
 
-    monkeypatch.setattr(module, "write_case_overview_plots", fake_write_case_overview_plots)
-    monkeypatch.setattr(module, "validation_summary", lambda solution, case_name, ha=None: {"u_max": 1.0})
+    monkeypatch.setattr(
+        module, "write_case_overview_plots", fake_write_case_overview_plots
+    )
+    monkeypatch.setattr(
+        module,
+        "validation_summary",
+        lambda solution, case_name, ha=None: {"u_max": 1.0},
+    )
 
     summary = module.run_variable_field_geometry_demo(out_dir=tmp_path)
     assert summary["rectangular_case"]["magnetic_field_kind"] == "analytic"
@@ -1833,11 +2426,19 @@ def test_portable_path_prefers_relative_and_falls_back_to_name(tmp_path: Path):
     nested.parent.mkdir()
     nested.write_text("{}")
 
-    assert example_runner._portable_path(nested, relative_to=tmp_path) == "nested/file.json"
-    assert example_runner._portable_path("/outside/path/file.json", relative_to=tmp_path) == "file.json"
+    assert (
+        example_runner._portable_path(nested, relative_to=tmp_path)
+        == "nested/file.json"
+    )
+    assert (
+        example_runner._portable_path("/outside/path/file.json", relative_to=tmp_path)
+        == "file.json"
+    )
 
 
-def test_solve_case_snapshots_records_fully_developed_frames(monkeypatch: pytest.MonkeyPatch):
+def test_solve_case_snapshots_records_fully_developed_frames(
+    monkeypatch: pytest.MonkeyPatch,
+):
     case = example_runner._build_case("hartmann", 5.0, 6, 6)
 
     def fake_step(**kwargs):
@@ -1872,11 +2473,18 @@ def test_solve_case_snapshots_records_fully_developed_frames(monkeypatch: pytest
     assert "face_lorentz_max" in frames[0]
 
 
-def test_run_case_example_cli_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path):
+def test_run_case_example_cli_prints_report(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+):
     monkeypatch.setattr(
         example_runner,
         "run_case_example",
-        lambda **kwargs: {"case": "hartmann_ha5", "plots": [], "metrics": {"u_max": 1.0}, "output_dir": str(tmp_path)},
+        lambda **kwargs: {
+            "case": "hartmann_ha5",
+            "plots": [],
+            "metrics": {"u_max": 1.0},
+            "output_dir": str(tmp_path),
+        },
     )
     exit_code = example_runner.run_case_example_cli(
         case_kind="hartmann",
@@ -1891,9 +2499,13 @@ def test_run_case_example_cli_prints_report(monkeypatch: pytest.MonkeyPatch, cap
     assert payload["case"] == "hartmann_ha5"
 
 
-def test_run_case_example_uses_reference_data_when_available(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_run_case_example_uses_reference_data_when_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     fake_solution = SimpleNamespace(
-        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        state=SimpleNamespace(
+            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
+        ),
         mesh=SimpleNamespace(),
         case_name="shercliff_ha5",
     )
@@ -1903,20 +2515,42 @@ def test_run_case_example_uses_reference_data_when_available(tmp_path: Path, mon
     monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
     monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
     monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "validation_summary",
+        lambda solution, case_name, ha: {"u_max": 1.0},
+    )
     monkeypatch.setattr(
         example_runner,
         "closed_channel_validation",
         lambda solution, case_name, ha, reference_root: SimpleNamespace(
-            y_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.1),
-            z_profile=SimpleNamespace(coordinate=np.array([0.0]), reference=np.array([0.9]), l2_error=0.2),
+            y_profile=SimpleNamespace(
+                coordinate=np.array([0.0]), reference=np.array([1.0]), l2_error=0.1
+            ),
+            z_profile=SimpleNamespace(
+                coordinate=np.array([0.0]), reference=np.array([0.9]), l2_error=0.2
+            ),
             reference_path=Path("analytical.csv"),
         ),
     )
-    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda solution, out_dir, **kwargs: [out_dir / "overview.png"])
-    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+    monkeypatch.setattr(
+        example_runner,
+        "write_case_overview_plots",
+        lambda solution, out_dir, **kwargs: [out_dir / "overview.png"],
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_metrics_json",
+        lambda payload, path: path.write_text("{}"),
+    )
 
     report = run_case_example(
         case_kind="shercliff",
@@ -1931,9 +2565,13 @@ def test_run_case_example_uses_reference_data_when_available(tmp_path: Path, mon
     assert report["reference"]["kind"] == "closed_channel_analytical"
 
 
-def test_run_case_example_handles_missing_reference_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_run_case_example_handles_missing_reference_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     fake_solution = SimpleNamespace(
-        state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
+        state=SimpleNamespace(
+            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
+        ),
         mesh=SimpleNamespace(),
         case_name="hunt_ha5",
     )
@@ -1943,16 +2581,34 @@ def test_run_case_example_handles_missing_reference_file(tmp_path: Path, monkeyp
     monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
     monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
     monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "extract_midplane_profile", lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]})
-    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "validation_summary",
+        lambda solution, case_name, ha: {"u_max": 1.0},
+    )
     monkeypatch.setattr(
         example_runner,
         "closed_channel_validation",
         lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
     )
-    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda solution, out_dir, **kwargs: [out_dir / "overview.png"])
-    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}"))
+    monkeypatch.setattr(
+        example_runner,
+        "write_case_overview_plots",
+        lambda solution, out_dir, **kwargs: [out_dir / "overview.png"],
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_metrics_json",
+        lambda payload, path: path.write_text("{}"),
+    )
 
     report = run_case_example(
         case_kind="hunt",
@@ -1966,49 +2622,75 @@ def test_run_case_example_handles_missing_reference_file(tmp_path: Path, monkeyp
     assert report["reference"]["available"] is False
 
 
-def test_run_theory_meeting_demo_rejects_unknown_movie_case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(example_runner, "run_case_example", lambda **kwargs: {"case": "demo", "plots": [], "metrics": {}})
-    monkeypatch.setattr(example_runner, "make_hunt_case", lambda **kwargs: SimpleNamespace(name="hunt_ha5"))
+def test_run_theory_meeting_demo_rejects_unknown_movie_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        example_runner,
+        "run_case_example",
+        lambda **kwargs: {"case": "demo", "plots": [], "metrics": {}},
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "make_hunt_case",
+        lambda **kwargs: SimpleNamespace(name="hunt_ha5"),
+    )
     monkeypatch.setattr(
         example_runner,
         "solve_steady",
         lambda case: SimpleNamespace(
-            state=SimpleNamespace(u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0),
-            mesh=SimpleNamespace(),
-                case_name="hunt_ha5",
+            state=SimpleNamespace(
+                u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
             ),
+            mesh=SimpleNamespace(),
+            case_name="hunt_ha5",
+        ),
     )
     monkeypatch.setattr(
         example_runner,
         "closed_channel_validation",
         lambda *args, **kwargs: SimpleNamespace(
             reference_path="reference.txt",
-            y_profile=SimpleNamespace(l2_error=0.0, coordinate=np.array([0.0]), reference=np.array([1.0])),
-            z_profile=SimpleNamespace(l2_error=0.0, coordinate=np.array([0.0]), reference=np.array([1.0])),
+            y_profile=SimpleNamespace(
+                l2_error=0.0, coordinate=np.array([0.0]), reference=np.array([1.0])
+            ),
+            z_profile=SimpleNamespace(
+                l2_error=0.0, coordinate=np.array([0.0]), reference=np.array([1.0])
+            ),
         ),
     )
     monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
     monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
     monkeypatch.setattr(
         example_runner,
         "extract_midplane_profile",
         lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
     )
-    monkeypatch.setattr(example_runner, "validation_summary", lambda solution, case_name, ha: {"u_max": 1.0})
-    monkeypatch.setattr(example_runner, "write_case_overview_plots", lambda solution, out_dir, **kwargs: [])
-    monkeypatch.setattr(example_runner, "write_metrics_json", lambda payload, path: path)
+    monkeypatch.setattr(
+        example_runner,
+        "validation_summary",
+        lambda solution, case_name, ha: {"u_max": 1.0},
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_case_overview_plots",
+        lambda solution, out_dir, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        example_runner, "write_metrics_json", lambda payload, path: path
+    )
 
     with pytest.raises(ValueError, match="Unsupported movie_case"):
         run_theory_meeting_demo(out_dir=tmp_path, movie_case="bad")
 
 
-def test_li_aln_phase3_6_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_wall_stack_phase3_6.py"
-    spec = importlib.util.spec_from_file_location("li_aln_wall_stack_phase3_6_example", module_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+def test_li_aln_phase3_6_example_writes_docs_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _load_example_module("li_aln_wall_stack_phase3_6.py")
 
     monkeypatch.setattr(module, "MAGNETIC_FIELDS_T", (1.0,))
     monkeypatch.setattr(module, "VELOCITIES_M_S", (0.02,))
@@ -2027,12 +2709,10 @@ def test_li_aln_phase3_6_example_writes_docs_artifacts(tmp_path: Path, monkeypat
     assert (tmp_path / "docs" / "li_aln_wall_stack_phase3_6.png").exists()
 
 
-def test_li_aln_multilayer_mesh_qa_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_multilayer_mesh_qa.py"
-    spec = importlib.util.spec_from_file_location("li_aln_multilayer_mesh_qa_example", module_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+def test_li_aln_multilayer_mesh_qa_example_writes_docs_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _load_example_module("li_aln_multilayer_mesh_qa.py")
 
     monkeypatch.setattr(module, "FLUID_CELLS_Y", 10)
     monkeypatch.setattr(module, "FLUID_CELLS_Z", 10)
@@ -2043,18 +2723,18 @@ def test_li_aln_multilayer_mesh_qa_example_writes_docs_artifacts(tmp_path: Path,
     )
 
     assert summary["qa"]["ready_for_conservative_current_diagnostics"] is True
-    assert (tmp_path / "multilayer_mesh" / "li_aln_multilayer_mesh_qa_summary.json").exists()
+    assert (
+        tmp_path / "multilayer_mesh" / "li_aln_multilayer_mesh_qa_summary.json"
+    ).exists()
     assert (tmp_path / "multilayer_mesh" / "li_aln_multilayer_mesh_qa.png").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_mesh_qa_summary.json").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_mesh_qa.png").exists()
 
 
-def test_li_aln_multilayer_solve_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_multilayer_solve.py"
-    spec = importlib.util.spec_from_file_location("li_aln_multilayer_solve_example", module_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+def test_li_aln_multilayer_solve_example_writes_docs_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _load_example_module("li_aln_multilayer_solve.py")
 
     def fake_write(out_dir: Path, **kwargs):
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -2079,18 +2759,18 @@ def test_li_aln_multilayer_solve_example_writes_docs_artifacts(tmp_path: Path, m
     )
 
     assert summary["qa"]["charge_balance_pass"] is True
-    assert (tmp_path / "multilayer_solve" / "li_aln_multilayer_solve_summary.json").exists()
+    assert (
+        tmp_path / "multilayer_solve" / "li_aln_multilayer_solve_summary.json"
+    ).exists()
     assert (tmp_path / "multilayer_solve" / "li_aln_multilayer_solve.png").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_solve_summary.json").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_solve.png").exists()
 
 
-def test_li_aln_multilayer_convergence_example_writes_docs_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    module_path = Path(__file__).resolve().parents[1] / "examples" / "li_aln_multilayer_convergence.py"
-    spec = importlib.util.spec_from_file_location("li_aln_multilayer_convergence_example", module_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+def test_li_aln_multilayer_convergence_example_writes_docs_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    module = _load_example_module("li_aln_multilayer_convergence.py")
 
     def fake_write(out_dir: Path, **kwargs):
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -2109,7 +2789,9 @@ def test_li_aln_multilayer_convergence_example_writes_docs_artifacts(tmp_path: P
         png_path.write_bytes(b"plot")
         return [summary_path, csv_path, png_path]
 
-    monkeypatch.setattr(module, "write_li_aln_multilayer_convergence_artifacts", fake_write)
+    monkeypatch.setattr(
+        module, "write_li_aln_multilayer_convergence_artifacts", fake_write
+    )
     summary = module.run_li_aln_multilayer_convergence(
         output_dir=tmp_path / "multilayer_convergence",
         figure_dir=tmp_path / "figures",
@@ -2117,7 +2799,13 @@ def test_li_aln_multilayer_convergence_example_writes_docs_artifacts(tmp_path: P
     )
 
     assert summary["qa"]["pressure_last_step_relative_change_pass"] is True
-    assert (tmp_path / "multilayer_convergence" / "li_aln_multilayer_convergence_summary.json").exists()
-    assert (tmp_path / "multilayer_convergence" / "li_aln_multilayer_convergence.png").exists()
+    assert (
+        tmp_path
+        / "multilayer_convergence"
+        / "li_aln_multilayer_convergence_summary.json"
+    ).exists()
+    assert (
+        tmp_path / "multilayer_convergence" / "li_aln_multilayer_convergence.png"
+    ).exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_convergence_summary.json").exists()
     assert (tmp_path / "docs" / "li_aln_multilayer_convergence.png").exists()

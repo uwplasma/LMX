@@ -10,7 +10,9 @@ from scripts import run_strong_scaling_worker
 pytestmark = pytest.mark.unit
 
 
-def test_run_strong_scaling_worker_writes_expected_json(monkeypatch, tmp_path: Path, capsys):
+def test_run_strong_scaling_worker_writes_expected_json(
+    monkeypatch, tmp_path: Path, capsys
+):
     def fake_benchmark_sharded_extruded_operator(**kwargs):
         assert kwargs["nx"] == 48
         assert kwargs["ny"] == 64
@@ -35,7 +37,11 @@ def test_run_strong_scaling_worker_writes_expected_json(monkeypatch, tmp_path: P
             benchmark_kind="extruded3d",
         )
 
-    monkeypatch.setattr(run_strong_scaling_worker, "benchmark_sharded_extruded_operator", fake_benchmark_sharded_extruded_operator)
+    monkeypatch.setattr(
+        run_strong_scaling_worker,
+        "benchmark_sharded_extruded_operator",
+        fake_benchmark_sharded_extruded_operator,
+    )
     output_path = tmp_path / "worker.json"
 
     rc = run_strong_scaling_worker.main(
@@ -92,7 +98,11 @@ def test_run_strong_scaling_worker_covers_stencil_branch(monkeypatch, tmp_path: 
             benchmark_kind="stencil2d",
         )
 
-    monkeypatch.setattr(run_strong_scaling_worker, "benchmark_sharded_stencil", fake_benchmark_sharded_stencil)
+    monkeypatch.setattr(
+        run_strong_scaling_worker,
+        "benchmark_sharded_stencil",
+        fake_benchmark_sharded_stencil,
+    )
     output_path = tmp_path / "worker_stencil.json"
 
     rc = run_strong_scaling_worker.main(
@@ -120,7 +130,9 @@ def test_run_strong_scaling_worker_covers_stencil_branch(monkeypatch, tmp_path: 
     assert payload["num_devices"] == 2
 
 
-def test_run_strong_scaling_worker_covers_solver_faithful_branch(monkeypatch, tmp_path: Path):
+def test_run_strong_scaling_worker_covers_solver_faithful_branch(
+    monkeypatch, tmp_path: Path
+):
     def fake_benchmark_extruded_inductionless_solve(**kwargs):
         assert kwargs["nx"] == 12
         assert kwargs["ny"] == 10

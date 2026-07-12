@@ -1,0 +1,473 @@
+{
+  "analytical_continuum_audit": {
+    "cases": {
+      "hunt": {
+        "axes": {
+          "y": {
+            "lmx_l2": 0.0032523518315443287,
+            "lmx_not_worse_than_processed_freemhd": true,
+            "processed_freemhd_l2": 0.005627822554379408
+          },
+          "z": {
+            "lmx_l2": 0.002500430277202934,
+            "lmx_not_worse_than_processed_freemhd": true,
+            "processed_freemhd_l2": 0.004532266927434644
+          }
+        },
+        "pass": true
+      },
+      "shercliff": {
+        "axes": {
+          "y": {
+            "lmx_l2": 0.010689348617534122,
+            "lmx_not_worse_than_processed_freemhd": true,
+            "processed_freemhd_l2": 0.015415195795091334
+          },
+          "z": {
+            "lmx_l2": 0.006641945670555972,
+            "lmx_not_worse_than_processed_freemhd": true,
+            "processed_freemhd_l2": 0.009754541155720418
+          }
+        },
+        "pass": true
+      }
+    },
+    "criterion": "LMX is no worse than the processed finite-grid FreeMHD reference against the supplied analytical profile",
+    "pass": true
+  },
+  "benchmark": "A: fully developed laminar inductionless MHD ducts",
+  "conservation_and_power": {
+    "cases": {
+      "hunt": {
+        "current": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 2.6721056637450232e-14,
+          "div_current_max_normalized": 4.8031868665835594e-08,
+          "interface_current_residual_normalized": 6.180203280900478e-11
+        },
+        "pass": true,
+        "power": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 8.718481166127394e-12,
+          "electrical_power_residual": 1.3601564319287718e-11,
+          "emf_power": 1.5600841545673394,
+          "joule_dissipation": 1.5600841545809416,
+          "lorentz_transfer_relative_error": 4.2698582177063767e-16,
+          "lorentz_transfer_residual": -6.661338147750939e-16,
+          "lorentz_work": -1.56008415456734,
+          "mechanical_power_relative_error": 1.32112952152388e-09,
+          "mechanical_power_residual": 3.1821936197218292e-09,
+          "network_electrical_relative_error": 8.718908151949165e-12,
+          "network_electrical_residual": 1.3602230453102493e-11,
+          "pressure_power": 2.4086916293046516,
+          "viscous_dissipation": 0.848607471555118
+        }
+      },
+      "shercliff": {
+        "current": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 6.846865833602211e-20,
+          "div_current_max_normalized": 3.612772192846651e-08,
+          "interface_current_residual_normalized": 0.0
+        },
+        "pass": true,
+        "power": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 5.373731957344367e-12,
+          "electrical_power_residual": 2.1478285816556308e-10,
+          "emf_power": 39.96903080937289,
+          "joule_dissipation": 39.969030809587714,
+          "lorentz_transfer_relative_error": 1.066639928015952e-15,
+          "lorentz_transfer_residual": -4.263256414560601e-14,
+          "lorentz_work": -39.96903080937293,
+          "mechanical_power_relative_error": 1.0939390583482722e-05,
+          "mechanical_power_residual": -0.0010636600452968992,
+          "network_electrical_relative_error": 5.3747985972723825e-12,
+          "network_electrical_residual": 2.148254907297087e-10,
+          "pressure_power": 97.23104787118653,
+          "viscous_dissipation": 57.2630807218589
+        }
+      }
+    },
+    "pass": true
+  },
+  "finite_grid_freemhd": {
+    "cases": {
+      "hunt": {
+        "pass": true,
+        "primary_errors": {
+          "lorentz_y_l2": 0.008589663820186106,
+          "pressure_gradient_relative": 0.0026123822338922974,
+          "velocity_y_l2": 0.005807724527391936
+        }
+      },
+      "shercliff": {
+        "pass": true,
+        "primary_errors": {
+          "lorentz_y_l2": 0.00403707866980878,
+          "pressure_gradient_relative": 0.0026603072474014125,
+          "velocity_y_l2": 0.005609758821295503
+        }
+      }
+    },
+    "confirmation_level": "confirmation_85x63",
+    "pass": true,
+    "target": 0.01
+  },
+  "implementation": {
+    "lmx_version": "1.1.3",
+    "runners": {
+      "acceptance_builder_sha256": "8872e34ee7a5fdfa2f623dfaed86d81ed686d31c0339c8f40938e64c9c618fda",
+      "ha20_ladder_sha256": "b0e1adacd324442c4d8bedbdca44626f21142f74b2ba885475c330b00ac2120f",
+      "table_i_sha256": "ad66dd0d33f7e4842855eb59eadde5909bc8f87a788cb398972cde850bc1b0b2"
+    },
+    "solvax_version": "0.4.0",
+    "solver_core_sha256": "60c67d073508d36be713148955150074ad556166d48cb8a94df330b7b1be4172"
+  },
+  "literature_table_i": {
+    "pass": true,
+    "rows": [
+      {
+        "analytical_flow_relative_error": 0.002412664912123573,
+        "case": "shercliff",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 6.9764336701687e-22,
+          "div_current_max_normalized": 4.372878514560676e-08,
+          "interface_current_residual_normalized": 0.0,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.001336504608207382,
+        "hartmann_number": 500,
+        "observed_order": 2.0061009761450115,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 5.152721258422173e-10,
+          "electrical_power_residual": -1.937806685947674e-12,
+          "emf_power": 0.0037607442529135676,
+          "joule_dissipation": 0.0037607442509757587,
+          "lorentz_transfer_relative_error": 5.765891534078869e-16,
+          "lorentz_transfer_residual": 2.168404344971009e-18,
+          "lorentz_work": -0.0037607442529135654,
+          "mechanical_power_relative_error": 5.960597793608438e-05,
+          "mechanical_power_residual": 4.5887836560079553e-07,
+          "network_electrical_relative_error": 5.152727024313706e-10,
+          "network_electrical_residual": -1.937808854352019e-12,
+          "pass": true,
+          "pressure_power": 0.007698529266525109,
+          "viscous_dissipation": 0.003937326135245943
+        },
+        "source": "samper-table-i-shercliff-ha500.json",
+        "source_sha256": "6bd41d3ab0d50ab970117b9b57e12cba4aa4903da2a0be7863aba6ab3cb24318",
+        "steady_residual": 1.4417338546970915e-10
+      },
+      {
+        "analytical_flow_relative_error": 0.003688023686723814,
+        "case": "shercliff",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 6.33990425761995e-23,
+          "div_current_max_normalized": 7.937152691695563e-06,
+          "interface_current_residual_normalized": 0.0,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.0020432503316962654,
+        "hartmann_number": 5000,
+        "observed_order": 2.017657695160856,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 3.867670966835493e-08,
+          "electrical_power_residual": -1.5226642158510523e-11,
+          "emf_power": 0.00039369021535378725,
+          "joule_dissipation": 0.00039369020012714417,
+          "lorentz_transfer_relative_error": 2.340855349388138e-15,
+          "lorentz_transfer_residual": 9.215718466126788e-19,
+          "lorentz_work": -0.0003936902153537863,
+          "mechanical_power_relative_error": 2.2861985963154078e-05,
+          "mechanical_power_residual": 1.8132167452342054e-08,
+          "network_electrical_relative_error": 3.867671200921028e-08,
+          "network_electrical_residual": -1.522664308008237e-11,
+          "pass": true,
+          "pressure_power": 0.0007931142763172492,
+          "viscous_dissipation": 0.0003994059287960105
+        },
+        "source": "samper-table-i-shercliff-ha5000.json",
+        "source_sha256": "2320ed7b91a27d385d00022b089f4eb3763e9e19d0d6cd32337fbb80c5691faf",
+        "steady_residual": 1.576800129810159e-11
+      },
+      {
+        "analytical_flow_relative_error": 0.004176968788559995,
+        "case": "shercliff",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 9.622916231854908e-23,
+          "div_current_max_normalized": 4.460307749829579e-05,
+          "interface_current_residual_normalized": 0.0,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.0024703594062808693,
+        "hartmann_number": 10000,
+        "observed_order": 2.065362504777287,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 8.100431550056606e-08,
+          "electrical_power_residual": -1.6039834879136988e-11,
+          "emf_power": 0.00019801210318263712,
+          "joule_dissipation": 0.00019801208714280235,
+          "lorentz_transfer_relative_error": 5.475433850048481e-16,
+          "lorentz_transfer_residual": -1.0842021724855044e-19,
+          "lorentz_work": -0.00019801210318263723,
+          "mechanical_power_relative_error": 0.00010497473189130288,
+          "mechanical_power_residual": 4.179633699975512e-08,
+          "network_electrical_relative_error": 8.100431495302269e-08,
+          "network_electrical_residual": -1.603983477071677e-11,
+          "pass": true,
+          "pressure_power": 0.000398156168124664,
+          "viscous_dissipation": 0.00020010226860502704
+        },
+        "source": "samper-table-i-shercliff-ha10000.json",
+        "source_sha256": "392f20364d1fef821decbc112b7a78eb7161cb774563845b9bb4bd3cd3260ad9",
+        "steady_residual": 7.629419787450777e-12
+      },
+      {
+        "analytical_flow_relative_error": 0.0030034043373452003,
+        "case": "shercliff",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 1.1826406384347727e-22,
+          "div_current_max_normalized": 0.0001860038456936287,
+          "interface_current_residual_normalized": 0.0,
+          "pass": true
+        },
+        "finest_mesh": [
+          119,
+          119
+        ],
+        "finest_mesh_change_relative": 0.0013937284383436655,
+        "hartmann_number": 15000,
+        "observed_order": 1.9580525559110535,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 3.7363452121137504e-08,
+          "electrical_power_residual": 4.941015072134139e-12,
+          "emf_power": 0.0001322419264553313,
+          "joule_dissipation": 0.0001322419313963464,
+          "lorentz_transfer_relative_error": 2.0496565670158138e-16,
+          "lorentz_transfer_residual": -2.710505431213761e-20,
+          "lorentz_work": -0.00013224192645533133,
+          "mechanical_power_relative_error": 4.223190688771344e-05,
+          "mechanical_power_residual": 1.1216596041433097e-08,
+          "network_electrical_relative_error": 3.736345232610316e-08,
+          "network_electrical_residual": 4.941015099239193e-12,
+          "pass": true,
+          "pressure_power": 0.000265595301468529,
+          "viscous_dissipation": 0.00013334215841715624
+        },
+        "source": "samper-table-i-shercliff-ha15000.json",
+        "source_sha256": "8a3675b87a6c182b04e68cf9e308bace67acd44213dec5e8e0f3d732b5debebe",
+        "steady_residual": 5.242732077192624e-12
+      },
+      {
+        "analytical_flow_relative_error": 0.0015405741976767375,
+        "case": "hunt",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 9.382865240112397e-15,
+          "div_current_max_normalized": 6.338804440503645e-08,
+          "interface_current_residual_normalized": 3.967841776929774e-11,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.0005081796933979336,
+        "hartmann_number": 500,
+        "observed_order": 1.4541633324893792,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 5.621252235447366e-11,
+          "electrical_power_residual": -7.063165156917517e-14,
+          "emf_power": 0.0012565109803074682,
+          "joule_dissipation": 0.0012565109802368365,
+          "lorentz_transfer_relative_error": 0.0,
+          "lorentz_transfer_residual": 0.0,
+          "lorentz_work": -0.0012565109803074682,
+          "mechanical_power_relative_error": 7.141032889161335e-08,
+          "mechanical_power_residual": 1.0048608023146069e-10,
+          "network_electrical_relative_error": 5.621252235447366e-11,
+          "network_electrical_residual": -7.063165156917517e-14,
+          "pass": true,
+          "pressure_power": 0.0014071645067477358,
+          "viscous_dissipation": 0.0001506534259541874
+        },
+        "source": "samper-table-i-hunt-ha500.json",
+        "source_sha256": "0e724a636a084df4913ba88ff6013a69e37f1356f53b70566c564b3ce03b2e9b",
+        "steady_residual": 2.553257735446457e-11
+      },
+      {
+        "analytical_flow_relative_error": 0.0032465215496586047,
+        "case": "hunt",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 3.3750507436469846e-15,
+          "div_current_max_normalized": 7.378631559343682e-06,
+          "interface_current_residual_normalized": 1.4920039849807026e-09,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.0009581079743109021,
+        "hartmann_number": 5000,
+        "observed_order": 1.2879820333660352,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 7.972219841417947e-12,
+          "electrical_power_residual": 1.4409385685511256e-16,
+          "emf_power": 1.8074496152922837e-05,
+          "joule_dissipation": 1.807449615306693e-05,
+          "lorentz_transfer_relative_error": 0.0,
+          "lorentz_transfer_residual": 0.0,
+          "lorentz_work": -1.8074496152922837e-05,
+          "mechanical_power_relative_error": 5.408866463538093e-07,
+          "mechanical_power_residual": 1.0348195268890768e-11,
+          "network_electrical_relative_error": 7.972219841417947e-12,
+          "network_electrical_residual": 1.4409385685511256e-16,
+          "pass": true,
+          "pressure_power": 1.9131911165951988e-05,
+          "viscous_dissipation": 1.0574046648338821e-06
+        },
+        "source": "samper-table-i-hunt-ha5000.json",
+        "source_sha256": "99f6eec9ff87afc4eda7ea8ff9114400fc5ee3becf66d56fe3b58fe74ec3a948",
+        "steady_residual": 3.58297088999288e-13
+      },
+      {
+        "analytical_flow_relative_error": 0.004270493699117763,
+        "case": "hunt",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 1.830800301263903e-15,
+          "div_current_max_normalized": 4.718473124672009e-05,
+          "interface_current_residual_normalized": 5.058823908707168e-09,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.0013743934576390558,
+        "hartmann_number": 10000,
+        "observed_order": 1.3666978229453604,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 1.6040867493958318e-11,
+          "electrical_power_residual": -7.794397180634072e-17,
+          "emf_power": 4.8590870684330395e-06,
+          "joule_dissipation": 4.859087068355093e-06,
+          "lorentz_transfer_relative_error": 5.229580795682999e-16,
+          "lorentz_transfer_residual": 2.541098841762901e-21,
+          "lorentz_work": -4.859087068433037e-06,
+          "mechanical_power_relative_error": 1.0041200059735175e-06,
+          "mechanical_power_residual": 5.212461438569267e-12,
+          "network_electrical_relative_error": 1.6041390452037885e-11,
+          "network_electrical_residual": -7.794651290518248e-17,
+          "pass": true,
+          "pressure_power": 5.19107418193074e-06,
+          "viscous_dissipation": 3.3198190103626413e-07
+        },
+        "source": "samper-table-i-hunt-ha10000.json",
+        "source_sha256": "3569124076ce9c673eed913e0bee4a47443f4d79dc31bd60ed764ff1047fc70e",
+        "steady_residual": 1.0207788695532852e-13
+      },
+      {
+        "analytical_flow_relative_error": 0.005070096754069877,
+        "case": "hunt",
+        "current_balance": {
+          "acceptance_target": 0.001,
+          "charge_balance_normalized": 1.1324933343050367e-14,
+          "div_current_max_normalized": 0.00011847694005251372,
+          "interface_current_residual_normalized": 1.0689311459121572e-08,
+          "pass": true
+        },
+        "finest_mesh": [
+          99,
+          99
+        ],
+        "finest_mesh_change_relative": 0.0016957934288596582,
+        "hartmann_number": 15000,
+        "observed_order": 1.4033524683127536,
+        "pass": true,
+        "power_balance": {
+          "acceptance_target": 0.001,
+          "electrical_power_relative_error": 1.9160898798684597e-09,
+          "electrical_power_residual": -4.335448778545201e-15,
+          "emf_power": 2.26265418135961e-06,
+          "joule_dissipation": 2.26265417702416e-06,
+          "lorentz_transfer_relative_error": 5.615305384926249e-16,
+          "lorentz_transfer_residual": 1.2705494208814505e-21,
+          "lorentz_work": -2.2626541813596088e-06,
+          "mechanical_power_relative_error": 9.547223800693976e-07,
+          "mechanical_power_residual": -2.3269422902397235e-12,
+          "network_electrical_relative_error": 1.9160904413989982e-09,
+          "network_electrical_residual": -4.335450049094622e-15,
+          "pass": true,
+          "pressure_power": 2.4372949846286195e-06,
+          "viscous_dissipation": 1.74643130211301e-07
+        },
+        "source": "samper-table-i-hunt-ha15000.json",
+        "source_sha256": "d729dfe27d72f39258ecf51dd59ed217d648d25648e00921248f6633274e5a4a",
+        "steady_residual": 4.3088247860075446e-14
+      }
+    ]
+  },
+  "research_grade_validation_pass": true,
+  "richardson_diagnostic": {
+    "acceptance_gate": false,
+    "all_extrapolated_primary_pass": false,
+    "cases": {
+      "hunt": {
+        "extrapolated_primary_pass": false,
+        "fine_primary_pass": true
+      },
+      "shercliff": {
+        "extrapolated_primary_pass": true,
+        "fine_primary_pass": true
+      }
+    }
+  },
+  "schema_version": 1,
+  "sources": {
+    "benchmark-a-ha20-continuum-reference.json": "68c665524012f5a8c12113a16238608c23e8ee6cc2880b6e981a9e0c97ad1f5c",
+    "benchmark-a-ha20-power-balance.json": "73ac4e0bbea73cdc1259df7776a0c0f0f106fbbc15a8725c77a1ff55cc20ee21",
+    "benchmark-a-ha20-richardson.json": "7736c6e17fd8ea338f9470d6af8785e5f7e2d17cc72c3a02dcf755f665c00212",
+    "samper-table-i-hunt-ha10000.json": "3569124076ce9c673eed913e0bee4a47443f4d79dc31bd60ed764ff1047fc70e",
+    "samper-table-i-hunt-ha15000.json": "d729dfe27d72f39258ecf51dd59ed217d648d25648e00921248f6633274e5a4a",
+    "samper-table-i-hunt-ha500.json": "0e724a636a084df4913ba88ff6013a69e37f1356f53b70566c564b3ce03b2e9b",
+    "samper-table-i-hunt-ha5000.json": "99f6eec9ff87afc4eda7ea8ff9114400fc5ee3becf66d56fe3b58fe74ec3a948",
+    "samper-table-i-shercliff-ha10000.json": "392f20364d1fef821decbc112b7a78eb7161cb774563845b9bb4bd3cd3260ad9",
+    "samper-table-i-shercliff-ha15000.json": "8a3675b87a6c182b04e68cf9e308bace67acd44213dec5e8e0f3d732b5debebe",
+    "samper-table-i-shercliff-ha500.json": "6bd41d3ab0d50ab970117b9b57e12cba4aa4903da2a0be7863aba6ab3cb24318",
+    "samper-table-i-shercliff-ha5000.json": "2320ed7b91a27d385d00022b089f4eb3763e9e19d0d6cd32337fbb80c5691faf"
+  }
+}

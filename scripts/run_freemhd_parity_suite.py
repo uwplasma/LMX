@@ -10,9 +10,12 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lmx.freemhd import audit_freemhd_case_against_spec
+from lmx.reference_data import default_closed_channel_reference_root
+
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
-DEFAULT_PROCESSED_ROOT = Path("/Users/rogerio/local/tests/freemhd_test_cases/FreeMHDPaperAllFigures/ClosedChannel")
+DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -32,6 +35,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
     ]
     metrics = payload.get("parity_report", {}).get("metrics", {})
     observable_gate = payload.get("parity_report", {}).get("observable_gate", {})
+    case_audits = payload.get("runs", {}).get("matched_case_audit", {})
     if metrics:
         lines.extend(
             [
@@ -55,6 +59,13 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
                 f"- Low-signal cuts: `{observable_gate.get('low_signal_count', '-')}`",
             ]
         )
+    if case_audits:
+        lines.extend(["", "## Matched case audit", ""])
+        for case_kind, audit in sorted(case_audits.items()):
+            lines.append(
+                f"- {case_kind}: matched=`{audit.get('matched', False)}`, "
+                f"failed checks=`{audit.get('failed_check_count', '-')}`"
+            )
     path.write_text("\n".join(lines) + "\n")
 
 
@@ -123,19 +134,35 @@ def run_suite(
     observable_gate: dict[str, Any] | None = None
 
     if has_transient_reference:
-        from examples import freemhd_closed_channel_parity as transient
+        case_audits = {
+            case_kind: audit_freemhd_case_against_spec(
+                reference_output_root / case_kind,
+                case_kind=case_kind,
+            )
+            for case_kind in ("shercliff", "hunt")
+        }
+        summary["runs"]["matched_case_audit"] = case_audits
+        summary["matched_case_gate"] = all(bool(audit["matched"]) for audit in case_audits.values())
+        if summary["matched_case_gate"]:
+            from examples import freemhd_closed_channel_parity as transient
 
-        transient.OUTPUT_DIR = output / "closed_channel_parity"
-        transient.FREEMHD_INSTALL_DIR = freemhd_install_dir
-        transient_summary = transient.run_freemhd_closed_channel_parity()
-        summary["runs"]["closed_channel_parity"] = transient_summary
-        summary["sample_output"] = str(transient.OUTPUT_DIR)
-        summary["parity_output"] = str(transient.OUTPUT_DIR / "freemhd_closed_channel_parity_summary.json")
-        records = list(transient_summary.get("records", []))
-        for key, target in (("y_l2_error", y_errors), ("z_l2_error", z_errors), ("u_max_abs_diff", u_diffs)):
-            value = _max_record_metric(records, key)
-            if value is not None:
-                target.append(value)
+            transient.OUTPUT_DIR = output / "closed_channel_parity"
+            transient.FREEMHD_INSTALL_DIR = freemhd_install_dir
+            transient_summary = transient.run_freemhd_closed_channel_parity()
+            summary["runs"]["closed_channel_parity"] = transient_summary
+            summary["sample_output"] = str(transient.OUTPUT_DIR)
+            summary["parity_output"] = str(transient.OUTPUT_DIR / "freemhd_closed_channel_parity_summary.json")
+            records = list(transient_summary.get("records", []))
+            for key, target in (("y_l2_error", y_errors), ("z_l2_error", z_errors), ("u_max_abs_diff", u_diffs)):
+                value = _max_record_metric(records, key)
+                if value is not None:
+                    target.append(value)
+        else:
+            summary["status"] = "invalid_reference"
+            summary["reason"] = (
+                "FreeMHD case inputs do not match the canonical Benchmark-A specifications; "
+                "profile errors are not reported as parity evidence."
+            )
 
     if has_processed_reference:
         from examples import freemhd_closed_channel_observable_parity as observable
@@ -189,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     _write_json(args.output / "summary.json", summary)
     _write_markdown(args.output / "summary.md", summary)
     print(json.dumps(summary, indent=2))
-    return 0
+    return 2 if summary["status"] == "invalid_reference" else 0
 
 
 if __name__ == "__main__":

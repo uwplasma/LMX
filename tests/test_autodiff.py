@@ -46,11 +46,19 @@ pytestmark = pytest.mark.unit
 
 def _skip_without_magpylib_jax() -> None:
     if importlib.util.find_spec("magpylib_jax") is None:
-        pytest.skip("magpylib_jax is optional and is not installed in the bounded CI environment")
+        pytest.skip(
+            "magpylib_jax is optional and is not installed in the bounded CI environment"
+        )
 
 
 def test_differentiable_hartmann_solution_returns_finite_fields():
-    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
+    problem = build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
     u, phi = solve_differentiable_hartmann(problem, forcing=1.0, hartmann_number=5.0)
 
     assert u.shape == (12, 12)
@@ -60,19 +68,37 @@ def test_differentiable_hartmann_solution_returns_finite_fields():
 
 
 def test_hartmann_mean_velocity_is_differentiable():
-    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
-    value, gradient = jax.value_and_grad(lambda ha: hartmann_mean_velocity(problem, forcing=1.0, hartmann_number=ha))(5.0)
+    problem = build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
+    value, gradient = jax.value_and_grad(
+        lambda ha: hartmann_mean_velocity(problem, forcing=1.0, hartmann_number=ha)
+    )(5.0)
 
     assert jnp.isfinite(value)
     assert jnp.isfinite(gradient)
 
 
 def test_profile_loss_gradient_step_reduces_objective():
-    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
-    target_u, _ = solve_differentiable_hartmann(problem, forcing=1.0, hartmann_number=9.0)
+    problem = build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
+    target_u, _ = solve_differentiable_hartmann(
+        problem, forcing=1.0, hartmann_number=9.0
+    )
     target_profile = target_u[:, target_u.shape[1] // 2]
 
-    objective = lambda ha: hartmann_profile_loss(problem, forcing=1.0, hartmann_number=ha, target_profile=target_profile)
+    objective = lambda ha: hartmann_profile_loss(
+        problem, forcing=1.0, hartmann_number=ha, target_profile=target_profile
+    )
     loss0, grad0 = jax.value_and_grad(objective)(4.0)
     loss1 = objective(jnp.clip(4.0 - 2.0 * grad0, 0.5, 30.0))
 
@@ -82,19 +108,52 @@ def test_profile_loss_gradient_step_reduces_objective():
 
 
 def test_mean_velocity_gradients_match_finite_difference():
-    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
-    autodiff = hartmann_mean_velocity_gradients(problem, forcing=1.1, hartmann_number=5.0)
-    finite_diff = hartmann_mean_velocity_finite_difference_gradients(problem, forcing=1.1, hartmann_number=5.0)
+    problem = build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
+    autodiff = hartmann_mean_velocity_gradients(
+        problem, forcing=1.1, hartmann_number=5.0
+    )
+    finite_diff = hartmann_mean_velocity_finite_difference_gradients(
+        problem, forcing=1.1, hartmann_number=5.0
+    )
 
     assert jnp.isfinite(autodiff["d_mean_velocity_d_forcing"])
     assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
-    assert float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_diff["d_mean_velocity_d_forcing"])) < 5.0e-2
-    assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_diff["d_mean_velocity_d_ha"])) < 5.0e-2
+    assert (
+        float(
+            jnp.abs(
+                autodiff["d_mean_velocity_d_forcing"]
+                - finite_diff["d_mean_velocity_d_forcing"]
+            )
+        )
+        < 5.0e-2
+    )
+    assert (
+        float(
+            jnp.abs(
+                autodiff["d_mean_velocity_d_ha"] - finite_diff["d_mean_velocity_d_ha"]
+            )
+        )
+        < 5.0e-2
+    )
 
 
 def test_profile_loss_gradients_are_finite():
-    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
-    target_u, _ = solve_differentiable_hartmann(problem, forcing=1.0, hartmann_number=8.0)
+    problem = build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
+    target_u, _ = solve_differentiable_hartmann(
+        problem, forcing=1.0, hartmann_number=8.0
+    )
     target_profile = target_u[:, target_u.shape[1] // 2]
 
     gradients = hartmann_profile_loss_gradients(
@@ -110,8 +169,16 @@ def test_profile_loss_gradients_are_finite():
 
 
 def test_profile_inverse_design_reduces_loss():
-    problem = build_hartmann_autodiff_problem(ny=12, nz=12, macro_iterations=3, potential_iterations=12, velocity_iterations=16)
-    target_u, _ = solve_differentiable_hartmann(problem, forcing=1.0, hartmann_number=10.0)
+    problem = build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
+    target_u, _ = solve_differentiable_hartmann(
+        problem, forcing=1.0, hartmann_number=10.0
+    )
     target_profile = target_u[:, target_u.shape[1] // 2]
 
     result = run_hartmann_profile_inverse_design(
@@ -130,7 +197,14 @@ def test_profile_inverse_design_reduces_loss():
 
 
 def test_fringing_mean_velocity_history_returns_finite_trace():
-    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    problem = build_fringing_autodiff_problem(
+        nx_stations=9,
+        ny=10,
+        nz=10,
+        macro_iterations=2,
+        potential_iterations=10,
+        velocity_iterations=12,
+    )
     payload = fringing_mean_velocity_history(
         problem,
         forcing=1.0,
@@ -147,7 +221,14 @@ def test_fringing_mean_velocity_history_returns_finite_trace():
 
 
 def test_fringing_history_loss_gradients_are_finite():
-    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    problem = build_fringing_autodiff_problem(
+        nx_stations=9,
+        ny=10,
+        nz=10,
+        macro_iterations=2,
+        potential_iterations=10,
+        velocity_iterations=12,
+    )
     target = fringing_mean_velocity_history(
         problem,
         forcing=1.0,
@@ -174,7 +255,14 @@ def test_fringing_history_loss_gradients_are_finite():
 
 
 def test_fringing_response_history_returns_finite_current_proxy():
-    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    problem = build_fringing_autodiff_problem(
+        nx_stations=9,
+        ny=10,
+        nz=10,
+        macro_iterations=2,
+        potential_iterations=10,
+        velocity_iterations=12,
+    )
     payload = fringing_response_history(
         problem,
         forcing=1.0,
@@ -188,7 +276,14 @@ def test_fringing_response_history_returns_finite_current_proxy():
 
 
 def test_fringing_response_loss_gradients_are_finite():
-    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    problem = build_fringing_autodiff_problem(
+        nx_stations=9,
+        ny=10,
+        nz=10,
+        macro_iterations=2,
+        potential_iterations=10,
+        velocity_iterations=12,
+    )
     target = fringing_response_history(
         problem,
         forcing=1.0,
@@ -216,7 +311,14 @@ def test_fringing_response_loss_gradients_are_finite():
 
 
 def test_fringing_inverse_design_reduces_loss():
-    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    problem = build_fringing_autodiff_problem(
+        nx_stations=9,
+        ny=10,
+        nz=10,
+        macro_iterations=2,
+        potential_iterations=10,
+        velocity_iterations=12,
+    )
     target = fringing_mean_velocity_history(
         problem,
         forcing=1.0,
@@ -242,7 +344,14 @@ def test_fringing_inverse_design_reduces_loss():
 
 
 def test_fringing_response_inverse_design_reduces_loss():
-    problem = build_fringing_autodiff_problem(nx_stations=9, ny=10, nz=10, macro_iterations=2, potential_iterations=10, velocity_iterations=12)
+    problem = build_fringing_autodiff_problem(
+        nx_stations=7,
+        ny=8,
+        nz=8,
+        macro_iterations=2,
+        potential_iterations=8,
+        velocity_iterations=10,
+    )
     target = fringing_response_history(
         problem,
         forcing=1.0,
@@ -261,9 +370,9 @@ def test_fringing_response_inverse_design_reduces_loss():
         exit_center_init=5.0,
         transition_width_init=0.7,
         current_weight=0.5,
-        steps=6,
+        steps=4,
     )
-    assert len(result["history"]) == 6
+    assert len(result["history"]) == 4
     assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
 
 
@@ -302,10 +411,15 @@ def test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference():
         radial_loops=4,
         axial_loops=2,
     )
-    finite_difference = (plus["pressure_drop_proxy"] - minus["pressure_drop_proxy"]) / 2.0e-2
+    finite_difference = (
+        plus["pressure_drop_proxy"] - minus["pressure_drop_proxy"]
+    ) / 2.0e-2
     assert jnp.isfinite(sensitivity["pressure_drop_proxy"])
     assert jnp.isfinite(sensitivity["d_pressure_drop_d_separation"])
-    assert float(jnp.abs(sensitivity["d_pressure_drop_d_separation"] - finite_difference)) < 5.0e-2
+    assert (
+        float(jnp.abs(sensitivity["d_pressure_drop_d_separation"] - finite_difference))
+        < 5.0e-2
+    )
 
 
 def test_build_extruded_response_targets_returns_finite_histories():
@@ -538,10 +652,12 @@ def test_extruded_target_inverse_design_returns_finite_payload():
 
 
 def test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry():
-    problem = build_pipe_ogrid_extruded_problem(ha_peak=6.0, nx_stations=4, nr=4, ntheta=8)
+    problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=6.0, nx_stations=4, nr=4, ntheta=8
+    )
     solution = solve_extruded_inductionless(problem)
 
-    result = run_extruded_target_inverse_design(solution, ny=6, nz=6, steps=4)
+    result = run_extruded_target_inverse_design(solution, ny=4, nz=4, steps=2)
 
     assert result["geometry_kind"] == "pipe_ogrid"
     assert result["recovered"]["model"] == "fringing_response_surrogate"

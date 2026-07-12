@@ -1,0 +1,41 @@
+name: Set up locked LMX environment
+description: Install a supported Python and synchronize the committed uv lockfile
+
+inputs:
+  python-version:
+    description: Supported Python version to install
+    required: false
+    default: "3.11"
+  extras:
+    description: Comma-separated optional dependency groups to install
+    required: false
+    default: dev
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install pinned uv
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      with:
+        version: "0.11.28"
+        enable-cache: true
+        cache-dependency-glob: uv.lock
+
+    - name: Synchronize locked environment
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-version }}
+      run: |
+        extra_args=()
+        IFS=',' read -ra extras <<< "${{ inputs.extras }}"
+        for extra in "${extras[@]}"; do
+          if [[ -n "$extra" ]]; then
+            extra_args+=(--extra "$extra")
+          fi
+        done
+        uv sync --locked "${extra_args[@]}"
+        echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"

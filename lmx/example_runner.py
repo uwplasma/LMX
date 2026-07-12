@@ -114,7 +114,11 @@ def solve_case_snapshots(
         step_time = float(start_time + (step_index + 1) * dt)
         if case.solver.kind != "fully_developed_inductionless":
             raise NotImplementedError("solve_case_snapshots only supports fully_developed_inductionless cases")
-        linear_solver = "cg" if case.solver.linear_solver == "auto" else case.solver.linear_solver
+        linear_solver = (
+            "solvax_pcg"
+            if case.solver.linear_solver == "auto"
+            else case.solver.linear_solver
+        )
         (
             u,
             phi,

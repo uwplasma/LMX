@@ -33,7 +33,9 @@ pytestmark = pytest.mark.unit
 
 
 def test_benchmark_sharded_stencil_runs_on_single_device():
-    record = benchmark_sharded_stencil(ny=32, nz=32, iterations=4, repeats=1, num_devices=1)
+    record = benchmark_sharded_stencil(
+        ny=32, nz=32, iterations=4, repeats=1, num_devices=1
+    )
 
     assert record.num_devices == 1
     assert record.mean_seconds >= 0.0
@@ -42,7 +44,9 @@ def test_benchmark_sharded_stencil_runs_on_single_device():
 
 
 def test_write_scaling_report_writes_json(tmp_path: Path):
-    record = benchmark_sharded_stencil(ny=16, nz=16, iterations=2, repeats=1, num_devices=1)
+    record = benchmark_sharded_stencil(
+        ny=16, nz=16, iterations=2, repeats=1, num_devices=1
+    )
     path = write_scaling_report([record], tmp_path / "scaling.json")
 
     assert path.exists()
@@ -82,7 +86,9 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     }
 
     summary = summarize_strong_scaling_records([baseline, two_device])
-    table = write_strong_scaling_summary_table([baseline, two_device], tmp_path / "strong_scaling_table.csv")
+    table = write_strong_scaling_summary_table(
+        [baseline, two_device], tmp_path / "strong_scaling_table.csv"
+    )
 
     assert summary["validation_status"] == "solver_faithful_records_present"
     assert summary["solver_faithful_record_count"] == 2
@@ -100,11 +106,19 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
 
 def test_benchmark_sharded_stencil_rejects_invalid_device_count():
     with pytest.raises(ValueError):
-        benchmark_sharded_stencil(ny=18, nz=16, iterations=1, repeats=1, num_devices=max(2, len(jax.devices()) + 1))
+        benchmark_sharded_stencil(
+            ny=18,
+            nz=16,
+            iterations=1,
+            repeats=1,
+            num_devices=max(2, len(jax.devices()) + 1),
+        )
 
 
 def test_benchmark_sharded_extruded_operator_runs_on_single_device():
-    record = benchmark_sharded_extruded_operator(nx=16, ny=12, nz=10, iterations=2, repeats=1, num_devices=1)
+    record = benchmark_sharded_extruded_operator(
+        nx=16, ny=12, nz=10, iterations=2, repeats=1, num_devices=1
+    )
 
     assert record.num_devices == 1
     assert record.nx == 16
@@ -117,10 +131,19 @@ def test_benchmark_sharded_extruded_operator_runs_on_single_device():
 
 def test_benchmark_sharded_extruded_operator_rejects_invalid_device_count():
     with pytest.raises(ValueError):
-        benchmark_sharded_extruded_operator(nx=16, ny=12, nz=10, iterations=1, repeats=1, num_devices=max(2, len(jax.devices()) + 1))
+        benchmark_sharded_extruded_operator(
+            nx=16,
+            ny=12,
+            nz=10,
+            iterations=1,
+            repeats=1,
+            num_devices=max(2, len(jax.devices()) + 1),
+        )
 
 
-def test_benchmark_extruded_inductionless_solve_records_solver_path(monkeypatch: pytest.MonkeyPatch):
+def test_benchmark_extruded_inductionless_solve_records_solver_path(
+    monkeypatch: pytest.MonkeyPatch,
+):
     calls = []
 
     def fake_solve(problem):
@@ -168,7 +191,9 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(monkeypatch:
 
 def test_default_visible_devices_uses_highest_indices(monkeypatch: pytest.MonkeyPatch):
     def fake_run(*args, **kwargs):
-        return subprocess.CompletedProcess(args=args, returncode=0, stdout="0\n1\n", stderr="")
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout="0\n1\n", stderr=""
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -225,7 +250,9 @@ def test_row_or_replicated_sharding_covers_row_and_replicated_paths():
 def test_two_axis_mesh_and_sharding_covers_elongated_and_replicated_paths():
     devices = list(jax.devices()[:1])
 
-    mesh1, sharding1 = _two_axis_mesh_and_sharding(devices, num_devices=1, shape=(16, 4, 4))
+    mesh1, sharding1 = _two_axis_mesh_and_sharding(
+        devices, num_devices=1, shape=(16, 4, 4)
+    )
     mesh2, sharding2 = _two_axis_mesh_and_sharding(devices, num_devices=1, shape=(5, 3))
 
     assert isinstance(mesh1, Mesh)
@@ -234,7 +261,9 @@ def test_two_axis_mesh_and_sharding_covers_elongated_and_replicated_paths():
     assert isinstance(sharding2, NamedSharding)
 
 
-def test_two_axis_mesh_and_sharding_covers_multi_axis_and_flattened_partitions(monkeypatch: pytest.MonkeyPatch):
+def test_two_axis_mesh_and_sharding_covers_multi_axis_and_flattened_partitions(
+    monkeypatch: pytest.MonkeyPatch,
+):
     class FakeMesh:
         def __init__(self, devices, axis_names):
             self.devices = devices
@@ -248,8 +277,12 @@ def test_two_axis_mesh_and_sharding_covers_multi_axis_and_flattened_partitions(m
     monkeypatch.setattr(scaling, "Mesh", FakeMesh)
     monkeypatch.setattr(scaling, "NamedSharding", FakeSharding)
 
-    mesh1, sharding1 = _two_axis_mesh_and_sharding([object(), object(), object(), object()], num_devices=4, shape=(4, 4, 2))
-    mesh2, sharding2 = _two_axis_mesh_and_sharding([object(), object(), object(), object()], num_devices=4, shape=(4, 3, 2))
+    mesh1, sharding1 = _two_axis_mesh_and_sharding(
+        [object(), object(), object(), object()], num_devices=4, shape=(4, 4, 2)
+    )
+    mesh2, sharding2 = _two_axis_mesh_and_sharding(
+        [object(), object(), object(), object()], num_devices=4, shape=(4, 3, 2)
+    )
 
     assert mesh1.axis_names == ("x", "y")
     assert sharding1.spec == scaling.P("x", "y", None)
@@ -257,7 +290,9 @@ def test_two_axis_mesh_and_sharding_covers_multi_axis_and_flattened_partitions(m
     assert sharding2.spec == scaling.P(("x", "y"), None, None)
 
 
-def test_two_axis_mesh_and_sharding_rejects_incompatible_multi_axis_shape(monkeypatch: pytest.MonkeyPatch):
+def test_two_axis_mesh_and_sharding_rejects_incompatible_multi_axis_shape(
+    monkeypatch: pytest.MonkeyPatch,
+):
     class FakeMesh:
         def __init__(self, *args, **kwargs):
             self.args = args
@@ -272,16 +307,24 @@ def test_two_axis_mesh_and_sharding_rejects_incompatible_multi_axis_shape(monkey
     monkeypatch.setattr(scaling, "NamedSharding", FakeSharding)
 
     with pytest.raises(ValueError, match="not compatible"):
-        _two_axis_mesh_and_sharding([object(), object(), object(), object()], num_devices=4, shape=(3, 5, 2))
+        _two_axis_mesh_and_sharding(
+            [object(), object(), object(), object()], num_devices=4, shape=(3, 5, 2)
+        )
 
 
-def test_benchmark_sharded_stencil_rejects_missing_devices(monkeypatch: pytest.MonkeyPatch):
+def test_benchmark_sharded_stencil_rejects_missing_devices(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(jax, "devices", lambda: [])
     with pytest.raises(RuntimeError, match="No JAX devices"):
         benchmark_sharded_stencil(ny=8, nz=8, iterations=1, repeats=1, num_devices=1)
 
 
-def test_benchmark_sharded_extruded_operator_rejects_missing_devices(monkeypatch: pytest.MonkeyPatch):
+def test_benchmark_sharded_extruded_operator_rejects_missing_devices(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(jax, "devices", lambda: [])
     with pytest.raises(RuntimeError, match="No JAX devices"):
-        benchmark_sharded_extruded_operator(nx=8, ny=8, nz=8, iterations=1, repeats=1, num_devices=1)
+        benchmark_sharded_extruded_operator(
+            nx=8, ny=8, nz=8, iterations=1, repeats=1, num_devices=1
+        )

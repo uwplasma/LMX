@@ -81,4 +81,6 @@ def test_hartmann_centerline_regression():
 def test_shercliff_centerline_regression():
     case = make_shercliff_case(ha=2.0, ny=12, nz=12)
     solution = _manufactured_solution(case, _EXPECTED_SHERCLIFF_CENTERLINE)
-    assert jnp.allclose(_centerline(solution), _EXPECTED_SHERCLIFF_CENTERLINE, atol=1e-6)
+    assert jnp.allclose(
+        _centerline(solution), _EXPECTED_SHERCLIFF_CENTERLINE, atol=1e-6
+    )

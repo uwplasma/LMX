@@ -4,7 +4,10 @@ import numpy as np
 import pytest
 
 from lmx.reference_data import (
+    ProcessedSliceReference,
     _fill_missing_structured_values,
+    _interpolated_centerline_profile,
+    _match_single,
     default_closed_channel_reference_root,
     default_fringing_pipe_reference_root,
     extract_processed_profile,
@@ -43,7 +46,9 @@ def test_load_closed_channel_analytical_parses_axes_and_pressure_drop(tmp_path: 
     analytical_root.mkdir(parents=True)
     path = analytical_root / "Shercliff_Analytical_Ha20_PresDrop2512.1961.txt"
     path.write_text("r\tu1\tu2\n-0.1\t0.0\t0.1\n0.1\t1.0\t0.9\n")
-    reference = load_closed_channel_analytical("shercliff", 20, tmp_path / "ClosedChannel")
+    reference = load_closed_channel_analytical(
+        "shercliff", 20, tmp_path / "ClosedChannel"
+    )
     assert reference.pressure_drop == pytest.approx(2512.1961)
     assert reference.midplane_z.tolist() == pytest.approx([0.0, 1.0])
     assert reference.midplane_y.tolist() == pytest.approx([0.1, 0.9])
@@ -91,7 +96,9 @@ def test_extract_processed_profile_returns_requested_field_component(tmp_path: P
         )
     )
     reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
-    y_profile = extract_processed_profile(reference, axis="y", field_name="J", component=1)
+    y_profile = extract_processed_profile(
+        reference, axis="y", field_name="J", component=1
+    )
     z_profile = extract_processed_profile(reference, axis="z", field_name="potE")
     assert y_profile["coordinate"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
     assert y_profile["value"].tolist() == pytest.approx([40.0, 20.0, 50.0])
@@ -142,7 +149,9 @@ def test_processed_slice_area_mean_uses_nonuniform_quadrature(tmp_path: Path):
     assert processed_slice_area_mean(reference) == pytest.approx(2.0)
 
 
-def test_processed_slice_grid_fills_missing_values_and_reports_bad_field(tmp_path: Path):
+def test_processed_slice_grid_fills_missing_values_and_reports_bad_field(
+    tmp_path: Path,
+):
     closed_channel_root = tmp_path / "ClosedChannel"
     closed_channel_root.mkdir(parents=True)
     path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
@@ -218,7 +227,9 @@ def test_fill_missing_structured_values_covers_column_and_fallback_paths():
     assert fallback.ravel().tolist() == pytest.approx([0.0])
 
 
-def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp_path: Path):
+def test_extract_processed_profile_interpolates_symmetric_near_center_planes(
+    tmp_path: Path,
+):
     closed_channel_root = tmp_path / "ClosedChannel"
     closed_channel_root.mkdir(parents=True)
     path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
@@ -239,7 +250,9 @@ def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp
     )
     reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
 
-    y_profile = extract_processed_profile(reference, axis="y", field_name="J", component=1)
+    y_profile = extract_processed_profile(
+        reference, axis="y", field_name="J", component=1
+    )
     y_midplane = extract_processed_midplane_profile(reference, axis="y")
     z_profile = extract_processed_profile(reference, axis="z", field_name="potE")
 
@@ -250,6 +263,7 @@ def test_extract_processed_profile_interpolates_symmetric_near_center_planes(tmp
     assert z_profile["value"].tolist() == pytest.approx([-8.0, -4.0, 4.0, 8.0])
 
 
+@pytest.mark.external
 def test_default_closed_channel_reference_root_resolves_bundled_dataset():
     root = _closed_channel_root_or_skip()
     assert root.exists()
@@ -257,6 +271,7 @@ def test_default_closed_channel_reference_root_resolves_bundled_dataset():
     assert any(root.glob("hunt_*Ha20*XSlice1m_*.csv"))
 
 
+@pytest.mark.external
 def test_load_bundled_reference_data_uses_repo_dataset():
     root = _closed_channel_root_or_skip()
     analytical = load_closed_channel_analytical("hunt", 20, root)
@@ -269,6 +284,7 @@ def test_load_bundled_reference_data_uses_repo_dataset():
     assert "potE" in processed.columns
 
 
+@pytest.mark.external
 def test_case_specific_closed_channel_reference_helpers_forward_to_dataset():
     root = _closed_channel_root_or_skip()
     shercliff = load_shercliff_analytical(20, root)
@@ -280,12 +296,17 @@ def test_case_specific_closed_channel_reference_helpers_forward_to_dataset():
     assert hunt.coordinate.shape[0] > 10
 
 
+@pytest.mark.external
 def test_default_fringing_pipe_reference_root_resolves_bundled_dataset():
     root = _fringing_pipe_root_or_skip()
     assert root.exists()
-    assert (root / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv").exists()
+    assert (
+        root
+        / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv"
+    ).exists()
 
 
+@pytest.mark.external
 def test_load_bundled_fringing_pipe_profile_uses_repo_dataset():
     root = _fringing_pipe_root_or_skip()
     center_path = fringing_pipe_profile_reference_path("center", root)
@@ -296,3 +317,83 @@ def test_load_bundled_fringing_pipe_profile_uses_repo_dataset():
     assert reference.coordinate.shape[0] > 10
     assert reference.velocity.shape == reference.coordinate.shape
     assert abs(reference.x_offset_fraction) < 1.0e-12
+
+
+def test_reference_root_overrides_and_missing_match(tmp_path: Path):
+    assert default_closed_channel_reference_root(tmp_path) == tmp_path
+    assert default_fringing_pipe_reference_root(tmp_path) == tmp_path
+    with pytest.raises(FileNotFoundError, match="No reference files"):
+        _match_single(["*.missing"], tmp_path)
+
+
+def test_pressure_drop_optional_and_case_helpers(tmp_path: Path):
+    analytical = tmp_path / "AnalyticalSolutions"
+    analytical.mkdir()
+    (analytical / "Shercliff_Analytical_Ha5_profile.txt").write_text("r u1 u2\n0 1 1\n")
+    reference = load_shercliff_analytical(5, tmp_path)
+    assert reference.pressure_drop is None
+
+
+def test_centerline_profile_empty_one_sided_and_invalid_axes():
+    empty_coord, empty_values = _interpolated_centerline_profile(
+        np.asarray([]), np.asarray([]), np.asarray([])
+    )
+    assert empty_coord.size == empty_values.size == 0
+
+    coord, values = _interpolated_centerline_profile(
+        np.asarray([0.0, 1.0]), np.asarray([0.2, 0.2]), np.asarray([2.0, 3.0])
+    )
+    assert coord.tolist() == pytest.approx([0.0, 1.0])
+    assert values.tolist() == pytest.approx([2.0, 3.0])
+
+    reference = ProcessedSliceReference(
+        case_kind="hunt",
+        ha=1,
+        columns={
+            "Points:1": np.asarray([0.0]),
+            "Points:2": np.asarray([0.0]),
+            "U:0": np.asarray([1.0]),
+        },
+        path="memory",
+    )
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        extract_processed_midplane_profile(reference, axis="x")
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        extract_processed_profile(reference, axis="x", field_name="U", component=0)
+    with pytest.raises(ValueError, match="Unsupported fringing"):
+        fringing_pipe_profile_reference_path("diagonal", ".")
+
+
+def test_fringing_pipe_loader_accepts_compact_headers_and_reports_missing_field(
+    tmp_path: Path,
+):
+    good = tmp_path / "sample_CenterLine_data.csv"
+    good.write_text("Points2,U2,Points0\n-1,2,0\n1,4,0\n")
+    reference = load_fringing_pipe_profile("center", tmp_path)
+    assert reference.coordinate.tolist() == pytest.approx([-1.0, 1.0])
+    assert reference.velocity.tolist() == pytest.approx([2.0, 4.0])
+
+    good.unlink()
+    bad = tmp_path / "sample_CenterLine_data.csv"
+    bad.write_text("Points2,Points0\n0,0\n")
+    with pytest.raises(KeyError, match="U:2"):
+        load_fringing_pipe_profile("center", tmp_path)
+
+
+def test_area_mean_empty_and_fill_noop():
+    reference = ProcessedSliceReference(
+        case_kind="empty",
+        ha=0,
+        columns={
+            "Points:1": np.asarray([]),
+            "Points:2": np.asarray([]),
+            "U:0": np.asarray([]),
+        },
+        path="memory",
+    )
+    assert processed_slice_area_mean(reference) == 0.0
+    grid = np.asarray([[1.0, 2.0]])
+    assert (
+        _fill_missing_structured_values(grid, np.asarray([0.0]), np.asarray([0.0, 1.0]))
+        is grid
+    )

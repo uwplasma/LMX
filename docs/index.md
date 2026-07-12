@@ -34,6 +34,7 @@ geometry
 input_reference
 wall_models
 case_cookbook
+migration
 testing
 ```
 
@@ -78,7 +79,7 @@ developer_guide
 
 ## What is next
 
-- the first true `extruded_inductionless` 3D pressure-velocity-potential slice
-- deeper heavy-lane solver hardening on larger validation sets
-- differentiable workflows on Hunt/fringing objectives
-- broader variable-field and variable-geometry research studies driven from Python
+- release and integrate the generic SOLVAX PCG/implicit-solve backend
+- validate primal and transpose gradients on CPU and GPU
+- freeze and close the published pipe and square-duct fringing-field cases
+- profile and strongly scale only the externally accepted 3D path

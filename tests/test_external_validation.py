@@ -63,16 +63,30 @@ def test_magnetic_obstacle_reference_observable_csv_round_trip(tmp_path: Path):
 
     reference = load_magnetic_obstacle_reference_observables(path)
 
-    assert reference["centerline_velocity_deficit_ratio"]["value"] == pytest.approx(0.25)
-    assert reference["centerline_velocity_deficit_ratio"]["relative_tolerance"] == pytest.approx(0.10)
+    assert reference["centerline_velocity_deficit_ratio"]["value"] == pytest.approx(
+        0.25
+    )
+    assert reference["centerline_velocity_deficit_ratio"][
+        "relative_tolerance"
+    ] == pytest.approx(0.10)
     assert reference["pressure_drop_proxy"]["source"] == "Cuevas digitized figure"
 
 
-def test_compare_magnetic_obstacle_reference_observables_writes_publication_table(tmp_path: Path):
+def test_compare_magnetic_obstacle_reference_observables_writes_publication_table(
+    tmp_path: Path,
+):
     reference = {
-        "centerline_velocity_deficit_ratio": {"value": 0.25, "tolerance": 0.02, "relative_tolerance": 0.10},
+        "centerline_velocity_deficit_ratio": {
+            "value": 0.25,
+            "tolerance": 0.02,
+            "relative_tolerance": 0.10,
+        },
         "wake_recovery_ratio": {"value": 0.92, "tolerance": 0.02},
-        "pressure_drop_proxy": {"value": 1.2, "tolerance": 0.05, "units": "dimensionless"},
+        "pressure_drop_proxy": {
+            "value": 1.2,
+            "tolerance": 0.05,
+            "units": "dimensionless",
+        },
     }
     lmx_observables = {
         "centerline_velocity_deficit_ratio": 0.26,
@@ -81,14 +95,20 @@ def test_compare_magnetic_obstacle_reference_observables_writes_publication_tabl
         "current_proxy_peak": 4.0,
     }
 
-    comparison = compare_magnetic_obstacle_reference_observables(lmx_observables, reference)
-    table_path = write_magnetic_obstacle_reference_comparison_table(comparison, tmp_path / "comparison.csv")
+    comparison = compare_magnetic_obstacle_reference_observables(
+        lmx_observables, reference
+    )
+    table_path = write_magnetic_obstacle_reference_comparison_table(
+        comparison, tmp_path / "comparison.csv"
+    )
 
     assert comparison["compared_observable_count"] == 3
     assert comparison["passed_observable_count"] == 2
     assert comparison["validation_pass"] is False
     assert "current_proxy_peak" in comparison["extra_lmx_observables"]
-    assert table_path.read_text(encoding="utf-8").startswith("observable,lmx_value,reference_value")
+    assert table_path.read_text(encoding="utf-8").startswith(
+        "observable,lmx_value,reference_value"
+    )
 
 
 def test_write_magnetic_obstacle_reference_comparison_plots(tmp_path: Path):
@@ -126,10 +146,14 @@ def test_compare_magnetic_obstacle_reference_observables_reports_missing_lmx_obs
 
 def test_magnetic_obstacle_reference_template_has_required_columns(tmp_path: Path):
     template_rows = magnetic_obstacle_reference_template_rows()
-    template_path = write_magnetic_obstacle_reference_template(tmp_path / "template.csv")
+    template_path = write_magnetic_obstacle_reference_template(
+        tmp_path / "template.csv"
+    )
     text = template_path.read_text(encoding="utf-8")
 
-    assert {"observable", "value", "tolerance", "relative_tolerance"} <= set(template_rows[0])
+    assert {"observable", "value", "tolerance", "relative_tolerance"} <= set(
+        template_rows[0]
+    )
     assert "centerline_velocity_deficit_ratio" in text
     assert "pressure_drop_proxy" in text
 
@@ -163,7 +187,9 @@ def test_magnetic_obstacle_votyakov_curve_loader_and_panel(tmp_path: Path):
     experiment = next(row for row in observables if row["series"] == "experiment_Ha140")
     assert len(records) == 7
     assert experiment["reverse_flow_onset_interaction_parameter"] == pytest.approx(5.0)
-    assert experiment["plateau_minimum_centerline_velocity_ratio"] == pytest.approx(-0.13)
+    assert experiment["plateau_minimum_centerline_velocity_ratio"] == pytest.approx(
+        -0.13
+    )
     assert [path.suffix for path in paths] == [".csv", ".png", ".pdf"]
     assert all(path.exists() and path.stat().st_size > 0 for path in paths)
 
@@ -182,8 +208,14 @@ def test_scalar_reference_helpers_cover_q2d_and_dean_templates(tmp_path: Path):
 
     assert "final_spectral_centroid" in q2d_path.read_text(encoding="utf-8")
     assert "secondary_flow_rms_ratio" in dean_path.read_text(encoding="utf-8")
-    assert any(row["observable"] == "turnover_count" for row in q2d_turbulence_reference_template_rows())
-    assert any(row["observable"] == "inner_outer_velocity_ratio" for row in dean_vortex_reference_template_rows())
+    assert any(
+        row["observable"] == "turnover_count"
+        for row in q2d_turbulence_reference_template_rows()
+    )
+    assert any(
+        row["observable"] == "inner_outer_velocity_ratio"
+        for row in dean_vortex_reference_template_rows()
+    )
 
 
 def test_q2dmhdfoam_line_profile_observables_and_panel(tmp_path: Path):
@@ -195,7 +227,9 @@ def test_q2dmhdfoam_line_profile_observables_and_panel(tmp_path: Path):
 
     profile = load_q2dmhdfoam_line_profile(profile_path)
     observables = q2dmhdfoam_profile_observables(profile)
-    table = write_q2dmhdfoam_profile_observable_table([observables], tmp_path / "profiles.csv")
+    table = write_q2dmhdfoam_profile_observable_table(
+        [observables], tmp_path / "profiles.csv"
+    )
     paths = write_q2dmhdfoam_external_reference_panel(
         [profile],
         [observables],
@@ -242,16 +276,15 @@ def test_q2dmhdfoam_force_and_probe_history_parsers(tmp_path: Path):
     )
     probe_path = tmp_path / "U"
     probe_path.write_text(
-        "# Probe 0 (0 0 0)\n"
-        "0 (1 0 0) (0 1 0)\n"
-        "1 (2 0 0) (0 2 0)\n"
-        "2 (3 0 0) (0 3 0)\n",
+        "# Probe 0 (0 0 0)\n0 (1 0 0) (0 1 0)\n1 (2 0 0) (0 2 0)\n2 (3 0 0) (0 3 0)\n",
         encoding="utf-8",
     )
 
     force = load_q2dmhdfoam_force_coefficients(force_path, tail_fraction=0.5)
     probe = load_q2dmhdfoam_probe_velocity_history(probe_path)
-    table = write_q2dmhdfoam_timeseries_observable_table([force, probe], tmp_path / "timeseries.csv")
+    table = write_q2dmhdfoam_timeseries_observable_table(
+        [force, probe], tmp_path / "timeseries.csv"
+    )
 
     assert force["cd_tail_mean"] == pytest.approx(2.5)
     assert force["cl_tail_mean"] == pytest.approx(-0.1)
@@ -417,12 +450,14 @@ def test_q2dmhdfoam_case_manifest_and_match_audit(tmp_path: Path):
     assert manifest["total_cell_count"] == 12
     assert audit["strict_admissible"] is False
     assert audit["decision"] == "not_admissible_for_strict_csv"
-    assert {"topology", "hartmann_friction", "forcing", "observables"} <= set(audit["blockers"])
+    assert {"topology", "hartmann_friction", "forcing", "observables"} <= set(
+        audit["blockers"]
+    )
     assert [path.suffix for path in paths] == [".json", ".csv", ".png", ".pdf"]
     assert all(path.exists() and path.stat().st_size > 0 for path in paths)
-    assert "not_admissible_for_strict_csv" in (tmp_path / "audit" / "q2dmhdfoam_lmx_turbulence_match_audit.csv").read_text(
-        encoding="utf-8"
-    )
+    assert "not_admissible_for_strict_csv" in (
+        tmp_path / "audit" / "q2dmhdfoam_lmx_turbulence_match_audit.csv"
+    ).read_text(encoding="utf-8")
 
 
 def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Path):
@@ -433,7 +468,9 @@ def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Pa
         "final_spectral_centroid,7.2,0.1,,1/m,Reference spectrum\n",
         encoding="utf-8",
     )
-    reference = load_scalar_reference_observables(reference_path, context="Q2D turbulence reference CSV")
+    reference = load_scalar_reference_observables(
+        reference_path, context="Q2D turbulence reference CSV"
+    )
     comparison = compare_scalar_reference_observables(
         {
             "energy_decay_ratio": 0.76,
@@ -442,7 +479,9 @@ def test_generic_scalar_reference_comparison_writes_table_and_plots(tmp_path: Pa
         },
         reference,
     )
-    table_path = write_scalar_reference_comparison_table(comparison, tmp_path / "comparison.csv")
+    table_path = write_scalar_reference_comparison_table(
+        comparison, tmp_path / "comparison.csv"
+    )
     plot_paths = write_scalar_reference_comparison_plots(
         comparison,
         tmp_path,
@@ -473,7 +512,9 @@ def test_external_validation_readiness_rows_cover_open_lanes():
 
 
 def test_write_external_validation_readiness_panel(tmp_path: Path):
-    paths = write_external_validation_readiness_panel(external_validation_readiness_rows(), tmp_path)
+    paths = write_external_validation_readiness_panel(
+        external_validation_readiness_rows(), tmp_path
+    )
 
     assert [path.suffix for path in paths] == [".png"]
     assert all(path.exists() for path in paths)

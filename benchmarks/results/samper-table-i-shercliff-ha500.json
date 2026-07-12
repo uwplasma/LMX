@@ -1,0 +1,352 @@
+{
+  "balance_target": 0.001,
+  "controls": {
+    "coupling_iterations": 512,
+    "max_steps": 12,
+    "potential_iterations": 4000,
+    "wall_cells": 4,
+    "wall_thickness": 0.01
+  },
+  "finest_mesh_change_target": 0.0025,
+  "flow_error_target": 0.01,
+  "freeze": {
+    "format": "compact-json",
+    "source_sha256": "72b59cd78ccd1d828d226727ac213e053f8256266602d2e26d92cb1046c60583"
+  },
+  "implementation": {
+    "lmx_version": "1.1.3",
+    "runner_sha256": "ad66dd0d33f7e4842855eb59eadde5909bc8f87a788cb398972cde850bc1b0b2",
+    "solvax_version": "0.4.0",
+    "solver_core_sha256": "60c67d073508d36be713148955150074ad556166d48cb8a94df330b7b1be4172"
+  },
+  "mesh_levels": [
+    [
+      63,
+      63
+    ],
+    [
+      79,
+      79
+    ],
+    [
+      99,
+      99
+    ]
+  ],
+  "normalization": {
+    "flow_rate": "Q_tilde = integral_-1^1 integral_-1^1 U_tilde dy_tilde dz_tilde",
+    "geometry": "square duct with dimensionless coordinates spanning [-1, 1]^2",
+    "lm_x_conversion": "Q_tilde = Q*rho*nu/(a*b^3*(-dP/dx)); a=b for Table I",
+    "published_convergence": "abs((Q_tilde[n+1]-Q_tilde[n])/Q_tilde[n]) < 1e-10",
+    "published_mesh": "99x99 stretched",
+    "velocity": "U_tilde = U / (b^2*(-dP/dx)/(rho*nu))"
+  },
+  "potential_residual_stopping_ceiling": 0.01,
+  "records": [
+    {
+      "analytical_flow_rate": 0.00768,
+      "case_kind": "shercliff",
+      "finest_level_pass": true,
+      "hartmann_number": 500,
+      "hartmann_wall_conductance": 0.0,
+      "levels": [
+        {
+          "analytical_relative_error": 0.005974256812257683,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 1.0444484657562514e-20,
+              "div_current_max_normalized": 1.1410029306771748e-08,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 9.449459221888028e-11,
+              "electrical_power_residual": 3.559292617583143e-13,
+              "emf_power": 0.003766662762036502,
+              "joule_dissipation": 0.0037666627623924353,
+              "lorentz_transfer_relative_error": 1.0362296991166534e-15,
+              "lorentz_transfer_residual": -3.903127820947816e-18,
+              "lorentz_work": -0.003766662762036506,
+              "mechanical_power_relative_error": 0.00027999976486168377,
+              "mechanical_power_residual": 2.163245225198125e-06,
+              "network_electrical_relative_error": 9.449562844857939e-11,
+              "network_electrical_residual": 3.5593316488613524e-13,
+              "pass": true,
+              "pressure_power": 0.007725882292318139,
+              "viscous_dissipation": 0.003957056285056435
+            }
+          },
+          "layer_resolution": {
+            "hartmann_layer_cell_deficit": 2.0000000000000036,
+            "hartmann_layer_cell_ratio": 0.7499999999999996,
+            "hartmann_layer_cells": 5.9999999999999964,
+            "hartmann_layer_resolution_pass": false,
+            "hartmann_layer_thickness": 0.0019999999999999996,
+            "layer_resolution_pass": false,
+            "layer_resolution_supported": true,
+            "min_hartmann_spacing": 0.00017260534784768744,
+            "min_required_hartmann_layer_cells": 8.0,
+            "min_required_side_layer_cells": 6.0,
+            "min_side_spacing": 0.005884045084478151,
+            "minimum_mesh_refinement_factor": 1.3333333333333341,
+            "side_layer_cell_deficit": 1.0658141036401503e-14,
+            "side_layer_cell_ratio": 0.9999999999999982,
+            "side_layer_cells": 5.999999999999989,
+            "side_layer_resolution_pass": true,
+            "side_layer_thickness": 0.0447213595499958
+          },
+          "mesh": [
+            63,
+            63
+          ],
+          "published_numerical_relative_error": 0.006105260101333395,
+          "q_tilde": 0.007725882292318139,
+          "solver": {
+            "applied_forcing": 1.0,
+            "case": "samper_table_i_shercliff_ha500_63x63",
+            "centerline_y_negative_fraction": 0.0,
+            "centerline_y_sign_changes": 0.0,
+            "centerline_z_negative_fraction": 0.0,
+            "centerline_z_sign_changes": 0.0,
+            "charge_balance_residual": 1.0086607383531339e-20,
+            "current_scaled_pressure_proxy": 1.0,
+            "div_current_max": 1.1019067922002357e-08,
+            "gauge_residual": 0.0,
+            "interface_current_residual": 0.0,
+            "limited_fraction": 0.0,
+            "limiter_scale": 1.0,
+            "linear_iterations_used": 36.0,
+            "linear_residual": 1.1239536133050274e-12,
+            "lorentz_power": -0.003766662762036506,
+            "mean_current_magnitude": 0.004575788463000582,
+            "mean_velocity": 0.0019314705730795335,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 3.7698113947910187e-10,
+            "pressure_proxy": 1.0,
+            "raw_update_max": 1.4486454917583824e-10,
+            "residual": 1.4486454917583824e-10,
+            "symmetry_y_max_abs_error": 7.942431434759811e-15,
+            "symmetry_y_mean_abs_error": 5.753109301922106e-15,
+            "symmetry_z_max_abs_error": 5.58498559899423e-14,
+            "symmetry_z_mean_abs_error": 2.169674754564229e-14,
+            "time": 0.002,
+            "u_max": 0.002012253286003487,
+            "u_mean": 0.0014099988003788717,
+            "volumetric_flow_rate": 0.007725882292318139
+          },
+          "solver_convergence": {
+            "pass": true,
+            "potential_acceptance_gate": "normalized conservative current balance",
+            "potential_residual_stopping_ceiling": 0.01,
+            "steady_residual_target": 1.5360000000000002e-10
+          }
+        },
+        {
+          "analytical_relative_error": 0.003752394058104069,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 6.612999248963922e-21,
+              "div_current_max_normalized": 2.397099835302958e-08,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 1.4951377894812365e-10,
+              "electrical_power_residual": -5.62687049732169e-13,
+              "emf_power": 0.0037634461097221213,
+              "joule_dissipation": 0.003763446109159433,
+              "lorentz_transfer_relative_error": 3.4570512478486633e-16,
+              "lorentz_transfer_residual": 1.3010426069826053e-18,
+              "lorentz_work": -0.00376344610972212,
+              "mechanical_power_relative_error": 0.00011268777875543244,
+              "mechanical_power_residual": 8.686896207886485e-07,
+              "network_electrical_relative_error": 1.4951412465324845e-10,
+              "network_electrical_residual": -5.62688350774776e-13,
+              "pass": true,
+              "pressure_power": 0.0077088183863662394,
+              "viscous_dissipation": 0.003944503587023331
+            }
+          },
+          "layer_resolution": {
+            "hartmann_layer_cell_deficit": 5.329070518200751e-15,
+            "hartmann_layer_cell_ratio": 0.9999999999999993,
+            "hartmann_layer_cells": 7.999999999999995,
+            "hartmann_layer_resolution_pass": true,
+            "hartmann_layer_thickness": 0.0019999999999999996,
+            "layer_resolution_pass": true,
+            "layer_resolution_supported": true,
+            "min_hartmann_spacing": 0.00011753123644653307,
+            "min_required_hartmann_layer_cells": 8.0,
+            "min_required_side_layer_cells": 6.0,
+            "min_side_spacing": 0.004235845977232255,
+            "minimum_mesh_refinement_factor": 1.0000000000000007,
+            "side_layer_cell_deficit": 0.0,
+            "side_layer_cell_ratio": 1.3333333333333337,
+            "side_layer_cells": 8.000000000000002,
+            "side_layer_resolution_pass": true,
+            "side_layer_thickness": 0.044721359549995794
+          },
+          "mesh": [
+            79,
+            79
+          ],
+          "published_numerical_relative_error": 0.003883108004458833,
+          "q_tilde": 0.0077088183863662394,
+          "solver": {
+            "applied_forcing": 1.0,
+            "case": "samper_table_i_shercliff_ha500_79x79",
+            "centerline_y_negative_fraction": 0.0,
+            "centerline_y_sign_changes": 0.0,
+            "centerline_z_negative_fraction": 0.0,
+            "centerline_z_sign_changes": 0.0,
+            "charge_balance_residual": 6.372301274929902e-21,
+            "current_scaled_pressure_proxy": 1.0,
+            "div_current_max": 2.309850910542366e-08,
+            "gauge_residual": 0.0,
+            "interface_current_residual": 0.0,
+            "limited_fraction": 0.0,
+            "limiter_scale": 1.0,
+            "linear_iterations_used": 47.0,
+            "linear_residual": 1.4526904898200795e-12,
+            "lorentz_power": -0.00376344610972212,
+            "mean_current_magnitude": 0.0045785163910442945,
+            "mean_velocity": 0.0019272045965915603,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 8.555127996175041e-10,
+            "pressure_proxy": 1.0,
+            "raw_update_max": 1.52824684764713e-10,
+            "residual": 1.52824684764713e-10,
+            "symmetry_y_max_abs_error": 1.6604339431181003e-14,
+            "symmetry_y_mean_abs_error": 8.831226237119072e-15,
+            "symmetry_z_max_abs_error": 1.9373305043535183e-13,
+            "symmetry_z_mean_abs_error": 4.886621884650675e-14,
+            "time": 0.002,
+            "u_max": 0.002007626920531101,
+            "u_mean": 0.0013741174821452636,
+            "volumetric_flow_rate": 0.0077088183863662394
+          },
+          "solver_convergence": {
+            "pass": true,
+            "potential_acceptance_gate": "normalized conservative current balance",
+            "potential_residual_stopping_ceiling": 0.01,
+            "steady_residual_target": 1.5360000000000002e-10
+          }
+        },
+        {
+          "analytical_relative_error": 0.002412664912123573,
+          "balances": {
+            "current": {
+              "acceptance_target": 0.001,
+              "charge_balance_normalized": 6.9764336701687e-22,
+              "div_current_max_normalized": 4.372878514560676e-08,
+              "interface_current_residual_normalized": 0.0,
+              "pass": true
+            },
+            "power": {
+              "acceptance_target": 0.001,
+              "electrical_power_relative_error": 5.152721258422173e-10,
+              "electrical_power_residual": -1.937806685947674e-12,
+              "emf_power": 0.0037607442529135676,
+              "joule_dissipation": 0.0037607442509757587,
+              "lorentz_transfer_relative_error": 5.765891534078869e-16,
+              "lorentz_transfer_residual": 2.168404344971009e-18,
+              "lorentz_work": -0.0037607442529135654,
+              "mechanical_power_relative_error": 5.960597793608438e-05,
+              "mechanical_power_residual": 4.5887836560079553e-07,
+              "network_electrical_relative_error": 5.152727024313706e-10,
+              "network_electrical_residual": -1.937808854352019e-12,
+              "pass": true,
+              "pressure_power": 0.007698529266525109,
+              "viscous_dissipation": 0.003937326135245943
+            }
+          },
+          "layer_resolution": {
+            "hartmann_layer_cell_deficit": 0.0,
+            "hartmann_layer_cell_ratio": 1.2499999999999993,
+            "hartmann_layer_cells": 9.999999999999995,
+            "hartmann_layer_resolution_pass": true,
+            "hartmann_layer_thickness": 0.0019999999999999996,
+            "layer_resolution_pass": true,
+            "layer_resolution_supported": true,
+            "min_hartmann_spacing": 9.246084261804732e-05,
+            "min_required_hartmann_layer_cells": 8.0,
+            "min_required_side_layer_cells": 6.0,
+            "min_side_spacing": 0.0033673325946135257,
+            "minimum_mesh_refinement_factor": 0.8000000000000004,
+            "side_layer_cell_deficit": 0.0,
+            "side_layer_cell_ratio": 1.6666666666666698,
+            "side_layer_cells": 10.00000000000002,
+            "side_layer_resolution_pass": true,
+            "side_layer_thickness": 0.044721359549995794
+          },
+          "mesh": [
+            99,
+            99
+          ],
+          "published_numerical_relative_error": 0.0025432043918621142,
+          "q_tilde": 0.007698529266525109,
+          "solver": {
+            "applied_forcing": 1.0,
+            "case": "samper_table_i_shercliff_ha500_99x99",
+            "centerline_y_negative_fraction": 0.0,
+            "centerline_y_sign_changes": 0.0,
+            "centerline_z_negative_fraction": 0.0,
+            "centerline_z_sign_changes": 0.0,
+            "charge_balance_residual": 6.713534848220615e-22,
+            "current_scaled_pressure_proxy": 1.0,
+            "div_current_max": 4.2080916529130263e-08,
+            "gauge_residual": 0.0,
+            "interface_current_residual": 0.0,
+            "limited_fraction": 0.0,
+            "limiter_scale": 1.0,
+            "linear_iterations_used": 63.0,
+            "linear_residual": 1.081205301393348e-12,
+            "lorentz_power": -0.0037607442529135654,
+            "mean_current_magnitude": 0.004581215895723845,
+            "mean_velocity": 0.0019246323166312769,
+            "potential_iterations_used": 11.0,
+            "potential_residual": 1.8542930428807581e-09,
+            "pressure_proxy": 1.0,
+            "raw_update_max": 1.4417338546970915e-10,
+            "residual": 1.4417338546970915e-10,
+            "symmetry_y_max_abs_error": 3.3172249669366494e-15,
+            "symmetry_y_mean_abs_error": 8.681477845634556e-16,
+            "symmetry_z_max_abs_error": 2.823375214178192e-13,
+            "symmetry_z_mean_abs_error": 1.1157379640833707e-13,
+            "time": 0.002,
+            "u_max": 0.0020048828026686745,
+            "u_mean": 0.0013734020802917233,
+            "volumetric_flow_rate": 0.007698529266525109
+          },
+          "solver_convergence": {
+            "pass": true,
+            "potential_acceptance_gate": "normalized conservative current balance",
+            "potential_residual_stopping_ceiling": 0.01,
+            "steady_residual_target": 1.5360000000000002e-10
+          }
+        }
+      ],
+      "published_numerical_flow_rate": 0.007679,
+      "refinement": {
+        "analytical_error_monotonic": true,
+        "finest_mesh_change_relative": 0.001336504608207382,
+        "finest_mesh_change_target": 0.0025,
+        "observed_order_against_analytical": 2.0061009761450115,
+        "pass": true
+      }
+    }
+  ],
+  "reference": {
+    "id": "samper-2014-table-i-benchmark-a",
+    "path": "benchmarks/references/samper-table-i.toml",
+    "sha256": "8140a5a19438baea503112be6247c4394fea0c4c7ce0f4bd75a81e74bc664105"
+  },
+  "research_grade_validation_pass": true,
+  "schema_version": 1,
+  "steady_relative_update_target": 2e-08,
+  "steady_residual_target": 1e-09
+}

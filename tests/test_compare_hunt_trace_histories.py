@@ -23,8 +23,26 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "maxCenteredJxB": 2.0,
                 "maxJxB": 5.0,
             },
-            {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 2.0, "pIterations": 1, "maxP": 9.0, "minP": 1.0, "pSpan": 8.0},
-            {"kind": "pressure", "time": 0.1, "corr": 2, "maxU": 1.0, "pIterations": 2, "maxP": 9.0, "minP": 1.0, "pSpan": 8.0},
+            {
+                "kind": "pressure",
+                "time": 0.1,
+                "corr": 0,
+                "maxU": 2.0,
+                "pIterations": 1,
+                "maxP": 9.0,
+                "minP": 1.0,
+                "pSpan": 8.0,
+            },
+            {
+                "kind": "pressure",
+                "time": 0.1,
+                "corr": 2,
+                "maxU": 1.0,
+                "pIterations": 2,
+                "maxP": 9.0,
+                "minP": 1.0,
+                "pSpan": 8.0,
+            },
             {
                 "kind": "epot",
                 "time": 0.2,
@@ -36,19 +54,28 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
                 "maxCenteredJxB": 1.6,
                 "maxJxB": 4.0,
             },
-            {"kind": "pressure", "time": 0.2, "corr": 2, "maxU": 0.5, "pIterations": 3, "maxP": 4.5, "minP": 0.5, "pSpan": 4.0},
+            {
+                "kind": "pressure",
+                "time": 0.2,
+                "corr": 2,
+                "maxU": 0.5,
+                "pIterations": 3,
+                "maxP": 4.5,
+                "minP": 0.5,
+                "pSpan": 4.0,
+            },
         ]
     }
     lmx = {
-                "lmx_solver": {
-                    "trace": {
-                        "time_history": [0.1, 0.2],
-                        "u_max_history": [1.0, 0.5],
-                        "mean_velocity_history": [1.0, 0.5],
-                        "applied_forcing_history": [9.0, 4.5],
-                        "pressure_proxy_history": [8.0, 4.0],
-                        "current_scaled_pressure_proxy_history": [8.0, 4.0],
-                        "current_max_history": [4.0, 3.2],
+        "lmx_solver": {
+            "trace": {
+                "time_history": [0.1, 0.2],
+                "u_max_history": [1.0, 0.5],
+                "mean_velocity_history": [1.0, 0.5],
+                "applied_forcing_history": [9.0, 4.5],
+                "pressure_proxy_history": [8.0, 4.0],
+                "current_scaled_pressure_proxy_history": [8.0, 4.0],
+                "current_max_history": [4.0, 3.2],
                 "face_current_max_history": [7.0, 5.6],
                 "emf_max_history": [3.0, 2.4],
                 "lorentz_max_history": [2.0, 1.6],
@@ -95,7 +122,30 @@ def test_compare_trace_histories_aligns_pressure_and_epot_signals(tmp_path: Path
 
 def test_main_writes_alignment_json(tmp_path: Path):
     reference_path = tmp_path / "reference_trace.json"
-    reference_path.write_text(json.dumps({"records": [{"kind": "epot", "time": 0.1, "maxJ": 1.0, "maxCenteredJxB": 2.0, "maxJxB": 2.0}, {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 3.0, "maxP": 4.0, "minP": 1.0, "pSpan": 3.0}]}))
+    reference_path.write_text(
+        json.dumps(
+            {
+                "records": [
+                    {
+                        "kind": "epot",
+                        "time": 0.1,
+                        "maxJ": 1.0,
+                        "maxCenteredJxB": 2.0,
+                        "maxJxB": 2.0,
+                    },
+                    {
+                        "kind": "pressure",
+                        "time": 0.1,
+                        "corr": 0,
+                        "maxU": 3.0,
+                        "maxP": 4.0,
+                        "minP": 1.0,
+                        "pSpan": 3.0,
+                    },
+                ]
+            }
+        )
+    )
     lmx_path = tmp_path / "lmx.json"
     lmx_path.write_text(
         json.dumps(
@@ -138,13 +188,19 @@ def test_main_writes_alignment_json(tmp_path: Path):
     payload = json.loads(output.read_text())
     assert payload["u_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
     assert payload["pressure_proxy"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
-    assert payload["current_scaled_pressure_proxy"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["current_scaled_pressure_proxy"]["samples"][0][
+        "abs_diff"
+    ] == pytest.approx(0.0)
     assert payload["primary_pressure_metric"] == "pSpan"
     assert payload["primary_pressure_proxy_metric"] == "pressure_proxy"
     assert payload["primary_current_metric"] == "current_max"
-    assert payload["primary_current_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["primary_current_max"]["samples"][0]["abs_diff"] == pytest.approx(
+        0.0
+    )
     assert payload["primary_lorentz_metric"] == "centered_lorentz_max"
-    assert payload["primary_lorentz_max"]["samples"][0]["abs_diff"] == pytest.approx(0.0)
+    assert payload["primary_lorentz_max"]["samples"][0]["abs_diff"] == pytest.approx(
+        0.0
+    )
     assert payload["reference_pressure_final_records"][0]["time"] == pytest.approx(0.1)
 
 
@@ -235,10 +291,38 @@ def test_compare_trace_histories_prefers_current_scaled_pressure_proxy(tmp_path:
         json.dumps(
             {
                 "records": [
-                    {"kind": "pressure", "time": 0.1, "corr": 0, "maxU": 1.0, "maxP": 3.0, "minP": 1.0, "pSpan": 2.0},
-                    {"kind": "pressure", "time": 0.2, "corr": 0, "maxU": 0.5, "maxP": 1.5, "minP": 0.5, "pSpan": 1.0},
-                    {"kind": "epot", "time": 0.1, "maxJ": 2.0, "maxCenteredJxB": 1.0, "maxJxB": 1.0},
-                    {"kind": "epot", "time": 0.2, "maxJ": 1.0, "maxCenteredJxB": 0.5, "maxJxB": 0.5},
+                    {
+                        "kind": "pressure",
+                        "time": 0.1,
+                        "corr": 0,
+                        "maxU": 1.0,
+                        "maxP": 3.0,
+                        "minP": 1.0,
+                        "pSpan": 2.0,
+                    },
+                    {
+                        "kind": "pressure",
+                        "time": 0.2,
+                        "corr": 0,
+                        "maxU": 0.5,
+                        "maxP": 1.5,
+                        "minP": 0.5,
+                        "pSpan": 1.0,
+                    },
+                    {
+                        "kind": "epot",
+                        "time": 0.1,
+                        "maxJ": 2.0,
+                        "maxCenteredJxB": 1.0,
+                        "maxJxB": 1.0,
+                    },
+                    {
+                        "kind": "epot",
+                        "time": 0.2,
+                        "maxJ": 1.0,
+                        "maxCenteredJxB": 0.5,
+                        "maxJxB": 0.5,
+                    },
                 ]
             }
         )
@@ -270,5 +354,8 @@ def test_compare_trace_histories_prefers_current_scaled_pressure_proxy(tmp_path:
 
     payload = compare.compare_trace_histories(reference_path, lmx_path)
 
-    assert payload["pressure_proxy"]["l2_error"] > payload["current_scaled_pressure_proxy"]["l2_error"]
+    assert (
+        payload["pressure_proxy"]["l2_error"]
+        > payload["current_scaled_pressure_proxy"]["l2_error"]
+    )
     assert payload["primary_pressure_proxy_metric"] == "current_scaled_pressure_proxy"

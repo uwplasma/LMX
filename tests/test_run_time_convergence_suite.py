@@ -40,12 +40,15 @@ def test_observed_orders_reports_first_order_drop():
 
 def test_observed_orders_skips_invalid_pairs():
     assert suite._observed_orders([{"dt": 0.1}]) == {}
-    assert suite._observed_orders(
-        [
-            {"dt": 0.1, "y_l2_error": 0.1},
-            {"dt": 0.1, "y_l2_error": 0.05},
-        ]
-    ) == {}
+    assert (
+        suite._observed_orders(
+            [
+                {"dt": 0.1, "y_l2_error": 0.1},
+                {"dt": 0.1, "y_l2_error": 0.05},
+            ]
+        )
+        == {}
+    )
 
 
 def test_replace_like_rejects_unsupported_object():
@@ -68,13 +71,23 @@ def test_build_case_covers_all_supported_cases(tmp_path: Path):
     assert hunt.name.startswith("hunt")
 
 
-def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_reference_branch_handles_missing_slice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
     comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
 
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
-    monkeypatch.setattr(suite, "closed_channel_validation", lambda *args, **kwargs: comparison)
-    monkeypatch.setattr(suite, "processed_slice_validation", lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")))
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
+    )
+    monkeypatch.setattr(
+        suite, "closed_channel_validation", lambda *args, **kwargs: comparison
+    )
+    monkeypatch.setattr(
+        suite,
+        "processed_slice_validation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
+    )
 
     metrics = suite._collect_metrics(
         solution=SimpleNamespace(),
@@ -90,10 +103,22 @@ def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, 
     assert "slice_y_l2_error" not in metrics
 
 
-def test_collect_metrics_hartmann_branch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
-    monkeypatch.setattr(suite, "hartmann_validation", lambda *args, **kwargs: SimpleNamespace(l2_error=0.1, linf_error=0.2))
-    monkeypatch.setattr(suite, "hartmann_acceptance", lambda *args, **kwargs: SimpleNamespace(passed=False))
+def test_collect_metrics_hartmann_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
+    )
+    monkeypatch.setattr(
+        suite,
+        "hartmann_validation",
+        lambda *args, **kwargs: SimpleNamespace(l2_error=0.1, linf_error=0.2),
+    )
+    monkeypatch.setattr(
+        suite,
+        "hartmann_acceptance",
+        lambda *args, **kwargs: SimpleNamespace(passed=False),
+    )
 
     metrics = suite._collect_metrics(
         solution=SimpleNamespace(),
@@ -140,13 +165,21 @@ def test_run_time_convergence_suite_writes_summary(
             time_stepper=SimpleNamespace(dt=0.01, t_final=1.0, max_steps=100),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
         lambda solution, case_kind, ha, **kwargs: (
-            {"l2_error": 0.04} if case_kind == "hartmann" else {"y_l2_error": 0.2, "z_l2_error": 0.1, "combined_l2_error": 0.158}
+            {"l2_error": 0.04}
+            if case_kind == "hartmann"
+            else {"y_l2_error": 0.2, "z_l2_error": 0.1, "combined_l2_error": 0.158}
         ),
     )
 
@@ -162,7 +195,9 @@ def test_run_time_convergence_suite_writes_summary(
     assert '"cases"' in capsys.readouterr().out
 
 
-def test_run_time_convergence_suite_applies_t_final_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_run_time_convergence_suite_applies_t_final_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     output = tmp_path / "time_convergence_override"
 
     monkeypatch.setattr(
@@ -189,9 +224,17 @@ def test_run_time_convergence_suite_applies_t_final_override(tmp_path: Path, mon
             time_stepper=SimpleNamespace(dt=0.01, t_final=1.0, max_steps=100),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
-    monkeypatch.setattr(suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.04})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
+    monkeypatch.setattr(
+        suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.04}
+    )
 
     assert suite.main([]) == 0
     summary = (output / "summary.json").read_text()

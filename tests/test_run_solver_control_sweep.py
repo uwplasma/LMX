@@ -47,16 +47,32 @@ def test_build_case_covers_hartmann_shercliff_and_hunt(tmp_path: Path):
     assert hunt.geometry.kind == "layered_duct"
 
 
-def test_collect_metrics_covers_hartmann_and_slice_present_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_covers_hartmann_and_slice_present_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
     comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
     slice_report = SimpleNamespace(y_profile=profile, z_profile=profile)
 
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
-    monkeypatch.setattr(suite, "hartmann_validation", lambda *args, **kwargs: SimpleNamespace(l2_error=0.01, linf_error=0.02))
-    monkeypatch.setattr(suite, "hartmann_acceptance", lambda *args, **kwargs: SimpleNamespace(passed=True))
-    monkeypatch.setattr(suite, "closed_channel_validation", lambda *args, **kwargs: comparison)
-    monkeypatch.setattr(suite, "processed_slice_validation", lambda *args, **kwargs: slice_report)
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
+    )
+    monkeypatch.setattr(
+        suite,
+        "hartmann_validation",
+        lambda *args, **kwargs: SimpleNamespace(l2_error=0.01, linf_error=0.02),
+    )
+    monkeypatch.setattr(
+        suite,
+        "hartmann_acceptance",
+        lambda *args, **kwargs: SimpleNamespace(passed=True),
+    )
+    monkeypatch.setattr(
+        suite, "closed_channel_validation", lambda *args, **kwargs: comparison
+    )
+    monkeypatch.setattr(
+        suite, "processed_slice_validation", lambda *args, **kwargs: slice_report
+    )
 
     hartmann_metrics = suite._collect_metrics(
         solution=SimpleNamespace(),
@@ -77,13 +93,23 @@ def test_collect_metrics_covers_hartmann_and_slice_present_paths(tmp_path: Path,
     assert hunt_metrics["slice_combined_l2_error"] == pytest.approx(0.2)
 
 
-def test_collect_metrics_reference_branch_handles_missing_slice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_reference_branch_handles_missing_slice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     profile = SimpleNamespace(l2_error=0.2, linf_error=0.3)
     comparison = SimpleNamespace(y_profile=profile, z_profile=profile)
 
-    monkeypatch.setattr(suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4})
-    monkeypatch.setattr(suite, "closed_channel_validation", lambda *args, **kwargs: comparison)
-    monkeypatch.setattr(suite, "processed_slice_validation", lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")))
+    monkeypatch.setattr(
+        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
+    )
+    monkeypatch.setattr(
+        suite, "closed_channel_validation", lambda *args, **kwargs: comparison
+    )
+    monkeypatch.setattr(
+        suite,
+        "processed_slice_validation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
+    )
 
     metrics = suite._collect_metrics(
         solution=SimpleNamespace(),
@@ -134,12 +160,22 @@ def test_run_solver_control_sweep_accepts_potential_tolerance(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"l2_error": 0.2, "u_max": 0.1, "residual": 1e-4},
+        lambda solution, case_kind, ha, **kwargs: {
+            "l2_error": 0.2,
+            "u_max": 0.1,
+            "residual": 1e-4,
+        },
     )
 
     exit_code = suite.main([])
@@ -188,12 +224,22 @@ def test_run_solver_control_sweep_accepts_potential_relaxation(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"l2_error": 0.2, "u_max": 0.1, "residual": 1e-4},
+        lambda solution, case_kind, ha, **kwargs: {
+            "l2_error": 0.2,
+            "u_max": 0.1,
+            "residual": 1e-4,
+        },
     )
 
     exit_code = suite.main([])
@@ -243,12 +289,22 @@ def test_run_solver_control_sweep_accepts_potential_solver(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"l2_error": 0.2, "u_max": 0.1, "residual": 1e-4},
+        lambda solution, case_kind, ha, **kwargs: {
+            "l2_error": 0.2,
+            "u_max": 0.1,
+            "residual": 1e-4,
+        },
     )
 
     exit_code = suite.main([])
@@ -294,12 +350,22 @@ def test_run_solver_control_sweep_accepts_current_reconstruction(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"y_l2_error": 0.2, "z_l2_error": 0.3, "combined_l2_error": 0.255},
+        lambda solution, case_kind, ha, **kwargs: {
+            "y_l2_error": 0.2,
+            "z_l2_error": 0.3,
+            "combined_l2_error": 0.255,
+        },
     )
 
     exit_code = suite.main([])
@@ -345,12 +411,22 @@ def test_run_solver_control_sweep_accepts_velocity_update_limit(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"y_l2_error": 0.2, "z_l2_error": 0.3, "combined_l2_error": 0.255},
+        lambda solution, case_kind, ha, **kwargs: {
+            "y_l2_error": 0.2,
+            "z_l2_error": 0.3,
+            "combined_l2_error": 0.255,
+        },
     )
 
     exit_code = suite.main([])
@@ -388,15 +464,27 @@ def test_run_solver_control_sweep_writes_summary(
         suite,
         "_build_case",
         lambda case_kind, ha, resolution, output_dir, wall_cells: SimpleNamespace(
-            time_stepper=SimpleNamespace(dt=0.002, t_final=1.0, max_steps=500, outer_iterations=2),
+            time_stepper=SimpleNamespace(
+                dt=0.002, t_final=1.0, max_steps=500, outer_iterations=2
+            ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
-    monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 6.0})
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
+    monkeypatch.setattr(
+        suite,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 6.0},
+    )
     monkeypatch.setattr(
         suite,
         "_collect_metrics",
-        lambda solution, case_kind, ha, **kwargs: {"y_l2_error": 0.2, "z_l2_error": 0.3, "combined_l2_error": 0.255},
+        lambda solution, case_kind, ha, **kwargs: {
+            "y_l2_error": 0.2,
+            "z_l2_error": 0.3,
+            "combined_l2_error": 0.255,
+        },
     )
 
     exit_code = suite.main([])
@@ -444,9 +532,13 @@ def test_run_solver_control_sweep_dt_updates_max_steps(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
     monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {})
-    monkeypatch.setattr(suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.2})
+    monkeypatch.setattr(
+        suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.2}
+    )
 
     assert suite.main([]) == 0
     summary = (output / "summary.json").read_text()
@@ -488,9 +580,13 @@ def test_run_solver_control_sweep_dt_does_not_round_up_max_steps(
             ),
         ),
     )
-    monkeypatch.setattr(suite, "solve_steady", lambda case: SimpleNamespace(mesh=object()))
+    monkeypatch.setattr(
+        suite, "solve_steady", lambda case: SimpleNamespace(mesh=object())
+    )
     monkeypatch.setattr(suite, "duct_layer_resolution_metrics", lambda case, mesh: {})
-    monkeypatch.setattr(suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.2})
+    monkeypatch.setattr(
+        suite, "_collect_metrics", lambda *args, **kwargs: {"l2_error": 0.2}
+    )
 
     assert suite.main([]) == 0
     summary = (output / "summary.json").read_text()

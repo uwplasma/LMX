@@ -97,7 +97,9 @@ def _sample_solution(case) -> Solution:
 
 def _sample_frames(case, *, signed: bool) -> list[dict[str, object]]:
     mesh = _build_mesh(case)
-    y, z = np.meshgrid(np.asarray(mesh.y_centers), np.asarray(mesh.z_centers), indexing="ij")
+    y, z = np.meshgrid(
+        np.asarray(mesh.y_centers), np.asarray(mesh.z_centers), indexing="ij"
+    )
     if signed:
         base = 0.3 * np.sin(y) - 0.2 * np.cos(z)
     else:
@@ -146,7 +148,9 @@ def test_write_case_overview_plots_writes_overview_and_diagnostics(tmp_path: Pat
     assert len(outputs) == 4
 
 
-def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(tmp_path: Path):
+def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(
+    tmp_path: Path,
+):
     solution = _sample_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
     solution = Solution(
         mesh=solution.mesh,
@@ -164,10 +168,17 @@ def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(tmp_pa
     assert not (tmp_path / "diagnostics.png").exists()
 
 
-def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(tmp_path: Path):
+def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(
+    tmp_path: Path,
+):
     rect_mesh = _build_mesh(make_hartmann_case(ha=5.0, ny=8, nz=8))
-    rect_outputs = write_geometry_preview_plots(rect_mesh, tmp_path / "rect", case_title="Rectangular geometry")
-    assert rect_outputs == [tmp_path / "rect" / "geometry_preview.png", tmp_path / "rect" / "geometry_preview.pdf"]
+    rect_outputs = write_geometry_preview_plots(
+        rect_mesh, tmp_path / "rect", case_title="Rectangular geometry"
+    )
+    assert rect_outputs == [
+        tmp_path / "rect" / "geometry_preview.png",
+        tmp_path / "rect" / "geometry_preview.pdf",
+    ]
     assert rect_outputs[0].exists()
     assert rect_outputs[1].exists()
 
@@ -177,13 +188,21 @@ def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(tmp_pa
             "geometry": "pipe_ogrid",
             "point_coordinates": jnp.asarray(
                 [
-                    [[[0.0, -0.5, -0.5], [0.0, -0.5, 0.5]], [[0.0, 0.5, -0.5], [0.0, 0.5, 0.5]]],
-                    [[[1.0, -0.5, -0.5], [1.0, -0.5, 0.5]], [[1.0, 0.5, -0.5], [1.0, 0.5, 0.5]]],
+                    [
+                        [[0.0, -0.5, -0.5], [0.0, -0.5, 0.5]],
+                        [[0.0, 0.5, -0.5], [0.0, 0.5, 0.5]],
+                    ],
+                    [
+                        [[1.0, -0.5, -0.5], [1.0, -0.5, 0.5]],
+                        [[1.0, 0.5, -0.5], [1.0, 0.5, 0.5]],
+                    ],
                 ]
             ),
         }
     )
-    pipe_outputs = write_geometry_preview_plots(pipe_mesh, tmp_path / "pipe", case_title="Pipe preview")
+    pipe_outputs = write_geometry_preview_plots(
+        pipe_mesh, tmp_path / "pipe", case_title="Pipe preview"
+    )
     assert pipe_outputs[0].exists()
     assert pipe_outputs[1].exists()
 
@@ -197,8 +216,14 @@ def test_write_geometry_gallery_plots_writes_panel_outputs(tmp_path: Path):
             "geometry": "pipe_ogrid",
             "point_coordinates": jnp.asarray(
                 [
-                    [[[0.0, -0.5, -0.5], [0.0, -0.5, 0.5]], [[0.0, 0.5, -0.5], [0.0, 0.5, 0.5]]],
-                    [[[1.0, -0.5, -0.5], [1.0, -0.5, 0.5]], [[1.0, 0.5, -0.5], [1.0, 0.5, 0.5]]],
+                    [
+                        [[0.0, -0.5, -0.5], [0.0, -0.5, 0.5]],
+                        [[0.0, 0.5, -0.5], [0.0, 0.5, 0.5]],
+                    ],
+                    [
+                        [[1.0, -0.5, -0.5], [1.0, -0.5, 0.5]],
+                        [[1.0, 0.5, -0.5], [1.0, 0.5, 0.5]],
+                    ],
                 ]
             ),
         }
@@ -212,7 +237,10 @@ def test_write_geometry_gallery_plots_writes_panel_outputs(tmp_path: Path):
         tmp_path,
         title="Geometry gallery",
     )
-    assert outputs == [tmp_path / "geometry_gallery.png", tmp_path / "geometry_gallery.pdf"]
+    assert outputs == [
+        tmp_path / "geometry_gallery.png",
+        tmp_path / "geometry_gallery.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -221,16 +249,28 @@ def test_plot_field_handles_negative_only_field():
     solution = _sample_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
     fig, ax = plt.subplots()
     try:
-        _plot_field(ax, solution, -jnp.abs(solution.state.u), title="Negative field", cmap="RdBu_r")
+        _plot_field(
+            ax,
+            solution,
+            -jnp.abs(solution.state.u),
+            title="Negative field",
+            cmap="RdBu_r",
+        )
         assert ax.get_title() == "Negative field"
     finally:
         plt.close(fig)
 
 
 def test_movie_field_stack_supports_raw_and_bulk_deviation():
-    frames = _sample_frames(make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=False)
-    raw_fields, raw_peaks, raw_label, raw_colorbar = _movie_field_stack(frames, field_mode="raw")
-    dev_fields, dev_peaks, dev_label, dev_colorbar = _movie_field_stack(frames, field_mode="bulk_deviation")
+    frames = _sample_frames(
+        make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=False
+    )
+    raw_fields, raw_peaks, raw_label, raw_colorbar = _movie_field_stack(
+        frames, field_mode="raw"
+    )
+    dev_fields, dev_peaks, dev_label, dev_colorbar = _movie_field_stack(
+        frames, field_mode="bulk_deviation"
+    )
 
     assert len(raw_fields) == len(frames)
     assert len(dev_fields) == len(frames)
@@ -296,7 +336,10 @@ def test_write_freemhd_parity_plots_writes_outputs(tmp_path: Path):
         },
     ]
     outputs = write_freemhd_parity_plots(records, tmp_path, case_title="Parity demo")
-    assert outputs == [tmp_path / "freemhd_closed_channel_parity.png", tmp_path / "freemhd_closed_channel_parity.pdf"]
+    assert outputs == [
+        tmp_path / "freemhd_closed_channel_parity.png",
+        tmp_path / "freemhd_closed_channel_parity.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -325,7 +368,9 @@ def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
             },
         },
     ]
-    outputs = write_freemhd_observable_parity_plots(records, tmp_path, case_title="Observable parity")
+    outputs = write_freemhd_observable_parity_plots(
+        records, tmp_path, case_title="Observable parity"
+    )
     assert outputs == [
         tmp_path / "freemhd_closed_channel_observable_parity.png",
         tmp_path / "freemhd_closed_channel_observable_parity.pdf",
@@ -334,16 +379,24 @@ def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
     assert outputs[1].exists()
 
 
-def test_safe_writer_candidates_prefers_imagemagick_when_available(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("matplotlib.animation.writers.list", lambda: ["ffmpeg", "imagemagick", "pillow"])
+def test_safe_writer_candidates_prefers_imagemagick_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        "matplotlib.animation.writers.list", lambda: ["ffmpeg", "imagemagick", "pillow"]
+    )
     assert _safe_writer_candidates() == [("gif", "imagemagick"), ("gif", "pillow")]
 
 
-@pytest.mark.filterwarnings("ignore:Animation was deleted without rendering anything:UserWarning")
-def test_write_transient_movies_writes_posters_and_stubbed_gifs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    frames = _sample_frames(make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=True)
+def test_write_transient_movies_writes_posters_and_stubbed_gifs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    frames = _sample_frames(
+        make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=True
+    )
 
     def fake_save(self, filename, *args, **kwargs):
+        self._draw_was_started = True
         Path(filename).write_bytes(b"gif")
 
     monkeypatch.setattr("matplotlib.animation.FuncAnimation.save", fake_save)
@@ -370,13 +423,15 @@ def test_write_transient_movies_writes_posters_and_stubbed_gifs(tmp_path: Path, 
         assert path.exists()
 
 
-@pytest.mark.filterwarnings("ignore:Animation was deleted without rendering anything:UserWarning")
 def test_write_transient_movies_handles_positive_only_normalized_path_and_contour_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    frames = _sample_frames(make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=False)
+    frames = _sample_frames(
+        make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=False
+    )
 
     def fake_save(self, filename, *args, **kwargs):
+        self._draw_was_started = True
         self._func(0)
         self._func(1)
         Path(filename).write_bytes(b"gif")
@@ -427,38 +482,84 @@ def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
         target_parameter=8.0,
     )
 
-    assert outputs == [tmp_path / "autodiff_summary.png", tmp_path / "autodiff_summary.pdf"]
+    assert outputs == [
+        tmp_path / "autodiff_summary.png",
+        tmp_path / "autodiff_summary.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_write_operator_verification_plots_writes_png_and_pdf(tmp_path: Path):
     records = [
-        {"resolution": 16.0, "max_spacing": 0.125, "gradient_y_l2_error": 2.0e-2, "gradient_z_l2_error": 2.2e-2, "laplacian_l2_error": 5.0e-2},
-        {"resolution": 32.0, "max_spacing": 0.0625, "gradient_y_l2_error": 5.0e-3, "gradient_z_l2_error": 5.5e-3, "laplacian_l2_error": 1.3e-2},
-        {"resolution": 64.0, "max_spacing": 0.03125, "gradient_y_l2_error": 1.3e-3, "gradient_z_l2_error": 1.4e-3, "laplacian_l2_error": 3.3e-3},
+        {
+            "resolution": 16.0,
+            "max_spacing": 0.125,
+            "gradient_y_l2_error": 2.0e-2,
+            "gradient_z_l2_error": 2.2e-2,
+            "laplacian_l2_error": 5.0e-2,
+        },
+        {
+            "resolution": 32.0,
+            "max_spacing": 0.0625,
+            "gradient_y_l2_error": 5.0e-3,
+            "gradient_z_l2_error": 5.5e-3,
+            "laplacian_l2_error": 1.3e-2,
+        },
+        {
+            "resolution": 64.0,
+            "max_spacing": 0.03125,
+            "gradient_y_l2_error": 1.3e-3,
+            "gradient_z_l2_error": 1.4e-3,
+            "laplacian_l2_error": 3.3e-3,
+        },
     ]
-    outputs = write_operator_verification_plots(records, tmp_path, case_title="Operator verification")
+    outputs = write_operator_verification_plots(
+        records, tmp_path, case_title="Operator verification"
+    )
 
-    assert outputs == [tmp_path / "operator_verification.png", tmp_path / "operator_verification.pdf"]
+    assert outputs == [
+        tmp_path / "operator_verification.png",
+        tmp_path / "operator_verification.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_write_interface_verification_plots_writes_png_and_pdf(tmp_path: Path):
     records = [
-        {"resolution": 24.0, "max_spacing": 0.0833, "profile_l2_error": 1.0e-6, "flux_error": 2.0e-6},
-        {"resolution": 48.0, "max_spacing": 0.0417, "profile_l2_error": 2.5e-7, "flux_error": 5.0e-7},
-        {"resolution": 96.0, "max_spacing": 0.0208, "profile_l2_error": 6.0e-8, "flux_error": 1.2e-7},
+        {
+            "resolution": 24.0,
+            "max_spacing": 0.0833,
+            "profile_l2_error": 1.0e-6,
+            "flux_error": 2.0e-6,
+        },
+        {
+            "resolution": 48.0,
+            "max_spacing": 0.0417,
+            "profile_l2_error": 2.5e-7,
+            "flux_error": 5.0e-7,
+        },
+        {
+            "resolution": 96.0,
+            "max_spacing": 0.0208,
+            "profile_l2_error": 6.0e-8,
+            "flux_error": 1.2e-7,
+        },
     ]
     profile = {
         "y": np.linspace(-1.0, 1.0, 9),
         "u_exact": np.linspace(0.0, 1.0, 9),
         "u_numeric": np.linspace(0.0, 1.0, 9) + 1.0e-3,
     }
-    outputs = write_interface_verification_plots(records, profile, tmp_path, case_title="Interface verification")
+    outputs = write_interface_verification_plots(
+        records, profile, tmp_path, case_title="Interface verification"
+    )
 
-    assert outputs == [tmp_path / "interface_verification.png", tmp_path / "interface_verification.pdf"]
+    assert outputs == [
+        tmp_path / "interface_verification.png",
+        tmp_path / "interface_verification.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -468,7 +569,9 @@ def test_write_cross_section_field_plots_writes_png_and_pdf(tmp_path: Path):
     z = np.linspace(-1.0, 1.0, 11)
     yy, zz = np.meshgrid(y, z, indexing="ij")
     field = np.stack([np.zeros_like(yy), 0.2 * yy, 1.0 + 0.1 * zz], axis=-1)
-    outputs = write_cross_section_field_plots(y=y, z=z, field=field, out_dir=tmp_path, title="Field preview")
+    outputs = write_cross_section_field_plots(
+        y=y, z=z, field=field, out_dir=tmp_path, title="Field preview"
+    )
     assert outputs == [tmp_path / "field_preview.png", tmp_path / "field_preview.pdf"]
     assert outputs[0].exists()
     assert outputs[1].exists()
@@ -487,13 +590,18 @@ def test_write_tabulated_field_reconstruction_plots_writes_png_and_pdf(tmp_path:
         tabulated_field=sampled,
         out_dir=tmp_path,
     )
-    assert outputs == [tmp_path / "tabulated_field_reconstruction.png", tmp_path / "tabulated_field_reconstruction.pdf"]
+    assert outputs == [
+        tmp_path / "tabulated_field_reconstruction.png",
+        tmp_path / "tabulated_field_reconstruction.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
-    bent_problem = build_bent_pipe_extruded_problem(ha_peak=4.0, bend_radius=4.0, bend_angle=1.0, nx_stations=4, nr=4, ntheta=12)
+    bent_problem = build_bent_pipe_extruded_problem(
+        ha_peak=4.0, bend_radius=4.0, bend_angle=1.0, nx_stations=4, nr=4, ntheta=12
+    )
     straight_problem = build_pipe_ogrid_extruded_problem(
         ha_peak=4.0,
         radius=float(bent_problem.case.geometry.radius),
@@ -505,27 +613,46 @@ def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
     bent_solution = solve_extruded_inductionless(bent_problem)
     straight_solution = solve_extruded_inductionless(straight_problem)
 
-    outputs = write_bent_pipe_overview_plots(bent_solution, tmp_path, straight_solution=straight_solution)
-    assert outputs == [tmp_path / "bent_pipe_overview.png", tmp_path / "bent_pipe_overview.pdf"]
+    outputs = write_bent_pipe_overview_plots(
+        bent_solution, tmp_path, straight_solution=straight_solution
+    )
+    assert outputs == [
+        tmp_path / "bent_pipe_overview.png",
+        tmp_path / "bent_pipe_overview.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_write_magnetic_obstacle_schematic_plots_writes_png_and_pdf(tmp_path: Path):
-    problem = build_magnetic_obstacle_rect_extruded_problem(base_bz=4.0, ny=6, nz=6, nx_stations=5)
+    problem = build_magnetic_obstacle_rect_extruded_problem(
+        base_bz=4.0, ny=6, nz=6, nx_stations=5
+    )
     problem = replace(
         problem,
         case=replace(
             problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=3, potential_iterations=8),
+            time_stepper=replace(
+                problem.case.time_stepper, max_steps=3, potential_iterations=8
+            ),
             solver=replace(problem.case.solver, coupling_iterations=3),
         ),
     )
     solution = solve_extruded_inductionless(problem)
-    reference_problem = replace(problem, profile=replace(problem.profile, field_scale=jnp.zeros_like(problem.profile.field_scale)))
+    reference_problem = replace(
+        problem,
+        profile=replace(
+            problem.profile, field_scale=jnp.zeros_like(problem.profile.field_scale)
+        ),
+    )
     reference_solution = solve_extruded_inductionless(reference_problem)
-    outputs = write_magnetic_obstacle_schematic_plots(solution, reference_solution, tmp_path)
-    assert outputs == [tmp_path / "magnetic_obstacle_schematic.png", tmp_path / "magnetic_obstacle_schematic.pdf"]
+    outputs = write_magnetic_obstacle_schematic_plots(
+        solution, reference_solution, tmp_path
+    )
+    assert outputs == [
+        tmp_path / "magnetic_obstacle_schematic.png",
+        tmp_path / "magnetic_obstacle_schematic.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
@@ -537,8 +664,10 @@ def test_write_wham_mirror_overview_plots_writes_png_and_pdf(tmp_path: Path):
     xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
     bx = np.zeros_like(xx)
     by = 0.2 * yy
-    bz = 1.0 + 0.4 * np.exp(-(zz / 0.25) ** 2)
-    table_path = write_tabulated_field_npz(tmp_path / "wham_test_field.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz)
+    bz = 1.0 + 0.4 * np.exp(-((zz / 0.25) ** 2))
+    table_path = write_tabulated_field_npz(
+        tmp_path / "wham_test_field.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz
+    )
 
     bundle = SimpleNamespace(
         x=np.linspace(-0.4, 0.4, 5),
@@ -565,19 +694,59 @@ def test_write_wham_mirror_overview_plots_writes_png_and_pdf(tmp_path: Path):
         case_title="WHAM overview",
         autodiff_summary=autodiff_summary,
     )
-    assert outputs == [tmp_path / "wham_mirror_overview.png", tmp_path / "wham_mirror_overview.pdf"]
+    assert outputs == [
+        tmp_path / "wham_mirror_overview.png",
+        tmp_path / "wham_mirror_overview.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()
 
 
 def test_write_magnetic_obstacle_regime_plots_writes_png_and_pdf(tmp_path: Path):
     records = [
-        {"base_bz": 20.0, "forcing": 0.5, "peak_velocity_deficit_ratio": 1.0e-2, "pressure_excess_proxy": 2.0e-2, "current_proxy_peak": 5.0e-1, "y_l2_distortion": 1.5e-1, "z_l2_distortion": 1.3e-1},
-        {"base_bz": 20.0, "forcing": 1.0, "peak_velocity_deficit_ratio": 2.0e-2, "pressure_excess_proxy": 3.0e-2, "current_proxy_peak": 7.0e-1, "y_l2_distortion": 1.8e-1, "z_l2_distortion": 1.6e-1},
-        {"base_bz": 40.0, "forcing": 0.5, "peak_velocity_deficit_ratio": 3.0e-2, "pressure_excess_proxy": 5.0e-2, "current_proxy_peak": 1.2, "y_l2_distortion": 2.0e-1, "z_l2_distortion": 1.9e-1},
-        {"base_bz": 40.0, "forcing": 1.0, "peak_velocity_deficit_ratio": 4.0e-2, "pressure_excess_proxy": 7.0e-2, "current_proxy_peak": 1.7, "y_l2_distortion": 2.4e-1, "z_l2_distortion": 2.2e-1},
+        {
+            "base_bz": 20.0,
+            "forcing": 0.5,
+            "peak_velocity_deficit_ratio": 1.0e-2,
+            "pressure_excess_proxy": 2.0e-2,
+            "current_proxy_peak": 5.0e-1,
+            "y_l2_distortion": 1.5e-1,
+            "z_l2_distortion": 1.3e-1,
+        },
+        {
+            "base_bz": 20.0,
+            "forcing": 1.0,
+            "peak_velocity_deficit_ratio": 2.0e-2,
+            "pressure_excess_proxy": 3.0e-2,
+            "current_proxy_peak": 7.0e-1,
+            "y_l2_distortion": 1.8e-1,
+            "z_l2_distortion": 1.6e-1,
+        },
+        {
+            "base_bz": 40.0,
+            "forcing": 0.5,
+            "peak_velocity_deficit_ratio": 3.0e-2,
+            "pressure_excess_proxy": 5.0e-2,
+            "current_proxy_peak": 1.2,
+            "y_l2_distortion": 2.0e-1,
+            "z_l2_distortion": 1.9e-1,
+        },
+        {
+            "base_bz": 40.0,
+            "forcing": 1.0,
+            "peak_velocity_deficit_ratio": 4.0e-2,
+            "pressure_excess_proxy": 7.0e-2,
+            "current_proxy_peak": 1.7,
+            "y_l2_distortion": 2.4e-1,
+            "z_l2_distortion": 2.2e-1,
+        },
     ]
-    outputs = write_magnetic_obstacle_regime_plots(records, tmp_path, case_title="Obstacle regime scan")
-    assert outputs == [tmp_path / "magnetic_obstacle_regime_scan.png", tmp_path / "magnetic_obstacle_regime_scan.pdf"]
+    outputs = write_magnetic_obstacle_regime_plots(
+        records, tmp_path, case_title="Obstacle regime scan"
+    )
+    assert outputs == [
+        tmp_path / "magnetic_obstacle_regime_scan.png",
+        tmp_path / "magnetic_obstacle_regime_scan.pdf",
+    ]
     assert outputs[0].exists()
     assert outputs[1].exists()

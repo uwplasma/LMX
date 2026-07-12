@@ -66,7 +66,9 @@ def test_laplacian_of_quadratic_field():
 
 
 def test_laplacian_of_quadratic_field_on_clustered_mesh():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=48, nz=48, target_ha=100.0, magnetic_axis="z")
+    mesh = generate_rect_duct_mesh(
+        width=2.0, height=2.0, ny=48, nz=48, target_ha=100.0, magnetic_axis="z"
+    )
     y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
     field = y**2 + z**2
     lap = laplacian_scalar(field, mesh)
@@ -97,7 +99,9 @@ def test_operator_helpers_cover_spacings_face_averages_and_divergence():
     assert face_y.shape == (mesh.ny - 1, mesh.nz)
     assert face_z.shape == (mesh.ny, mesh.nz - 1)
 
-    div_flux = divergence_flux(jnp.ones(mesh.yz_shape), 2.0 * jnp.ones(mesh.yz_shape), mesh)
+    div_flux = divergence_flux(
+        jnp.ones(mesh.yz_shape), 2.0 * jnp.ones(mesh.yz_shape), mesh
+    )
     assert div_flux.shape == mesh.yz_shape
 
     face_flux_y = jnp.zeros((mesh.ny + 1, mesh.nz))

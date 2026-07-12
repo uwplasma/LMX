@@ -18,7 +18,9 @@ def _write_minimal_static(static_dir: Path) -> None:
     static_dir.mkdir(parents=True, exist_ok=True)
     for spec in PUBLICATION_FIGURE_SPECS:
         (static_dir / spec.artifact).write_bytes(b"plot")
-        (static_dir / spec.summary).write_text(json.dumps({"validation": {"validation_pass": True, "value": 1.0}}) + "\n")
+        (static_dir / spec.summary).write_text(
+            json.dumps({"validation": {"validation_pass": True, "value": 1.0}}) + "\n"
+        )
     (static_dir / "straight_duct_profile_comparison_summary.json").write_text(
         json.dumps(
             {
@@ -55,7 +57,9 @@ def test_publication_figure_rows_collect_metrics(tmp_path: Path):
     assert len(rows) == len(PUBLICATION_FIGURE_SPECS)
     assert all(row["artifact_exists"] for row in rows)
     assert closed["selected_metrics"]["max_l2_error"] == pytest.approx(0.005)
-    assert transient["selected_metrics"]["final_bend_outboard_to_inboard_ratio"] == pytest.approx(1.05)
+    assert transient["selected_metrics"][
+        "final_bend_outboard_to_inboard_ratio"
+    ] == pytest.approx(1.05)
 
 
 def test_write_publication_figure_manifest(tmp_path: Path):

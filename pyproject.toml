@@ -7,14 +7,17 @@ name = "lmx"
 version = "1.1.3"
 description = "JAX-native inductionless MHD toolkit for research, benchmarking, and differentiable simulation"
 readme = "README.md"
-requires-python = ">=3.10"
+authors = [{name = "Rogerio Jorge"}]
+requires-python = ">=3.10,<3.14"
 license = "MIT"
+keywords = ["magnetohydrodynamics", "liquid-metal", "jax", "differentiable-simulation"]
 dependencies = [
   "jax",
   "jaxlib",
   "matplotlib",
   "numpy",
   "scipy",
+  "solvax==0.5.1",
   "tomli; python_version < '3.11'",
 ]
 classifiers = [
@@ -25,9 +28,20 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 
+[project.urls]
+Homepage = "https://github.com/uwplasma/LMX"
+Documentation = "https://lmx.readthedocs.io/"
+Issues = "https://github.com/uwplasma/LMX/issues"
+Source = "https://github.com/uwplasma/LMX"
+
 [project.optional-dependencies]
 dev = [
   "pytest",
+  "pytest-cov",
+  "pytest-timeout",
+  "pytest-xdist",
+  "jsonschema",
+  "magpylib-jax",
   "lineax",
   "interpax",
 ]
@@ -37,6 +51,14 @@ docs = [
   "furo",
   "sphinx-copybutton",
 ]
+release = [
+  "build",
+  "twine",
+]
+magnetic = [
+  "magpylib-jax",
+]
+accelerated = []
 
 [project.scripts]
 lmx = "lmx.cli:main"
@@ -48,9 +70,34 @@ include = ["lmx*"]
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["."]
+timeout = 120
+timeout_method = "signal"
+filterwarnings = ["error"]
 markers = [
   "unit: fast local checks for isolated functionality",
   "regression: deterministic golden-profile and serialized-output checks",
   "physics: physics-level invariants for the current solver implementation",
   "validation: validation and parity harness checks",
+  "external: requires an external solver, dataset, service, or accelerator",
 ]
+
+[tool.coverage.run]
+source = ["lmx"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]
+
+[tool.lmx.provenance]
+tested-python = ["3.10", "3.13"]
+full-gate-budget-seconds = 600
+warning-budget-seconds = 450
+default-workers = 4
+jax-enable-x64 = true

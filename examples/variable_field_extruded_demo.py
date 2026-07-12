@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lmx import (
+from lmx.fringing import (
     build_variable_field_duct_extruded_problem,
     solve_extruded_inductionless,
     validate_variable_field_extruded_solution,
+)
+from lmx.plotting import (
     write_cross_section_field_plots,
     write_extruded_overview_plots,
 )
@@ -37,7 +39,9 @@ def run_variable_field_extruded_demo() -> dict[str, object]:
     solution = solve_extruded_inductionless(problem)
     field_fn = problem.case.magnetic_field.fn
     assert field_fn is not None
-    y, z, field = sample_cross_section_field(field_fn, width=WIDTH, height=HEIGHT, ny=81, nz=81)
+    y, z, field = sample_cross_section_field(
+        field_fn, width=WIDTH, height=HEIGHT, ny=81, nz=81
+    )
     field_plots = write_cross_section_field_plots(
         y=y,
         z=z,
@@ -58,7 +62,9 @@ def run_variable_field_extruded_demo() -> dict[str, object]:
         "extruded_plots": [path.name for path in extruded_plots],
         "validation": validation,
     }
-    (OUTPUT_DIR / "variable_field_extruded_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (OUTPUT_DIR / "variable_field_extruded_summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
     return summary
 
 

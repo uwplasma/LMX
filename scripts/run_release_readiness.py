@@ -113,7 +113,13 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
         name = str(item.get("name", ""))
         if name and not (static_dir / name).exists():
             missing_figures.append(name)
-    passed = not missing_names and not missing_posters and not missing_local_media and not missing_figures and not invalid_urls
+    passed = (
+        not missing_names
+        and not missing_posters
+        and not missing_local_media
+        and not missing_figures
+        and not invalid_urls
+    )
     return _gate(
         "readme_external_media_manifest",
         passed,
@@ -138,7 +144,9 @@ def _publication_figure_manifest_gate(root: Path) -> ReleaseGate:
         summary_count=int(summary.get("summary_count", 0)),
         missing_artifacts=list(summary.get("missing_artifacts", [])),
         missing_summaries=list(summary.get("missing_summaries", [])),
-        external_or_resolved_validation_open=list(summary.get("external_or_resolved_validation_open", [])),
+        external_or_resolved_validation_open=list(
+            summary.get("external_or_resolved_validation_open", [])
+        ),
         paper_ready=bool(summary.get("paper_ready")),
     )
 
@@ -167,26 +175,57 @@ def _packaging_gate(root: Path) -> ReleaseGate:
     required_deps = {"jax", "jaxlib", "matplotlib", "numpy", "scipy"}
     dev_deps = set(optional.get("dev", []))
     docs_deps = set(optional.get("docs", []))
+    required_project_files = {
+        "CITATION.cff",
+        "CHANGELOG.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
+        "LICENSE",
+        "README.md",
+        "SECURITY.md",
+        "SUPPORT.md",
+    }
+    missing_project_files = sorted(
+        name for name in required_project_files if not (root / name).is_file()
+    )
+    citation = (
+        (root / "CITATION.cff").read_text(encoding="utf-8")
+        if (root / "CITATION.cff").is_file()
+        else ""
+    )
     passed = (
         project.get("name") == "lmx"
         and bool(project.get("version"))
+        and bool(project.get("authors"))
+        and bool(project.get("urls"))
         and required_deps.issubset(dependencies)
         and {"pytest", "lineax", "interpax"}.issubset(dev_deps)
         and {"sphinx", "myst-parser", "furo", "sphinx-copybutton"}.issubset(docs_deps)
+        and not missing_project_files
+        and f"version: {project.get('version')}" in citation
+        and 'repository-code: "https://github.com/uwplasma/LMX"' in citation
     )
     return _gate(
         "package_metadata",
         passed,
         package_name=project.get("name"),
         version=project.get("version"),
+        missing_project_files=missing_project_files,
+        citation_version_matches=f"version: {project.get('version')}" in citation,
         missing_runtime_dependencies=sorted(required_deps - dependencies),
         missing_dev_dependencies=sorted({"pytest", "lineax", "interpax"} - dev_deps),
-        missing_docs_dependencies=sorted({"sphinx", "myst-parser", "furo", "sphinx-copybutton"} - docs_deps),
+        missing_docs_dependencies=sorted(
+            {"sphinx", "myst-parser", "furo", "sphinx-copybutton"} - docs_deps
+        ),
     )
 
 
-def _straight_duct_gate(root: Path, *, target_l2: float) -> tuple[ReleaseGate, list[str]]:
-    summary = _load_json(_static_dir(root) / "straight_duct_profile_comparison_summary.json")
+def _straight_duct_gate(
+    root: Path, *, target_l2: float
+) -> tuple[ReleaseGate, list[str]]:
+    summary = _load_json(
+        _static_dir(root) / "straight_duct_profile_comparison_summary.json"
+    )
     checked = {
         "hartmann_l2": float(summary["hartmann"]["l2_error"]),
         "shercliff_y_l2": float(summary["shercliff"]["y_l2_error"]),
@@ -194,10 +233,15 @@ def _straight_duct_gate(root: Path, *, target_l2: float) -> tuple[ReleaseGate, l
         "hunt_y_l2": float(summary["hunt"]["y_l2_error"]),
         "hunt_z_l2": float(summary["hunt"]["z_l2_error"]),
     }
-    ladder = _load_json(_static_dir(root) / "straight_duct_validation_ladder_summary.json")
+    ladder = _load_json(
+        _static_dir(root) / "straight_duct_validation_ladder_summary.json"
+    )
     deferred: list[str] = []
     for record in ladder.get("hunt", []):
-        if int(float(record.get("ha", 0))) == 100 and float(record.get("z_l2_error", 0.0)) > target_l2:
+        if (
+            int(float(record.get("ha", 0))) == 100
+            and float(record.get("z_l2_error", 0.0)) > target_l2
+        ):
             deferred.append(
                 "High-Ha Hunt side-layer cut remains above the manuscript target "
                 f"(Ha=100 z_l2={float(record['z_l2_error']):.3e})."
@@ -224,7 +268,9 @@ def _q2d_gate(root: Path) -> tuple[ReleaseGate, list[str]]:
     )
     deferred = []
     if not bool(validation.get("research_grade_turbulence_validation_pass")):
-        deferred.append("Nonlinear Q2D movie is an internal SM82-style physics gate; external turbulent parity remains open.")
+        deferred.append(
+            "Nonlinear Q2D movie is an internal SM82-style physics gate; external turbulent parity remains open."
+        )
     return (
         _gate(
             "q2d_nonlinear_movie_gate",
@@ -263,10 +309,18 @@ def _magnetic_obstacle_gate(root: Path) -> tuple[ReleaseGate, list[str]]:
         _gate(
             "magnetic_obstacle_internal_response",
             passed,
-            peak_centerline_deficit_ratio=float(validation.get("peak_centerline_deficit_ratio", 0.0)),
-            peak_crosscut_distortion=float(validation.get("peak_crosscut_distortion", 0.0)),
-            max_charge_balance_residual=float(validation.get("max_charge_balance_residual", 0.0)),
-            research_grade_validation_pass=bool(validation.get("research_grade_validation_pass")),
+            peak_centerline_deficit_ratio=float(
+                validation.get("peak_centerline_deficit_ratio", 0.0)
+            ),
+            peak_crosscut_distortion=float(
+                validation.get("peak_crosscut_distortion", 0.0)
+            ),
+            max_charge_balance_residual=float(
+                validation.get("max_charge_balance_residual", 0.0)
+            ),
+            research_grade_validation_pass=bool(
+                validation.get("research_grade_validation_pass")
+            ),
         ),
         deferred,
     )
@@ -295,16 +349,24 @@ def _bent_pipe_gate(root: Path) -> tuple[ReleaseGate, list[str]]:
                 "current low-De bent-pipe solve has no resolved secondary flow."
             )
         else:
-            deferred.append("Higher-inertia Dean-vortex bent-pipe validation remains open.")
+            deferred.append(
+                "Higher-inertia Dean-vortex bent-pipe validation remains open."
+            )
     return (
         _gate(
             "bent_pipe_low_de_gate",
             passed,
             cross_section_l2_error=float(validation.get("cross_section_l2_error", 0.0)),
             centerline_l2_error=float(validation.get("centerline_l2_error", 0.0)),
-            max_charge_balance_residual=float(validation.get("max_charge_balance_residual", 0.0)),
-            max_wall_current_leakage=float(validation.get("max_wall_current_leakage", 0.0)),
-            net_boundary_current_residual=float(validation.get("net_boundary_current_residual", 0.0)),
+            max_charge_balance_residual=float(
+                validation.get("max_charge_balance_residual", 0.0)
+            ),
+            max_wall_current_leakage=float(
+                validation.get("max_wall_current_leakage", 0.0)
+            ),
+            net_boundary_current_residual=float(
+                validation.get("net_boundary_current_residual", 0.0)
+            ),
         ),
         deferred,
     )
@@ -319,16 +381,22 @@ def _variable_field_gate(root: Path) -> ReleaseGate:
         bool(field_quality.get("validation_pass"))
         and bool(reconstruction.get("validation_pass"))
         and bool(validation.get("validation_pass"))
-        and float(reconstruction.get("relative_l2_error", 1.0)) <= float(reconstruction.get("relative_l2_tolerance", 0.0))
-        and float(reconstruction.get("relative_linf_error", 1.0)) <= float(reconstruction.get("relative_linf_tolerance", 0.0))
+        and float(reconstruction.get("relative_l2_error", 1.0))
+        <= float(reconstruction.get("relative_l2_tolerance", 0.0))
+        and float(reconstruction.get("relative_linf_error", 1.0))
+        <= float(reconstruction.get("relative_linf_tolerance", 0.0))
     )
     return _gate(
         "tabulated_variable_field_gate",
         passed,
-        divergence_to_field_ratio=float(field_quality.get("divergence_to_field_ratio", 0.0)),
+        divergence_to_field_ratio=float(
+            field_quality.get("divergence_to_field_ratio", 0.0)
+        ),
         reconstruction_l2=float(reconstruction.get("relative_l2_error", 0.0)),
         reconstruction_linf=float(reconstruction.get("relative_linf_error", 0.0)),
-        max_charge_balance_residual=float(validation.get("max_charge_balance_residual", 0.0)),
+        max_charge_balance_residual=float(
+            validation.get("max_charge_balance_residual", 0.0)
+        ),
     )
 
 
@@ -339,12 +407,22 @@ def _workflow_gate(root: Path) -> ReleaseGate:
         root / ".github" / "workflows" / "release.yml",
     ]
     missing = [str(path.relative_to(root)) for path in workflows if not path.exists()]
-    release_text = (root / ".github" / "workflows" / "release.yml").read_text() if not missing else ""
-    passed = not missing and "pypa/gh-action-pypi-publish@release/v1" in release_text and "id-token: write" in release_text
+    release_text = (
+        (root / ".github" / "workflows" / "release.yml").read_text()
+        if not missing
+        else ""
+    )
+    passed = (
+        not missing
+        and "pypa/gh-action-pypi-publish@release/v1" in release_text
+        and "id-token: write" in release_text
+    )
     return _gate("release_workflows", passed, missing=missing)
 
 
-def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2e-2) -> dict[str, Any]:
+def evaluate_release_readiness(
+    root: str | Path = ".", *, target_l2: float = 1.2e-2
+) -> dict[str, Any]:
     root_path = Path(root).resolve()
     gates: list[ReleaseGate] = [
         _packaging_gate(root_path),
@@ -356,7 +434,9 @@ def evaluate_release_readiness(root: str | Path = ".", *, target_l2: float = 1.2
     research_closure_gate = _research_closure_status_gate(root_path)
     gates.append(research_closure_gate)
     deferred: list[str] = []
-    straight_gate, straight_deferred = _straight_duct_gate(root_path, target_l2=target_l2)
+    straight_gate, straight_deferred = _straight_duct_gate(
+        root_path, target_l2=target_l2
+    )
     q2d_gate, q2d_deferred = _q2d_gate(root_path)
     obstacle_gate, obstacle_deferred = _magnetic_obstacle_gate(root_path)
     bent_gate, bent_deferred = _bent_pipe_gate(root_path)
@@ -405,9 +485,13 @@ def write_release_readiness_report(report: dict[str, Any], output: str | Path) -
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Check the bounded LMX release-readiness gates.")
+    parser = argparse.ArgumentParser(
+        description="Check the bounded LMX release-readiness gates."
+    )
     parser.add_argument("--root", type=Path, default=Path("."), help="Repository root.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/release/release_readiness.json"))
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/release/release_readiness.json")
+    )
     parser.add_argument("--target-l2", type=float, default=1.2e-2)
     parser.add_argument(
         "--strict-research-grade",

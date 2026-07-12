@@ -18,9 +18,13 @@ pytestmark = pytest.mark.unit
 
 
 def test_wham_blanket_centerline_has_clearance_and_monotone_station():
-    geometry = WhamBlanketLoop(pipe_radius=0.08, bend_radius=0.7, entry_length=0.9, central_cell_radius=0.35)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.08, bend_radius=0.7, entry_length=0.9, central_cell_radius=0.35
+    )
 
-    centerline = build_wham_blanket_centerline(geometry, straight_points=12, bend_points=24)
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=12, bend_points=24
+    )
     metrics = wham_blanket_clearance_metrics(centerline, geometry)
 
     assert centerline["x"].shape == centerline["y"].shape == centerline["z"].shape
@@ -33,17 +37,25 @@ def test_wham_blanket_centerline_has_clearance_and_monotone_station():
 
 
 def test_wham_blanket_centerline_rejects_overlapping_cell_envelope():
-    geometry = WhamBlanketLoop(pipe_radius=0.2, bend_radius=0.5, central_cell_radius=0.35)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.2, bend_radius=0.5, central_cell_radius=0.35
+    )
 
     with pytest.raises(ValueError, match="bend_radius"):
         build_wham_blanket_centerline(geometry)
 
 
 def test_tube_surface_from_centerline_shape_and_radius():
-    geometry = WhamBlanketLoop(pipe_radius=0.05, bend_radius=0.7, entry_length=0.9, central_cell_radius=0.35)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=10, bend_points=16)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.05, bend_radius=0.7, entry_length=0.9, central_cell_radius=0.35
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=10, bend_points=16
+    )
 
-    tube = tube_surface_from_centerline(centerline, radius=geometry.pipe_radius, circumferential_points=12)
+    tube = tube_surface_from_centerline(
+        centerline, radius=geometry.pipe_radius, circumferential_points=12
+    )
 
     assert tube["x"].shape == (centerline["x"].size, 12)
     centers = np.column_stack([centerline["x"], centerline["y"], centerline["z"]])
@@ -53,10 +65,16 @@ def test_tube_surface_from_centerline_shape_and_radius():
 
 
 def test_write_wham_blanket_geometry_preview_outputs_artifacts(tmp_path: Path):
-    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.75, entry_length=0.8, central_cell_radius=0.35)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=10, bend_points=18)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.06, bend_radius=0.75, entry_length=0.8, central_cell_radius=0.35
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=10, bend_points=18
+    )
 
-    outputs = write_wham_blanket_geometry_preview(centerline, tmp_path, geometry=geometry)
+    outputs = write_wham_blanket_geometry_preview(
+        centerline, tmp_path, geometry=geometry
+    )
 
     names = {path.name for path in outputs}
     assert "wham_blanket_geometry_preview.png" in names
@@ -66,11 +84,19 @@ def test_write_wham_blanket_geometry_preview_outputs_artifacts(tmp_path: Path):
 
 
 def test_write_centerline_pipe_mesh_preview_outputs_artifacts(tmp_path: Path):
-    geometry = WhamBlanketLoop(pipe_radius=0.06, bend_radius=0.75, entry_length=0.8, central_cell_radius=0.35)
-    centerline = build_wham_blanket_centerline(geometry, straight_points=10, bend_points=18)
-    mesh = generate_centerline_pipe_mesh(centerline, tube_radius=geometry.pipe_radius, nx=8, nr=4, ntheta=12)
+    geometry = WhamBlanketLoop(
+        pipe_radius=0.06, bend_radius=0.75, entry_length=0.8, central_cell_radius=0.35
+    )
+    centerline = build_wham_blanket_centerline(
+        geometry, straight_points=10, bend_points=18
+    )
+    mesh = generate_centerline_pipe_mesh(
+        centerline, tube_radius=geometry.pipe_radius, nx=8, nr=4, ntheta=12
+    )
 
-    outputs = write_centerline_pipe_mesh_preview(mesh, tmp_path, filename_stem="mesh_preview")
+    outputs = write_centerline_pipe_mesh_preview(
+        mesh, tmp_path, filename_stem="mesh_preview"
+    )
 
     names = {path.name for path in outputs}
     assert "mesh_preview.png" in names

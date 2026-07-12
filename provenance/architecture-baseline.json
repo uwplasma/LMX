@@ -1,0 +1,830 @@
+{
+  "inventory": {
+    "checkout_bytes_excluding_build_artifacts": 7098963,
+    "checkout_bytes_excluding_release_candidates": 7098963,
+    "completed_workflow_disposition_count": 85,
+    "curated_example_count": 11,
+    "curated_examples": [
+      {
+        "command": "lmx examples/hartmann_case.toml",
+        "docs": "docs/getting_started.md",
+        "id": "hartmann-cli",
+        "outputs": [
+          "solution NPZ",
+          "diagnostics JSON",
+          "profile CSV"
+        ],
+        "path": "examples/hartmann_case.toml",
+        "runtime": "portable",
+        "status": "stable"
+      },
+      {
+        "command": "python examples/hartmann_example.py",
+        "docs": "docs/getting_started.md",
+        "id": "hartmann-python",
+        "outputs": [
+          "solution NPZ",
+          "overview plots",
+          "diagnostics JSON"
+        ],
+        "path": "examples/hartmann_example.py",
+        "runtime": "portable",
+        "status": "stable"
+      },
+      {
+        "command": "python examples/hunt_example.py",
+        "docs": "docs/case_cookbook.md",
+        "id": "hunt-python",
+        "outputs": [
+          "solution NPZ",
+          "overview plots",
+          "diagnostics JSON"
+        ],
+        "path": "examples/hunt_example.py",
+        "runtime": "portable",
+        "status": "stable"
+      },
+      {
+        "command": "python examples/operator_verification_demo.py",
+        "docs": "docs/numerics.md",
+        "id": "operator-verification",
+        "outputs": [
+          "observed-order JSON",
+          "verification plots"
+        ],
+        "path": "examples/operator_verification_demo.py",
+        "runtime": "portable",
+        "status": "stable"
+      },
+      {
+        "command": "python -m examples.freemhd_closed_channel_observable_parity",
+        "docs": "docs/external_benchmarks.md",
+        "id": "freemhd-validation",
+        "outputs": [
+          "matched observable JSON",
+          "comparison plots"
+        ],
+        "path": "examples/freemhd_closed_channel_observable_parity.py",
+        "runtime": "external",
+        "status": "external-data"
+      },
+      {
+        "command": "python examples/fringing_benchmark_demo.py",
+        "docs": "docs/fringing.md",
+        "id": "fringing-benchmark",
+        "outputs": [
+          "extruded summary JSON",
+          "station history",
+          "overview plots"
+        ],
+        "path": "examples/fringing_benchmark_demo.py",
+        "runtime": "portable",
+        "status": "research-stage"
+      },
+      {
+        "command": "python examples/extruded_restart_demo.py",
+        "docs": "docs/case_cookbook.md",
+        "id": "restart",
+        "outputs": [
+          "restart NPZ",
+          "restart comparison JSON"
+        ],
+        "path": "examples/extruded_restart_demo.py",
+        "runtime": "portable",
+        "status": "research-stage"
+      },
+      {
+        "command": "python examples/variable_field_extruded_demo.py",
+        "docs": "docs/geometry.md",
+        "id": "custom-field",
+        "outputs": [
+          "field reconstruction JSON",
+          "extruded solution summary"
+        ],
+        "path": "examples/variable_field_extruded_demo.py",
+        "runtime": "portable",
+        "status": "research-stage"
+      },
+      {
+        "command": "python examples/autodiff_design_demo.py",
+        "docs": "docs/autodiff.md",
+        "id": "differentiable-design",
+        "outputs": [
+          "sensitivity JSON",
+          "inverse-design plots"
+        ],
+        "path": "examples/autodiff_design_demo.py",
+        "runtime": "portable",
+        "status": "research-stage"
+      },
+      {
+        "command": "python examples/strong_scaling_demo.py",
+        "docs": "docs/performance.md",
+        "id": "cpu-gpu-benchmark",
+        "outputs": [
+          "cold/warm timing JSON",
+          "scaling table and plots"
+        ],
+        "path": "examples/strong_scaling_demo.py",
+        "runtime": "accelerator-optional",
+        "status": "research-stage"
+      },
+      {
+        "command": "python examples/pipe_reference_comparison_demo.py",
+        "docs": "docs/external_benchmarks.md",
+        "id": "experimental-reference",
+        "outputs": [
+          "reference comparison JSON",
+          "pressure/profile plots"
+        ],
+        "path": "examples/pipe_reference_comparison_demo.py",
+        "runtime": "external",
+        "status": "external-data"
+      }
+    ],
+    "dependencies": {
+      "optional": {
+        "accelerated": [],
+        "dev": [
+          "interpax",
+          "jsonschema",
+          "lineax",
+          "magpylib-jax",
+          "pytest",
+          "pytest-cov",
+          "pytest-timeout",
+          "pytest-xdist"
+        ],
+        "docs": [
+          "furo",
+          "myst-parser",
+          "sphinx",
+          "sphinx-copybutton"
+        ],
+        "magnetic": [
+          "magpylib-jax"
+        ],
+        "release": [
+          "build",
+          "twine"
+        ]
+      },
+      "runtime": [
+        "jax",
+        "jaxlib",
+        "matplotlib",
+        "numpy",
+        "scipy",
+        "solvax==0.5.1",
+        "tomli; python_version < '3.11'"
+      ]
+    },
+    "example_count": 11,
+    "examples": [
+      "examples/autodiff_design_demo.py",
+      "examples/extruded_restart_demo.py",
+      "examples/freemhd_closed_channel_observable_parity.py",
+      "examples/fringing_benchmark_demo.py",
+      "examples/hartmann_case.toml",
+      "examples/hartmann_example.py",
+      "examples/hunt_example.py",
+      "examples/operator_verification_demo.py",
+      "examples/pipe_reference_comparison_demo.py",
+      "examples/strong_scaling_demo.py",
+      "examples/variable_field_extruded_demo.py"
+    ],
+    "maintained_core_lines": 8995,
+    "package_module_count": 45,
+    "package_modules": [
+      {
+        "bytes": 31249,
+        "lines": 546,
+        "owner": "stable_core",
+        "path": "lmx/__init__.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 116,
+        "lines": 7,
+        "owner": "stable_core",
+        "path": "lmx/__main__.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 84500,
+        "lines": 2137,
+        "owner": "research_stage_extension",
+        "path": "lmx/_autodiff.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 208582,
+        "lines": 5659,
+        "owner": "research_stage_extension",
+        "path": "lmx/_fringing.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 3006,
+        "lines": 105,
+        "owner": "research_stage_extension",
+        "path": "lmx/_fringing_types.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 105492,
+        "lines": 2518,
+        "owner": "visualization",
+        "path": "lmx/_plotting.py",
+        "role": "visualization"
+      },
+      {
+        "bytes": 88871,
+        "lines": 2196,
+        "owner": "stable_core",
+        "path": "lmx/_solvers.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 57628,
+        "lines": 1453,
+        "owner": "validation_and_evidence",
+        "path": "lmx/_validation.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 225,
+        "lines": 9,
+        "owner": "compatibility_facade",
+        "path": "lmx/autodiff.py",
+        "role": "compatibility_facade"
+      },
+      {
+        "bytes": 18569,
+        "lines": 475,
+        "owner": "stable_core",
+        "path": "lmx/benchmarks.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 81772,
+        "lines": 1856,
+        "owner": "research_stage_extension",
+        "path": "lmx/blanket_flow.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 21175,
+        "lines": 520,
+        "owner": "research_stage_extension",
+        "path": "lmx/blanket_geometry.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 8434,
+        "lines": 227,
+        "owner": "stable_core",
+        "path": "lmx/cases.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 31804,
+        "lines": 762,
+        "owner": "research_stage_extension",
+        "path": "lmx/centerline_fields.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 26136,
+        "lines": 605,
+        "owner": "stable_core",
+        "path": "lmx/cli.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 13866,
+        "lines": 322,
+        "owner": "stable_core",
+        "path": "lmx/config.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 3128,
+        "lines": 72,
+        "owner": "stable_core",
+        "path": "lmx/core.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 9404,
+        "lines": 241,
+        "owner": "research_stage_extension",
+        "path": "lmx/dean.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 15075,
+        "lines": 418,
+        "owner": "stable_core",
+        "path": "lmx/example_runner.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 94677,
+        "lines": 2289,
+        "owner": "validation_and_evidence",
+        "path": "lmx/external_validation.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 24026,
+        "lines": 631,
+        "owner": "stable_core",
+        "path": "lmx/field_models.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 39442,
+        "lines": 971,
+        "owner": "validation_and_evidence",
+        "path": "lmx/freemhd.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 361,
+        "lines": 13,
+        "owner": "compatibility_facade",
+        "path": "lmx/fringing.py",
+        "role": "compatibility_facade"
+      },
+      {
+        "bytes": 32491,
+        "lines": 807,
+        "owner": "stable_core",
+        "path": "lmx/io.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 882,
+        "lines": 25,
+        "owner": "stable_core",
+        "path": "lmx/jax_setup.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 21922,
+        "lines": 693,
+        "owner": "stable_core",
+        "path": "lmx/linear.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 32498,
+        "lines": 882,
+        "owner": "stable_core",
+        "path": "lmx/mesh.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 4401,
+        "lines": 105,
+        "owner": "stable_core",
+        "path": "lmx/operators.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 7533,
+        "lines": 173,
+        "owner": "stable_core",
+        "path": "lmx/physics.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 222,
+        "lines": 9,
+        "owner": "compatibility_facade",
+        "path": "lmx/plotting.py",
+        "role": "compatibility_facade"
+      },
+      {
+        "bytes": 20934,
+        "lines": 425,
+        "owner": "validation_and_evidence",
+        "path": "lmx/publication.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 68290,
+        "lines": 1794,
+        "owner": "research_stage_extension",
+        "path": "lmx/q2d.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 15274,
+        "lines": 386,
+        "owner": "validation_and_evidence",
+        "path": "lmx/reference_data.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 14586,
+        "lines": 345,
+        "owner": "validation_and_evidence",
+        "path": "lmx/research_blockers.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 34600,
+        "lines": 785,
+        "owner": "validation_and_evidence",
+        "path": "lmx/research_closure.py",
+        "role": "validation_and_evidence"
+      },
+      {
+        "bytes": 32983,
+        "lines": 844,
+        "owner": "visualization",
+        "path": "lmx/research_figures.py",
+        "role": "visualization"
+      },
+      {
+        "bytes": 12524,
+        "lines": 270,
+        "owner": "stable_core",
+        "path": "lmx/runtime_logging.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 23664,
+        "lines": 629,
+        "owner": "research_stage_extension",
+        "path": "lmx/scaling.py",
+        "role": "research_stage_extension"
+      },
+      {
+        "bytes": 40225,
+        "lines": 1021,
+        "owner": "visualization",
+        "path": "lmx/showcase.py",
+        "role": "visualization"
+      },
+      {
+        "bytes": 214,
+        "lines": 9,
+        "owner": "compatibility_facade",
+        "path": "lmx/solvers.py",
+        "role": "compatibility_facade"
+      },
+      {
+        "bytes": 5254,
+        "lines": 172,
+        "owner": "stable_core",
+        "path": "lmx/specs.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 5243,
+        "lines": 150,
+        "owner": "stable_core",
+        "path": "lmx/units.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 221,
+        "lines": 9,
+        "owner": "compatibility_facade",
+        "path": "lmx/validation.py",
+        "role": "compatibility_facade"
+      },
+      {
+        "bytes": 6250,
+        "lines": 170,
+        "owner": "stable_core",
+        "path": "lmx/wall_models.py",
+        "role": "stable_core"
+      },
+      {
+        "bytes": 83184,
+        "lines": 1962,
+        "owner": "research_stage_extension",
+        "path": "lmx/wall_study.py",
+        "role": "research_stage_extension"
+      }
+    ],
+    "pending_workflow_disposition_count": 0,
+    "release_asset_candidate_bytes": 0,
+    "release_asset_candidates": [],
+    "root_export_count": 30,
+    "root_exports": [
+      "enable_compilation_cache",
+      "make_hartmann_case",
+      "make_shercliff_case",
+      "make_hunt_case",
+      "solve_steady",
+      "solve_transient",
+      "fully_developed_power_balance",
+      "generate_rect_duct_mesh",
+      "generate_rect_duct_mesh_from_faces",
+      "generate_layered_duct_mesh",
+      "generate_layered_duct_mesh_from_fluid_faces",
+      "generate_multilayer_duct_mesh",
+      "WallLayer",
+      "dynamic_to_kinematic_viscosity",
+      "kinematic_to_dynamic_viscosity",
+      "hartmann_number",
+      "reynolds_number",
+      "interaction_parameter",
+      "magnetic_reynolds_number",
+      "magnetic_field_from_hartmann",
+      "wall_conductance_ratio",
+      "effective_pinhole_conductance_ratio",
+      "tangential_stack_conductance_ratio",
+      "normal_stack_leakage_ratio",
+      "equivalent_single_layer",
+      "nested_wall_layer_resolution_summary",
+      "load_shercliff_analytical",
+      "load_hunt_analytical",
+      "load_closed_channel_analytical",
+      "load_processed_slice"
+    ],
+    "total_package_lines": 35697,
+    "uncurated_example_count": 0,
+    "workflow_disposition_count": 85,
+    "workflow_dispositions": [
+      {
+        "action": "move_to_campaigns",
+        "id": "autodiff-campaigns",
+        "paths": [
+          "examples/autodiff_extruded_field_design_demo.py",
+          "examples/autodiff_extruded_target_demo.py",
+          "examples/autodiff_extruded_trajectory_demo.py",
+          "examples/autodiff_fringing_design_demo.py",
+          "examples/autodiff_fringing_response_demo.py",
+          "examples/autodiff_profile_design_demo.py",
+          "examples/autodiff_sensitivity_demo.py",
+          "examples/autodiff_wham_pressure_sensitivity.py"
+        ],
+        "reason": "Keep specialized design studies without presenting each study as a first-run example.",
+        "status": "complete",
+        "target": "campaigns/autodiff/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "fringing-campaigns",
+        "paths": [
+          "examples/bent_pipe_inductionless_demo.py",
+          "examples/bent_pipe_preview.py",
+          "examples/dean_literature_validation.py",
+          "examples/dean_vortex_bayat_rezai_strict_attempt.py",
+          "examples/dean_vortex_external_reference_template.py",
+          "examples/extruded_summary_figures.py",
+          "examples/extruded_validation_campaign.py"
+        ],
+        "reason": "Retain developing-flow and Dean evidence as research campaigns until Benchmark B closes.",
+        "status": "complete",
+        "target": "campaigns/fringing/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "external-status-campaigns",
+        "paths": [
+          "examples/external_validation_readiness_panel.py"
+        ],
+        "reason": "Status panels are evidence-maintenance tools, not user examples.",
+        "status": "complete",
+        "target": "campaigns/status/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "freemhd-campaigns",
+        "paths": [
+          "examples/freemhd_closed_channel_flow_rate_parity.py",
+          "examples/freemhd_closed_channel_parity.py",
+          "examples/freemhd_observable_mesh_ladder.py"
+        ],
+        "reason": "Keep the canonical observable parity example curated and move supporting ladders and diagnostics.",
+        "status": "complete",
+        "target": "campaigns/freemhd/"
+      },
+      {
+        "action": "move_to_cases",
+        "id": "fringing-case-files",
+        "paths": [
+          "examples/fringing_layered_case.toml",
+          "examples/fringing_layered_restart_case.toml",
+          "examples/fringing_pipe_case.toml",
+          "examples/fringing_rect_case.toml",
+          "examples/fringing_tabulated_case.toml"
+        ],
+        "reason": "Reusable configurations are case data consumed by the curated fringing workflow.",
+        "status": "complete",
+        "target": "cases/fringing/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "geometry-reader-merge",
+        "paths": [
+          "examples/geometry_panel_demo.py",
+          "examples/geometry_preview_demo.py"
+        ],
+        "reason": "Preserve detailed geometry galleries as supporting tutorials behind the curated fringing journey.",
+        "status": "complete",
+        "target": "campaigns/tutorials/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "duct-campaigns",
+        "paths": [
+          "examples/hartmann_validation_ladder.py",
+          "examples/hunt_showcase.py",
+          "examples/shercliff_example.py",
+          "examples/shercliff_showcase.py",
+          "examples/straight_duct_geometry_and_mesh.py",
+          "examples/straight_duct_profile_comparison.py",
+          "examples/straight_duct_validation_ladder.py"
+        ],
+        "reason": "Preserve restart, refinement, Shercliff, and diagnostic studies behind the three curated duct journeys.",
+        "status": "complete",
+        "target": "campaigns/ducts/"
+      },
+      {
+        "action": "move_to_cases",
+        "id": "duct-case-files",
+        "paths": [
+          "examples/hartmann_restart_case.toml",
+          "examples/hunt_case.toml",
+          "examples/shercliff_case.toml"
+        ],
+        "reason": "Reusable duct restart, Hunt, and Shercliff configurations are case data, not campaigns.",
+        "status": "complete",
+        "target": "cases/ducts/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "interface-campaigns",
+        "paths": [
+          "examples/interface_conductivity_verification_demo.py"
+        ],
+        "reason": "Interface-conductivity verification belongs with numerical evidence.",
+        "status": "complete",
+        "target": "campaigns/interfaces/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "wall-campaigns",
+        "paths": [
+          "examples/li_aln_multilayer_convergence.py",
+          "examples/li_aln_multilayer_mesh_qa.py",
+          "examples/li_aln_multilayer_solve.py",
+          "examples/li_aln_wall_stack_phase0_2.py",
+          "examples/li_aln_wall_stack_phase3_6.py"
+        ],
+        "reason": "Retain the full Li/AlN study while exposing only a bounded wall-model journey to users.",
+        "status": "complete",
+        "target": "campaigns/walls/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "magnetic-obstacle-campaigns",
+        "paths": [
+          "examples/magnetic_obstacle_baseline.py",
+          "examples/magnetic_obstacle_benchmark.py",
+          "examples/magnetic_obstacle_external_reference_template.py",
+          "examples/magnetic_obstacle_regime_scan.py",
+          "examples/magnetic_obstacle_votyakov_curve_validation.py",
+          "examples/magnetic_obstacle_votyakov_strict_attempt.py"
+        ],
+        "reason": "Keep localized-field diagnostics explicitly research-stage until Benchmark D.",
+        "status": "complete",
+        "target": "campaigns/magnetic_obstacle/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "operator-reader-merge",
+        "paths": [
+          "examples/operator_clustered_verification_demo.py"
+        ],
+        "reason": "Preserve the clustered operator study while the curated example remains the first-run verification path.",
+        "status": "complete",
+        "target": "campaigns/tutorials/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "plotting-reader-merge",
+        "paths": [
+          "examples/plot_npz_results.py",
+          "examples/plotting_api_demo.py"
+        ],
+        "reason": "Preserve executable plotting and compact-output tools as supporting tutorials documented by the user guide.",
+        "status": "complete",
+        "target": "campaigns/tutorials/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "publication-campaigns",
+        "paths": [
+          "examples/publication_figure_campaign.py"
+        ],
+        "reason": "Manuscript figure generation is maintained campaign tooling.",
+        "status": "complete",
+        "target": "campaigns/publication/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "q2d-campaigns",
+        "paths": [
+          "examples/q2d_decay_validation.py",
+          "examples/q2d_forced_validation.py",
+          "examples/q2d_lmx_q2dmhdfoam_lid_driven_parity.py",
+          "examples/q2d_lmx_q2dmhdfoam_turbulence_comparison.py",
+          "examples/q2d_turbulence_decay_demo.py",
+          "examples/q2d_turbulence_external_reference_template.py",
+          "examples/q2d_wall_bounded_validation.py",
+          "examples/q2dmhdfoam_docker_reference_validation.py",
+          "examples/q2dmhdfoam_external_reference_adapter.py",
+          "examples/q2dmhdfoam_lid_driven_vtk_artifact.py",
+          "examples/q2dmhdfoam_lmx_turbulence_match_audit.py"
+        ],
+        "reason": "Retain Q2D verification and cross-code work without promoting Benchmark C prematurely.",
+        "status": "complete",
+        "target": "campaigns/q2d/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "readme-reader-merge",
+        "paths": [
+          "examples/readme_showcase_demo.py"
+        ],
+        "reason": "Keep README media generation as campaign tooling rather than a first-run example.",
+        "status": "complete",
+        "target": "campaigns/tutorials/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "research-status-campaigns",
+        "paths": [
+          "examples/reference_slice_mesh_diagnostic.py",
+          "examples/research_grade_closure_dashboard.py",
+          "examples/research_grade_closure_status.py",
+          "examples/research_grade_external_data_audit.py",
+          "examples/research_grade_external_target_figures.py",
+          "examples/research_grade_final_lane_disposition.py",
+          "examples/research_grade_strict_blocker_probe.py"
+        ],
+        "reason": "Closure dashboards and blocker probes are release-evidence tooling.",
+        "status": "complete",
+        "target": "campaigns/status/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "theory-reader-merge",
+        "paths": [
+          "examples/theory_meeting_demo.py"
+        ],
+        "reason": "Keep the verbose executable walkthrough as a supporting tutorial while theory.md is authoritative.",
+        "status": "complete",
+        "target": "campaigns/tutorials/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "variable-field-campaigns",
+        "paths": [
+          "examples/variable_field_bent_pipe_demo.py",
+          "examples/variable_field_geometry_demo.py",
+          "examples/variable_field_layered_demo.py",
+          "examples/variable_field_tabulated_demo.py",
+          "examples/variable_field_validation.py"
+        ],
+        "reason": "Keep representation-specific checks behind the curated custom-field journey.",
+        "status": "complete",
+        "target": "campaigns/fields/"
+      },
+      {
+        "action": "move_to_campaigns",
+        "id": "blanket-campaigns",
+        "paths": [
+          "examples/wham_blanket_autodiff_research_demo.py",
+          "examples/wham_blanket_current_closure_demo.py",
+          "examples/wham_blanket_field_on_mesh_demo.py",
+          "examples/wham_blanket_flow_demo.py",
+          "examples/wham_blanket_geometry_preview.py",
+          "examples/wham_blanket_mesh_demo.py",
+          "examples/wham_coil_model_field_adapter.py",
+          "examples/wham_mirror_pipe_demo.py"
+        ],
+        "reason": "Preserve blanket studies as explicitly research-stage campaign tooling.",
+        "status": "complete",
+        "target": "campaigns/blanket/"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "targets": {
+    "checkout_bytes_max": 10485760,
+    "curated_examples_max": 20,
+    "maintained_core_lines_max": 15000,
+    "new_module_lines_max": 1000,
+    "stable_root_exports_max": 30
+  }
+}

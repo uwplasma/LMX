@@ -57,9 +57,9 @@ quick rectangular, layered, and mapped-pipe launches.
 ## Run the scaffold
 
 ```bash
-lmx examples/fringing_rect_case.toml
-lmx examples/fringing_layered_case.toml
-lmx examples/fringing_pipe_case.toml
+lmx cases/fringing/fringing_rect_case.toml
+lmx cases/fringing/fringing_layered_case.toml
+lmx cases/fringing/fringing_pipe_case.toml
 lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
 lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
 lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
@@ -79,7 +79,7 @@ python examples/fringing_benchmark_demo.py \
 python examples/fringing_benchmark_demo.py \
   --geometry-kind pipe_ogrid \
   --output artifacts/examples/fringing_benchmark_pipe
-python examples/extruded_summary_figures.py \
+python campaigns/fringing/extruded_summary_figures.py \
   --output artifacts/examples/extruded_summary_figures
 ```
 
@@ -95,14 +95,14 @@ The example writes:
   `overview.png`, `overview.pdf`, a station-archive manifest, per-station
   `station_XXXX.npz` field bundles, and a JSON summary with conservation metrics
 
-The input files `examples/fringing_rect_case.toml`,
-`examples/fringing_layered_case.toml`, and
-`examples/fringing_pipe_case.toml` are now the recommended starting points for
+The input files `cases/fringing/fringing_rect_case.toml`,
+`cases/fringing/fringing_layered_case.toml`, and
+`cases/fringing/fringing_pipe_case.toml` are now the recommended starting points for
 3D fringing studies. They enable figure writing directly
 through `[output].write_plots = true` and keep the full solver setup in the
 input file rather than hiding it in Python glue.
 
-The paired restart template is `examples/fringing_layered_restart_case.toml`.
+The paired restart template is `cases/fringing/fringing_layered_restart_case.toml`.
 Use it after a base layered run has written its extruded restart bundle under
 `artifacts/examples/toml_fringing_layered/restart/`.
 
@@ -112,7 +112,7 @@ Fringing overview artifact:
 
 Mapped-pipe comparison artifact:
 
-![LMX mapped-pipe comparison](_static/generated/pipe_reference_comparison.png)
+![LMX mapped-pipe comparison](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/pipe_reference_comparison.png)
 
 Restart / resume reproducibility artifact:
 
@@ -203,7 +203,7 @@ into pass/fail gates with:
 The repository now also ships a bounded larger-dataset wrapper:
 
 ```bash
-python examples/extruded_validation_campaign.py \
+python campaigns/fringing/extruded_validation_campaign.py \
   --output artifacts/examples/extruded_validation_campaign
 ```
 
@@ -344,12 +344,51 @@ That summary separates the current dense-slice status clearly:
 - the stationwise pressure span `max(p)-min(p)`, which is a more stable
   observable than the earlier current-weighted proxy when reviewing 3D fringing
   behavior
+- for prescribed-flow problems, the stationwise pressure Lagrange multiplier
+  reported as positive pressure-loss gradient `-dp/dx`, and the signed
+  transverse pressure difference between adjacent wall midpoints,
+  `p(side,+z)-p(top,+y)`
 - contour views of the stacked velocity bundle in `x-y` and `x-z`
 - the stationwise axial current together with charge-balance residuals, which
   are the key current-closure diagnostics for inlet/outlet hardening
 - a first true 3D pressure field `p(x, y, z)`
 - layered conducting/insulating wall fringing responses through the same API
 - the first mapped-pipe fringing slice through the same public API
+
+The pressure span and current-weighted quantity remain exploratory diagnostics.
+They are not accepted substitutes for the direct ALEX observables. The frozen
+B1 comparison uses `axial_pressure_loss_gradient` with its downstream plateau
+removed; B2 uses `transverse_pressure_difference` with the uniform-field/no-field
+plateau removed.
+
+### ALEX B2 numerical path
+
+The frozen ALEX B2 square-duct builder now selects a dedicated nonuniform
+finite-volume path. It differs deliberately from the characterized low-`Ha`
+demonstration path:
+
+- masked diffusion places no-slip at the fluid/wall face instead of forcing the
+  adjacent fluid cell centre to zero;
+- one face-flux divergence/gradient pair is used for both the pressure equation
+  and velocity correction, so a small Poisson residual cannot conceal a
+  collocated continuity error;
+- the stationwise pressure multiplier is applied before projection, followed by
+  one divergence-free global response that restores the exact prescribed mean
+  flow without reopening continuity;
+- pressure and variable-conductivity electric-potential equations use the
+  released SOLVAX implicit PCG backend with cell-volume symmetrization and an
+  explicit rank-one Neumann gauge; and
+- stretched-grid gradients, conservative face currents, wall areas, and charge
+  diagnostics use the actual face and centre spacing.
+
+Manufactured agreement, fixed-flow preservation, current closure, restart,
+`jax.jit`, and finite-difference-checked implicit gradients are portable tests.
+This establishes the B2 solver implementation; it does **not** establish the
+experimental benchmark. Steady/tolerance independence, the frozen thin-wall
+comparison, the three production meshes, and matched FreeMHD evidence remain
+mandatory before B2 is called validated. ALEX B1 remains guarded until the
+corresponding mapped-pipe face-flux projection and conducting-annulus coupling
+are complete.
 
 ## Literature context
 

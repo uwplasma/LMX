@@ -475,9 +475,7 @@ def load_q2dmhdfoam_line_profile(
     """
 
     source = Path(path)
-    data = np.loadtxt(source)
-    if data.ndim == 1:
-        data = data.reshape(1, -1)
+    data = np.atleast_2d(np.loadtxt(source))
     if data.shape[1] < 2:
         raise ValueError(f"Q2DmhdFoam line profile {source} needs at least two columns")
 
@@ -2232,8 +2230,6 @@ def _parse_q2dmhdfoam_list_payload(text: str, label: str) -> list[list[float]]:
     if not match:
         return []
     payload = ast.literal_eval(match.group(1))
-    if not isinstance(payload, list):
-        raise ValueError(f"{label} payload must be a list")
     return payload
 
 

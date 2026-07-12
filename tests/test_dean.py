@@ -22,7 +22,9 @@ pytestmark = pytest.mark.unit
 
 def test_bayat_rezai_dean_velocity_correlation_matches_dimensionless_form():
     dean = np.asarray([2.73, 6.82, 20.0])
-    velocity = bayat_rezai_dean_velocity(dean, kinematic_viscosity=1.0e-6, largest_channel_dimension=150.0e-6)
+    velocity = bayat_rezai_dean_velocity(
+        dean, kinematic_viscosity=1.0e-6, largest_channel_dimension=150.0e-6
+    )
     lateral_re = bayat_rezai_lateral_reynolds(dean)
 
     assert np.all(velocity > 0.0)

@@ -22,11 +22,14 @@ BoundaryKind = Literal[
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
-CurrentReconstructionKind = Literal["cell_centered", "face_averaged", "hybrid_face_lorentz"]
+CurrentReconstructionKind = Literal[
+    "cell_centered", "face_averaged", "hybrid_face_lorentz"
+]
 VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
-LinearSolverKind = Literal["auto", "cg", "gmres", "bicgstab"]
+LinearSolverKind = Literal["auto", "cg", "solvax_pcg", "gmres", "bicgstab"]
 PreconditionerKind = Literal["none", "jacobi", "block_jacobi"]
 TimeSchemeKind = Literal["implicit_euler", "crank_nicolson"]
+CouplingAccelerationKind = Literal["none", "aitken", "anderson"]
 MagneticAxisKind = Literal["x", "y", "z"]
 
 
@@ -75,6 +78,12 @@ class SolverConfig:
     time_scheme: TimeSchemeKind = "implicit_euler"
     coupling_iterations: int = 12
     coupling_tolerance: float = 1e-8
+    coupling_acceleration: CouplingAccelerationKind = "none"
+    coupling_min_relaxation: float = 0.05
+    coupling_max_relaxation: float = 100.0
+    coupling_history_depth: int = 6
+    coupling_regularization: float = 1.0e-8
+    coupling_damping: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -124,6 +133,7 @@ class GeometrySpec:
     width: float
     height: float
     length: float = 1.0
+    axial_origin: float = 0.0
     nx: int = 1
     ny: int = 64
     nz: int = 64
@@ -136,6 +146,7 @@ class GeometrySpec:
     wall_cells: tuple[int, int, int, int] = (0, 0, 0, 0)
     target_ha: float | None = None
     target_side_layer: float | None = None
+    hartmann_layer_cells: int | None = None
 
 
 @dataclass(frozen=True)

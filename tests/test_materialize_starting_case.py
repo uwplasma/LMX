@@ -30,13 +30,23 @@ def test_materialize_case_expands_expected_archives(tmp_path: Path):
 
 def test_materialize_case_reports_missing_archives(tmp_path: Path):
     payload = materialize.materialize_case(tmp_path)
-    assert payload["missing_archives"] == ["0.tar.gz", "constant.tar.gz", "system.tar.gz"]
+    assert payload["missing_archives"] == [
+        "0.tar.gz",
+        "constant.tar.gz",
+        "system.tar.gz",
+    ]
     assert payload["extracted_archives"] == []
 
 
-def test_materialize_main_writes_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+def test_materialize_main_writes_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
     output = tmp_path / "materialized.json"
-    monkeypatch.setattr(materialize.argparse.ArgumentParser, "parse_args", lambda self: type("Args", (), {"case_dir": tmp_path, "output": output})())
+    monkeypatch.setattr(
+        materialize.argparse.ArgumentParser,
+        "parse_args",
+        lambda self: type("Args", (), {"case_dir": tmp_path, "output": output})(),
+    )
 
     exit_code = materialize.main()
 

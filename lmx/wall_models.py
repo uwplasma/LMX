@@ -33,6 +33,10 @@ def tangential_stack_conductance_ratio(
     """Return the thin-wall tangential ratio for layers conducting in parallel."""
 
     _validate_layers(layers)
+    if fluid_conductivity <= 0.0:
+        raise ValueError("fluid_conductivity must be positive")
+    if length_scale <= 0.0:
+        raise ValueError("length_scale must be positive")
     equivalent_surface_conductance = sum(float(layer.conductivity) * float(layer.thickness) for layer in layers)
     return equivalent_surface_conductance / (float(fluid_conductivity) * float(length_scale))
 
@@ -55,8 +59,6 @@ def normal_stack_leakage_ratio(
         if layer.conductivity <= 0.0:
             return 0.0
         resistance += float(layer.thickness) / float(layer.conductivity)
-    if resistance <= 0.0:
-        return math.inf
     normal_conductance = 1.0 / resistance
     return normal_conductance * float(length_scale) / float(fluid_conductivity)
 
@@ -87,8 +89,6 @@ def equivalent_single_layer(
 
     _validate_layers(layers)
     total_thickness = sum(float(layer.thickness) for layer in layers)
-    if total_thickness <= 0.0:
-        raise ValueError("total wall-stack thickness must be positive")
     equivalent_conductivity = sum(float(layer.conductivity) * float(layer.thickness) for layer in layers) / total_thickness
     return WallLayer(name=name, conductivity=equivalent_conductivity, thickness=total_thickness, cells=sum(max(int(layer.cells), 0) for layer in layers))
 

@@ -8,7 +8,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from lmx.autodiff import build_hartmann_autodiff_problem, hartmann_mean_velocity, solve_differentiable_hartmann
+from lmx.autodiff import (
+    build_hartmann_autodiff_problem,
+    hartmann_mean_velocity,
+    solve_differentiable_hartmann,
+)
 from lmx.plotting import write_autodiff_plots
 
 
@@ -17,8 +21,17 @@ def run_sensitivity_scan(
     forcing: float,
     hartmann_values: jnp.ndarray,
 ) -> list[dict[str, float]]:
-    problem = build_hartmann_autodiff_problem(ny=48, nz=48, macro_iterations=8, potential_iterations=80, velocity_iterations=120)
-    mean_velocity_fn = lambda ha: hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=ha)
+    problem = build_hartmann_autodiff_problem(
+        ny=48,
+        nz=48,
+        macro_iterations=8,
+        potential_iterations=80,
+        velocity_iterations=120,
+    )
+
+    def mean_velocity_fn(ha):
+        return hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=ha)
+
     mean_velocity = jax.vmap(mean_velocity_fn)(hartmann_values)
     sensitivity = jax.vmap(jax.grad(mean_velocity_fn))(hartmann_values)
     return [
@@ -27,7 +40,12 @@ def run_sensitivity_scan(
             "mean_velocity": float(mean),
             "d_mean_velocity_d_ha": float(dmean),
         }
-        for ha, mean, dmean in zip(np.asarray(hartmann_values), np.asarray(mean_velocity), np.asarray(sensitivity), strict=True)
+        for ha, mean, dmean in zip(
+            np.asarray(hartmann_values),
+            np.asarray(mean_velocity),
+            np.asarray(sensitivity),
+            strict=True,
+        )
     ]
 
 
@@ -39,7 +57,13 @@ def run_inverse_design(
     learning_rate: float,
     steps: int,
 ) -> tuple[list[dict[str, float]], dict[str, object]]:
-    problem = build_hartmann_autodiff_problem(ny=48, nz=48, macro_iterations=8, potential_iterations=80, velocity_iterations=120)
+    problem = build_hartmann_autodiff_problem(
+        ny=48,
+        nz=48,
+        macro_iterations=8,
+        potential_iterations=80,
+        velocity_iterations=120,
+    )
     target_u, _ = solve_differentiable_hartmann(
         problem,
         forcing=reference_forcing,
@@ -80,7 +104,9 @@ def run_inverse_design(
         "target_forcing": float(reference_forcing),
         "recovered_forcing": float(parameter),
         "target_profile": np.asarray(target_profile).tolist(),
-        "recovered_profile": np.asarray(recovered_u[:, recovered_u.shape[1] // 2]).tolist(),
+        "recovered_profile": np.asarray(
+            recovered_u[:, recovered_u.shape[1] // 2]
+        ).tolist(),
         "recovered_phi_max": float(jnp.max(jnp.abs(recovered_phi))),
     }
 
@@ -96,7 +122,9 @@ def run_autodiff_design_demo(
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
     hartmann_values = jnp.linspace(2.0, 30.0, 24)
-    sensitivity_scan = run_sensitivity_scan(forcing=forcing, hartmann_values=hartmann_values)
+    sensitivity_scan = run_sensitivity_scan(
+        forcing=forcing, hartmann_values=hartmann_values
+    )
     optimization_history, recovered = run_inverse_design(
         reference_forcing=forcing,
         target_hartmann_number=target_hartmann_number,
@@ -130,8 +158,12 @@ def run_autodiff_design_demo(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the LMX autodiff sensitivity and inverse-design demo.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/autodiff_design"))
+    parser = argparse.ArgumentParser(
+        description="Run the LMX autodiff sensitivity and inverse-design demo."
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/examples/autodiff_design")
+    )
     parser.add_argument("--forcing", type=float, default=1.0)
     parser.add_argument("--target-ha", type=float, default=14.0)
     parser.add_argument("--initial-guess", type=float, default=0.2)

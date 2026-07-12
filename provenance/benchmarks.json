@@ -1,0 +1,402 @@
+{
+  "benchmarks": [
+    {
+      "acceptance": {
+        "bounded_profile_l2_max": 0.09,
+        "high_ha_table_open": false,
+        "publication_requires_three_mesh_levels": true
+      },
+      "id": "A1-hartmann",
+      "open_reason": "The bounded Hartmann verification is closed; broader Hartmann-only high-Ha profile studies remain outside the Table I Shercliff/Hunt matrix.",
+      "parameters": {
+        "hartmann_numbers_bounded": [
+          5,
+          10,
+          20
+        ]
+      },
+      "primary_observables": [
+        "velocity profile",
+        "volumetric flow rate",
+        "observed spatial order"
+      ],
+      "runtime_lane": "portable-full",
+      "source_ids": [
+        "lmx-benchmark-matrix",
+        "benchmark-a-ha20-richardson",
+        "benchmark-a-ha20-continuum",
+        "benchmark-a-ha20-power",
+        "benchmark-a-acceptance",
+        "smolentsev-vv",
+        "muller-buhler-book"
+      ],
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_operators.py::test_gradient_observed_order_for_smooth_manufactured_solution",
+        "tests/test_physics.py::test_small_hartmann_solution_matches_analytic_profile"
+      ],
+      "tier": "A",
+      "title": "Fully developed Hartmann duct verification",
+      "workflows": [
+        "campaigns/ducts/hartmann_validation_ladder.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "convergence_extrapolated_flow_rate_relative_max": 0.01,
+        "per_profile_fitted_normalization_allowed": false,
+        "primary_profile_l2_max": 0.01
+      },
+      "id": "A2-shercliff",
+      "parameters": {
+        "hartmann_number_baseline": 20,
+        "mesh_levels_required": 4
+      },
+      "primary_observables": [
+        "normalized flow rate",
+        "y velocity profile",
+        "z velocity profile",
+        "charge balance",
+        "power balance"
+      ],
+      "runtime_lane": "freemhd",
+      "source_ids": [
+        "lmx-benchmark-matrix",
+        "benchmark-a-ha20-richardson",
+        "benchmark-a-ha20-continuum",
+        "benchmark-a-ha20-power",
+        "benchmark-a-acceptance",
+        "smolentsev-vv",
+        "muller-buhler-book",
+        "freemhd"
+      ],
+      "spec_path": "benchmarks/specs/shercliff-ha20.toml",
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_freeze_freemhd_benchmark_a.py::test_compact_evidence_is_portable_and_uses_confirmation",
+        "tests/test_physics.py::test_small_shercliff_solution_matches_bundled_reference_profiles",
+        "tests/test_freemhd.py::test_observable_ladder_summary_ranks_mesh_and_offender_progress"
+      ],
+      "tier": "A",
+      "title": "Fully developed Shercliff duct and FreeMHD parity",
+      "workflows": [
+        "examples/freemhd_closed_channel_observable_parity.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "convergence_extrapolated_flow_rate_relative_max": 0.01,
+        "per_profile_fitted_normalization_allowed": false,
+        "primary_profile_l2_max": 0.01
+      },
+      "id": "A2-hunt",
+      "parameters": {
+        "hartmann_number_baseline": 20,
+        "mesh_levels_required": 4
+      },
+      "primary_observables": [
+        "normalized flow rate",
+        "y velocity profile",
+        "z velocity profile",
+        "side-jet location",
+        "charge balance",
+        "power balance"
+      ],
+      "runtime_lane": "freemhd",
+      "source_ids": [
+        "lmx-benchmark-matrix",
+        "samper-table-i",
+        "benchmark-a-acceptance",
+        "smolentsev-vv",
+        "muller-buhler-book",
+        "freemhd"
+      ],
+      "spec_path": "benchmarks/specs/hunt-ha20.toml",
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_freeze_freemhd_benchmark_a.py::test_compact_evidence_is_portable_and_uses_confirmation",
+        "tests/test_physics.py::test_small_hunt_solution_matches_bundled_reference_profiles",
+        "tests/test_freemhd.py::test_side_jet_profile_metrics_and_comparison_capture_peak_locations"
+      ],
+      "tier": "A",
+      "title": "Fully developed Hunt duct and FreeMHD parity",
+      "workflows": [
+        "examples/freemhd_closed_channel_observable_parity.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "analytical_flow_rate_relative_max": 0.01,
+        "eight_row_acceptance_closed": true,
+        "finest_mesh_change_relative_max": 0.0025,
+        "hunt_ha10000_closed": true,
+        "hunt_ha15000_closed": true,
+        "hunt_ha5000_closed": true,
+        "hunt_ha500_closed": true,
+        "normalized_current_balance_relative_max": 0.001,
+        "normalized_mechanical_power_relative_max": 0.001,
+        "shercliff_ha10000_closed": true,
+        "shercliff_ha15000_closed": true,
+        "shercliff_ha5000_closed": true,
+        "shercliff_ha500_closed": true,
+        "three_mesh_levels_required": true,
+        "tolerance_must_be_frozen_before_production": true
+      },
+      "id": "A3-high-ha",
+      "parameters": {
+        "hartmann_numbers": [
+          500,
+          5000,
+          10000,
+          15000
+        ]
+      },
+      "primary_observables": [
+        "dimensionless integral flow rate",
+        "Hartmann-layer resolution",
+        "side-layer resolution"
+      ],
+      "runtime_lane": "external-data",
+      "source_ids": [
+        "lmx-benchmark-matrix",
+        "samper-table-i",
+        "benchmark-a-acceptance",
+        "solvax-pcg-acceptance",
+        "smolentsev-vv",
+        "muller-buhler-book"
+      ],
+      "spec_path": "benchmarks/references/samper-table-i.toml",
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_freemhd.py::test_samper_table_i_reference_is_complete_and_exact",
+        "tests/test_physics.py::test_high_ha_rect_duct_mesh_uses_smooth_boundary_layer_layout",
+        "tests/test_run_samper_table_i.py::test_build_samper_shercliff_case_makes_q_equal_q_tilde",
+        "tests/test_run_samper_table_i.py::test_build_samper_hunt_case_preserves_wall_conductance",
+        "tests/test_freeze_samper_table_i.py::test_freeze_campaign_writes_deterministic_compact_evidence",
+        "tests/test_build_benchmark_a_acceptance.py::test_build_acceptance_separates_claims_and_accepts_all_rows"
+      ],
+      "tier": "A",
+      "title": "High-Hartmann-number integral duct validation",
+      "workflows": [
+        "scripts/run_samper_table_i.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "divergence_free_imposed_field_required": true,
+        "experimental_uncertainty_required": true,
+        "three_mesh_levels_required": true
+      },
+      "id": "B1-fringing-pipe",
+      "parameters": {
+        "hartmann_number": 6600,
+        "interaction_parameter": 10700,
+        "wall_conductance_ratio": 0.027
+      },
+      "primary_observables": [
+        "dimensionless pressure drop",
+        "velocity distortion",
+        "electric potential",
+        "current closure"
+      ],
+      "production_blocker": "The frozen builder, direct pressure observable, and nonuniform radial primitives exist, but production is blocked until the compatible mapped-pipe face-flux projection and conducting-annulus coupling pass the full portable, steady/tolerance, thin-wall, three-level, and matched FreeMHD gates.",
+      "runtime_lane": "external-data",
+      "source_ids": [
+        "lmx-benchmark-matrix",
+        "benchmark-b-specification",
+        "alex-results-1987",
+        "smolentsev-vv",
+        "smolentsev-blanket-review",
+        "muller-buhler-book",
+        "abdou-apex",
+        "freemhd"
+      ],
+      "spec_path": "benchmarks/specs/alex-b1-pipe.toml",
+      "status": "specification-frozen",
+      "tests": [
+        "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
+        "tests/test_benchmarks.py::test_benchmark_b_problem_binds_frozen_nondimensional_contract",
+        "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
+        "tests/test_freeze_benchmark_b_specs.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
+        "tests/test_fringing.py::test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle"
+      ],
+      "tier": "B",
+      "title": "Conducting pipe through a fringing magnetic field",
+      "workflows": [
+        "examples/pipe_reference_comparison_demo.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "divergence_free_imposed_field_required": true,
+        "experimental_uncertainty_required": true,
+        "three_mesh_levels_required": true
+      },
+      "id": "B2-fringing-square",
+      "parameters": {
+        "hartmann_number": 2900,
+        "interaction_parameter": 540,
+        "wall_conductance_ratio": 0.07
+      },
+      "primary_observables": [
+        "dimensionless pressure drop",
+        "velocity distortion",
+        "electric potential",
+        "current closure"
+      ],
+      "production_blocker": "The nonuniform masked-diffusion, compatible face-flux, fixed-flow, and SOLVAX implicit pressure/electric path passes portable manufactured, JIT, gradient, restart, and balance tests, but benchmark acceptance is blocked until steady/tolerance, thin-wall, three-level, and matched FreeMHD gates pass.",
+      "runtime_lane": "external-data",
+      "source_ids": [
+        "lmx-benchmark-matrix",
+        "benchmark-b-specification",
+        "alex-results-1987",
+        "smolentsev-vv",
+        "smolentsev-blanket-review",
+        "muller-buhler-book",
+        "freemhd"
+      ],
+      "spec_path": "benchmarks/specs/alex-b2-square.toml",
+      "status": "specification-frozen",
+      "tests": [
+        "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
+        "tests/test_benchmarks.py::test_benchmark_b_problem_binds_frozen_nondimensional_contract",
+        "tests/test_benchmarks.py::test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite",
+        "tests/test_freeze_benchmark_b_specs.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
+        "tests/test_fringing.py::test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle"
+      ],
+      "tier": "B",
+      "title": "Conducting square duct through a fringing magnetic field",
+      "workflows": [
+        "examples/fringing_benchmark_demo.py"
+      ]
+    }
+  ],
+  "schema_version": 1,
+  "sources": [
+    {
+      "availability": "repository",
+      "id": "lmx-benchmark-matrix",
+      "kind": "repository_document",
+      "path": "docs/benchmark_matrix.md",
+      "sha256": "e7f7c64e87e0dafe4af640db531f9ef416e44b288cc5a0367475dc5ef21eb604",
+      "title": "LMX Benchmark Matrix"
+    },
+    {
+      "availability": "repository",
+      "id": "benchmark-b-specification",
+      "kind": "repository_document",
+      "path": "benchmarks/results/benchmark-b-specification.json",
+      "sha256": "1dcd96151bb18f57d2685b6adc6e956f0cce0a18d213e0d58f48ad5902944541",
+      "title": "LMX frozen Benchmark B specifications and extracted ALEX data index"
+    },
+    {
+      "authors": "C. B. Reed, B. F. Picologlou, T. Q. Hua, and J. S. Walker",
+      "availability": "external",
+      "id": "alex-results-1987",
+      "kind": "technical_report",
+      "report": "CONF-871007-90 / OSTI 5332375",
+      "sha256": "d67bfc6181a780e1a13f104f443746d1d05d359ba9886e4a0a2563542e6aa16a",
+      "title": "ALEX results - a comparison of measurements from a round and a rectangular duct with 3-D code predictions",
+      "url": "https://www.osti.gov/servlets/purl/5332375",
+      "year": 1987
+    },
+    {
+      "availability": "repository",
+      "id": "benchmark-a-ha20-richardson",
+      "kind": "repository_document",
+      "path": "benchmarks/results/benchmark-a-ha20-richardson.json",
+      "sha256": "7736c6e17fd8ea338f9470d6af8785e5f7e2d17cc72c3a02dcf755f665c00212",
+      "title": "LMX Benchmark A Ha=20 Richardson evidence"
+    },
+    {
+      "availability": "repository",
+      "id": "benchmark-a-ha20-continuum",
+      "kind": "repository_document",
+      "path": "benchmarks/results/benchmark-a-ha20-continuum-reference.json",
+      "sha256": "68c665524012f5a8c12113a16238608c23e8ee6cc2880b6e981a9e0c97ad1f5c",
+      "title": "LMX Benchmark A Ha=20 analytical-continuum evidence"
+    },
+    {
+      "availability": "repository",
+      "id": "benchmark-a-ha20-power",
+      "kind": "repository_document",
+      "path": "benchmarks/results/benchmark-a-ha20-power-balance.json",
+      "sha256": "73ac4e0bbea73cdc1259df7776a0c0f0f106fbbc15a8725c77a1ff55cc20ee21",
+      "title": "LMX Benchmark A Ha=20 current and power evidence"
+    },
+    {
+      "availability": "repository",
+      "id": "samper-table-i",
+      "kind": "repository_document",
+      "path": "benchmarks/references/samper-table-i.toml",
+      "sha256": "8140a5a19438baea503112be6247c4394fea0c4c7ce0f4bd75a81e74bc664105",
+      "title": "LMX extraction of Samper Table I"
+    },
+    {
+      "availability": "repository",
+      "id": "benchmark-a-acceptance",
+      "kind": "repository_document",
+      "path": "benchmarks/results/benchmark-a-acceptance.json",
+      "sha256": "a8ab639141722cf2730dcc5aa1c4954610c82b5c18eec93256e32ac576dc0bb9",
+      "title": "LMX combined Benchmark A acceptance evidence"
+    },
+    {
+      "availability": "repository",
+      "id": "solvax-pcg-acceptance",
+      "kind": "repository_document",
+      "path": "benchmarks/results/solvax-pcg-acceptance.json",
+      "sha256": "367ad17600913278e1bc6458aa6b5d0c37f8dadecdb25c70e98e15e82a2fede1",
+      "title": "LMX released-SOLVAX PCG CPU and Benchmark A acceptance evidence"
+    },
+    {
+      "authors": "S. Smolentsev et al.",
+      "availability": "external",
+      "doi": "10.1016/j.fusengdes.2014.04.049",
+      "filename": "art042.pdf",
+      "id": "smolentsev-vv",
+      "kind": "article",
+      "sha256": "9d0986bc912fc4b7ba9c3b79756db52319295c3b8c3c7304103523e5755f91b9",
+      "title": "An approach to verification and validation of MHD codes for fusion applications"
+    },
+    {
+      "authors": "S. Smolentsev, R. Moreau, L. Bühler, and C. Mistrangelo",
+      "availability": "external",
+      "doi": "10.1016/j.fusengdes.2010.02.038",
+      "filename": "1-s2.0-S0920379610000645-main.pdf",
+      "id": "smolentsev-blanket-review",
+      "kind": "article",
+      "sha256": "21cfa7f97790e4c5671192c9a818a598fcd5d2cf62b4c14b1dff10e471ec8cfd",
+      "title": "MHD thermofluid issues of liquid-metal blankets",
+      "year": 2010
+    },
+    {
+      "authors": "U. Müller and L. Bühler",
+      "availability": "external",
+      "filename": "U. Müller, L. Bühler - Magnetofluiddynamics in channels and containers (2010, Springer) - libgen.li.pdf",
+      "id": "muller-buhler-book",
+      "kind": "book",
+      "note": "The local filename says 2010; bibliographic year must be checked before publication. The PDF is not redistributed.",
+      "sha256": "6f54c642f265fd115fce3abbc9f0edbae629e7c4be480b7418037cb56a02ce54",
+      "title": "Magnetofluiddynamics in Channels and Containers",
+      "year": 2001
+    },
+    {
+      "authors": "M. A. Abdou et al.",
+      "availability": "external",
+      "filename": "2001-FED Abodu.pdf",
+      "id": "abdou-apex",
+      "kind": "article",
+      "sha256": "8752479ab018fc0fcde1af88464ac4a98104d1d3f0b8811f77b73b67b8670bcf",
+      "title": "On the exploration of innovative concepts for fusion chamber technology",
+      "year": 2001
+    },
+    {
+      "availability": "external",
+      "commit": "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5",
+      "id": "freemhd",
+      "kind": "repository",
+      "title": "FreeMHD",
+      "url": "https://github.com/PlasmaControl/FreeMHD"
+    }
+  ]
+}

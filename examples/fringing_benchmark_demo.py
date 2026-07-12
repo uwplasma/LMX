@@ -77,7 +77,9 @@ def run_fringing_benchmark_demo(
     else:
         raise ValueError(f"Unsupported geometry_kind {geometry_kind!r}")
     case_updates = {
-        "solver": _replace_fields(problem.case.solver, coupling_iterations=coupling_iterations),
+        "solver": _replace_fields(
+            problem.case.solver, coupling_iterations=coupling_iterations
+        ),
     }
     if hasattr(problem.case, "time_stepper"):
         case_updates["time_stepper"] = _replace_fields(
@@ -85,7 +87,9 @@ def run_fringing_benchmark_demo(
             max_steps=max_steps,
             potential_iterations=potential_iterations,
         )
-    problem = _replace_fields(problem, case=_replace_fields(problem.case, **case_updates))
+    problem = _replace_fields(
+        problem, case=_replace_fields(problem.case, **case_updates)
+    )
     solution = solve_extruded_inductionless(problem)
     history = solution.station_history
     extruded = solution.bundle
@@ -101,8 +105,12 @@ def run_fringing_benchmark_demo(
     charge_balance = np.asarray(extruded.charge_balance_residual)
     z_mid = extruded.u.shape[2] // 2
     y_mid = extruded.u.shape[1] // 2
-    x_grid, y_grid = np.meshgrid(np.asarray(extruded.x), np.asarray(extruded.y), indexing="xy")
-    x_grid_z, z_grid = np.meshgrid(np.asarray(extruded.x), np.asarray(extruded.z), indexing="xy")
+    x_grid, y_grid = np.meshgrid(
+        np.asarray(extruded.x), np.asarray(extruded.y), indexing="xy"
+    )
+    x_grid_z, z_grid = np.meshgrid(
+        np.asarray(extruded.x), np.asarray(extruded.z), indexing="xy"
+    )
     y_label = "r" if geometry_kind == "pipe_ogrid" else "y"
     z_label = r"$\theta$" if geometry_kind == "pipe_ogrid" else "z"
 
@@ -121,20 +129,34 @@ def run_fringing_benchmark_demo(
     axes[0, 2].set_xlabel("x")
     axes[0, 2].set_ylabel(r"$\max p - \min p$")
 
-    contour_y = axes[1, 0].contourf(x_grid, y_grid, np.asarray(extruded.u[:, :, z_mid]).T, levels=18, cmap="viridis")
+    contour_y = axes[1, 0].contourf(
+        x_grid, y_grid, np.asarray(extruded.u[:, :, z_mid]).T, levels=18, cmap="viridis"
+    )
     axes[1, 0].set_title("Midplane velocity u(x, y, zmid)")
     axes[1, 0].set_xlabel("x")
     axes[1, 0].set_ylabel(y_label)
     fig.colorbar(contour_y, ax=axes[1, 0], shrink=0.9, label="u")
 
-    contour_z = axes[1, 1].contourf(x_grid_z, z_grid, np.asarray(extruded.u[:, y_mid, :]).T, levels=18, cmap="viridis")
+    contour_z = axes[1, 1].contourf(
+        x_grid_z,
+        z_grid,
+        np.asarray(extruded.u[:, y_mid, :]).T,
+        levels=18,
+        cmap="viridis",
+    )
     axes[1, 1].set_title("Centerline-normal velocity u(x, ymid, z)")
     axes[1, 1].set_xlabel("x")
     axes[1, 1].set_ylabel(z_label)
     fig.colorbar(contour_z, ax=axes[1, 1], shrink=0.9, label="u")
 
     axes[1, 2].plot(x, axial_current, color="#0891b2", label="Axial current")
-    axes[1, 2].semilogy(x, np.maximum(charge_balance, 1.0e-16), color="#7c3aed", linestyle="--", label="Charge balance")
+    axes[1, 2].semilogy(
+        x,
+        np.maximum(charge_balance, 1.0e-16),
+        color="#7c3aed",
+        linestyle="--",
+        label="Charge balance",
+    )
     axes[1, 2].set_title("Current response and conservation")
     axes[1, 2].set_xlabel("x")
     axes[1, 2].set_ylabel("Response / residual")
@@ -157,7 +179,9 @@ def run_fringing_benchmark_demo(
             "z": np.asarray(extruded.z).tolist(),
             "field_scale": np.asarray(extruded.field_scale).tolist(),
             "u_shape": list(np.asarray(extruded.u).shape),
-            "charge_balance_residual": np.asarray(extruded.charge_balance_residual).tolist(),
+            "charge_balance_residual": np.asarray(
+                extruded.charge_balance_residual
+            ).tolist(),
             "axial_current": np.asarray(extruded.axial_current).tolist(),
             "wall_current_leakage": np.asarray(extruded.wall_current_leakage).tolist(),
             "pressure_span": pressure_span.tolist(),
@@ -183,14 +207,24 @@ def run_fringing_benchmark_demo(
             "Lorentz-force diagnostics on the extruded inductionless path."
         ),
     }
-    (out_dir / "fringing_benchmark_summary.json").write_text(json.dumps(summary, indent=2))
+    (out_dir / "fringing_benchmark_summary.json").write_text(
+        json.dumps(summary, indent=2)
+    )
     return summary
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the LMX fringing-field benchmark scaffold.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/examples/fringing_benchmark"))
-    parser.add_argument("--geometry-kind", choices=("rect_duct", "layered_duct", "pipe_ogrid"), default="rect_duct")
+    parser = argparse.ArgumentParser(
+        description="Run the LMX fringing-field benchmark scaffold."
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/examples/fringing_benchmark")
+    )
+    parser.add_argument(
+        "--geometry-kind",
+        choices=("rect_duct", "layered_duct", "pipe_ogrid"),
+        default="rect_duct",
+    )
     parser.add_argument("--ha-peak", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=24)
     parser.add_argument("--nz", type=int, default=24)

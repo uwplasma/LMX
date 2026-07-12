@@ -14,7 +14,9 @@ from scripts import inspect_starting_files_archive as archive_tools
 pytestmark = pytest.mark.unit
 
 
-def _write_partial_zip(path: Path, name: str, payload: bytes, compress_type: int = 0) -> None:
+def _write_partial_zip(
+    path: Path, name: str, payload: bytes, compress_type: int = 0
+) -> None:
     if compress_type == 0:
         compressed = payload
     elif compress_type == 8:
@@ -128,8 +130,12 @@ def test_extract_partial_entry_handles_stored_and_deflated_payloads(tmp_path: Pa
     deflated_entry = archive_tools._read_partial_entries(deflated_zip)[0]
     output = tmp_path / "extract"
 
-    stored_target = archive_tools._extract_partial_entry(stored_zip, stored_entry, output)
-    deflated_target = archive_tools._extract_partial_entry(deflated_zip, deflated_entry, output)
+    stored_target = archive_tools._extract_partial_entry(
+        stored_zip, stored_entry, output
+    )
+    deflated_target = archive_tools._extract_partial_entry(
+        deflated_zip, deflated_entry, output
+    )
 
     assert stored_target.read_text() == "abc"
     assert deflated_target.read_text() == "xyz"
@@ -172,7 +178,9 @@ def test_extract_matching_uses_partial_zip_fallback(tmp_path: Path):
     assert (tmp_path / "out" / "Hunt" / "case.dat").read_text() == "payload"
 
 
-def test_main_writes_json_for_inspection(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+def test_main_writes_json_for_inspection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
     archive_path = tmp_path / "cases.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr("Hunt/caseB.txt", "b")
@@ -200,7 +208,9 @@ def test_main_writes_json_for_inspection(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert payload["entry_count"] == 1
 
 
-def test_main_writes_json_for_extract(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+def test_main_writes_json_for_extract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
     archive_path = tmp_path / "cases.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr("Hunt/caseB.txt", "b")

@@ -7,7 +7,11 @@ import sys
 import pytest
 
 from lmx.publication import PUBLICATION_FIGURE_SPECS
-from scripts.run_release_readiness import evaluate_release_readiness, main, write_release_readiness_report
+from scripts.run_release_readiness import (
+    evaluate_release_readiness,
+    main,
+    write_release_readiness_report,
+)
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -21,13 +25,30 @@ def _write_release_fixture(root: Path) -> None:
 [project]
 name = "lmx"
 version = "1.0.0"
+authors = [{name = "LMX Test Maintainer"}]
 dependencies = ["jax", "jaxlib", "matplotlib", "numpy", "scipy"]
+
+[project.urls]
+Source = "https://github.com/uwplasma/LMX"
 
 [project.optional-dependencies]
 dev = ["pytest", "lineax", "interpax"]
 docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
 """.strip()
         + "\n"
+    )
+    for name in (
+        "CHANGELOG.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
+        "LICENSE",
+        "README.md",
+        "SECURITY.md",
+        "SUPPORT.md",
+    ):
+        (root / name).write_text(f"# {name}\n")
+    (root / "CITATION.cff").write_text(
+        'cff-version: 1.2.0\nversion: 1.0.0\nrepository-code: "https://github.com/uwplasma/LMX"\n'
     )
     workflow_dir = root / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
@@ -59,7 +80,10 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
         if not (static / spec.artifact).exists():
             (static / spec.artifact).write_bytes(b"artifact")
         if not (static / spec.summary).exists():
-            _write_json(static / spec.summary, {"validation": {"validation_pass": True, "value": 1.0}})
+            _write_json(
+                static / spec.summary,
+                {"validation": {"validation_pass": True, "value": 1.0}},
+            )
     _write_json(
         static / "readme_media_manifest.json",
         {
@@ -156,7 +180,10 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
     _write_json(
         static / "variable_field_tabulated_summary.json",
         {
-            "field_quality": {"validation_pass": True, "divergence_to_field_ratio": 1.0e-3},
+            "field_quality": {
+                "validation_pass": True,
+                "divergence_to_field_ratio": 1.0e-3,
+            },
             "reconstruction_quality": {
                 "validation_pass": True,
                 "relative_l2_error": 1.0e-5,
@@ -164,12 +191,17 @@ docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton"]
                 "relative_l2_tolerance": 2.0e-3,
                 "relative_linf_tolerance": 1.0e-2,
             },
-            "validation": {"validation_pass": True, "max_charge_balance_residual": 1.0e-12},
+            "validation": {
+                "validation_pass": True,
+                "max_charge_balance_residual": 1.0e-12,
+            },
         },
     )
 
 
-def test_release_readiness_passes_bounded_release_and_tracks_deferred_lanes(tmp_path: Path):
+def test_release_readiness_passes_bounded_release_and_tracks_deferred_lanes(
+    tmp_path: Path,
+):
     _write_release_fixture(tmp_path)
 
     report = evaluate_release_readiness(tmp_path)
@@ -179,11 +211,17 @@ def test_release_readiness_passes_bounded_release_and_tracks_deferred_lanes(tmp_
     assert report["research_grade_ready"] is False
     assert report["blockers"] == []
     assert report["research_blockers"] == report["deferred_research_lanes"]
-    assert any("High-Ha Hunt side-layer" in item for item in report["deferred_research_lanes"])
-    assert any("Magnetic-obstacle" in item for item in report["deferred_research_lanes"])
+    assert any(
+        "High-Ha Hunt side-layer" in item for item in report["deferred_research_lanes"]
+    )
+    assert any(
+        "Magnetic-obstacle" in item for item in report["deferred_research_lanes"]
+    )
     assert any("Bent-pipe" in item for item in report["deferred_research_lanes"])
 
-    output = write_release_readiness_report(report, tmp_path / "artifacts/release/release_readiness.json")
+    output = write_release_readiness_report(
+        report, tmp_path / "artifacts/release/release_readiness.json"
+    )
     assert output.exists()
 
 
@@ -202,7 +240,11 @@ def test_release_readiness_fails_missing_manifest_media(tmp_path: Path):
     (tmp_path / "docs/_static/generated/wham_blanket_flow.gif").unlink()
 
     report = evaluate_release_readiness(tmp_path)
-    gate = next(item for item in report["gates"] if item["name"] == "readme_external_media_manifest")
+    gate = next(
+        item
+        for item in report["gates"]
+        if item["name"] == "readme_external_media_manifest"
+    )
 
     assert report["release_ready"] is False
     assert "readme_external_media_manifest" in report["blockers"]
@@ -214,17 +256,26 @@ def test_release_readiness_fails_missing_publication_manifest_artifact(tmp_path:
     (tmp_path / "docs/_static/generated/q2d_turbulence_observables.png").unlink()
 
     report = evaluate_release_readiness(tmp_path)
-    gate = next(item for item in report["gates"] if item["name"] == "publication_figure_manifest")
+    gate = next(
+        item
+        for item in report["gates"]
+        if item["name"] == "publication_figure_manifest"
+    )
 
     assert report["release_ready"] is False
     assert "publication_figure_manifest" in report["blockers"]
     assert gate["details"]["missing_artifacts"] == ["q2d_turbulence_observables.png"]
 
 
-def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_path: Path):
+def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(
+    tmp_path: Path,
+):
     _write_release_fixture(tmp_path)
     static = tmp_path / "docs/_static/generated"
-    _write_json(static / "straight_duct_validation_ladder_summary.json", {"hunt": [{"ha": 100, "z_l2_error": 0.006}]})
+    _write_json(
+        static / "straight_duct_validation_ladder_summary.json",
+        {"hunt": [{"ha": 100, "z_l2_error": 0.006}]},
+    )
     _write_json(
         static / "q2d_turbulence_decay_summary.json",
         {
@@ -236,7 +287,10 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
                 "max_divergence_linf": 1.0e-14,
                 "research_grade_turbulence_validation_pass": True,
             },
-            "external_reference_comparison": {"status": "external_reference_compared", "validation_pass": True},
+            "external_reference_comparison": {
+                "status": "external_reference_compared",
+                "validation_pass": True,
+            },
         },
     )
     _write_json(
@@ -250,7 +304,10 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
                 "max_charge_balance_residual": 1.0e-12,
                 "research_grade_validation_pass": True,
             },
-            "external_reference_comparison": {"status": "external_reference_compared", "validation_pass": True},
+            "external_reference_comparison": {
+                "status": "external_reference_compared",
+                "validation_pass": True,
+            },
         },
     )
     _write_json(
@@ -266,7 +323,10 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
                 "research_grade_charge_balance_pass": True,
                 "research_grade_dean_validation_pass": True,
             },
-            "external_reference_comparison": {"status": "external_reference_compared", "validation_pass": True},
+            "external_reference_comparison": {
+                "status": "external_reference_compared",
+                "validation_pass": True,
+            },
         },
     )
     for name in (
@@ -285,10 +345,16 @@ def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(tmp_pat
     assert report["deferred_research_lanes"] == []
 
 
-def test_release_readiness_main_writes_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_release_readiness_main_writes_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     _write_release_fixture(tmp_path)
     output = tmp_path / "artifacts/release/readiness.json"
-    monkeypatch.setattr(sys, "argv", ["run_release_readiness.py", "--root", str(tmp_path), "--output", str(output)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_release_readiness.py", "--root", str(tmp_path), "--output", str(output)],
+    )
 
     main()
 
@@ -297,11 +363,17 @@ def test_release_readiness_main_writes_report(tmp_path: Path, monkeypatch: pytes
     assert payload["release_class"] == "bounded"
 
 
-def test_release_readiness_main_exits_on_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_release_readiness_main_exits_on_blocker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     _write_release_fixture(tmp_path)
     (tmp_path / "docs/_static/generated/strong_scaling.png").unlink()
     output = tmp_path / "artifacts/release/readiness.json"
-    monkeypatch.setattr(sys, "argv", ["run_release_readiness.py", "--root", str(tmp_path), "--output", str(output)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_release_readiness.py", "--root", str(tmp_path), "--output", str(output)],
+    )
 
     with pytest.raises(SystemExit):
         main()

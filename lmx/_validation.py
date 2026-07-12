@@ -581,6 +581,47 @@ def compare_normalized_profiles(
     return compare_profile_to_reference(ref_coord, interpolated_simulated, normalized_reference)
 
 
+def compare_profiles_with_shared_scale(
+    simulated_coordinate: jnp.ndarray,
+    simulated: jnp.ndarray,
+    reference_coordinate: jnp.ndarray,
+    reference: jnp.ndarray,
+    *,
+    coordinate_scale: float,
+    value_scale: float,
+    simulated_offset: float = 0.0,
+    reference_offset: float = 0.0,
+    simulated_boundary_values: tuple[float, float] | None = None,
+) -> AnalyticComparison:
+    """Compare profiles using declared common coordinate and observable scales.
+
+    Unlike :func:`compare_normalized_profiles`, this function never fits each
+    profile to its own peak. Gauge-like offsets must also be supplied
+    explicitly, which keeps cross-code benchmark normalization auditable.
+    """
+
+    if coordinate_scale <= 0.0:
+        raise ValueError("coordinate_scale must be positive")
+    if value_scale <= 0.0:
+        raise ValueError("value_scale must be positive")
+    sim_coord = jnp.asarray(simulated_coordinate, dtype=float) / float(coordinate_scale)
+    ref_coord = jnp.asarray(reference_coordinate, dtype=float) / float(coordinate_scale)
+    scaled_simulated = (jnp.asarray(simulated, dtype=float) - float(simulated_offset)) / float(value_scale)
+    scaled_reference = (jnp.asarray(reference, dtype=float) - float(reference_offset)) / float(value_scale)
+    sim_coord, scaled_simulated = _sorted_profile(sim_coord, scaled_simulated)
+    if simulated_boundary_values is not None:
+        lower_value, upper_value = simulated_boundary_values
+        sim_coord, scaled_simulated = _extend_profile_with_boundary_values(
+            sim_coord,
+            scaled_simulated,
+            lower_value=(float(lower_value) - float(simulated_offset)) / float(value_scale),
+            upper_value=(float(upper_value) - float(simulated_offset)) / float(value_scale),
+        )
+    ref_coord, scaled_reference = _sorted_profile(ref_coord, scaled_reference)
+    interpolated_simulated = jnp.interp(ref_coord, sim_coord, scaled_simulated)
+    return compare_profile_to_reference(ref_coord, interpolated_simulated, scaled_reference)
+
+
 def symmetry_metrics(profile: jnp.ndarray, axis: str) -> ProfileSymmetry:
     mirrored = jnp.flip(profile)
     diff = profile - mirrored

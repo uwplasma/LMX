@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.mesh import (
+    _smooth_boundary_layer_segment,
     centerline_pipe_mesh_quality_metrics,
     generate_bent_pipe_mesh,
     generate_centerline_pipe_mesh,
@@ -25,6 +26,37 @@ def test_rect_duct_mesh_shape():
     assert mesh.nz == 6
 
 
+def test_smooth_boundary_layer_segment_allocates_layer_without_spacing_jumps():
+    faces = _smooth_boundary_layer_segment(
+        -1.0, 1.0, 99, layer_thickness=0.002, layer_cells=10
+    )
+    widths = jnp.diff(faces)
+    assert faces.shape == (100,)
+    assert float(jnp.sum(widths[:10])) == pytest.approx(0.002)
+    assert (
+        float(jnp.max(jnp.maximum(widths[1:] / widths[:-1], widths[:-1] / widths[1:])))
+        < 1.3
+    )
+    assert widths.tolist() == pytest.approx(widths[::-1].tolist())
+
+
+@pytest.mark.parametrize(
+    "count, layer_thickness, layer_cells",
+    [(1, 0.1, 1), (8, 0.0, 2), (8, 0.1, 0), (8, 0.6, 2)],
+)
+def test_smooth_boundary_layer_segment_falls_back_to_uniform_for_degenerate_requests(
+    count, layer_thickness, layer_cells
+):
+    faces = _smooth_boundary_layer_segment(
+        0.0,
+        1.0,
+        count,
+        layer_thickness=layer_thickness,
+        layer_cells=layer_cells,
+    )
+    assert faces.tolist() == pytest.approx(jnp.linspace(0.0, 1.0, count + 1).tolist())
+
+
 def test_layered_duct_mesh_has_solid_cells():
     mesh = generate_layered_duct_mesh(
         width=2.0,
@@ -45,8 +77,59 @@ def test_pipe_ogrid_points_exist():
     assert mesh.point_coordinates.shape[-1] == 3
 
 
+def test_pipe_ogrid_explicit_wall_preserves_fluid_resolution():
+    mesh = generate_pipe_ogrid_mesh(
+        radius=1.0,
+        nx=2,
+        nr=4,
+        ntheta=8,
+        wall_thickness=0.1,
+        wall_cells=2,
+    )
+
+    assert mesh.ny == 6
+    assert mesh.fluid_mask.shape == (6, 8)
+    assert bool(jnp.all(mesh.fluid_mask[:4]))
+    assert not bool(jnp.any(mesh.fluid_mask[4:]))
+    assert float(mesh.y_faces[4]) == pytest.approx(1.0)
+    assert float(mesh.y_faces[-1]) == pytest.approx(1.1)
+    assert mesh.point_coordinates.shape == (3, 7, 9, 3)
+
+
+@pytest.mark.parametrize(
+    "wall_thickness, wall_cells",
+    [(0.1, 0), (0.0, 2), (-0.1, 2), (0.1, -2)],
+)
+def test_pipe_ogrid_rejects_inconsistent_wall_request(wall_thickness, wall_cells):
+    with pytest.raises(ValueError):
+        generate_pipe_ogrid_mesh(
+            radius=1.0,
+            nr=4,
+            ntheta=8,
+            wall_thickness=wall_thickness,
+            wall_cells=wall_cells,
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"radius": 0.0},
+        {"radius": 1.0, "length": 0.0},
+        {"radius": 1.0, "nx": 0},
+        {"radius": 1.0, "nr": 0},
+        {"radius": 1.0, "ntheta": 0},
+    ],
+)
+def test_pipe_ogrid_rejects_nonpositive_domain_or_resolution(kwargs):
+    with pytest.raises(ValueError, match="positive"):
+        generate_pipe_ogrid_mesh(**kwargs)
+
+
 def test_bent_pipe_points_follow_curved_centerline():
-    mesh = generate_bent_pipe_mesh(tube_radius=0.2, bend_radius=1.0, bend_angle=1.0, nx=4, nr=4, ntheta=8)
+    mesh = generate_bent_pipe_mesh(
+        tube_radius=0.2, bend_radius=1.0, bend_angle=1.0, nx=4, nr=4, ntheta=8
+    )
     assert mesh.point_coordinates is not None
     start = mesh.point_coordinates[0, 0, 0]
     end = mesh.point_coordinates[-1, 0, 0]
@@ -63,7 +146,9 @@ def test_centerline_pipe_mesh_follows_arbitrary_route():
         "z": jnp.asarray([0.0, 0.0, 0.1, 0.1]),
     }
 
-    mesh = generate_centerline_pipe_mesh(centerline, tube_radius=0.08, nx=8, nr=5, ntheta=12)
+    mesh = generate_centerline_pipe_mesh(
+        centerline, tube_radius=0.08, nx=8, nr=5, ntheta=12
+    )
     metrics = centerline_pipe_mesh_quality_metrics(mesh)
 
     assert mesh.geometry == "centerline_pipe"
@@ -78,7 +163,11 @@ def test_centerline_pipe_mesh_follows_arbitrary_route():
 def test_centerline_pipe_mesh_rejects_invalid_centerline():
     with pytest.raises(ValueError, match="at least three"):
         generate_centerline_pipe_mesh(
-            {"x": jnp.asarray([0.0, 1.0]), "y": jnp.asarray([0.0, 0.0]), "z": jnp.asarray([0.0, 0.0])},
+            {
+                "x": jnp.asarray([0.0, 1.0]),
+                "y": jnp.asarray([0.0, 0.0]),
+                "z": jnp.asarray([0.0, 0.0]),
+            },
             tube_radius=0.1,
         )
     with pytest.raises(ValueError, match="strictly increasing"):
@@ -94,7 +183,9 @@ def test_centerline_pipe_mesh_rejects_invalid_centerline():
 
 
 def test_moderate_ha_rect_mesh_clusters_boundary_layers():
-    mesh = generate_rect_duct_mesh(width=0.2, height=0.2, ny=32, nz=32, target_ha=20.0, magnetic_axis="z")
+    mesh = generate_rect_duct_mesh(
+        width=0.2, height=0.2, ny=32, nz=32, target_ha=20.0, magnetic_axis="z"
+    )
     dy = mesh.dy
     dz = mesh.dz
     uniform_spacing = 0.2 / 32.0
@@ -122,11 +213,17 @@ def test_generate_rect_duct_mesh_from_faces_preserves_explicit_faces():
 
 def test_generate_rect_duct_mesh_from_faces_rejects_invalid_faces():
     with pytest.raises(ValueError, match="strictly increasing"):
-        generate_rect_duct_mesh_from_faces(y_faces=jnp.asarray([0.0, 0.0]), z_faces=jnp.asarray([0.0, 1.0]))
+        generate_rect_duct_mesh_from_faces(
+            y_faces=jnp.asarray([0.0, 0.0]), z_faces=jnp.asarray([0.0, 1.0])
+        )
     with pytest.raises(ValueError, match="one-dimensional"):
-        generate_rect_duct_mesh_from_faces(y_faces=jnp.ones((2, 2)), z_faces=jnp.asarray([0.0, 1.0]))
+        generate_rect_duct_mesh_from_faces(
+            y_faces=jnp.ones((2, 2)), z_faces=jnp.asarray([0.0, 1.0])
+        )
     with pytest.raises(ValueError, match="at least two"):
-        generate_rect_duct_mesh_from_faces(y_faces=jnp.asarray([0.0]), z_faces=jnp.asarray([0.0, 1.0]))
+        generate_rect_duct_mesh_from_faces(
+            y_faces=jnp.asarray([0.0]), z_faces=jnp.asarray([0.0, 1.0])
+        )
 
 
 def test_generate_layered_duct_mesh_from_fluid_faces_adds_wall_regions():
@@ -172,8 +269,12 @@ def test_generate_multilayer_duct_mesh_aligns_interfaces_and_sigma():
     assert mesh.region_names[0] == "fluid"
     assert "left:aln" in mesh.region_names
     assert float(mesh.sigma[mesh.region_ids == 0][0]) == pytest.approx(2.0)
-    assert float(mesh.sigma[mesh.region_ids == mesh.region_names.index("left:aln")][0]) == pytest.approx(1.0e-8)
-    assert float(mesh.sigma[mesh.region_ids == mesh.region_names.index("left:metal")][0]) == pytest.approx(1.0e6)
+    assert float(
+        mesh.sigma[mesh.region_ids == mesh.region_names.index("left:aln")][0]
+    ) == pytest.approx(1.0e-8)
+    assert float(
+        mesh.sigma[mesh.region_ids == mesh.region_names.index("left:metal")][0]
+    ) == pytest.approx(1.0e6)
     y_faces = [float(value) for value in mesh.y_faces]
     z_faces = [float(value) for value in mesh.z_faces]
     assert any(abs(value + 0.5) < 1.0e-12 for value in y_faces)

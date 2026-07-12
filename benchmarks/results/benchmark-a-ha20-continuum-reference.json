@@ -1,0 +1,142 @@
+{
+  "cases": {
+    "hunt": {
+      "axes": {
+        "y": {
+          "analytical_endpoint_values": [
+            -0.013882664409738083,
+            -0.013882664409738083
+          ],
+          "lmx_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.003192540900013125,
+            "linf_error": 0.011952431287449938
+          },
+          "lmx_raw_analytical": {
+            "l2_error": 0.0032523518315443287,
+            "linf_error": 0.013882993879387804
+          },
+          "processed_freemhd_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.005492724763193136,
+            "linf_error": 0.024201558256982614
+          },
+          "processed_freemhd_raw_analytical": {
+            "l2_error": 0.005627822554379408,
+            "linf_error": 0.033995971324162655
+          }
+        },
+        "z": {
+          "analytical_endpoint_values": [
+            0.0,
+            0.0
+          ],
+          "lmx_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.002500430277202934,
+            "linf_error": 0.008117991172301942
+          },
+          "lmx_raw_analytical": {
+            "l2_error": 0.002500430277202934,
+            "linf_error": 0.008117991172301942
+          },
+          "processed_freemhd_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.004532266927434644,
+            "linf_error": 0.007620237941359353
+          },
+          "processed_freemhd_raw_analytical": {
+            "l2_error": 0.004532266927434644,
+            "linf_error": 0.007620237941359353
+          }
+        }
+      },
+      "benchmark_spec": {
+        "id": "A2-hunt-ha20",
+        "path": "benchmarks/specs/hunt-ha20.toml",
+        "sha256": "04f1b9d1a28d9c495ea22f75330e1b7213a35f737ccaae3d1c05c40eaf0beb87"
+      },
+      "reference_file": "Hunt_Analytical_Ha20_db0.05_PresDrop514.2123.txt",
+      "settings": {
+        "current_reconstruction": "face_averaged",
+        "effective_ny": 89,
+        "effective_nz": 67,
+        "max_steps": 64,
+        "ny": 85,
+        "nz": 63,
+        "potential_iterations": 2000,
+        "velocity_update_limit": 0.1
+      }
+    },
+    "shercliff": {
+      "axes": {
+        "y": {
+          "analytical_endpoint_values": [
+            -0.04233273897663679,
+            -0.04233273897663679
+          ],
+          "lmx_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.010520360622762716,
+            "linf_error": 0.040505438281072434
+          },
+          "lmx_raw_analytical": {
+            "l2_error": 0.010689348617534122,
+            "linf_error": 0.04233312080684539
+          },
+          "processed_freemhd_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.015296049850130264,
+            "linf_error": 0.041540670492752445
+          },
+          "processed_freemhd_raw_analytical": {
+            "l2_error": 0.015415195795091334,
+            "linf_error": 0.04277565156771286
+          }
+        },
+        "z": {
+          "analytical_endpoint_values": [
+            0.0,
+            0.0
+          ],
+          "lmx_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.006641945670555972,
+            "linf_error": 0.009621859442714875
+          },
+          "lmx_raw_analytical": {
+            "l2_error": 0.006641945670555972,
+            "linf_error": 0.009621859442714875
+          },
+          "processed_freemhd_no_slip_endpoint_corrected_analytical": {
+            "l2_error": 0.009754541155720418,
+            "linf_error": 0.014246388283380762
+          },
+          "processed_freemhd_raw_analytical": {
+            "l2_error": 0.009754541155720418,
+            "linf_error": 0.014246388283380762
+          }
+        }
+      },
+      "benchmark_spec": {
+        "id": "A2-shercliff-ha20",
+        "path": "benchmarks/specs/shercliff-ha20.toml",
+        "sha256": "778fb5958ccc7fa594bfd3ab4aefbb997ea60a1ee17a6adb83b5cc449008415f"
+      },
+      "reference_file": "Shercliff_Analytical_Ha20_PresDrop2512.1961.txt",
+      "settings": {
+        "current_reconstruction": "face_averaged",
+        "effective_ny": 85,
+        "effective_nz": 63,
+        "max_steps": 64,
+        "ny": 85,
+        "nz": 63,
+        "potential_iterations": 1000,
+        "velocity_update_limit": 0.1
+      }
+    }
+  },
+  "confirmation_level": "confirmation_85x63",
+  "description": "Finest-level LMX and processed-FreeMHD velocity errors against the supplied analytical continuum profiles on one shared physical scale.",
+  "implementation": {
+    "lmx_version": "1.1.3",
+    "runner_sha256": "b0e1adacd324442c4d8bedbdca44626f21142f74b2ba885475c330b00ac2120f",
+    "solvax_version": "0.4.0",
+    "solver_core_sha256": "60c67d073508d36be713148955150074ad556166d48cb8a94df330b7b1be4172"
+  },
+  "schema_version": 1,
+  "source_artifact_sha256": "00393ae1c65ef338a00afbe137df8e7e001ef851c0fdb53f3989e861bf8ea255"
+}

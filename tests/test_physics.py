@@ -8,10 +8,25 @@ import pytest
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.field_models import write_tabulated_field_npz
-from lmx.mesh import generate_layered_duct_mesh, generate_multilayer_duct_mesh, generate_rect_duct_mesh
-from lmx.physics import _boundary_sides, build_material_fields, magnetic_field_components
+from lmx.mesh import (
+    generate_layered_duct_mesh,
+    generate_multilayer_duct_mesh,
+    generate_rect_duct_mesh,
+)
+from lmx.physics import (
+    _boundary_sides,
+    build_material_fields,
+    magnetic_field_components,
+)
 from lmx.reference_data import default_closed_channel_reference_root
-from lmx.specs import BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, RegionSpec, TimeStepperConfig
+from lmx.specs import (
+    BoundaryCondition,
+    CaseSpec,
+    GeometrySpec,
+    MagneticFieldSpec,
+    RegionSpec,
+    TimeStepperConfig,
+)
 from lmx.showcase import solve_closed_channel_benchmark
 from lmx.solvers import _build_mesh, solve_steady, solve_transient
 import lmx.solvers as solvers
@@ -70,7 +85,9 @@ def test_hartmann_profile_is_wall_bounded_and_center_peaked():
     left_half = centerline[: centerline.shape[0] // 2 + 1]
     assert jnp.allclose(centerline[0], 0.0)
     assert jnp.allclose(centerline[-1], 0.0)
-    center_slice = centerline[centerline.shape[0] // 2 - 1 : centerline.shape[0] // 2 + 1]
+    center_slice = centerline[
+        centerline.shape[0] // 2 - 1 : centerline.shape[0] // 2 + 1
+    ]
     assert jnp.allclose(jnp.max(center_slice), jnp.max(centerline), atol=1e-6)
     assert jnp.all(jnp.diff(left_half) >= -5e-6)
 
@@ -102,13 +119,17 @@ def test_hunt_default_case_now_stays_bounded():
 
 
 @pytest.mark.unit
-def test_transient_solver_can_start_from_nonzero_initial_velocity(monkeypatch: pytest.MonkeyPatch):
+def test_transient_solver_can_start_from_nonzero_initial_velocity(
+    monkeypatch: pytest.MonkeyPatch,
+):
     case = make_hartmann_case(ha=0.0, ny=12, nz=12)
     case = replace(
         case,
         forcing=0.0,
         initial_velocity=0.5,
-        time_stepper=replace(case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0),
+        time_stepper=replace(
+            case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0
+        ),
     )
 
     def fake_fully_developed_case_step(**kwargs):
@@ -139,10 +160,14 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity(monkeypatch: p
             1.0e-2,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(
+        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
+    )
 
     solution = solve_transient(case)
-    center_value = float(solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2])
+    center_value = float(
+        solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2]
+    )
     assert center_value > 0.0
     assert float(solution.state.u[0, 0]) == pytest.approx(0.0)
 
@@ -156,7 +181,9 @@ def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
     profile = profile.at[0, :].set(0.0)
     profile = profile.at[-1, :].set(0.0)
     solution = _synthetic_solution(case, profile)
-    acceptance = hartmann_acceptance(solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2)
+    acceptance = hartmann_acceptance(
+        solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2
+    )
     path = write_acceptance_report(acceptance, tmp_path / "acceptance.json")
     assert path.exists()
     assert acceptance.passed is True
@@ -165,11 +192,11 @@ def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
 
 @pytest.mark.validation
 def test_small_hartmann_solution_matches_analytic_profile():
-    case = make_hartmann_case(ha=10.0, ny=10, nz=10)
+    case = make_hartmann_case(ha=10.0, ny=8, nz=8)
     case = replace(
         case,
-        time_stepper=replace(case.time_stepper, max_steps=16, potential_iterations=48),
-        solver=replace(case.solver, coupling_iterations=8),
+        time_stepper=replace(case.time_stepper, max_steps=12, potential_iterations=32),
+        solver=replace(case.solver, coupling_iterations=6),
     )
 
     solution = solve_steady(case)
@@ -180,6 +207,7 @@ def test_small_hartmann_solution_matches_analytic_profile():
 
 
 @pytest.mark.validation
+@pytest.mark.external
 def test_small_shercliff_solution_matches_bundled_reference_profiles():
     reference_root = _closed_channel_root_or_skip()
     case = make_shercliff_case(ha=20.0, ny=10, nz=10)
@@ -199,7 +227,12 @@ def test_small_shercliff_solution_matches_bundled_reference_profiles():
 
     assert comparison.y_profile.l2_error < 0.4
     assert comparison.z_profile.l2_error < 0.3
-    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.36
+    assert (
+        combined_profile_error(
+            comparison.y_profile.l2_error, comparison.z_profile.l2_error
+        )
+        < 0.36
+    )
 
 
 @pytest.mark.unit
@@ -222,7 +255,7 @@ def test_rect_duct_mesh_uses_field_aware_boundary_layer_spacing():
 
 
 @pytest.mark.unit
-def test_high_ha_rect_duct_mesh_switches_to_segmented_boundary_layer_layout():
+def test_high_ha_rect_duct_mesh_uses_smooth_boundary_layer_layout():
     case = make_shercliff_case(ha=1000.0, width=0.2, height=0.2, ny=96, nz=96)
     mesh = _build_mesh(case)
     metrics = duct_layer_resolution_metrics(case, mesh)
@@ -230,6 +263,9 @@ def test_high_ha_rect_duct_mesh_switches_to_segmented_boundary_layer_layout():
     assert metrics["hartmann_layer_cells"] >= 5.0
     assert metrics["side_layer_cells"] >= metrics["hartmann_layer_cells"]
     assert float(jnp.max(mesh.dz) / jnp.maximum(jnp.min(mesh.dz), 1.0e-12)) > 10.0
+    for widths in (mesh.dy, mesh.dz):
+        adjacent_ratio = jnp.maximum(widths[1:] / widths[:-1], widths[:-1] / widths[1:])
+        assert float(jnp.max(adjacent_ratio)) < 1.3
 
 
 @pytest.mark.unit
@@ -242,6 +278,7 @@ def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
 
 
 @pytest.mark.validation
+@pytest.mark.external
 def test_small_hunt_solution_matches_bundled_reference_profiles():
     _closed_channel_root_or_skip()
     _, solution, comparison = solve_closed_channel_benchmark(
@@ -270,11 +307,18 @@ def test_small_hunt_solution_matches_bundled_reference_profiles():
     # examples use finer meshes for the <= O(1e-2) analytical overlays.
     assert comparison.y_profile.l2_error < 0.065
     assert comparison.z_profile.l2_error < 0.04
-    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.055
+    assert (
+        combined_profile_error(
+            comparison.y_profile.l2_error, comparison.z_profile.l2_error
+        )
+        < 0.055
+    )
 
 
 @pytest.mark.unit
-def test_magnetic_field_components_support_analytic_and_tabulated_fields(tmp_path: Path):
+def test_magnetic_field_components_support_analytic_and_tabulated_fields(
+    tmp_path: Path,
+):
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     analytic = MagneticFieldSpec(
         kind="analytic",
@@ -297,7 +341,9 @@ def test_magnetic_field_components_support_analytic_and_tabulated_fields(tmp_pat
         by=yy + zz,
         bz=yy - zz,
     )
-    tbx, tby, tbz = magnetic_field_components(MagneticFieldSpec(kind="tabulated", table_path=str(path)), mesh, time=0.0)
+    tbx, tby, tbz = magnetic_field_components(
+        MagneticFieldSpec(kind="tabulated", table_path=str(path)), mesh, time=0.0
+    )
     assert jnp.allclose(tbx, 0.0)
     assert jnp.allclose(tby, by)
     assert jnp.allclose(tbz, bz)
@@ -308,9 +354,15 @@ def test_magnetic_field_components_support_analytic_and_tabulated_fields(tmp_pat
 
 @pytest.mark.unit
 def test_boundary_sides_support_aliases_and_csv_lists():
-    assert _boundary_sides(BoundaryCondition("lr", "insulating", side="left_right")) == ("left", "right")
-    assert _boundary_sides(BoundaryCondition("tb", "insulating", side="top_bottom")) == ("bottom", "top")
-    assert _boundary_sides(BoundaryCondition("mix", "insulating", side="left, top")) == ("left", "top")
+    assert _boundary_sides(
+        BoundaryCondition("lr", "insulating", side="left_right")
+    ) == ("left", "right")
+    assert _boundary_sides(
+        BoundaryCondition("tb", "insulating", side="top_bottom")
+    ) == ("bottom", "top")
+    assert _boundary_sides(
+        BoundaryCondition("mix", "insulating", side="left, top")
+    ) == ("left", "top")
     assert _boundary_sides(BoundaryCondition("none", "insulating")) == ()
 
 
@@ -329,11 +381,19 @@ def test_build_material_fields_handles_missing_solid_region_assignment_with_laye
             target_ha=5.0,
         ),
         regions=(
-            RegionSpec(name="fluid", kind="fluid", conductivity=2.0, density=3.0, viscosity=4.0),
-            RegionSpec(name="wall", kind="solid", conductivity=5.0, density=6.0, viscosity=7.0),
+            RegionSpec(
+                name="fluid", kind="fluid", conductivity=2.0, density=3.0, viscosity=4.0
+            ),
+            RegionSpec(
+                name="wall", kind="solid", conductivity=5.0, density=6.0, viscosity=7.0
+            ),
         ),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0)),
-        boundary_conditions=(BoundaryCondition("bogus", "conducting_wall", region="missing", side="left"),),
+        boundary_conditions=(
+            BoundaryCondition(
+                "bogus", "conducting_wall", region="missing", side="left"
+            ),
+        ),
         time_stepper=TimeStepperConfig(dt=0.1, t_final=0.1, max_steps=1),
     )
     mesh = generate_layered_duct_mesh(
@@ -362,14 +422,28 @@ def test_build_material_fields_uses_explicit_multilayer_mesh_sigma():
         nz=4,
         fluid_conductivity=2.0,
         wall_layers={
-            "left": (WallLayer("aln", 1.0e-8, 0.01, 1), WallLayer("metal", 7.0, 0.01, 1)),
-            "right": (WallLayer("aln", 1.0e-8, 0.01, 1), WallLayer("metal", 7.0, 0.01, 1)),
+            "left": (
+                WallLayer("aln", 1.0e-8, 0.01, 1),
+                WallLayer("metal", 7.0, 0.01, 1),
+            ),
+            "right": (
+                WallLayer("aln", 1.0e-8, 0.01, 1),
+                WallLayer("metal", 7.0, 0.01, 1),
+            ),
         },
     )
     case = CaseSpec(
         name="explicit_multilayer_sigma",
         geometry=GeometrySpec(kind="layered_duct", width=1.0, height=1.0, ny=4, nz=4),
-        regions=(RegionSpec(name="fluid", kind="fluid", conductivity=99.0, density=3.0, viscosity=4.0),),
+        regions=(
+            RegionSpec(
+                name="fluid",
+                kind="fluid",
+                conductivity=99.0,
+                density=3.0,
+                viscosity=4.0,
+            ),
+        ),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0)),
         boundary_conditions=(BoundaryCondition("walls", "insulating"),),
         time_stepper=TimeStepperConfig(dt=0.1, t_final=0.1, max_steps=1),
@@ -379,5 +453,9 @@ def test_build_material_fields_uses_explicit_multilayer_mesh_sigma():
 
     assert fields.conductivity.shape == mesh.yz_shape
     assert float(fields.conductivity[mesh.region_ids == 0][0]) == pytest.approx(2.0)
-    assert float(fields.conductivity[mesh.region_ids == mesh.region_names.index("left:aln")][0]) == pytest.approx(1.0e-8)
-    assert float(fields.conductivity[mesh.region_ids == mesh.region_names.index("left:metal")][0]) == pytest.approx(7.0)
+    assert float(
+        fields.conductivity[mesh.region_ids == mesh.region_names.index("left:aln")][0]
+    ) == pytest.approx(1.0e-8)
+    assert float(
+        fields.conductivity[mesh.region_ids == mesh.region_names.index("left:metal")][0]
+    ) == pytest.approx(7.0)

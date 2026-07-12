@@ -116,7 +116,7 @@ XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THR
 Single GPU:
 
 ```bash
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx cases/ducts/hunt_case.toml
 ```
 
 Those commands select the execution device for the normal CLI solver run. The
@@ -126,20 +126,20 @@ multiple CPU or GPU devices. For remote GPU runs on the `office` host, the same
 pattern works over SSH:
 
 ```bash
-ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/hunt_case.toml'
+ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx cases/ducts/hunt_case.toml'
 ```
 
 ## Current artifact
 
 The current scaling artifact is stored under
-`docs/_static/generated/strong_scaling.png` and is generated from:
+`https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/strong_scaling.png` and is generated from:
 
 - a local CPU sweep on a fixed `8192 x 64 x 64` extruded operator with `256`
   iterations
 - a remote GPU sweep on a fixed `6144 x 96 x 96` extruded operator with `4096`
   iterations
 
-![LMX strong scaling](_static/generated/strong_scaling.png)
+![LMX strong scaling](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/strong_scaling.png)
 
 The figure shows warm runtime only. First-run compile / JIT
 overhead is still stored in the JSON summary, but it is no longer plotted in
@@ -185,6 +185,24 @@ That solver-faithful entry point is now available as
 `--benchmark-kind extruded_solve`. Until the production projection loop has
 explicit multi-device domain decomposition, treat `extruded_solve` device-count
 sweeps as backend/runtime diagnostics rather than final strong-scaling claims.
+
+The `auto` path resolves to released SOLVAX 0.5.1 PCG. Reproduce its
+native/SOLVAX forward, implicit-gradient, independent-transpose, compile,
+warm-time, and compiler-memory comparison on CPU with:
+
+```bash
+JAX_ENABLE_X64=true uv run --locked --extra dev \
+  python scripts/benchmark_solvax_pcg_backend.py --expected-backend cpu
+```
+
+The tracked CPU and RTX A4000 x64 records are
+`benchmarks/results/solvax-pcg-equivalence-cpu.json` and
+`benchmarks/results/solvax-pcg-equivalence-gpu.json`. Both pass. On the recorded
+GPU, SOLVAX has field relative difference `1.54e-12`, implicit-gradient error
+`1.13e-16`, transpose residual `2.54e-13`, warm-time ratio `0.230`, and
+temporary-memory ratio `1.000` relative to native CG. The four-level Ha=20
+FreeMHD ladder and all eight high-Ha Table I rows pass at the same promoted
+solver-core fingerprint in `benchmarks/results/solvax-pcg-acceptance.json`.
 
 ## Recent compatibility and platform validation
 

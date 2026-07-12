@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import jax
 import jax.numpy as jnp
 import pytest
 
@@ -19,10 +20,14 @@ def _poisson_coefficients():
     return diagonal, west, east, south, north, rhs
 
 
-def test_solve_poisson_lineax_falls_back_without_lineax(monkeypatch: pytest.MonkeyPatch):
+def test_solve_poisson_lineax_falls_back_without_lineax(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(linear, "lx", None)
     diagonal, west, east, south, north, rhs = _poisson_coefficients()
-    solution, info = linear.solve_poisson_lineax(diagonal, west, east, south, north, rhs, anchor=(0, 0))
+    solution, info = linear.solve_poisson_lineax(
+        diagonal, west, east, south, north, rhs, anchor=(0, 0)
+    )
 
     assert solution.shape == (2, 2)
     assert info.backend == "jax-jacobi"
@@ -55,7 +60,9 @@ def test_solve_poisson_lineax_uses_lineax_backend(monkeypatch: pytest.MonkeyPatc
     )
     monkeypatch.setattr(linear, "lx", fake_lx)
 
-    solution, info = linear.solve_poisson_lineax(diagonal, west, east, south, north, rhs, anchor=(0, 0))
+    solution, info = linear.solve_poisson_lineax(
+        diagonal, west, east, south, north, rhs, anchor=(0, 0)
+    )
 
     assert solution.shape == (2, 2)
     assert info.backend == "lineax-cg"
@@ -182,7 +189,116 @@ def test_solve_five_point_cg_state_stays_finite_when_denominator_breaks_down():
     assert int(iterations) <= 1
 
 
-def test_solve_five_point_lineax_falls_back_without_lineax(monkeypatch: pytest.MonkeyPatch):
+def test_solve_five_point_cg_state_is_invariant_to_small_system_scaling():
+    scale = 1.0e-20
+    diagonal = scale * jnp.full((3, 3), 6.0)
+    west = scale * jnp.ones((3, 3))
+    east = scale * jnp.ones((3, 3))
+    south = scale * jnp.ones((3, 3))
+    north = scale * jnp.ones((3, 3))
+    known = jnp.arange(1.0, 10.0).reshape(3, 3)
+    rhs = linear.apply_five_point_operator(diagonal, west, east, south, north, known)
+
+    field, residual, iterations = linear.solve_five_point_cg_state(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        iterations=30,
+        tolerance=1.0e-20,
+        preconditioner="jacobi",
+    )
+
+    assert int(iterations) > 0
+    assert float(residual) <= 1.0e-20
+    assert jnp.linalg.norm(field - known) / jnp.linalg.norm(known) <= 1.0e-10
+
+
+def test_solvax_pcg_matches_native_five_point_solution_and_reports_backend():
+    scale = 1.0e-8
+    diagonal = scale * jnp.full((3, 3), 6.0)
+    west = scale * jnp.ones((3, 3))
+    east = scale * jnp.ones((3, 3))
+    south = scale * jnp.ones((3, 3))
+    north = scale * jnp.ones((3, 3))
+    known = jnp.arange(1.0, 10.0).reshape(3, 3)
+    rhs = linear.apply_five_point_operator(diagonal, west, east, south, north, known)
+    tolerance = max(1.0e-11, 100.0 * jnp.finfo(rhs.dtype).eps)
+
+    native, native_info = linear.solve_five_point_system(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        linear_solver="cg",
+        tolerance=tolerance,
+        max_steps=40,
+    )
+    solvax, solvax_info = linear.solve_five_point_system(
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
+        linear_solver="solvax_pcg",
+        tolerance=tolerance,
+        max_steps=40,
+    )
+
+    assert native_info.backend == "jax-cg"
+    assert solvax_info.backend == "solvax-pcg"
+    assert native_info.residual <= tolerance
+    assert solvax_info.residual <= tolerance
+    assert jnp.allclose(solvax, native, rtol=tolerance, atol=tolerance)
+    assert jnp.allclose(solvax, known, rtol=tolerance, atol=tolerance)
+
+
+def test_solvax_pcg_five_point_gradient_is_implicit_and_matches_exact_solution():
+    diagonal = jnp.full((2, 2), 4.0)
+    zeros = jnp.zeros((2, 2))
+    rhs_base = jnp.arange(1.0, 5.0).reshape(2, 2)
+    exact_base = rhs_base / diagonal
+
+    def objective(scale):
+        field, _, _ = linear.solve_five_point_solvax_pcg_state(
+            diagonal,
+            zeros,
+            zeros,
+            zeros,
+            zeros,
+            scale * rhs_base,
+            iterations=8,
+            tolerance=1.0e-12,
+            preconditioner="jacobi",
+        )
+        return jnp.sum(field**2)
+
+    scale = 1.3
+    expected = 2.0 * scale * jnp.sum(exact_base**2)
+    assert jnp.allclose(jax.grad(objective)(scale), expected, rtol=1.0e-10)
+
+
+def test_solvax_pcg_backend_requires_optional_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(linear, "_solvax_pcg_linear_solve", None)
+    coefficients = _five_point_coefficients()
+    with pytest.raises(ImportError, match="solvax>=0.5"):
+        linear.solve_five_point_solvax_pcg_state.__wrapped__(
+            *coefficients,
+            iterations=4,
+            tolerance=1.0e-8,
+        )
+
+
+def test_solve_five_point_lineax_falls_back_without_lineax(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(linear, "lx", None)
     diagonal, west, east, south, north, rhs = _five_point_coefficients()
 
@@ -203,7 +319,9 @@ def test_solve_five_point_lineax_falls_back_without_lineax(monkeypatch: pytest.M
     assert info.iterations <= 6
 
 
-def test_solve_five_point_lineax_supports_gmres_and_bicgstab_and_rejects_unknown(monkeypatch: pytest.MonkeyPatch):
+def test_solve_five_point_lineax_supports_gmres_and_bicgstab_and_rejects_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+):
     diagonal, west, east, south, north, rhs = _five_point_coefficients()
     created = []
 
@@ -219,7 +337,9 @@ def test_solve_five_point_lineax_supports_gmres_and_bicgstab_and_rejects_unknown
     def fake_linear_solve(op, rhs_vec, solver=None):
         created.append(type(solver).__name__)
         op.mv(jnp.ones_like(rhs_vec))
-        return SimpleNamespace(value=jnp.zeros_like(rhs_vec), stats={"num_steps": "fallback"})
+        return SimpleNamespace(
+            value=jnp.zeros_like(rhs_vec), stats={"num_steps": "fallback"}
+        )
 
     fake_lx = SimpleNamespace(
         FunctionLinearOperator=FakeLinearOperator,
@@ -244,10 +364,14 @@ def test_solve_five_point_lineax_supports_gmres_and_bicgstab_and_rejects_unknown
     assert created == ["FakeSolver", "FakeSolver"]
 
     with pytest.raises(ValueError, match="Unsupported lineax solver"):
-        linear.solve_five_point_lineax(diagonal, west, east, south, north, rhs, linear_solver="bad")
+        linear.solve_five_point_lineax(
+            diagonal, west, east, south, north, rhs, linear_solver="bad"
+        )
 
 
-def test_solve_five_point_system_supports_auto_gmres_and_rejects_unknown(monkeypatch: pytest.MonkeyPatch):
+def test_solve_five_point_system_supports_auto_gmres_and_rejects_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+):
     diagonal, west, east, south, north, rhs = _five_point_coefficients()
 
     field, info = linear.solve_five_point_system(
@@ -261,12 +385,15 @@ def test_solve_five_point_system_supports_auto_gmres_and_rejects_unknown(monkeyp
         max_steps=4,
     )
     assert field.shape == rhs.shape
-    assert info.backend == "jax-cg"
+    assert info.backend == "solvax-pcg"
 
     monkeypatch.setattr(
         linear,
         "solve_five_point_lineax",
-        lambda *args, **kwargs: (jnp.zeros_like(rhs), linear.LinearSolveInfo("lineax-gmres", 3, 1e-6)),
+        lambda *args, **kwargs: (
+            jnp.zeros_like(rhs),
+            linear.LinearSolveInfo("lineax-gmres", 3, 1e-6),
+        ),
     )
     _, gmres_info = linear.solve_five_point_system(
         diagonal,
@@ -280,4 +407,6 @@ def test_solve_five_point_system_supports_auto_gmres_and_rejects_unknown(monkeyp
     assert gmres_info.backend == "lineax-gmres"
 
     with pytest.raises(ValueError, match="Unsupported linear solver"):
-        linear.solve_five_point_system(diagonal, west, east, south, north, rhs, linear_solver="bad")
+        linear.solve_five_point_system(
+            diagonal, west, east, south, north, rhs, linear_solver="bad"
+        )

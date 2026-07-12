@@ -9,7 +9,9 @@ from scripts import run_manual_solver_family_validation as manual_validation
 pytestmark = pytest.mark.unit
 
 
-def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_main_writes_manual_solver_family_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(
         manual_validation,
         "solve_steady",
@@ -20,7 +22,11 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
         "validation_summary",
         lambda solution, case_name, ha=None: {"case": case_name, "u_max": 1.0},
     )
-    monkeypatch.setattr(manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {"hartmann_layer_cells": 3.0})
+    monkeypatch.setattr(
+        manual_validation,
+        "duct_layer_resolution_metrics",
+        lambda case, mesh: {"hartmann_layer_cells": 3.0},
+    )
     monkeypatch.setattr(
         manual_validation,
         "hartmann_acceptance",
@@ -99,7 +105,9 @@ def test_main_writes_manual_solver_family_summary(tmp_path: Path, monkeypatch: p
     assert payload["fringing_rect_duct_ha10"]["validation_pass"] == pytest.approx(1.0)
 
 
-def test_main_can_fail_on_conservation_threshold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_main_can_fail_on_conservation_threshold(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(
         manual_validation,
         "solve_steady",
@@ -115,7 +123,9 @@ def test_main_can_fail_on_conservation_threshold(tmp_path: Path, monkeypatch: py
             "interface_current_residual": 1.0e-2,
         },
     )
-    monkeypatch.setattr(manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {})
+    monkeypatch.setattr(
+        manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {}
+    )
     monkeypatch.setattr(
         manual_validation,
         "hartmann_acceptance",
@@ -146,7 +156,9 @@ def test_main_can_fail_on_conservation_threshold(tmp_path: Path, monkeypatch: py
     assert exit_code == 1
 
 
-def test_main_writes_multi_resolution_csv_and_plot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_main_writes_multi_resolution_csv_and_plot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(
         manual_validation,
         "solve_steady",
@@ -162,7 +174,9 @@ def test_main_writes_multi_resolution_csv_and_plot(tmp_path: Path, monkeypatch: 
             "interface_current_residual": 1.0e-7,
         },
     )
-    monkeypatch.setattr(manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {})
+    monkeypatch.setattr(
+        manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {}
+    )
     monkeypatch.setattr(
         manual_validation,
         "hartmann_acceptance",
@@ -223,7 +237,9 @@ def test_main_writes_multi_resolution_csv_and_plot(tmp_path: Path, monkeypatch: 
     assert output.with_name("manual_summary_multi_fringing.png").exists()
 
 
-def test_main_can_fail_on_fringing_physics_thresholds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_main_can_fail_on_fringing_physics_thresholds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(
         manual_validation,
         "solve_steady",
@@ -239,7 +255,9 @@ def test_main_can_fail_on_fringing_physics_thresholds(tmp_path: Path, monkeypatc
             "interface_current_residual": 1.0e-7,
         },
     )
-    monkeypatch.setattr(manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {})
+    monkeypatch.setattr(
+        manual_validation, "duct_layer_resolution_metrics", lambda case, mesh: {}
+    )
     monkeypatch.setattr(
         manual_validation,
         "hartmann_acceptance",

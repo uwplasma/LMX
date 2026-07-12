@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .coverage
 coverage.json
+coverage.xml
 htmlcov/
 out/
 out_*/

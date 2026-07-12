@@ -46,6 +46,12 @@ preconditioner = "block_jacobi"
 time_scheme = "implicit_euler"
 coupling_iterations = 9
 coupling_tolerance = 1.0e-7
+coupling_acceleration = "aitken"
+coupling_min_relaxation = 0.1
+coupling_max_relaxation = 12.0
+coupling_history_depth = 5
+coupling_regularization = 1.0e-9
+coupling_damping = 0.8
 
 [time_stepper]
 dt = 0.001
@@ -129,6 +135,12 @@ side = "max"
     assert config.case.solver.linear_solver == "gmres"
     assert config.case.solver.preconditioner == "block_jacobi"
     assert config.case.solver.coupling_iterations == 9
+    assert config.case.solver.coupling_acceleration == "aitken"
+    assert config.case.solver.coupling_min_relaxation == pytest.approx(0.1)
+    assert config.case.solver.coupling_max_relaxation == pytest.approx(12.0)
+    assert config.case.solver.coupling_history_depth == 5
+    assert config.case.solver.coupling_regularization == pytest.approx(1.0e-9)
+    assert config.case.solver.coupling_damping == pytest.approx(0.8)
     assert config.case.time_stepper.potential_solver == "cg"
     assert config.logging.verbosity == "debug"
     assert config.logging.step_stride == 2
@@ -239,29 +251,31 @@ kind = "no_slip"
 
 
 def test_shipped_example_toml_files_parse():
-    root = Path(__file__).resolve().parents[1] / "examples"
+    root = Path(__file__).resolve().parents[1]
 
-    for name in (
-        "hartmann_case.toml",
-        "hartmann_restart_case.toml",
-        "shercliff_case.toml",
-        "hunt_case.toml",
-        "fringing_rect_case.toml",
-        "fringing_tabulated_case.toml",
-        "fringing_layered_case.toml",
-        "fringing_layered_restart_case.toml",
-        "fringing_pipe_case.toml",
+    for relative in (
+        "examples/hartmann_case.toml",
+        "cases/ducts/hartmann_restart_case.toml",
+        "cases/ducts/shercliff_case.toml",
+        "cases/ducts/hunt_case.toml",
+        "cases/fringing/fringing_rect_case.toml",
+        "cases/fringing/fringing_tabulated_case.toml",
+        "cases/fringing/fringing_layered_case.toml",
+        "cases/fringing/fringing_layered_restart_case.toml",
+        "cases/fringing/fringing_pipe_case.toml",
     ):
-        config = load_run_config(root / name)
+        config = load_run_config(root / relative)
         assert config.case.name
         assert config.case.regions
 
 
 def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann_walls():
-    root = Path(__file__).resolve().parents[1] / "examples"
-    config = load_run_config(root / "hunt_case.toml")
+    root = Path(__file__).resolve().parents[1]
+    config = load_run_config(root / "cases/ducts/hunt_case.toml")
 
-    boundaries = {boundary.name: boundary for boundary in config.case.boundary_conditions}
+    boundaries = {
+        boundary.name: boundary for boundary in config.case.boundary_conditions
+    }
     assert boundaries["left_wall"].kind == "conducting_wall"
     assert boundaries["right_wall"].kind == "conducting_wall"
     assert boundaries["bottom_wall"].kind == "insulating"

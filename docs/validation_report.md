@@ -71,29 +71,29 @@ research-grade closed.
 The executable external-code audit now has a generated map that separates
 available solver/data paths from completed observable-level parity:
 
-![LMX executable external-code validation map](_static/generated/external_validation_readiness.png)
+![LMX executable external-code validation map](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/external_validation_readiness.png)
 
 The current target-acquisition panel records candidate observables for the
 remaining strict lanes. It is evidence for the next validation runs, not a
 replacement for matched reference CSVs:
 
-![LMX strict external validation targets](_static/generated/research_grade_external_targets.png)
+![LMX strict external validation targets](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/research_grade_external_targets.png)
 
 The closure dashboard summarizes the current reviewer-facing state: the matched
 side-wall Q2D support gate is closed, but the strict magnetic-obstacle and
 Dean-vortex comparisons still fail against the external targets and the
 nonlinear turbulent Q2D parity lane remains open.
 
-![LMX strict research-grade validation closure dashboard](_static/generated/research_grade_closure_dashboard.png)
+![LMX strict research-grade validation closure dashboard](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/research_grade_closure_dashboard.png)
 
 The final strict-lane disposition records the last-push decision without
 over-claiming. It keeps the three strict lanes deferred, names the blocking
 observable for each one, and points to the next physics required before a
 research-grade tag can be justified:
 
-![LMX final strict research-lane disposition](_static/generated/research_grade_final_disposition.png)
+![LMX final strict research-lane disposition](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/research_grade_final_disposition.png)
 
-![Q2DmhdFoam external reference adapter](_static/generated/q2dmhdfoam_external_reference.png)
+![Q2DmhdFoam external reference adapter](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2dmhdfoam_external_reference.png)
 
 The Q2DmhdFoam executable path is now reproducible through
 `docker/q2dmhdfoam`. The container builds the foam-extend 4.1 solver, runs the
@@ -110,7 +110,7 @@ dependency, and reduced to field observables. This is executable external-code
 evidence and a post-processing gate; it is not yet a matched LMX turbulence
 parity claim.
 
-![Q2DmhdFoam lid-driven VTK field ingestion](_static/generated/q2dmhdfoam_lid_driven_vtk.png)
+![Q2DmhdFoam lid-driven VTK field ingestion](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2dmhdfoam_lid_driven_vtk.png)
 
 The first matched LMX-vs-Q2DmhdFoam side-wall Q2D comparison uses an
 isothermal `run/lidDriven` rerun with `ZERO_THERMAL=1`, which zeros gravity,
@@ -123,7 +123,7 @@ passes. This closes the matched side-wall field-observable gate; the separate
 research-grade turbulent parity lane still requires a matched nonlinear
 Q2DmhdFoam/LMX case.
 
-![LMX/Q2DmhdFoam matched side-wall Q2D comparison](_static/generated/q2d_lmx_q2dmhdfoam_lid_driven_parity.png)
+![LMX/Q2DmhdFoam matched side-wall Q2D comparison](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2d_lmx_q2dmhdfoam_lid_driven_parity.png)
 
 The current LMX/Q2DmhdFoam Q2D comparison artifact overlays the LMX nonlinear
 SM82-style movie observables with the available Q2DmhdFoam lid-driven spectral
@@ -131,7 +131,7 @@ summary. It is useful for manuscript planning and parser testing, but its
 summary records `matched_parity = false` because the physical cases are not
 identical.
 
-![LMX/Q2DmhdFoam Q2D turbulence-observable comparison](_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.png)
+![LMX/Q2DmhdFoam Q2D turbulence-observable comparison](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2d_lmx_q2dmhdfoam_turbulence_comparison.png)
 
 The Q2DmhdFoam-to-LMX match audit reads the available case dictionaries before
 any output is promoted into `q2d_turbulence_reference_observables.csv`. The
@@ -140,7 +140,7 @@ evidence, but not strict nonlinear Q2D turbulence parity cases: they differ
 from the LMX SM82 movie in topology, forcing, Hartmann friction, timestep
 window, or observable contract.
 
-![Q2DmhdFoam-to-LMX nonlinear Q2D match audit](_static/generated/q2dmhdfoam_lmx_turbulence_match_audit.png)
+![Q2DmhdFoam-to-LMX nonlinear Q2D match audit](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2dmhdfoam_lmx_turbulence_match_audit.png)
 
 The latest strict closure attempt keeps the research-grade tag blocked. The
 magnetic-obstacle escalation did not retain a Votyakov-scale reverse-flow
@@ -160,7 +160,7 @@ lanes; they do not change the strict closure status until matched LMX solved
 physics is compared against the references.
 
 A third support artifact now makes the magnetic-obstacle gap quantitative
-instead of template-only. `examples/magnetic_obstacle_votyakov_strict_attempt.py`
+instead of template-only. `campaigns/magnetic_obstacle/magnetic_obstacle_votyakov_strict_attempt.py`
 filters the filled Votyakov Fig. 7(a) centerline digitization into the strict
 reference CSV and compares it against the current LMX readiness observables.
 The current reduced LMX case has positive minimum centerline velocity
@@ -171,14 +171,14 @@ external-code parity case before this lane can close.
 
 ![LMX magnetic-obstacle Votyakov strict attempt](_static/generated/magnetic_obstacle_reference_comparison.png)
 
-`examples/magnetic_obstacle_votyakov_curve_validation.py` now also renders the
+`campaigns/magnetic_obstacle/magnetic_obstacle_votyakov_curve_validation.py` now also renders the
 full digitized Votyakov curve used by that scalar gate. It extracts reverse-flow
 onset and high-interaction-parameter plateau observables and compares the
 plateau to the current LMX localized-field response. This makes the open
 physics explicit: current closure is clean, but the retained magnetic-obstacle
 case is not an inertial recirculating obstacle solve.
 
-![LMX magnetic-obstacle Votyakov curve comparison](_static/generated/magnetic_obstacle_votyakov_curve_comparison.png)
+![LMX magnetic-obstacle Votyakov curve comparison](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/magnetic_obstacle_votyakov_curve_comparison.png)
 
 The Dean-vortex lane has the same explicit-offender treatment. The current
 low-De bent-pipe solve has conservative charge closure and no spurious
@@ -191,7 +191,7 @@ curved-pipe reference, not another low-De current-closure run.
 
 ![LMX Dean-vortex Bayat-Rezai strict attempt](_static/generated/dean_vortex_reference_comparison.png)
 
-![LMX Dean-flow literature validation](_static/generated/dean_literature_validation.png)
+![LMX Dean-flow literature validation](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/dean_literature_validation.png)
 
 ## Combined validation workflow
 

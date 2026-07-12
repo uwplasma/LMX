@@ -25,11 +25,16 @@ def test_portable_path_and_inference_helpers_cover_missing_paths(tmp_path: Path)
     assert parity.infer_initial_velocity_x(tmp_path / "missing") is None
     assert parity.infer_inlet_flow_rate(tmp_path / "missing") is None
     assert parity.infer_inlet_drive_mode(tmp_path / "missing") is None
-    assert parity.infer_reduced_inlet_flow_rate(tmp_path / "missing", reduced_area=1.0) is None
+    assert (
+        parity.infer_reduced_inlet_flow_rate(tmp_path / "missing", reduced_area=1.0)
+        is None
+    )
     assert parity.infer_magnetic_ramp(tmp_path / "missing") == pytest.approx((0.0, 0.0))
 
 
-def test_extract_inlet_block_and_inference_cover_missing_and_velocity_only_cases(tmp_path: Path):
+def test_extract_inlet_block_and_inference_cover_missing_and_velocity_only_cases(
+    tmp_path: Path,
+):
     text = "boundaryField\n{\n inlet\n {\n type fixedValue;\n "
     assert parity._extract_inlet_block(text) is None
 
@@ -105,7 +110,9 @@ boundaryField
     )
     assert parity.infer_inlet_drive_mode(tmp_path) == "inlet_flow_rate"
     assert parity.infer_inlet_flow_rate(tmp_path) == pytest.approx(0.0047)
-    assert parity.infer_reduced_inlet_flow_rate(tmp_path, reduced_area=4.0, initial_velocity=0.1175) == pytest.approx(0.47)
+    assert parity.infer_reduced_inlet_flow_rate(
+        tmp_path, reduced_area=4.0, initial_velocity=0.1175
+    ) == pytest.approx(0.47)
 
 
 def test_infer_magnetic_ramp_reads_control_dict(tmp_path: Path):
@@ -147,7 +154,9 @@ def test_build_case_covers_hunt_inlet_velocity_and_flow_rate_modes():
         ramp_duration=2.0e-4,
     )
 
-    velocity_bcs = [bc for bc in velocity_case.boundary_conditions if bc.name == "inlet"]
+    velocity_bcs = [
+        bc for bc in velocity_case.boundary_conditions if bc.name == "inlet"
+    ]
     flow_bcs = [bc for bc in flow_case.boundary_conditions if bc.name == "inlet"]
     assert velocity_bcs[-1].kind == "inlet_velocity"
     assert flow_bcs[-1].kind == "inlet_flow_rate"
@@ -171,7 +180,9 @@ def test_build_case_defaults_hunt_flow_rate_from_area():
         ramp_duration=0.0,
     )
     inlet = [bc for bc in case.boundary_conditions if bc.name == "inlet"][-1]
-    assert inlet.value == pytest.approx(0.2 * case.geometry.width * case.geometry.height)
+    assert inlet.value == pytest.approx(
+        0.2 * case.geometry.width * case.geometry.height
+    )
 
 
 def test_main_writes_parity_report(
@@ -179,16 +190,20 @@ def test_main_writes_parity_report(
 ):
     run_dir = tmp_path / "run"
     (run_dir / "0" / "liquid").mkdir(parents=True)
-    (run_dir / "0" / "liquid" / "U").write_text("internalField   uniform ( 0.9725 0 0 );\n")
+    (run_dir / "0" / "liquid" / "U").write_text(
+        "internalField   uniform ( 0.9725 0 0 );\n"
+    )
 
     # Minimal structure that keeps compare_with_reference_outputs happy.
     (run_dir / "system").mkdir()
     (run_dir / "constant").mkdir()
     (run_dir / "postProcessing" / "liquid" / "minMax" / "0").mkdir(parents=True)
-    (run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
+    (
+        run_dir / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
+    (run_dir / "system" / "controlDict").write_text(
+        "application epotMultiRegionFoam;\nBtStartTime 1e-5;\nBtDuration 2e-4;\n"
     )
-    (run_dir / "system" / "controlDict").write_text("application epotMultiRegionFoam;\nBtStartTime 1e-5;\nBtDuration 2e-4;\n")
     (run_dir / "0" / "liquid" / "potE").write_text("internalField uniform 0;\n")
 
     def fake_compare(case, reference_run_dir):
@@ -248,7 +263,9 @@ boundaryField
     def fake_compare(case, reference_run_dir):
         recorded["forcing"] = case.forcing
         recorded["boundary_conditions"] = case.boundary_conditions
-        return parity.ValidationReport(case_name=case.name, metrics={"u_max_abs_diff": 0.1}, artifacts={})
+        return parity.ValidationReport(
+            case_name=case.name, metrics={"u_max_abs_diff": 0.1}, artifacts={}
+        )
 
     monkeypatch.setattr(parity, "compare_with_reference_outputs", fake_compare)
 
@@ -268,7 +285,11 @@ boundaryField
 
     assert exit_code == 0
     assert recorded["forcing"] == pytest.approx(0.0)
-    flow_boundaries = [boundary for boundary in recorded["boundary_conditions"] if boundary.kind == "inlet_flow_rate"]
+    flow_boundaries = [
+        boundary
+        for boundary in recorded["boundary_conditions"]
+        if boundary.kind == "inlet_flow_rate"
+    ]
     assert flow_boundaries
     assert flow_boundaries[0].value == pytest.approx(0.47)
     stdout = capsys.readouterr().out

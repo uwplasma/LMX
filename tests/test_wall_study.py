@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import lmx.wall_study as wall_study
-from lmx import (
+from lmx.wall_study import (
     DEFAULT_LI_ALN_CASE,
     DEFAULT_SUBSTRATE_CONDUCTIVITIES,
     build_li_aln_multilayer_solve_case,
@@ -34,7 +34,8 @@ def test_li_aln_unit_audit_uses_kinematic_viscosity_and_inductionless_check():
 
     assert audit["viscosity_convention"] == "kinematic_nu_m2_per_s"
     assert audit["kinematic_viscosity_m2_s"] == pytest.approx(
-        DEFAULT_LI_ALN_CASE.lithium.dynamic_viscosity / DEFAULT_LI_ALN_CASE.lithium.density
+        DEFAULT_LI_ALN_CASE.lithium.dynamic_viscosity
+        / DEFAULT_LI_ALN_CASE.lithium.density
     )
     assert audit["hartmann_number"] > 0.0
     assert audit["reynolds_number"] > 0.0
@@ -57,7 +58,10 @@ def test_li_aln_phase0_2_summary_tracks_pinhole_limits_and_scope():
     assert summary["wall_stack"]["mesh_resolution"]["resolution_pass"] is True
     assert ideal["current_closure_proxy"] == pytest.approx(0.0)
     assert bare["current_closure_proxy"] > 0.0
-    assert summary["thresholds"]["max_effective_conductance_ratio_for_10pct_deviation"] is not None
+    assert (
+        summary["thresholds"]["max_effective_conductance_ratio_for_10pct_deviation"]
+        is not None
+    )
 
 
 def test_li_aln_wall_layers_support_degraded_aln_conductivity():
@@ -97,13 +101,19 @@ def test_li_aln_phase3_6_summary_reports_operating_and_degradation_thresholds():
     ten_moly = next(row for row in thresholds if row["substrate"] == "molybdenum")
 
     assert summary["material_compatibility_claim"] is False
-    assert summary["phase_status"]["phase_5_degradation_thresholds"] == "complete_for_reduced_tangential_and_normal_thresholds"
+    assert (
+        summary["phase_status"]["phase_5_degradation_thresholds"]
+        == "complete_for_reduced_tangential_and_normal_thresholds"
+    )
     assert len(summary["operating_rows"]) == 4
     assert ten_316l["critical_effective_conductance_ratio"] == pytest.approx(1.0 / 9.0)
     assert ten_316l["minimum_aln_thickness_for_normal_leakage_m"] > 0.0
     assert ten_316l["maximum_aln_thickness_for_tangential_conductance_m"] > 0.0
     assert ten_moly["maximum_pinhole_fraction"] < ten_316l["maximum_pinhole_fraction"]
-    assert DEFAULT_SUBSTRATE_CONDUCTIVITIES["molybdenum"] > DEFAULT_SUBSTRATE_CONDUCTIVITIES["316L"]
+    assert (
+        DEFAULT_SUBSTRATE_CONDUCTIVITIES["molybdenum"]
+        > DEFAULT_SUBSTRATE_CONDUCTIVITIES["316L"]
+    )
 
 
 def test_write_li_aln_phase3_6_artifacts(tmp_path: Path):
@@ -115,7 +125,13 @@ def test_write_li_aln_phase3_6_artifacts(tmp_path: Path):
         pinhole_fractions=(0.0, 1.0e-4),
     )
 
-    assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".csv", ".png"]
+    assert [path.suffix for path in outputs] == [
+        ".json",
+        ".csv",
+        ".csv",
+        ".csv",
+        ".png",
+    ]
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
 
 
@@ -129,18 +145,27 @@ def test_li_aln_multilayer_mesh_summary_tracks_interfaces_and_regions():
     assert summary["qa"]["interface_faces_aligned"] is True
     assert summary["qa"]["ready_for_conservative_current_diagnostics"] is True
     assert len(rows) == 8
-    assert any(row["inner_region"] == "fluid" and row["outer_region"] == "aln" for row in rows)
-    assert any(row["inner_region"] == "aln" and row["outer_region"] == "316L" for row in rows)
+    assert any(
+        row["inner_region"] == "fluid" and row["outer_region"] == "aln" for row in rows
+    )
+    assert any(
+        row["inner_region"] == "aln" and row["outer_region"] == "316L" for row in rows
+    )
     assert any(row["name"] == "left:aln" for row in regions)
     assert any(row["name"] == "right:316L" for row in regions)
 
 
 def test_li_aln_wall_stacks_by_side_supports_degraded_aln():
-    stacks = li_aln_wall_stacks_by_side(DEFAULT_LI_ALN_CASE, aln_conductivity=DEFAULT_LI_ALN_CASE.degraded_aln_conductivity)
+    stacks = li_aln_wall_stacks_by_side(
+        DEFAULT_LI_ALN_CASE,
+        aln_conductivity=DEFAULT_LI_ALN_CASE.degraded_aln_conductivity,
+    )
 
     assert sorted(stacks) == ["bottom", "left", "right", "top"]
     assert stacks["left"][0].name == "aln"
-    assert stacks["left"][0].conductivity == pytest.approx(DEFAULT_LI_ALN_CASE.degraded_aln_conductivity)
+    assert stacks["left"][0].conductivity == pytest.approx(
+        DEFAULT_LI_ALN_CASE.degraded_aln_conductivity
+    )
     assert stacks["left"][1].name == DEFAULT_LI_ALN_CASE.metal_name
 
 
@@ -165,15 +190,23 @@ def test_li_aln_multilayer_solve_case_uses_explicit_sigma_and_flow_rate():
 
 
 def test_li_aln_multilayer_wall_model_stacks_rank_conductive_limit():
-    intact = li_aln_multilayer_wall_model_stacks(DEFAULT_LI_ALN_CASE, wall_model="intact_aln")
-    bare = li_aln_multilayer_wall_model_stacks(DEFAULT_LI_ALN_CASE, wall_model="bare_metal")
+    intact = li_aln_multilayer_wall_model_stacks(
+        DEFAULT_LI_ALN_CASE, wall_model="intact_aln"
+    )
+    bare = li_aln_multilayer_wall_model_stacks(
+        DEFAULT_LI_ALN_CASE, wall_model="bare_metal"
+    )
 
     assert intact["left"][0].name == "aln"
     assert len(bare["left"]) == 1
-    assert bare["left"][0].conductivity == pytest.approx(DEFAULT_LI_ALN_CASE.metal_conductivity)
+    assert bare["left"][0].conductivity == pytest.approx(
+        DEFAULT_LI_ALN_CASE.metal_conductivity
+    )
 
 
-def test_li_aln_multilayer_solve_summary_tracks_conservation(monkeypatch: pytest.MonkeyPatch):
+def test_li_aln_multilayer_solve_summary_tracks_conservation(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(wall_study, "solve_steady", _fake_multilayer_solution)
 
     summary = li_aln_multilayer_solve_summary(
@@ -190,12 +223,18 @@ def test_li_aln_multilayer_solve_summary_tracks_conservation(monkeypatch: pytest
     assert summary["external_code_parity_claim"] is False
     assert summary["qa"]["charge_balance_pass"] is True
     assert len(summary["observable_rows"]) == 2
-    bare = next(row for row in summary["observable_rows"] if row["wall_model"] == "bare_metal")
-    intact = next(row for row in summary["observable_rows"] if row["wall_model"] == "intact_aln")
+    bare = next(
+        row for row in summary["observable_rows"] if row["wall_model"] == "bare_metal"
+    )
+    intact = next(
+        row for row in summary["observable_rows"] if row["wall_model"] == "intact_aln"
+    )
     assert bare["tangential_conductance_ratio"] > intact["tangential_conductance_ratio"]
 
 
-def test_write_li_aln_multilayer_solve_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_write_li_aln_multilayer_solve_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(wall_study, "solve_steady", _fake_multilayer_solution)
 
     outputs = write_li_aln_multilayer_solve_artifacts(
@@ -212,8 +251,12 @@ def test_write_li_aln_multilayer_solve_artifacts(tmp_path: Path, monkeypatch: py
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
 
 
-def test_li_aln_multilayer_convergence_summary_tracks_last_step_changes(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(wall_study, "li_aln_multilayer_solve_summary", _fake_convergence_solve_summary)
+def test_li_aln_multilayer_convergence_summary_tracks_last_step_changes(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        wall_study, "li_aln_multilayer_solve_summary", _fake_convergence_solve_summary
+    )
 
     summary = li_aln_multilayer_convergence_summary(
         DEFAULT_LI_ALN_CASE,
@@ -228,8 +271,12 @@ def test_li_aln_multilayer_convergence_summary_tracks_last_step_changes(monkeypa
     assert len(summary["model_rows"]) == 2
 
 
-def test_write_li_aln_multilayer_convergence_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(wall_study, "li_aln_multilayer_solve_summary", _fake_convergence_solve_summary)
+def test_write_li_aln_multilayer_convergence_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        wall_study, "li_aln_multilayer_solve_summary", _fake_convergence_solve_summary
+    )
 
     outputs = write_li_aln_multilayer_convergence_artifacts(
         tmp_path,
@@ -248,7 +295,9 @@ def _fake_multilayer_solution(case, *, mesh):
     diagnostics = SimpleNamespace(
         pressure_proxy_history=np.asarray([1.0]),
         current_scaled_pressure_proxy_history=np.asarray([1.0]),
-        volumetric_flow_rate_history=np.asarray([float(case.boundary_conditions[-1].value)]),
+        volumetric_flow_rate_history=np.asarray(
+            [float(case.boundary_conditions[-1].value)]
+        ),
         mean_current_magnitude_history=np.asarray([1.0e-3]),
         current_max_history=np.asarray([2.0e-3]),
         face_current_max_history=np.asarray([2.5e-3]),
@@ -268,7 +317,9 @@ def _fake_multilayer_solution(case, *, mesh):
         time=float(case.time_stepper.t_final),
         residual=0.0,
     )
-    return SimpleNamespace(state=state, diagnostics=diagnostics, mesh=mesh, case_name=case.name)
+    return SimpleNamespace(
+        state=state, diagnostics=diagnostics, mesh=mesh, case_name=case.name
+    )
 
 
 def _fake_convergence_solve_summary(case, *, wall_models, ny, nz, **kwargs):
@@ -293,5 +344,11 @@ def _fake_convergence_solve_summary(case, *, wall_models, ny, nz, **kwargs):
 def test_write_li_aln_multilayer_mesh_artifacts(tmp_path: Path):
     outputs = write_li_aln_multilayer_mesh_artifacts(tmp_path, ny=10, nz=10)
 
-    assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".csv", ".png"]
+    assert [path.suffix for path in outputs] == [
+        ".json",
+        ".csv",
+        ".csv",
+        ".csv",
+        ".png",
+    ]
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)

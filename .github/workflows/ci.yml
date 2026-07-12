@@ -10,19 +10,23 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    name: portable full (Python ${{ matrix.python-version }})
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/setup-lmx
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - name: Verify provenance and dependency lock
+        run: python scripts/manage_provenance.py --check
 
-      - name: Run pytest suite
+      - name: Run complete test and branch-coverage gate
         env:
           MPLBACKEND: Agg
           XLA_PYTHON_CLIENT_PREALLOCATE: "false"
@@ -31,19 +35,17 @@ jobs:
           OPENBLAS_NUM_THREADS: "1"
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python -m pytest -m unit \
-            tests/test_cases.py \
-            tests/test_config.py \
-            tests/test_units_and_wall_models.py \
-            tests/test_physics.py \
-            tests/test_mesh.py \
-            tests/test_linear.py \
-            tests/test_q2d.py \
-            tests/test_wall_study.py \
-            tests/test_release_readiness.py \
-            tests/test_package_api.py \
-            tests/test_reference_data.py
+        run: python scripts/run_full_test_suite.py --budget-seconds 600
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-gate-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            artifacts/tests/full-suite-junit.xml
+          if-no-files-found: ignore
 
       - name: Run bounded release-readiness check
         env:
@@ -69,14 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded solver validation artifacts
         env:
@@ -105,14 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Verify external-reference parity contract
         env:
@@ -145,14 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded mesh-convergence artifacts
         env:
@@ -181,14 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded time-convergence artifacts
         env:
@@ -219,14 +193,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded Q2D validation artifacts
         env:
@@ -238,10 +205,10 @@ jobs:
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
         run: |
-          python examples/q2d_decay_validation.py
-          python examples/q2d_forced_validation.py
-          python examples/q2d_wall_bounded_validation.py
-          python examples/q2d_turbulence_decay_demo.py
+          python campaigns/q2d/q2d_decay_validation.py
+          python campaigns/q2d/q2d_forced_validation.py
+          python campaigns/q2d/q2d_wall_bounded_validation.py
+          python campaigns/q2d/q2d_turbulence_decay_demo.py
           mkdir -p artifacts/ci/q2d
           cp -R artifacts/examples/q2d_decay_validation artifacts/ci/q2d/
           cp -R artifacts/examples/q2d_forced_validation artifacts/ci/q2d/
@@ -260,14 +227,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run regression and physics suites
         env:
@@ -286,14 +246,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run validation artifact suite
         env:
@@ -360,9 +313,9 @@ jobs:
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
         run: |
-          python examples/q2d_decay_validation.py
-          python examples/q2d_forced_validation.py
-          python examples/q2d_wall_bounded_validation.py
+          python campaigns/q2d/q2d_decay_validation.py
+          python campaigns/q2d/q2d_forced_validation.py
+          python campaigns/q2d/q2d_wall_bounded_validation.py
           mkdir -p artifacts/q2d
           cp -R artifacts/examples/q2d_decay_validation artifacts/q2d/
           cp -R artifacts/examples/q2d_forced_validation artifacts/q2d/
@@ -388,44 +341,3 @@ jobs:
             artifacts/control_sweep
             artifacts/freemhd_parity
             artifacts/q2d
-
-  coverage:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
-          python -m pip install pytest-cov
-
-      - name: Run coverage suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python -m pytest \
-            --cov=lmx \
-            --cov=scripts \
-            --cov-branch \
-            --cov-fail-under=95 \
-            --cov-report=term-missing:skip-covered \
-            --cov-report=xml:artifacts/coverage/coverage.xml \
-            --cov-report=json:artifacts/coverage/coverage.json
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: artifacts/coverage

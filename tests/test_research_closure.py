@@ -27,7 +27,10 @@ def _write_open_static(static_dir: Path) -> None:
     static_dir.mkdir(parents=True, exist_ok=True)
     for spec in RESEARCH_CLOSURE_LANES:
         (static_dir / spec.primary_artifact).write_bytes(b"plot")
-        _write_json(static_dir / spec.external_summary, {"status": "template_only_no_external_reference_claim"})
+        _write_json(
+            static_dir / spec.external_summary,
+            {"status": "template_only_no_external_reference_claim"},
+        )
     _write_json(
         static_dir / "q2d_turbulence_decay_summary.json",
         {
@@ -38,7 +41,9 @@ def _write_open_static(static_dir: Path) -> None:
                 "max_courant": 0.05,
                 "research_grade_turbulence_validation_pass": False,
             },
-            "external_reference_comparison": {"status": "external_reference_csv_missing"},
+            "external_reference_comparison": {
+                "status": "external_reference_csv_missing"
+            },
         },
     )
     _write_json(
@@ -49,7 +54,9 @@ def _write_open_static(static_dir: Path) -> None:
                 "research_grade_validation_pass": False,
                 "max_charge_balance_residual": 1.0e-12,
             },
-            "external_reference_comparison": {"status": "external_reference_csv_missing"},
+            "external_reference_comparison": {
+                "status": "external_reference_csv_missing"
+            },
         },
     )
     _write_json(
@@ -60,7 +67,9 @@ def _write_open_static(static_dir: Path) -> None:
                 "research_grade_charge_balance_pass": True,
                 "research_grade_dean_validation_pass": False,
             },
-            "external_reference_comparison": {"status": "external_reference_csv_missing"},
+            "external_reference_comparison": {
+                "status": "external_reference_csv_missing"
+            },
         },
     )
 
@@ -76,7 +85,9 @@ def test_research_grade_closure_status_tracks_open_lanes(tmp_path: Path):
     assert status["research_grade_ready"] is False
     assert status["closed_lane_count"] == 0
     assert set(status["open_lanes"]) == {spec.lane for spec in RESEARCH_CLOSURE_LANES}
-    dean = next(row for row in rows if row["lane"] == "dean_vortex_higher_inertia_validation")
+    dean = next(
+        row for row in rows if row["lane"] == "dean_vortex_higher_inertia_validation"
+    )
     assert dean["status"] == "resolved_secondary_flow_open"
     assert dean["physics_gate_pass"] is False
 
@@ -87,7 +98,9 @@ def test_write_research_grade_closure_status(tmp_path: Path):
     _write_open_static(static_dir)
 
     outputs = write_research_grade_closure_status(out_dir, static_dir=static_dir)
-    summary = json.loads((out_dir / "research_grade_closure_status.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (out_dir / "research_grade_closure_status.json").read_text(encoding="utf-8")
+    )
 
     assert all(path.exists() for path in outputs)
     assert (out_dir / "research_grade_closure_status.csv").exists()
@@ -150,7 +163,10 @@ def test_research_grade_final_disposition_records_deferred_lanes(tmp_path: Path)
     assert summary["final_push_complete"] is True
     assert summary["research_grade_ready"] is False
     assert summary["deferred_lane_count"] == 3
-    assert any(row["final_decision"] == "defer_strict_turbulent_parity" for row in summary["rows"])
+    assert any(
+        row["final_decision"] == "defer_strict_turbulent_parity"
+        for row in summary["rows"]
+    )
 
 
 def test_write_research_grade_final_disposition(tmp_path: Path):
@@ -159,7 +175,9 @@ def test_write_research_grade_final_disposition(tmp_path: Path):
     _write_open_static(static_dir)
 
     outputs = write_research_grade_final_disposition(out_dir, static_dir=static_dir)
-    summary = json.loads((out_dir / "research_grade_final_disposition.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (out_dir / "research_grade_final_disposition.json").read_text(encoding="utf-8")
+    )
 
     assert [path.suffix for path in outputs] == [".json", ".csv", ".png"]
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
@@ -172,9 +190,13 @@ def test_research_grade_external_data_audit_reports_available_inputs(tmp_path: P
     freemhd_root = tmp_path / "freemhd"
     _write_open_static(static_dir)
     (external_root / "Q2DmhdFoam/run/lidDriven").mkdir(parents=True)
-    (external_root / "Q2DmhdFoam/run/lidDriven/IDM_output_U.txt").write_text("Weak turbulence:[]\n")
+    (external_root / "Q2DmhdFoam/run/lidDriven/IDM_output_U.txt").write_text(
+        "Weak turbulence:[]\n"
+    )
     (external_root / "MHD_Solvers_OpenFOAM/solvers/mhdEpotFoam").mkdir(parents=True)
-    (external_root / "MHD_Solvers_OpenFOAM/solvers/mhdEpotFoam/mhdEpotFoam.C").write_text("// solver\n")
+    (
+        external_root / "MHD_Solvers_OpenFOAM/solvers/mhdEpotFoam/mhdEpotFoam.C"
+    ).write_text("// solver\n")
     (freemhd_root / "FreeMHDPaperAllFigures/ClosedChannel").mkdir(parents=True)
     (freemhd_root / "freemhd_paper.pdf").write_bytes(b"%PDF")
 
@@ -183,8 +205,14 @@ def test_research_grade_external_data_audit_reports_available_inputs(tmp_path: P
         external_codes_root=external_root,
         freemhd_cases_root=freemhd_root,
     )
-    q2d = next(row for row in audit["rows"] if row["lane"] == "q2d_turbulence_external_parity")
-    magnetic = next(row for row in audit["rows"] if row["lane"] == "magnetic_obstacle_external_validation")
+    q2d = next(
+        row for row in audit["rows"] if row["lane"] == "q2d_turbulence_external_parity"
+    )
+    magnetic = next(
+        row
+        for row in audit["rows"]
+        if row["lane"] == "magnetic_obstacle_external_validation"
+    )
 
     assert audit["source_count"] == 4
     assert audit["strict_closure"]["closed_lane_count"] == 0

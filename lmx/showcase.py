@@ -13,12 +13,12 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 from .cases import make_hunt_case, make_shercliff_case
 from .example_runner import solve_case_snapshots
-from .mesh import StructuredMesh, generate_layered_duct_mesh
+from .mesh import StructuredMesh
 from .plotting import write_transient_movies
 from .reference_data import load_hunt_analytical, load_shercliff_analytical
 from .solvers import _build_mesh, solve_steady
 from .specs import BoundaryCondition
-from .validation import closed_channel_validation, extract_midplane_profile, hartmann_validation
+from .validation import closed_channel_validation, hartmann_validation
 from .core import MHDState
 
 
@@ -107,12 +107,15 @@ def solve_closed_channel_benchmark(
     max_steps: int = 160,
     velocity_update_limit: float | None = None,
     current_reconstruction: str = "face_averaged",
+    linear_solver: str = "auto",
     drive_mode: str = "forcing",
     pressure_gradient: float | None = None,
     target_mean_velocity: float = 0.1,
     initial_profile: str = "analytic",
+    reference_root: str | Path | None = None,
 ):
     reference = None
+    reference_kwargs = {} if reference_root is None else {"reference_root": reference_root}
     if case_kind == "shercliff":
         case = make_shercliff_case(
             ha=ha,
@@ -158,7 +161,11 @@ def solve_closed_channel_benchmark(
             ),
         )
     elif drive_mode == "pressure_gradient":
-        reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
+        reference = (
+            load_shercliff_analytical(int(ha), **reference_kwargs)
+            if case_kind == "shercliff"
+            else load_hunt_analytical(int(ha), **reference_kwargs)
+        )
         if pressure_gradient is None:
             pressure_gradient = reference.pressure_drop
         if pressure_gradient is None:
@@ -173,7 +180,11 @@ def solve_closed_channel_benchmark(
     initial_state = None
     if initial_profile == "analytic":
         if reference is None:
-            reference = load_shercliff_analytical(int(ha)) if case_kind == "shercliff" else load_hunt_analytical(int(ha))
+            reference = (
+                load_shercliff_analytical(int(ha), **reference_kwargs)
+                if case_kind == "shercliff"
+                else load_hunt_analytical(int(ha), **reference_kwargs)
+            )
         solve_mesh = _build_mesh(case) if mesh is None else mesh
         y_target = np.asarray(solve_mesh.y_centers, dtype=float)
         z_target = np.asarray(solve_mesh.z_centers, dtype=float)
@@ -202,7 +213,12 @@ def solve_closed_channel_benchmark(
 
     case = replace(
         case,
-        solver=replace(case.solver, coupling_iterations=coupling_iterations, coupling_tolerance=1.0e-9),
+        solver=replace(
+            case.solver,
+            coupling_iterations=coupling_iterations,
+            coupling_tolerance=1.0e-9,
+            linear_solver=linear_solver,
+        ),
         time_stepper=replace(
             case.time_stepper,
             max_steps=max_steps,
@@ -216,7 +232,7 @@ def solve_closed_channel_benchmark(
         ),
     )
     solution = solve_steady(case, mesh=mesh, initial_state=initial_state)
-    comparison = closed_channel_validation(solution, case_kind, int(ha))
+    comparison = closed_channel_validation(solution, case_kind, int(ha), **reference_kwargs)
     return case, solution, comparison
 
 

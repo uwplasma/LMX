@@ -35,29 +35,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/setup-lmx
         with:
-          python-version: "3.11"
+          extras: dev,docs
 
-      - name: Install package with release-gate dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev,docs]
+      - name: Verify provenance and dependency lock
+        run: python scripts/manage_provenance.py --check
 
-      - name: Run fast research gate
-        run: |
-          python -m pytest -m unit -q \
-            tests/test_cases.py \
-            tests/test_config.py \
-            tests/test_units_and_wall_models.py \
-            tests/test_physics.py \
-            tests/test_mesh.py \
-            tests/test_linear.py \
-            tests/test_q2d.py \
-            tests/test_wall_study.py \
-            tests/test_release_readiness.py \
-            tests/test_package_api.py \
-            tests/test_reference_data.py
+      - name: Run complete portable test gate
+        run: python scripts/run_full_test_suite.py --budget-seconds 600
 
       - name: Build documentation
         run: python -m sphinx -W -b html docs docs/_build/html
@@ -66,7 +52,7 @@ jobs:
         run: |
           mkdir -p artifacts/release
           python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
-          python examples/publication_figure_campaign.py
+          python campaigns/publication/publication_figure_campaign.py
           cp docs/_static/generated/publication_figure_campaign_summary.json artifacts/release/publication_figure_campaign_summary.json
           cp docs/_static/generated/publication_figure_campaign_table.csv artifacts/release/publication_figure_campaign_table.csv
 
@@ -91,14 +77,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded solver validation artifacts
         run: |
@@ -120,14 +99,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Verify external-reference parity contract
         env:
@@ -153,14 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded convergence artifacts
         run: |
@@ -182,14 +147,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded time-convergence artifacts
         run: |
@@ -213,21 +171,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+      - uses: ./.github/actions/setup-lmx
 
       - name: Run bounded Q2D validation artifacts
         run: |
-          python examples/q2d_decay_validation.py
-          python examples/q2d_forced_validation.py
-          python examples/q2d_wall_bounded_validation.py
-          python examples/q2d_turbulence_decay_demo.py
+          python campaigns/q2d/q2d_decay_validation.py
+          python campaigns/q2d/q2d_forced_validation.py
+          python campaigns/q2d/q2d_wall_bounded_validation.py
+          python campaigns/q2d/q2d_turbulence_decay_demo.py
           mkdir -p artifacts/release/q2d
           cp -R artifacts/examples/q2d_decay_validation artifacts/release/q2d/
           cp -R artifacts/examples/q2d_forced_validation artifacts/release/q2d/
@@ -253,14 +204,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/setup-lmx
         with:
-          python-version: "3.11"
+          extras: release
 
       - name: Build package artifacts
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install build twine
           python -m build
           python -m twine check dist/*
 

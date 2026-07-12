@@ -70,7 +70,9 @@ def _sample_solution(case) -> Solution:
         gauge_residual_history=jnp.asarray([1.0e-8, 5.0e-9, 2.5e-9]),
         interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7, 6.0e-7]),
     )
-    return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
+    return Solution(
+        mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name
+    )
 
 
 def test_paraview_writer(tmp_path: Path):
@@ -89,9 +91,7 @@ def test_vtu_writer(tmp_path: Path):
 def test_vtu_writer_requires_point_coordinates(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     mesh = _build_mesh(case)
-    mesh_without_points = mesh.__class__(
-        **{**mesh.__dict__, "point_coordinates": None}
-    )
+    mesh_without_points = mesh.__class__(**{**mesh.__dict__, "point_coordinates": None})
 
     with pytest.raises(ValueError, match="Mapped mesh requires point_coordinates"):
         write_vtu(mesh_without_points, tmp_path)
@@ -141,28 +141,74 @@ def test_load_restart_bundle_round_trips_solution_npz(tmp_path: Path):
 
     bundle = load_restart_bundle(path)
 
-    validate_restart_bundle(bundle, mesh=_build_mesh(case), geometry_kind=case.geometry.kind, case_name=case.name)
+    validate_restart_bundle(
+        bundle,
+        mesh=_build_mesh(case),
+        geometry_kind=case.geometry.kind,
+        case_name=case.name,
+    )
     assert bundle.path == path.resolve()
     assert bundle.geometry_kind == case.geometry.kind
     assert bundle.state.u.shape == solution.state.u.shape
     assert float(bundle.state.time) == pytest.approx(float(solution.state.time))
     assert float(bundle.state.residual) == pytest.approx(float(solution.state.residual))
-    assert bundle.diagnostics.current_scaled_pressure_proxy_history.shape == solution.diagnostics.current_scaled_pressure_proxy_history.shape
-    assert bundle.diagnostics.linear_residual_history.shape == solution.diagnostics.linear_residual_history.shape
-    assert bundle.diagnostics.linear_iterations_history.shape == solution.diagnostics.linear_iterations_history.shape
-    assert bundle.diagnostics.volumetric_flow_rate_history.shape == solution.diagnostics.volumetric_flow_rate_history.shape
-    assert bundle.diagnostics.mean_current_magnitude_history.shape == solution.diagnostics.mean_current_magnitude_history.shape
-    assert bundle.diagnostics.lorentz_power_history.shape == solution.diagnostics.lorentz_power_history.shape
-    assert bundle.diagnostics.div_current_max_history.shape == solution.diagnostics.div_current_max_history.shape
-    assert bundle.diagnostics.charge_balance_residual_history.shape == solution.diagnostics.charge_balance_residual_history.shape
-    assert bundle.diagnostics.gauge_residual_history.shape == solution.diagnostics.gauge_residual_history.shape
-    assert bundle.diagnostics.interface_current_residual_history.shape == solution.diagnostics.interface_current_residual_history.shape
-    assert bundle.diagnostics.raw_update_max_history.shape == solution.diagnostics.raw_update_max_history.shape
-    assert bundle.diagnostics.limiter_scale_history.shape == solution.diagnostics.limiter_scale_history.shape
-    assert bundle.diagnostics.limited_fraction_history.shape == solution.diagnostics.limited_fraction_history.shape
+    assert (
+        bundle.diagnostics.current_scaled_pressure_proxy_history.shape
+        == solution.diagnostics.current_scaled_pressure_proxy_history.shape
+    )
+    assert (
+        bundle.diagnostics.linear_residual_history.shape
+        == solution.diagnostics.linear_residual_history.shape
+    )
+    assert (
+        bundle.diagnostics.linear_iterations_history.shape
+        == solution.diagnostics.linear_iterations_history.shape
+    )
+    assert (
+        bundle.diagnostics.volumetric_flow_rate_history.shape
+        == solution.diagnostics.volumetric_flow_rate_history.shape
+    )
+    assert (
+        bundle.diagnostics.mean_current_magnitude_history.shape
+        == solution.diagnostics.mean_current_magnitude_history.shape
+    )
+    assert (
+        bundle.diagnostics.lorentz_power_history.shape
+        == solution.diagnostics.lorentz_power_history.shape
+    )
+    assert (
+        bundle.diagnostics.div_current_max_history.shape
+        == solution.diagnostics.div_current_max_history.shape
+    )
+    assert (
+        bundle.diagnostics.charge_balance_residual_history.shape
+        == solution.diagnostics.charge_balance_residual_history.shape
+    )
+    assert (
+        bundle.diagnostics.gauge_residual_history.shape
+        == solution.diagnostics.gauge_residual_history.shape
+    )
+    assert (
+        bundle.diagnostics.interface_current_residual_history.shape
+        == solution.diagnostics.interface_current_residual_history.shape
+    )
+    assert (
+        bundle.diagnostics.raw_update_max_history.shape
+        == solution.diagnostics.raw_update_max_history.shape
+    )
+    assert (
+        bundle.diagnostics.limiter_scale_history.shape
+        == solution.diagnostics.limiter_scale_history.shape
+    )
+    assert (
+        bundle.diagnostics.limited_fraction_history.shape
+        == solution.diagnostics.limited_fraction_history.shape
+    )
 
 
-def test_load_restart_bundle_falls_back_to_metadata_and_residual_history(tmp_path: Path):
+def test_load_restart_bundle_falls_back_to_metadata_and_residual_history(
+    tmp_path: Path,
+):
     path = tmp_path / "restart_minimal.npz"
     np.savez_compressed(
         path,
@@ -184,7 +230,9 @@ def test_load_restart_bundle_falls_back_to_metadata_and_residual_history(tmp_pat
     assert bundle.diagnostics.time_history.shape == (0,)
 
 
-def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(tmp_path: Path):
+def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(
+    tmp_path: Path,
+):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     solution = _sample_solution(case)
     path = write_solution_npz(solution, case, tmp_path / "hartmann_results.npz")
@@ -192,28 +240,60 @@ def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(
     mesh = _build_mesh(case)
 
     with pytest.raises(ValueError, match="geometry_kind"):
-        validate_restart_bundle(bundle, mesh=mesh, geometry_kind="pipe", case_name=case.name)
+        validate_restart_bundle(
+            bundle, mesh=mesh, geometry_kind="pipe", case_name=case.name
+        )
 
     wrong_shape_bundle = bundle.__class__(
-        **{**bundle.__dict__, "state": bundle.state.__class__(**{**bundle.state.__dict__, "u": jnp.zeros((1, 1))})}
+        **{
+            **bundle.__dict__,
+            "state": bundle.state.__class__(
+                **{**bundle.state.__dict__, "u": jnp.zeros((1, 1))}
+            ),
+        }
     )
     with pytest.raises(ValueError, match="field shape"):
-        validate_restart_bundle(wrong_shape_bundle, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+        validate_restart_bundle(
+            wrong_shape_bundle,
+            mesh=mesh,
+            geometry_kind=case.geometry.kind,
+            case_name=case.name,
+        )
 
-    wrong_y_faces = bundle.__class__(**{**bundle.__dict__, "y_faces": np.array([0.0, 1.0])})
+    wrong_y_faces = bundle.__class__(
+        **{**bundle.__dict__, "y_faces": np.array([0.0, 1.0])}
+    )
     with pytest.raises(ValueError, match="y_faces"):
-        validate_restart_bundle(wrong_y_faces, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+        validate_restart_bundle(
+            wrong_y_faces,
+            mesh=mesh,
+            geometry_kind=case.geometry.kind,
+            case_name=case.name,
+        )
 
-    wrong_z_faces = bundle.__class__(**{**bundle.__dict__, "z_faces": np.array([0.0, 1.0])})
+    wrong_z_faces = bundle.__class__(
+        **{**bundle.__dict__, "z_faces": np.array([0.0, 1.0])}
+    )
     with pytest.raises(ValueError, match="z_faces"):
-        validate_restart_bundle(wrong_z_faces, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+        validate_restart_bundle(
+            wrong_z_faces,
+            mesh=mesh,
+            geometry_kind=case.geometry.kind,
+            case_name=case.name,
+        )
 
-    wrong_case = bundle.__class__(**{**bundle.__dict__, "metadata": {**bundle.metadata, "case": "other_case"}})
+    wrong_case = bundle.__class__(
+        **{**bundle.__dict__, "metadata": {**bundle.metadata, "case": "other_case"}}
+    )
     with pytest.raises(ValueError, match="Restart case"):
-        validate_restart_bundle(wrong_case, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
+        validate_restart_bundle(
+            wrong_case, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name
+        )
 
 
-def test_write_solution_outputs_respects_output_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_write_solution_outputs_respects_output_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = case.__class__(
         **{
@@ -231,10 +311,20 @@ def test_write_solution_outputs_respects_output_flags(tmp_path: Path, monkeypatc
     )
     solution = _sample_solution(case)
 
-    monkeypatch.setattr("lmx.io.write_paraview", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected paraview")))
-    monkeypatch.setattr("lmx.io.write_solution_npz", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected npz")))
+    monkeypatch.setattr(
+        "lmx.io.write_paraview",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("unexpected paraview")
+        ),
+    )
+    monkeypatch.setattr(
+        "lmx.io.write_solution_npz",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected npz")),
+    )
 
-    outputs = write_solution_outputs(solution, case, tmp_path, write_npz=True, write_plots=True)
+    outputs = write_solution_outputs(
+        solution, case, tmp_path, write_npz=True, write_plots=True
+    )
 
     assert outputs == {"paraview": [], "csv": [], "npz": [], "plots": []}
 
@@ -245,8 +335,12 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         **{
             **case.__dict__,
             "name": "fringing_rect_demo",
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
-            "output": case.output.__class__(**{**case.output.__dict__, "write_plots": True}),
+            "solver": case.solver.__class__(
+                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
+            ),
+            "output": case.output.__class__(
+                **{**case.output.__dict__, "write_plots": True}
+            ),
         }
     )
     bundle = SimpleNamespace(
@@ -271,6 +365,8 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         axial_current=jnp.asarray([0.0, 0.1, 0.0]),
         wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
         current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
+        axial_pressure_loss_gradient=jnp.asarray([1.0, 1.5, 1.0]),
+        transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
         geometry_kind="rect_duct",
@@ -318,8 +414,12 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         ),
     )
 
-    npz_path = write_extruded_solution_npz(solution, case, tmp_path / "fringing_results.npz")
-    outputs = write_extruded_solution_outputs(solution, case, tmp_path, write_plots=True)
+    npz_path = write_extruded_solution_npz(
+        solution, case, tmp_path / "fringing_results.npz"
+    )
+    outputs = write_extruded_solution_outputs(
+        solution, case, tmp_path, write_plots=True
+    )
 
     assert npz_path.exists()
     assert outputs["csv"][0].exists()
@@ -342,9 +442,18 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
             **case.__dict__,
             "name": "fringing_rect_demo",
             "geometry": case.geometry.__class__(
-                **{**case.geometry.__dict__, "kind": "rect_duct", "length": 6.0, "nx": 3, "ny": 2, "nz": 2}
+                **{
+                    **case.geometry.__dict__,
+                    "kind": "rect_duct",
+                    "length": 6.0,
+                    "nx": 3,
+                    "ny": 2,
+                    "nz": 2,
+                }
             ),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "solver": case.solver.__class__(
+                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
+            ),
         }
     )
     bundle = SimpleNamespace(
@@ -369,6 +478,8 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         axial_current=jnp.asarray([0.0, 0.1, 0.0]),
         wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
         current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
+        axial_pressure_loss_gradient=jnp.asarray([1.0, 1.5, 1.0]),
+        transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
         geometry_kind="rect_duct",
@@ -376,13 +487,22 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     )
     solution = SimpleNamespace(bundle=bundle, station_history=({"x": 0.0},))
 
-    restart_path = write_extruded_restart_npz(solution, case, tmp_path / "restart" / "fringing_restart.npz")
+    restart_path = write_extruded_restart_npz(
+        solution, case, tmp_path / "restart" / "fringing_restart.npz"
+    )
     restart_bundle = load_extruded_restart_bundle(restart_path)
     validate_extruded_restart_bundle(restart_bundle, case=case)
 
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
+    assert restart_bundle.bundle.axial_pressure_loss_gradient.tolist() == pytest.approx(
+        [1.0, 1.5, 1.0]
+    )
+    assert (
+        restart_bundle.bundle.transverse_pressure_difference.tolist()
+        == pytest.approx([0.0, 0.25, 0.0])
+    )
     assert layout.system_dir.exists()
     assert layout.fields_dir.exists()
     assert layout.post_dir.exists()
@@ -397,8 +517,20 @@ def test_validate_extruded_restart_bundle_rejects_mismatch():
         **{
             **case.__dict__,
             "name": "fringing_pipe_demo",
-            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "kind": "pipe_ogrid", "nx": 3, "ny": 4, "nz": 8, "nr": 4, "ntheta": 8}),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "geometry": case.geometry.__class__(
+                **{
+                    **case.geometry.__dict__,
+                    "kind": "pipe_ogrid",
+                    "nx": 3,
+                    "ny": 4,
+                    "nz": 8,
+                    "nr": 4,
+                    "ntheta": 8,
+                }
+            ),
+            "solver": case.solver.__class__(
+                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
+            ),
         }
     )
     bad_bundle = SimpleNamespace(
@@ -418,8 +550,19 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
         **{
             **case.__dict__,
             "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "kind": "rect_duct", "length": 6.0, "nx": 3, "ny": 2, "nz": 2}),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "geometry": case.geometry.__class__(
+                **{
+                    **case.geometry.__dict__,
+                    "kind": "rect_duct",
+                    "length": 6.0,
+                    "nx": 3,
+                    "ny": 2,
+                    "nz": 2,
+                }
+            ),
+            "solver": case.solver.__class__(
+                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
+            ),
         }
     )
     bundle = SimpleNamespace(
@@ -432,31 +575,55 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
     with pytest.raises(ValueError, match="solver_kind"):
         validate_extruded_restart_bundle(bundle, case=case)
 
-    good_solver = SimpleNamespace(**{**bundle.__dict__, "solver_kind": "extruded_inductionless"})
+    good_solver = SimpleNamespace(
+        **{**bundle.__dict__, "solver_kind": "extruded_inductionless"}
+    )
     with pytest.raises(ValueError, match="Extruded restart case"):
         validate_extruded_restart_bundle(good_solver, case=case)
 
-    good_case = SimpleNamespace(**{**good_solver.__dict__, "metadata": {"case": case.name}})
+    good_case = SimpleNamespace(
+        **{**good_solver.__dict__, "metadata": {"case": case.name}}
+    )
     with pytest.raises(ValueError, match="station count"):
         validate_extruded_restart_bundle(good_case, case=case)
 
-    good_x = SimpleNamespace(**{**good_case.__dict__, "bundle": SimpleNamespace(x=jnp.zeros((3,)), y=jnp.zeros((3,)), z=jnp.zeros((2,)))})
+    good_x = SimpleNamespace(
+        **{
+            **good_case.__dict__,
+            "bundle": SimpleNamespace(
+                x=jnp.zeros((3,)), y=jnp.zeros((3,)), z=jnp.zeros((2,))
+            ),
+        }
+    )
     with pytest.raises(ValueError, match="y resolution"):
         validate_extruded_restart_bundle(good_x, case=case)
 
-    good_y = SimpleNamespace(**{**good_x.__dict__, "bundle": SimpleNamespace(x=jnp.zeros((3,)), y=jnp.zeros((2,)), z=jnp.zeros((3,)))})
+    good_y = SimpleNamespace(
+        **{
+            **good_x.__dict__,
+            "bundle": SimpleNamespace(
+                x=jnp.zeros((3,)), y=jnp.zeros((2,)), z=jnp.zeros((3,))
+            ),
+        }
+    )
     with pytest.raises(ValueError, match="z/theta resolution"):
         validate_extruded_restart_bundle(good_y, case=case)
 
 
-def test_write_extruded_solution_outputs_archives_last_station_with_stride(tmp_path: Path):
+def test_write_extruded_solution_outputs_archives_last_station_with_stride(
+    tmp_path: Path,
+):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = case.__class__(
         **{
             **case.__dict__,
             "name": "fringing_rect_demo",
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
-            "output": case.output.__class__(**{**case.output.__dict__, "write_plots": False, "write_stride": 2}),
+            "solver": case.solver.__class__(
+                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
+            ),
+            "output": case.output.__class__(
+                **{**case.output.__dict__, "write_plots": False, "write_stride": 2}
+            ),
         }
     )
     bundle = SimpleNamespace(
@@ -506,16 +673,22 @@ def test_write_extruded_solution_outputs_archives_last_station_with_stride(tmp_p
             "volumetric_flow_rate": float(bundle.volumetric_flow_rate[i]),
             "axial_current": float(bundle.axial_current[i]),
             "wall_current_leakage": float(bundle.wall_current_leakage[i]),
-            "current_scaled_pressure_proxy": float(bundle.current_scaled_pressure_proxy[i]),
+            "current_scaled_pressure_proxy": float(
+                bundle.current_scaled_pressure_proxy[i]
+            ),
             "residual": float(bundle.residual[i]),
             "charge_balance_residual": float(bundle.charge_balance_residual[i]),
             "boundary_current_residual": float(bundle.boundary_current_residual[i]),
         }
         for i in range(4)
     )
-    solution = SimpleNamespace(bundle=bundle, validation=validation, station_history=station_history)
+    solution = SimpleNamespace(
+        bundle=bundle, validation=validation, station_history=station_history
+    )
 
-    outputs = write_extruded_solution_outputs(solution, case, tmp_path, write_plots=False)
+    outputs = write_extruded_solution_outputs(
+        solution, case, tmp_path, write_plots=False
+    )
 
     archived = [path.name for path in outputs["archive"] if path.suffix == ".npz"]
     assert archived == ["station_0000.npz", "station_0002.npz", "station_0003.npz"]

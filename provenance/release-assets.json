@@ -1,0 +1,580 @@
+{
+  "assets": [
+    {
+      "bytes": 163685,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_coil_model_field_adapter.png"
+      ],
+      "sha256": "00dbde822660aa102b677c81ea7366eeb3cdd6f0b615aa7cf8ef120dc86789c3"
+    },
+    {
+      "bytes": 187534,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/variable_field_tabulated_reconstruction.png"
+      ],
+      "sha256": "011dc634dae6af4f0f4df8edab16ec837347f1c2bf887620da1f954799e8c78e"
+    },
+    {
+      "bytes": 359584,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/dean_literature_validation.png"
+      ],
+      "sha256": "06a214ab29223d8dafc21260ffaa726f0c379bfdbe25919211e6949524440c97"
+    },
+    {
+      "bytes": 723721,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_mesh_preview.png"
+      ],
+      "sha256": "0a08142cc99dd0f206c6cd9dfe8ce6584b7700117ed7aa7798d56f93bf678dd1"
+    },
+    {
+      "bytes": 221151,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/li_aln_multilayer_convergence.png",
+        "studies/li_aln_wall_mhd/figures/li_aln_multilayer_convergence.png",
+        "studies/li_aln_wall_mhd/results/processed/multilayer_convergence/li_aln_multilayer_convergence.png"
+      ],
+      "sha256": "0a5d4d0a9a97cff78eb15efdb79934515fcabb5918c23148c8c0653ce198ea94"
+    },
+    {
+      "bytes": 388587,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_mirror_field_preview.png"
+      ],
+      "sha256": "0fef18cd5ba6098e20d8ac99829a5983a10ec7aa7d2b8d13f4b872cf96ea62cf"
+    },
+    {
+      "bytes": 296314,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/q2dmhdfoam_external_reference.png"
+      ],
+      "sha256": "111ffe3daf0c57f3b2372a3917c1e61e82b8eef58a4d6d9cbc06c01fb8382cef"
+    },
+    {
+      "bytes": 283196,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.png"
+      ],
+      "sha256": "11f452c14a95077b8aa68098ca05b24f3855d7ad47019f62ae4057c183ec3921"
+    },
+    {
+      "bytes": 867368,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/freemhd_closed_channel_flow_rate_parity.png"
+      ],
+      "sha256": "18e8abf51e4540d4da1bbcc58c6555458ee75dbd3d2a8491dc3725ab4978d345"
+    },
+    {
+      "bytes": 1112659,
+      "media_types": [
+        "image/gif"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_flow.gif"
+      ],
+      "sha256": "1a23d23da1b22addea52b90b1827c058044fe4fbe305460b0a0cfea6118fc3d4"
+    },
+    {
+      "bytes": 252164,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/external_validation_readiness.png"
+      ],
+      "sha256": "20c79c707dee476dfc18755b621e8399478f5605ee841806c2e071f4d88d9eea"
+    },
+    {
+      "bytes": 840829,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/bent_pipe_overview.png"
+      ],
+      "sha256": "20d2ea12e79cfb2b0ec9484daf54459d1ecd15b2c448a1c55dde3a6987ee8505"
+    },
+    {
+      "bytes": 317850,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/autodiff_wham_pressure_sensitivity.png"
+      ],
+      "sha256": "30c2ee8064fcf5f5dea1ed78ebf8bf99b3008ba0d052dc289c2f8b21855da637"
+    },
+    {
+      "bytes": 863700,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/freemhd_closed_channel_observable_parity.png"
+      ],
+      "sha256": "31d5b60bd9f3088f84043d481be4e1cce5e95a0b02d565ce221dbe958d033c02"
+    },
+    {
+      "bytes": 184138,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/li_aln_multilayer_mesh_qa.png",
+        "studies/li_aln_wall_mhd/figures/li_aln_multilayer_mesh_qa.png",
+        "studies/li_aln_wall_mhd/results/processed/multilayer_mesh/li_aln_multilayer_mesh_qa.png"
+      ],
+      "sha256": "3d1b9d5f3f1bc761b2a6a8a7490fc967a708de89e53e5939b10506c2c7e6c66c"
+    },
+    {
+      "bytes": 1398715,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_mirror_overview.png"
+      ],
+      "sha256": "42e9060de2e2970c71b28afde1236a693b57fbecc7c6a5e3cc91f452f74650fc"
+    },
+    {
+      "bytes": 402615,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/variable_field_tabulated_extruded_overview.png"
+      ],
+      "sha256": "4630e13c77eeecb5dca8f12556cc2de5d72c3678dadc28e04c6378a7e4dc005a"
+    },
+    {
+      "bytes": 143456,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/closed_channel_validation_ladder.png"
+      ],
+      "sha256": "46a9f21c554dbdbd1db57967e8cb2d7733543852b03ee67f6c59fac5e383233a"
+    },
+    {
+      "bytes": 584878,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_current_closure.png"
+      ],
+      "sha256": "48f4ba5845444a375f837f7b15f87daef582ead38e651e8ae17cadd6862eb2a2"
+    },
+    {
+      "bytes": 277776,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_pressure_sweep.png"
+      ],
+      "sha256": "4be8617618b8d157a10b68d0e7568d135fa6d43cb740e0ce9f9e6917f53796c4"
+    },
+    {
+      "bytes": 224457,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/strong_scaling.png"
+      ],
+      "sha256": "529b5610a106e861a024c0cda8d6173f2dbdee57299e5e6a6f168e0a33bea56e"
+    },
+    {
+      "bytes": 240044,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/li_aln_wall_stack_phase3_6.png",
+        "studies/li_aln_wall_mhd/figures/li_aln_wall_stack_phase3_6.png",
+        "studies/li_aln_wall_mhd/results/processed/phase3_6/li_aln_wall_stack_phase3_6.png"
+      ],
+      "sha256": "5542be6fa8439699fb90f994934eae383203211f61fb677657fab3e9a70e9a19"
+    },
+    {
+      "bytes": 385794,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_autodiff_research.png"
+      ],
+      "sha256": "56a82bc7ecc27482a16c94a02db779810c5641f12ef609761e43a8e9323b73a5"
+    },
+    {
+      "bytes": 197218,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/q2d_lmx_q2dmhdfoam_lid_driven_parity.png"
+      ],
+      "sha256": "5bc140894172bdc9071e9256e970dd0b52a777d04552b39b728783499736ac02"
+    },
+    {
+      "bytes": 421243,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/extruded_validation_solver_family.png"
+      ],
+      "sha256": "5fd83110c167e741e38ffb1564ac82ce07041383d1891f8d8c5b004344135a3f"
+    },
+    {
+      "bytes": 600414,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/magnetic_obstacle_benchmark.png"
+      ],
+      "sha256": "605f891efbb575e44263981a263e475e56d3f9fa30fb8f8abc554a8f9952aad3"
+    },
+    {
+      "bytes": 359042,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_transient_flow.png"
+      ],
+      "sha256": "696e7ee4a81b7aabfce26257816250c90bcb10e9f0a78cdc257e984dc3446b57"
+    },
+    {
+      "bytes": 202390,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/li_aln_multilayer_solve.png",
+        "studies/li_aln_wall_mhd/figures/li_aln_multilayer_solve.png",
+        "studies/li_aln_wall_mhd/results/processed/multilayer_solve/li_aln_multilayer_solve.png"
+      ],
+      "sha256": "6a006588f53f8d8a94c1807d8fdf7de3074ae0a2fec8db32b21e8c78cdd1b4fc"
+    },
+    {
+      "bytes": 236482,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/q2dmhdfoam_lid_driven_vtk.png"
+      ],
+      "sha256": "74186337a98c0092ec1da8f38a3796704dfee5736fc9f0f413a9690e6d155acc"
+    },
+    {
+      "bytes": 201042,
+      "media_types": [
+        "application/json"
+      ],
+      "paths": [
+        "docs/_static/generated/freemhd_closed_channel_observable_parity_summary.json"
+      ],
+      "sha256": "7b0a60365ef95d0ee189341d7f595e4cfa58fe9885afd5e72f528db2396973d3"
+    },
+    {
+      "bytes": 180495,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/magnetic_obstacle_votyakov_curve_comparison.png"
+      ],
+      "sha256": "7bb3ca5196bca7730f59d2f89b2c6ee8a9005d59a583c8106362544488a25eb0"
+    },
+    {
+      "bytes": 158075,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/q2dmhdfoam_lmx_turbulence_match_audit.png"
+      ],
+      "sha256": "840de255d12c8851ebabe0aba09af722ca73f36a8568f3212fd789f77c76e53b"
+    },
+    {
+      "bytes": 765610,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_field_on_mesh.png"
+      ],
+      "sha256": "9030f826df0afc98d01994b675752ea59a41d865d0be973672d2f63bbeb99b32"
+    },
+    {
+      "bytes": 331415,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/autodiff_summary.png"
+      ],
+      "sha256": "95522603e4542526fd4110c95fca5d0523f6ba85f91ce5973a971c6aaaf06aee"
+    },
+    {
+      "bytes": 289525,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/readme_hunt_startup_3d_poster.png"
+      ],
+      "sha256": "a9aa46e8fcfb565a3c3ca5326b184d0042a9bf48ad2f3cca41628fb66f433cf0"
+    },
+    {
+      "bytes": 167316,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/paper_rect_3d.png"
+      ],
+      "sha256": "b1358d065d5b8d679127d334887c2adfe868b5dbef138d4520d11fde8286295f"
+    },
+    {
+      "bytes": 363072,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/variable_field_tabulated_field_preview.png"
+      ],
+      "sha256": "b6134aa16025a98788fd229b1083ca598be7da8910267531f83c0812550ca94e"
+    },
+    {
+      "bytes": 1372111,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/geometry_gallery.png"
+      ],
+      "sha256": "bcdc469902cdf2c48e0c4820a42bc9b9ea1da7d37dc98c4aa1574566b6c3df96"
+    },
+    {
+      "bytes": 198464,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/research_grade_final_disposition.png"
+      ],
+      "sha256": "ca9a38d0d030087377c08113435724e27c722aed972f884fa5a6aef6ebcc83b5"
+    },
+    {
+      "bytes": 344570,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/readme_hunt_startup_2d_poster.png"
+      ],
+      "sha256": "cac2125ee43450a738aef08bbe50dd48c52cb72569903d39aec1f88492c0860f"
+    },
+    {
+      "bytes": 158271,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/pipe_reference_comparison.png"
+      ],
+      "sha256": "d3343a09efcfb554c96059c436911cf0c3e04f09cb6195e2bb51cddda0f9fa8a"
+    },
+    {
+      "bytes": 412313,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/freemhd_closed_channel_parity.png"
+      ],
+      "sha256": "d359e5a3c3f643010798fb832f2c439ffdee3f8a47876538e33f3bc4b2c4eb7d"
+    },
+    {
+      "bytes": 200756,
+      "media_types": [
+        "application/json"
+      ],
+      "paths": [
+        "docs/_static/generated/freemhd_closed_channel_flow_rate_parity_summary.json"
+      ],
+      "sha256": "d8c8ac2a1d650b84b8d2f47b194b6ac997501966e7b24ea3847addabc63bddea"
+    },
+    {
+      "bytes": 287617,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/research_grade_closure_dashboard.png"
+      ],
+      "sha256": "d9fca0d3f0130acb1f4c9df09e244691112ffac0a1bc6b1eb58dda9ae38eb770"
+    },
+    {
+      "bytes": 895160,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_geometry_preview.png"
+      ],
+      "sha256": "dbef8189ce2c8ea47d091c2d0a5e1929a68484e8132d8672198d28302802b58a"
+    },
+    {
+      "bytes": 775854,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/magnetic_obstacle_schematic.png"
+      ],
+      "sha256": "dcb007dcda0d3ccc30efb58dde1875945a491f034ef41f7ec57c718a6f3e2d96"
+    },
+    {
+      "bytes": 352809,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_mirror_extruded_overview.png"
+      ],
+      "sha256": "de8220a13855529e14fefa7c29fa262ea9ac5803ae8b0d7deb48db3a0bc7ea3d"
+    },
+    {
+      "bytes": 195795,
+      "media_types": [
+        "text/csv"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_pressure_sweep_data.csv"
+      ],
+      "sha256": "de9fcc1269c0f04b84c9318726d5c1190ebabc74fe50bf51a921ba63ac1ca132"
+    },
+    {
+      "bytes": 525402,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/wham_blanket_flow.png"
+      ],
+      "sha256": "df99b60827f605ee92954ef80bb47f324d12a12d8fe94f141449dfe685dd88c0"
+    },
+    {
+      "bytes": 248563,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/research_grade_external_targets.png"
+      ],
+      "sha256": "f3761ad5575da1e6d49b2d1ebb0b8ed03f0127d586cf59396bc681d87021d6a0"
+    },
+    {
+      "bytes": 197296,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/analytic_velocity_profiles.png"
+      ],
+      "sha256": "f55c380ca739b04da8cfcb6eae5fb33a1472eedc9e63fbe3fa37be36a25fc120"
+    },
+    {
+      "bytes": 205514,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/li_aln_wall_stack_phase0_2.png",
+        "studies/li_aln_wall_mhd/figures/li_aln_wall_stack_phase0_2.png",
+        "studies/li_aln_wall_mhd/results/processed/phase0_2/li_aln_wall_stack_phase0_2.png"
+      ],
+      "sha256": "fc3c4dca2228992e7186cb26721d80b1a8a04cfb0052238137d9e10986bb9b5d"
+    },
+    {
+      "bytes": 159121,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/paper_layered_3d.png"
+      ],
+      "sha256": "fd2245cf028594cf830f41804527a75e129cee41b8c843082eed562eec09a7ee"
+    },
+    {
+      "bytes": 312760,
+      "media_types": [
+        "image/png"
+      ],
+      "paths": [
+        "docs/_static/generated/magnetic_obstacle_regime_scan.png"
+      ],
+      "sha256": "fd99d1ca9522de37e7abf19c0940433e2c2dff94f9e737c2ebc70363d777a995"
+    },
+    {
+      "bytes": 3691312,
+      "media_types": [
+        "image/gif"
+      ],
+      "paths": [
+        "docs/_static/generated/q2d_lmx_q2dmhdfoam_turbulence_comparison.gif"
+      ],
+      "sha256": "feb9e145cee2a5a87f13381803855a34ad16d44f4d63d0c31c155ad07f74bd96"
+    }
+  ],
+  "generated_by": "scripts/manage_release_assets.py",
+  "release": {
+    "archive_sha256": "71b22c98100ce9e18b253ef4b96c89c1d51aeae6200536445ac2bc5a98879f88",
+    "archive_name": "lmx-research-assets-v1.tar.gz",
+    "download_url": "https://github.com/uwplasma/lmx/releases/download/lmx-research-assets-v1/lmx-research-assets-v1.tar.gz",
+    "repository": "uwplasma/lmx",
+    "status": "uploaded",
+    "tag": "lmx-research-assets-v1"
+  },
+  "schema_version": 1,
+  "summary": {
+    "logical_bytes": 27833716,
+    "logical_file_count": 65,
+    "unique_bytes": 25727242,
+    "unique_content_count": 55
+  }
+}

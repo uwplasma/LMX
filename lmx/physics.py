@@ -139,6 +139,21 @@ def build_material_fields(case: CaseSpec, mesh: StructuredMesh) -> MaterialField
             conductivity = jnp.where(fallback, solid.conductivity, conductivity)
             density = jnp.where(fallback, solid.density or fluid.density or 1.0, density)
             viscosity = jnp.where(fallback, solid.viscosity or fluid.viscosity or 1.0, viscosity)
+
+            # Exact insulating boundaries own wall intersections. Nearest-side
+            # assignment is ambiguous at corners and otherwise leaves a thin
+            # conducting bridge around an ideal insulating wall.
+            for side, region in side_assignments:
+                if region.conductivity != 0.0:
+                    continue
+                mask, _ = distance_by_side.get(
+                    side,
+                    (
+                        jnp.zeros(mesh.yz_shape, dtype=bool),
+                        jnp.full(mesh.yz_shape, jnp.inf, dtype=float),
+                    ),
+                )
+                conductivity = jnp.where((~fluid_mask) & mask, 0.0, conductivity)
         else:
             conductivity = jnp.where(fluid_mask, conductivity, solid.conductivity)
             density = jnp.where(fluid_mask, density, solid.density or fluid.density or 1.0)

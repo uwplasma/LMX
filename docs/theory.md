@@ -168,6 +168,12 @@ is why LMX tracks:
 - `charge_balance_residual_history`
 - `interface_current_residual_history`
 
+For a shared conservative face, equal-and-opposite flux is enforced by
+construction. The reported interface residual therefore measures the local
+finite-volume charge imbalance in interface-adjacent cells, scaled by their
+characteristic length into current-density units. This makes normalization by
+the declared `sigma*U*B` current scale physically meaningful.
+
 as first-class diagnostics.
 
 For the 3D fringing workflows, the same conservation view is extended to

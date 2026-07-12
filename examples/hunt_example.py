@@ -11,12 +11,16 @@ from lmx.example_runner import run_case_example_cli
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a Hunt example and generate summary plots.")
+    parser = argparse.ArgumentParser(
+        description="Run a Hunt example and generate summary plots."
+    )
     parser.add_argument("--ha", type=float, default=20.0)
     parser.add_argument("--ny", type=int, default=64)
     parser.add_argument("--nz", type=int, default=64)
     parser.add_argument("--reference-root", type=Path, default=None)
-    parser.add_argument("--output", type=Path, default=Path("./artifacts/examples/hunt"))
+    parser.add_argument(
+        "--output", type=Path, default=Path("./artifacts/examples/hunt")
+    )
     args = parser.parse_args(argv)
     return run_case_example_cli(
         case_kind="hunt",

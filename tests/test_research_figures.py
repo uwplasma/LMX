@@ -26,7 +26,9 @@ def test_research_grade_external_target_tables_are_candidate_only(tmp_path: Path
 
     assert len(outputs) == 5
     assert len(VOTYAKOV_FIG7A_DIGITIZED) >= 20
-    magnetic_candidate = tmp_path / "magnetic_obstacle_reference_observables_candidate.csv"
+    magnetic_candidate = (
+        tmp_path / "magnetic_obstacle_reference_observables_candidate.csv"
+    )
     magnetic_text = magnetic_candidate.read_text(encoding="utf-8")
     assert "minimum_centerline_velocity_ratio" in magnetic_text
     assert "Candidate target only" in magnetic_text
@@ -170,7 +172,11 @@ def test_research_grade_closure_dashboard_writes_media_and_summary(tmp_path: Pat
     )
 
     assert [path.suffix for path in outputs] == [".png", ".pdf", ".json"]
-    summary = json.loads((tmp_path / "research_grade_closure_dashboard_summary.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (tmp_path / "research_grade_closure_dashboard_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert summary["q2d_sidewall_gate_closed"] is True
     assert summary["magnetic_obstacle_external_validation_pass"] is False
     assert summary["research_grade_ready"] is False

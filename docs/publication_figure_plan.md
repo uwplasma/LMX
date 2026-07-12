@@ -41,24 +41,24 @@ liquid-metal MHD literature:
 
 | Figure family | What the plot should show | Current LMX generator | Needed additions |
 |---|---|---|---|
-| Closed duct analytical validation | Shercliff/Hunt profiles, layer zooms, `L2/L∞` convergence, pressure-gradient parity versus `Ha` and wall conductance | `examples/straight_duct_profile_comparison.py`, `examples/hartmann_validation_ladder.py` | Add a single publication table that combines mesh, `Ha`, wall conductance, and FreeMHD observable errors |
-| FreeMHD observable parity | `u`, `φ`, `J`, `J×B`, pressure-gradient, transient `u_max(t)`, runtime and memory on matched cases | `examples/freemhd_closed_channel_observable_parity.py`, `examples/freemhd_closed_channel_flow_rate_parity.py` | Add electric-current streamline or vector plots and a ranked offender table with rerun commands |
+| Closed duct analytical validation | Shercliff/Hunt profiles, layer zooms, `L2/L∞` convergence, pressure-gradient parity versus `Ha` and wall conductance | `campaigns/ducts/straight_duct_profile_comparison.py`, `campaigns/ducts/hartmann_validation_ladder.py` | Add a single publication table that combines mesh, `Ha`, wall conductance, and FreeMHD observable errors |
+| FreeMHD observable parity | `u`, `φ`, `J`, `J×B`, pressure-gradient, transient `u_max(t)`, runtime and memory on matched cases | `examples/freemhd_closed_channel_observable_parity.py`, `campaigns/freemhd/freemhd_closed_channel_flow_rate_parity.py` | Add electric-current streamline or vector plots and a ranked offender table with rerun commands |
 | WHAM blanket geometry and field | Pipe route, coil position, centerline `B`, transverse `B_\perp`, mapped-mesh QA, current closure residual | WHAM geometry, mesh, field, and current-closure examples | Add one combined overview panel with geometry, field contours, mesh slice, and current-closure summary |
-| WHAM blanket pressure drop | Cumulative `Δp(s)`, pressure-budget components, `Δp` versus `B`, `U`, coil separation, and pipe radius | `examples/wham_blanket_flow_demo.py`, `examples/wham_blanket_autodiff_research_demo.py` | Add velocity and radius sweeps, then a nondimensional pressure plot versus `Ha`, `N`, and Dean number |
-| WHAM curved-bend velocity skew | Inboard/outboard axial velocity during startup and steady state, with the inboard side slower than the outboard side in the bend | `examples/wham_blanket_flow_demo.py` | Replace the reduced Dean-skew proxy with a resolved secondary-flow solve and validate against curved-pipe MHD literature |
-| Magnetic obstacle | Setup schematic, centerline velocity deficit, cross-cut distortion, pressure/drop drag proxy, `curl(J×B)` layer indicator | `examples/magnetic_obstacle_benchmark.py` | Import external reference observables from Cuevas/Smolentsev/Abdou or a reproducible external-code run |
+| WHAM blanket pressure drop | Cumulative `Δp(s)`, pressure-budget components, `Δp` versus `B`, `U`, coil separation, and pipe radius | `campaigns/blanket/wham_blanket_flow_demo.py`, `campaigns/blanket/wham_blanket_autodiff_research_demo.py` | Add velocity and radius sweeps, then a nondimensional pressure plot versus `Ha`, `N`, and Dean number |
+| WHAM curved-bend velocity skew | Inboard/outboard axial velocity during startup and steady state, with the inboard side slower than the outboard side in the bend | `campaigns/blanket/wham_blanket_flow_demo.py` | Replace the reduced Dean-skew proxy with a resolved secondary-flow solve and validate against curved-pipe MHD literature |
+| Magnetic obstacle | Setup schematic, centerline velocity deficit, cross-cut distortion, pressure/drop drag proxy, `curl(J×B)` layer indicator | `campaigns/magnetic_obstacle/magnetic_obstacle_benchmark.py` | Import external reference observables from Cuevas/Smolentsev/Abdou or a reproducible external-code run |
 | Q2D turbulence | Vorticity movie, kinetic energy, enstrophy, spectra, Hartmann-friction decay, transient-growth comparison | Q2D decay/forced examples | Add external Q2D reference run and acceptance gates on energy decay and spectra |
-| Bent pipe Dean-vortex validation | Axial velocity contours, outboard shift, secondary-flow streamfunction/vorticity, pressure drop versus `De` and `Ha` | `examples/bent_pipe_inductionless_demo.py`, WHAM blanket flow preview | Add a resolved cross-section secondary-flow state and mesh ladder |
+| Bent pipe Dean-vortex validation | Axial velocity contours, outboard shift, secondary-flow streamfunction/vorticity, pressure drop versus `De` and `Ha` | `campaigns/fringing/bent_pipe_inductionless_demo.py`, WHAM blanket flow preview | Add a resolved cross-section secondary-flow state and mesh ladder |
 | Variable/tabulated fields | Interpolation error, `∇·B`, field-line/contour plots, pressure response, autodiff sensitivities to coil parameters | variable-field and WHAM field examples | Add divergence-cleaning comparisons and full sensitivity plots for tabulated fields |
 | Performance and differentiability | CPU/GPU strong scaling, memory, compile time, gradient runtime, optimization trajectory | strong-scaling and autodiff examples | Tie all performance plots to the real operator paths used by the validation figures |
-| Strict closure dashboard | Closed support gates, external strict mismatches, and research-grade closure ledger | `examples/research_grade_closure_dashboard.py` | Replace failed panels with passed solved-physics comparisons as each lane closes |
+| Strict closure dashboard | Closed support gates, external strict mismatches, and research-grade closure ledger | `campaigns/status/research_grade_closure_dashboard.py` | Replace failed panels with passed solved-physics comparisons as each lane closes |
 
 ## Required Code Features
 
 - `lmx.publication` or `lmx.validation_figures`: thin orchestration helpers that
   collect already-existing plotting functions into a reproducible manuscript
   campaign without making examples too large.
-- `examples/publication_figure_campaign.py`: a bounded default campaign that
+- `campaigns/publication/publication_figure_campaign.py`: a bounded default campaign that
   records all tracked manuscript figures, optionally refreshes the fast WHAM
   figure family, and writes one summary JSON plus a CSV table.
 - `examples/publication_heavy_campaign.py`: opt-in heavy campaign for external
@@ -95,9 +95,9 @@ over a mesh/`De`/`Ha` ladder.
 1. Keep the current WHAM pressure and movie artifacts with the bend
    inboard/outboard velocity diagnostic now present in the movie, transient
    panel, CSV, and JSON summary.
-2. Keep `examples/publication_figure_campaign.py` as the bounded manifest gate
+2. Keep `campaigns/publication/publication_figure_campaign.py` as the bounded manifest gate
    for all currently available manuscript artifacts.
-3. Keep `examples/research_grade_closure_dashboard.py` as the reviewer-facing
+3. Keep `campaigns/status/research_grade_closure_dashboard.py` as the reviewer-facing
    closure ledger for strict blockers and support gates.
 4. Add the combined WHAM overview panel and nondimensional pressure-sweep plots
    versus `Ha`, `N`, `De`, and `B^2`.

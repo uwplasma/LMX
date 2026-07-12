@@ -58,7 +58,9 @@ def test_run_full_validation_exercise_writes_combined_summary(
         }
         out_path.write_text(__import__("json").dumps(payload))
         csv_path = out_path.with_suffix(".csv")
-        csv_path.write_text("key,case\nfringing_rect_duct_ha10_n8,fringing_rect_duct_ha10\n")
+        csv_path.write_text(
+            "key,case\nfringing_rect_duct_ha10_n8,fringing_rect_duct_ha10\n"
+        )
         return 0
 
     monkeypatch.setattr(suite.validation_suite, "main", fake_validation_main)
@@ -75,7 +77,9 @@ def test_run_full_validation_exercise_writes_combined_summary(
         ]
     )
 
-    summary = __import__("json").loads((output / "full_validation_summary.json").read_text())
+    summary = __import__("json").loads(
+        (output / "full_validation_summary.json").read_text()
+    )
     markdown = (output / "full_validation_summary.md").read_text()
     csv_text = (output / "full_validation_summary.csv").read_text()
 
@@ -112,6 +116,8 @@ def test_run_full_validation_exercise_respects_fail_on_threshold(
     monkeypatch.setattr(suite.validation_suite, "main", fake_validation_main)
     monkeypatch.setattr(suite.manual_validation, "main", fake_manual_main)
 
-    exit_code = suite.main(["--output", str(output), "--ha-values", "10", "--fail-on-threshold"])
+    exit_code = suite.main(
+        ["--output", str(output), "--ha-values", "10", "--fail-on-threshold"]
+    )
 
     assert exit_code == 1

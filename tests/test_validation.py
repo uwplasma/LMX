@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import jax.numpy as jnp
 import pytest
 
-import lmx.solvers as solvers
 import lmx.validation as validation
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
@@ -18,6 +17,7 @@ from lmx.validation import (
     _fluid_axis_profile,
     closed_channel_validation,
     compare_normalized_profiles,
+    compare_profiles_with_shared_scale,
     compare_with_reference_outputs,
     combined_profile_error,
     duct_layer_resolution_gate,
@@ -59,11 +59,6 @@ from lmx.validation import (
 pytestmark = pytest.mark.validation
 
 
-@pytest.fixture(autouse=True)
-def disable_jit(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(solvers.jax, "jit", lambda fn: fn)
-
-
 def _synthetic_solution(case, *, oscillatory: bool = False) -> Solution:
     mesh = _build_mesh(case)
     y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
@@ -72,7 +67,6 @@ def _synthetic_solution(case, *, oscillatory: bool = False) -> Solution:
         profile = profile * jnp.cos(6.0 * y)
     if mesh.fluid_mask is not None:
         profile = jnp.where(mesh.fluid_mask, profile, 0.0)
-    zeros = jnp.zeros_like(profile)
     diagnostics = Diagnostics(
         residual_history=jnp.asarray([1.0e-2, 1.0e-4, 1.0e-6]),
         courant_like=jnp.asarray([0.1, 0.08, 0.06]),
@@ -126,8 +120,12 @@ def test_hartmann_profile_center_is_maximum():
 
 def test_extract_midplane_scalar_profile_returns_requested_field():
     solution = _synthetic_solution(make_hartmann_case(ha=5.0, ny=6, nz=6))
-    y_profile = extract_midplane_scalar_profile(solution, solution.state.jy, axis="y", fluid_only=True)
-    z_profile = extract_midplane_scalar_profile(solution, solution.state.lorentz_x, axis="z", fluid_only=True)
+    y_profile = extract_midplane_scalar_profile(
+        solution, solution.state.jy, axis="y", fluid_only=True
+    )
+    z_profile = extract_midplane_scalar_profile(
+        solution, solution.state.lorentz_x, axis="z", fluid_only=True
+    )
     assert y_profile["coordinate"].size == y_profile["value"].size
     assert z_profile["coordinate"].size == z_profile["value"].size
     assert float(jnp.max(jnp.abs(y_profile["value"]))) > 0.0
@@ -140,8 +138,20 @@ def test_extract_centerline_uses_exact_zero_column_when_available():
     phi = 2.0 * u
     solution = Solution(
         mesh=mesh,
-        state=MHDState(u=u, phi=phi, jy=jnp.zeros_like(u), jz=jnp.zeros_like(u), lorentz_x=jnp.zeros_like(u), time=0.0, residual=0.0),
-        diagnostics=Diagnostics(residual_history=jnp.zeros((0,)), courant_like=jnp.zeros((0,)), ohmic_power=jnp.zeros((0,))),
+        state=MHDState(
+            u=u,
+            phi=phi,
+            jy=jnp.zeros_like(u),
+            jz=jnp.zeros_like(u),
+            lorentz_x=jnp.zeros_like(u),
+            time=0.0,
+            residual=0.0,
+        ),
+        diagnostics=Diagnostics(
+            residual_history=jnp.zeros((0,)),
+            courant_like=jnp.zeros((0,)),
+            ohmic_power=jnp.zeros((0,)),
+        ),
         case_name="exact_centerline",
     )
 
@@ -159,8 +169,20 @@ def test_extract_midplane_profile_uses_exact_zero_row_when_available():
     phi = -u
     solution = Solution(
         mesh=mesh,
-        state=MHDState(u=u, phi=phi, jy=jnp.zeros_like(u), jz=jnp.zeros_like(u), lorentz_x=jnp.zeros_like(u), time=0.0, residual=0.0),
-        diagnostics=Diagnostics(residual_history=jnp.zeros((0,)), courant_like=jnp.zeros((0,)), ohmic_power=jnp.zeros((0,))),
+        state=MHDState(
+            u=u,
+            phi=phi,
+            jy=jnp.zeros_like(u),
+            jz=jnp.zeros_like(u),
+            lorentz_x=jnp.zeros_like(u),
+            time=0.0,
+            residual=0.0,
+        ),
+        diagnostics=Diagnostics(
+            residual_history=jnp.zeros((0,)),
+            courant_like=jnp.zeros((0,)),
+            ohmic_power=jnp.zeros((0,)),
+        ),
         case_name="exact_midplane",
     )
 
@@ -181,8 +203,14 @@ def test_combined_profile_error_returns_zero_for_empty_input():
 
 def test_dominant_magnetic_axis_handles_zero_and_nonconstant_fields():
     zero_case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    zero_case = replace(zero_case, magnetic_field=replace(zero_case.magnetic_field, value=(0.0, 0.0, 0.0)))
-    varying_case = replace(zero_case, magnetic_field=replace(zero_case.magnetic_field, kind="analytic", value=None))
+    zero_case = replace(
+        zero_case,
+        magnetic_field=replace(zero_case.magnetic_field, value=(0.0, 0.0, 0.0)),
+    )
+    varying_case = replace(
+        zero_case,
+        magnetic_field=replace(zero_case.magnetic_field, kind="analytic", value=None),
+    )
 
     assert _dominant_magnetic_axis(zero_case) is None
     assert _dominant_magnetic_axis(varying_case) is None
@@ -204,9 +232,13 @@ def test_fluid_axis_profile_and_layer_metrics_cover_empty_and_invalid_paths():
 
 def test_layer_resolution_metrics_reject_unsupported_or_empty_fluid_meshes():
     case = make_hartmann_case(ha=20.0, ny=4, nz=4)
-    x_field_case = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
+    x_field_case = replace(
+        case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0))
+    )
     assert duct_layer_resolution_metrics(x_field_case, _build_mesh(x_field_case)) == {}
-    unsupported_gate = duct_layer_resolution_gate(x_field_case, _build_mesh(x_field_case))
+    unsupported_gate = duct_layer_resolution_gate(
+        x_field_case, _build_mesh(x_field_case)
+    )
     assert unsupported_gate["layer_resolution_supported"] is False
     assert unsupported_gate["minimum_mesh_refinement_factor"] == pytest.approx(0.0)
 
@@ -222,9 +254,22 @@ def test_layer_resolution_metrics_reject_unsupported_or_empty_fluid_meshes():
     assert validation._exact_coordinate_index(jnp.asarray([])) is None
 
     with pytest.raises(ValueError, match="Unsupported axis"):
-        validation._profile_axis_mask(SimpleNamespace(mesh=SimpleNamespace(fluid_mask=None), state=SimpleNamespace(u=jnp.zeros((2, 2)))), "x", 0)
+        validation._profile_axis_mask(
+            SimpleNamespace(
+                mesh=SimpleNamespace(fluid_mask=None),
+                state=SimpleNamespace(u=jnp.zeros((2, 2))),
+            ),
+            "x",
+            0,
+        )
     with pytest.raises(ValueError, match="Unsupported axis"):
-        validation._profile_axis_mask(SimpleNamespace(mesh=empty_mesh, state=SimpleNamespace(u=jnp.zeros((2, 2)))), "x", 0)
+        validation._profile_axis_mask(
+            SimpleNamespace(
+                mesh=empty_mesh, state=SimpleNamespace(u=jnp.zeros((2, 2)))
+            ),
+            "x",
+            0,
+        )
 
 
 def test_compare_normalized_profiles_handles_cell_centered_simulation_against_wall_sample():
@@ -299,6 +344,60 @@ def test_compare_normalized_profiles_overwrites_existing_boundary_values():
     assert comparison.simulated[-1] == pytest.approx(0.0)
 
 
+def test_shared_scale_profile_comparison_preserves_amplitude_error_and_gauge_offsets():
+    coordinate = jnp.asarray([-0.1, 0.0, 0.1])
+    reference = jnp.asarray([2.0, 4.0, 2.0])
+    simulated = jnp.asarray([3.0, 5.5, 3.0])
+
+    comparison = compare_profiles_with_shared_scale(
+        coordinate,
+        simulated,
+        coordinate,
+        reference,
+        coordinate_scale=0.1,
+        value_scale=2.0,
+        simulated_offset=1.0,
+        reference_offset=0.0,
+    )
+
+    assert comparison.coordinate.tolist() == pytest.approx([-1.0, 0.0, 1.0])
+    assert comparison.reference.tolist() == pytest.approx([1.0, 2.0, 1.0])
+    assert comparison.simulated.tolist() == pytest.approx([1.0, 2.25, 1.0])
+    assert comparison.linf_error == pytest.approx(0.25)
+
+
+def test_shared_scale_profile_comparison_adds_declared_boundary_values():
+    comparison = compare_profiles_with_shared_scale(
+        jnp.asarray([-0.05, 0.0, 0.05]),
+        jnp.asarray([1.0, 2.0, 1.0]),
+        jnp.asarray([-0.1, 0.0, 0.1]),
+        jnp.asarray([0.0, 2.0, 0.0]),
+        coordinate_scale=0.1,
+        value_scale=2.0,
+        simulated_boundary_values=(0.0, 0.0),
+    )
+
+    assert comparison.simulated.tolist() == pytest.approx([0.0, 1.0, 0.0])
+    assert comparison.l2_error == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize(
+    "name,value", [("coordinate_scale", 0.0), ("value_scale", -1.0)]
+)
+def test_shared_scale_profile_comparison_rejects_nonpositive_scales(
+    name: str, value: float
+):
+    kwargs = {"coordinate_scale": 1.0, "value_scale": 1.0, name: value}
+    with pytest.raises(ValueError, match=f"{name} must be positive"):
+        compare_profiles_with_shared_scale(
+            jnp.asarray([0.0]),
+            jnp.asarray([1.0]),
+            jnp.asarray([0.0]),
+            jnp.asarray([1.0]),
+            **kwargs,
+        )
+
+
 def test_profile_sign_changes_and_negative_fraction_handle_oscillatory_profiles():
     profile = jnp.asarray([0.1, 0.05, -0.02, -0.01, 0.03, 0.02])
 
@@ -324,7 +423,9 @@ def test_duct_layer_resolution_metrics_reports_cells_for_supported_ducts():
 
 
 def test_duct_mesh_quality_metrics_reports_spacing_and_condition_proxy():
-    mesh = generate_rect_duct_mesh(width=0.2, height=0.1, ny=8, nz=4, target_ha=20.0, magnetic_axis="y")
+    mesh = generate_rect_duct_mesh(
+        width=0.2, height=0.1, ny=8, nz=4, target_ha=20.0, magnetic_axis="y"
+    )
 
     metrics = duct_mesh_quality_metrics(mesh)
 
@@ -337,15 +438,24 @@ def test_duct_mesh_quality_metrics_reports_spacing_and_condition_proxy():
 
 
 def test_duct_layer_resolution_gate_marks_publication_mesh_readiness():
-    coarse_case = make_hunt_case(ha=20.0, width=0.2, height=0.2, ny=16, nz=16, wall_cells=2)
-    retained_case = make_hunt_case(ha=20.0, width=0.2, height=0.2, ny=49, nz=49, wall_cells=2)
+    coarse_case = make_hunt_case(
+        ha=20.0, width=0.2, height=0.2, ny=16, nz=16, wall_cells=2
+    )
+    retained_case = make_hunt_case(
+        ha=20.0, width=0.2, height=0.2, ny=49, nz=49, wall_cells=2
+    )
 
     coarse_gate = duct_layer_resolution_gate(coarse_case, _build_mesh(coarse_case))
-    retained_gate = duct_layer_resolution_gate(retained_case, _build_mesh(retained_case))
+    retained_gate = duct_layer_resolution_gate(
+        retained_case, _build_mesh(retained_case)
+    )
 
     assert coarse_gate["layer_resolution_pass"] is False
     assert coarse_gate["minimum_mesh_refinement_factor"] > 1.0
-    assert coarse_gate["hartmann_layer_cell_ratio"] < 1.0 or coarse_gate["side_layer_cell_ratio"] < 1.0
+    assert (
+        coarse_gate["hartmann_layer_cell_ratio"] < 1.0
+        or coarse_gate["side_layer_cell_ratio"] < 1.0
+    )
     assert retained_gate["hartmann_layer_resolution_pass"] is True
     assert retained_gate["side_layer_resolution_pass"] is True
     assert retained_gate["layer_resolution_pass"] is True
@@ -355,7 +465,15 @@ def test_duct_layer_resolution_gate_marks_publication_mesh_readiness():
 
 
 def test_duct_layer_resolution_gate_tolerates_exact_threshold_roundoff():
-    case = make_hunt_case(ha=100.0, width=0.2, height=0.2, ny=81, nz=81, wall_cells=12, wall_thickness=0.02)
+    case = make_hunt_case(
+        ha=100.0,
+        width=0.2,
+        height=0.2,
+        ny=81,
+        nz=81,
+        wall_cells=12,
+        wall_thickness=0.02,
+    )
 
     gate = duct_layer_resolution_gate(case, _build_mesh(case))
 
@@ -416,38 +534,76 @@ def test_extract_centerline_and_midplane_profile_cover_singleton_and_invalid_axi
 
 def test_midplane_extraction_covers_singleton_degenerate_and_scalar_paths():
     singleton_y_solution = SimpleNamespace(
-        mesh=SimpleNamespace(y_centers=jnp.asarray([0.0]), z_centers=jnp.asarray([-0.5, 0.5]), fluid_mask=None),
-        state=SimpleNamespace(u=jnp.asarray([[1.0, 3.0]]), phi=jnp.asarray([[2.0, 6.0]]), jy=jnp.asarray([[4.0, 8.0]])),
+        mesh=SimpleNamespace(
+            y_centers=jnp.asarray([0.0]),
+            z_centers=jnp.asarray([-0.5, 0.5]),
+            fluid_mask=None,
+        ),
+        state=SimpleNamespace(
+            u=jnp.asarray([[1.0, 3.0]]),
+            phi=jnp.asarray([[2.0, 6.0]]),
+            jy=jnp.asarray([[4.0, 8.0]]),
+        ),
     )
-    z_profile = extract_midplane_profile(singleton_y_solution, axis="z", fluid_only=True)
-    z_scalar = extract_midplane_scalar_profile(singleton_y_solution, singleton_y_solution.state.jy, axis="z")
+    z_profile = extract_midplane_profile(
+        singleton_y_solution, axis="z", fluid_only=True
+    )
+    z_scalar = extract_midplane_scalar_profile(
+        singleton_y_solution, singleton_y_solution.state.jy, axis="z"
+    )
     assert jnp.allclose(z_profile["u"], jnp.asarray([1.0, 3.0]))
     assert jnp.allclose(z_scalar["value"], jnp.asarray([4.0, 8.0]))
 
     singleton_z_solution = SimpleNamespace(
-        mesh=SimpleNamespace(y_centers=jnp.asarray([-0.5, 0.5]), z_centers=jnp.asarray([0.0]), fluid_mask=None),
-        state=SimpleNamespace(u=jnp.asarray([[1.0], [3.0]]), phi=jnp.asarray([[2.0], [6.0]]), jy=jnp.asarray([[5.0], [7.0]])),
+        mesh=SimpleNamespace(
+            y_centers=jnp.asarray([-0.5, 0.5]),
+            z_centers=jnp.asarray([0.0]),
+            fluid_mask=None,
+        ),
+        state=SimpleNamespace(
+            u=jnp.asarray([[1.0], [3.0]]),
+            phi=jnp.asarray([[2.0], [6.0]]),
+            jy=jnp.asarray([[5.0], [7.0]]),
+        ),
     )
-    y_profile = extract_midplane_profile(singleton_z_solution, axis="y", fluid_only=True)
-    y_scalar = extract_midplane_scalar_profile(singleton_z_solution, singleton_z_solution.state.jy, axis="y")
+    y_profile = extract_midplane_profile(
+        singleton_z_solution, axis="y", fluid_only=True
+    )
+    y_scalar = extract_midplane_scalar_profile(
+        singleton_z_solution, singleton_z_solution.state.jy, axis="y"
+    )
     assert jnp.allclose(y_profile["u"], jnp.asarray([1.0, 3.0]))
     assert jnp.allclose(y_scalar["value"], jnp.asarray([5.0, 7.0]))
 
     exact_centers = jnp.asarray([-0.5, 0.0, 0.5])
     exact_solution = SimpleNamespace(
-        mesh=SimpleNamespace(y_centers=exact_centers, z_centers=exact_centers, fluid_mask=None),
+        mesh=SimpleNamespace(
+            y_centers=exact_centers, z_centers=exact_centers, fluid_mask=None
+        ),
         state=SimpleNamespace(
             u=jnp.arange(9, dtype=float).reshape((3, 3)),
             phi=jnp.zeros((3, 3)),
             jy=jnp.arange(10, 19, dtype=float).reshape((3, 3)),
         ),
     )
-    assert jnp.allclose(extract_midplane_scalar_profile(exact_solution, exact_solution.state.jy, axis="y")["value"], exact_solution.state.jy[:, 1])
-    assert jnp.allclose(extract_midplane_scalar_profile(exact_solution, exact_solution.state.jy, axis="z")["value"], exact_solution.state.jy[1, :])
+    assert jnp.allclose(
+        extract_midplane_scalar_profile(
+            exact_solution, exact_solution.state.jy, axis="y"
+        )["value"],
+        exact_solution.state.jy[:, 1],
+    )
+    assert jnp.allclose(
+        extract_midplane_scalar_profile(
+            exact_solution, exact_solution.state.jy, axis="z"
+        )["value"],
+        exact_solution.state.jy[1, :],
+    )
 
     degenerate_centers = jnp.asarray([0.1, 0.1])
     degenerate_solution = SimpleNamespace(
-        mesh=SimpleNamespace(y_centers=degenerate_centers, z_centers=degenerate_centers, fluid_mask=None),
+        mesh=SimpleNamespace(
+            y_centers=degenerate_centers, z_centers=degenerate_centers, fluid_mask=None
+        ),
         state=SimpleNamespace(
             u=jnp.asarray([[1.0, 5.0], [3.0, 7.0]]),
             phi=jnp.asarray([[2.0, 10.0], [6.0, 14.0]]),
@@ -456,8 +612,12 @@ def test_midplane_extraction_covers_singleton_degenerate_and_scalar_paths():
     )
     centerline = validation.extract_centerline(degenerate_solution)
     degenerate_z = extract_midplane_profile(degenerate_solution, axis="z")
-    degenerate_y_scalar = extract_midplane_scalar_profile(degenerate_solution, degenerate_solution.state.jy, axis="y")
-    degenerate_z_scalar = extract_midplane_scalar_profile(degenerate_solution, degenerate_solution.state.jy, axis="z")
+    degenerate_y_scalar = extract_midplane_scalar_profile(
+        degenerate_solution, degenerate_solution.state.jy, axis="y"
+    )
+    degenerate_z_scalar = extract_midplane_scalar_profile(
+        degenerate_solution, degenerate_solution.state.jy, axis="z"
+    )
 
     assert jnp.allclose(centerline["u"], jnp.asarray([3.0, 5.0]))
     assert jnp.allclose(degenerate_z["u"], jnp.asarray([2.0, 6.0]))
@@ -465,22 +625,30 @@ def test_midplane_extraction_covers_singleton_degenerate_and_scalar_paths():
     assert jnp.allclose(degenerate_z_scalar["value"], jnp.asarray([8.0, 12.0]))
 
     with pytest.raises(ValueError, match="Unsupported axis"):
-        extract_midplane_scalar_profile(degenerate_solution, degenerate_solution.state.jy, axis="bad")
+        extract_midplane_scalar_profile(
+            degenerate_solution, degenerate_solution.state.jy, axis="bad"
+        )
 
 
 def test_hartmann_acceptance_covers_failing_path():
     case = make_hartmann_case(ha=50.0, ny=6, nz=6)
     solution = _synthetic_solution(case, oscillatory=True)
 
-    acceptance = hartmann_acceptance(solution, 50.0, l2_threshold=1.0e-4, linf_threshold=1.0e-4)
+    acceptance = hartmann_acceptance(
+        solution, 50.0, l2_threshold=1.0e-4, linf_threshold=1.0e-4
+    )
 
     assert acceptance.passed is False
     assert acceptance.passed_l2 is False or acceptance.passed_linf is False
 
 
-def test_compare_with_reference_outputs_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_compare_with_reference_outputs_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     case = make_hartmann_case()
-    monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
+    monkeypatch.setattr(
+        validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec)
+    )
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
     (tmp_path / "0").mkdir()
@@ -490,12 +658,26 @@ def test_compare_with_reference_outputs_report(tmp_path: Path, monkeypatch: pyte
     (tmp_path / "system" / "controlDict").write_text("application epotMultiRegionFoam;")
     (tmp_path / "0" / "fluid" / "U").write_text("internalField uniform (0 0 0);")
     (tmp_path / "0" / "fluid" / "potE").write_text("internalField uniform 0;")
-    (tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat").write_text(
-        "# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n"
-    )
+    (
+        tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    ).write_text("# header\n0.1 mag(U) 0.0 (0 0 0) 0 0.25 (0 0 0) 0\n")
     sample_lines = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
-    (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1" / "centerlineY_potE_U.xy").write_text(sample_lines)
-    (tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1" / "centerlineZ_potE_U.xy").write_text(sample_lines)
+    (
+        tmp_path
+        / "postProcessing"
+        / "sampleDict"
+        / "liquid"
+        / "0.1"
+        / "centerlineY_potE_U.xy"
+    ).write_text(sample_lines)
+    (
+        tmp_path
+        / "postProcessing"
+        / "sampleDict"
+        / "liquid"
+        / "0.1"
+        / "centerlineZ_potE_U.xy"
+    ).write_text(sample_lines)
     report = compare_with_reference_outputs(case, tmp_path)
     path = write_validation_report(report, tmp_path / "report.json")
     assert path.exists()
@@ -508,9 +690,13 @@ def test_compare_with_reference_outputs_report(tmp_path: Path, monkeypatch: pyte
     assert "reference_sample_y_l2_error" in report.metrics
 
 
-def test_compare_with_reference_outputs_handles_missing_minmax_and_samples(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_compare_with_reference_outputs_handles_missing_minmax_and_samples(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     case = make_hartmann_case()
-    monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
+    monkeypatch.setattr(
+        validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec)
+    )
     (tmp_path / "system").mkdir()
     (tmp_path / "constant").mkdir()
     (tmp_path / "0").mkdir()
@@ -523,9 +709,13 @@ def test_compare_with_reference_outputs_handles_missing_minmax_and_samples(tmp_p
     assert report.metrics["sampled_profile_pair_available"] == pytest.approx(0.0)
 
 
-def test_compare_with_reference_outputs_solves_when_only_sample_profiles_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_compare_with_reference_outputs_solves_when_only_sample_profiles_exist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     case = make_hartmann_case(ha=5.0, ny=6, nz=6)
-    monkeypatch.setattr(validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec))
+    monkeypatch.setattr(
+        validation, "solve_transient", lambda case_spec: _synthetic_solution(case_spec)
+    )
     sample_root = tmp_path / "postProcessing" / "sampleDict" / "liquid" / "0.1"
     sample_root.mkdir(parents=True)
     rows = "0.0 0.0 0.0 0.0 0.0\n1.0 0.0 1.0 0.0 0.0\n2.0 0.0 0.0 0.0 0.0\n"
@@ -548,7 +738,10 @@ def test_duct_profile_metrics_reports_sign_pathology():
     assert "centerline_y_sign_changes" in metrics
     assert "centerline_z_sign_changes" in metrics
     assert "centerline_y_negative_fraction" in metrics
-    assert metrics["centerline_y_sign_changes"] > 0.0 or metrics["centerline_y_negative_fraction"] > 0.0
+    assert (
+        metrics["centerline_y_sign_changes"] > 0.0
+        or metrics["centerline_y_negative_fraction"] > 0.0
+    )
 
 
 def test_inspect_reference_case_collects_case_structure(tmp_path: Path):
@@ -620,7 +813,9 @@ def test_infer_sampling_geometry_prefers_mesh_bounds_when_points_exist(tmp_path:
         "(1.2 0.1 0.2)\n"
         ")\n"
     )
-    minmax_path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    minmax_path = (
+        tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    )
     minmax_path.parent.mkdir(parents=True)
     minmax_path.write_text(
         "# header\n"
@@ -641,7 +836,9 @@ def test_infer_sampling_geometry_prefers_mesh_bounds_when_points_exist(tmp_path:
     assert geometry.z_max == pytest.approx(0.2)
 
 
-def test_infer_sampling_geometry_keeps_field_based_x_for_conducting_wall_cases(tmp_path: Path):
+def test_infer_sampling_geometry_keeps_field_based_x_for_conducting_wall_cases(
+    tmp_path: Path,
+):
     points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
     points_path.parent.mkdir(parents=True)
     points_path.write_text(
@@ -652,13 +849,17 @@ def test_infer_sampling_geometry_keeps_field_based_x_for_conducting_wall_cases(t
         "(1.0 0.1 0.1)\n"
         ")\n"
     )
-    liquid_props = tmp_path / "constant" / "liquid" / "thermophysicalProperties.liquidMetal"
+    liquid_props = (
+        tmp_path / "constant" / "liquid" / "thermophysicalProperties.liquidMetal"
+    )
     liquid_props.parent.mkdir(parents=True, exist_ok=True)
     liquid_props.write_text("elcond [-1 -3  3 0 0 2 0]1e6;\n")
     wall_props = tmp_path / "constant" / "solidWalls" / "thermophysicalProperties"
     wall_props.parent.mkdir(parents=True, exist_ok=True)
     wall_props.write_text("elcond 5e6;\n")
-    minmax_path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    minmax_path = (
+        tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    )
     minmax_path.parent.mkdir(parents=True)
     minmax_path.write_text(
         "# header\n"
@@ -691,7 +892,9 @@ def test_infer_mesh_axis_coordinates_and_boundary_interior_selection(tmp_path: P
     assert interior_sample_coordinate(coordinates, 1.0) == pytest.approx(0.015)
 
 
-def test_infer_sampling_geometry_uses_first_interior_streamwise_plane_for_boundary_cut(tmp_path: Path):
+def test_infer_sampling_geometry_uses_first_interior_streamwise_plane_for_boundary_cut(
+    tmp_path: Path,
+):
     points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
     points_path.parent.mkdir(parents=True)
     points_path.write_text(
@@ -704,13 +907,17 @@ def test_infer_sampling_geometry_uses_first_interior_streamwise_plane_for_bounda
         "(1.0 0.1 0.1)\n"
         ")\n"
     )
-    liquid_props = tmp_path / "constant" / "liquid" / "thermophysicalProperties.liquidMetal"
+    liquid_props = (
+        tmp_path / "constant" / "liquid" / "thermophysicalProperties.liquidMetal"
+    )
     liquid_props.parent.mkdir(parents=True, exist_ok=True)
     liquid_props.write_text("elcond [-1 -3  3 0 0 2 0]1e6;\n")
     wall_props = tmp_path / "constant" / "solidWalls" / "thermophysicalProperties"
     wall_props.parent.mkdir(parents=True, exist_ok=True)
     wall_props.write_text("elcond 5e6;\n")
-    minmax_path = tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    minmax_path = (
+        tmp_path / "postProcessing" / "liquid" / "minMax" / "0" / "fieldMinMax.dat"
+    )
     minmax_path.parent.mkdir(parents=True)
     minmax_path.write_text(
         "# header\n"
@@ -810,7 +1017,9 @@ def test_extract_midplane_profile_averages_even_grid_centerlines():
     assert jnp.allclose(z_profile["phi"], 0.5 * (phi[1, :] + phi[2, :]))
 
 
-def test_latest_reference_sampled_profiles_prefers_newest_file_when_times_match(tmp_path: Path):
+def test_latest_reference_sampled_profiles_prefers_newest_file_when_times_match(
+    tmp_path: Path,
+):
     older_root = tmp_path / "postProcessing" / "lmxAutoSampleDict" / "liquid" / "0.0001"
     newer_root = tmp_path / "postProcessing" / "lmxCiSampleDict" / "liquid" / "0.0001"
     older_root.mkdir(parents=True)
@@ -837,7 +1046,9 @@ def test_hartmann_validation_writer(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=16, nz=16)
     solution = _synthetic_solution(case)
     comparison = hartmann_validation(solution, ha=5.0)
-    path = write_analytic_comparison(comparison, tmp_path / "analytic.json", axis_name="y")
+    path = write_analytic_comparison(
+        comparison, tmp_path / "analytic.json", axis_name="y"
+    )
     assert path.exists()
 
 
@@ -868,18 +1079,27 @@ def test_closed_channel_validation_writer(tmp_path: Path):
     )
     case = make_shercliff_case(ha=2.0, ny=12, nz=12)
     solution = _synthetic_solution(case)
-    comparison = closed_channel_validation(solution, "shercliff", 2, reference_root=tmp_path / "ClosedChannel")
-    path = write_closed_channel_validation(comparison, tmp_path / "closed_channel_validation.json")
+    comparison = closed_channel_validation(
+        solution, "shercliff", 2, reference_root=tmp_path / "ClosedChannel"
+    )
+    path = write_closed_channel_validation(
+        comparison, tmp_path / "closed_channel_validation.json"
+    )
     assert path.exists()
 
 
 def test_profile_and_validation_writers_emit_expected_files(tmp_path: Path):
-    profile_path = write_profile_csv(tmp_path / "profile.csv", {"x": jnp.asarray([0.0, 1.0]), "u": jnp.asarray([1.0, 2.0])})
+    profile_path = write_profile_csv(
+        tmp_path / "profile.csv",
+        {"x": jnp.asarray([0.0, 1.0]), "u": jnp.asarray([1.0, 2.0])},
+    )
     assert profile_path.exists()
     assert profile_path.read_text().startswith("x,u")
 
 
-def test_reference_parsing_helpers_cover_invalid_axis_missing_time_and_missing_case(tmp_path: Path):
+def test_reference_parsing_helpers_cover_invalid_axis_missing_time_and_missing_case(
+    tmp_path: Path,
+):
     assert validation.parse_location_tuple("not-a-location") is None
 
     with pytest.raises(ValueError, match="Unsupported axis"):
@@ -889,10 +1109,14 @@ def test_reference_parsing_helpers_cover_invalid_axis_missing_time_and_missing_c
         infer_sampling_geometry(tmp_path)
 
     with pytest.raises(ValueError, match="Unable to infer sample time"):
-        validation.infer_sample_time_from_path(Path("postProcessing") / "liquid" / "centerlineY.xy")
+        validation.infer_sample_time_from_path(
+            Path("postProcessing") / "liquid" / "centerlineY.xy"
+        )
 
     with pytest.raises(FileNotFoundError, match="No paired sampled reference profiles"):
-        validation.reference_profile_validation(_synthetic_solution(make_hartmann_case()), tmp_path)
+        validation.reference_profile_validation(
+            _synthetic_solution(make_hartmann_case()), tmp_path
+        )
 
     inspection = inspect_reference_case(tmp_path / "missing_case")
     assert inspection.control_dicts == ()
@@ -900,7 +1124,9 @@ def test_reference_parsing_helpers_cover_invalid_axis_missing_time_and_missing_c
     assert inspection.parallel_time_dirs == ()
 
 
-def test_latest_field_minmax_record_and_sample_pair_handle_malformed_or_incomplete_outputs(tmp_path: Path):
+def test_latest_field_minmax_record_and_sample_pair_handle_malformed_or_incomplete_outputs(
+    tmp_path: Path,
+):
     post_dir = tmp_path / "postProcessing" / "fieldMinMax1" / "0.1"
     post_dir.mkdir(parents=True)
     (post_dir / "fieldMinMax.dat").write_text(
@@ -922,30 +1148,25 @@ def test_latest_field_minmax_record_and_sample_pair_handle_malformed_or_incomple
     assert latest_reference_sampled_profiles(tmp_path) is None
 
 
-def test_reference_readers_skip_comments_short_rows_and_malformed_csv_values(tmp_path: Path):
+def test_reference_readers_skip_comments_short_rows_and_malformed_csv_values(
+    tmp_path: Path,
+):
     xy_path = tmp_path / "centerlineY_potE_U.xy"
-    xy_path.write_text(
-        "# comment\n"
-        "\n"
-        "0.0 0.0 1.0\n"
-        "1.0 0.2 3.0 4.0 5.0\n"
-    )
+    xy_path.write_text("# comment\n\n0.0 0.0 1.0\n1.0 0.2 3.0 4.0 5.0\n")
     xy = read_reference_xy_sample(xy_path)
     assert xy.distance.tolist() == pytest.approx([1.0])
     assert xy.u_x.tolist() == pytest.approx([3.0])
 
     csv_path = tmp_path / "lineTransverse_p_U.csv"
-    csv_path.write_text(
-        "y,p,U_0,U_1,U_2\n"
-        "bad,1.0,2.0,3.0,4.0\n"
-        "0.0,1.0,2.0,3.0,4.0\n"
-    )
+    csv_path.write_text("y,p,U_0,U_1,U_2\nbad,1.0,2.0,3.0,4.0\n0.0,1.0,2.0,3.0,4.0\n")
     csv_sample = read_reference_csv_sample(csv_path)
     assert csv_sample.distance.tolist() == pytest.approx([0.0])
     assert csv_sample.u_x.tolist() == pytest.approx([2.0])
 
 
-def test_reference_mesh_and_profile_discovery_cover_empty_and_incomplete_files(tmp_path: Path):
+def test_reference_mesh_and_profile_discovery_cover_empty_and_incomplete_files(
+    tmp_path: Path,
+):
     points_path = tmp_path / "constant" / "liquid" / "polyMesh" / "points"
     points_path.parent.mkdir(parents=True)
     points_path.write_text("FoamFile\n{\n}\n(\nnot-a-point\n)\n")
@@ -959,7 +1180,9 @@ def test_reference_mesh_and_profile_discovery_cover_empty_and_incomplete_files(t
     (invalid_xy_root / "centerlineY_potE_U.xy").write_text("0.0 0.0 1.0 0.0 0.0\n")
     (invalid_xy_root / "centerlineZ_potE_U.xy").write_text("0.0 0.0 1.0 0.0 0.0\n")
 
-    invalid_csv_root = tmp_path / "postProcessing" / "outputLines" / "liquid" / "also_bad"
+    invalid_csv_root = (
+        tmp_path / "postProcessing" / "outputLines" / "liquid" / "also_bad"
+    )
     invalid_csv_root.mkdir(parents=True)
     (invalid_csv_root / "lineTransverse_p_U.csv").write_text("y,p,U_0\n0.0,0.0,1.0\n")
 
@@ -970,7 +1193,9 @@ def test_reference_mesh_and_profile_discovery_cover_empty_and_incomplete_files(t
     assert latest_reference_sampled_profiles(tmp_path) is None
 
 
-def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_selection(tmp_path: Path):
+def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_selection(
+    tmp_path: Path,
+):
     points_path = tmp_path / "constant" / "polyMesh" / "points"
     points_path.parent.mkdir(parents=True)
     points_path.write_text(
@@ -981,13 +1206,17 @@ def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_sel
         "(1.0 0.0 0.0)\n"
         ")\n"
     )
-    assert infer_mesh_axis_coordinates(tmp_path, axis="x") == pytest.approx((0.0, 0.25, 0.5, 1.0))
+    assert infer_mesh_axis_coordinates(tmp_path, axis="x") == pytest.approx(
+        (0.0, 0.25, 0.5, 1.0)
+    )
 
     old_path = tmp_path / "postProcessing" / "minMaxA" / "0.1" / "fieldMinMax.dat"
     new_path = tmp_path / "postProcessing" / "minMaxB" / "0.2" / "fieldMinMax.dat"
     old_path.parent.mkdir(parents=True)
     new_path.parent.mkdir(parents=True)
-    old_path.write_text("0.05 mag(phi) 0.0 (0 0 0) x 9.0 (1 0 0) x\n0.1 mag(U) 0.0 (0 0 0) x 1.0 (1 0 0) x\n")
+    old_path.write_text(
+        "0.05 mag(phi) 0.0 (0 0 0) x 9.0 (1 0 0) x\n0.1 mag(U) 0.0 (0 0 0) x 1.0 (1 0 0) x\n"
+    )
     new_path.write_text("0.2 mag(U) 0.0 (0 0 0) x 2.0 (1 0 0) x\n")
 
     latest = latest_field_minmax_record(tmp_path, field="mag(U)")
@@ -996,7 +1225,9 @@ def test_reference_helpers_cover_generic_polymesh_fallback_and_latest_record_sel
     assert latest.max_value == pytest.approx(2.0)
 
 
-def test_inspect_reference_case_skips_files_and_nonnumeric_parallel_times(tmp_path: Path):
+def test_inspect_reference_case_skips_files_and_nonnumeric_parallel_times(
+    tmp_path: Path,
+):
     (tmp_path / "system").mkdir()
     (tmp_path / "0").mkdir()
     (tmp_path / "processors8").mkdir()
@@ -1051,8 +1282,12 @@ def test_processed_slice_validation_writer(tmp_path: Path):
             continue
         rows.append(f"0.0,{z_coord},{value},0.0")
     (closed_channel_root / "shercliff_Ha2_XSlice1m_4s.csv").write_text("\n".join(rows))
-    report = processed_slice_validation(solution, "shercliff", 2, reference_root=closed_channel_root)
-    path = write_processed_slice_validation(report, tmp_path / "processed_slice_validation.json")
+    report = processed_slice_validation(
+        solution, "shercliff", 2, reference_root=closed_channel_root
+    )
+    path = write_processed_slice_validation(
+        report, tmp_path / "processed_slice_validation.json"
+    )
     assert report.y_profile.l2_error < 0.02
     assert report.z_profile.l2_error < 0.03
     assert path.exists()

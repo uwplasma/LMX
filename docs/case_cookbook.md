@@ -34,7 +34,7 @@ research edits are:
 
 ```bash
 python -m lmx.cli run shercliff --ha 20 --output ./out/shercliff
-lmx examples/shercliff_case.toml
+lmx cases/ducts/shercliff_case.toml
 ```
 
 ## Hunt
@@ -43,7 +43,7 @@ lmx examples/shercliff_case.toml
 
 ```bash
 python -m lmx.cli run hunt --ha 20 --output ./out/hunt
-lmx examples/hunt_case.toml
+lmx cases/ducts/hunt_case.toml
 ```
 
 ### Python
@@ -68,7 +68,7 @@ This is the intended entry point for:
 ## Variable fields and custom geometries
 
 ```bash
-python examples/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
+python campaigns/fields/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
 ```
 
 That example is the recommended starting point when a user wants to:
@@ -90,17 +90,17 @@ python scripts/run_time_convergence_suite.py --output ./artifacts/time_convergen
 ## Plotting and movies
 
 ```bash
-python examples/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
-python examples/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
-python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
-python examples/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
+python campaigns/tutorials/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
+python campaigns/tutorials/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
+python campaigns/tutorials/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
+python campaigns/tutorials/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
 ```
 
 ## Geometry and mesh preview
 
 ```bash
-python examples/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
-python examples/geometry_preview_demo.py --with-post-run --post-case hunt --output ./artifacts/examples/geometry_preview_hunt
+python campaigns/tutorials/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
+python campaigns/tutorials/geometry_preview_demo.py --with-post-run --post-case hunt --output ./artifacts/examples/geometry_preview_hunt
 ```
 
 That example previews:
@@ -117,7 +117,7 @@ Hartmann or Hunt solve and matching overview plots.
 
 ```bash
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/hunt_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx cases/ducts/hunt_case.toml
 python examples/strong_scaling_demo.py --remote-host office --output ./artifacts/examples/strong_scaling
 python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
 ```
@@ -132,7 +132,7 @@ actual rectangular `extruded_inductionless` projection path, and the default
 
 ```bash
 lmx examples/hartmann_case.toml
-lmx examples/hartmann_restart_case.toml
+lmx cases/ducts/hartmann_restart_case.toml
 ```
 
 The second run resumes from the first run’s `.npz` state and extends the

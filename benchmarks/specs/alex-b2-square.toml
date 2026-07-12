@@ -1,0 +1,145 @@
+schema_version = 1
+id = "B2-fringing-square"
+title = "ALEX conducting square duct in a fringing transverse magnetic field"
+status = "frozen"
+frozen_on = "2026-07-11"
+tolerances_frozen_before_production = true
+runtime_lane = "external-data"
+
+[physics]
+model = "steady incompressible inductionless MHD with finite inertia and viscosity"
+fluid = "eutectic NaK at the ALEX room-temperature test condition"
+hartmann_number = 2900.0
+interaction_parameter = 540.0
+magnetic_reynolds_number_assumption = "Rm << 1"
+
+[geometry]
+kind = "square_duct"
+length_scale = "duct half-width"
+half_width_m = 0.0439
+x_over_L_min = -15.0
+x_over_L_max = 10.0
+x_origin = "edge of the magnet pole face"
+constant_cross_section = true
+
+[wall]
+model = "uniform thin conducting wall"
+wall_conductance_ratio = 0.07
+definition = "c_w = sigma_wall * thickness / (sigma_fluid * half-width)"
+numerical_realization = "explicit volumetric shell preserving c_w"
+nominal_thickness_over_L = 0.02
+confirmation_thickness_over_L = 0.01
+thickness_independence_relative_max = 0.02
+
+[drive]
+mode = "fixed mean flow rate"
+mean_velocity_m_per_s = 0.339
+peak_magnetic_field_T = 1.1
+
+[field]
+representation = "tabulated monotone interpolation"
+components = "B = (0, B_y(x), 0) in the global Cartesian frame"
+normalization = "B_y / B0"
+coordinate = "x / half-width"
+divergence_model = "exactly divergence free because d(B_y(x))/dy = 0"
+divergence_acceptance = 1.0e-8
+no_extrapolation = true
+
+[reference]
+data_path = "benchmarks/references/alex-b2-square.csv"
+data_sha256 = "6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483"
+primary_observable = "excess transverse pressure difference between published A/B taps"
+normalization = "[Delta p_AB / (sigma * U * B0^2 * half-width)] minus the uniform-field/no-field plateau"
+baseline_x_over_L_upstream_max = -7.5
+baseline_x_over_L_downstream_min = 5.0
+signed_orientation = "LMX side (+z, across B) minus top (+y, along B) is the published A-minus-B convention"
+tap_geometry = "adjacent wall midpoints at one axial cross-section: top and side, rectangular analogue of 12 and 3 o'clock stated for the pipe"
+source_series = "N = 540, M (Ha) = 2900"
+digitization_method = "manual anchor extraction from published markers and axes"
+digitization_uncertainty_absolute = 0.0030
+marker_scatter_allowance_absolute = 0.0026
+combined_uncertainty_absolute = 0.0040
+experimental_instrument_uncertainty_status = "not reported in the accessible benchmark papers"
+
+[[sources]]
+id = "smolentsev-vv"
+doi = "10.1016/j.fusengdes.2014.04.049"
+pages = "71-72 in the accepted manuscript; PDF pages 8-9"
+figures = "Figure 4 and Table II"
+sha256 = "9d0986bc912fc4b7ba9c3b79756db52319295c3b8c3c7304103523e5755f91b9"
+
+[[sources]]
+id = "alex-results-1987"
+report = "CONF-871007-90 / OSTI 5332375"
+url = "https://www.osti.gov/servlets/purl/5332375"
+pages = "report pages 1 and 3-4; PDF pages 2 and 4-5"
+figures = "Figures 1, 5-7 and Table 1"
+sha256 = "d67bfc6181a780e1a13f104f443746d1d05d359ba9886e4a0a2563542e6aa16a"
+
+[data_rights]
+reference_access = "publicly accessible US government technical report and cited manuscript"
+redistribution = "only manually extracted numerical facts are redistributed; source figures are not vendored"
+attribution_required = true
+
+[[mesh.levels]]
+name = "coarse"
+axial_stations_min = 101
+cross_section_cells_min = 65
+hartmann_layer_cells_min = 6
+side_layer_cells_min = 6
+
+[[mesh.levels]]
+name = "medium"
+axial_stations_min = 151
+cross_section_cells_min = 97
+hartmann_layer_cells_min = 8
+side_layer_cells_min = 8
+
+[[mesh.levels]]
+name = "fine"
+axial_stations_min = 201
+cross_section_cells_min = 129
+hartmann_layer_cells_min = 10
+side_layer_cells_min = 10
+
+[mesh]
+family = "wall-clustered square grid with axial refinement across the measured field ramp"
+axial_cells_per_field_transition_min = 16
+geometric_quality_required = true
+
+[solver]
+coupling_acceleration = "anderson"
+coupling_history_depth = 16
+coupling_regularization = 1.0e-8
+coupling_damping = 1.0
+electric_iterations_min = 600
+electric_tolerance_max = 1.0e-12
+projection_iterations_min = 4000
+projection_tolerance_max = 1.0e-12
+steady_residual_max = 5.0e-5
+steady_residual_uncertainty_fraction_max = 0.05
+mass_balance_max = 1.0e-3
+current_balance_max = 1.0e-3
+interface_current_max = 1.0e-3
+power_balance_max = 1.0e-3
+tolerance_independence_factor = 0.5
+tolerance_independence_uncertainty_fraction_max = 0.25
+time_or_iteration_independence_required = true
+iteration_independence_factor = 2.0
+iteration_independence_uncertainty_fraction_max = 0.25
+
+[acceptance]
+weighted_rms_max = 1.0
+weighted_linf_max = 2.0
+integrated_pressure_relative_error_max = 0.10
+finest_mesh_change_relative_max = 0.02
+monotonic_or_asymptotic_refinement_required = true
+matched_freemhd_case_required = true
+primary_before_secondary = true
+
+secondary_observables = [
+  "axial pressure gradient",
+  "axial wall-voltage difference over Delta x = 1.73 half-widths",
+  "velocity and current redistribution",
+  "mass, current, interface-current, and mechanical/electrical power closure",
+]
