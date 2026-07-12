@@ -44,6 +44,11 @@ class StrongScalingRecord:
     velocity_l2: float | None = None
     potential_l2: float | None = None
     current_l2: float | None = None
+    max_charge_balance_residual: float | None = None
+    max_boundary_current_residual: float | None = None
+    max_electric_local_residual: float | None = None
+    electric_solves_converged: bool | None = None
+    validation_passed: bool | None = None
 
 
 StrongScalingRecordLike = StrongScalingRecord | Mapping[str, object]
@@ -67,6 +72,7 @@ _SCALING_TABLE_COLUMNS = (
     "profile_path",
     "spatially_sharded",
     "global_shard_count",
+    "validation_passed",
     "physics_equivalent",
     "solver_faithful",
 )
@@ -179,7 +185,7 @@ def summarize_strong_scaling_records(
                 and value is not None
                 and np.isclose(value, reference, rtol=2.0e-6, atol=1.0e-10)
                 for value, reference in zip(signature, baseline_signature, strict=True)
-            )
+            ) and bool(record.get("validation_passed", False))
             rows.append(
                 {
                     "benchmark_kind": str(record.get("benchmark_kind", "")),
@@ -415,6 +421,7 @@ def benchmark_extruded_inductionless_solve(
     repeats: int = 2,
     num_devices: int | None = None,
     profile_dir: str | Path | None = None,
+    strict_validation: bool = True,
 ) -> StrongScalingRecord:
     """Benchmark the production ALEX B2 ``extruded_inductionless`` solve path.
 
@@ -522,6 +529,32 @@ def benchmark_extruded_inductionless_solve(
         raise RuntimeError(
             "Production scaling solve returned a zero or nonfinite physics signature."
         )
+    charge_residual = np.asarray(last_bundle.charge_balance_residual, dtype=float)
+    boundary_residual = np.asarray(last_bundle.boundary_current_residual, dtype=float)
+    electric_history = np.asarray(
+        last_bundle.iteration_electric_linear_history, dtype=float
+    ).reshape((-1, 6))
+    max_charge_residual = float(np.max(np.abs(charge_residual)))
+    max_boundary_residual = float(np.max(np.abs(boundary_residual)))
+    max_electric_local_residual = float(np.max(np.abs(electric_history[:, 2])))
+    electric_solves_converged = bool(np.all(electric_history[:, 4] == 1.0))
+    validation_passed = bool(
+        np.isfinite(max_charge_residual)
+        and np.isfinite(max_boundary_residual)
+        and np.isfinite(max_electric_local_residual)
+        and max_charge_residual <= 1.0e-3
+        and max_boundary_residual <= 1.0e-3
+        and max_electric_local_residual <= 1.0e-3
+        and electric_solves_converged
+    )
+    if strict_validation and not validation_passed:
+        raise RuntimeError(
+            "Production scaling solve failed conservation/linear-solve validation: "
+            f"charge={max_charge_residual:.6e}, "
+            f"boundary_current={max_boundary_residual:.6e}, "
+            f"electric_local={max_electric_local_residual:.6e}, "
+            f"electric_converged={electric_solves_converged}."
+        )
     return StrongScalingRecord(
         backend=jax.default_backend(),
         device_kind=devices[0].device_kind,
@@ -550,6 +583,11 @@ def benchmark_extruded_inductionless_solve(
         velocity_l2=velocity_l2,
         potential_l2=potential_l2,
         current_l2=current_l2,
+        max_charge_balance_residual=max_charge_residual,
+        max_boundary_current_residual=max_boundary_residual,
+        max_electric_local_residual=max_electric_local_residual,
+        electric_solves_converged=electric_solves_converged,
+        validation_passed=validation_passed,
     )
 
 

@@ -65,6 +65,7 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
         velocity_l2=3.0,
         potential_l2=2.0,
         current_l2=1.0,
+        validation_passed=True,
     )
     two_device = {
         **baseline.__dict__,
@@ -147,6 +148,11 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
             lorentz_x=jnp.zeros(shape),
             lorentz_y=jnp.zeros(shape),
             lorentz_z=jnp.zeros(shape),
+            charge_balance_residual=jnp.asarray([1.0e-6]),
+            boundary_current_residual=jnp.asarray([2.0e-6]),
+            iteration_electric_linear_history=jnp.asarray(
+                [[1.0e-8, 1.0e-9, 3.0e-6, 4.0, 1.0, 1.0]]
+            ),
         )
         return SimpleNamespace(bundle=bundle)
 
@@ -172,6 +178,8 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
     assert not record.spatially_sharded
     assert record.global_shard_count == 1
     assert record.velocity_l2 is not None
+    assert record.validation_passed
+    assert record.electric_solves_converged
 
 
 def test_solver_scaling_rejects_invalid_devices_and_physics(
@@ -208,6 +216,45 @@ def test_solver_scaling_rejects_invalid_devices_and_physics(
         lambda problem, num_devices=None: SimpleNamespace(bundle=bundle),
     )
     with pytest.raises(RuntimeError, match="physics signature"):
+        benchmark_extruded_inductionless_solve(
+            nx=4, ny=4, nz=4, repeats=1, num_devices=1
+        )
+
+
+def test_solver_scaling_rejects_failed_conservation(monkeypatch: pytest.MonkeyPatch):
+    shape = (4, 4, 4)
+    one = jnp.ones(shape)
+    zero = jnp.zeros(shape)
+    bundle = SimpleNamespace(
+        **{
+            name: one if name in {"u", "phi", "jx"} else zero
+            for name in (
+                "u",
+                "v",
+                "w",
+                "p",
+                "phi",
+                "jx",
+                "jy",
+                "jz",
+                "lorentz_x",
+                "lorentz_y",
+                "lorentz_z",
+            )
+        },
+        charge_balance_residual=jnp.asarray([2.0e-3]),
+        boundary_current_residual=jnp.asarray([0.0]),
+        iteration_electric_linear_history=jnp.asarray(
+            [[1.0e-8, 1.0e-9, 2.0e-3, 4.0, 0.0, 1.0]]
+        ),
+    )
+    monkeypatch.setattr(
+        scaling,
+        "solve_extruded_inductionless",
+        lambda problem, num_devices=None: SimpleNamespace(bundle=bundle),
+    )
+
+    with pytest.raises(RuntimeError, match="failed conservation"):
         benchmark_extruded_inductionless_solve(
             nx=4, ny=4, nz=4, repeats=1, num_devices=1
         )
