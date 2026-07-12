@@ -759,7 +759,9 @@ wall time is acceptable.
    `48 x 36 x 36` case. A `102 x 77 x 77` footprint fits one A4000 at about
    `15.7 GiB` and takes `34.08 s` warm for two outer steps. Next reduce global
    PCG synchronization and run independent variants concurrently across the
-   GPUs; do not claim strong scaling yet.
+   GPUs; do not claim strong scaling yet. The Benchmark B campaign runner now
+   supports `--gpu-devices 0,1`, assigning one variant per GPU in two
+   restart-aware waves without duplicating the campaign implementation.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

@@ -7,7 +7,10 @@ import argparse
 from dataclasses import replace
 import hashlib
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import time
 from typing import Any
 
@@ -253,6 +256,93 @@ def _parse_variant_restarts(values: list[str]) -> dict[str, Path]:
     return restarts
 
 
+def _parse_gpu_devices(value: str) -> tuple[str, ...]:
+    devices = tuple(item.strip() for item in value.split(",") if item.strip())
+    if not devices or len(set(devices)) != len(devices):
+        raise ValueError("--gpu-devices requires a comma-separated list of unique IDs")
+    return devices
+
+
+def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--output",
+        str(args.output),
+        "--cases",
+        case_id,
+        "--mesh-level",
+        args.mesh_level,
+        "--variants",
+        variant,
+        "--worker",
+    ]
+    if args.resume:
+        command.append("--resume")
+    if variant == "baseline" and args.initial_restart is not None:
+        command.extend(("--initial-restart", str(args.initial_restart)))
+    for restart in args.variant_restart:
+        if restart.startswith(f"{variant}="):
+            command.extend(("--variant-restart", restart))
+    return command
+
+
+def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) -> None:
+    """Run independent case variants concurrently, one process per GPU."""
+
+    for offset in range(0, len(tasks), len(devices)):
+        processes = []
+        for device, (case_id, variant) in zip(devices, tasks[offset:]):
+            environment = {**os.environ, "CUDA_VISIBLE_DEVICES": device}
+            process = subprocess.Popen(
+                _gpu_child_command(args, case_id, variant),
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            processes.append((case_id, variant, process))
+        for case_id, variant, process in processes:
+            stdout, stderr = process.communicate()
+            # A single-variant child normally returns 2 because the four-variant
+            # comparison is incomplete; solver/runtime failures return 1.
+            if process.returncode not in {0, 2}:
+                detail = stderr.strip() or stdout.strip()
+                raise RuntimeError(
+                    f"GPU worker failed for {case_id}/{variant}: {detail}"
+                )
+
+
+def _run_gpu_campaign(args) -> int:
+    devices = _parse_gpu_devices(args.gpu_devices)
+    independent = [
+        (case_id, variant)
+        for case_id in args.cases
+        for variant in args.variants
+        if variant in {"baseline", "thin_wall"}
+    ]
+    dependent = [
+        (case_id, variant)
+        for case_id in args.cases
+        for variant in args.variants
+        if variant in {"tight_tolerance", "extended_iterations"}
+    ]
+    _run_gpu_wave(args, independent, devices)
+    _run_gpu_wave(args, dependent, devices)
+    summary_args = [
+        "--output",
+        str(args.output),
+        "--cases",
+        *args.cases,
+        "--mesh-level",
+        args.mesh_level,
+        "--variants",
+        *args.variants,
+        "--resume",
+    ]
+    return main(summary_args)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -278,8 +368,16 @@ def main(argv: list[str] | None = None) -> int:
         metavar="VARIANT=PATH",
         help="Explicit restart for a newly run variant; repeat for multiple variants.",
     )
+    parser.add_argument(
+        "--gpu-devices",
+        metavar="ID[,ID...]",
+        help="Run independent variants concurrently, one subprocess per CUDA GPU.",
+    )
+    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.gpu_devices is not None and not args.dry_run:
+        return _run_gpu_campaign(args)
     variant_restarts = _parse_variant_restarts(args.variant_restart)
 
     fingerprint = _source_fingerprint()
@@ -352,6 +450,9 @@ def main(argv: list[str] | None = None) -> int:
                     baseline_restart_sha256 = record["restart"]["sha256"]
                 _atomic_json(path, record)
             records_by_case[case_id][variant] = record
+
+    if args.worker:
+        return 2
 
     comparisons = [
         _comparison(case_id, records)

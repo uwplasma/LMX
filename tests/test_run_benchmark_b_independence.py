@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -145,3 +146,69 @@ def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
         campaign._parse_variant_restarts(["thin_wall"])
     with pytest.raises(ValueError, match="VARIANT"):
         campaign._parse_variant_restarts(["unknown=/tmp/x.npz"])
+
+
+def test_gpu_device_parser_requires_unique_ids():
+    assert campaign._parse_gpu_devices("0, 1") == ("0", "1")
+    with pytest.raises(ValueError, match="unique"):
+        campaign._parse_gpu_devices("")
+    with pytest.raises(ValueError, match="unique"):
+        campaign._parse_gpu_devices("0,0")
+
+
+def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch):
+    launches = []
+
+    class Process:
+        returncode = 2
+
+        def communicate(self):
+            return "incomplete comparison", ""
+
+    def fake_popen(command, **kwargs):
+        launches.append((command, kwargs))
+        return Process()
+
+    monkeypatch.setattr(campaign.subprocess, "Popen", fake_popen)
+    args = SimpleNamespace(
+        output=Path("artifacts/campaign"),
+        mesh_level="coarse",
+        resume=True,
+        initial_restart=None,
+        variant_restart=[],
+    )
+    campaign._run_gpu_wave(
+        args,
+        [("B1-fringing-pipe", "baseline"), ("B2-fringing-square", "thin_wall")],
+        ("0", "1"),
+    )
+
+    assert [item[1]["env"]["CUDA_VISIBLE_DEVICES"] for item in launches] == ["0", "1"]
+    assert "baseline" in launches[0][0]
+    assert "thin_wall" in launches[1][0]
+
+
+def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    waves = []
+    monkeypatch.setattr(
+        campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks)
+    )
+    monkeypatch.setattr(campaign, "main", lambda argv=None: 7)
+    args = SimpleNamespace(
+        gpu_devices="0,1",
+        output=Path("artifacts/campaign"),
+        cases=["B2-fringing-square"],
+        mesh_level="coarse",
+        variants=list(campaign.VARIANTS),
+    )
+
+    assert campaign._run_gpu_campaign(args) == 7
+    assert waves == [
+        [("B2-fringing-square", "baseline"), ("B2-fringing-square", "thin_wall")],
+        [
+            ("B2-fringing-square", "tight_tolerance"),
+            ("B2-fringing-square", "extended_iterations"),
+        ],
+    ]

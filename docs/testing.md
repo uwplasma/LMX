@@ -203,6 +203,18 @@ manual campaign: they use the real steady solver on small grids, compare
 against the bundled analytical/reference datasets, and keep low-resolution
 profile drift visible without forcing the full A/B exercise into routine CI.
 
+On a two-GPU workstation, run independent Benchmark B variants concurrently:
+
+```bash
+python scripts/run_benchmark_b_independence.py --resume --gpu-devices 0,1
+```
+
+The coordinator gives each subprocess one visible GPU. Baseline and thin-wall
+runs form the first wave; tolerance and iteration variants form a second wave
+so both can start from the recorded baseline restart. Each record remains
+atomic and source-fingerprinted, and interrupted campaigns retain `--resume`
+semantics.
+
 ## Physics gates
 
 The heavier validation lane should only be considered passing when all of the
