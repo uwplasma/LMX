@@ -143,7 +143,11 @@ multiplicative y--z--y SOLVAX smoother reduced electric PCG to 380--381
 iterations and retained a `2.48e-5` charge residual, but its extra residual
 refreshes increased runtime to `77.8 s`. Multigrid must therefore supply a
 cheap coarse correction instead of adding line-smoother work at every Krylov
-iteration.
+iteration. The design target follows the structured finite-volume evidence of
+[Singh et al.](https://doi.org/10.1002/fld.4277), where multigrid was the best
+of the tested parallel pressure-Poisson preconditioners on nonuniform grids:
+cell-volume restriction, geometry-aware prolongation, and semicoarsening where
+the wall-normal anisotropy requires it.
 
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
