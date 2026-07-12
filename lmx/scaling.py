@@ -72,6 +72,20 @@ _SCALING_TABLE_COLUMNS = (
     "solver_faithful",
 )
 
+_BUNDLE_FIELD_NAMES = (
+    "u",
+    "v",
+    "w",
+    "p",
+    "phi",
+    "jx",
+    "jy",
+    "jz",
+    "lorentz_x",
+    "lorentz_y",
+    "lorentz_z",
+)
+
 
 def _record_mapping(record: StrongScalingRecordLike) -> dict[str, Any]:
     if isinstance(record, StrongScalingRecord):
@@ -288,20 +302,9 @@ def _array_nbytes(array: object) -> int:
 
 
 def _bundle_memory_bytes(bundle: object) -> int:
-    fields = (
-        "u",
-        "v",
-        "w",
-        "p",
-        "phi",
-        "jx",
-        "jy",
-        "jz",
-        "lorentz_x",
-        "lorentz_y",
-        "lorentz_z",
+    return sum(
+        _array_nbytes(getattr(bundle, name, None)) for name in _BUNDLE_FIELD_NAMES
     )
-    return sum(_array_nbytes(getattr(bundle, name, None)) for name in fields)
 
 
 def _row_or_replicated_sharding(
@@ -572,7 +575,7 @@ def benchmark_extruded_inductionless_solve(
         try:
             solution = solve_extruded_inductionless(problem, num_devices=num_devices)
             jax.block_until_ready(
-                (solution.bundle.u, solution.bundle.phi, solution.bundle.jx)
+                tuple(getattr(solution.bundle, name) for name in _BUNDLE_FIELD_NAMES)
             )
         finally:
             if trace_started:

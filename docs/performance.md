@@ -65,10 +65,16 @@ A4000s took `40.72 s`, so this overhead-dominated probe is a measured scaling
 miss, not a speedup claim. It is nevertheless a correctness gate: relative
 one/two-GPU differences in the velocity, potential, and current L2 signatures
 were `2.4e-9`, `7.3e-7`, and `1.4e-6`, respectively, and every returned 3-D
-field retained two axial shards. The next performance package moves the local
-JIT closures to reusable cached kernels, separates initialization/transfer from
-warm iteration time, and repeats the study on a grid large enough to amortize
-communication.
+field retained two axial shards. The production wrappers now reuse a
+process-stable device mesh and cached JIT kernels, so repeated two-GPU solves
+remain physics-identical. Warm time is `8.79 s` on one GPU and `21.43 s` on two
+for the small case; a `48 x 36 x 36` case measures `10.48 s` versus `38.28 s`.
+Cross-section-only pressure line blocks did not improve that result and were
+rejected. The coarse-scale `102 x 77 x 77` footprint fits one A4000 narrowly
+(about `15.7 GiB` observed) and runs two outer steps in `34.08 s` warm. Frequent
+global PCG reductions are therefore the next bottleneck; until a
+communication-avoiding Krylov path exists, independent campaign variants
+should occupy the two GPUs concurrently.
 
 ## Run the benchmark
 

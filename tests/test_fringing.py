@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 from dataclasses import replace
 
+import lmx._fringing as fringing_impl
+
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
     sample_cross_section_field,
@@ -80,6 +82,15 @@ from lmx.specs import MagneticFieldSpec, RegionSpec
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_b2_jit_cache_reuses_the_first_compiled_kernel():
+    fringing_impl._B2_JIT_CACHE.clear()
+    first = object()
+    key = ("operator", "configuration")
+
+    assert fringing_impl._reuse_b2_jit(key, first) is first
+    assert fringing_impl._reuse_b2_jit(key, object()) is first
 
 
 def test_distance_weighted_harmonic_mean_preserves_series_resistance():

@@ -753,8 +753,13 @@ wall time is acceptable.
    package is accepted. The first `24 x 24 x 24`, two-step CUDA checkpoint
    passes one/two-GPU field placement and L2-signature equivalence (largest
    relative difference `1.4e-6`) but misses scaling: `29.10 s` on one A4000 and
-   `40.72 s` on two. Cache the compiled production kernels and repeat on an
-   amortizing grid before making a performance claim.
+   `40.72 s` on two. Process-stable meshes and cached kernels now make repeated
+   two-GPU solves deterministic, but warm scaling still misses: `8.79 s`
+   versus `21.43 s` on the small case and `10.48 s` versus `38.28 s` on a
+   `48 x 36 x 36` case. A `102 x 77 x 77` footprint fits one A4000 at about
+   `15.7 GiB` and takes `34.08 s` warm for two outer steps. Next reduce global
+   PCG synchronization and run independent variants concurrently across the
+   GPUs; do not claim strong scaling yet.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
-from functools import partial
+from functools import lru_cache, partial
 import math
 
 import jax
@@ -91,6 +91,15 @@ MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
         ],
     },
 }
+
+_B2_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
+
+
+def _reuse_b2_jit(key: tuple[object, ...], function: Callable) -> Callable:
+    """Reuse an identical compiled B2 kernel across repeated solves."""
+
+    return _B2_JIT_CACHE.setdefault(key, function)
+
 
 # Frozen in both ALEX Benchmark B specifications for mass and current closure.
 ALEX_BALANCE_TOLERANCE = 1.0e-3
@@ -4573,12 +4582,24 @@ def _shard_extruded_fields(
         raise ValueError(
             f"Axial cell count {axial_size} must be divisible by {num_devices} devices."
         )
-    mesh = Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",))
-    sharding = NamedSharding(mesh, P("x", None, None))
+    sharding = _axial_field_sharding(num_devices)
     # JAX 0.6.x CUDA can leave non-primary shards uninitialized when directly
     # resharding a single-GPU array. Stage each global initial field once on the
     # host; all subsequent production iterations remain device-resident.
     return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
+
+
+@lru_cache(maxsize=None)
+def _axial_field_sharding(num_devices: int) -> NamedSharding:
+    """Return one process-stable axial mesh for compilation and repeat reuse."""
+
+    devices = jax.devices()
+    if not 1 <= num_devices <= len(devices):
+        raise ValueError(
+            f"Requested {num_devices} devices, but only {len(devices)} are visible."
+        )
+    mesh = Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",))
+    return NamedSharding(mesh, P("x", None, None))
 
 
 def _solve_extruded_projection(
@@ -5456,6 +5477,24 @@ def _solve_extruded_projection(
         field_sharding = (
             u.sharding if num_devices is not None and num_devices > 1 else None
         )
+        kernel_key = (
+            field_sharding,
+            u.shape,
+            fluid_bounds,
+            dt,
+            dx,
+            tuple(np.asarray(dy)),
+            tuple(np.asarray(dz)),
+            momentum_iterations,
+            momentum_tolerance,
+            projection_iterations,
+            projection_tolerance,
+            electric_iterations,
+            electric_tolerance,
+            forcing,
+            target_flow_rate,
+            scalar_limit,
+        )
 
         def diffusion_solve(rhs, viscosity, initial):
             return _solvax_implicit_diffusion_duct(
@@ -5471,7 +5510,9 @@ def _solve_extruded_projection(
                 include_axial_line=field_sharding is None,
             )
 
-        if field_sharding is not None:
+        # The multi-device branches require a real device mesh and are covered
+        # by the GPU scaling gate documented in ``docs/performance.md``.
+        if field_sharding is not None:  # pragma: no cover - hardware gate
             replicated_sharding = NamedSharding(field_sharding.mesh, P())
             diffusion_solve = jax.jit(
                 diffusion_solve,
@@ -5482,6 +5523,7 @@ def _solve_extruded_projection(
                     replicated_sharding,
                 ),
             )
+            diffusion_solve = _reuse_b2_jit(("diffusion", *kernel_key), diffusion_solve)
 
         def axial_momentum_solve(state, force, density, viscosity):
             state = state[:, y0:y1, z0:z1]
@@ -5521,7 +5563,25 @@ def _solve_extruded_projection(
                 _enforce_fluid_mask_3d(w_full, mask),
             )
 
-        if field_sharding is not None:
+        def pressure_response(density, viscosity, mask):
+            rhs = dt / density[:, y0:y1, z0:z1]
+            scale = dt / minimum_fluid_density
+            response, _, _ = diffusion_solve(
+                rhs / scale,
+                viscosity[:, y0:y1, z0:z1],
+                jnp.zeros_like(rhs),
+            )
+            response = scale * response
+            response = jnp.broadcast_to(
+                jnp.mean(response, axis=0, keepdims=True), response.shape
+            )
+            return (
+                jnp.zeros_like(mask, dtype=response.dtype)
+                .at[:, y0:y1, z0:z1]
+                .set(response)
+            )
+
+        if field_sharding is not None:  # pragma: no cover - hardware gate
             axial_momentum_solve = jax.jit(
                 axial_momentum_solve,
                 in_shardings=(field_sharding,) * 4,
@@ -5545,19 +5605,24 @@ def _solve_extruded_projection(
                 in_shardings=(field_sharding,) * 4,
                 out_shardings=(field_sharding,) * 3,
             )
-        response_rhs = dt / rho[:, y0:y1, z0:z1]
-        response_scale = dt / minimum_fluid_density
-        response_fluid, _, _ = diffusion_solve(
-            response_rhs / response_scale,
-            nu[:, y0:y1, z0:z1],
-            jnp.zeros_like(response_rhs),
-        )
-        response_fluid = response_scale * response_fluid
-        response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
-        response_fluid = jnp.broadcast_to(response_cross_section, response_fluid.shape)
-        unit_pressure_response = (
-            jnp.zeros_like(u).at[:, y0:y1, z0:z1].set(response_fluid)
-        )
+            pressure_response = jax.jit(
+                pressure_response,
+                in_shardings=(field_sharding,) * 3,
+                out_shardings=field_sharding,
+            )
+            axial_momentum_solve = _reuse_b2_jit(
+                ("axial_momentum", *kernel_key), axial_momentum_solve
+            )
+            transverse_momentum_solve = _reuse_b2_jit(
+                ("transverse_momentum", *kernel_key), transverse_momentum_solve
+            )
+            embed_velocity = _reuse_b2_jit(
+                ("embed_velocity", *kernel_key), embed_velocity
+            )
+            pressure_response = _reuse_b2_jit(
+                ("pressure_response", *kernel_key), pressure_response
+            )
+        unit_pressure_response = pressure_response(rho, nu, fluid_mask)
     else:
         unit_pressure_response = _enforce_velocity_bc_3d(
             jnp.where(fluid_mask, dt / rho, 0.0), fluid_mask
@@ -5680,7 +5745,7 @@ def _solve_extruded_projection(
             values = state * fixed_point_scale
             return values[0], values[1], values[2], values[3]
 
-        if field_sharding is not None:
+        if field_sharding is not None:  # pragma: no cover - hardware gate
             axial_sharding = NamedSharding(field_sharding.mesh, P("x"))
             state_sharding = NamedSharding(
                 field_sharding.mesh, P(None, "x", None, None)
@@ -5732,6 +5797,28 @@ def _solve_extruded_projection(
                 unscaled_state,
                 in_shardings=state_sharding,
                 out_shardings=(field_sharding,) * 4,
+            )
+            (
+                fixed_flow_projection,
+                electric_solve,
+                emf_operator,
+                reconstruct_electric,
+                lorentz_operator,
+                scaled_state,
+                state_difference,
+                unscaled_state,
+            ) = tuple(
+                _reuse_b2_jit((name, *kernel_key), function)
+                for name, function in (
+                    ("fixed_flow", fixed_flow_projection),
+                    ("electric", electric_solve),
+                    ("emf", emf_operator),
+                    ("reconstruct", reconstruct_electric),
+                    ("lorentz", lorentz_operator),
+                    ("scale_state", scaled_state),
+                    ("state_difference", state_difference),
+                    ("unscale_state", unscaled_state),
+                )
             )
 
     for step in range(outer_steps):
@@ -6024,6 +6111,8 @@ def _solve_extruded_projection(
                         regularization=case.solver.coupling_regularization,
                         damping=case.solver.coupling_damping,
                     )
+                elif len(fixed_point_iterates) == 1:
+                    accelerated = mapped_state
                 else:
                     iterates = tuple(
                         fixed_point_iterates[-case.solver.coupling_history_depth :]
@@ -6031,7 +6120,7 @@ def _solve_extruded_projection(
                     residuals = tuple(
                         fixed_point_residuals[-case.solver.coupling_history_depth :]
                     )
-                    accelerated = jax.jit(
+                    mix_history = jax.jit(
                         lambda xs, rs: anderson_mixing(
                             jnp.stack(xs),
                             jnp.stack(rs),
@@ -6043,7 +6132,11 @@ def _solve_extruded_projection(
                             (state_sharding,) * len(residuals),
                         ),
                         out_shardings=state_sharding,
-                    )(iterates, residuals)
+                    )
+                    mix_history = _reuse_b2_jit(
+                        ("anderson", len(iterates), *kernel_key), mix_history
+                    )
+                    accelerated = mix_history(iterates, residuals)
             elif case.solver.coupling_acceleration == "aitken":
                 if previous_fixed_point_residual is not None:
                     fixed_point_relaxation = aitken_relaxation(
