@@ -103,6 +103,14 @@ def _reuse_b2_jit(key: tuple[object, ...], function: Callable) -> Callable:
 
 # Frozen in both ALEX Benchmark B specifications for mass and current closure.
 ALEX_BALANCE_TOLERANCE = 1.0e-3
+ALEX_B2_STEADY_STEPS = 3
+
+
+def _sustained_convergence(streak: int, passed: bool) -> tuple[int, bool]:
+    """Require repeated passing updates before accepting an oscillatory B2 map."""
+
+    streak = streak + 1 if passed else 0
+    return streak, streak >= ALEX_B2_STEADY_STEPS
 
 
 def magnetic_obstacle_literature_reference_cases() -> dict[str, dict[str, object]]:
@@ -5534,6 +5542,7 @@ def _solve_extruded_projection(
     fixed_point_iterates: list[jnp.ndarray] = []
     fixed_point_residuals: list[jnp.ndarray] = []
     previous_fixed_point_residual: jnp.ndarray | None = None
+    steady_streak = 0
     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
     fixed_point_scale = jnp.asarray(
         [
@@ -6172,12 +6181,18 @@ def _solve_extruded_projection(
                 charge_balance,
             )
         )
-        converged = (
+        instantaneous_convergence = (
             update_residual <= case.solver.coupling_tolerance
             and projected_divergence_max <= ALEX_BALANCE_TOLERANCE
             and flow_error_value <= ALEX_BALANCE_TOLERANCE
             and charge_balance <= ALEX_BALANCE_TOLERANCE
         )
+        if use_alex_b2_finite_volume:
+            steady_streak, converged = _sustained_convergence(
+                steady_streak, instantaneous_convergence
+            )
+        else:
+            converged = instantaneous_convergence
         if use_alex_b2_finite_volume and not converged and step + 1 < outer_steps:
             current_state = scaled_state(u, v, w, phi_previous)
             mapped_state = scaled_state(u_next, v_next, w_next, phi)

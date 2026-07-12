@@ -118,6 +118,7 @@ electric_tolerance_max = 1.0e-12
 projection_iterations_min = 4000
 projection_tolerance_max = 1.0e-12
 steady_residual_max = 5.0e-5
+steady_steps_min = 3
 steady_residual_uncertainty_fraction_max = 0.05
 mass_balance_max = 1.0e-3
 current_balance_max = 1.0e-3

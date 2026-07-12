@@ -86,6 +86,15 @@ from lmx.specs import MagneticFieldSpec, RegionSpec
 pytestmark = pytest.mark.unit
 
 
+def test_b2_steady_gate_requires_three_consecutive_passing_updates():
+    streak = 0
+    outcomes = []
+    for passed in (True, True, False, True, True, True):
+        streak, converged = fringing_impl._sustained_convergence(streak, passed)
+        outcomes.append(converged)
+    assert outcomes == [False, False, False, False, False, True]
+
+
 def test_b2_jit_cache_reuses_the_first_compiled_kernel():
     fringing_impl._B2_JIT_CACHE.clear()
     first = object()

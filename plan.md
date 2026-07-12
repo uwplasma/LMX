@@ -741,7 +741,13 @@ wall time is acceptable.
     16-step probe reduced the residual monotonically from `6.57e-5` to
     `5.92e-5` with damping `0.3`, while plain fixed-point coupling reached only
     `6.52e-5`; B2 therefore uses the damped recurrence without changing its
-    physical model, fixed point, or acceptance tolerance.
+    physical model, fixed point, or acceptance tolerance. Exact damped
+    continuations then exposed isolated sub-threshold updates inside an
+    oscillatory history: nominal and confirmation endpoints differed by 12% in
+    fluid velocity and 19.5% in Lorentz force. Those endpoints are diagnostic,
+    not accepted. B2 now requires three consecutive updates to pass the full
+    residual, divergence, flow, and charge conjunction before wall independence
+    can be evaluated.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and
