@@ -116,6 +116,11 @@ def _sync_repo_to_remote(*, repo_root: Path, remote_host: str, remote_dir: str) 
     try:
         with tarfile.open(archive_path, "w") as archive:
             archive.add(repo_root / "lmx", arcname="lmx")
+            archive.add(repo_root / "benchmarks" / "specs", arcname="benchmarks/specs")
+            archive.add(
+                repo_root / "benchmarks" / "references",
+                arcname="benchmarks/references",
+            )
             archive.add(
                 repo_root / "scripts" / "run_strong_scaling_worker.py",
                 arcname="scripts/run_strong_scaling_worker.py",

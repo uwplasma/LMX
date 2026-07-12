@@ -41,6 +41,8 @@ The strong-scaling workflow now has two explicit benchmark kinds:
 
 - `extruded_solve`
   - runs the actual rectangular `solve_extruded_inductionless(...)` path
+  - applies named axial sharding to every production ALEX B2 3-D field
+  - fails if a requested multi-device solve does not return that shard count
   - records grid size, estimated array memory, warm cell-updates per second,
     and optional JAX trace directory
   - is the solver-faithful timing gate for release candidates
@@ -48,13 +50,25 @@ The strong-scaling workflow now has two explicit benchmark kinds:
   - runs the sharded fixed-iteration MHD operator surrogate used for the
     current strong-scaling figure
   - keeps explicit multi-device sharding over the fixed global grid
-  - remains useful for CPU/GPU sharding studies while the production solver
-    is still being moved toward explicit domain decomposition
+  - remains useful for isolating CPU/GPU stencil and communication behavior
 
 This distinction matters for publication claims. `extruded_solve` is the
 research-code runtime evidence because it uses the same projection loop as the
 examples. `extruded3d` is the scaling-algorithm evidence because it exposes the
 current multi-device sharding behavior on a denser fixed operator.
+
+### Production-sharding checkpoint (12 July 2026)
+
+The first end-to-end ALEX B2 checkpoint uses a deliberately small
+`24 x 24 x 24` total grid and two outer steps. One RTX A4000 took `29.10 s`; two
+A4000s took `40.72 s`, so this overhead-dominated probe is a measured scaling
+miss, not a speedup claim. It is nevertheless a correctness gate: relative
+one/two-GPU differences in the velocity, potential, and current L2 signatures
+were `2.4e-9`, `7.3e-7`, and `1.4e-6`, respectively, and every returned 3-D
+field retained two axial shards. The next performance package moves the local
+JIT closures to reusable cached kernels, separates initialization/transfer from
+warm iteration time, and repeats the study on a grid large enough to amortize
+communication.
 
 ## Run the benchmark
 
@@ -181,10 +195,12 @@ the executable `extruded_inductionless` projection loop or a higher-intensity
 3D operator path rather than relying on the present host-device sharding curve
 alone.
 
-That solver-faithful entry point is now available as
-`--benchmark-kind extruded_solve`. Until the production projection loop has
-explicit multi-device domain decomposition, treat `extruded_solve` device-count
-sweeps as backend/runtime diagnostics rather than final strong-scaling claims.
+That solver-faithful entry point is available as
+`--benchmark-kind extruded_solve`. It now runs an ALEX B2 problem and places
+its production fields on a named
+axial device mesh and records the returned shard count. Treat a device-count
+sweep as strong-scaling evidence only after field/diagnostic equivalence also
+passes; shard placement alone is not a physics result.
 
 The `auto` path resolves to released SOLVAX 0.5.1 PCG. Reproduce its
 native/SOLVAX forward, implicit-gradient, independent-transpose, compile,

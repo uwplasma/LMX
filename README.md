@@ -156,12 +156,16 @@ the retained native comparison path.
 
 ## Performance and parallelism
 
-LMX can run on JAX CPU and GPU backends. It does **not** yet make a general
+LMX can run on JAX CPU and GPU backends. The production ALEX B2 duct solve
+accepts `num_devices=N` for named axial sharding on visible JAX devices. Other
+extruded paths remain single-device until their operator-specific equivalence
+gates pass. LMX does
+**not** yet make a general
 strong-scaling claim. Performance reports must separate compilation from warm
 runtime, use the real solver rather than a presentation-only kernel, include
 one-device baselines, report problem size and memory, and validate identical
-physics on every device count. Multi-device work will use JAX sharding and
-explicit collectives only where profiles show a benefit.
+physics on every device count. Scaling claims require actual shard-placement
+and solution-equivalence checks, not merely multiple visible devices.
 
 See [Performance and scaling](docs/performance.md) for the current commands and
 the acceptance protocol.

@@ -1,8 +1,8 @@
 # LMX authoritative development plan
 
 - **Status:** final authoritative execution plan
-- **Baseline:** 11 July 2026, after M3 closure and accepted ALEX B1/B2
-  finite-volume integration; Benchmark B numerical independence is active
+- **Baseline:** 12 July 2026, after M3 closure and accepted ALEX B1/B2
+  finite-volume integration; production sharding and scaling are active
 - **Scope:** `uwplasma/lmx` and the reusable solver work contributed to
   `uwplasma/SOLVAX`
 - **Supersedes:** every earlier roadmap, checklist, and planning note
@@ -12,7 +12,8 @@ authoritative only when backed by a tracked acceptance artifact from the same
 source fingerprint. Commands, investigation logs, and transient measurements
 belong in issues, campaign artifacts, or benchmark documentation—not here.
 
-The current critical path is **M4 -> M5 -> research release**. M0 through M3
+The current critical path is **M5 performance unblock -> M4 closure -> research
+release**. M0 through M3
 are closed. SOLVAX 0.5.1 is a normal pinned runtime dependency and `auto`
 resolves deterministically to its PCG backend. CPU and real-GPU forward,
 implicit-gradient, transpose, resource, four-level Ha=20 FreeMHD, all-eight-row
@@ -52,7 +53,8 @@ Work proceeds in this dependency order:
 3. simplify the core without changing the verified numerical contracts;
 4. move generic solver machinery to SOLVAX and validate implicit gradients;
 5. close literature, experimental, and FreeMHD fringing-field validation;
-6. optimize the verified solvers and demonstrate CPU/GPU strong scaling;
+6. keep production runs within their runtime budgets and demonstrate CPU/GPU
+   strong scaling before launching expensive validation campaigns;
 7. add turbulence and heat transfer in separately validated releases.
 
 ## 2. Product boundary
@@ -592,9 +594,11 @@ this order:
 uncertainty-aware gates; current, mass, power, and `div(B)` close; refinement is
 credible; compact evidence and the supported fringing envelope are documented.
 
-### M5 — CPU/GPU performance and strong scaling
+### M5 — CPU/GPU performance and strong scaling (active unblock)
 
-Profile only accepted M1/M4 paths. Remove synchronization and materialization
+Profile only accepted M1/M4 paths. No single acceptance variant may run for an
+hour while a faster equivalent execution path remains available. Remove
+synchronization and materialization
 costs, batch independent cases with `vmap`, then introduce named spatial
 sharding and justified halo communication. Keep compilation, warm execution,
 memory, transfers, and iterations separate in every report.
@@ -618,8 +622,10 @@ Work on one numbered package at a time. A package is complete only when its
 listed artifacts exist, focused tests pass, the complete portable gate passes
 when portable LMX code changed, and documentation/provenance are synchronized.
 The compact Benchmark A replay is mandatory after a solver, operator, material,
-mesh, boundary, or normalization change. M4 production now has priority; M5
-optimization may not displace its physics and external-validation exit work.
+mesh, boundary, or normalization change. The performance unblock is the one
+approved exception to numerical package order: expensive M4 campaigns pause
+until production CPU/GPU sharding is physics-equivalent and their projected
+wall time is acceptable.
 
 1. **Complete — freeze M0/M1.** Preserve the eight Table I rows, four-level Ha=20
    FreeMHD ladder, analytical-reference-floor audit, conservative balances, and
@@ -703,7 +709,7 @@ optimization may not displace its physics and external-validation exit work.
     optional-data skips, 95.17% branch coverage, and a 131.1-second runtime; the
     compact Benchmark A hash remained unchanged.
 
-11. **Active — establish numerical independence.** First close exact coarse B1
+11. **Paused after valid evidence — establish numerical independence.** First close exact coarse B1
     and B2 steady and balance gates using the frozen specifications. Retain
     per-iteration velocity, divergence, flow, and charge histories so a failed
     gate identifies the responsible operator. Then run checkpointed baseline,
@@ -723,7 +729,8 @@ optimization may not displace its physics and external-validation exit work.
     the frozen `2%` limit, so this is now a wall-model discretization failure,
     not a solver-convergence failure. Next make the explicit shell preserve its
     collapsed thin-wall conductance independent of volumetric thickness; do not
-    weaken the wall gate or start medium/fine runs. The campaign runner enforces
+    weaken the wall gate or start medium/fine runs. Do not launch another
+    hour-scale variant until package 13 supplies a faster production path. The campaign runner enforces
     every variant's physics gates and supports explicit per-variant restarts.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
@@ -734,13 +741,20 @@ optimization may not displace its physics and external-validation exit work.
     Fringing becomes stable only when both experiments pass their frozen,
     uncertainty-aware gates and refinement is credible.
 
-13. **Pending — optimize and scale accepted paths.** Establish reproducible single-CPU and
+13. **Active — optimize and scale accepted paths.** Establish reproducible single-CPU and
    single-GPU cold/warm baselines for M1 and M4. Profile before changing code;
    remove host synchronization/materialization, batch ensembles with `vmap`,
    then add named spatial sharding and justified halos. Publish equivalent
    1/2/4-device physics, gradients, iterations, memory, transfers, and timing.
    Claim strong scaling only at >=70% four-device efficiency for the documented
-   3D problem; otherwise publish the miss and bottleneck.
+   3D problem; otherwise publish the miss and bottleneck. Named axial sharding
+   is now wired into the production ALEX B2 extruded solve and must pass shard-placement,
+   one/two-device physics-equivalence, and end-to-end timing gates before this
+   package is accepted. The first `24 x 24 x 24`, two-step CUDA checkpoint
+   passes one/two-GPU field placement and L2-signature equivalence (largest
+   relative difference `1.4e-6`) but misses scaling: `29.10 s` on one A4000 and
+   `40.72 s` on two. Cache the compiled production kernels and repeat on an
+   amortizing grid before making a performance claim.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

@@ -13,7 +13,8 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from .fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
+from .benchmarks import build_benchmark_b_field_profile, build_benchmark_b_problem
+from .fringing import solve_extruded_inductionless
 from .mesh import generate_rect_duct_mesh
 
 
@@ -39,6 +40,11 @@ class StrongScalingRecord:
     warm_cell_updates_per_second: float | None = None
     memory_bytes_estimate: int | None = None
     profile_path: str | None = None
+    spatially_sharded: bool = False
+    global_shard_count: int = 1
+    velocity_l2: float | None = None
+    potential_l2: float | None = None
+    current_l2: float | None = None
 
 
 StrongScalingRecordLike = StrongScalingRecord | Mapping[str, object]
@@ -60,6 +66,9 @@ _SCALING_TABLE_COLUMNS = (
     "warm_mcell_updates_per_second",
     "memory_mib",
     "profile_path",
+    "spatially_sharded",
+    "global_shard_count",
+    "physics_equivalent",
     "solver_faithful",
 )
 
@@ -101,7 +110,9 @@ def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
     )
 
 
-def summarize_strong_scaling_records(records: Sequence[StrongScalingRecordLike]) -> dict[str, object]:
+def summarize_strong_scaling_records(
+    records: Sequence[StrongScalingRecordLike],
+) -> dict[str, object]:
     """Return derived strong-scaling diagnostics for JSON summaries and CI gates.
 
     The raw benchmark records intentionally stay close to the timing worker
@@ -117,19 +128,45 @@ def summarize_strong_scaling_records(records: Sequence[StrongScalingRecordLike])
         grouped.setdefault(_scaling_group_key(record), []).append(record)
 
     rows: list[dict[str, object]] = []
-    for _, group_records in sorted(grouped.items(), key=lambda item: tuple(str(value) for value in item[0])):
-        sorted_records = sorted(group_records, key=lambda row: (_int_or_none(row.get("num_devices")) or 0, str(row.get("backend", ""))))
+    for _, group_records in sorted(
+        grouped.items(), key=lambda item: tuple(str(value) for value in item[0])
+    ):
+        sorted_records = sorted(
+            group_records,
+            key=lambda row: (
+                _int_or_none(row.get("num_devices")) or 0,
+                str(row.get("backend", "")),
+            ),
+        )
         baseline = sorted_records[0]
         baseline_devices = max(_int_or_none(baseline.get("num_devices")) or 1, 1)
-        baseline_warm = max(_float_or_none(baseline.get("warm_seconds")) or 0.0, 1.0e-20)
+        baseline_warm = max(
+            _float_or_none(baseline.get("warm_seconds")) or 0.0, 1.0e-20
+        )
+        baseline_signature = tuple(
+            _float_or_none(baseline.get(name))
+            for name in ("velocity_l2", "potential_l2", "current_l2")
+        )
         for record in sorted_records:
             num_devices = max(_int_or_none(record.get("num_devices")) or 1, 1)
-            warm_seconds = max(_float_or_none(record.get("warm_seconds")) or 0.0, 1.0e-20)
+            warm_seconds = max(
+                _float_or_none(record.get("warm_seconds")) or 0.0, 1.0e-20
+            )
             speedup = baseline_warm / warm_seconds
             device_ratio = num_devices / baseline_devices
             cell_rate = _float_or_none(record.get("warm_cell_updates_per_second"))
             memory_bytes = _float_or_none(record.get("memory_bytes_estimate"))
             operator_path = str(record.get("operator_path", ""))
+            signature = tuple(
+                _float_or_none(record.get(name))
+                for name in ("velocity_l2", "potential_l2", "current_l2")
+            )
+            physics_equivalent = all(
+                reference is not None
+                and value is not None
+                and np.isclose(value, reference, rtol=2.0e-6, atol=1.0e-10)
+                for value, reference in zip(signature, baseline_signature, strict=True)
+            )
             rows.append(
                 {
                     "benchmark_kind": str(record.get("benchmark_kind", "")),
@@ -144,29 +181,45 @@ def summarize_strong_scaling_records(records: Sequence[StrongScalingRecordLike])
                     "warm_seconds": warm_seconds,
                     "speedup": speedup,
                     "parallel_efficiency": speedup / max(device_ratio, 1.0e-20),
-                    "warm_mcell_updates_per_second": None if cell_rate is None else cell_rate / 1.0e6,
-                    "memory_mib": None if memory_bytes is None else memory_bytes / (1024.0**2),
+                    "warm_mcell_updates_per_second": None
+                    if cell_rate is None
+                    else cell_rate / 1.0e6,
+                    "memory_mib": None
+                    if memory_bytes is None
+                    else memory_bytes / (1024.0**2),
                     "profile_path": str(record.get("profile_path") or ""),
+                    "spatially_sharded": bool(record.get("spatially_sharded", False)),
+                    "global_shard_count": _int_or_none(record.get("global_shard_count"))
+                    or 1,
+                    "physics_equivalent": physics_equivalent,
                     "solver_faithful": operator_path == "solve_extruded_inductionless",
                 }
             )
 
     solver_faithful_count = sum(1 for row in rows if row["solver_faithful"])
     profiled_count = sum(1 for row in rows if row["profile_path"])
+    physics_equivalent_count = sum(1 for row in rows if row["physics_equivalent"])
     best_speedup = max((float(row["speedup"]) for row in rows), default=0.0)
-    best_parallel_efficiency = max((float(row["parallel_efficiency"]) for row in rows), default=0.0)
+    best_parallel_efficiency = max(
+        (float(row["parallel_efficiency"]) for row in rows), default=0.0
+    )
     return {
         "record_count": len(rows),
         "solver_faithful_record_count": solver_faithful_count,
         "profiled_record_count": profiled_count,
+        "physics_equivalent_record_count": physics_equivalent_count,
         "best_speedup": best_speedup,
         "best_parallel_efficiency": best_parallel_efficiency,
-        "validation_status": "solver_faithful_records_present" if solver_faithful_count else "surrogate_only",
+        "validation_status": "solver_faithful_records_present"
+        if solver_faithful_count
+        else "surrogate_only",
         "rows": rows,
     }
 
 
-def write_strong_scaling_summary_table(records: Sequence[StrongScalingRecordLike], path: str | Path) -> Path:
+def write_strong_scaling_summary_table(
+    records: Sequence[StrongScalingRecordLike], path: str | Path
+) -> Path:
     """Write a compact CSV table with derived strong-scaling diagnostics."""
 
     path = Path(path)
@@ -181,7 +234,9 @@ def write_strong_scaling_summary_table(records: Sequence[StrongScalingRecordLike
 
 def _build_operator_problem(ny: int, nz: int) -> tuple[np.ndarray, ...]:
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=ny, nz=nz)
-    y, z = np.meshgrid(np.asarray(mesh.y_centers), np.asarray(mesh.z_centers), indexing="ij")
+    y, z = np.meshgrid(
+        np.asarray(mesh.y_centers), np.asarray(mesh.z_centers), indexing="ij"
+    )
     y_scale = max(float(np.max(np.abs(np.asarray(mesh.y_centers)))), 1.0e-12)
     z_scale = max(float(np.max(np.abs(np.asarray(mesh.z_centers)))), 1.0e-12)
     field = np.sin(np.pi * y / y_scale) * np.cos(np.pi * z / z_scale)
@@ -191,15 +246,23 @@ def _build_operator_problem(ny: int, nz: int) -> tuple[np.ndarray, ...]:
         - 0.35 * np.cos(3.0 * np.pi * z / z_scale)
         + 0.15 * np.sin(np.pi * y * z / max(y_scale * z_scale, 1.0e-12))
     )
-    return field.astype(np.float32), potential.astype(np.float32), forcing.astype(np.float32)
+    return (
+        field.astype(np.float32),
+        potential.astype(np.float32),
+        forcing.astype(np.float32),
+    )
 
 
-def _build_extruded_operator_problem(nx: int, ny: int, nz: int) -> tuple[np.ndarray, ...]:
+def _build_extruded_operator_problem(
+    nx: int, ny: int, nz: int
+) -> tuple[np.ndarray, ...]:
     x = np.linspace(0.0, 1.0, nx, dtype=np.float32)
     y = np.linspace(-1.0, 1.0, ny, dtype=np.float32)
     z = np.linspace(-1.0, 1.0, nz, dtype=np.float32)
     xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-    sigma = (1.0 + 0.15 * np.cos(2.0 * np.pi * xx) * np.cos(np.pi * yy)).astype(np.float32)
+    sigma = (1.0 + 0.15 * np.cos(2.0 * np.pi * xx) * np.cos(np.pi * yy)).astype(
+        np.float32
+    )
     forcing = (
         0.35 * np.sin(2.0 * np.pi * xx)
         - 0.22 * np.cos(np.pi * yy)
@@ -209,7 +272,9 @@ def _build_extruded_operator_problem(nx: int, ny: int, nz: int) -> tuple[np.ndar
     u = (0.2 * np.sin(np.pi * yy) * np.cos(np.pi * zz)).astype(np.float32)
     v = (0.12 * np.cos(np.pi * xx) * np.sin(np.pi * zz)).astype(np.float32)
     w = (0.08 * np.sin(np.pi * xx) * np.cos(np.pi * yy)).astype(np.float32)
-    phi = (0.1 * np.cos(0.5 * np.pi * xx) * np.sin(np.pi * yy) * np.sin(np.pi * zz)).astype(np.float32)
+    phi = (
+        0.1 * np.cos(0.5 * np.pi * xx) * np.sin(np.pi * yy) * np.sin(np.pi * zz)
+    ).astype(np.float32)
     return u, v, w, phi, forcing, sigma
 
 
@@ -239,7 +304,9 @@ def _bundle_memory_bytes(bundle: object) -> int:
     return sum(_array_nbytes(getattr(bundle, name, None)) for name in fields)
 
 
-def _row_or_replicated_sharding(mesh: Mesh, shape: tuple[int, ...], num_devices: int) -> NamedSharding:
+def _row_or_replicated_sharding(
+    mesh: Mesh, shape: tuple[int, ...], num_devices: int
+) -> NamedSharding:
     if shape and shape[0] >= num_devices and shape[0] % num_devices == 0:
         return NamedSharding(mesh, P("d", None))
     return NamedSharding(mesh, P())
@@ -281,7 +348,9 @@ def _two_axis_mesh_and_sharding(
     if shape and shape[0] % num_devices == 0:
         partition = (("x", "y"), *([None] * max(0, len(shape) - 1)))
         return mesh, NamedSharding(mesh, P(*partition))
-    raise ValueError(f"Shape {shape} is not compatible with a {rows}x{cols} device mesh.")
+    raise ValueError(
+        f"Shape {shape} is not compatible with a {rows}x{cols} device mesh."
+    )
 
 
 def benchmark_sharded_stencil(
@@ -298,20 +367,32 @@ def benchmark_sharded_stencil(
     if num_devices is None:
         num_devices = len(devices)
     if num_devices < 1 or num_devices > len(devices):
-        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
+        raise ValueError(
+            f"Requested {num_devices} devices, but only {len(devices)} are visible."
+        )
     if ny % num_devices != 0:
-        raise ValueError(f"ny={ny} must be divisible by num_devices={num_devices} for y-sharded scaling.")
+        raise ValueError(
+            f"ny={ny} must be divisible by num_devices={num_devices} for y-sharded scaling."
+        )
 
-    mesh, field_sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=(ny, nz))
+    mesh, field_sharding = _two_axis_mesh_and_sharding(
+        devices, num_devices=num_devices, shape=(ny, nz)
+    )
     field, potential, forcing = _build_operator_problem(ny, nz)
-    _, potential_sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=potential.shape)
-    _, forcing_sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=forcing.shape)
+    _, potential_sharding = _two_axis_mesh_and_sharding(
+        devices, num_devices=num_devices, shape=potential.shape
+    )
+    _, forcing_sharding = _two_axis_mesh_and_sharding(
+        devices, num_devices=num_devices, shape=forcing.shape
+    )
     field = jax.device_put(field, field_sharding)
     potential = jax.device_put(potential, potential_sharding)
     forcing = jax.device_put(forcing, forcing_sharding)
 
     kernel = jax.jit(
-        lambda u0, phi0, src: _benchmark_operator_iterations(u0, phi0, src, iterations=iterations),
+        lambda u0, phi0, src: _benchmark_operator_iterations(
+            u0, phi0, src, iterations=iterations
+        ),
         in_shardings=(
             field_sharding,
             potential_sharding,
@@ -343,8 +424,11 @@ def benchmark_sharded_stencil(
         operator_path="synthetic_stencil2d",
         total_cells=ny * nz,
         cell_updates=ny * nz * iterations,
-        warm_cell_updates_per_second=(ny * nz * iterations) / max(min(timings[1:] or timings), 1.0e-20),
-        memory_bytes_estimate=sum(_array_nbytes(array) for array in (field, potential, forcing)),
+        warm_cell_updates_per_second=(ny * nz * iterations)
+        / max(min(timings[1:] or timings), 1.0e-20),
+        memory_bytes_estimate=sum(
+            _array_nbytes(array) for array in (field, potential, forcing)
+        ),
     )
 
 
@@ -363,8 +447,12 @@ def benchmark_sharded_extruded_operator(
     if num_devices is None:
         num_devices = len(devices)
     if num_devices < 1 or num_devices > len(devices):
-        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
-    mesh, sharding = _two_axis_mesh_and_sharding(devices, num_devices=num_devices, shape=(nx, ny, nz))
+        raise ValueError(
+            f"Requested {num_devices} devices, but only {len(devices)} are visible."
+        )
+    mesh, sharding = _two_axis_mesh_and_sharding(
+        devices, num_devices=num_devices, shape=(nx, ny, nz)
+    )
     u, v, w, phi, forcing, sigma = _build_extruded_operator_problem(nx, ny, nz)
     u = jax.device_put(u, sharding)
     v = jax.device_put(v, sharding)
@@ -406,8 +494,11 @@ def benchmark_sharded_extruded_operator(
         operator_path="sharded_extruded_operator_surrogate",
         total_cells=nx * ny * nz,
         cell_updates=nx * ny * nz * iterations,
-        warm_cell_updates_per_second=(nx * ny * nz * iterations) / max(min(timings[1:] or timings), 1.0e-20),
-        memory_bytes_estimate=sum(_array_nbytes(array) for array in (u, v, w, phi, forcing, sigma)),
+        warm_cell_updates_per_second=(nx * ny * nz * iterations)
+        / max(min(timings[1:] or timings), 1.0e-20),
+        memory_bytes_estimate=sum(
+            _array_nbytes(array) for array in (u, v, w, phi, forcing, sigma)
+        ),
     )
 
 
@@ -416,7 +507,6 @@ def benchmark_extruded_inductionless_solve(
     nx: int = 48,
     ny: int = 24,
     nz: int = 24,
-    ha_peak: float = 20.0,
     max_steps: int = 12,
     potential_iterations: int = 24,
     coupling_iterations: int = 4,
@@ -424,12 +514,10 @@ def benchmark_extruded_inductionless_solve(
     num_devices: int | None = None,
     profile_dir: str | Path | None = None,
 ) -> StrongScalingRecord:
-    """Benchmark the executable rectangular ``extruded_inductionless`` solve path.
+    """Benchmark the production ALEX B2 ``extruded_inductionless`` solve path.
 
-    This is intentionally solver-faithful rather than a synthetic sharded
-    stencil. It records the number of visible devices for the launched worker,
-    but the current solver path does not yet perform explicit multi-device
-    domain decomposition.
+    This solver-faithful path applies named axial sharding to the production
+    fields and verifies that the returned solution remains distributed.
     """
 
     devices = jax.devices()
@@ -438,16 +526,15 @@ def benchmark_extruded_inductionless_solve(
     if num_devices is None:
         num_devices = len(devices)
     if num_devices < 1 or num_devices > len(devices):
-        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
+        raise ValueError(
+            f"Requested {num_devices} devices, but only {len(devices)} are visible."
+        )
 
-    problem = build_square_duct_extruded_problem(
-        ha_peak=ha_peak,
-        nx_stations=nx,
-        ny=ny,
-        nz=nz,
-    )
+    problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse")
+    geometry = replace(problem.case.geometry, nx=nx, ny=ny, nz=nz)
     case = replace(
         problem.case,
+        geometry=geometry,
         time_stepper=replace(
             problem.case.time_stepper,
             max_steps=max_steps,
@@ -458,11 +545,18 @@ def benchmark_extruded_inductionless_solve(
             coupling_iterations=coupling_iterations,
         ),
     )
-    problem = replace(problem, case=case)
+    problem = replace(
+        problem,
+        case=case,
+        profile=build_benchmark_b_field_profile(
+            "B2-fringing-square", axial_stations=nx
+        ),
+    )
     outer_steps = max(2, min(max_steps, max(6, coupling_iterations * 2)))
 
     timings: list[float] = []
     last_bundle = None
+    shard_count = 1
     profile_path: Path | None = None
     for repeat_index in range(repeats):
         trace_started = False
@@ -476,8 +570,10 @@ def benchmark_extruded_inductionless_solve(
                 trace_started = False
         start = time.perf_counter()
         try:
-            solution = solve_extruded_inductionless(problem)
-            jax.block_until_ready((solution.bundle.u, solution.bundle.phi, solution.bundle.jx))
+            solution = solve_extruded_inductionless(problem, num_devices=num_devices)
+            jax.block_until_ready(
+                (solution.bundle.u, solution.bundle.phi, solution.bundle.jx)
+            )
         finally:
             if trace_started:
                 try:
@@ -486,17 +582,51 @@ def benchmark_extruded_inductionless_solve(
                     pass
         timings.append(time.perf_counter() - start)
         last_bundle = solution.bundle
+        shard_counts = {
+            len(getattr(solution.bundle, name).addressable_shards)
+            for name in ("u", "v", "w", "p", "phi", "jx", "jy", "jz")
+        }
+        shard_count = min(shard_counts)
+        if num_devices > 1 and shard_counts != {num_devices}:
+            raise RuntimeError(
+                "Production fields returned shard counts "
+                f"{sorted(shard_counts)} for {num_devices} devices."
+            )
 
-    total_cells = nx * ny * nz
+    actual_shape = tuple(int(value) for value in last_bundle.u.shape)
+    actual_nx, actual_ny, actual_nz = actual_shape
+    total_cells = actual_nx * actual_ny * actual_nz
     cell_updates = total_cells * outer_steps
     warm_seconds = min(timings[1:] or timings)
+    velocity_l2 = float(
+        np.sqrt(
+            np.sum(np.asarray(last_bundle.u) ** 2)
+            + np.sum(np.asarray(last_bundle.v) ** 2)
+            + np.sum(np.asarray(last_bundle.w) ** 2)
+        )
+    )
+    potential_l2 = float(np.linalg.norm(np.asarray(last_bundle.phi)))
+    current_l2 = float(
+        np.sqrt(
+            np.sum(np.asarray(last_bundle.jx) ** 2)
+            + np.sum(np.asarray(last_bundle.jy) ** 2)
+            + np.sum(np.asarray(last_bundle.jz) ** 2)
+        )
+    )
+    if not all(
+        np.isfinite(value) and value > 0.0
+        for value in (velocity_l2, potential_l2, current_l2)
+    ):
+        raise RuntimeError(
+            "Production scaling solve returned a zero or nonfinite physics signature."
+        )
     return StrongScalingRecord(
         backend=jax.default_backend(),
         device_kind=devices[0].device_kind,
         num_devices=num_devices,
-        nx=nx,
-        ny=ny,
-        nz=nz,
+        nx=actual_nx,
+        ny=actual_ny,
+        nz=actual_nz,
         iterations=outer_steps,
         repeats=repeats,
         cold_seconds=timings[0],
@@ -509,8 +639,15 @@ def benchmark_extruded_inductionless_solve(
         total_cells=total_cells,
         cell_updates=cell_updates,
         warm_cell_updates_per_second=cell_updates / max(warm_seconds, 1.0e-20),
-        memory_bytes_estimate=_bundle_memory_bytes(last_bundle) if last_bundle is not None else None,
+        memory_bytes_estimate=_bundle_memory_bytes(last_bundle)
+        if last_bundle is not None
+        else None,
         profile_path=str(profile_path) if profile_path is not None else None,
+        spatially_sharded=num_devices > 1,
+        global_shard_count=shard_count,
+        velocity_l2=velocity_l2,
+        potential_l2=potential_l2,
+        current_l2=current_l2,
     )
 
 
@@ -568,7 +705,9 @@ def _laplacian_3d_benchmark(field: jnp.ndarray) -> jnp.ndarray:
     )
 
 
-def _gradient_3d_benchmark(field: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+def _gradient_3d_benchmark(
+    field: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     d_dx = 0.5 * (jnp.roll(field, -1, axis=0) - jnp.roll(field, 1, axis=0))
     d_dy = 0.5 * (jnp.roll(field, -1, axis=1) - jnp.roll(field, 1, axis=1))
     d_dz = 0.5 * (jnp.roll(field, -1, axis=2) - jnp.roll(field, 1, axis=2))
@@ -610,10 +749,31 @@ def _benchmark_extruded_operator_iterations(
             + 0.5 * (jnp.roll(jy, -1, axis=1) - jnp.roll(jy, 1, axis=1))
             + 0.5 * (jnp.roll(jz, -1, axis=2) - jnp.roll(jz, 1, axis=2))
         )
-        u_new = 0.935 * u + 0.048 * lap_u + 0.022 * forcing + 0.032 * lorentz_x - 0.008 * div_j + 0.004 * jnp.sin(2.5 * u)
-        v_new = 0.94 * v + 0.045 * lap_v + 0.018 * lorentz_y - 0.006 * div_j + 0.003 * jnp.cos(2.0 * phi)
-        w_new = 0.94 * w + 0.045 * lap_w + 0.018 * lorentz_z - 0.006 * div_j + 0.003 * jnp.sin(1.5 * phi)
-        phi_rhs = 0.11 * u_new - 0.035 * forcing - 0.025 * div_j + 0.015 * (jx + jy + jz)
+        u_new = (
+            0.935 * u
+            + 0.048 * lap_u
+            + 0.022 * forcing
+            + 0.032 * lorentz_x
+            - 0.008 * div_j
+            + 0.004 * jnp.sin(2.5 * u)
+        )
+        v_new = (
+            0.94 * v
+            + 0.045 * lap_v
+            + 0.018 * lorentz_y
+            - 0.006 * div_j
+            + 0.003 * jnp.cos(2.0 * phi)
+        )
+        w_new = (
+            0.94 * w
+            + 0.045 * lap_w
+            + 0.018 * lorentz_z
+            - 0.006 * div_j
+            + 0.003 * jnp.sin(1.5 * phi)
+        )
+        phi_rhs = (
+            0.11 * u_new - 0.035 * forcing - 0.025 * div_j + 0.015 * (jx + jy + jz)
+        )
         phi_new = 0.91 * phi + 0.075 * lap_phi + phi_rhs
         return u_new, v_new, w_new, phi_new
 

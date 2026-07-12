@@ -43,6 +43,7 @@ from lmx.fringing import (
     _pipe_variable_diffusion_coefficients_3d,
     _rectangular_fluid_bounds,
     _solvax_pressure_poisson_duct,
+    _shard_extruded_fields,
     _solvax_pressure_poisson_pipe,
     _solvax_implicit_diffusion_duct,
     _solvax_implicit_diffusion_pipe,
@@ -955,6 +956,34 @@ def test_cross_duct_pressure_difference_rejects_invalid_contract():
         _cross_duct_pressure_difference(
             p, active_mask=jnp.zeros_like(p, dtype=bool), magnetic_axis=1, side_axis=2
         )
+
+
+def test_extruded_sharding_validates_and_places_fields(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    field = jnp.zeros((4, 2, 2))
+    assert _shard_extruded_fields((field,), num_devices=1)[0] is field
+
+    devices = [object(), object()]
+    monkeypatch.setattr("lmx.fringing.jax.devices", lambda: devices)
+    with pytest.raises(ValueError, match="divisible"):
+        _shard_extruded_fields((jnp.zeros((3, 2, 2)),), num_devices=2)
+
+    monkeypatch.setattr("lmx.fringing.Mesh", lambda *args, **kwargs: "mesh")
+    monkeypatch.setattr(
+        "lmx.fringing.NamedSharding", lambda *args, **kwargs: "sharding"
+    )
+    monkeypatch.setattr(
+        "lmx.fringing.jax.device_put", lambda value, sharding: value + 1
+    )
+    placed = _shard_extruded_fields((field,), num_devices=2)
+    assert jnp.all(placed[0] == 1)
+
+
+def test_spatial_sharding_rejects_unimplemented_extruded_paths():
+    problem = build_square_duct_extruded_problem(nx_stations=4, ny=4, nz=4)
+    with pytest.raises(NotImplementedError, match="ALEX B2"):
+        solve_extruded_inductionless(problem, num_devices=2)
 
 
 def test_pressure_observable_update_uses_magnetic_pressure_normalization():

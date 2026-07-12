@@ -75,6 +75,9 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
         warm_cell_updates_per_second=96.0,
         memory_bytes_estimate=2 * 1024 * 1024,
         profile_path="profiles/cpu_1",
+        velocity_l2=3.0,
+        potential_l2=2.0,
+        current_l2=1.0,
     )
     two_device = {
         **baseline.__dict__,
@@ -93,6 +96,7 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert summary["validation_status"] == "solver_faithful_records_present"
     assert summary["solver_faithful_record_count"] == 2
     assert summary["profiled_record_count"] == 1
+    assert summary["physics_equivalent_record_count"] == 2
     assert summary["best_speedup"] == pytest.approx(2.0)
     rows = summary["rows"]
     assert rows[0]["speedup"] == pytest.approx(1.0)
@@ -100,6 +104,7 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert rows[1]["parallel_efficiency"] == pytest.approx(1.0)
     assert rows[0]["warm_mcell_updates_per_second"] == pytest.approx(9.6e-5)
     assert rows[0]["memory_mib"] == pytest.approx(2.0)
+    assert rows[1]["physics_equivalent"]
     assert table.exists()
     assert "parallel_efficiency" in table.read_text()
 
@@ -146,8 +151,9 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
 ):
     calls = []
 
-    def fake_solve(problem):
+    def fake_solve(problem, *, num_devices=None):
         calls.append(problem)
+        assert num_devices == 1
         shape = (
             problem.case.geometry.nx,
             problem.case.geometry.ny,
@@ -158,8 +164,8 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
             v=jnp.zeros(shape),
             w=jnp.zeros(shape),
             p=jnp.zeros(shape),
-            phi=jnp.zeros(shape),
-            jx=jnp.zeros(shape),
+            phi=jnp.ones(shape),
+            jx=jnp.ones(shape),
             jy=jnp.zeros(shape),
             jz=jnp.zeros(shape),
             lorentz_x=jnp.zeros(shape),
@@ -187,6 +193,48 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
     assert record.total_cells == 6 * 5 * 4
     assert record.cell_updates == 6 * 5 * 4 * record.iterations
     assert record.memory_bytes_estimate is not None and record.memory_bytes_estimate > 0
+    assert not record.spatially_sharded
+    assert record.global_shard_count == 1
+    assert record.velocity_l2 is not None
+
+
+def test_solver_scaling_rejects_invalid_devices_and_physics(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    with pytest.raises(ValueError, match="only"):
+        benchmark_extruded_inductionless_solve(
+            repeats=1, num_devices=len(jax.devices()) + 1
+        )
+
+    shape = (4, 4, 4)
+    zero = jnp.zeros(shape)
+    bundle = SimpleNamespace(
+        **{
+            name: zero
+            for name in (
+                "u",
+                "v",
+                "w",
+                "p",
+                "phi",
+                "jx",
+                "jy",
+                "jz",
+                "lorentz_x",
+                "lorentz_y",
+                "lorentz_z",
+            )
+        }
+    )
+    monkeypatch.setattr(
+        scaling,
+        "solve_extruded_inductionless",
+        lambda problem, num_devices=None: SimpleNamespace(bundle=bundle),
+    )
+    with pytest.raises(RuntimeError, match="physics signature"):
+        benchmark_extruded_inductionless_solve(
+            nx=4, ny=4, nz=4, repeats=1, num_devices=1
+        )
 
 
 def test_default_visible_devices_uses_highest_indices(monkeypatch: pytest.MonkeyPatch):
