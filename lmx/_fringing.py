@@ -1077,6 +1077,7 @@ def _finalize_local_pressure_solve(
     iterations: int,
     effective_atol: float,
     local_tolerance: float | None,
+    single_reduction: bool = False,
 ) -> tuple[jnp.ndarray, ...]:
     """Gauge-fix a pressure solve and optionally apply one refinement correction."""
 
@@ -1110,6 +1111,7 @@ def _finalize_local_pressure_solve(
         transpose_rtol=0.0,
         transpose_atol=effective_atol,
         transpose_max_steps=iterations,
+        single_reduction=single_reduction,
     )
     field = gauge_fixed(field + correction.x)
     local_residual = local_residual_fn(field)
@@ -1142,6 +1144,7 @@ def _solvax_pressure_poisson_duct(
     initial_field: jnp.ndarray | None = None,
     local_tolerance: float | None = None,
     local_volume_min: float | None = None,
+    single_reduction: bool = False,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -1226,6 +1229,7 @@ def _solvax_pressure_poisson_duct(
         transpose_rtol=tolerance,
         transpose_atol=tolerance,
         transpose_max_steps=iterations,
+        single_reduction=single_reduction,
     )
     return _finalize_local_pressure_solve(
         solution,
@@ -1237,6 +1241,7 @@ def _solvax_pressure_poisson_duct(
         iterations=iterations,
         effective_atol=effective_atol,
         local_tolerance=local_tolerance,
+        single_reduction=single_reduction,
     )
 
 
@@ -1252,6 +1257,7 @@ def _solvax_implicit_diffusion_duct(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
     include_axial_line: bool = True,
+    single_reduction: bool = False,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve ``(I - dt div(nu grad)) u = rhs`` with no-slip wall faces."""
 
@@ -1321,6 +1327,7 @@ def _solvax_implicit_diffusion_duct(
         transpose_rtol=tolerance,
         transpose_atol=tolerance,
         transpose_max_steps=iterations,
+        single_reduction=single_reduction,
     )
     return solution.x, solution.residual_norm, solution.converged
 
@@ -1340,6 +1347,7 @@ def _face_flux_pressure_projection_duct(
     tolerance: float,
     fluid_bounds: tuple[int, int, int, int] | None = None,
     initial_pressure: jnp.ndarray | None = None,
+    single_reduction: bool = False,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Project duct velocities with a compatible finite-volume face flux."""
 
@@ -1380,6 +1388,7 @@ def _face_flux_pressure_projection_duct(
         initial_field=(
             None if initial_pressure is None else initial_pressure[:, y0:y1, z0:z1]
         ),
+        single_reduction=single_reduction,
     )
 
     mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
@@ -1436,6 +1445,7 @@ def _fixed_flow_face_flux_projection_duct(
     fluid_bounds: tuple[int, int, int, int] | None = None,
     initial_pressure: jnp.ndarray | None = None,
     validate_response: bool = True,
+    single_reduction: bool = False,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -1482,6 +1492,7 @@ def _fixed_flow_face_flux_projection_duct(
             tolerance=tolerance,
             fluid_bounds=fluid_bounds,
             initial_pressure=initial_pressure,
+            single_reduction=single_reduction,
         )
     )
     projected_flow = jnp.sum(
@@ -5508,6 +5519,7 @@ def _solve_extruded_projection(
                 tolerance=momentum_tolerance,
                 initial_field=initial,
                 include_axial_line=field_sharding is None,
+                single_reduction=field_sharding is not None,
             )
 
         # The multi-device branches require a real device mesh and are covered
@@ -5651,6 +5663,7 @@ def _solve_extruded_projection(
                 fluid_bounds=fluid_bounds,
                 initial_pressure=pressure0,
                 validate_response=field_sharding is None,
+                single_reduction=field_sharding is not None,
             )
 
         def electric_solve(rhs, initial, conductivity):
@@ -5665,6 +5678,7 @@ def _solve_extruded_projection(
                 initial_field=initial,
                 local_tolerance=ALEX_BALANCE_TOLERANCE,
                 local_volume_min=electric_volume_min,
+                single_reduction=field_sharding is not None,
             )
 
         def emf_operator(conductivity, emf_x, emf_y, emf_z):

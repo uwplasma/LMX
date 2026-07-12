@@ -72,9 +72,23 @@ for the small case; a `48 x 36 x 36` case measures `10.48 s` versus `38.28 s`.
 Cross-section-only pressure line blocks did not improve that result and were
 rejected. The coarse-scale `102 x 77 x 77` footprint fits one A4000 narrowly
 (about `15.7 GiB` observed) and runs two outer steps in `34.08 s` warm. Frequent
-global PCG reductions are therefore the next bottleneck; until a
-communication-avoiding Krylov path exists, independent campaign variants
-should occupy the two GPUs concurrently.
+global PCG reductions are therefore the next bottleneck; independent campaign
+variants should occupy the two GPUs concurrently while reduction-count work is
+qualified.
+
+SOLVAX 0.7.0 adds an opt-in algebraically equivalent single-reduction PCG
+recurrence, and sharded B2 duct solves now use it for momentum, projection, and
+electric solves. On two A4000s its compiled per-step scalar products form one
+tuple all-reduce. It improves one/two-GPU numerical agreement: relative L2
+signature differences are below `1.1e-8` on the `48 x 36 x 36` probe. It does
+not yet improve wall time: the same probe measures `10.23 s` on one GPU and
+`38.33 s` on two. This is a correctness and synchronization-count improvement,
+not a strong-scaling claim.
+
+On the Mac CPU backend, two forced virtual devices are also slower than JAX's
+normal single CPU device (`5.03 s` versus `3.19 s` warm on the small probe).
+Normal CPU execution already uses threaded kernels, so virtual-device sharding
+is not the recommended local acceleration path.
 
 ## Run the benchmark
 

@@ -762,6 +762,12 @@ wall time is acceptable.
    GPUs; do not claim strong scaling yet. The Benchmark B campaign runner now
    supports `--gpu-devices 0,1`, assigning one variant per GPU in two
    restart-aware waves without duplicating the campaign implementation.
+   SOLVAX 0.7.0 single-reduction PCG is now enabled for sharded B2 momentum,
+   projection, and electric solves. It reduces the compiled per-step reduction
+   stages and brings medium one/two-GPU L2 signatures within `1.1e-8`, but the
+   measured warm time remains `10.23 s` versus `38.33 s`; halo traffic and the
+   remaining combined reduction still block domain strong scaling. Forced
+   two-device CPU sharding is likewise rejected (`5.03 s` versus `3.19 s`).
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

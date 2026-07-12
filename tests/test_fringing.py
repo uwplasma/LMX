@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from dataclasses import replace
+from types import SimpleNamespace
 
 import lmx._fringing as fringing_impl
 
@@ -91,6 +92,49 @@ def test_b2_jit_cache_reuses_the_first_compiled_kernel():
 
     assert fringing_impl._reuse_b2_jit(key, first) is first
     assert fringing_impl._reuse_b2_jit(key, object()) is first
+
+
+def test_duct_solvers_forward_single_reduction_to_solvax(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    calls = []
+
+    def fake_solve(_matvec, rhs, **kwargs):
+        calls.append(kwargs["single_reduction"])
+        return SimpleNamespace(
+            x=jnp.zeros_like(rhs),
+            residual_norm=jnp.asarray(0.0),
+            relative_residual_norm=jnp.asarray(0.0),
+            iterations=jnp.asarray(0),
+            converged=jnp.asarray(True),
+            status=jnp.asarray(1),
+        )
+
+    monkeypatch.setattr(fringing_impl, "pcg_linear_solve", fake_solve)
+    field = jnp.ones((2, 2, 2))
+    spacing = jnp.ones(2)
+    _solvax_implicit_diffusion_duct(
+        field,
+        field,
+        dt=0.1,
+        dx=1.0,
+        dy=spacing,
+        dz=spacing,
+        iterations=2,
+        tolerance=1.0e-6,
+        single_reduction=True,
+    )
+    _solvax_pressure_poisson_duct(
+        field,
+        field,
+        dx=1.0,
+        dy=spacing,
+        dz=spacing,
+        iterations=2,
+        tolerance=1.0e-6,
+        single_reduction=True,
+    )
+    assert calls == [True, True]
 
 
 def test_distance_weighted_harmonic_mean_preserves_series_resistance():
