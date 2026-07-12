@@ -85,6 +85,9 @@ temporary directory, while an explicit `JAX_COMPILATION_CACHE_DIR` override is
 preserved.
 Long solves also retain only the configured Anderson history window instead of
 keeping every prior three-dimensional state alive.
+The campaign stops before tolerance/iteration variants when baseline or wall
+prerequisites miss a frozen physics gate, so GPU time is not spent refining an
+invalid state.
 
 SOLVAX 0.7.0 adds an opt-in algebraically equivalent single-reduction PCG
 recurrence, and sharded B2 duct solves now use it for momentum, projection, and

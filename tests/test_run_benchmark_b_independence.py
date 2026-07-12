@@ -202,6 +202,7 @@ def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
     monkeypatch.setattr(
         campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks)
     )
+    monkeypatch.setattr(campaign, "_wave_physics_passes", lambda args, tasks: True)
     monkeypatch.setattr(campaign, "main", lambda argv=None: 7)
     args = SimpleNamespace(
         gpu_devices="0,1",
@@ -219,3 +220,48 @@ def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
             ("B2-fringing-square", "extended_iterations"),
         ],
     ]
+
+
+def test_gpu_campaign_stops_before_dependent_wave_when_physics_fails(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    waves = []
+    monkeypatch.setattr(
+        campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks)
+    )
+    monkeypatch.setattr(campaign, "_wave_physics_passes", lambda args, tasks: False)
+    args = SimpleNamespace(
+        gpu_devices="0,1",
+        output=Path("artifacts/campaign"),
+        cases=["B2-fringing-square"],
+        mesh_level="coarse",
+        variants=list(campaign.VARIANTS),
+    )
+
+    assert campaign._run_gpu_campaign(args) == 2
+    assert waves == [
+        [("B2-fringing-square", "baseline"), ("B2-fringing-square", "thin_wall")]
+    ]
+
+
+def test_gpu_wave_physics_gate_reads_worker_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    path = runs / "B2-fringing-square-coarse-baseline.json"
+    path.write_text('{"variant": "baseline"}')
+    args = SimpleNamespace(output=tmp_path, mesh_level="coarse")
+    task = [("B2-fringing-square", "baseline")]
+    monkeypatch.setattr(
+        campaign,
+        "_comparison",
+        lambda case_id, records: {"gates": {"steady_residual": True}},
+    )
+    assert campaign._wave_physics_passes(args, task)
+    monkeypatch.setattr(
+        campaign,
+        "_comparison",
+        lambda case_id, records: {"gates": {"steady_residual": False}},
+    )
+    assert not campaign._wave_physics_passes(args, task)

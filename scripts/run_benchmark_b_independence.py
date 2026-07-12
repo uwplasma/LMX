@@ -327,6 +327,28 @@ def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) 
             )
 
 
+def _wave_physics_passes(args, tasks: list[tuple[str, str]]) -> bool:
+    """Reject dependent work when completed prerequisite states miss a gate."""
+
+    records: dict[str, dict[str, dict[str, Any]]] = {}
+    for case_id, variant in tasks:
+        path = args.output / "runs" / f"{case_id}-{args.mesh_level}-{variant}.json"
+        records.setdefault(case_id, {})[variant] = json.loads(path.read_text())
+    comparisons = [
+        _comparison(case_id, case_records) for case_id, case_records in records.items()
+    ]
+    passed = all(all(item["gates"].values()) for item in comparisons)
+    if not passed:
+        print(
+            json.dumps(
+                {"wave": "prerequisites", "cases": comparisons},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    return passed
+
+
 def _run_gpu_campaign(args) -> int:
     devices = _parse_gpu_devices(args.gpu_devices)
     independent = [
@@ -342,6 +364,8 @@ def _run_gpu_campaign(args) -> int:
         if variant in {"tight_tolerance", "extended_iterations"}
     ]
     _run_gpu_wave(args, independent, devices)
+    if independent and not _wave_physics_passes(args, independent):
+        return 2
     _run_gpu_wave(args, dependent, devices)
     summary_args = [
         "--output",

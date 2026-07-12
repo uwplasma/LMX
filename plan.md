@@ -766,7 +766,8 @@ wall time is acceptable.
    PCG synchronization and run independent variants concurrently across the
    GPUs; do not claim strong scaling yet. The Benchmark B campaign runner now
    supports `--gpu-devices 0,1`, assigning one variant per GPU in two
-   restart-aware waves without duplicating the campaign implementation.
+   restart-aware waves without duplicating the campaign implementation. It
+   refuses to launch the dependent wave when prerequisite physics gates fail.
    SOLVAX 0.7.0 single-reduction PCG is now enabled for sharded B2 momentum,
    projection, and electric solves. It reduces the compiled per-step reduction
    stages and brings medium one/two-GPU L2 signatures within `1.1e-8`, but the
