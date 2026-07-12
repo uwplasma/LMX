@@ -18,6 +18,7 @@ from lmx.fringing import (
     _laplacian_3d,
     _masked_laplacian_duct,
     _net_boundary_current_residual,
+    _normalized_pressure_observable_update,
     _pipe_poisson_jacobi_3d,
     build_bent_pipe_extruded_problem,
     build_extruded_problem_from_case,
@@ -919,6 +920,17 @@ def test_cross_duct_pressure_difference_rejects_invalid_contract():
         _cross_duct_pressure_difference(
             p, active_mask=jnp.zeros_like(p, dtype=bool), magnetic_axis=1, side_axis=2
         )
+
+
+def test_pressure_observable_update_uses_magnetic_pressure_normalization():
+    assert _normalized_pressure_observable_update(
+        jnp.array([2.0, -1.0]),
+        jnp.zeros(2),
+        jnp.array([25.0, 100.0]),
+    ) == pytest.approx(0.02)
+    assert _normalized_pressure_observable_update(
+        jnp.array([2.0]), jnp.zeros(1), jnp.array([0.25])
+    ) == pytest.approx(2.0)
 
 
 def test_smooth_fringing_profile_produces_bounded_station_scales():

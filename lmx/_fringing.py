@@ -542,6 +542,17 @@ def _cross_duct_pressure_difference(
     return side_pressure - top_pressure
 
 
+def _normalized_pressure_observable_update(
+    current: jnp.ndarray,
+    previous: jnp.ndarray,
+    magnetic_energy: jnp.ndarray,
+) -> float:
+    """Measure a pressure-observable update in magnetic-pressure units."""
+
+    scale = jnp.maximum(1.0, jnp.max(jnp.asarray(magnetic_energy)))
+    return float(jnp.max(jnp.abs(current - previous)) / scale)
+
+
 def _poisson_jacobi_3d(
     rhs: jnp.ndarray,
     *,
@@ -4831,12 +4842,10 @@ def _solve_extruded_projection(
             w_update = float(jnp.max(jnp.abs(w_next - w)))
             flow_error_value = float(fixed_flow_error)
             pressure_update = (
-                float(
-                    jnp.max(
-                        jnp.abs(
-                            axial_pressure_loss_gradient - pressure_gradient_previous
-                        )
-                    )
+                _normalized_pressure_observable_update(
+                    axial_pressure_loss_gradient,
+                    pressure_gradient_previous,
+                    bx**2 + by**2 + bz**2,
                 )
                 if use_alex_b1_finite_volume
                 else 0.0
@@ -5369,18 +5378,15 @@ def _solve_extruded_projection(
         w_update = float(jnp.max(jnp.abs(w_next - w)))
         flow_error_value = float(fixed_flow_error)
         pressure_update = (
-            float(
-                jnp.max(
-                    jnp.abs(
-                        _cross_duct_pressure_difference(
-                            p,
-                            active_mask=fluid_mask,
-                            magnetic_axis=1,
-                            side_axis=2,
-                        )
-                        - pressure_observable_previous
-                    )
-                )
+            _normalized_pressure_observable_update(
+                _cross_duct_pressure_difference(
+                    p,
+                    active_mask=fluid_mask,
+                    magnetic_axis=1,
+                    side_axis=2,
+                ),
+                pressure_observable_previous,
+                bx**2 + by**2 + bz**2,
             )
             if use_alex_b2_finite_volume
             else 0.0
