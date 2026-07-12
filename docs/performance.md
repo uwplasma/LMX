@@ -136,6 +136,10 @@ differences were around `1e-7`; transverse components changed by less than
 `5.8e-7` absolute, and the primary observable changed by `8.38e-9` absolute.
 The unified B2 path therefore omits the axial line block; B1 and generic duct
 solves retain their existing preconditioners.
+On a two-device HLO audit of the same two-step pressure solve, that choice
+reduced `collective-permute` operations from 17 to 7, all-reduces from 25 to
+15, and all-gathers from 12 to zero. These are compiler counts, not a scaling
+claim; the release gate remains measured one/two/four-GPU wall time.
 
 Two cheaper-looking follow-ups are rejected. A single y or z line block took
 more than 98 seconds without completing the baseline. A symmetric

@@ -842,6 +842,10 @@ wall time is acceptable.
    Use cross-section line blocks for B2 momentum, projection, and electric PCG;
    retain existing B1/generic preconditioners. Rerun the corrected four-variant
    campaign and one/two-GPU scaling at this new source fingerprint.
+   The matching two-device HLO pressure probe reduces collective-permute
+   operations `17 -> 7`, all-reduces `25 -> 15`, and all-gathers `12 -> 0`;
+   treat these as synchronization diagnostics until GPU wall time confirms a
+   speedup.
    Further line-block ablations are closed: one y/z direction exceeded `98 s`
    without completing, while a symmetric multiplicative y--z--y SOLVAX
    smoother reduced electric PCG to 380--381 iterations but increased runtime
