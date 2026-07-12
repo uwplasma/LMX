@@ -137,6 +137,14 @@ differences were around `1e-7`; transverse components changed by less than
 The unified B2 path therefore omits the axial line block; B1 and generic duct
 solves retain their existing preconditioners.
 
+Two cheaper-looking follow-ups are rejected. A single y or z line block took
+more than 98 seconds without completing the baseline. A symmetric
+multiplicative y--z--y SOLVAX smoother reduced electric PCG to 380--381
+iterations and retained a `2.48e-5` charge residual, but its extra residual
+refreshes increased runtime to `77.8 s`. Multigrid must therefore supply a
+cheap coarse correction instead of adding line-smoother work at every Krylov
+iteration.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and
