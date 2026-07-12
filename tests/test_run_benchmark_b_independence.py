@@ -187,7 +187,10 @@ def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch
     assert all(
         item[1]["env"]["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false" for item in launches
     )
-    assert all("lmx-jax-cache" in item[1]["env"]["JAX_COMPILATION_CACHE_DIR"] for item in launches)
+    assert all(
+        "lmx-jax-cache" in item[1]["env"]["JAX_COMPILATION_CACHE_DIR"]
+        for item in launches
+    )
     assert "baseline" in launches[0][0]
     assert "thin_wall" in launches[1][0]
 

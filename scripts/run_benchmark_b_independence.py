@@ -291,7 +291,9 @@ def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
 def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) -> None:
     """Run independent case variants concurrently, one process per GPU."""
 
-    cache_dir = Path(tempfile.gettempdir()) / "lmx-jax-cache" / _source_fingerprint()[:16]
+    cache_dir = (
+        Path(tempfile.gettempdir()) / "lmx-jax-cache" / _source_fingerprint()[:16]
+    )
     for offset in range(0, len(tasks), len(devices)):
         processes = []
         for device, (case_id, variant) in zip(devices, tasks[offset:]):
@@ -307,8 +309,9 @@ def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) 
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            processes.append((case_id, variant, process))
-        for case_id, variant, process in processes:
+            print(f"[GPU {device}] started {case_id}/{variant}", flush=True)
+            processes.append((device, case_id, variant, time.perf_counter(), process))
+        for device, case_id, variant, started, process in processes:
             stdout, stderr = process.communicate()
             # A single-variant child normally returns 2 because the four-variant
             # comparison is incomplete; solver/runtime failures return 1.
@@ -317,6 +320,11 @@ def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) 
                 raise RuntimeError(
                     f"GPU worker failed for {case_id}/{variant}: {detail}"
                 )
+            elapsed = time.perf_counter() - started
+            print(
+                f"[GPU {device}] finished {case_id}/{variant} in {elapsed:.1f}s",
+                flush=True,
+            )
 
 
 def _run_gpu_campaign(args) -> int:
