@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 import hashlib
 import json
@@ -329,20 +330,32 @@ def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) 
             )
             print(f"[GPU {device}] started {case_id}/{variant}", flush=True)
             processes.append((device, case_id, variant, time.perf_counter(), process))
-        for device, case_id, variant, started, process in processes:
-            stdout, stderr = process.communicate()
-            # A single-variant child normally returns 2 because the four-variant
-            # comparison is incomplete; solver/runtime failures return 1.
-            if process.returncode not in {0, 2}:
-                detail = stderr.strip() or stdout.strip()
-                raise RuntimeError(
-                    f"GPU worker failed for {case_id}/{variant}: {detail}"
+        with ThreadPoolExecutor(max_workers=len(processes)) as pool:
+            pending = {
+                pool.submit(process.communicate): (
+                    device,
+                    case_id,
+                    variant,
+                    started,
+                    process,
                 )
-            elapsed = time.perf_counter() - started
-            print(
-                f"[GPU {device}] finished {case_id}/{variant} in {elapsed:.1f}s",
-                flush=True,
-            )
+                for device, case_id, variant, started, process in processes
+            }
+            for future in as_completed(pending):
+                device, case_id, variant, started, process = pending[future]
+                stdout, stderr = future.result()
+                # A single-variant child normally returns 2 because the complete
+                # comparison is unavailable; solver/runtime failures return 1.
+                if process.returncode not in {0, 2}:
+                    detail = stderr.strip() or stdout.strip()
+                    raise RuntimeError(
+                        f"GPU worker failed for {case_id}/{variant}: {detail}"
+                    )
+                elapsed = time.perf_counter() - started
+                print(
+                    f"[GPU {device}] finished {case_id}/{variant} in {elapsed:.1f}s",
+                    flush=True,
+                )
 
 
 def _wave_physics_passes(args, tasks: list[tuple[str, str]]) -> bool:
