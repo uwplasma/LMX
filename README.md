@@ -166,6 +166,11 @@ runtime, use the real solver rather than a presentation-only kernel, include
 one-device baselines, report problem size and memory, and validate identical
 physics on every device count. Scaling claims require actual shard-placement
 and solution-equivalence checks, not merely multiple visible devices.
+For heavy independent validation variants, use the campaign runner's
+`--gpu-devices 0,1` mode: it assigns one process per GPU, disables default JAX
+memory preallocation, shares a persistent compilation cache, and preserves
+restart provenance. Normal single-device JAX execution remains fastest on the
+Mac CPU because its kernels already use the host cores.
 
 See [Performance and scaling](docs/performance.md) for the current commands and
 the acceptance protocol.
