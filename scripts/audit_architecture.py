@@ -96,7 +96,11 @@ def _checkout_size(root: Path) -> int:
     total = 0
     for path in root.rglob("*"):
         relative = path.relative_to(root)
-        if not path.is_file() or path.name in EXCLUDED_FILES:
+        if (
+            not path.is_file()
+            or path.name in EXCLUDED_FILES
+            or path.name.startswith(".coverage.")
+        ):
             continue
         if relative.as_posix() in EXCLUDED_RELATIVE_FILES:
             continue

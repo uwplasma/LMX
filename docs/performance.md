@@ -111,24 +111,23 @@ even with `OMP_NUM_THREADS=1`, or about 2.5 cores on average. Setting
 not the recommended local acceleration path. Use normal one-device JAX for one
 solve and process-level concurrency for independent cases.
 
-The next domain-decomposition experiment replaces automatic global-array
-partitioning at the axial stencil boundary with a manual `jax.shard_map`
-kernel. Each device will own a local axial slab and exchange only its adjacent
-halo plane with `jax.lax.ppermute`; scalar Krylov products remain explicit
-collectives. This follows JAX's documented manual-SPMD model and must beat the
-one-GPU production solve while preserving fields, gradients, balances, and
-iteration behavior before it replaces the current path. In parallel, a
-geometric multigrid preconditioner is the primary time-to-solution experiment:
+An HLO audit of the named-sharded axial stencil shows that XLA already emits
+two one-plane `collective-permute` exchanges and no all-gather. A manual
+`jax.shard_map` rewrite would reproduce that communication pattern, so it is
+deferred unless a GPU trace later exposes a different partition. A geometric
+multigrid preconditioner is the primary time-to-solution experiment:
 the exact coarse B2 checkpoint currently needs about 722--723 electric PCG
 iterations per outer update, so reducing Krylov iterations also removes the
-same number of global synchronization points.
+same number of global synchronization points. The next scaling checkpoint must
+profile the multigrid-preconditioned production solve and its remaining scalar
+collectives before changing halo code.
 
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and
 four oscillate and are rejected. This reduces continuation time, but it does
 not address the dominant per-update PCG and collective costs targeted by
-multigrid and explicit halos.
+multigrid and larger fused solver regions.
 
 ## Run the benchmark
 

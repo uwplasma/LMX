@@ -820,11 +820,13 @@ wall time is acceptable.
    `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
    identical `3.44/3.45/3.58 s` warm times. Local acceleration therefore uses
    normal JAX threading plus process-level case concurrency, not fake CPU
-   devices. The next spatial experiment is manual SPMD with `jax.shard_map`:
-   local axial slabs exchange one neighbor plane with `ppermute`, and only
-   scalar Krylov products use global collectives. Pair that with a geometric
-   multigrid preconditioner because the current exact coarse B2 electric solve
-   takes about 722--723 PCG iterations per outer update. Accept either change
+   devices. An HLO audit confirms that automatic named sharding already lowers
+   the axial stencil to two one-plane `collective-permute` exchanges with no
+   all-gather, so a manual `shard_map` rewrite is deferred unless a GPU trace
+   contradicts that result. Prioritize a geometric multigrid preconditioner
+   because the current exact coarse B2 electric solve takes about 722--723 PCG
+   iterations—and global reductions—per outer update, then fuse larger solver
+   regions and reprofile the remaining collectives. Accept either change
    only after production field, balance, gradient, iteration, and restart
    equivalence; then require an actual one-to-two-GPU speedup before attempting
    the frozen four-device >=70% efficiency gate.
