@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Any
 
@@ -290,11 +291,15 @@ def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
 def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) -> None:
     """Run independent case variants concurrently, one process per GPU."""
 
+    cache_dir = Path(tempfile.gettempdir()) / "lmx-jax-cache" / _source_fingerprint()[:16]
     for offset in range(0, len(tasks), len(devices)):
         processes = []
         for device, (case_id, variant) in zip(devices, tasks[offset:]):
             environment = {**os.environ, "CUDA_VISIBLE_DEVICES": device}
             environment.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+            # Workers are separate processes; a shared persistent cache avoids
+            # recompiling unchanged solver kernels in later restart waves.
+            environment.setdefault("JAX_COMPILATION_CACHE_DIR", str(cache_dir))
             process = subprocess.Popen(
                 _gpu_child_command(args, case_id, variant),
                 env=environment,
