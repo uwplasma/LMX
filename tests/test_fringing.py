@@ -95,6 +95,18 @@ def test_b2_steady_gate_requires_three_consecutive_passing_updates():
     assert outcomes == [False, False, False, False, False, True]
 
 
+def test_b2_canonical_shell_widths_remove_realization_thickness():
+    nominal = jnp.asarray([0.01, 0.01, 0.4, 0.4, 0.4, 0.4, 0.4, 0.01, 0.01])
+    confirmation = nominal.at[:2].divide(2.0).at[-2:].divide(2.0)
+
+    expected = fringing_impl._canonical_shell_widths(nominal, 2, 7)
+    observed = fringing_impl._canonical_shell_widths(confirmation, 2, 7)
+
+    assert observed.tolist() == pytest.approx(expected.tolist())
+    assert float(jnp.sum(observed[:2])) == pytest.approx(0.02)
+    assert float(jnp.sum(observed[-2:])) == pytest.approx(0.02)
+
+
 def test_b2_jit_cache_reuses_the_first_compiled_kernel():
     fringing_impl._B2_JIT_CACHE.clear()
     first = object()

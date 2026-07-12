@@ -387,15 +387,16 @@ This establishes the B2 solver implementation; it does **not** establish the
 experimental benchmark. Steady/tolerance independence, the frozen thin-wall
 comparison, the three production meshes, and matched FreeMHD evidence remain
 mandatory before B2 is called validated. ALEX B1 remains guarded until the
-corresponding mapped-pipe face-flux projection and conducting-annulus coupling
-are complete.
+accepted mapped-pipe evidence is rerun at the final release fingerprint.
 
 For the explicit B2 shell, fluid-to-wall face transmissibility uses the
 mixed-dimensional thin-wall limit: tangential conductance remains
 `sigma_wall * thickness`, while artificial wall-center half-cell resistance is
-excluded from normal coupling. A reduced nominal/confirmation check changes
-the primary pressure observable by `5.1e-5` relative; the full frozen coarse
-independence campaign is still required before acceptance.
+excluded from normal coupling. Shell cell widths and conductivity are mapped to
+the frozen nominal numerical thickness while preserving that sheet
+conductance; the confirmation thickness therefore tests the collapsed surface
+operator instead of introducing a second volumetric wall. Sustained exact
+coarse independence remains required before acceptance.
 
 ## Literature context
 

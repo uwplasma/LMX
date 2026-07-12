@@ -751,7 +751,11 @@ wall time is acceptable.
     worker launched as `python scripts/...` could import another installed LMX
     through `PYTHONPATH` while hashing the copied source tree. All exact remote
     records produced before the runner began prepending and verifying its own
-    source root are invalid as acceptance evidence and must be rerun.
+    source root are invalid as acceptance evidence and must be rerun. The valid
+    rerun must use a canonical mixed-dimensional shell: nominal and confirmation
+    cell widths/conductivity map to the frozen nominal numerical thickness while
+    preserving `sigma_wall * thickness`, removing arbitrary volumetric-shell
+    geometry from the physical wall-conductance comparison.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and

@@ -27,6 +27,7 @@ model = "uniform thin conducting wall"
 wall_conductance_ratio = 0.07
 definition = "c_w = sigma_wall * thickness / (sigma_fluid * half-width)"
 numerical_realization = "explicit volumetric shell preserving c_w"
+mixed_dimensional_reference_thickness_over_L = 0.02
 nominal_thickness_over_L = 0.02
 confirmation_thickness_over_L = 0.01
 thickness_independence_relative_max = 0.02

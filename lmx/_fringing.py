@@ -104,6 +104,7 @@ def _reuse_b2_jit(key: tuple[object, ...], function: Callable) -> Callable:
 # Frozen in both ALEX Benchmark B specifications for mass and current closure.
 ALEX_BALANCE_TOLERANCE = 1.0e-3
 ALEX_B2_STEADY_STEPS = 3
+ALEX_B2_CANONICAL_SHELL_THICKNESS = 0.02
 
 
 def _sustained_convergence(streak: int, passed: bool) -> tuple[int, bool]:
@@ -111,6 +112,20 @@ def _sustained_convergence(streak: int, passed: bool) -> tuple[int, bool]:
 
     streak = streak + 1 if passed else 0
     return streak, streak >= ALEX_B2_STEADY_STEPS
+
+
+def _canonical_shell_widths(widths: jnp.ndarray, lower: int, upper: int) -> jnp.ndarray:
+    """Map explicit wall cells to the frozen B2 mixed-dimensional shell."""
+
+    if lower:
+        widths = widths.at[:lower].multiply(
+            ALEX_B2_CANONICAL_SHELL_THICKNESS / jnp.sum(widths[:lower])
+        )
+    if upper < widths.size:
+        widths = widths.at[upper:].multiply(
+            ALEX_B2_CANONICAL_SHELL_THICKNESS / jnp.sum(widths[upper:])
+        )
+    return widths
 
 
 def magnetic_obstacle_literature_reference_cases() -> dict[str, dict[str, object]]:
@@ -5416,7 +5431,18 @@ def _solve_extruded_projection(
     fluid_bounds = (
         _rectangular_fluid_bounds(fluid_mask) if use_alex_b2_finite_volume else None
     )
-    cell_area = _broadcast_cross_section(mesh.dy[:, None] * mesh.dz[None, :], nx)
+    if use_alex_b2_finite_volume:
+        y0, y1, z0, z1 = fluid_bounds
+        dy = _canonical_shell_widths(dy, y0, y1)
+        dz = _canonical_shell_widths(dz, z0, z1)
+        wall = next(region for region in case.regions if region.kind == "solid")
+        sheet_conductance = wall.conductivity * wall.wall_thickness
+        sigma = jnp.where(
+            fluid_mask,
+            sigma,
+            sheet_conductance / ALEX_B2_CANONICAL_SHELL_THICKNESS,
+        )
+    cell_area = _broadcast_cross_section(dy[:, None] * dz[None, :], nx)
     forcing = float(case.forcing)
     field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
     bx, by, bz = _sample_station_magnetic_field_duct(
