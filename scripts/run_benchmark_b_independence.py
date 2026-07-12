@@ -178,6 +178,24 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         "boundary_current": float(base_diagnostics["net_boundary_current_residual"])
         <= float(spec["solver"]["current_balance_max"]),
     }
+    for variant, record in records.items():
+        if variant == "baseline":
+            continue
+        diagnostics = record["diagnostics"]
+        prefix = variant.replace("_", "-")
+        gates[f"{prefix}_steady_residual"] = float(
+            diagnostics["max_residual"]
+        ) <= float(spec["solver"]["steady_residual_max"])
+        gates[f"{prefix}_mass_balance"] = max(
+            float(diagnostics["volumetric_flow_rate_span"]),
+            float(diagnostics.get("max_divergence_residual", 0.0)),
+        ) <= float(spec["solver"]["mass_balance_max"])
+        gates[f"{prefix}_current_balance"] = float(
+            diagnostics["max_charge_balance_residual"]
+        ) <= float(spec["solver"]["current_balance_max"])
+        gates[f"{prefix}_boundary_current"] = float(
+            diagnostics["net_boundary_current_residual"]
+        ) <= float(spec["solver"]["current_balance_max"])
     result: dict[str, Any] = {
         "case_id": case_id,
         "complete": not missing,
@@ -216,6 +234,19 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
     return result
 
 
+def _parse_variant_restarts(values: list[str]) -> dict[str, Path]:
+    restarts: dict[str, Path] = {}
+    for value in values:
+        variant, separator, raw_path = value.partition("=")
+        if not separator or variant not in VARIANTS or not raw_path:
+            raise ValueError(
+                "--variant-restart VARIANT=PATH must use one of "
+                f"{', '.join(VARIANTS)} followed by '=PATH'"
+            )
+        restarts[variant] = Path(raw_path)
+    return restarts
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -234,8 +265,16 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="Explicit restart used only to initialize a newly run baseline variant.",
     )
+    parser.add_argument(
+        "--variant-restart",
+        action="append",
+        default=[],
+        metavar="VARIANT=PATH",
+        help="Explicit restart for a newly run variant; repeat for multiple variants.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    variant_restarts = _parse_variant_restarts(args.variant_restart)
 
     fingerprint = _source_fingerprint()
     records_by_case: dict[str, dict[str, dict[str, Any]]] = {}
@@ -264,7 +303,14 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 initialization = None
                 initialization_sha256 = None
-                if variant == "baseline" and args.initial_restart is not None:
+                explicit_restart = variant_restarts.get(variant)
+                if explicit_restart is not None:
+                    initial_bundle = load_extruded_restart_bundle(
+                        explicit_restart
+                    ).bundle
+                    initialization = f"provided_restart:{explicit_restart}"
+                    initialization_sha256 = _file_sha256(explicit_restart)
+                elif variant == "baseline" and args.initial_restart is not None:
                     initial_bundle = load_extruded_restart_bundle(
                         args.initial_restart
                     ).bundle

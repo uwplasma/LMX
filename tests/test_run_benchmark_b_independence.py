@@ -81,6 +81,12 @@ def test_comparison_applies_uncertainty_and_thin_wall_gates():
     assert failed["pass"] is False
     assert failed["gates"]["mass_balance"] is False
 
+    records["baseline"] = _record([0.1, 0.2, 0.1])
+    records["thin_wall"] = _record([0.1001, 0.2001, 0.1001], residual=1.0)
+    failed = campaign._comparison("B2-fringing-square", records)
+    assert failed["pass"] is False
+    assert failed["gates"]["thin-wall_steady_residual"] is False
+
     incomplete = campaign._comparison(
         "B2-fringing-square", {"baseline": records["baseline"]}
     )
@@ -126,3 +132,16 @@ def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
                 "--resume",
             ]
         )
+
+
+def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
+    assert campaign._parse_variant_restarts(
+        ["thin_wall=/tmp/thin.npz", "baseline=/tmp/base.npz"]
+    ) == {
+        "thin_wall": Path("/tmp/thin.npz"),
+        "baseline": Path("/tmp/base.npz"),
+    }
+    with pytest.raises(ValueError, match="VARIANT"):
+        campaign._parse_variant_restarts(["thin_wall"])
+    with pytest.raises(ValueError, match="VARIANT"):
+        campaign._parse_variant_restarts(["unknown=/tmp/x.npz"])
