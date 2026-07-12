@@ -830,6 +830,10 @@ wall time is acceptable.
    only after production field, balance, gradient, iteration, and restart
    equivalence; then require an actual one-to-two-GPU speedup before attempting
    the frozen four-device >=70% efficiency gate.
+   A conditional skip of electric iterative refinement is rejected: it reduced
+   the reported solve from about 720 to 600 iterations without improving wall
+   time and degraded maximum charge residual from `2.63e-5` to `7.76e-4`.
+   Preserve the stronger refinement result and improve its preconditioner.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production

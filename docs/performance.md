@@ -122,6 +122,12 @@ same number of global synchronization points. The next scaling checkpoint must
 profile the multigrid-preconditioned production solve and its remaining scalar
 collectives before changing halo code.
 
+Skipping the local-residual refinement after the first electric PCG is also
+rejected. It reduced the recorded solve from about 720 to 600 iterations but
+did not improve baseline wall time and worsened maximum charge residual from
+`2.63e-5` to `7.76e-4`. Although still below the frozen `1e-3` limit, that loss
+of verification margin is not acceptable.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and

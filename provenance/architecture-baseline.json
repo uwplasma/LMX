@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 7164220,
-    "checkout_bytes_excluding_release_candidates": 7164220,
+    "checkout_bytes_excluding_build_artifacts": 7164879,
+    "checkout_bytes_excluding_release_candidates": 7164879,
     "completed_workflow_disposition_count": 85,
     "curated_example_count": 11,
     "curated_examples": [
