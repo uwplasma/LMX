@@ -213,7 +213,9 @@ The coordinator gives each subprocess one visible GPU. Baseline and thin-wall
 runs form the first wave; tolerance and iteration variants form a second wave
 so both can start from the recorded baseline restart. Each record remains
 atomic and source-fingerprinted, and interrupted campaigns retain `--resume`
-semantics.
+semantics. GPU workers disable JAX's large up-front memory reservation by
+default, allowing concurrent variants to use their actual array/compile memory;
+an explicitly supplied `XLA_PYTHON_CLIENT_PREALLOCATE` setting still wins.
 
 ## Physics gates
 

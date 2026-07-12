@@ -184,6 +184,9 @@ def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch
     )
 
     assert [item[1]["env"]["CUDA_VISIBLE_DEVICES"] for item in launches] == ["0", "1"]
+    assert all(
+        item[1]["env"]["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false" for item in launches
+    )
     assert "baseline" in launches[0][0]
     assert "thin_wall" in launches[1][0]
 

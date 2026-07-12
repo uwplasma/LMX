@@ -294,6 +294,7 @@ def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) 
         processes = []
         for device, (case_id, variant) in zip(devices, tasks[offset:]):
             environment = {**os.environ, "CUDA_VISIBLE_DEVICES": device}
+            environment.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
             process = subprocess.Popen(
                 _gpu_child_command(args, case_id, variant),
                 env=environment,
