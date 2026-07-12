@@ -343,7 +343,7 @@ The maintained core converges toward the responsibilities `case`, `mesh`,
 The measured pre-slimming surface was 45 top-level Python modules, about 32,000
 package lines, 285 root exports, and 96 top-level Python/TOML examples. The
 current working-tree audit has 45 modules, 8,995 maintained core/facade lines,
-35,697 total classified lines, 30 stable root exports, and 11 curated examples.
+35,703 total classified lines, 30 stable root exports, and 11 curated examples.
 The tracked inventory is regenerated after each accepted milestone and must
 remain within the numeric limits below. The M3 adapter and Benchmark B operator
 work are included in that inventory rather than exempted from it.
