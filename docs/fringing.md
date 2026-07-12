@@ -390,6 +390,13 @@ mandatory before B2 is called validated. ALEX B1 remains guarded until the
 corresponding mapped-pipe face-flux projection and conducting-annulus coupling
 are complete.
 
+For the explicit B2 shell, fluid-to-wall face transmissibility uses the
+mixed-dimensional thin-wall limit: tangential conductance remains
+`sigma_wall * thickness`, while artificial wall-center half-cell resistance is
+excluded from normal coupling. A reduced nominal/confirmation check changes
+the primary pressure observable by `5.1e-5` relative; the full frozen coarse
+independence campaign is still required before acceptance.
+
 ## Literature context
 
 The duct benchmark ladder and fringing-region validation targets documented

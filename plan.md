@@ -732,6 +732,11 @@ wall time is acceptable.
     weaken the wall gate or start medium/fine runs. Do not launch another
     hour-scale variant until package 13 supplies a faster production path. The campaign runner enforces
     every variant's physics gates and supports explicit per-variant restarts.
+    The corrected mixed-dimensional interface removes the artificial wall
+    half-cell resistance while preserving tangential conductance. A reduced
+    one-GPU B2 nominal/confirmation pair changes the primary observable by only
+    `5.1e-5` relative, down from `7.00%`; the exact coarse campaign remains the
+    acceptance gate.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and

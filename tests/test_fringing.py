@@ -17,6 +17,7 @@ from lmx.fringing import (
     _apply_pipe_diffusion_coefficients_3d,
     _cross_duct_pressure_difference,
     _distance_weighted_harmonic_mean,
+    _thin_wall_interface_mean,
     _enforce_stationwise_flow_rate_3d,
     _gradient_3d,
     _laplacian_3d,
@@ -145,6 +146,21 @@ def test_distance_weighted_harmonic_mean_preserves_series_resistance():
         jnp.asarray([0.9]),
     )
     assert value == pytest.approx([1.0 / (0.1 / 10.0 + 0.9 / 1.0)])
+
+
+@pytest.mark.parametrize("wall_width", [0.01, 0.02, 0.05])
+def test_thin_wall_interface_removes_artificial_normal_resistance(wall_width):
+    fluid_width = jnp.asarray([0.004])
+    face_sigma = _thin_wall_interface_mean(
+        jnp.asarray([0.07 / wall_width]),
+        jnp.asarray([1.0]),
+        jnp.asarray([wall_width]),
+        fluid_width,
+        jnp.asarray([False]),
+        jnp.asarray([True]),
+    )
+    transmissibility = face_sigma / (0.5 * (wall_width + fluid_width))
+    assert transmissibility == pytest.approx(2.0 / float(fluid_width[0]))
 
 
 def test_fixed_flow_pressure_constraint_recovers_target_and_multiplier():

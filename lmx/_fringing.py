@@ -141,6 +141,24 @@ def _distance_weighted_harmonic_mean(
     return total_width / jnp.maximum(resistance, 1.0e-20)
 
 
+def _thin_wall_interface_mean(
+    a: jnp.ndarray,
+    b: jnp.ndarray,
+    a_width: jnp.ndarray,
+    b_width: jnp.ndarray,
+    a_fluid: jnp.ndarray,
+    b_fluid: jnp.ndarray,
+) -> jnp.ndarray:
+    """Collapse wall-normal half-cell resistance at a thin-wall interface."""
+
+    base = _distance_weighted_harmonic_mean(a, b, a_width, b_width)
+    interface = a_fluid != b_fluid
+    fluid_sigma = jnp.where(a_fluid, a, b)
+    fluid_width = jnp.where(a_fluid, a_width, b_width)
+    collapsed = (a_width + b_width) * fluid_sigma / jnp.maximum(fluid_width, 1.0e-20)
+    return jnp.where(interface, collapsed, base)
+
+
 def _anderson_extruded_state(
     iterates: list[jnp.ndarray],
     residuals: list[jnp.ndarray],
@@ -794,6 +812,7 @@ def _variable_diffusion_coefficients_3d(
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
     validated_spacing: bool = False,
+    thin_wall_fluid_mask: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Cell-volume-normalized face coefficients for ``div(sigma grad)``."""
 
@@ -815,6 +834,15 @@ def _variable_diffusion_coefficients_3d(
         dy_widths[None, 1:, None],
         dy_widths[None, :-1, None],
     )
+    if thin_wall_fluid_mask is not None:
+        sigma_y = _thin_wall_interface_mean(
+            conductivity[:, 1:, :],
+            conductivity[:, :-1, :],
+            dy_widths[None, 1:, None],
+            dy_widths[None, :-1, None],
+            thin_wall_fluid_mask[:, 1:, :],
+            thin_wall_fluid_mask[:, :-1, :],
+        )
     y_distance = 0.5 * (dy_widths[:-1] + dy_widths[1:])
     coef_y_s = (
         jnp.zeros_like(conductivity)
@@ -833,6 +861,15 @@ def _variable_diffusion_coefficients_3d(
         dz_widths[None, None, 1:],
         dz_widths[None, None, :-1],
     )
+    if thin_wall_fluid_mask is not None:
+        sigma_z = _thin_wall_interface_mean(
+            conductivity[:, :, 1:],
+            conductivity[:, :, :-1],
+            dz_widths[None, None, 1:],
+            dz_widths[None, None, :-1],
+            thin_wall_fluid_mask[:, :, 1:],
+            thin_wall_fluid_mask[:, :, :-1],
+        )
     z_distance = 0.5 * (dz_widths[:-1] + dz_widths[1:])
     coef_z_b = (
         jnp.zeros_like(conductivity)
@@ -1145,6 +1182,7 @@ def _solvax_pressure_poisson_duct(
     local_tolerance: float | None = None,
     local_volume_min: float | None = None,
     single_reduction: bool = False,
+    thin_wall_fluid_mask: jnp.ndarray | None = None,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -1174,6 +1212,7 @@ def _solvax_pressure_poisson_duct(
         dy=dy_widths,
         dz=dz_widths,
         validated_spacing=True,
+        thin_wall_fluid_mask=thin_wall_fluid_mask,
     )
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
 
@@ -1814,6 +1853,7 @@ def _conservative_current_fluxes_3d(
     dx: float,
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
+    thin_wall_fluid_mask: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     nx, ny, nz = phi.shape
     fx = jnp.zeros((nx + 1, ny, nz), dtype=phi.dtype)
@@ -1835,6 +1875,15 @@ def _conservative_current_fluxes_3d(
         dy_widths[None, 1:, None],
         dy_widths[None, :-1, None],
     )
+    if thin_wall_fluid_mask is not None:
+        sigma_y = _thin_wall_interface_mean(
+            sigma[:, 1:, :],
+            sigma[:, :-1, :],
+            dy_widths[None, 1:, None],
+            dy_widths[None, :-1, None],
+            thin_wall_fluid_mask[:, 1:, :],
+            thin_wall_fluid_mask[:, :-1, :],
+        )
     phi_grad_y = (phi[:, 1:, :] - phi[:, :-1, :]) / dy_centers[None, :, None]
     uxb_face_y = 0.5 * (uxb_y[:, 1:, :] + uxb_y[:, :-1, :])
     fy = fy.at[:, 1:-1, :].set(sigma_y * (-phi_grad_y + uxb_face_y))
@@ -1845,6 +1894,15 @@ def _conservative_current_fluxes_3d(
         dz_widths[None, None, 1:],
         dz_widths[None, None, :-1],
     )
+    if thin_wall_fluid_mask is not None:
+        sigma_z = _thin_wall_interface_mean(
+            sigma[:, :, 1:],
+            sigma[:, :, :-1],
+            dz_widths[None, None, 1:],
+            dz_widths[None, None, :-1],
+            thin_wall_fluid_mask[:, :, 1:],
+            thin_wall_fluid_mask[:, :, :-1],
+        )
     phi_grad_z = (phi[:, :, 1:] - phi[:, :, :-1]) / dz_centers[None, None, :]
     uxb_face_z = 0.5 * (uxb_z[:, :, 1:] + uxb_z[:, :, :-1])
     fz = fz.at[:, :, 1:-1].set(sigma_z * (-phi_grad_z + uxb_face_z))
@@ -1868,6 +1926,7 @@ def _conservative_current_diagnostics_3d(
     dx: float,
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
+    thin_wall_fluid_mask: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     fx, fy, fz = _conservative_current_fluxes_3d(
         sigma,
@@ -1878,6 +1937,7 @@ def _conservative_current_diagnostics_3d(
         dx=dx,
         dy=dy,
         dz=dz,
+        thin_wall_fluid_mask=thin_wall_fluid_mask,
     )
     dy_widths = _spacing_vector(dy, phi.shape[1], dtype=phi.dtype)
     dz_widths = _spacing_vector(dz, phi.shape[2], dtype=phi.dtype)
@@ -1913,6 +1973,7 @@ def _conservative_emf_rhs_3d(
     dx: float,
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
+    thin_wall_fluid_mask: jnp.ndarray | None = None,
 ) -> jnp.ndarray:
     zeros = jnp.zeros_like(uxb_x)
     fx, fy, fz = _conservative_current_fluxes_3d(
@@ -1924,6 +1985,7 @@ def _conservative_emf_rhs_3d(
         dx=dx,
         dy=dy,
         dz=dz,
+        thin_wall_fluid_mask=thin_wall_fluid_mask,
     )
     dy_widths = _spacing_vector(dy, sigma.shape[1], dtype=sigma.dtype)
     dz_widths = _spacing_vector(dz, sigma.shape[2], dtype=sigma.dtype)
@@ -5666,7 +5728,7 @@ def _solve_extruded_projection(
                 single_reduction=field_sharding is not None,
             )
 
-        def electric_solve(rhs, initial, conductivity):
+        def electric_solve(rhs, initial, conductivity, mask):
             return _solvax_pressure_poisson_duct(
                 rhs,
                 conductivity,
@@ -5679,9 +5741,10 @@ def _solve_extruded_projection(
                 local_tolerance=ALEX_BALANCE_TOLERANCE,
                 local_volume_min=electric_volume_min,
                 single_reduction=field_sharding is not None,
+                thin_wall_fluid_mask=mask,
             )
 
-        def emf_operator(conductivity, emf_x, emf_y, emf_z):
+        def emf_operator(conductivity, emf_x, emf_y, emf_z, mask):
             return _conservative_emf_rhs_3d(
                 conductivity,
                 emf_x,
@@ -5690,6 +5753,7 @@ def _solve_extruded_projection(
                 dx=dx,
                 dy=dy,
                 dz=dz,
+                thin_wall_fluid_mask=mask,
             )
 
         def reconstruct_electric(
@@ -5701,6 +5765,7 @@ def _solve_extruded_projection(
             field_x,
             field_y,
             field_z,
+            mask,
         ):
             dphi_dx, dphi_dy, dphi_dz = _gradient_3d(potential, dx=dx, dy=dy, dz=dz)
             current_x = _clip_state(conductivity * (-dphi_dx + emf_x), scalar_limit)
@@ -5715,6 +5780,7 @@ def _solve_extruded_projection(
                 dx=dx,
                 dy=dy,
                 dz=dz,
+                thin_wall_fluid_mask=mask,
             )
             return (
                 current_x,
@@ -5779,17 +5845,17 @@ def _solve_extruded_projection(
             )
             electric_solve = jax.jit(
                 electric_solve,
-                in_shardings=(field_sharding,) * 3,
+                in_shardings=(field_sharding,) * 4,
                 out_shardings=(field_sharding,) + (replicated_sharding,) * 6,
             )
             emf_operator = jax.jit(
                 emf_operator,
-                in_shardings=(field_sharding,) * 4,
+                in_shardings=(field_sharding,) * 5,
                 out_shardings=field_sharding,
             )
             reconstruct_electric = jax.jit(
                 reconstruct_electric,
-                in_shardings=(field_sharding,) * 8,
+                in_shardings=(field_sharding,) * 9,
                 out_shardings=(field_sharding,) * 7,
             )
             lorentz_operator = jax.jit(
@@ -5974,7 +6040,7 @@ def _solve_extruded_projection(
         uxb_y = w_next * bx - u_next * bz
         uxb_z = u_next * by - v_next * bx
         emf_rhs = (
-            emf_operator(sigma, uxb_x, uxb_y, uxb_z)
+            emf_operator(sigma, uxb_x, uxb_y, uxb_z, fluid_mask)
             if use_alex_b2_finite_volume
             else _conservative_emf_rhs_3d(
                 sigma,
@@ -5995,7 +6061,7 @@ def _solve_extruded_projection(
                 electric_iteration_count,
                 electric_status,
                 electric_local_residual,
-            ) = electric_solve(emf_rhs, phi, sigma)
+            ) = electric_solve(emf_rhs, phi, sigma, fluid_mask)
         else:
             electric_solver = (
                 _variable_coefficient_poisson_sparse_3d
@@ -6035,7 +6101,7 @@ def _solve_extruded_projection(
 
         if use_alex_b2_finite_volume:
             jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
-                phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz
+                phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
             )
         else:
             dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
@@ -6190,6 +6256,7 @@ def _solve_extruded_projection(
         dx=dx,
         dy=dy,
         dz=dz,
+        thin_wall_fluid_mask=fluid_mask if use_alex_b2_finite_volume else None,
     )
     axial_current = _station_axial_current_from_fluxes(fx, cell_area[0])
     div_j, wall_current_leakage, boundary_current_residual = (
@@ -6202,6 +6269,7 @@ def _solve_extruded_projection(
             dx=dx,
             dy=dy,
             dz=dz,
+            thin_wall_fluid_mask=fluid_mask if use_alex_b2_finite_volume else None,
         )
     )
     current_scaled_pressure_proxy = jnp.max(jnp.abs(jy), axis=(1, 2)) * jnp.maximum(
