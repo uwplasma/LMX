@@ -103,6 +103,13 @@ Standard PCG reproduces the failure, excluding the single-reduction recurrence
 as the cause. These measurements diagnose the sharded domain path; they are not
 strong-scaling evidence.
 
+A symmetric point constraint was tested as a way to remove the rank-one gauge
+all-reduce. It reconstructs the manufactured solution on one device, but the
+real two-GPU B2 probe becomes unstable and reaches a charge residual near
+`1e9`. That branch is rejected. A replacement nullspace treatment must be
+designed together with the explicit distributed operator and pass the same
+conservative production gate.
+
 On the Mac CPU backend, two forced virtual devices are also slower than JAX's
 normal single CPU device (`5.03 s` versus `3.19 s` warm on the small probe).
 Normal CPU execution already uses threaded kernels: a production-path check on

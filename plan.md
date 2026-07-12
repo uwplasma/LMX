@@ -715,14 +715,13 @@ wall time is acceptable.
     histories so every failed gate identifies its responsible operator. The
     canonical mixed-dimensional shell, strict per-variant steady gate, and
     bounded SOLVAX Aitken continuation close the exact coarse B2 campaign. At
-    source fingerprint `2c2a678e...`, all four checkpointed variants pass
+    source fingerprint `54df1de8...`, all four checkpointed variants pass
     steady, mass, current, and boundary-current gates. The half-tolerance
     observable shift is `0.08381` of experimental uncertainty, the
     doubled-iteration shift is zero, and the thin-wall relative difference is
-    `3.35e-13`. Because the scaling-validation hardening changes the repository
-    fingerprint without changing this numerical path, replay the short
-    checkpoint continuations at the release-candidate fingerprint before
-    promotion. Next close coarse B1. Do not start medium/fine production runs
+    `5.39e-13`. This is the replay after scaling-validation hardening, so coarse
+    B2 is accepted at the current numerical fingerprint. Next close coarse B1.
+    Do not start medium/fine production runs
     until both coarse cases pass, and do not launch another hour-scale variant
     until package 13 supplies a faster equivalent production path. A failed
     gate changes the discretization or solver, never the frozen experimental
@@ -770,6 +769,10 @@ wall time is acceptable.
    convergence gates. Halo/domain decomposition and the remaining combined
    reductions still block domain strong scaling. Forced
    two-device CPU sharding is likewise rejected (`5.03 s` versus `3.19 s`).
+   A symmetric point-gauge prototype is also rejected: although it passes the
+   single-device manufactured reconstruction, the real two-GPU B2 probe becomes
+   unstable with charge residual near `1e9`. Keep the rank-one gauge until a
+   decomposition-aware nullspace treatment passes the production gate.
    A direct production-path Mac check confirms that normal one-device JAX is
    already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
    `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
