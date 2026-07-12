@@ -134,17 +134,21 @@ electric work from 720 to 571--572 iterations and wall time from `63.9` to
 `52.1 s` (18.5%) while keeping charge residual near `2.7e-5`. Major-field L2
 differences were around `1e-7`; transverse components changed by less than
 `5.8e-7` absolute, and the primary observable changed by `8.38e-9` absolute.
-The unified B2 path therefore omits the axial line block; B1 and generic duct
-solves retain their existing preconditioners.
-On a two-device HLO audit of the same two-step pressure solve, that choice
+The single-device B2 path therefore omits the axial line block; B1 and generic
+duct solves retain their existing preconditioners. A two-device HLO audit of
+the same cross-only pressure solve
 reduced `collective-permute` operations from 17 to 7, all-reduces from 25 to
-15, and all-gathers from 12 to zero. These are compiler counts, not a scaling
-claim; the release gate remains measured one/two/four-GPU wall time.
+15, and all-gathers from 12 to zero, but the resulting two-GPU velocity/current
+signatures missed parity by about 1.8%/0.24%. Sharded projection and electric
+solves therefore retain axial line blocks; only sharded momentum uses the
+cross-section block. The reduced collective graph is rejected diagnostic
+evidence, not an active scaling path.
 On the matched small Mac production solve, warm time improves from `3.44` to
 `3.15 s` (8.5%); velocity and current L2 signatures change by only about
 `1.1e-8` and `3.5e-7` relative, respectively.
 An idle-device matched `48 x 36 x 36` A4000 row measures `9.71 s` warm, down
-from the earlier `10.23 s` one-GPU row; its two-GPU pair remains required.
+from the earlier `10.23 s` one-GPU row. The rejected cross-only two-GPU row took
+`42.99 s` and failed signature parity; the restored parity path must be rerun.
 
 Clean follow-up runs close the line-smoother search. The symmetric
 multiplicative y--z--y SOLVAX smoother reduced electric PCG to 380--381

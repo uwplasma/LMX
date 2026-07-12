@@ -5770,7 +5770,7 @@ def _solve_extruded_projection(
                 initial_pressure=pressure0,
                 validate_response=field_sharding is None,
                 single_reduction=field_sharding is not None,
-                include_axial_line=False,
+                include_axial_line=field_sharding is not None,
             )
 
         def electric_solve(rhs, initial, conductivity, mask):
@@ -5786,7 +5786,7 @@ def _solve_extruded_projection(
                 local_tolerance=ALEX_BALANCE_TOLERANCE,
                 local_volume_min=electric_volume_min,
                 single_reduction=field_sharding is not None,
-                include_axial_line=False,
+                include_axial_line=field_sharding is not None,
                 thin_wall_fluid_mask=mask,
             )
 

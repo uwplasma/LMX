@@ -839,13 +839,13 @@ wall time is acceptable.
    720 to 571--572 iterations and runtime from `63.9` to `52.1 s`, with charge
    residual near `2.7e-5`, major-field L2 changes around `1e-7`, transverse
    absolute changes below `5.8e-7`, and primary-observable change `8.38e-9`.
-   Use cross-section line blocks for B2 momentum, projection, and electric PCG;
-   retain existing B1/generic preconditioners. Rerun the corrected four-variant
-   campaign and one/two-GPU scaling at this new source fingerprint.
-   The matching two-device HLO pressure probe reduces collective-permute
-   operations `17 -> 7`, all-reduces `25 -> 15`, and all-gathers `12 -> 0`;
-   treat these as synchronization diagnostics until GPU wall time confirms a
-   speedup.
+   Use cross-section line blocks for single-device B2 momentum, projection, and
+   electric PCG; retain existing B1/generic preconditioners. The same choice on
+   sharded projection/electric solves reduces collective-permute `17 -> 7`,
+   all-reduce `25 -> 15`, and all-gather `12 -> 0`, but fails two-GPU
+   velocity/current signature parity by about 1.8%/0.24% and takes `42.99 s`.
+   Reject that branch: sharded projection/electric retain axial line blocks,
+   while sharded momentum keeps its established cross-section block.
    The matched small Mac production solve also improves from `3.44` to
    `3.15 s` warm (8.5%) with velocity/current L2 changes near `1.1e-8` and
    `3.5e-7` relative.
