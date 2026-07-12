@@ -834,6 +834,14 @@ wall time is acceptable.
    the reported solve from about 720 to 600 iterations without improving wall
    time and degraded maximum charge residual from `2.63e-5` to `7.76e-4`.
    Preserve the stronger refinement result and improve its preconditioner.
+   A B2-wide cross-section line-block ablation succeeds where the earlier
+   pressure-only experiment did not: exact baseline electric work falls from
+   720 to 571--572 iterations and runtime from `63.9` to `52.1 s`, with charge
+   residual near `2.7e-5`, major-field L2 changes around `1e-7`, transverse
+   absolute changes below `5.8e-7`, and primary-observable change `8.38e-9`.
+   Use cross-section line blocks for B2 momentum, projection, and electric PCG;
+   retain existing B1/generic preconditioners. Rerun the corrected four-variant
+   campaign and one/two-GPU scaling at this new source fingerprint.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production

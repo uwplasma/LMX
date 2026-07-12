@@ -73,8 +73,8 @@ field retained two axial shards. The production wrappers now reuse a
 process-stable device mesh and cached JIT kernels, so repeated two-GPU solves
 remain physics-identical. Warm time is `8.79 s` on one GPU and `21.43 s` on two
 for the small case; a `48 x 36 x 36` case measures `10.48 s` versus `38.28 s`.
-Cross-section-only pressure line blocks did not improve that result and were
-rejected. The coarse-scale `102 x 77 x 77` footprint runs two outer steps in
+An early pressure-only cross-section line-block experiment did not improve that
+result and was rejected. The coarse-scale `102 x 77 x 77` footprint runs two outer steps in
 `34.08 s` warm. The earlier `15.7 GiB` observation mostly measured JAX's
 default memory preallocation; production campaigns now disable preallocation
 unless the user overrides it. Global PCG reductions and halo traffic remain
@@ -127,6 +127,15 @@ rejected. It reduced the recorded solve from about 720 to 600 iterations but
 did not improve baseline wall time and worsened maximum charge residual from
 `2.63e-5` to `7.76e-4`. Although still below the frozen `1e-3` limit, that loss
 of verification margin is not acceptable.
+
+A later exact B2 ablation applied the same cross-section line-block choice
+consistently to momentum, projection, and electric PCG. This reduced baseline
+electric work from 720 to 571--572 iterations and wall time from `63.9` to
+`52.1 s` (18.5%) while keeping charge residual near `2.7e-5`. Major-field L2
+differences were around `1e-7`; transverse components changed by less than
+`5.8e-7` absolute, and the primary observable changed by `8.38e-9` absolute.
+The unified B2 path therefore omits the axial line block; B1 and generic duct
+solves retain their existing preconditioners.
 
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local

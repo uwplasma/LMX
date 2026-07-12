@@ -1205,6 +1205,7 @@ def _solvax_pressure_poisson_duct(
     local_tolerance: float | None = None,
     local_volume_min: float | None = None,
     single_reduction: bool = False,
+    include_axial_line: bool = True,
     thin_wall_fluid_mask: jnp.ndarray | None = None,
 ) -> tuple[
     jnp.ndarray,
@@ -1267,6 +1268,8 @@ def _solvax_pressure_poisson_duct(
         (1, -volume * coef_y_s, -volume * coef_y_n),
         (2, -volume * coef_z_b, -volume * coef_z_t),
     )
+    if not include_axial_line:
+        directions = directions[1:]
     precondition = _additive_line_preconditioner_3d(diagonal, directions)
 
     linear_rhs = -volume * rhs_compatible
@@ -1410,6 +1413,7 @@ def _face_flux_pressure_projection_duct(
     fluid_bounds: tuple[int, int, int, int] | None = None,
     initial_pressure: jnp.ndarray | None = None,
     single_reduction: bool = False,
+    include_axial_line: bool = True,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Project duct velocities with a compatible finite-volume face flux."""
 
@@ -1451,6 +1455,7 @@ def _face_flux_pressure_projection_duct(
             None if initial_pressure is None else initial_pressure[:, y0:y1, z0:z1]
         ),
         single_reduction=single_reduction,
+        include_axial_line=include_axial_line,
     )
 
     mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
@@ -1508,6 +1513,7 @@ def _fixed_flow_face_flux_projection_duct(
     initial_pressure: jnp.ndarray | None = None,
     validate_response: bool = True,
     single_reduction: bool = False,
+    include_axial_line: bool = True,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -1555,6 +1561,7 @@ def _fixed_flow_face_flux_projection_duct(
             fluid_bounds=fluid_bounds,
             initial_pressure=initial_pressure,
             single_reduction=single_reduction,
+            include_axial_line=include_axial_line,
         )
     )
     projected_flow = jnp.sum(
@@ -5617,7 +5624,7 @@ def _solve_extruded_projection(
                 iterations=momentum_iterations,
                 tolerance=momentum_tolerance,
                 initial_field=initial,
-                include_axial_line=field_sharding is None,
+                include_axial_line=False,
                 single_reduction=field_sharding is not None,
             )
 
@@ -5763,6 +5770,7 @@ def _solve_extruded_projection(
                 initial_pressure=pressure0,
                 validate_response=field_sharding is None,
                 single_reduction=field_sharding is not None,
+                include_axial_line=False,
             )
 
         def electric_solve(rhs, initial, conductivity, mask):
@@ -5778,6 +5786,7 @@ def _solve_extruded_projection(
                 local_tolerance=ALEX_BALANCE_TOLERANCE,
                 local_volume_min=electric_volume_min,
                 single_reduction=field_sharding is not None,
+                include_axial_line=False,
                 thin_wall_fluid_mask=mask,
             )
 

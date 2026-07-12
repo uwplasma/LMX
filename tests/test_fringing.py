@@ -145,6 +145,7 @@ def test_duct_solvers_forward_single_reduction_to_solvax(
         iterations=2,
         tolerance=1.0e-6,
         single_reduction=True,
+        include_axial_line=False,
     )
     _solvax_pressure_poisson_duct(
         field,
@@ -155,6 +156,7 @@ def test_duct_solvers_forward_single_reduction_to_solvax(
         iterations=2,
         tolerance=1.0e-6,
         single_reduction=True,
+        include_axial_line=False,
     )
     assert calls == [True, True]
 
@@ -660,6 +662,7 @@ def test_fixed_flow_face_projection_closes_divergence_and_flow_constraint():
         iterations=200,
         tolerance=1.0e-10,
         initial_pressure=pressure,
+        include_axial_line=False,
     )
     assert warm[3] == pytest.approx(pressure, rel=1.0e-8, abs=1.0e-8)
 
