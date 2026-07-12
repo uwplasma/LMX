@@ -855,6 +855,10 @@ wall time is acceptable.
    block; one direction exceeds 95 seconds without completing. The clean
    matched one-GPU `48 x 36 x 36` row is `9.71 s` warm versus the prior
    `10.23 s`; obtain its uncontended two-GPU pair before a scaling conclusion.
+   A 123 MiB external warm trace remains outside git and reports 102 compile
+   events (`7.10 s`), 932 cache misses (`1.30 s`), and six PCG while calls
+   (`2.29 s`), with negligible host/device copy time. Stabilize compiled closure
+   identities and fuse larger solver regions in parallel with multigrid.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production

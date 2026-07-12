@@ -157,6 +157,13 @@ of the tested parallel pressure-Poisson preconditioners on nonuniform grids:
 cell-volume restriction, geometry-aware prolongation, and semicoarsening where
 the wall-normal anisotropy requires it.
 
+An external warm-run JAX trace (123 MiB, intentionally not tracked) shows that
+rebuilding an identical solver call still triggers 102 compile events totaling
+`7.10 s` and 932 cache misses totaling `1.30 s`; six PCG while calls total
+`2.29 s`, while host/device copies are negligible. The next package must
+therefore make compiled solver closures stable across calls and fuse larger
+regions independently of the multigrid work.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and
