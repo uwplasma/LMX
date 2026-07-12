@@ -1,14 +1,7 @@
 {
-  "import_measurement": {
-    "command": "python -c 'import lmx'",
-    "max_seconds": 0.01731920801103115,
-    "median_seconds": 0.015985999954864383,
-    "min_seconds": 0.015663124970160425,
-    "repeats": 5
-  },
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 7156747,
-    "checkout_bytes_excluding_release_candidates": 7156747,
+    "checkout_bytes_excluding_build_artifacts": 7158914,
+    "checkout_bytes_excluding_release_candidates": 7158914,
     "completed_workflow_disposition_count": 85,
     "curated_example_count": 11,
     "curated_examples": [

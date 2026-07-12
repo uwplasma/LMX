@@ -798,6 +798,19 @@ wall time is acceptable.
    measured warm time remains `10.23 s` versus `38.33 s`; halo traffic and the
    remaining combined reduction still block domain strong scaling. Forced
    two-device CPU sharding is likewise rejected (`5.03 s` versus `3.19 s`).
+   A direct production-path Mac check confirms that normal one-device JAX is
+   already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
+   `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
+   identical `3.44/3.45/3.58 s` warm times. Local acceleration therefore uses
+   normal JAX threading plus process-level case concurrency, not fake CPU
+   devices. The next spatial experiment is manual SPMD with `jax.shard_map`:
+   local axial slabs exchange one neighbor plane with `ppermute`, and only
+   scalar Krylov products use global collectives. Pair that with a geometric
+   multigrid preconditioner because the current exact coarse B2 electric solve
+   takes about 722--723 PCG iterations per outer update. Accept either change
+   only after production field, balance, gradient, iteration, and restart
+   equivalence; then require an actual one-to-two-GPU speedup before attempting
+   the frozen four-device >=70% efficiency gate.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production

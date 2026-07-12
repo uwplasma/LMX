@@ -103,8 +103,25 @@ not a strong-scaling claim.
 
 On the Mac CPU backend, two forced virtual devices are also slower than JAX's
 normal single CPU device (`5.03 s` versus `3.19 s` warm on the small probe).
-Normal CPU execution already uses threaded kernels, so virtual-device sharding
-is not the recommended local acceleration path.
+Normal CPU execution already uses threaded kernels: a production-path check on
+the M-series development Mac consumed `30.7` CPU-seconds in `12.5` wall-seconds
+even with `OMP_NUM_THREADS=1`, or about 2.5 cores on average. Setting
+`OMP_NUM_THREADS` to 1, 4, and 8 left the warm time statistically unchanged at
+`3.44`, `3.45`, and `3.58 s`, respectively. Virtual-device sharding is therefore
+not the recommended local acceleration path. Use normal one-device JAX for one
+solve and process-level concurrency for independent cases.
+
+The next domain-decomposition experiment replaces automatic global-array
+partitioning at the axial stencil boundary with a manual `jax.shard_map`
+kernel. Each device will own a local axial slab and exchange only its adjacent
+halo plane with `jax.lax.ppermute`; scalar Krylov products remain explicit
+collectives. This follows JAX's documented manual-SPMD model and must beat the
+one-GPU production solve while preserving fields, gradients, balances, and
+iteration behavior before it replaces the current path. In parallel, a
+geometric multigrid preconditioner is the primary time-to-solution experiment:
+the exact coarse B2 checkpoint currently needs about 722--723 electric PCG
+iterations per outer update, so reducing Krylov iterations also removes the
+same number of global synchronization points.
 
 ## Run the benchmark
 
