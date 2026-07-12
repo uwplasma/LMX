@@ -16,6 +16,19 @@ def test_campaign_imports_lmx_from_its_own_source_tree():
     assert campaign.ROOT in Path(campaign.lmx.__file__).resolve().parents
 
 
+def test_campaign_fingerprint_covers_runner(tmp_path):
+    (tmp_path / "lmx").mkdir()
+    (tmp_path / "benchmarks" / "specs").mkdir(parents=True)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    runner = scripts / "run_benchmark_b_independence.py"
+    runner.write_text("first")
+    first = campaign._source_fingerprint(tmp_path)
+    runner.write_text("second")
+
+    assert campaign._source_fingerprint(tmp_path) != first
+
+
 def test_variant_problem_applies_only_frozen_solver_control_changes():
     baseline = campaign._variant_problem("B1-fringing-pipe", "coarse", "baseline")
     tight = campaign._variant_problem("B1-fringing-pipe", "coarse", "tight_tolerance")

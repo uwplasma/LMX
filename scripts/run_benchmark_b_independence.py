@@ -45,8 +45,10 @@ VARIANTS = ("baseline", "tight_tolerance", "extended_iterations", "thin_wall")
 
 def _source_fingerprint(root: Path = ROOT) -> str:
     digest = hashlib.sha256()
-    paths = sorted((root / "lmx").glob("*.py")) + sorted(
-        (root / "benchmarks" / "specs").glob("alex-b*.toml")
+    paths = (
+        sorted((root / "lmx").glob("*.py"))
+        + sorted((root / "benchmarks" / "specs").glob("alex-b*.toml"))
+        + [root / "scripts" / "run_benchmark_b_independence.py"]
     )
     for path in paths:
         digest.update(str(path.relative_to(root)).encode())
