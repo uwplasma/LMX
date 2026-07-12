@@ -685,8 +685,9 @@ wall time is acceptable.
    degenerate-axis, half-cell Dirichlet wall, nonuniform Poisson dispatch and
    warm-start gauge, and invalid fluid-mask topology tests cover the new
    contracts. Formatting, lint, strict docs, deterministic provenance, and the
-   complete locked portable battery pass with 866 passed, 8 optional-data skips,
-   95.08% branch coverage, and 130.6 seconds. The compact Benchmark A acceptance
+   complete locked portable battery pass. The current tree passes 896 tests
+   with 8 optional-data skips, 95.08% branch coverage, and a 148.5-second local
+   runtime, safely inside the 600-second CI ceiling. The compact Benchmark A acceptance
    file remains byte-identical at SHA-256
    `a8ab639141722cf2730dcc5aa1c4954610c82b5c18eec93256e32ac576dc0bb9`.
 
@@ -709,75 +710,23 @@ wall time is acceptable.
     optional-data skips, 95.17% branch coverage, and a 131.1-second runtime; the
     compact Benchmark A hash remained unchanged.
 
-11. **Paused after valid evidence — establish numerical independence.** First close exact coarse B1
-    and B2 steady and balance gates using the frozen specifications. Retain
-    per-iteration velocity, divergence, flow, and charge histories so a failed
-    gate identifies the responsible operator. Then run checkpointed baseline,
-    half-tolerance, doubled-iteration, and nominal-versus-confirmation wall
-    variants. Do not start medium/fine production runs until every coarse
-    variant passes. A failure changes the discretization or solver, not the
-    frozen experimental tolerance. The current implicit-momentum/strict-
-    projection slice must still pass the complete portable gate and compact
-    Benchmark A replay before it becomes accepted. B2 baseline, half-tolerance,
-    doubled-iteration, and confirmation-wall states now each pass steady, mass,
-    current, and boundary-current gates with retained pressure, potential, and
-    electric-PCG histories. Distance-weighted nonuniform face conductivity and
-    one local-norm iterative-refinement correction removed false charge and
-    electric-state convergence. Tolerance and iteration independence pass at
-    `0.0246` and `1.19e-5` of experimental uncertainty, respectively. The valid
-    nominal-versus-confirmation wall comparison still fails at `7.00%` against
-    the frozen `2%` limit, so this is now a wall-model discretization failure,
-    not a solver-convergence failure. Next make the explicit shell preserve its
-    collapsed thin-wall conductance independent of volumetric thickness; do not
-    weaken the wall gate or start medium/fine runs. Do not launch another
-    hour-scale variant until package 13 supplies a faster production path. The campaign runner enforces
-    every variant's physics gates and supports explicit per-variant restarts.
-    The corrected mixed-dimensional interface removes the artificial wall
-    half-cell resistance while preserving tangential conductance. A reduced
-    one-GPU B2 nominal/confirmation pair changes the primary observable by only
-    `5.1e-5` relative, down from `7.00%`; the exact coarse campaign remains the
-    acceptance gate. The first exact cold and restart segments exposed an
-    undamped-Anderson limit cycle above the frozen `5e-5` residual. A matched
-    16-step probe reduced the residual monotonically from `6.57e-5` to
-    `5.92e-5` with damping `0.3`, while plain fixed-point coupling reached only
-    `6.52e-5`. A subsequent verified 24-step tight-tolerance probe showed that
-    damping `0.1` initially reduced smoothly to `2.79e-5`, while plain fixed
-    point was slower but limited the observable shift to `0.00343` of
-    experimental uncertainty. The full damping-0.1 segment later developed a
-    limit cycle and failed at `8.33e-5`; B2 therefore uses the simpler monotone
-    plain fixed-point recurrence without changing its
-    physical model, fixed point, or acceptance tolerance. Exact damped
-    continuations then exposed isolated sub-threshold updates inside an
-    oscillatory history: nominal and confirmation endpoints differed by 12% in
-    fluid velocity and 19.5% in Lorentz force. Those endpoints are diagnostic,
-    not accepted. B2 now requires three consecutive updates to pass the full
-    residual, divergence, flow, and charge conjunction before wall independence
-    can be evaluated. The office campaign then exposed a provenance flaw: a
-    worker launched as `python scripts/...` could import another installed LMX
-    through `PYTHONPATH` while hashing the copied source tree. All exact remote
-    records produced before the runner began prepending and verifying its own
-    source root are invalid as acceptance evidence and must be rerun. The valid
-    rerun must use a canonical mixed-dimensional shell: nominal and confirmation
-    cell widths/conductivity map to the frozen nominal numerical thickness while
-    preserving `sigma_wall * thickness`, removing arbitrary volumetric-shell
-    geometry from the physical wall-conductance comparison.
-    The first fully source-bound canonical-shell campaign (`836ceb21...`) passed
-    baseline, extended-iteration, wall, mass, and current gates and measured a
-    `0.0179`-uncertainty-fraction observable shift for the tighter run. Raw
-    inspection nevertheless found that the tighter segment exhausted its 64
-    new updates at `2.983e-5`, above its requested `2.5e-5`. The campaign
-    summary had incorrectly tested every variant against only the baseline
-    `5e-5` threshold. The comparison now uses the stricter of the frozen steady
-    limit and each record's requested coupling tolerance. Continue the tight
-    checkpoint until it passes that corrected gate before declaring coarse B2
-    independence; the earlier nominal `pass` is diagnostic, not acceptance.
-    Checkpoint-matched 24-update probes then bounded a safer SOLVAX Aitken
-    continuation: relaxation caps `1.5` and `2` decreased monotonically, while
-    caps `3` and `4` developed late oscillations and cap `8` was terminated as
-    dominated. B2 now selects the conservative cap `2`, roughly doubling the
-    local residual decay rate without changing the fixed point. Rerun all four
-    coarse variants at the new runner-inclusive fingerprint; only that rerun
-    may close this package.
+11. **Active after accepted coarse B2 evidence — establish numerical independence.**
+    Retain per-iteration velocity, divergence, flow, charge, and linear-solver
+    histories so every failed gate identifies its responsible operator. The
+    canonical mixed-dimensional shell, strict per-variant steady gate, and
+    bounded SOLVAX Aitken continuation close the exact coarse B2 campaign. At
+    source fingerprint `2c2a678e...`, all four checkpointed variants pass
+    steady, mass, current, and boundary-current gates. The half-tolerance
+    observable shift is `0.08381` of experimental uncertainty, the
+    doubled-iteration shift is zero, and the thin-wall relative difference is
+    `3.35e-13`. Because the scaling-validation hardening changes the repository
+    fingerprint without changing this numerical path, replay the short
+    checkpoint continuations at the release-candidate fingerprint before
+    promotion. Next close coarse B1. Do not start medium/fine production runs
+    until both coarse cases pass, and do not launch another hour-scale variant
+    until package 13 supplies a faster equivalent production path. A failed
+    gate changes the discretization or solver, never the frozen experimental
+    tolerance.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and
@@ -810,10 +759,16 @@ wall time is acceptable.
    restart-aware waves without duplicating the campaign implementation. It
    refuses to launch the dependent wave when prerequisite physics gates fail.
    SOLVAX 0.7.0 single-reduction PCG is now enabled for sharded B2 momentum,
-   projection, and electric solves. It reduces the compiled per-step reduction
-   stages and brings medium one/two-GPU L2 signatures within `1.1e-8`, but the
-   measured warm time remains `10.23 s` versus `38.33 s`; halo traffic and the
-   remaining combined reduction still block domain strong scaling. Forced
+   projection, and electric solves and reduces the compiled per-step reduction
+   stages. A later conservative-residual audit supersedes the earlier apparent
+   signature parity: on a matched `48 x 36 x 36`, two-step case, one GPU passes
+   with maximum charge residual `6.66e-5`, whereas two GPUs report
+   `1.91e-3`--`2.53e-3` and change velocity/current L2 by about 1.8%/0.24%.
+   Standard PCG reproduces the failure, so it is not caused by the
+   single-reduction recurrence. The scaling harness now rejects any row that
+   fails charge, boundary-current, electric-local-residual, or linear-solve
+   convergence gates. Halo/domain decomposition and the remaining combined
+   reductions still block domain strong scaling. Forced
    two-device CPU sharding is likewise rejected (`5.03 s` versus `3.19 s`).
    A direct production-path Mac check confirms that normal one-device JAX is
    already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
@@ -844,8 +799,10 @@ wall time is acceptable.
    sharded projection/electric solves reduces collective-permute `17 -> 7`,
    all-reduce `25 -> 15`, and all-gather `12 -> 0`, but fails two-GPU
    velocity/current signature parity by about 1.8%/0.24% and takes `42.99 s`.
-   Reject that branch: sharded projection/electric retain axial line blocks,
-   while sharded momentum keeps its established cross-section block.
+   Reject that branch. Restoring axial line blocks for sharded
+   projection/electric does not restore conservative parity, so the current
+   two-GPU path remains research diagnostic only while explicit-halo and
+   decomposition work proceeds.
    The matched small Mac production solve also improves from `3.44` to
    `3.15 s` warm (8.5%) with velocity/current L2 changes near `1.1e-8` and
    `3.5e-7` relative.
@@ -854,7 +811,9 @@ wall time is acceptable.
    residual but takes `64.5 s`, 24% slower than the accepted additive y/z
    block; one direction exceeds 95 seconds without completing. The clean
    matched one-GPU `48 x 36 x 36` row is `9.71 s` warm versus the prior
-   `10.23 s`; obtain its uncontended two-GPU pair before a scaling conclusion.
+   `10.23 s`. The matched two-GPU timings (`42.99`--`45.15 s`) are rejected
+   because their conservative physics gates fail; they are bottleneck evidence,
+   not scaling rows.
    A 123 MiB external warm trace remains outside git and reports 102 compile
    events (`7.10 s`), 932 cache misses (`1.30 s`), and six PCG while calls
    (`2.29 s`), with negligible host/device copy time. Stabilize compiled closure

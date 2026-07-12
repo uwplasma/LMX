@@ -95,11 +95,13 @@ being mislabeled with the copied source fingerprint.
 SOLVAX 0.7.0 adds an opt-in algebraically equivalent single-reduction PCG
 recurrence, and sharded B2 duct solves now use it for momentum, projection, and
 electric solves. On two A4000s its compiled per-step scalar products form one
-tuple all-reduce. It improves one/two-GPU numerical agreement: relative L2
-signature differences are below `1.1e-8` on the `48 x 36 x 36` probe. It does
-not yet improve wall time: the same probe measures `10.23 s` on one GPU and
-`38.33 s` on two. This is a correctness and synchronization-count improvement,
-not a strong-scaling claim.
+tuple all-reduce. A stricter conservative-residual audit supersedes the earlier
+apparent L2 parity: on the matched `48 x 36 x 36`, two-step probe, one GPU has a
+maximum charge residual of `6.66e-5`, while two GPUs produce
+`1.91e-3`--`2.53e-3` and shift velocity/current L2 by about 1.8%/0.24%.
+Standard PCG reproduces the failure, excluding the single-reduction recurrence
+as the cause. These measurements diagnose the sharded domain path; they are not
+strong-scaling evidence.
 
 On the Mac CPU backend, two forced virtual devices are also slower than JAX's
 normal single CPU device (`5.03 s` versus `3.19 s` warm on the small probe).
@@ -139,16 +141,19 @@ duct solves retain their existing preconditioners. A two-device HLO audit of
 the same cross-only pressure solve
 reduced `collective-permute` operations from 17 to 7, all-reduces from 25 to
 15, and all-gathers from 12 to zero, but the resulting two-GPU velocity/current
-signatures missed parity by about 1.8%/0.24%. Sharded projection and electric
-solves therefore retain axial line blocks; only sharded momentum uses the
-cross-section block. The reduced collective graph is rejected diagnostic
-evidence, not an active scaling path.
+signatures missed parity by about 1.8%/0.24%. Restoring axial line blocks for
+sharded projection and electric solves leaves the same conservative-residual
+and signature failure. The reduced collective graph and the restored-line run
+are both rejected diagnostic evidence, not active scaling paths. The next
+implementation step is an explicitly verified halo/domain-decomposition path,
+with multigrid and stable compiled closures reducing its synchronization cost.
 On the matched small Mac production solve, warm time improves from `3.44` to
 `3.15 s` (8.5%); velocity and current L2 signatures change by only about
 `1.1e-8` and `3.5e-7` relative, respectively.
 An idle-device matched `48 x 36 x 36` A4000 row measures `9.71 s` warm, down
-from the earlier `10.23 s` one-GPU row. The rejected cross-only two-GPU row took
-`42.99 s` and failed signature parity; the restored parity path must be rerun.
+from the earlier `10.23 s` one-GPU row. Rejected two-GPU runs take
+`42.99`--`45.15 s`; neither their timings nor their signatures may appear in an
+accepted scaling table.
 
 Clean follow-up runs close the line-smoother search. The symmetric
 multiplicative y--z--y SOLVAX smoother reduced electric PCG to 380--381
@@ -218,7 +223,10 @@ Mcell-updates/s, estimated array memory, profiler-trace availability, and
 whether each row came from the actual `solve_extruded_inductionless` path. The
 JSON diagnostics carry the same rows plus summary counters, so release gates can
 reject surrogate-only timing evidence when a solver-faithful scaling claim is
-being made.
+being made. Solver-faithful workers also enforce the frozen `1e-3` charge,
+boundary-current, and electric local-residual limits and require every electric
+solve to converge. A failed physics gate aborts the worker instead of emitting
+a publishable timing row.
 
 ## Backend selection for CLI runs
 
