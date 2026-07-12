@@ -849,11 +849,12 @@ wall time is acceptable.
    The matched small Mac production solve also improves from `3.44` to
    `3.15 s` warm (8.5%) with velocity/current L2 changes near `1.1e-8` and
    `3.5e-7` relative.
-   Later one-direction and multiplicative line-block timings are invalid
-   because an unrelated VMEC-JAX job occupied about 84% of GPU 1. The
-   multiplicative y--z--y SOLVAX smoother's numerical result—380--381 electric
-   iterations with `2.48e-5` charge residual—is diagnostic, but both timing
-   variants require an idle-device rerun before acceptance or rejection.
+   Clean reruns close the remaining line-block variants. Multiplicative y--z--y
+   SOLVAX reduces electric PCG to 380--381 iterations with `2.48e-5` charge
+   residual but takes `64.5 s`, 24% slower than the accepted additive y/z
+   block; one direction exceeds 95 seconds without completing. The clean
+   matched one-GPU `48 x 36 x 36` row is `9.71 s` warm versus the prior
+   `10.23 s`; obtain its uncontended two-GPU pair before a scaling conclusion.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production

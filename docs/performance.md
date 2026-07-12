@@ -143,12 +143,14 @@ claim; the release gate remains measured one/two/four-GPU wall time.
 On the matched small Mac production solve, warm time improves from `3.44` to
 `3.15 s` (8.5%); velocity and current L2 signatures change by only about
 `1.1e-8` and `3.5e-7` relative, respectively.
+An idle-device matched `48 x 36 x 36` A4000 row measures `9.71 s` warm, down
+from the earlier `10.23 s` one-GPU row; its two-GPU pair remains required.
 
-Two follow-ups ran while an unrelated VMEC-JAX process occupied about 84% of
-GPU 1, so their wall times are invalid. The symmetric multiplicative y--z--y
-SOLVAX smoother did reduce electric PCG to 380--381 iterations while retaining
-a `2.48e-5` charge residual; its timing and the incomplete one-direction probe
-must be rerun on an idle device before either is accepted or rejected. The
+Clean follow-up runs close the line-smoother search. The symmetric
+multiplicative y--z--y SOLVAX smoother reduced electric PCG to 380--381
+iterations with a `2.48e-5` charge residual but took `64.5 s`, 24% slower than
+the accepted additive y/z block. A one-direction block exceeded 95 seconds
+without completing. The
 multigrid design target follows the structured finite-volume evidence of
 [Singh et al.](https://doi.org/10.1002/fld.4277), where multigrid was the best
 of the tested parallel pressure-Poisson preconditioners on nonuniform grids:
