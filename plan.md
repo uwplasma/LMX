@@ -846,6 +846,9 @@ wall time is acceptable.
    operations `17 -> 7`, all-reduces `25 -> 15`, and all-gathers `12 -> 0`;
    treat these as synchronization diagnostics until GPU wall time confirms a
    speedup.
+   The matched small Mac production solve also improves from `3.44` to
+   `3.15 s` warm (8.5%) with velocity/current L2 changes near `1.1e-8` and
+   `3.5e-7` relative.
    Later one-direction and multiplicative line-block timings are invalid
    because an unrelated VMEC-JAX job occupied about 84% of GPU 1. The
    multiplicative y--z--y SOLVAX smoother's numerical result—380--381 electric

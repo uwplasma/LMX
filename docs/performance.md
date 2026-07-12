@@ -140,6 +140,9 @@ On a two-device HLO audit of the same two-step pressure solve, that choice
 reduced `collective-permute` operations from 17 to 7, all-reduces from 25 to
 15, and all-gathers from 12 to zero. These are compiler counts, not a scaling
 claim; the release gate remains measured one/two/four-GPU wall time.
+On the matched small Mac production solve, warm time improves from `3.44` to
+`3.15 s` (8.5%); velocity and current L2 signatures change by only about
+`1.1e-8` and `3.5e-7` relative, respectively.
 
 Two follow-ups ran while an unrelated VMEC-JAX process occupied about 84% of
 GPU 1, so their wall times are invalid. The symmetric multiplicative y--z--y
