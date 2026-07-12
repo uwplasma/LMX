@@ -846,11 +846,11 @@ wall time is acceptable.
    operations `17 -> 7`, all-reduces `25 -> 15`, and all-gathers `12 -> 0`;
    treat these as synchronization diagnostics until GPU wall time confirms a
    speedup.
-   Further line-block ablations are closed: one y/z direction exceeded `98 s`
-   without completing, while a symmetric multiplicative y--z--y SOLVAX
-   smoother reduced electric PCG to 380--381 iterations but increased runtime
-   to `77.8 s`. The next preconditioner must use a cheap geometric coarse
-   correction, not additional residual-refreshing line sweeps.
+   Later one-direction and multiplicative line-block timings are invalid
+   because an unrelated VMEC-JAX job occupied about 84% of GPU 1. The
+   multiplicative y--z--y SOLVAX smoother's numerical result—380--381 electric
+   iterations with `2.48e-5` charge residual—is diagnostic, but both timing
+   variants require an idle-device rerun before acceptance or rejection.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production

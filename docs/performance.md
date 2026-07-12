@@ -141,13 +141,12 @@ reduced `collective-permute` operations from 17 to 7, all-reduces from 25 to
 15, and all-gathers from 12 to zero. These are compiler counts, not a scaling
 claim; the release gate remains measured one/two/four-GPU wall time.
 
-Two cheaper-looking follow-ups are rejected. A single y or z line block took
-more than 98 seconds without completing the baseline. A symmetric
-multiplicative y--z--y SOLVAX smoother reduced electric PCG to 380--381
-iterations and retained a `2.48e-5` charge residual, but its extra residual
-refreshes increased runtime to `77.8 s`. Multigrid must therefore supply a
-cheap coarse correction instead of adding line-smoother work at every Krylov
-iteration. The design target follows the structured finite-volume evidence of
+Two follow-ups ran while an unrelated VMEC-JAX process occupied about 84% of
+GPU 1, so their wall times are invalid. The symmetric multiplicative y--z--y
+SOLVAX smoother did reduce electric PCG to 380--381 iterations while retaining
+a `2.48e-5` charge residual; its timing and the incomplete one-direction probe
+must be rerun on an idle device before either is accepted or rejected. The
+multigrid design target follows the structured finite-volume evidence of
 [Singh et al.](https://doi.org/10.1002/fld.4277), where multigrid was the best
 of the tested parallel pressure-Poisson preconditioners on nonuniform grids:
 cell-volume restriction, geometry-aware prolongation, and semicoarsening where
