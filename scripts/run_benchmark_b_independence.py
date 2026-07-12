@@ -139,6 +139,12 @@ def _run_record(
         "iteration_pressure_residual_history": np.asarray(
             solution.bundle.iteration_pressure_residual_history
         ).tolist(),
+        "iteration_electric_linear_history": np.asarray(
+            solution.bundle.iteration_electric_linear_history
+        ).tolist(),
+        "iteration_potential_residual_history": np.asarray(
+            solution.bundle.iteration_potential_residual_history
+        ).tolist(),
         "diagnostics": {
             "max_residual": validation.max_residual,
             "max_divergence_residual": validation.max_divergence_residual,

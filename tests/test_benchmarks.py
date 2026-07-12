@@ -204,6 +204,23 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         solution.bundle.iteration_residual_history
         >= solution.bundle.iteration_pressure_residual_history
     )
+    assert solution.bundle.iteration_electric_linear_history.shape == (
+        solution.bundle.iteration_residual_history.size,
+        6,
+    )
+    assert benchmarks.jnp.all(
+        solution.bundle.iteration_electric_linear_history[:, 3] > 0
+    )
+    assert benchmarks.jnp.all(
+        solution.bundle.iteration_electric_linear_history[:, 2] <= 1.0e-3
+    )
+    assert solution.bundle.iteration_potential_residual_history.shape == (
+        solution.bundle.iteration_residual_history.shape
+    )
+    assert benchmarks.jnp.all(
+        solution.bundle.iteration_residual_history
+        >= solution.bundle.iteration_potential_residual_history
+    )
 
     restarted = solve_extruded_inductionless(
         reduced_problem, initial_bundle=solution.bundle
@@ -262,6 +279,23 @@ def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert benchmarks.jnp.all(
         solution.bundle.iteration_residual_history
         >= solution.bundle.iteration_pressure_residual_history
+    )
+    assert solution.bundle.iteration_electric_linear_history.shape == (
+        solution.bundle.iteration_residual_history.size,
+        6,
+    )
+    assert benchmarks.jnp.all(
+        solution.bundle.iteration_electric_linear_history[:, 3] > 0
+    )
+    assert benchmarks.jnp.all(
+        solution.bundle.iteration_electric_linear_history[:, 2] <= 1.0e-3
+    )
+    assert solution.bundle.iteration_potential_residual_history.shape == (
+        solution.bundle.iteration_residual_history.shape
+    )
+    assert benchmarks.jnp.all(
+        solution.bundle.iteration_residual_history
+        >= solution.bundle.iteration_potential_residual_history
     )
 
     restarted = solve_extruded_inductionless(

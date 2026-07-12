@@ -13,6 +13,7 @@ from lmx.fringing import (
     _apply_fixed_flow_pressure_constraint,
     _apply_pipe_diffusion_coefficients_3d,
     _cross_duct_pressure_difference,
+    _distance_weighted_harmonic_mean,
     _enforce_stationwise_flow_rate_3d,
     _gradient_3d,
     _laplacian_3d,
@@ -78,6 +79,16 @@ from lmx.specs import MagneticFieldSpec, RegionSpec
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_distance_weighted_harmonic_mean_preserves_series_resistance():
+    value = _distance_weighted_harmonic_mean(
+        jnp.asarray([10.0]),
+        jnp.asarray([1.0]),
+        jnp.asarray([0.1]),
+        jnp.asarray([0.9]),
+    )
+    assert value == pytest.approx([1.0 / (0.1 / 10.0 + 0.9 / 1.0)])
 
 
 def test_fixed_flow_pressure_constraint_recovers_target_and_multiplier():
@@ -219,7 +230,15 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     assert float(jnp.max(jnp.abs(solved - expected))) < 1.0e-9
     assert residual < 1.0e-8
 
-    solvax_solved, solvax_residual, solvax_converged = _solvax_pressure_poisson_duct(
+    (
+        solvax_solved,
+        solvax_residual,
+        solvax_converged,
+        solvax_relative_residual,
+        solvax_iterations,
+        solvax_status,
+        solvax_local_residual,
+    ) = _solvax_pressure_poisson_duct(
         rhs,
         conductivity,
         dx=0.4,
@@ -231,6 +250,10 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     solvax_solved = solvax_solved - jnp.mean(solvax_solved)
     assert bool(solvax_converged)
     assert float(solvax_residual) < 1.0e-8
+    assert float(solvax_relative_residual) < 1.0e-8
+    assert int(solvax_iterations) > 0
+    assert int(solvax_status) == 1
+    assert float(solvax_local_residual) < 1.0e-8
     assert float(jnp.max(jnp.abs(solvax_solved - expected))) < 1.0e-8
 
     warm, warm_residual, warm_iterations, warm_initial = (
@@ -284,7 +307,7 @@ def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
     mobility = jnp.broadcast_to(1.0 + 0.1 * y, rhs_shape.shape)
 
     def objective(amplitude):
-        pressure, _, _ = _solvax_pressure_poisson_duct(
+        pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_duct(
             amplitude * rhs_shape,
             mobility,
             dx=0.4,
@@ -305,7 +328,7 @@ def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-6, abs=1.0e-8)
 
     def coefficient_objective(scale):
-        pressure, _, _ = _solvax_pressure_poisson_duct(
+        pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_duct(
             rhs_shape,
             scale * mobility,
             dx=0.4,
@@ -618,7 +641,15 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
         dtheta=2.0 * jnp.pi / 8,
     )
     rhs = _apply_pipe_diffusion_coefficients_3d(manufactured, coefficients)
-    solved, residual, converged = _solvax_pressure_poisson_pipe(
+    (
+        solved,
+        residual,
+        converged,
+        relative_residual,
+        iterations,
+        status,
+        local_residual,
+    ) = _solvax_pressure_poisson_pipe(
         rhs,
         coefficient,
         dx=0.4,
@@ -637,10 +668,14 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     expected = manufactured - jnp.sum(manufactured * volume) / jnp.sum(volume)
     assert bool(converged)
     assert float(residual) < 1.0e-8
+    assert float(relative_residual) < 1.0e-8
+    assert int(iterations) > 0
+    assert int(status) == 1
+    assert float(local_residual) < 1.0e-8
     assert solved == pytest.approx(expected, abs=1.0e-8)
 
     def objective(scale):
-        field, _, _ = _solvax_pressure_poisson_pipe(
+        field, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
             rhs,
             scale * coefficient,
             dx=0.4,

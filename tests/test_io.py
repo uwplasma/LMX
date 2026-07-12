@@ -369,6 +369,10 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
+        iteration_electric_linear_history=jnp.asarray(
+            [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
+        ),
+        iteration_potential_residual_history=jnp.asarray([3.0e-5]),
         geometry_kind="rect_duct",
         solver_kind="extruded_inductionless",
     )
@@ -482,6 +486,10 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
+        iteration_electric_linear_history=jnp.asarray(
+            [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
+        ),
+        iteration_potential_residual_history=jnp.asarray([3.0e-5]),
         geometry_kind="rect_duct",
         solver_kind="extruded_inductionless",
     )
@@ -502,6 +510,12 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     assert (
         restart_bundle.bundle.transverse_pressure_difference.tolist()
         == pytest.approx([0.0, 0.25, 0.0])
+    )
+    assert restart_bundle.bundle.iteration_electric_linear_history.tolist() == [
+        pytest.approx([1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0])
+    ]
+    assert restart_bundle.bundle.iteration_potential_residual_history.tolist() == (
+        pytest.approx([3.0e-5])
     )
     assert layout.system_dir.exists()
     assert layout.fields_dir.exists()

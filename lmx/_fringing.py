@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 import math
 
@@ -113,6 +114,19 @@ def _broadcast_cross_section(values: jnp.ndarray, nx: int) -> jnp.ndarray:
 def _harmonic_mean(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
     denom = jnp.maximum(a + b, 1.0e-20)
     return 2.0 * a * b / denom
+
+
+def _distance_weighted_harmonic_mean(
+    a: jnp.ndarray,
+    b: jnp.ndarray,
+    a_width: jnp.ndarray,
+    b_width: jnp.ndarray,
+) -> jnp.ndarray:
+    """Return the face coefficient for two unequal finite-volume half-cells."""
+
+    total_width = a_width + b_width
+    resistance = a_width / jnp.maximum(a, 1.0e-20) + b_width / jnp.maximum(b, 1.0e-20)
+    return total_width / jnp.maximum(resistance, 1.0e-20)
 
 
 def _anderson_extruded_state(
@@ -763,7 +777,12 @@ def _variable_diffusion_coefficients_3d(
         [sigma_x / max(dx**2, 1.0e-12), jnp.zeros_like(conductivity[-1:])], axis=0
     )
 
-    sigma_y = _harmonic_mean(conductivity[:, 1:, :], conductivity[:, :-1, :])
+    sigma_y = _distance_weighted_harmonic_mean(
+        conductivity[:, 1:, :],
+        conductivity[:, :-1, :],
+        dy_widths[None, 1:, None],
+        dy_widths[None, :-1, None],
+    )
     y_distance = 0.5 * (dy_widths[:-1] + dy_widths[1:])
     coef_y_s = (
         jnp.zeros_like(conductivity)
@@ -776,7 +795,12 @@ def _variable_diffusion_coefficients_3d(
         .set(sigma_y / (dy_widths[None, :-1, None] * y_distance[None, :, None]))
     )
 
-    sigma_z = _harmonic_mean(conductivity[:, :, 1:], conductivity[:, :, :-1])
+    sigma_z = _distance_weighted_harmonic_mean(
+        conductivity[:, :, 1:],
+        conductivity[:, :, :-1],
+        dz_widths[None, None, 1:],
+        dz_widths[None, None, :-1],
+    )
     z_distance = 0.5 * (dz_widths[:-1] + dz_widths[1:])
     coef_z_b = (
         jnp.zeros_like(conductivity)
@@ -1010,6 +1034,70 @@ def _additive_line_preconditioner_3d(
     return apply
 
 
+def _finalize_local_pressure_solve(
+    solution,
+    *,
+    linear_rhs: jnp.ndarray,
+    matvec: Callable[[jnp.ndarray], jnp.ndarray],
+    local_residual_fn: Callable[[jnp.ndarray], jnp.ndarray],
+    volume: jnp.ndarray,
+    precondition: Callable[[jnp.ndarray], jnp.ndarray],
+    iterations: int,
+    effective_atol: float,
+    local_tolerance: float | None,
+) -> tuple[jnp.ndarray, ...]:
+    """Gauge-fix a pressure solve and optionally apply one refinement correction."""
+
+    volume_sum = jnp.sum(volume)
+
+    def gauge_fixed(field: jnp.ndarray) -> jnp.ndarray:
+        return field - jnp.sum(field * volume) / volume_sum
+
+    field = gauge_fixed(solution.x)
+    local_residual = local_residual_fn(field)
+    if local_tolerance is None:
+        return (
+            field,
+            solution.residual_norm,
+            solution.converged,
+            solution.relative_residual_norm,
+            solution.iterations,
+            solution.status,
+            jnp.max(jnp.abs(local_residual)),
+        )
+
+    correction = pcg_linear_solve(
+        matvec,
+        linear_rhs - matvec(field),
+        x0=jnp.zeros_like(field),
+        precond=precondition,
+        transpose_precond=precondition,
+        rtol=0.0,
+        atol=effective_atol,
+        max_steps=iterations,
+        transpose_rtol=0.0,
+        transpose_atol=effective_atol,
+        transpose_max_steps=iterations,
+    )
+    field = gauge_fixed(field + correction.x)
+    local_residual = local_residual_fn(field)
+    final_linear_residual = linear_rhs - matvec(field)
+    residual_norm = jnp.linalg.norm(final_linear_residual)
+    relative_residual_norm = residual_norm / jnp.maximum(
+        jnp.linalg.norm(linear_rhs), jnp.asarray(1.0e-30)
+    )
+    converged = jnp.max(jnp.abs(local_residual)) <= local_tolerance
+    return (
+        field,
+        residual_norm,
+        converged,
+        relative_residual_norm,
+        solution.iterations + correction.iterations,
+        jnp.where(converged, jnp.asarray(1), correction.status),
+        jnp.max(jnp.abs(local_residual)),
+    )
+
+
 def _solvax_pressure_poisson_duct(
     rhs: jnp.ndarray,
     mobility: jnp.ndarray,
@@ -1020,7 +1108,16 @@ def _solvax_pressure_poisson_duct(
     iterations: int,
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    local_tolerance: float | None = None,
+) -> tuple[
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+]:
     """Solve the compatible Neumann pressure equation with implicit PCG.
 
     Multiplication by cell volume converts the finite-volume operator into a
@@ -1044,14 +1141,14 @@ def _solvax_pressure_poisson_duct(
     )
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
 
-    def matvec(field: jnp.ndarray) -> jnp.ndarray:
+    def diffusion_operator(field: jnp.ndarray) -> jnp.ndarray:
         x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
             field,
             mode_x="neumann",
             mode_y="neumann",
             mode_z="neumann",
         )
-        diffusion = (
+        return (
             coef_x_w * (x_west - field)
             + coef_x_e * (x_east - field)
             + coef_y_s * (y_south - field)
@@ -1059,6 +1156,9 @@ def _solvax_pressure_poisson_duct(
             + coef_z_b * (z_bottom - field)
             + coef_z_t * (z_top - field)
         )
+
+    def matvec(field: jnp.ndarray) -> jnp.ndarray:
+        diffusion = diffusion_operator(field)
         gauge = volume * jnp.sum(volume * field) / volume_sum
         return -volume * diffusion + gauge
 
@@ -1071,21 +1171,37 @@ def _solvax_pressure_poisson_duct(
     )
     precondition = _additive_line_preconditioner_3d(diagonal, directions)
 
+    linear_rhs = -volume * rhs_compatible
+    effective_rtol = tolerance
+    effective_atol = tolerance
+    if local_tolerance is not None:
+        local_absolute_target = float(jnp.min(volume)) * local_tolerance
+        effective_rtol = 0.0
+        effective_atol = min(tolerance, local_absolute_target)
     solution = pcg_linear_solve(
         matvec,
-        -volume * rhs_compatible,
+        linear_rhs,
         x0=initial_field,
         precond=precondition,
         transpose_precond=precondition,
-        rtol=tolerance,
-        atol=tolerance,
+        rtol=effective_rtol,
+        atol=effective_atol,
         max_steps=iterations,
         transpose_rtol=tolerance,
         transpose_atol=tolerance,
         transpose_max_steps=iterations,
     )
-    pressure = solution.x - jnp.sum(solution.x * volume) / volume_sum
-    return pressure, solution.residual_norm, solution.converged
+    return _finalize_local_pressure_solve(
+        solution,
+        linear_rhs=linear_rhs,
+        matvec=matvec,
+        local_residual_fn=lambda field: diffusion_operator(field) - rhs_compatible,
+        volume=volume,
+        precondition=precondition,
+        iterations=iterations,
+        effective_atol=effective_atol,
+        local_tolerance=local_tolerance,
+    )
 
 
 def _solvax_implicit_diffusion_duct(
@@ -1214,7 +1330,7 @@ def _face_flux_pressure_projection_duct(
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
     mobility = dt / jnp.maximum(rhos, 1.0e-20)
-    pressure, _, _ = _solvax_pressure_poisson_duct(
+    pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_duct(
         divergence,
         mobility,
         dx=dx,
@@ -1281,6 +1397,7 @@ def _fixed_flow_face_flux_projection_duct(
     fluid_bounds: tuple[int, int, int, int] | None = None,
     initial_pressure: jnp.ndarray | None = None,
 ) -> tuple[
+    jnp.ndarray,
     jnp.ndarray,
     jnp.ndarray,
     jnp.ndarray,
@@ -1660,12 +1777,22 @@ def _conservative_current_fluxes_3d(
     uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
     fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
 
-    sigma_y = _harmonic_mean(sigma[:, 1:, :], sigma[:, :-1, :])
+    sigma_y = _distance_weighted_harmonic_mean(
+        sigma[:, 1:, :],
+        sigma[:, :-1, :],
+        dy_widths[None, 1:, None],
+        dy_widths[None, :-1, None],
+    )
     phi_grad_y = (phi[:, 1:, :] - phi[:, :-1, :]) / dy_centers[None, :, None]
     uxb_face_y = 0.5 * (uxb_y[:, 1:, :] + uxb_y[:, :-1, :])
     fy = fy.at[:, 1:-1, :].set(sigma_y * (-phi_grad_y + uxb_face_y))
 
-    sigma_z = _harmonic_mean(sigma[:, :, 1:], sigma[:, :, :-1])
+    sigma_z = _distance_weighted_harmonic_mean(
+        sigma[:, :, 1:],
+        sigma[:, :, :-1],
+        dz_widths[None, None, 1:],
+        dz_widths[None, None, :-1],
+    )
     phi_grad_z = (phi[:, :, 1:] - phi[:, :, :-1]) / dz_centers[None, None, :]
     uxb_face_z = 0.5 * (uxb_z[:, :, 1:] + uxb_z[:, :, :-1])
     fz = fz.at[:, :, 1:-1].set(sigma_z * (-phi_grad_z + uxb_face_z))
@@ -2022,7 +2149,15 @@ def _solvax_pressure_poisson_pipe(
     iterations: int,
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    local_tolerance: float | None = None,
+) -> tuple[
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+    jnp.ndarray,
+]:
     """Implicit SOLVAX solve for a cylindrical Neumann FV operator."""
 
     radial_widths = jnp.diff(r_faces)
@@ -2056,21 +2191,39 @@ def _solvax_pressure_poisson_pipe(
     )
     precondition = _additive_line_preconditioner_3d(diagonal, directions)
 
+    linear_rhs = -volume * rhs_compatible
+    effective_rtol = tolerance
+    effective_atol = tolerance
+    if local_tolerance is not None:
+        local_absolute_target = float(jnp.min(volume)) * local_tolerance
+        effective_rtol = 0.0
+        effective_atol = min(tolerance, local_absolute_target)
     solution = pcg_linear_solve(
         matvec,
-        -volume * rhs_compatible,
+        linear_rhs,
         x0=initial_field,
         precond=precondition,
         transpose_precond=precondition,
-        rtol=tolerance,
-        atol=tolerance,
+        rtol=effective_rtol,
+        atol=effective_atol,
         max_steps=iterations,
         transpose_rtol=tolerance,
         transpose_atol=tolerance,
         transpose_max_steps=iterations,
     )
-    field = solution.x - jnp.sum(solution.x * volume) / volume_sum
-    return field, solution.residual_norm, solution.converged
+    return _finalize_local_pressure_solve(
+        solution,
+        linear_rhs=linear_rhs,
+        matvec=matvec,
+        local_residual_fn=lambda field: (
+            _apply_pipe_diffusion_coefficients_3d(field, coefficients) - rhs_compatible
+        ),
+        volume=volume,
+        precondition=precondition,
+        iterations=iterations,
+        effective_atol=effective_atol,
+        local_tolerance=local_tolerance,
+    )
 
 
 def _solvax_implicit_diffusion_pipe(
@@ -2234,7 +2387,7 @@ def _face_flux_pressure_projection_pipe(
         / jnp.maximum(centers[None, :, None] * dtheta, 1.0e-20)
     )
     mobility = dt / jnp.maximum(rhos, 1.0e-20)
-    pressure, _, _ = _solvax_pressure_poisson_pipe(
+    pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
         divergence,
         mobility,
         dx=dx,
@@ -4506,15 +4659,25 @@ def _solve_extruded_projection(
             20.0,
             2.0 * float(jnp.max(bx**2 + by**2 + bz**2)),
         )
+        electric_potential_scale = max(
+            1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2)))
+        )
         residual_by_step: list[float] = []
         component_residual_by_step: list[tuple[float, ...]] = []
         pressure_residual_by_step: list[float] = []
+        electric_linear_by_step: list[tuple[float, ...]] = []
+        potential_residual_by_step: list[float] = []
         fixed_point_iterates: list[jnp.ndarray] = []
         fixed_point_residuals: list[jnp.ndarray] = []
         previous_fixed_point_residual: jnp.ndarray | None = None
         fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
         fixed_point_scale = jnp.asarray(
-            [velocity_limit, velocity_limit, velocity_limit, scalar_limit],
+            [
+                velocity_limit,
+                velocity_limit,
+                velocity_limit,
+                electric_potential_scale,
+            ],
             dtype=u.dtype,
         )[:, None, None, None]
         if use_alex_b1_finite_volume:
@@ -4767,7 +4930,15 @@ def _solve_extruded_projection(
                 dtheta=dtheta,
             )
             if use_alex_b1_finite_volume:
-                phi, _, _ = _solvax_pressure_poisson_pipe(
+                (
+                    phi,
+                    electric_residual,
+                    electric_converged,
+                    electric_relative_residual,
+                    electric_iteration_count,
+                    electric_status,
+                    electric_local_residual,
+                ) = _solvax_pressure_poisson_pipe(
                     emf_rhs,
                     sigma,
                     dx=dx,
@@ -4777,6 +4948,7 @@ def _solve_extruded_projection(
                     iterations=electric_iterations,
                     tolerance=electric_tolerance,
                     initial_field=phi,
+                    local_tolerance=ALEX_BALANCE_TOLERANCE,
                 )
             else:
                 # The sparse pipe operator represents -div(sigma grad(phi)); J
@@ -4792,7 +4964,26 @@ def _solve_extruded_projection(
                     tolerance=poisson_tolerance,
                     initial_field=phi,
                 )
+                electric_residual = jnp.asarray(jnp.nan)
+                electric_relative_residual = jnp.asarray(jnp.nan)
+                electric_iteration_count = jnp.asarray(0)
+                electric_converged = jnp.asarray(False)
+                electric_status = jnp.asarray(-1)
+                electric_local_residual = jnp.asarray(jnp.nan)
             phi = _clip_state(phi, scalar_limit)
+            potential_update = (
+                float(jnp.max(jnp.abs(phi - phi_previous))) / electric_potential_scale
+            )
+            electric_linear_by_step.append(
+                (
+                    float(electric_residual),
+                    float(electric_relative_residual),
+                    float(electric_local_residual),
+                    float(electric_iteration_count),
+                    float(electric_converged),
+                    float(electric_status),
+                )
+            )
 
             fx, fr, ftheta = _pipe_conservative_current_fluxes_3d(
                 sigma,
@@ -4855,10 +5046,12 @@ def _solve_extruded_projection(
                 v_update,
                 w_update,
                 pressure_update,
+                potential_update,
             )
             charge_balance = float(jnp.max(jnp.abs(div_j)))
             residual_by_step.append(update_residual)
             pressure_residual_by_step.append(pressure_update)
+            potential_residual_by_step.append(potential_update)
             component_residual_by_step.append(
                 (
                     u_update,
@@ -4986,6 +5179,12 @@ def _solve_extruded_projection(
             iteration_pressure_residual_history=jnp.asarray(
                 pressure_residual_by_step, dtype=float
             ),
+            iteration_electric_linear_history=jnp.asarray(
+                electric_linear_by_step, dtype=float
+            ).reshape((-1, 6)),
+            iteration_potential_residual_history=jnp.asarray(
+                potential_residual_by_step, dtype=float
+            ),
         )
     materials = build_material_fields(case, mesh)
     x = jnp.asarray(mesh.x_centers, dtype=float)
@@ -5083,15 +5282,26 @@ def _solve_extruded_projection(
         20.0,
         2.0 * float(jnp.max(bx**2 + by**2 + bz**2)),
     )
+    electric_potential_scale = max(
+        1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2)))
+    )
     residual_by_step: list[float] = []
     component_residual_by_step: list[tuple[float, ...]] = []
     pressure_residual_by_step: list[float] = []
+    electric_linear_by_step: list[tuple[float, ...]] = []
+    potential_residual_by_step: list[float] = []
     fixed_point_iterates: list[jnp.ndarray] = []
     fixed_point_residuals: list[jnp.ndarray] = []
     previous_fixed_point_residual: jnp.ndarray | None = None
     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
     fixed_point_scale = jnp.asarray(
-        [velocity_limit, velocity_limit, velocity_limit, scalar_limit], dtype=u.dtype
+        [
+            velocity_limit,
+            velocity_limit,
+            velocity_limit,
+            electric_potential_scale,
+        ],
+        dtype=u.dtype,
     )[:, None, None, None]
     axial_pressure_loss_gradient = jnp.full((nx,), forcing, dtype=float)
     fluid_bounds = (
@@ -5318,7 +5528,15 @@ def _solve_extruded_projection(
             dz=dz,
         )
         if use_alex_b2_finite_volume:
-            phi, _, _ = _solvax_pressure_poisson_duct(
+            (
+                phi,
+                electric_residual,
+                electric_converged,
+                electric_relative_residual,
+                electric_iteration_count,
+                electric_status,
+                electric_local_residual,
+            ) = _solvax_pressure_poisson_duct(
                 emf_rhs,
                 sigma,
                 dx=dx,
@@ -5327,6 +5545,7 @@ def _solve_extruded_projection(
                 iterations=electric_iterations,
                 tolerance=electric_tolerance,
                 initial_field=phi,
+                local_tolerance=ALEX_BALANCE_TOLERANCE,
             )
         else:
             electric_solver = (
@@ -5344,7 +5563,26 @@ def _solve_extruded_projection(
                 tolerance=poisson_tolerance,
                 initial_field=phi,
             )
+            electric_residual = jnp.asarray(jnp.nan)
+            electric_relative_residual = jnp.asarray(jnp.nan)
+            electric_iteration_count = jnp.asarray(0)
+            electric_converged = jnp.asarray(False)
+            electric_status = jnp.asarray(-1)
+            electric_local_residual = jnp.asarray(jnp.nan)
         phi = _clip_state(phi, scalar_limit)
+        potential_update = (
+            float(jnp.max(jnp.abs(phi - phi_previous))) / electric_potential_scale
+        )
+        electric_linear_by_step.append(
+            (
+                float(electric_residual),
+                float(electric_relative_residual),
+                float(electric_local_residual),
+                float(electric_iteration_count),
+                float(electric_converged),
+                float(electric_status),
+            )
+        )
 
         dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
         jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
@@ -5396,10 +5634,12 @@ def _solve_extruded_projection(
             v_update,
             w_update,
             pressure_update,
+            potential_update,
         )
         charge_balance = float(jnp.max(jnp.abs(div_j)))
         residual_by_step.append(update_residual)
         pressure_residual_by_step.append(pressure_update)
+        potential_residual_by_step.append(potential_update)
         component_residual_by_step.append(
             (
                 u_update,
@@ -5559,6 +5799,12 @@ def _solve_extruded_projection(
         ).reshape((-1, 6)),
         iteration_pressure_residual_history=jnp.asarray(
             pressure_residual_by_step, dtype=float
+        ),
+        iteration_electric_linear_history=jnp.asarray(
+            electric_linear_by_step, dtype=float
+        ).reshape((-1, 6)),
+        iteration_potential_residual_history=jnp.asarray(
+            potential_residual_by_step, dtype=float
         ),
     )
 

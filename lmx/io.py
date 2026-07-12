@@ -348,6 +348,12 @@ def write_extruded_restart_npz(solution, case, path: str | Path) -> Path:
         iteration_pressure_residual_history=np.asarray(
             getattr(bundle, "iteration_pressure_residual_history", np.zeros((0,)))
         ),
+        iteration_electric_linear_history=np.asarray(
+            getattr(bundle, "iteration_electric_linear_history", np.zeros((0, 6)))
+        ),
+        iteration_potential_residual_history=np.asarray(
+            getattr(bundle, "iteration_potential_residual_history", np.zeros((0,)))
+        ),
     )
     return path
 
@@ -530,6 +536,12 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             ).reshape((-1, 6)),
             iteration_pressure_residual_history=jnp.asarray(
                 _load_optional_array(data, "iteration_pressure_residual_history")
+            ),
+            iteration_electric_linear_history=jnp.asarray(
+                _load_optional_array(data, "iteration_electric_linear_history")
+            ).reshape((-1, 6)),
+            iteration_potential_residual_history=jnp.asarray(
+                _load_optional_array(data, "iteration_potential_residual_history")
             ),
         )
         return ExtrudedRestartBundle(

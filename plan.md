@@ -342,8 +342,8 @@ The maintained core converges toward the responsibilities `case`, `mesh`,
 
 The measured pre-slimming surface was 45 top-level Python modules, about 32,000
 package lines, 285 root exports, and 96 top-level Python/TOML examples. The
-current working-tree audit has 45 modules, 8,995 maintained core/facade lines,
-35,703 total classified lines, 30 stable root exports, and 11 curated examples.
+current working-tree audit has 45 modules, 9,007 maintained core/facade lines,
+35,967 total classified lines, 30 stable root exports, and 11 curated examples.
 The tracked inventory is regenerated after each accepted milestone and must
 remain within the numeric limits below. The M3 adapter and Benchmark B operator
 work are included in that inventory rather than exempted from it.
@@ -712,19 +712,19 @@ optimization may not displace its physics and external-validation exit work.
     variant passes. A failure changes the discretization or solver, not the
     frozen experimental tolerance. The current implicit-momentum/strict-
     projection slice must still pass the complete portable gate and compact
-    Benchmark A replay before it becomes accepted. B2 nominal-wall evidence now
-    passes steady, mass, current, boundary-current, half-tolerance, and doubled-
-    iteration gates; the latter two change the primary observable by only
-    `3.26e-5` of its experimental uncertainty. The confirmation shell is not yet
-    valid wall-independence evidence: three checkpointed 128-step segments
-    reduced charge residual from `1.316e-3` to `1.152e-3`, but its normalized
-    pressure update remains oscillatory (`1.969e-4` at the third endpoint) and
-    exceeds the `5e-5` steady limit. Further blind continuation is prohibited.
-    Next expose electric-PCG convergence in production diagnostics and improve
-    the high-contrast thin-shell preconditioner/outer acceleration; require the
-    confirmation state to pass its own four physics gates before comparing wall
-    profiles. The campaign runner now enforces every variant's physics gates and
-    supports explicit per-variant restarts.
+    Benchmark A replay before it becomes accepted. B2 baseline, half-tolerance,
+    doubled-iteration, and confirmation-wall states now each pass steady, mass,
+    current, and boundary-current gates with retained pressure, potential, and
+    electric-PCG histories. Distance-weighted nonuniform face conductivity and
+    one local-norm iterative-refinement correction removed false charge and
+    electric-state convergence. Tolerance and iteration independence pass at
+    `0.0246` and `1.19e-5` of experimental uncertainty, respectively. The valid
+    nominal-versus-confirmation wall comparison still fails at `7.00%` against
+    the frozen `2%` limit, so this is now a wall-model discretization failure,
+    not a solver-convergence failure. Next make the explicit shell preserve its
+    collapsed thin-wall conductance independent of volumetric thickness; do not
+    weaken the wall gate or start medium/fine runs. The campaign runner enforces
+    every variant's physics gates and supports explicit per-variant restarts.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and

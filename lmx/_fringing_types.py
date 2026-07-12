@@ -63,6 +63,12 @@ class ExtrudedFieldBundle:
     iteration_pressure_residual_history: jnp.ndarray = field(
         default_factory=lambda: jnp.zeros((0,))
     )
+    iteration_electric_linear_history: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0, 6))
+    )
+    iteration_potential_residual_history: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
 
 
 @dataclass(frozen=True)
