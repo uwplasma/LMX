@@ -49,9 +49,14 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
         campaign._variant_problem("B1-fringing-pipe", "coarse", "unknown")
 
 
-def _record(observable, *, residual=1.0e-9):
+def _record(observable, *, residual=1.0e-9, coupling_tolerance=None):
     return {
         "primary_observable": observable,
+        "controls": (
+            {}
+            if coupling_tolerance is None
+            else {"coupling_tolerance": coupling_tolerance}
+        ),
         "diagnostics": {
             "max_residual": residual,
             "max_divergence_residual": 1.0e-5,
@@ -61,6 +66,23 @@ def _record(observable, *, residual=1.0e-9):
             "net_boundary_current_residual": 0.0,
         },
     }
+
+
+def test_comparison_enforces_tighter_variant_steady_tolerance():
+    records = {
+        "baseline": _record([0.1, 0.2, 0.1], residual=4.0e-5),
+        "tight_tolerance": _record(
+            [0.1, 0.2, 0.1], residual=3.0e-5, coupling_tolerance=2.5e-5
+        ),
+        "extended_iterations": _record([0.1, 0.2, 0.1]),
+        "thin_wall": _record([0.1, 0.2, 0.1]),
+    }
+
+    comparison = campaign._comparison("B2-fringing-square", records)
+
+    assert comparison["gates"]["steady_residual"]
+    assert not comparison["gates"]["tight-tolerance_steady_residual"]
+    assert not comparison["pass"]
 
 
 def test_comparison_applies_uncertainty_and_thin_wall_gates():

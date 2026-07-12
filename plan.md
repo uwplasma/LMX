@@ -761,6 +761,16 @@ wall time is acceptable.
     cell widths/conductivity map to the frozen nominal numerical thickness while
     preserving `sigma_wall * thickness`, removing arbitrary volumetric-shell
     geometry from the physical wall-conductance comparison.
+    The first fully source-bound canonical-shell campaign (`836ceb21...`) passed
+    baseline, extended-iteration, wall, mass, and current gates and measured a
+    `0.0179`-uncertainty-fraction observable shift for the tighter run. Raw
+    inspection nevertheless found that the tighter segment exhausted its 64
+    new updates at `2.983e-5`, above its requested `2.5e-5`. The campaign
+    summary had incorrectly tested every variant against only the baseline
+    `5e-5` threshold. The comparison now uses the stricter of the frozen steady
+    limit and each record's requested coupling tolerance. Continue the tight
+    checkpoint until it passes that corrected gate before declaring coarse B2
+    independence; the earlier nominal `pass` is diagnostic, not acceptance.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and

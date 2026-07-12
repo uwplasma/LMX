@@ -185,9 +185,17 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
     baseline = np.asarray(records["baseline"]["primary_observable"], dtype=float)
     uncertainty = float(spec["reference"]["combined_uncertainty_absolute"])
     base_diagnostics = records["baseline"]["diagnostics"]
+    steady_max = float(spec["solver"]["steady_residual_max"])
+
+    def steady_limit(record: dict[str, Any]) -> float:
+        """Honor a variant's tighter requested tolerance in its steady gate."""
+
+        requested = record.get("controls", {}).get("coupling_tolerance", steady_max)
+        return min(steady_max, float(requested))
+
     gates = {
         "steady_residual": float(base_diagnostics["max_residual"])
-        <= float(spec["solver"]["steady_residual_max"]),
+        <= steady_limit(records["baseline"]),
         "mass_balance": max(
             float(base_diagnostics["volumetric_flow_rate_span"]),
             float(base_diagnostics.get("max_divergence_residual", 0.0)),
@@ -205,7 +213,7 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         prefix = variant.replace("_", "-")
         gates[f"{prefix}_steady_residual"] = float(
             diagnostics["max_residual"]
-        ) <= float(spec["solver"]["steady_residual_max"])
+        ) <= steady_limit(record)
         gates[f"{prefix}_mass_balance"] = max(
             float(diagnostics["volumetric_flow_rate_span"]),
             float(diagnostics.get("max_divergence_residual", 0.0)),

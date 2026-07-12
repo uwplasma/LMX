@@ -396,7 +396,10 @@ excluded from normal coupling. Shell cell widths and conductivity are mapped to
 the frozen nominal numerical thickness while preserving that sheet
 conductance; the confirmation thickness therefore tests the collapsed surface
 operator instead of introducing a second volumetric wall. Sustained exact
-coarse independence remains required before acceptance.
+coarse independence remains required before acceptance. In particular, every
+independence variant must satisfy its own requested coupling tolerance. A
+tight-tolerance run that merely remains below the looser baseline steady limit
+is not accepted, even when its observable difference is small.
 
 ## Literature context
 
