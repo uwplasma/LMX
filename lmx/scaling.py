@@ -15,7 +15,6 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from .benchmarks import build_benchmark_b_field_profile, build_benchmark_b_problem
 from .fringing import solve_extruded_inductionless
-from .mesh import generate_rect_duct_mesh
 
 
 @dataclass(frozen=True)
@@ -33,8 +32,8 @@ class StrongScalingRecord:
     python_version: str
     jax_version: str
     nx: int | None = None
-    benchmark_kind: str = "stencil2d"
-    operator_path: str = "synthetic_stencil2d"
+    benchmark_kind: str = "extruded3d"
+    operator_path: str = "sharded_extruded_operator_surrogate"
     total_cells: int | None = None
     cell_updates: int | None = None
     warm_cell_updates_per_second: float | None = None
@@ -113,8 +112,8 @@ def _int_or_none(value: object) -> int | None:
 
 def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
     return (
-        record.get("benchmark_kind", "stencil2d"),
-        record.get("operator_path", "synthetic_stencil2d"),
+        record.get("benchmark_kind", "extruded3d"),
+        record.get("operator_path", "sharded_extruded_operator_surrogate"),
         record.get("backend", ""),
         record.get("device_kind", ""),
         record.get("nx"),
@@ -246,27 +245,6 @@ def write_strong_scaling_summary_table(
     return path
 
 
-def _build_operator_problem(ny: int, nz: int) -> tuple[np.ndarray, ...]:
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=ny, nz=nz)
-    y, z = np.meshgrid(
-        np.asarray(mesh.y_centers), np.asarray(mesh.z_centers), indexing="ij"
-    )
-    y_scale = max(float(np.max(np.abs(np.asarray(mesh.y_centers)))), 1.0e-12)
-    z_scale = max(float(np.max(np.abs(np.asarray(mesh.z_centers)))), 1.0e-12)
-    field = np.sin(np.pi * y / y_scale) * np.cos(np.pi * z / z_scale)
-    potential = np.cos(0.5 * np.pi * y / y_scale) * np.sin(0.5 * np.pi * z / z_scale)
-    forcing = (
-        0.5 * np.sin(2.0 * np.pi * y / y_scale)
-        - 0.35 * np.cos(3.0 * np.pi * z / z_scale)
-        + 0.15 * np.sin(np.pi * y * z / max(y_scale * z_scale, 1.0e-12))
-    )
-    return (
-        field.astype(np.float32),
-        potential.astype(np.float32),
-        forcing.astype(np.float32),
-    )
-
-
 def _build_extruded_operator_problem(
     nx: int, ny: int, nz: int
 ) -> tuple[np.ndarray, ...]:
@@ -353,85 +331,6 @@ def _two_axis_mesh_and_sharding(
         return mesh, NamedSharding(mesh, P(*partition))
     raise ValueError(
         f"Shape {shape} is not compatible with a {rows}x{cols} device mesh."
-    )
-
-
-def benchmark_sharded_stencil(
-    *,
-    ny: int = 1024,
-    nz: int = 1024,
-    iterations: int = 120,
-    repeats: int = 3,
-    num_devices: int | None = None,
-) -> StrongScalingRecord:
-    devices = jax.devices()
-    if not devices:
-        raise RuntimeError("No JAX devices are available for scaling benchmark.")
-    if num_devices is None:
-        num_devices = len(devices)
-    if num_devices < 1 or num_devices > len(devices):
-        raise ValueError(
-            f"Requested {num_devices} devices, but only {len(devices)} are visible."
-        )
-    if ny % num_devices != 0:
-        raise ValueError(
-            f"ny={ny} must be divisible by num_devices={num_devices} for y-sharded scaling."
-        )
-
-    mesh, field_sharding = _two_axis_mesh_and_sharding(
-        devices, num_devices=num_devices, shape=(ny, nz)
-    )
-    field, potential, forcing = _build_operator_problem(ny, nz)
-    _, potential_sharding = _two_axis_mesh_and_sharding(
-        devices, num_devices=num_devices, shape=potential.shape
-    )
-    _, forcing_sharding = _two_axis_mesh_and_sharding(
-        devices, num_devices=num_devices, shape=forcing.shape
-    )
-    field = jax.device_put(field, field_sharding)
-    potential = jax.device_put(potential, potential_sharding)
-    forcing = jax.device_put(forcing, forcing_sharding)
-
-    kernel = jax.jit(
-        lambda u0, phi0, src: _benchmark_operator_iterations(
-            u0, phi0, src, iterations=iterations
-        ),
-        in_shardings=(
-            field_sharding,
-            potential_sharding,
-            forcing_sharding,
-        ),
-        out_shardings=field_sharding,
-    )
-
-    timings: list[float] = []
-    for _ in range(repeats):
-        start = time.perf_counter()
-        result = kernel(field, potential, forcing)
-        jax.block_until_ready(result)
-        timings.append(time.perf_counter() - start)
-
-    return StrongScalingRecord(
-        backend=jax.default_backend(),
-        device_kind=devices[0].device_kind,
-        num_devices=num_devices,
-        ny=ny,
-        nz=nz,
-        iterations=iterations,
-        repeats=repeats,
-        cold_seconds=timings[0],
-        warm_seconds=min(timings[1:] or timings),
-        mean_seconds=sum(timings) / len(timings),
-        python_version=platform.python_version(),
-        jax_version=jax.__version__,
-        operator_path="synthetic_stencil2d",
-        total_cells=ny * nz,
-        cell_updates=ny * nz * iterations,
-        warm_cell_updates_per_second=(ny * nz * iterations)
-        / max(min(timings[1:] or timings), 1.0e-20),
-        memory_bytes_estimate=sum(
-            _array_nbytes(array) for array in (field, potential, forcing)
-        ),
     )
 
 
@@ -652,48 +551,6 @@ def benchmark_extruded_inductionless_solve(
         potential_l2=potential_l2,
         current_l2=current_l2,
     )
-
-
-def _benchmark_operator_iterations(
-    u0: jnp.ndarray,
-    phi0: jnp.ndarray,
-    forcing: jnp.ndarray,
-    *,
-    iterations: int,
-) -> jnp.ndarray:
-    def body(_, state):
-        u, phi = state
-        lap_u = (
-            jnp.roll(u, 1, axis=0)
-            + jnp.roll(u, -1, axis=0)
-            + jnp.roll(u, 1, axis=1)
-            + jnp.roll(u, -1, axis=1)
-            - 4.0 * u
-        )
-        lap_phi = (
-            jnp.roll(phi, 1, axis=0)
-            + jnp.roll(phi, -1, axis=0)
-            + jnp.roll(phi, 1, axis=1)
-            + jnp.roll(phi, -1, axis=1)
-            - 4.0 * phi
-        )
-        grad_phi_y = 0.5 * (jnp.roll(phi, -1, axis=0) - jnp.roll(phi, 1, axis=0))
-        grad_phi_z = 0.5 * (jnp.roll(phi, -1, axis=1) - jnp.roll(phi, 1, axis=1))
-        lorentz = 0.18 * grad_phi_z - 0.07 * grad_phi_y
-        u_new = (
-            0.92 * u
-            + 0.06 * lap_u
-            + 0.035 * forcing
-            + lorentz
-            + 0.01 * jnp.sin(3.0 * u)
-            + 0.005 * jnp.cos(2.0 * phi)
-        )
-        phi_source = 0.15 * u_new - 0.04 * forcing + 0.03 * jnp.sin(phi)
-        phi_new = 0.9 * phi + 0.08 * lap_phi + phi_source
-        return u_new, phi_new
-
-    final_u, _ = jax.lax.fori_loop(0, iterations, body, (u0, phi0))
-    return final_u
 
 
 def _laplacian_3d_benchmark(field: jnp.ndarray) -> jnp.ndarray:

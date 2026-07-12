@@ -13,7 +13,6 @@ from lmx.scaling import (
     StrongScalingRecord,
     _array_nbytes,
     _build_extruded_operator_problem,
-    _build_operator_problem,
     _factor_device_mesh,
     _float_or_none,
     _int_or_none,
@@ -21,7 +20,6 @@ from lmx.scaling import (
     _two_axis_mesh_and_sharding,
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
-    benchmark_sharded_stencil,
     summarize_strong_scaling_records,
     write_scaling_report,
     write_strong_scaling_summary_table,
@@ -32,20 +30,9 @@ from examples.strong_scaling_demo import _default_visible_devices
 pytestmark = pytest.mark.unit
 
 
-def test_benchmark_sharded_stencil_runs_on_single_device():
-    record = benchmark_sharded_stencil(
-        ny=32, nz=32, iterations=4, repeats=1, num_devices=1
-    )
-
-    assert record.num_devices == 1
-    assert record.mean_seconds >= 0.0
-    assert record.ny == 32
-    assert record.nz == 32
-
-
 def test_write_scaling_report_writes_json(tmp_path: Path):
-    record = benchmark_sharded_stencil(
-        ny=16, nz=16, iterations=2, repeats=1, num_devices=1
+    record = benchmark_sharded_extruded_operator(
+        nx=16, ny=8, nz=8, iterations=2, repeats=1, num_devices=1
     )
     path = write_scaling_report([record], tmp_path / "scaling.json")
 
@@ -107,17 +94,6 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert rows[1]["physics_equivalent"]
     assert table.exists()
     assert "parallel_efficiency" in table.read_text()
-
-
-def test_benchmark_sharded_stencil_rejects_invalid_device_count():
-    with pytest.raises(ValueError):
-        benchmark_sharded_stencil(
-            ny=18,
-            nz=16,
-            iterations=1,
-            repeats=1,
-            num_devices=max(2, len(jax.devices()) + 1),
-        )
 
 
 def test_benchmark_sharded_extruded_operator_runs_on_single_device():
@@ -250,12 +226,6 @@ def test_default_visible_devices_uses_highest_indices(monkeypatch: pytest.Monkey
 
 
 def test_scaling_problem_builders_return_expected_shapes():
-    field, potential, forcing = _build_operator_problem(12, 10)
-    assert field.shape == (12, 10)
-    assert potential.shape == (12, 10)
-    assert forcing.shape == (12, 10)
-    assert field.dtype == np.float32
-
     u, v, w, phi, src, sigma = _build_extruded_operator_problem(8, 6, 4)
     assert u.shape == (8, 6, 4)
     assert v.shape == (8, 6, 4)
@@ -358,14 +328,6 @@ def test_two_axis_mesh_and_sharding_rejects_incompatible_multi_axis_shape(
         _two_axis_mesh_and_sharding(
             [object(), object(), object(), object()], num_devices=4, shape=(3, 5, 2)
         )
-
-
-def test_benchmark_sharded_stencil_rejects_missing_devices(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setattr(jax, "devices", lambda: [])
-    with pytest.raises(RuntimeError, match="No JAX devices"):
-        benchmark_sharded_stencil(ny=8, nz=8, iterations=1, repeats=1, num_devices=1)
 
 
 def test_benchmark_sharded_extruded_operator_rejects_missing_devices(

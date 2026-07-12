@@ -303,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--benchmark-kind",
-        choices=("stencil2d", "extruded3d", "extruded_solve"),
+        choices=("extruded3d", "extruded_solve"),
         default="extruded3d",
     )
     parser.add_argument("--python", type=str, default=sys.executable)

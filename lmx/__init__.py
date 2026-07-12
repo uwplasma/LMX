@@ -408,7 +408,6 @@ _EXPORTS = {
     "run_extruded_target_inverse_design": ("lmx.autodiff", "run_extruded_target_inverse_design"),
     "run_hartmann_profile_inverse_design": ("lmx.autodiff", "run_hartmann_profile_inverse_design"),
     "solve_differentiable_hartmann": ("lmx.autodiff", "solve_differentiable_hartmann"),
-    "benchmark_sharded_stencil": ("lmx.scaling", "benchmark_sharded_stencil"),
     "summarize_strong_scaling_records": ("lmx.scaling", "summarize_strong_scaling_records"),
     "write_scaling_report": ("lmx.scaling", "write_scaling_report"),
     "write_strong_scaling_summary_table": ("lmx.scaling", "write_strong_scaling_summary_table"),

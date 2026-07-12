@@ -768,6 +768,9 @@ wall time is acceptable.
    measured warm time remains `10.23 s` versus `38.33 s`; halo traffic and the
    remaining combined reduction still block domain strong scaling. Forced
    two-device CPU sharding is likewise rejected (`5.03 s` versus `3.19 s`).
+   The obsolete public 2-D stencil microbenchmark is removed now that production
+   and 3-D operator paths cover the required evidence; this deletes 237 net
+   lines across implementation and tests without removing solver coverage.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

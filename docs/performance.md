@@ -57,6 +57,11 @@ research-code runtime evidence because it uses the same projection loop as the
 examples. `extruded3d` is the scaling-algorithm evidence because it exposes the
 current multi-device sharding behavior on a denser fixed operator.
 
+The older public `stencil2d` microbenchmark has been removed. It duplicated
+sharding/reporting machinery without exercising the 3-D inductionless solver;
+the retained surrogate isolates operator costs, while `extruded_solve` is the
+only release-facing performance gate.
+
 ### Production-sharding checkpoint (12 July 2026)
 
 The first end-to-end ALEX B2 checkpoint uses a deliberately small

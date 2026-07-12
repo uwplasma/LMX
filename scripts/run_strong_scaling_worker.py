@@ -4,12 +4,21 @@ import argparse
 import json
 from pathlib import Path
 
-from lmx.scaling import benchmark_extruded_inductionless_solve, benchmark_sharded_extruded_operator, benchmark_sharded_stencil
+from lmx.scaling import (
+    benchmark_extruded_inductionless_solve,
+    benchmark_sharded_extruded_operator,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a single strong-scaling benchmark worker.")
-    parser.add_argument("--benchmark-kind", choices=("stencil2d", "extruded3d", "extruded_solve"), default="extruded3d")
+    parser = argparse.ArgumentParser(
+        description="Run a single strong-scaling benchmark worker."
+    )
+    parser.add_argument(
+        "--benchmark-kind",
+        choices=("extruded3d", "extruded_solve"),
+        default="extruded3d",
+    )
     parser.add_argument("--nx", type=int, default=384)
     parser.add_argument("--ny", type=int, default=1024)
     parser.add_argument("--nz", type=int, default=1024)
@@ -34,14 +43,6 @@ def main(argv: list[str] | None = None) -> int:
     elif args.benchmark_kind == "extruded3d":
         record = benchmark_sharded_extruded_operator(
             nx=args.nx,
-            ny=args.ny,
-            nz=args.nz,
-            iterations=args.iterations,
-            repeats=args.repeats,
-            num_devices=args.num_devices,
-        )
-    else:
-        record = benchmark_sharded_stencil(
             ny=args.ny,
             nz=args.nz,
             iterations=args.iterations,

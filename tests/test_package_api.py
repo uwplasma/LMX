@@ -111,7 +111,6 @@ def test_lmx_lazy_exports_resolve_expected_symbols():
     assert callable(lmx.run_extruded_rect_projection_field_inverse_design)
     assert callable(lmx.run_extruded_rect_projection_trajectory_inverse_design)
     assert callable(lmx.run_extruded_target_inverse_design)
-    assert callable(lmx.benchmark_sharded_stencil)
     assert callable(lmx.summarize_strong_scaling_records)
     assert callable(lmx.write_scaling_report)
     assert callable(lmx.write_strong_scaling_summary_table)
