@@ -736,7 +736,12 @@ wall time is acceptable.
     half-cell resistance while preserving tangential conductance. A reduced
     one-GPU B2 nominal/confirmation pair changes the primary observable by only
     `5.1e-5` relative, down from `7.00%`; the exact coarse campaign remains the
-    acceptance gate.
+    acceptance gate. The first exact cold and restart segments exposed an
+    undamped-Anderson limit cycle above the frozen `5e-5` residual. A matched
+    16-step probe reduced the residual monotonically from `6.57e-5` to
+    `5.92e-5` with damping `0.3`, while plain fixed-point coupling reached only
+    `6.52e-5`; B2 therefore uses the damped recurrence without changing its
+    physical model, fixed point, or acceptance tolerance.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and
