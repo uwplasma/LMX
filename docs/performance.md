@@ -83,6 +83,8 @@ GPUs concurrently, one process per GPU, in restart-aware waves. Those workers
 share a source-fingerprinted persistent compilation cache under the system
 temporary directory, while an explicit `JAX_COMPILATION_CACHE_DIR` override is
 preserved.
+Long solves also retain only the configured Anderson history window instead of
+keeping every prior three-dimensional state alive.
 
 SOLVAX 0.7.0 adds an opt-in algebraically equivalent single-reduction PCG
 recurrence, and sharded B2 duct solves now use it for momentum, projection, and

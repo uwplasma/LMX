@@ -10,8 +10,8 @@ asset changes:
 uv run --locked --extra dev python scripts/audit_architecture.py --measure-import
 ```
 
-The current classified baseline is 45 package modules and 32,176 total package
-lines. The maintained stable core plus compatibility facades are 8,087 lines;
+The current classified baseline is 45 package modules and 36,545 total package
+lines. The maintained stable core plus compatibility facades are 9,006 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is

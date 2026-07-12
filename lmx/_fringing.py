@@ -5277,6 +5277,8 @@ def _solve_extruded_projection(
                 if case.solver.coupling_acceleration == "anderson":
                     fixed_point_iterates.append(current_state)
                     fixed_point_residuals.append(fixed_point_residual)
+                    del fixed_point_iterates[: -case.solver.coupling_history_depth]
+                    del fixed_point_residuals[: -case.solver.coupling_history_depth]
                     accelerated = _anderson_extruded_state(
                         fixed_point_iterates,
                         fixed_point_residuals,
@@ -6183,6 +6185,8 @@ def _solve_extruded_projection(
             if case.solver.coupling_acceleration == "anderson":
                 fixed_point_iterates.append(current_state)
                 fixed_point_residuals.append(fixed_point_residual)
+                del fixed_point_iterates[: -case.solver.coupling_history_depth]
+                del fixed_point_residuals[: -case.solver.coupling_history_depth]
                 if field_sharding is None:
                     accelerated = _anderson_extruded_state(
                         fixed_point_iterates,
