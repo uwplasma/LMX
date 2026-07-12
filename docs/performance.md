@@ -1,8 +1,8 @@
 # Performance and Scaling
 
 LMX keeps the fully developed duct solver on a JAX-native operator path and
-includes a dedicated strong-scaling benchmark for a dense structured-grid
-inductionless MHD operator. The goal is practical research throughput:
+benchmarks the production ALEX B2 solve directly. The goal is practical
+research throughput:
 
 - keep the routine validation lane under five minutes
 - preserve a differentiable fixed-iteration lane
@@ -30,14 +30,14 @@ Required benchmark behavior:
 - memory-allocation and host-to-device placement checks for large arrays
 - persistent JAX compilation cache on long artifact workflows where supported
 
-The current scaling figure is useful evidence, but it should not be the final
-CPU-scaling claim for a paper. The next accepted CPU panel needs to be backed
-by a profile explaining whether the limiting factor is memory bandwidth,
-cross-device communication, compile overhead, or kernel launch overhead.
+Archived surrogate figures remain reproducibility evidence, not a current
+performance claim. A paper-facing panel must use the production solve and a
+profile that identifies memory bandwidth, communication, compilation, and
+kernel-launch costs.
 
 ## What is benchmarked
 
-The strong-scaling workflow now has two explicit benchmark kinds:
+The scaling workflow has two explicit benchmark kinds:
 
 - `extruded_solve`
   - runs the actual rectangular `solve_extruded_inductionless(...)` path
@@ -45,10 +45,9 @@ The strong-scaling workflow now has two explicit benchmark kinds:
   - fails if a requested multi-device solve does not return that shard count
   - records grid size, estimated array memory, warm cell-updates per second,
     and optional JAX trace directory
-  - is the solver-faithful timing gate for release candidates
+  - is the only solver-faithful timing gate for release candidates
 - `extruded3d`
-  - runs the sharded fixed-iteration MHD operator surrogate used for the
-    current strong-scaling figure
+  - runs a sharded fixed-iteration MHD operator surrogate
   - keeps explicit multi-device sharding over the fixed global grid
   - remains useful for isolating CPU/GPU stencil and communication behavior
 
@@ -75,11 +74,12 @@ process-stable device mesh and cached JIT kernels, so repeated two-GPU solves
 remain physics-identical. Warm time is `8.79 s` on one GPU and `21.43 s` on two
 for the small case; a `48 x 36 x 36` case measures `10.48 s` versus `38.28 s`.
 Cross-section-only pressure line blocks did not improve that result and were
-rejected. The coarse-scale `102 x 77 x 77` footprint fits one A4000 narrowly
-(about `15.7 GiB` observed) and runs two outer steps in `34.08 s` warm. Frequent
-global PCG reductions are therefore the next bottleneck; independent campaign
-variants should occupy the two GPUs concurrently while reduction-count work is
-qualified.
+rejected. The coarse-scale `102 x 77 x 77` footprint runs two outer steps in
+`34.08 s` warm. The earlier `15.7 GiB` observation mostly measured JAX's
+default memory preallocation; production campaigns now disable preallocation
+unless the user overrides it. Global PCG reductions and halo traffic remain
+the multi-device bottlenecks. Independent variants therefore occupy the two
+GPUs concurrently, one process per GPU, in restart-aware waves.
 
 SOLVAX 0.7.0 adds an opt-in algebraically equivalent single-reduction PCG
 recurrence, and sharded B2 duct solves now use it for momentum, projection, and
@@ -158,74 +158,25 @@ Single GPU:
 JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx cases/ducts/hunt_case.toml
 ```
 
-Those commands select the execution device for the normal CLI solver run. The
-committed strong-scaling figures use `examples/strong_scaling_demo.py`,
-because that benchmark intentionally exercises the sharded stencil kernel across
-multiple CPU or GPU devices. For remote GPU runs on the `office` host, the same
-pattern works over SSH:
+Those commands select the execution device for the normal CLI solver run. Use
+`examples/strong_scaling_demo.py --benchmark-kind extruded_solve` for a
+production-path device-count sweep. For remote GPU runs on the `office` host,
+the same pattern works over SSH:
 
 ```bash
 ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx cases/ducts/hunt_case.toml'
 ```
 
-## Current artifact
+## Current conclusion
 
-The current scaling artifact is stored under
-`https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/strong_scaling.png` and is generated from:
-
-- a local CPU sweep on a fixed `8192 x 64 x 64` extruded operator with `256`
-  iterations
-- a remote GPU sweep on a fixed `6144 x 96 x 96` extruded operator with `4096`
-  iterations
-
-![LMX strong scaling](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/strong_scaling.png)
-
-The figure shows warm runtime only. First-run compile / JIT
-overhead is still stored in the JSON summary, but it is no longer plotted in
-the main scaling figure because it dominated the left panel without helping
-the actual strong-scaling interpretation.
-
-Observed warm-runtime points from that artifact:
-
-- CPU:
-  - `1` device: `80.5495 s`
-  - `2` devices: `74.6580 s`
-  - `4` devices: `65.5038 s`
-- GPU:
-  - `1` GPU: `78.5812 s`
-  - `2` GPUs: `46.8238 s`
-
-The CPU sweep is reported as measured rather than idealized. On this
-workstation, the denser operator improves through `4` logical CPU devices,
-which is still consistent with a memory-bandwidth and communication limit on
-the host path beyond that range. The remote GPU path shows about `1.68x`
-speedup from `1` to `2` GPUs on the larger fixed problem.
-
-This is also the point where the current JAX implementation strategy matters.
-The official JAX guidance distinguishes automatic sharding from explicit
-per-device kernels with [`jax.shard_map`](https://docs.jax.dev/en/latest/notebooks/shard_map.html),
-and the profiling docs recommend validating those choices with Perfetto or
-XProf traces rather than inferring bottlenecks from wall time alone. For LMX,
-that means the next CPU-scaling step is not another presentation-only rerun of
-the same host benchmark: it is a profiler-guided check on the current
-`extruded3d` path and, if needed, an explicit `shard_map` / halo-exchange
-version of the most communication-heavy stencil/projection kernels.
-
-Recent local profiling confirms that the current CPU benchmark is still the
-wrong place to claim a final CPU strong-scaling result. A JAX trace collected
-for the `2`-device CPU benchmark (`/tmp/lmx_cpu_scaling_profile`) shows the
-current path is dominated by a memory-bound sharded stencil on forced logical
-host devices. The next CPU scaling benchmark should therefore move closer to
-the executable `extruded_inductionless` projection loop or a higher-intensity
-3D operator path rather than relying on the present host-device sharding curve
-alone.
-
-That solver-faithful entry point is available as
-`--benchmark-kind extruded_solve`. It now runs an ALEX B2 problem and places
-its production fields on a named
-axial device mesh and records the returned shard count. Treat a device-count
-sweep as strong-scaling evidence only after field/diagnostic equivalence also
-passes; shard placement alone is not a physics result.
+The production `extruded_solve` checkpoints above supersede the archived
+surrogate curve as the current scaling result. They prove device placement and
+physics equivalence but miss the strong-scaling target on two A4000s. Forced
+virtual-device sharding also slows the Mac CPU path, whose normal JAX kernels
+already use host threads. Until a production solve meets the frozen efficiency
+gate, the supported throughput strategy is one solve per GPU and normal
+single-device JAX execution on the Mac. Treat shard placement alone as an
+implementation check, never as a physics or performance result.
 
 The `auto` path resolves to released SOLVAX 0.5.1 PCG. Reproduce its
 native/SOLVAX forward, implicit-gradient, independent-transpose, compile,

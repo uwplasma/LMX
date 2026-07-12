@@ -123,10 +123,11 @@ python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile
 ```
 
 Routine CLI runs inherit the active JAX backend from the shell, while
-`examples/strong_scaling_demo.py` is the main path for explicit
-CPU and GPU scaling studies. Use `--benchmark-kind extruded_solve` for the
-actual rectangular `extruded_inductionless` projection path, and the default
-`extruded3d` mode for the explicitly sharded dense-operator scaling panel.
+`examples/strong_scaling_demo.py` is the main path for explicit CPU and GPU
+scaling studies. Use `--benchmark-kind extruded_solve` for release-facing
+evidence from the actual rectangular `extruded_inductionless` projection path.
+The `extruded3d` surrogate is retained only for operator diagnosis and cannot
+support a production strong-scaling claim.
 
 ## Restart
 

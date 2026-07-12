@@ -62,7 +62,7 @@ and posters exist, and that the core publication-facing figures are present.
 | `li_aln_multilayer_mesh_qa.png` | `campaigns/walls/li_aln_multilayer_mesh_qa.py` | Explicit `fluid | AlN | metal` mesh, aligned interfaces, region IDs, and conductivity field |
 | `li_aln_multilayer_solve.png` | `campaigns/walls/li_aln_multilayer_solve.py` | Explicit multilayer wall-stack solved limiting-case response and conservative-current diagnostics |
 | `li_aln_multilayer_convergence.png` | `campaigns/walls/li_aln_multilayer_convergence.py` | Representative explicit multilayer mesh ladder for pressure/current observables |
-| `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Solver-facing CPU/GPU scaling summary |
+| `strong_scaling.png` | `scripts/run_strong_scaling_worker.py` | Archived operator-scaling diagnostic; production claims require `extruded_solve` evidence |
 | `publication_figure_campaign_summary.json` | `campaigns/publication/publication_figure_campaign.py` | Manuscript figure manifest, status table, and remaining figure gaps |
 | `research_grade_closure_status.json` | `campaigns/status/research_grade_closure_status.py` | Strict research-blocker closure status, physics gates, and next artifacts |
 | `research_grade_external_data_audit.json` | `campaigns/status/research_grade_external_data_audit.py` | Local external-code/data inputs available for strict blocker closure |
