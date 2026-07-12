@@ -143,9 +143,13 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         int(solver.get("projection_iterations_min", 0)),
         float(solver.get("projection_tolerance_max", math.inf)),
     )
+    acceleration = solver.get("coupling_acceleration")
     if (
-        solver.get("coupling_acceleration") != "anderson"
-        or int(solver.get("coupling_history_depth", 0)) < 1
+        acceleration not in {"anderson", "none"}
+        or (
+            acceleration == "anderson"
+            and int(solver.get("coupling_history_depth", 0)) < 1
+        )
         or float(solver.get("coupling_regularization", -1.0)) < 0.0
         or not 0.0 <= float(solver.get("coupling_damping", math.inf)) <= 1.0
         or steady_uncertainty_fraction > 0.05

@@ -1,14 +1,14 @@
 {
   "import_measurement": {
     "command": "python -c 'import lmx'",
-    "max_seconds": 0.017980249947868288,
-    "median_seconds": 0.0163705000304617,
-    "min_seconds": 0.015988249971996993,
+    "max_seconds": 0.01731920801103115,
+    "median_seconds": 0.015985999954864383,
+    "min_seconds": 0.015663124970160425,
     "repeats": 5
   },
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 7156507,
-    "checkout_bytes_excluding_release_candidates": 7156507,
+    "checkout_bytes_excluding_build_artifacts": 7156747,
+    "checkout_bytes_excluding_release_candidates": 7156747,
     "completed_workflow_disposition_count": 85,
     "curated_example_count": 11,
     "curated_examples": [
@@ -200,7 +200,7 @@
       "examples/strong_scaling_demo.py",
       "examples/variable_field_extruded_demo.py"
     ],
-    "maintained_core_lines": 9006,
+    "maintained_core_lines": 9010,
     "package_module_count": 45,
     "package_modules": [
       {
@@ -267,8 +267,8 @@
         "role": "compatibility_facade"
       },
       {
-        "bytes": 18569,
-        "lines": 475,
+        "bytes": 18682,
+        "lines": 479,
         "owner": "stable_core",
         "path": "lmx/benchmarks.py",
         "role": "stable_core"
@@ -555,7 +555,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 36586,
+    "total_package_lines": 36590,
     "uncurated_example_count": 0,
     "workflow_disposition_count": 85,
     "workflow_dispositions": [

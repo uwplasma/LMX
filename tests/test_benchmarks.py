@@ -104,14 +104,14 @@ def test_benchmark_b_field_profile_rejects_degenerate_station_count():
 
 
 @pytest.mark.parametrize(
-    ("case_id", "expected_shape", "expected_conductance", "expected_damping"),
+    ("case_id", "expected_shape", "expected_conductance", "expected_acceleration"),
     [
-        ("B1-fringing-pipe", (101, 64, 128), 0.027, 1.0),
-        ("B2-fringing-square", (101, 65, 65), 0.07, 0.1),
+        ("B1-fringing-pipe", (101, 64, 128), 0.027, "anderson"),
+        ("B2-fringing-square", (101, 65, 65), 0.07, "none"),
     ],
 )
 def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
-    case_id, expected_shape, expected_conductance, expected_damping
+    case_id, expected_shape, expected_conductance, expected_acceleration
 ):
     problem = build_benchmark_b_problem(case_id, mesh_level="coarse")
     case = problem.case
@@ -126,7 +126,7 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
         assert case.geometry.ny == expected_shape[1]
         assert case.geometry.nz == expected_shape[2]
     assert recovered_conductance == pytest.approx(expected_conductance)
-    assert case.solver.coupling_damping == expected_damping
+    assert case.solver.coupling_acceleration == expected_acceleration
     assert case.initial_velocity == 1.0
     assert case.forcing == 0.0
     assert case.geometry.axial_origin == -15.0

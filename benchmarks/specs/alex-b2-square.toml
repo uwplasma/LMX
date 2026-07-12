@@ -109,11 +109,11 @@ axial_cells_per_field_transition_min = 16
 geometric_quality_required = true
 
 [solver]
-coupling_acceleration = "anderson"
+coupling_acceleration = "none"
 coupling_history_depth = 16
 coupling_regularization = 1.0e-8
-coupling_damping = 0.1
-coupling_damping_basis = "verified 24-step exact coarse probe removed tight-tolerance phase sensitivity while converging faster than plain fixed-point coupling"
+coupling_damping = 1.0
+coupling_damping_basis = "verified exact coarse probe selected monotone plain fixed-point coupling after Anderson variants developed tight-tolerance limit cycles"
 electric_iterations_min = 600
 electric_tolerance_max = 1.0e-12
 projection_iterations_min = 4000

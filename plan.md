@@ -741,10 +741,11 @@ wall time is acceptable.
     16-step probe reduced the residual monotonically from `6.57e-5` to
     `5.92e-5` with damping `0.3`, while plain fixed-point coupling reached only
     `6.52e-5`. A subsequent verified 24-step tight-tolerance probe showed that
-    damping `0.1` retained a smooth reduction, reached `2.79e-5`, and limited
-    the observable shift to `0.0405` of experimental uncertainty; plain fixed
-    point was slightly closer but slower. B2 therefore uses damping `0.1`
-    without changing its
+    damping `0.1` initially reduced smoothly to `2.79e-5`, while plain fixed
+    point was slower but limited the observable shift to `0.00343` of
+    experimental uncertainty. The full damping-0.1 segment later developed a
+    limit cycle and failed at `8.33e-5`; B2 therefore uses the simpler monotone
+    plain fixed-point recurrence without changing its
     physical model, fixed point, or acceptance tolerance. Exact damped
     continuations then exposed isolated sub-threshold updates inside an
     oscillatory history: nominal and confirmation endpoints differed by 12% in
