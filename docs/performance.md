@@ -88,6 +88,9 @@ keeping every prior three-dimensional state alive.
 The campaign stops before tolerance/iteration variants when baseline or wall
 prerequisites miss a frozen physics gate, so GPU time is not spent refining an
 invalid state.
+Worker entry points prepend and verify their own repository root before
+importing LMX, preventing an installed package or external `PYTHONPATH` from
+being mislabeled with the copied source fingerprint.
 
 SOLVAX 0.7.0 adds an opt-in algebraically equivalent single-reduction PCG
 recurrence, and sharded B2 duct solves now use it for momentum, projection, and

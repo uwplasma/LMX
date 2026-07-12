@@ -747,7 +747,11 @@ wall time is acceptable.
     fluid velocity and 19.5% in Lorentz force. Those endpoints are diagnostic,
     not accepted. B2 now requires three consecutive updates to pass the full
     residual, divergence, flow, and charge conjunction before wall independence
-    can be evaluated.
+    can be evaluated. The office campaign then exposed a provenance flaw: a
+    worker launched as `python scripts/...` could import another installed LMX
+    through `PYTHONPATH` while hashing the copied source tree. All exact remote
+    records produced before the runner began prepending and verifying its own
+    source root are invalid as acceptance evidence and must be rerun.
 
 12. **Pending — execute and accept Benchmark B.** Run the frozen three-level
     B1/B2 ladders, validate their distinct pressure observables first and

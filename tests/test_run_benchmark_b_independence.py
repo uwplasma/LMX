@@ -12,6 +12,10 @@ from scripts import run_benchmark_b_independence as campaign
 pytestmark = pytest.mark.unit
 
 
+def test_campaign_imports_lmx_from_its_own_source_tree():
+    assert campaign.ROOT in Path(campaign.lmx.__file__).resolve().parents
+
+
 def test_variant_problem_applies_only_frozen_solver_control_changes():
     baseline = campaign._variant_problem("B1-fringing-pipe", "coarse", "baseline")
     tight = campaign._variant_problem("B1-fringing-pipe", "coarse", "tight_tolerance")

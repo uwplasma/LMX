@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run checkpointed ALEX B1/B2 solver and thin-wall independence gates."""
 
+# ruff: noqa: E402 -- repository-root bootstrap must precede project imports.
+
 from __future__ import annotations
 
 import argparse
@@ -15,9 +17,13 @@ import tempfile
 import time
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import jax
 import numpy as np
 
+import lmx
 from lmx.benchmarks import (
     benchmark_b_pressure_observable,
     build_benchmark_b_problem,
@@ -27,7 +33,11 @@ from lmx.fringing import solve_extruded_inductionless
 from lmx.io import load_extruded_restart_bundle, write_extruded_restart_npz
 
 
-ROOT = Path(__file__).resolve().parents[1]
+if ROOT not in Path(lmx.__file__).resolve().parents:
+    raise RuntimeError(
+        f"Benchmark B runner imported LMX outside its source tree: {lmx.__file__}"
+    )
+
 CASE_IDS = ("B1-fringing-pipe", "B2-fringing-square")
 VARIANTS = ("baseline", "tight_tolerance", "extended_iterations", "thin_wall")
 
