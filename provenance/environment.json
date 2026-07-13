@@ -30,7 +30,7 @@
       "matplotlib",
       "numpy",
       "scipy",
-      "solvax==0.7.0",
+      "solvax>=0.8,<1",
       "tomli; python_version < '3.11'"
     ]
   },
@@ -39,7 +39,7 @@
     "format": "uv",
     "path": "uv.lock",
     "revision": 3,
-    "sha256": "1dffb65406e764958df2438d978d72de7471894036739920bd223de2b5c45d59",
+    "sha256": "7cc9e566ba686ea741f68086c8dbbf2d2e21b6b02acc6d372b9b313db8460232",
     "version": 1
   },
   "numerical_policy": {

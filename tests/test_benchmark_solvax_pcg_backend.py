@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from importlib.metadata import version
+
 from scripts.benchmark_solvax_pcg_backend import run_backend_comparison
 
 
 def test_solvax_pcg_backend_benchmark_records_equivalence_and_resources():
     result = run_backend_comparison(grid=6, repeats=2, max_steps=32)
-    assert result["implementation"]["solvax_version"] == "0.7.0"
+    assert result["implementation"]["solvax_version"] == version("solvax")
     assert result["acceptance"]["forward_equivalent"] is True
     assert result["acceptance"]["gradient_verified"] is True
     assert result["acceptance"]["transpose_gradient_verified"] is True

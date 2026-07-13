@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 7369218,
-    "checkout_bytes_excluding_release_candidates": 7369218,
+    "checkout_bytes_excluding_build_artifacts": 7370853,
+    "checkout_bytes_excluding_release_candidates": 7370853,
     "completed_workflow_disposition_count": 85,
     "curated_example_count": 11,
     "curated_examples": [
@@ -175,7 +175,7 @@
         "matplotlib",
         "numpy",
         "scipy",
-        "solvax==0.7.0",
+        "solvax>=0.8,<1",
         "tomli; python_version < '3.11'"
       ]
     },
