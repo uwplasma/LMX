@@ -799,15 +799,18 @@ wall time is acceptable.
    pressure tail. Reusing the in-loop conservative diagnostics also closes
    repeated sharded solves in one process and removes a duplicate evaluation.
    The initial matched warm times were `37.78 s` on one A4000 and `109.23 s`
-   on two (speedup `0.346`, efficiency `0.173`). Commit `9e0d1dc` then batches
-   the 14 outer-step diagnostics into one host transfer. Exact-parity warm rows
-   improve to `36.68 s` and `50.18 s`; cold rows are `58.99 s` and `71.32 s`,
-   speedup is `0.731`, and efficiency is `0.366`. Main signatures remain within
-   `2.2e-15` and all gates pass. Preserve the refreshed compact result in
-   `benchmarks/results/gpu-strong-scaling-20260712.json`. M5 remains active
-   because two GPUs are still slower than one; next reduce the roughly 573/719
-   one/two-GPU electric PCG iterations and device-side global reductions with
-   a viable preconditioner rather than further host-scalar tuning.
+   on two (speedup `0.346`, efficiency `0.173`). Commit `9e0d1dc` batches 14
+   outer-step diagnostics into one host transfer, reducing the two-GPU row to
+   `50.18 s`. Commit `036d26b` then removes axial line relaxation from sharded
+   projection/electric preconditioners while retaining the dominant transverse
+   y/z blocks and single-reduction PCG. Final source-matched three-repeat warm
+   rows are `36.96 s` and `22.23 s`; speedup is `1.662`, two-device efficiency
+   is `0.831`, and the two warm sharded repeats agree within 0.12%. Cold rows
+   are `66.71 s` and `65.75 s`; main signatures agree within `1.8e-16`, and all
+   gates pass. Preserve the new compact result in
+   `benchmarks/results/gpu-strong-scaling-20260713.json`. M5 remains active only
+   because its exit contract requires a measured four-device row, which the
+   current two-GPU host cannot supply.
    A direct production-path Mac check confirms that normal one-device JAX is
    already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
    `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
@@ -904,6 +907,14 @@ wall time is acceptable.
    on one GPU and `50.26 s` versus `50.18 s` on two. The full-size Mac cold
    restart passes in `48.03 s`. Do not pursue further standalone diagnostic
    fusion; return the active experiment to solver-side work.
+   The accepted solver-side experiment keeps line relaxation transverse to the
+   sharded axis. The previous cross-section-only ablation predated corrected
+   decomposition-safe current diagnostics; at the accepted fingerprint it now
+   passes exact physics and improves two-GPU warm time from `50.18 s` to
+   `22.23 s`. It adds three net package lines. The full portable gate passes
+   899 tests with 8 expected skips and 95.06% branch coverage in `512.04 s`,
+   below the 600-second hard limit. The one-to-two-GPU efficiency target is
+   closed at 83.1%; acquire a four-GPU row before closing M5.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at

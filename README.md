@@ -166,10 +166,10 @@ runtime, use the real solver rather than a presentation-only kernel, include
 one-device baselines, report problem size and memory, and validate identical
 physics on every device count. Scaling claims require actual shard-placement
 and solution-equivalence checks, not merely multiple visible devices.
-The current exact-parity `102 x 77 x 77` A4000 checkpoint is `36.68 s` warm on
-one GPU and `50.18 s` on two (speedup `0.731`, efficiency `0.366`); this is a
-substantial sharded-path improvement, but correctly remains below the release
-strong-scaling gate.
+The current exact-parity `102 x 77 x 77` A4000 checkpoint is `36.96 s` warm on
+one GPU and `22.23 s` on two (speedup `1.66`, efficiency `0.831`). This passes
+the two-device target; the release-level four-device gate remains open because
+the current host has only two GPUs.
 For heavy independent validation variants, use the campaign runner's
 `--gpu-devices 0,1` mode: it assigns one process per GPU, disables default JAX
 memory preallocation, shares a persistent compilation cache, and preserves
@@ -199,7 +199,7 @@ convergence, analytical profiles, and independent reference data. Heavy
 FreeMHD and scaling campaigns remain explicit workflows because they require
 external software or hardware.
 The latest complete local gate passes 899 tests with 8 expected external-data
-skips and 95.06% branch coverage in 504.16 seconds.
+skips and 95.06% branch coverage in 512.04 seconds.
 
 ## Repository policy
 

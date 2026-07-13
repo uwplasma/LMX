@@ -141,17 +141,18 @@ repeated sharded solves safe in one process and removes a duplicate final
 evaluation.
 
 Correctness does not imply strong scaling. The initial paired RTX A4000 row was
-`37.78 s` warm on one GPU and `109.23 s` on two. Commit `9e0d1dc` batches the
-14 outer-step scalar diagnostics into one host transfer without changing any
-field update or PCG stopping rule. The refreshed exact-parity row is `36.68 s`
-on one GPU and `50.18 s` on two: the sharded path is 54% faster than its prior
-row, with speedup `0.731` and parallel efficiency `0.366`. Cold time also drops
-from about `129 s` to `71.32 s`. The main L2 signatures still agree within
-`2.2e-15`, and every physics gate passes. Small persistent service allocations
-make these timings non-publication-grade, and two GPUs remain slower than one,
-so no strong-scaling claim is promoted. The compact record is
-`benchmarks/results/gpu-strong-scaling-20260712.json`; M5 now targets the
-remaining device-side PCG/reduction cost rather than host scalar orchestration.
+`37.78 s` warm on one GPU and `109.23 s` on two. Commit `9e0d1dc` first batches
+14 outer-step scalars into one host transfer, reducing two-GPU time to
+`50.18 s`. Commit `036d26b` then keeps the line preconditioner transverse to
+the sharded axis: the axial block crossed devices and diluted the dominant
+wall-normal y/z blocks. The final source-matched three-repeat row is `36.96 s`
+on one GPU and `22.23 s` on two, for speedup `1.662` and two-device efficiency
+`0.831`. Both warm two-GPU repeats agree within 0.12%. Cold times are `66.71 s`
+and `65.75 s`; main L2 signatures agree within `1.8e-16`, and every steady,
+mass, current, boundary, and electric gate passes. This meets the two-device
+efficiency target but not the M5 exit requirement, because a four-device host
+has not yet been measured. The compact source-bound record is
+`benchmarks/results/gpu-strong-scaling-20260713.json`.
 
 Solver-faithful workers accept `--restart` and record its SHA-256. Restart and
 cold-start rows are separate scaling groups. Production scaling should use a
@@ -287,6 +288,14 @@ accepted `36.68 s`, and two GPUs are `50.26 s` versus `50.18 s`. The full-size
 Mac cold restart passes in `48.03 s`. This prototype is rejected and removed;
 the eager `pjit` events visible under tracing are not a profitable standalone
 fusion target after the accepted one-transfer stack.
+
+The accepted solver-side change removes axial line relaxation from sharded
+projection/electric preconditioners while retaining transverse y/z line solves
+and SOLVAX single-reduction PCG. This revisits an earlier ablation only after
+the decomposition-safe current diagnostics closed its false failure. It adds
+three net package lines, preserves exact one/two-GPU physics, and changes the
+two-GPU warm row from `50.18 s` to `22.23 s`. The complete portable gate passes
+899 tests with 8 expected skips and 95.06% branch coverage in `512.04 s`.
 
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
