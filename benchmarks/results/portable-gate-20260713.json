@@ -1,0 +1,54 @@
+{
+  "date": "2026-07-13",
+  "commit": "b42403f8b87c04fd27cb9ac7d83df142d35d6970",
+  "lock_sha256": "1dffb65406e764958df2438d978d72de7471894036739920bd223de2b5c45d59",
+  "hardware": {
+    "model": "Mac mini (Mac16,10)",
+    "chip": "Apple M4",
+    "cores": 10,
+    "memory_gib": 24,
+    "platform": "Darwin arm64"
+  },
+  "gate": {
+    "workers": 4,
+    "budget_seconds": 600,
+    "engineering_target_seconds": 360,
+    "minimum_branch_coverage_percent": 95.0
+  },
+  "records": [
+    {
+      "python": "3.10.20",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "passed": 899,
+      "skipped": 8,
+      "pytest_seconds": 140.82,
+      "gate_seconds": 142.8,
+      "branch_coverage_percent": 95.07,
+      "passed_gate": true
+    },
+    {
+      "python": "3.13.7",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "passed": 899,
+      "skipped": 8,
+      "pytest_seconds": 193.58,
+      "gate_seconds": 196.3,
+      "branch_coverage_percent": 95.06,
+      "passed_gate": true
+    }
+  ],
+  "comparison": {
+    "slowest_gate_seconds": 196.3,
+    "slowest_budget_fraction": 0.32716666666666666,
+    "slowest_engineering_target_fraction": 0.5452777777777778,
+    "all_supported_endpoints_pass": true
+  },
+  "hosted_ci": {
+    "status": "administratively_not_started",
+    "reason": "GitHub Actions reported an account billing or spending-limit failure before runner assignment; every affected job had zero executed steps.",
+    "code_failure_observed": false,
+    "rerun_required_after_billing_resolution": true
+  }
+}

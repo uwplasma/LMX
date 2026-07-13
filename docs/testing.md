@@ -44,6 +44,15 @@ multi-accelerator hardware cannot be made portable unit-test dependencies;
 their parsers, schemas, failure modes, and dispatch are covered here, while
 fresh solver/data/hardware comparisons remain explicit external campaigns.
 
+At commit `b42403f`, both configured endpoints pass the complete gate on the
+same Apple M4 host. Python 3.10.20/JAX 0.6.2 finishes 899 passing tests and 8
+expected skips with 95.07% branch coverage in 142.8 seconds. Python
+3.13.7/JAX 0.10.2 finishes the same collection with 95.06% coverage in 196.3
+seconds. The compact environment and timing record is
+`benchmarks/results/portable-gate-20260713.json`. GitHub-hosted jobs for this
+checkpoint were not assigned runners because of an account billing or
+spending-limit error; rerun them after resolving that administrative condition.
+
 ## Reproducible environment and provenance
 
 The committed `uv.lock` resolves runtime, development, documentation, and

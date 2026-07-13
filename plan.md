@@ -99,14 +99,17 @@ uv run --locked --extra dev python scripts/run_full_test_suite.py
 CI may invoke the runner directly only after the shared setup action has
 synchronized this same locked `dev` extra.
 
-The latest accepted complete audited run collected 881 tests: 873 passed and 8
-optional external reference tests skipped. Branch coverage was 95.17%; total
-gate runtime was 131.1 seconds on Python 3.10. Strict documentation, deterministic
-provenance, and the compact Benchmark A replay also pass. This is 22% of the
-hard ten-minute budget and 36% of the 360-second engineering target. The
-retained Python 3.13 endpoint baseline remains 189 seconds and must be refreshed
-in CI at the release-candidate fingerprint. No focused run, historical green
-run, or partially regenerated provenance may be reported as the current gate.
+The source-matched endpoint gate at commit `b42403f` collects 907 tests: 899
+pass and 8 optional external-reference tests skip. Python 3.10.20 with JAX
+0.6.2 reaches 95.07% branch coverage in 142.8 seconds; Python 3.13.7 with JAX
+0.10.2 reaches 95.06% in 196.3 seconds. The slower endpoint consumes 33% of
+the hard ten-minute budget and 55% of the 360-second engineering target. The
+compact record is `benchmarks/results/portable-gate-20260713.json`. Hosted
+Actions did not assign runners because of an account billing/spending-limit
+failure, so they must be rerun after that administrative issue is resolved;
+this is not a code-gate failure. Strict documentation and deterministic
+provenance also pass. No focused run, historical green run, or partially
+regenerated provenance may be reported as the current gate.
 
 The runner collects every portable test, uses at most four workers, constrains
 BLAS threads, disables JAX preallocation, fails below 95% branch coverage, warns
