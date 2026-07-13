@@ -1008,6 +1008,18 @@ wall time is acceptable.
    `benchmarks/results/b1-coarse-runtime-cap-20260713.json`; independent-variant
    concurrency is throughput, not strong scaling of one solve. Rerun one coarse
    B1 variant with checkpoints before scheduling the two-variant wave.
+   That bounded rerun now completes an uncontended first outer iteration in
+   `93.01 s`, writes a checksummed 20 MiB state, and resumes it into a new
+   checksummed state in `91.39 s`. At the unchanged 128-step allowance this is
+   about `11,698 s`, so runtime—not observability—is the remaining gate. The
+   resumed electric solve consumes 4,570 PCG iterations. SOLVAX single-reduction
+   PCG is rejected (`62.46 s` versus `55.46 s`, worse divergence), and an exact
+   batched FFT theta-line preconditioner is rejected despite reducing the first
+   electric solve from 609 to 341 iterations: its two wall times are
+   `52.29/53.49 s` versus `49.54/49.82 s`. Evidence is in
+   `benchmarks/results/b1-pipe-pcg-screening-20260713.json`. The next experiment
+   must reduce electric solve cost or count without adding a periodic solve to
+   every PCG application.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

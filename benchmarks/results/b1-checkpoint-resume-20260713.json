@@ -26,8 +26,24 @@
       "reduced ALEX B2 layered-duct production solve"
     ]
   },
+  "accelerator_smoke": {
+    "hardware": "NVIDIA RTX A4000",
+    "environment": "Python 3.10.12, JAX 0.6.2, SOLVAX 0.7.0",
+    "mesh": [101, 64, 128],
+    "first_outer_iteration_seconds": 93.01,
+    "first_checkpoint_size_mib_rounded": 20,
+    "first_checkpoint_sha256": "a88c615dcd04db9d24ce8edda12a25acf03d0f2af4c6a40246be701cff8396a1",
+    "resumed_outer_iteration_seconds": 91.39,
+    "resumed_checkpoint_bytes": 25990245,
+    "resumed_checkpoint_sha256": "2c9858309a1d64fd04cdca530d6f3062c4e073ad6fe9f6751b91d8efdb44a322",
+    "resume_checksum_verified": true,
+    "electric_iterations_after_resume": 4570,
+    "estimated_128_step_seconds_at_observed_rate": 11698,
+    "runtime_gate_seconds": 3600,
+    "runtime_gate_passed": false
+  },
   "accepted": true,
-  "claim": "Periodic progress, atomic partial restart, and provenance-checked resume infrastructure only.",
+  "claim": "Periodic progress, atomic partial restart, and provenance-checked resume infrastructure, including one interrupted accelerator continuation.",
   "excluded_claims": [
     "B1 coarse runtime below 3600 seconds",
     "B1 coarse physics acceptance",

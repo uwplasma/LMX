@@ -1,0 +1,43 @@
+{
+  "date": "2026-07-13",
+  "baseline_source_fingerprint": "ad197463d8c586400278bb25e197294d4c1e55bc434cbfbb88ef0ecea291602e",
+  "hardware": "2 x NVIDIA RTX A4000",
+  "problem": {
+    "case": "ALEX B1 reduced full-physics production path",
+    "shape": [32, 16, 32],
+    "outer_updates": 10,
+    "method": "Concurrent isolated one-GPU workers"
+  },
+  "experiments": [
+    {
+      "name": "SOLVAX single-reduction PCG",
+      "candidate_source_fingerprint": "9110f0eff42c5de8c9d811fb32d33a369e2db6a88a1747a69bbd0a5ce563691b",
+      "baseline_seconds": 55.4642,
+      "candidate_seconds": 62.4628,
+      "speedup": 0.88796,
+      "baseline_first_electric_iterations": 609,
+      "candidate_first_electric_iterations": 846,
+      "baseline_max_divergence_residual": 9.9174e-05,
+      "candidate_max_divergence_residual": 3.3963e-04,
+      "field_signature_relative_difference_max": 3.93e-09,
+      "accepted": false,
+      "reason": "More Krylov work, slower wall time, and worse divergence."
+    },
+    {
+      "name": "Batched FFT circulant theta-line preconditioner",
+      "candidate_source_fingerprint": "4c23447e60a1790bfd97ad416a45c1085e0e6dd91f8d9853dd89fc7646903ae4",
+      "baseline_seconds": [49.5394, 49.8157],
+      "candidate_seconds": [52.2891, 53.4914],
+      "median_speedup": 0.93926,
+      "baseline_first_electric_iterations": 609,
+      "candidate_first_electric_iterations": 341,
+      "baseline_max_divergence_residual": 9.9174e-05,
+      "candidate_max_divergence_residual": 1.0034e-04,
+      "field_signature_relative_difference_max": 9.69e-10,
+      "accepted": false,
+      "reason": "Exact physics and fewer iterations did not offset per-iteration FFT cost."
+    }
+  ],
+  "accepted": false,
+  "next_constraint": "Reduce the cost or count of the capped electric solve without adding a periodic preconditioner application to every PCG step."
+}

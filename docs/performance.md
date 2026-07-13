@@ -356,6 +356,16 @@ hour before the independent or dependent waves resume. Evidence is in
 `benchmarks/results/b1-coarse-runtime-cap-20260713.json` and
 `benchmarks/results/b1-checkpoint-resume-20260713.json`.
 
+The first uncontended coarse checkpoint quantifies the remaining gap: one outer
+iteration takes `93.01 s`, and checksum-verified continuation takes `91.39 s`.
+The resumed electric stage uses 4,570 PCG iterations, making 128 unchanged
+updates roughly a 3.25-hour run. Two periodic-synchronization alternatives are
+rejected. SOLVAX single-reduction PCG is slower and worsens divergence; an exact
+batched FFT theta-line preconditioner reduces the first electric iteration
+count from 609 to 341 but is still 6--7% slower in two paired A4000 repeats.
+Compact timings and field signatures are in
+`benchmarks/results/b1-pipe-pcg-screening-20260713.json`.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep
