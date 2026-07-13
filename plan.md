@@ -1065,7 +1065,12 @@ wall time is acceptable.
    the accepted reduced B1 path is unchanged, and the source-matched portable
    gate passes 903 tests with 8 expected skips and 95.08% branch coverage in
    `125.2 s`. Build the divergence/flow-constrained Stokes Schur response on
-   this operator next; do not reintroduce a parallel solver stack.
+   this operator next; do not reintroduce a parallel solver stack. A paired
+   `32 x 16 x 32` A4000 screen also rejects retaining projected face fluxes as
+   the iteration state: it improves terminal divergence from `9.62e-4` to
+   `3.97e-4`, but leaves the controlling residual unchanged at `2.03e-3`, is
+   6.1% slower, and adds 122 net source/test lines. Preserve the projection
+   idempotence diagnosis as evidence, not production complexity.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

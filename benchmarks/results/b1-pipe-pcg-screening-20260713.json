@@ -235,6 +235,23 @@
       "accepted": false,
       "reason": "The affine primitive crosses the steady gate on a tiny mesh, but the exact reduced production geometry stagnates 6.3 times above it; a local rate preconditioner makes the operator worse."
     },
+    "retained_face_flux_state": {
+      "shape": [32, 16, 32],
+      "steps": 16,
+      "hardware": "Paired isolated NVIDIA RTX A4000 workers",
+      "baseline_seconds": 83.3798,
+      "candidate_seconds": 88.4825,
+      "speedup": 0.9423,
+      "baseline_terminal_residual": 0.0020308382,
+      "candidate_terminal_residual": 0.0020308907,
+      "baseline_terminal_divergence_residual": 0.00096218284,
+      "candidate_terminal_divergence_residual": 0.00039672123,
+      "baseline_terminal_charge_balance_residual": 1.1817904e-05,
+      "candidate_terminal_charge_balance_residual": 1.169498e-05,
+      "candidate_source_fingerprint": "38c26515039545a42d428cdd3438b4cec8ca944b40dc7b59d7b44f174ab4d7ee",
+      "accepted": false,
+      "reason": "Retaining compatible projected faces removes a representation-only reprojection mode and improves terminal divergence, but leaves the controlling axial-velocity residual unchanged, costs 6.1% more time, and adds 122 net source/test lines."
+    },
     "accepted": false,
     "next_candidate": "Remove the explicit electromagnetic timestep from the conditioning with a steady coupled Stokes-electric block solve and a physics-preserving Schur preconditioner."
   },
