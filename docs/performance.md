@@ -110,6 +110,38 @@ real two-GPU B2 probe becomes unstable and reaches a charge residual near
 designed together with the explicit distributed operator and pass the same
 conservative production gate.
 
+The subsequent isolation audit found that the axial neighbor exchange and
+variable-coefficient finite-volume operator are bitwise identical on one and
+two GPUs. Manufactured cold and warm pressure solves agree to `7.4e-15`, and
+the exact B2 conductivity-jump electric solve agrees to `1.3e-11` cold and
+`4.1e-12` warm relative. The earlier boundary-current failure was diagnostic,
+not physical: it mixed global inlet/outlet fluxes into every axial station and
+sliced the remote endpoint shard. LMX now evaluates each slab through the exact
+finite-volume divergence theorem. On a near-converged `102 x 77 x 77` restart,
+one/two-GPU potential and current signatures agree to about `4.2e-9` and
+`6.2e-7` relative; charge residuals are `2.56e-5` and `2.79e-5`, and boundary
+residuals are below `2e-14`. Velocity L2 differs by `3.2e-6` relative on the
+two-step probe. A six-step two-GPU continuation passes the complete steady
+conjunction with update residual `3.28e-5`, charge `2.50e-5`, boundary flux
+`1.76e-14`, and gauge-invariant potential updates near `1e-6`. Matched
+records store an explicit signature limit of `2.5e-5`, half the frozen
+nonlinear tolerance, and are grouped by the actual executed update count. This
+establishes the production scaling workload; a common converged initializer
+and uncontended paired timing are still required before any speedup claim.
+
+The final source-bound retry (`5e2baaeb...`) remains fail-closed. From the same
+restart (`75097639...`), one GPU satisfies the sustained gate after four
+updates, while two GPUs does not satisfy it within the six-update ceiling even
+though charge and boundary flux remain acceptable. Because the records have
+different or invalid executed work, the summary cannot group them and no timing
+is admissible. The next implementation target is sharded nonlinear/Krylov
+sensitivity, not a looser gate or a larger timing campaign.
+
+Solver-faithful workers accept `--restart` and record its SHA-256. Restart and
+cold-start rows are separate scaling groups. Production scaling should use a
+verified, evenly shardable steady restart; cold-start transients remain useful
+for debugging but are not release performance evidence.
+
 On the Mac CPU backend, two forced virtual devices are also slower than JAX's
 normal single CPU device (`5.03 s` versus `3.19 s` warm on the small probe).
 Normal CPU execution already uses threaded kernels: a production-path check on
@@ -205,6 +237,22 @@ python examples/strong_scaling_demo.py \
   --profile \
   --output artifacts/examples/extruded_solve_scaling
 ```
+
+For release scaling, initialize each worker from the same verified,
+evenly-shardable restart and preserve its checksum in the JSON record:
+
+```bash
+python scripts/run_strong_scaling_worker.py \
+  --benchmark-kind extruded_solve \
+  --nx 102 --ny 65 --nz 65 --iterations 6 --repeats 2 \
+  --num-devices 1 --platform GPU \
+  --restart /path/to/b2_102_steady.npz \
+  --output artifacts/scaling/gpu_1.json
+```
+
+Run the matching two-device worker with only `--num-devices` and the output
+path changed. The worker rejects a restart whose case or mesh metadata do not
+match the requested problem.
 
 Local CPU plus a remote GPU host reachable over SSH:
 

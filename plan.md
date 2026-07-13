@@ -685,8 +685,8 @@ wall time is acceptable.
    degenerate-axis, half-cell Dirichlet wall, nonuniform Poisson dispatch and
    warm-start gauge, and invalid fluid-mask topology tests cover the new
    contracts. Formatting, lint, strict docs, deterministic provenance, and the
-   complete locked portable battery pass. The current tree passes 896 tests
-   with 8 optional-data skips, 95.08% branch coverage, and a 148.5-second local
+   complete locked portable battery pass. The current tree passes 899 tests
+   with 8 optional-data skips, 95.09% branch coverage, and a 180.6-second local
    runtime, safely inside the 600-second CI ceiling. The compact Benchmark A acceptance
    file remains byte-identical at SHA-256
    `a8ab639141722cf2730dcc5aa1c4954610c82b5c18eec93256e32ac576dc0bb9`.
@@ -715,11 +715,12 @@ wall time is acceptable.
     histories so every failed gate identifies its responsible operator. The
     canonical mixed-dimensional shell, strict per-variant steady gate, and
     bounded SOLVAX Aitken continuation close the exact coarse B2 campaign. At
-    source fingerprint `54df1de8...`, all four checkpointed variants pass
+    source fingerprint `7de3d682...`, all four checkpointed variants pass
     steady, mass, current, and boundary-current gates. The half-tolerance
     observable shift is `0.08381` of experimental uncertainty, the
     doubled-iteration shift is zero, and the thin-wall relative difference is
-    `5.39e-13`. This is the replay after scaling-validation hardening, so coarse
+    `1.03e-12`. This is the replay after decomposition-safe diagnostics and
+    scaling-validation hardening, so coarse
     B2 is accepted at the current numerical fingerprint. Next close coarse B1.
     Do not start medium/fine production runs
     until both coarse cases pass, and do not launch another hour-scale variant
@@ -773,6 +774,27 @@ wall time is acceptable.
    single-device manufactured reconstruction, the real two-GPU B2 probe becomes
    unstable with charge residual near `1e9`. Keep the rank-one gauge until a
    decomposition-aware nullspace treatment passes the production gate.
+   A granular follow-up clears the distributed stencil and linear solver: axial
+   neighbor exchange is bitwise identical, manufactured cold/warm solves agree
+   to `7.4e-15`, and the B2 conductivity-jump solve agrees within `1.3e-11`
+   cold and `4.1e-12` warm relative. The remaining boundary-current failure was
+   a diagnostic bug that mixed global end fluxes into each station; the
+   finite-volume divergence integral now gives a decomposition-safe slab
+   balance. A near-converged `102 x 77 x 77` restart gives one/two-GPU
+   potential/current agreement of about `4.2e-9`/`6.2e-7`, charge below
+   `2.8e-5`, and boundary flux below `2e-14`; velocity differs by `3.2e-6` on
+   the two-step probe. A six-step two-GPU continuation closes the steady gate
+   at `3.28e-5`, with `2.50e-5` charge, `1.76e-14` boundary flux, and
+   gauge-invariant potential update near `1e-6`. Records store an explicit
+   `2.5e-5` signature limit tied to half the frozen nonlinear tolerance and are
+   grouped by actual executed update count. The rejected forced-continuation
+   branch proves that convergence may not silently change the nonlinear map.
+   Scaling workers now accept checksummed steady restarts and keep them in a
+   separate comparison group from cold starts. The final source-bound retry
+   (`5e2baaeb...`) stops after four passing one-GPU updates but fails the
+   two-GPU sustained gate inside six updates from the same restart
+   (`75097639...`). Keep M5 active and reduce sharded nonlinear/Krylov
+   sensitivity; do not weaken the gate or publish the current timings.
    A direct production-path Mac check confirms that normal one-device JAX is
    already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
    `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
