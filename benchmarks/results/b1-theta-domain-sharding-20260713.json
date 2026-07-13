@@ -1,0 +1,56 @@
+{
+  "date": "2026-07-13",
+  "branch": "agent/b1-multigpu",
+  "accepted_base": "e11dee8",
+  "hardware": "two NVIDIA RTX A4000 GPUs without NVLink",
+  "method": "Partition the cylindrical momentum inverse along periodic theta; retain complete axial and radial preconditioner lines on each GPU.",
+  "placement_contract": {
+    "unsafe": "Implicitly resharding arrays resident on GPU 0 produced a 9.61% relative error and was rejected.",
+    "accepted_for_screening": "Create global sharded arrays once from host data, keep all PCG iterations sharded, and compare gathered results on host.",
+    "virtual_two_cpu": {
+      "shape": [7, 9, 16],
+      "maximum_absolute_error": 4.163336342344337e-17,
+      "relative_error": 1.4128712198958434e-16,
+      "output_shards": 2
+    }
+  },
+  "gpu_warm_seconds": [
+    {
+      "shape": [7, 9, 16],
+      "one_gpu": 0.013467239972669631,
+      "two_gpu": 0.04030405497178435
+    },
+    {
+      "shape": [21, 24, 64],
+      "one_gpu": 0.20265290996758267,
+      "two_gpu": 0.3383322519948706
+    },
+    {
+      "shape": [51, 40, 96],
+      "one_gpu": 1.5079857599921525,
+      "two_gpu": 1.880131866026204
+    },
+    {
+      "shape": [101, 64, 128],
+      "one_gpu": 4.52795125299599,
+      "two_gpu": 6.373655533010606
+    }
+  ],
+  "coarse_single_reduction_screen": {
+    "shape": [101, 64, 128],
+    "one_gpu_cold_seconds": 15.652140466030687,
+    "two_gpu_cold_seconds": 7.581226249982137,
+    "one_gpu_warm_seconds": 4.527810311992653,
+    "two_gpu_warm_seconds": 5.754191840998828,
+    "maximum_absolute_error": 1.739060284666749e-16,
+    "relative_error": 1.6383232301138527e-15,
+    "output_shards": 2
+  },
+  "decision": {
+    "result": "rejected and fully removed",
+    "reason": "The corrected decomposition is exact and improves the cold coarse row, but warm two-GPU execution is 27.1% slower even with single-reduction PCG. Strong scaling is the acceptance metric.",
+    "retained_source": "none",
+    "supported_two_gpu_strategy": "Run independent B1 variants concurrently, one per GPU."
+  },
+  "next_gate": "Do not attempt another placement-only B1 split. Reduce the coarse residual/iteration floor or implement a literature-anchored communication-avoiding solver with a bounded exact scaling gate."
+}

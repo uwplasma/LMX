@@ -1345,6 +1345,19 @@ wall time is acceptable.
    The LMX wiring is fully removed. Stop component decomposition; the next GPU
    implementation must be a balanced spatial/domain split with setup outside
    the runtime mesh, exact physics parity, and first-solve time below `69.52 s`.
+   The balanced theta-domain screen is also complete and rejected. Explicit
+   host-to-global placement fixes the earlier CUDA corruption and is exact on
+   two virtual CPU devices and two A4000s. A four-size ladder remains slower on
+   two GPUs when warm; at the frozen `101 x 64 x 128` coarse shape, standard
+   PCG is `4.53 s` on one GPU versus `6.37 s` on two. SOLVAX single-reduction
+   PCG improves the two-GPU row to `5.75 s`, but it is still 27.1% slower than
+   one GPU (relative error `1.64e-15`). The prototype and optional plumbing are
+   fully removed. Evidence is in
+   `benchmarks/results/b1-theta-domain-sharding-20260713.json`. Placement-only
+   B1 splitting is closed on this hardware: schedule independent variants one
+   per GPU and direct solver work toward the coarse residual/iteration floor or
+   a literature-anchored communication-avoiding method with an exact bounded
+   scaling gate.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

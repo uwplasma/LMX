@@ -312,6 +312,15 @@ Until a partition-preserving cyclic SPD line solve has a reusable, efficient
 accelerator application, run independent B1 variants one per GPU with the
 campaign runner rather than claiming spatial scaling for the mapped-pipe path.
 
+A later corrected theta-domain screen explicitly constructs global sharded
+arrays from host data and keeps PCG state sharded throughout; it is exact to
+`1.64e-15` relative on two A4000s. Warm scaling is nevertheless negative across
+four sizes. At the frozen `101 x 64 x 128` coarse shape, one GPU takes `4.53 s`,
+two GPUs take `6.37 s`, and single-reduction PCG lowers the latter only to
+`5.75 s`. The faster two-GPU cold row does not satisfy the warm strong-scaling
+gate. This prototype is removed; compact evidence is in
+`benchmarks/results/b1-theta-domain-sharding-20260713.json`.
+
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
 published for review as [SOLVAX PR #12](https://github.com/uwplasma/SOLVAX/pull/12),
