@@ -104,7 +104,10 @@ def _checkout_size(root: Path) -> int:
             continue
         if relative.as_posix() in EXCLUDED_RELATIVE_FILES:
             continue
-        if any(part in EXCLUDED_PARTS for part in relative.parts):
+        if any(
+            part in EXCLUDED_PARTS or part.endswith(".egg-info")
+            for part in relative.parts
+        ):
             continue
         total += path.stat().st_size
     return total

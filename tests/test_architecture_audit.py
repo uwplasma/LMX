@@ -6,7 +6,7 @@ from pathlib import Path
 
 import lmx
 
-from scripts.audit_architecture import build_inventory, write_inventory
+from scripts.audit_architecture import _checkout_size, build_inventory, write_inventory
 
 
 def test_tracked_architecture_baseline_matches_repository() -> None:
@@ -34,6 +34,14 @@ def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) 
     write_inventory(first)
     write_inventory(second)
     assert first.read_bytes() == second.read_bytes()
+
+
+def test_architecture_inventory_ignores_generated_egg_info(tmp_path: Path) -> None:
+    (tmp_path / "source.py").write_bytes(b"x")
+    metadata = tmp_path / "package.egg-info"
+    metadata.mkdir()
+    (metadata / "PKG-INFO").write_bytes(b"generated")
+    assert _checkout_size(tmp_path) == 1
 
 
 def test_every_uncurated_workflow_has_one_reviewed_disposition() -> None:
