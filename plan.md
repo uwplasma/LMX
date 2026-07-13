@@ -1412,6 +1412,10 @@ wall time is acceptable.
    still reach 192 iterations and the complete worker misses 360 seconds.
    Retain this checkpoint on the experimental branch; next profile the
    non-projection tail and reduce the remaining large-grid iteration ceiling.
+   The source-matched portable gate passes 908 tests with 8 expected skips,
+   95.05% branch coverage, and 243.2-second wall time. This preserves the
+   ten-minute full-suite contract without adding a test file; the existing
+   modal test now exercises both probed and direct production factors.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

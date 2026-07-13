@@ -387,6 +387,9 @@ and passes the physical gate in `114.31 s`. The 360-second whole-worker cap is
 still missed after both projections, so the implementation remains on the
 experimental branch while non-projection runtime and the large iteration
 ceiling are addressed.
+The source-matched portable gate passes 908 tests with 8 expected external-data
+skips and 95.05% branch coverage in 243.2 seconds. The direct production path
+is exercised inside the existing fringing test file; no test file was added.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is

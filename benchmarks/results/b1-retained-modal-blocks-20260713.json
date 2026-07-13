@@ -2,6 +2,7 @@
   "schema_version": 1,
   "recorded_at": "2026-07-13",
   "source_parent": "d3d41a4",
+  "verified_code_commit": "8f94d27",
   "candidate": "axisymmetric retained m=0,2 modal block assembly",
   "environment": {
     "host": "office",
@@ -165,6 +166,15 @@
       "second_projection_converged": true,
       "worker_360_second_cap_completed": false
     }
+  },
+  "portable_gate": {
+    "solvax_version": "0.7.0",
+    "tests_passed": 908,
+    "expected_external_data_skips": 8,
+    "branch_coverage_percent": 95.05,
+    "seconds": 243.2,
+    "budget_seconds": 600,
+    "passed": true
   },
   "decision": {
     "setup_builder": "accepted with separated m=0 through m=4 factors for continued branch development",
