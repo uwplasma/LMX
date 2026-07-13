@@ -2837,6 +2837,177 @@ def _pipe_face_velocity_cells(
     )
 
 
+def _pipe_retained_modal_blocks(
+    mobility: jnp.ndarray,
+    pressure_mobility: jnp.ndarray,
+    cell_area: jnp.ndarray,
+    momentum_coefficients: tuple[jnp.ndarray, ...],
+    momentum_sink: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Assemble exact axisymmetric ``m=0,2`` modal Schur blocks."""
+
+    nx, nr, ntheta = mobility.shape
+    radial_widths = jnp.diff(r_faces)
+    mobility = mobility[:, :, 0]
+    pressure_mobility = pressure_mobility[:, :, 0]
+    cell_area = cell_area[:, :, 0]
+    coefficients = tuple(coefficient[:, :, 0] for coefficient in momentum_coefficients)
+    momentum_sink = momentum_sink[:, :, 0]
+    face_area = jnp.concatenate(
+        (cell_area[:1], 0.5 * (cell_area[:-1] + cell_area[1:]), cell_area[-1:])
+    )
+    radial_weights = cell_area[0]
+
+    def pressure_faces(pressure, coefficient, phase):
+        axial = jnp.zeros((nx + 1, nr), dtype=pressure.dtype)
+        axial = axial.at[1:-1].set(
+            -_harmonic_mean(coefficient[1:], coefficient[:-1])
+            * (pressure[1:] - pressure[:-1])
+            / max(dx, 1.0e-12)
+        )
+        radial = jnp.zeros((nx, nr + 1), dtype=pressure.dtype)
+        radial = radial.at[:, 1:-1].set(
+            -_harmonic_mean(coefficient[:, 1:], coefficient[:, :-1])
+            * (pressure[:, 1:] - pressure[:, :-1])
+            / jnp.diff(r_centers)[None, :]
+        )
+        azimuthal = (
+            -coefficient
+            * (phase - 1.0)
+            * pressure
+            / jnp.maximum(r_centers[None, :] * dtheta, 1.0e-20)
+        )
+        return axial, radial, azimuthal
+
+    def face_cells(axial, radial, azimuthal, phase):
+        return (
+            0.5 * (axial[:-1] + axial[1:]),
+            0.5 * (radial[:, :-1] + radial[:, 1:]),
+            0.5 * (1.0 + 1.0 / phase) * azimuthal,
+        )
+
+    def velocity_faces(axial, radial, azimuthal, phase):
+        axial_faces = jnp.zeros((nx + 1, nr), dtype=axial.dtype)
+        axial_faces = axial_faces.at[1:-1].set(0.5 * (axial[1:] + axial[:-1]))
+        axial_faces = axial_faces.at[0].set(axial[0]).at[-1].set(axial[-1])
+        radial_faces = jnp.zeros((nx, nr + 1), dtype=radial.dtype)
+        radial_faces = radial_faces.at[:, 1:-1].set(
+            0.5 * (radial[:, 1:] + radial[:, :-1])
+        )
+        return axial_faces, radial_faces, 0.5 * (1.0 + phase) * azimuthal
+
+    def momentum_inverse(rhs, phase):
+        coef_x_w, coef_x_e, coef_r_i, coef_r_o, coef_t_i, coef_t_o = coefficients
+        diagonal = (
+            coef_x_w
+            + coef_x_e
+            + coef_r_i
+            + coef_r_o
+            + coef_t_i * (1.0 - 1.0 / phase)
+            + coef_t_o * (1.0 - phase)
+            + momentum_sink
+        ).real
+        lower = -coef_r_i
+        upper = -coef_r_o
+        solve_args = tuple(jnp.swapaxes(array, 0, 1) for array in (lower, diagonal, upper, rhs))
+        solved = tridiagonal_solve(*solve_args[:3], solve_args[3].real) + 1j * (
+            tridiagonal_solve(*solve_args[:3], solve_args[3].imag)
+        )
+        return jnp.swapaxes(solved, 0, 1)
+
+    def divergence(axial, radial, azimuthal, phase):
+        return (
+            (axial[1:] - axial[:-1]) / max(dx, 1.0e-12)
+            + (
+                r_faces[None, 1:] * radial[:, 1:]
+                - r_faces[None, :-1] * radial[:, :-1]
+            )
+            / jnp.maximum(r_centers[None, :] * radial_widths[None, :], 1.0e-20)
+            + (1.0 - 1.0 / phase)
+            * azimuthal
+            / jnp.maximum(r_centers[None, :] * dtheta, 1.0e-20)
+        )
+
+    def modal_action(radial_pressure, source, phase, zero_mean):
+        if zero_mean:
+            final = -jnp.sum(radial_pressure * radial_weights[:-1]) / jnp.maximum(
+                radial_weights[-1], 1.0e-20
+            )
+            radial_pressure = jnp.concatenate((radial_pressure, final[None]))
+        pressure = jnp.zeros((nx, nr), dtype=jnp.result_type(mobility, 1j))
+        pressure = pressure.at[source].set(radial_pressure)
+        forcing_faces = pressure_faces(pressure, mobility, phase)
+        forcing = face_cells(*forcing_faces, phase)
+        response = tuple(momentum_inverse(force, phase) for force in forcing)
+
+        direct_faces = pressure_faces(pressure, pressure_mobility, phase)
+        reconstructed = velocity_faces(*face_cells(*direct_faces, phase), phase)
+        stabilization = tuple(
+            direct - recovered
+            for direct, recovered in zip(direct_faces, reconstructed)
+        )
+        axial = stabilization[0]
+        if zero_mean:
+            axial = axial - jnp.sum(axial * face_area, axis=1)[:, None] / jnp.maximum(
+                jnp.sum(face_area, axis=1)[:, None], 1.0e-30
+            )
+        axial = axial.at[0].set(0.0).at[-1].set(0.0)
+        response_faces = velocity_faces(*response, phase)
+        result = divergence(
+            response_faces[0] + axial,
+            response_faces[1] + stabilization[1],
+            response_faces[2] + stabilization[2],
+            phase,
+        )
+        if zero_mean:
+            result = result - jnp.sum(result * cell_area, axis=1)[:, None] / jnp.maximum(
+                jnp.sum(cell_area, axis=1)[:, None], 1.0e-20
+            )
+            return result[:, :-1]
+        return result
+
+    phase_two = jnp.exp(4j * jnp.pi / ntheta)
+    m0_jacobian = jax.jit(
+        jax.jacfwd(lambda pressure, source: modal_action(pressure, source, 1.0, True))
+    )
+    m2_jacobian = jax.jit(
+        jax.jacfwd(
+            lambda pressure, source: modal_action(pressure, source, phase_two, False)
+        )
+    )
+    local_size = 3 * nr - 1
+    empty = jnp.zeros((local_size, local_size), dtype=mobility.dtype)
+
+    def real_block(m0, m2):
+        modal = jnp.concatenate(
+            (
+                jnp.concatenate((m2.real, m2.imag), axis=1),
+                jnp.concatenate((-m2.imag, m2.real), axis=1),
+            ),
+            axis=0,
+        )
+        return empty.at[: nr - 1, : nr - 1].set(m0.real).at[nr - 1 :, nr - 1 :].set(modal)
+
+    diagonal = []
+    lower = [empty]
+    upper = []
+    for source in range(nx):
+        m0 = m0_jacobian(jnp.zeros((nr - 1,), dtype=mobility.dtype), source)
+        m2 = m2_jacobian(jnp.zeros((nr,), dtype=mobility.dtype), source)
+        diagonal.append(real_block(m0[source], m2[source]))
+        if source:
+            upper.append(real_block(m0[source - 1], m2[source - 1]))
+        if source < nx - 1:
+            lower.append(real_block(m0[source + 1], m2[source + 1]))
+    upper.append(empty)
+    return jnp.stack(lower), jnp.stack(diagonal), jnp.stack(upper)
+
+
 def _steady_stokes_projection_pipe(
     u: jnp.ndarray,
     v: jnp.ndarray,
@@ -2860,6 +3031,8 @@ def _steady_stokes_projection_pipe(
     apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray]
     | None = None,
     apply_modal_momentum_inverse: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
+    modal_momentum_coefficients: tuple[jnp.ndarray, ...] | None = None,
+    modal_momentum_sink: jnp.ndarray | None = None,
     modal_stabilization: bool = False,
     modal_factor_key: tuple[object, ...] | None = None,
     physical_tolerance: float | None = None,
@@ -3104,6 +3277,23 @@ def _steady_stokes_projection_pipe(
         stations = jnp.arange(u.shape[0])
 
         def build_modal_factors():
+            if (
+                modal_momentum_coefficients is not None
+                and modal_momentum_sink is not None
+            ):
+                blocks = _pipe_retained_modal_blocks(
+                    mobility,
+                    pressure_mobility,
+                    cell_area,
+                    modal_momentum_coefficients,
+                    modal_momentum_sink,
+                    dx=dx,
+                    r_faces=r_faces,
+                    r_centers=r_centers,
+                    dtheta=dtheta,
+                )
+                return block_thomas_factor(*blocks)
+
             def modal_action(source, basis):
                 return modal_restrict(
                     schur(
@@ -5858,6 +6048,9 @@ def _solve_extruded_projection(
                 else None
             )
             if use_compatible_steady_b1:
+                use_retained_modal_blocks = (
+                    os.environ.get("LMX_B1_RETAINED_MODAL_BLOCKS") == "1"
+                )
                 steady_coefficients = _pipe_variable_diffusion_coefficients_3d(
                     nu[:, :count, :],
                     dx=dx,
@@ -5886,6 +6079,7 @@ def _solve_extruded_projection(
                 )
                 modal_factor_key = (
                     "b1_modal_factors",
+                    "retained" if use_retained_modal_blocks else "probed",
                     jax.default_backend(),
                     u.dtype.str,
                     kernel_key,
@@ -5897,6 +6091,7 @@ def _solve_extruded_projection(
                     ),
                 )
             else:
+                use_retained_modal_blocks = False
                 pressure_preconditioner_mobility = None
                 modal_factor_key = None
 
@@ -6104,6 +6299,14 @@ def _solve_extruded_projection(
                             pressure_preconditioner_mobility
                         ),
                         apply_modal_momentum_inverse=modal_momentum_solve,
+                        modal_momentum_coefficients=(
+                            steady_coefficients if use_retained_modal_blocks else None
+                        ),
+                        modal_momentum_sink=(
+                            wall_sink + steady_reaction
+                            if use_retained_modal_blocks
+                            else None
+                        ),
                         modal_stabilization=True,
                         modal_factor_key=modal_factor_key,
                         physical_tolerance=ALEX_BALANCE_TOLERANCE,

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-07-13",
+  "source_parent": "d3d41a4",
+  "candidate": "axisymmetric retained m=0,2 modal block assembly",
+  "environment": {
+    "host": "office",
+    "devices": "2 x NVIDIA RTX A4000",
+    "jax": "0.10.2",
+    "precision": "float64"
+  },
+  "method": {
+    "full_theta_arrays_in_setup": false,
+    "modal_jacobians_per_station": 2,
+    "runtime_schur_remains_exact": true,
+    "small_factor_solve_parity_relative_tolerance": 1e-10
+  },
+  "matched_11x17x32": {
+    "retained": {
+      "first_seconds": 65.6403036689735,
+      "restart_seconds": 24.12366856803419,
+      "projection_iterations": [83, 89, 106, 108],
+      "restart_charge_residual": 2.023284817465054e-9,
+      "restart_divergence_residual": 9.014322480721731e-5
+    },
+    "probed": {
+      "first_seconds": 115.86721010395559,
+      "restart_seconds": 29.52051984600257,
+      "projection_iterations": [78, 98, 111, 122],
+      "restart_charge_residual": 2.3490507317092124e-9,
+      "restart_divergence_residual": 1.2134964953896656e-5
+    },
+    "retained_first_speedup": 1.765098
+  },
+  "grid_7x9x16": {
+    "first_seconds": 47.79898088198388,
+    "restart_seconds": 6.448477334983181,
+    "restart_charge_residual": 3.4710900820300594e-9,
+    "restart_divergence_residual": 2.1016492485438285e-5,
+    "passed": true
+  },
+  "grid_21x24x64": {
+    "first_projection_seconds": 138.72121041401988,
+    "first_projection_iterations": 192,
+    "first_projection_residual": 4.463320726797999e-6,
+    "first_projection_converged": true,
+    "two_step_240_second_cap_passed": false
+  },
+  "decision": {
+    "setup_builder": "accepted for continued branch development",
+    "production_default": false,
+    "full_coarse_gate": "deferred until axial coarse correction arrests Krylov growth"
+  }
+}

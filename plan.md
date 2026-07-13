@@ -1378,6 +1378,15 @@ wall time is acceptable.
    `11 x 17 x 32` worker core-dumps during setup. The next coarse-grid design
    must assemble the retained `m=0,2` blocks directly or fuse a bounded batch;
    it must not invoke a full transform/solve for every modal basis vector.
+   That retained-mode builder now passes factor-solve parity at `1e-10` and a
+   matched A4000 gate. At `11 x 17 x 32`, it improves cold/restart time from
+   `115.87/29.52 s` to `65.64/24.12 s`, with charge `2.02e-9` and divergence
+   `9.01e-5`. The next `21 x 24 x 64` level exposes the remaining limit: its
+   first projection converges in `138.72 s` but needs 192 GMRES iterations, and
+   two steps exceed the 240-second cap. Keep the retained builder on the
+   experimental branch; before the full coarse allocation, strengthen axial
+   coarse coupling so iterations do not grow with station count. Evidence is
+   in `benchmarks/results/b1-retained-modal-blocks-20260713.json`.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

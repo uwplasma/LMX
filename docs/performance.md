@@ -345,6 +345,17 @@ worker core-dumps during modal setup. A scalable replacement must assemble the
 retained Fourier blocks directly or fuse their batched solve; invoking a full
 transform and tridiagonal solve for every modal basis vector is not viable.
 
+The retained-mode replacement now assembles the axisymmetric `m=0,2` blocks
+from complex-amplitude finite-volume actions, requiring two bounded Jacobians
+per axial station and no full theta arrays. On the matched `11 x 17 x 32`
+A4000 pair, cold/restart time improves from `115.87/29.52 s` to
+`65.64/24.12 s`; the exact runtime Schur still closes charge at `2.02e-9` and
+divergence at `9.01e-5`. A small factor-solve comparison agrees to `1e-10`.
+The `21 x 24 x 64` first projection converges in `138.72 s` but needs 192 GMRES
+iterations, and the two-step worker exceeds 240 seconds. The setup design is
+therefore retained on the experimental branch, while production promotion and
+the full coarse run wait for a stronger axial coarse correction.
+
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
 published for review as [SOLVAX PR #12](https://github.com/uwplasma/SOLVAX/pull/12),
