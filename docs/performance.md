@@ -490,7 +490,7 @@ gate, the supported throughput strategy is one solve per GPU and normal
 single-device JAX execution on the Mac. Treat shard placement alone as an
 implementation check, never as a physics or performance result.
 
-The `auto` path resolves to released SOLVAX 0.5.1 PCG. Reproduce its
+The `auto` path resolves to released SOLVAX 0.7.0 PCG. Reproduce its
 native/SOLVAX forward, implicit-gradient, independent-transpose, compile,
 warm-time, and compiler-memory comparison on CPU with:
 
@@ -499,14 +499,13 @@ JAX_ENABLE_X64=true uv run --locked --extra dev \
   python scripts/benchmark_solvax_pcg_backend.py --expected-backend cpu
 ```
 
-The tracked CPU and RTX A4000 x64 records are
-`benchmarks/results/solvax-pcg-equivalence-cpu.json` and
-`benchmarks/results/solvax-pcg-equivalence-gpu.json`. Both pass. On the recorded
-GPU, SOLVAX has field relative difference `1.54e-12`, implicit-gradient error
-`1.13e-16`, transpose residual `2.54e-13`, warm-time ratio `0.230`, and
-temporary-memory ratio `1.000` relative to native CG. The four-level Ha=20
-FreeMHD ladder and all eight high-Ha Table I rows pass at the same promoted
-solver-core fingerprint in `benchmarks/results/solvax-pcg-acceptance.json`.
+The tracked CPU record, `benchmarks/results/solvax-pcg-equivalence-cpu.json`,
+uses 0.7.0 and passes with field relative difference `1.54e-12`,
+implicit-gradient error `1.13e-15`, warm-time ratio `0.744`, and
+temporary-memory ratio `0.625` relative to native CG. The tracked RTX A4000
+record and the combined four-level Ha=20/all-eight-row acceptance record still
+identify 0.5.1. They remain historical M3 evidence, not proof for 0.7.0; their
+version-matched refresh is an explicit M14 release gate.
 
 ## Recent compatibility and platform validation
 

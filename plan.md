@@ -13,12 +13,13 @@ source fingerprint. Commands, investigation logs, and transient measurements
 belong in issues, campaign artifacts, or benchmark documentation—not here.
 
 The current critical path is **M5 performance unblock -> M4 closure -> research
-release**. M0 through M3
-are closed. SOLVAX 0.5.1 is a normal pinned runtime dependency and `auto`
-resolves deterministically to its PCG backend. CPU and real-GPU forward,
-implicit-gradient, transpose, resource, four-level Ha=20 FreeMHD, all-eight-row
-high-Ha, and portable LMX gates pass at the promoted fingerprint. Explicit
-native `cg` remains available for comparison and one compatibility cycle.
+release**. M0 through M3 are closed. SOLVAX 0.7.0 is the pinned runtime
+dependency and `auto` resolves deterministically to its PCG backend. Its current
+CPU forward, implicit-gradient, transpose, resource, and end-to-end Hartmann
+gates pass. The complete real-GPU, four-level Ha=20 FreeMHD, and all-eight-row
+high-Ha acceptance record remains the historical 0.5.1 M3 baseline until the
+queued version-matched M14 refresh completes. Explicit native `cg` remains
+available for comparison and one compatibility cycle.
 Research-stage fringing, Q2D, blanket, and scaling demonstrations are not
 release evidence until their milestone gates pass. Both ALEX production
 branches now use the accepted nonuniform finite-volume operators, compatible
@@ -1005,7 +1006,9 @@ wall time is acceptable.
     95.09% branch coverage, and a 141.1-second wall time. The source-matched
     wheel/sdist build, Twine inspection, clean Python 3.10 install, imports, and
     CLI smoke check also pass; the universal wheel is 300 KiB. Checksums are in
-    `benchmarks/results/package-smoke-20260713.json`.
+    `benchmarks/results/package-smoke-20260713.json`. The current SOLVAX 0.7.0
+    CPU equivalence record passes; the 0.7.0 GPU and full physics refresh must
+    replace, rather than relabel, the historical 0.5.1 acceptance evidence.
 
 15. **Deferred — expand physics only through new release tiers.** Benchmark C is Q2D
     turbulence, D is 3D turbulence/magnetic obstacles, and E is energy/buoyancy.

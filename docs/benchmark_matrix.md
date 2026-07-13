@@ -123,6 +123,11 @@ The RTX A4000 record passes with corresponding values `1.54e-12`, `1.13e-16`,
 Shercliff Ha=15,000, and the four-level Ha=20 FreeMHD ladder passes at the same
 solver-core fingerprint.
 
+This is the historical M3 promotion record. LMX now pins released SOLVAX 0.7.0;
+the current 0.7.0 CPU equivalence record passes, while a version-matched GPU and
+full physics acceptance refresh remains an M14 gate. The 0.5.1 results are not
+silently relabeled as 0.7.0 evidence.
+
 The combined machine-readable record is
 `benchmarks/results/solvax-pcg-acceptance.json`. Its
 `cpu_acceptance_pass` and `m3_promotion_pass` are true, the GPU and Ha=20
