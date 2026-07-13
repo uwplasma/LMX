@@ -1256,6 +1256,12 @@ wall time is acceptable.
    accepted optimization must reduce Schur/preconditioner applications or
    keep that Krylov state persistently device-resident across devices; compile
    caching and restart-size tuning are no longer the dominant levers.
+   A direct `jax.vmap` screen of the three component momentum inverses is also
+   rejected and fully removed. It holds one A4000 at 100% for more than `213 s`
+   without completing, already over `2.4x` the accepted complete solve/restart
+   budget. Independently converging PCGs cannot be forced into one lockstep
+   batch. A component decomposition must preserve per-component convergence
+   and remain inside one compiled multi-device boundary.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

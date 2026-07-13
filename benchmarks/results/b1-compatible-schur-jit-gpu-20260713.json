@@ -52,6 +52,7 @@
     "before": "The compatible warm trace rebuilt and compiled the GMRES closure on each solve.",
     "after": "The modal factors are materialized first, then the complete pressure GMRES is cached by backend, operator fingerprint, tolerance, and Krylov controls.",
     "remaining_bottleneck": "The cached GMRES is compute-bound in Schur applications and preconditioning; a traced restart used about 18 Arnoldi iterations.",
+    "rejected_batched_component_axis": "A jax.vmap over the three independently converging momentum PCGs held the A4000 at 100% for more than 213 seconds without completing. It was terminated and fully removed because lockstep batched convergence was already over 2.4 times the accepted complete-run budget.",
     "next_gate": "Reduce Schur operator calls or keep the entire Krylov state persistently device-resident across an exact two-GPU decomposition."
   },
   "gates": {
