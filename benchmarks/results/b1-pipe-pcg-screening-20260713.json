@@ -301,14 +301,23 @@
         "tiny_b1_flow_block_preconditioner_residual": 3.8276465e-08,
         "tiny_b1_pressure_block_residual": 1.7872608,
         "reference_jax_gmres_reproduced_failure": true,
+        "rank_diagnostic_commit": "1750ff0",
+        "axisymmetric_deflation_first_pressure_residual": 1.7539145e-06,
+        "axisymmetric_deflation_second_pressure_residual": 265859622.95,
+        "assembled_schur_dimension": 1008,
+        "assembled_schur_numerical_rank": 1006,
+        "assembled_schur_condition_number": 1.4567718e+19,
+        "rhie_chow_screen_numerical_rank": 1008,
+        "rhie_chow_screen_condition_number": 1.6629891e+09,
+        "rhie_chow_screen_accepted": false,
         "accepted": false,
-        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree."
+        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree. Axial deflation closes only the first axisymmetric map. Explicit assembly then exposes two checkerboard null modes in the collocated face-to-cell-to-face response. A preliminary momentum-weighted Rhie-Chow correction restores full rank but remains too ill-conditioned and fails the two-map physics gate."
       },
-      "next_candidate": "Retain the compatible face operators and exact axial flow block. Replace the pressure mobility surrogate with a bounded approximation to D A^-1 G itself (begin with axial-mode deflation plus cross-sectional block solves), and require the tiny pressure-block residual to decrease before another electromagnetic or exact-GPU campaign."
+      "next_candidate": "Retain the compatible face operators and exact axial flow block. Derive a momentum-consistent Rhie-Chow face mass flux from the shared steady momentum diagonal, use volume-weighted orthonormal pressure coordinates, and require full reduced rank plus refinement-stable conditioning on manufactured and two-map B1 gates before adding scalable Fourier-radial blocks or running another exact-GPU campaign."
     },
     "accepted": false,
-    "next_candidate": "Extract and verify a compatible cylindrical face G/D operator set before retrying the steady D A^-1 G Stokes-electric block; transient projection and mixed cell/face Schur variants are closed."
+    "next_candidate": "Replace the rank-deficient collocated pressure response with a momentum-consistent face mass flux and volume-weighted pressure coordinates; require the tiny rank, conditioning, divergence, and fixed-flow gates before another electromagnetic campaign."
   },
   "accepted": true,
-  "next_constraint": "Implement and verify compatible cylindrical face G/D operators, then use them for the steady coupled Stokes-electric block; pseudo-time-map acceleration and transient-pressure Schur variants are closed."
+  "next_constraint": "Close the collocated checkerboard nullspace and conditioning gates with a momentum-consistent face mass flux before scalable block preconditioning, exact GPU correctness, or strong-scaling campaigns; pseudo-time and transient-pressure variants remain closed."
 }

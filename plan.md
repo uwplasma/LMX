@@ -1108,6 +1108,27 @@ wall time is acceptable.
    independent cross-sectional block solves. Require monotone pressure-block
    residual reduction on the tiny case before reconnecting electromagnetics,
    and do not schedule another exact GPU campaign before that gate passes.
+   The follow-up rank diagnosis at experimental commit `1750ff0` closes that
+   candidate in its current form. Axisymmetric deflation reduces the first
+   pressure-block residual from `1.7873` to `1.75e-6`, but the next
+   Lorentz-forced map excites every azimuthal Fourier mode and diverges. More
+   decisively, explicit assembly of the `1008 x 1008` tiny Schur operator finds
+   numerical rank `1006` and condition number `1.46e19`: the collocated
+   face-to-cell-to-face momentum response admits checkerboard pressure modes.
+   A first momentum-weighted Rhie--Chow screen restores full rank and improves
+   conditioning by about ten orders of magnitude, but `1.66e9` remains too
+   ill-conditioned and the two-step divergence/flow gates still fail. This
+   agrees with the established collocated-grid momentum-interpolation
+   literature and supersedes the cross-sectional-block-only next step.
+   Next derive the face mass flux from the shared steady momentum diagonal,
+   express stationwise mean-free pressure in a volume-weighted orthonormal
+   basis, and verify constant nullspace, full reduced rank, refinement-stable
+   conditioning, adjoint consistency, and zero influence from relaxation or
+   pseudo-time parameters. Dense assembly is a tiny diagnostic only; the
+   accepted operator must remain matrix-free and must first pass identity,
+   viscous, reaction-dominated, checkerboard, and B1 two-map gates. Only then
+   add axial/coarse and Fourier-radial block preconditioning, followed by exact
+   GPU correctness and sharding/scaling measurements.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
