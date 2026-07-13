@@ -76,10 +76,24 @@
     "restart_charge_balance_residual": 3.26210169987462e-9,
     "result": "accepted on the one-GPU path"
   },
+  "solvax_staged_gmres": {
+    "repository": "uwplasma/SOLVAX",
+    "branch": "agent/staged-gmres",
+    "commit": "428d7d3",
+    "api": "gmres_cycle",
+    "solvax_gates": {
+      "focused_krylov_tests": "16 passed",
+      "full_tests": "232 passed in 84.77 seconds",
+      "implicit_reverse_mode_gradient": "passed against dense reference"
+    },
+    "lmx_consumption_result": "rejected and removed",
+    "lmx_reason": "Even one separately JIT-compiled staged Arnoldi cycle exceeded 180 seconds of CPU compilation with idle GPUs because XLA still traced through the nested B1 Schur and preconditioner calls.",
+    "lmx_source_after_screen": "No dependency on unreleased gmres_cycle and no public two-GPU wiring retained."
+  },
   "gates": {
     "ruff_touched_files": "passed",
     "full_fringing_module_81_tests": "passed",
     "exact_compatible_cpu_solve_restart": "passed"
   },
-  "next_gate": "Keep GMRES outside a monolithic multi-device XLA transform and invoke the already-compiled exact Schur and preconditioner kernels through bounded differentiable call boundaries."
+  "next_gate": "Introduce a genuinely opaque differentiable custom-call or FFI boundary for exact compiled Schur and preconditioner kernels; nested jit and staged GMRES have both failed the 180-second compiler gate."
 }
