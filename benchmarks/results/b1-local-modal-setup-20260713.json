@@ -51,5 +51,16 @@
     "balance_tolerance": 1e-3,
     "all_levels_passed": true
   },
+  "portable_gate": {
+    "source_commit": "b8241ca",
+    "python": "3.11.15",
+    "solvax": "0.7.0",
+    "passed": 908,
+    "skipped_external_reference": 8,
+    "branch_coverage": 0.9503,
+    "wall_seconds": 202.0,
+    "budget_seconds": 600,
+    "passed_all_gates": true
+  },
   "rejected_point_diagonal_restart_divergence": 8.27462
 }

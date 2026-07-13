@@ -1369,7 +1369,9 @@ wall time is acceptable.
    probe had restart divergence `8.27`. Evidence is in
    `benchmarks/results/b1-local-modal-setup-20260713.json`. The three-level
    compatible refinement/runtime ladder is closed; next apply the accepted
-   setup to the full coarse physics and one-hour runtime gates.
+   setup to the full coarse physics and one-hour runtime gates. The locked
+   portable gate passes 908 tests with 8 expected external-data skips and
+   95.03% branch coverage in 202.0 seconds, well inside the ten-minute cap.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

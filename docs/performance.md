@@ -335,6 +335,8 @@ Compact evidence is in
 `benchmarks/results/b1-local-modal-setup-20260713.json`. This closes the
 medium-grid setup failure; it does not change the decision to run independent
 B1 variants on the two GPUs or yet claim the full coarse refinement gate.
+The source-matched portable gate passes 908 tests with 8 expected external-data
+skips and 95.03% branch coverage in 202.0 seconds.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
