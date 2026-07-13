@@ -187,6 +187,9 @@ files above 128 KiB live in the checksummed `lmx-research-assets-v1` GitHub
 release and are governed by `provenance/release-assets.json`; the portable suite
 verifies manifest drift and deterministic archive construction. Smaller compact
 observables may remain in Git when they are needed by tests or offline docs.
+The readiness gate treats an absent generated file as available only when that
+verified manifest is marked `uploaded` and lists the exact generated path.
+Missing, malformed, staged, or checksum-inconsistent manifests remain blockers.
 
 That report separates hard release blockers from deferred research lanes. The
 current bounded `1.0` gate requires package metadata, workflow scaffolding,

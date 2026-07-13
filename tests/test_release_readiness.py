@@ -267,6 +267,53 @@ def test_release_readiness_fails_missing_publication_manifest_artifact(tmp_path:
     assert gate["details"]["missing_artifacts"] == ["q2d_turbulence_observables.png"]
 
 
+def test_release_readiness_accepts_verified_uploaded_assets(tmp_path: Path):
+    _write_release_fixture(tmp_path)
+    static = tmp_path / "docs" / "_static" / "generated"
+    externalized = (
+        "strong_scaling.png",
+        "wham_blanket_flow.gif",
+        "q2d_turbulence_observables.png",
+        "freemhd_closed_channel_observable_parity_summary.json",
+    )
+    for name in externalized:
+        (static / name).unlink()
+    _write_json(
+        tmp_path / "provenance" / "release-assets.json",
+        {
+            "release": {
+                "status": "uploaded",
+                "archive_sha256": "a" * 64,
+            },
+            "assets": [
+                {
+                    "bytes": 1,
+                    "sha256": "b" * 64,
+                    "paths": [f"docs/_static/generated/{name}"],
+                }
+                for name in externalized
+            ],
+        },
+    )
+
+    report = evaluate_release_readiness(tmp_path)
+    gates = {item["name"]: item for item in report["gates"]}
+
+    assert report["release_ready"] is True
+    assert gates["required_public_artifacts"]["details"]["externalized"] == [
+        "strong_scaling.png"
+    ]
+    assert gates["readme_external_media_manifest"]["details"]["externalized_media"] == [
+        "wham_blanket_flow.gif"
+    ]
+    assert gates["publication_figure_manifest"]["details"][
+        "externalized_artifacts"
+    ] == ["q2d_turbulence_observables.png", "strong_scaling.png"]
+    assert gates["publication_figure_manifest"]["details"][
+        "externalized_summaries"
+    ] == ["freemhd_closed_channel_observable_parity_summary.json"]
+
+
 def test_release_readiness_omits_deferred_lanes_when_research_gates_pass(
     tmp_path: Path,
 ):

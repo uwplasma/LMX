@@ -5,10 +5,15 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from lmx.publication import publication_figure_campaign_summary
 from lmx.research_closure import research_grade_closure_status
+
+try:
+    from scripts.manage_release_assets import check_manifest as check_asset_manifest
+except ModuleNotFoundError:  # direct ``python scripts/...`` execution
+    from manage_release_assets import check_manifest as check_asset_manifest
 
 try:  # pragma: no cover - Python 3.10 fallback
     import tomllib
@@ -59,18 +64,61 @@ def _gate(name: str, passed: bool, **details: Any) -> ReleaseGate:
     return ReleaseGate(name=name, passed=bool(passed), details=details)
 
 
-def _required_artifact_gate(root: Path) -> ReleaseGate:
+def _partition_unavailable_assets(
+    names: Iterable[str], static_dir: Path, external_assets: set[str]
+) -> tuple[list[str], list[str]]:
+    unavailable = {name for name in names if name and not (static_dir / name).exists()}
+    return sorted(unavailable - external_assets), sorted(unavailable & external_assets)
+
+
+def _uploaded_release_asset_names(root: Path) -> tuple[set[str], str | None]:
+    """Return verified generated filenames available from the uploaded archive."""
+
+    path = root / "provenance" / "release-assets.json"
+    try:
+        manifest = check_asset_manifest(path=path, root=root)
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return set(), str(exc)
+    if manifest.get("release", {}).get("status") != "uploaded":
+        return set(), "release-asset manifest is not marked uploaded"
+    generated = Path("docs/_static/generated")
+    names = {
+        relative.name
+        for asset in manifest.get("assets", [])
+        for raw_path in asset.get("paths", [])
+        if (relative := Path(str(raw_path))).parent == generated
+    }
+    return names, None
+
+
+def _required_artifact_gate(
+    root: Path, external_assets: set[str], manifest_error: str | None
+) -> ReleaseGate:
     static_dir = _static_dir(root)
-    missing = [name for name in REQUIRED_ARTIFACTS if not (static_dir / name).exists()]
+    missing, externalized = _partition_unavailable_assets(
+        REQUIRED_ARTIFACTS, static_dir, external_assets
+    )
     return _gate(
         "required_public_artifacts",
         not missing,
         required=list(REQUIRED_ARTIFACTS),
         missing=missing,
+        externalized=externalized,
+        release_asset_manifest_error=manifest_error,
     )
 
 
-def _readme_media_gate(root: Path) -> ReleaseGate:
+def _readme_media_gate(
+    root: Path, external_assets: set[str], manifest_error: str | None
+) -> ReleaseGate:
     static_dir = _static_dir(root)
     manifest_path = static_dir / "readme_media_manifest.json"
     try:
@@ -85,9 +133,9 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
     }
     seen_names = {str(item.get("name", "")) for item in media if isinstance(item, dict)}
     missing_names = sorted(required_names - seen_names)
-    missing_posters: list[str] = []
-    missing_local_media: list[str] = []
-    missing_figures: list[str] = []
+    posters: list[str] = []
+    local_media: list[str] = []
+    figures: list[str] = []
     invalid_urls: list[str] = []
     for item in media:
         if not isinstance(item, dict):
@@ -96,23 +144,28 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
         poster = str(item.get("poster", ""))
         if not url.startswith("https://github.com/uwplasma/LMX/releases/download/"):
             invalid_urls.append(url)
-        if poster and not (static_dir / poster).exists():
-            missing_posters.append(poster)
+        posters.append(poster)
     for item in manifest.get("local_media", []):
         if not isinstance(item, dict):
             continue
         name = str(item.get("name", ""))
         poster = str(item.get("poster", ""))
-        if name and not (static_dir / name).exists():
-            missing_local_media.append(name)
-        if poster and not (static_dir / poster).exists():
-            missing_posters.append(poster)
+        local_media.append(name)
+        posters.append(poster)
     for item in manifest.get("figures", []):
         if not isinstance(item, dict):
             continue
         name = str(item.get("name", ""))
-        if name and not (static_dir / name).exists():
-            missing_figures.append(name)
+        figures.append(name)
+    missing_posters, externalized_posters = _partition_unavailable_assets(
+        posters, static_dir, external_assets
+    )
+    missing_local_media, externalized_media = _partition_unavailable_assets(
+        local_media, static_dir, external_assets
+    )
+    missing_figures, externalized_figures = _partition_unavailable_assets(
+        figures, static_dir, external_assets
+    )
     passed = (
         not missing_names
         and not missing_posters
@@ -128,26 +181,44 @@ def _readme_media_gate(root: Path) -> ReleaseGate:
         missing_local_media=missing_local_media,
         missing_figures=missing_figures,
         invalid_urls=invalid_urls,
+        externalized_posters=externalized_posters,
+        externalized_media=externalized_media,
+        externalized_figures=externalized_figures,
+        release_asset_manifest_error=manifest_error,
     )
 
 
-def _publication_figure_manifest_gate(root: Path) -> ReleaseGate:
+def _publication_figure_manifest_gate(
+    root: Path, external_assets: set[str], manifest_error: str | None
+) -> ReleaseGate:
     try:
         summary = publication_figure_campaign_summary(_static_dir(root))
     except Exception as exc:  # pragma: no cover - defensive release reporting
         return _gate("publication_figure_manifest", False, error=str(exc))
+    static_dir = _static_dir(root)
+    missing_artifacts, externalized = _partition_unavailable_assets(
+        summary.get("missing_artifacts", []), static_dir, external_assets
+    )
+    missing_summaries, externalized_summaries = _partition_unavailable_assets(
+        summary.get("missing_summaries", []), static_dir, external_assets
+    )
+    external_open = list(summary.get("external_or_resolved_validation_open", []))
+    figure_count = int(summary.get("figure_count", 0))
     return _gate(
         "publication_figure_manifest",
-        not bool(summary.get("release_blocking", True)),
-        figure_count=int(summary.get("figure_count", 0)),
-        artifact_count=int(summary.get("artifact_count", 0)),
-        summary_count=int(summary.get("summary_count", 0)),
-        missing_artifacts=list(summary.get("missing_artifacts", [])),
-        missing_summaries=list(summary.get("missing_summaries", [])),
-        external_or_resolved_validation_open=list(
-            summary.get("external_or_resolved_validation_open", [])
-        ),
-        paper_ready=bool(summary.get("paper_ready")),
+        not missing_artifacts and not missing_summaries,
+        figure_count=figure_count,
+        artifact_count=figure_count - len(missing_artifacts),
+        summary_count=figure_count - len(missing_summaries),
+        missing_artifacts=missing_artifacts,
+        missing_summaries=missing_summaries,
+        externalized_artifacts=externalized,
+        externalized_summaries=externalized_summaries,
+        external_or_resolved_validation_open=external_open,
+        paper_ready=not missing_artifacts
+        and not missing_summaries
+        and not external_open,
+        release_asset_manifest_error=manifest_error,
     )
 
 
@@ -424,12 +495,13 @@ def evaluate_release_readiness(
     root: str | Path = ".", *, target_l2: float = 1.2e-2
 ) -> dict[str, Any]:
     root_path = Path(root).resolve()
+    external_assets, manifest_error = _uploaded_release_asset_names(root_path)
     gates: list[ReleaseGate] = [
         _packaging_gate(root_path),
         _workflow_gate(root_path),
-        _required_artifact_gate(root_path),
-        _readme_media_gate(root_path),
-        _publication_figure_manifest_gate(root_path),
+        _required_artifact_gate(root_path, external_assets, manifest_error),
+        _readme_media_gate(root_path, external_assets, manifest_error),
+        _publication_figure_manifest_gate(root_path, external_assets, manifest_error),
     ]
     research_closure_gate = _research_closure_status_gate(root_path)
     gates.append(research_closure_gate)

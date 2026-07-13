@@ -995,7 +995,14 @@ wall time is acceptable.
     SOLVAX CPU/GPU equivalence, and scaling lanes. Publish the acceptance index,
     environment manifests, DOI, and checksummed release assets. The portable
     suite must remain <=600 seconds per job, with <=360 seconds as the planning
-    target and >=95% branch coverage.
+    target and >=95% branch coverage. The bounded release-readiness gate now
+    passes with no hard blockers: local generated files and exact paths verified
+    in the uploaded `lmx-research-assets-v1` manifest are treated equivalently,
+    while missing or unverified assets still fail closed. This does not close the
+    three explicitly deferred research-grade physics lanes. Compact evidence is
+    recorded in `benchmarks/results/bounded-release-readiness-20260713.json`;
+    its source-matched portable gate passes 900 tests with 8 expected skips,
+    95.09% branch coverage, and a 141.1-second wall time.
 
 15. **Deferred — expand physics only through new release tiers.** Benchmark C is Q2D
     turbulence, D is 3D turbulence/magnetic obstacles, and E is energy/buoyancy.

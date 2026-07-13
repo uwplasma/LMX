@@ -297,7 +297,8 @@ gate. After the closures above, it reports:
 - no bounded-release hard blockers
 - straight-duct reader-facing profiles below the `1.2e-2` target
 - bent-pipe low-De current closure below the `1e-3` target
-- all required public artifacts present
+- every required public artifact present locally or verified in the uploaded,
+  checksummed release-asset manifest
 
 It still reports a bounded release class rather than full research-grade
 completion because external Q2D turbulence parity, external magnetic-obstacle
