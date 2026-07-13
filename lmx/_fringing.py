@@ -5832,26 +5832,22 @@ def _solve_extruded_projection(
             current_x = _clip_state(conductivity * (-dphi_dx + emf_x), scalar_limit)
             current_y = _clip_state(conductivity * (-dphi_dy + emf_y), scalar_limit)
             current_z = _clip_state(conductivity * (-dphi_dz + emf_z), scalar_limit)
-            divergence, wall_leakage, boundary_residual = (
-                _conservative_current_diagnostics_3d(
-                    conductivity,
-                    potential,
-                    emf_x,
-                    emf_y,
-                    emf_z,
-                    dx=dx,
-                    dy=dy,
-                    dz=dz,
-                    thin_wall_fluid_mask=mask,
-                )
+            divergence, _, _ = _conservative_current_diagnostics_3d(
+                conductivity,
+                potential,
+                emf_x,
+                emf_y,
+                emf_z,
+                dx=dx,
+                dy=dy,
+                dz=dz,
+                thin_wall_fluid_mask=mask,
             )
             return (
                 current_x,
                 current_y,
                 current_z,
                 divergence,
-                wall_leakage,
-                boundary_residual,
                 current_y * field_z - current_z * field_y,
                 current_z * field_x - current_x * field_z,
                 current_x * field_y - current_y * field_x,
@@ -5921,9 +5917,7 @@ def _solve_extruded_projection(
             reconstruct_electric = jax.jit(
                 reconstruct_electric,
                 in_shardings=(field_sharding,) * 9,
-                out_shardings=(field_sharding,) * 4
-                + (axial_sharding,) * 2
-                + (field_sharding,) * 3,
+                out_shardings=(field_sharding,) * 7,
             )
             lorentz_operator = jax.jit(
                 lorentz_operator,
@@ -6170,17 +6164,7 @@ def _solve_extruded_projection(
         )
 
         if use_alex_b2_finite_volume:
-            (
-                jx,
-                jy,
-                jz,
-                div_j,
-                wall_current_leakage,
-                boundary_current_residual,
-                lorentz_x,
-                lorentz_y,
-                lorentz_z,
-            ) = reconstruct_electric(
+            jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
                 phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
             )
         else:
@@ -6360,7 +6344,12 @@ def _solve_extruded_projection(
         thin_wall_fluid_mask=fluid_mask if use_alex_b2_finite_volume else None,
     )
     axial_current = _station_axial_current_from_fluxes(fx, cell_area[0])
-    if not use_alex_b2_finite_volume:
+    if use_alex_b2_finite_volume:
+        wall_current_leakage = jnp.zeros((nx,), dtype=div_j.dtype)
+        boundary_current_residual = jnp.abs(
+            jnp.sum(div_j * cell_area, axis=(1, 2)) * dx
+        )
+    else:
         div_j, wall_current_leakage, boundary_current_residual = (
             _conservative_current_diagnostics_3d(
                 sigma,
