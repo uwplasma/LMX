@@ -242,6 +242,15 @@ between Cartesian and pipe-local frames only at the assembly boundaries; the
 rest of the control-volume bookkeeping remains metric-aware inside
 `lmx/fringing.py`.
 
+The frozen ALEX B1 coefficients are axisymmetric, so its pressure and electric
+PCG preconditioners augment the axial and radial line solves with an exact
+circulant solve in periodic `theta`. A batched real FFT diagonalizes that line:
+for diagonal `d`, azimuthal off-diagonal `c`, and mode `k`, the eigenvalue is
+`d + 2 c cos(2 pi k / n_theta)`. This is an additive preconditioner only; it
+does not change the cylindrical finite-volume operator or its converged
+solution. Generic mapped-pipe calls retain the axial/radial preconditioner
+unless they explicitly satisfy the same axisymmetric contract.
+
 The ALEX B2 square-duct path uses the actual nonuniform `dy` and `dz` arrays for
 masked viscous diffusion, conservative electric current, and a compatible
 face-flux pressure projection. Its Neumann pressure and electric-potential

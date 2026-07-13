@@ -42,10 +42,25 @@
     "runtime_gate_seconds": 3600,
     "runtime_gate_passed": false
   },
+  "optimized_full_coarse": {
+    "source_fingerprint": "4c23447e60a1790bfd97ad416a45c1085e0e6dd91f8d9853dd89fc7646903ae4",
+    "optimization": "exact batched FFT circulant theta-line preconditioner",
+    "hardware": "NVIDIA RTX A4000",
+    "mesh": [101, 64, 128],
+    "precursor_steps": 5,
+    "precursor_seconds_rounded": 138.44,
+    "resumed_steps": 128,
+    "resumed_seconds": 2721.6664,
+    "combined_seconds_rounded": 2860.11,
+    "runtime_gate_seconds": 3600,
+    "runtime_gate_passed": true,
+    "physics_gate_passed": false,
+    "restart_sha256": "e0becadf51256eb61f951a0ad5c428633ab25412f9a3b8c45d9903e3c4b7d47f",
+    "record_sha256": "ed3c3ee5b5dd7c21f71723eaaa4945300f2b6ae0cf7142fd023d307490e6b34b"
+  },
   "accepted": true,
-  "claim": "Periodic progress, atomic partial restart, and provenance-checked resume infrastructure, including one interrupted accelerator continuation.",
+  "claim": "Periodic progress, atomic partial restart, provenance-checked resume, and a source-matched full coarse continuation below one hour.",
   "excluded_claims": [
-    "B1 coarse runtime below 3600 seconds",
     "B1 coarse physics acceptance",
     "B1 spatial strong scaling"
   ]

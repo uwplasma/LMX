@@ -1013,13 +1013,20 @@ wall time is acceptable.
    checksummed state in `91.39 s`. At the unchanged 128-step allowance this is
    about `11,698 s`, so runtime—not observability—is the remaining gate. The
    resumed electric solve consumes 4,570 PCG iterations. SOLVAX single-reduction
-   PCG is rejected (`62.46 s` versus `55.46 s`, worse divergence), and an exact
-   batched FFT theta-line preconditioner is rejected despite reducing the first
-   electric solve from 609 to 341 iterations: its two wall times are
-   `52.29/53.49 s` versus `49.54/49.82 s`. Evidence is in
-   `benchmarks/results/b1-pipe-pcg-screening-20260713.json`. The next experiment
-   must reduce electric solve cost or count without adding a periodic solve to
-   every PCG application.
+   PCG is rejected (`62.46 s` versus `55.46 s`, worse divergence). An exact
+   batched FFT theta-line preconditioner initially appeared 6--7% slower on the
+   reduced proxy despite reducing its first electric solve from 609 to 341
+   iterations. The source-matched full `101 x 64 x 128` result reverses that
+   screen: five precursor updates plus a checksum-resumed 128-update segment
+   complete in `2860.11 s`, below the `3600 s` gate and `4.30x` faster than the
+   prior rate projection. Accept the axisymmetric B1 FFT line; keep it disabled
+   for generic pipe coefficients. The terminal charge diagnostic passes at
+   `1.44e-4`, but steady residual `1.97e-3` and divergence `1.27e-3` miss the
+   frozen physics gates. Evidence is in
+   `benchmarks/results/b1-pipe-pcg-screening-20260713.json`. Use the full coarse
+   checkpoint to screen Anderson damping/history next, without loosening any
+   physics tolerance; accept baseline/thin-wall physics before dependent
+   variants.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

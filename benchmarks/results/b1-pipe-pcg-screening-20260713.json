@@ -34,10 +34,30 @@
       "baseline_max_divergence_residual": 9.9174e-05,
       "candidate_max_divergence_residual": 1.0034e-04,
       "field_signature_relative_difference_max": 9.69e-10,
-      "accepted": false,
-      "reason": "Exact physics and fewer iterations did not offset per-iteration FFT cost."
+      "reduced_screen_accepted": false,
+      "production_coarse_followup": {
+        "mesh": [101, 64, 128],
+        "hardware": "1 x NVIDIA RTX A4000",
+        "precursor_steps": 5,
+        "precursor_seconds_rounded": 138.44,
+        "resumed_steps": 128,
+        "resumed_seconds": 2721.6664,
+        "combined_steps": 133,
+        "combined_seconds_rounded": 2860.11,
+        "previous_128_step_estimate_seconds": 11698,
+        "resumed_segment_speedup_over_previous_estimate": 4.2981,
+        "runtime_gate_seconds": 3600,
+        "runtime_gate_passed": true,
+        "terminal_max_residual": 0.0019652993,
+        "terminal_max_divergence_residual": 0.0012737612,
+        "terminal_max_charge_balance_residual": 0.00014377428,
+        "physics_gate_passed": false,
+        "record_sha256": "ed3c3ee5b5dd7c21f71723eaaa4945300f2b6ae0cf7142fd023d307490e6b34b"
+      },
+      "accepted": true,
+      "reason": "The reduced proxy was 6--7% slower, but the exact full coarse path completed below one hour and was 4.30x faster than the prior rate estimate."
     }
   ],
-  "accepted": false,
-  "next_constraint": "Reduce the cost or count of the capped electric solve without adding a periodic preconditioner application to every PCG step."
+  "accepted": true,
+  "next_constraint": "Use the full coarse checkpoints to stabilize the outer fixed-point acceleration without loosening steady, mass, or current gates."
 }

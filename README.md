@@ -172,6 +172,12 @@ The current exact-parity `102 x 77 x 77` A4000 checkpoint is `36.96 s` warm on
 one GPU and `22.23 s` on two (speedup `1.66`, efficiency `0.831`). This passes
 the two-device target; the release-level four-device gate remains open because
 the current host has only two GPUs.
+The axisymmetric `101 x 64 x 128` ALEX B1 pipe path now uses an exact batched
+FFT line in periodic `theta`: its checkpointed 133-update campaign completes in
+`2860.11 s` on one A4000, below the one-hour cap and `4.30x` faster than the
+previous rate projection. This accepts the runtime optimization, not the B1
+physics result; the terminal steady and divergence gates still require a more
+stable outer fixed-point policy.
 For heavy independent validation variants, use the campaign runner's
 `--gpu-devices 0,1` mode: it assigns one process per GPU, disables default JAX
 memory preallocation, shares a persistent compilation cache, and preserves

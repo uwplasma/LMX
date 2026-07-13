@@ -356,14 +356,26 @@ hour before the independent or dependent waves resume. Evidence is in
 `benchmarks/results/b1-coarse-runtime-cap-20260713.json` and
 `benchmarks/results/b1-checkpoint-resume-20260713.json`.
 
-The first uncontended coarse checkpoint quantifies the remaining gap: one outer
-iteration takes `93.01 s`, and checksum-verified continuation takes `91.39 s`.
-The resumed electric stage uses 4,570 PCG iterations, making 128 unchanged
-updates roughly a 3.25-hour run. Two periodic-synchronization alternatives are
-rejected. SOLVAX single-reduction PCG is slower and worsens divergence; an exact
-batched FFT theta-line preconditioner reduces the first electric iteration
-count from 609 to 341 but is still 6--7% slower in two paired A4000 repeats.
-Compact timings and field signatures are in
+The first uncontended coarse checkpoint quantified the original gap: one outer
+iteration took `93.01 s`, and checksum-verified continuation took `91.39 s`.
+The resumed electric stage used 4,570 PCG iterations, projecting 128 unchanged
+updates to about 3.25 hours. SOLVAX single-reduction PCG was slower and worsened
+divergence. An exact batched FFT circulant solve in periodic `theta` also looked
+6--7% slower on the reduced proxy, despite cutting its first electric solve
+from 609 to 341 iterations.
+
+The full `101 x 64 x 128` coarse mesh reverses that reduced-mesh decision. With
+the same source fingerprint, five precursor updates took `138.44 s` and the
+checksum-resumed 128-update segment took `2721.67 s`; the combined `2860.11 s`
+campaign passes the 3600-second gate and is `4.30x` faster than the previous
+rate projection. The optimization is therefore accepted for the axisymmetric
+B1 pressure and electric preconditioners. It does not alter the finite-volume
+operator, and it is not enabled for generic non-axisymmetric pipe coefficients.
+The terminal steady (`1.97e-3`) and divergence (`1.27e-3`) diagnostics still
+miss their frozen physics gates, while charge closure passes (`1.44e-4`). Thus
+runtime is accepted independently of physics; the next experiment uses the
+full coarse checkpoint to stabilize outer fixed-point acceleration. Compact
+timings, hashes, and the earlier reduced field signatures are in
 `benchmarks/results/b1-pipe-pcg-screening-20260713.json`.
 
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
