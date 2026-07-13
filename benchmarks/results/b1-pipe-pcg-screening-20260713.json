@@ -200,9 +200,44 @@
         "reason": "Bounded and best terminal state, but still 7.7 times above the steady gate and with intermittent continuity excursions."
       }
     ],
+    "affine_fixed_point_fgmres": {
+      "solvax_pull_request": "https://github.com/uwplasma/SOLVAX/pull/15",
+      "solvax_checks_passed": true,
+      "tiny_mesh_probe": {
+        "shape": [7, 10, 16],
+        "krylov_dimension": 16,
+        "maximum_restarts": 2,
+        "seconds": 8.168,
+        "terminal_residual": 2.6062837e-05,
+        "maximum_divergence_residual": 4.2263817e-08,
+        "maximum_charge_balance_residual": 3.6129677e-10,
+        "steady_gate_passed": true
+      },
+      "reduced_production_probe": {
+        "shape": [32, 16, 32],
+        "krylov_dimension": 32,
+        "krylov_iterations": 64,
+        "krylov_residual_norm": 5.8536937e-05,
+        "krylov_converged": false,
+        "seconds": 61.7100,
+        "terminal_residual": 0.00031749469,
+        "maximum_divergence_residual": 0.00042695103,
+        "maximum_charge_balance_residual": 9.504458e-06,
+        "steady_gate_passed": false,
+        "candidate_source_fingerprint": "a6944157f9b9f9daff90b9b9611f710502f3a5f8154f861d35f5c971dca91bb3"
+      },
+      "physics_diagonal_preconditioner": {
+        "probe": "tiny mesh",
+        "terminal_residual": 0.010310248,
+        "accepted": false,
+        "candidate_source_fingerprint": "d16f3aa2f48a0fadfb9fa30ee850b8ccc8e098b4adc22c4407237f4d415c8f23"
+      },
+      "accepted": false,
+      "reason": "The affine primitive crosses the steady gate on a tiny mesh, but the exact reduced production geometry stagnates 6.3 times above it; a local rate preconditioner makes the operator worse."
+    },
     "accepted": false,
-    "next_candidate": "Solve the affine low-Re fixed-point equation with the tested SOLVAX matrix-free FGMRES primitive."
+    "next_candidate": "Remove the explicit electromagnetic timestep from the conditioning with a steady coupled Stokes-electric block solve and a physics-preserving Schur preconditioner."
   },
   "accepted": true,
-  "next_constraint": "Integrate the affine fixed-point FGMRES candidate; scalar pseudo-time and history controls are closed."
+  "next_constraint": "Implement a steady coupled Stokes-electric block solve; pseudo-time-map acceleration is closed."
 }

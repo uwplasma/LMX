@@ -1047,8 +1047,18 @@ wall time is acceptable.
    `1e4` condition limit diverges to `1.09e-2`, while `1e8` ends at `3.87e-4`
    after 32 updates but has a `4.48e-3` continuity excursion. Accelerator,
    scalar pseudo-time, and history controls are closed. The next bounded B1
-   experiment is matrix-free FGMRES on the affine low-Re fixed-point equation,
-   using the tested SOLVAX primitive, before another production campaign.
+   experiment was matrix-free FGMRES on the affine low-Re fixed-point equation.
+   Its reusable SOLVAX implementation and condition-filtered Anderson support
+   pass 239 tests at 98.77% branch coverage and all hosted checks in draft PR
+   [#15](https://github.com/uwplasma/SOLVAX/pull/15). The method crosses the
+   steady gate on a tiny B1 mesh (`2.61e-5`), but the exact prior
+   `32 x 16 x 32` production screen stagnates after 64 Krylov iterations at
+   `3.17e-4`; a local electromagnetic-plus-diffusive rate preconditioner
+   regresses the tiny probe to `1.03e-2`. Reject composite-map FGMRES for B1.
+   The next structural experiment must remove the explicit electromagnetic
+   timestep from the operator: solve the steady coupled Stokes-electric block
+   with a physics-preserving Schur preconditioner before another production
+   campaign.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
