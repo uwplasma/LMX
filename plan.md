@@ -1225,6 +1225,24 @@ wall time is acceptable.
    gradient, divergence, Rhie--Chow, and momentum response directly in mode
    space, or prove component-task parallelism. Do not gather within the Schur
    loop and do not retain a slower one-GPU alternative merely to expose shards.
+   A smaller component-task probe is also rejected: dispatching the three
+   independent momentum responses to GPU `0/1/0` takes `0.123--0.127 s` versus
+   `0.041--0.047 s` sequentially on GPU 0 and changes the checksum by 24.2% at
+   the cross-device return. It confirms that `device_put` is not an admissible
+   synchronization boundary for this CUDA stack.
+   The same probe exposes and closes a more valuable single-device bottleneck.
+   Experimental commit `21144b3` JITs and reuses the complete compatible
+   momentum closure, keyed by backend, numerical controls, and a content
+   fingerprint of viscosity and steady reaction. Three isolated warm solves
+   improve from `0.856--0.984 s` to `0.0473--0.0482 s`, with relative field
+   differences below `4.8e-11`. The exact two-step A4000 solve/restart gate
+   improves from `137.39 s` to `100.39 s` (`1.369x`, 26.9% reduction), passes
+   below the normal 120-second timeout, and reduces peak RSS by 3.4%. The full
+   fringing module passes, and the refactor adds only seven net package lines.
+   Evidence is in
+   `benchmarks/results/b1-compatible-momentum-jit-20260713.json`. Profile this
+   accepted source before the next decomposition; any multi-GPU design must
+   keep its state device-resident and beat this stronger one-GPU baseline.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

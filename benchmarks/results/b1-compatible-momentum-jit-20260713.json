@@ -1,0 +1,77 @@
+{
+  "date": "2026-07-13",
+  "branch": "agent/b1-compatible-stokes",
+  "commit": "21144b3",
+  "hardware": "NVIDIA RTX A4000 16376 MiB",
+  "software": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "solvax": "0.7.0 plus disposable complex-tridiagonal validation patch"
+  },
+  "implementation": {
+    "change": "JIT the complete compatible momentum solve closure and reuse it by a backend/operator content key.",
+    "cache_key_includes": [
+      "backend",
+      "geometry and solver controls",
+      "viscosity and steady-reaction fingerprint"
+    ],
+    "net_package_lines": 7
+  },
+  "isolated_three_solve_probe": {
+    "shape": [32, 16, 32],
+    "eager_warm_seconds": [
+      0.871839871047996,
+      0.9552571710082702,
+      0.9102259139763191,
+      0.983590959047433,
+      0.8564127840218134
+    ],
+    "compiled_warm_seconds": [
+      0.047985938959755,
+      0.047313363989815116,
+      0.04765323700848967,
+      0.04813677701167762,
+      0.048221128003206104
+    ],
+    "maximum_relative_field_difference": 4.7717418965043025e-11
+  },
+  "exact_production_gate": {
+    "test": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
+    "scope": "compatible two-step solve plus restart",
+    "baseline_commit": "be74706",
+    "baseline_wall_seconds": 137.39,
+    "current_wall_seconds": 100.39,
+    "speedup": 1.3685626058372347,
+    "wall_time_reduction": 0.2693063541742484,
+    "baseline_max_rss_kib": 2866144,
+    "current_max_rss_kib": 2769872,
+    "result": "passed below the normal 120 s timeout"
+  },
+  "rejected_component_task_parallelism": {
+    "mapping": "three momentum solves on GPU 0/1/0",
+    "sequential_gpu0_warm_seconds": [
+      0.04721255996264517,
+      0.044913912017364055,
+      0.04228173295268789,
+      0.04062724602408707,
+      0.04102304199477658
+    ],
+    "two_gpu_warm_seconds": [
+      0.1270245470223017,
+      0.12365059502189979,
+      0.12245366600109264,
+      0.12262747500790283,
+      0.12278757500462234
+    ],
+    "relative_checksum_difference": 0.24191188714528997,
+    "result": "rejected and not implemented"
+  },
+  "gates": {
+    "cpu_manufactured_reaction": "passed",
+    "cpu_compatible_solve_restart": "passed",
+    "cuda_compatible_solve_restart": "passed",
+    "full_fringing_module": "passed",
+    "ruff": "passed"
+  },
+  "next_gate": "Profile the now-faster compatible Schur path and design a persistent device-resident decomposition; cross-device device_put is not an accepted synchronization boundary."
+}
