@@ -224,6 +224,17 @@ rebuilding an identical solver call still triggers 102 compile events totaling
 therefore make compiled solver closures stable across calls and fuse larger
 regions independently of the multigrid work.
 
+A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
+exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
+but the approximate diagonal coarse solve is not production-safe: one sweep
+stalls B2 at the 1200-iteration cap with charge residual near 52, and four
+sweeps trigger PCG preconditioner breakdown. It is rejected. The replacement
+must construct a stronger SPD coarse solve once for the fixed conductivity and
+reuse it across electric right-hand sides. Capturing conductivity and mask in
+the compiled closure is also rejected: physics remains exact and one-GPU warm
+time is `37.37 s`, but two-GPU warm time regresses from `109.23 s` to
+`118.66 s`.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and

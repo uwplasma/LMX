@@ -852,6 +852,17 @@ wall time is acceptable.
    events (`7.10 s`), 932 cache misses (`1.30 s`), and six PCG while calls
    (`2.29 s`), with negligible host/device copy time. Stabilize compiled closure
    identities and fuse larger solver regions in parallel with multigrid.
+   A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
+   reduced a manufactured solve from 39 to 27 PCG iterations, but its
+   diagonal coarse action is rejected on production B2: one sweep stalls at
+   1200 iterations with charge residual near 52, while four sweeps cause an
+   immediate PCG preconditioner breakdown. The next multigrid implementation
+   must build a provably stronger SPD coarse solve once per fixed conductivity,
+   not rebuild an approximate hierarchy for every electric right-hand side.
+   Hoisting the fixed conductivity and mask into the compiled electric closure
+   preserves exact one/two-GPU physics and gives `37.37 s` one-GPU warm time,
+   but worsens two-GPU warm time from `109.23 s` to `118.66 s`; reject the
+   additional captured-constant cache key and retain dynamic solver arguments.
    Long B1/B2 runs now bound retained Anderson states to the configured history
    depth, removing growth proportional to the total outer-iteration count.
    The obsolete public 2-D stencil microbenchmark is removed now that production
