@@ -245,6 +245,8 @@ def _run_record(
                 )
             ),
             "initialization_sha256": initialization_sha256,
+            "b1_compatible_steady": case_id == "B1-fringing-pipe",
+            "b1_retained_modal_blocks": case_id == "B1-fringing-pipe",
         },
         "restart": {
             "path": str(restart_path),
@@ -569,6 +571,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.checkpoint_interval <= 0:
         parser.error("--checkpoint-interval must be positive")
+    if "B1-fringing-pipe" in args.cases and not args.dry_run:
+        # The acceptance runner must exercise the characterized B1 path rather
+        # than silently fall back to the older rate-projection implementation.
+        os.environ["LMX_B1_COMPATIBLE_STEADY"] = "1"
+        os.environ["LMX_B1_RETAINED_MODAL_BLOCKS"] = "1"
     if args.gpu_devices is not None and not args.dry_run:
         return _run_gpu_campaign(args)
     variant_restarts = _parse_variant_restarts(args.variant_restart)
