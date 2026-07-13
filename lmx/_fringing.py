@@ -9,7 +9,6 @@ import os
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.scipy.sparse.linalg import gmres as jax_gmres
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
     KrylovSolution,
@@ -2908,18 +2907,6 @@ def _steady_stokes_projection_pipe(
     preconditioned_rhs = precondition(rhs)
     if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
         preconditioned_residual = schur(preconditioned_rhs) - rhs
-        residual_field = unpack_pressure(preconditioned_residual[:pressure_size])
-        pressure_field = unpack_pressure(preconditioned_rhs[:pressure_size])
-        axial_energy = jnp.linalg.norm(
-            jnp.fft.rfft(residual_field, axis=0), axis=(1, 2)
-        )
-        theta_energy = jnp.linalg.norm(
-            jnp.fft.rfft(residual_field, axis=2), axis=(0, 1)
-        )
-        singular_values = jnp.linalg.svd(
-            pressure_field.reshape((u.shape[0], cross_section_size)),
-            compute_uv=False,
-        )
         print(
             "B1 compatible preconditioner:",
             float(jnp.linalg.norm(rhs)),
@@ -2927,79 +2914,16 @@ def _steady_stokes_projection_pipe(
             float(jnp.linalg.norm(preconditioned_residual[pressure_size:])),
             float(jnp.mean(preconditioned_rhs[pressure_size:])),
         )
-        print(
-            "B1 compatible modes:",
-            np.asarray(
-                axial_energy / jnp.maximum(jnp.linalg.norm(axial_energy), 1.0e-30)
-            ).tolist(),
-            np.asarray(
-                theta_energy / jnp.maximum(jnp.linalg.norm(theta_energy), 1.0e-30)
-            ).tolist(),
-            np.asarray(
-                singular_values / jnp.maximum(singular_values[0], 1.0e-30)
-            ).tolist(),
-        )
-
-    if os.environ.get("LMX_B1_STOKES_DIRECT") == "1":
-        basis = jnp.eye(rhs.size, dtype=rhs.dtype)
-        matrix = jax.vmap(schur)(basis).T
-        row_scale = jnp.maximum(jnp.linalg.norm(matrix, axis=1), 1.0e-30)
-        column_scale = jnp.maximum(jnp.linalg.norm(matrix, axis=0), 1.0e-30)
-        scaled_matrix = matrix / row_scale[:, None] / column_scale[None, :]
-        solution, _, rank, singular_values = jnp.linalg.lstsq(
-            scaled_matrix, rhs / row_scale, rcond=1.0e-12
-        )
-        solution = solution / column_scale
-        residual_norm = jnp.linalg.norm(schur(solution) - rhs)
-        pressure_solution = KrylovSolution(
-            solution,
-            residual_norm,
-            jnp.asarray(rhs.size),
-            residual_norm <= pressure_tolerance,
-            None,
-        )
-        if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
-            print(
-                "B1 compatible direct:",
-                int(rank),
-                float(singular_values[0] / singular_values[-1]),
-                [
-                    float(jnp.linalg.norm(matrix[:pressure_size, :pressure_size])),
-                    float(jnp.linalg.norm(matrix[:pressure_size, pressure_size:])),
-                    float(jnp.linalg.norm(matrix[pressure_size:, :pressure_size])),
-                    float(jnp.linalg.norm(matrix[pressure_size:, pressure_size:])),
-                ],
-            )
-    elif os.environ.get("LMX_B1_STOKES_JAX_GMRES") == "1":
-        solution, info = jax_gmres(
-            schur,
-            rhs,
-            x0=preconditioned_rhs,
-            tol=pressure_tolerance,
-            atol=pressure_tolerance,
-            restart=restart,
-            maxiter=max_restarts,
-            M=precondition,
-        )
-        residual_norm = jnp.linalg.norm(schur(solution) - rhs)
-        pressure_solution = KrylovSolution(
-            solution,
-            residual_norm,
-            jnp.asarray(restart * max_restarts),
-            info == 0,
-            None,
-        )
-    else:
-        pressure_solution = gmres(
-            schur,
-            rhs,
-            x0=preconditioned_rhs,
-            precond=precondition,
-            restart=restart,
-            rtol=pressure_tolerance,
-            atol=pressure_tolerance,
-            max_restarts=max_restarts,
-        )
+    pressure_solution = gmres(
+        schur,
+        rhs,
+        x0=preconditioned_rhs,
+        precond=precondition,
+        restart=restart,
+        rtol=pressure_tolerance,
+        atol=pressure_tolerance,
+        max_restarts=max_restarts,
+    )
     pressure = unpack_pressure(pressure_solution.x[:pressure_size])
     pressure_loss = pressure_solution.x[pressure_size:]
     correction = velocity_response(pressure_solution.x)
