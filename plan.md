@@ -1335,6 +1335,15 @@ wall time is acceptable.
    shardings, eliminating per-action transfers. It is accepted only with exact
    one/two-GPU physics and first-solve time below `69.52 s`; otherwise stop
    component decomposition and move to a balanced spatial/domain split.
+   That final component screen is now complete and rejected. SOLVAX commit
+   `0b8322b` keeps Krylov state replicated and gives Arnoldi explicit replicated
+   shardings; a two-CPU-device contract converges in 14 iterations with residual
+   `1.11e-10`. On the real two-A4000 B1 path, however, the explicit mesh pulls
+   modal-factor `vmap` compilation and later electric setup into multi-device
+   programs, and the first two-step solve again misses the `180 s` checkpoint.
+   The LMX wiring is fully removed. Stop component decomposition; the next GPU
+   implementation must be a balanced spatial/domain split with setup outside
+   the runtime mesh, exact physics parity, and first-solve time below `69.52 s`.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

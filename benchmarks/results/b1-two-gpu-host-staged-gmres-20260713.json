@@ -35,11 +35,19 @@
     "physics_parity": "not evaluated because the bounded two-GPU solve did not complete",
     "strong_scaling": "failed"
   },
+  "replicated_krylov_state_screen": {
+    "solvax_commit": "0b8322b",
+    "portable_contract": "An explicit two-CPU-device replicated Krylov solve converged in 14 iterations with residual 1.1128912365939964e-10 and retained two addressable shards.",
+    "method": "Keep Krylov and Arnoldi state replicated on the operator mesh with explicit compiled Arnoldi input/output shardings, eliminating per-action replicate/gather transitions.",
+    "gpu_result": "rejected",
+    "gpu_failure": "The first two-step production solve again exceeded 180 seconds. The explicit mesh pulled modal-factor vmap compilation and later electric setup compilation into multi-device programs, so the first-solve checkpoint was never reached.",
+    "source_after_screen": "All LMX wiring was removed; the reusable state_sharding API remains on the pushed SOLVAX branch."
+  },
   "decision": {
     "result": "rejected and fully removed from LMX",
     "reason": "A public two-GPU path must beat the 69.52-second one-GPU reference. Per-action sharding transitions erase the isolated 1.70x Schur speedup and the complete path exceeds 180 seconds.",
     "retained_solvax_work": "The general host-staged GMRES and explicit operator/state sharding boundary are retained on the pushed SOLVAX branch; all 233 tests and strict docs pass.",
     "lmx_source_after_screen": "No public B1 two-GPU solve, temporary trace hook, diagnostic environment switch, or unreleased SOLVAX dependency remains."
   },
-  "next_gate": "Keep Krylov state device-resident on the explicit operator mesh and run the small Arnoldi algebra with explicit replicated input/output shardings, eliminating per-action replicate/gather transitions. Require exact one/two-GPU physics and a first-solve time below 69.52 seconds before public wiring."
+  "next_gate": "Stop B1 component decomposition. Design a balanced spatial/domain decomposition that keeps modal-factor and electric setup outside the runtime mesh, then require exact one/two-GPU physics and a first-solve time below 69.52 seconds before public wiring."
 }
