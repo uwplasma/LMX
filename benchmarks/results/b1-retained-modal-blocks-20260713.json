@@ -105,11 +105,70 @@
         "second_projection_converged": false
       },
       "reason": "the previous pressure state does not change the iteration ceiling or recover second-projection convergence"
+    },
+    "coupled_axisymmetric_pressure_flow_block": {
+      "grid_11x17x32": {
+        "first_seconds": 63.7795,
+        "restart_seconds": 26.2456,
+        "projection_iterations": [71, 95, 114, 123]
+      },
+      "grid_21x24x64": {
+        "first_projection_seconds": 137.9748,
+        "first_projection_iterations": 192,
+        "second_projection_seconds": 114.2612,
+        "second_projection_iterations": 192,
+        "second_projection_residual": 0.049446,
+        "second_projection_converged": false
+      },
+      "reason": "adding the stationwise pressure-loss scalar to m=0 did not remove the large-grid iteration ceiling and regressed the medium restart"
+    }
+  },
+  "residual_mode_diagnosis": {
+    "grid_11x17x32": {
+      "dominant_location": "last three axial stations",
+      "first_projection_peak_mode": 14,
+      "first_projection_peak_amplitude": 7.425e-8
+    },
+    "grid_21x24x64": {
+      "dominant_location": "last five axial stations",
+      "first_projection_m0_amplitude": 3.993e-6,
+      "first_projection_largest_nonzero_mode_amplitude": 3.829e-7,
+      "failed_second_projection_modes_0_to_4": [
+        0.0112,
+        0.020562,
+        0.029243,
+        0.014278,
+        0.011923
+      ]
+    },
+    "conclusion": "the unresolved coarse residual is outlet-localized; the failed large second projection spans m=0 through m=4 rather than only m=0,2"
+  },
+  "separated_modes_0_to_4": {
+    "method": "independent real m=0 and complex m=1,2,3,4 SOLVAX block-Thomas factors",
+    "grid_11x17x32": {
+      "first_seconds": 57.8538,
+      "restart_seconds": 10.6261,
+      "projection_iterations": [37, 56, 43, 58],
+      "restart_charge_residual": 2.4412e-9,
+      "restart_divergence_residual": 9.021e-5,
+      "first_speedup_over_m0_m2": 1.1346,
+      "restart_speedup_over_m0_m2": 2.2702
+    },
+    "grid_21x24x64": {
+      "first_projection_seconds": 138.9838,
+      "first_projection_iterations": 192,
+      "first_projection_residual": 1.6172e-6,
+      "first_projection_converged": true,
+      "second_projection_seconds": 114.3074,
+      "second_projection_iterations": 192,
+      "second_projection_residual": 8.9941e-6,
+      "second_projection_converged": true,
+      "worker_360_second_cap_completed": false
     }
   },
   "decision": {
-    "setup_builder": "accepted for continued branch development",
+    "setup_builder": "accepted with separated m=0 through m=4 factors for continued branch development",
     "production_default": false,
-    "full_coarse_gate": "deferred until axial coarse correction arrests Krylov growth"
+    "full_coarse_gate": "deferred until the remaining large-grid iteration ceiling and non-projection runtime are reduced"
   }
 }

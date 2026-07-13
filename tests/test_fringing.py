@@ -6,7 +6,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import lmx._fringing as fringing_impl
-from solvax import block_thomas_factor, block_thomas_solve
+from solvax import block_thomas_solve
 
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
@@ -1081,7 +1081,7 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             .at[:, -1, :]
             .set(0.07 * r_faces[-1] / (r_centers[-1] * 0.5 * (1.0 - 0.7) ** 2))
         )
-        blocks = fringing_impl._pipe_retained_modal_blocks(
+        retained = fringing_impl._pipe_retained_modal_factors(
             jnp.ones(shape),
             jnp.maximum(unit_response, jnp.mean(unit_response) * 1.0e-8),
             cell_area,
@@ -1091,11 +1091,13 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             r_faces=r_faces,
             r_centers=r_centers,
             dtheta=dtheta,
+            modes=(2,),
         )
-        retained = block_thomas_factor(*blocks)
         probed = fringing_impl._FRINGING_MODAL_FACTOR_CACHE.pop(modal_key)
         trial = jnp.arange(nx * (3 * nr - 1), dtype=float).reshape(nx, 3 * nr - 1)
-        assert block_thomas_solve(retained, trial) == pytest.approx(
+        assert fringing_impl._solve_pipe_retained_modal_factors(
+            retained, trial
+        ) == pytest.approx(
             block_thomas_solve(probed, trial), rel=1.0e-10, abs=1.0e-10
         )
 

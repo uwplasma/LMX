@@ -2837,7 +2837,7 @@ def _pipe_face_velocity_cells(
     )
 
 
-def _pipe_retained_modal_blocks(
+def _pipe_retained_modal_factors(
     mobility: jnp.ndarray,
     pressure_mobility: jnp.ndarray,
     cell_area: jnp.ndarray,
@@ -2848,8 +2848,9 @@ def _pipe_retained_modal_blocks(
     r_faces: jnp.ndarray,
     r_centers: jnp.ndarray,
     dtheta: float,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Assemble exact axisymmetric ``m=0,2`` modal Schur blocks."""
+    modes: tuple[int, ...] = (1, 2, 3, 4),
+) -> tuple[object, tuple[object, ...]]:
+    """Factor separated axisymmetric low-mode Schur blocks."""
 
     nx, nr, ntheta = mobility.shape
     radial_widths = jnp.diff(r_faces)
@@ -2971,41 +2972,55 @@ def _pipe_retained_modal_blocks(
             return result[:, :-1]
         return result
 
-    phase_two = jnp.exp(4j * jnp.pi / ntheta)
-    m0_jacobian = jax.jit(
-        jax.jacfwd(lambda pressure, source: modal_action(pressure, source, 1.0, True))
-    )
-    m2_jacobian = jax.jit(
-        jax.jacfwd(
-            lambda pressure, source: modal_action(pressure, source, phase_two, False)
+    def factor_mode(mode, size, zero_mean):
+        phase = 1.0 if zero_mean else jnp.exp(2j * jnp.pi * mode / ntheta)
+        jacobian = jax.jit(
+            jax.jacfwd(
+                lambda pressure, source: modal_action(
+                    pressure, source, phase, zero_mean
+                )
+            )
         )
-    )
-    local_size = 3 * nr - 1
-    empty = jnp.zeros((local_size, local_size), dtype=mobility.dtype)
-
-    def real_block(m0, m2):
-        modal = jnp.concatenate(
-            (
-                jnp.concatenate((m2.real, m2.imag), axis=1),
-                jnp.concatenate((-m2.imag, m2.real), axis=1),
-            ),
-            axis=0,
+        actions = tuple(
+            jacobian(jnp.zeros((size,), dtype=mobility.dtype), source)
+            for source in range(nx)
         )
-        return empty.at[: nr - 1, : nr - 1].set(m0.real).at[nr - 1 :, nr - 1 :].set(modal)
+        if zero_mean:
+            actions = tuple(action.real for action in actions)
+        empty = jnp.zeros((size, size), dtype=actions[0].dtype)
+        blocks = (
+            jnp.stack((empty, *(actions[i - 1][i] for i in range(1, nx)))),
+            jnp.stack(tuple(actions[i][i] for i in range(nx))),
+            jnp.stack((*(actions[i + 1][i] for i in range(nx - 1)), empty)),
+        )
+        return block_thomas_factor(*blocks)
 
-    diagonal = []
-    lower = [empty]
-    upper = []
-    for source in range(nx):
-        m0 = m0_jacobian(jnp.zeros((nr - 1,), dtype=mobility.dtype), source)
-        m2 = m2_jacobian(jnp.zeros((nr,), dtype=mobility.dtype), source)
-        diagonal.append(real_block(m0[source], m2[source]))
-        if source:
-            upper.append(real_block(m0[source - 1], m2[source - 1]))
-        if source < nx - 1:
-            lower.append(real_block(m0[source + 1], m2[source + 1]))
-    upper.append(empty)
-    return jnp.stack(lower), jnp.stack(diagonal), jnp.stack(upper)
+    return (
+        factor_mode(0, nr - 1, True),
+        tuple(factor_mode(mode, nr, False) for mode in modes),
+    )
+
+
+def _solve_pipe_retained_modal_factors(factors, residual):
+    """Solve real cosine/sine residuals with separated complex factors."""
+
+    axisymmetric, modes = factors
+    radial_size = axisymmetric[0].shape[-1]
+    radial = block_thomas_solve(axisymmetric, residual[:, :radial_size])
+    mode_rhs = residual[:, radial_size:].reshape(
+        (residual.shape[0], 2, len(modes), -1)
+    )
+    solved = jnp.stack(
+        tuple(
+            block_thomas_solve(factor, mode_rhs[:, 0, i] - 1j * mode_rhs[:, 1, i])
+            for i, factor in enumerate(modes)
+        ),
+        axis=1,
+    )
+    return jnp.concatenate(
+        (radial, jnp.stack((solved.real, -solved.imag), axis=1).reshape((residual.shape[0], -1))),
+        axis=1,
+    )
 
 
 def _steady_stokes_projection_pipe(
@@ -3201,11 +3216,16 @@ def _steady_stokes_projection_pipe(
     if modal_stabilization:
         radial_weights = jnp.sum(cell_area, axis=2)
         coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
-        mode_two_size = 2 * u.shape[0] * u.shape[1]
-        coarse_size = coarse_pressure_size + mode_two_size + u.shape[0]
+        use_direct_modal_factors = (
+            modal_momentum_coefficients is not None and modal_momentum_sink is not None
+        )
+        modal_modes = (1, 2, 3, 4) if use_direct_modal_factors else (2,)
+        mode_size = 2 * len(modal_modes) * u.shape[0] * u.shape[1]
+        coarse_size = coarse_pressure_size + mode_size + u.shape[0]
         theta = jnp.arange(u.shape[2], dtype=u.dtype) * dtheta
-        mode_two_cosine = jnp.cos(2.0 * theta)
-        mode_two_sine = jnp.sin(2.0 * theta)
+        mode_angles = jnp.asarray(modal_modes, dtype=u.dtype)[:, None] * theta
+        mode_cosine = jnp.cos(mode_angles)
+        mode_sine = jnp.sin(mode_angles)
 
         def prolong(coarse):
             radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
@@ -3217,21 +3237,18 @@ def _steady_stokes_projection_pipe(
                 u.shape,
             )
             offset = coarse_pressure_size
-            mode_shape = (u.shape[0], u.shape[1])
-            cosine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
-                mode_shape
+            modes = coarse[offset : offset + mode_size].reshape(
+                (2, len(modal_modes), u.shape[0], u.shape[1])
             )
-            offset += u.shape[0] * u.shape[1]
-            sine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(mode_shape)
             pressure = (
                 pressure
-                + cosine[:, :, None] * mode_two_cosine[None, None, :]
-                + sine[:, :, None] * mode_two_sine[None, None, :]
+                + jnp.einsum("mxr,mt->xrt", modes[0], mode_cosine)
+                + jnp.einsum("mxr,mt->xrt", modes[1], mode_sine)
             )
             return jnp.concatenate(
                 (
                     reduce_field(pressure),
-                    coarse[coarse_pressure_size + mode_two_size :],
+                    coarse[coarse_pressure_size + mode_size :],
                 )
             )
 
@@ -3240,13 +3257,21 @@ def _steady_stokes_projection_pipe(
             return jnp.concatenate(
                 (
                     jnp.mean(divergence, axis=2)[:, :-1].reshape(-1),
-                    (2.0 * jnp.mean(divergence * mode_two_cosine, axis=2)).reshape(-1),
-                    (2.0 * jnp.mean(divergence * mode_two_sine, axis=2)).reshape(-1),
+                    (
+                        2.0
+                        / u.shape[2]
+                        * jnp.stack(
+                            (
+                                jnp.einsum("xrt,mt->mxr", divergence, mode_cosine),
+                                jnp.einsum("xrt,mt->mxr", divergence, mode_sine),
+                            )
+                        )
+                    ).reshape(-1),
                     residual[pressure_size:],
                 )
             )
 
-        local_size = 3 * u.shape[1] - 1
+        local_size = u.shape[1] - 1 + 2 * len(modal_modes) * u.shape[1]
         local_basis = jnp.eye(local_size, dtype=u.dtype)
 
         def station_prolong(station, local):
@@ -3255,33 +3280,33 @@ def _steady_stokes_projection_pipe(
             radial = radial.at[station].set(local[: u.shape[1] - 1])
             coarse = coarse.at[:coarse_pressure_size].set(radial.reshape(-1))
             offset = coarse_pressure_size
-            modes = coarse[offset : offset + mode_two_size].reshape(
-                (2, u.shape[0], u.shape[1])
+            modes = coarse[offset : offset + mode_size].reshape(
+                (2, len(modal_modes), u.shape[0], u.shape[1])
             )
-            modes = modes.at[:, station].set(
-                local[u.shape[1] - 1 :].reshape((2, u.shape[1]))
+            modes = modes.at[:, :, station].set(
+                local[u.shape[1] - 1 :].reshape(
+                    (2, len(modal_modes), u.shape[1])
+                )
             )
-            coarse = coarse.at[offset : offset + mode_two_size].set(modes.reshape(-1))
+            coarse = coarse.at[offset : offset + mode_size].set(modes.reshape(-1))
             return prolong(coarse)
 
         def modal_restrict(residual):
             coarse = restrict(residual)
             radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
             modes = coarse[
-                coarse_pressure_size : coarse_pressure_size + mode_two_size
-            ].reshape((2, u.shape[0], u.shape[1]))
+                coarse_pressure_size : coarse_pressure_size + mode_size
+            ].reshape((2, len(modal_modes), u.shape[0], u.shape[1]))
             return jnp.concatenate(
-                (radial, jnp.swapaxes(modes, 0, 1).reshape((u.shape[0], -1))), axis=1
+                (radial, jnp.transpose(modes, (2, 0, 1, 3)).reshape((u.shape[0], -1))),
+                axis=1,
             )
 
         stations = jnp.arange(u.shape[0])
 
         def build_modal_factors():
-            if (
-                modal_momentum_coefficients is not None
-                and modal_momentum_sink is not None
-            ):
-                blocks = _pipe_retained_modal_blocks(
+            if use_direct_modal_factors:
+                return _pipe_retained_modal_factors(
                     mobility,
                     pressure_mobility,
                     cell_area,
@@ -3291,8 +3316,8 @@ def _steady_stokes_projection_pipe(
                     r_faces=r_faces,
                     r_centers=r_centers,
                     dtheta=dtheta,
+                    modes=modal_modes,
                 )
-                return block_thomas_factor(*blocks)
 
             def modal_action(source, basis):
                 return modal_restrict(
@@ -3352,16 +3377,22 @@ def _steady_stokes_projection_pipe(
             coarse = coarse.at[:coarse_pressure_size].set(
                 local[:, : u.shape[1] - 1].reshape(-1)
             )
-            modes = local[:, u.shape[1] - 1 :].reshape((u.shape[0], 2, u.shape[1]))
+            modes = local[:, u.shape[1] - 1 :].reshape(
+                (u.shape[0], 2, len(modal_modes), u.shape[1])
+            )
             coarse = coarse.at[
-                coarse_pressure_size : coarse_pressure_size + mode_two_size
-            ].set(jnp.swapaxes(modes, 0, 1).reshape(-1))
+                coarse_pressure_size : coarse_pressure_size + mode_size
+            ].set(jnp.transpose(modes, (1, 2, 0, 3)).reshape(-1))
             return prolong(coarse)
 
         def precondition(residual):
             local = local_precondition(residual)
             modal_residual = modal_restrict(residual - schur(local))
-            modal_correction = block_thomas_solve(modal_factors, modal_residual)
+            modal_correction = (
+                _solve_pipe_retained_modal_factors(modal_factors, modal_residual)
+                if use_direct_modal_factors
+                else block_thomas_solve(modal_factors, modal_residual)
+            )
             candidate = local + modal_prolong(modal_correction)
             flow_residual = (residual - schur(candidate))[pressure_size:]
             flow_response = (

@@ -1398,6 +1398,20 @@ wall time is acceptable.
    second projection remains at 192 iterations and `~115.4 s` in both lanes;
    both fail the physical gate (`0.0606` warm, `0.0676` control). Proceed only
    with a coarse operator that materially reduces the exact Schur residual.
+   Residual spectra now localize the error to the last three to five axial
+   stations. The large failed second projection spans `m=0...4`; coupling the
+   pressure-loss scalar only into `m=0` remains at 192 iterations and fails at
+   residual `0.0494`, so it is removed. The next bounded gate separates the
+   measured low modes into independent complex SOLVAX block-Thomas factors,
+   avoiding cubic growth from a single enlarged dense block.
+   This separated design passes its bounded gate. At `11 x 17 x 32`, it cuts
+   iterations from `[78,98,106,123]` to `[37,56,43,58]` and cold/restart time
+   from `65.64/24.12 s` to `57.85/10.63 s`, with charge `2.44e-9` and
+   divergence `9.02e-5`. At `21 x 24 x 64`, the formerly failing second
+   projection now passes at `8.99e-6` in `114.31 s`, although both projections
+   still reach 192 iterations and the complete worker misses 360 seconds.
+   Retain this checkpoint on the experimental branch; next profile the
+   non-projection tail and reduce the remaining large-grid iteration ceiling.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

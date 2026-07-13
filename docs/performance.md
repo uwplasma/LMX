@@ -369,6 +369,24 @@ prior-pressure and control lanes at 192 iterations, about `115.4 s`, and both
 second projections fail the balance gate. The trial is removed; a useful
 coarse-space change must reduce this residual rather than only change GMRES's
 initial vector.
+Residual-spectrum traces localize the remaining error to the final three to
+five axial stations. The `21 x 24 x 64` first projection is dominated by
+`m=0`; its failed second projection spans `m=0` through `m=4`, with `m=2`
+largest. Adding the pressure-loss/flow scalar only to the `m=0` factor is
+therefore insufficient: the large solve remains at 192 iterations and fails
+with residual `4.94e-2`, while the medium restart slightly regresses. That
+trial is removed. The bounded follow-up factors the measured low modes
+separately with SOLVAX complex block Thomas solves, avoiding one enlarged dense
+block.
+That separated design passes. At `11 x 17 x 32`, projection iterations fall
+from `[78, 98, 106, 123]` to `[37, 56, 43, 58]`; cold/restart time improves
+from `65.64/24.12 s` to `57.85/10.63 s`, with charge `2.44e-9` and divergence
+`9.02e-5`. At `21 x 24 x 64`, both projections still reach 192 iterations,
+but the formerly failing second residual falls from `6.76e-2` to `8.99e-6`
+and passes the physical gate in `114.31 s`. The 360-second whole-worker cap is
+still missed after both projections, so the implementation remains on the
+experimental branch while non-projection runtime and the large iteration
+ceiling are addressed.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
