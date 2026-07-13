@@ -46,6 +46,19 @@ Production-size sweeps, Docker solvers, accelerators, and clusters run in their
 named external lanes. Their parsers, schemas, small fixtures, and failure paths
 remain in the portable gate.
 
+## Support and security
+
+Use GitHub Discussions or an issue for installation questions, reproducible
+bugs, and proposed capabilities. Include the LMX commit, Python/JAX versions,
+platform and device, the smallest reproducer, expected and observed behavior,
+and relevant residual or conservation diagnostics. Research-stage features are
+supported only within their documented evidence envelope.
+
+Report vulnerabilities through GitHub's private security-advisory interface for
+`uwplasma/LMX`; never publish exploit details, credentials, or private data in an
+issue. Security fixes target the latest release and `main`. Treat user-provided
+TOML, NPZ, CSV, JSON, VTK, and external-solver data as untrusted input.
+
 ## Benchmarks and tolerances
 
 Freeze a versioned benchmark specification before examining production results.

@@ -291,7 +291,7 @@ $$
 for this discrete operator sign convention. The bent-pipe low-De charge
 closure now uses that sign and verifies it with a direct conservative-flux
 regression test. This changed the public bent-pipe local charge residual from
-`O(1e-2)` to `2.16e-12`; see [](closure_notes.md) for the full audit trail.
+`O(1e-2)` to `2.16e-12`; see the [validation report](validation_report.md).
 
 ## Linear solver backends
 

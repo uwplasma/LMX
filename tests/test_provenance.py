@@ -16,10 +16,9 @@ def test_repository_provenance_manifests_are_canonical_and_complete():
     assert environment["portable_gate"]["branch_coverage_percent"] >= 95.0
     assert "lmx/solvers.py" in environment["repository_inventory"]["modules"]
     assert "tests/test_provenance.py" in environment["repository_inventory"]["tests"]
-    assert (
-        "campaigns/autodiff/autodiff_profile_design_demo.py"
-        in environment["repository_inventory"]["examples"]
-    )
+    examples = environment["repository_inventory"]["examples"]
+    assert "examples/autodiff_design_demo.py" in examples
+    assert "examples/cases/ducts/hunt_case.toml" in examples
 
 
 def test_feature_manifest_references_real_tests_and_all_package_modules():

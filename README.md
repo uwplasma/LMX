@@ -83,9 +83,9 @@ print("final residual:", solution.diagnostics.residual_history[-1])
 Useful next examples:
 
 ```bash
-lmx cases/ducts/shercliff_case.toml
-lmx cases/ducts/hunt_case.toml
-lmx cases/fringing/fringing_rect_case.toml
+lmx examples/cases/ducts/shercliff_case.toml
+lmx examples/cases/ducts/hunt_case.toml
+lmx examples/cases/fringing/fringing_rect_case.toml
 ```
 
 The [case cookbook](docs/case_cookbook.md) explains inputs, outputs, restarts,
@@ -228,10 +228,9 @@ skips and 95.10% branch coverage in 111.8 seconds on six Mac workers.
 ## Contributing and citing
 
 The project is under active research development. Before opening a change,
-read the [contribution and authorship policy](CONTRIBUTING.md),
+read the [contribution, support, security, and authorship policy](CONTRIBUTING.md),
 [developer guide](docs/developer_guide.md), [testing contract](docs/testing.md),
-and [plan](plan.md). Support and vulnerability reports follow
-[SUPPORT.md](SUPPORT.md) and [SECURITY.md](SECURITY.md). Benchmark changes must
+and [plan](plan.md). Benchmark changes must
 record equations, parameters, reference provenance, observables, tolerances,
 and convergence evidence.
 

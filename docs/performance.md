@@ -605,7 +605,7 @@ XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THR
 Single GPU:
 
 ```bash
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx cases/ducts/hunt_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/cases/ducts/hunt_case.toml
 ```
 
 Those commands select the execution device for the normal CLI solver run. Use
@@ -614,7 +614,7 @@ production-path device-count sweep. For remote GPU runs on the `office` host,
 the same pattern works over SSH:
 
 ```bash
-ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx cases/ducts/hunt_case.toml'
+ssh office 'cd /home/rjorge/tmp/lmx_scaling_repo && PYTHONPATH=/home/rjorge/tmp/lmx_scaling_repo CUDA_VISIBLE_DEVICES=1 JAX_PLATFORMS=cuda python3 -m lmx examples/cases/ducts/hunt_case.toml'
 ```
 
 ## Current conclusion

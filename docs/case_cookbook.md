@@ -34,7 +34,7 @@ research edits are:
 
 ```bash
 python -m lmx.cli run shercliff --ha 20 --output ./out/shercliff
-lmx cases/ducts/shercliff_case.toml
+lmx examples/cases/ducts/shercliff_case.toml
 ```
 
 ## Hunt
@@ -43,7 +43,7 @@ lmx cases/ducts/shercliff_case.toml
 
 ```bash
 python -m lmx.cli run hunt --ha 20 --output ./out/hunt
-lmx cases/ducts/hunt_case.toml
+lmx examples/cases/ducts/hunt_case.toml
 ```
 
 ### Python
@@ -117,7 +117,7 @@ Hartmann or Hunt solve and matching overview plots.
 
 ```bash
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx cases/ducts/hunt_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/cases/ducts/hunt_case.toml
 python examples/strong_scaling_demo.py --remote-host office --output ./artifacts/examples/strong_scaling
 python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
 ```
@@ -133,7 +133,7 @@ support a production strong-scaling claim.
 
 ```bash
 lmx examples/hartmann_case.toml
-lmx cases/ducts/hartmann_restart_case.toml
+lmx examples/cases/ducts/hartmann_restart_case.toml
 ```
 
 The second run resumes from the first run’s `.npz` state and extends the

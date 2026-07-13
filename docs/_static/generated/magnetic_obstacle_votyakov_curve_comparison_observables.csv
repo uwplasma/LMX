@@ -1,4 +1,0 @@
-series,sample_count,reverse_flow_onset_interaction_parameter,plateau_minimum_centerline_velocity_ratio,plateau_std,high_interaction_minimum_ratio,high_interaction_parameter
-experiment_Ha140,14,4.666666666666667,-0.137,0.01058300524425836,-0.151,34.0
-simulation_Re100,8,5.2,-0.137,0.008981462390204982,-0.148,36.0
-simulation_Re196,4,5.1891891891891895,-0.124,0.0,-0.124,16.0

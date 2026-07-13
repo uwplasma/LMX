@@ -5,7 +5,7 @@ release.
 
 For the detailed audit trail behind the currently closed release lanes,
 including equations, wall models, boundary conditions, numerical choices, and
-failed alternatives, see [](closure_notes.md).
+failed alternatives, see the [authoritative plan](https://github.com/uwplasma/LMX/blob/main/plan.md).
 
 ## Mandatory now: Benchmark A
 
@@ -798,7 +798,7 @@ scientific gap remains a matched higher-inertia reference case.
     `campaigns/fields/variable_field_bent_pipe_demo.py`
   - tabulated-field extension:
     `campaigns/fields/variable_field_tabulated_demo.py` and
-    `cases/fringing/fringing_tabulated_case.toml`
+    `examples/cases/fringing/fringing_tabulated_case.toml`
   - recovery test: reproduce the current fringing benchmarks through the
     generic field-loading path
   - extension: tabulated or analytic 3D fields for ducts and pipes

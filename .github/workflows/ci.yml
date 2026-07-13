@@ -2,342 +2,46 @@ name: ci
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+env:
+  MPLBACKEND: Agg
+  XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+  XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+
 jobs:
-  tests:
+  test:
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    name: portable full (Python ${{ matrix.python-version }})
-    timeout-minutes: 15
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v4
-
       - uses: ./.github/actions/setup-lmx
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Verify provenance and dependency lock
+      - name: Verify metadata
         run: python scripts/manage_provenance.py --check
-
-      - name: Run complete test and branch-coverage gate
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
+      - name: Run all tests and branch coverage
         run: python scripts/run_full_test_suite.py --budget-seconds 600
-
-      - name: Upload coverage report
-        if: always()
+      - name: Upload failure diagnostics
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: portable-gate-py${{ matrix.python-version }}
+          name: test-diagnostics-py${{ matrix.python-version }}
           path: |
             coverage.xml
             artifacts/tests/full-suite-junit.xml
           if-no-files-found: ignore
-
-      - name: Run bounded release-readiness check
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_release_readiness.py --output artifacts/ci/release_readiness.json
-
-  bounded-validation-artifacts:
-    runs-on: ubuntu-latest
-    name: bounded validation (${{ matrix.case }})
-    strategy:
-      fail-fast: false
-      matrix:
-        case:
-          - hartmann
-          - shercliff
-          - hunt
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded solver validation artifacts
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python scripts/run_validation_suite.py \
-            --output artifacts/ci/validation/${{ matrix.case }} \
-            --resolution 8 \
-            --cases ${{ matrix.case }} \
-            --skip-paraview
-
-      - name: Upload bounded validation artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: bounded-validation-${{ matrix.case }}
-          path: artifacts/ci/validation/${{ matrix.case }}
-
-  external-reference-contract:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Verify external-reference parity contract
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-          LMX_FREEMHD_INSTALL_DIR: artifacts/ci/empty_freemhd_install
-          LMX_FREEMHD_PROCESSED_ROOT: artifacts/ci/empty_freemhd_processed
-        run: python scripts/run_freemhd_parity_suite.py --output artifacts/ci/freemhd_parity
-
-      - name: Upload external-reference contract artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: external-reference-contract
-          path: artifacts/ci/freemhd_parity
-
-  convergence-artifacts:
-    runs-on: ubuntu-latest
-    name: convergence level n${{ matrix.resolution }}
-    strategy:
-      fail-fast: false
-      matrix:
-        resolution:
-          - 8
-          - 12
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded mesh-convergence artifacts
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python scripts/run_convergence_suite.py \
-            --output artifacts/ci/convergence/n${{ matrix.resolution }} \
-            --cases hartmann \
-            --ha 5 \
-            --resolutions ${{ matrix.resolution }}
-
-      - name: Upload convergence artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: convergence-artifacts-n${{ matrix.resolution }}
-          path: artifacts/ci/convergence/n${{ matrix.resolution }}
-
-  time-convergence-artifacts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded time-convergence artifacts
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python scripts/run_time_convergence_suite.py \
-            --output artifacts/ci/time_convergence \
-            --cases hartmann \
-            --ha 5 \
-            --resolution 8 \
-            --dts 0.004,0.002 \
-            --t-final 0.004
-
-      - name: Upload time-convergence artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: time-convergence-artifacts
-          path: artifacts/ci/time_convergence
-
-  q2d-validation-artifacts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded Q2D validation artifacts
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python campaigns/q2d/q2d_decay_validation.py
-          python campaigns/q2d/q2d_forced_validation.py
-          python campaigns/q2d/q2d_wall_bounded_validation.py
-          python campaigns/q2d/q2d_turbulence_decay_demo.py
-          mkdir -p artifacts/ci/q2d
-          cp -R artifacts/examples/q2d_decay_validation artifacts/ci/q2d/
-          cp -R artifacts/examples/q2d_forced_validation artifacts/ci/q2d/
-          cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/ci/q2d/
-          cp -R artifacts/examples/q2d_turbulence_decay artifacts/ci/q2d/
-
-      - name: Upload Q2D artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: q2d-validation-artifacts
-          path: artifacts/ci/q2d
-
-  release-tests:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run regression and physics suites
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python -m pytest -m "regression or physics"
-
-  validation-artifacts:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run validation artifact suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_validation_suite.py --output artifacts/validation
-
-      - name: Run convergence artifact suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_convergence_suite.py --output artifacts/convergence --cases hartmann --ha 5 --resolutions 8,16,32
-
-      - name: Run time-convergence artifact suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_time_convergence_suite.py --output artifacts/time_convergence --cases hartmann --ha 5 --resolution 16 --dts 0.004,0.002,0.001
-
-      - name: Run control-sweep artifact suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_solver_control_sweep.py --output artifacts/control_sweep --case hartmann --ha 20 --resolution 32 --parameter potential_iterations --values 50,100,200,400,800 --value-type int
-
-      - name: Run FreeMHD parity artifact suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_freemhd_parity_suite.py --output artifacts/freemhd_parity
-
-      - name: Run Q2D reduced-model artifact suite
-        env:
-          MPLBACKEND: Agg
-          XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-          XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-          OMP_NUM_THREADS: "1"
-          OPENBLAS_NUM_THREADS: "1"
-          MKL_NUM_THREADS: "1"
-          NUMEXPR_NUM_THREADS: "1"
-        run: |
-          python campaigns/q2d/q2d_decay_validation.py
-          python campaigns/q2d/q2d_forced_validation.py
-          python campaigns/q2d/q2d_wall_bounded_validation.py
-          mkdir -p artifacts/q2d
-          cp -R artifacts/examples/q2d_decay_validation artifacts/q2d/
-          cp -R artifacts/examples/q2d_forced_validation artifacts/q2d/
-          cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/q2d/
-
-      - name: Build validation summary
-        run: |
-          python scripts/summarize_ci_artifacts.py \
-            --validation-summary artifacts/validation/summary.json \
-            --parity-summary artifacts/freemhd_parity/summary.json \
-            --control-sweep-summary artifacts/control_sweep/summary.json \
-            --output-json artifacts/validation/summary-report.json \
-            --output-md artifacts/validation/summary-report.md
-
-      - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: validation-artifacts
-          path: |
-            artifacts/validation
-            artifacts/convergence
-            artifacts/time_convergence
-            artifacts/control_sweep
-            artifacts/freemhd_parity
-            artifacts/q2d

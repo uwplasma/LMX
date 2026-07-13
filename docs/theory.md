@@ -210,8 +210,8 @@ explicit solid wall with reduced conductivity can preserve the scalar
 conductance ratio but still redistribute electric potential and current over a
 different finite wall volume. The retained validation therefore uses the
 physical thin-wall thickness and conductivity ratio from the reference files.
-The full closure rationale and failed thick-wall probes are recorded in
-[](closure_notes.md).
+The retained assumptions and evidence are summarized in the
+[validation report](validation_report.md).
 
 ## Charge conservation and compatibility projection
 

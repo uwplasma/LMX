@@ -57,9 +57,9 @@ quick rectangular, layered, and mapped-pipe launches.
 ## Run the scaffold
 
 ```bash
-lmx cases/fringing/fringing_rect_case.toml
-lmx cases/fringing/fringing_layered_case.toml
-lmx cases/fringing/fringing_pipe_case.toml
+lmx examples/cases/fringing/fringing_rect_case.toml
+lmx examples/cases/fringing/fringing_layered_case.toml
+lmx examples/cases/fringing/fringing_pipe_case.toml
 lmx run fringing_rect --ha 20 --nx-stations 21 --output out/fringing_rect
 lmx run fringing_layered --ha 20 --nx-stations 21 --wall-cells 1 --insulator-cells 1 --output out/fringing_layered
 lmx run fringing_pipe --ha 20 --radius 0.5 --nr 24 --ntheta 48 --output out/fringing_pipe
@@ -95,20 +95,20 @@ The example writes:
   `overview.png`, `overview.pdf`, a station-archive manifest, per-station
   `station_XXXX.npz` field bundles, and a JSON summary with conservation metrics
 
-The input files `cases/fringing/fringing_rect_case.toml`,
-`cases/fringing/fringing_layered_case.toml`, and
-`cases/fringing/fringing_pipe_case.toml` are now the recommended starting points for
+The input files `examples/cases/fringing/fringing_rect_case.toml`,
+`examples/cases/fringing/fringing_layered_case.toml`, and
+`examples/cases/fringing/fringing_pipe_case.toml` are now the recommended starting points for
 3D fringing studies. They enable figure writing directly
 through `[output].write_plots = true` and keep the full solver setup in the
 input file rather than hiding it in Python glue.
 
-The paired restart template is `cases/fringing/fringing_layered_restart_case.toml`.
+The paired restart template is `examples/cases/fringing/fringing_layered_restart_case.toml`.
 Use it after a base layered run has written its extruded restart bundle under
 `artifacts/examples/toml_fringing_layered/restart/`.
 
 Fringing overview artifact:
 
-![LMX fringing rectangular-duct slice](_static/generated/fringing_benchmark_rect.png)
+![LMX fringing rectangular-duct slice](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/fringing_benchmark_rect.png)
 
 Mapped-pipe comparison artifact:
 
@@ -116,11 +116,11 @@ Mapped-pipe comparison artifact:
 
 Restart / resume reproducibility artifact:
 
-![LMX extruded restart reproducibility](_static/generated/extruded_restart_demo.png)
+![LMX extruded restart reproducibility](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/extruded_restart_demo.png)
 
 Larger 3D validation campaign artifact:
 
-![LMX extruded validation campaign](_static/generated/extruded_validation_campaign.png)
+![LMX extruded validation campaign](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/extruded_validation_campaign.png)
 
 The larger campaign is intentionally a resolution study, not a claim
 that every coarse layered case is already fully converged. In particular, the
@@ -333,7 +333,7 @@ That summary separates the current dense-slice status clearly:
   parity gap is still dominated by the high-`Ha`, high-`Re` reference regime
   mismatch described above
 
-![Benchmark B quantitative summary](_static/generated/benchmark_b_quantitative_summary.png)
+![Benchmark B quantitative summary](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/benchmark_b_quantitative_summary.png)
 
 ## What the example shows
 

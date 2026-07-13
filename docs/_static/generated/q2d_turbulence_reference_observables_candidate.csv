@@ -1,6 +1,0 @@
-observable,value,tolerance,relative_tolerance,units,source,note
-energy_decay_ratio,,,0.10,dimensionless,/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt,Candidate row left open; Q2DmhdFoam spectral summary does not include matched LMX interval energy history.
-enstrophy_decay_ratio,,,0.15,dimensionless,/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt,Candidate row left open; requires matched vorticity/enstrophy history.
-final_spectral_centroid,2.46106495468,,0.15,mode index,/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt,Candidate Q2DmhdFoam spectral target only; not yet a matched LMX turbulent parity run.
-final_high_k_energy_fraction,0.151699327623,,0.20,dimensionless,/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt,Computed from normalized spectral amplitudes at mode index >= 4; replace with matched shell-energy definition before strict closure.
-turnover_count,,,0.10,dimensionless,/Users/rogerio/local/tests/lmx_external_codes/Q2DmhdFoam/run/lidDriven/IDM_output_U.txt,Candidate row left open; requires matched time integration interval.

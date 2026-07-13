@@ -4,270 +4,85 @@ on:
   workflow_dispatch:
     inputs:
       publish_target:
-        description: "Optional package publish target after validation and build."
+        description: Optional package publish target
         required: true
-        default: "none"
+        default: none
         type: choice
-        options:
-          - none
-          - testpypi
-          - pypi
+        options: [none, testpypi, pypi]
   release:
-    types:
-      - published
+    types: [published]
 
 permissions:
   contents: read
 
-env:
-  MPLBACKEND: Agg
-  XLA_PYTHON_CLIENT_PREALLOCATE: "false"
-  XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
-  OMP_NUM_THREADS: "1"
-  OPENBLAS_NUM_THREADS: "1"
-  MKL_NUM_THREADS: "1"
-  NUMEXPR_NUM_THREADS: "1"
-
 jobs:
-  validation-gate:
-    name: selected validation artifact gate
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
       - uses: ./.github/actions/setup-lmx
         with:
           extras: dev,docs
-
-      - name: Verify provenance and dependency lock
+      - name: Verify metadata
         run: python scripts/manage_provenance.py --check
-
-      - name: Run complete portable test gate
+      - name: Run portable quality gate
         run: python scripts/run_full_test_suite.py --budget-seconds 600
-
       - name: Build documentation
         run: python -m sphinx -W -b html docs docs/_build/html
 
-      - name: Run bounded release-readiness artifact gate
-        run: |
-          mkdir -p artifacts/release
-          python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
-          python campaigns/publication/publication_figure_campaign.py
-          cp docs/_static/generated/publication_figure_campaign_summary.json artifacts/release/publication_figure_campaign_summary.json
-          cp docs/_static/generated/publication_figure_campaign_table.csv artifacts/release/publication_figure_campaign_table.csv
-
-      - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-validation-artifacts
-          path: |
-            artifacts/release
-            docs/_build/html
-
-  bounded-validation-artifacts:
-    name: bounded solver validation artifacts (${{ matrix.case }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        case:
-          - hartmann
-          - shercliff
-          - hunt
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded solver validation artifacts
-        run: |
-          python scripts/run_validation_suite.py \
-            --output artifacts/release/validation/${{ matrix.case }} \
-            --resolution 8 \
-            --cases ${{ matrix.case }} \
-            --skip-paraview
-
-      - name: Upload bounded validation artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-bounded-validation-${{ matrix.case }}
-          path: artifacts/release/validation/${{ matrix.case }}
-
-  external-reference-contract:
-    name: external-reference contract
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Verify external-reference parity contract
-        env:
-          LMX_FREEMHD_INSTALL_DIR: artifacts/release/empty_freemhd_install
-          LMX_FREEMHD_PROCESSED_ROOT: artifacts/release/empty_freemhd_processed
-        run: python scripts/run_freemhd_parity_suite.py --output artifacts/release/freemhd_parity
-
-      - name: Upload external-reference contract artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-external-reference-contract
-          path: artifacts/release/freemhd_parity
-
-  convergence-artifacts:
-    name: bounded convergence level n${{ matrix.resolution }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        resolution:
-          - 8
-          - 12
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded convergence artifacts
-        run: |
-          python scripts/run_convergence_suite.py \
-            --output artifacts/release/convergence/n${{ matrix.resolution }} \
-            --cases hartmann \
-            --ha 5 \
-            --resolutions ${{ matrix.resolution }}
-
-      - name: Upload convergence artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-convergence-artifacts-n${{ matrix.resolution }}
-          path: artifacts/release/convergence/n${{ matrix.resolution }}
-
-  time-convergence-artifacts:
-    name: bounded time-convergence artifacts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded time-convergence artifacts
-        run: |
-          python scripts/run_time_convergence_suite.py \
-            --output artifacts/release/time_convergence \
-            --cases hartmann \
-            --ha 5 \
-            --resolution 8 \
-            --dts 0.004,0.002 \
-            --t-final 0.004
-
-      - name: Upload time-convergence artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-time-convergence-artifacts
-          path: artifacts/release/time_convergence
-
-  q2d-validation-artifacts:
-    name: bounded Q2D validation artifacts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-lmx
-
-      - name: Run bounded Q2D validation artifacts
-        run: |
-          python campaigns/q2d/q2d_decay_validation.py
-          python campaigns/q2d/q2d_forced_validation.py
-          python campaigns/q2d/q2d_wall_bounded_validation.py
-          python campaigns/q2d/q2d_turbulence_decay_demo.py
-          mkdir -p artifacts/release/q2d
-          cp -R artifacts/examples/q2d_decay_validation artifacts/release/q2d/
-          cp -R artifacts/examples/q2d_forced_validation artifacts/release/q2d/
-          cp -R artifacts/examples/q2d_wall_bounded_validation artifacts/release/q2d/
-          cp -R artifacts/examples/q2d_turbulence_decay artifacts/release/q2d/
-
-      - name: Upload Q2D artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-q2d-validation-artifacts
-          path: artifacts/release/q2d
-
   build:
-    name: build and inspect distributions
+    needs: validate
     runs-on: ubuntu-latest
-    needs:
-      - validation-gate
-      - bounded-validation-artifacts
-      - external-reference-contract
-      - convergence-artifacts
-      - time-convergence-artifacts
-      - q2d-validation-artifacts
     steps:
       - uses: actions/checkout@v4
-
       - uses: ./.github/actions/setup-lmx
         with:
           extras: release
-
-      - name: Build package artifacts
+      - name: Build and inspect distributions
         run: |
           python -m build
           python -m twine check dist/*
-
-      - name: Install wheel in a clean environment
+      - name: Smoke-test the wheel
         run: |
           python -m venv /tmp/lmx-wheel-check
-          /tmp/lmx-wheel-check/bin/python -m pip install --upgrade pip
           /tmp/lmx-wheel-check/bin/python -m pip install dist/*.whl
-          /tmp/lmx-wheel-check/bin/python -c "import lmx; import lmx.solvers; import lmx.validation"
-
-      - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
+          /tmp/lmx-wheel-check/bin/python -c "import lmx; import lmx.solvers"
+      - uses: actions/upload-artifact@v4
         with:
           name: python-distributions
           path: dist/
 
   publish-testpypi:
-    name: publish to TestPyPI
     if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
+    needs: build
     runs-on: ubuntu-latest
-    needs:
-      - build
     permissions:
-      contents: read
       id-token: write
     environment:
       name: testpypi
       url: https://test.pypi.org/p/lmx
     steps:
-      - name: Download package artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: python-distributions
           path: dist/
-
-      - name: Publish package distributions to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    name: publish to PyPI
     if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi'
+    needs: build
     runs-on: ubuntu-latest
-    needs:
-      - build
     permissions:
-      contents: read
       id-token: write
     environment:
       name: pypi
       url: https://pypi.org/p/lmx
     steps:
-      - name: Download package artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: python-distributions
           path: dist/
-
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1

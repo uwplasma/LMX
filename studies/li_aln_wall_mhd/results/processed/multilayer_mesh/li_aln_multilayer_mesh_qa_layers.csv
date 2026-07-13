@@ -1,9 +1,0 @@
-side,layer_index_fluid_outward,name,conductivity_s_m,thickness_m,cells,normal_cell_width_m,inner_distance_from_fluid_m,outer_distance_from_fluid_m,mhd_performance_only
-left,0,aln,1e-08,0.0002,4,5e-05,0.0,0.0002,True
-left,1,316L,1350000.0,0.001,8,0.000125,0.0002,0.0012000000000000001,True
-right,0,aln,1e-08,0.0002,4,5e-05,0.0,0.0002,True
-right,1,316L,1350000.0,0.001,8,0.000125,0.0002,0.0012000000000000001,True
-bottom,0,aln,1e-08,0.0002,4,5e-05,0.0,0.0002,True
-bottom,1,316L,1350000.0,0.001,8,0.000125,0.0002,0.0012000000000000001,True
-top,0,aln,1e-08,0.0002,4,5e-05,0.0,0.0002,True
-top,1,316L,1350000.0,0.001,8,0.000125,0.0002,0.0012000000000000001,True

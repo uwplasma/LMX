@@ -237,7 +237,7 @@ cell-gradient-only version.
 
 Extruded-target artifact:
 
-![LMX extruded-target autodiff summary](_static/generated/autodiff_extruded_target.png)
+![LMX extruded-target autodiff summary](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/autodiff_extruded_target.png)
 
 The field-level extruded example pushes the objective deeper into the
 projection loop. It matches selected-station fields instead of only
@@ -257,7 +257,7 @@ python campaigns/autodiff/autodiff_extruded_field_design_demo.py \
 
 Field-level artifact:
 
-![LMX extruded field autodiff summary](_static/generated/autodiff_extruded_field_design.png)
+![LMX extruded field autodiff summary](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/autodiff_extruded_field_design.png)
 
 The projection-trajectory example goes one step deeper still. It matches
 selected-station fields and conservation diagnostics across the
@@ -272,7 +272,7 @@ projection iterations themselves:
 
 Trajectory-level artifact:
 
-![LMX extruded trajectory autodiff summary](_static/generated/autodiff_extruded_trajectory.png)
+![LMX extruded trajectory autodiff summary](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/autodiff_extruded_trajectory.png)
 
 `campaigns/autodiff/autodiff_extruded_trajectory_demo.py` is the deepest bounded
 example in the differentiable fringing lane because it matches fields

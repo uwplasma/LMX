@@ -38,7 +38,7 @@
       "tier": "A",
       "title": "Fully developed Hartmann duct verification",
       "workflows": [
-        "campaigns/ducts/hartmann_validation_ladder.py"
+        "examples/hartmann_example.py"
       ]
     },
     {
@@ -278,7 +278,7 @@
       "id": "lmx-benchmark-matrix",
       "kind": "repository_document",
       "path": "docs/benchmark_matrix.md",
-      "sha256": "2269db3f34de452ddb2a2d37df735dbe86bcfa6315f91a0f27f831a26bd6cb5a",
+      "sha256": "9b46c19e40c28b0fa107b1b79bf0753acbc0ad79a8fcdd2f8732c3c8e9367389",
       "title": "LMX Benchmark Matrix"
     },
     {

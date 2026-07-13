@@ -41,8 +41,8 @@ Run one of the example cases:
 
 ```bash
 lmx examples/hartmann_case.toml
-lmx cases/ducts/shercliff_case.toml
-lmx cases/ducts/hunt_case.toml
+lmx examples/cases/ducts/shercliff_case.toml
+lmx examples/cases/ducts/hunt_case.toml
 ```
 
 The equivalent module entrypoint also works:
@@ -81,7 +81,7 @@ LMX inherits the active JAX backend from the shell:
 ```bash
 JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
 XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx cases/ducts/hunt_case.toml
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/cases/ducts/hunt_case.toml
 ```
 
 ## Use custom geometry and magnetic fields from Python

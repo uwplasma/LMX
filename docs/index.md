@@ -47,14 +47,10 @@ testing
 benchmark_matrix
 validation_report
 media
-closure_notes
 performance
 autodiff
 fringing
 external_benchmarks
-executable_external_code_audit
-publication_figure_plan
-research_grade_closure_plan
 research_directions
 ```
 

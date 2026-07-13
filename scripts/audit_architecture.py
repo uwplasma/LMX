@@ -120,12 +120,7 @@ def _release_asset_candidates(root: Path) -> list[dict[str, Any]]:
             continue
         relative = path.relative_to(root)
         generated_doc = relative.parts[:3] == ("docs", "_static", "generated")
-        generated_study = (
-            len(relative.parts) >= 4
-            and relative.parts[0] == "studies"
-            and ("results" in relative.parts or "figures" in relative.parts)
-        )
-        if not (generated_doc or generated_study):
+        if not generated_doc:
             continue
         candidates.append(
             {
@@ -182,60 +177,8 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
     missing_curated = [path for path in curated_paths if not (root / path).is_file()]
     if missing_curated:
         raise ValueError(f"Curated examples do not exist: {missing_curated}")
-    dispositions = catalog.get("disposition", [])
-    if not isinstance(dispositions, list) or not dispositions:
-        raise ValueError("examples/catalog.toml must classify uncurated workflows")
-    allowed_actions = {"merge_into_curated", "move_to_campaigns", "move_to_cases"}
-    disposition_paths: list[str] = []
-    pending_disposition_paths: list[str] = []
-    for item in dispositions:
-        if item.get("action") not in allowed_actions:
-            raise ValueError(
-                f"Unknown workflow disposition action: {item.get('action')!r}"
-            )
-        if not item.get("id") or not item.get("target") or not item.get("reason"):
-            raise ValueError("Each workflow disposition needs id, target, and reason")
-        status = item.get("status", "pending")
-        if status not in {"pending", "complete"}:
-            raise ValueError(f"Unknown workflow disposition status: {status!r}")
-        paths = item.get("paths")
-        if not isinstance(paths, list) or not paths:
-            raise ValueError(f"Workflow disposition {item.get('id')!r} has no paths")
-        paths = [str(path) for path in paths]
-        disposition_paths.extend(paths)
-        if status == "pending":
-            pending_disposition_paths.extend(paths)
-        else:
-            action = str(item["action"])
-            target = root / str(item["target"])
-            for source in paths:
-                if (root / source).exists():
-                    raise ValueError(
-                        f"Completed workflow source still exists: {source}"
-                    )
-                if action in {"move_to_campaigns", "move_to_cases"}:
-                    destination = target / Path(source).name
-                    if not destination.is_file():
-                        raise ValueError(
-                            f"Completed workflow destination is missing: {destination}"
-                        )
-            if action == "merge_into_curated" and not target.is_file():
-                raise ValueError(
-                    f"Completed workflow merge target is missing: {target}"
-                )
-    duplicate_dispositions = sorted(
-        path for path in set(disposition_paths) if disposition_paths.count(path) > 1
-    )
-    if duplicate_dispositions:
-        raise ValueError(
-            f"Workflows have multiple dispositions: {duplicate_dispositions}"
-        )
-    overlap = sorted(set(curated_paths) & set(pending_disposition_paths))
-    if overlap:
-        raise ValueError(f"Curated workflows also have dispositions: {overlap}")
-    classified = set(curated_paths) | set(pending_disposition_paths)
-    unclassified = sorted(set(examples) - classified)
-    stale = sorted(classified - set(examples))
+    unclassified = sorted(set(examples) - set(curated_paths))
+    stale = sorted(set(curated_paths) - set(examples))
     if unclassified or stale:
         raise ValueError(
             f"Workflow catalog drift: unclassified={unclassified}, stale={stale}"
@@ -263,11 +206,6 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             "curated_example_count": len(curated_paths),
             "curated_examples": curated,
             "uncurated_example_count": len(set(examples) - set(curated_paths)),
-            "workflow_disposition_count": len(disposition_paths),
-            "pending_workflow_disposition_count": len(pending_disposition_paths),
-            "completed_workflow_disposition_count": len(disposition_paths)
-            - len(pending_disposition_paths),
-            "workflow_dispositions": dispositions,
             "checkout_bytes_excluding_build_artifacts": checkout_bytes,
             "release_asset_candidate_bytes": sum(
                 item["bytes"] for item in release_candidates

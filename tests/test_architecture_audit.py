@@ -17,10 +17,7 @@ def test_tracked_architecture_baseline_matches_repository() -> None:
     assert current["inventory"]["maintained_core_lines"] <= 15000
     assert current["inventory"]["root_export_count"] <= 30
     assert current["inventory"]["curated_example_count"] <= 20
-    assert (
-        current["inventory"]["pending_workflow_disposition_count"]
-        == current["inventory"]["uncurated_example_count"]
-    )
+    assert current["inventory"]["uncurated_example_count"] == 0
     assert (
         current["inventory"]["checkout_bytes_excluding_build_artifacts"]
         <= 10 * 1024 * 1024
@@ -44,18 +41,10 @@ def test_architecture_inventory_ignores_generated_egg_info(tmp_path: Path) -> No
     assert _checkout_size(tmp_path) == 1
 
 
-def test_every_uncurated_workflow_has_one_reviewed_disposition() -> None:
+def test_every_workflow_is_curated() -> None:
     inventory = build_inventory()["inventory"]
     curated = {item["path"] for item in inventory["curated_examples"]}
-    disposed = [
-        path
-        for item in inventory["workflow_dispositions"]
-        if item.get("status", "pending") == "pending"
-        for path in item["paths"]
-    ]
-    assert len(disposed) == len(set(disposed))
-    assert curated.isdisjoint(disposed)
-    assert curated | set(disposed) == set(inventory["examples"])
+    assert curated == set(inventory["examples"])
 
 
 def test_curated_examples_use_submodules_for_advanced_apis() -> None:

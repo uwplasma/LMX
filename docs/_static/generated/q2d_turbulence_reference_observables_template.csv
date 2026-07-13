@@ -1,6 +1,0 @@
-observable,value,tolerance,relative_tolerance,units,source,note
-energy_decay_ratio,,,0.10,dimensionless,digitized Sommeria-Moreau-style turbulent reference,Final-to-initial kinetic-energy ratio at matched Hartmann friction and time.
-enstrophy_decay_ratio,,,0.15,dimensionless,digitized Sommeria-Moreau-style turbulent reference,Final-to-initial enstrophy proxy ratio at matched parameters.
-final_spectral_centroid,,,0.10,1/length,digitized spectrum or reference output,Shell-energy spectral centroid at the final compared time.
-final_high_k_energy_fraction,,,0.15,dimensionless,digitized spectrum or reference output,Fraction of shell energy above the documented high-wavenumber cutoff.
-turnover_count,,,0.10,dimensionless,reference runtime diagnostics,Integrated eddy-turnover proxy over the compared interval.

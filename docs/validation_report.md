@@ -41,9 +41,8 @@ The `1.0` release is aiming for:
 - low-De bent-pipe current closure that is locally conservative, not only
   globally balanced
 
-The latest closure details are collected in [](closure_notes.md). That page is
-the audit trail for the two recent blockers: Hunt `Ha = 100` side-layer
-agreement and bent-pipe local `div J`.
+The retained evidence below summarizes the two recent blockers: Hunt
+`Ha = 100` side-layer agreement and bent-pipe local `div J`.
 
 ## Recently Closed Release Lanes
 
@@ -62,11 +61,9 @@ matched isothermal side-wall comparison; that side-wall comparison now passes
 its retained cell-centered observables, but it is still not a turbulent parity
 claim.
 
-The closure criteria and execution order for those three lanes are now tracked
-in [](research_grade_closure_plan.md). That page defines the external-reference
-provenance, physics gates, convergence checks, publication artifacts, and
-strict release-readiness conditions needed before any lane can be marked
-research-grade closed.
+The closure criteria and execution order for those lanes are tracked in the
+[authoritative plan](https://github.com/uwplasma/LMX/blob/main/plan.md), including external-reference provenance,
+physics gates, convergence, and publication evidence.
 
 The executable external-code audit now has a generated map that separates
 available solver/data paths from completed observable-level parity:
@@ -101,7 +98,7 @@ fully developed reference case with MPI, exports VTK fields, and writes the
 profile/summary artifact shown below. This closes the external-code rerun
 plumbing; it remains separate from the stricter matched turbulent parity gate.
 
-![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
+![Archived Q2DmhdFoam reference](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2dmhdfoam_docker_reference.png)
 
 The same container can run non-default Q2DmhdFoam cases through
 `CASE_RELATIVE_PATH`. The lid-driven smoke below was rerun from the pinned
@@ -149,7 +146,7 @@ external Q2D cases for strict nonlinear turbulence parity, and the current
 bent-pipe example remains a low-De current-closure baseline rather than a
 Dean-vortex validation:
 
-![LMX strict blocker closure attempt](_static/generated/research_grade_strict_blocker_attempt.png)
+![LMX strict blocker closure attempt](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/research_grade_strict_blocker_attempt.png)
 
 Two blocker-support artifacts were added after that audit. The Q2DmhdFoam
 adapter now ingests saved force coefficients and probe histories in addition to
@@ -169,7 +166,7 @@ The current reduced LMX case has positive minimum centerline velocity
 needs a geometry-matched, inertia-capable magnetic-obstacle solve or a matched
 external-code parity case before this lane can close.
 
-![LMX magnetic-obstacle Votyakov strict attempt](_static/generated/magnetic_obstacle_reference_comparison.png)
+![LMX magnetic-obstacle Votyakov strict attempt](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/magnetic_obstacle_reference_comparison.png)
 
 `campaigns/magnetic_obstacle/magnetic_obstacle_votyakov_curve_validation.py` now also renders the
 full digitized Votyakov curve used by that scalar gate. It extracts reverse-flow
@@ -189,7 +186,7 @@ while the target requires `secondary_flow_rms_ratio ≈ 4.13e-2`. This confirms
 that the remaining task is a higher-inertia secondary-flow model or solved
 curved-pipe reference, not another low-De current-closure run.
 
-![LMX Dean-vortex Bayat-Rezai strict attempt](_static/generated/dean_vortex_reference_comparison.png)
+![LMX Dean-vortex Bayat-Rezai strict attempt](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/dean_vortex_reference_comparison.png)
 
 ![LMX Dean-flow literature validation](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/dean_literature_validation.png)
 

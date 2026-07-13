@@ -128,7 +128,7 @@ This produces VTK fields, `profile.csv`, `summary.json`, and the panel below
 from a steady `Q2DfullyDeveloped` rerun. It closes the runnable external-code
 gate but remains distinct from a matched turbulence-parity benchmark.
 
-![Docker-rerun Q2DmhdFoam reference](_static/generated/q2dmhdfoam_docker_reference.png)
+![Archived Q2DmhdFoam reference](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/q2dmhdfoam_docker_reference.png)
 
 Generate the template with:
 

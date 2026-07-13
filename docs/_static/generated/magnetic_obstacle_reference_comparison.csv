@@ -1,2 +1,0 @@
-observable,lmx_value,reference_value,absolute_error,relative_error,effective_tolerance,validation_pass,status,units,source
-minimum_centerline_velocity_ratio,0.9975211034129313,-0.13,1.1275211034129313,8.673239257022548,0.03,False,compared,dimensionless,"Approximate digitization of Votyakov et al. Fig. 7(a), N > 15 plateau"

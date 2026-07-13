@@ -255,14 +255,14 @@ def test_shipped_example_toml_files_parse():
 
     for relative in (
         "examples/hartmann_case.toml",
-        "cases/ducts/hartmann_restart_case.toml",
-        "cases/ducts/shercliff_case.toml",
-        "cases/ducts/hunt_case.toml",
-        "cases/fringing/fringing_rect_case.toml",
-        "cases/fringing/fringing_tabulated_case.toml",
-        "cases/fringing/fringing_layered_case.toml",
-        "cases/fringing/fringing_layered_restart_case.toml",
-        "cases/fringing/fringing_pipe_case.toml",
+        "examples/cases/ducts/hartmann_restart_case.toml",
+        "examples/cases/ducts/shercliff_case.toml",
+        "examples/cases/ducts/hunt_case.toml",
+        "examples/cases/fringing/fringing_rect_case.toml",
+        "examples/cases/fringing/fringing_tabulated_case.toml",
+        "examples/cases/fringing/fringing_layered_case.toml",
+        "examples/cases/fringing/fringing_layered_restart_case.toml",
+        "examples/cases/fringing/fringing_pipe_case.toml",
     ):
         config = load_run_config(root / relative)
         assert config.case.name
@@ -271,7 +271,7 @@ def test_shipped_example_toml_files_parse():
 
 def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann_walls():
     root = Path(__file__).resolve().parents[1]
-    config = load_run_config(root / "cases/ducts/hunt_case.toml")
+    config = load_run_config(root / "examples/cases/ducts/hunt_case.toml")
 
     boundaries = {
         boundary.name: boundary for boundary in config.case.boundary_conditions

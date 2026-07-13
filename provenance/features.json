@@ -61,7 +61,7 @@
       },
       "title": "Fully developed inductionless duct solver",
       "workflows": [
-        "campaigns/ducts/hartmann_validation_ladder.py"
+        "examples/hartmann_example.py"
       ]
     },
     {
@@ -84,7 +84,7 @@
       },
       "title": "Uniform, analytic, divergence-free, and tabulated imposed fields",
       "workflows": [
-        "campaigns/fields/variable_field_validation.py"
+        "examples/variable_field_extruded_demo.py"
       ]
     },
     {
@@ -109,7 +109,7 @@
       },
       "title": "Insulating, conducting, thin-wall, multilayer, and degraded wall models",
       "workflows": [
-        "campaigns/walls/li_aln_wall_stack_phase0_2.py"
+        "examples/hunt_example.py"
       ]
     },
     {
@@ -132,7 +132,7 @@
       },
       "title": "Restart, structured outputs, and field export",
       "workflows": [
-        "cases/ducts/hartmann_restart_case.toml"
+        "examples/cases/ducts/hartmann_restart_case.toml"
       ]
     },
     {
@@ -157,7 +157,7 @@
       },
       "title": "Visualization and publication artifact contracts",
       "workflows": [
-        "campaigns/tutorials/plotting_api_demo.py"
+        "examples/hartmann_example.py"
       ]
     },
     {
@@ -206,7 +206,7 @@
       },
       "title": "Differentiable observables and inverse-design workflows",
       "workflows": [
-        "campaigns/autodiff/autodiff_profile_design_demo.py"
+        "examples/autodiff_design_demo.py"
       ]
     },
     {
@@ -254,7 +254,7 @@
       },
       "title": "Reduced quasi-two-dimensional MHD models",
       "workflows": [
-        "campaigns/q2d/q2d_decay_validation.py"
+        "docs/benchmark_matrix.md"
       ]
     },
     {
@@ -277,7 +277,7 @@
       },
       "title": "Reduced Dean-flow correlation and reporting",
       "workflows": [
-        "campaigns/fringing/dean_literature_validation.py"
+        "examples/pipe_reference_comparison_demo.py"
       ]
     },
     {
@@ -301,7 +301,7 @@
       },
       "title": "WHAM blanket geometry and reduced pressure-flow model",
       "workflows": [
-        "campaigns/blanket/wham_blanket_flow_demo.py"
+        "docs/geometry.md"
       ]
     },
     {
@@ -351,7 +351,7 @@
       },
       "title": "Research-claim status, blocker, and showcase reporting",
       "workflows": [
-        "campaigns/status/research_grade_closure_dashboard.py"
+        "docs/validation_report.md"
       ]
     }
   ],

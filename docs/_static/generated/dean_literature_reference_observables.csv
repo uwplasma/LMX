@@ -1,6 +1,0 @@
-observable,value,tolerance,relative_tolerance,units,source,note
-bayat_rezai_vde_de_2.73,0.001062222629746719,8.497781037973753e-05,0.08,m/s,"Bayat & Rezai, Sci. Rep. 2017, Eq. 8",Average Dean velocity correlation for De up to about 30.
-bayat_rezai_vde_de_6.82,0.004724316287952816,0.0003779453030362253,0.08,m/s,"Bayat & Rezai, Sci. Rep. 2017, Eq. 8",Average Dean velocity correlation for De up to about 30.
-bayat_rezai_vde_de_10,0.00881597672189958,0.0007052781377519663,0.08,m/s,"Bayat & Rezai, Sci. Rep. 2017, Eq. 8",Average Dean velocity correlation for De up to about 30.
-bayat_rezai_vde_de_20,0.027286593917392767,0.0021829275133914213,0.08,m/s,"Bayat & Rezai, Sci. Rep. 2017, Eq. 8",Average Dean velocity correlation for De up to about 30.
-bayat_rezai_vde_de_30,0.05284185803734788,0.00422734864298783,0.08,m/s,"Bayat & Rezai, Sci. Rep. 2017, Eq. 8",Average Dean velocity correlation for De up to about 30.

@@ -100,10 +100,8 @@ def build_environment_manifest(root: Path = ROOT) -> dict[str, Any]:
             "modules": _relative_paths(root, "lmx/*.py"),
             "tests": _relative_paths(root, "tests/test_*.py"),
             "examples": sorted(
-                _relative_paths(root, "examples/*.py")
-                + _relative_paths(root, "examples/*.toml")
-                + _relative_paths(root, "campaigns/**/*.py")
-                + _relative_paths(root, "cases/**/*.toml")
+                _relative_paths(root, "examples/**/*.py")
+                + _relative_paths(root, "examples/**/*.toml")
             ),
             "scripts": _relative_paths(root, "scripts/*.py"),
             "benchmark_specs": _relative_paths(root, "benchmarks/specs/*.toml"),
