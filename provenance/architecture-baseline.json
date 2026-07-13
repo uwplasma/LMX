@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3592755,
-    "checkout_bytes_excluding_release_candidates": 3592755,
+    "checkout_bytes_excluding_build_artifacts": 3589364,
+    "checkout_bytes_excluding_release_candidates": 3589364,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -216,8 +216,8 @@
         "role": "research_stage_extension"
       },
       {
-        "bytes": 83488,
-        "lines": 2105,
+        "bytes": 79215,
+        "lines": 2015,
         "owner": "research_stage_extension",
         "path": "lmx/autodiff.py",
         "role": "research_stage_extension"
@@ -482,7 +482,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 35042,
+    "total_package_lines": 34952,
     "uncurated_example_count": 0
   },
   "schema_version": 1,

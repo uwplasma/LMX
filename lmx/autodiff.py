@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import jax
@@ -1505,6 +1506,51 @@ def run_hartmann_profile_inverse_design(
     }
 
 
+def _run_fringing_parameter_descent(
+    problem: FringingAutodiffProblem,
+    *,
+    gradient_function: Callable[..., dict[str, jnp.ndarray]],
+    gradient_kwargs: dict[str, object],
+    initial: tuple[float, float, float, float],
+    learning_rates: tuple[float, float, float, float],
+    steps: int,
+) -> tuple[tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray], list[dict[str, float]]]:
+    """Optimize the four bounded parameters shared by fringing objectives."""
+    peak_hartmann_number, entry_center, exit_center, transition_width = (
+        jnp.asarray(value, dtype=jnp.float32) for value in initial
+    )
+    learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width = learning_rates
+    x_max = float(problem.x[-1])
+    history: list[dict[str, float]] = []
+    for step in range(steps):
+        gradients = gradient_function(
+            problem,
+            peak_hartmann_number=peak_hartmann_number,
+            entry_center=entry_center,
+            exit_center=exit_center,
+            transition_width=transition_width,
+            **gradient_kwargs,
+        )
+        history.append(
+            {
+                "iteration": float(step),
+                "peak_hartmann_number": float(peak_hartmann_number),
+                "entry_center": float(entry_center),
+                "exit_center": float(exit_center),
+                "transition_width": float(transition_width),
+                "loss": float(gradients["loss"]),
+            }
+        )
+        peak_hartmann_number = jnp.clip(
+            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
+        )
+        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, x_max)
+        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, x_max)
+        transition_width = jnp.clip(transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, x_max)
+        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
+    return (peak_hartmann_number, entry_center, exit_center, transition_width), history
+
+
 def run_fringing_history_inverse_design(
     problem: FringingAutodiffProblem,
     *,
@@ -1520,42 +1566,18 @@ def run_fringing_history_inverse_design(
     learning_rate_width: float = 0.1,
     steps: int = 16,
 ) -> dict[str, object]:
-    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
-    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
-    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
-    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
-    history: list[dict[str, float]] = []
-
-    for step in range(steps):
-        gradients = fringing_history_loss_gradients(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            target_mean_velocity=target_mean_velocity,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
-        transition_width = jnp.clip(
-            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
-        )
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
-
+    """Recover fringing-field parameters from an axial velocity history."""
+    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
+        problem,
+        gradient_function=fringing_history_loss_gradients,
+        gradient_kwargs={
+            "forcing": forcing,
+            "target_mean_velocity": target_mean_velocity,
+        },
+        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
+        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
+        steps=steps,
+    )
     recovered = fringing_mean_velocity_history(
         problem,
         forcing=forcing,
@@ -1593,44 +1615,20 @@ def run_fringing_response_inverse_design(
     learning_rate_width: float = 0.1,
     steps: int = 16,
 ) -> dict[str, object]:
-    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
-    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
-    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
-    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
-    history: list[dict[str, float]] = []
-
-    for step in range(steps):
-        gradients = fringing_response_loss_gradients(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            target_mean_velocity=target_mean_velocity,
-            target_current_proxy=target_current_proxy,
-            current_weight=current_weight,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
-        transition_width = jnp.clip(
-            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
-        )
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
-
+    """Recover fringing-field parameters from velocity and current responses."""
+    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
+        problem,
+        gradient_function=fringing_response_loss_gradients,
+        gradient_kwargs={
+            "forcing": forcing,
+            "target_mean_velocity": target_mean_velocity,
+            "target_current_proxy": target_current_proxy,
+            "current_weight": current_weight,
+        },
+        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
+        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
+        steps=steps,
+    )
     recovered = fringing_response_history(
         problem,
         forcing=forcing,
@@ -1673,46 +1671,24 @@ def run_extruded_rect_inverse_design(
     learning_rate_width: float = 0.08,
     steps: int = 12,
 ) -> dict[str, object]:
-    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
-    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
-    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
-    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
-    history: list[dict[str, float]] = []
-    for step in range(steps):
-        gradients = extruded_rect_response_loss_gradients(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            target_mean_velocity=target_mean_velocity,
-            target_current_proxy=target_current_proxy,
-            target_charge_balance=target_charge_balance,
-            target_boundary_current=target_boundary_current,
-            current_weight=current_weight,
-            charge_balance_weight=charge_balance_weight,
-            boundary_current_weight=boundary_current_weight,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
-        transition_width = jnp.clip(
-            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
-        )
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
+    """Recover field parameters from direct extruded-duct observables."""
+    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
+        problem,
+        gradient_function=extruded_rect_response_loss_gradients,
+        gradient_kwargs={
+            "forcing": forcing,
+            "target_mean_velocity": target_mean_velocity,
+            "target_current_proxy": target_current_proxy,
+            "target_charge_balance": target_charge_balance,
+            "target_boundary_current": target_boundary_current,
+            "current_weight": current_weight,
+            "charge_balance_weight": charge_balance_weight,
+            "boundary_current_weight": boundary_current_weight,
+        },
+        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
+        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
+        steps=steps,
+    )
     recovered = extruded_rect_response_history(
         problem,
         forcing=forcing,
@@ -1760,48 +1736,26 @@ def run_extruded_rect_projection_inverse_design(
     learning_rate_width: float = 0.05,
     steps: int = 8,
 ) -> dict[str, object]:
-    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
-    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
-    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
-    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
-    history: list[dict[str, float]] = []
-    for step in range(steps):
-        gradients = extruded_rect_projection_loss_gradients(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            target_mean_velocity=target_mean_velocity,
-            target_current_proxy=target_current_proxy,
-            target_charge_balance=target_charge_balance,
-            target_boundary_current=target_boundary_current,
-            target_pressure_span=target_pressure_span,
-            current_weight=current_weight,
-            charge_balance_weight=charge_balance_weight,
-            boundary_current_weight=boundary_current_weight,
-            pressure_span_weight=pressure_span_weight,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
-        transition_width = jnp.clip(
-            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
-        )
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
+    """Recover field parameters from projected extruded-duct observables."""
+    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
+        problem,
+        gradient_function=extruded_rect_projection_loss_gradients,
+        gradient_kwargs={
+            "forcing": forcing,
+            "target_mean_velocity": target_mean_velocity,
+            "target_current_proxy": target_current_proxy,
+            "target_charge_balance": target_charge_balance,
+            "target_boundary_current": target_boundary_current,
+            "target_pressure_span": target_pressure_span,
+            "current_weight": current_weight,
+            "charge_balance_weight": charge_balance_weight,
+            "boundary_current_weight": boundary_current_weight,
+            "pressure_span_weight": pressure_span_weight,
+        },
+        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
+        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
+        steps=steps,
+    )
     recovered = extruded_rect_projection_history(
         problem,
         forcing=forcing,
@@ -1851,49 +1805,27 @@ def run_extruded_rect_projection_field_inverse_design(
     learning_rate_width: float = 0.05,
     steps: int = 8,
 ) -> dict[str, object]:
-    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
-    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
-    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
-    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
+    """Recover field parameters from selected three-dimensional snapshots."""
     station_ids = jnp.asarray(station_indices, dtype=jnp.int32)
-    history: list[dict[str, float]] = []
-    for step in range(steps):
-        gradients = extruded_rect_projection_field_loss_gradients(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            target_u_field=target_u_field,
-            target_phi_field=target_phi_field,
-            target_jy_field=target_jy_field,
-            target_pressure_field=target_pressure_field,
-            station_indices=station_ids,
-            u_weight=u_weight,
-            phi_weight=phi_weight,
-            jy_weight=jy_weight,
-            pressure_weight=pressure_weight,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
-        transition_width = jnp.clip(
-            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
-        )
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
+    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
+        problem,
+        gradient_function=extruded_rect_projection_field_loss_gradients,
+        gradient_kwargs={
+            "forcing": forcing,
+            "target_u_field": target_u_field,
+            "target_phi_field": target_phi_field,
+            "target_jy_field": target_jy_field,
+            "target_pressure_field": target_pressure_field,
+            "station_indices": station_ids,
+            "u_weight": u_weight,
+            "phi_weight": phi_weight,
+            "jy_weight": jy_weight,
+            "pressure_weight": pressure_weight,
+        },
+        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
+        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
+        steps=steps,
+    )
     recovered = extruded_rect_projection_history(
         problem,
         forcing=forcing,
@@ -1946,53 +1878,31 @@ def run_extruded_rect_projection_trajectory_inverse_design(
     learning_rate_width: float = 0.04,
     steps: int = 8,
 ) -> dict[str, object]:
-    peak_hartmann_number = jnp.asarray(peak_hartmann_init, dtype=jnp.float32)
-    entry_center = jnp.asarray(entry_center_init, dtype=jnp.float32)
-    exit_center = jnp.asarray(exit_center_init, dtype=jnp.float32)
-    transition_width = jnp.asarray(transition_width_init, dtype=jnp.float32)
+    """Recover field parameters from selected solver-iteration trajectories."""
     station_ids = jnp.asarray(station_indices, dtype=jnp.int32)
-    history: list[dict[str, float]] = []
-    for step in range(steps):
-        gradients = extruded_rect_projection_trajectory_loss_gradients(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            target_u_history=target_u_history,
-            target_phi_history=target_phi_history,
-            target_jy_history=target_jy_history,
-            target_pressure_history=target_pressure_history,
-            target_charge_balance_history=target_charge_balance_history,
-            target_boundary_current_history=target_boundary_current_history,
-            station_indices=station_ids,
-            u_weight=u_weight,
-            phi_weight=phi_weight,
-            jy_weight=jy_weight,
-            pressure_weight=pressure_weight,
-            charge_balance_weight=charge_balance_weight,
-            boundary_current_weight=boundary_current_weight,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, float(problem.x[-1]))
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, float(problem.x[-1]))
-        transition_width = jnp.clip(
-            transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, float(problem.x[-1])
-        )
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
+    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
+        problem,
+        gradient_function=extruded_rect_projection_trajectory_loss_gradients,
+        gradient_kwargs={
+            "forcing": forcing,
+            "target_u_history": target_u_history,
+            "target_phi_history": target_phi_history,
+            "target_jy_history": target_jy_history,
+            "target_pressure_history": target_pressure_history,
+            "target_charge_balance_history": target_charge_balance_history,
+            "target_boundary_current_history": target_boundary_current_history,
+            "station_indices": station_ids,
+            "u_weight": u_weight,
+            "phi_weight": phi_weight,
+            "jy_weight": jy_weight,
+            "pressure_weight": pressure_weight,
+            "charge_balance_weight": charge_balance_weight,
+            "boundary_current_weight": boundary_current_weight,
+        },
+        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
+        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
+        steps=steps,
+    )
     recovered = extruded_rect_projection_iteration_history(
         problem,
         forcing=forcing,

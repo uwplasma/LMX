@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import importlib.util
 import pytest
 
+import lmx.autodiff as autodiff
 from lmx.autodiff import (
     build_extruded_response_targets,
     build_fringing_autodiff_problem,
@@ -49,6 +50,31 @@ def _skip_without_magpylib_jax() -> None:
         pytest.skip(
             "magpylib_jax is optional and is not installed in the bounded CI environment"
         )
+
+
+def test_shared_fringing_descent_enforces_parameter_bounds():
+    problem = build_fringing_autodiff_problem(nx_stations=3, ny=4, nz=4)
+
+    def gradients(_, **kwargs):
+        del kwargs
+        return {
+            "loss": jnp.asarray(1.0),
+            "d_peak_hartmann_number": jnp.asarray(100.0),
+            "d_entry_center": jnp.asarray(100.0),
+            "d_exit_center": jnp.asarray(-100.0),
+            "d_transition_width": jnp.asarray(100.0),
+        }
+
+    parameters, history = autodiff._run_fringing_parameter_descent(
+        problem,
+        gradient_function=gradients,
+        gradient_kwargs={},
+        initial=(5.0, 1.0, 2.0, 0.5),
+        learning_rates=(1.0, 1.0, 1.0, 1.0),
+        steps=1,
+    )
+    assert [float(value) for value in parameters] == pytest.approx([0.5, 0.0, 6.0, 0.05])
+    assert history[0]["loss"] == 1.0
 
 
 def test_differentiable_hartmann_solution_returns_finite_fields():
