@@ -49,7 +49,7 @@
     "branch_coverage_percent": 95.0,
     "budget_seconds": 600,
     "command": "python scripts/run_full_test_suite.py",
-    "default_workers": 4,
+    "default_workers": 6,
     "warning_seconds": 450
   },
   "project": {

@@ -36,9 +36,10 @@ the pinned optional solver backends exercised by integration tests. Minimal
 runtime installs are covered separately, including clear failure behavior when
 an optional backend is not installed.
 
-The runner uses at most four workers, limits BLAS threads inside each worker,
-and keeps JAX preallocation disabled. Override the worker count on smaller or
-larger machines with `--workers`; the wall-clock contract remains controlled by
+The runner uses up to six host-aware workers, limits BLAS threads inside each
+worker, and keeps JAX preallocation disabled. A four-core CI runner therefore
+still uses four workers, while the 10-core reference Mac uses six. Override the
+worker count with `--workers`; the wall-clock contract remains controlled by
 `--budget-seconds`. External solvers, optional proprietary/large datasets, and
 multi-accelerator hardware cannot be made portable unit-test dependencies;
 their parsers, schemas, failure modes, and dispatch are covered here, while

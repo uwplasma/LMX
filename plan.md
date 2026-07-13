@@ -112,9 +112,12 @@ this is not a code-gate failure. Strict documentation and deterministic
 provenance also pass. No focused run, historical green run, or partially
 regenerated provenance may be reported as the current gate.
 
-The runner collects every portable test, uses at most four workers, constrains
-BLAS threads, disables JAX preallocation, fails below 95% branch coverage, warns
-at 450 seconds, and terminates at 600 seconds. The engineering target is <=360
+The runner collects every portable test, uses up to six host-aware workers,
+constrains BLAS threads, disables JAX preallocation, fails below 95% branch
+coverage, warns at 450 seconds, and terminates at 600 seconds. Four-core CI
+runners remain at four workers. On the 10-core reference Mac, six workers reduce
+the current Python 3.10 gate from 141.1 to 113.0 seconds (`1.249x`) with the same
+900 passes, 8 skips, and 95.09% coverage. The engineering target is <=360
 seconds, leaving 40% headroom for slower supported machines and future tests.
 No feature may evade this gate by being marked slow. External data, Docker,
 GPU, and cluster runs live in explicit lanes whose schemas, parsers, dispatch,

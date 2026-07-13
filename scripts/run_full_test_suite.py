@@ -11,7 +11,7 @@ import time
 
 
 def _default_workers() -> int:
-    return max(1, min(4, os.cpu_count() or 1))
+    return max(1, min(6, os.cpu_count() or 1))
 
 
 def main(argv: list[str] | None = None) -> int:

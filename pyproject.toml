@@ -99,5 +99,5 @@ exclude_also = [
 tested-python = ["3.10", "3.13"]
 full-gate-budget-seconds = 600
 warning-budget-seconds = 450
-default-workers = 4
+default-workers = 6
 jax-enable-x64 = true

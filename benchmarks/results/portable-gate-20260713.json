@@ -45,6 +45,23 @@
     "slowest_engineering_target_fraction": 0.5452777777777778,
     "all_supported_endpoints_pass": true
   },
+  "local_worker_scaling": {
+    "source_commit": "80f4ed73976a7e6b8a6f5b3f4184c9491e67ced8",
+    "python": "3.10.20",
+    "jax": "0.6.2",
+    "jaxlib": "0.6.2",
+    "reference_workers": 4,
+    "reference_gate_seconds": 141.1,
+    "candidate_workers": 6,
+    "candidate_gate_seconds": 113.0,
+    "speedup": 1.2486725663716813,
+    "wall_time_reduction_percent": 19.914953933380577,
+    "passed": 900,
+    "skipped": 8,
+    "branch_coverage_percent": 95.09,
+    "swaps": 0,
+    "accepted": true
+  },
   "hosted_ci": {
     "status": "administratively_not_started",
     "reason": "GitHub Actions reported an account billing or spending-limit failure before runner assignment; every affected job had zero executed steps.",
