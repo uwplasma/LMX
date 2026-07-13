@@ -294,10 +294,17 @@ def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
     return path
 
 
-def write_extruded_restart_npz(solution, case, path: str | Path) -> Path:
+def write_extruded_bundle_restart_npz(
+    bundle,
+    case,
+    path: str | Path,
+    *,
+    station_history: tuple[dict[str, float], ...] = (),
+) -> Path:
+    """Write a solved or in-progress extruded bundle in the restart schema."""
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    bundle = solution.bundle
     metadata = {
         "case": case.name,
         "geometry_kind": case.geometry.kind,
@@ -309,7 +316,7 @@ def write_extruded_restart_npz(solution, case, path: str | Path) -> Path:
     np.savez_compressed(
         path,
         metadata_json=json.dumps(metadata),
-        station_history_json=json.dumps(solution.station_history),
+        station_history_json=json.dumps(station_history),
         x=np.asarray(bundle.x),
         y=np.asarray(bundle.y),
         z=np.asarray(bundle.z),
@@ -356,6 +363,15 @@ def write_extruded_restart_npz(solution, case, path: str | Path) -> Path:
         ),
     )
     return path
+
+
+def write_extruded_restart_npz(solution, case, path: str | Path) -> Path:
+    return write_extruded_bundle_restart_npz(
+        solution.bundle,
+        case,
+        path,
+        station_history=solution.station_history,
+    )
 
 
 def write_restart_npz(solution: Solution, case, path: str | Path) -> Path:

@@ -50,6 +50,7 @@ from ._fringing_types import (
     ExtrudedInductionlessProblem,
     ExtrudedInductionlessSolution,
     ExtrudedInductionlessValidation,
+    ExtrudedIterationProgress,
     FringingProfile,
 )
 
@@ -4725,6 +4726,96 @@ def _shard_extruded_fields(
     return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
 
 
+def _iteration_checkpoint_bundle(
+    *,
+    case: CaseSpec,
+    x: jnp.ndarray,
+    y: jnp.ndarray,
+    z: jnp.ndarray,
+    field_scale: jnp.ndarray,
+    u: jnp.ndarray,
+    v: jnp.ndarray,
+    w: jnp.ndarray,
+    p: jnp.ndarray,
+    phi: jnp.ndarray,
+    axial_pressure_loss_gradient: jnp.ndarray | None,
+    transverse_pressure_difference: jnp.ndarray | None,
+    residual_history: list[float],
+    component_history: list[tuple[float, ...]],
+    pressure_history: list[float],
+    electric_history: list[tuple[float, ...]],
+    potential_history: list[float],
+) -> ExtrudedFieldBundle:
+    """Build the minimal existing-schema bundle needed to resume a solve."""
+
+    return ExtrudedFieldBundle(
+        x=x,
+        y=y,
+        z=z,
+        field_scale=field_scale,
+        u=u,
+        v=v,
+        w=w,
+        p=p,
+        phi=phi,
+        geometry_kind=case.geometry.kind,
+        solver_kind=case.solver.kind,
+        axial_pressure_loss_gradient=(
+            jnp.zeros_like(x)
+            if axial_pressure_loss_gradient is None
+            else axial_pressure_loss_gradient
+        ),
+        transverse_pressure_difference=(
+            jnp.zeros_like(x)
+            if transverse_pressure_difference is None
+            else transverse_pressure_difference
+        ),
+        iteration_residual_history=jnp.asarray(residual_history, dtype=float),
+        iteration_component_residual_history=jnp.asarray(
+            component_history, dtype=float
+        ).reshape((-1, 6)),
+        iteration_pressure_residual_history=jnp.asarray(pressure_history, dtype=float),
+        iteration_electric_linear_history=jnp.asarray(
+            electric_history, dtype=float
+        ).reshape((-1, 6)),
+        iteration_potential_residual_history=jnp.asarray(
+            potential_history, dtype=float
+        ),
+    )
+
+
+def _emit_iteration_progress(
+    callback: Callable[[ExtrudedIterationProgress], None] | None,
+    *,
+    checkpoint_interval: int | None,
+    step: int,
+    total_steps: int,
+    converged: bool,
+    residual: float,
+    component_residuals: tuple[float, ...],
+    pressure_residual: float,
+    potential_residual: float,
+    checkpoint_factory: Callable[[], ExtrudedFieldBundle],
+) -> None:
+    if callback is None:
+        return
+    write_checkpoint = bool(
+        checkpoint_interval
+        and (step % checkpoint_interval == 0 or converged or step == total_steps)
+    )
+    callback(
+        ExtrudedIterationProgress(
+            step=step,
+            total_steps=total_steps,
+            residual=residual,
+            component_residuals=component_residuals,
+            pressure_residual=pressure_residual,
+            potential_residual=potential_residual,
+            checkpoint=checkpoint_factory() if write_checkpoint else None,
+        )
+    )
+
+
 @lru_cache(maxsize=None)
 def _axial_field_sharding(num_devices: int) -> NamedSharding:
     """Return one process-stable axial mesh for compilation and repeat reuse."""
@@ -4743,6 +4834,8 @@ def _solve_extruded_projection(
     *,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
+    progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
+    checkpoint_interval: int | None = None,
 ) -> ExtrudedFieldBundle:
     case = problem.case
     mesh = _cross_section_mesh(case)
@@ -5386,6 +5479,36 @@ def _solve_extruded_projection(
                 u, v, w, phi = accelerated * fixed_point_scale
             else:
                 u, v, w = u_next, v_next, w_next
+            _emit_iteration_progress(
+                progress_callback,
+                checkpoint_interval=checkpoint_interval,
+                step=step + 1,
+                total_steps=outer_steps,
+                converged=converged,
+                residual=update_residual,
+                component_residuals=component_residual_by_step[-1],
+                pressure_residual=pressure_update,
+                potential_residual=potential_update,
+                checkpoint_factory=lambda: _iteration_checkpoint_bundle(
+                    case=case,
+                    x=x,
+                    y=r,
+                    z=theta,
+                    field_scale=field_scale,
+                    u=u,
+                    v=v,
+                    w=w,
+                    p=p,
+                    phi=phi,
+                    axial_pressure_loss_gradient=axial_pressure_loss_gradient,
+                    transverse_pressure_difference=None,
+                    residual_history=residual_by_step,
+                    component_history=component_residual_by_step,
+                    pressure_history=pressure_residual_by_step,
+                    electric_history=electric_linear_by_step,
+                    potential_history=potential_residual_by_step,
+                ),
+            )
             if converged:
                 break
 
@@ -6379,6 +6502,36 @@ def _solve_extruded_projection(
             u, v, w, phi = unscaled_state(accelerated)
         else:
             u, v, w = u_next, v_next, w_next
+        _emit_iteration_progress(
+            progress_callback,
+            checkpoint_interval=checkpoint_interval,
+            step=step + 1,
+            total_steps=outer_steps,
+            converged=converged,
+            residual=update_residual,
+            component_residuals=component_residual_by_step[-1],
+            pressure_residual=pressure_update,
+            potential_residual=potential_update,
+            checkpoint_factory=lambda: _iteration_checkpoint_bundle(
+                case=case,
+                x=x,
+                y=y,
+                z=z,
+                field_scale=field_scale,
+                u=u,
+                v=v,
+                w=w,
+                p=p,
+                phi=phi,
+                axial_pressure_loss_gradient=axial_pressure_loss_gradient,
+                transverse_pressure_difference=None,
+                residual_history=residual_by_step,
+                component_history=component_residual_by_step,
+                pressure_history=pressure_residual_by_step,
+                electric_history=electric_linear_by_step,
+                potential_history=potential_residual_by_step,
+            ),
+        )
         if converged:
             break
 
@@ -6583,8 +6736,18 @@ def solve_extruded_inductionless(
     solver=solve_steady,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
+    progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
+    checkpoint_interval: int | None = None,
 ) -> ExtrudedInductionlessSolution:
-    """Solve an extruded inductionless problem, optionally sharded in ``x``."""
+    """Solve an extruded problem with optional sharding and progress checkpoints.
+
+    ``progress_callback`` is called after every outer iteration. Its progress
+    object contains a restart-capable bundle at ``checkpoint_interval`` steps
+    and on convergence; no checkpoint arrays are materialized otherwise.
+    """
+
+    if checkpoint_interval is not None and checkpoint_interval <= 0:
+        raise ValueError("checkpoint_interval must be positive")
 
     if problem.case.geometry.kind in {
         "rect_duct",
@@ -6592,7 +6755,11 @@ def solve_extruded_inductionless(
         "pipe_ogrid",
         "bent_pipe",
     }:
-        projection_kwargs = {"initial_bundle": initial_bundle}
+        projection_kwargs = {
+            "initial_bundle": initial_bundle,
+            "progress_callback": progress_callback,
+            "checkpoint_interval": checkpoint_interval,
+        }
         if num_devices is not None:
             projection_kwargs["num_devices"] = num_devices
         bundle = _solve_extruded_projection(problem, **projection_kwargs)

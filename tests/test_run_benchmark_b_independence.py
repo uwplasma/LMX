@@ -57,6 +57,17 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
     baseline_conductivity = baseline.case.regions[1].conductivity
     thin_conductivity = thin.case.regions[1].conductivity
     assert thin_conductivity == pytest.approx(2.0 * baseline_conductivity)
+    assert campaign._effective_iteration_limits(baseline) == {
+        "electric_iterations": 4000,
+        "projection_iterations": 4000,
+        "momentum_iterations": 400,
+    }
+    assert (
+        campaign._effective_iteration_limits(
+            campaign._variant_problem("B2-fringing-square", "coarse", "baseline")
+        )["electric_iterations"]
+        == 600
+    )
 
     with pytest.raises(ValueError, match="Unsupported independence variant"):
         campaign._variant_problem("B1-fringing-pipe", "coarse", "unknown")
@@ -174,6 +185,81 @@ def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
         )
 
 
+def test_progress_writer_keeps_latest_atomic_partial_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    progress_path = tmp_path / "run.progress.json"
+    restart_path = tmp_path / "run.partial.npz"
+    monkeypatch.setattr(campaign, "_source_fingerprint", lambda: "source")
+
+    def fake_restart_writer(bundle, case, path):
+        Path(path).write_bytes(bundle)
+
+    monkeypatch.setattr(
+        campaign, "write_extruded_bundle_restart_npz", fake_restart_writer
+    )
+    writer = campaign._progress_writer(
+        problem=SimpleNamespace(case=object()),
+        case_id="B1-fringing-pipe",
+        variant="baseline",
+        progress_path=progress_path,
+        partial_restart_path=restart_path,
+        started=campaign.time.perf_counter(),
+    )
+    common = {
+        "total_steps": 8,
+        "residual": 1.0e-4,
+        "component_residuals": (1.0e-4,) * 6,
+        "pressure_residual": 1.0e-5,
+        "potential_residual": 1.0e-6,
+    }
+    writer(SimpleNamespace(step=2, checkpoint=b"restart", **common))
+    writer(SimpleNamespace(step=3, checkpoint=None, **common))
+
+    payload = json.loads(progress_path.read_text())
+    assert restart_path.read_bytes() == b"restart"
+    assert payload["step"] == 3
+    assert payload["checkpoint"]["step"] == 2
+    assert payload["checkpoint"]["sha256"] == campaign._file_sha256(restart_path)
+
+
+def test_partial_restart_requires_matching_progress_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    restart_path = tmp_path / "run.partial.npz"
+    progress_path = tmp_path / "run.progress.json"
+    restart_path.touch()
+
+    with pytest.raises(ValueError, match="no progress metadata"):
+        campaign._load_partial_restart(restart_path, progress_path, "source")
+
+    progress_path.write_text(json.dumps({"source_fingerprint": "stale"}))
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        campaign._load_partial_restart(restart_path, progress_path, "source")
+
+    bundle = object()
+    progress_path.write_text(
+        json.dumps(
+            {
+                "source_fingerprint": "source",
+                "checkpoint": {"sha256": campaign._file_sha256(restart_path)},
+            }
+        )
+    )
+    monkeypatch.setattr(
+        campaign,
+        "load_extruded_restart_bundle",
+        lambda path: SimpleNamespace(bundle=bundle),
+    )
+    assert (
+        campaign._load_partial_restart(restart_path, progress_path, "source") is bundle
+    )
+
+    restart_path.write_bytes(b"changed")
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        campaign._load_partial_restart(restart_path, progress_path, "source")
+
+
 def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
     assert campaign._parse_variant_restarts(
         ["thin_wall=/tmp/thin.npz", "baseline=/tmp/base.npz"]
@@ -215,6 +301,7 @@ def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch
         resume=True,
         initial_restart=None,
         variant_restart=[],
+        checkpoint_interval=8,
     )
     campaign._run_gpu_wave(
         args,
@@ -232,6 +319,7 @@ def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch
     )
     assert "baseline" in launches[0][0]
     assert "thin_wall" in launches[1][0]
+    assert launches[0][0][-3:-1] == ["--checkpoint-interval", "8"]
 
 
 def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
@@ -249,6 +337,7 @@ def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
         cases=["B2-fringing-square"],
         mesh_level="coarse",
         variants=list(campaign.VARIANTS),
+        checkpoint_interval=8,
     )
 
     assert campaign._run_gpu_campaign(args) == 7
@@ -275,6 +364,7 @@ def test_gpu_campaign_stops_before_dependent_wave_when_physics_fails(
         cases=["B2-fringing-square"],
         mesh_level="coarse",
         variants=list(campaign.VARIANTS),
+        checkpoint_interval=8,
     )
 
     assert campaign._run_gpu_campaign(args) == 2

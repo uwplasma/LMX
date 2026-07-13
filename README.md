@@ -175,8 +175,10 @@ the current host has only two GPUs.
 For heavy independent validation variants, use the campaign runner's
 `--gpu-devices 0,1` mode: it assigns one process per GPU, disables default JAX
 memory preallocation, shares a persistent compilation cache, and preserves
-restart provenance. Normal single-device JAX execution remains fastest on the
-Mac CPU because its kernels already use the host cores.
+restart provenance. Long ALEX runs report every outer iteration and write an
+atomic partial restart every eight iterations by default, so `--resume` can
+recover a source-matched interrupted run. Normal single-device JAX execution
+remains fastest on the Mac CPU because its kernels already use the host cores.
 
 See [Performance and scaling](docs/performance.md) for the current commands and
 the acceptance protocol.
@@ -200,8 +202,8 @@ separately with manufactured solutions, conservation identities, mesh/time
 convergence, analytical profiles, and independent reference data. Heavy
 FreeMHD and scaling campaigns remain explicit workflows because they require
 external software or hardware.
-The latest complete local gate passes 899 tests with 8 expected external-data
-skips and 95.06% branch coverage in 512.04 seconds.
+The latest complete local gate passes 902 tests with 8 expected external-data
+skips and 95.10% branch coverage in 113.3 seconds on six Mac workers.
 
 ## Repository policy
 

@@ -991,15 +991,23 @@ wall time is acceptable.
    improves `2.05e-4 -> 2.02e-4`. The whole-operator JIT variant was faster warm
    but rejected because it amplified short-run divergence. Evidence is in
    `benchmarks/results/b1-momentum-jit-20260713.json`. Resume coarse B1 through
-   process-parallel independent variants; the portable gate passes 899 tests
-   with 8 expected skips and 95.07% branch coverage in 141.6 seconds.
+   process-parallel independent variants.
    The subsequent full coarse baseline/thin-wall wave is rejected on runtime:
    both one-A4000 variants exceeded 3600 seconds at full GPU utilization without
    producing a result or restart checkpoint. Do not launch the dependent wave
-   until one coarse variant is bounded below one hour and the production outer
-   loop emits periodic progress/restart checkpoints. Evidence is in
+   until one coarse variant is bounded below one hour. The production outer
+   loop now emits source-fingerprinted progress after every iteration and an
+   atomic, restart-compatible partial state every eight iterations, on final
+   iteration, and on convergence. `--resume` automatically selects that state
+   only when its fingerprint and checksum match; explicit variant restarts
+   retain priority.
+   Both reduced production geometries exercise this path. The source-matched
+   six-worker gate passes 902 tests with 8 expected skips and 95.10% branch
+   coverage in 113.3 seconds. Checkpoint evidence is in
+   `benchmarks/results/b1-checkpoint-resume-20260713.json`; runtime evidence is in
    `benchmarks/results/b1-coarse-runtime-cap-20260713.json`; independent-variant
-   concurrency is throughput, not strong scaling of one solve.
+   concurrency is throughput, not strong scaling of one solve. Rerun one coarse
+   B1 variant with checkpoints before scheduling the two-variant wave.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

@@ -344,6 +344,18 @@ worker; independent variants remain the supported way to occupy both GPUs. The
 source-matched portable gate passes 899 tests with 8 expected skips and 95.07%
 branch coverage in 141.6 seconds, comfortably inside the 600-second CI limit.
 
+The first full coarse baseline/thin-wall wave nevertheless exceeded the
+3600-second per-variant cap at full GPU utilization and was terminated before
+physics assessment. The production solver now reports every completed outer
+iteration and materializes an atomic partial restart every eight iterations,
+on convergence, and at the final iteration. These checkpoints use the normal
+extruded restart schema; the campaign's `--resume` option accepts one only when
+its source fingerprint matches. This closes observability and fault recovery,
+not the runtime gate: a single coarse B1 variant must still finish below one
+hour before the independent or dependent waves resume. Evidence is in
+`benchmarks/results/b1-coarse-runtime-cap-20260713.json` and
+`benchmarks/results/b1-checkpoint-resume-20260713.json`.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep

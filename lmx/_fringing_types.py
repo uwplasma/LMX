@@ -32,22 +32,28 @@ class ExtrudedFieldBundle:
     w: jnp.ndarray
     p: jnp.ndarray
     phi: jnp.ndarray
-    jx: jnp.ndarray
-    jy: jnp.ndarray
-    jz: jnp.ndarray
-    lorentz_x: jnp.ndarray
-    lorentz_y: jnp.ndarray
-    lorentz_z: jnp.ndarray
-    residual: jnp.ndarray
-    volumetric_flow_rate: jnp.ndarray
-    mean_velocity: jnp.ndarray
-    axial_current: jnp.ndarray
-    wall_current_leakage: jnp.ndarray
-    current_scaled_pressure_proxy: jnp.ndarray
-    charge_balance_residual: jnp.ndarray
-    boundary_current_residual: jnp.ndarray
     geometry_kind: str
     solver_kind: str
+    jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    jz: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    lorentz_x: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    lorentz_y: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    lorentz_z: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    residual: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    volumetric_flow_rate: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    mean_velocity: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    axial_current: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    wall_current_leakage: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    current_scaled_pressure_proxy: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
+    charge_balance_residual: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
+    boundary_current_residual: jnp.ndarray = field(
+        default_factory=lambda: jnp.zeros((0,))
+    )
     axial_pressure_loss_gradient: jnp.ndarray = field(
         default_factory=lambda: jnp.zeros((0,))
     )
@@ -69,6 +75,19 @@ class ExtrudedFieldBundle:
     iteration_potential_residual_history: jnp.ndarray = field(
         default_factory=lambda: jnp.zeros((0,))
     )
+
+
+@dataclass(frozen=True)
+class ExtrudedIterationProgress:
+    """One completed outer iteration and an optional resumable state."""
+
+    step: int
+    total_steps: int
+    residual: float
+    component_residuals: tuple[float, ...]
+    pressure_residual: float
+    potential_residual: float
+    checkpoint: ExtrudedFieldBundle | None = None
 
 
 @dataclass(frozen=True)

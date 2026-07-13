@@ -219,16 +219,22 @@ profile drift visible without forcing the full A/B exercise into routine CI.
 On a two-GPU workstation, run independent Benchmark B variants concurrently:
 
 ```bash
-python scripts/run_benchmark_b_independence.py --resume --gpu-devices 0,1
+python scripts/run_benchmark_b_independence.py \
+  --resume --checkpoint-interval 8 --gpu-devices 0,1
 ```
 
 The coordinator gives each subprocess one visible GPU. Baseline and thin-wall
 runs form the first wave; tolerance and iteration variants form a second wave
 so both can start from the recorded baseline restart. Each record remains
-atomic and source-fingerprinted, and interrupted campaigns retain `--resume`
-semantics. GPU workers disable JAX's large up-front memory reservation by
-default, allowing concurrent variants to use their actual array/compile memory;
-an explicitly supplied `XLA_PYTHON_CLIENT_PREALLOCATE` setting still wins.
+atomic and source-fingerprinted. During a solve, `*.progress.json` is replaced
+after every outer iteration and `*.partial.npz` is replaced at the requested
+interval, on convergence, and on the final iteration. `--resume` automatically
+uses this partial state when the final record is absent and the source
+fingerprint and recorded restart checksum match; an explicit
+`--variant-restart` still takes priority. GPU
+workers disable JAX's large up-front memory reservation by default, allowing
+concurrent variants to use their actual array/compile memory; an explicitly
+supplied `XLA_PYTHON_CLIENT_PREALLOCATE` setting still wins.
 
 ## Physics gates
 

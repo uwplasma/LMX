@@ -31,7 +31,11 @@ from lmx.benchmarks import (
     load_benchmark_b_spec,
 )
 from lmx.fringing import solve_extruded_inductionless
-from lmx.io import load_extruded_restart_bundle, write_extruded_restart_npz
+from lmx.io import (
+    load_extruded_restart_bundle,
+    write_extruded_bundle_restart_npz,
+    write_extruded_restart_npz,
+)
 
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
@@ -99,19 +103,119 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _effective_iteration_limits(problem) -> dict[str, int]:
+    """Expose the production caps that implement the frozen ALEX spec."""
+
+    requested = int(problem.case.time_stepper.potential_iterations)
+    b1 = problem.case.name.startswith("alex_b1-fringing-pipe_")
+    return {
+        "electric_iterations": max(requested, 4000 if b1 else 600),
+        "projection_iterations": max(requested, 4000),
+        "momentum_iterations": max(requested, 400),
+    }
+
+
+def _progress_writer(
+    *,
+    problem,
+    case_id: str,
+    variant: str,
+    progress_path: Path,
+    partial_restart_path: Path,
+    started: float,
+):
+    """Return a callback that atomically records progress and restart state."""
+
+    fingerprint = _source_fingerprint()
+    checkpoint_sha256 = None
+    checkpoint_step = None
+
+    def write(progress) -> None:
+        nonlocal checkpoint_sha256, checkpoint_step
+        if progress.checkpoint is not None:
+            temporary = partial_restart_path.with_suffix(".tmp.npz")
+            write_extruded_bundle_restart_npz(
+                progress.checkpoint, problem.case, temporary
+            )
+            temporary.replace(partial_restart_path)
+            checkpoint_sha256 = _file_sha256(partial_restart_path)
+            checkpoint_step = progress.step
+        _atomic_json(
+            progress_path,
+            {
+                "case_id": case_id,
+                "variant": variant,
+                "source_fingerprint": fingerprint,
+                "step": progress.step,
+                "total_steps": progress.total_steps,
+                "residual": progress.residual,
+                "component_residuals": list(progress.component_residuals),
+                "pressure_residual": progress.pressure_residual,
+                "potential_residual": progress.potential_residual,
+                "elapsed_seconds": time.perf_counter() - started,
+                "checkpoint": (
+                    {
+                        "path": str(partial_restart_path),
+                        "sha256": checkpoint_sha256,
+                        "step": checkpoint_step,
+                    }
+                    if checkpoint_sha256 is not None
+                    else None
+                ),
+            },
+        )
+
+    return write
+
+
+def _load_partial_restart(
+    partial_restart_path: Path,
+    progress_path: Path,
+    fingerprint: str,
+):
+    """Load a partial restart only when its progress provenance matches."""
+
+    if not progress_path.is_file():
+        raise ValueError(
+            f"Partial restart has no progress metadata: {partial_restart_path}"
+        )
+    progress = json.loads(progress_path.read_text())
+    if progress.get("source_fingerprint") != fingerprint:
+        raise ValueError(f"Checkpoint fingerprint mismatch: {partial_restart_path}")
+    checkpoint = progress.get("checkpoint") or {}
+    if checkpoint.get("sha256") != _file_sha256(partial_restart_path):
+        raise ValueError(f"Checkpoint checksum mismatch: {partial_restart_path}")
+    return load_extruded_restart_bundle(partial_restart_path).bundle
+
+
 def _run_record(
     case_id: str,
     mesh_level: str,
     variant: str,
     *,
     restart_path: Path,
+    checkpoint_interval: int,
     initial_bundle=None,
     initialization: str | None = None,
     initialization_sha256: str | None = None,
 ) -> tuple[dict[str, Any], Any]:
     problem = _variant_problem(case_id, mesh_level, variant)
     started = time.perf_counter()
-    solution = solve_extruded_inductionless(problem, initial_bundle=initial_bundle)
+    progress_path = restart_path.with_suffix(".progress.json")
+    partial_restart_path = restart_path.with_suffix(".partial.npz")
+    solution = solve_extruded_inductionless(
+        problem,
+        initial_bundle=initial_bundle,
+        progress_callback=_progress_writer(
+            problem=problem,
+            case_id=case_id,
+            variant=variant,
+            progress_path=progress_path,
+            partial_restart_path=partial_restart_path,
+            started=started,
+        ),
+        checkpoint_interval=checkpoint_interval,
+    )
     jax.block_until_ready(solution.bundle.u)
     elapsed = time.perf_counter() - started
     restart_path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,6 +233,7 @@ def _run_record(
             "coupling_tolerance": problem.case.solver.coupling_tolerance,
             "coupling_iterations": problem.case.solver.coupling_iterations,
             "potential_iterations": problem.case.time_stepper.potential_iterations,
+            **_effective_iteration_limits(problem),
             "max_steps": problem.case.time_stepper.max_steps,
             "initialization": (
                 initialization
@@ -144,6 +249,11 @@ def _run_record(
         "restart": {
             "path": str(restart_path),
             "sha256": _file_sha256(restart_path),
+        },
+        "progress": {
+            "path": str(progress_path),
+            "checkpoint_interval": checkpoint_interval,
+            "partial_restart_path": str(partial_restart_path),
         },
         "x_over_L": np.asarray(solution.bundle.x).tolist(),
         "primary_observable": observable.tolist(),
@@ -298,6 +408,8 @@ def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
         "--variants",
         variant,
         "--worker",
+        "--checkpoint-interval",
+        str(args.checkpoint_interval),
     ]
     if args.resume:
         command.append("--resume")
@@ -410,6 +522,8 @@ def _run_gpu_campaign(args) -> int:
         "--variants",
         *args.variants,
         "--resume",
+        "--checkpoint-interval",
+        str(args.checkpoint_interval),
     ]
     return main(summary_args)
 
@@ -427,6 +541,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--variants", nargs="+", choices=VARIANTS, default=VARIANTS)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=8,
+        help="Write an atomic partial restart every N outer iterations (default: 8).",
+    )
     parser.add_argument(
         "--initial-restart",
         type=Path,
@@ -447,6 +567,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.checkpoint_interval <= 0:
+        parser.error("--checkpoint-interval must be positive")
     if args.gpu_devices is not None and not args.dry_run:
         return _run_gpu_campaign(args)
     variant_restarts = _parse_variant_restarts(args.variant_restart)
@@ -460,6 +582,8 @@ def main(argv: list[str] | None = None) -> int:
         for variant in args.variants:
             path = args.output / "runs" / f"{case_id}-{args.mesh_level}-{variant}.json"
             restart_path = path.with_suffix(".npz")
+            partial_restart_path = path.with_suffix(".partial.npz")
+            progress_path = path.with_suffix(".progress.json")
             if args.resume and path.is_file():
                 record = json.loads(path.read_text())
                 if record.get("source_fingerprint") != fingerprint:
@@ -491,6 +615,12 @@ def main(argv: list[str] | None = None) -> int:
                     ).bundle
                     initialization = f"provided_restart:{args.initial_restart}"
                     initialization_sha256 = _file_sha256(args.initial_restart)
+                elif args.resume and partial_restart_path.is_file():
+                    initial_bundle = _load_partial_restart(
+                        partial_restart_path, progress_path, fingerprint
+                    )
+                    initialization = f"partial_restart:{partial_restart_path}"
+                    initialization_sha256 = _file_sha256(partial_restart_path)
                 elif variant in {"tight_tolerance", "extended_iterations"}:
                     if baseline_bundle is None:
                         baseline_restart = (
@@ -512,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.mesh_level,
                     variant,
                     restart_path=restart_path,
+                    checkpoint_interval=args.checkpoint_interval,
                     initial_bundle=initial_bundle,
                     initialization=initialization,
                     initialization_sha256=initialization_sha256,

@@ -1,0 +1,36 @@
+{
+  "case_family": "ALEX Benchmark B",
+  "source_fingerprint": "7c990bc2893cbd7385d20cfcc0d7788bfa8bf4a453b50098b20514b291ff101c",
+  "checkpoint_contract": {
+    "progress_frequency_outer_iterations": 1,
+    "default_restart_frequency_outer_iterations": 8,
+    "restart_on_convergence": true,
+    "restart_on_final_iteration": true,
+    "atomic_progress": true,
+    "atomic_restart": true,
+    "restart_schema": "LMX extruded inductionless restart bundle",
+    "resume_requires_source_fingerprint_match": true,
+    "resume_requires_restart_checksum_match": true,
+    "explicit_restart_has_priority": true
+  },
+  "portable_acceptance": {
+    "command": ".venv/bin/python scripts/run_full_test_suite.py --workers 6 --budget-seconds 600",
+    "python": "3.10.20",
+    "passed": 902,
+    "skipped": 8,
+    "branch_coverage_percent": 95.10,
+    "wall_seconds": 113.3,
+    "budget_seconds": 600,
+    "physics_paths": [
+      "reduced ALEX B1 mapped-pipe production solve",
+      "reduced ALEX B2 layered-duct production solve"
+    ]
+  },
+  "accepted": true,
+  "claim": "Periodic progress, atomic partial restart, and provenance-checked resume infrastructure only.",
+  "excluded_claims": [
+    "B1 coarse runtime below 3600 seconds",
+    "B1 coarse physics acceptance",
+    "B1 spatial strong scaling"
+  ]
+}

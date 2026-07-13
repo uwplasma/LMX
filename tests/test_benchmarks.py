@@ -187,8 +187,17 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         "B1-fringing-pipe", axial_stations=case.geometry.nx
     )
     reduced_problem = replace(problem, case=case, profile=profile)
-    solution = solve_extruded_inductionless(reduced_problem)
+    progress = []
+    solution = solve_extruded_inductionless(
+        reduced_problem,
+        progress_callback=progress.append,
+        checkpoint_interval=1,
+    )
 
+    assert [item.step for item in progress] == list(range(1, len(progress) + 1))
+    assert all(item.checkpoint is not None for item in progress)
+    assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
+    assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-10
     )
@@ -233,6 +242,9 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     )
     assert restarted.validation.max_charge_balance_residual < 1.0e-3
 
+    with pytest.raises(ValueError, match="checkpoint_interval"):
+        solve_extruded_inductionless(reduced_problem, checkpoint_interval=0)
+
 
 def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse")
@@ -261,10 +273,15 @@ def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
     profile = build_benchmark_b_field_profile(
         "B2-fringing-square", axial_stations=case.geometry.nx
     )
+    progress = []
     solution = solve_extruded_inductionless(
-        replace(problem, case=case, profile=profile)
+        replace(problem, case=case, profile=profile),
+        progress_callback=progress.append,
+        checkpoint_interval=1,
     )
 
+    assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
+    assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-10
     )
