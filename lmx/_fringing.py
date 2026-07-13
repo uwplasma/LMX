@@ -2412,11 +2412,12 @@ def _solve_pipe_diffusion_system(
     wall_sink: jnp.ndarray,
     initial_field: jnp.ndarray | None,
     *,
-    dt: float,
+    mass_coefficient: float = 1.0,
+    diffusion_coefficient: float = 1.0,
     iterations: int,
     tolerance: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Solve one prepared cylindrical implicit-diffusion system."""
+    """Solve one prepared shifted cylindrical diffusion system."""
 
     coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
 
@@ -2425,12 +2426,24 @@ def _solve_pipe_diffusion_system(
             _apply_pipe_diffusion_coefficients_3d(field, coefficients)
             - wall_sink * field
         )
-        return volume * (field - dt * diffusion)
+        return volume * (
+            mass_coefficient * field - diffusion_coefficient * diffusion
+        )
 
-    diagonal = volume * (1.0 + dt * (sum(coefficients) + wall_sink))
+    diagonal = volume * (
+        mass_coefficient + diffusion_coefficient * (sum(coefficients) + wall_sink)
+    )
     directions = (
-        (0, -volume * dt * coef_x_w, -volume * dt * coef_x_e),
-        (1, -volume * dt * coef_r_i, -volume * dt * coef_r_o),
+        (
+            0,
+            -volume * diffusion_coefficient * coef_x_w,
+            -volume * diffusion_coefficient * coef_x_e,
+        ),
+        (
+            1,
+            -volume * diffusion_coefficient * coef_r_i,
+            -volume * diffusion_coefficient * coef_r_o,
+        ),
     )
     precondition = _additive_line_preconditioner_3d(diagonal, directions)
     solution = pcg_linear_solve(
@@ -2449,11 +2462,11 @@ def _solve_pipe_diffusion_system(
     return solution.x, solution.residual_norm, solution.converged
 
 
-def _solvax_implicit_diffusion_pipe(
+def _solvax_diffusion_pipe(
     rhs: jnp.ndarray,
     viscosity: jnp.ndarray,
     *,
-    dt: float,
+    dt: float | None,
     dx: float,
     r_faces: jnp.ndarray,
     r_centers: jnp.ndarray,
@@ -2463,13 +2476,15 @@ def _solvax_implicit_diffusion_pipe(
     initial_field: jnp.ndarray | None = None,
     _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Implicit cylindrical diffusion with no-slip at the outer radial face."""
+    """Solve steady or implicit cylindrical no-slip diffusion.
+
+    ``dt=None`` solves ``-div(viscosity grad(field)) = rhs``. A positive
+    ``dt`` solves the implicit update ``field - dt * div(...) = rhs``.
+    """
 
     radial_widths = jnp.diff(r_faces)
     volume = jnp.broadcast_to(
-        r_centers[None, :, None]
-        * radial_widths[None, :, None]
-        * jnp.asarray(dtheta, dtype=rhs.dtype),
+        r_centers[None, :, None] * radial_widths[None, :, None] * dtheta,
         rhs.shape,
     )
     coefficients = _pipe_variable_diffusion_coefficients_3d(
@@ -2479,24 +2494,25 @@ def _solvax_implicit_diffusion_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
-    wall_sink = (
-        jnp.zeros_like(rhs)
-        .at[:, -1, :]
-        .set(
-            viscosity[:, -1, :]
-            * r_faces[-1]
-            / jnp.maximum(
-                r_centers[-1] * radial_widths[-1] * (0.5 * radial_widths[-1]),
-                1.0e-20,
-            )
+    wall_sink = jnp.zeros_like(rhs).at[:, -1, :].set(
+        viscosity[:, -1, :]
+        * r_faces[-1]
+        / jnp.maximum(
+            r_centers[-1] * radial_widths[-1] * (0.5 * radial_widths[-1]),
+            1.0e-20,
         )
     )
-
     system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
     if _system_solve is not None:
+        if dt is None:
+            raise ValueError("a cached implicit system requires a positive dt")
         return _system_solve(*system)
     return _solve_pipe_diffusion_system(
-        *system, dt=dt, iterations=iterations, tolerance=tolerance
+        *system,
+        mass_coefficient=float(dt is not None),
+        diffusion_coefficient=1.0 if dt is None else dt,
+        iterations=iterations,
+        tolerance=tolerance,
     )
 
 
@@ -5090,7 +5106,7 @@ def _solve_extruded_projection(
                     coefficients,
                     wall_sink,
                     initial,
-                    dt=dt,
+                    diffusion_coefficient=dt,
                     iterations=momentum_iterations,
                     tolerance=momentum_tolerance,
                 )
@@ -5100,7 +5116,7 @@ def _solve_extruded_projection(
             )
 
             def momentum_solve(rhs, viscosity, initial):
-                return _solvax_implicit_diffusion_pipe(
+                return _solvax_diffusion_pipe(
                     rhs,
                     viscosity,
                     dt=dt,
@@ -5114,7 +5130,7 @@ def _solve_extruded_projection(
                     _system_solve=diffusion_system_solve,
                 )
 
-            response_fluid, _, _ = _solvax_implicit_diffusion_pipe(
+            response_fluid, _, _ = _solvax_diffusion_pipe(
                 dt / rho[:, :count, :],
                 nu[:, :count, :],
                 dt=dt,

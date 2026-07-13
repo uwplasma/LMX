@@ -52,7 +52,7 @@ from lmx.fringing import (
     _shard_extruded_fields,
     _solvax_pressure_poisson_pipe,
     _solvax_implicit_diffusion_duct,
-    _solvax_implicit_diffusion_pipe,
+    _solvax_diffusion_pipe,
     _spacing_vector,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
@@ -803,28 +803,32 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     assert gradient == pytest.approx(-2.0 * value, rel=1.0e-6, abs=1.0e-8)
 
 
-def test_implicit_pipe_diffusion_reconstructs_manufactured_field():
+@pytest.mark.parametrize("steady", [False, True])
+def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
     shape = (4, 5, 8)
     manufactured = jnp.arange(np.prod(shape), dtype=float).reshape(shape) / 1000.0
     viscosity = jnp.full(shape, 0.04)
-    mask = jnp.ones(shape, dtype=bool)
     dt = 0.02
     laplacian = _masked_laplacian_pipe(
         manufactured,
-        mask,
+        jnp.ones(shape, dtype=bool),
         dx=0.4,
         r_faces=r_faces,
         r_centers=r_centers,
         dtheta=2.0 * jnp.pi / 8,
         radial_fluid_count=5,
     )
-    rhs = manufactured - dt * viscosity * laplacian
-    solved, residual, converged = _solvax_implicit_diffusion_pipe(
+    rhs = (
+        -viscosity * laplacian
+        if steady
+        else manufactured - dt * viscosity * laplacian
+    )
+    solved, residual, converged = _solvax_diffusion_pipe(
         rhs,
         viscosity,
-        dt=dt,
+        dt=None if steady else dt,
         dx=0.4,
         r_faces=r_faces,
         r_centers=r_centers,
