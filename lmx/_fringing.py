@@ -12,6 +12,7 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
     aitken_relaxation,
     anderson_mixing,
+    gmres,
     pcg_linear_solve,
     tridiagonal_solve,
 )
@@ -2636,6 +2637,117 @@ def _pipe_face_velocity_cells(
         0.5 * (uf[:-1] + uf[1:]),
         0.5 * (vf[:, :-1, :] + vf[:, 1:, :]),
         0.5 * (wf + jnp.roll(wf, 1, axis=2)),
+    )
+
+
+def _steady_stokes_projection_pipe(
+    u: jnp.ndarray,
+    v: jnp.ndarray,
+    w: jnp.ndarray,
+    rho: jnp.ndarray,
+    unit_flow_response: jnp.ndarray,
+    cell_area: jnp.ndarray,
+    apply_momentum_inverse: Callable[[jnp.ndarray], jnp.ndarray],
+    *,
+    target_flow_rate: float,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+    pressure_iterations: int,
+    pressure_tolerance: float,
+    restart: int = 16,
+    max_restarts: int = 2,
+) -> tuple[jnp.ndarray, ...]:
+    """Apply the compatible steady ``D A^-1 G`` pipe projection."""
+
+    response_flow = jnp.sum(unit_flow_response * cell_area, axis=(1, 2))
+    mean_response = jnp.mean(response_flow)
+
+    def set_mean_flow(state_u, target):
+        flow = jnp.sum(state_u * cell_area, axis=(1, 2))
+        multiplier = (target - jnp.mean(flow)) / mean_response
+        return state_u + multiplier * unit_flow_response, multiplier
+
+    base_u, base_multiplier = set_mean_flow(u, target_flow_rate)
+    base_faces = _pipe_velocity_faces(base_u, v, w)
+    base_divergence = _pipe_face_divergence(
+        *base_faces,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    mobility = 1.0 / jnp.maximum(rho, 1.0e-20)
+
+    def pressure_velocity(pressure):
+        face_force = _pipe_pressure_face_correction(
+            pressure,
+            mobility,
+            dx=dx,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        cell_force = _pipe_face_velocity_cells(*face_force)
+        correction = tuple(apply_momentum_inverse(force) for force in cell_force)
+        correction_u, multiplier = set_mean_flow(correction[0], 0.0)
+        return (correction_u, *correction[1:]), multiplier
+
+    def schur(pressure):
+        correction, _ = pressure_velocity(pressure)
+        return _pipe_face_divergence(
+            *_pipe_velocity_faces(*correction),
+            dx=dx,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+
+    def precondition(residual):
+        residual = residual.reshape(u.shape)
+        pressure, *_ = _solvax_pressure_poisson_pipe(
+            -residual,
+            mobility,
+            dx=dx,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            iterations=pressure_iterations,
+            tolerance=pressure_tolerance,
+            include_theta_fft_line=True,
+        )
+        return pressure.reshape(-1)
+
+    def flat_schur(pressure):
+        return schur(pressure.reshape(u.shape)).reshape(-1)
+
+    pressure_solution = gmres(
+        flat_schur,
+        -base_divergence.reshape(-1),
+        precond=precondition,
+        restart=restart,
+        rtol=pressure_tolerance,
+        atol=pressure_tolerance,
+        max_restarts=max_restarts,
+    )
+    pressure = pressure_solution.x.reshape(u.shape)
+    correction, pressure_multiplier = pressure_velocity(pressure)
+    projected = tuple(base + delta for base, delta in zip((base_u, v, w), correction))
+    final_flow = jnp.sum(projected[0] * cell_area, axis=(1, 2))
+    final_divergence = _pipe_face_divergence(
+        *_pipe_velocity_faces(*projected),
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    return (
+        *projected,
+        pressure,
+        base_multiplier + pressure_multiplier,
+        jnp.max(jnp.abs(final_divergence)),
+        jnp.max(jnp.abs(final_flow - target_flow_rate)),
+        pressure_solution,
     )
 
 

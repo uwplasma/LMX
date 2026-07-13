@@ -55,6 +55,7 @@ from lmx.fringing import (
     _solvax_pressure_poisson_pipe,
     _solvax_implicit_diffusion_duct,
     _solvax_diffusion_pipe,
+    _steady_stokes_projection_pipe,
     _spacing_vector,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
@@ -892,6 +893,46 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
         jax.value_and_grad(lambda a: jnp.sum(operator(a * pressure) ** 2))
     )(jnp.asarray(1.0))
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
+
+
+def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
+    nx, nr, ntheta = 5, 4, 8
+    r_faces = jnp.asarray([0.0, 0.15, 0.4, 0.7, 1.0])
+    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    dtheta = 2.0 * jnp.pi / ntheta
+    shape = (nx, nr, ntheta)
+    x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
+    radius = r_centers[None, :, None]
+    theta = jnp.arange(ntheta)[None, None, :] * dtheta
+    u = 0.7 + 0.2 * x * (1.0 - radius) * jnp.cos(theta)
+    v = 0.1 * (1.0 - radius) * jnp.sin(theta) * jnp.ones_like(x)
+    w = -0.1 * x * (1.0 - radius) * jnp.cos(theta)
+    cell_area = jnp.broadcast_to(
+        r_centers[None, :, None] * jnp.diff(r_faces)[None, :, None] * dtheta,
+        shape,
+    )
+    result = _steady_stokes_projection_pipe(
+        u,
+        v,
+        w,
+        jnp.ones(shape),
+        jnp.ones(shape),
+        cell_area,
+        lambda rhs: rhs,
+        target_flow_rate=2.0,
+        dx=0.5,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+        pressure_iterations=300,
+        pressure_tolerance=1.0e-10,
+        restart=24,
+        max_restarts=3,
+    )
+    assert result[-3] < 1.0e-8
+    assert result[-2] < 1.0e-8
+    assert bool(result[-1].converged)
+    assert jnp.isfinite(result[3]).all()
 
 
 def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():
