@@ -1,0 +1,42 @@
+{
+  "date": "2026-07-13",
+  "lmx_branch": "agent/b1-compatible-stokes",
+  "accepted_lmx_commit_after_revert": "86da2b2",
+  "solvax_branch": "agent/complex-tridiagonal",
+  "solvax_commit": "0f65a5e",
+  "hardware": "two NVIDIA RTX A4000 GPUs",
+  "problem": {
+    "shape": [32, 16, 32],
+    "operator": "steady cylindrical diffusion with x-r-varying reaction",
+    "validation": "discrete manufactured reconstruction"
+  },
+  "one_gpu": {
+    "three_dimensional_pcg_warm_seconds": [0.23069410101743415, 0.23891215299954638],
+    "complex_fourier_pcg_warm_seconds": [0.418624529032968, 0.4374162169988267],
+    "three_dimensional_max_error": 8.309763988023633e-10,
+    "complex_fourier_max_error": 3.9528880169115155e-10,
+    "result": "Fourier mode PCG is exact but 1.8x slower on one GPU"
+  },
+  "two_gpu_mode_sharding": {
+    "cold_seconds": 4.5521468369988725,
+    "warm_seconds": [0.7996878270059824, 0.7681270339526236],
+    "reported_internal_residual": 2.6803772046087366e-09,
+    "max_error_by_run": [
+      3.9528880169115155e-10,
+      0.001115539389145881,
+      0.6469040900217853
+    ],
+    "output_shards": 2,
+    "result": "rejected: slower and repeated gather/reshard corrupts CUDA output while internal residual is unchanged"
+  },
+  "solvax_supporting_change": {
+    "change": "Promote tridiagonal bands and RHS to a common dtype so Hermitian-complex PCG can use real-coefficient line preconditioners.",
+    "focused_tests": "29 passed",
+    "full_tests": "216 passed in 98.11 s",
+    "cuda_fused_max_residual": 2.6668472207145996e-15,
+    "status": "pushed for review; not yet part of the pinned SOLVAX 0.7.0 dependency"
+  },
+  "retained_lmx_change": "The existing steady/implicit pipe reconstruction test now covers an x-r-varying reaction term.",
+  "removed_lmx_change": "All Fourier momentum and gather-based multi-GPU prototype code.",
+  "next_gate": "Keep Fourier state persistently sharded and implement the Schur operators directly in mode space, or prove component-task parallelism; do not inverse-transform/gather inside each Krylov action."
+}

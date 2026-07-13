@@ -1204,6 +1204,27 @@ wall time is acceptable.
    electric block only. Next carry the compatible momentum/pressure Schur
    action into theta mode space so the dominant Krylov batch can be explicitly
    partitioned across devices without distributing an FFT or dense gauge basis.
+   The first Fourier momentum implementation is rejected and fully removed.
+   On a `32 x 16 x 32` reaction-shifted manufactured operator, complex
+   Fourier-mode PCG is exact but takes `0.419--0.437 s` warm on one A4000 versus
+   `0.231--0.239 s` for the existing 3-D PCG. Explicitly sharding the mode batch
+   takes `0.768--0.800 s` on two GPUs and, more importantly, repeated
+   gather/reshard calls corrupt the reconstructed field: maximum error grows
+   from `3.95e-10` cold to `1.12e-3` and `6.47e-1` while the internal residual
+   is unchanged. This independently reproduces the unsafe CUDA reshard boundary
+   and forbids inverse-transform/gather inside each Krylov action. The only LMX
+   change retained at `86da2b2` strengthens the shared steady/implicit
+   reconstruction test with an x-r-varying reaction.
+   The screen also found a reusable SOLVAX gap. Commit `0f65a5e` on
+   `agent/complex-tridiagonal` promotes real bands and complex right-hand sides
+   to a common dtype; 29 focused and 216 full tests pass, and fused CUDA
+   tridiagonal residual is `2.67e-15`. It is pushed for review but is not yet
+   part of pinned SOLVAX 0.7.0. Evidence is in
+   `benchmarks/results/b1-fourier-momentum-rejection-20260713.json`. The next
+   multi-GPU design must keep Fourier state persistently sharded and express
+   gradient, divergence, Rhie--Chow, and momentum response directly in mode
+   space, or prove component-task parallelism. Do not gather within the Schur
+   loop and do not retain a slower one-GPU alternative merely to expose shards.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
