@@ -42,6 +42,8 @@ from lmx.fringing import (
     _cross_section_mesh,
     _pipe_conservative_current_diagnostics_3d,
     _pipe_conservative_emf_rhs_3d,
+    _pipe_face_divergence,
+    _pipe_pressure_face_correction,
     _pipe_gradient_3d,
     _pipe_laplacian_3d,
     _pipe_poisson_sparse_3d,
@@ -821,9 +823,7 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
         radial_fluid_count=5,
     )
     rhs = (
-        -viscosity * laplacian
-        if steady
-        else manufactured - dt * viscosity * laplacian
+        -viscosity * laplacian if steady else manufactured - dt * viscosity * laplacian
     )
     solved, residual, converged = _solvax_diffusion_pipe(
         rhs,
@@ -839,6 +839,59 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     assert bool(converged)
     assert float(residual) < 1.0e-8
     assert solved == pytest.approx(manufactured, abs=1.0e-8)
+
+
+def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
+    nx, ntheta = 4, 8
+    r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0])
+    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    dtheta = 2.0 * jnp.pi / ntheta
+    x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
+    radius = r_centers[None, :, None]
+    theta = jnp.arange(ntheta)[None, None, :] * dtheta
+    pressure = x * (1.0 - radius**2) * jnp.cos(theta)
+    probe = (x**2 - jnp.mean(x**2)) * (1.0 - radius) * jnp.sin(theta)
+    mobility = jnp.broadcast_to(1.0 + 0.2 * radius, pressure.shape)
+    coefficients = _pipe_variable_diffusion_coefficients_3d(
+        mobility,
+        dx=0.4,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+
+    def operator(field):
+        correction = _pipe_pressure_face_correction(
+            field,
+            mobility,
+            dx=0.4,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        return -_pipe_face_divergence(
+            *correction,
+            dx=0.4,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+
+    applied = jax.jit(operator)(pressure)
+    assert applied == pytest.approx(
+        _apply_pipe_diffusion_coefficients_3d(pressure, coefficients), abs=1.0e-12
+    )
+    assert operator(jnp.ones_like(pressure)) == pytest.approx(0.0, abs=1.0e-12)
+    volume = jnp.broadcast_to(
+        r_centers[None, :, None] * jnp.diff(r_faces)[None, :, None] * dtheta,
+        pressure.shape,
+    )
+    assert jnp.sum(volume * pressure * operator(probe)) == pytest.approx(
+        jnp.sum(volume * probe * applied), rel=1.0e-12, abs=1.0e-12
+    )
+    value, gradient = jax.jit(
+        jax.value_and_grad(lambda a: jnp.sum(operator(a * pressure) ** 2))
+    )(jnp.asarray(1.0))
+    assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
 
 
 def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():

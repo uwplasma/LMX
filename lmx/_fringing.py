@@ -2426,9 +2426,7 @@ def _solve_pipe_diffusion_system(
             _apply_pipe_diffusion_coefficients_3d(field, coefficients)
             - wall_sink * field
         )
-        return volume * (
-            mass_coefficient * field - diffusion_coefficient * diffusion
-        )
+        return volume * (mass_coefficient * field - diffusion_coefficient * diffusion)
 
     diagonal = volume * (
         mass_coefficient + diffusion_coefficient * (sum(coefficients) + wall_sink)
@@ -2494,12 +2492,16 @@ def _solvax_diffusion_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
-    wall_sink = jnp.zeros_like(rhs).at[:, -1, :].set(
-        viscosity[:, -1, :]
-        * r_faces[-1]
-        / jnp.maximum(
-            r_centers[-1] * radial_widths[-1] * (0.5 * radial_widths[-1]),
-            1.0e-20,
+    wall_sink = (
+        jnp.zeros_like(rhs)
+        .at[:, -1, :]
+        .set(
+            viscosity[:, -1, :]
+            * r_faces[-1]
+            / jnp.maximum(
+                r_centers[-1] * radial_widths[-1] * (0.5 * radial_widths[-1]),
+                1.0e-20,
+            )
         )
     )
     system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
@@ -2553,6 +2555,90 @@ def _masked_laplacian_pipe(
     return jnp.where(fluid_mask, full, 0.0)
 
 
+def _pipe_velocity_faces(
+    u: jnp.ndarray, v: jnp.ndarray, w: jnp.ndarray
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Interpolate cylindrical cell velocities to conservative faces."""
+
+    nx, nr, ntheta = u.shape
+    uf = jnp.zeros((nx + 1, nr, ntheta), dtype=u.dtype)
+    uf = uf.at[1:-1].set(0.5 * (u[1:] + u[:-1]))
+    uf = uf.at[0].set(u[0])
+    uf = uf.at[-1].set(u[-1])
+    vf = jnp.zeros((nx, nr + 1, ntheta), dtype=v.dtype)
+    vf = vf.at[:, 1:-1, :].set(0.5 * (v[:, 1:, :] + v[:, :-1, :]))
+    wf = 0.5 * (w + jnp.roll(w, -1, axis=2))
+    return uf, vf, wf
+
+
+def _pipe_face_divergence(
+    uf: jnp.ndarray,
+    vf: jnp.ndarray,
+    wf: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+) -> jnp.ndarray:
+    """Return finite-volume divergence from cylindrical face fluxes."""
+
+    widths = jnp.diff(r_faces)
+    return (
+        (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
+        + (
+            r_faces[None, 1:, None] * vf[:, 1:, :]
+            - r_faces[None, :-1, None] * vf[:, :-1, :]
+        )
+        / jnp.maximum(r_centers[None, :, None] * widths[None, :, None], 1.0e-20)
+        + (wf - jnp.roll(wf, 1, axis=2))
+        / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-20)
+    )
+
+
+def _pipe_pressure_face_correction(
+    pressure: jnp.ndarray,
+    mobility: jnp.ndarray,
+    *,
+    dx: float,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Return ``-mobility grad(pressure)`` on cylindrical faces."""
+
+    nx, nr, ntheta = pressure.shape
+    correction_x = jnp.zeros((nx + 1, nr, ntheta), dtype=pressure.dtype)
+    correction_x = correction_x.at[1:-1].set(
+        -_harmonic_mean(mobility[1:], mobility[:-1])
+        * (pressure[1:] - pressure[:-1])
+        / max(dx, 1.0e-12)
+    )
+    correction_r = jnp.zeros((nx, nr + 1, ntheta), dtype=pressure.dtype)
+    correction_r = correction_r.at[:, 1:-1, :].set(
+        -_harmonic_mean(mobility[:, 1:, :], mobility[:, :-1, :])
+        * (pressure[:, 1:, :] - pressure[:, :-1, :])
+        / jnp.diff(r_centers)[None, :, None]
+    )
+    correction_theta = (
+        -_harmonic_mean(mobility, jnp.roll(mobility, -1, axis=2))
+        * (jnp.roll(pressure, -1, axis=2) - pressure)
+        / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-20)
+    )
+    return correction_x, correction_r, correction_theta
+
+
+def _pipe_face_velocity_cells(
+    uf: jnp.ndarray, vf: jnp.ndarray, wf: jnp.ndarray
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Reconstruct cylindrical cell velocities from conservative faces."""
+
+    return (
+        0.5 * (uf[:-1] + uf[1:]),
+        0.5 * (vf[:, :-1, :] + vf[:, 1:, :]),
+        0.5 * (wf + jnp.roll(wf, 1, axis=2)),
+    )
+
+
 def _face_flux_pressure_projection_pipe(
     u: jnp.ndarray,
     v: jnp.ndarray,
@@ -2584,26 +2670,15 @@ def _face_flux_pressure_projection_pipe(
     rhos = rho[:, :count, :]
     faces = r_faces[: count + 1]
     centers = r_centers[:count]
-    widths = jnp.diff(faces)
-    nx, nr, ntheta = us.shape
-
-    uf = jnp.zeros((nx + 1, nr, ntheta), dtype=u.dtype)
-    uf = uf.at[1:-1].set(0.5 * (us[1:] + us[:-1]))
-    uf = uf.at[0].set(us[0])
-    uf = uf.at[-1].set(us[-1])
-    vf = jnp.zeros((nx, nr + 1, ntheta), dtype=v.dtype)
-    vf = vf.at[:, 1:-1, :].set(0.5 * (vs[:, 1:, :] + vs[:, :-1, :]))
-    wf = 0.5 * (ws + jnp.roll(ws, -1, axis=2))
-
-    divergence = (
-        (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
-        + (
-            faces[None, 1:, None] * vf[:, 1:, :]
-            - faces[None, :-1, None] * vf[:, :-1, :]
-        )
-        / jnp.maximum(centers[None, :, None] * widths[None, :, None], 1.0e-20)
-        + (wf - jnp.roll(wf, 1, axis=2))
-        / jnp.maximum(centers[None, :, None] * dtheta, 1.0e-20)
+    uf, vf, wf = _pipe_velocity_faces(us, vs, ws)
+    divergence = _pipe_face_divergence(
+        uf,
+        vf,
+        wf,
+        dx=dx,
+        r_faces=faces,
+        r_centers=centers,
+        dtheta=dtheta,
     )
     mobility = dt / jnp.maximum(rhos, 1.0e-20)
     pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
@@ -2621,35 +2696,25 @@ def _face_flux_pressure_projection_pipe(
         include_theta_fft_line=include_theta_fft_line,
     )
 
-    mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
-    uf = uf.at[1:-1].add(
-        -mobility_x * (pressure[1:] - pressure[:-1]) / max(dx, 1.0e-12)
+    correction = _pipe_pressure_face_correction(
+        pressure,
+        mobility,
+        dx=dx,
+        r_centers=centers,
+        dtheta=dtheta,
     )
-    mobility_r = _harmonic_mean(mobility[:, 1:, :], mobility[:, :-1, :])
-    radial_distance = jnp.diff(centers)
-    vf = vf.at[:, 1:-1, :].add(
-        -mobility_r
-        * (pressure[:, 1:, :] - pressure[:, :-1, :])
-        / radial_distance[None, :, None]
-    )
-    mobility_theta = _harmonic_mean(mobility, jnp.roll(mobility, -1, axis=2))
-    wf = wf - mobility_theta * (
-        jnp.roll(pressure, -1, axis=2) - pressure
-    ) / jnp.maximum(centers[None, :, None] * dtheta, 1.0e-20)
-    divergence_after = (
-        (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
-        + (
-            faces[None, 1:, None] * vf[:, 1:, :]
-            - faces[None, :-1, None] * vf[:, :-1, :]
-        )
-        / jnp.maximum(centers[None, :, None] * widths[None, :, None], 1.0e-20)
-        + (wf - jnp.roll(wf, 1, axis=2))
-        / jnp.maximum(centers[None, :, None] * dtheta, 1.0e-20)
+    uf, vf, wf = (face + delta for face, delta in zip((uf, vf, wf), correction))
+    divergence_after = _pipe_face_divergence(
+        uf,
+        vf,
+        wf,
+        dx=dx,
+        r_faces=faces,
+        r_centers=centers,
+        dtheta=dtheta,
     )
 
-    projected_u = 0.5 * (uf[:-1] + uf[1:])
-    projected_v = 0.5 * (vf[:, :-1, :] + vf[:, 1:, :])
-    projected_w = 0.5 * (wf + jnp.roll(wf, 1, axis=2))
+    projected_u, projected_v, projected_w = _pipe_face_velocity_cells(uf, vf, wf)
     full_u = jnp.zeros_like(u).at[:, :count, :].set(projected_u)
     full_v = jnp.zeros_like(v).at[:, :count, :].set(projected_v)
     full_w = jnp.zeros_like(w).at[:, :count, :].set(projected_w)
