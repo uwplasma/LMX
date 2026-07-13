@@ -3079,16 +3079,32 @@ def _steady_stokes_projection_pipe(
         precondition = local_precondition
 
     preconditioned_rhs = precondition(rhs)
-    pressure_solution = gmres(
-        schur,
-        rhs,
-        x0=preconditioned_rhs,
-        precond=precondition,
-        restart=restart,
-        rtol=pressure_tolerance,
-        atol=pressure_tolerance,
-        max_restarts=max_restarts,
-    )
+    def solve_pressure(linear_rhs, initial):
+        return gmres(
+            schur,
+            linear_rhs,
+            x0=initial,
+            precond=precondition,
+            restart=restart,
+            rtol=pressure_tolerance,
+            atol=pressure_tolerance,
+            max_restarts=max_restarts,
+        )
+
+    if modal_factor_key is not None:
+        solve_pressure = _reuse_fringing_jit(
+            (
+                "b1_steady_pressure",
+                jax.default_backend(),
+                modal_factor_key,
+                pressure_iterations,
+                pressure_tolerance,
+                restart,
+                max_restarts,
+            ),
+            jax.jit(solve_pressure),
+        )
+    pressure_solution = solve_pressure(rhs, preconditioned_rhs)
     pressure = unpack_pressure(pressure_solution.x[:pressure_size])
     pressure_loss = pressure_solution.x[pressure_size:]
     correction = velocity_response(pressure_solution.x)
