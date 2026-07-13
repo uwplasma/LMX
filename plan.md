@@ -1267,6 +1267,10 @@ wall time is acceptable.
    fresh exact solve from `76.15 s` to `68.04 s` (10.6%). The existing campaign
    cache implementation is therefore retained, but it does not alter the Schur
    optimization or two-GPU acceptance gates.
+   The complete accepted compatible series is integrated on `main` at
+   `8061f40`; touched-file lint, all 81 consolidated fringing tests, and the
+   exact compatible CPU solve/restart gate pass from the merged source. Further
+   multi-GPU work branches from this fingerprint.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
