@@ -4,12 +4,15 @@ from collections.abc import Callable
 from dataclasses import replace
 from functools import lru_cache, partial
 import math
+import os
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.scipy.sparse.linalg import gmres as jax_gmres
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
+    KrylovSolution,
     aitken_relaxation,
     anderson_mixing,
     gmres,
@@ -2473,6 +2476,7 @@ def _solvax_diffusion_pipe(
     iterations: int,
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
+    reaction: jnp.ndarray | None = None,
     _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve steady or implicit cylindrical no-slip diffusion.
@@ -2505,10 +2509,10 @@ def _solvax_diffusion_pipe(
             )
         )
     )
+    if reaction is not None:
+        wall_sink = wall_sink + reaction
     system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
     if _system_solve is not None:
-        if dt is None:
-            raise ValueError("a cached implicit system requires a positive dt")
         return _system_solve(*system)
     return _solve_pipe_diffusion_system(
         *system,
@@ -2658,29 +2662,35 @@ def _steady_stokes_projection_pipe(
     pressure_tolerance: float,
     restart: int = 16,
     max_restarts: int = 2,
+    use_pressure_preconditioner: bool = True,
+    flow_constraint_scale: float = 1.0,
+    flow_response_matrix: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Apply the compatible steady ``D A^-1 G`` pipe projection."""
 
     response_flow = jnp.sum(unit_flow_response * cell_area, axis=(1, 2))
-    mean_response = jnp.mean(response_flow)
-
-    def set_mean_flow(state_u, target):
-        flow = jnp.sum(state_u * cell_area, axis=(1, 2))
-        multiplier = (target - jnp.mean(flow)) / mean_response
-        return state_u + multiplier * unit_flow_response, multiplier
-
-    base_u, base_multiplier = set_mean_flow(u, target_flow_rate)
-    base_faces = _pipe_velocity_faces(base_u, v, w)
-    base_divergence = _pipe_face_divergence(
-        *base_faces,
-        dx=dx,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-    )
+    area_sum = jnp.sum(cell_area, axis=(1, 2), keepdims=True)
     mobility = 1.0 / jnp.maximum(rho, 1.0e-20)
+    pressure_mobility = jnp.maximum(
+        unit_flow_response, jnp.mean(unit_flow_response) * 1.0e-8
+    )
+    cross_section_size = u.shape[1] * u.shape[2]
+    pressure_size = u.shape[0] * (cross_section_size - 1)
 
-    def pressure_velocity(pressure):
+    def unpack_pressure(reduced):
+        reduced = reduced.reshape((u.shape[0], cross_section_size - 1))
+        flat_area = cell_area.reshape((u.shape[0], cross_section_size))
+        final = -jnp.sum(reduced * flat_area[:, :-1], axis=1) / jnp.maximum(
+            flat_area[:, -1], 1.0e-20
+        )
+        return jnp.concatenate((reduced, final[:, None]), axis=1).reshape(u.shape)
+
+    def reduce_field(field):
+        return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
+
+    def velocity_response(state):
+        pressure = unpack_pressure(state[:pressure_size])
+        pressure_loss = state[pressure_size:]
         face_force = _pipe_pressure_face_correction(
             pressure,
             mobility,
@@ -2688,51 +2698,101 @@ def _steady_stokes_projection_pipe(
             r_centers=r_centers,
             dtheta=dtheta,
         )
-        cell_force = _pipe_face_velocity_cells(*face_force)
-        correction = tuple(apply_momentum_inverse(force) for force in cell_force)
-        correction_u, multiplier = set_mean_flow(correction[0], 0.0)
-        return (correction_u, *correction[1:]), multiplier
+        force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
+        force_u = force_u + pressure_loss[:, None, None] * mobility
+        return tuple(
+            apply_momentum_inverse(force) for force in (force_u, force_v, force_w)
+        )
 
-    def schur(pressure):
-        correction, _ = pressure_velocity(pressure)
-        return _pipe_face_divergence(
-            *_pipe_velocity_faces(*correction),
+    def constraints(state_u, state_v, state_w):
+        divergence = _pipe_face_divergence(
+            *_pipe_velocity_faces(state_u, state_v, state_w),
             dx=dx,
             r_faces=r_faces,
             r_centers=r_centers,
             dtheta=dtheta,
         )
+        mean_divergence = jnp.sum(
+            divergence * cell_area, axis=(1, 2), keepdims=True
+        ) / jnp.maximum(area_sum, 1.0e-20)
+        flow = flow_constraint_scale * jnp.sum(state_u * cell_area, axis=(1, 2))
+        return jnp.concatenate((reduce_field(divergence - mean_divergence), flow))
+
+    base_constraints = constraints(u, v, w)
+    rhs = -base_constraints.at[pressure_size:].add(
+        -flow_constraint_scale * target_flow_rate
+    )
+
+    def schur(state):
+        return constraints(*velocity_response(state))
 
     def precondition(residual):
-        residual = residual.reshape(u.shape)
-        pressure, *_ = _solvax_pressure_poisson_pipe(
-            -residual,
-            mobility,
-            dx=dx,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
-            iterations=pressure_iterations,
-            tolerance=pressure_tolerance,
-            include_theta_fft_line=True,
+        divergence = unpack_pressure(residual[:pressure_size])
+        if use_pressure_preconditioner:
+            pressure, *_ = _solvax_pressure_poisson_pipe(
+                -divergence,
+                pressure_mobility,
+                dx=dx,
+                r_faces=r_faces,
+                r_centers=r_centers,
+                dtheta=dtheta,
+                iterations=pressure_iterations,
+                tolerance=pressure_tolerance,
+                include_theta_fft_line=True,
+            )
+        else:
+            pressure = jnp.zeros_like(divergence)
+        flow_residual = residual[pressure_size:] / flow_constraint_scale
+        pressure_loss = (
+            jnp.linalg.solve(flow_response_matrix, flow_residual)
+            if flow_response_matrix is not None
+            else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
         )
-        return pressure.reshape(-1)
+        return jnp.concatenate((reduce_field(pressure), pressure_loss))
 
-    def flat_schur(pressure):
-        return schur(pressure.reshape(u.shape)).reshape(-1)
+    if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
+        preconditioned_rhs = precondition(rhs)
+        preconditioned_residual = schur(preconditioned_rhs) - rhs
+        print(
+            "B1 compatible preconditioner:",
+            float(jnp.linalg.norm(rhs)),
+            float(jnp.linalg.norm(preconditioned_residual)),
+            float(jnp.linalg.norm(preconditioned_residual[pressure_size:])),
+            float(jnp.mean(preconditioned_rhs[pressure_size:])),
+        )
 
-    pressure_solution = gmres(
-        flat_schur,
-        -base_divergence.reshape(-1),
-        precond=precondition,
-        restart=restart,
-        rtol=pressure_tolerance,
-        atol=pressure_tolerance,
-        max_restarts=max_restarts,
-    )
-    pressure = pressure_solution.x.reshape(u.shape)
-    correction, pressure_multiplier = pressure_velocity(pressure)
-    projected = tuple(base + delta for base, delta in zip((base_u, v, w), correction))
+    if os.environ.get("LMX_B1_STOKES_JAX_GMRES") == "1":
+        solution, info = jax_gmres(
+            schur,
+            rhs,
+            tol=pressure_tolerance,
+            atol=pressure_tolerance,
+            restart=restart,
+            maxiter=max_restarts,
+            M=precondition,
+        )
+        residual_norm = jnp.linalg.norm(schur(solution) - rhs)
+        pressure_solution = KrylovSolution(
+            solution,
+            residual_norm,
+            jnp.asarray(restart * max_restarts),
+            info == 0,
+            None,
+        )
+    else:
+        pressure_solution = gmres(
+            schur,
+            rhs,
+            precond=precondition,
+            restart=restart,
+            rtol=pressure_tolerance,
+            atol=pressure_tolerance,
+            max_restarts=max_restarts,
+        )
+    pressure = unpack_pressure(pressure_solution.x[:pressure_size])
+    pressure_loss = pressure_solution.x[pressure_size:]
+    correction = velocity_response(pressure_solution.x)
+    projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
     final_flow = jnp.sum(projected[0] * cell_area, axis=(1, 2))
     final_divergence = _pipe_face_divergence(
         *_pipe_velocity_faces(*projected),
@@ -2744,7 +2804,7 @@ def _steady_stokes_projection_pipe(
     return (
         *projected,
         pressure,
-        base_multiplier + pressure_multiplier,
+        pressure_loss,
         jnp.max(jnp.abs(final_divergence)),
         jnp.max(jnp.abs(final_flow - target_flow_rate)),
         pressure_solution,
@@ -5068,6 +5128,9 @@ def _solve_extruded_projection(
         case.name.startswith("alex_b1-fringing-pipe_")
         and case.geometry.kind == "pipe_ogrid"
     )
+    use_compatible_steady_b1 = (
+        use_alex_b1_finite_volume and os.environ.get("LMX_B1_COMPATIBLE_STEADY") == "1"
+    )
     if case.name.startswith("alex_") and not (
         use_alex_b1_finite_volume or use_alex_b2_finite_volume
     ):
@@ -5227,7 +5290,9 @@ def _solve_extruded_projection(
         electric_tolerance = min(poisson_tolerance, 1.0e-12)
         projection_iterations = max(poisson_iterations, 4000)
         projection_tolerance = min(poisson_tolerance, 1.0e-12)
-        momentum_iterations = max(poisson_iterations, 400)
+        momentum_iterations = max(
+            poisson_iterations, 2000 if use_compatible_steady_b1 else 400
+        )
         momentum_tolerance = min(poisson_tolerance, 1.0e-10)
         velocity_limit = max(
             5.0, 2.0 * math.sqrt(float(case.geometry.target_ha or 1.0))
@@ -5272,6 +5337,7 @@ def _solve_extruded_projection(
                 dtheta,
                 momentum_iterations,
                 momentum_tolerance,
+                use_compatible_steady_b1,
             )
 
             def diffusion_system_solve(
@@ -5283,7 +5349,8 @@ def _solve_extruded_projection(
                     coefficients,
                     wall_sink,
                     initial,
-                    diffusion_coefficient=dt,
+                    mass_coefficient=0.0 if use_compatible_steady_b1 else 1.0,
+                    diffusion_coefficient=1.0 if use_compatible_steady_b1 else dt,
                     iterations=momentum_iterations,
                     tolerance=momentum_tolerance,
                 )
@@ -5291,12 +5358,23 @@ def _solve_extruded_projection(
             diffusion_system_solve = _reuse_fringing_jit(
                 kernel_key, jax.jit(diffusion_system_solve)
             )
+            steady_reaction = (
+                sigma[:, :count, :]
+                * (
+                    bx[:, :count, :] ** 2
+                    + br[:, :count, :] ** 2
+                    + btheta[:, :count, :] ** 2
+                )
+                / rho[:, :count, :]
+                if use_compatible_steady_b1
+                else None
+            )
 
             def momentum_solve(rhs, viscosity, initial):
                 return _solvax_diffusion_pipe(
                     rhs,
                     viscosity,
-                    dt=dt,
+                    dt=None if use_compatible_steady_b1 else dt,
                     dx=dx,
                     r_faces=faces,
                     r_centers=centers,
@@ -5304,24 +5382,40 @@ def _solve_extruded_projection(
                     iterations=momentum_iterations,
                     tolerance=momentum_tolerance,
                     initial_field=initial,
+                    reaction=steady_reaction,
                     _system_solve=diffusion_system_solve,
                 )
 
             response_fluid, _, _ = _solvax_diffusion_pipe(
-                dt / rho[:, :count, :],
+                (1.0 if use_compatible_steady_b1 else dt) / rho[:, :count, :],
                 nu[:, :count, :],
-                dt=dt,
+                dt=None if use_compatible_steady_b1 else dt,
                 dx=dx,
                 r_faces=faces,
                 r_centers=centers,
                 dtheta=dtheta,
                 iterations=momentum_iterations,
                 tolerance=momentum_tolerance,
+                reaction=steady_reaction,
             )
-            response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
-            response_fluid = jnp.broadcast_to(
-                response_cross_section, response_fluid.shape
-            )
+            if not use_compatible_steady_b1:
+                response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
+                response_fluid = jnp.broadcast_to(
+                    response_cross_section, response_fluid.shape
+                )
+                flow_response_matrix = None
+            else:
+                basis_rhs = (
+                    jnp.eye(nx, dtype=u.dtype)[:, :, None, None]
+                    / rho[None, :, :count, :]
+                )
+                zero = jnp.zeros_like(response_fluid)
+                basis_response = jax.vmap(
+                    lambda rhs: momentum_solve(rhs, nu[:, :count, :], zero)[0]
+                )(basis_rhs)
+                flow_response_matrix = jnp.sum(
+                    basis_response * fluid_cell_area[None, :, :count, :], axis=(2, 3)
+                ).T
             unit_pressure_response = (
                 jnp.zeros_like(u).at[:, :count, :].set(response_fluid)
             )
@@ -5387,6 +5481,18 @@ def _solve_extruded_projection(
                 rhs_w = w[:, :count, :] + dt * (
                     lorentz_theta[:, :count, :] / rho[:, :count, :]
                 )
+                if use_compatible_steady_b1:
+                    rhs_u = (forcing + lorentz_x[:, :count, :]) / rho[
+                        :, :count, :
+                    ] + steady_reaction * u[:, :count, :]
+                    rhs_v = (
+                        lorentz_r[:, :count, :] / rho[:, :count, :]
+                        + steady_reaction * v[:, :count, :]
+                    )
+                    rhs_w = (
+                        lorentz_theta[:, :count, :] / rho[:, :count, :]
+                        + steady_reaction * w[:, :count, :]
+                    )
                 viscosity = nu[:, :count, :]
                 u_fluid, _, _ = momentum_solve(rhs_u, viscosity, u[:, :count, :])
                 v_fluid, _, _ = momentum_solve(rhs_v, viscosity, v[:, :count, :])
@@ -5411,35 +5517,89 @@ def _solve_extruded_projection(
                 w_star = jnp.where(fluid_mask, w_star, 0.0)
                 if target_flow_rate is None:
                     raise ValueError("ALEX B1 requires its frozen fixed mean flow rate")
-                (
-                    u_next,
-                    v_next,
-                    w_next,
-                    p_corr,
-                    axial_pressure_loss_gradient,
-                    projected_divergence_norm,
-                    fixed_flow_error,
-                ) = _fixed_flow_face_flux_projection_pipe(
-                    u_star,
-                    v_star,
-                    w_star,
-                    rho,
-                    fluid_mask,
-                    unit_pressure_response,
-                    fluid_cell_area,
-                    target_flow_rate=target_flow_rate,
-                    base_pressure_loss_gradient=forcing,
-                    dt=dt,
-                    dx=dx,
-                    r_faces=r_faces,
-                    r_centers=r,
-                    dtheta=dtheta,
-                    iterations=projection_iterations,
-                    tolerance=projection_tolerance,
-                    radial_fluid_count=radial_fluid_count,
-                    initial_pressure=p,
-                    include_theta_fft_line=True,
-                )
+                if use_compatible_steady_b1:
+                    zero = jnp.zeros_like(u_fluid)
+                    steady_projection = _steady_stokes_projection_pipe(
+                        u_fluid,
+                        v_fluid,
+                        w_fluid,
+                        rho[:, :count, :],
+                        response_fluid,
+                        fluid_cell_area[:, :count, :],
+                        lambda rhs: momentum_solve(rhs, viscosity, zero)[0],
+                        target_flow_rate=target_flow_rate,
+                        dx=dx,
+                        r_faces=faces,
+                        r_centers=centers,
+                        dtheta=dtheta,
+                        pressure_iterations=projection_iterations,
+                        pressure_tolerance=momentum_tolerance,
+                        restart=int(os.environ.get("LMX_B1_STOKES_RESTART", "16")),
+                        max_restarts=int(os.environ.get("LMX_B1_STOKES_RESTARTS", "2")),
+                        use_pressure_preconditioner=os.environ.get(
+                            "LMX_B1_STOKES_NO_PRECONDITIONER"
+                        )
+                        != "1",
+                        flow_constraint_scale=float(
+                            os.environ.get("LMX_B1_STOKES_FLOW_SCALE", "1")
+                        ),
+                        flow_response_matrix=flow_response_matrix,
+                    )
+                    if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
+                        print(
+                            "B1 compatible Stokes:",
+                            int(steady_projection[-1].iterations),
+                            float(steady_projection[-1].residual_norm),
+                            bool(steady_projection[-1].converged),
+                            float(steady_projection[5]),
+                            float(steady_projection[6]),
+                            float(jnp.max(jnp.abs(steady_projection[0]))),
+                        )
+                    u_next = (
+                        jnp.zeros_like(u).at[:, :count, :].set(steady_projection[0])
+                    )
+                    v_next = (
+                        jnp.zeros_like(v).at[:, :count, :].set(steady_projection[1])
+                    )
+                    w_next = (
+                        jnp.zeros_like(w).at[:, :count, :].set(steady_projection[2])
+                    )
+                    p_corr = (
+                        jnp.zeros_like(p).at[:, :count, :].set(steady_projection[3])
+                    )
+                    axial_pressure_loss_gradient = forcing + steady_projection[4]
+                    projected_divergence_norm = steady_projection[5]
+                    fixed_flow_error = steady_projection[6]
+                else:
+                    (
+                        u_next,
+                        v_next,
+                        w_next,
+                        p_corr,
+                        axial_pressure_loss_gradient,
+                        projected_divergence_norm,
+                        fixed_flow_error,
+                    ) = _fixed_flow_face_flux_projection_pipe(
+                        u_star,
+                        v_star,
+                        w_star,
+                        rho,
+                        fluid_mask,
+                        unit_pressure_response,
+                        fluid_cell_area,
+                        target_flow_rate=target_flow_rate,
+                        base_pressure_loss_gradient=forcing,
+                        dt=dt,
+                        dx=dx,
+                        r_faces=r_faces,
+                        r_centers=r,
+                        dtheta=dtheta,
+                        iterations=projection_iterations,
+                        tolerance=projection_tolerance,
+                        radial_fluid_count=radial_fluid_count,
+                        initial_pressure=p,
+                        include_theta_fft_line=True,
+                    )
                 p_corr = _clip_state(p_corr, scalar_limit)
                 u_next = _clip_state(u_next, velocity_limit)
                 v_next = _clip_state(v_next, velocity_limit)
