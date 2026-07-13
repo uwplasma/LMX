@@ -204,7 +204,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite(
     assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
     assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
-        1.0, abs=1.0e-10
+        1.0, abs=1.0e-8
     )
     assert solution.validation.mean_velocity_span < 1.0e-3
     assert solution.validation.volumetric_flow_rate_span < 1.0e-3

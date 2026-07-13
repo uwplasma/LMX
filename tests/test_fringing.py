@@ -1040,30 +1040,33 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
     modal_key = ("test_retained_modal_blocks",) if modal_stabilization else None
     unit_response = inverse(jnp.ones(shape))
 
-    steady_result = _steady_stokes_projection_pipe(
-        inverse(u),
-        inverse(v),
-        inverse(w),
-        jnp.ones(shape),
-        unit_response,
-        cell_area,
-        inverse,
-        target_flow_rate=2.0,
-        dx=0.5,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-        pressure_iterations=300,
-        pressure_tolerance=1.0e-9,
-        restart=24,
-        max_restarts=3,
-        apply_modal_momentum_inverse=(
-            modal_inverse if modal_stabilization else None
-        ),
-        modal_stabilization=modal_stabilization,
-        modal_factor_key=modal_key,
-        physical_tolerance=1.0e-7,
-    )
+    def steady_project(**kwargs):
+        return _steady_stokes_projection_pipe(
+            inverse(u),
+            inverse(v),
+            inverse(w),
+            jnp.ones(shape),
+            unit_response,
+            cell_area,
+            inverse,
+            target_flow_rate=2.0,
+            dx=0.5,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            pressure_iterations=300,
+            pressure_tolerance=1.0e-9,
+            restart=24,
+            max_restarts=3,
+            apply_modal_momentum_inverse=(
+                modal_inverse if modal_stabilization else None
+            ),
+            modal_stabilization=modal_stabilization,
+            physical_tolerance=1.0e-7,
+            **kwargs,
+        )
+
+    steady_result = steady_project(modal_factor_key=modal_key)
     assert steady_result[-3] < 1.0e-7
     assert steady_result[-2] < 1.0e-7
     assert bool(steady_result[-1].converged)
@@ -1081,18 +1084,15 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             .at[:, -1, :]
             .set(0.07 * r_faces[-1] / (r_centers[-1] * 0.5 * (1.0 - 0.7) ** 2))
         )
-        retained = fringing_impl._pipe_retained_modal_factors(
-            jnp.ones(shape),
-            jnp.maximum(unit_response, jnp.mean(unit_response) * 1.0e-8),
-            cell_area,
-            coefficients,
-            wall_sink,
-            dx=0.5,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
-            modes=(2,),
+        direct_key = ("test_retained_modes_0_to_4",)
+        direct_result = steady_project(
+            modal_factor_key=direct_key,
+            modal_momentum_coefficients=coefficients,
+            modal_momentum_sink=wall_sink,
         )
+        assert bool(direct_result[-1].converged)
+        retained_all = fringing_impl._FRINGING_MODAL_FACTOR_CACHE.pop(direct_key)
+        retained = (retained_all[0], (retained_all[1][1],))
         probed = fringing_impl._FRINGING_MODAL_FACTOR_CACHE.pop(modal_key)
         trial = jnp.arange(nx * (3 * nr - 1), dtype=float).reshape(nx, 3 * nr - 1)
         assert fringing_impl._solve_pipe_retained_modal_factors(
