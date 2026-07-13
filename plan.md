@@ -1058,7 +1058,14 @@ wall time is acceptable.
    The next structural experiment must remove the explicit electromagnetic
    timestep from the operator: solve the steady coupled Stokes-electric block
    with a physics-preserving Schur preconditioner before another production
-   campaign.
+   campaign. The first compact foundation is merged at `cd5c76e`: the existing
+   cylindrical diffusion solver now supports both shifted implicit updates and
+   the exact steady SPD operator through one shared implementation. Its
+   manufactured no-slip reconstruction passes without duplicating the test,
+   the accepted reduced B1 path is unchanged, and the source-matched portable
+   gate passes 903 tests with 8 expected skips and 95.08% branch coverage in
+   `125.2 s`. Build the divergence/flow-constrained Stokes Schur response on
+   this operator next; do not reintroduce a parallel solver stack.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
