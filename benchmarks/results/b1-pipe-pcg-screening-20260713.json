@@ -252,9 +252,49 @@
       "accepted": false,
       "reason": "Retaining compatible projected faces removes a representation-only reprojection mode and improves terminal divergence, but leaves the controlling axial-velocity residual unchanged, costs 6.1% more time, and adds 122 net source/test lines."
     },
+    "steady_reaction_schur_probes": {
+      "branch": "agent/b1-steady-response",
+      "steady_reaction_map": {
+        "tiny_shape": [7, 10, 16],
+        "observation": "Adding sigma*|B|^2/rho to the shared steady diffusion operator and its matching right-hand side changes the raw B1 map from unstable to contractive while preserving its fixed point.",
+        "accepted_as_preconditioner": true
+      },
+      "transient_projection_schur": {
+        "commit": "dd62331",
+        "shape": [32, 16, 32],
+        "hardware": "1 x NVIDIA RTX A4000",
+        "compile_inclusive_seconds": 91.0275,
+        "warm_seconds": 68.6178,
+        "terminal_residual": 0.00012512632,
+        "terminal_divergence_residual": 0.076785892,
+        "terminal_charge_balance_residual": 0.00021284462,
+        "volumetric_flow_rate_span": 0.000030721603,
+        "candidate_source_sha256": "8b77aafe9bd735f783561497b106871458e2ca78d962f5aeee49fe10fc40b68b",
+        "accepted": false,
+        "reason": "The small affine stationwise Schur solve is fast and closes flow, but a transient (1/rho) pressure correction is not the steady D A^-1 G Stokes Schur operator and produces inadmissible divergence."
+      },
+      "truncated_stationwise_schur": {
+        "shape": [32, 16, 32],
+        "dimensions": [3, 4],
+        "warm_seconds": [58.7987, 63.5416],
+        "terminal_residual": [0.0014315451, 0.00029451956],
+        "terminal_divergence_residual": [0.070420807, 0.069123614],
+        "volumetric_flow_rate_span": [0.0004212627, 0.0001570267],
+        "candidate_source_sha256": "f489466317783f663f44384e5a177963f4a23eb12b4ba934498210cc895cd3aa",
+        "accepted": false,
+        "reason": "Krylov truncation regularizes the pressure multipliers but does not repair the incompatible steady pressure projection."
+      },
+      "coupled_pressure_block": {
+        "commit": "5d2d296",
+        "probe": "tiny mesh",
+        "accepted": false,
+        "reason": "Using the cell-centred gradient with the face-flux divergence does not form a compatible discrete G/D pair; the pressure Krylov residual stagnates or excites divergence. Preserve this branch as a diagnostic, not production code."
+      },
+      "next_candidate": "Extract one reusable compatible cylindrical face interpolation, divergence, pressure-gradient, and cell reconstruction operator set, prove D G consistency and adjointness with manufactured tests, then build the steady D A^-1 G block on that foundation."
+    },
     "accepted": false,
-    "next_candidate": "Remove the explicit electromagnetic timestep from the conditioning with a steady coupled Stokes-electric block solve and a physics-preserving Schur preconditioner."
+    "next_candidate": "Extract and verify a compatible cylindrical face G/D operator set before retrying the steady D A^-1 G Stokes-electric block; transient projection and mixed cell/face Schur variants are closed."
   },
   "accepted": true,
-  "next_constraint": "Implement a steady coupled Stokes-electric block solve; pseudo-time-map acceleration is closed."
+  "next_constraint": "Implement and verify compatible cylindrical face G/D operators, then use them for the steady coupled Stokes-electric block; pseudo-time-map acceleration and transient-pressure Schur variants are closed."
 }

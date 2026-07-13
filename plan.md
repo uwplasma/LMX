@@ -1071,6 +1071,27 @@ wall time is acceptable.
    `3.97e-4`, but leaves the controlling residual unchanged at `2.03e-3`, is
    6.1% slower, and adds 122 net source/test lines. Preserve the projection
    idempotence diagnosis as evidence, not production complexity.
+   A steady electromagnetic reaction split is retained as the next block
+   preconditioner: adding `sigma |B|^2 / rho` to the shared steady diffusion
+   operator and adding the same linear term to its right-hand side preserves
+   the fixed point and changes the tiny B1 map from unstable to contractive.
+   The first stationwise Schur prototype then closes the exact reduced flow
+   span to `3.07e-5` in a warm `68.62 s`, but is rejected because it applies the
+   transient `(1/rho)` pressure projection to a steady momentum response and
+   raises divergence to `7.68e-2`. Truncating that Schur space to three or four
+   vectors retains `5.88--6.35e1 s` warm runtimes and closes flow below the
+   frozen gate, but divergence remains about `7e-2`. A direct coupled pressure
+   prototype confirms that mixing the cell-centred gradient with the
+   face-flux divergence is not a compatible discrete `G/D` pair; preserve it
+   only on `agent/b1-steady-response` at `5d2d296`. Before another exact GPU
+   campaign, extract the existing cylindrical face interpolation and
+   divergence into one reusable operator set, add its matching pressure
+   gradient and cell reconstruction, and prove constant-nullspace,
+   `D G` consistency, weighted adjointness, projection closure, and JIT/AD
+   behavior on a manufactured mesh. Build `D A^-1 G` only from that verified
+   pair. This is a smaller and more decisive step than adding another solver
+   or tuning more Krylov dimensions; evidence is in the existing B1 screening
+   record.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
