@@ -1,6 +1,6 @@
 {
   "case_family": "ALEX Benchmark B",
-  "source_fingerprint": "7c990bc2893cbd7385d20cfcc0d7788bfa8bf4a453b50098b20514b291ff101c",
+  "source_fingerprint": "ad197463d8c586400278bb25e197294d4c1e55bc434cbfbb88ef0ecea291602e",
   "checkpoint_contract": {
     "progress_frequency_outer_iterations": 1,
     "default_restart_frequency_outer_iterations": 8,
@@ -19,7 +19,7 @@
     "passed": 902,
     "skipped": 8,
     "branch_coverage_percent": 95.10,
-    "wall_seconds": 113.3,
+    "wall_seconds": 114.9,
     "budget_seconds": 600,
     "physics_paths": [
       "reduced ALEX B1 mapped-pipe production solve",

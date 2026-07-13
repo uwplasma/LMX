@@ -1003,7 +1003,7 @@ wall time is acceptable.
    retain priority.
    Both reduced production geometries exercise this path. The source-matched
    six-worker gate passes 902 tests with 8 expected skips and 95.10% branch
-   coverage in 113.3 seconds. Checkpoint evidence is in
+   coverage in 114.9 seconds. Checkpoint evidence is in
    `benchmarks/results/b1-checkpoint-resume-20260713.json`; runtime evidence is in
    `benchmarks/results/b1-coarse-runtime-cap-20260713.json`; independent-variant
    concurrency is throughput, not strong scaling of one solve. Rerun one coarse

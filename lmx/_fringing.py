@@ -4807,10 +4807,10 @@ def _emit_iteration_progress(
         ExtrudedIterationProgress(
             step=step,
             total_steps=total_steps,
-            residual=residual,
-            component_residuals=component_residuals,
-            pressure_residual=pressure_residual,
-            potential_residual=potential_residual,
+            residual=float(residual),
+            component_residuals=tuple(float(value) for value in component_residuals),
+            pressure_residual=float(pressure_residual),
+            potential_residual=float(potential_residual),
             checkpoint=checkpoint_factory() if write_checkpoint else None,
         )
     )

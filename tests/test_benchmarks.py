@@ -195,6 +195,8 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     )
 
     assert [item.step for item in progress] == list(range(1, len(progress) + 1))
+    assert all(isinstance(item.potential_residual, float) for item in progress)
+    assert all(isinstance(value, float) for value in progress[-1].component_residuals)
     assert all(item.checkpoint is not None for item in progress)
     assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
     assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
