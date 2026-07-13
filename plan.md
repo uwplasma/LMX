@@ -1358,6 +1358,18 @@ wall time is acceptable.
    per GPU and direct solver work toward the coarse residual/iteration floor or
    a literature-anchored communication-avoiding method with an exact bounded
    scaling gate.
+   The first coarse-path setup repair is accepted on the medium refinement
+   grid. Modal-factor construction now uses a full radial/azimuthal momentum
+   block at each axial station, retaining the axial diagonal but not its
+   off-station couplings; the runtime Schur operator remains exact. Sequential
+   axial-response and modal-block assembly avoids the previous giant batched
+   GPU graph. The `11 x 17 x 32` two-step A4000 solve completes in `87.42 s`
+   cold and `24.10 s` from restart, with mean flow `1.00000000018`, charge
+   residual `1.97e-9`, and divergence `7.15e-6`. The rejected point-diagonal
+   probe had restart divergence `8.27`. Evidence is in
+   `benchmarks/results/b1-local-modal-setup-20260713.json`. Next run the frozen
+   compatible B1 refinement/runtime ladder; acceptance at medium scale does not
+   substitute for the full coarse physics and one-hour runtime gates.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

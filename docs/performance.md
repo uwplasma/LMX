@@ -321,6 +321,20 @@ two GPUs take `6.37 s`, and single-reduction PCG lowers the latter only to
 gate. This prototype is removed; compact evidence is in
 `benchmarks/results/b1-theta-domain-sharding-20260713.json`.
 
+The compatible B1 modal setup now uses a cross-section block-Jacobi momentum
+inverse: it preserves radial/azimuthal diffusion and the axial diagonal while
+dropping only neighboring-station momentum couplings during preconditioner
+construction. The solved Schur operator remains exact. Sequential assembly
+also avoids the GPU compiler failure caused by batching every axial response
+and modal probe into one graph. On one A4000, the `11 x 17 x 32` two-step gate
+completes in `87.42 s` cold and `24.10 s` from restart, with mean flow
+`1.00000000018`, charge residual `1.97e-9`, and divergence residual `7.15e-6`.
+The point-diagonal alternative reached divergence `8.27` and remains rejected.
+Compact evidence is in
+`benchmarks/results/b1-local-modal-setup-20260713.json`. This closes the
+medium-grid setup failure; it does not change the decision to run independent
+B1 variants on the two GPUs or yet claim the full coarse refinement gate.
+
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
 published for review as [SOLVAX PR #12](https://github.com/uwplasma/SOLVAX/pull/12),

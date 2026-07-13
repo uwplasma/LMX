@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-07-13",
+  "source_parent": "bb4873f",
+  "candidate": "sequential axial responses and cross-section block-Jacobi modal momentum",
+  "case": "B1-fringing-pipe",
+  "grid": [11, 17, 32],
+  "outer_steps": 2,
+  "environment": {
+    "host": "office",
+    "device": "NVIDIA RTX A4000",
+    "device_count": 1,
+    "jax": "0.10.2",
+    "precision": "float64"
+  },
+  "timing_seconds": {
+    "first": 87.42041795398109,
+    "restart": 24.09873200103175
+  },
+  "physics": {
+    "first_mean_velocity": 0.9999999999668406,
+    "restart_mean_velocity": 1.0000000001844502,
+    "first_charge_residual": 1.9669270726052623e-9,
+    "restart_charge_residual": 1.972006738459875e-9,
+    "restart_divergence_residual": 7.149659571260153e-6,
+    "restart_boundary_current": 0.0
+  },
+  "acceptance": {
+    "completed_bounded_180_second_gate": true,
+    "mean_flow_tolerance": 1e-8,
+    "balance_tolerance": 1e-3,
+    "passed": true
+  },
+  "rejected_point_diagonal_restart_divergence": 8.27462
+}

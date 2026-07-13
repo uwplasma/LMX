@@ -2601,12 +2601,15 @@ def _solvax_diffusion_pipe(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
     reaction: jnp.ndarray | None = None,
+    decouple_axial: bool = False,
     _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve steady or implicit cylindrical no-slip diffusion.
 
     ``dt=None`` solves ``-div(viscosity grad(field)) = rhs``. A positive
     ``dt`` solves the implicit update ``field - dt * div(...) = rhs``.
+    ``decouple_axial`` retains the axial diagonal while dropping neighboring
+    station couplings, providing a cross-section block-Jacobi inverse.
     """
 
     radial_widths = jnp.diff(r_faces)
@@ -2621,6 +2624,11 @@ def _solvax_diffusion_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
+    axial_sink = jnp.zeros_like(rhs)
+    if decouple_axial:
+        axial_sink = coefficients[0] + coefficients[1]
+        zero = jnp.zeros_like(coefficients[0])
+        coefficients = (zero, zero, *coefficients[2:])
     wall_sink = (
         jnp.zeros_like(rhs)
         .at[:, -1, :]
@@ -2632,7 +2640,7 @@ def _solvax_diffusion_pipe(
                 1.0e-20,
             )
         )
-    )
+    ) + axial_sink
     if reaction is not None:
         wall_sink = wall_sink + reaction
     system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
@@ -2851,6 +2859,7 @@ def _steady_stokes_projection_pipe(
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
     apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray]
     | None = None,
+    apply_modal_momentum_inverse: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
     modal_stabilization: bool = False,
     modal_factor_key: tuple[object, ...] | None = None,
     physical_tolerance: float | None = None,
@@ -2900,7 +2909,9 @@ def _steady_stokes_projection_pipe(
             return transformed[:, :-1].reshape(-1)
         return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
 
-    def velocity_response(state, *, use_component_inverse=True):
+    def velocity_response(
+        state, *, use_component_inverse=True, use_modal_inverse=False
+    ):
         pressure = unpack_pressure(state[:pressure_size])
         pressure_loss = state[pressure_size:]
         face_force = _pipe_pressure_face_correction(
@@ -2913,9 +2924,16 @@ def _steady_stokes_projection_pipe(
         force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
         force_u = force_u + pressure_loss[:, None, None] * mobility
         forces = jnp.stack((force_u, force_v, force_w))
+        momentum_inverse = (
+            apply_modal_momentum_inverse
+            if use_modal_inverse and apply_modal_momentum_inverse is not None
+            else apply_momentum_inverse
+        )
         responses = (
-            jnp.stack(tuple(apply_momentum_inverse(force) for force in forces))
-            if apply_momentum_inverse_components is None or not use_component_inverse
+            jnp.stack(tuple(momentum_inverse(force) for force in forces))
+            if apply_momentum_inverse_components is None
+            or not use_component_inverse
+            or use_modal_inverse
             else apply_momentum_inverse_components(forces)
         )
         return tuple(responses)
@@ -2975,9 +2993,11 @@ def _steady_stokes_projection_pipe(
     base_constraints = constraints(u, v, w)
     rhs = -base_constraints.at[pressure_size:].add(-target_flow_rate)
 
-    def schur(state, *, use_component_inverse=True):
+    def schur(state, *, use_component_inverse=True, use_modal_inverse=False):
         response = velocity_response(
-            state, use_component_inverse=use_component_inverse
+            state,
+            use_component_inverse=use_component_inverse,
+            use_modal_inverse=use_modal_inverse,
         )
         if not modal_stabilization:
             return constraints(*response)
@@ -3084,16 +3104,30 @@ def _steady_stokes_projection_pipe(
         stations = jnp.arange(u.shape[0])
 
         def build_modal_factors():
-            modal_actions = jax.vmap(
-                lambda source: jax.vmap(
-                    lambda basis: modal_restrict(
-                        schur(
-                            station_prolong(source, basis),
-                            use_component_inverse=False,
-                        )
+            def modal_action(source, basis):
+                return modal_restrict(
+                    schur(
+                        station_prolong(source, basis),
+                        use_component_inverse=False,
+                        use_modal_inverse=True,
                     )
-                )(local_basis)
-            )(stations)
+                )
+
+            if apply_modal_momentum_inverse is None:
+                modal_actions = jax.vmap(
+                    lambda source: jax.vmap(
+                        lambda basis: modal_action(source, basis)
+                    )(local_basis)
+                )(stations)
+            else:
+                modal_actions = jnp.stack(
+                    tuple(
+                        jnp.stack(
+                            tuple(modal_action(source, basis) for basis in local_basis)
+                        )
+                        for source in stations
+                    )
+                )
             diagonal = jax.vmap(
                 lambda station: modal_actions[station, :, station, :].T
             )(stations)
@@ -5896,6 +5930,33 @@ def _solve_extruded_projection(
                     ),
                     jax.jit(momentum_solve),
                 )
+
+                def modal_momentum_solve(rhs):
+                    return _solvax_diffusion_pipe(
+                        rhs,
+                        momentum_viscosity,
+                        dt=None,
+                        dx=dx,
+                        r_faces=faces,
+                        r_centers=centers,
+                        dtheta=dtheta,
+                        iterations=momentum_iterations,
+                        tolerance=momentum_tolerance,
+                        reaction=steady_reaction,
+                        decouple_axial=True,
+                    )[0]
+
+                modal_momentum_solve = _reuse_fringing_jit(
+                    (
+                        "b1_modal_momentum",
+                        jax.default_backend(),
+                        kernel_key,
+                        _array_fingerprint(momentum_viscosity, steady_reaction),
+                    ),
+                    jax.jit(modal_momentum_solve),
+                )
+            else:
+                modal_momentum_solve = None
             response_rhs = (1.0 if use_compatible_steady_b1 else dt) / rho[
                 :, :count, :
             ]
@@ -5914,8 +5975,8 @@ def _solve_extruded_projection(
                     / rho[None, :, :count, :]
                 )
                 zero = jnp.zeros_like(response_fluid)
-                basis_response = jax.vmap(lambda rhs: momentum_solve(rhs, zero)[0])(
-                    basis_rhs
+                basis_response = jnp.stack(
+                    tuple(momentum_solve(rhs, zero)[0] for rhs in basis_rhs)
                 )
                 flow_response_matrix = jnp.sum(
                     basis_response * fluid_cell_area[None, :, :count, :], axis=(2, 3)
@@ -6042,6 +6103,7 @@ def _solve_extruded_projection(
                         pressure_preconditioner_mobility=(
                             pressure_preconditioner_mobility
                         ),
+                        apply_modal_momentum_inverse=modal_momentum_solve,
                         modal_stabilization=True,
                         modal_factor_key=modal_factor_key,
                         physical_tolerance=ALEX_BALANCE_TOLERANCE,

@@ -876,6 +876,35 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     assert float(residual) < 1.0e-8
     assert solved == pytest.approx(manufactured, abs=1.0e-8)
 
+
+def test_pipe_block_jacobi_diffusion_decouples_axial_stations():
+    r_faces = jnp.asarray([0.0, 0.2, 0.5, 0.75, 1.0])
+    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    dx, viscosity = 0.4, 0.07
+    rhs = jnp.zeros((3, 4, 8)).at[1].set(1.0)
+    common = dict(
+        dt=None,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=2.0 * jnp.pi / 8,
+        iterations=300,
+        tolerance=1.0e-10,
+    )
+    solved, _, converged = _solvax_diffusion_pipe(
+        rhs, jnp.full(rhs.shape, viscosity), decouple_axial=True, **common
+    )
+    local, _, local_converged = _solvax_diffusion_pipe(
+        rhs[1:2],
+        jnp.full(rhs[1:2].shape, viscosity),
+        reaction=jnp.full(rhs[1:2].shape, 2.0 * viscosity / dx**2),
+        **common,
+    )
+    assert bool(converged) and bool(local_converged)
+    assert solved[jnp.asarray([0, 2])] == pytest.approx(0.0, abs=1.0e-12)
+    assert solved[1] == pytest.approx(local[0], abs=1.0e-8)
+
+
 def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
     nx, ntheta = 4, 8
     r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0])
