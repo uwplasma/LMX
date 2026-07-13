@@ -843,6 +843,11 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     shape = (4, 5, 8)
     manufactured = jnp.arange(np.prod(shape), dtype=float).reshape(shape) / 1000.0
     viscosity = jnp.full(shape, 0.04)
+    reaction = jnp.broadcast_to(
+        jnp.linspace(0.01, 0.03, shape[0])[:, None, None]
+        * (1.0 + r_centers[None, :, None]),
+        shape,
+    )
     dt = 0.02
     laplacian = _masked_laplacian_pipe(
         manufactured,
@@ -853,9 +858,8 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
         dtheta=2.0 * jnp.pi / 8,
         radial_fluid_count=5,
     )
-    rhs = (
-        -viscosity * laplacian if steady else manufactured - dt * viscosity * laplacian
-    )
+    steady_rhs = -viscosity * laplacian + reaction * manufactured
+    rhs = steady_rhs if steady else manufactured + dt * steady_rhs
     solved, residual, converged = _solvax_diffusion_pipe(
         rhs,
         viscosity,
@@ -866,11 +870,11 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
         dtheta=2.0 * jnp.pi / 8,
         iterations=500,
         tolerance=1.0e-10,
+        reaction=reaction,
     )
     assert bool(converged)
     assert float(residual) < 1.0e-8
     assert solved == pytest.approx(manufactured, abs=1.0e-8)
-
 
 def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
     nx, ntheta = 4, 8
