@@ -1317,6 +1317,24 @@ wall time is acceptable.
    unreleased SOLVAX dependency is exposed. Touched-file lint, focused
    projection/diffusion tests, and the exact compatible CPU solve/restart pass
    from the merged source.
+   SOLVAX commits `d0ce14f` and `8d466a2` then add a genuinely host-staged
+   FGMRES and an explicit separation between Krylov-state and operator-mesh
+   shardings. All 233 SOLVAX tests pass in `116.32 s`, strict docs pass, and a
+   one-GPU compatible B1 solve/restart passes in `69.52 s` and `6.45 s` with
+   charge residuals below `6.84e-9`. The two-GPU screen proves that this
+   boundary removes the former monolithic compile stall and the inherited
+   replicated-Arnoldi stall. It is nevertheless rejected: replicating and
+   gathering every action inflates the warm exact Schur from `~7.2 ms` in
+   isolation to `~54.5 ms`, and the first two-step production solve does not
+   complete within `180 s`, so it cannot beat the one-GPU reference. All LMX
+   wiring and trace hooks are fully removed; the reusable SOLVAX API remains
+   pushed but unreleased. Evidence is in
+   `benchmarks/results/b1-two-gpu-host-staged-gmres-20260713.json`.
+   The next bounded experiment must keep Krylov state on the explicit operator
+   mesh and give the small Arnoldi update explicit replicated input/output
+   shardings, eliminating per-action transfers. It is accepted only with exact
+   one/two-GPU physics and first-solve time below `69.52 s`; otherwise stop
+   component decomposition and move to a balanced spatial/domain split.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
