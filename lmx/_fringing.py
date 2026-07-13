@@ -2784,7 +2784,7 @@ def _steady_stokes_projection_pipe(
     dtheta: float,
     pressure_iterations: int,
     pressure_tolerance: float,
-    restart: int = 64,
+    restart: int = 24,
     max_restarts: int = 8,
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
