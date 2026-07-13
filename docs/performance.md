@@ -129,13 +129,25 @@ nonlinear tolerance, and are grouped by the actual executed update count. This
 establishes the production scaling workload; a common converged initializer
 and uncontended paired timing are still required before any speedup claim.
 
-The final source-bound retry (`5e2baaeb...`) remains fail-closed. From the same
-restart (`75097639...`), one GPU satisfies the sustained gate after four
-updates, while two GPUs does not satisfy it within the six-update ceiling even
-though charge and boundary flux remain acceptable. Because the records have
-different or invalid executed work, the summary cannot group them and no timing
-is admissible. The next implementation target is sharded nonlinear/Krylov
-sensitivity, not a looser gate or a larger timing campaign.
+The source-bound retry on commit `3d5de4e` (`c6485085...`) closes correctness
+from the same restart (`75097639...`). Aitken acceleration is now suspended
+only after the primary fields meet the nonlinear tolerance, preventing a
+global reduction from amplifying decomposition-order roundoff in the converged
+tail. One and two GPUs both stop after four updates; their largest recorded
+velocity, potential, or current L2 difference is `2.2e-15` relative. Charge is
+below `2.7e-5`, boundary flux below `2.0e-14`, and every electric solve passes.
+Reusing the already computed conservative current diagnostics also makes two
+repeated sharded solves safe in one process and removes a duplicate final
+evaluation.
+
+Correctness does not imply strong scaling. On the two RTX A4000s, the matched
+warm times are `37.78 s` on one GPU and `109.23 s` on two: speedup `0.346` and
+parallel efficiency `0.173`. Small persistent service allocations make these
+timings non-publication-grade, but the miss is too large to promote a scaling
+claim. The compact record is
+`benchmarks/results/gpu-strong-scaling-20260712.json`. M5 remains active with
+multigrid/reduction-count work as the next performance target; the physics and
+repeatability blocker is closed without weakening any gate.
 
 Solver-faithful workers accept `--restart` and record its SHA-256. Restart and
 cold-start rows are separate scaling groups. Production scaling should use a

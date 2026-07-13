@@ -790,11 +790,20 @@ wall time is acceptable.
    grouped by actual executed update count. The rejected forced-continuation
    branch proves that convergence may not silently change the nonlinear map.
    Scaling workers now accept checksummed steady restarts and keep them in a
-   separate comparison group from cold starts. The final source-bound retry
-   (`5e2baaeb...`) stops after four passing one-GPU updates but fails the
-   two-GPU sustained gate inside six updates from the same restart
-   (`75097639...`). Keep M5 active and reduce sharded nonlinear/Krylov
-   sensitivity; do not weaken the gate or publish the current timings.
+   separate comparison group from cold starts. Commit `3d5de4e` closes the
+   source-bound correctness gate from restart `75097639...`: one and two GPUs
+   both stop after four updates, pass every steady/conservation/electric gate,
+   and agree in the main L2 signatures within `2.2e-15` relative. The fix
+   suspends Aitken only after the primary state is already within tolerance,
+   preventing decomposition-order roundoff from destabilizing the converged
+   pressure tail. Reusing the in-loop conservative diagnostics also closes
+   repeated sharded solves in one process and removes a duplicate evaluation.
+   The matched warm times, however, are `37.78 s` on one A4000 and `109.23 s`
+   on two (speedup `0.346`, efficiency `0.173`), so M5 remains active and no
+   strong-scaling claim is allowed. Preserve the compact result in
+   `benchmarks/results/gpu-strong-scaling-20260712.json`; next reduce the roughly
+   573/719 one/two-GPU electric PCG iterations and global reductions with the
+   planned geometric multigrid preconditioner, then reprofile uncontended GPUs.
    A direct production-path Mac check confirms that normal one-device JAX is
    already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
    `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
