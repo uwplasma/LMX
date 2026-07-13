@@ -1394,6 +1394,10 @@ wall time is acceptable.
    `3e-7` cause the next coupled projection to fail its physical residual gate.
    Preserve the strict tolerance and next test pressure-state reuse or a true
    pressure coarse-space improvement.
+   Prior-pressure reuse is also rejected and removed. On matched A4000s the
+   second projection remains at 192 iterations and `~115.4 s` in both lanes;
+   both fail the physical gate (`0.0606` warm, `0.0676` control). Proceed only
+   with a coarse operator that materially reduces the exact Schur residual.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

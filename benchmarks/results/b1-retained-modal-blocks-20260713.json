@@ -86,6 +86,25 @@
         "two_projection_300_second_cap_passed": false
       },
       "reason": "loosening the fixed algebraic tolerance either saved no work or destabilized the next coupled projection"
+    },
+    "prior_pressure_initial_guess": {
+      "warm": {
+        "first_projection_seconds": 139.003,
+        "first_projection_iterations": 192,
+        "second_projection_seconds": 115.3999,
+        "second_projection_iterations": 192,
+        "second_projection_residual": 0.060585,
+        "second_projection_converged": false
+      },
+      "control": {
+        "first_projection_seconds": 140.0703,
+        "first_projection_iterations": 192,
+        "second_projection_seconds": 115.2293,
+        "second_projection_iterations": 192,
+        "second_projection_residual": 0.067616,
+        "second_projection_converged": false
+      },
+      "reason": "the previous pressure state does not change the iteration ceiling or recover second-projection convergence"
     }
   },
   "decision": {

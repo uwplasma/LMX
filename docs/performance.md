@@ -364,6 +364,11 @@ at 192 iterations (`146.13 s`). Fixed looser Krylov tolerances are unsafe:
 projection fail its physical balance gate. These prototypes are removed. The
 next optimization must improve or reuse the pressure coarse state without
 weakening the per-projection physics criterion.
+Direct reuse is now closed as well: matched `21 x 24 x 64` runs keep both the
+prior-pressure and control lanes at 192 iterations, about `115.4 s`, and both
+second projections fail the balance gate. The trial is removed; a useful
+coarse-space change must reduce this residual rather than only change GMRES's
+initial vector.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
