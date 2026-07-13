@@ -1279,6 +1279,20 @@ wall time is acceptable.
    not device-resident collectives. Evidence is in
    `benchmarks/results/b1-two-gpu-shard-map-contract-20260713.json`. Implement
    one exact B1 Schur action under this contract before wrapping the full GMRES.
+   That exact action now passes on `agent/b1-multigpu` at `88fac50`. Three
+   cylindrical momentum inverses are padded to four components, two per GPU;
+   each device runs its local PCGs sequentially so convergence is not forced
+   into lockstep. The complete 896-entry Schur action—including pressure force,
+   Rhie--Chow faces, finite-volume divergence, weighted gauge reduction, and
+   flow constraint—is bitwise identical to one GPU and improves from
+   `12.10--12.49 ms` to `7.12--7.26 ms` warm (`~1.70x`). All 81 fringing tests
+   and the exact compatible CPU solve/restart pass. Evidence is in
+   `benchmarks/results/b1-two-gpu-schur-action-20260713.json`.
+   Directly nesting this kernel beneath modal-factor construction and the full
+   GMRES is not accepted: cold compilation exceeded `180 s` with idle GPUs and
+   was terminated and removed. The next implementation must materialize modal
+   factors and the preconditioner outside the multi-device trace, then wrap only
+   the bounded runtime Krylov loop around the exact sharded Schur action.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

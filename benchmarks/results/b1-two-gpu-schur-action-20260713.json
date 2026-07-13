@@ -1,0 +1,72 @@
+{
+  "date": "2026-07-13",
+  "branch": "agent/b1-multigpu",
+  "commit": "88fac50",
+  "hardware": "two NVIDIA RTX A4000 GPUs without NVLink",
+  "software": {
+    "jax": "0.10.2",
+    "dtype": "float64"
+  },
+  "implementation": {
+    "decomposition": "Pad three momentum-force components to four and shard two components per GPU.",
+    "local_execution": "Each GPU solves its two PCGs sequentially, preserving independent convergence.",
+    "communication": "Inputs are explicitly replicated once; responses are collectively replicated inside the compiled Schur action.",
+    "portable_coverage": "The generic component callback is exercised by an existing projection test; the shard_map kernel is a two-GPU hardware lane."
+  },
+  "isolated_momentum_triple": {
+    "one_gpu_warm_seconds": [
+      0.010834241984412074,
+      0.010885101044550538,
+      0.010645850969012827
+    ],
+    "two_gpu_warm_seconds": [
+      0.008231976011302322,
+      0.008125208027195185,
+      0.008568119956180453
+    ],
+    "maximum_absolute_error": 0.0,
+    "maximum_relative_error": 0.0
+  },
+  "exact_schur_action": {
+    "constraint_size": 896,
+    "includes": [
+      "pressure face force",
+      "three cylindrical momentum inverses",
+      "Rhie-Chow stabilization",
+      "finite-volume divergence",
+      "weighted Householder gauge reduction",
+      "stationwise flow constraint"
+    ],
+    "one_gpu_warm_seconds": [
+      0.012488044041674584,
+      0.012172018992714584,
+      0.012095418991521,
+      0.012167972978204489,
+      0.012325327028520405,
+      0.012175399984698743,
+      0.012181142985355109
+    ],
+    "two_gpu_warm_seconds_after_warmup": [
+      0.007177635037805885,
+      0.007258746947627515,
+      0.007154716004151851,
+      0.007120041991584003
+    ],
+    "representative_speedup": 1.6990094575629027,
+    "maximum_absolute_error": 0.0,
+    "relative_l2_error": 0.0,
+    "output_shards": 2,
+    "result": "passed"
+  },
+  "rejected_full_gmres_wiring": {
+    "result": "terminated and removed",
+    "reason": "Cold compilation exceeded 180 seconds with both GPUs idle when shard_map was nested under modal-factor and full-GMRES transformations.",
+    "retained_code": "Only the exact local-pair kernel and generic component-inverse hook."
+  },
+  "gates": {
+    "ruff_touched_files": "passed",
+    "full_fringing_module_81_tests": "passed",
+    "exact_compatible_cpu_solve_restart": "passed"
+  },
+  "next_gate": "Lift the already-materialized modal factors and preconditioner outside the multi-device GMRES trace, then compile a bounded Krylov loop around the exact Schur action."
+}
