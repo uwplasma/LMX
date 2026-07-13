@@ -55,6 +55,14 @@
     "rejected_batched_component_axis": "A jax.vmap over the three independently converging momentum PCGs held the A4000 at 100% for more than 213 seconds without completing. It was terminated and fully removed because lockstep batched convergence was already over 2.4 times the accepted complete-run budget.",
     "next_gate": "Reduce Schur operator calls or keep the entire Krylov state persistently device-resident across an exact two-GPU decomposition."
   },
+  "persistent_compilation_cache": {
+    "cache_size_mib": 4.2,
+    "cache_files": 810,
+    "empty_cache_fresh_process_seconds": 76.14973784401082,
+    "warm_cache_fresh_process_seconds": 68.04107383301016,
+    "wall_reduction": 0.1064831507051394,
+    "result": "accepted as existing campaign and CI policy, but not a substitute for reducing Schur computation"
+  },
   "gates": {
     "focused_projection_cpu": "passed",
     "exact_b1_solve_restart_cpu": "passed",

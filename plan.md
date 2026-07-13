@@ -1262,6 +1262,11 @@ wall time is acceptable.
    budget. Independently converging PCGs cannot be forced into one lockstep
    batch. A component decomposition must preserve per-component convergence
    and remain inside one compiled multi-device boundary.
+   A cross-process persistent-cache screen is accepted as supporting policy,
+   not as an algorithmic milestone: a `4.2 MiB` source-keyed cache reduces a
+   fresh exact solve from `76.15 s` to `68.04 s` (10.6%). The existing campaign
+   cache implementation is therefore retained, but it does not alter the Schur
+   optimization or two-GPU acceptance gates.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
