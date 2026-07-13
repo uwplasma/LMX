@@ -136,12 +136,12 @@
       ]
     },
     {
-      "claim": "Plot and publication helpers produce deterministic documented artifact sets without entering solver kernels.",
+      "claim": "Plot helpers produce deterministic documented artifact sets without entering solver kernels.",
       "id": "visualization-publication",
       "modules": [
         "lmx/_plotting.py",
         "lmx/plotting.py",
-        "lmx/publication.py"
+        "lmx/showcase.py"
       ],
       "status": "stable",
       "tests": {
@@ -149,13 +149,13 @@
           "tests/test_plotting.py::test_plot_field_handles_negative_only_field"
         ],
         "verification": [
-          "tests/test_publication.py::test_publication_figure_rows_collect_metrics"
+          "tests/test_plotting.py::test_write_operator_verification_plots_writes_png_and_pdf"
         ],
         "workflow": [
-          "tests/test_publication.py::test_write_publication_figure_manifest"
+          "tests/test_plotting.py::test_write_case_overview_plots_writes_overview_and_diagnostics"
         ]
       },
-      "title": "Visualization and publication artifact contracts",
+      "title": "Visualization artifact contracts",
       "workflows": [
         "examples/hartmann_example.py"
       ]
@@ -326,32 +326,6 @@
       "title": "Runtime benchmarking and JAX sharding experiments",
       "workflows": [
         "examples/strong_scaling_demo.py"
-      ]
-    },
-    {
-      "claim": "Generated status artifacts preserve open and deferred research claims instead of promoting demonstrations silently.",
-      "id": "research-status-reporting",
-      "modules": [
-        "lmx/research_blockers.py",
-        "lmx/research_closure.py",
-        "lmx/research_figures.py",
-        "lmx/showcase.py"
-      ],
-      "status": "stable",
-      "tests": {
-        "unit": [
-          "tests/test_research_closure.py::test_research_grade_closure_status_tracks_open_lanes"
-        ],
-        "verification": [
-          "tests/test_research_blockers.py::test_strict_blocker_closure_attempt_keeps_strict_lanes_open"
-        ],
-        "workflow": [
-          "tests/test_research_figures.py::test_research_grade_closure_dashboard_writes_media_and_summary"
-        ]
-      },
-      "title": "Research-claim status, blocker, and showcase reporting",
-      "workflows": [
-        "docs/validation_report.md"
       ]
     }
   ],

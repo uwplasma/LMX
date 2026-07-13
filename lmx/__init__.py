@@ -323,63 +323,6 @@ _EXPORTS = {
         "lmx.external_validation",
         "write_scalar_reference_template",
     ),
-    "publication_figure_campaign_summary": (
-        "lmx.publication",
-        "publication_figure_campaign_summary",
-    ),
-    "publication_figure_rows": ("lmx.publication", "publication_figure_rows"),
-    "research_grade_external_data_audit": (
-        "lmx.research_closure",
-        "research_grade_external_data_audit",
-    ),
-    "research_grade_closure_rows": (
-        "lmx.research_closure",
-        "research_grade_closure_rows",
-    ),
-    "research_grade_closure_status": (
-        "lmx.research_closure",
-        "research_grade_closure_status",
-    ),
-    "research_grade_final_disposition": (
-        "lmx.research_closure",
-        "research_grade_final_disposition",
-    ),
-    "strict_blocker_closure_attempt_summary": (
-        "lmx.research_blockers",
-        "strict_blocker_closure_attempt_summary",
-    ),
-    "write_strict_blocker_closure_attempt": (
-        "lmx.research_blockers",
-        "write_strict_blocker_closure_attempt",
-    ),
-    "write_research_grade_closure_dashboard": (
-        "lmx.research_figures",
-        "write_research_grade_closure_dashboard",
-    ),
-    "write_research_grade_external_target_panel": (
-        "lmx.research_figures",
-        "write_research_grade_external_target_panel",
-    ),
-    "write_research_grade_external_target_tables": (
-        "lmx.research_figures",
-        "write_research_grade_external_target_tables",
-    ),
-    "write_publication_figure_manifest": (
-        "lmx.publication",
-        "write_publication_figure_manifest",
-    ),
-    "write_research_grade_external_data_audit": (
-        "lmx.research_closure",
-        "write_research_grade_external_data_audit",
-    ),
-    "write_research_grade_closure_status": (
-        "lmx.research_closure",
-        "write_research_grade_closure_status",
-    ),
-    "write_research_grade_final_disposition": (
-        "lmx.research_closure",
-        "write_research_grade_final_disposition",
-    ),
     "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
     "build_fringing_autodiff_problem": ("lmx.autodiff", "build_fringing_autodiff_problem"),
     "extruded_rect_response_history": ("lmx.autodiff", "extruded_rect_response_history"),

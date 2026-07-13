@@ -209,8 +209,8 @@ separately with manufactured solutions, conservation identities, mesh/time
 convergence, analytical profiles, and independent reference data. Heavy
 FreeMHD and scaling campaigns remain explicit workflows because they require
 external software or hardware.
-The latest complete local gate passes 852 tests with 8 expected external-data
-skips and 95.01% branch coverage in 179.3 seconds on six Mac workers. The lower
+The latest complete local gate passes 830 tests with 8 expected external-data
+skips and 95.30% branch coverage in 211.9 seconds on six Mac workers. The lower
 test count reflects removal of duplicate campaign-wrapper tests; direct physics,
 numerics, adapters, plotting, and curated workflows remain covered.
 

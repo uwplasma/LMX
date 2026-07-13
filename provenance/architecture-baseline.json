@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 4105463,
-    "checkout_bytes_excluding_release_candidates": 4105463,
+    "checkout_bytes_excluding_build_artifacts": 3938280,
+    "checkout_bytes_excluding_release_candidates": 3938280,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -191,12 +191,12 @@
       "examples/strong_scaling_demo.py",
       "examples/variable_field_extruded_demo.py"
     ],
-    "maintained_core_lines": 9040,
-    "package_module_count": 45,
+    "maintained_core_lines": 8983,
+    "package_module_count": 41,
     "package_modules": [
       {
-        "bytes": 31170,
-        "lines": 545,
+        "bytes": 29245,
+        "lines": 488,
         "owner": "stable_core",
         "path": "lmx/__init__.py",
         "role": "stable_core"
@@ -405,13 +405,6 @@
         "role": "compatibility_facade"
       },
       {
-        "bytes": 20934,
-        "lines": 425,
-        "owner": "validation_and_evidence",
-        "path": "lmx/publication.py",
-        "role": "validation_and_evidence"
-      },
-      {
         "bytes": 68290,
         "lines": 1794,
         "owner": "research_stage_extension",
@@ -424,27 +417,6 @@
         "owner": "validation_and_evidence",
         "path": "lmx/reference_data.py",
         "role": "validation_and_evidence"
-      },
-      {
-        "bytes": 14586,
-        "lines": 345,
-        "owner": "validation_and_evidence",
-        "path": "lmx/research_blockers.py",
-        "role": "validation_and_evidence"
-      },
-      {
-        "bytes": 34600,
-        "lines": 785,
-        "owner": "validation_and_evidence",
-        "path": "lmx/research_closure.py",
-        "role": "validation_and_evidence"
-      },
-      {
-        "bytes": 32983,
-        "lines": 844,
-        "owner": "visualization",
-        "path": "lmx/research_figures.py",
-        "role": "visualization"
       },
       {
         "bytes": 12524,
@@ -545,7 +517,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 38185,
+    "total_package_lines": 35729,
     "uncurated_example_count": 0
   },
   "schema_version": 1,

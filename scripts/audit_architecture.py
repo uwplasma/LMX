@@ -52,15 +52,12 @@ COMPATIBILITY = {
     "solvers.py",
     "validation.py",
 }
-VISUALIZATION = {"_plotting.py", "research_figures.py", "showcase.py"}
+VISUALIZATION = {"_plotting.py", "showcase.py"}
 VALIDATION = {
     "_validation.py",
     "external_validation.py",
     "freemhd.py",
-    "publication.py",
     "reference_data.py",
-    "research_blockers.py",
-    "research_closure.py",
 }
 
 

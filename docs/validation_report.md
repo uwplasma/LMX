@@ -51,7 +51,7 @@ The retained evidence below summarizes the two recent blockers: Hunt
 | Hunt `Ha = 100` side-layer | Thin-wall reference model `t_w=0.001`, `sigma_w/sigma=5`, `c=0.05`; retained `z_l2 = 2.89e-3` |
 | Bent-pipe low-De charge closure | Conservative mapped-pipe potential sign fixed; retained `max_charge_balance_residual = 2.16e-12` |
 | Reader-facing straight-duct profiles | Hartmann, Shercliff, and Hunt retained cuts below `L2 <= 1.2e-2` |
-| Bounded release readiness | `scripts/run_release_readiness.py` reports no hard blockers |
+| Portable release gate | Full tests, branch coverage, warning-free docs, and clean wheel installation pass |
 
 The strict research-grade deferred lanes remain matched external Q2D
 turbulence parity, external magnetic-obstacle reference data, and

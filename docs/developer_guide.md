@@ -200,14 +200,9 @@ artifact gates before package artifacts are built.
   - install `.[docs]`
   - run `python -m sphinx -W -b html docs docs/_build/html`
 - bounded release validation:
-  - run physics/regression suites
-  - regenerate selected bounded validation artifacts in parallel CI/CD jobs
-  - summarize FreeMHD observable-gate pass/fail counts in the release report
-  - archive Q2D decay, forced, and wall-bounded reduced-model artifacts with
-    modal energy-budget gates
-  - run `python scripts/run_release_readiness.py` to check the bounded release
-    gates and list deferred research lanes separately from release blockers
-  - run broad branch coverage with `--cov-fail-under=95`
+  - run the complete portable physics, numerics, workflow, and branch-coverage gate
+  - build documentation with warnings as errors
+  - keep external validation and large scaling outputs as checksummed release assets
 - packaging:
   - build sdist and wheel artifacts
   - inspect/install the wheel in a clean environment
@@ -247,27 +242,13 @@ python -m pip install --upgrade build twine
 rm -rf dist build lmx.egg-info
 python -m build
 python -m twine check dist/*
-python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
+python scripts/run_full_test_suite.py --budget-seconds 600
+python -m sphinx -W -b html docs docs/_build/html
 ```
 
-The release-readiness report is intentionally conservative: missing artifacts,
-metadata regressions, failed bounded profile gates, or failed internal
-conservation gates block the release. Known research gaps such as high-`Ha`
-Hunt side-layer parity, external magnetic-obstacle reference data, and
-higher-inertia Dean-vortex validation are listed as deferred research lanes
-instead of being silently treated as solved.
-
-For manuscript/research-grade release candidates, run the strict form:
-
-```bash
-python scripts/run_release_readiness.py \
-  --strict-research-grade \
-  --output artifacts/release/release_readiness.json
-```
-
-That mode exits nonzero if any deferred research lane remains open. Use it for a
-paper claim; use the default bounded gate for package releases that explicitly
-publish the remaining research blockers.
+The release workflow also installs the built wheel in a clean environment.
+Open research lanes remain explicit in the validation report and authoritative
+plan rather than being maintained by a separate status-dashboard subsystem.
 
 ## Test runtime baseline
 

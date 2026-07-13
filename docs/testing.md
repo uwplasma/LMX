@@ -176,11 +176,12 @@ python scripts/run_full_validation_exercise.py \
   --write-plot
 ```
 
-For release candidates, run the bounded release-status gate after regenerating
-the selected public artifacts:
+For release candidates, run the same bounded gate used by CI and build the
+documentation with warnings as errors:
 
 ```bash
-python scripts/run_release_readiness.py --output artifacts/release/release_readiness.json
+python scripts/run_full_test_suite.py --budget-seconds 600
+python -m sphinx -W -b html docs docs/_build/html
 ```
 
 The README/docs media inventory is documented in `docs/media.md`. Generated
