@@ -1243,6 +1243,19 @@ wall time is acceptable.
    `benchmarks/results/b1-compatible-momentum-jit-20260713.json`. Profile this
    accepted source before the next decomposition; any multi-GPU design must
    keep its state device-resident and beat this stronger one-GPU baseline.
+   That profile is now closed at experimental commit `004eb3b`. The exact
+   compatible flag is recorded explicitly: an initial legacy-path trace that
+   omitted it was rejected. On the isolated A4000, the compatible two-step
+   restart falls from `14.31 s` to `8.12 s` (`1.76x`, 43.2% reduction) by
+   materializing modal factors before caching the complete pressure GMRES.
+   Reducing the Arnoldi basis from 64 to the already-tested 24 entries trims
+   Krylov workspace by 62.5% with identical physics gates, though it adds only
+   a further 2.4% warm speedup. A post-change trace shows the cached solve is
+   now compute-bound at about 18 Arnoldi iterations. Evidence is in
+   `benchmarks/results/b1-compatible-schur-jit-gpu-20260713.json`. The next
+   accepted optimization must reduce Schur/preconditioner applications or
+   keep that Krylov state persistently device-resident across devices; compile
+   caching and restart-size tuning are no longer the dominant levers.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

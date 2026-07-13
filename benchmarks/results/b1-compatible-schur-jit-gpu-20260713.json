@@ -1,0 +1,63 @@
+{
+  "date": "2026-07-13",
+  "branch": "agent/b1-compatible-stokes",
+  "commit": "004eb3b",
+  "hardware": "NVIDIA RTX A4000 16376 MiB (GPU 1 isolated)",
+  "environment": {
+    "LMX_B1_COMPATIBLE_STEADY": "1",
+    "CUDA_VISIBLE_DEVICES": "1",
+    "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "solvax": "0.7.0 plus disposable complex-tridiagonal validation patch"
+  },
+  "case": {
+    "benchmark": "B1-fringing-pipe",
+    "shape": [7, 9, 16],
+    "hartmann_number": 20.0,
+    "outer_steps": 2,
+    "coupling_tolerance": 1e-9
+  },
+  "baseline_21144b3": {
+    "setup_seconds": 1.5224883769988082,
+    "first_solve_seconds": 79.23750789801124,
+    "restart_seconds": 14.307585322996601,
+    "total_seconds": 95.06758159800665,
+    "restart_charge_balance_residual": 6.698435278673642e-9
+  },
+  "cached_schur_9e26bf6": {
+    "setup_seconds": 1.4446428189985454,
+    "first_solve_seconds": 75.41733354097232,
+    "restart_seconds": 8.321284258039668,
+    "total_seconds": 85.18326061801054,
+    "restart_charge_balance_residual": 3.340735688084351e-9,
+    "restart_speedup": 1.7193962950097787
+  },
+  "accepted_004eb3b": {
+    "arnoldi_restart_dimension": 24,
+    "setup_seconds": 1.4474438009783626,
+    "first_solve_seconds": 76.42454510298558,
+    "restart_seconds": 8.122742520994507,
+    "total_seconds": 85.99473142495845,
+    "first_mean_velocity": 1.0000000000000073,
+    "restart_mean_velocity": 1.0000000000005729,
+    "first_charge_balance_residual": 3.327501829630819e-9,
+    "restart_charge_balance_residual": 3.6037821615764187e-9,
+    "restart_speedup_over_21144b3": 1.7614229782633628,
+    "restart_wall_reduction_over_21144b3": 0.4322771915999822,
+    "krylov_workspace_reduction": 0.625
+  },
+  "profile_conclusion": {
+    "discarded_screen": "A legacy-path trace without LMX_B1_COMPATIBLE_STEADY=1 was rejected and is not benchmark evidence.",
+    "before": "The compatible warm trace rebuilt and compiled the GMRES closure on each solve.",
+    "after": "The modal factors are materialized first, then the complete pressure GMRES is cached by backend, operator fingerprint, tolerance, and Krylov controls.",
+    "remaining_bottleneck": "The cached GMRES is compute-bound in Schur applications and preconditioning; a traced restart used about 18 Arnoldi iterations.",
+    "next_gate": "Reduce Schur operator calls or keep the entire Krylov state persistently device-resident across an exact two-GPU decomposition."
+  },
+  "gates": {
+    "focused_projection_cpu": "passed",
+    "exact_b1_solve_restart_cpu": "passed",
+    "exact_b1_solve_restart_cuda": "passed",
+    "ruff": "passed"
+  }
+}
