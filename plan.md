@@ -1312,6 +1312,11 @@ wall time is acceptable.
    public two-GPU path remains in LMX. The next boundary must be genuinely
    opaque to XLA—custom call/FFI with a registered implicit derivative—not
    another composition of nested `jit`.
+   The accepted exact component kernel/hook and non-inline one-GPU pressure
+   kernels are integrated on `main` at `dff2da9`; no public two-GPU solve or
+   unreleased SOLVAX dependency is exposed. Touched-file lint, focused
+   projection/diffusion tests, and the exact compatible CPU solve/restart pass
+   from the merged source.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

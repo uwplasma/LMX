@@ -2,6 +2,7 @@
   "date": "2026-07-13",
   "branch": "agent/b1-multigpu",
   "commit": "88fac50",
+  "integrated_main_commit": "dff2da9",
   "hardware": "two NVIDIA RTX A4000 GPUs without NVLink",
   "software": {
     "jax": "0.10.2",
