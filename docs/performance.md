@@ -255,6 +255,12 @@ manufactured solve from 39 to 54 iterations and again consumes all 1200 B2
 iterations, with charge residual `6.7e-5`. Additive overlap is rejected; a
 coarse line solve must be embedded in a balanced symmetric V-cycle.
 
+The balanced form `L + (I-LA) C (I-AL)` is stable, but piecewise-constant
+aggregates still worsen the manufactured solve from 39 to 41 iterations and B2
+from 573 to 852. This closes unsmoothed aggregation. M5 now prioritizes
+reduction-count and fused-kernel profiling; only smoothed interpolation remains
+a viable future multigrid direction.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and
