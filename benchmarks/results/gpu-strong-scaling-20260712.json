@@ -1,7 +1,7 @@
 {
   "date": "2026-07-12",
-  "commit": "3d5de4e",
-  "source_fingerprint": "c6485085019d907e2385de51dcb7ebb7a75a3e22c0cad7d9750c49e9021ba345",
+  "commit": "9e0d1dc",
+  "source_fingerprint": "c30c9dbe4a156164d6275ee1230cdbbf89a160486fcaf6f317a4660f9db79166",
   "restart_sha256": "75097639ef012597606f443c00a4bfc808105a98bf25ea46fc490cd3583cab76",
   "hardware": "NVIDIA RTX A4000",
   "problem": {
@@ -13,9 +13,9 @@
   "records": [
     {
       "num_devices": 1,
-      "cold_seconds": 62.27520451898454,
-      "warm_seconds": 37.77847738401033,
-      "warm_cell_updates_per_second": 64032.01419186499,
+      "cold_seconds": 58.987644118024036,
+      "warm_seconds": 36.683484215987846,
+      "warm_cell_updates_per_second": 65943.354392321,
       "max_charge_balance_residual": 2.355128526687622e-05,
       "max_boundary_current_residual": 1.9687841744198825e-14,
       "max_electric_local_residual": 2.843211404979229e-05,
@@ -25,9 +25,9 @@
     },
     {
       "num_devices": 2,
-      "cold_seconds": 128.99415880802553,
-      "warm_seconds": 109.22768825601088,
-      "warm_cell_updates_per_second": 22146.692277604612,
+      "cold_seconds": 71.3159372759983,
+      "warm_seconds": 50.18258306500502,
+      "warm_cell_updates_per_second": 48204.61307992971,
       "max_charge_balance_residual": 2.660602331161499e-05,
       "max_boundary_current_residual": 1.5363900663697683e-14,
       "max_electric_local_residual": 3.111525438725948e-05,
@@ -37,11 +37,11 @@
     }
   ],
   "comparison": {
-    "warm_speedup": 0.3458690556140316,
-    "parallel_efficiency": 0.1729345278070158,
+    "warm_speedup": 0.7310003187454331,
+    "parallel_efficiency": 0.36550015937271657,
     "max_signature_relative_difference": 2.1412488468159433e-15,
     "signature_relative_tolerance": 2.5e-05,
     "strong_scaling_target_met": false
   },
-  "timing_caveat": "Small persistent GPU service allocations were present; correctness conclusions are valid, but repeat on an uncontended host before publication."
+  "timing_caveat": "Small persistent GPU service allocations were present, but both devices were otherwise idle before the paired workers; repeat on a dedicated host before publication."
 }

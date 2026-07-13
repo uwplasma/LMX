@@ -140,14 +140,18 @@ Reusing the already computed conservative current diagnostics also makes two
 repeated sharded solves safe in one process and removes a duplicate final
 evaluation.
 
-Correctness does not imply strong scaling. On the two RTX A4000s, the matched
-warm times are `37.78 s` on one GPU and `109.23 s` on two: speedup `0.346` and
-parallel efficiency `0.173`. Small persistent service allocations make these
-timings non-publication-grade, but the miss is too large to promote a scaling
-claim. The compact record is
-`benchmarks/results/gpu-strong-scaling-20260712.json`. M5 remains active with
-multigrid/reduction-count work as the next performance target; the physics and
-repeatability blocker is closed without weakening any gate.
+Correctness does not imply strong scaling. The initial paired RTX A4000 row was
+`37.78 s` warm on one GPU and `109.23 s` on two. Commit `9e0d1dc` batches the
+14 outer-step scalar diagnostics into one host transfer without changing any
+field update or PCG stopping rule. The refreshed exact-parity row is `36.68 s`
+on one GPU and `50.18 s` on two: the sharded path is 54% faster than its prior
+row, with speedup `0.731` and parallel efficiency `0.366`. Cold time also drops
+from about `129 s` to `71.32 s`. The main L2 signatures still agree within
+`2.2e-15`, and every physics gate passes. Small persistent service allocations
+make these timings non-publication-grade, and two GPUs remain slower than one,
+so no strong-scaling claim is promoted. The compact record is
+`benchmarks/results/gpu-strong-scaling-20260712.json`; M5 now targets the
+remaining device-side PCG/reduction cost rather than host scalar orchestration.
 
 Solver-faithful workers accept `--restart` and record its SHA-256. Restart and
 cold-start rows are separate scaling groups. Production scaling should use a
@@ -257,6 +261,12 @@ otherwise idle A4000, the two-repeat one-GPU worker was still running after
 135 seconds versus about 100 seconds for the accepted cold-plus-warm row, so it
 was terminated before the longer two-GPU lane. Independent component solves
 remain the accepted path; future fusion must not couple their stopping times.
+
+The accepted alternative stacks only outer-step diagnostics. It reduces about
+14 scalar transfers to one per update while leaving the three momentum solves
+independent. The complete portable gate passes 899 tests with 8 expected
+optional-data skips and 95.06% branch coverage in `504.16 s`, below the
+ten-minute hard limit but above the `450 s` warning target on this Mac run.
 
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,

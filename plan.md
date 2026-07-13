@@ -798,12 +798,16 @@ wall time is acceptable.
    preventing decomposition-order roundoff from destabilizing the converged
    pressure tail. Reusing the in-loop conservative diagnostics also closes
    repeated sharded solves in one process and removes a duplicate evaluation.
-   The matched warm times, however, are `37.78 s` on one A4000 and `109.23 s`
-   on two (speedup `0.346`, efficiency `0.173`), so M5 remains active and no
-   strong-scaling claim is allowed. Preserve the compact result in
-   `benchmarks/results/gpu-strong-scaling-20260712.json`; next reduce the roughly
-   573/719 one/two-GPU electric PCG iterations and global reductions with the
-   planned geometric multigrid preconditioner, then reprofile uncontended GPUs.
+   The initial matched warm times were `37.78 s` on one A4000 and `109.23 s`
+   on two (speedup `0.346`, efficiency `0.173`). Commit `9e0d1dc` then batches
+   the 14 outer-step diagnostics into one host transfer. Exact-parity warm rows
+   improve to `36.68 s` and `50.18 s`; cold rows are `58.99 s` and `71.32 s`,
+   speedup is `0.731`, and efficiency is `0.366`. Main signatures remain within
+   `2.2e-15` and all gates pass. Preserve the refreshed compact result in
+   `benchmarks/results/gpu-strong-scaling-20260712.json`. M5 remains active
+   because two GPUs are still slower than one; next reduce the roughly 573/719
+   one/two-GPU electric PCG iterations and device-side global reductions with
+   a viable preconditioner rather than further host-scalar tuning.
    A direct production-path Mac check confirms that normal one-device JAX is
    already threaded: `30.7` CPU-seconds over `12.5` wall-seconds with
    `OMP_NUM_THREADS=1`, while requested thread counts 1/4/8 give essentially
@@ -879,6 +883,12 @@ wall time is acceptable.
    worker exceeded 135 seconds before completing two repeats, versus about 100
    seconds cold-plus-warm for the accepted row. Keep independent component
    stopping and pursue fusion only outside the iterative loops.
+   The accepted outside-loop fusion stacks 14 scalar diagnostics into one host
+   transfer per outer update. One-GPU warm time improves 2.9%, while two-GPU
+   warm time improves 54% with exact physics, closing the dominant host
+   synchronization penalty. The full portable gate passes 899 tests with 8
+   expected skips and 95.06% branch coverage in `504.16 s`: under the 600-second
+   limit, though above the 450-second warning target for this Mac run.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at
