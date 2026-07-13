@@ -2647,6 +2647,67 @@ def _solvax_diffusion_pipe(
     )
 
 
+def _pipe_component_momentum_inverse(  # pragma: no cover - two-GPU hardware gate
+    mesh: Mesh,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+    iterations: int,
+    tolerance: float,
+):
+    """Return a persistent two-component-per-device pipe inverse."""
+
+    if mesh.size != 2:
+        raise ValueError("Component momentum sharding requires exactly two devices.")
+
+    component = NamedSharding(mesh, P("component", None, None, None))
+    replicated = NamedSharding(mesh, P(None, None, None, None))
+
+    @jax.shard_map(
+        mesh=mesh,
+        in_specs=(
+            P("component", None, None, None),
+            P(None, None, None),
+            P(None, None, None),
+            P(None),
+            P(None),
+        ),
+        out_specs=P("component", None, None, None),
+        check_vma=False,
+    )
+    def solve_local_pair(forces, viscosity, reaction, faces, centers):
+        def solve(force):
+            return _solvax_diffusion_pipe(
+                force,
+                viscosity,
+                dt=None,
+                dx=dx,
+                r_faces=faces,
+                r_centers=centers,
+                dtheta=dtheta,
+                iterations=iterations,
+                tolerance=tolerance,
+                reaction=reaction,
+            )[0]
+
+        return jnp.stack((solve(forces[0]), solve(forces[1])))
+
+    def apply(forces, viscosity, reaction):
+        padded = jnp.concatenate((forces, jnp.zeros_like(forces[:1])), axis=0)
+        solved = solve_local_pair(
+            jax.reshard(padded, component),
+            viscosity,
+            reaction,
+            r_faces,
+            r_centers,
+        )
+        return jax.reshard(solved, replicated)[:3]
+
+    return apply
+
+
 def _masked_laplacian_pipe(
     field: jnp.ndarray,
     fluid_mask: jnp.ndarray,
@@ -2788,6 +2849,8 @@ def _steady_stokes_projection_pipe(
     max_restarts: int = 8,
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
+    apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray]
+    | None = None,
     modal_stabilization: bool = False,
     modal_factor_key: tuple[object, ...] | None = None,
     physical_tolerance: float | None = None,
@@ -2837,7 +2900,7 @@ def _steady_stokes_projection_pipe(
             return transformed[:, :-1].reshape(-1)
         return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
 
-    def velocity_response(state):
+    def velocity_response(state, *, use_component_inverse=True):
         pressure = unpack_pressure(state[:pressure_size])
         pressure_loss = state[pressure_size:]
         face_force = _pipe_pressure_face_correction(
@@ -2849,9 +2912,13 @@ def _steady_stokes_projection_pipe(
         )
         force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
         force_u = force_u + pressure_loss[:, None, None] * mobility
-        return tuple(
-            apply_momentum_inverse(force) for force in (force_u, force_v, force_w)
+        forces = jnp.stack((force_u, force_v, force_w))
+        responses = (
+            jnp.stack(tuple(apply_momentum_inverse(force) for force in forces))
+            if apply_momentum_inverse_components is None or not use_component_inverse
+            else apply_momentum_inverse_components(forces)
         )
+        return tuple(responses)
 
     def rhie_chow_faces(pressure, response):
         pressure_faces = _pipe_pressure_face_correction(
@@ -2908,8 +2975,10 @@ def _steady_stokes_projection_pipe(
     base_constraints = constraints(u, v, w)
     rhs = -base_constraints.at[pressure_size:].add(-target_flow_rate)
 
-    def schur(state):
-        response = velocity_response(state)
+    def schur(state, *, use_component_inverse=True):
+        response = velocity_response(
+            state, use_component_inverse=use_component_inverse
+        )
         if not modal_stabilization:
             return constraints(*response)
         pressure = unpack_pressure(state[:pressure_size])
@@ -3017,7 +3086,12 @@ def _steady_stokes_projection_pipe(
         def build_modal_factors():
             modal_actions = jax.vmap(
                 lambda source: jax.vmap(
-                    lambda basis: modal_restrict(schur(station_prolong(source, basis)))
+                    lambda basis: modal_restrict(
+                        schur(
+                            station_prolong(source, basis),
+                            use_component_inverse=False,
+                        )
+                    )
                 )(local_basis)
             )(stations)
             diagonal = jax.vmap(
