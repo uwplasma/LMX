@@ -3152,6 +3152,22 @@ def _steady_stokes_projection_pipe(
     else:
         precondition = local_precondition
 
+    if modal_factor_key is not None:
+        pressure_kernel_key = (
+            jax.default_backend(),
+            modal_factor_key,
+            pressure_iterations,
+            pressure_tolerance,
+        )
+        schur = _reuse_fringing_jit(
+            ("b1_steady_schur", *pressure_kernel_key),
+            jax.jit(schur, inline=False),
+        )
+        precondition = _reuse_fringing_jit(
+            ("b1_steady_preconditioner", *pressure_kernel_key),
+            jax.jit(precondition, inline=False),
+        )
+
     preconditioned_rhs = precondition(rhs)
     def solve_pressure(linear_rhs, initial):
         return gmres(
