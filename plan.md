@@ -1271,6 +1271,14 @@ wall time is acceptable.
    `8061f40`; touched-file lint, all 81 consolidated fringing tests, and the
    exact compatible CPU solve/restart gate pass from the merged source. Further
    multi-GPU work branches from this fingerprint.
+   The first new-branch two-GPU contract passes: 500 float64 updates across 20
+   repeated `jit`/`shard_map` calls retain two shards and match a serial
+   reference exactly in `0.421 s`. Inputs are explicitly placed once and all
+   global scalars use `lax.psum`; there is no host gather inside the iteration.
+   This confines the earlier CUDA corruption to host gather/reshard boundaries,
+   not device-resident collectives. Evidence is in
+   `benchmarks/results/b1-two-gpu-shard-map-contract-20260713.json`. Implement
+   one exact B1 Schur action under this contract before wrapping the full GMRES.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

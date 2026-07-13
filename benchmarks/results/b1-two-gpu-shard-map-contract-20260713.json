@@ -1,0 +1,36 @@
+{
+  "date": "2026-07-13",
+  "source_commit": "9b0fc34",
+  "hardware": "two NVIDIA RTX A4000 GPUs",
+  "software": {
+    "jax": "0.10.2",
+    "dtype": "float64"
+  },
+  "contract": {
+    "api": "jax.shard_map inside jax.jit",
+    "mesh_axis": "component",
+    "input_spec": "P('component', None)",
+    "output_specs": ["P('component', None)", "P()"],
+    "initial_placement_count": 1,
+    "host_gathers_inside_iteration": 0,
+    "collective": "jax.lax.psum"
+  },
+  "probe": {
+    "repeated_calls": 20,
+    "local_steps_per_call": 25,
+    "total_collective_iterations": 500,
+    "wall_seconds": 0.4206584339844994,
+    "output_shards": 2,
+    "max_absolute_error_against_serial": 0.0,
+    "checksum_monotone": true,
+    "first_checksum": 325.3129447232336,
+    "last_checksum": 125.75207489071471
+  },
+  "result": "passed",
+  "interpretation": "The office CUDA stack preserves exact repeated device-resident shard_map state and explicit collectives. Earlier corruption is specific to host gather/reshard boundaries, which remain forbidden inside the Krylov loop.",
+  "references": [
+    "https://docs.jax.dev/en/latest/notebooks/shard_map.html",
+    "https://docs.jax.dev/en/latest/migrate_pmap.html"
+  ],
+  "next_gate": "Express one exact B1 Schur application with persistent sharded component state and explicit psum reductions, then compare it against the merged one-GPU source."
+}
