@@ -508,10 +508,7 @@ def benchmark_extruded_inductionless_solve(
                 trace_started = False
         start = time.perf_counter()
         try:
-            solve_kwargs = {
-                "num_devices": num_devices,
-                "stop_on_convergence": False,
-            }
+            solve_kwargs = {"num_devices": num_devices}
             if initial_bundle is not None:
                 solve_kwargs["initial_bundle"] = initial_bundle
             solution = solve_extruded_inductionless(problem, **solve_kwargs)

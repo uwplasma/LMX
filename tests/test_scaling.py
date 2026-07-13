@@ -132,13 +132,10 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
     restart_path.write_bytes(b"restart")
     initial_bundle = object()
 
-    def fake_solve(
-        problem, *, num_devices=None, initial_bundle=None, stop_on_convergence=True
-    ):
+    def fake_solve(problem, *, num_devices=None, initial_bundle=None):
         calls.append(problem)
         assert num_devices == 1
         assert initial_bundle is not None
-        assert not stop_on_convergence
         shape = (
             problem.case.geometry.nx,
             problem.case.geometry.ny,

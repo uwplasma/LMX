@@ -4722,7 +4722,6 @@ def _solve_extruded_projection(
     *,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
-    stop_on_convergence: bool = True,
 ) -> ExtrudedFieldBundle:
     case = problem.case
     mesh = _cross_section_mesh(case)
@@ -5314,11 +5313,7 @@ def _solve_extruded_projection(
                 and flow_error_value <= ALEX_BALANCE_TOLERANCE
                 and charge_balance <= ALEX_BALANCE_TOLERANCE
             )
-            if (
-                use_alex_b1_finite_volume
-                and (not converged or not stop_on_convergence)
-                and step + 1 < outer_steps
-            ):
+            if use_alex_b1_finite_volume and not converged and step + 1 < outer_steps:
                 current_state = jnp.stack((u, v, w, phi_previous)) / fixed_point_scale
                 mapped_state = (
                     jnp.stack((u_next, v_next, w_next, phi)) / fixed_point_scale
@@ -5354,7 +5349,7 @@ def _solve_extruded_projection(
                 u, v, w, phi = accelerated * fixed_point_scale
             else:
                 u, v, w = u_next, v_next, w_next
-            if converged and stop_on_convergence:
+            if converged:
                 break
 
         final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
@@ -6251,11 +6246,7 @@ def _solve_extruded_projection(
             )
         else:
             converged = instantaneous_convergence
-        if (
-            use_alex_b2_finite_volume
-            and (not converged or not stop_on_convergence)
-            and step + 1 < outer_steps
-        ):
+        if use_alex_b2_finite_volume and not converged and step + 1 < outer_steps:
             current_state = scaled_state(u, v, w, phi_previous)
             mapped_state = scaled_state(u_next, v_next, w_next, phi)
             fixed_point_residual = state_difference(mapped_state, current_state)
@@ -6316,7 +6307,7 @@ def _solve_extruded_projection(
             u, v, w, phi = unscaled_state(accelerated)
         else:
             u, v, w = u_next, v_next, w_next
-        if converged and stop_on_convergence:
+        if converged:
             break
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
@@ -6515,7 +6506,6 @@ def solve_extruded_inductionless(
     solver=solve_steady,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
-    stop_on_convergence: bool = True,
 ) -> ExtrudedInductionlessSolution:
     """Solve an extruded inductionless problem, optionally sharded in ``x``."""
 
@@ -6525,10 +6515,7 @@ def solve_extruded_inductionless(
         "pipe_ogrid",
         "bent_pipe",
     }:
-        projection_kwargs = {
-            "initial_bundle": initial_bundle,
-            "stop_on_convergence": stop_on_convergence,
-        }
+        projection_kwargs = {"initial_bundle": initial_bundle}
         if num_devices is not None:
             projection_kwargs["num_devices"] = num_devices
         bundle = _solve_extruded_projection(problem, **projection_kwargs)
