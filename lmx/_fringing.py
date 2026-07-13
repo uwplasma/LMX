@@ -5760,10 +5760,12 @@ def _solve_extruded_projection(
                 pressure_preconditioner_mobility = None
                 modal_factor_key = None
 
-            def momentum_solve(rhs, viscosity, initial):
+            momentum_viscosity = nu[:, :count, :]
+
+            def momentum_solve(rhs, initial):
                 return _solvax_diffusion_pipe(
                     rhs,
-                    viscosity,
+                    momentum_viscosity,
                     dt=None if use_compatible_steady_b1 else dt,
                     dx=dx,
                     r_faces=faces,
@@ -5773,20 +5775,26 @@ def _solve_extruded_projection(
                     tolerance=momentum_tolerance,
                     initial_field=initial,
                     reaction=steady_reaction,
-                    _system_solve=diffusion_system_solve,
+                    _system_solve=(
+                        None if use_compatible_steady_b1 else diffusion_system_solve
+                    ),
                 )
 
-            response_fluid, _, _ = _solvax_diffusion_pipe(
-                (1.0 if use_compatible_steady_b1 else dt) / rho[:, :count, :],
-                nu[:, :count, :],
-                dt=None if use_compatible_steady_b1 else dt,
-                dx=dx,
-                r_faces=faces,
-                r_centers=centers,
-                dtheta=dtheta,
-                iterations=momentum_iterations,
-                tolerance=momentum_tolerance,
-                reaction=steady_reaction,
+            if use_compatible_steady_b1:
+                momentum_solve = _reuse_fringing_jit(
+                    (
+                        "b1_momentum",
+                        jax.default_backend(),
+                        kernel_key,
+                        _array_fingerprint(momentum_viscosity, steady_reaction),
+                    ),
+                    jax.jit(momentum_solve),
+                )
+            response_rhs = (1.0 if use_compatible_steady_b1 else dt) / rho[
+                :, :count, :
+            ]
+            response_fluid, _, _ = momentum_solve(
+                response_rhs, jnp.zeros_like(response_rhs)
             )
             if not use_compatible_steady_b1:
                 response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
@@ -5800,9 +5808,9 @@ def _solve_extruded_projection(
                     / rho[None, :, :count, :]
                 )
                 zero = jnp.zeros_like(response_fluid)
-                basis_response = jax.vmap(
-                    lambda rhs: momentum_solve(rhs, nu[:, :count, :], zero)[0]
-                )(basis_rhs)
+                basis_response = jax.vmap(lambda rhs: momentum_solve(rhs, zero)[0])(
+                    basis_rhs
+                )
                 flow_response_matrix = jnp.sum(
                     basis_response * fluid_cell_area[None, :, :count, :], axis=(2, 3)
                 ).T
@@ -5883,10 +5891,9 @@ def _solve_extruded_projection(
                         lorentz_theta[:, :count, :] / rho[:, :count, :]
                         + steady_reaction * w[:, :count, :]
                     )
-                viscosity = nu[:, :count, :]
-                u_fluid, _, _ = momentum_solve(rhs_u, viscosity, u[:, :count, :])
-                v_fluid, _, _ = momentum_solve(rhs_v, viscosity, v[:, :count, :])
-                w_fluid, _, _ = momentum_solve(rhs_w, viscosity, w[:, :count, :])
+                u_fluid, _, _ = momentum_solve(rhs_u, u[:, :count, :])
+                v_fluid, _, _ = momentum_solve(rhs_v, v[:, :count, :])
+                w_fluid, _, _ = momentum_solve(rhs_w, w[:, :count, :])
                 u_star = jnp.zeros_like(u).at[:, :count, :].set(u_fluid)
                 v_star = jnp.zeros_like(v).at[:, :count, :].set(v_fluid)
                 w_star = jnp.zeros_like(w).at[:, :count, :].set(w_fluid)
@@ -5917,7 +5924,7 @@ def _solve_extruded_projection(
                         rho[:, :count, :],
                         response_fluid,
                         fluid_cell_area[:, :count, :],
-                        lambda rhs: momentum_solve(rhs, viscosity, zero)[0],
+                        lambda rhs: momentum_solve(rhs, zero)[0],
                         target_flow_rate=target_flow_rate,
                         dx=dx,
                         r_faces=faces,
