@@ -125,12 +125,17 @@ def test_benchmark_sharded_extruded_operator_rejects_invalid_device_count():
 
 def test_benchmark_extruded_inductionless_solve_records_solver_path(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ):
     calls = []
+    restart_path = tmp_path / "steady.npz"
+    restart_path.write_bytes(b"restart")
+    initial_bundle = object()
 
-    def fake_solve(problem, *, num_devices=None):
+    def fake_solve(problem, *, num_devices=None, initial_bundle=None):
         calls.append(problem)
         assert num_devices == 1
+        assert initial_bundle is not None
         shape = (
             problem.case.geometry.nx,
             problem.case.geometry.ny,
@@ -157,6 +162,17 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
         return SimpleNamespace(bundle=bundle)
 
     monkeypatch.setattr(scaling, "solve_extruded_inductionless", fake_solve)
+    monkeypatch.setattr(
+        scaling,
+        "load_extruded_restart_bundle",
+        lambda path: SimpleNamespace(bundle=initial_bundle),
+    )
+    validated = []
+    monkeypatch.setattr(
+        scaling,
+        "validate_extruded_restart_bundle",
+        lambda restart, case: validated.append((restart, case)),
+    )
 
     record = benchmark_extruded_inductionless_solve(
         nx=6,
@@ -167,6 +183,7 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
         coupling_iterations=1,
         repeats=1,
         num_devices=1,
+        restart_path=restart_path,
     )
 
     assert calls
@@ -180,6 +197,9 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
     assert record.velocity_l2 is not None
     assert record.validation_passed
     assert record.electric_solves_converged
+    assert validated
+    assert record.initialization == "restart"
+    assert record.restart_sha256 == scaling.hashlib.sha256(b"restart").hexdigest()
 
 
 def test_solver_scaling_rejects_invalid_devices_and_physics(

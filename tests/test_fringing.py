@@ -16,10 +16,12 @@ from lmx.fringing import (
     _apply_fixed_flow_pressure_constraint,
     _apply_pipe_diffusion_coefficients_3d,
     _cross_duct_pressure_difference,
+    _conservative_current_diagnostics_3d,
     _distance_weighted_harmonic_mean,
     _thin_wall_interface_mean,
     _enforce_stationwise_flow_rate_3d,
     _gradient_3d,
+    _gauge_invariant_scalar_update,
     _laplacian_3d,
     _masked_laplacian_duct,
     _net_boundary_current_residual,
@@ -1000,6 +1002,55 @@ def test_net_boundary_current_residual_cancels_balanced_faces():
         dy=1.0,
         dz=1.0,
     ) == pytest.approx(0.0)
+
+
+def test_scalar_update_ignores_constant_gauge_mode():
+    previous = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+    physical_update = jnp.asarray([[0.0, 0.2], [-0.1, 0.1]])
+    volume = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+
+    reference = _gauge_invariant_scalar_update(
+        previous + physical_update,
+        previous,
+        volume,
+        scale=2.0,
+    )
+    shifted = _gauge_invariant_scalar_update(
+        previous + physical_update + 1.0e6,
+        previous,
+        volume,
+        scale=2.0,
+    )
+
+    assert shifted == pytest.approx(reference, rel=1.0e-9, abs=1.0e-12)
+
+
+def test_duct_boundary_current_is_stationwise_divergence_integral():
+    shape = (4, 3, 2)
+    x = jnp.linspace(0.0, 1.0, shape[0])[:, None, None]
+    phi = jnp.broadcast_to(x**2, shape)
+    sigma = jnp.ones(shape)
+    zeros = jnp.zeros(shape)
+    dy = jnp.asarray([0.2, 0.3, 0.5])
+    dz = jnp.asarray([0.4, 0.6])
+
+    divergence, _, boundary = _conservative_current_diagnostics_3d(
+        sigma,
+        phi,
+        zeros,
+        zeros,
+        zeros,
+        dx=0.25,
+        dy=dy,
+        dz=dz,
+    )
+    expected = jnp.abs(
+        jnp.sum(divergence * dy[None, :, None] * dz[None, None, :], axis=(1, 2)) * 0.25
+    )
+
+    assert boundary.shape == (shape[0],)
+    assert boundary == pytest.approx(expected)
+    assert float(jnp.max(boundary)) > 0.0
 
 
 def test_build_extruded_problem_from_case_preserves_case_and_profile():

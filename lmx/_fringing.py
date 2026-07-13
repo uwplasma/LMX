@@ -640,6 +640,20 @@ def _normalized_pressure_observable_update(
     return float(jnp.max(jnp.abs(current - previous)) / scale)
 
 
+def _gauge_invariant_scalar_update(
+    current: jnp.ndarray,
+    previous: jnp.ndarray,
+    volume: jnp.ndarray,
+    *,
+    scale: float,
+) -> float:
+    """Measure an update after removing its volume-weighted constant gauge."""
+
+    delta = current - previous
+    delta = delta - jnp.sum(delta * volume) / jnp.sum(volume)
+    return float(jnp.max(jnp.abs(delta)) / max(scale, 1.0e-20))
+
+
 def _poisson_jacobi_3d(
     rhs: jnp.ndarray,
     *,
@@ -1983,13 +1997,11 @@ def _conservative_current_diagnostics_3d(
         + jnp.sum(jnp.abs(fz[:, :, -1]) * dy_widths[None, :], axis=1) * dx
     )
     cross_section_area = dy_widths[:, None] * dz_widths[None, :]
+    # Integrating the conservative cell divergence gives the complete boundary
+    # flux for each axial control-volume slab. This is the discrete divergence
+    # theorem and avoids mixing global inlet/outlet fluxes into every station.
     boundary_residual = jnp.abs(
-        -jnp.sum(fx[0] * cross_section_area)
-        + jnp.sum(fx[-1] * cross_section_area)
-        - jnp.sum(fy[:, 0, :] * dz_widths[None, :], axis=1) * dx
-        + jnp.sum(fy[:, -1, :] * dz_widths[None, :], axis=1) * dx
-        - jnp.sum(fz[:, :, 0] * dy_widths[None, :], axis=1) * dx
-        + jnp.sum(fz[:, :, -1] * dy_widths[None, :], axis=1) * dx
+        jnp.sum(div_j * cross_section_area[None, :, :], axis=(1, 2)) * dx
     )
     return div_j, wall_leakage, boundary_residual
 
@@ -5201,8 +5213,11 @@ def _solve_extruded_projection(
                 electric_status = jnp.asarray(-1)
                 electric_local_residual = jnp.asarray(jnp.nan)
             phi = _clip_state(phi, scalar_limit)
-            potential_update = (
-                float(jnp.max(jnp.abs(phi - phi_previous))) / electric_potential_scale
+            potential_update = _gauge_invariant_scalar_update(
+                phi,
+                phi_previous,
+                cell_area,
+                scale=electric_potential_scale,
             )
             electric_linear_by_step.append(
                 (
@@ -6131,8 +6146,11 @@ def _solve_extruded_projection(
             electric_status = jnp.asarray(-1)
             electric_local_residual = jnp.asarray(jnp.nan)
         phi = _clip_state(phi, scalar_limit)
-        potential_update = (
-            float(jnp.max(jnp.abs(phi - phi_previous))) / electric_potential_scale
+        potential_update = _gauge_invariant_scalar_update(
+            phi,
+            phi_previous,
+            cell_area,
+            scale=electric_potential_scale,
         )
         electric_linear_by_step.append(
             (

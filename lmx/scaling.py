@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass, replace
+import hashlib
 import json
 import platform
 import time
@@ -15,6 +16,7 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from .benchmarks import build_benchmark_b_field_profile, build_benchmark_b_problem
 from .fringing import solve_extruded_inductionless
+from .io import load_extruded_restart_bundle, validate_extruded_restart_bundle
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,8 @@ class StrongScalingRecord:
     max_electric_local_residual: float | None = None
     electric_solves_converged: bool | None = None
     validation_passed: bool | None = None
+    initialization: str = "cold_start"
+    restart_sha256: str | None = None
 
 
 StrongScalingRecordLike = StrongScalingRecord | Mapping[str, object]
@@ -72,6 +76,7 @@ _SCALING_TABLE_COLUMNS = (
     "profile_path",
     "spatially_sharded",
     "global_shard_count",
+    "initialization",
     "validation_passed",
     "physics_equivalent",
     "solver_faithful",
@@ -126,6 +131,7 @@ def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
         record.get("ny"),
         record.get("nz"),
         record.get("iterations"),
+        record.get("initialization", "cold_start"),
     )
 
 
@@ -210,6 +216,8 @@ def summarize_strong_scaling_records(
                     "spatially_sharded": bool(record.get("spatially_sharded", False)),
                     "global_shard_count": _int_or_none(record.get("global_shard_count"))
                     or 1,
+                    "initialization": str(record.get("initialization", "cold_start")),
+                    "validation_passed": bool(record.get("validation_passed", False)),
                     "physics_equivalent": physics_equivalent,
                     "solver_faithful": operator_path == "solve_extruded_inductionless",
                 }
@@ -422,6 +430,7 @@ def benchmark_extruded_inductionless_solve(
     num_devices: int | None = None,
     profile_dir: str | Path | None = None,
     strict_validation: bool = True,
+    restart_path: str | Path | None = None,
 ) -> StrongScalingRecord:
     """Benchmark the production ALEX B2 ``extruded_inductionless`` solve path.
 
@@ -461,6 +470,14 @@ def benchmark_extruded_inductionless_solve(
             "B2-fringing-square", axial_stations=nx
         ),
     )
+    initial_bundle = None
+    restart_sha256 = None
+    if restart_path is not None:
+        restart_path = Path(restart_path)
+        restart = load_extruded_restart_bundle(restart_path)
+        validate_extruded_restart_bundle(restart, case=case)
+        initial_bundle = restart.bundle
+        restart_sha256 = hashlib.sha256(restart_path.read_bytes()).hexdigest()
     outer_steps = max(2, min(max_steps, max(6, coupling_iterations * 2)))
 
     timings: list[float] = []
@@ -479,7 +496,10 @@ def benchmark_extruded_inductionless_solve(
                 trace_started = False
         start = time.perf_counter()
         try:
-            solution = solve_extruded_inductionless(problem, num_devices=num_devices)
+            solve_kwargs = {"num_devices": num_devices}
+            if initial_bundle is not None:
+                solve_kwargs["initial_bundle"] = initial_bundle
+            solution = solve_extruded_inductionless(problem, **solve_kwargs)
             jax.block_until_ready(
                 tuple(getattr(solution.bundle, name) for name in _BUNDLE_FIELD_NAMES)
             )
@@ -588,6 +608,8 @@ def benchmark_extruded_inductionless_solve(
         max_electric_local_residual=max_electric_local_residual,
         electric_solves_converged=electric_solves_converged,
         validation_passed=validation_passed,
+        initialization="restart" if initial_bundle is not None else "cold_start",
+        restart_sha256=restart_sha256,
     )
 
 

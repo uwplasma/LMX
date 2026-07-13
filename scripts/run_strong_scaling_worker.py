@@ -28,6 +28,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", type=str, default="cpu")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--profile-dir", type=Path, default=None)
+    parser.add_argument(
+        "--restart",
+        type=Path,
+        default=None,
+        help="Verified extruded restart used to initialize solver-faithful timing.",
+    )
     args = parser.parse_args(argv)
 
     if args.benchmark_kind == "extruded_solve":
@@ -39,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
             repeats=args.repeats,
             num_devices=args.num_devices,
             profile_dir=args.profile_dir,
+            restart_path=args.restart,
         )
     elif args.benchmark_kind == "extruded3d":
         record = benchmark_sharded_extruded_operator(

@@ -86,6 +86,7 @@ def test_run_strong_scaling_worker_covers_solver_faithful_branch(
         assert kwargs["repeats"] == 1
         assert kwargs["num_devices"] == 1
         assert kwargs["profile_dir"] == tmp_path / "profile"
+        assert kwargs["restart_path"] == tmp_path / "steady.npz"
         return StrongScalingRecord(
             backend="cpu",
             device_kind="cpu",
@@ -129,6 +130,8 @@ def test_run_strong_scaling_worker_covers_solver_faithful_branch(
             "1",
             "--profile-dir",
             str(tmp_path / "profile"),
+            "--restart",
+            str(tmp_path / "steady.npz"),
             "--output",
             str(output_path),
         ]
