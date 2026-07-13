@@ -1,0 +1,57 @@
+{
+  "date": "2026-07-13",
+  "base_commit": "c44ae81",
+  "baseline_source_fingerprint": "d0d30cac7667e83fe6562f5b204d8cdf2096381fa200dd3102c7de8161986923",
+  "candidate_source_fingerprint": "2e61e28a9d1a76d1220bd1998cae9ef2f745b43ab8c74b7d85595bdff3e5b8a1",
+  "hardware": "2 x NVIDIA RTX A4000",
+  "method": "Concurrent isolated one-GPU workers, one baseline and one candidate",
+  "problem": {
+    "case": "ALEX B1 reduced full-physics production path",
+    "shape": [32, 16, 32],
+    "executed_updates": 10,
+    "repeats": 1
+  },
+  "baseline": {
+    "seconds": 62.684708030021284,
+    "velocity_l2": 119.55702440734284,
+    "potential_l2": 4822.664900774106,
+    "pressure_l2": 9517.232519169862,
+    "pressure_gradient_l2": 1458.3850175093146,
+    "max_residual": 0.0020328076861310107,
+    "max_divergence_residual": 0.003365115036878346,
+    "max_charge_balance_residual": 0.00020534886947132236,
+    "volumetric_flow_rate_span": 9.0970245354427e-06,
+    "net_boundary_current_residual": 0.0
+  },
+  "candidate": {
+    "seconds": 50.563100190018304,
+    "velocity_l2": 119.55702440734267,
+    "potential_l2": 4822.664900774106,
+    "pressure_l2": 9517.23251851201,
+    "pressure_gradient_l2": 1458.385017504801,
+    "max_residual": 0.0020328076861307887,
+    "max_divergence_residual": 0.0031607898150455395,
+    "max_charge_balance_residual": 0.0002024265050977192,
+    "volumetric_flow_rate_span": 9.097024548321286e-06,
+    "net_boundary_current_residual": 0.0
+  },
+  "comparison": {
+    "speedup": 1.2397322908296655,
+    "runtime_reduction": 0.19337424103814338,
+    "max_field_signature_relative_difference": 6.912220210891394e-11,
+    "signature_relative_tolerance": 2.5e-05,
+    "divergence_change": -0.0002043252218328064,
+    "charge_balance_change": -2.922364373603165e-06,
+    "runtime_gate_passed": true,
+    "physics_gate_passed": true,
+    "accepted": true
+  },
+  "portable_gate": {
+    "passed": 899,
+    "skipped": 8,
+    "branch_coverage_percent": 95.07,
+    "wall_seconds": 141.6,
+    "budget_seconds": 600
+  },
+  "scope": "Momentum PCG system reuse only; pressure response, projection, electric solve, and B1 process-level GPU parallelism are unchanged."
+}

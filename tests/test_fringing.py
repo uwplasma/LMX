@@ -109,13 +109,13 @@ def test_b2_canonical_shell_widths_remove_realization_thickness():
     assert float(jnp.sum(observed[-2:])) == pytest.approx(0.02)
 
 
-def test_b2_jit_cache_reuses_the_first_compiled_kernel():
-    fringing_impl._B2_JIT_CACHE.clear()
+def test_fringing_jit_cache_reuses_the_first_compiled_kernel():
+    fringing_impl._FRINGING_JIT_CACHE.clear()
     first = object()
     key = ("operator", "configuration")
 
-    assert fringing_impl._reuse_b2_jit(key, first) is first
-    assert fringing_impl._reuse_b2_jit(key, object()) is first
+    assert fringing_impl._reuse_fringing_jit(key, first) is first
+    assert fringing_impl._reuse_fringing_jit(key, object()) is first
 
 
 def test_duct_solvers_forward_single_reduction_to_solvax(

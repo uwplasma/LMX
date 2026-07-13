@@ -92,13 +92,13 @@ MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
     },
 }
 
-_B2_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
+_FRINGING_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
 
 
-def _reuse_b2_jit(key: tuple[object, ...], function: Callable) -> Callable:
-    """Reuse an identical compiled B2 kernel across repeated solves."""
+def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
+    """Reuse an identical compiled production kernel across repeated solves."""
 
-    return _B2_JIT_CACHE.setdefault(key, function)
+    return _FRINGING_JIT_CACHE.setdefault(key, function)
 
 
 # Frozen in both ALEX Benchmark B specifications for mass and current closure.
@@ -2380,6 +2380,50 @@ def _solvax_pressure_poisson_pipe(
     )
 
 
+def _solve_pipe_diffusion_system(
+    linear_rhs: jnp.ndarray,
+    volume: jnp.ndarray,
+    coefficients: tuple[jnp.ndarray, ...],
+    wall_sink: jnp.ndarray,
+    initial_field: jnp.ndarray | None,
+    *,
+    dt: float,
+    iterations: int,
+    tolerance: float,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Solve one prepared cylindrical implicit-diffusion system."""
+
+    coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
+
+    def matvec(field: jnp.ndarray) -> jnp.ndarray:
+        diffusion = (
+            _apply_pipe_diffusion_coefficients_3d(field, coefficients)
+            - wall_sink * field
+        )
+        return volume * (field - dt * diffusion)
+
+    diagonal = volume * (1.0 + dt * (sum(coefficients) + wall_sink))
+    directions = (
+        (0, -volume * dt * coef_x_w, -volume * dt * coef_x_e),
+        (1, -volume * dt * coef_r_i, -volume * dt * coef_r_o),
+    )
+    precondition = _additive_line_preconditioner_3d(diagonal, directions)
+    solution = pcg_linear_solve(
+        matvec,
+        linear_rhs,
+        x0=initial_field,
+        precond=precondition,
+        transpose_precond=precondition,
+        rtol=tolerance,
+        atol=tolerance,
+        max_steps=iterations,
+        transpose_rtol=tolerance,
+        transpose_atol=tolerance,
+        transpose_max_steps=iterations,
+    )
+    return solution.x, solution.residual_norm, solution.converged
+
+
 def _solvax_implicit_diffusion_pipe(
     rhs: jnp.ndarray,
     viscosity: jnp.ndarray,
@@ -2392,6 +2436,7 @@ def _solvax_implicit_diffusion_pipe(
     iterations: int,
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
+    _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Implicit cylindrical diffusion with no-slip at the outer radial face."""
 
@@ -2409,7 +2454,6 @@ def _solvax_implicit_diffusion_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
-    coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
     wall_sink = (
         jnp.zeros_like(rhs)
         .at[:, -1, :]
@@ -2423,33 +2467,12 @@ def _solvax_implicit_diffusion_pipe(
         )
     )
 
-    def matvec(field: jnp.ndarray) -> jnp.ndarray:
-        diffusion = (
-            _apply_pipe_diffusion_coefficients_3d(field, coefficients)
-            - wall_sink * field
-        )
-        return volume * (field - dt * diffusion)
-
-    diagonal = volume * (1.0 + dt * (sum(coefficients) + wall_sink))
-    directions = (
-        (0, -volume * dt * coef_x_w, -volume * dt * coef_x_e),
-        (1, -volume * dt * coef_r_i, -volume * dt * coef_r_o),
+    system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
+    if _system_solve is not None:
+        return _system_solve(*system)
+    return _solve_pipe_diffusion_system(
+        *system, dt=dt, iterations=iterations, tolerance=tolerance
     )
-    precondition = _additive_line_preconditioner_3d(diagonal, directions)
-    solution = pcg_linear_solve(
-        matvec,
-        volume * rhs,
-        x0=initial_field,
-        precond=precondition,
-        transpose_precond=precondition,
-        rtol=tolerance,
-        atol=tolerance,
-        max_steps=iterations,
-        transpose_rtol=tolerance,
-        transpose_atol=tolerance,
-        transpose_max_steps=iterations,
-    )
-    return solution.x, solution.residual_norm, solution.converged
 
 
 def _masked_laplacian_pipe(
@@ -4922,13 +4945,61 @@ def _solve_extruded_projection(
         )[:, None, None, None]
         if use_alex_b1_finite_volume:
             count = radial_fluid_count
+            faces = r_faces[: count + 1]
+            centers = r[:count]
+            kernel_key = (
+                "b1_diffusion",
+                u.shape,
+                count,
+                dt,
+                dx,
+                tuple(np.asarray(faces)),
+                tuple(np.asarray(centers)),
+                dtheta,
+                momentum_iterations,
+                momentum_tolerance,
+            )
+
+            def diffusion_system_solve(
+                linear_rhs, volume, coefficients, wall_sink, initial
+            ):
+                return _solve_pipe_diffusion_system(
+                    linear_rhs,
+                    volume,
+                    coefficients,
+                    wall_sink,
+                    initial,
+                    dt=dt,
+                    iterations=momentum_iterations,
+                    tolerance=momentum_tolerance,
+                )
+
+            diffusion_system_solve = _reuse_fringing_jit(
+                kernel_key, jax.jit(diffusion_system_solve)
+            )
+
+            def momentum_solve(rhs, viscosity, initial):
+                return _solvax_implicit_diffusion_pipe(
+                    rhs,
+                    viscosity,
+                    dt=dt,
+                    dx=dx,
+                    r_faces=faces,
+                    r_centers=centers,
+                    dtheta=dtheta,
+                    iterations=momentum_iterations,
+                    tolerance=momentum_tolerance,
+                    initial_field=initial,
+                    _system_solve=diffusion_system_solve,
+                )
+
             response_fluid, _, _ = _solvax_implicit_diffusion_pipe(
                 dt / rho[:, :count, :],
                 nu[:, :count, :],
                 dt=dt,
                 dx=dx,
-                r_faces=r_faces[: count + 1],
-                r_centers=r[:count],
+                r_faces=faces,
+                r_centers=centers,
                 dtheta=dtheta,
                 iterations=momentum_iterations,
                 tolerance=momentum_tolerance,
@@ -4996,42 +5067,10 @@ def _solve_extruded_projection(
                 rhs_w = w[:, :count, :] + dt * (
                     lorentz_theta[:, :count, :] / rho[:, :count, :]
                 )
-                u_fluid, _, _ = _solvax_implicit_diffusion_pipe(
-                    rhs_u,
-                    nu[:, :count, :],
-                    dt=dt,
-                    dx=dx,
-                    r_faces=faces,
-                    r_centers=centers,
-                    dtheta=dtheta,
-                    iterations=momentum_iterations,
-                    tolerance=momentum_tolerance,
-                    initial_field=u[:, :count, :],
-                )
-                v_fluid, _, _ = _solvax_implicit_diffusion_pipe(
-                    rhs_v,
-                    nu[:, :count, :],
-                    dt=dt,
-                    dx=dx,
-                    r_faces=faces,
-                    r_centers=centers,
-                    dtheta=dtheta,
-                    iterations=momentum_iterations,
-                    tolerance=momentum_tolerance,
-                    initial_field=v[:, :count, :],
-                )
-                w_fluid, _, _ = _solvax_implicit_diffusion_pipe(
-                    rhs_w,
-                    nu[:, :count, :],
-                    dt=dt,
-                    dx=dx,
-                    r_faces=faces,
-                    r_centers=centers,
-                    dtheta=dtheta,
-                    iterations=momentum_iterations,
-                    tolerance=momentum_tolerance,
-                    initial_field=w[:, :count, :],
-                )
+                viscosity = nu[:, :count, :]
+                u_fluid, _, _ = momentum_solve(rhs_u, viscosity, u[:, :count, :])
+                v_fluid, _, _ = momentum_solve(rhs_v, viscosity, v[:, :count, :])
+                w_fluid, _, _ = momentum_solve(rhs_w, viscosity, w[:, :count, :])
                 u_star = jnp.zeros_like(u).at[:, :count, :].set(u_fluid)
                 v_star = jnp.zeros_like(v).at[:, :count, :].set(v_fluid)
                 w_star = jnp.zeros_like(w).at[:, :count, :].set(w_fluid)
@@ -5654,7 +5693,9 @@ def _solve_extruded_projection(
                     replicated_sharding,
                 ),
             )
-            diffusion_solve = _reuse_b2_jit(("diffusion", *kernel_key), diffusion_solve)
+            diffusion_solve = _reuse_fringing_jit(
+                ("diffusion", *kernel_key), diffusion_solve
+            )
 
         def axial_momentum_solve(state, force, density, viscosity):
             state = state[:, y0:y1, z0:z1]
@@ -5741,16 +5782,16 @@ def _solve_extruded_projection(
                 in_shardings=(field_sharding,) * 3,
                 out_shardings=field_sharding,
             )
-            axial_momentum_solve = _reuse_b2_jit(
+            axial_momentum_solve = _reuse_fringing_jit(
                 ("axial_momentum", *kernel_key), axial_momentum_solve
             )
-            transverse_momentum_solve = _reuse_b2_jit(
+            transverse_momentum_solve = _reuse_fringing_jit(
                 ("transverse_momentum", *kernel_key), transverse_momentum_solve
             )
-            embed_velocity = _reuse_b2_jit(
+            embed_velocity = _reuse_fringing_jit(
                 ("embed_velocity", *kernel_key), embed_velocity
             )
-            pressure_response = _reuse_b2_jit(
+            pressure_response = _reuse_fringing_jit(
                 ("pressure_response", *kernel_key), pressure_response
             )
         unit_pressure_response = pressure_response(rho, nu, fluid_mask)
@@ -5950,7 +5991,7 @@ def _solve_extruded_projection(
                 state_difference,
                 unscaled_state,
             ) = tuple(
-                _reuse_b2_jit((name, *kernel_key), function)
+                _reuse_fringing_jit((name, *kernel_key), function)
                 for name, function in (
                     ("fixed_flow", fixed_flow_projection),
                     ("electric", electric_solve),
@@ -6307,7 +6348,7 @@ def _solve_extruded_projection(
                         ),
                         out_shardings=state_sharding,
                     )
-                    mix_history = _reuse_b2_jit(
+                    mix_history = _reuse_fringing_jit(
                         ("anderson", len(iterates), *kernel_key), mix_history
                     )
                     accelerated = mix_history(iterates, residuals)

@@ -326,6 +326,21 @@ with the A4000 idle after 66 seconds. That integration is likewise rejected;
 the required reuse must retain a fused accelerator apply rather than falling
 back to scanned general-banded LU.
 
+The accepted B1 optimization keeps cylindrical coefficient and wall-system
+preparation eager, then reuses one compiled SOLVAX PCG system for the three
+momentum components. This boundary matters: compiling the entire diffusion
+operator was faster but amplified the short-run divergence diagnostic and was
+rejected. In a paired ten-update `32 x 16 x 32` full-physics run on the two
+A4000s, the accepted split reduces runtime from `62.68 s` to `50.56 s`
+(`1.240x`). Velocity, potential, pressure, and pressure-gradient L2 signatures
+agree within `6.9e-11` relative; divergence improves from `3.37e-3` to
+`3.16e-3`, and charge residual improves from `2.05e-4` to `2.02e-4`. The
+compact record is
+`benchmarks/results/b1-momentum-jit-20260713.json`. This accelerates each B1
+worker; independent variants remain the supported way to occupy both GPUs. The
+source-matched portable gate passes 899 tests with 8 expected skips and 95.07%
+branch coverage in 141.6 seconds, comfortably inside the 600-second CI limit.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep

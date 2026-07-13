@@ -974,6 +974,16 @@ wall time is acceptable.
    gates but is also rejected: the reduced worker is CPU-bound with the A4000
    idle after 66 seconds. A viable periodic inverse must retain a fused
    accelerator apply; general scanned banded LU is not that path.
+   The accepted next B1 step reuses one compiled momentum-PCG system while
+   retaining eager cylindrical coefficient/wall preparation and the original
+   pressure-response path. A paired ten-update `32 x 16 x 32` A4000 run changes
+   `62.68 s -> 50.56 s` (`1.240x`); all main signatures agree within `6.9e-11`
+   relative, divergence improves `3.37e-3 -> 3.16e-3`, and charge residual
+   improves `2.05e-4 -> 2.02e-4`. The whole-operator JIT variant was faster warm
+   but rejected because it amplified short-run divergence. Evidence is in
+   `benchmarks/results/b1-momentum-jit-20260713.json`. Resume coarse B1 through
+   process-parallel independent variants; the portable gate passes 899 tests
+   with 8 expected skips and 95.07% branch coverage in 141.6 seconds.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
