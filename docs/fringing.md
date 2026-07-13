@@ -83,10 +83,11 @@ The retained specifications and references are:
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
 
-B1 uses an exact periodic azimuthal line and retained modal setup factors. The
-latest large-grid profile shows that pressure Krylov work consumes about 91% of
-runtime, so the next optimization must reduce iterations while retaining
-residual and observable equivalence.
+B1 uses an exact periodic azimuthal line and retained modal setup factors. A
+one-cycle physical-convergence pilot now reduces the large solve-plus-restart
+pressure ceiling from 768 to 669 Krylov iterations while preserving divergence,
+fixed-flow, charge, and restart gates. Experimental pressure-observable and mesh
+acceptance remain open.
 
 B2 supports named axial sharding. On two RTX A4000 GPUs the current fixed-size
 run improves from 36.96 s to 22.23 s with matching solution signatures. This is

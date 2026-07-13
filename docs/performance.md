@@ -8,14 +8,21 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 790 pass, 8 skip, 95.32% branch coverage, 224.9 s | below the ten-minute budget |
+| portable test gate | Apple M4, six workers | 790 pass, 8 skip, 95.32% branch coverage, 154.3 s | below the ten-minute budget |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
+| B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
 The B2 result passes the two-device target and exact observable-equivalence
 gate. A general or four-device scaling claim remains open. The B1 timings do
 not promote its experimental physics result.
+
+The B1 pressure path first screens one 24-iteration GMRES cycle against the
+actual mean-free divergence and normalized fixed-flow tolerance. Passing states
+stop there; failing states continue through the original tight GMRES solve.
+The large gate used `21/216` iterations initially and `216/216` after restart,
+with maximum divergence below `6.1e-5` and charge residual below `5.1e-9`.
 
 Run the checkpointed B1 acceptance path with:
 
@@ -106,8 +113,8 @@ than silently reused.
 
 ## Next performance work
 
-1. Reduce B1 pressure-Krylov iterations without weakening its residual gate.
-2. Re-measure B1 after numerical equivalence and steady convergence pass.
+1. Re-measure the accepted B1 physical-pilot path on an otherwise idle GPU.
+2. Close B1/B2 mesh and experimental-observable acceptance.
 3. Add a four-GPU B2 point on suitable hardware.
 4. Keep compilation-cache and memory measurements in every accelerator report.
 

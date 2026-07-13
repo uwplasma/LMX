@@ -179,6 +179,11 @@ FFT line in periodic `theta`: its checkpointed 133-update campaign completes in
 previous rate projection. This accepts the runtime optimization, not the B1
 physics result; the terminal steady and divergence gates still require a more
 stable outer fixed-point policy.
+The compatible B1 pressure solver now screens one 24-step GMRES cycle against
+the actual divergence and fixed-flow tolerance, retaining the original tight
+fallback when needed. On the `21 x 24 x 64` solve-plus-restart gate this reduced
+pressure work from a four-projection ceiling of 768 iterations to 669 while all
+physical residuals passed; experimental pressure agreement remains open.
 For independent validation variants, run one process per GPU with explicit
 `CUDA_VISIBLE_DEVICES`; for a single B2 solve, use its `num_devices` setting for
 named axial sharding. Disable default JAX memory preallocation when processes
@@ -209,7 +214,7 @@ convergence, analytical profiles, and independent reference data. Heavy
 FreeMHD and scaling campaigns remain explicit workflows because they require
 external software or hardware.
 The latest complete local gate passes 789 tests with 8 expected external-data
-skips and 95.32% branch coverage in 224.9 seconds on six Mac workers. The lower
+skips and 95.32% branch coverage in 154.3 seconds on six Mac workers. The lower
 test count reflects removal of duplicate campaign-wrapper tests; direct physics,
 numerics, adapters, plotting, and curated workflows remain covered.
 

@@ -167,6 +167,63 @@
       "worker_360_second_cap_completed": false
     }
   },
+  "physical_convergence_pilot": {
+    "verified_code_commit": "ae64168",
+    "environment": {
+      "host": "office",
+      "device": "NVIDIA RTX A4000",
+      "jax": "0.8.0",
+      "solvax": "0.8.1",
+      "precision": "float64",
+      "host_was_shared": true
+    },
+    "method": {
+      "pilot_restart_cycles": 1,
+      "pilot_maximum_iterations": 24,
+      "pilot_algebraic_tolerance": 1E-6,
+      "acceptance": "exact physical divergence and normalized flow residual",
+      "acceptance_tolerance": 0.001,
+      "fallback": "original tight GMRES continued from the pilot state"
+    },
+    "grid_7x9x16": {
+      "first_projection_iterations": [2, 2],
+      "restart_projection_iterations": [2, 5],
+      "solve_and_restart_seconds": 66.19,
+      "first_divergence_residual": 0.00011628711260347393,
+      "restart_divergence_residual": 0.000011536100768931318,
+      "first_charge_residual": 6.79517222351711E-9,
+      "restart_charge_residual": 6.563778576218482E-9,
+      "passed": true
+    },
+    "grid_21x24x64": {
+      "fixed_ceiling_iterations_per_projection": 192,
+      "first_projection_iterations": [21, 216],
+      "restart_projection_iterations": [216, 216],
+      "four_projection_fixed_ceiling_iterations": 768,
+      "four_projection_candidate_iterations": 669,
+      "krylov_iteration_reduction_fraction": 0.12890625,
+      "solve_and_restart_seconds_shared_host": 479.86,
+      "first_divergence_residual": 0.000060755159704233735,
+      "restart_divergence_residual": 0.000009405588187408144,
+      "first_charge_residual": 5.060973418125059E-9,
+      "restart_charge_residual": 5.030038607856113E-9,
+      "all_projections_passed": true,
+      "wall_time_speedup_claimed": false
+    },
+    "rejected_four_cycle_pilot": {
+      "first_projection_iterations": [21, 288],
+      "reason": "The hard projection paid 96 pilot iterations before the unchanged 192-iteration fallback; the restart run was terminated."
+    },
+    "portable_gate": {
+      "tests_passed": 790,
+      "expected_external_data_skips": 8,
+      "branch_coverage_percent": 95.32,
+      "seconds": 154.3,
+      "budget_seconds": 600,
+      "passed": true
+    },
+    "decision": "accepted for the research-stage B1 path; the pilot reduces bounded Krylov work and preserves exact physical fallback gates"
+  },
   "portable_gate": {
     "solvax_version": "0.7.0",
     "tests_passed": 908,

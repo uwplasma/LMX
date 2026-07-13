@@ -14,14 +14,14 @@ are authoritative when prose and results differ.
   the 1% finite-grid gate.
 - SOLVAX 0.8 integration passes primal, implicit-gradient, independent
   transpose, CPU/GPU, and bounded end-to-end gates.
-- The portable package gate passes 789 tests with 8 expected external-data
-  skips and 95.32% branch coverage in 224.9 seconds on the reference Mac.
+- The portable package gate passes 790 tests with 8 expected external-data
+  skips and 95.32% branch coverage in 154.3 seconds on the reference Mac.
 
 ## Research-stage
 
-- ALEX B1 conducting-pipe fringing flow: conservation and restart machinery are
-  present; large-grid steady pressure convergence and experimental pressure
-  agreement remain open.
+- ALEX B1 conducting-pipe fringing flow: conservation, restart, and bounded
+  large-grid pressure convergence pass; experimental pressure agreement and
+  the final mesh/observable acceptance record remain open.
 - ALEX B2 square-duct fringing flow: conservation and two-GPU numerical
   equivalence pass; experimental validation remains open.
 - Q2D turbulence, magnetic-obstacle, mapped blanket, and Dean-vortex workflows

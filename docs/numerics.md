@@ -251,6 +251,13 @@ does not change the cylindrical finite-volume operator or its converged
 solution. Generic mapped-pipe calls retain the axial/radial preconditioner
 unless they explicitly satisfy the same axisymmetric contract.
 
+The compatible B1 projection uses a bounded physical-convergence pilot: one
+GMRES restart cycle is tested against the mean-free face-flux divergence and
+normalized fixed-flow residual. A passing state is accepted at that physical
+tolerance; otherwise the original tight algebraic solve continues from the
+pilot state. This avoids oversolving easy projections without weakening the
+fallback or conservation criteria.
+
 The ALEX B2 square-duct path uses the actual nonuniform `dy` and `dz` arrays for
 masked viscous diffusion, conservative electric current, and a compatible
 face-flux pressure projection. Its Neumann pressure and electric-potential
