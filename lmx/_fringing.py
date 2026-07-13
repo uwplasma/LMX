@@ -633,11 +633,11 @@ def _normalized_pressure_observable_update(
     current: jnp.ndarray,
     previous: jnp.ndarray,
     magnetic_energy: jnp.ndarray,
-) -> float:
+) -> jnp.ndarray:
     """Measure a pressure-observable update in magnetic-pressure units."""
 
     scale = jnp.maximum(1.0, jnp.max(jnp.asarray(magnetic_energy)))
-    return float(jnp.max(jnp.abs(current - previous)) / scale)
+    return jnp.max(jnp.abs(current - previous)) / scale
 
 
 def _gauge_invariant_scalar_update(
@@ -646,12 +646,12 @@ def _gauge_invariant_scalar_update(
     volume: jnp.ndarray,
     *,
     scale: float,
-) -> float:
+) -> jnp.ndarray:
     """Measure an update after removing its volume-weighted constant gauge."""
 
     delta = current - previous
     delta = delta - jnp.sum(delta * volume) / jnp.sum(volume)
-    return float(jnp.max(jnp.abs(delta)) / max(scale, 1.0e-20))
+    return jnp.max(jnp.abs(delta)) / max(scale, 1.0e-20)
 
 
 def _poisson_jacobi_3d(
@@ -6150,16 +6150,6 @@ def _solve_extruded_projection(
             cell_area,
             scale=electric_potential_scale,
         )
-        electric_linear_by_step.append(
-            (
-                float(electric_residual),
-                float(electric_relative_residual),
-                float(electric_local_residual),
-                float(electric_iteration_count),
-                float(electric_converged),
-                float(electric_status),
-            )
-        )
 
         if use_alex_b2_finite_volume:
             jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
@@ -6191,12 +6181,8 @@ def _solve_extruded_projection(
             _, dv_dy, _ = _gradient_3d(v_next, dx=dx, dy=dy_momentum, dz=dz_momentum)
             _, _, dw_dz = _gradient_3d(w_next, dx=dx, dy=dy_momentum, dz=dz_momentum)
             projected_divergence = jnp.where(fluid_mask, du_dx + dv_dy + dw_dz, 0.0)
-            projected_divergence_max = float(jnp.max(jnp.abs(projected_divergence)))
+            projected_divergence_max = jnp.max(jnp.abs(projected_divergence))
 
-        u_update = float(jnp.max(jnp.abs(u_next - u)))
-        v_update = float(jnp.max(jnp.abs(v_next - v)))
-        w_update = float(jnp.max(jnp.abs(w_next - w)))
-        flow_error_value = float(fixed_flow_error)
         pressure_update = (
             _normalized_pressure_observable_update(
                 _cross_duct_pressure_difference(
@@ -6209,8 +6195,40 @@ def _solve_extruded_projection(
                 bx**2 + by**2 + bz**2,
             )
             if use_alex_b2_finite_volume
-            else 0.0
+            else jnp.asarray(0.0)
         )
+        diagnostics = np.asarray(
+            jnp.stack(
+                (
+                    jnp.max(jnp.abs(u_next - u)),
+                    jnp.max(jnp.abs(v_next - v)),
+                    jnp.max(jnp.abs(w_next - w)),
+                    projected_divergence_max,
+                    fixed_flow_error,
+                    jnp.max(jnp.abs(div_j)),
+                    pressure_update,
+                    potential_update,
+                    electric_residual,
+                    electric_relative_residual,
+                    electric_local_residual,
+                    electric_iteration_count,
+                    electric_converged,
+                    electric_status,
+                )
+            )
+        )
+        (
+            u_update,
+            v_update,
+            w_update,
+            projected_divergence_max,
+            flow_error_value,
+            charge_balance,
+            pressure_update,
+            potential_update,
+            *electric_diagnostics,
+        ) = map(float, diagnostics)
+        electric_linear_by_step.append(tuple(electric_diagnostics))
         update_residual = max(
             u_update,
             v_update,
@@ -6218,7 +6236,6 @@ def _solve_extruded_projection(
             pressure_update,
             potential_update,
         )
-        charge_balance = float(jnp.max(jnp.abs(div_j)))
         residual_by_step.append(update_residual)
         pressure_residual_by_step.append(pressure_update)
         potential_residual_by_step.append(potential_update)
