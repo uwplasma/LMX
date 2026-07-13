@@ -6713,7 +6713,7 @@ def _solve_extruded_projection(
         volumetric_flow_rate = jnp.sum(u * fluid_cell_area, axis=(1, 2))
         mean_velocity = volumetric_flow_rate / cross_section_area
         axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
-        _, wall_current_leakage, boundary_current_residual = (
+        final_div_j, wall_current_leakage, boundary_current_residual = (
             _pipe_conservative_current_diagnostics_3d(
                 sigma,
                 phi,
@@ -6730,22 +6730,7 @@ def _solve_extruded_projection(
             jnp.max(jnp.abs(bx) + jnp.abs(br) + jnp.abs(btheta), axis=(1, 2)),
             1.0e-12,
         )
-        charge_balance_residual = jnp.max(
-            jnp.abs(
-                _pipe_conservative_current_diagnostics_3d(
-                    sigma,
-                    phi,
-                    uxb_x,
-                    uxb_r,
-                    uxb_theta,
-                    dx=dx,
-                    r_faces=r_faces,
-                    r_centers=r,
-                    dtheta=dtheta,
-                )[0]
-            ),
-            axis=(1, 2),
-        )
+        charge_balance_residual = jnp.max(jnp.abs(final_div_j), axis=(1, 2))
         return ExtrudedFieldBundle(
             x=x,
             y=r,
