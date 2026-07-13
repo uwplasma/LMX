@@ -321,14 +321,24 @@
         "weighted_modal_full_fringing_module_passed": true,
         "weighted_modal_dense_coarse_action": true,
         "weighted_modal_all_krylov_status_flags_passed": false,
+        "separable_modal_commit": "b34bc64",
+        "separable_modal_tiny_test_passed": true,
+        "separable_modal_full_fringing_module_passed": true,
+        "separable_modal_tiny_runtime_seconds": 21.9904,
+        "separable_modal_tiny_stored_coefficients": 3703,
+        "dense_modal_tiny_stored_coefficients": 28224,
+        "separable_modal_32x16x32_stored_coefficients": 70688,
+        "dense_modal_32x16x32_stored_coefficients": 2359296,
+        "separable_modal_storage_scaling": "O(nx * nr^2)",
+        "dense_modal_storage_scaling": "O(nx^2 * nr^2)",
         "accepted": false,
-        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree. Axial deflation closes only the first axisymmetric map. Explicit assembly then exposes two checkerboard null modes in the collocated face-to-cell-to-face response. A preliminary momentum-weighted Rhie-Chow correction restores full rank but remains too ill-conditioned. The subsequent weighted m=0/m=2 prototype passes the complete tiny B1 physics test and restart, but remains experimental because its coarse action is densely assembled and some Euclidean Krylov status flags do not reflect the passing physical residual components."
+        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree. Axial deflation closes only the first axisymmetric map. Explicit assembly then exposes two checkerboard null modes in the collocated face-to-cell-to-face response. The subsequent weighted m=0/m=2 Rhie-Chow prototype passes the complete tiny B1 physics test and restart, and separable stationwise radial blocks remove its quadratic coarse storage. It remains experimental until the dense fallback and environment plumbing are removed, physical and Krylov convergence statuses agree, and refinement-independent cost is demonstrated."
       },
-      "next_candidate": "Retain the passing weighted Rhie-Chow m=0/m=2 physics path. Define convergence from mean-free divergence and normalized station-flow residuals, replace the dense tiny coarse action with separable axial/Fourier-radial blocks, remove diagnostic branches, and require refinement-independent iterations and memory before enabling it or running another exact-GPU campaign."
+      "next_candidate": "Retain the passing weighted Rhie-Chow m=0/m=2 physics path and its separable per-station radial blocks. Define convergence from mean-free divergence and normalized station-flow residuals, remove the dense fallback and environment-only diagnostics, and require refinement-independent iterations and memory before enabling it or running another exact-GPU campaign."
     },
     "accepted": false,
-    "next_candidate": "Convert the passing weighted-modal tiny prototype from a dense coarse action to separable axial/Fourier-radial blocks, align Krylov status with the independent physical residual components, and require refinement-independent cost before another electromagnetic campaign."
+    "next_candidate": "Slim the passing separable weighted-modal prototype, align Krylov status with the independent physical residual components, and require refinement-independent cost before another electromagnetic campaign."
   },
   "accepted": true,
-  "next_constraint": "Make the passing weighted Rhie-Chow m=0/m=2 prototype matrix-free and refinement-scalable, remove diagnostic branches, and close physical/Krylov convergence agreement before exact GPU correctness or strong-scaling campaigns; pseudo-time and transient-pressure variants remain closed."
+  "next_constraint": "Remove the dense fallback and experimental plumbing from the passing separable weighted-modal path, then close physical/Krylov convergence agreement and three-level refinement cost before exact GPU correctness or strong-scaling campaigns; pseudo-time and transient-pressure variants remain closed."
 }

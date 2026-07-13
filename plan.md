@@ -1147,6 +1147,19 @@ wall time is acceptable.
    delete diagnostic-only branches, and prove refinement-independent
    iterations and memory before enabling the path by default or resuming exact
    GPU/sharding campaigns.
+   Experimental commit `b34bc64` then replaces the dense modal action with
+   independent per-axial-station `m=0,2` radial blocks followed by the existing
+   exact flow response; outer flexible GMRES retains axial coupling. The full
+   tiny solve/restart and fringing module still pass. Modal storage drops from
+   `28,224` to `3,703` coefficients on the tiny mesh and, for the planned
+   `32 x 16 x 32` screen, from about `2.36e6` to `70,688`; it is linear in
+   axial stations rather than quadratic. Tiny runtime is about `22.0 s`, a
+   modest setup tradeoff that must be checked at larger meshes. This closes the
+   dense-coarse replacement subgate. Before promotion, remove the now-redundant
+   dense fallback and environment-only plumbing, factor the modal transforms
+   into concise tested helpers, align Krylov status with the physical residual
+   decomposition, and demonstrate iteration/memory behavior across at least
+   three tiny-to-medium refinements.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
