@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3607952,
-    "checkout_bytes_excluding_release_candidates": 3607952,
+    "checkout_bytes_excluding_build_artifacts": 3596583,
+    "checkout_bytes_excluding_release_candidates": 3596583,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -487,10 +487,13 @@
   },
   "schema_version": 1,
   "targets": {
-    "checkout_bytes_max": 10485760,
-    "curated_examples_max": 20,
-    "maintained_core_lines_max": 15000,
-    "new_module_lines_max": 1000,
-    "stable_root_exports_max": 30
+    "checkout_bytes_max": 4194304,
+    "curated_examples_max": 12,
+    "maintained_core_lines_max": 8500,
+    "package_module_count_max": 36,
+    "root_import_median_seconds_max": 0.25,
+    "stable_root_exports_max": 30,
+    "total_package_lines_max": 35500,
+    "wheel_bytes_max": 393216
   }
 }

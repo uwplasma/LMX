@@ -150,8 +150,8 @@ for external research use.
 
 ## Current checkpoint
 
-- Portable gate: 787 passed, 8 expected external-data skips, 95.29% branch
-  coverage, 189.8 seconds on the reference Mac.
+- Portable gate: 789 passed, 8 expected external-data skips, 95.29% branch
+  coverage, 200.0 seconds on the reference Mac.
 - SOLVAX: compatible `>=0.8,<1`; latest tested package is 0.8.1.
 - B1 retained modes: separated real `m=0` and complex `m=1..4` block factors
   pass factor parity and reduce medium restart time from 24.12 to 10.63 seconds.
@@ -161,6 +161,8 @@ for external research use.
   seconds on two (1.66x, 83.1% efficiency).
 - Repository consolidation is active; historical campaigns and large studies
   are being moved out of the source tree before further solver slimming.
+- Architecture budgets now cap module count, source/core lines, tracked bytes,
+  lazy import time, curated examples, root exports, and release-wheel contents.
 
 ## Decision rule
 

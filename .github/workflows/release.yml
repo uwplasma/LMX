@@ -26,6 +26,8 @@ jobs:
           extras: dev,docs
       - name: Verify metadata
         run: python scripts/manage_provenance.py --check
+      - name: Enforce architecture budgets
+        run: python scripts/audit_architecture.py --check --measure-import
       - name: Run portable quality gate
         run: python scripts/run_full_test_suite.py --budget-seconds 600
       - name: Build documentation
@@ -43,6 +45,7 @@ jobs:
         run: |
           python -m build
           python -m twine check dist/*
+          python scripts/audit_architecture.py --check --wheel dist/*.whl
       - name: Smoke-test the wheel
         run: |
           python -m venv /tmp/lmx-wheel-check

@@ -3,10 +3,18 @@ from __future__ import annotations
 import json
 import ast
 from pathlib import Path
+import zipfile
 
 import lmx
 
-from scripts.audit_architecture import _checkout_size, build_inventory, write_inventory
+from scripts.audit_architecture import (
+    _checkout_size,
+    architecture_budget_errors,
+    build_inventory,
+    inspect_wheel,
+    measure_import,
+    write_inventory,
+)
 
 
 def test_tracked_architecture_baseline_matches_repository() -> None:
@@ -14,15 +22,7 @@ def test_tracked_architecture_baseline_matches_repository() -> None:
     current = build_inventory()
     assert tracked["inventory"] == current["inventory"]
     assert tracked["targets"] == current["targets"]
-    assert current["inventory"]["maintained_core_lines"] <= 15000
-    assert current["inventory"]["root_export_count"] <= 30
-    assert current["inventory"]["curated_example_count"] <= 20
-    assert current["inventory"]["uncurated_example_count"] == 0
-    assert (
-        current["inventory"]["checkout_bytes_excluding_build_artifacts"]
-        <= 10 * 1024 * 1024
-    )
-    assert current["inventory"]["release_asset_candidate_bytes"] == 0
+    assert architecture_budget_errors(current) == []
 
 
 def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) -> None:
@@ -39,6 +39,24 @@ def test_architecture_inventory_ignores_generated_egg_info(tmp_path: Path) -> No
     metadata.mkdir()
     (metadata / "PKG-INFO").write_bytes(b"generated")
     assert _checkout_size(tmp_path) == 1
+
+
+def test_root_import_is_lazy_and_within_budget() -> None:
+    payload = build_inventory()
+    payload["import_measurement"] = measure_import(repeats=3)
+    assert architecture_budget_errors(payload) == []
+
+
+def test_wheel_audit_rejects_nonpackage_payload(tmp_path: Path) -> None:
+    wheel = tmp_path / "lmx-test.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("lmx/__init__.py", "")
+        archive.writestr("lmx-1.dist-info/METADATA", "")
+        archive.writestr("benchmarks/raw.bin", b"large output")
+    assert inspect_wheel(wheel)["forbidden_members"] == ["benchmarks/raw.bin"]
+    assert "outside lmx/" in architecture_budget_errors(
+        build_inventory(), wheel=wheel
+    )[0]
 
 
 def test_every_workflow_is_curated() -> None:

@@ -7,7 +7,7 @@ it after any module, public API, curated example, dependency, or large generated
 asset changes:
 
 ```bash
-uv run --locked --extra dev python scripts/audit_architecture.py --measure-import
+uv run --locked --extra dev python scripts/audit_architecture.py --check --measure-import
 ```
 
 The current classified baseline is 45 package modules and 36,545 total package
@@ -37,6 +37,12 @@ python scripts/manage_release_assets.py --verify-archive PATH_TO_ARCHIVE
 
 New generated files above 128 KiB fail the manifest check until deliberately
 assigned to a new versioned asset release.
+
+The architecture gate also caps the package at 36 modules, 35,500 source lines,
+8,500 maintained-core lines, 30 root exports, 12 curated examples, a 4 MiB
+tracked checkout, and a 0.25 s median lazy root import. Release builds cap the
+wheel at 384 KiB and reject benchmark, documentation, or generated payloads
+outside `lmx/` and wheel metadata.
 
 ## Architecture
 

@@ -11,6 +11,7 @@ import statistics
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,6 @@ EXCLUDED_RELATIVE_FILES = {"provenance/architecture-baseline.json"}
 
 RESEARCH_STAGE = {
     "autodiff.py",
-    "fringing.py",
     "fringing.py",
     "_fringing_types.py",
     "q2d.py",
@@ -83,9 +83,31 @@ def _root_exports(root: Path) -> list[str]:
     raise ValueError("lmx.__all__ must be a literal list for architecture auditing")
 
 
+def _tracked_files(root: Path) -> list[Path] | None:
+    """Return live Git-tracked files, or ``None`` outside a worktree."""
+
+    completed = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+    return [
+        root / item.decode()
+        for item in completed.stdout.split(b"\0")
+        if item and (root / item.decode()).is_file()
+    ]
+
+
 def _checkout_size(root: Path) -> int:
+    """Measure tracked checkout bytes without counting local build products."""
+
     total = 0
-    for path in root.rglob("*"):
+    tracked = _tracked_files(root)
+    paths = tracked if tracked is not None else root.rglob("*")
+    for path in paths:
         relative = path.relative_to(root)
         if (
             not path.is_file()
@@ -215,24 +237,33 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             },
         },
         "targets": {
-            "maintained_core_lines_max": 15000,
+            "package_module_count_max": 36,
+            "total_package_lines_max": 35500,
+            "maintained_core_lines_max": 8500,
             "stable_root_exports_max": 30,
-            "curated_examples_max": 20,
-            "checkout_bytes_max": 10 * 1024 * 1024,
-            "new_module_lines_max": 1000,
+            "curated_examples_max": 12,
+            "checkout_bytes_max": 4 * 1024 * 1024,
+            "root_import_median_seconds_max": 0.25,
+            "wheel_bytes_max": 384 * 1024,
         },
     }
 
 
 def measure_import(root: Path = ROOT, repeats: int = 5) -> dict[str, Any]:
     samples = []
-    command = [sys.executable, "-c", "import lmx"]
+    command = [
+        sys.executable,
+        "-c",
+        "import sys, lmx; print(int('jax' in sys.modules))",
+    ]
+    jax_loaded = False
     for _ in range(repeats):
         started = time.perf_counter()
         completed = subprocess.run(command, cwd=root, capture_output=True, check=False)
         elapsed = time.perf_counter() - started
         if completed.returncode != 0:
             raise ValueError(completed.stderr.decode(errors="replace"))
+        jax_loaded |= completed.stdout.strip() == b"1"
         samples.append(elapsed)
     return {
         "command": "python -c 'import lmx'",
@@ -240,7 +271,72 @@ def measure_import(root: Path = ROOT, repeats: int = 5) -> dict[str, Any]:
         "median_seconds": statistics.median(samples),
         "min_seconds": min(samples),
         "max_seconds": max(samples),
+        "jax_loaded": jax_loaded,
     }
+
+
+def inspect_wheel(path: str | Path) -> dict[str, Any]:
+    """Return wheel size and flag files outside the package/metadata roots."""
+
+    wheel = Path(path)
+    with zipfile.ZipFile(wheel) as archive:
+        members = [name for name in archive.namelist() if not name.endswith("/")]
+    forbidden = [
+        name
+        for name in members
+        if not (name.startswith("lmx/") or ".dist-info/" in name)
+    ]
+    return {
+        "path": wheel.name,
+        "bytes": wheel.stat().st_size,
+        "member_count": len(members),
+        "forbidden_members": forbidden,
+    }
+
+
+def architecture_budget_errors(
+    payload: dict[str, Any], *, wheel: str | Path | None = None
+) -> list[str]:
+    """Validate inventory, optional import timing, and optional wheel budgets."""
+
+    inventory = payload["inventory"]
+    targets = payload["targets"]
+    checks = {
+        "package_module_count": "package_module_count_max",
+        "total_package_lines": "total_package_lines_max",
+        "maintained_core_lines": "maintained_core_lines_max",
+        "root_export_count": "stable_root_exports_max",
+        "curated_example_count": "curated_examples_max",
+        "checkout_bytes_excluding_build_artifacts": "checkout_bytes_max",
+    }
+    errors = [
+        f"{value_key}={inventory[value_key]} exceeds {target_key}={targets[target_key]}"
+        for value_key, target_key in checks.items()
+        if inventory[value_key] > targets[target_key]
+    ]
+    if inventory["uncurated_example_count"]:
+        errors.append("all examples must be listed in examples/catalog.toml")
+    if inventory["release_asset_candidate_bytes"]:
+        errors.append("generated release assets must not be tracked in Git")
+    measurement = payload.get("import_measurement")
+    if measurement is not None:
+        if measurement["median_seconds"] > targets["root_import_median_seconds_max"]:
+            errors.append("root import exceeds its median wall-time budget")
+        if measurement["jax_loaded"]:
+            errors.append("import lmx must not eagerly import JAX")
+    if wheel is not None:
+        wheel_record = inspect_wheel(wheel)
+        if wheel_record["bytes"] > targets["wheel_bytes_max"]:
+            errors.append(
+                f"wheel bytes={wheel_record['bytes']} exceeds "
+                f"wheel_bytes_max={targets['wheel_bytes_max']}"
+            )
+        if wheel_record["forbidden_members"]:
+            errors.append(
+                "wheel contains files outside lmx/ and dist-info/: "
+                + ", ".join(wheel_record["forbidden_members"])
+            )
+    return errors
 
 
 def write_inventory(
@@ -264,8 +360,19 @@ def main() -> int:
         default=Path("provenance/architecture-baseline.json"),
     )
     parser.add_argument("--measure-import", action="store_true")
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--wheel", type=Path)
     args = parser.parse_args()
-    payload = write_inventory(args.output, measure=args.measure_import)
+    payload = build_inventory()
+    if args.measure_import:
+        payload["import_measurement"] = measure_import()
+    if not args.check:
+        write_inventory(args.output, measure=args.measure_import)
+    errors = architecture_budget_errors(payload, wheel=args.wheel)
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     inventory = payload["inventory"]
     print(
         f"modules={inventory['package_module_count']} "
@@ -274,6 +381,9 @@ def main() -> int:
         f"exports={inventory['root_export_count']} "
         f"curated_examples={inventory['curated_example_count']}"
     )
+    if args.wheel is not None:
+        wheel = inspect_wheel(args.wheel)
+        print(f"wheel_bytes={wheel['bytes']} wheel_members={wheel['member_count']}")
     return 0
 
 
