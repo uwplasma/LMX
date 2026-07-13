@@ -62,5 +62,18 @@
     "budget_seconds": 600,
     "passed_all_gates": true
   },
+  "rejected_axisymmetric_direct_modal": {
+    "standalone_cpu_gpu_equivalence_passed": true,
+    "grid_7x9x16": {
+      "first_seconds": 61.37968914798694,
+      "restart_seconds": 6.465135411010124,
+      "restart_divergence_residual": 9.052941430059188e-6,
+      "accepted_first_seconds": 52.67098516901024,
+      "accepted_restart_seconds": 6.282273991033435
+    },
+    "grid_11x17x32": "CUDA core dump during modal setup before first checkpoint",
+    "reason": "Repeated tridiagonal dispatch regressed the small gate and was not robust at medium scale",
+    "retained_in_source": false
+  },
   "rejected_point_diagonal_restart_divergence": 8.27462
 }

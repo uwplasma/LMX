@@ -337,6 +337,13 @@ medium-grid setup failure; it does not change the decision to run independent
 B1 variants on the two GPUs or yet claim the full coarse refinement gate.
 The source-matched portable gate passes 908 tests with 8 expected external-data
 skips and 95.03% branch coverage in 202.0 seconds.
+An exact axisymmetric FFT/radial-tridiagonal replacement for the modal momentum
+inverse is also rejected and removed. Its standalone CPU/GPU solve agrees with
+the iterative block, but repeated GPU dispatch regresses the `7 x 9 x 16` gate
+from `52.67/6.28 s` to `61.38/6.47 s` cold/restart, and the `11 x 17 x 32`
+worker core-dumps during modal setup. A scalable replacement must assemble the
+retained Fourier blocks directly or fuse their batched solve; invoking a full
+transform and tridiagonal solve for every modal basis vector is not viable.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is

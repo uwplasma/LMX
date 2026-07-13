@@ -1372,6 +1372,12 @@ wall time is acceptable.
    setup to the full coarse physics and one-hour runtime gates. The locked
    portable gate passes 908 tests with 8 expected external-data skips and
    95.03% branch coverage in 202.0 seconds, well inside the ten-minute cap.
+   A direct axisymmetric FFT/radial-tridiagonal modal inverse is exact in
+   isolation but rejected and removed: repeated dispatch regresses the
+   `7 x 9 x 16` gate from `52.67/6.28 s` to `61.38/6.47 s`, and the
+   `11 x 17 x 32` worker core-dumps during setup. The next coarse-grid design
+   must assemble the retained `m=0,2` blocks directly or fuse a bounded batch;
+   it must not invoke a full transform/solve for every modal basis vector.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
