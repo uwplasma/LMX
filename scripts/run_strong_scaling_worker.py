@@ -1,13 +1,25 @@
 from __future__ import annotations
 
+# ruff: noqa: E402 -- repository-root bootstrap must precede project imports.
+
 import argparse
 import json
 from pathlib import Path
+import sys
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import lmx
 from lmx.scaling import (
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
 )
+
+if ROOT not in Path(lmx.__file__).resolve().parents:
+    raise RuntimeError(
+        f"Scaling worker imported LMX outside its source tree: {lmx.__file__}"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
