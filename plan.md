@@ -1387,6 +1387,13 @@ wall time is acceptable.
    experimental branch; before the full coarse allocation, strengthen axial
    coarse coupling so iterations do not grow with station count. Evidence is
    in `benchmarks/results/b1-retained-modal-blocks-20260713.json`.
+   Wider five-band axial grouping (`204.04 s`, 192 iterations) and an exact
+   axial-radial modal momentum inverse (`146.13 s`, 192 iterations) are both
+   rejected and removed: neither changes the iteration floor. Fixed loose
+   Krylov tolerances are also closed; `1e-8` saves no work, while `1e-6` and
+   `3e-7` cause the next coupled projection to fail its physical residual gate.
+   Preserve the strict tolerance and next test pressure-state reuse or a true
+   pressure coarse-space improvement.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

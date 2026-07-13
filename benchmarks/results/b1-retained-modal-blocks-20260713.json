@@ -46,6 +46,48 @@
     "first_projection_converged": true,
     "two_step_240_second_cap_passed": false
   },
+  "rejected_iteration_floor_experiments": {
+    "five_band_axial_grouping": {
+      "projection_seconds": 204.04,
+      "projection_iterations": 192,
+      "reason": "retaining the plus/minus-two axial bands did not change the iteration ceiling and increased compile/runtime cost"
+    },
+    "exact_axial_radial_modal_momentum_inverse": {
+      "projection_seconds": 146.134,
+      "projection_iterations": 192,
+      "reason": "the exact retained-mode momentum inverse did not change the iteration ceiling"
+    },
+    "fixed_loose_krylov_tolerance": {
+      "tolerance_1e-8": {
+        "first_projection_seconds": 137.2436,
+        "first_projection_iterations": 192,
+        "first_projection_residual": 4.463e-6
+      },
+      "tolerance_1e-6": {
+        "first_projection_seconds": 71.231,
+        "first_projection_iterations": 80,
+        "second_projection_seconds": 117.1832,
+        "second_projection_iterations": 192,
+        "second_projection_residual": 0.08404,
+        "second_projection_converged": false
+      },
+      "tolerance_3e-7": {
+        "first_projection_seconds": 115.578,
+        "first_projection_iterations": 161,
+        "second_projection_seconds": 115.5041,
+        "second_projection_iterations": 192,
+        "second_projection_residual": 0.20102,
+        "second_projection_converged": false
+      },
+      "tolerance_1e-7": {
+        "first_projection_seconds": 186.0578,
+        "first_projection_iterations": 175,
+        "first_projection_residual": 3.73e-6,
+        "two_projection_300_second_cap_passed": false
+      },
+      "reason": "loosening the fixed algebraic tolerance either saved no work or destabilized the next coupled projection"
+    }
+  },
   "decision": {
     "setup_builder": "accepted for continued branch development",
     "production_default": false,

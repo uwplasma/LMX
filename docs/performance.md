@@ -356,6 +356,15 @@ iterations, and the two-step worker exceeds 240 seconds. The setup design is
 therefore retained on the experimental branch, while production promotion and
 the full coarse run wait for a stronger axial coarse correction.
 
+Three bounded follow-ups isolate that remaining floor. Keeping the next-nearest
+axial bands still takes 192 iterations and regresses the projection to
+`204.04 s`; an exact axial-radial retained-mode momentum inverse likewise stays
+at 192 iterations (`146.13 s`). Fixed looser Krylov tolerances are unsafe:
+`1e-8` saves no iterations, while `1e-6` and `3e-7` make the following coupled
+projection fail its physical balance gate. These prototypes are removed. The
+next optimization must improve or reuse the pressure coarse state without
+weakening the per-projection physics criterion.
+
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
 published for review as [SOLVAX PR #12](https://github.com/uwplasma/SOLVAX/pull/12),
