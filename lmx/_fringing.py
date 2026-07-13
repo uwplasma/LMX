@@ -2659,17 +2659,12 @@ def _steady_stokes_projection_pipe(
     dtheta: float,
     pressure_iterations: int,
     pressure_tolerance: float,
-    restart: int = 16,
-    max_restarts: int = 2,
-    use_pressure_preconditioner: bool = True,
-    flow_constraint_scale: float = 1.0,
+    restart: int = 64,
+    max_restarts: int = 8,
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
-    axisymmetric_deflation: bool = False,
-    azimuthal_mode_two_deflation: bool = False,
-    separable_modal_blocks: bool = False,
-    rhie_chow: bool = False,
-    orthonormal_pressure: bool = False,
+    modal_stabilization: bool = False,
+    physical_tolerance: float | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Apply the compatible steady ``D A^-1 G`` pipe projection."""
 
@@ -2698,7 +2693,7 @@ def _steady_stokes_projection_pipe(
 
     def unpack_pressure(reduced):
         reduced = reduced.reshape((u.shape[0], cross_section_size - 1))
-        if orthonormal_pressure:
+        if modal_stabilization:
             transformed = reflect(
                 jnp.concatenate(
                     (reduced, jnp.zeros((u.shape[0], 1), dtype=reduced.dtype)), axis=1
@@ -2711,7 +2706,7 @@ def _steady_stokes_projection_pipe(
         return jnp.concatenate((reduced, final[:, None]), axis=1).reshape(u.shape)
 
     def reduce_field(field):
-        if orthonormal_pressure:
+        if modal_stabilization:
             transformed = reflect(sqrt_area * field.reshape(flat_area.shape))
             return transformed[:, :-1].reshape(-1)
         return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
@@ -2781,38 +2776,33 @@ def _steady_stokes_projection_pipe(
         mean_divergence = jnp.sum(
             divergence * cell_area, axis=(1, 2), keepdims=True
         ) / jnp.maximum(area_sum, 1.0e-20)
-        flow = flow_constraint_scale * jnp.sum(state_u * cell_area, axis=(1, 2))
+        flow = jnp.sum(state_u * cell_area, axis=(1, 2))
         return jnp.concatenate((reduce_field(divergence - mean_divergence), flow))
 
     base_constraints = constraints(u, v, w)
-    rhs = -base_constraints.at[pressure_size:].add(
-        -flow_constraint_scale * target_flow_rate
-    )
+    rhs = -base_constraints.at[pressure_size:].add(-target_flow_rate)
 
     def schur(state):
         response = velocity_response(state)
-        if not rhie_chow:
+        if not modal_stabilization:
             return constraints(*response)
         pressure = unpack_pressure(state[:pressure_size])
         return constraints(*response, faces=rhie_chow_faces(pressure, response))
 
     def local_precondition(residual):
         divergence = unpack_pressure(residual[:pressure_size])
-        if use_pressure_preconditioner:
-            pressure, *_ = _solvax_pressure_poisson_pipe(
-                -divergence,
-                pressure_mobility,
-                dx=dx,
-                r_faces=r_faces,
-                r_centers=r_centers,
-                dtheta=dtheta,
-                iterations=pressure_iterations,
-                tolerance=pressure_tolerance,
-                include_theta_fft_line=True,
-            )
-        else:
-            pressure = jnp.zeros_like(divergence)
-        flow_residual = residual[pressure_size:] / flow_constraint_scale
+        pressure, *_ = _solvax_pressure_poisson_pipe(
+            -divergence,
+            pressure_mobility,
+            dx=dx,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            iterations=pressure_iterations,
+            tolerance=pressure_tolerance,
+            include_theta_fft_line=True,
+        )
+        flow_residual = residual[pressure_size:]
         pressure_loss = (
             jnp.linalg.solve(flow_response_matrix, flow_residual)
             if flow_response_matrix is not None
@@ -2820,12 +2810,10 @@ def _steady_stokes_projection_pipe(
         )
         return jnp.concatenate((reduce_field(pressure), pressure_loss))
 
-    if axisymmetric_deflation:
+    if modal_stabilization:
         radial_weights = jnp.sum(cell_area, axis=2)
         coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
-        mode_two_size = (
-            2 * u.shape[0] * u.shape[1] if azimuthal_mode_two_deflation else 0
-        )
+        mode_two_size = 2 * u.shape[0] * u.shape[1]
         coarse_size = coarse_pressure_size + mode_two_size + u.shape[0]
         theta = jnp.arange(u.shape[2], dtype=u.dtype) * dtheta
         mode_two_cosine = jnp.cos(2.0 * theta)
@@ -2840,21 +2828,18 @@ def _steady_stokes_projection_pipe(
                 jnp.concatenate((radial, final[:, None]), axis=1)[:, :, None],
                 u.shape,
             )
-            if azimuthal_mode_two_deflation:
-                offset = coarse_pressure_size
-                mode_shape = (u.shape[0], u.shape[1])
-                cosine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
-                    mode_shape
-                )
-                offset += u.shape[0] * u.shape[1]
-                sine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
-                    mode_shape
-                )
-                pressure = (
-                    pressure
-                    + cosine[:, :, None] * mode_two_cosine[None, None, :]
-                    + sine[:, :, None] * mode_two_sine[None, None, :]
-                )
+            offset = coarse_pressure_size
+            mode_shape = (u.shape[0], u.shape[1])
+            cosine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
+                mode_shape
+            )
+            offset += u.shape[0] * u.shape[1]
+            sine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(mode_shape)
+            pressure = (
+                pressure
+                + cosine[:, :, None] * mode_two_cosine[None, None, :]
+                + sine[:, :, None] * mode_two_sine[None, None, :]
+            )
             return jnp.concatenate(
                 (
                     reduce_field(pressure),
@@ -2864,159 +2849,93 @@ def _steady_stokes_projection_pipe(
 
         def restrict(residual):
             divergence = unpack_pressure(residual[:pressure_size])
-            restricted = [jnp.mean(divergence, axis=2)[:, :-1].reshape(-1)]
-            if azimuthal_mode_two_deflation:
-                restricted.extend(
-                    (
-                        (2.0 * jnp.mean(divergence * mode_two_cosine, axis=2)).reshape(
-                            -1
-                        ),
-                        (2.0 * jnp.mean(divergence * mode_two_sine, axis=2)).reshape(
-                            -1
-                        ),
-                    )
+            return jnp.concatenate(
+                (
+                    jnp.mean(divergence, axis=2)[:, :-1].reshape(-1),
+                    (2.0 * jnp.mean(divergence * mode_two_cosine, axis=2)).reshape(-1),
+                    (2.0 * jnp.mean(divergence * mode_two_sine, axis=2)).reshape(-1),
+                    residual[pressure_size:],
                 )
-            restricted.append(residual[pressure_size:])
-            return jnp.concatenate(restricted)
-
-        if separable_modal_blocks:
-            local_size = (
-                u.shape[1] - 1 + (2 * u.shape[1] if azimuthal_mode_two_deflation else 0)
-            )
-            local_basis = jnp.eye(local_size, dtype=u.dtype)
-
-            def station_prolong(station, local):
-                coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
-                radial = coarse[:coarse_pressure_size].reshape(
-                    (u.shape[0], u.shape[1] - 1)
-                )
-                radial = radial.at[station].set(local[: u.shape[1] - 1])
-                coarse = coarse.at[:coarse_pressure_size].set(radial.reshape(-1))
-                if azimuthal_mode_two_deflation:
-                    offset = coarse_pressure_size
-                    modes = coarse[offset : offset + mode_two_size].reshape(
-                        (2, u.shape[0], u.shape[1])
-                    )
-                    modes = modes.at[:, station].set(
-                        local[u.shape[1] - 1 :].reshape((2, u.shape[1]))
-                    )
-                    coarse = coarse.at[offset : offset + mode_two_size].set(
-                        modes.reshape(-1)
-                    )
-                return prolong(coarse)
-
-            def station_restrict(station, residual):
-                coarse = restrict(residual)
-                radial = coarse[:coarse_pressure_size].reshape(
-                    (u.shape[0], u.shape[1] - 1)
-                )[station]
-                if not azimuthal_mode_two_deflation:
-                    return radial
-                modes = coarse[
-                    coarse_pressure_size : coarse_pressure_size + mode_two_size
-                ].reshape((2, u.shape[0], u.shape[1]))
-                return jnp.concatenate((radial, modes[:, station].reshape(-1)))
-
-            modal_blocks = jax.vmap(
-                lambda station: (
-                    jax.vmap(
-                        lambda basis: station_restrict(
-                            station, schur(station_prolong(station, basis))
-                        )
-                    )(local_basis).T
-                )
-            )(jnp.arange(u.shape[0]))
-
-            def modal_restrict(residual):
-                coarse = restrict(residual)
-                radial = coarse[:coarse_pressure_size].reshape(
-                    (u.shape[0], u.shape[1] - 1)
-                )
-                if not azimuthal_mode_two_deflation:
-                    return radial
-                modes = coarse[
-                    coarse_pressure_size : coarse_pressure_size + mode_two_size
-                ].reshape((2, u.shape[0], u.shape[1]))
-                return jnp.concatenate(
-                    (radial, jnp.swapaxes(modes, 0, 1).reshape((u.shape[0], -1))),
-                    axis=1,
-                )
-
-            def modal_prolong(local):
-                coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
-                coarse = coarse.at[:coarse_pressure_size].set(
-                    local[:, : u.shape[1] - 1].reshape(-1)
-                )
-                if azimuthal_mode_two_deflation:
-                    modes = local[:, u.shape[1] - 1 :].reshape(
-                        (u.shape[0], 2, u.shape[1])
-                    )
-                    coarse = coarse.at[
-                        coarse_pressure_size : coarse_pressure_size + mode_two_size
-                    ].set(jnp.swapaxes(modes, 0, 1).reshape(-1))
-                return prolong(coarse)
-
-            def precondition(residual):
-                local = local_precondition(residual)
-                modal_residual = modal_restrict(residual - schur(local))
-                modal_correction = jax.vmap(jnp.linalg.solve)(
-                    modal_blocks, modal_residual
-                )
-                candidate = local + modal_prolong(modal_correction)
-                flow_residual = (residual - schur(candidate))[pressure_size:]
-                flow_response = (
-                    jnp.linalg.solve(
-                        flow_response_matrix,
-                        flow_residual / flow_constraint_scale,
-                    )
-                    if flow_response_matrix is not None
-                    else flow_residual
-                    / flow_constraint_scale
-                    / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
-                )
-                return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(
-                    flow_response
-                )
-
-        else:
-            coarse_basis = jnp.eye(coarse_size, dtype=u.dtype)
-            coarse_action = jax.vmap(lambda basis: restrict(schur(prolong(basis))))(
-                coarse_basis
-            ).T
-            coarse_row_scale = jnp.maximum(
-                jnp.linalg.norm(coarse_action, axis=1), 1.0e-30
-            )
-            coarse_column_scale = jnp.maximum(
-                jnp.linalg.norm(coarse_action, axis=0), 1.0e-30
-            )
-            scaled_coarse_action = (
-                coarse_action / coarse_row_scale[:, None] / coarse_column_scale[None, :]
             )
 
-            def precondition(residual):
-                local = local_precondition(residual)
-                coarse_residual = restrict(residual - schur(local))
-                coarse_correction = (
-                    jnp.linalg.solve(
-                        scaled_coarse_action, coarse_residual / coarse_row_scale
+        local_size = 3 * u.shape[1] - 1
+        local_basis = jnp.eye(local_size, dtype=u.dtype)
+
+        def station_prolong(station, local):
+            coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
+            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
+            radial = radial.at[station].set(local[: u.shape[1] - 1])
+            coarse = coarse.at[:coarse_pressure_size].set(radial.reshape(-1))
+            offset = coarse_pressure_size
+            modes = coarse[offset : offset + mode_two_size].reshape(
+                (2, u.shape[0], u.shape[1])
+            )
+            modes = modes.at[:, station].set(
+                local[u.shape[1] - 1 :].reshape((2, u.shape[1]))
+            )
+            coarse = coarse.at[offset : offset + mode_two_size].set(modes.reshape(-1))
+            return prolong(coarse)
+
+        def station_restrict(station, residual):
+            coarse = restrict(residual)
+            radial = coarse[:coarse_pressure_size].reshape(
+                (u.shape[0], u.shape[1] - 1)
+            )[station]
+            modes = coarse[
+                coarse_pressure_size : coarse_pressure_size + mode_two_size
+            ].reshape((2, u.shape[0], u.shape[1]))
+            return jnp.concatenate((radial, modes[:, station].reshape(-1)))
+
+        modal_blocks = jax.vmap(
+            lambda station: (
+                jax.vmap(
+                    lambda basis: station_restrict(
+                        station, schur(station_prolong(station, basis))
                     )
-                    / coarse_column_scale
-                )
-                return local + prolong(coarse_correction)
+                )(local_basis).T
+            )
+        )(jnp.arange(u.shape[0]))
+
+        def modal_restrict(residual):
+            coarse = restrict(residual)
+            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
+            modes = coarse[
+                coarse_pressure_size : coarse_pressure_size + mode_two_size
+            ].reshape((2, u.shape[0], u.shape[1]))
+            return jnp.concatenate(
+                (radial, jnp.swapaxes(modes, 0, 1).reshape((u.shape[0], -1))), axis=1
+            )
+
+        def modal_prolong(local):
+            coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
+            coarse = coarse.at[:coarse_pressure_size].set(
+                local[:, : u.shape[1] - 1].reshape(-1)
+            )
+            modes = local[:, u.shape[1] - 1 :].reshape((u.shape[0], 2, u.shape[1]))
+            coarse = coarse.at[
+                coarse_pressure_size : coarse_pressure_size + mode_two_size
+            ].set(jnp.swapaxes(modes, 0, 1).reshape(-1))
+            return prolong(coarse)
+
+        def precondition(residual):
+            local = local_precondition(residual)
+            modal_residual = modal_restrict(residual - schur(local))
+            modal_correction = jax.vmap(jnp.linalg.solve)(modal_blocks, modal_residual)
+            candidate = local + modal_prolong(modal_correction)
+            flow_residual = (residual - schur(candidate))[pressure_size:]
+            flow_response = (
+                jnp.linalg.solve(flow_response_matrix, flow_residual)
+                if flow_response_matrix is not None
+                else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
+            )
+            return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(
+                flow_response
+            )
 
     else:
         precondition = local_precondition
 
     preconditioned_rhs = precondition(rhs)
-    if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
-        preconditioned_residual = schur(preconditioned_rhs) - rhs
-        print(
-            "B1 compatible preconditioner:",
-            float(jnp.linalg.norm(rhs)),
-            float(jnp.linalg.norm(preconditioned_residual)),
-            float(jnp.linalg.norm(preconditioned_residual[pressure_size:])),
-            float(jnp.mean(preconditioned_rhs[pressure_size:])),
-        )
     pressure_solution = gmres(
         schur,
         rhs,
@@ -3055,7 +2974,7 @@ def _steady_stokes_projection_pipe(
         )
     final_flow = jnp.sum(projected[0] * cell_area, axis=(1, 2))
     projected_faces = _pipe_velocity_faces(*projected)
-    if rhie_chow:
+    if modal_stabilization:
         response_faces = rhie_chow_faces(pressure, correction)
         projected_faces = tuple(
             base + response
@@ -3072,20 +2991,26 @@ def _steady_stokes_projection_pipe(
         final_divergence * cell_area, axis=(1, 2), keepdims=True
     ) / jnp.maximum(area_sum, 1.0e-30)
     final_mean_free_divergence = final_divergence - final_mean_divergence
-    if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
-        print(
-            "B1 compatible divergence:",
-            float(jnp.max(jnp.abs(final_mean_divergence))),
-            float(jnp.max(jnp.abs(final_mean_free_divergence))),
-            np.asarray(final_mean_divergence[:, 0, 0]).tolist(),
-            np.asarray(final_flow - target_flow_rate).tolist(),
-        )
+    divergence_residual = jnp.max(jnp.abs(final_mean_free_divergence))
+    flow_residual = jnp.max(jnp.abs(final_flow - target_flow_rate))
+    normalized_flow_residual = flow_residual / jnp.maximum(jnp.mean(area_sum), 1.0e-30)
+    physical_residual = jnp.maximum(divergence_residual, normalized_flow_residual)
+    convergence_tolerance = (
+        pressure_tolerance if physical_tolerance is None else physical_tolerance
+    )
+    pressure_solution = KrylovSolution(
+        pressure_solution.x,
+        physical_residual,
+        pressure_solution.iterations,
+        physical_residual <= convergence_tolerance,
+        pressure_solution.recycle,
+    )
     return (
         *projected,
         pressure,
         pressure_loss,
-        jnp.max(jnp.abs(final_mean_free_divergence)),
-        jnp.max(jnp.abs(final_flow - target_flow_rate)),
+        divergence_residual,
+        flow_residual,
         pressure_solution,
     )
 
@@ -5638,7 +5563,7 @@ def _solve_extruded_projection(
                 kernel_key, jax.jit(diffusion_system_solve)
             )
             steady_reaction = (
-                float(os.environ.get("LMX_B1_STEADY_REACTION_SCALE", "2"))
+                2.0
                 * sigma[:, :count, :]
                 * (
                     bx[:, :count, :] ** 2
@@ -5843,52 +5768,14 @@ def _solve_extruded_projection(
                         r_centers=centers,
                         dtheta=dtheta,
                         pressure_iterations=projection_iterations,
-                        pressure_tolerance=float(
-                            os.environ.get(
-                                "LMX_B1_STOKES_TOLERANCE", momentum_tolerance
-                            )
-                        ),
-                        restart=int(os.environ.get("LMX_B1_STOKES_RESTART", "16")),
-                        max_restarts=int(os.environ.get("LMX_B1_STOKES_RESTARTS", "2")),
-                        use_pressure_preconditioner=os.environ.get(
-                            "LMX_B1_STOKES_NO_PRECONDITIONER"
-                        )
-                        != "1",
-                        flow_constraint_scale=float(
-                            os.environ.get("LMX_B1_STOKES_FLOW_SCALE", "1")
-                        ),
+                        pressure_tolerance=momentum_tolerance,
                         flow_response_matrix=flow_response_matrix,
                         pressure_preconditioner_mobility=(
                             pressure_preconditioner_mobility
                         ),
-                        axisymmetric_deflation=os.environ.get(
-                            "LMX_B1_STOKES_AXISYMMETRIC_DEFLATION"
-                        )
-                        == "1",
-                        azimuthal_mode_two_deflation=os.environ.get(
-                            "LMX_B1_STOKES_MODE_TWO_DEFLATION"
-                        )
-                        == "1",
-                        separable_modal_blocks=os.environ.get(
-                            "LMX_B1_STOKES_SEPARABLE_MODAL_BLOCKS"
-                        )
-                        == "1",
-                        rhie_chow=os.environ.get("LMX_B1_STOKES_RHIE_CHOW") == "1",
-                        orthonormal_pressure=os.environ.get(
-                            "LMX_B1_STOKES_ORTHONORMAL_PRESSURE"
-                        )
-                        == "1",
+                        modal_stabilization=True,
+                        physical_tolerance=ALEX_BALANCE_TOLERANCE,
                     )
-                    if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
-                        print(
-                            "B1 compatible Stokes:",
-                            int(steady_projection[-1].iterations),
-                            float(steady_projection[-1].residual_norm),
-                            bool(steady_projection[-1].converged),
-                            float(steady_projection[5]),
-                            float(steady_projection[6]),
-                            float(jnp.max(jnp.abs(steady_projection[0]))),
-                        )
                     u_next = (
                         jnp.zeros_like(u).at[:, :count, :].set(steady_projection[0])
                     )
