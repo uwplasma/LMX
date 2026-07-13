@@ -326,9 +326,10 @@ inverse: it preserves radial/azimuthal diffusion and the axial diagonal while
 dropping only neighboring-station momentum couplings during preconditioner
 construction. The solved Schur operator remains exact. Sequential assembly
 also avoids the GPU compiler failure caused by batching every axial response
-and modal probe into one graph. On one A4000, the `11 x 17 x 32` two-step gate
-completes in `87.42 s` cold and `24.10 s` from restart, with mean flow
-`1.00000000018`, charge residual `1.97e-9`, and divergence residual `7.15e-6`.
+and modal probe into one graph. The exact-commit A4000 ladder has restart times
+of `6.28`, `13.28`, and `24.69 s` at `7 x 9 x 16`, `9 x 13 x 24`, and
+`11 x 17 x 32`. The finest restart has mean flow `0.99999999970`, charge
+residual `2.05e-9`, and divergence residual `7.48e-6`.
 The point-diagonal alternative reached divergence `8.27` and remains rejected.
 Compact evidence is in
 `benchmarks/results/b1-local-modal-setup-20260713.json`. This closes the

@@ -1,7 +1,14 @@
 {
+  "import_measurement": {
+    "command": "python -c 'import lmx'",
+    "max_seconds": 0.0262117920210585,
+    "median_seconds": 0.022232791990973055,
+    "min_seconds": 0.020474124990869313,
+    "repeats": 5
+  },
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 7284124,
-    "checkout_bytes_excluding_release_candidates": 7284124,
+    "checkout_bytes_excluding_build_artifacts": 7341727,
+    "checkout_bytes_excluding_release_candidates": 7341727,
     "completed_workflow_disposition_count": 85,
     "curated_example_count": 11,
     "curated_examples": [
@@ -218,8 +225,8 @@
         "role": "research_stage_extension"
       },
       {
-        "bytes": 251722,
-        "lines": 6899,
+        "bytes": 284482,
+        "lines": 7743,
         "owner": "research_stage_extension",
         "path": "lmx/_fringing.py",
         "role": "research_stage_extension"
@@ -548,7 +555,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 37122,
+    "total_package_lines": 37966,
     "uncurated_example_count": 0,
     "workflow_disposition_count": 85,
     "workflow_dispositions": [

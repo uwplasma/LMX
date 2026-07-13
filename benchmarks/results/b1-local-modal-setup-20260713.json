@@ -1,10 +1,9 @@
 {
   "schema_version": 1,
   "recorded_at": "2026-07-13",
-  "source_parent": "bb4873f",
+  "source_commit": "a14e3d0",
   "candidate": "sequential axial responses and cross-section block-Jacobi modal momentum",
   "case": "B1-fringing-pipe",
-  "grid": [11, 17, 32],
   "outer_steps": 2,
   "environment": {
     "host": "office",
@@ -13,23 +12,44 @@
     "jax": "0.10.2",
     "precision": "float64"
   },
-  "timing_seconds": {
-    "first": 87.42041795398109,
-    "restart": 24.09873200103175
-  },
-  "physics": {
-    "first_mean_velocity": 0.9999999999668406,
-    "restart_mean_velocity": 1.0000000001844502,
-    "first_charge_residual": 1.9669270726052623e-9,
-    "restart_charge_residual": 1.972006738459875e-9,
-    "restart_divergence_residual": 7.149659571260153e-6,
-    "restart_boundary_current": 0.0
-  },
+  "schedule": "levels 0 and 1 concurrently on separate GPUs; level 2 standalone",
+  "levels": [
+    {
+      "grid": [7, 9, 16],
+      "first_seconds": 52.67098516901024,
+      "restart_seconds": 6.282273991033435,
+      "restart_mean_velocity": 1.0000000017871409,
+      "restart_charge_residual": 6.698238547153679e-9,
+      "restart_divergence_residual": 2.811069999946944e-6,
+      "restart_boundary_current": 0.0,
+      "passed": true
+    },
+    {
+      "grid": [9, 13, 24],
+      "first_seconds": 70.12641824298771,
+      "restart_seconds": 13.280242959037423,
+      "restart_mean_velocity": 1.0000000000110418,
+      "restart_charge_residual": 2.6018582843789773e-9,
+      "restart_divergence_residual": 1.253903286743544e-5,
+      "restart_boundary_current": 0.0,
+      "passed": true
+    },
+    {
+      "grid": [11, 17, 32],
+      "first_seconds": 95.12825146899559,
+      "restart_seconds": 24.688744126004167,
+      "restart_mean_velocity": 0.9999999997005642,
+      "restart_charge_residual": 2.054790636252246e-9,
+      "restart_divergence_residual": 7.4788295089013855e-6,
+      "restart_boundary_current": 0.0,
+      "passed": true
+    }
+  ],
   "acceptance": {
     "completed_bounded_180_second_gate": true,
     "mean_flow_tolerance": 1e-8,
     "balance_tolerance": 1e-3,
-    "passed": true
+    "all_levels_passed": true
   },
   "rejected_point_diagonal_restart_divergence": 8.27462
 }
