@@ -970,6 +970,10 @@ wall time is acceptable.
    versus `26.62 s` cold and `6.85 s` warm for the accepted x/r block. The
    next periodic-line experiment must reuse persistent factors or otherwise
    prove lower apply cost before another production B1 run.
+   Reusing SOLVAX's existing periodic-banded factors passes the manufactured
+   gates but is also rejected: the reduced worker is CPU-bound with the A4000
+   idle after 66 seconds. A viable periodic inverse must retain a fused
+   accelerator apply; general scanned banded LU is not that path.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

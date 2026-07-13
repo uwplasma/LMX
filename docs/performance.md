@@ -320,6 +320,11 @@ cold and `6.85 s` warm without that line. The integration is rejected and
 removed: refactoring the cyclic system inside every PCG application costs more
 than the additional block saves. Revisit it only with persistent reusable
 factors or a demonstrably cheaper periodic accelerator path.
+The existing SOLVAX periodic-banded factors were also tested as a reusable
+theta inverse. Manufactured gates pass, but the reduced worker is CPU-bound
+with the A4000 idle after 66 seconds. That integration is likewise rejected;
+the required reuse must retain a fused accelerator apply rather than falling
+back to scanned general-banded LU.
 
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
