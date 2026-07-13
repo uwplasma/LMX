@@ -5314,7 +5314,11 @@ def _solve_extruded_projection(
                 and flow_error_value <= ALEX_BALANCE_TOLERANCE
                 and charge_balance <= ALEX_BALANCE_TOLERANCE
             )
-            if use_alex_b1_finite_volume and not converged and step + 1 < outer_steps:
+            if (
+                use_alex_b1_finite_volume
+                and (not converged or not stop_on_convergence)
+                and step + 1 < outer_steps
+            ):
                 current_state = jnp.stack((u, v, w, phi_previous)) / fixed_point_scale
                 mapped_state = (
                     jnp.stack((u_next, v_next, w_next, phi)) / fixed_point_scale
@@ -6247,7 +6251,11 @@ def _solve_extruded_projection(
             )
         else:
             converged = instantaneous_convergence
-        if use_alex_b2_finite_volume and not converged and step + 1 < outer_steps:
+        if (
+            use_alex_b2_finite_volume
+            and (not converged or not stop_on_convergence)
+            and step + 1 < outer_steps
+        ):
             current_state = scaled_state(u, v, w, phi_previous)
             mapped_state = scaled_state(u_next, v_next, w_next, phi)
             fixed_point_residual = state_difference(mapped_state, current_state)
