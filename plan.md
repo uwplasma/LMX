@@ -1416,6 +1416,12 @@ wall time is acceptable.
    95.05% branch coverage, and 243.2-second wall time. This preserves the
    ten-minute full-suite contract without adding a test file; the existing
    modal test now exercises both probed and direct production factors.
+   Phase tracing closes the apparent post-projection tail: the first
+   `21 x 24 x 64` solve completes in `270.42 s`, with pressure projections
+   consuming `246.64 s` (91%), first-step setup about 22 seconds, and
+   finalization 1.30 seconds. The previous 360-second cap had entered the
+   restart. Keep the next optimization focused on the 192-iteration pressure
+   ceiling rather than electric or final-diagnostic work.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

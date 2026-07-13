@@ -176,6 +176,16 @@
     "budget_seconds": 600,
     "passed": true
   },
+  "phase_profile_21x24x64": {
+    "first_solve_seconds": 270.4167,
+    "projection_seconds": [135.3395, 111.3028],
+    "projection_iterations": [192, 192],
+    "projection_residuals": [1.6173e-6, 2.693e-5],
+    "outer_step_completion_seconds": [157.6045, 269.1168],
+    "finalization_seconds": 1.2999,
+    "pressure_fraction_percent": 91.2,
+    "conclusion": "the sustained large-grid bottleneck remains pressure Krylov work; the apparent post-projection tail was the start of the restart solve"
+  },
   "decision": {
     "setup_builder": "accepted with separated m=0 through m=4 factors for continued branch development",
     "production_default": false,

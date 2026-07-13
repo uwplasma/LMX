@@ -390,6 +390,12 @@ ceiling are addressed.
 The source-matched portable gate passes 908 tests with 8 expected external-data
 skips and 95.05% branch coverage in 243.2 seconds. The direct production path
 is exercised inside the existing fringing test file; no test file was added.
+A phase trace closes the apparent large post-projection tail. The first
+`21 x 24 x 64` solve completes in `270.42 s`: its two pressure projections take
+`135.34 s` and `111.30 s` (91% of total time), first-step compilation/setup is
+about 22 seconds, and finalization is 1.30 seconds. The prior 360-second worker
+cap was entering the restart, not stuck after projection. Further speed work
+must therefore reduce the 192-iteration pressure ceiling.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
 tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
