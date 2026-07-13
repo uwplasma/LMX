@@ -2,7 +2,7 @@
   "schema_version": 1,
   "recorded_at": "2026-07-13",
   "source_parent": "d3d41a4",
-  "verified_code_commit": "8f94d27",
+  "verified_code_commit": "766f5a7",
   "candidate": "axisymmetric retained m=0,2 modal block assembly",
   "environment": {
     "host": "office",
@@ -172,7 +172,7 @@
     "tests_passed": 908,
     "expected_external_data_skips": 8,
     "branch_coverage_percent": 95.05,
-    "seconds": 243.2,
+    "seconds": 204.3,
     "budget_seconds": 600,
     "passed": true
   },

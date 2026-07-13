@@ -388,7 +388,7 @@ still missed after both projections, so the implementation remains on the
 experimental branch while non-projection runtime and the large iteration
 ceiling are addressed.
 The source-matched portable gate passes 908 tests with 8 expected external-data
-skips and 95.05% branch coverage in 243.2 seconds. The direct production path
+skips and 95.05% branch coverage in 204.3 seconds. The direct production path
 is exercised inside the existing fringing test file; no test file was added.
 A phase trace closes the apparent large post-projection tail. The first
 `21 x 24 x 64` solve completes in `270.42 s`: its two pressure projections take
