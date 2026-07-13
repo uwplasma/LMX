@@ -902,6 +902,7 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
         {
             "axisymmetric_deflation": True,
             "azimuthal_mode_two_deflation": True,
+            "separable_modal_blocks": True,
             "rhie_chow": True,
             "orthonormal_pressure": True,
         },

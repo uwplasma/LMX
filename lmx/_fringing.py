@@ -2667,6 +2667,7 @@ def _steady_stokes_projection_pipe(
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
     axisymmetric_deflation: bool = False,
     azimuthal_mode_two_deflation: bool = False,
+    separable_modal_blocks: bool = False,
     rhie_chow: bool = False,
     orthonormal_pressure: bool = False,
 ) -> tuple[jnp.ndarray, ...]:
@@ -2878,28 +2879,130 @@ def _steady_stokes_projection_pipe(
             restricted.append(residual[pressure_size:])
             return jnp.concatenate(restricted)
 
-        coarse_basis = jnp.eye(coarse_size, dtype=u.dtype)
-        coarse_action = jax.vmap(lambda basis: restrict(schur(prolong(basis))))(
-            coarse_basis
-        ).T
-        coarse_row_scale = jnp.maximum(jnp.linalg.norm(coarse_action, axis=1), 1.0e-30)
-        coarse_column_scale = jnp.maximum(
-            jnp.linalg.norm(coarse_action, axis=0), 1.0e-30
-        )
-        scaled_coarse_action = (
-            coarse_action / coarse_row_scale[:, None] / coarse_column_scale[None, :]
-        )
-
-        def precondition(residual):
-            local = local_precondition(residual)
-            coarse_residual = restrict(residual - schur(local))
-            coarse_correction = (
-                jnp.linalg.solve(
-                    scaled_coarse_action, coarse_residual / coarse_row_scale
-                )
-                / coarse_column_scale
+        if separable_modal_blocks:
+            local_size = (
+                u.shape[1] - 1 + (2 * u.shape[1] if azimuthal_mode_two_deflation else 0)
             )
-            return local + prolong(coarse_correction)
+            local_basis = jnp.eye(local_size, dtype=u.dtype)
+
+            def station_prolong(station, local):
+                coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
+                radial = coarse[:coarse_pressure_size].reshape(
+                    (u.shape[0], u.shape[1] - 1)
+                )
+                radial = radial.at[station].set(local[: u.shape[1] - 1])
+                coarse = coarse.at[:coarse_pressure_size].set(radial.reshape(-1))
+                if azimuthal_mode_two_deflation:
+                    offset = coarse_pressure_size
+                    modes = coarse[offset : offset + mode_two_size].reshape(
+                        (2, u.shape[0], u.shape[1])
+                    )
+                    modes = modes.at[:, station].set(
+                        local[u.shape[1] - 1 :].reshape((2, u.shape[1]))
+                    )
+                    coarse = coarse.at[offset : offset + mode_two_size].set(
+                        modes.reshape(-1)
+                    )
+                return prolong(coarse)
+
+            def station_restrict(station, residual):
+                coarse = restrict(residual)
+                radial = coarse[:coarse_pressure_size].reshape(
+                    (u.shape[0], u.shape[1] - 1)
+                )[station]
+                if not azimuthal_mode_two_deflation:
+                    return radial
+                modes = coarse[
+                    coarse_pressure_size : coarse_pressure_size + mode_two_size
+                ].reshape((2, u.shape[0], u.shape[1]))
+                return jnp.concatenate((radial, modes[:, station].reshape(-1)))
+
+            modal_blocks = jax.vmap(
+                lambda station: (
+                    jax.vmap(
+                        lambda basis: station_restrict(
+                            station, schur(station_prolong(station, basis))
+                        )
+                    )(local_basis).T
+                )
+            )(jnp.arange(u.shape[0]))
+
+            def modal_restrict(residual):
+                coarse = restrict(residual)
+                radial = coarse[:coarse_pressure_size].reshape(
+                    (u.shape[0], u.shape[1] - 1)
+                )
+                if not azimuthal_mode_two_deflation:
+                    return radial
+                modes = coarse[
+                    coarse_pressure_size : coarse_pressure_size + mode_two_size
+                ].reshape((2, u.shape[0], u.shape[1]))
+                return jnp.concatenate(
+                    (radial, jnp.swapaxes(modes, 0, 1).reshape((u.shape[0], -1))),
+                    axis=1,
+                )
+
+            def modal_prolong(local):
+                coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
+                coarse = coarse.at[:coarse_pressure_size].set(
+                    local[:, : u.shape[1] - 1].reshape(-1)
+                )
+                if azimuthal_mode_two_deflation:
+                    modes = local[:, u.shape[1] - 1 :].reshape(
+                        (u.shape[0], 2, u.shape[1])
+                    )
+                    coarse = coarse.at[
+                        coarse_pressure_size : coarse_pressure_size + mode_two_size
+                    ].set(jnp.swapaxes(modes, 0, 1).reshape(-1))
+                return prolong(coarse)
+
+            def precondition(residual):
+                local = local_precondition(residual)
+                modal_residual = modal_restrict(residual - schur(local))
+                modal_correction = jax.vmap(jnp.linalg.solve)(
+                    modal_blocks, modal_residual
+                )
+                candidate = local + modal_prolong(modal_correction)
+                flow_residual = (residual - schur(candidate))[pressure_size:]
+                flow_response = (
+                    jnp.linalg.solve(
+                        flow_response_matrix,
+                        flow_residual / flow_constraint_scale,
+                    )
+                    if flow_response_matrix is not None
+                    else flow_residual
+                    / flow_constraint_scale
+                    / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
+                )
+                return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(
+                    flow_response
+                )
+
+        else:
+            coarse_basis = jnp.eye(coarse_size, dtype=u.dtype)
+            coarse_action = jax.vmap(lambda basis: restrict(schur(prolong(basis))))(
+                coarse_basis
+            ).T
+            coarse_row_scale = jnp.maximum(
+                jnp.linalg.norm(coarse_action, axis=1), 1.0e-30
+            )
+            coarse_column_scale = jnp.maximum(
+                jnp.linalg.norm(coarse_action, axis=0), 1.0e-30
+            )
+            scaled_coarse_action = (
+                coarse_action / coarse_row_scale[:, None] / coarse_column_scale[None, :]
+            )
+
+            def precondition(residual):
+                local = local_precondition(residual)
+                coarse_residual = restrict(residual - schur(local))
+                coarse_correction = (
+                    jnp.linalg.solve(
+                        scaled_coarse_action, coarse_residual / coarse_row_scale
+                    )
+                    / coarse_column_scale
+                )
+                return local + prolong(coarse_correction)
 
     else:
         precondition = local_precondition
@@ -5764,6 +5867,10 @@ def _solve_extruded_projection(
                         == "1",
                         azimuthal_mode_two_deflation=os.environ.get(
                             "LMX_B1_STOKES_MODE_TWO_DEFLATION"
+                        )
+                        == "1",
+                        separable_modal_blocks=os.environ.get(
+                            "LMX_B1_STOKES_SEPARABLE_MODAL_BLOCKS"
                         )
                         == "1",
                         rhie_chow=os.environ.get("LMX_B1_STOKES_RHIE_CHOW") == "1",
