@@ -1130,8 +1130,25 @@ def _line_solvers_3d(
 def _additive_line_preconditioner_3d(
     diagonal: jnp.ndarray,
     directions: tuple[tuple[int, jnp.ndarray, jnp.ndarray], ...],
+    *,
+    periodic_last_axis: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ):
-    line_solves = _line_solvers_3d(diagonal, directions)
+    line_solves = list(_line_solvers_3d(diagonal, directions))
+    if periodic_last_axis is not None:
+        lower, upper = periodic_last_axis
+        off_diagonal = 0.5 * (lower[..., :1] + upper[..., :1])
+        wave = 2.0 * jnp.pi * jnp.fft.rfftfreq(diagonal.shape[-1])
+        eigenvalues = diagonal[..., :1] + 2.0 * off_diagonal * jnp.cos(wave)
+
+        def solve_periodic(residual: jnp.ndarray) -> jnp.ndarray:
+            transformed = jnp.fft.rfft(residual, axis=-1)
+            return jnp.fft.irfft(
+                transformed / eigenvalues,
+                n=diagonal.shape[-1],
+                axis=-1,
+            )
+
+        line_solves.append(solve_periodic)
 
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
         return sum(solve_line(residual) for solve_line in line_solves) / len(
@@ -2305,6 +2322,7 @@ def _solvax_pressure_poisson_pipe(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
     local_tolerance: float | None = None,
+    include_theta_fft_line: bool = False,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -2331,7 +2349,7 @@ def _solvax_pressure_poisson_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
-    coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
+    coef_x_w, coef_x_e, coef_r_i, coef_r_o, coef_t_i, coef_t_o = coefficients
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
         diffusion = _apply_pipe_diffusion_coefficients_3d(field, coefficients)
@@ -2344,7 +2362,13 @@ def _solvax_pressure_poisson_pipe(
         (0, -volume * coef_x_w, -volume * coef_x_e),
         (1, -volume * coef_r_i, -volume * coef_r_o),
     )
-    precondition = _additive_line_preconditioner_3d(diagonal, directions)
+    precondition = _additive_line_preconditioner_3d(
+        diagonal,
+        directions,
+        periodic_last_axis=(
+            (-volume * coef_t_i, -volume * coef_t_o) if include_theta_fft_line else None
+        ),
+    )
 
     linear_rhs = -volume * rhs_compatible
     effective_rtol = tolerance
@@ -2529,6 +2553,7 @@ def _face_flux_pressure_projection_pipe(
     tolerance: float,
     radial_fluid_count: int | None = None,
     initial_pressure: jnp.ndarray | None = None,
+    include_theta_fft_line: bool = False,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Project mapped-pipe velocity using the same cylindrical face flux."""
 
@@ -2577,6 +2602,7 @@ def _face_flux_pressure_projection_pipe(
         initial_field=(
             None if initial_pressure is None else initial_pressure[:, :count, :]
         ),
+        include_theta_fft_line=include_theta_fft_line,
     )
 
     mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
@@ -2635,6 +2661,7 @@ def _fixed_flow_face_flux_projection_pipe(
     tolerance: float,
     radial_fluid_count: int,
     initial_pressure: jnp.ndarray | None = None,
+    include_theta_fft_line: bool = False,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -2671,6 +2698,7 @@ def _fixed_flow_face_flux_projection_pipe(
             tolerance=tolerance,
             radial_fluid_count=radial_fluid_count,
             initial_pressure=initial_pressure,
+            include_theta_fft_line=include_theta_fft_line,
         )
     )
     projected_flow = jnp.sum(
@@ -5211,6 +5239,7 @@ def _solve_extruded_projection(
                     tolerance=projection_tolerance,
                     radial_fluid_count=radial_fluid_count,
                     initial_pressure=p,
+                    include_theta_fft_line=True,
                 )
                 p_corr = _clip_state(p_corr, scalar_limit)
                 u_next = _clip_state(u_next, velocity_limit)
@@ -5321,6 +5350,7 @@ def _solve_extruded_projection(
                     tolerance=electric_tolerance,
                     initial_field=phi,
                     local_tolerance=ALEX_BALANCE_TOLERANCE,
+                    include_theta_fft_line=True,
                 )
             else:
                 # The sparse pipe operator represents -div(sigma grad(phi)); J

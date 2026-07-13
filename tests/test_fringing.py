@@ -772,6 +772,20 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     assert float(local_residual) < 1.0e-8
     assert solved == pytest.approx(expected, abs=1.0e-8)
 
+    fft_solved, *fft_diagnostics = _solvax_pressure_poisson_pipe(
+        rhs,
+        coefficient,
+        dx=0.4,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=2.0 * jnp.pi / 8,
+        iterations=500,
+        tolerance=1.0e-10,
+        include_theta_fft_line=True,
+    )
+    assert fft_solved == pytest.approx(solved, abs=1.0e-8)
+    assert int(fft_diagnostics[3]) <= int(iterations)
+
     def objective(scale):
         field, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
             rhs,
