@@ -10,6 +10,7 @@ import os
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.scipy.fft import dct, idct
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
     KrylovSolution,
@@ -2338,6 +2339,102 @@ def _apply_pipe_diffusion_coefficients_3d(
         + coef_r_o * (r_outer - field)
         + coef_t_i * (theta_in - field)
         + coef_t_o * (theta_out - field)
+    )
+
+
+def _separable_pressure_poisson_pipe(
+    rhs: jnp.ndarray,
+    coefficient: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+    tolerance: float,
+) -> tuple[jnp.ndarray, ...]:
+    """Solve an axisymmetric cylindrical Neumann operator by x/theta modes."""
+
+    nx, nr, ntheta = rhs.shape
+    radial_widths = jnp.diff(r_faces)
+    volume = jnp.broadcast_to(
+        r_centers[None, :, None] * radial_widths[None, :, None] * dtheta,
+        rhs.shape,
+    )
+    volume_sum = jnp.sum(volume)
+    rhs_compatible = rhs - jnp.sum(rhs * volume) / volume_sum
+    coefficients = _pipe_variable_diffusion_coefficients_3d(
+        coefficient,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    _, _, radial_inner, radial_outer, _, theta_outer = coefficients
+    sigma = coefficient[0, :, 0]
+    x_wave = jnp.pi * jnp.arange(nx, dtype=rhs.dtype) / nx
+    theta_wave = 2.0 * jnp.pi * jnp.arange(ntheta // 2 + 1, dtype=rhs.dtype) / ntheta
+    radial_inner_rate = radial_inner[0, :, 0]
+    radial_outer_rate = radial_outer[0, :, 0]
+    radial_rate = radial_inner_rate + radial_outer_rate
+    modal_rate = (
+        radial_rate[:, None, None]
+        + 2.0
+        * sigma[:, None, None]
+        * (1.0 - jnp.cos(x_wave))[None, :, None]
+        / dx**2
+        + 2.0
+        * theta_outer[0, :, 0][:, None, None]
+        * (1.0 - jnp.cos(theta_wave))[None, None, :]
+    )
+    radial_volume = r_centers * radial_widths * dtheta
+    diagonal = radial_volume[:, None, None] * modal_rate
+    lower = jnp.broadcast_to(
+        -radial_volume[:, None, None] * radial_inner_rate[:, None, None],
+        diagonal.shape,
+    )
+    upper = jnp.broadcast_to(
+        -radial_volume[:, None, None] * radial_outer_rate[:, None, None],
+        diagonal.shape,
+    )
+    modal_rhs = jnp.moveaxis(
+        jnp.fft.rfft(dct(-volume * rhs_compatible, type=2, norm="ortho", axis=0), axis=2),
+        1,
+        0,
+    )
+    # The compatible (kx, m) = (0, 0) radial system has one redundant row.
+    # Pin its outer cell for the solve, then restore the volume-weighted gauge.
+    lower = lower.at[-1, 0, 0].set(0.0)
+    upper = upper.at[-1, 0, 0].set(0.0)
+    diagonal = diagonal.at[-1, 0, 0].set(1.0)
+    modal_rhs = modal_rhs.at[-1, 0, 0].set(0.0)
+    modes = tridiagonal_solve(lower, diagonal, upper, modal_rhs.real) + 1j * (
+        tridiagonal_solve(lower, diagonal, upper, modal_rhs.imag)
+    )
+    field = idct(
+        jnp.fft.irfft(jnp.moveaxis(modes, 0, 1), n=ntheta, axis=2),
+        type=2,
+        norm="ortho",
+        axis=0,
+    )
+    field = field - jnp.sum(field * volume) / volume_sum
+    local_residual = jnp.max(
+        jnp.abs(_apply_pipe_diffusion_coefficients_3d(field, coefficients) - rhs_compatible)
+    )
+    linear_rhs = -volume * rhs_compatible
+    linear_residual = jnp.linalg.norm(
+        -volume * _apply_pipe_diffusion_coefficients_3d(field, coefficients)
+        - linear_rhs
+    )
+    relative_residual = linear_residual / jnp.maximum(jnp.linalg.norm(linear_rhs), 1.0e-30)
+    converged = local_residual <= tolerance
+    return (
+        field,
+        linear_residual,
+        converged,
+        relative_residual,
+        jnp.asarray(1),
+        jnp.where(converged, 1, 0),
+        local_residual,
     )
 
 
@@ -5971,7 +6068,25 @@ def _solve_extruded_projection(
                 r_centers=r,
                 dtheta=dtheta,
             )
-            if use_alex_b1_finite_volume:
+            if use_compatible_steady_b1:
+                (
+                    phi,
+                    electric_residual,
+                    electric_converged,
+                    electric_relative_residual,
+                    electric_iteration_count,
+                    electric_status,
+                    electric_local_residual,
+                ) = _separable_pressure_poisson_pipe(
+                    emf_rhs,
+                    sigma,
+                    dx=dx,
+                    r_faces=r_faces,
+                    r_centers=r,
+                    dtheta=dtheta,
+                    tolerance=electric_tolerance,
+                )
+            elif use_alex_b1_finite_volume:
                 (
                     phi,
                     electric_residual,

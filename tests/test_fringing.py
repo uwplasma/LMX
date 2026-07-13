@@ -55,6 +55,7 @@ from lmx.fringing import (
     _solvax_pressure_poisson_pipe,
     _solvax_implicit_diffusion_duct,
     _solvax_diffusion_pipe,
+    _separable_pressure_poisson_pipe,
     _steady_stokes_projection_pipe,
     _spacing_vector,
     _station_axial_current_from_fluxes,
@@ -788,6 +789,35 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     )
     assert fft_solved == pytest.approx(solved, abs=1.0e-8)
     assert int(fft_diagnostics[3]) <= int(iterations)
+
+    direct = _separable_pressure_poisson_pipe(
+        rhs,
+        coefficient,
+        dx=0.4,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=2.0 * jnp.pi / 8,
+        tolerance=1.0e-8,
+    )
+    assert bool(direct[2])
+    assert direct[0] == pytest.approx(solved, abs=1.0e-8)
+
+    def direct_objective(scale):
+        field, *_ = _separable_pressure_poisson_pipe(
+            rhs,
+            scale * coefficient,
+            dx=0.4,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=2.0 * jnp.pi / 8,
+            tolerance=1.0e-8,
+        )
+        return jnp.mean(field**2)
+
+    direct_value, direct_gradient = jax.value_and_grad(direct_objective)(jnp.asarray(1.0))
+    assert direct_gradient == pytest.approx(
+        -2.0 * direct_value, rel=1.0e-6, abs=1.0e-8
+    )
 
     def objective(scale):
         field, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
