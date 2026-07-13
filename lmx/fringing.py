@@ -3340,17 +3340,65 @@ def _steady_stokes_projection_pipe(
         )
 
     preconditioned_rhs = precondition(rhs)
+
+    def physical_constraint_residual(state, linear_rhs):
+        residual = schur(state) - linear_rhs
+        divergence = unpack_pressure(residual[:pressure_size])
+        flow = residual[pressure_size:] / jnp.maximum(
+            jnp.mean(area_sum), 1.0e-30
+        )
+        return jnp.maximum(jnp.max(jnp.abs(divergence)), jnp.max(jnp.abs(flow)))
+
     def solve_pressure(linear_rhs, initial):
-        return gmres(
+        if physical_tolerance is None:
+            return gmres(
+                schur,
+                linear_rhs,
+                x0=initial,
+                precond=precondition,
+                restart=restart,
+                rtol=pressure_tolerance,
+                atol=pressure_tolerance,
+                max_restarts=max_restarts,
+            )
+        pilot_tolerance = max(
+            pressure_tolerance, min(1.0e-6, physical_tolerance)
+        )
+        pilot = gmres(
             schur,
             linear_rhs,
             x0=initial,
             precond=precondition,
             restart=restart,
-            rtol=pressure_tolerance,
-            atol=pressure_tolerance,
-            max_restarts=max_restarts,
+            rtol=pilot_tolerance,
+            atol=pilot_tolerance,
+            max_restarts=1,
         )
+        pilot_passes = physical_constraint_residual(pilot.x, linear_rhs) <= physical_tolerance
+
+        def accept_pilot(_):
+            return pilot
+
+        def refine_pilot(_):
+            refined = gmres(
+                schur,
+                linear_rhs,
+                x0=pilot.x,
+                precond=precondition,
+                restart=restart,
+                rtol=pressure_tolerance,
+                atol=pressure_tolerance,
+                max_restarts=max_restarts,
+            )
+            return KrylovSolution(
+                refined.x,
+                refined.residual_norm,
+                pilot.iterations + refined.iterations,
+                refined.converged,
+                refined.recycle,
+            )
+
+        return jax.lax.cond(pilot_passes, accept_pilot, refine_pilot, operand=None)
 
     if modal_factor_key is not None:
         solve_pressure = _reuse_fringing_jit(
@@ -3362,6 +3410,7 @@ def _steady_stokes_projection_pipe(
                 pressure_tolerance,
                 restart,
                 max_restarts,
+                physical_tolerance,
             ),
             jax.jit(solve_pressure),
         )

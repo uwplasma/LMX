@@ -1001,7 +1001,6 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
         max_restarts=3,
         apply_momentum_inverse_components=lambda forces: forces,
         modal_stabilization=modal_stabilization,
-        physical_tolerance=1.0e-8,
     )
     assert result[-3] < 1.0e-8
     assert result[-2] < 1.0e-8
