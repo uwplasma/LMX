@@ -889,6 +889,15 @@ wall time is acceptable.
    synchronization penalty. The full portable gate passes 899 tests with 8
    expected skips and 95.06% branch coverage in `504.16 s`: under the 600-second
    limit, though above the 450-second warning target for this Mac run.
+   The post-change accepted-source two-GPU trace remains external (207 MiB).
+   Profiling inflates wall time to `91.41 s`; structurally, projection occupies
+   `71.24 s` of the `73.49 s` public solve span, with 580 `pjit` misses
+   (`6.20 s`) and 62 compile/load events (`4.11 s`). Labelled collective spans
+   total only `0.091 s` for all-reduce, `0.110 s` for collective-permute, and
+   `0.002 s` for all-gather, but do not capture full asynchronous device-loop
+   cost. Retain SOLVAX single-reduction PCG and require either a stronger
+   accepted preconditioner or a device-resolved timeline before changing its
+   recurrence.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at

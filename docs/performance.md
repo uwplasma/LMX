@@ -268,6 +268,18 @@ independent. The complete portable gate passes 899 tests with 8 expected
 optional-data skips and 95.06% branch coverage in `504.16 s`, below the
 ten-minute hard limit but above the `450 s` warning target on this Mac run.
 
+A fresh accepted-source two-GPU trace after this change is kept external
+(207 MiB). Profiling inflates the worker to `91.41 s`, so that number is not a
+scaling row. The trace places `71.24 s` of the `73.49 s` public solve span in
+the projection path and still records 580 `pjit` cache misses (`6.20 s`) and
+62 compile/load events (`4.11 s`). It contains 554 all-reduce-labelled spans
+totalling `0.091 s`, 92 collective-permute spans totalling `0.110 s`, and 324
+all-gather-labelled spans totalling `0.002 s`; these are launch/trace spans,
+not complete asynchronous device-loop costs. SOLVAX's sharded PCG already uses
+the accepted single-reduction recurrence, so the next change requires a
+better preconditioner or a device-resolved timeline, not another ungrounded
+inner-product rearrangement.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep
