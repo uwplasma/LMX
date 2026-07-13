@@ -14,6 +14,8 @@ from solvax import (
     KrylovSolution,
     aitken_relaxation,
     anderson_mixing,
+    block_thomas_factor,
+    block_thomas_solve,
     gmres,
     pcg_linear_solve,
     tridiagonal_solve,
@@ -2876,26 +2878,6 @@ def _steady_stokes_projection_pipe(
             coarse = coarse.at[offset : offset + mode_two_size].set(modes.reshape(-1))
             return prolong(coarse)
 
-        def station_restrict(station, residual):
-            coarse = restrict(residual)
-            radial = coarse[:coarse_pressure_size].reshape(
-                (u.shape[0], u.shape[1] - 1)
-            )[station]
-            modes = coarse[
-                coarse_pressure_size : coarse_pressure_size + mode_two_size
-            ].reshape((2, u.shape[0], u.shape[1]))
-            return jnp.concatenate((radial, modes[:, station].reshape(-1)))
-
-        modal_blocks = jax.vmap(
-            lambda station: (
-                jax.vmap(
-                    lambda basis: station_restrict(
-                        station, schur(station_prolong(station, basis))
-                    )
-                )(local_basis).T
-            )
-        )(jnp.arange(u.shape[0]))
-
         def modal_restrict(residual):
             coarse = restrict(residual)
             radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
@@ -2905,6 +2887,35 @@ def _steady_stokes_projection_pipe(
             return jnp.concatenate(
                 (radial, jnp.swapaxes(modes, 0, 1).reshape((u.shape[0], -1))), axis=1
             )
+
+        stations = jnp.arange(u.shape[0])
+        modal_actions = jax.vmap(
+            lambda source: jax.vmap(
+                lambda basis: modal_restrict(schur(station_prolong(source, basis)))
+            )(local_basis)
+        )(stations)
+        diagonal = jax.vmap(lambda station: modal_actions[station, :, station, :].T)(
+            stations
+        )
+        lower = (
+            jnp.zeros_like(diagonal)
+            .at[1:]
+            .set(
+                jax.vmap(lambda target: modal_actions[target - 1, :, target, :].T)(
+                    stations[1:]
+                )
+            )
+        )
+        upper = (
+            jnp.zeros_like(diagonal)
+            .at[:-1]
+            .set(
+                jax.vmap(lambda target: modal_actions[target + 1, :, target, :].T)(
+                    stations[:-1]
+                )
+            )
+        )
+        modal_factors = block_thomas_factor(lower, diagonal, upper)
 
         def modal_prolong(local):
             coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
@@ -2920,7 +2931,7 @@ def _steady_stokes_projection_pipe(
         def precondition(residual):
             local = local_precondition(residual)
             modal_residual = modal_restrict(residual - schur(local))
-            modal_correction = jax.vmap(jnp.linalg.solve)(modal_blocks, modal_residual)
+            modal_correction = block_thomas_solve(modal_factors, modal_residual)
             candidate = local + modal_prolong(modal_correction)
             flow_residual = (residual - schur(candidate))[pressure_size:]
             flow_response = (
