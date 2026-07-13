@@ -5761,6 +5761,9 @@ def _solve_extruded_projection(
 
     if use_alex_b2_finite_volume:
         electric_volume_min = float(jnp.min(dy) * jnp.min(dz))
+        # Transverse lines capture the dominant wall-normal coupling; an axial
+        # line crosses shards, dilutes those blocks, and regresses PCG scaling.
+        use_axial_line_preconditioner = False
 
         def fixed_flow_projection(u0, v0, w0, pressure0, rho0, mask0, response0, area0):
             return _fixed_flow_face_flux_projection_duct(
@@ -5783,7 +5786,7 @@ def _solve_extruded_projection(
                 initial_pressure=pressure0,
                 validate_response=field_sharding is None,
                 single_reduction=field_sharding is not None,
-                include_axial_line=field_sharding is not None,
+                include_axial_line=use_axial_line_preconditioner,
             )
 
         def electric_solve(rhs, initial, conductivity, mask):
@@ -5799,7 +5802,7 @@ def _solve_extruded_projection(
                 local_tolerance=ALEX_BALANCE_TOLERANCE,
                 local_volume_min=electric_volume_min,
                 single_reduction=field_sharding is not None,
-                include_axial_line=field_sharding is not None,
+                include_axial_line=use_axial_line_preconditioner,
                 thin_wall_fluid_mask=mask,
             )
 
