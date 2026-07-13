@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3669711,
-    "checkout_bytes_excluding_release_candidates": 3669711,
+    "checkout_bytes_excluding_build_artifacts": 3652006,
+    "checkout_bytes_excluding_release_candidates": 3652006,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -191,7 +191,7 @@
       "examples/strong_scaling_demo.py",
       "examples/variable_field_extruded_demo.py"
     ],
-    "maintained_core_lines": 8592,
+    "maintained_core_lines": 8455,
     "package_module_count": 41,
     "package_modules": [
       {
@@ -321,8 +321,8 @@
         "role": "research_stage_extension"
       },
       {
-        "bytes": 15075,
-        "lines": 418,
+        "bytes": 9781,
+        "lines": 281,
         "owner": "stable_core",
         "path": "lmx/example_runner.py",
         "role": "stable_core"
@@ -517,7 +517,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 35338,
+    "total_package_lines": 35201,
     "uncurated_example_count": 0
   },
   "schema_version": 1,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -9,7 +8,7 @@ import jax.numpy as jnp
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
 from .physics import build_material_fields, magnetic_field_components
-from .plotting import write_case_overview_plots, write_transient_movies
+from .plotting import write_case_overview_plots
 from .reference_data import default_closed_channel_reference_root
 from .solvers import solve_steady
 import lmx.solvers as solvers
@@ -258,142 +257,6 @@ def run_case_example(
         "metrics": metrics,
     }
     write_metrics_json(report, out_dir / "example_report.json")
-    return report
-
-
-def run_theory_meeting_demo(
-    *,
-    out_dir: str | Path,
-    hartmann_ha: float = 20.0,
-    shercliff_ha: float = 20.0,
-    hunt_ha: float = 20.0,
-    resolution: int = 32,
-    movie_case: str = "shercliff",
-    movie_resolution: int = 24,
-    movie_dt: float = 5e-6,
-    movie_t_final: float = 6e-5,
-    movie_frames: int = 8,
-    reference_root: str | Path | None = None,
-) -> dict[str, object]:
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    reference_root = Path(reference_root) if reference_root else _default_reference_root()
-
-    hartmann_dir = out_dir / "hartmann"
-    shercliff_dir = out_dir / "shercliff"
-    hunt_dir = out_dir / "hunt"
-
-    hartmann_report = run_case_example(
-        case_kind="hartmann",
-        ha=hartmann_ha,
-        ny=resolution,
-        nz=resolution,
-        out_dir=hartmann_dir,
-        reference_root=reference_root,
-    )
-    shercliff_report = run_case_example(
-        case_kind="shercliff",
-        ha=shercliff_ha,
-        ny=resolution,
-        nz=resolution,
-        out_dir=shercliff_dir,
-        reference_root=reference_root,
-    )
-
-    hunt_case = make_hunt_case(ha=hunt_ha, ny=resolution, nz=resolution)
-    hunt_solution = solve_steady(hunt_case)
-    write_paraview(hunt_solution, hunt_dir)
-    write_profile_csv(hunt_dir / f"{hunt_case.name}_centerline.csv", extract_centerline(hunt_solution))
-    write_profile_csv(hunt_dir / f"{hunt_case.name}_midplane_y.csv", extract_midplane_profile(hunt_solution, axis="y", fluid_only=True))
-    write_profile_csv(hunt_dir / f"{hunt_case.name}_midplane_z.csv", extract_midplane_profile(hunt_solution, axis="z", fluid_only=True))
-    hunt_metrics = validation_summary(hunt_solution, hunt_case.name, ha=hunt_ha)
-
-    y_reference_coordinate = None
-    y_reference_values = None
-    z_reference_coordinate = None
-    z_reference_values = None
-    hunt_reference: dict[str, object] = {"available": False}
-    if reference_root is not None and reference_root.exists():
-        try:
-            comparison = closed_channel_validation(hunt_solution, "hunt", int(hunt_ha), reference_root=reference_root)
-        except FileNotFoundError:
-            comparison = None
-        if comparison is not None:
-            y_reference_coordinate = comparison.y_profile.coordinate
-            y_reference_values = comparison.y_profile.reference
-            z_reference_coordinate = comparison.z_profile.coordinate
-            z_reference_values = comparison.z_profile.reference
-            hunt_reference = {
-                "available": True,
-                "kind": "closed_channel_analytical",
-                "path": comparison.reference_path,
-                "y_l2_error": comparison.y_profile.l2_error,
-                "z_l2_error": comparison.z_profile.l2_error,
-            }
-
-    hunt_plot_paths = write_case_overview_plots(
-        hunt_solution,
-        hunt_dir,
-        case_title=f"Hunt case (Ha={int(hunt_ha)})",
-        y_reference_coordinate=y_reference_coordinate,
-        y_reference_values=y_reference_values,
-        z_reference_coordinate=z_reference_coordinate,
-        z_reference_values=z_reference_values,
-        reference_label="Analytical",
-    )
-    movie_case_ha = {
-        "hartmann": hartmann_ha,
-        "shercliff": shercliff_ha,
-        "hunt": hunt_ha,
-    }.get(movie_case)
-    if movie_case_ha is None:
-        raise ValueError(f"Unsupported movie_case {movie_case!r}")
-    movie_case_spec = _build_case(movie_case, movie_case_ha, movie_resolution, movie_resolution)
-    movie_case_spec = replace(
-        movie_case_spec,
-        time_stepper=replace(
-            movie_case_spec.time_stepper,
-            dt=movie_dt,
-            t_final=movie_t_final,
-            max_steps=solvers._bounded_time_step_count(
-                start_time=0.0,
-                dt=movie_dt,
-                t_final=movie_t_final,
-                max_steps=movie_case_spec.time_stepper.max_steps,
-            ),
-        ),
-    )
-    movie_frames_payload = solve_case_snapshots(movie_case_spec, frame_count=movie_frames)
-    movie_dir = {"hartmann": hartmann_dir, "shercliff": shercliff_dir, "hunt": hunt_dir}[movie_case]
-    movie_field_mode = "bulk_deviation" if movie_case == "hunt" else "raw"
-    movie_paths = write_transient_movies(
-        movie_frames_payload,
-        movie_dir,
-        case_title=f"{movie_case.capitalize()} startup (Ha={int(movie_case_ha)})",
-        field_mode=movie_field_mode,
-        output_stem=f"{movie_case}_startup",
-    )
-
-    hunt_report = {
-        "case": hunt_case.name,
-        "ha": hunt_ha,
-        "output_dir": _portable_path(hunt_dir),
-        "plots": [_portable_path(path) for path in hunt_plot_paths],
-        "reference": hunt_reference,
-        "metrics": hunt_metrics,
-    }
-    write_metrics_json(hunt_report, hunt_dir / "example_report.json")
-
-    report = {
-        "output_dir": _portable_path(out_dir),
-        "movie_case": movie_case,
-        "movie_mode": movie_field_mode,
-        "movie_outputs": [_portable_path(path) for path in movie_paths],
-        "hartmann": hartmann_report,
-        "shercliff": shercliff_report,
-        "hunt": hunt_report,
-    }
-    write_metrics_json(report, out_dir / "meeting_demo_report.json")
     return report
 
 
