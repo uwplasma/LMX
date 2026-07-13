@@ -964,7 +964,9 @@ wall time is acceptable.
    SPD/batched line solve that preserves partitioning; do not pad or alter the
    frozen 101-station mesh to manufacture divisibility.
    SOLVAX branch checkpoint `47831dd` implements the exact batched cyclic
-   tridiagonal solve and passes 241 tests at 98.00% branch coverage. It also
+   tridiagonal solve and passes 241 tests at 98.00% branch coverage. Draft
+   [SOLVAX PR #12](https://github.com/uwplasma/SOLVAX/pull/12) publishes it with
+   strict docs, minimum-stack, Ubuntu/macOS, and Codecov checks green. It also
    passes LMX's manufactured pipe gates, but direct use as a theta block is
    rejected and removed: the reduced one-A4000 worker exceeds 100 seconds,
    versus `26.62 s` cold and `6.85 s` warm for the accepted x/r block. The

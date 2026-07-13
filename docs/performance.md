@@ -313,7 +313,10 @@ accelerator application, run independent B1 variants one per GPU with the
 campaign runner rather than claiming spatial scaling for the mapped-pipe path.
 
 SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
-tridiagonal algebra and passes 241 tests with 98.00% branch coverage. LMX's
+tridiagonal algebra and passes 241 tests with 98.00% branch coverage. It is
+published for review as [SOLVAX PR #12](https://github.com/uwplasma/SOLVAX/pull/12),
+where strict docs, the minimum Python/JAX stack, current Ubuntu/macOS lanes,
+and Codecov all pass. LMX's
 manufactured pipe gates pass when it is used as a theta line, but the reduced
 one-A4000 worker exceeds 100 seconds with the GPU saturated, versus `26.62 s`
 cold and `6.85 s` warm without that line. The integration is rejected and
