@@ -11,7 +11,7 @@ uv run --locked --extra dev python scripts/run_full_test_suite.py
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
 and a hard ten-minute timeout. The current Apple M4 result is 804 passed, 8
-expected external-data skips, 95.30% branch coverage, and 229.5 seconds with six
+expected external-data skips, 95.29% branch coverage, and 270.1 seconds with six
 workers.
 
 The eight skips represent unavailable independent datasets, not disabled source
@@ -22,7 +22,7 @@ target is six minutes to preserve CI margin.
 
 ```bash
 python -m pytest -m unit
-python -m pytest tests/test_solvers.py
+python -m pytest tests/test_solver.py
 python -m pytest tests/test_fringing.py
 python -m pytest tests/test_validation.py
 ```

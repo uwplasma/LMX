@@ -95,12 +95,7 @@
     "modules": [
       "lmx/__init__.py",
       "lmx/__main__.py",
-      "lmx/_autodiff.py",
-      "lmx/_fringing.py",
       "lmx/_fringing_types.py",
-      "lmx/_plotting.py",
-      "lmx/_solvers.py",
-      "lmx/_validation.py",
       "lmx/autodiff.py",
       "lmx/benchmarks.py",
       "lmx/blanket_flow.py",

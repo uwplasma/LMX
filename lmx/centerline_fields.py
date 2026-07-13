@@ -250,7 +250,7 @@ def solve_centerline_pipe_current_closure(
     velocity profile. It is a current-closure gate, not a full momentum solve.
     """
 
-    from ._fringing import (
+    from .fringing import (
         _pipe_conservative_current_diagnostics_3d,
         _pipe_conservative_current_fluxes_3d,
         _pipe_conservative_emf_rhs_3d,

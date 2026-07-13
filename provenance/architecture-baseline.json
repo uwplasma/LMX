@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3652006,
-    "checkout_bytes_excluding_release_candidates": 3652006,
+    "checkout_bytes_excluding_build_artifacts": 3649160,
+    "checkout_bytes_excluding_release_candidates": 3649160,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -191,8 +191,8 @@
       "examples/strong_scaling_demo.py",
       "examples/variable_field_extruded_demo.py"
     ],
-    "maintained_core_lines": 8455,
-    "package_module_count": 41,
+    "maintained_core_lines": 8408,
+    "package_module_count": 36,
     "package_modules": [
       {
         "bytes": 4238,
@@ -209,20 +209,6 @@
         "role": "stable_core"
       },
       {
-        "bytes": 84500,
-        "lines": 2137,
-        "owner": "research_stage_extension",
-        "path": "lmx/_autodiff.py",
-        "role": "research_stage_extension"
-      },
-      {
-        "bytes": 293213,
-        "lines": 7962,
-        "owner": "research_stage_extension",
-        "path": "lmx/_fringing.py",
-        "role": "research_stage_extension"
-      },
-      {
         "bytes": 4307,
         "lines": 130,
         "owner": "research_stage_extension",
@@ -230,32 +216,11 @@
         "role": "research_stage_extension"
       },
       {
-        "bytes": 105492,
-        "lines": 2518,
-        "owner": "visualization",
-        "path": "lmx/_plotting.py",
-        "role": "visualization"
-      },
-      {
-        "bytes": 88871,
-        "lines": 2196,
-        "owner": "stable_core",
-        "path": "lmx/_solvers.py",
-        "role": "stable_core"
-      },
-      {
-        "bytes": 57628,
-        "lines": 1453,
-        "owner": "validation_and_evidence",
-        "path": "lmx/_validation.py",
-        "role": "validation_and_evidence"
-      },
-      {
-        "bytes": 225,
-        "lines": 9,
-        "owner": "compatibility_facade",
+        "bytes": 84561,
+        "lines": 2139,
+        "owner": "research_stage_extension",
         "path": "lmx/autodiff.py",
-        "role": "compatibility_facade"
+        "role": "research_stage_extension"
       },
       {
         "bytes": 19247,
@@ -286,7 +251,7 @@
         "role": "stable_core"
       },
       {
-        "bytes": 31804,
+        "bytes": 31803,
         "lines": 762,
         "owner": "research_stage_extension",
         "path": "lmx/centerline_fields.py",
@@ -349,11 +314,11 @@
         "role": "validation_and_evidence"
       },
       {
-        "bytes": 361,
-        "lines": 13,
-        "owner": "compatibility_facade",
+        "bytes": 293276,
+        "lines": 7964,
+        "owner": "research_stage_extension",
         "path": "lmx/fringing.py",
-        "role": "compatibility_facade"
+        "role": "research_stage_extension"
       },
       {
         "bytes": 33478,
@@ -398,11 +363,11 @@
         "role": "stable_core"
       },
       {
-        "bytes": 222,
-        "lines": 9,
-        "owner": "compatibility_facade",
+        "bytes": 105561,
+        "lines": 2520,
+        "owner": "visualization",
         "path": "lmx/plotting.py",
-        "role": "compatibility_facade"
+        "role": "visualization"
       },
       {
         "bytes": 68290,
@@ -440,11 +405,11 @@
         "role": "visualization"
       },
       {
-        "bytes": 214,
-        "lines": 9,
-        "owner": "compatibility_facade",
+        "bytes": 88938,
+        "lines": 2198,
+        "owner": "stable_core",
         "path": "lmx/solvers.py",
-        "role": "compatibility_facade"
+        "role": "stable_core"
       },
       {
         "bytes": 5254,
@@ -461,11 +426,11 @@
         "role": "stable_core"
       },
       {
-        "bytes": 221,
-        "lines": 9,
-        "owner": "compatibility_facade",
+        "bytes": 57697,
+        "lines": 1455,
+        "owner": "validation_and_evidence",
         "path": "lmx/validation.py",
-        "role": "compatibility_facade"
+        "role": "validation_and_evidence"
       },
       {
         "bytes": 6250,
@@ -517,7 +482,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 35201,
+    "total_package_lines": 35162,
     "uncurated_example_count": 0
   },
   "schema_version": 1,

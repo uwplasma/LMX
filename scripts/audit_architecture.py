@@ -33,8 +33,8 @@ EXCLUDED_FILES = {".coverage", "coverage.xml"}
 EXCLUDED_RELATIVE_FILES = {"provenance/architecture-baseline.json"}
 
 RESEARCH_STAGE = {
-    "_autodiff.py",
-    "_fringing.py",
+    "autodiff.py",
+    "fringing.py",
     "fringing.py",
     "_fringing_types.py",
     "q2d.py",
@@ -45,16 +45,10 @@ RESEARCH_STAGE = {
     "scaling.py",
     "wall_study.py",
 }
-COMPATIBILITY = {
-    "autodiff.py",
-    "fringing.py",
-    "plotting.py",
-    "solvers.py",
-    "validation.py",
-}
-VISUALIZATION = {"_plotting.py", "showcase.py"}
+COMPATIBILITY: set[str] = set()
+VISUALIZATION = {"plotting.py", "showcase.py"}
 VALIDATION = {
-    "_validation.py",
+    "validation.py",
     "external_validation.py",
     "freemhd.py",
     "reference_data.py",

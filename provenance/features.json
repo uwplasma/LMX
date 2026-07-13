@@ -35,10 +35,8 @@
       "claim": "Bounded Hartmann, Shercliff, and Hunt duct cases are executable and analytically checked; the 1% FreeMHD parity gate remains open.",
       "id": "fully-developed-ducts",
       "modules": [
-        "lmx/_solvers.py",
         "lmx/solvers.py",
         "lmx/physics.py",
-        "lmx/_validation.py",
         "lmx/validation.py",
         "lmx/mesh.py",
         "lmx/operators.py",
@@ -139,7 +137,6 @@
       "claim": "Plot helpers produce deterministic documented artifact sets without entering solver kernels.",
       "id": "visualization-publication",
       "modules": [
-        "lmx/_plotting.py",
         "lmx/plotting.py",
         "lmx/showcase.py"
       ],
@@ -164,9 +161,8 @@
       "claim": "Rectangular, layered, mapped-pipe, and bent slices pass bounded internal checks; experimental Benchmark-B validation is open.",
       "id": "extruded-fringing",
       "modules": [
-        "lmx/_fringing.py",
-        "lmx/_fringing_types.py",
-        "lmx/fringing.py"
+        "lmx/fringing.py",
+        "lmx/_fringing_types.py"
       ],
       "status": "research",
       "tests": {
@@ -189,7 +185,6 @@
       "claim": "Selected smooth Hartmann and extruded responses differentiate; the full implicit primal/transpose contract remains open.",
       "id": "differentiation",
       "modules": [
-        "lmx/_autodiff.py",
         "lmx/autodiff.py"
       ],
       "status": "research",

@@ -5,7 +5,7 @@ import pytest
 from dataclasses import replace
 from types import SimpleNamespace
 
-import lmx._fringing as fringing_impl
+import lmx.fringing as fringing_impl
 from solvax import block_thomas_solve
 
 from lmx.field_models import (

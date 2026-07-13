@@ -40,71 +40,25 @@ assigned to a new versioned asset release.
 
 ## Architecture
 
-The codebase is organized around a small number of core modules:
+Public concepts map directly to source modules:
 
-- `lmx/specs.py`
-  - dataclasses and typed configuration models
-- `lmx/config.py`
-  - TOML parsing and schema validation
-- `lmx/mesh.py`
-  - structured mesh generation
-- `lmx/operators.py`
-  - discrete gradient, divergence, and diffusion operators
-- `lmx/physics.py`
-  - magnetic fields, materials, and benchmark-specific physical helpers
-- `lmx/linear.py`
-  - iterative linear solves
-- `lmx/solvers.py`
-  - compatibility facade for steady and transient solver-family implementations
-- `lmx/_solvers.py`
-  - current fully developed solver implementation pending the next extraction
-- `lmx/io.py`
-  - restart/state bundles and output serialization
-- `lmx/runtime_logging.py`
-  - live terminal logging
-- `lmx/validation.py`
-  - compatibility facade for analytical and reference-output comparisons
-- `lmx/_validation.py`
-  - current validation implementation pending the next extraction
-- `lmx/_fringing_types.py`
-  - stable private data containers for the extruded/fringing solver family
+| Module | Responsibility |
+|---|---|
+| `specs.py`, `config.py` | typed cases and TOML parsing |
+| `mesh.py`, `operators.py` | structured meshes and discrete operators |
+| `physics.py`, `linear.py` | material/field terms and linear solves |
+| `solvers.py` | fully developed steady and transient solvers |
+| `fringing.py` | extruded and mapped-pipe research solvers |
+| `validation.py`, `freemhd.py` | analytical and independent-code evidence |
+| `autodiff.py`, `scaling.py` | gradients and parallel performance |
+| `io.py`, `plotting.py` | restart/output and compressed visual results |
 
-## Planned module split
-
-The first split stage is in place: the historical public modules remain as
-compatibility facades, while implementation lives in private modules such as
-`lmx/_fringing.py`, `lmx/_autodiff.py`, `lmx/_plotting.py`, `lmx/_solvers.py`,
-and `lmx/_validation.py`. The first private extraction is
-`lmx/_fringing_types.py`, which holds the extruded/fringing problem, bundle,
-solution, and validation containers while the public `lmx.fringing` facade
-continues to resolve the same names. The next stages should extract cohesive
-submodules from those private implementations without changing public import
-paths.
-
-Target structure:
-
-- `lmx/fringing/`
-  - problem builders, projection solve, conservative metrics, benchmark gates,
-    and reference comparison helpers
-- `lmx/solvers/`
-  - a thin public facade plus fully developed solve logic, potential helpers,
-    diagnostics, and logging adapters
-- `lmx/validation/`
-  - profile comparisons, reference-data loading, and report construction
-- `lmx/plotting/`
-  - profiles, benchmark figures, fields, media, and scaling/autodiff panels
-- `lmx/autodiff/`
-  - objectives, gradient checks, design loops, and uncertainty propagation
-
-Refactor rules:
-
-- preserve existing `import lmx` and module-level public paths during the
-  split cycle
-- do not mix numerical changes with file moves
-- move or add tests with each extracted module
-- keep benchmark-specific acceptance logic out of the low-level solver kernels
-- update module docstrings with governing equations, shape conventions, units,
-  and literature anchors
+`_fringing_types.py` is the only private shared container module. Avoid facade
+files, one-function modules, and benchmark-specific logic in low-level kernels.
+When a large module is simplified, preserve its public import path and separate
+the structural commit from numerical changes. Docstrings should state array
+shape, units, solver assumptions, and literature anchors where these are not
+obvious from the type signature.
 
 ## Solver families
 
