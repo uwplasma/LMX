@@ -1040,8 +1040,15 @@ wall time is acceptable.
    stable and monotone, with conservation inside the frozen gates, but ends 16
    full-mesh updates at `3.98e-4`; raising its inactive relaxation floor from
    `0.05` to `0.1` reproduces the history exactly. Reject it for steady closure.
-   Accelerator knobs are now closed: accelerate the slow axial-velocity map
-   itself before another 128-step campaign.
+   The requested `dt=0.01` is actually capped at `9.35e-8` by the B1
+   electromagnetic scale. Raising that cap by factors of 500 and 1000 leaves
+   16-step residuals above `1.8e-2`; Anderson variants remain above `6.1e-3`
+   and worsen continuity. Condition-filtered Anderson is also rejected: a
+   `1e4` condition limit diverges to `1.09e-2`, while `1e8` ends at `3.87e-4`
+   after 32 updates but has a `4.48e-3` continuity excursion. Accelerator,
+   scalar pseudo-time, and history controls are closed. The next bounded B1
+   experiment is matrix-free FGMRES on the affine low-Re fixed-point equation,
+   using the tested SOLVAX primitive, before another production campaign.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

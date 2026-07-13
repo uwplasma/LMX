@@ -122,6 +122,87 @@
       "floor_0.1_record_sha256": "25d0c23e09a0d1e26435e47e40a0371ac9bf7f5a3fd15d8dfdb445bac06cfdf3"
     }
   ],
+  "map_level_screens": {
+    "diagnosis": {
+      "requested_dt": 0.01,
+      "effective_dt": 9.345794392523365e-08,
+      "inverse_electromagnetic_scale": 10700.0,
+      "stable_aitken_contraction_geometric_mean": 0.995247,
+      "projected_additional_updates_to_steady_gate": 435,
+      "conclusion": "The electromagnetic stability cap, not the requested time step, controls the axial-velocity map. The stable map is far too weakly contractive for another production campaign."
+    },
+    "electromagnetic_courant": [
+      {
+        "factor": 0.5,
+        "acceleration": "none",
+        "steps": 16,
+        "seconds": 346.2117,
+        "terminal_residual": 0.019959149,
+        "maximum_divergence_residual": 0.0028886718,
+        "accepted": false,
+        "record_sha256": "f947f3828fd6d06ca8ac1877bdfc5af045eba96609675c9f238c3ac0eef6cc09"
+      },
+      {
+        "factor": 1.0,
+        "acceleration": "none",
+        "steps": 16,
+        "seconds": 342.9671,
+        "terminal_residual": 0.018767138,
+        "maximum_divergence_residual": 0.0023154904,
+        "accepted": false,
+        "record_sha256": "5d1343df03d54999c71674d69a9cbe77b2686023b2069f6174c1c25a35c3a61d"
+      },
+      {
+        "factor": 0.5,
+        "acceleration": "anderson",
+        "steps": 16,
+        "seconds": 374.3898,
+        "terminal_residual": 0.0061788498,
+        "maximum_divergence_residual": 0.0028173447,
+        "accepted": false,
+        "record_sha256": "19cd8f1b5b56da86baeef87452d20d03ce2ffb3da2fb7b91f88898eea92f17a6"
+      },
+      {
+        "factor": 1.0,
+        "acceleration": "anderson",
+        "steps": 16,
+        "seconds": 381.8767,
+        "terminal_residual": 0.0070793906,
+        "maximum_divergence_residual": 0.0037589425,
+        "accepted": false,
+        "record_sha256": "26d6a7bcfa5c8fbb261884c37b42242dd4a3d6ae783e8415ecc4e75b80a3f58e"
+      }
+    ],
+    "condition_filtered_anderson": [
+      {
+        "condition_limit": 10000.0,
+        "steps": 32,
+        "seconds": 675.6605,
+        "minimum_residual": 0.00040129661,
+        "terminal_residual": 0.010949613,
+        "maximum_divergence_residual": 0.002894369,
+        "terminal_charge_balance_residual": 0.00013781038,
+        "accepted": false,
+        "candidate_source_fingerprint": "93e4ffb3ea65a6afae4c35f31c813ffedf736e4091d73047c2dd2663b36c6d74",
+        "record_sha256": "3fb983f9e707c6756fea5db781d8a7facd6dafc573b291d5c12d1dd617da74f2"
+      },
+      {
+        "condition_limit": 100000000.0,
+        "steps": 32,
+        "seconds": 674.7652,
+        "minimum_and_terminal_residual": 0.00038721102,
+        "maximum_divergence_residual": 0.0044784117,
+        "terminal_divergence_residual": 0.0006611192,
+        "terminal_charge_balance_residual": 0.00013570701,
+        "accepted": false,
+        "candidate_source_fingerprint": "7777ad9feb69c7f3dd115c146fbcfb6fe42c8652cc0a7514edc96a9ca95faf5f",
+        "record_sha256": "8506c62d7157fed9edf06637b928d1877d76f568d3f3271dccddd1f6be07484c",
+        "reason": "Bounded and best terminal state, but still 7.7 times above the steady gate and with intermittent continuity excursions."
+      }
+    ],
+    "accepted": false,
+    "next_candidate": "Solve the affine low-Re fixed-point equation with the tested SOLVAX matrix-free FGMRES primitive."
+  },
   "accepted": true,
-  "next_constraint": "Accelerate the slow axial-velocity fixed-point map itself; Anderson knobs, block scaling, and bounded Aitken are closed."
+  "next_constraint": "Integrate the affine fixed-point FGMRES candidate; scalar pseudo-time and history controls are closed."
 }
