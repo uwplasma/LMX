@@ -1,0 +1,39 @@
+{
+  "case": "B1-fringing-pipe",
+  "mesh_level": "coarse",
+  "source_commit": "388c839983b7e7af4f5c68d9ea7700ebf7ec9c3c",
+  "source_fingerprint": "3ee086e33fa496e58402d1b494ad9ffa58d3a047c85729f0df9cd86ed6234063",
+  "variants": [
+    "baseline",
+    "thin_wall"
+  ],
+  "execution": {
+    "strategy": "one independent variant per GPU",
+    "gpu_model": "NVIDIA RTX A4000",
+    "gpu_count": 2,
+    "observed_runtime_seconds_min": 3602,
+    "runtime_cap_seconds": 3600,
+    "gpu_utilization_percent_at_cap": [
+      99,
+      99
+    ],
+    "gpu_memory_mib_at_cap": [
+      9135,
+      9207
+    ],
+    "swap_bytes": 0
+  },
+  "result": {
+    "accepted": false,
+    "terminated_at_runtime_cap": true,
+    "completed_variant_count": 0,
+    "restart_checkpoint_count": 0,
+    "physics_gates_assessed": false,
+    "reason": "Both independent coarse variants exceeded one hour without producing a restart or result checkpoint."
+  },
+  "required_before_rerun": [
+    "Bound one-variant coarse runtime below 3600 seconds.",
+    "Emit periodic progress and restart checkpoints from the production outer iteration.",
+    "Demonstrate faster spatial parallelism or an equivalent per-step production-kernel speedup; campaign-level variant concurrency alone is insufficient."
+  ]
+}

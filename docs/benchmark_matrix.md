@@ -113,8 +113,8 @@ passes.
 ### Released-SOLVAX PCG promotion evidence
 
 SOLVAX 0.5.1 commit
-`e348c0b4a1b9995c3e33ceb11c04f93e7aa48e63` is the runtime-pinned `auto`
-backend. The tracked x64 CPU comparison passes with field relative difference
+`e348c0b4a1b9995c3e33ceb11c04f93e7aa48e63` was the runtime-pinned `auto`
+backend at M3 closure. The tracked x64 CPU comparison passes with field relative difference
 `1.54e-12`, implicit-gradient relative error `1.13e-15`, warm-time ratio
 `0.748`, and compiler temporary-memory ratio `0.625` relative to native CG.
 The RTX A4000 record passes with corresponding values `1.54e-12`, `1.13e-16`,
@@ -124,7 +124,7 @@ Shercliff Ha=15,000, and the four-level Ha=20 FreeMHD ladder passes at the same
 solver-core fingerprint.
 
 This is the historical M3 promotion record. LMX now pins released SOLVAX 0.7.0;
-the current 0.7.0 CPU equivalence record passes, while a version-matched GPU and
+the current version-matched CPU and RTX A4000 equivalence records pass, while a
 full physics acceptance refresh remains an M14 gate. The 0.5.1 results are not
 silently relabeled as 0.7.0 evidence.
 

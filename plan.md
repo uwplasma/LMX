@@ -15,10 +15,10 @@ belong in issues, campaign artifacts, or benchmark documentation—not here.
 The current critical path is **M5 performance unblock -> M4 closure -> research
 release**. M0 through M3 are closed. SOLVAX 0.7.0 is the pinned runtime
 dependency and `auto` resolves deterministically to its PCG backend. Its current
-CPU forward, implicit-gradient, transpose, resource, and end-to-end Hartmann
-gates pass. The complete real-GPU, four-level Ha=20 FreeMHD, and all-eight-row
+CPU and RTX A4000 forward, implicit-gradient, transpose, resource, and
+end-to-end Hartmann gates pass. The four-level Ha=20 FreeMHD and all-eight-row
 high-Ha acceptance record remains the historical 0.5.1 M3 baseline until the
-queued version-matched M14 refresh completes. Explicit native `cg` remains
+version-matched M14 physics refresh completes. Explicit native `cg` remains
 available for comparison and one compatibility cycle.
 Research-stage fringing, Q2D, blanket, and scaling demonstrations are not
 release evidence until their milestone gates pass. Both ALEX production
@@ -993,6 +993,13 @@ wall time is acceptable.
    `benchmarks/results/b1-momentum-jit-20260713.json`. Resume coarse B1 through
    process-parallel independent variants; the portable gate passes 899 tests
    with 8 expected skips and 95.07% branch coverage in 141.6 seconds.
+   The subsequent full coarse baseline/thin-wall wave is rejected on runtime:
+   both one-A4000 variants exceeded 3600 seconds at full GPU utilization without
+   producing a result or restart checkpoint. Do not launch the dependent wave
+   until one coarse variant is bounded below one hour and the production outer
+   loop emits periodic progress/restart checkpoints. Evidence is in
+   `benchmarks/results/b1-coarse-runtime-cap-20260713.json`; independent-variant
+   concurrency is throughput, not strong scaling of one solve.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
@@ -1010,8 +1017,8 @@ wall time is acceptable.
     wheel/sdist build, Twine inspection, clean Python 3.10 install, imports, and
     CLI smoke check also pass; the universal wheel is 300 KiB. Checksums are in
     `benchmarks/results/package-smoke-20260713.json`. The current SOLVAX 0.7.0
-    CPU equivalence record passes; the 0.7.0 GPU and full physics refresh must
-    replace, rather than relabel, the historical 0.5.1 acceptance evidence.
+    CPU and RTX A4000 equivalence records pass; the full 0.7.0 physics refresh
+    must replace, rather than relabel, the historical 0.5.1 acceptance evidence.
 
 15. **Deferred — expand physics only through new release tiers.** Benchmark C is Q2D
     turbulence, D is 3D turbulence/magnetic obstacles, and E is energy/buoyancy.

@@ -149,12 +149,12 @@ gradients must agree with finite differences or an independent adjoint, and
 the linear solves must use implicit differentiation with controlled primal and
 transpose residuals. Released
 [SOLVAX 0.7.0](https://github.com/uwplasma/SOLVAX/releases/tag/v0.7.0) PCG is the
-default `auto` backend. Current CPU forward, implicit-gradient, independent
-transpose, resource, and end-to-end Hartmann gates pass. The complete CPU/GPU,
-four-level Ha=20 FreeMHD, and all-eight-row high-Ha acceptance record remains
-the historical 0.5.1 promotion baseline until the queued 0.7.0 GPU and physics
-refresh completes. Select `linear_solver = "cg"` explicitly for the retained
-native comparison path.
+default `auto` backend. Current CPU and RTX A4000 forward, implicit-gradient,
+independent-transpose, resource, and end-to-end Hartmann gates pass. The
+four-level Ha=20 FreeMHD and all-eight-row high-Ha acceptance record remains the
+historical 0.5.1 promotion baseline until the 0.7.0 physics refresh completes.
+Select `linear_solver = "cg"` explicitly for the retained native comparison
+path.
 
 ## Performance and parallelism
 
