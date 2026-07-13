@@ -859,6 +859,11 @@ wall time is acceptable.
    immediate PCG preconditioner breakdown. The next multigrid implementation
    must build a provably stronger SPD coarse solve once per fixed conductivity,
    not rebuild an approximate hierarchy for every electric right-hand side.
+   Exact tensor-cosine Galerkin spaces confirm the same cost constraint: 27
+   modes increase B2 work from 573 to 586--588 iterations; 64 modes reduce it
+   to 514--515 with exact physics but worsen one-GPU warm time from `37.78 s`
+   to `57.98 s`. Reject dense spectral setup. A viable hierarchy must have
+   near-linear transfer/setup cost and persistent reuse.
    Hoisting the fixed conductivity and mask into the compiled electric closure
    preserves exact one/two-GPU physics and gives `37.37 s` one-GPU warm time,
    but worsens two-GPU warm time from `109.23 s` to `118.66 s`; reject the

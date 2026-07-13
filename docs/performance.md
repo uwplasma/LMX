@@ -235,6 +235,12 @@ the compiled closure is also rejected: physics remains exact and one-GPU warm
 time is `37.37 s`, but two-GPU warm time regresses from `109.23 s` to
 `118.66 s`.
 
+Dense spectral Galerkin correction is likewise rejected. A 27-mode cosine
+space raises production work from 573 to 586--588 iterations. Expanding to 64
+modes lowers it to 514--515 with exact physics, but setup/application overhead
+increases one-GPU warm time from `37.78 s` to `57.98 s`. The accepted design
+therefore requires near-linear coarse transfers and persistent hierarchy reuse.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and
