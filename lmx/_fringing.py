@@ -1815,50 +1815,48 @@ def _sample_station_magnetic_field_pipe(
 def _bundle_station_history(
     bundle: ExtrudedFieldBundle,
 ) -> tuple[dict[str, float], ...]:
+    names = (
+        "x",
+        "field_scale",
+        "u_max",
+        "mean_velocity",
+        "volumetric_flow_rate",
+        "axial_current",
+        "wall_current_leakage",
+        "current_scaled_pressure_proxy",
+        "axial_pressure_loss_gradient",
+        "transverse_pressure_difference",
+        "pressure_span",
+        "residual",
+        "charge_balance_residual",
+        "boundary_current_residual",
+    )
+    zeros = jnp.zeros_like(bundle.x)
+    axial_pressure = getattr(bundle, "axial_pressure_loss_gradient", zeros)
+    transverse_pressure = getattr(bundle, "transverse_pressure_difference", zeros)
+    axial_pressure = axial_pressure if axial_pressure.size else zeros
+    transverse_pressure = transverse_pressure if transverse_pressure.size else zeros
+    columns = jnp.stack(
+        (
+            bundle.x,
+            bundle.field_scale,
+            jnp.max(jnp.abs(bundle.u), axis=(1, 2)),
+            bundle.mean_velocity,
+            bundle.volumetric_flow_rate,
+            bundle.axial_current,
+            bundle.wall_current_leakage,
+            bundle.current_scaled_pressure_proxy,
+            axial_pressure,
+            transverse_pressure,
+            jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2)),
+            bundle.residual,
+            bundle.charge_balance_residual,
+            bundle.boundary_current_residual,
+        ),
+        axis=1,
+    )
     return tuple(
-        {
-            "x": float(bundle.x[index]),
-            "field_scale": float(bundle.field_scale[index]),
-            "u_max": float(jnp.max(jnp.abs(bundle.u[index]))),
-            "mean_velocity": float(bundle.mean_velocity[index]),
-            "volumetric_flow_rate": float(bundle.volumetric_flow_rate[index]),
-            "axial_current": float(bundle.axial_current[index]),
-            "wall_current_leakage": float(bundle.wall_current_leakage[index]),
-            "current_scaled_pressure_proxy": float(
-                bundle.current_scaled_pressure_proxy[index]
-            ),
-            "axial_pressure_loss_gradient": (
-                float(
-                    getattr(
-                        bundle, "axial_pressure_loss_gradient", jnp.zeros_like(bundle.x)
-                    )[index]
-                )
-                if getattr(
-                    bundle, "axial_pressure_loss_gradient", jnp.zeros_like(bundle.x)
-                ).size
-                else 0.0
-            ),
-            "transverse_pressure_difference": (
-                float(
-                    getattr(
-                        bundle,
-                        "transverse_pressure_difference",
-                        jnp.zeros_like(bundle.x),
-                    )[index]
-                )
-                if getattr(
-                    bundle,
-                    "transverse_pressure_difference",
-                    jnp.zeros_like(bundle.x),
-                ).size
-                else 0.0
-            ),
-            "pressure_span": float(jnp.max(bundle.p[index]) - jnp.min(bundle.p[index])),
-            "residual": float(bundle.residual[index]),
-            "charge_balance_residual": float(bundle.charge_balance_residual[index]),
-            "boundary_current_residual": float(bundle.boundary_current_residual[index]),
-        }
-        for index in range(bundle.x.shape[0])
+        dict(zip(names, map(float, row), strict=True)) for row in np.asarray(columns)
     )
 
 

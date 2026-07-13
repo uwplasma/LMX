@@ -1510,6 +1510,9 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(
     assert "wall_current_leakage" in solution.station_history[0]
     assert "boundary_current_residual" in solution.station_history[0]
     assert "pressure_span" in solution.station_history[0]
+    assert solution.station_history[0]["u_max"] == pytest.approx(1.0)
+    assert solution.station_history[0]["axial_pressure_loss_gradient"] == 0.0
+    assert solution.station_history[0]["transverse_pressure_difference"] == 0.0
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():
