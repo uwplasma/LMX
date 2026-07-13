@@ -1189,6 +1189,21 @@ wall time is acceptable.
    `benchmarks/results/b1-compatible-gpu-correctness-20260713.json`. Next make
    the compatible momentum/Schur Krylov executable retain explicit sharding,
    require exact one/two-GPU physics, and only then record strong-scaling time.
+   The first accepted mode-space block is now implemented at experimental
+   commit `93331fd`. For the frozen axisymmetric conductivity, an orthonormal
+   DCT-II in x and real FFT in theta reduce the electric finite-volume operator
+   to batched radial tridiagonal systems solved by pinned SOLVAX. The zero mode
+   pins only its redundant outer radial equation and then restores the
+   volume-weighted gauge. Manufactured reconstruction, reverse-mode coefficient
+   differentiation, CUDA execution, the compatible solve/restart gate, and the
+   full fringing module all pass. On a `32 x 16 x 32` A4000 probe, warm time is
+   `0.0506 s` versus `0.2811 s` for 48-step PCG (`5.55x`); local residual
+   improves from `3.70e-5` to `2.18e-10`, and maximum discrete error improves
+   from `1.69e-9` to `2.44e-15`. Evidence is in
+   `benchmarks/results/b1-separable-electric-gpu-20260713.json`. This closes the
+   electric block only. Next carry the compatible momentum/pressure Schur
+   action into theta mode space so the dominant Krylov batch can be explicitly
+   partitioned across devices without distributing an FFT or dense gauge basis.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

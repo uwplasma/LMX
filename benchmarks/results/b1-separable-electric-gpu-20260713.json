@@ -1,0 +1,48 @@
+{
+  "date": "2026-07-13",
+  "branch": "agent/b1-compatible-stokes",
+  "commit": "93331fd",
+  "hardware": "NVIDIA RTX A4000 16376 MiB",
+  "software": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "solvax": "0.7.0",
+    "cuda": "pip CUDA 13 wheels"
+  },
+  "method": {
+    "operator": "axisymmetric cylindrical finite-volume electric Poisson",
+    "decomposition": "orthonormal DCT-II in x, real FFT in theta, batched radial tridiagonal solves",
+    "radial_solver": "SOLVAX tridiagonal_solve",
+    "gauge": "pin the redundant outer radial equation in the zero mode, then restore the volume-weighted mean-zero gauge",
+    "differentiable": true
+  },
+  "manufactured_gpu_benchmark": {
+    "shape": [32, 16, 32],
+    "iterative_pcg": {
+      "cold_seconds": 4.947243079019245,
+      "warm_seconds": 0.28111948899459094,
+      "iterations": 48,
+      "relative_residual": 9.262059827239079e-10,
+      "local_residual": 3.7010999221820384e-05,
+      "max_error": 1.6901110233558114e-09
+    },
+    "separable_direct": {
+      "cold_seconds": 4.521285539958626,
+      "warm_seconds": 0.05063360201893374,
+      "iterations": 1,
+      "relative_residual": 3.0451502851160408e-15,
+      "local_residual": 2.1827872842550278e-10,
+      "max_error": 2.4424906541753444e-15
+    },
+    "warm_speedup": 5.55202467477328
+  },
+  "gates": {
+    "cpu_manufactured_reconstruction": "passed",
+    "reverse_mode_coefficient_gradient": "passed",
+    "cuda_manufactured_reconstruction": "passed",
+    "compatible_b1_solve_restart": "passed",
+    "full_fringing_module": "passed"
+  },
+  "cold_process_note": "The combined CUDA manufactured-gradient and compatible B1 solve/restart tests took 248.38 s and 3.29 GiB RSS. The small production gate remains dominated by compatible Schur compilation; the isolated electric warm row is the accepted performance evidence.",
+  "next_gate": "Represent the compatible pressure/momentum Schur action in theta mode space so the dominant Krylov work, not only the electric block, can be partitioned across GPUs."
+}
