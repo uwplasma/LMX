@@ -37,6 +37,7 @@
   },
   "replicated_krylov_state_screen": {
     "solvax_commit": "0b8322b",
+    "solvax_gates": "17 focused Krylov tests passed; full suite 233 passed in 246.58 seconds; strict warning-as-error documentation build passed.",
     "portable_contract": "An explicit two-CPU-device replicated Krylov solve converged in 14 iterations with residual 1.1128912365939964e-10 and retained two addressable shards.",
     "method": "Keep Krylov and Arnoldi state replicated on the operator mesh with explicit compiled Arnoldi input/output shardings, eliminating per-action replicate/gather transitions.",
     "gpu_result": "rejected",

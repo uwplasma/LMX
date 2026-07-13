@@ -1341,6 +1341,7 @@ wall time is acceptable.
    `1.11e-10`. On the real two-A4000 B1 path, however, the explicit mesh pulls
    modal-factor `vmap` compilation and later electric setup into multi-device
    programs, and the first two-step solve again misses the `180 s` checkpoint.
+   All 233 SOLVAX tests pass in `246.58 s`, and strict docs pass.
    The LMX wiring is fully removed. Stop component decomposition; the next GPU
    implementation must be a balanced spatial/domain split with setup outside
    the runtime mesh, exact physics parity, and first-solve time below `69.52 s`.
