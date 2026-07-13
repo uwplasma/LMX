@@ -1091,7 +1091,23 @@ wall time is acceptable.
    behavior on a manufactured mesh. Build `D A^-1 G` only from that verified
    pair. This is a smaller and more decisive step than adding another solver
    or tuning more Krylov dimensions; evidence is in the existing B1 screening
-   record.
+   record. The compatible face operator set is now merged at `c3f7954`; its
+   manufactured test proves `D G` agreement with the shared variable-
+   coefficient diffusion operator, the constant nullspace, volume-weighted
+   symmetry, and JIT differentiation, while the full fringing module passes.
+   On `agent/b1-compatible-stokes`, `dfaeb09` closes manufactured steady
+   Stokes divergence and flow below `1e-7` with both identity and actual
+   viscous `A^-1`. The B1 saddle diagnosis at `fef95df` then separates the
+   remaining blocks: an exact `7 x 7` axial flow-response matrix reduces its
+   preconditioned flow residual to `3.83e-8`, but transient, unit-response,
+   and point-diagonal pressure mobilities leave the pressure-block residual at
+   `1.79` or become unstable. Reference JAX GMRES reproduces the SOLVAX result,
+   so do not tune the Krylov implementation. Retain the compatible operators
+   and exact axial block; next prototype a bounded approximation to the
+   pressure `D A^-1 G` action itself, beginning with axial-mode deflation and
+   independent cross-sectional block solves. Require monotone pressure-block
+   residual reduction on the tiny case before reconnecting electromagnetics,
+   and do not schedule another exact GPU campaign before that gate passes.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

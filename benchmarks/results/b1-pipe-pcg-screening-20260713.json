@@ -290,7 +290,21 @@
         "accepted": false,
         "reason": "Using the cell-centred gradient with the face-flux divergence does not form a compatible discrete G/D pair; the pressure Krylov residual stagnates or excites divergence. Preserve this branch as a diagnostic, not production code."
       },
-      "next_candidate": "Extract one reusable compatible cylindrical face interpolation, divergence, pressure-gradient, and cell reconstruction operator set, prove D G consistency and adjointness with manufactured tests, then build the steady D A^-1 G block on that foundation."
+      "compatible_face_block": {
+        "production_foundation_commit": "c3f7954",
+        "experimental_branch": "agent/b1-compatible-stokes",
+        "manufactured_stokes_commit": "dfaeb09",
+        "diagnostic_commit": "fef95df",
+        "manufactured_identity_and_viscous_inverse_passed": true,
+        "manufactured_divergence_limit": 1e-07,
+        "manufactured_flow_limit": 1e-07,
+        "tiny_b1_flow_block_preconditioner_residual": 3.8276465e-08,
+        "tiny_b1_pressure_block_residual": 1.7872608,
+        "reference_jax_gmres_reproduced_failure": true,
+        "accepted": false,
+        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree."
+      },
+      "next_candidate": "Retain the compatible face operators and exact axial flow block. Replace the pressure mobility surrogate with a bounded approximation to D A^-1 G itself (begin with axial-mode deflation plus cross-sectional block solves), and require the tiny pressure-block residual to decrease before another electromagnetic or exact-GPU campaign."
     },
     "accepted": false,
     "next_candidate": "Extract and verify a compatible cylindrical face G/D operator set before retrying the steady D A^-1 G Stokes-electric block; transient projection and mixed cell/face Schur variants are closed."
