@@ -898,6 +898,12 @@ wall time is acceptable.
    cost. Retain SOLVAX single-reduction PCG and require either a stronger
    accepted preconditioner or a device-resolved timeline before changing its
    recurrence.
+   A stable top-level JIT for the complete outer-step diagnostic vector is
+   exact on Mac CPU and one/two A4000s but is rejected and removed. It adds 115
+   net source/test lines while warm time is neutral: `36.82 s` versus `36.68 s`
+   on one GPU and `50.26 s` versus `50.18 s` on two. The full-size Mac cold
+   restart passes in `48.03 s`. Do not pursue further standalone diagnostic
+   fusion; return the active experiment to solver-side work.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at

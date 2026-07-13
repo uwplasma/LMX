@@ -280,6 +280,14 @@ the accepted single-reduction recurrence, so the next change requires a
 better preconditioner or a device-resolved timeline, not another ungrounded
 inner-product rearrangement.
 
+A stable top-level JIT for all B2 outer-step reductions was tested next. It
+preserves every Mac CPU and one/two-GPU physics gate, but adds 115 net source
+and test lines without improving runtime: one GPU is `36.82 s` warm versus the
+accepted `36.68 s`, and two GPUs are `50.26 s` versus `50.18 s`. The full-size
+Mac cold restart passes in `48.03 s`. This prototype is rejected and removed;
+the eager `pjit` events visible under tracing are not a profitable standalone
+fusion target after the accepted one-transfer stack.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep
