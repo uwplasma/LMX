@@ -1,14 +1,16 @@
-"""LMX public API with lazy imports for lightweight startup."""
+"""Small, lazy convenience API for LMX.
+
+Research and advanced APIs live in their named modules, for example
+``lmx.fringing`` and ``lmx.autodiff``. Keeping the package root deliberately
+small makes supported concepts discoverable and avoids importing JAX-heavy
+solver modules until a symbol is used.
+"""
 
 from __future__ import annotations
 
 from importlib import import_module
-import warnings
 
 
-# Deliberate stable convenience surface. Advanced and research-stage APIs live
-# in their owning submodules; the former root attributes remain available for
-# one deprecation release through ``__getattr__`` below.
 __all__ = [
     "enable_compilation_cache",
     "make_hartmann_case",
@@ -44,445 +46,52 @@ __all__ = [
 
 
 _EXPORTS = {
-    "WhamBlanketLoop": ("lmx.blanket_geometry", "WhamBlanketLoop"),
-    "build_wham_blanket_centerline": ("lmx.blanket_geometry", "build_wham_blanket_centerline"),
-    "tube_surface_from_centerline": ("lmx.blanket_geometry", "tube_surface_from_centerline"),
-    "wham_blanket_clearance_metrics": ("lmx.blanket_geometry", "wham_blanket_clearance_metrics"),
-    "write_centerline_pipe_mesh_preview": ("lmx.blanket_geometry", "write_centerline_pipe_mesh_preview"),
-    "write_wham_blanket_geometry_preview": ("lmx.blanket_geometry", "write_wham_blanket_geometry_preview"),
-    "BlanketFlowSettings": ("lmx.blanket_flow", "BlanketFlowSettings"),
-    "BlanketTransientFlowSettings": ("lmx.blanket_flow", "BlanketTransientFlowSettings"),
-    "LiquidMetalProperties": ("lmx.blanket_flow", "LiquidMetalProperties"),
-    "blanket_pressure_budget_from_transverse_field": (
-        "lmx.blanket_flow",
-        "blanket_pressure_budget_from_transverse_field",
-    ),
-    "solve_wham_blanket_reduced_flow": ("lmx.blanket_flow", "solve_wham_blanket_reduced_flow"),
-    "solve_wham_blanket_transient_flow": ("lmx.blanket_flow", "solve_wham_blanket_transient_flow"),
-    "wham_blanket_pressure_drop_history": ("lmx.blanket_flow", "wham_blanket_pressure_drop_history"),
-    "wham_blanket_pressure_drop_sensitivity": ("lmx.blanket_flow", "wham_blanket_pressure_drop_sensitivity"),
-    "write_wham_blanket_autodiff_research_plots": (
-        "lmx.blanket_flow",
-        "write_wham_blanket_autodiff_research_plots",
-    ),
-    "write_wham_blanket_flow_movie": ("lmx.blanket_flow", "write_wham_blanket_flow_movie"),
-    "write_wham_blanket_flow_plots": ("lmx.blanket_flow", "write_wham_blanket_flow_plots"),
-    "write_wham_blanket_pressure_sweep_plots": (
-        "lmx.blanket_flow",
-        "write_wham_blanket_pressure_sweep_plots",
-    ),
-    "write_wham_blanket_flow_summary": ("lmx.blanket_flow", "write_wham_blanket_flow_summary"),
-    "write_wham_blanket_transient_flow_movie": (
-        "lmx.blanket_flow",
-        "write_wham_blanket_transient_flow_movie",
-    ),
-    "write_wham_blanket_transient_flow_plots": (
-        "lmx.blanket_flow",
-        "write_wham_blanket_transient_flow_plots",
-    ),
-    "centerline_field_quality_metrics": ("lmx.centerline_fields", "centerline_field_quality_metrics"),
-    "centerline_current_closure_metrics": ("lmx.centerline_fields", "centerline_current_closure_metrics"),
-    "centerline_current_pressure_metrics": ("lmx.centerline_fields", "centerline_current_pressure_metrics"),
-    "centerline_pipe_frames": ("lmx.centerline_fields", "centerline_pipe_frames"),
-    "sample_field_on_centerline_pipe_mesh": ("lmx.centerline_fields", "sample_field_on_centerline_pipe_mesh"),
-    "sample_wham_field_on_centerline_pipe_mesh": (
-        "lmx.centerline_fields",
-        "sample_wham_field_on_centerline_pipe_mesh",
-    ),
-    "solve_centerline_pipe_current_closure": (
-        "lmx.centerline_fields",
-        "solve_centerline_pipe_current_closure",
-    ),
-    "write_centerline_field_preview": ("lmx.centerline_fields", "write_centerline_field_preview"),
-    "write_centerline_current_closure_preview": (
-        "lmx.centerline_fields",
-        "write_centerline_current_closure_preview",
-    ),
-    "benchmark_solver": ("lmx.benchmarks", "benchmark_solver"),
-    "write_benchmark_report": ("lmx.benchmarks", "write_benchmark_report"),
-    "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),
-    "make_hunt_case": ("lmx.cases", "make_hunt_case"),
-    "make_shercliff_case": ("lmx.cases", "make_shercliff_case"),
-    "dynamic_to_kinematic_viscosity": ("lmx.units", "dynamic_to_kinematic_viscosity"),
-    "kinematic_to_dynamic_viscosity": ("lmx.units", "kinematic_to_dynamic_viscosity"),
-    "hartmann_number": ("lmx.units", "hartmann_number"),
-    "magnetic_field_from_hartmann": ("lmx.units", "magnetic_field_from_hartmann"),
-    "reynolds_number": ("lmx.units", "reynolds_number"),
-    "interaction_parameter": ("lmx.units", "interaction_parameter"),
-    "magnetic_reynolds_number": ("lmx.units", "magnetic_reynolds_number"),
-    "wall_conductance_ratio": ("lmx.units", "wall_conductance_ratio"),
-    "normal_leakage_ratio": ("lmx.units", "normal_leakage_ratio"),
-    "WallLayer": ("lmx.wall_models", "WallLayer"),
-    "tangential_stack_conductance_ratio": ("lmx.wall_models", "tangential_stack_conductance_ratio"),
-    "normal_stack_leakage_ratio": ("lmx.wall_models", "normal_stack_leakage_ratio"),
-    "effective_pinhole_conductance_ratio": ("lmx.wall_models", "effective_pinhole_conductance_ratio"),
-    "equivalent_single_layer": ("lmx.wall_models", "equivalent_single_layer"),
-    "nested_wall_layer_resolution_summary": ("lmx.wall_models", "nested_wall_layer_resolution_summary"),
-    "wall_layer_from_conductance_ratio": ("lmx.wall_models", "wall_layer_from_conductance_ratio"),
-    "LithiumMaterial": ("lmx.wall_study", "LithiumMaterial"),
-    "WallStackStudyCase": ("lmx.wall_study", "WallStackStudyCase"),
-    "DEFAULT_LI_ALN_CASE": ("lmx.wall_study", "DEFAULT_LI_ALN_CASE"),
-    "DEFAULT_SUBSTRATE_CONDUCTIVITIES": ("lmx.wall_study", "DEFAULT_SUBSTRATE_CONDUCTIVITIES"),
-    "li_aln_phase0_2_summary": ("lmx.wall_study", "li_aln_phase0_2_summary"),
-    "li_aln_phase3_6_summary": ("lmx.wall_study", "li_aln_phase3_6_summary"),
-    "li_aln_multilayer_mesh_summary": ("lmx.wall_study", "li_aln_multilayer_mesh_summary"),
-    "li_aln_multilayer_solve_summary": ("lmx.wall_study", "li_aln_multilayer_solve_summary"),
-    "li_aln_multilayer_convergence_summary": ("lmx.wall_study", "li_aln_multilayer_convergence_summary"),
-    "li_aln_unit_audit": ("lmx.wall_study", "li_aln_unit_audit"),
-    "build_li_aln_multilayer_solve_case": ("lmx.wall_study", "build_li_aln_multilayer_solve_case"),
-    "li_aln_wall_layers": ("lmx.wall_study", "li_aln_wall_layers"),
-    "li_aln_multilayer_wall_model_stacks": ("lmx.wall_study", "li_aln_multilayer_wall_model_stacks"),
-    "li_aln_wall_stacks_by_side": ("lmx.wall_study", "li_aln_wall_stacks_by_side"),
-    "write_li_aln_phase0_2_artifacts": ("lmx.wall_study", "write_li_aln_phase0_2_artifacts"),
-    "write_li_aln_phase3_6_artifacts": ("lmx.wall_study", "write_li_aln_phase3_6_artifacts"),
-    "write_li_aln_multilayer_mesh_artifacts": ("lmx.wall_study", "write_li_aln_multilayer_mesh_artifacts"),
-    "write_li_aln_multilayer_solve_artifacts": ("lmx.wall_study", "write_li_aln_multilayer_solve_artifacts"),
-    "write_li_aln_multilayer_convergence_artifacts": ("lmx.wall_study", "write_li_aln_multilayer_convergence_artifacts"),
-    "run_case_example": ("lmx.example_runner", "run_case_example"),
-    "run_theory_meeting_demo": ("lmx.example_runner", "run_theory_meeting_demo"),
-    "solve_case_snapshots": ("lmx.example_runner", "solve_case_snapshots"),
-    "generate_layered_duct_mesh": ("lmx.mesh", "generate_layered_duct_mesh"),
-    "generate_layered_duct_mesh_from_fluid_faces": ("lmx.mesh", "generate_layered_duct_mesh_from_fluid_faces"),
-    "generate_multilayer_duct_mesh": ("lmx.mesh", "generate_multilayer_duct_mesh"),
-    "generate_bent_pipe_mesh": ("lmx.mesh", "generate_bent_pipe_mesh"),
-    "generate_centerline_pipe_mesh": ("lmx.mesh", "generate_centerline_pipe_mesh"),
-    "centerline_pipe_mesh_quality_metrics": ("lmx.mesh", "centerline_pipe_mesh_quality_metrics"),
-    "generate_pipe_ogrid_mesh": ("lmx.mesh", "generate_pipe_ogrid_mesh"),
-    "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
-    "generate_rect_duct_mesh_from_faces": ("lmx.mesh", "generate_rect_duct_mesh_from_faces"),
     "enable_compilation_cache": ("lmx.jax_setup", "enable_compilation_cache"),
-    "load_closed_channel_analytical": ("lmx.reference_data", "load_closed_channel_analytical"),
-    "load_hunt_analytical": ("lmx.reference_data", "load_hunt_analytical"),
-    "load_shercliff_analytical": ("lmx.reference_data", "load_shercliff_analytical"),
-    "load_fringing_pipe_profile": ("lmx.reference_data", "load_fringing_pipe_profile"),
-    "load_processed_slice": ("lmx.reference_data", "load_processed_slice"),
-    "processed_slice_area_mean": ("lmx.reference_data", "processed_slice_area_mean"),
-    "processed_slice_field_grid": ("lmx.reference_data", "processed_slice_field_grid"),
-    "processed_slice_point_mesh": ("lmx.reference_data", "processed_slice_point_mesh"),
+    "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),
+    "make_shercliff_case": ("lmx.cases", "make_shercliff_case"),
+    "make_hunt_case": ("lmx.cases", "make_hunt_case"),
     "solve_steady": ("lmx.solvers", "solve_steady"),
     "solve_transient": ("lmx.solvers", "solve_transient"),
     "fully_developed_power_balance": ("lmx.solvers", "fully_developed_power_balance"),
-    "compare_with_reference_outputs": ("lmx.validation", "compare_with_reference_outputs"),
-    "compare_magnetic_obstacle_reference_observables": (
-        "lmx.external_validation",
-        "compare_magnetic_obstacle_reference_observables",
-    ),
-    "compare_scalar_reference_observables": (
-        "lmx.external_validation",
-        "compare_scalar_reference_observables",
-    ),
-    "external_validation_readiness_rows": (
-        "lmx.external_validation",
-        "external_validation_readiness_rows",
-    ),
-    "load_scalar_reference_observables": (
-        "lmx.external_validation",
-        "load_scalar_reference_observables",
-    ),
-    "load_magnetic_obstacle_reference_observables": (
-        "lmx.external_validation",
-        "load_magnetic_obstacle_reference_observables",
-    ),
-    "load_magnetic_obstacle_votyakov_digitized_curve": (
-        "lmx.external_validation",
-        "load_magnetic_obstacle_votyakov_digitized_curve",
-    ),
-    "load_q2dmhdfoam_line_profile": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_line_profile",
-    ),
-    "load_q2dmhdfoam_lid_driven_observables": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_lid_driven_observables",
-    ),
-    "load_q2dmhdfoam_force_coefficients": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_force_coefficients",
-    ),
-    "load_q2dmhdfoam_docker_reference_profile": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_docker_reference_profile",
-    ),
-    "load_q2dmhdfoam_probe_velocity_history": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_probe_velocity_history",
-    ),
-    "load_q2dmhdfoam_vtk_vector_field": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_vtk_vector_field",
-    ),
-    "load_q2dmhdfoam_lid_driven_cell_field": (
-        "lmx.external_validation",
-        "load_q2dmhdfoam_lid_driven_cell_field",
-    ),
-    "audit_q2dmhdfoam_lmx_turbulence_match": (
-        "lmx.external_validation",
-        "audit_q2dmhdfoam_lmx_turbulence_match",
-    ),
-    "q2dmhdfoam_case_manifest": (
-        "lmx.external_validation",
-        "q2dmhdfoam_case_manifest",
-    ),
-    "q2dmhdfoam_profile_observables": (
-        "lmx.external_validation",
-        "q2dmhdfoam_profile_observables",
-    ),
-    "q2dmhdfoam_docker_reference_observables": (
-        "lmx.external_validation",
-        "q2dmhdfoam_docker_reference_observables",
-    ),
-    "q2dmhdfoam_vtk_velocity_observables": (
-        "lmx.external_validation",
-        "q2dmhdfoam_vtk_velocity_observables",
-    ),
-    "q2dmhdfoam_cell_velocity_observables": (
-        "lmx.external_validation",
-        "q2dmhdfoam_cell_velocity_observables",
-    ),
-    "q2d_turbulence_reference_template_rows": (
-        "lmx.external_validation",
-        "q2d_turbulence_reference_template_rows",
-    ),
-    "dean_vortex_reference_template_rows": (
-        "lmx.external_validation",
-        "dean_vortex_reference_template_rows",
-    ),
-    "magnetic_obstacle_reference_template_rows": (
-        "lmx.external_validation",
-        "magnetic_obstacle_reference_template_rows",
-    ),
-    "magnetic_obstacle_votyakov_curve_observables": (
-        "lmx.external_validation",
-        "magnetic_obstacle_votyakov_curve_observables",
-    ),
-    "write_dean_vortex_reference_template": (
-        "lmx.external_validation",
-        "write_dean_vortex_reference_template",
-    ),
-    "summarize_external_validation_readiness": (
-        "lmx.external_validation",
-        "summarize_external_validation_readiness",
-    ),
-    "write_external_validation_readiness_panel": (
-        "lmx.external_validation",
-        "write_external_validation_readiness_panel",
-    ),
-    "write_magnetic_obstacle_reference_comparison_table": (
-        "lmx.external_validation",
-        "write_magnetic_obstacle_reference_comparison_table",
-    ),
-    "write_magnetic_obstacle_reference_comparison_plots": (
-        "lmx.external_validation",
-        "write_magnetic_obstacle_reference_comparison_plots",
-    ),
-    "write_magnetic_obstacle_reference_template": (
-        "lmx.external_validation",
-        "write_magnetic_obstacle_reference_template",
-    ),
-    "write_magnetic_obstacle_votyakov_curve_comparison": (
-        "lmx.external_validation",
-        "write_magnetic_obstacle_votyakov_curve_comparison",
-    ),
-    "write_q2dmhdfoam_external_reference_panel": (
-        "lmx.external_validation",
-        "write_q2dmhdfoam_external_reference_panel",
-    ),
-    "write_q2dmhdfoam_docker_reference_panel": (
-        "lmx.external_validation",
-        "write_q2dmhdfoam_docker_reference_panel",
-    ),
-    "write_q2dmhdfoam_profile_observable_table": (
-        "lmx.external_validation",
-        "write_q2dmhdfoam_profile_observable_table",
-    ),
-    "write_q2dmhdfoam_timeseries_observable_table": (
-        "lmx.external_validation",
-        "write_q2dmhdfoam_timeseries_observable_table",
-    ),
-    "write_q2dmhdfoam_lmx_turbulence_match_audit": (
-        "lmx.external_validation",
-        "write_q2dmhdfoam_lmx_turbulence_match_audit",
-    ),
-    "write_q2dmhdfoam_vtk_velocity_panel": (
-        "lmx.external_validation",
-        "write_q2dmhdfoam_vtk_velocity_panel",
-    ),
-    "write_q2d_turbulence_reference_template": (
-        "lmx.external_validation",
-        "write_q2d_turbulence_reference_template",
-    ),
-    "write_scalar_reference_comparison_table": (
-        "lmx.external_validation",
-        "write_scalar_reference_comparison_table",
-    ),
-    "write_scalar_reference_comparison_plots": (
-        "lmx.external_validation",
-        "write_scalar_reference_comparison_plots",
-    ),
-    "write_scalar_reference_template": (
-        "lmx.external_validation",
-        "write_scalar_reference_template",
-    ),
-    "build_hartmann_autodiff_problem": ("lmx.autodiff", "build_hartmann_autodiff_problem"),
-    "build_fringing_autodiff_problem": ("lmx.autodiff", "build_fringing_autodiff_problem"),
-    "extruded_rect_response_history": ("lmx.autodiff", "extruded_rect_response_history"),
-    "extruded_rect_projection_history": ("lmx.autodiff", "extruded_rect_projection_history"),
-    "extruded_rect_projection_iteration_history": ("lmx.autodiff", "extruded_rect_projection_iteration_history"),
-    "extruded_rect_projection_field_loss_gradients": ("lmx.autodiff", "extruded_rect_projection_field_loss_gradients"),
-    "extruded_rect_projection_trajectory_loss_gradients": ("lmx.autodiff", "extruded_rect_projection_trajectory_loss_gradients"),
-    "fringing_response_history": ("lmx.autodiff", "fringing_response_history"),
-    "wham_mirror_pressure_drop_history": ("lmx.autodiff", "wham_mirror_pressure_drop_history"),
-    "wham_mirror_pressure_drop_sensitivity": ("lmx.autodiff", "wham_mirror_pressure_drop_sensitivity"),
-    "build_extruded_response_targets": ("lmx.autodiff", "build_extruded_response_targets"),
-    "hartmann_mean_velocity_gradients": ("lmx.autodiff", "hartmann_mean_velocity_gradients"),
-    "hartmann_mean_velocity_finite_difference_gradients": ("lmx.autodiff", "hartmann_mean_velocity_finite_difference_gradients"),
-    "hartmann_profile_loss_gradients": ("lmx.autodiff", "hartmann_profile_loss_gradients"),
-    "fringing_mean_velocity_history": ("lmx.autodiff", "fringing_mean_velocity_history"),
-    "fringing_history_loss_gradients": ("lmx.autodiff", "fringing_history_loss_gradients"),
-    "fringing_response_loss_gradients": ("lmx.autodiff", "fringing_response_loss_gradients"),
-    "extruded_rect_response_loss_gradients": ("lmx.autodiff", "extruded_rect_response_loss_gradients"),
-    "extruded_rect_projection_loss_gradients": ("lmx.autodiff", "extruded_rect_projection_loss_gradients"),
-    "run_fringing_history_inverse_design": ("lmx.autodiff", "run_fringing_history_inverse_design"),
-    "run_fringing_response_inverse_design": ("lmx.autodiff", "run_fringing_response_inverse_design"),
-    "run_extruded_rect_inverse_design": ("lmx.autodiff", "run_extruded_rect_inverse_design"),
-    "run_extruded_rect_projection_inverse_design": ("lmx.autodiff", "run_extruded_rect_projection_inverse_design"),
-    "run_extruded_rect_projection_field_inverse_design": ("lmx.autodiff", "run_extruded_rect_projection_field_inverse_design"),
-    "run_extruded_rect_projection_trajectory_inverse_design": ("lmx.autodiff", "run_extruded_rect_projection_trajectory_inverse_design"),
-    "run_extruded_target_inverse_design": ("lmx.autodiff", "run_extruded_target_inverse_design"),
-    "run_hartmann_profile_inverse_design": ("lmx.autodiff", "run_hartmann_profile_inverse_design"),
-    "solve_differentiable_hartmann": ("lmx.autodiff", "solve_differentiable_hartmann"),
-    "summarize_strong_scaling_records": ("lmx.scaling", "summarize_strong_scaling_records"),
-    "write_scaling_report": ("lmx.scaling", "write_scaling_report"),
-    "write_strong_scaling_summary_table": ("lmx.scaling", "write_strong_scaling_summary_table"),
-    "write_case_overview_plots": ("lmx.plotting", "write_case_overview_plots"),
-    "write_extruded_overview_plots": ("lmx.plotting", "write_extruded_overview_plots"),
-    "write_magnetic_obstacle_benchmark_plots": ("lmx.plotting", "write_magnetic_obstacle_benchmark_plots"),
-    "write_magnetic_obstacle_schematic_plots": ("lmx.plotting", "write_magnetic_obstacle_schematic_plots"),
-    "write_magnetic_obstacle_regime_plots": ("lmx.plotting", "write_magnetic_obstacle_regime_plots"),
-    "write_bent_pipe_overview_plots": ("lmx.plotting", "write_bent_pipe_overview_plots"),
-    "bayat_rezai_dean_velocity": ("lmx.dean", "bayat_rezai_dean_velocity"),
-    "bayat_rezai_lateral_reynolds": ("lmx.dean", "bayat_rezai_lateral_reynolds"),
-    "compare_dean_velocity_points": ("lmx.dean", "compare_dean_velocity_points"),
-    "dean_number_from_reynolds": ("lmx.dean", "dean_number_from_reynolds"),
-    "dean_secondary_flow_field": ("lmx.dean", "dean_secondary_flow_field"),
-    "dean_velocity_reference_rows": ("lmx.dean", "dean_velocity_reference_rows"),
-    "write_dean_literature_validation_plots": ("lmx.dean", "write_dean_literature_validation_plots"),
-    "write_geometry_gallery_plots": ("lmx.plotting", "write_geometry_gallery_plots"),
-    "write_geometry_preview_plots": ("lmx.plotting", "write_geometry_preview_plots"),
-    "write_cross_section_field_plots": ("lmx.plotting", "write_cross_section_field_plots"),
-    "write_tabulated_field_reconstruction_plots": (
-        "lmx.plotting",
-        "write_tabulated_field_reconstruction_plots",
-    ),
-    "write_wham_mirror_overview_plots": ("lmx.plotting", "write_wham_mirror_overview_plots"),
-    "write_transient_movies": ("lmx.plotting", "write_transient_movies"),
-    "write_strong_scaling_plots": ("lmx.plotting", "write_strong_scaling_plots"),
-    "write_autodiff_plots": ("lmx.plotting", "write_autodiff_plots"),
-    "write_operator_verification_plots": ("lmx.plotting", "write_operator_verification_plots"),
-    "write_interface_verification_plots": ("lmx.plotting", "write_interface_verification_plots"),
-    "write_freemhd_parity_plots": ("lmx.plotting", "write_freemhd_parity_plots"),
-    "write_freemhd_observable_parity_plots": ("lmx.plotting", "write_freemhd_observable_parity_plots"),
-    "summarize_observable_ladder_levels": ("lmx.freemhd", "summarize_observable_ladder_levels"),
-    "write_observable_ladder_table": ("lmx.freemhd", "write_observable_ladder_table"),
-    "solve_closed_channel_benchmark": ("lmx.showcase", "solve_closed_channel_benchmark"),
-    "write_lm_duct_geometry_setup_figure": ("lmx.showcase", "write_lm_duct_geometry_setup_figure"),
-    "write_structured_mesh_figure": ("lmx.showcase", "write_structured_mesh_figure"),
-    "write_boundary_layer_figure": ("lmx.showcase", "write_boundary_layer_figure"),
-    "write_annotated_layer_figure": ("lmx.showcase", "write_annotated_layer_figure"),
-    "write_velocity_profile_volume_figure": ("lmx.showcase", "write_velocity_profile_volume_figure"),
-    "write_closed_channel_profile_comparison_figure": ("lmx.showcase", "write_closed_channel_profile_comparison_figure"),
-    "write_hartmann_validation_ladder_figure": ("lmx.showcase", "write_hartmann_validation_ladder_figure"),
-    "write_closed_channel_startup_movies": ("lmx.showcase", "write_closed_channel_startup_movies"),
-    "build_square_duct_fringing_benchmark": ("lmx.fringing", "build_square_duct_fringing_benchmark"),
-    "build_square_duct_extruded_problem": ("lmx.fringing", "build_square_duct_extruded_problem"),
-    "build_layered_duct_extruded_problem": ("lmx.fringing", "build_layered_duct_extruded_problem"),
-    "build_bent_pipe_extruded_problem": ("lmx.fringing", "build_bent_pipe_extruded_problem"),
-    "build_variable_field_duct_extruded_problem": ("lmx.fringing", "build_variable_field_duct_extruded_problem"),
-    "build_variable_field_layered_extruded_problem": ("lmx.fringing", "build_variable_field_layered_extruded_problem"),
-    "build_variable_field_pipe_ogrid_extruded_problem": ("lmx.fringing", "build_variable_field_pipe_ogrid_extruded_problem"),
-    "build_variable_field_bent_pipe_extruded_problem": ("lmx.fringing", "build_variable_field_bent_pipe_extruded_problem"),
-    "build_magnetic_obstacle_rect_extruded_problem": ("lmx.fringing", "build_magnetic_obstacle_rect_extruded_problem"),
-    "build_wham_mirror_pipe_extruded_problem": ("lmx.fringing", "build_wham_mirror_pipe_extruded_problem"),
-    "build_pipe_ogrid_extruded_problem": ("lmx.fringing", "build_pipe_ogrid_extruded_problem"),
-    "run_extruded_inductionless_slice": ("lmx.fringing", "run_extruded_inductionless_slice"),
-    "run_fringing_station_sweep": ("lmx.fringing", "run_fringing_station_sweep"),
-    "solve_extruded_inductionless": ("lmx.fringing", "solve_extruded_inductionless"),
-    "validate_extruded_inductionless_solution": ("lmx.fringing", "validate_extruded_inductionless_solution"),
-    "validate_bent_pipe_low_de_baseline": ("lmx.fringing", "validate_bent_pipe_low_de_baseline"),
-    "validate_variable_field_extruded_solution": ("lmx.fringing", "validate_variable_field_extruded_solution"),
-    "validate_variable_field_pipe_solution": ("lmx.fringing", "validate_variable_field_pipe_solution"),
-    "validate_magnetic_obstacle_baseline": ("lmx.fringing", "validate_magnetic_obstacle_baseline"),
-    "validate_magnetic_obstacle_benchmark": ("lmx.fringing", "validate_magnetic_obstacle_benchmark"),
-    "validate_magnetic_obstacle_literature_slice": ("lmx.fringing", "validate_magnetic_obstacle_literature_slice"),
-    "magnetic_obstacle_literature_reference_cases": ("lmx.fringing", "magnetic_obstacle_literature_reference_cases"),
-    "validate_magnetic_obstacle_external_readiness": ("lmx.fringing", "validate_magnetic_obstacle_external_readiness"),
-    "validate_wham_mirror_pipe_baseline": ("lmx.fringing", "validate_wham_mirror_pipe_baseline"),
-    "make_divergence_free_cross_section_field": ("lmx.field_models", "make_divergence_free_cross_section_field"),
-    "make_localized_divergence_free_obstacle_field": ("lmx.field_models", "make_localized_divergence_free_obstacle_field"),
-    "sample_cross_section_field": ("lmx.field_models", "sample_cross_section_field"),
-    "cross_section_divergence_metrics": ("lmx.field_models", "cross_section_divergence_metrics"),
-    "save_cross_section_divergence_report": ("lmx.field_models", "save_cross_section_divergence_report"),
-    "load_tabulated_field": ("lmx.field_models", "load_tabulated_field"),
-    "load_wham_coil_model_script": ("lmx.field_models", "load_wham_coil_model_script"),
-    "tabulated_field_quality_metrics": ("lmx.field_models", "tabulated_field_quality_metrics"),
-    "tabulated_cross_section_reconstruction_metrics": (
-        "lmx.field_models",
-        "tabulated_cross_section_reconstruction_metrics",
-    ),
-    "sample_tabulated_cross_section_field": ("lmx.field_models", "sample_tabulated_cross_section_field"),
-    "sample_tabulated_field_volume": ("lmx.field_models", "sample_tabulated_field_volume"),
-    "sample_wham_mirror_field": ("lmx.field_models", "sample_wham_mirror_field"),
-    "sample_wham_mirror_axis_profile": ("lmx.field_models", "sample_wham_mirror_axis_profile"),
-    "wham_mirror_station_scale": ("lmx.field_models", "wham_mirror_station_scale"),
-    "write_tabulated_field_npz": ("lmx.field_models", "write_tabulated_field_npz"),
-    "write_wham_mirror_field_npz": ("lmx.field_models", "write_wham_mirror_field_npz"),
-    "build_q2d_decay_case": ("lmx.q2d", "build_q2d_decay_case"),
-    "build_q2d_forced_case": ("lmx.q2d", "build_q2d_forced_case"),
-    "build_q2d_wall_bounded_forced_case": ("lmx.q2d", "build_q2d_wall_bounded_forced_case"),
-    "build_q2d_wall_driven_cavity_case": ("lmx.q2d", "build_q2d_wall_driven_cavity_case"),
-    "build_q2d_turbulence_decay_case": ("lmx.q2d", "build_q2d_turbulence_decay_case"),
-    "solve_q2d_decay": ("lmx.q2d", "solve_q2d_decay"),
-    "solve_q2d_forced": ("lmx.q2d", "solve_q2d_forced"),
-    "solve_q2d_wall_bounded_forced": ("lmx.q2d", "solve_q2d_wall_bounded_forced"),
-    "solve_q2d_wall_driven_cavity": ("lmx.q2d", "solve_q2d_wall_driven_cavity"),
-    "solve_q2d_turbulence_decay": ("lmx.q2d", "solve_q2d_turbulence_decay"),
-    "validate_q2d_decay_solution": ("lmx.q2d", "validate_q2d_decay_solution"),
-    "validate_q2d_decay_energy_budget": ("lmx.q2d", "validate_q2d_decay_energy_budget"),
-    "validate_q2d_forced_solution": ("lmx.q2d", "validate_q2d_forced_solution"),
-    "validate_q2d_forced_energy_budget": ("lmx.q2d", "validate_q2d_forced_energy_budget"),
-    "validate_q2d_wall_bounded_forced_solution": ("lmx.q2d", "validate_q2d_wall_bounded_forced_solution"),
-    "validate_q2d_wall_bounded_energy_budget": ("lmx.q2d", "validate_q2d_wall_bounded_energy_budget"),
-    "validate_q2d_turbulence_decay_observables": ("lmx.q2d", "validate_q2d_turbulence_decay_observables"),
-    "q2d_wall_driven_cavity_observables": ("lmx.q2d", "q2d_wall_driven_cavity_observables"),
-    "q2d_wall_driven_cavity_observables_on_grid": ("lmx.q2d", "q2d_wall_driven_cavity_observables_on_grid"),
-    "compare_q2d_wall_driven_observables": ("lmx.q2d", "compare_q2d_wall_driven_observables"),
-    "q2d_modal_energy_budget": ("lmx.q2d", "q2d_modal_energy_budget"),
-    "q2d_energy_spectrum": ("lmx.q2d", "q2d_energy_spectrum"),
-    "q2d_turbulence_observables": ("lmx.q2d", "q2d_turbulence_observables"),
-    "q2d_turbulence_readiness_metrics": ("lmx.q2d", "q2d_turbulence_readiness_metrics"),
-    "write_q2d_decay_plots": ("lmx.q2d", "write_q2d_decay_plots"),
-    "write_q2d_forced_plots": ("lmx.q2d", "write_q2d_forced_plots"),
-    "write_q2d_wall_bounded_forced_plots": ("lmx.q2d", "write_q2d_wall_bounded_forced_plots"),
-    "write_q2d_wall_driven_comparison_plots": ("lmx.q2d", "write_q2d_wall_driven_comparison_plots"),
-    "write_q2d_turbulence_observable_plots": ("lmx.q2d", "write_q2d_turbulence_observable_plots"),
-    "write_q2d_turbulence_decay_movie": ("lmx.q2d", "write_q2d_turbulence_decay_movie"),
+    "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
+    "generate_rect_duct_mesh_from_faces": ("lmx.mesh", "generate_rect_duct_mesh_from_faces"),
+    "generate_layered_duct_mesh": ("lmx.mesh", "generate_layered_duct_mesh"),
+    "generate_layered_duct_mesh_from_fluid_faces": ("lmx.mesh", "generate_layered_duct_mesh_from_fluid_faces"),
+    "generate_multilayer_duct_mesh": ("lmx.mesh", "generate_multilayer_duct_mesh"),
+    "WallLayer": ("lmx.wall_models", "WallLayer"),
+    "dynamic_to_kinematic_viscosity": ("lmx.units", "dynamic_to_kinematic_viscosity"),
+    "kinematic_to_dynamic_viscosity": ("lmx.units", "kinematic_to_dynamic_viscosity"),
+    "hartmann_number": ("lmx.units", "hartmann_number"),
+    "reynolds_number": ("lmx.units", "reynolds_number"),
+    "interaction_parameter": ("lmx.units", "interaction_parameter"),
+    "magnetic_reynolds_number": ("lmx.units", "magnetic_reynolds_number"),
+    "magnetic_field_from_hartmann": ("lmx.units", "magnetic_field_from_hartmann"),
+    "wall_conductance_ratio": ("lmx.units", "wall_conductance_ratio"),
+    "effective_pinhole_conductance_ratio": ("lmx.wall_models", "effective_pinhole_conductance_ratio"),
+    "tangential_stack_conductance_ratio": ("lmx.wall_models", "tangential_stack_conductance_ratio"),
+    "normal_stack_leakage_ratio": ("lmx.wall_models", "normal_stack_leakage_ratio"),
+    "equivalent_single_layer": ("lmx.wall_models", "equivalent_single_layer"),
+    "nested_wall_layer_resolution_summary": ("lmx.wall_models", "nested_wall_layer_resolution_summary"),
+    "load_shercliff_analytical": ("lmx.reference_data", "load_shercliff_analytical"),
+    "load_hunt_analytical": ("lmx.reference_data", "load_hunt_analytical"),
+    "load_closed_channel_analytical": ("lmx.reference_data", "load_closed_channel_analytical"),
+    "load_processed_slice": ("lmx.reference_data", "load_processed_slice"),
 }
-
-_LEGACY_ROOT_EXPORTS = frozenset(_EXPORTS) - frozenset(__all__)
 
 
 def __getattr__(name: str):
-    if name not in _EXPORTS:
-        raise AttributeError(name)
-    module_name, attr_name = _EXPORTS[name]
-    if name in _LEGACY_ROOT_EXPORTS:
-        warnings.warn(
-            f"lmx.{name} is deprecated at the package root; import "
-            f"{attr_name} from {module_name} instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    module = import_module(module_name)
-    value = getattr(module, attr_name)
+    """Load a documented root export on first access."""
+
+    try:
+        module_name, attr_name = _EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(f"module 'lmx' has no attribute {name!r}") from exc
+    value = getattr(import_module(module_name), attr_name)
     globals()[name] = value
     return value
+
+
+def __dir__() -> list[str]:
+    """Return module globals plus the lazy public surface for discovery."""
+
+    return sorted(set(globals()) | set(__all__))

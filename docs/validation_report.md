@@ -15,7 +15,7 @@ are authoritative when prose and results differ.
 - SOLVAX 0.8 integration passes primal, implicit-gradient, independent
   transpose, CPU/GPU, and bounded end-to-end gates.
 - The portable package gate passes 807 tests with 8 expected external-data
-  skips and 95.30% branch coverage in 217.5 seconds on the reference Mac.
+  skips and 95.30% branch coverage in 321.0 seconds on the reference Mac.
 
 ## Research-stage
 

@@ -1,236 +1,57 @@
 import lmx
-import pytest
 
 
-@pytest.mark.filterwarnings(
-    "ignore:.*deprecated at the package root.*:DeprecationWarning"
-)
-def test_lmx_lazy_exports_resolve_expected_symbols():
-    assert callable(lmx.generate_rect_duct_mesh)
-    assert callable(lmx.build_wham_blanket_centerline)
-    assert callable(lmx.centerline_field_quality_metrics)
-    assert callable(lmx.centerline_current_closure_metrics)
-    assert callable(lmx.centerline_current_pressure_metrics)
-    assert callable(lmx.centerline_pipe_frames)
-    assert callable(lmx.generate_centerline_pipe_mesh)
-    assert callable(lmx.centerline_pipe_mesh_quality_metrics)
-    assert callable(lmx.BlanketFlowSettings)
-    assert callable(lmx.BlanketTransientFlowSettings)
-    assert callable(lmx.LiquidMetalProperties)
-    assert callable(lmx.blanket_pressure_budget_from_transverse_field)
-    assert callable(lmx.solve_wham_blanket_reduced_flow)
-    assert callable(lmx.solve_wham_blanket_transient_flow)
-    assert callable(lmx.wham_blanket_pressure_drop_history)
-    assert callable(lmx.wham_blanket_pressure_drop_sensitivity)
-    assert callable(lmx.tube_surface_from_centerline)
-    assert callable(lmx.wham_blanket_clearance_metrics)
-    assert callable(lmx.write_centerline_pipe_mesh_preview)
-    assert callable(lmx.write_wham_blanket_autodiff_research_plots)
-    assert callable(lmx.write_wham_blanket_flow_movie)
-    assert callable(lmx.write_wham_blanket_flow_plots)
-    assert callable(lmx.write_wham_blanket_pressure_sweep_plots)
-    assert callable(lmx.write_wham_blanket_flow_summary)
-    assert callable(lmx.write_wham_blanket_transient_flow_movie)
-    assert callable(lmx.write_wham_blanket_transient_flow_plots)
-    assert callable(lmx.write_wham_blanket_geometry_preview)
-    assert callable(lmx.generate_rect_duct_mesh_from_faces)
-    assert callable(lmx.generate_layered_duct_mesh_from_fluid_faces)
-    assert callable(lmx.generate_bent_pipe_mesh)
-    assert callable(lmx.compare_magnetic_obstacle_reference_observables)
-    assert callable(lmx.audit_q2dmhdfoam_lmx_turbulence_match)
-    assert callable(lmx.load_magnetic_obstacle_reference_observables)
-    assert callable(lmx.load_magnetic_obstacle_votyakov_digitized_curve)
-    assert callable(lmx.magnetic_obstacle_reference_template_rows)
-    assert callable(lmx.magnetic_obstacle_votyakov_curve_observables)
-    assert callable(lmx.q2dmhdfoam_case_manifest)
-    assert callable(lmx.write_magnetic_obstacle_reference_comparison_plots)
-    assert callable(lmx.write_magnetic_obstacle_reference_comparison_table)
-    assert callable(lmx.write_magnetic_obstacle_reference_template)
-    assert callable(lmx.write_magnetic_obstacle_votyakov_curve_comparison)
-    assert callable(lmx.write_q2dmhdfoam_lmx_turbulence_match_audit)
-    assert callable(lmx.enable_compilation_cache)
-    assert callable(lmx.load_fringing_pipe_profile)
-    assert callable(lmx.load_shercliff_analytical)
-    assert callable(lmx.load_hunt_analytical)
-    assert callable(lmx.processed_slice_area_mean)
-    assert callable(lmx.processed_slice_field_grid)
-    assert callable(lmx.processed_slice_point_mesh)
-    assert callable(lmx.build_hartmann_autodiff_problem)
-    assert callable(lmx.build_extruded_response_targets)
-    assert callable(lmx.hartmann_mean_velocity_gradients)
-    assert callable(lmx.hartmann_profile_loss_gradients)
-    assert callable(lmx.run_hartmann_profile_inverse_design)
-    assert callable(lmx.build_square_duct_fringing_benchmark)
-    assert callable(lmx.build_layered_duct_extruded_problem)
-    assert callable(lmx.build_bent_pipe_extruded_problem)
-    assert callable(lmx.build_variable_field_duct_extruded_problem)
-    assert callable(lmx.build_variable_field_layered_extruded_problem)
-    assert callable(lmx.build_variable_field_pipe_ogrid_extruded_problem)
-    assert callable(lmx.build_variable_field_bent_pipe_extruded_problem)
-    assert callable(lmx.build_magnetic_obstacle_rect_extruded_problem)
-    assert callable(lmx.build_wham_mirror_pipe_extruded_problem)
-    assert callable(lmx.build_pipe_ogrid_extruded_problem)
-    assert callable(lmx.run_extruded_inductionless_slice)
-    assert callable(lmx.solve_extruded_inductionless)
-    assert callable(lmx.validate_bent_pipe_low_de_baseline)
-    assert callable(lmx.validate_variable_field_extruded_solution)
-    assert callable(lmx.validate_variable_field_pipe_solution)
-    assert callable(lmx.validate_magnetic_obstacle_baseline)
-    assert callable(lmx.validate_magnetic_obstacle_benchmark)
-    assert callable(lmx.validate_magnetic_obstacle_literature_slice)
-    assert callable(lmx.magnetic_obstacle_literature_reference_cases)
-    assert callable(lmx.validate_magnetic_obstacle_external_readiness)
-    assert callable(lmx.validate_wham_mirror_pipe_baseline)
-    assert callable(lmx.build_square_duct_extruded_problem)
-    assert callable(lmx.build_fringing_autodiff_problem)
-    assert callable(lmx.wham_mirror_pressure_drop_history)
-    assert callable(lmx.wham_mirror_pressure_drop_sensitivity)
-    assert callable(lmx.extruded_rect_response_history)
-    assert callable(lmx.extruded_rect_projection_iteration_history)
-    assert callable(lmx.extruded_rect_projection_field_loss_gradients)
-    assert callable(lmx.extruded_rect_projection_trajectory_loss_gradients)
-    assert callable(lmx.fringing_mean_velocity_history)
-    assert callable(lmx.fringing_response_history)
-    assert callable(lmx.extruded_rect_response_loss_gradients)
-    assert callable(lmx.run_fringing_history_inverse_design)
-    assert callable(lmx.run_fringing_response_inverse_design)
-    assert callable(lmx.run_extruded_rect_inverse_design)
-    assert callable(lmx.run_extruded_rect_projection_field_inverse_design)
-    assert callable(lmx.run_extruded_rect_projection_trajectory_inverse_design)
-    assert callable(lmx.run_extruded_target_inverse_design)
-    assert callable(lmx.summarize_strong_scaling_records)
-    assert callable(lmx.write_scaling_report)
-    assert callable(lmx.write_strong_scaling_summary_table)
-    assert callable(lmx.solve_case_snapshots)
-    assert callable(lmx.write_case_overview_plots)
-    assert callable(lmx.write_extruded_overview_plots)
-    assert callable(lmx.write_magnetic_obstacle_benchmark_plots)
-    assert callable(lmx.write_magnetic_obstacle_regime_plots)
-    assert callable(lmx.write_bent_pipe_overview_plots)
-    assert callable(lmx.bayat_rezai_dean_velocity)
-    assert callable(lmx.bayat_rezai_lateral_reynolds)
-    assert callable(lmx.compare_dean_velocity_points)
-    assert callable(lmx.dean_number_from_reynolds)
-    assert callable(lmx.dean_secondary_flow_field)
-    assert callable(lmx.dean_velocity_reference_rows)
-    assert callable(lmx.write_dean_literature_validation_plots)
-    assert callable(lmx.write_geometry_gallery_plots)
-    assert callable(lmx.write_geometry_preview_plots)
-    assert callable(lmx.write_cross_section_field_plots)
-    assert callable(lmx.write_wham_mirror_overview_plots)
-    assert callable(lmx.write_transient_movies)
-    assert callable(lmx.write_strong_scaling_plots)
-    assert callable(lmx.write_autodiff_plots)
-    assert callable(lmx.write_operator_verification_plots)
-    assert callable(lmx.write_interface_verification_plots)
-    assert callable(lmx.write_freemhd_parity_plots)
-    assert callable(lmx.write_freemhd_observable_parity_plots)
-    assert callable(lmx.summarize_observable_ladder_levels)
-    assert callable(lmx.write_observable_ladder_table)
-    assert callable(lmx.solve_closed_channel_benchmark)
-    assert callable(lmx.fully_developed_power_balance)
-    assert callable(lmx.write_lm_duct_geometry_setup_figure)
-    assert callable(lmx.write_structured_mesh_figure)
-    assert callable(lmx.write_boundary_layer_figure)
-    assert callable(lmx.write_annotated_layer_figure)
-    assert callable(lmx.write_velocity_profile_volume_figure)
-    assert callable(lmx.write_closed_channel_profile_comparison_figure)
-    assert callable(lmx.write_hartmann_validation_ladder_figure)
-    assert callable(lmx.write_closed_channel_startup_movies)
-    assert callable(lmx.make_divergence_free_cross_section_field)
-    assert callable(lmx.make_localized_divergence_free_obstacle_field)
-    assert callable(lmx.cross_section_divergence_metrics)
-    assert callable(lmx.load_tabulated_field)
-    assert callable(lmx.load_wham_coil_model_script)
-    assert callable(lmx.tabulated_field_quality_metrics)
-    assert callable(lmx.tabulated_cross_section_reconstruction_metrics)
-    assert callable(lmx.sample_tabulated_cross_section_field)
-    assert callable(lmx.sample_tabulated_field_volume)
-    assert callable(lmx.sample_field_on_centerline_pipe_mesh)
-    assert callable(lmx.sample_wham_field_on_centerline_pipe_mesh)
-    assert callable(lmx.solve_centerline_pipe_current_closure)
-    assert callable(lmx.sample_wham_mirror_field)
-    assert callable(lmx.sample_wham_mirror_axis_profile)
-    assert callable(lmx.wham_mirror_station_scale)
-    assert callable(lmx.write_tabulated_field_npz)
-    assert callable(lmx.write_wham_mirror_field_npz)
-    assert callable(lmx.write_centerline_field_preview)
-    assert callable(lmx.write_centerline_current_closure_preview)
-    assert callable(lmx.build_q2d_decay_case)
-    assert callable(lmx.build_q2d_forced_case)
-    assert callable(lmx.build_q2d_wall_bounded_forced_case)
-    assert callable(lmx.build_q2d_wall_driven_cavity_case)
-    assert callable(lmx.build_q2d_turbulence_decay_case)
-    assert callable(lmx.solve_q2d_decay)
-    assert callable(lmx.solve_q2d_forced)
-    assert callable(lmx.solve_q2d_wall_bounded_forced)
-    assert callable(lmx.solve_q2d_wall_driven_cavity)
-    assert callable(lmx.solve_q2d_turbulence_decay)
-    assert callable(lmx.validate_q2d_decay_solution)
-    assert callable(lmx.validate_q2d_decay_energy_budget)
-    assert callable(lmx.validate_q2d_forced_solution)
-    assert callable(lmx.validate_q2d_forced_energy_budget)
-    assert callable(lmx.validate_q2d_wall_bounded_forced_solution)
-    assert callable(lmx.validate_q2d_wall_bounded_energy_budget)
-    assert callable(lmx.validate_q2d_turbulence_decay_observables)
-    assert callable(lmx.q2d_modal_energy_budget)
-    assert callable(lmx.q2d_energy_spectrum)
-    assert callable(lmx.q2d_turbulence_observables)
-    assert callable(lmx.q2d_turbulence_readiness_metrics)
-    assert callable(lmx.q2d_wall_driven_cavity_observables)
-    assert callable(lmx.q2d_wall_driven_cavity_observables_on_grid)
-    assert callable(lmx.compare_q2d_wall_driven_observables)
-    assert callable(lmx.write_q2d_decay_plots)
-    assert callable(lmx.write_q2d_forced_plots)
-    assert callable(lmx.write_q2d_wall_bounded_forced_plots)
-    assert callable(lmx.write_q2d_wall_driven_comparison_plots)
-    assert callable(lmx.write_q2d_turbulence_observable_plots)
-    assert callable(lmx.write_q2d_turbulence_decay_movie)
-    assert callable(lmx.write_magnetic_obstacle_schematic_plots)
-    assert callable(lmx.load_q2dmhdfoam_docker_reference_profile)
-    assert callable(lmx.q2dmhdfoam_docker_reference_observables)
-    assert callable(lmx.write_q2dmhdfoam_docker_reference_panel)
-    assert callable(lmx.load_q2dmhdfoam_force_coefficients)
-    assert callable(lmx.load_q2dmhdfoam_probe_velocity_history)
-    assert callable(lmx.load_q2dmhdfoam_vtk_vector_field)
-    assert callable(lmx.q2dmhdfoam_vtk_velocity_observables)
-    assert callable(lmx.load_q2dmhdfoam_lid_driven_cell_field)
-    assert callable(lmx.q2dmhdfoam_cell_velocity_observables)
-    assert callable(lmx.write_q2dmhdfoam_timeseries_observable_table)
-    assert callable(lmx.write_q2dmhdfoam_vtk_velocity_panel)
-    assert callable(lmx.write_tabulated_field_reconstruction_plots)
-    assert lmx.DEFAULT_LI_ALN_CASE.name == "li_aln_rectangular_wall_stack_phase0_2"
-    assert callable(lmx.LithiumMaterial)
-    assert callable(lmx.WallStackStudyCase)
-    assert lmx.DEFAULT_SUBSTRATE_CONDUCTIVITIES["316L"] > 0.0
-    assert callable(lmx.li_aln_phase0_2_summary)
-    assert callable(lmx.li_aln_phase3_6_summary)
-    assert callable(lmx.li_aln_multilayer_mesh_summary)
-    assert callable(lmx.li_aln_unit_audit)
-    assert callable(lmx.li_aln_wall_layers)
-    assert callable(lmx.li_aln_wall_stacks_by_side)
-    assert callable(lmx.write_li_aln_phase0_2_artifacts)
-    assert callable(lmx.write_li_aln_phase3_6_artifacts)
-    assert callable(lmx.write_li_aln_multilayer_mesh_artifacts)
-    assert callable(lmx.generate_multilayer_duct_mesh)
-    assert "solve_steady" in lmx.__all__
-    assert len(lmx.__all__) == 30
-    assert "build_hartmann_autodiff_problem" not in lmx.__all__
-    assert "write_case_overview_plots" not in lmx.__all__
+EXPECTED_ROOT_API = {
+    "enable_compilation_cache",
+    "make_hartmann_case",
+    "make_shercliff_case",
+    "make_hunt_case",
+    "solve_steady",
+    "solve_transient",
+    "fully_developed_power_balance",
+    "generate_rect_duct_mesh",
+    "generate_rect_duct_mesh_from_faces",
+    "generate_layered_duct_mesh",
+    "generate_layered_duct_mesh_from_fluid_faces",
+    "generate_multilayer_duct_mesh",
+    "WallLayer",
+    "dynamic_to_kinematic_viscosity",
+    "kinematic_to_dynamic_viscosity",
+    "hartmann_number",
+    "reynolds_number",
+    "interaction_parameter",
+    "magnetic_reynolds_number",
+    "magnetic_field_from_hartmann",
+    "wall_conductance_ratio",
+    "effective_pinhole_conductance_ratio",
+    "tangential_stack_conductance_ratio",
+    "normal_stack_leakage_ratio",
+    "equivalent_single_layer",
+    "nested_wall_layer_resolution_summary",
+    "load_shercliff_analytical",
+    "load_hunt_analytical",
+    "load_closed_channel_analytical",
+    "load_processed_slice",
+}
+
+
+def test_stable_root_api_is_small_lazy_and_resolvable():
+    assert set(lmx.__all__) == EXPECTED_ROOT_API
+    assert EXPECTED_ROOT_API <= set(dir(lmx))
     assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
 
 
-def test_legacy_root_export_remains_available_with_migration_warning():
-    name = "build_hartmann_autodiff_problem"
-    lmx.__dict__.pop(name, None)
-    with pytest.warns(DeprecationWarning, match="import .* from lmx.autodiff"):
-        assert callable(getattr(lmx, name))
+def test_advanced_api_uses_owning_module():
+    assert not hasattr(lmx, "solve_extruded_inductionless")
+    from lmx.fringing import solve_extruded_inductionless
+
+    assert callable(solve_extruded_inductionless)
 
 
-def test_lmx_lazy_exports_reject_unknown_name():
+def test_unknown_root_attribute_has_standard_error():
     try:
-        getattr(lmx, "definitely_missing_symbol")
+        lmx.not_an_api
     except AttributeError as exc:
-        assert str(exc) == "definitely_missing_symbol"
-    else:
-        raise AssertionError("Expected AttributeError for missing lazy export.")
+        assert "not_an_api" in str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("unknown root attribute unexpectedly resolved")

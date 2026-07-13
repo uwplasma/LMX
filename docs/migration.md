@@ -1,19 +1,17 @@
 # API migration
 
-## Root namespace introduced for the slim-core release
+## Slim package root
 
 LMX now limits `lmx.__all__` to 30 deliberate convenience exports covering
 case construction, fully developed solves, core meshes, nondimensional groups,
 wall conductance, and the bundled straight-duct references. This keeps
 `from lmx import *` small and makes the supported top-level surface legible.
 
-No existing attribute has been removed in this release. Former root exports
-remain lazily available for one deprecation cycle and emit
-`DeprecationWarning` with their destination module. New code should import
-advanced capabilities directly from the owning submodule:
+The one-release compatibility period for former root aliases has ended.
+Advanced capabilities now import directly from their owning submodule:
 
 ```python
-# Before (supported temporarily)
+# Before
 from lmx import solve_extruded_inductionless, write_case_overview_plots
 
 # After
@@ -32,9 +30,5 @@ The same rule applies to research-stage families:
 | External-code adapters | `lmx.external_validation` or `lmx.freemhd` |
 | Blanket and wall-stack studies | `lmx.blanket_flow`, `lmx.wall_study` |
 
-The compatibility facade will be removed only after one documented release.
-Applications can identify migrations during testing with:
-
-```bash
-python -W error::DeprecationWarning your_driver.py
-```
+This change affects only import locations; the owning-module APIs and solver
+functionality are unchanged.
