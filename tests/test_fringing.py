@@ -1499,7 +1499,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(
     )()
     monkeypatch.setattr(
         "lmx.fringing._solve_extruded_projection",
-        lambda problem, initial_bundle=None: fake_bundle,
+        lambda problem, **kwargs: fake_bundle,
     )
 
     solution = solve_extruded_inductionless(problem)
@@ -2065,7 +2065,7 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(
     pipe_problem = replace(problem, case=pipe_case)
     monkeypatch.setattr(
         "lmx.fringing._solve_extruded_projection",
-        lambda problem, initial_bundle=None: type(
+        lambda problem, **kwargs: type(
             "Bundle",
             (),
             {

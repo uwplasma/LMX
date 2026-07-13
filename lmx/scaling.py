@@ -496,7 +496,10 @@ def benchmark_extruded_inductionless_solve(
                 trace_started = False
         start = time.perf_counter()
         try:
-            solve_kwargs = {"num_devices": num_devices}
+            solve_kwargs = {
+                "num_devices": num_devices,
+                "stop_on_convergence": False,
+            }
             if initial_bundle is not None:
                 solve_kwargs["initial_bundle"] = initial_bundle
             solution = solve_extruded_inductionless(problem, **solve_kwargs)
@@ -525,7 +528,10 @@ def benchmark_extruded_inductionless_solve(
     actual_shape = tuple(int(value) for value in last_bundle.u.shape)
     actual_nx, actual_ny, actual_nz = actual_shape
     total_cells = actual_nx * actual_ny * actual_nz
-    cell_updates = total_cells * outer_steps
+    executed_steps = int(
+        getattr(last_bundle, "iteration_residual_history", np.empty(outer_steps)).size
+    )
+    cell_updates = total_cells * executed_steps
     warm_seconds = min(timings[1:] or timings)
     velocity_l2 = float(
         np.sqrt(
@@ -582,7 +588,7 @@ def benchmark_extruded_inductionless_solve(
         nx=actual_nx,
         ny=actual_ny,
         nz=actual_nz,
-        iterations=outer_steps,
+        iterations=executed_steps,
         repeats=repeats,
         cold_seconds=timings[0],
         warm_seconds=warm_seconds,

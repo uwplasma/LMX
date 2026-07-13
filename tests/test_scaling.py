@@ -132,10 +132,13 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
     restart_path.write_bytes(b"restart")
     initial_bundle = object()
 
-    def fake_solve(problem, *, num_devices=None, initial_bundle=None):
+    def fake_solve(
+        problem, *, num_devices=None, initial_bundle=None, stop_on_convergence=True
+    ):
         calls.append(problem)
         assert num_devices == 1
         assert initial_bundle is not None
+        assert not stop_on_convergence
         shape = (
             problem.case.geometry.nx,
             problem.case.geometry.ny,
@@ -158,6 +161,7 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
             iteration_electric_linear_history=jnp.asarray(
                 [[1.0e-8, 1.0e-9, 3.0e-6, 4.0, 1.0, 1.0]]
             ),
+            iteration_residual_history=jnp.asarray([1.0e-4, 5.0e-5]),
         )
         return SimpleNamespace(bundle=bundle)
 
@@ -233,7 +237,7 @@ def test_solver_scaling_rejects_invalid_devices_and_physics(
     monkeypatch.setattr(
         scaling,
         "solve_extruded_inductionless",
-        lambda problem, num_devices=None: SimpleNamespace(bundle=bundle),
+        lambda problem, **kwargs: SimpleNamespace(bundle=bundle),
     )
     with pytest.raises(RuntimeError, match="physics signature"):
         benchmark_extruded_inductionless_solve(
@@ -271,7 +275,7 @@ def test_solver_scaling_rejects_failed_conservation(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(
         scaling,
         "solve_extruded_inductionless",
-        lambda problem, num_devices=None: SimpleNamespace(bundle=bundle),
+        lambda problem, **kwargs: SimpleNamespace(bundle=bundle),
     )
 
     with pytest.raises(RuntimeError, match="failed conservation"):

@@ -4722,6 +4722,7 @@ def _solve_extruded_projection(
     *,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
+    stop_on_convergence: bool = True,
 ) -> ExtrudedFieldBundle:
     case = problem.case
     mesh = _cross_section_mesh(case)
@@ -5349,7 +5350,7 @@ def _solve_extruded_projection(
                 u, v, w, phi = accelerated * fixed_point_scale
             else:
                 u, v, w = u_next, v_next, w_next
-            if converged:
+            if converged and stop_on_convergence:
                 break
 
         final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
@@ -6307,7 +6308,7 @@ def _solve_extruded_projection(
             u, v, w, phi = unscaled_state(accelerated)
         else:
             u, v, w = u_next, v_next, w_next
-        if converged:
+        if converged and stop_on_convergence:
             break
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
@@ -6506,6 +6507,7 @@ def solve_extruded_inductionless(
     solver=solve_steady,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
+    stop_on_convergence: bool = True,
 ) -> ExtrudedInductionlessSolution:
     """Solve an extruded inductionless problem, optionally sharded in ``x``."""
 
@@ -6515,7 +6517,10 @@ def solve_extruded_inductionless(
         "pipe_ogrid",
         "bent_pipe",
     }:
-        projection_kwargs = {"initial_bundle": initial_bundle}
+        projection_kwargs = {
+            "initial_bundle": initial_bundle,
+            "stop_on_convergence": stop_on_convergence,
+        }
         if num_devices is not None:
             projection_kwargs["num_devices"] = num_devices
         bundle = _solve_extruded_projection(problem, **projection_kwargs)
