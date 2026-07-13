@@ -1,0 +1,33 @@
+{
+  "case": "package_smoke",
+  "generated_at_utc": "2026-07-13T07:24:00+00:00",
+  "source_commit": "248a8ac1d63e78e9d1c46af2505900bc548e03d9",
+  "version": "1.1.3",
+  "python": "3.10.20",
+  "build": {
+    "twine_check": true,
+    "wheel": {
+      "name": "lmx-1.1.3-py3-none-any.whl",
+      "bytes": 307392,
+      "files": 51,
+      "sha256": "5654240dd93f37dc014c7b7810ded549f540a25be265ec57355160ed51e136bc"
+    },
+    "sdist": {
+      "name": "lmx-1.1.3.tar.gz",
+      "bytes": 451531,
+      "members": 127,
+      "sha256": "d08e2f41890f3e8524725fc348d9e35c88c53fda20b3eb385cff2e33886a7946"
+    }
+  },
+  "clean_install": {
+    "installed": true,
+    "installed_version": "1.1.3",
+    "installed_module_path_verified": true,
+    "imports": [
+      "lmx",
+      "lmx.solvers",
+      "lmx.validation"
+    ],
+    "cli_help": true
+  }
+}

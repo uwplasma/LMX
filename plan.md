@@ -1002,7 +1002,10 @@ wall time is acceptable.
     three explicitly deferred research-grade physics lanes. Compact evidence is
     recorded in `benchmarks/results/bounded-release-readiness-20260713.json`;
     its source-matched portable gate passes 900 tests with 8 expected skips,
-    95.09% branch coverage, and a 141.1-second wall time.
+    95.09% branch coverage, and a 141.1-second wall time. The source-matched
+    wheel/sdist build, Twine inspection, clean Python 3.10 install, imports, and
+    CLI smoke check also pass; the universal wheel is 300 KiB. Checksums are in
+    `benchmarks/results/package-smoke-20260713.json`.
 
 15. **Deferred — expand physics only through new release tiers.** Benchmark C is Q2D
     turbulence, D is 3D turbulence/magnetic obstacles, and E is energy/buoyancy.
