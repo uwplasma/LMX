@@ -6240,6 +6240,10 @@ def _solve_extruded_projection(
             and flow_error_value <= ALEX_BALANCE_TOLERANCE
             and charge_balance <= ALEX_BALANCE_TOLERANCE
         )
+        primary_state_converged = (
+            max(u_update, v_update, w_update, potential_update)
+            <= case.solver.coupling_tolerance
+        )
         if use_alex_b2_finite_volume:
             steady_streak, converged = _sustained_convergence(
                 steady_streak, instantaneous_convergence
@@ -6290,7 +6294,13 @@ def _solve_extruded_projection(
                     )
                     accelerated = mix_history(iterates, residuals)
             elif case.solver.coupling_acceleration == "aitken":
-                if previous_fixed_point_residual is not None:
+                if primary_state_converged:
+                    # A global Aitken reduction can amplify decomposition-order
+                    # roundoff after the physical fields have already settled.
+                    accelerated = mapped_state
+                    previous_fixed_point_residual = None
+                    fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
+                elif previous_fixed_point_residual is not None:
                     fixed_point_relaxation = aitken_relaxation(
                         previous_fixed_point_residual,
                         fixed_point_residual,
@@ -6298,10 +6308,13 @@ def _solve_extruded_projection(
                         min_relaxation=case.solver.coupling_min_relaxation,
                         max_relaxation=case.solver.coupling_max_relaxation,
                     )
-                accelerated = (
-                    current_state + fixed_point_relaxation * fixed_point_residual
-                )
-                previous_fixed_point_residual = fixed_point_residual
+                    accelerated = (
+                        current_state + fixed_point_relaxation * fixed_point_residual
+                    )
+                else:
+                    accelerated = mapped_state
+                if not primary_state_converged:
+                    previous_fixed_point_residual = fixed_point_residual
             else:
                 accelerated = mapped_state
             u, v, w, phi = unscaled_state(accelerated)
