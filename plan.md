@@ -864,6 +864,11 @@ wall time is acceptable.
    to 514--515 with exact physics but worsen one-GPU warm time from `37.78 s`
    to `57.98 s`. Reject dense spectral setup. A viable hierarchy must have
    near-linear transfer/setup cost and persistent reuse.
+   Unsmoothed piecewise-constant aggregation is also rejected. Factor-four
+   aggregation changes a manufactured solve from 39 to 41 iterations;
+   factor-two improves that probe to 35 but drives both B2 electric stages to
+   the full 1200 combined iterations. Proceed only with smoothed aggregation
+   or a rediscretized hierarchy with a genuine coarse line solve.
    Hoisting the fixed conductivity and mask into the compiled electric closure
    preserves exact one/two-GPU physics and gives `37.37 s` one-GPU warm time,
    but worsens two-GPU warm time from `109.23 s` to `118.66 s`; reject the
