@@ -2665,14 +2665,17 @@ def _steady_stokes_projection_pipe(
     use_pressure_preconditioner: bool = True,
     flow_constraint_scale: float = 1.0,
     flow_response_matrix: jnp.ndarray | None = None,
+    pressure_preconditioner_mobility: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Apply the compatible steady ``D A^-1 G`` pipe projection."""
 
     response_flow = jnp.sum(unit_flow_response * cell_area, axis=(1, 2))
     area_sum = jnp.sum(cell_area, axis=(1, 2), keepdims=True)
     mobility = 1.0 / jnp.maximum(rho, 1.0e-20)
-    pressure_mobility = jnp.maximum(
-        unit_flow_response, jnp.mean(unit_flow_response) * 1.0e-8
+    pressure_mobility = (
+        jnp.maximum(unit_flow_response, jnp.mean(unit_flow_response) * 1.0e-8)
+        if pressure_preconditioner_mobility is None
+        else pressure_preconditioner_mobility
     )
     cross_section_size = u.shape[1] * u.shape[2]
     pressure_size = u.shape[0] * (cross_section_size - 1)
@@ -2750,8 +2753,8 @@ def _steady_stokes_projection_pipe(
         )
         return jnp.concatenate((reduce_field(pressure), pressure_loss))
 
+    preconditioned_rhs = precondition(rhs)
     if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
-        preconditioned_rhs = precondition(rhs)
         preconditioned_residual = schur(preconditioned_rhs) - rhs
         print(
             "B1 compatible preconditioner:",
@@ -2765,6 +2768,7 @@ def _steady_stokes_projection_pipe(
         solution, info = jax_gmres(
             schur,
             rhs,
+            x0=preconditioned_rhs,
             tol=pressure_tolerance,
             atol=pressure_tolerance,
             restart=restart,
@@ -2783,6 +2787,7 @@ def _steady_stokes_projection_pipe(
         pressure_solution = gmres(
             schur,
             rhs,
+            x0=preconditioned_rhs,
             precond=precondition,
             restart=restart,
             rtol=pressure_tolerance,
@@ -5369,6 +5374,35 @@ def _solve_extruded_projection(
                 if use_compatible_steady_b1
                 else None
             )
+            if use_compatible_steady_b1:
+                steady_coefficients = _pipe_variable_diffusion_coefficients_3d(
+                    nu[:, :count, :],
+                    dx=dx,
+                    r_faces=faces,
+                    r_centers=centers,
+                    dtheta=dtheta,
+                )
+                radial_widths = jnp.diff(faces)
+                wall_sink = (
+                    jnp.zeros_like(steady_reaction)
+                    .at[:, -1, :]
+                    .set(
+                        nu[:, count - 1, :]
+                        * faces[-1]
+                        / jnp.maximum(
+                            centers[-1] * radial_widths[-1] * (0.5 * radial_widths[-1]),
+                            1.0e-20,
+                        )
+                    )
+                )
+                steady_rate_diagonal = (
+                    sum(steady_coefficients) + wall_sink + steady_reaction
+                )
+                pressure_preconditioner_mobility = 1.0 / jnp.maximum(
+                    rho[:, :count, :] * steady_rate_diagonal, 1.0e-20
+                )
+            else:
+                pressure_preconditioner_mobility = None
 
             def momentum_solve(rhs, viscosity, initial):
                 return _solvax_diffusion_pipe(
@@ -5544,6 +5578,9 @@ def _solve_extruded_projection(
                             os.environ.get("LMX_B1_STOKES_FLOW_SCALE", "1")
                         ),
                         flow_response_matrix=flow_response_matrix,
+                        pressure_preconditioner_mobility=(
+                            pressure_preconditioner_mobility
+                        ),
                     )
                     if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
                         print(
