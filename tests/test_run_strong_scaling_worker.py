@@ -72,6 +72,7 @@ def test_run_strong_scaling_worker_writes_expected_json(
     assert payload["platform"] == "CPU"
     assert payload["warm_seconds"] == 0.1
     assert payload["benchmark_kind"] == "extruded3d"
+    assert len(payload["source_fingerprint"]) == 64
     assert json.loads(capsys.readouterr().out)["num_devices"] == 1
 
 
@@ -141,3 +142,4 @@ def test_run_strong_scaling_worker_covers_solver_faithful_branch(
     payload = json.loads(output_path.read_text())
     assert payload["benchmark_kind"] == "extruded_solve"
     assert payload["operator_path"] == "solve_extruded_inductionless"
+    assert len(payload["source_fingerprint"]) == 64

@@ -53,6 +53,9 @@ class StrongScalingRecord:
     validation_passed: bool | None = None
     initialization: str = "cold_start"
     restart_sha256: str | None = None
+    final_update_residual: float | None = None
+    steady_state_passed: bool | None = None
+    signature_relative_tolerance: float = 2.0e-6
 
 
 StrongScalingRecordLike = StrongScalingRecord | Mapping[str, object]
@@ -78,6 +81,8 @@ _SCALING_TABLE_COLUMNS = (
     "global_shard_count",
     "initialization",
     "validation_passed",
+    "steady_state_passed",
+    "signature_relative_tolerance",
     "physics_equivalent",
     "solver_faithful",
 )
@@ -186,10 +191,13 @@ def summarize_strong_scaling_records(
                 _float_or_none(record.get(name))
                 for name in ("velocity_l2", "potential_l2", "current_l2")
             )
+            signature_rtol = (
+                _float_or_none(record.get("signature_relative_tolerance")) or 2.0e-6
+            )
             physics_equivalent = all(
                 reference is not None
                 and value is not None
-                and np.isclose(value, reference, rtol=2.0e-6, atol=1.0e-10)
+                and np.isclose(value, reference, rtol=signature_rtol, atol=1.0e-10)
                 for value, reference in zip(signature, baseline_signature, strict=True)
             ) and bool(record.get("validation_passed", False))
             rows.append(
@@ -218,6 +226,10 @@ def summarize_strong_scaling_records(
                     or 1,
                     "initialization": str(record.get("initialization", "cold_start")),
                     "validation_passed": bool(record.get("validation_passed", False)),
+                    "steady_state_passed": bool(
+                        record.get("steady_state_passed", False)
+                    ),
+                    "signature_relative_tolerance": signature_rtol,
                     "physics_equivalent": physics_equivalent,
                     "solver_faithful": operator_path == "solve_extruded_inductionless",
                 }
@@ -564,6 +576,21 @@ def benchmark_extruded_inductionless_solve(
     max_boundary_residual = float(np.max(np.abs(boundary_residual)))
     max_electric_local_residual = float(np.max(np.abs(electric_history[:, 2])))
     electric_solves_converged = bool(np.all(electric_history[:, 4] == 1.0))
+    update_history = np.asarray(
+        getattr(last_bundle, "iteration_residual_history", ()), dtype=float
+    )
+    component_history = np.asarray(
+        getattr(last_bundle, "iteration_component_residual_history", ()), dtype=float
+    ).reshape((-1, 6))
+    sustained_count = min(3, len(update_history), len(component_history))
+    final_update_residual = (
+        float(update_history[-1]) if update_history.size else float("inf")
+    )
+    steady_state_passed = bool(
+        sustained_count == 3
+        and np.all(update_history[-sustained_count:] <= case.solver.coupling_tolerance)
+        and np.all(component_history[-sustained_count:, 3:] <= 1.0e-3)
+    )
     validation_passed = bool(
         np.isfinite(max_charge_residual)
         and np.isfinite(max_boundary_residual)
@@ -572,6 +599,7 @@ def benchmark_extruded_inductionless_solve(
         and max_boundary_residual <= 1.0e-3
         and max_electric_local_residual <= 1.0e-3
         and electric_solves_converged
+        and steady_state_passed
     )
     if strict_validation and not validation_passed:
         raise RuntimeError(
@@ -579,7 +607,8 @@ def benchmark_extruded_inductionless_solve(
             f"charge={max_charge_residual:.6e}, "
             f"boundary_current={max_boundary_residual:.6e}, "
             f"electric_local={max_electric_local_residual:.6e}, "
-            f"electric_converged={electric_solves_converged}."
+            f"electric_converged={electric_solves_converged}, "
+            f"steady={steady_state_passed}."
         )
     return StrongScalingRecord(
         backend=jax.default_backend(),
@@ -616,6 +645,9 @@ def benchmark_extruded_inductionless_solve(
         validation_passed=validation_passed,
         initialization="restart" if initial_bundle is not None else "cold_start",
         restart_sha256=restart_sha256,
+        final_update_residual=final_update_residual,
+        steady_state_passed=steady_state_passed,
+        signature_relative_tolerance=0.5 * case.solver.coupling_tolerance,
     )
 
 

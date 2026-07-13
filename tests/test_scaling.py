@@ -161,7 +161,10 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
             iteration_electric_linear_history=jnp.asarray(
                 [[1.0e-8, 1.0e-9, 3.0e-6, 4.0, 1.0, 1.0]]
             ),
-            iteration_residual_history=jnp.asarray([1.0e-4, 5.0e-5]),
+            iteration_residual_history=jnp.asarray([5.0e-5, 4.0e-5, 3.0e-5]),
+            iteration_component_residual_history=jnp.asarray(
+                [[3.0e-5, 0.0, 0.0, 1.0e-6, 0.0, 3.0e-6]] * 3
+            ),
         )
         return SimpleNamespace(bundle=bundle)
 

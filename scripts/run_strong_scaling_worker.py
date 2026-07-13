@@ -3,6 +3,7 @@ from __future__ import annotations
 # ruff: noqa: E402 -- repository-root bootstrap must precede project imports.
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -20,6 +21,24 @@ if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(
         f"Scaling worker imported LMX outside its source tree: {lmx.__file__}"
     )
+
+
+def _source_fingerprint() -> str:
+    """Hash the source and frozen specifications used by this worker."""
+
+    paths = [*sorted((ROOT / "lmx").glob("*.py")), Path(__file__).resolve()]
+    paths.extend(
+        sorted(
+            path
+            for path in (ROOT / "benchmarks" / "specs").rglob("*")
+            if path.is_file()
+        )
+    )
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.relative_to(ROOT).as_posix().encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     payload = {
         **record.__dict__,
         "platform": args.platform,
+        "source_fingerprint": _source_fingerprint(),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2))
