@@ -331,14 +331,24 @@
         "dense_modal_32x16x32_stored_coefficients": 2359296,
         "separable_modal_storage_scaling": "O(nx * nr^2)",
         "dense_modal_storage_scaling": "O(nx^2 * nr^2)",
+        "consolidated_modal_commit": "df64a47",
+        "axially_coupled_modal_commit": "cf33000",
+        "experimental_environment_switches_removed": 9,
+        "net_lines_removed_by_consolidation": 119,
+        "refinement_artifact": "benchmarks/results/b1-compatible-projection-refinement-20260713.json",
+        "refinement_levels_passed": 3,
+        "refinement_total_projection_iterations": [135, 155, 169],
+        "refinement_warm_seconds": [5.76706, 9.9997, 23.8453],
+        "refinement_maximum_physical_divergence": 4.9975496e-05,
+        "refinement_cost_gate_passed": true,
         "accepted": false,
-        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree. Axial deflation closes only the first axisymmetric map. Explicit assembly then exposes two checkerboard null modes in the collocated face-to-cell-to-face response. The subsequent weighted m=0/m=2 Rhie-Chow prototype passes the complete tiny B1 physics test and restart, and separable stationwise radial blocks remove its quadratic coarse storage. It remains experimental until the dense fallback and environment plumbing are removed, physical and Krylov convergence statuses agree, and refinement-independent cost is demonstrated."
+        "reason": "The compatible D A^-1 G construction and exact axial flow response pass independently. Explicit assembly exposed two checkerboard null modes in the original collocated face-to-cell-to-face response. The consolidated weighted m=0/m=2 Rhie-Chow path now passes the complete tiny B1 solve/restart, uses SOLVAX block-Thomas axial coupling with linear-scale storage, reports physical and Krylov convergence consistently, and passes a three-level refinement-cost gate. It remains experimental until exact single-/dual-GPU correctness and scaling pass and the path is integrated without regressing the complete portable gate."
       },
-      "next_candidate": "Retain the passing weighted Rhie-Chow m=0/m=2 physics path and its separable per-station radial blocks. Define convergence from mean-free divergence and normalized station-flow residuals, remove the dense fallback and environment-only diagnostics, and require refinement-independent iterations and memory before enabling it or running another exact-GPU campaign."
+      "next_candidate": "Run exact single-/dual-GPU correctness for the consolidated weighted Rhie-Chow m=0/m=2 SOLVAX block-Thomas path, then measure strong scaling before production integration."
     },
     "accepted": false,
-    "next_candidate": "Slim the passing separable weighted-modal prototype, align Krylov status with the independent physical residual components, and require refinement-independent cost before another electromagnetic campaign."
+    "next_candidate": "Run exact GPU correctness and strong scaling for the passing consolidated compatible path before production integration."
   },
   "accepted": true,
-  "next_constraint": "Remove the dense fallback and experimental plumbing from the passing separable weighted-modal path, then close physical/Krylov convergence agreement and three-level refinement cost before exact GPU correctness or strong-scaling campaigns; pseudo-time and transient-pressure variants remain closed."
+  "next_constraint": "Require exact single-/dual-GPU correctness before timing strong scaling or integrating the consolidated compatible path; pseudo-time and transient-pressure variants remain closed."
 }

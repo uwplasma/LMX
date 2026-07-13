@@ -1160,6 +1160,20 @@ wall time is acceptable.
    into concise tested helpers, align Krylov status with the physical residual
    decomposition, and demonstrate iteration/memory behavior across at least
    three tiny-to-medium refinements.
+   That refinement gate now passes at experimental commit `cf33000`. The
+   `7 x 9 x 16`, `9 x 13 x 24`, and `11 x 17 x 32` ladder reports total
+   projection iterations `135`, `155`, and `169` while fluid unknowns grow
+   from `896` to `5,632`. Warm runtime grows from `5.77 s` to `23.85 s`
+   (`4.13x` for `6.29x` more unknowns), and three-band modal storage grows
+   from `11,158` to `73,018` coefficients. Every projection reports physical
+   convergence; the worst mean-free divergence is `5.00e-5`, below the frozen
+   `1e-3` balance gate. Nearest-neighbor axial blocks use the pinned SOLVAX
+   block-Thomas factorization and are reused by flexible GMRES. Compact
+   evidence is tracked in
+   `benchmarks/results/b1-compatible-projection-refinement-20260713.json`.
+   This closes code consolidation, physical/Krylov status agreement, dense
+   fallback removal, and the bounded refinement-cost gate. Proceed next to
+   exact single-/dual-GPU correctness and only then strong-scaling timing.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
