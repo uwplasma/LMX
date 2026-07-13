@@ -52,12 +52,76 @@
         "terminal_max_divergence_residual": 0.0012737612,
         "terminal_max_charge_balance_residual": 0.00014377428,
         "physics_gate_passed": false,
-        "record_sha256": "ed3c3ee5b5dd7c21f71723eaaa4945300f2b6ae0cf7142fd023d307490e6b34b"
+        "record_sha256": "ed3c3ee5b5dd7c21f71723eaaa4945300f2b6ae0cf7142fd023d307490e6b34b",
+        "thin_wall": {
+          "steps": 128,
+          "seconds": 2645.5887,
+          "runtime_gate_passed": true,
+          "terminal_max_residual": 0.032343896,
+          "terminal_max_divergence_residual": 0.00071766982,
+          "terminal_max_charge_balance_residual": 0.00014495677,
+          "physics_gate_passed": false,
+          "observable_relative_difference": 0.012265963,
+          "independence_limit": 0.02,
+          "independence_gate_provisional": true,
+          "restart_sha256": "8eb708cc6f06a49c7363f5c03aa4a9261dabea53676bc60dce93afcc52df2a66",
+          "record_sha256": "ae00fe84b84d7adf00ba0065c640a3590afbf91887e9cf991832166198c738ae"
+        }
       },
       "accepted": true,
       "reason": "The reduced proxy was 6--7% slower, but the exact full coarse path completed below one hour and was 4.30x faster than the prior rate estimate."
     }
   ],
+  "outer_acceleration_screens": [
+    {
+      "name": "Anderson damping 0.5",
+      "history_depth": 16,
+      "steps": 16,
+      "seconds": 359.4649,
+      "minimum_residual": 0.0011797168,
+      "terminal_residual": 0.0047922064,
+      "maximum_divergence_residual": 0.0025963548,
+      "maximum_charge_balance_residual": 0.0001445392,
+      "accepted": false,
+      "record_sha256": "ddd859fb1996c5076cf75b36456762b605103e880a7e8eb14a9c7b444aba047c"
+    },
+    {
+      "name": "Anderson history depth 8",
+      "damping": 1.0,
+      "steps": 16,
+      "seconds": 340.3809,
+      "minimum_residual": 0.00040349502,
+      "terminal_residual": 0.0030482167,
+      "maximum_divergence_residual": 0.0021814317,
+      "maximum_charge_balance_residual": 0.00014491844,
+      "accepted": false,
+      "record_sha256": "76a216a748cf025945a3208a181083f9abcfccea20b60221ca2e1ab967d1d163"
+    },
+    {
+      "name": "Physical velocity normalization",
+      "candidate_source_fingerprint": "c20d62f173fdfdc49cc25d42be1fed2a5991dcd215bab3e0381cb9a256eb7196",
+      "steps": 9,
+      "minimum_residual": 0.00041014384,
+      "terminal_residual": 0.0032645585,
+      "accepted": false,
+      "reason": "Potential updates were already negligible, so rescaling the velocity block reproduced the history-depth trace and was terminated early."
+    },
+    {
+      "name": "Aitken acceleration, cap 2",
+      "candidate_source_fingerprint": "787e3587e273b9182ad2833380705bd484f95c5c66d443617b5e05536a6a4307",
+      "steps": 16,
+      "seconds": 331.4201,
+      "minimum_and_terminal_residual": 0.00039775413,
+      "maximum_divergence_residual": 0.00099994388,
+      "terminal_divergence_residual": 0.00012070968,
+      "maximum_charge_balance_residual": 0.00014506163,
+      "minimum_relaxation_floor_0.1_reproduced_history": true,
+      "accepted": false,
+      "reason": "Stable and monotone, but eight times above the frozen steady gate; changing the inactive relaxation floor had no effect.",
+      "record_sha256": "41770ca38c54d2313ddb2dbbc2a030686b9e49ccb941371df0d0253aad389c7e",
+      "floor_0.1_record_sha256": "25d0c23e09a0d1e26435e47e40a0371ac9bf7f5a3fd15d8dfdb445bac06cfdf3"
+    }
+  ],
   "accepted": true,
-  "next_constraint": "Use the full coarse checkpoints to stabilize the outer fixed-point acceleration without loosening steady, mass, or current gates."
+  "next_constraint": "Accelerate the slow axial-velocity fixed-point map itself; Anderson knobs, block scaling, and bounded Aitken are closed."
 }

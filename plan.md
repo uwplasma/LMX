@@ -1026,7 +1026,22 @@ wall time is acceptable.
    `benchmarks/results/b1-pipe-pcg-screening-20260713.json`. Use the full coarse
    checkpoint to screen Anderson damping/history next, without loosening any
    physics tolerance; accept baseline/thin-wall physics before dependent
-   variants.
+   variants. The independent thin-wall run also finishes below the cap in
+   `2645.59 s`; its `1.23%` observable delta is provisionally inside the `2%`
+   wall-realization limit, but neither unconverged field is admissible for final
+   independence. Full-mesh 16-update restart screens reject Anderson damping
+   `0.5` (minimum residual `1.18e-3`) and history depth `8` (`4.03e-4`). Stop
+   scalar accelerator sweeps. Physical velocity normalization also reproduces
+   the history-depth trace because potential updates are already negligible;
+   reject it after nine full-mesh steps. Restart now restores the checkpointed
+   axial pressure-loss gradient, eliminating an artificial first-step residual
+   without changing fields. Diagnose the state-residual floor and its
+   pressure/continuity coupling before the next full wave. Bounded Aitken is
+   stable and monotone, with conservation inside the frozen gates, but ends 16
+   full-mesh updates at `3.98e-4`; raising its inactive relaxation floor from
+   `0.05` to `0.1` reproduces the history exactly. Reject it for steady closure.
+   Accelerator knobs are now closed: accelerate the slow axial-velocity map
+   itself before another 128-step campaign.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

@@ -5141,7 +5141,13 @@ def _solve_extruded_projection(
                 r_faces=r_faces,
                 fluid_mask=fluid_mask,
             )
-        axial_pressure_loss_gradient = jnp.full((nx,), forcing, dtype=float)
+        axial_pressure_loss_gradient = (
+            jnp.asarray(initial_bundle.axial_pressure_loss_gradient, dtype=float)
+            if initial_bundle is not None
+            and initial_bundle.axial_pressure_loss_gradient is not None
+            and initial_bundle.axial_pressure_loss_gradient.shape == (nx,)
+            else jnp.full((nx,), forcing, dtype=float)
+        )
 
         for step in range(outer_steps):
             phi_previous = phi

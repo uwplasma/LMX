@@ -242,6 +242,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert float(benchmarks.jnp.mean(restarted.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-8
     )
+    assert restarted.bundle.iteration_pressure_residual_history[0] < 1.0e-3
     assert restarted.validation.max_charge_balance_residual < 1.0e-3
 
     with pytest.raises(ValueError, match="checkpoint_interval"):

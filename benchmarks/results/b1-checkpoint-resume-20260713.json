@@ -14,12 +14,13 @@
     "explicit_restart_has_priority": true
   },
   "portable_acceptance": {
+    "source_fingerprint": "787e3587e273b9182ad2833380705bd484f95c5c66d443617b5e05536a6a4307",
     "command": ".venv/bin/python scripts/run_full_test_suite.py --workers 6 --budget-seconds 600",
     "python": "3.10.20",
     "passed": 902,
     "skipped": 8,
     "branch_coverage_percent": 95.10,
-    "wall_seconds": 114.9,
+    "wall_seconds": 111.8,
     "budget_seconds": 600,
     "physics_paths": [
       "reduced ALEX B1 mapped-pipe production solve",
@@ -56,7 +57,12 @@
     "runtime_gate_passed": true,
     "physics_gate_passed": false,
     "restart_sha256": "e0becadf51256eb61f951a0ad5c428633ab25412f9a3b8c45d9903e3c4b7d47f",
-    "record_sha256": "ed3c3ee5b5dd7c21f71723eaaa4945300f2b6ae0cf7142fd023d307490e6b34b"
+    "record_sha256": "ed3c3ee5b5dd7c21f71723eaaa4945300f2b6ae0cf7142fd023d307490e6b34b",
+    "thin_wall_seconds": 2645.5887,
+    "thin_wall_runtime_gate_passed": true,
+    "thin_wall_physics_gate_passed": false,
+    "thin_wall_restart_sha256": "8eb708cc6f06a49c7363f5c03aa4a9261dabea53676bc60dce93afcc52df2a66",
+    "thin_wall_record_sha256": "ae00fe84b84d7adf00ba0065c640a3590afbf91887e9cf991832166198c738ae"
   },
   "accepted": true,
   "claim": "Periodic progress, atomic partial restart, provenance-checked resume, and a source-matched full coarse continuation below one hour.",

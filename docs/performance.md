@@ -377,6 +377,25 @@ runtime is accepted independently of physics; the next experiment uses the
 full coarse checkpoint to stabilize outer fixed-point acceleration. Compact
 timings, hashes, and the earlier reduced field signatures are in
 `benchmarks/results/b1-pipe-pcg-screening-20260713.json`.
+The independently scheduled thin-wall confirmation also completes below the
+cap (`2645.59 s`). Its provisional observable difference is `1.23%` against a
+`2%` wall-realization limit, but the comparison cannot be accepted until both
+states pass the steady gate. Two 16-update, full-mesh restart screens close the
+obvious scalar Anderson adjustments: damping `0.5` bottoms at `1.18e-3`, and
+history depth `8` bottoms at `4.03e-4`; neither couples that state residual to
+acceptable continuity. The next investigation must diagnose the residual floor
+and pressure/continuity coupling rather than sweep more damping/history values.
+Replacing the velocity safety-bound normalization with the physical velocity
+scale is also rejected after nine full-mesh steps: potential updates were
+already negligible, so the trace reproduced the history-depth screen. The
+restart path does now restore the checkpointed axial pressure-loss gradient;
+this removes an artificial first-step diagnostic jump without changing fields.
+Bounded Aitken acceleration is stable and monotone, with divergence and charge
+inside their gates, but ends a 16-update full-mesh screen at `3.98e-4`--about
+eight times the steady limit. Raising its inactive minimum-relaxation floor
+from `0.05` to `0.1` reproduces the physics history exactly. This closes the
+existing accelerator knobs: the next change must accelerate the slow axial
+velocity map itself and retain the frozen conservation gates.
 
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
