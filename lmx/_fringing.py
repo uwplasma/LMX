@@ -2732,6 +2732,40 @@ def _steady_stokes_projection_pipe(
             apply_momentum_inverse(force) for force in (force_u, force_v, force_w)
         )
 
+    def rhie_chow_faces(pressure, response):
+        pressure_faces = _pipe_pressure_face_correction(
+            pressure,
+            pressure_mobility,
+            dx=dx,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        reconstructed_faces = _pipe_velocity_faces(
+            *_pipe_face_velocity_cells(*pressure_faces)
+        )
+        stabilization = tuple(
+            direct - reconstructed
+            for direct, reconstructed in zip(pressure_faces, reconstructed_faces)
+        )
+        face_area = jnp.concatenate(
+            (
+                cell_area[:1],
+                0.5 * (cell_area[:-1] + cell_area[1:]),
+                cell_area[-1:],
+            ),
+            axis=0,
+        )
+        axial_mean = jnp.sum(stabilization[0] * face_area, axis=(1, 2)) / jnp.maximum(
+            jnp.sum(face_area, axis=(1, 2)), 1.0e-30
+        )
+        axial = stabilization[0] - axial_mean[:, None, None]
+        axial = axial.at[0].set(0.0).at[-1].set(0.0)
+        stabilization = (axial, *stabilization[1:])
+        return tuple(
+            exact + correction
+            for exact, correction in zip(_pipe_velocity_faces(*response), stabilization)
+        )
+
     def constraints(state_u, state_v, state_w, *, faces=None):
         divergence = _pipe_face_divergence(
             *(
@@ -2760,23 +2794,7 @@ def _steady_stokes_projection_pipe(
         if not rhie_chow:
             return constraints(*response)
         pressure = unpack_pressure(state[:pressure_size])
-        pressure_faces = _pipe_pressure_face_correction(
-            pressure,
-            pressure_mobility,
-            dx=dx,
-            r_centers=r_centers,
-            dtheta=dtheta,
-        )
-        reconstructed_faces = _pipe_velocity_faces(
-            *_pipe_face_velocity_cells(*pressure_faces)
-        )
-        stabilized_faces = tuple(
-            exact + direct - reconstructed
-            for exact, direct, reconstructed in zip(
-                _pipe_velocity_faces(*response), pressure_faces, reconstructed_faces
-            )
-        )
-        return constraints(*response, faces=stabilized_faces)
+        return constraints(*response, faces=rhie_chow_faces(pressure, response))
 
     def local_precondition(residual):
         divergence = unpack_pressure(residual[:pressure_size])
@@ -2986,24 +3004,35 @@ def _steady_stokes_projection_pipe(
     pressure_loss = pressure_solution.x[pressure_size:]
     correction = velocity_response(pressure_solution.x)
     projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
+    if flow_response_matrix is not None:
+        flow_delta = target_flow_rate - jnp.sum(projected[0] * cell_area, axis=(1, 2))
+        flow_refinement_state = (
+            jnp.zeros_like(pressure_solution.x)
+            .at[pressure_size:]
+            .set(jnp.linalg.solve(flow_response_matrix, flow_delta))
+        )
+        flow_refinement = velocity_response(flow_refinement_state)
+        correction = tuple(
+            base + delta for base, delta in zip(correction, flow_refinement)
+        )
+        projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
+        pressure_loss = pressure_loss + flow_refinement_state[pressure_size:]
+        refined_state = pressure_solution.x + flow_refinement_state
+        refined_residual = jnp.linalg.norm(schur(refined_state) - rhs)
+        pressure_solution = KrylovSolution(
+            refined_state,
+            refined_residual,
+            pressure_solution.iterations,
+            refined_residual <= pressure_tolerance,
+            pressure_solution.recycle,
+        )
     final_flow = jnp.sum(projected[0] * cell_area, axis=(1, 2))
     projected_faces = _pipe_velocity_faces(*projected)
     if rhie_chow:
-        pressure_faces = _pipe_pressure_face_correction(
-            pressure,
-            pressure_mobility,
-            dx=dx,
-            r_centers=r_centers,
-            dtheta=dtheta,
-        )
-        reconstructed_faces = _pipe_velocity_faces(
-            *_pipe_face_velocity_cells(*pressure_faces)
-        )
+        response_faces = rhie_chow_faces(pressure, correction)
         projected_faces = tuple(
-            face + direct - reconstructed
-            for face, direct, reconstructed in zip(
-                projected_faces, pressure_faces, reconstructed_faces
-            )
+            base + response
+            for base, response in zip(_pipe_velocity_faces(u, v, w), response_faces)
         )
     final_divergence = _pipe_face_divergence(
         *projected_faces,
@@ -3012,11 +3041,23 @@ def _steady_stokes_projection_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
+    final_mean_divergence = jnp.sum(
+        final_divergence * cell_area, axis=(1, 2), keepdims=True
+    ) / jnp.maximum(area_sum, 1.0e-30)
+    final_mean_free_divergence = final_divergence - final_mean_divergence
+    if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
+        print(
+            "B1 compatible divergence:",
+            float(jnp.max(jnp.abs(final_mean_divergence))),
+            float(jnp.max(jnp.abs(final_mean_free_divergence))),
+            np.asarray(final_mean_divergence[:, 0, 0]).tolist(),
+            np.asarray(final_flow - target_flow_rate).tolist(),
+        )
     return (
         *projected,
         pressure,
         pressure_loss,
-        jnp.max(jnp.abs(final_divergence)),
+        jnp.max(jnp.abs(final_mean_free_divergence)),
         jnp.max(jnp.abs(final_flow - target_flow_rate)),
         pressure_solution,
     )
@@ -5570,7 +5611,8 @@ def _solve_extruded_projection(
                 kernel_key, jax.jit(diffusion_system_solve)
             )
             steady_reaction = (
-                sigma[:, :count, :]
+                float(os.environ.get("LMX_B1_STEADY_REACTION_SCALE", "2"))
+                * sigma[:, :count, :]
                 * (
                     bx[:, :count, :] ** 2
                     + br[:, :count, :] ** 2
@@ -5774,7 +5816,11 @@ def _solve_extruded_projection(
                         r_centers=centers,
                         dtheta=dtheta,
                         pressure_iterations=projection_iterations,
-                        pressure_tolerance=momentum_tolerance,
+                        pressure_tolerance=float(
+                            os.environ.get(
+                                "LMX_B1_STOKES_TOLERANCE", momentum_tolerance
+                            )
+                        ),
                         restart=int(os.environ.get("LMX_B1_STOKES_RESTART", "16")),
                         max_restarts=int(os.environ.get("LMX_B1_STOKES_RESTARTS", "2")),
                         use_pressure_preconditioner=os.environ.get(

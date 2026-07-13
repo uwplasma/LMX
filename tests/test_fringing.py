@@ -895,7 +895,22 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
 
 
-def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
+@pytest.mark.parametrize(
+    "projection_options",
+    [
+        {},
+        {
+            "axisymmetric_deflation": True,
+            "azimuthal_mode_two_deflation": True,
+            "rhie_chow": True,
+            "orthonormal_pressure": True,
+        },
+    ],
+    ids=("base", "weighted-modal-rhie-chow"),
+)
+def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
+    projection_options,
+):
     nx, nr, ntheta = 5, 4, 8
     r_faces = jnp.asarray([0.0, 0.15, 0.4, 0.7, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
@@ -928,6 +943,7 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
         pressure_tolerance=1.0e-10,
         restart=24,
         max_restarts=3,
+        **projection_options,
     )
     assert result[-3] < 1.0e-8
     assert result[-2] < 1.0e-8
