@@ -6,8 +6,8 @@ structured meshes. The project is organized so that:
 - a new user can install it quickly, run a benchmark case, and inspect output
 - an advanced user can trace every equation and numerical choice back to the
   source files
-- a researcher can reproduce figures, scaling studies, validation reports, and
-  differentiable inverse-design workflows from the repository directly
+- a researcher can reproduce bounded validation and differentiable workflows
+  from Git, with large figure and movie bundles supplied by versioned releases
 
 ## Highlights
 
@@ -75,7 +75,7 @@ developer_guide
 
 ## What is next
 
-- release and integrate the generic SOLVAX PCG/implicit-solve backend
-- validate primal and transpose gradients on CPU and GPU
+- improve the accepted SOLVAX PCG/implicit-solve backend as SOLVAX evolves
+- extend the passing primal and transpose gradient gates to new objectives
 - freeze and close the published pipe and square-duct fringing-field cases
 - profile and strongly scale only the externally accepted 3D path

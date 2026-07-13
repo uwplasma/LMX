@@ -1,140 +1,104 @@
-# Case Cookbook
+# Case cookbook
 
-## Hartmann
+The curated examples cover the supported user journeys without a large tree of
+one-off campaign drivers. Run commands from the repository root.
 
-### CLI
+## Fully developed ducts
 
 ```bash
-python -m lmx.cli run hartmann --ha 20 --output ./out/hartmann
 lmx examples/hartmann_case.toml
-python -m lmx examples/hartmann_case.toml
-```
-
-### Python
-
-```python
-from lmx.cases import make_hartmann_case
-from lmx.solvers import solve_steady
-
-case = make_hartmann_case(ha=20.0, ny=48, nz=48)
-solution = solve_steady(case)
-```
-
-The public Python driver surface is intended to be modified directly. Typical
-research edits are:
-
-- increase `ny` and `nz` for refinement studies
-- replace the magnetic field with an analytic callable
-- change the logging verbosity through `LoggingSpec`
-- change the output tree without touching solver internals
-
-## Shercliff
-
-### CLI
-
-```bash
-python -m lmx.cli run shercliff --ha 20 --output ./out/shercliff
 lmx examples/cases/ducts/shercliff_case.toml
-```
-
-## Hunt
-
-### CLI
-
-```bash
-python -m lmx.cli run hunt --ha 20 --output ./out/hunt
 lmx examples/cases/ducts/hunt_case.toml
 ```
 
-### Python
+Python constructors expose the same stable cases:
 
 ```python
-from dataclasses import replace
-
 from lmx.cases import make_hunt_case
 from lmx.solvers import solve_steady
 
-case = make_hunt_case(ha=20.0, ny=40, nz=32, wall_cells=2)
-case = replace(case, forcing=0.8)
+case = make_hunt_case(ha=20.0, ny=48, nz=48, wall_cells=2)
 solution = solve_steady(case)
 ```
 
-This is the intended entry point for:
+Increase `ny` and `nz` for convergence studies; change wall resolution or
+conductance through the constructor rather than private arrays.
 
-- changing wall conductance ratios
-- changing side-wall or Hartmann-wall resolution
-- staging custom benchmark studies without dropping into private solver code
-
-## Variable fields and custom geometries
+## Validate a case
 
 ```bash
-python campaigns/fields/variable_field_geometry_demo.py --output ./artifacts/examples/variable_field_geometry
+lmx validate hartmann --ha 20 --output artifacts/validation/hartmann
+python scripts/run_validation_suite.py --output artifacts/validation
+python scripts/run_convergence_suite.py --help
+python scripts/run_time_convergence_suite.py --help
 ```
 
-That example is the recommended starting point when a user wants to:
+The suite records analytical error, conservation, power balance, mesh/time
+change, solver convergence, and fingerprints. Long or external comparisons are
+not hidden inside the portable test run.
 
-- define an analytic spatially varying magnetic field in Python
-- alter duct width, height, or wall layout from a benchmark constructor
-- preview the geometry and the material map before running
-- emit a short steady solve and standard overview plots in the same directory
-
-## Validation and convergence
+## Fringing fields
 
 ```bash
-python -m lmx.cli validate hartmann --ha 20 --output ./out/validation/hartmann
-python scripts/run_validation_suite.py --output ./artifacts/validation
-python scripts/run_convergence_suite.py --output ./artifacts/convergence --cases hartmann,shercliff,hunt --ha 20 --resolutions 16,32,48
-python scripts/run_time_convergence_suite.py --output ./artifacts/time_convergence --cases hartmann,shercliff,hunt --ha 20 --resolution 32 --dts 0.002,0.001,0.0005
+lmx examples/cases/fringing/fringing_rect_case.toml
+lmx examples/cases/fringing/fringing_layered_case.toml
+lmx examples/cases/fringing/fringing_pipe_case.toml
+python examples/fringing_benchmark_demo.py --help
 ```
 
-## Plotting and movies
-
-```bash
-python campaigns/tutorials/theory_meeting_demo.py --output ./artifacts/examples/theory_meeting_demo
-python campaigns/tutorials/plot_npz_results.py --npz ./artifacts/examples/theory_meeting_demo/shercliff/shercliff_ha20_results.npz --output ./artifacts/examples/theory_meeting_demo/shercliff/replot
-python campaigns/tutorials/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
-python campaigns/tutorials/geometry_preview_demo.py --with-post-run --post-case hartmann --output ./artifacts/examples/geometry_preview_full
-```
-
-## Geometry and mesh preview
-
-```bash
-python campaigns/tutorials/geometry_preview_demo.py --output ./artifacts/examples/geometry_preview
-python campaigns/tutorials/geometry_preview_demo.py --with-post-run --post-case hunt --output ./artifacts/examples/geometry_preview_hunt
-```
-
-That example previews:
-
-- a uniform rectangular Hartmann duct
-- a layered Hunt duct with explicit wall regions
-- a mapped pipe O-grid
-
-The default path is preview-only so it stays fast enough for routine use.
-Enable `--with-post-run` when you want the same output tree to include a short
-Hartmann or Hunt solve and matching overview plots.
-
-## Parallel backend selection
-
-```bash
-JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/cases/ducts/hunt_case.toml
-python examples/strong_scaling_demo.py --remote-host office --output ./artifacts/examples/strong_scaling
-python examples/strong_scaling_demo.py --benchmark-kind extruded_solve --profile --output ./artifacts/examples/extruded_solve_scaling
-```
-
-Routine CLI runs inherit the active JAX backend from the shell, while
-`examples/strong_scaling_demo.py` is the main path for explicit CPU and GPU
-scaling studies. Use `--benchmark-kind extruded_solve` for release-facing
-evidence from the actual rectangular `extruded_inductionless` projection path.
-The `extruded3d` surrogate is retained only for operator diagnosis and cannot
-support a production strong-scaling claim.
+These workflows are research-stage. Begin with the rectangular case, then add
+layers, mapped geometry, or tabulated fields one change at a time.
 
 ## Restart
 
 ```bash
 lmx examples/hartmann_case.toml
 lmx examples/cases/ducts/hartmann_restart_case.toml
+python examples/extruded_restart_demo.py --help
 ```
 
-The second run resumes from the first run’s `.npz` state and extends the
-simulation while appending diagnostics.
+Restart metadata protects against incompatible source, mesh, or input state.
+Use atomic partial checkpoints for long extruded runs.
+
+## Custom imposed field
+
+```bash
+python examples/variable_field_extruded_demo.py --help
+lmx examples/cases/fringing/fringing_tabulated_case.toml
+```
+
+The included `examples/tabulated_rect_field.npz` is a small tested fixture.
+Production field volumes belong in release or user storage, not Git.
+
+## Differentiable design
+
+```bash
+python examples/autodiff_design_demo.py --help
+```
+
+Always compare the automatic derivative against a finite difference or
+independent transpose reference at the final mesh and solver tolerance.
+
+## Plotting
+
+`lmx.plotting` writes bounded plots from solution and validation objects. The
+Python examples demonstrate the supported plotting API. Showcase media in the
+README and docs is compressed and served from releases; new runs write under
+ignored `artifacts/` directories.
+
+## Parallel performance
+
+```bash
+JAX_PLATFORMS=cpu python examples/strong_scaling_demo.py --help
+JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0,1 python scripts/run_strong_scaling_worker.py --help
+```
+
+Scaling results must use fixed global physics, include a one-device baseline,
+separate compilation from warm execution, prove shard placement, and pass
+solution-equivalence gates. See [Performance](performance.md).
+
+## Choose the right example
+
+The complete supported list and maturity labels are in `examples/catalog.toml`.
+Large parameter sweeps, raw external-solver cases, and manuscript campaigns are
+release assets rather than permanent source-tree entry points.

@@ -179,13 +179,12 @@ FFT line in periodic `theta`: its checkpointed 133-update campaign completes in
 previous rate projection. This accepts the runtime optimization, not the B1
 physics result; the terminal steady and divergence gates still require a more
 stable outer fixed-point policy.
-For heavy independent validation variants, use the campaign runner's
-`--gpu-devices 0,1` mode: it assigns one process per GPU, disables default JAX
-memory preallocation, shares a persistent compilation cache, and preserves
-restart provenance. Long ALEX runs report every outer iteration and write an
-atomic partial restart every eight iterations by default, so `--resume` can
-recover a source-matched interrupted run. Normal single-device JAX execution
-remains fastest on the Mac CPU because its kernels already use the host cores.
+For independent validation variants, run one process per GPU with explicit
+`CUDA_VISIBLE_DEVICES`; for a single B2 solve, use its `num_devices` setting for
+named axial sharding. Disable default JAX memory preallocation when processes
+share a host. Long ALEX runs emit progress and atomic partial restarts so a
+source-matched run can resume safely. Normal single-process CPU execution is
+usually fastest on the Mac because compiled kernels already use the host cores.
 
 See [Performance and scaling](docs/performance.md) for the current commands and
 the acceptance protocol.
@@ -223,8 +222,8 @@ numerics, adapters, plotting, and curated workflows remain covered.
 - The first 65-file generated-media bundle is published as
   [`lmx-research-assets-v1`](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
   and indexed by `provenance/release-assets.json`.
-- Generated documentation media retained in Git will be reduced to a small
-  curated set; every retained figure must have a reproducible command.
+- Documentation media is served from versioned releases; every published
+  figure must retain its generating command and fingerprints.
 - New public API is added only when it represents a stable user concept.
 
 ## Contributing and citing

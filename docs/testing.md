@@ -1,487 +1,93 @@
-# Testing and Validation
+# Testing and validation
 
-LMX uses a split validation strategy so that the default release gate remains
-fast while deeper research checks stay reproducible.
+LMX uses one portable gate for source quality and separate explicit lanes for
+external solvers, long physics campaigns, and hardware scaling.
 
-## Research-grade test contract
-
-The test suite is expected to protect scientific behavior, not only exercise
-lines of Python. Every new paper-facing capability should have all of the
-following before it is described as validated:
-
-- a direct unit test for setup, helper, and fallback logic
-- a numerical verification or invariant test
-- a physics or literature-facing validation test
-- an artifact-producing example that writes a figure and summary JSON
-- a docs entry that states whether the case is verification, validation, or a
-  capability demonstration
-
-This contract follows the benchmark hierarchy in Samper et al. and the current
-FreeMHD comparison surface: analytical solutions and conservation checks are
-the primary acceptance gate, while external solver comparisons add independent
-evidence through matched observables such as velocity, potential, current,
-Lorentz force, pressure proxy, and runtime.
-
-## Complete ten-minute gate
-
-The required local and CI gate runs every collected package test in parallel,
-measures branch coverage over `lmx`, and fails below 95% or after ten minutes:
+## Complete portable gate
 
 ```bash
 uv run --locked --extra dev python scripts/run_full_test_suite.py
 ```
 
-The `dev` extra is part of this full-functionality contract because it includes
-the pinned optional solver backends exercised by integration tests. Minimal
-runtime installs are covered separately, including clear failure behavior when
-an optional backend is not installed.
+The driver runs the full suite with branch coverage, a minimum coverage of 95%,
+and a hard ten-minute timeout. The current Apple M4 result is 807 passed, 8
+expected external-data skips, 95.30% branch coverage, and 217.5 seconds with six
+workers.
 
-The runner uses up to six host-aware workers, limits BLAS threads inside each
-worker, and keeps JAX preallocation disabled. A four-core CI runner therefore
-still uses four workers, while the 10-core reference Mac uses six. Override the
-worker count with `--workers`; the wall-clock contract remains controlled by
-`--budget-seconds`. External solvers, optional proprietary/large datasets, and
-multi-accelerator hardware cannot be made portable unit-test dependencies;
-their parsers, schemas, failure modes, and dispatch are covered here, while
-fresh solver/data/hardware comparisons remain explicit external campaigns.
+The eight skips represent unavailable independent datasets, not disabled source
+paths. The gate must stay below ten minutes as the code grows; its engineering
+target is six minutes to preserve CI margin.
 
-At commit `b42403f`, both configured endpoints pass the complete gate on the
-same Apple M4 host. Python 3.10.20/JAX 0.6.2 finishes 899 passing tests and 8
-expected skips with 95.07% branch coverage in 142.8 seconds. Python
-3.13.7/JAX 0.10.2 finishes the same collection with 95.06% coverage in 196.3
-seconds. The compact environment and timing record is
-`benchmarks/results/portable-gate-20260713.json`. GitHub-hosted jobs for this
-checkpoint were not assigned runners because of an account billing or
-spending-limit error; rerun them after resolving that administrative condition.
-
-## Reproducible environment and provenance
-
-The committed `uv.lock` resolves runtime, development, documentation, and
-release dependencies across the supported Python range. Recreate the locked
-development environment with:
+## Focused development checks
 
 ```bash
-uv sync --locked --extra dev
+python -m pytest -m unit
+python -m pytest tests/test_solvers.py
+python -m pytest tests/test_fringing.py
+python -m pytest tests/test_validation.py
 ```
 
-Project-wide provenance is stored under `provenance/`:
+Markers describe cost or external requirements, not correctness importance.
+Avoid adding a new test file when a compact test belongs naturally in an
+existing module-level family.
 
-- `environment.json` records the dependency-lock checksum, supported Python
-  endpoints, numerical precision policy, gate budgets, and current source/test
-  inventory;
-- `features.json` maps every package module and public feature to unit,
-  numerical-verification, user-workflow tests, and an honest stability claim;
-- `benchmarks.json` records literature and FreeMHD sources, checksums, current
-  status, observables, acceptance criteria, and runtime lane;
-- `schemas/` defines the machine-readable contract for each manifest.
+## What is tested
 
-Regenerate and verify the manifests with:
+| Layer | Examples |
+|---|---|
+| API and configuration | constructors, TOML, CLI, errors, restart metadata |
+| numerics | operators, linear solves, manufactured solutions, observed order |
+| physics | analytical profiles, charge closure, wall currents, power balance |
+| solver integration | steady/transient paths, diagnostics, backend equivalence |
+| differentiability | finite differences, implicit gradients, transpose solves |
+| parallelism | shard placement, one/two-device equivalence, scaling summaries |
+| outputs | compact plots, tables, NPZ/JSON round trips |
+| examples | every curated portable workflow |
 
-```bash
-python scripts/manage_provenance.py --write
-python scripts/manage_provenance.py --check
-```
+Coverage is a floor, not a validation claim. Physics acceptance requires
+quantitative reference and conservation gates even when code coverage is 100%.
 
-The check fails on a stale dependency lock, repository inventory, local
-reference checksum, missing test node, missing workflow, unmapped package
-module, unknown benchmark source, or schema violation. CI runs the check before
-the complete test gate. Locally held literature PDFs can also be verified
-without copying them into Git:
+## Test design rules
 
-```bash
-python scripts/manage_provenance.py --check \
-  --external-literature-root /path/to/literature
-```
-
-## Focused development gate
-
-During iteration, run the relevant marker or file subset:
-
-```bash
-python -m pytest -m unit -q
-python -m sphinx -W -b html docs docs/_build/html
-```
-
-The complete gate must still be run before merge. Focused checks cover:
-
-- configuration parsing
-- CLI dispatch
-- runtime logging
-- output writing and restart loading
-- plotting/reporting contracts
-- low-cost solver checks
-- manufactured/direct-kernel tests
-- small bundled-reference physics regressions for Hartmann, Shercliff, and Hunt
+- Test public behavior and invariants rather than implementation choreography.
+- Parametrize related cases instead of copying test functions.
+- Share expensive compiled fixtures within a worker when isolation is safe.
+- Keep grids at the smallest size that exposes the numerical property.
+- Mark a genuinely expensive test with a measured local timeout.
+- Never weaken a physics tolerance merely to shorten CI.
+- Put multi-hour campaigns outside pytest and retain compact accepted outputs.
 
 ## Manual research lanes
 
-Heavier validation remains available for manual or release-time execution:
-
-- regression snapshots
-- heavier physics suites
-- benchmark artifact generation
-- Q2D decay, forced, and wall-bounded reduced-model artifacts with modal
-  energy-budget gates
-- extended coverage collection
-
-The main post-`1.0` manual entry point is:
+These commands are intentionally not part of the portable gate:
 
 ```bash
-python scripts/run_manual_solver_family_validation.py \
-  --output artifacts/manual_validation/solver_family_summary.json \
-  --ha-values 10,20 \
-  --resolutions 16,24 \
-  --include-fringing \
-  --write-csv \
-  --write-plot \
-  --max-steps 20 \
-  --potential-iterations 80 \
-  --coupling-iterations 8
+python scripts/run_freemhd_parity_suite.py --help
+python scripts/run_convergence_suite.py --help
+python scripts/run_time_convergence_suite.py --help
+python scripts/run_strong_scaling_worker.py --help
 ```
 
-That command keeps the fast lane clean while still exercising the heavier
-Hartmann / Shercliff / Hunt acceptance path together with the bounded
-fringing slices. With `--write-csv` and `--write-plot`, the same run produces
-a machine-readable campaign table and a convergence figure
-for the fringing conservation metrics.
+Each lane must emit a compact JSON or CSV summary with input, source, dependency,
+and hardware fingerprints. Large raw fields belong in a versioned release.
 
-The manual lane can also enforce conservation thresholds directly:
+## CI contract
 
-```bash
-python scripts/run_manual_solver_family_validation.py \
-  --output artifacts/manual_validation/solver_family_summary.json \
-  --ha-values 10,20 \
-  --resolution 24 \
-  --include-fringing \
-  --fringing-geometries rect_duct,layered_duct,pipe_ogrid \
-  --max-charge-balance 8e-1 \
-  --max-interface-current 2.5e-1 \
-  --max-fringing-wall-current-leakage 1e-1 \
-  --max-fringing-boundary-current 1e-5 \
-  --fail-on-threshold
-```
+Pull requests run the full gate on supported Python endpoints and build the
+documentation with warnings as errors. Release jobs repeat the gate, build the
+docs, build wheel and source distributions, and smoke-test the wheel. Dependency
+compatibility is expressed as a supported range; the lockfile supplies CI
+reproducibility.
 
-This is the intended post-1.0 release-validation mode for conservation
-hardening.
+## Adding functionality
 
-The current combined Benchmark A/B exercise is:
+A new stable feature is complete only when it has:
 
-```bash
-python scripts/run_full_validation_exercise.py \
-  --output artifacts/validation/full_validation_exercise \
-  --ha-values 10,20 \
-  --resolution 12 \
-  --fringing-resolutions 8,12 \
-  --skip-paraview \
-  --write-plot
-```
+1. concise public API documentation and docstrings;
+2. unit and failure-path coverage;
+3. a numerics or physics validation appropriate to its claim;
+4. one bounded example if it introduces a distinct user workflow;
+5. no regression of the ten-minute gate or 95% branch-coverage floor.
 
-For release candidates, run the same bounded gate used by CI and build the
-documentation with warnings as errors:
-
-```bash
-python scripts/run_full_test_suite.py --budget-seconds 600
-python -m sphinx -W -b html docs docs/_build/html
-```
-
-The README/docs media inventory is documented in `docs/media.md`. Generated
-files above 128 KiB live in the checksummed `lmx-research-assets-v1` GitHub
-release and are governed by `provenance/release-assets.json`; the portable suite
-verifies manifest drift and deterministic archive construction. Smaller compact
-observables may remain in Git when they are needed by tests or offline docs.
-The readiness gate treats an absent generated file as available only when that
-verified manifest is marked `uploaded` and lists the exact generated path.
-Missing, malformed, staged, or checksum-inconsistent manifests remain blockers.
-
-That report separates hard release blockers from deferred research lanes. The
-current bounded `1.0` gate requires package metadata, workflow scaffolding,
-public README/docs artifacts, retained straight-duct analytical overlays,
-nonlinear Q2D movie diagnostics, magnetic-obstacle internal response,
-low-De bent-pipe global current closure, and tabulated-field reconstruction to
-pass. It keeps external magnetic-obstacle reference data, Q2D turbulent parity,
-and higher-inertia Dean-vortex validation explicitly open.
-
-For a manuscript-grade release, add `--strict-research-grade`. That strict mode
-fails until the deferred lanes above have real passing external or
-literature-anchored gates, so a package release cannot be confused with a full
-research-validation claim.
-
-That driver produces Benchmark A artifacts, Benchmark B gate summaries, and a
-combined JSON/CSV/Markdown report for the current documented thresholds.
-When run from the source tree it uses the bundled closed-channel reference
-dataset by default, so `--reference-root` is only needed for an alternate
-comparison set.
-
-The bundled-reference physics regressions sit between the fast gate and the
-manual campaign: they use the real steady solver on small grids, compare
-against the bundled analytical/reference datasets, and keep low-resolution
-profile drift visible without forcing the full A/B exercise into routine CI.
-
-On a two-GPU workstation, run independent Benchmark B variants concurrently:
-
-```bash
-python scripts/run_benchmark_b_independence.py \
-  --resume --checkpoint-interval 8 --gpu-devices 0,1
-```
-
-The coordinator gives each subprocess one visible GPU. Baseline and thin-wall
-runs form the first wave; tolerance and iteration variants form a second wave
-so both can start from the recorded baseline restart. Each record remains
-atomic and source-fingerprinted. During a solve, `*.progress.json` is replaced
-after every outer iteration and `*.partial.npz` is replaced at the requested
-interval, on convergence, and on the final iteration. `--resume` automatically
-uses this partial state when the final record is absent and the source
-fingerprint and recorded restart checksum match; an explicit
-`--variant-restart` still takes priority. GPU
-workers disable JAX's large up-front memory reservation by default, allowing
-concurrent variants to use their actual array/compile memory; an explicitly
-supplied `XLA_PYTHON_CLIENT_PREALLOCATE` setting still wins.
-
-## Physics gates
-
-The heavier validation lane should only be considered passing when all of the
-following are satisfied on the selected dataset:
-
-- fully developed ducts
-  - Hartmann/Shercliff/Hunt profile errors remain bounded under refinement
-  - flow-rate and forcing/pressure-proxy trends stabilize under refinement
-  - charge-balance and interface-current residuals stay below configured
-    thresholds
-- fringing 3D cases
-  - charge-balance, wall-current leakage, and boundary-current residuals stay
-    below configured thresholds
-  - throughput variation outside the field-ramp region remains bounded
-  - field/mean-velocity correlation has the expected negative sign
-  - pressure span grows through the magnet region and relaxes downstream
-
-## Quality gates
-
-Routine and release validation together should maintain:
-
-- fast lane under five minutes
-- strict docs build
-- deterministic restart continuation on the executable TOML/CLI path
-- stable JSON/CSV/NPZ output schemas
-- example workflows that regenerate the committed docs media and figures
-- branch coverage concentrated away from dead or historical code paths
-
-Current larger dataset:
-
-- `Ha = 10, 20`
-- `resolution = 10`
-- bounded fringing lane on `rect_duct`, `layered_duct`, and `pipe_ogrid`
-- hard thresholds:
-  - `charge_balance <= 8e-1`
-  - `interface_current <= 2.5e-1`
-  - `wall_current_leakage <= 1e-1`
-  - `boundary_current <= 1e-5`
-
-The layered 3D case joined that validation gate after the multi-region electric
-subproblem was upgraded from a bounded iterative solve to a sparse direct solve
-of the conservative variable-coefficient potential operator.
-
-That gate now passes on the current tree for rectangular ducts,
-layered ducts, and mapped pipes.
-
-This split avoids exhausting CI runtime on every routine push while still
-preserving reproducible research checks.
-
-## Test families
-
-### Unit tests
-
-Unit tests validate:
-
-- dataclass/config behavior
-- operator kernels
-- linear-solver helpers
-- output schema and logging contracts
-- example orchestration paths
-
-### Validation tests
-
-Validation tests focus on:
-
-- analytical benchmark metrics
-- report generation
-- convergence bookkeeping
-- benchmark summary writing
-
-### Regression tests
-
-Regression tests freeze representative outputs for:
-
-- solver behavior
-- examples
-- reporting formats
-- selected benchmark artifacts
-
-### Physics-heavy checks
-
-The heavier manual lane is where we continue to harden:
-
-- Hartmann analytical acceptance
-- Shercliff analytical acceptance
-- Hunt benchmark acceptance
-- deeper solver-family hardening on larger meshes and longer windows
-
-## Coverage strategy
-
-LMX intentionally avoids expensive end-to-end solves when a smaller synthetic
-or monkeypatched test can validate the same contract. The current coverage
-strategy uses:
-
-- direct kernel tests for `lmx/linear.py` and `lmx/operators.py`
-- monkeypatched orchestration tests for examples and reporting
-- small-mesh real solves for selected solver paths
-- focused autodiff tests on reduced iteration counts
-
-This is how the project keeps the fast unit lane small while preserving
-coverage at the release target. Bounded solver-artifact, convergence, Q2D, and
-external-reference contract jobs now run in parallel CI/CD lanes so the full
-routine workflow remains below the 10-minute wall-clock target without
-serializing every validation solve.
-
-The broad local coverage gate now clears `95%` over `lmx/` and `scripts/`
-without moving long benchmark runs into routine CI. The current preferred order
-for further coverage work is:
-
-- delete genuinely dead helper branches instead of testing historical behavior
-- add cheap direct tests for `lmx/solvers.py` branch helpers, restart/initial
-  condition paths, flow-rate/forcing modes, current reconstruction, and
-  diagnostic guards
-- keep manufactured-solution and invariant tests close to `lmx/operators.py`
-  and `lmx/linear.py`
-- keep paper-facing examples in `examples/`, then test their summary JSON
-  schema and governing observables rather than comparing image pixels
-- leave heavy FreeMHD reruns, high-Ha mesh ladders, and long scaling campaigns
-  in explicit manual workflows, while keeping bounded validation artifacts in
-  push and release CI
-
-The manual coverage workflow now enforces the `95%` gate with
-`--cov-fail-under=95`. The default push/PR lane keeps the fast unit suite
-separate from the parallel bounded validation-artifact jobs so routine commits
-exercise real physics gates without rerunning the full coverage campaign.
-
-## Publication artifact rule
-
-Numerical and physics tests that demonstrate publishable behavior should have a
-matching artifact-producing workflow. The expected pattern is:
-
-- the test asserts the invariant, convergence rate, profile error, or
-  conservation metric cheaply
-- the example writes a publication-ready PNG/PDF and a machine-readable JSON
-  summary
-- the docs link the figure and state the literature anchor
-- CI checks JSON summaries, bounded validation artifacts, and the docs build;
-  manual workflows regenerate the heavier external-code figures when needed
-
-This is the route for the straight-duct overlays, 3D fringing-field summaries,
-Q2D panels, localized-field response panels, WHAM sensitivity figures,
-bent-pipe overview, and future heat-transfer plots.
-
-## Source map
-
-- `tests/test_solver.py`
-  - solver-family and control-path tests
-- `tests/test_validation.py`
-  - benchmark/report summaries
-- `tests/test_linear.py`
-  - linear-kernel coverage
-- `tests/test_operators.py`
-  - operator-kernel coverage
-- `tests/test_example_runner.py`
-  - example orchestration and artifacts
-- `tests/test_autodiff.py`
-  - differentiable lane checks
-- `tests/test_fringing.py`
-  - fringing research slice
-
-## Literature anchors
-
-The testing strategy is intentionally tied to published benchmark ladders and
-verification/validation practice, not only to internal regression history.
-
-- [Samper et al., *An approach to verification and validation of MHD codes for fusion applications*](https://www.sciencedirect.com/science/article/pii/S0920379614003263)
-  - governs the A/B/C/D/E benchmark ladder used in the plan and benchmark docs
-- [FreeMHD V&V paper, arXiv:2409.08950](https://arxiv.org/abs/2409.08950)
-  - provides straight-duct, fringing, and free-surface comparison targets and
-    a useful reference implementation baseline
-- [Quasi-two dimensional perturbations in duct flows under transverse magnetic field](https://arxiv.org/abs/2006.03993)
-  - anchors the current Q2D Hartmann-friction validation direction
-  - the current decay, forced, and wall-bounded Q2D summaries now include the
-    modal energy balance `dE/dt = P - 2 lambda E` as a reduced-model closure
-    gate before turbulent spectra are claimed
-  - the current wall-bounded Q2D summary now emits energy, enstrophy,
-    dissipation, and shell-spectrum observables, but the turbulence gate remains
-    open until those quantities are compared with published turbulent Q2D data
-  - the current multi-mode Q2D decay movie adds monotone energy/enstrophy,
-    high-wavenumber damping, and spectral-centroid checks, while still keeping
-    nonlinear turbulent parity explicitly open
-  - `campaigns/q2d/q2d_turbulence_external_reference_template.py` now writes the
-    observable CSV contract used by the movie example when matched turbulent
-    reference data are available
-- [On the flow past a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA)
-- [Constrained flow around a magnetic obstacle](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0)
-  - anchor the wake-deficit / recovery / distortion observables needed before
-    the magnetic-obstacle lane can be called externally validated
-  - the current example now writes a setup schematic plus internal response
-    panel; tests assert the artifact exists, but research-grade status remains
-    false until the external reference CSV is filled with matched published or
-    experimental observables
-- [Validation and verification of a robust 3-D MHD code](https://www.sciencedirect.com/science/article/pii/S0920379618300358)
-  - supports the broader validation roadmap for curved ducts, magnetic
-    obstacles, and higher-inertia 3D cases
-  - `campaigns/fringing/dean_vortex_external_reference_template.py` now writes the
-    scalar-observable CSV contract for future higher-inertia curved-pipe or
-    curved-duct Dean-vortex validation
-- [A research framework for writing differentiable PDE discretizations in JAX](https://arxiv.org/abs/2111.05218)
-  - anchors the autodiff verification philosophy for gradient, optimization,
-    and differentiable-operator tests
-
-The tabulated-field tests now separate two failure modes:
-
-- table-node interpolation and divergence quality through
-  `tabulated_field_quality_metrics(...)`
-- solver-point reconstruction against a manufactured analytic field through
-  `tabulated_cross_section_reconstruction_metrics(...)`
-
-The latter is the gate that protects the README tabulated-field extruded solve
-from silently using a table that differs from the expected magnetic field at
-the actual solve points.
-
-## Artifact-producing verification examples
-
-When a numerical or physics verification family is strong enough to support
-the docs or manuscript, it should not remain only as a unit test. The intended
-pattern is:
-
-- keep the cheap direct test in `tests/`
-- add a companion standalone example under `examples/`
-- write a publication-ready figure plus a summary JSON
-- validate the summary schema and governing observables in tests
-
-This keeps the fast lane bounded while making the same verification evidence
-available for documentation and later manuscript figures.
-
-The first explicit examples following this pattern are:
-- `examples/operator_verification_demo.py` for smooth-grid manufactured
-  operator convergence
-- `campaigns/tutorials/operator_clustered_verification_demo.py` for clustered
-  boundary-layer operator convergence
-- `campaigns/interfaces/interface_conductivity_verification_demo.py` for aligned
-  coefficient-jump verification
-- `campaigns/ducts/straight_duct_profile_comparison.py` for the Hartmann /
-  Shercliff / Hunt literature-facing straight-duct panel, including no-slip
-  wall reconstruction when comparing cell-centered profiles against the
-  analytical wall-to-wall curves; the current release target is
-  `L2 <= 1.2e-2` on the retained cuts, and the current bounded
-  `45 × 45` Shercliff / `49 × 49` Hunt wall-model artifact meets it from zero
-  initial conditions
-- `campaigns/ducts/hartmann_validation_ladder.py` for the bounded Hartmann multi-`Ha`
-  literature ladder, with the same stable summary-JSON pattern used by the
-  manuscript-facing straight-duct figures
-- `campaigns/ducts/straight_duct_validation_ladder.py` for the bounded Shercliff /
-  Hunt multi-Ha literature ladder
-- `campaigns/freemhd/freemhd_closed_channel_parity.py` for fresh LMX versus FreeMHD
-  transient straight-duct parity and runtime comparison on the same host
+See [Benchmark matrix](benchmark_matrix.md) for research acceptance and
+[Developer guide](developer_guide.md) for contribution mechanics.

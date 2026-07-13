@@ -1,43 +1,33 @@
-# Getting Started
+# Getting started
 
-LMX is designed to be usable from either a single TOML input file or a Python
-driver script. The intended workflow is:
+LMX supports a single-file TOML workflow and a Python API. Start with a bundled
+case, inspect its compact outputs, and increase resolution only after the
+workflow is understood.
 
-1. define a geometry, material regions, and magnetic field
-2. choose a solver family and time controls
-3. run from the CLI or Python
-4. inspect logs, JSON summaries, `.npz` restart bundles, VTK output, and plots
-
-## Installation
-
-Minimal install:
+## Install
 
 ```bash
-git clone https://github.com/uwplasma/LMX
+git clone https://github.com/uwplasma/LMX.git
 cd LMX
 python -m pip install -e .
 ```
 
-Development install:
+For tests and documentation:
 
 ```bash
-git clone https://github.com/uwplasma/LMX
-cd LMX
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,docs]'
 ```
 
-Documentation install:
+CI uses the committed lockfile:
 
 ```bash
-python -m pip install -e '.[docs]'
+uv sync --locked --extra dev --extra docs
 ```
 
-LMX supports Python `3.10+`. On Python `3.10`, TOML parsing falls back
-automatically to `tomli`.
+LMX supports Python 3.10 and newer. Install the JAX wheel appropriate for your
+accelerator before installing LMX when using CUDA.
 
-## Fastest first run
-
-Run one of the example cases:
+## First run
 
 ```bash
 lmx examples/hartmann_case.toml
@@ -45,73 +35,63 @@ lmx examples/cases/ducts/shercliff_case.toml
 lmx examples/cases/ducts/hunt_case.toml
 ```
 
-The equivalent module entrypoint also works:
+`python -m lmx CASE.toml` is equivalent. Each case writes to its configured
+directory under ignored `artifacts/` or `out/` storage.
 
-```bash
-python -m lmx examples/hartmann_case.toml
-```
+Hartmann and Shercliff cases use canonical insulating/conducting duct limits.
+The Hunt case has conducting side walls and insulating Hartmann walls. These
+fully developed cases are the stable first-run surface.
 
-If you are new to liquid-metal MHD, the two benchmark names that appear most
-often in LMX are:
-
-- `Hunt`:
-  a rectangular duct with conducting walls parallel to the imposed field,
-  insulating Hartmann walls, and a transverse magnetic field
-- `fringing field`:
-  a magnetic field that varies along the flow direction, so the problem is no
-  longer fully developed and must be treated as 3D
-
-## Run from Python
+## Python API
 
 ```python
 from lmx.cases import make_hartmann_case
-from lmx.config import LoggingSpec
-from lmx.runtime_logging import StreamingSolverLogger
 from lmx.solvers import solve_steady
 
 case = make_hartmann_case(ha=20.0, ny=48, nz=48)
-logger = StreamingSolverLogger(LoggingSpec.from_user_controls(verbose=True, verbosity="debug"))
-solution = solve_steady(case, logger=logger)
+solution = solve_steady(case)
+
+print(solution.diagnostics.volumetric_flow_rate_history[-1])
+print(solution.diagnostics.residual_history[-1])
 ```
 
-## Control the backend
+Case dataclasses can be changed with `dataclasses.replace`; public constructors
+avoid requiring users to know private solver internals.
 
-LMX inherits the active JAX backend from the shell:
+## CPU or GPU
+
+Choose the backend before Python imports JAX:
 
 ```bash
-JAX_PLATFORMS=cpu OMP_NUM_THREADS=8 lmx examples/hartmann_case.toml
-XLA_FLAGS=--xla_force_host_platform_device_count=8 JAX_PLATFORMS=cpu OMP_NUM_THREADS=1 lmx examples/hartmann_case.toml
+JAX_PLATFORMS=cpu lmx examples/hartmann_case.toml
 JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0 lmx examples/cases/ducts/hunt_case.toml
 ```
 
-## Use custom geometry and magnetic fields from Python
+Normal CPU kernels already use XLA's host thread pool. Artificially creating
+many host devices is intended for sharding tests, not routine speedups.
 
-`campaigns/fields/variable_field_geometry_demo.py` shows how to:
+## Custom fields and fringing flow
 
-- build a `CaseSpec` directly
-- define a custom `GeometrySpec`
-- attach an analytic magnetic field callback through `MagneticFieldSpec(kind="analytic", fn=...)`
-- or point a TOML / Python case at a tabulated NPZ field through
-  `MagneticFieldSpec(kind="tabulated", table_path=...)`
-- preview the geometry before solving
-- run the solver and write plots
-
-Run it with:
+Use the bounded custom-field example:
 
 ```bash
-python campaigns/fields/variable_field_geometry_demo.py --output artifacts/examples/variable_field_geometry
+python examples/variable_field_extruded_demo.py --help
 ```
 
-## Output products
+Then inspect the reusable TOML cases:
 
-A standard run can produce:
+```bash
+lmx examples/cases/fringing/fringing_rect_case.toml
+lmx examples/cases/fringing/fringing_tabulated_case.toml
+```
 
-- live solver logs
-- a JSON summary
-- restartable `.npz` state bundles
-- VTK files for ParaView
-- CSV profiles
-- `PNG` / `PDF` plots
+Fringing and mapped-pipe workflows are research-stage. Their outputs should be
+checked for current closure, divergence, solver convergence, and mesh/time
+sensitivity before physical interpretation.
 
-The precise output selection is controlled by `[output]` in the TOML input or
-the corresponding `OutputSpec` in Python.
+## Outputs
+
+Depending on `[output]`, a run can write live logs, a JSON summary, restartable
+NPZ state, CSV profiles, VTK files, and compressed plots. Keep generated results
+outside Git. See [Case cookbook](case_cookbook.md) for restarts and validation,
+and [Input reference](input_reference.md) for every TOML field.
