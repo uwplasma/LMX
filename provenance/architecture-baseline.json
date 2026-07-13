@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3596583,
-    "checkout_bytes_excluding_release_candidates": 3596583,
+    "checkout_bytes_excluding_build_artifacts": 3592755,
+    "checkout_bytes_excluding_release_candidates": 3592755,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -216,8 +216,8 @@
         "role": "research_stage_extension"
       },
       {
-        "bytes": 84561,
-        "lines": 2139,
+        "bytes": 83488,
+        "lines": 2105,
         "owner": "research_stage_extension",
         "path": "lmx/autodiff.py",
         "role": "research_stage_extension"
@@ -314,8 +314,8 @@
         "role": "validation_and_evidence"
       },
       {
-        "bytes": 293276,
-        "lines": 7964,
+        "bytes": 290852,
+        "lines": 7878,
         "owner": "research_stage_extension",
         "path": "lmx/fringing.py",
         "role": "research_stage_extension"
@@ -482,7 +482,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 35162,
+    "total_package_lines": 35042,
     "uncurated_example_count": 0
   },
   "schema_version": 1,

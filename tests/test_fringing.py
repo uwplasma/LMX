@@ -25,7 +25,6 @@ from lmx.fringing import (
     _gauge_invariant_scalar_update,
     _laplacian_3d,
     _masked_laplacian_duct,
-    _net_boundary_current_residual,
     _normalized_pressure_observable_update,
     _pipe_poisson_jacobi_3d,
     build_bent_pipe_extruded_problem,
@@ -1270,18 +1269,6 @@ def test_pipe_jacobi_pressure_fallback_solves_compatible_zero_rhs():
     assert residual == pytest.approx(0.0)
     assert initial == pytest.approx(0.0)
     assert iterations == 1
-
-
-def test_net_boundary_current_residual_cancels_balanced_faces():
-    field = jnp.ones((2, 2, 2))
-    assert _net_boundary_current_residual(
-        field,
-        jnp.zeros_like(field),
-        jnp.zeros_like(field),
-        dx=1.0,
-        dy=1.0,
-        dz=1.0,
-    ) == pytest.approx(0.0)
 
 
 def test_scalar_update_ignores_constant_gauge_mode():

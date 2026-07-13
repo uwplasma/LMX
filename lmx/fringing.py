@@ -1912,31 +1912,6 @@ def _bundle_station_history(
     )
 
 
-def _net_boundary_current_residual(
-    jx: jnp.ndarray,
-    jy: jnp.ndarray,
-    jz: jnp.ndarray,
-    *,
-    dx: float,
-    dy: float,
-    dz: float,
-) -> float:
-    yz_area = dy * dz
-    xz_area = dx * dz
-    xy_area = dx * dy
-    inlet_flux = -jnp.sum(jx[0, :, :]) * yz_area
-    outlet_flux = jnp.sum(jx[-1, :, :]) * yz_area
-    south_flux = -jnp.sum(jy[:, 0, :]) * xz_area
-    north_flux = jnp.sum(jy[:, -1, :]) * xz_area
-    bottom_flux = -jnp.sum(jz[:, :, 0]) * xy_area
-    top_flux = jnp.sum(jz[:, :, -1]) * xy_area
-    return float(
-        jnp.abs(
-            inlet_flux + outlet_flux + south_flux + north_flux + bottom_flux + top_flux
-        )
-    )
-
-
 def _conservative_current_fluxes_3d(
     sigma: jnp.ndarray,
     phi: jnp.ndarray,
@@ -2655,67 +2630,6 @@ def _solvax_diffusion_pipe(
         iterations=iterations,
         tolerance=tolerance,
     )
-
-
-def _pipe_component_momentum_inverse(  # pragma: no cover - two-GPU hardware gate
-    mesh: Mesh,
-    *,
-    dx: float,
-    r_faces: jnp.ndarray,
-    r_centers: jnp.ndarray,
-    dtheta: float,
-    iterations: int,
-    tolerance: float,
-):
-    """Return a persistent two-component-per-device pipe inverse."""
-
-    if mesh.size != 2:
-        raise ValueError("Component momentum sharding requires exactly two devices.")
-
-    component = NamedSharding(mesh, P("component", None, None, None))
-    replicated = NamedSharding(mesh, P(None, None, None, None))
-
-    @jax.shard_map(
-        mesh=mesh,
-        in_specs=(
-            P("component", None, None, None),
-            P(None, None, None),
-            P(None, None, None),
-            P(None),
-            P(None),
-        ),
-        out_specs=P("component", None, None, None),
-        check_vma=False,
-    )
-    def solve_local_pair(forces, viscosity, reaction, faces, centers):
-        def solve(force):
-            return _solvax_diffusion_pipe(
-                force,
-                viscosity,
-                dt=None,
-                dx=dx,
-                r_faces=faces,
-                r_centers=centers,
-                dtheta=dtheta,
-                iterations=iterations,
-                tolerance=tolerance,
-                reaction=reaction,
-            )[0]
-
-        return jnp.stack((solve(forces[0]), solve(forces[1])))
-
-    def apply(forces, viscosity, reaction):
-        padded = jnp.concatenate((forces, jnp.zeros_like(forces[:1])), axis=0)
-        solved = solve_local_pair(
-            jax.reshard(padded, component),
-            viscosity,
-            reaction,
-            r_faces,
-            r_centers,
-        )
-        return jax.reshard(solved, replicated)[:3]
-
-    return apply
 
 
 def _masked_laplacian_pipe(

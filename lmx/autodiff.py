@@ -387,40 +387,6 @@ def _extruded_conservative_emf_rhs(
     )
 
 
-def _solve_extruded_velocity_jacobi(
-    *,
-    rhs: jnp.ndarray,
-    diffusivity: jnp.ndarray,
-    reaction: jnp.ndarray,
-    dx: float,
-    dy: float,
-    dz: float,
-    iterations: int,
-    relaxation: float,
-) -> jnp.ndarray:
-    omega = jnp.asarray(relaxation, dtype=rhs.dtype)
-    diagonal = reaction + 2.0 * diffusivity * (
-        1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12)
-    )
-    diagonal = jnp.maximum(diagonal, 1.0e-12)
-
-    def body_fun(_, field):
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _extruded_neighbor_fields(field)
-        updated = (
-            rhs
-            + diffusivity
-            * (
-                (x_west + x_east) / max(dx**2, 1.0e-12)
-                + (y_south + y_north) / max(dy**2, 1.0e-12)
-                + (z_bottom + z_top) / max(dz**2, 1.0e-12)
-            )
-        ) / diagonal
-        blended = (1.0 - omega) * field + omega * updated
-        return _extruded_enforce_velocity_bc(blended)
-
-    return jax.lax.fori_loop(0, iterations, body_fun, jnp.zeros_like(rhs))
-
-
 def _solve_velocity_jacobi_state(
     *,
     mesh: StructuredMesh,
