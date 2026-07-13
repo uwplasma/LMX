@@ -1129,6 +1129,24 @@ wall time is acceptable.
    viscous, reaction-dominated, checkerboard, and B1 two-map gates. Only then
    add axial/coarse and Fourier-radial block preconditioning, followed by exact
    GPU correctness and sharding/scaling measurements.
+   The bounded follow-up at experimental commit `6067ff1` passes the complete
+   tiny B1 solve/restart test without relaxing a gate. A volume-weighted
+   Householder pressure basis, momentum-consistent Rhie--Chow correction,
+   exact stationwise flow refinement, and only the symmetry-required `m=0`
+   and `m=2` azimuthal coarse spaces reduce the terminal two-map mean-free
+   divergence to `1.93e-6` and flow error to `1.73e-13`; the restart terminates
+   at `7.64e-7` and `5.42e-14`. A fixed-point-preserving reaction split factor
+   of two closes the frozen restart-pressure gate, and the run takes about
+   `19.15 s` on the reference Mac. The full fringing module and both base and
+   weighted-modal manufactured Stokes variants pass. This is a passed physics
+   prototype, not yet the production M5 exit: some Euclidean Krylov status
+   flags remain false despite the physical component gates, and the exact
+   coarse action is densely assembled on the tiny mesh. Next define stopping
+   from the independent mean-free-divergence and normalized-flow residuals,
+   replace dense coarse assembly with separable axial/Fourier-radial blocks,
+   delete diagnostic-only branches, and prove refinement-independent
+   iterations and memory before enabling the path by default or resuming exact
+   GPU/sharding campaigns.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,

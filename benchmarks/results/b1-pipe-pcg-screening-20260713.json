@@ -310,14 +310,25 @@
         "rhie_chow_screen_numerical_rank": 1008,
         "rhie_chow_screen_condition_number": 1.6629891e+09,
         "rhie_chow_screen_accepted": false,
+        "weighted_modal_gate_commit": "6067ff1",
+        "weighted_modal_tiny_test_passed": true,
+        "weighted_modal_reaction_split_factor": 2.0,
+        "weighted_modal_terminal_mean_free_divergence": 1.9328521e-06,
+        "weighted_modal_terminal_flow_error": 1.7319479e-13,
+        "weighted_modal_restart_mean_free_divergence": 7.6400288e-07,
+        "weighted_modal_restart_flow_error": 5.4178884e-14,
+        "weighted_modal_runtime_seconds": 19.1512,
+        "weighted_modal_full_fringing_module_passed": true,
+        "weighted_modal_dense_coarse_action": true,
+        "weighted_modal_all_krylov_status_flags_passed": false,
         "accepted": false,
-        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree. Axial deflation closes only the first axisymmetric map. Explicit assembly then exposes two checkerboard null modes in the collocated face-to-cell-to-face response. A preliminary momentum-weighted Rhie-Chow correction restores full rank but remains too ill-conditioned and fails the two-map physics gate."
+        "reason": "The compatible D A^-1 G construction and exact 7x7 axial flow-response block pass independently. B1 still fails because transient, unit-response, and point-diagonal pressure mobilities do not approximate the steady pressure Schur block; SOLVAX and reference JAX GMRES agree. Axial deflation closes only the first axisymmetric map. Explicit assembly then exposes two checkerboard null modes in the collocated face-to-cell-to-face response. A preliminary momentum-weighted Rhie-Chow correction restores full rank but remains too ill-conditioned. The subsequent weighted m=0/m=2 prototype passes the complete tiny B1 physics test and restart, but remains experimental because its coarse action is densely assembled and some Euclidean Krylov status flags do not reflect the passing physical residual components."
       },
-      "next_candidate": "Retain the compatible face operators and exact axial flow block. Derive a momentum-consistent Rhie-Chow face mass flux from the shared steady momentum diagonal, use volume-weighted orthonormal pressure coordinates, and require full reduced rank plus refinement-stable conditioning on manufactured and two-map B1 gates before adding scalable Fourier-radial blocks or running another exact-GPU campaign."
+      "next_candidate": "Retain the passing weighted Rhie-Chow m=0/m=2 physics path. Define convergence from mean-free divergence and normalized station-flow residuals, replace the dense tiny coarse action with separable axial/Fourier-radial blocks, remove diagnostic branches, and require refinement-independent iterations and memory before enabling it or running another exact-GPU campaign."
     },
     "accepted": false,
-    "next_candidate": "Replace the rank-deficient collocated pressure response with a momentum-consistent face mass flux and volume-weighted pressure coordinates; require the tiny rank, conditioning, divergence, and fixed-flow gates before another electromagnetic campaign."
+    "next_candidate": "Convert the passing weighted-modal tiny prototype from a dense coarse action to separable axial/Fourier-radial blocks, align Krylov status with the independent physical residual components, and require refinement-independent cost before another electromagnetic campaign."
   },
   "accepted": true,
-  "next_constraint": "Close the collocated checkerboard nullspace and conditioning gates with a momentum-consistent face mass flux before scalable block preconditioning, exact GPU correctness, or strong-scaling campaigns; pseudo-time and transient-pressure variants remain closed."
+  "next_constraint": "Make the passing weighted Rhie-Chow m=0/m=2 prototype matrix-free and refinement-scalable, remove diagnostic branches, and close physical/Krylov convergence agreement before exact GPU correctness or strong-scaling campaigns; pseudo-time and transient-pressure variants remain closed."
 }
