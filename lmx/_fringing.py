@@ -2666,6 +2666,8 @@ def _steady_stokes_projection_pipe(
     flow_constraint_scale: float = 1.0,
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
+    axisymmetric_deflation: bool = False,
+    rhie_chow: bool = False,
 ) -> tuple[jnp.ndarray, ...]:
     """Apply the compatible steady ``D A^-1 G`` pipe projection."""
 
@@ -2707,9 +2709,13 @@ def _steady_stokes_projection_pipe(
             apply_momentum_inverse(force) for force in (force_u, force_v, force_w)
         )
 
-    def constraints(state_u, state_v, state_w):
+    def constraints(state_u, state_v, state_w, *, faces=None):
         divergence = _pipe_face_divergence(
-            *_pipe_velocity_faces(state_u, state_v, state_w),
+            *(
+                _pipe_velocity_faces(state_u, state_v, state_w)
+                if faces is None
+                else faces
+            ),
             dx=dx,
             r_faces=r_faces,
             r_centers=r_centers,
@@ -2727,9 +2733,29 @@ def _steady_stokes_projection_pipe(
     )
 
     def schur(state):
-        return constraints(*velocity_response(state))
+        response = velocity_response(state)
+        if not rhie_chow:
+            return constraints(*response)
+        pressure = unpack_pressure(state[:pressure_size])
+        pressure_faces = _pipe_pressure_face_correction(
+            pressure,
+            pressure_mobility,
+            dx=dx,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        reconstructed_faces = _pipe_velocity_faces(
+            *_pipe_face_velocity_cells(*pressure_faces)
+        )
+        stabilized_faces = tuple(
+            exact + direct - reconstructed
+            for exact, direct, reconstructed in zip(
+                _pipe_velocity_faces(*response), pressure_faces, reconstructed_faces
+            )
+        )
+        return constraints(*response, faces=stabilized_faces)
 
-    def precondition(residual):
+    def local_precondition(residual):
         divergence = unpack_pressure(residual[:pressure_size])
         if use_pressure_preconditioner:
             pressure, *_ = _solvax_pressure_poisson_pipe(
@@ -2753,9 +2779,62 @@ def _steady_stokes_projection_pipe(
         )
         return jnp.concatenate((reduce_field(pressure), pressure_loss))
 
+    if axisymmetric_deflation:
+        radial_weights = jnp.sum(cell_area, axis=2)
+        coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
+        coarse_size = coarse_pressure_size + u.shape[0]
+
+        def prolong(coarse):
+            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
+            final = -jnp.sum(radial * radial_weights[:, :-1], axis=1) / jnp.maximum(
+                radial_weights[:, -1], 1.0e-20
+            )
+            pressure = jnp.broadcast_to(
+                jnp.concatenate((radial, final[:, None]), axis=1)[:, :, None],
+                u.shape,
+            )
+            return jnp.concatenate(
+                (reduce_field(pressure), coarse[coarse_pressure_size:])
+            )
+
+        def restrict(residual):
+            divergence = jnp.mean(unpack_pressure(residual[:pressure_size]), axis=2)
+            return jnp.concatenate(
+                (
+                    divergence[:, :-1].reshape(-1),
+                    residual[pressure_size:],
+                )
+            )
+
+        coarse_basis = jnp.eye(coarse_size, dtype=u.dtype)
+        coarse_action = jax.vmap(lambda basis: restrict(schur(prolong(basis))))(
+            coarse_basis
+        ).T
+
+        def precondition(residual):
+            local = local_precondition(residual)
+            coarse_residual = restrict(residual - schur(local))
+            coarse_correction = jnp.linalg.solve(coarse_action, coarse_residual)
+            return local + prolong(coarse_correction)
+
+    else:
+        precondition = local_precondition
+
     preconditioned_rhs = precondition(rhs)
     if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
         preconditioned_residual = schur(preconditioned_rhs) - rhs
+        residual_field = unpack_pressure(preconditioned_residual[:pressure_size])
+        pressure_field = unpack_pressure(preconditioned_rhs[:pressure_size])
+        axial_energy = jnp.linalg.norm(
+            jnp.fft.rfft(residual_field, axis=0), axis=(1, 2)
+        )
+        theta_energy = jnp.linalg.norm(
+            jnp.fft.rfft(residual_field, axis=2), axis=(0, 1)
+        )
+        singular_values = jnp.linalg.svd(
+            pressure_field.reshape((u.shape[0], cross_section_size)),
+            compute_uv=False,
+        )
         print(
             "B1 compatible preconditioner:",
             float(jnp.linalg.norm(rhs)),
@@ -2763,8 +2842,50 @@ def _steady_stokes_projection_pipe(
             float(jnp.linalg.norm(preconditioned_residual[pressure_size:])),
             float(jnp.mean(preconditioned_rhs[pressure_size:])),
         )
+        print(
+            "B1 compatible modes:",
+            np.asarray(
+                axial_energy / jnp.maximum(jnp.linalg.norm(axial_energy), 1.0e-30)
+            ).tolist(),
+            np.asarray(
+                theta_energy / jnp.maximum(jnp.linalg.norm(theta_energy), 1.0e-30)
+            ).tolist(),
+            np.asarray(
+                singular_values / jnp.maximum(singular_values[0], 1.0e-30)
+            ).tolist(),
+        )
 
-    if os.environ.get("LMX_B1_STOKES_JAX_GMRES") == "1":
+    if os.environ.get("LMX_B1_STOKES_DIRECT") == "1":
+        basis = jnp.eye(rhs.size, dtype=rhs.dtype)
+        matrix = jax.vmap(schur)(basis).T
+        row_scale = jnp.maximum(jnp.linalg.norm(matrix, axis=1), 1.0e-30)
+        column_scale = jnp.maximum(jnp.linalg.norm(matrix, axis=0), 1.0e-30)
+        scaled_matrix = matrix / row_scale[:, None] / column_scale[None, :]
+        solution, _, rank, singular_values = jnp.linalg.lstsq(
+            scaled_matrix, rhs / row_scale, rcond=1.0e-12
+        )
+        solution = solution / column_scale
+        residual_norm = jnp.linalg.norm(schur(solution) - rhs)
+        pressure_solution = KrylovSolution(
+            solution,
+            residual_norm,
+            jnp.asarray(rhs.size),
+            residual_norm <= pressure_tolerance,
+            None,
+        )
+        if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
+            print(
+                "B1 compatible direct:",
+                int(rank),
+                float(singular_values[0] / singular_values[-1]),
+                [
+                    float(jnp.linalg.norm(matrix[:pressure_size, :pressure_size])),
+                    float(jnp.linalg.norm(matrix[:pressure_size, pressure_size:])),
+                    float(jnp.linalg.norm(matrix[pressure_size:, :pressure_size])),
+                    float(jnp.linalg.norm(matrix[pressure_size:, pressure_size:])),
+                ],
+            )
+    elif os.environ.get("LMX_B1_STOKES_JAX_GMRES") == "1":
         solution, info = jax_gmres(
             schur,
             rhs,
@@ -2799,8 +2920,26 @@ def _steady_stokes_projection_pipe(
     correction = velocity_response(pressure_solution.x)
     projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
     final_flow = jnp.sum(projected[0] * cell_area, axis=(1, 2))
+    projected_faces = _pipe_velocity_faces(*projected)
+    if rhie_chow:
+        pressure_faces = _pipe_pressure_face_correction(
+            pressure,
+            pressure_mobility,
+            dx=dx,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        reconstructed_faces = _pipe_velocity_faces(
+            *_pipe_face_velocity_cells(*pressure_faces)
+        )
+        projected_faces = tuple(
+            face + direct - reconstructed
+            for face, direct, reconstructed in zip(
+                projected_faces, pressure_faces, reconstructed_faces
+            )
+        )
     final_divergence = _pipe_face_divergence(
-        *_pipe_velocity_faces(*projected),
+        *projected_faces,
         dx=dx,
         r_faces=r_faces,
         r_centers=r_centers,
@@ -5581,6 +5720,11 @@ def _solve_extruded_projection(
                         pressure_preconditioner_mobility=(
                             pressure_preconditioner_mobility
                         ),
+                        axisymmetric_deflation=os.environ.get(
+                            "LMX_B1_STOKES_AXISYMMETRIC_DEFLATION"
+                        )
+                        == "1",
+                        rhie_chow=os.environ.get("LMX_B1_STOKES_RHIE_CHOW") == "1",
                     )
                     if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
                         print(
