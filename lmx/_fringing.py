@@ -3,15 +3,22 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 from functools import lru_cache, partial
+import hashlib
 import math
+import os
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.scipy.fft import dct, idct
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
+    KrylovSolution,
     aitken_relaxation,
     anderson_mixing,
+    block_thomas_factor,
+    block_thomas_solve,
+    gmres,
     pcg_linear_solve,
     tridiagonal_solve,
 )
@@ -94,12 +101,37 @@ MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
 }
 
 _FRINGING_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
+_FRINGING_MODAL_FACTOR_CACHE: dict[tuple[object, ...], object] = {}
 
 
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
     """Reuse an identical compiled production kernel across repeated solves."""
 
     return _FRINGING_JIT_CACHE.setdefault(key, function)
+
+
+def _array_fingerprint(*arrays: jnp.ndarray) -> str:
+    """Return a compact cache key for immutable operator coefficients."""
+
+    digest = hashlib.blake2b(digest_size=16)
+    for array in arrays:
+        host = np.ascontiguousarray(np.asarray(array))
+        digest.update(host.dtype.str.encode())
+        digest.update(np.asarray(host.shape, dtype=np.int64).tobytes())
+        digest.update(host.tobytes())
+    return digest.hexdigest()
+
+
+def _reuse_modal_factors(key: tuple[object, ...], factory: Callable):
+    """Build expensive B1 modal factors once per backend and operator."""
+
+    factors = _FRINGING_MODAL_FACTOR_CACHE.get(key)
+    if factors is None:
+        factors = factory()
+        if len(_FRINGING_MODAL_FACTOR_CACHE) >= 8:
+            _FRINGING_MODAL_FACTOR_CACHE.pop(next(iter(_FRINGING_MODAL_FACTOR_CACHE)))
+        _FRINGING_MODAL_FACTOR_CACHE[key] = factors
+    return factors
 
 
 # Frozen in both ALEX Benchmark B specifications for mass and current closure.
@@ -2310,6 +2342,102 @@ def _apply_pipe_diffusion_coefficients_3d(
     )
 
 
+def _separable_pressure_poisson_pipe(
+    rhs: jnp.ndarray,
+    coefficient: jnp.ndarray,
+    *,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+    tolerance: float,
+) -> tuple[jnp.ndarray, ...]:
+    """Solve an axisymmetric cylindrical Neumann operator by x/theta modes."""
+
+    nx, nr, ntheta = rhs.shape
+    radial_widths = jnp.diff(r_faces)
+    volume = jnp.broadcast_to(
+        r_centers[None, :, None] * radial_widths[None, :, None] * dtheta,
+        rhs.shape,
+    )
+    volume_sum = jnp.sum(volume)
+    rhs_compatible = rhs - jnp.sum(rhs * volume) / volume_sum
+    coefficients = _pipe_variable_diffusion_coefficients_3d(
+        coefficient,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    _, _, radial_inner, radial_outer, _, theta_outer = coefficients
+    sigma = coefficient[0, :, 0]
+    x_wave = jnp.pi * jnp.arange(nx, dtype=rhs.dtype) / nx
+    theta_wave = 2.0 * jnp.pi * jnp.arange(ntheta // 2 + 1, dtype=rhs.dtype) / ntheta
+    radial_inner_rate = radial_inner[0, :, 0]
+    radial_outer_rate = radial_outer[0, :, 0]
+    radial_rate = radial_inner_rate + radial_outer_rate
+    modal_rate = (
+        radial_rate[:, None, None]
+        + 2.0
+        * sigma[:, None, None]
+        * (1.0 - jnp.cos(x_wave))[None, :, None]
+        / dx**2
+        + 2.0
+        * theta_outer[0, :, 0][:, None, None]
+        * (1.0 - jnp.cos(theta_wave))[None, None, :]
+    )
+    radial_volume = r_centers * radial_widths * dtheta
+    diagonal = radial_volume[:, None, None] * modal_rate
+    lower = jnp.broadcast_to(
+        -radial_volume[:, None, None] * radial_inner_rate[:, None, None],
+        diagonal.shape,
+    )
+    upper = jnp.broadcast_to(
+        -radial_volume[:, None, None] * radial_outer_rate[:, None, None],
+        diagonal.shape,
+    )
+    modal_rhs = jnp.moveaxis(
+        jnp.fft.rfft(dct(-volume * rhs_compatible, type=2, norm="ortho", axis=0), axis=2),
+        1,
+        0,
+    )
+    # The compatible (kx, m) = (0, 0) radial system has one redundant row.
+    # Pin its outer cell for the solve, then restore the volume-weighted gauge.
+    lower = lower.at[-1, 0, 0].set(0.0)
+    upper = upper.at[-1, 0, 0].set(0.0)
+    diagonal = diagonal.at[-1, 0, 0].set(1.0)
+    modal_rhs = modal_rhs.at[-1, 0, 0].set(0.0)
+    modes = tridiagonal_solve(lower, diagonal, upper, modal_rhs.real) + 1j * (
+        tridiagonal_solve(lower, diagonal, upper, modal_rhs.imag)
+    )
+    field = idct(
+        jnp.fft.irfft(jnp.moveaxis(modes, 0, 1), n=ntheta, axis=2),
+        type=2,
+        norm="ortho",
+        axis=0,
+    )
+    field = field - jnp.sum(field * volume) / volume_sum
+    local_residual = jnp.max(
+        jnp.abs(_apply_pipe_diffusion_coefficients_3d(field, coefficients) - rhs_compatible)
+    )
+    linear_rhs = -volume * rhs_compatible
+    linear_residual = jnp.linalg.norm(
+        -volume * _apply_pipe_diffusion_coefficients_3d(field, coefficients)
+        - linear_rhs
+    )
+    relative_residual = linear_residual / jnp.maximum(jnp.linalg.norm(linear_rhs), 1.0e-30)
+    converged = local_residual <= tolerance
+    return (
+        field,
+        linear_residual,
+        converged,
+        relative_residual,
+        jnp.asarray(1),
+        jnp.where(converged, 1, 0),
+        local_residual,
+    )
+
+
 def _solvax_pressure_poisson_pipe(
     rhs: jnp.ndarray,
     coefficient: jnp.ndarray,
@@ -2472,6 +2600,7 @@ def _solvax_diffusion_pipe(
     iterations: int,
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
+    reaction: jnp.ndarray | None = None,
     _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve steady or implicit cylindrical no-slip diffusion.
@@ -2504,10 +2633,10 @@ def _solvax_diffusion_pipe(
             )
         )
     )
+    if reaction is not None:
+        wall_sink = wall_sink + reaction
     system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
     if _system_solve is not None:
-        if dt is None:
-            raise ValueError("a cached implicit system requires a positive dt")
         return _system_solve(*system)
     return _solve_pipe_diffusion_system(
         *system,
@@ -2636,6 +2765,412 @@ def _pipe_face_velocity_cells(
         0.5 * (uf[:-1] + uf[1:]),
         0.5 * (vf[:, :-1, :] + vf[:, 1:, :]),
         0.5 * (wf + jnp.roll(wf, 1, axis=2)),
+    )
+
+
+def _steady_stokes_projection_pipe(
+    u: jnp.ndarray,
+    v: jnp.ndarray,
+    w: jnp.ndarray,
+    rho: jnp.ndarray,
+    unit_flow_response: jnp.ndarray,
+    cell_area: jnp.ndarray,
+    apply_momentum_inverse: Callable[[jnp.ndarray], jnp.ndarray],
+    *,
+    target_flow_rate: float,
+    dx: float,
+    r_faces: jnp.ndarray,
+    r_centers: jnp.ndarray,
+    dtheta: float,
+    pressure_iterations: int,
+    pressure_tolerance: float,
+    restart: int = 24,
+    max_restarts: int = 8,
+    flow_response_matrix: jnp.ndarray | None = None,
+    pressure_preconditioner_mobility: jnp.ndarray | None = None,
+    modal_stabilization: bool = False,
+    modal_factor_key: tuple[object, ...] | None = None,
+    physical_tolerance: float | None = None,
+) -> tuple[jnp.ndarray, ...]:
+    """Apply the compatible steady ``D A^-1 G`` pipe projection."""
+
+    response_flow = jnp.sum(unit_flow_response * cell_area, axis=(1, 2))
+    area_sum = jnp.sum(cell_area, axis=(1, 2), keepdims=True)
+    mobility = 1.0 / jnp.maximum(rho, 1.0e-20)
+    pressure_mobility = (
+        jnp.maximum(unit_flow_response, jnp.mean(unit_flow_response) * 1.0e-8)
+        if pressure_preconditioner_mobility is None
+        else pressure_preconditioner_mobility
+    )
+    cross_section_size = u.shape[1] * u.shape[2]
+    pressure_size = u.shape[0] * (cross_section_size - 1)
+    flat_area = cell_area.reshape((u.shape[0], cross_section_size))
+    sqrt_area = jnp.sqrt(jnp.maximum(flat_area, 1.0e-30))
+    gauge = sqrt_area / jnp.linalg.norm(sqrt_area, axis=1, keepdims=True)
+    householder = gauge.at[:, -1].add(-1.0)
+    householder_scale = 2.0 / jnp.maximum(
+        jnp.sum(householder**2, axis=1, keepdims=True), 1.0e-30
+    )
+
+    def reflect(field):
+        return field - householder_scale * householder * jnp.sum(
+            householder * field, axis=1, keepdims=True
+        )
+
+    def unpack_pressure(reduced):
+        reduced = reduced.reshape((u.shape[0], cross_section_size - 1))
+        if modal_stabilization:
+            transformed = reflect(
+                jnp.concatenate(
+                    (reduced, jnp.zeros((u.shape[0], 1), dtype=reduced.dtype)), axis=1
+                )
+            )
+            return (transformed / sqrt_area).reshape(u.shape)
+        final = -jnp.sum(reduced * flat_area[:, :-1], axis=1) / jnp.maximum(
+            flat_area[:, -1], 1.0e-20
+        )
+        return jnp.concatenate((reduced, final[:, None]), axis=1).reshape(u.shape)
+
+    def reduce_field(field):
+        if modal_stabilization:
+            transformed = reflect(sqrt_area * field.reshape(flat_area.shape))
+            return transformed[:, :-1].reshape(-1)
+        return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
+
+    def velocity_response(state):
+        pressure = unpack_pressure(state[:pressure_size])
+        pressure_loss = state[pressure_size:]
+        face_force = _pipe_pressure_face_correction(
+            pressure,
+            mobility,
+            dx=dx,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
+        force_u = force_u + pressure_loss[:, None, None] * mobility
+        return tuple(
+            apply_momentum_inverse(force) for force in (force_u, force_v, force_w)
+        )
+
+    def rhie_chow_faces(pressure, response):
+        pressure_faces = _pipe_pressure_face_correction(
+            pressure,
+            pressure_mobility,
+            dx=dx,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        reconstructed_faces = _pipe_velocity_faces(
+            *_pipe_face_velocity_cells(*pressure_faces)
+        )
+        stabilization = tuple(
+            direct - reconstructed
+            for direct, reconstructed in zip(pressure_faces, reconstructed_faces)
+        )
+        face_area = jnp.concatenate(
+            (
+                cell_area[:1],
+                0.5 * (cell_area[:-1] + cell_area[1:]),
+                cell_area[-1:],
+            ),
+            axis=0,
+        )
+        axial_mean = jnp.sum(stabilization[0] * face_area, axis=(1, 2)) / jnp.maximum(
+            jnp.sum(face_area, axis=(1, 2)), 1.0e-30
+        )
+        axial = stabilization[0] - axial_mean[:, None, None]
+        axial = axial.at[0].set(0.0).at[-1].set(0.0)
+        stabilization = (axial, *stabilization[1:])
+        return tuple(
+            exact + correction
+            for exact, correction in zip(_pipe_velocity_faces(*response), stabilization)
+        )
+
+    def constraints(state_u, state_v, state_w, *, faces=None):
+        divergence = _pipe_face_divergence(
+            *(
+                _pipe_velocity_faces(state_u, state_v, state_w)
+                if faces is None
+                else faces
+            ),
+            dx=dx,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+        )
+        mean_divergence = jnp.sum(
+            divergence * cell_area, axis=(1, 2), keepdims=True
+        ) / jnp.maximum(area_sum, 1.0e-20)
+        flow = jnp.sum(state_u * cell_area, axis=(1, 2))
+        return jnp.concatenate((reduce_field(divergence - mean_divergence), flow))
+
+    base_constraints = constraints(u, v, w)
+    rhs = -base_constraints.at[pressure_size:].add(-target_flow_rate)
+
+    def schur(state):
+        response = velocity_response(state)
+        if not modal_stabilization:
+            return constraints(*response)
+        pressure = unpack_pressure(state[:pressure_size])
+        return constraints(*response, faces=rhie_chow_faces(pressure, response))
+
+    def local_precondition(residual):
+        divergence = unpack_pressure(residual[:pressure_size])
+        pressure, *_ = _solvax_pressure_poisson_pipe(
+            -divergence,
+            pressure_mobility,
+            dx=dx,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            iterations=pressure_iterations,
+            tolerance=pressure_tolerance,
+            include_theta_fft_line=True,
+        )
+        flow_residual = residual[pressure_size:]
+        pressure_loss = (
+            jnp.linalg.solve(flow_response_matrix, flow_residual)
+            if flow_response_matrix is not None
+            else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
+        )
+        return jnp.concatenate((reduce_field(pressure), pressure_loss))
+
+    if modal_stabilization:
+        radial_weights = jnp.sum(cell_area, axis=2)
+        coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
+        mode_two_size = 2 * u.shape[0] * u.shape[1]
+        coarse_size = coarse_pressure_size + mode_two_size + u.shape[0]
+        theta = jnp.arange(u.shape[2], dtype=u.dtype) * dtheta
+        mode_two_cosine = jnp.cos(2.0 * theta)
+        mode_two_sine = jnp.sin(2.0 * theta)
+
+        def prolong(coarse):
+            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
+            final = -jnp.sum(radial * radial_weights[:, :-1], axis=1) / jnp.maximum(
+                radial_weights[:, -1], 1.0e-20
+            )
+            pressure = jnp.broadcast_to(
+                jnp.concatenate((radial, final[:, None]), axis=1)[:, :, None],
+                u.shape,
+            )
+            offset = coarse_pressure_size
+            mode_shape = (u.shape[0], u.shape[1])
+            cosine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
+                mode_shape
+            )
+            offset += u.shape[0] * u.shape[1]
+            sine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(mode_shape)
+            pressure = (
+                pressure
+                + cosine[:, :, None] * mode_two_cosine[None, None, :]
+                + sine[:, :, None] * mode_two_sine[None, None, :]
+            )
+            return jnp.concatenate(
+                (
+                    reduce_field(pressure),
+                    coarse[coarse_pressure_size + mode_two_size :],
+                )
+            )
+
+        def restrict(residual):
+            divergence = unpack_pressure(residual[:pressure_size])
+            return jnp.concatenate(
+                (
+                    jnp.mean(divergence, axis=2)[:, :-1].reshape(-1),
+                    (2.0 * jnp.mean(divergence * mode_two_cosine, axis=2)).reshape(-1),
+                    (2.0 * jnp.mean(divergence * mode_two_sine, axis=2)).reshape(-1),
+                    residual[pressure_size:],
+                )
+            )
+
+        local_size = 3 * u.shape[1] - 1
+        local_basis = jnp.eye(local_size, dtype=u.dtype)
+
+        def station_prolong(station, local):
+            coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
+            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
+            radial = radial.at[station].set(local[: u.shape[1] - 1])
+            coarse = coarse.at[:coarse_pressure_size].set(radial.reshape(-1))
+            offset = coarse_pressure_size
+            modes = coarse[offset : offset + mode_two_size].reshape(
+                (2, u.shape[0], u.shape[1])
+            )
+            modes = modes.at[:, station].set(
+                local[u.shape[1] - 1 :].reshape((2, u.shape[1]))
+            )
+            coarse = coarse.at[offset : offset + mode_two_size].set(modes.reshape(-1))
+            return prolong(coarse)
+
+        def modal_restrict(residual):
+            coarse = restrict(residual)
+            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
+            modes = coarse[
+                coarse_pressure_size : coarse_pressure_size + mode_two_size
+            ].reshape((2, u.shape[0], u.shape[1]))
+            return jnp.concatenate(
+                (radial, jnp.swapaxes(modes, 0, 1).reshape((u.shape[0], -1))), axis=1
+            )
+
+        stations = jnp.arange(u.shape[0])
+
+        def build_modal_factors():
+            modal_actions = jax.vmap(
+                lambda source: jax.vmap(
+                    lambda basis: modal_restrict(schur(station_prolong(source, basis)))
+                )(local_basis)
+            )(stations)
+            diagonal = jax.vmap(
+                lambda station: modal_actions[station, :, station, :].T
+            )(stations)
+            lower = (
+                jnp.zeros_like(diagonal)
+                .at[1:]
+                .set(
+                    jax.vmap(lambda target: modal_actions[target - 1, :, target, :].T)(
+                        stations[1:]
+                    )
+                )
+            )
+            upper = (
+                jnp.zeros_like(diagonal)
+                .at[:-1]
+                .set(
+                    jax.vmap(lambda target: modal_actions[target + 1, :, target, :].T)(
+                        stations[:-1]
+                    )
+                )
+            )
+            return block_thomas_factor(lower, diagonal, upper)
+
+        modal_factors = (
+            build_modal_factors()
+            if modal_factor_key is None
+            else _reuse_modal_factors(modal_factor_key, build_modal_factors)
+        )
+
+        def modal_prolong(local):
+            coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
+            coarse = coarse.at[:coarse_pressure_size].set(
+                local[:, : u.shape[1] - 1].reshape(-1)
+            )
+            modes = local[:, u.shape[1] - 1 :].reshape((u.shape[0], 2, u.shape[1]))
+            coarse = coarse.at[
+                coarse_pressure_size : coarse_pressure_size + mode_two_size
+            ].set(jnp.swapaxes(modes, 0, 1).reshape(-1))
+            return prolong(coarse)
+
+        def precondition(residual):
+            local = local_precondition(residual)
+            modal_residual = modal_restrict(residual - schur(local))
+            modal_correction = block_thomas_solve(modal_factors, modal_residual)
+            candidate = local + modal_prolong(modal_correction)
+            flow_residual = (residual - schur(candidate))[pressure_size:]
+            flow_response = (
+                jnp.linalg.solve(flow_response_matrix, flow_residual)
+                if flow_response_matrix is not None
+                else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
+            )
+            return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(
+                flow_response
+            )
+
+    else:
+        precondition = local_precondition
+
+    preconditioned_rhs = precondition(rhs)
+    def solve_pressure(linear_rhs, initial):
+        return gmres(
+            schur,
+            linear_rhs,
+            x0=initial,
+            precond=precondition,
+            restart=restart,
+            rtol=pressure_tolerance,
+            atol=pressure_tolerance,
+            max_restarts=max_restarts,
+        )
+
+    if modal_factor_key is not None:
+        solve_pressure = _reuse_fringing_jit(
+            (
+                "b1_steady_pressure",
+                jax.default_backend(),
+                modal_factor_key,
+                pressure_iterations,
+                pressure_tolerance,
+                restart,
+                max_restarts,
+            ),
+            jax.jit(solve_pressure),
+        )
+    pressure_solution = solve_pressure(rhs, preconditioned_rhs)
+    pressure = unpack_pressure(pressure_solution.x[:pressure_size])
+    pressure_loss = pressure_solution.x[pressure_size:]
+    correction = velocity_response(pressure_solution.x)
+    projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
+    if flow_response_matrix is not None:
+        flow_delta = target_flow_rate - jnp.sum(projected[0] * cell_area, axis=(1, 2))
+        flow_refinement_state = (
+            jnp.zeros_like(pressure_solution.x)
+            .at[pressure_size:]
+            .set(jnp.linalg.solve(flow_response_matrix, flow_delta))
+        )
+        flow_refinement = velocity_response(flow_refinement_state)
+        correction = tuple(
+            base + delta for base, delta in zip(correction, flow_refinement)
+        )
+        projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
+        pressure_loss = pressure_loss + flow_refinement_state[pressure_size:]
+        refined_state = pressure_solution.x + flow_refinement_state
+        refined_residual = jnp.linalg.norm(schur(refined_state) - rhs)
+        pressure_solution = KrylovSolution(
+            refined_state,
+            refined_residual,
+            pressure_solution.iterations,
+            refined_residual <= pressure_tolerance,
+            pressure_solution.recycle,
+        )
+    final_flow = jnp.sum(projected[0] * cell_area, axis=(1, 2))
+    projected_faces = _pipe_velocity_faces(*projected)
+    if modal_stabilization:
+        response_faces = rhie_chow_faces(pressure, correction)
+        projected_faces = tuple(
+            base + response
+            for base, response in zip(_pipe_velocity_faces(u, v, w), response_faces)
+        )
+    final_divergence = _pipe_face_divergence(
+        *projected_faces,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+    )
+    final_mean_divergence = jnp.sum(
+        final_divergence * cell_area, axis=(1, 2), keepdims=True
+    ) / jnp.maximum(area_sum, 1.0e-30)
+    final_mean_free_divergence = final_divergence - final_mean_divergence
+    divergence_residual = jnp.max(jnp.abs(final_mean_free_divergence))
+    flow_residual = jnp.max(jnp.abs(final_flow - target_flow_rate))
+    normalized_flow_residual = flow_residual / jnp.maximum(jnp.mean(area_sum), 1.0e-30)
+    physical_residual = jnp.maximum(divergence_residual, normalized_flow_residual)
+    convergence_tolerance = (
+        pressure_tolerance if physical_tolerance is None else physical_tolerance
+    )
+    pressure_solution = KrylovSolution(
+        pressure_solution.x,
+        physical_residual,
+        pressure_solution.iterations,
+        physical_residual <= convergence_tolerance,
+        pressure_solution.recycle,
+    )
+    return (
+        *projected,
+        pressure,
+        pressure_loss,
+        divergence_residual,
+        flow_residual,
+        pressure_solution,
     )
 
 
@@ -4956,6 +5491,9 @@ def _solve_extruded_projection(
         case.name.startswith("alex_b1-fringing-pipe_")
         and case.geometry.kind == "pipe_ogrid"
     )
+    use_compatible_steady_b1 = (
+        use_alex_b1_finite_volume and os.environ.get("LMX_B1_COMPATIBLE_STEADY") == "1"
+    )
     if case.name.startswith("alex_") and not (
         use_alex_b1_finite_volume or use_alex_b2_finite_volume
     ):
@@ -5115,7 +5653,9 @@ def _solve_extruded_projection(
         electric_tolerance = min(poisson_tolerance, 1.0e-12)
         projection_iterations = max(poisson_iterations, 4000)
         projection_tolerance = min(poisson_tolerance, 1.0e-12)
-        momentum_iterations = max(poisson_iterations, 400)
+        momentum_iterations = max(
+            poisson_iterations, 2000 if use_compatible_steady_b1 else 400
+        )
         momentum_tolerance = min(poisson_tolerance, 1.0e-10)
         velocity_limit = max(
             5.0, 2.0 * math.sqrt(float(case.geometry.target_ha or 1.0))
@@ -5160,6 +5700,7 @@ def _solve_extruded_projection(
                 dtheta,
                 momentum_iterations,
                 momentum_tolerance,
+                use_compatible_steady_b1,
             )
 
             def diffusion_system_solve(
@@ -5171,7 +5712,8 @@ def _solve_extruded_projection(
                     coefficients,
                     wall_sink,
                     initial,
-                    diffusion_coefficient=dt,
+                    mass_coefficient=0.0 if use_compatible_steady_b1 else 1.0,
+                    diffusion_coefficient=1.0 if use_compatible_steady_b1 else dt,
                     iterations=momentum_iterations,
                     tolerance=momentum_tolerance,
                 )
@@ -5179,12 +5721,68 @@ def _solve_extruded_projection(
             diffusion_system_solve = _reuse_fringing_jit(
                 kernel_key, jax.jit(diffusion_system_solve)
             )
+            steady_reaction = (
+                2.0
+                * sigma[:, :count, :]
+                * (
+                    bx[:, :count, :] ** 2
+                    + br[:, :count, :] ** 2
+                    + btheta[:, :count, :] ** 2
+                )
+                / rho[:, :count, :]
+                if use_compatible_steady_b1
+                else None
+            )
+            if use_compatible_steady_b1:
+                steady_coefficients = _pipe_variable_diffusion_coefficients_3d(
+                    nu[:, :count, :],
+                    dx=dx,
+                    r_faces=faces,
+                    r_centers=centers,
+                    dtheta=dtheta,
+                )
+                radial_widths = jnp.diff(faces)
+                wall_sink = (
+                    jnp.zeros_like(steady_reaction)
+                    .at[:, -1, :]
+                    .set(
+                        nu[:, count - 1, :]
+                        * faces[-1]
+                        / jnp.maximum(
+                            centers[-1] * radial_widths[-1] * (0.5 * radial_widths[-1]),
+                            1.0e-20,
+                        )
+                    )
+                )
+                steady_rate_diagonal = (
+                    sum(steady_coefficients) + wall_sink + steady_reaction
+                )
+                pressure_preconditioner_mobility = 1.0 / jnp.maximum(
+                    rho[:, :count, :] * steady_rate_diagonal, 1.0e-20
+                )
+                modal_factor_key = (
+                    "b1_modal_factors",
+                    jax.default_backend(),
+                    u.dtype.str,
+                    kernel_key,
+                    _array_fingerprint(
+                        rho[:, :count, :],
+                        nu[:, :count, :],
+                        steady_reaction,
+                        fluid_cell_area[:, :count, :],
+                    ),
+                )
+            else:
+                pressure_preconditioner_mobility = None
+                modal_factor_key = None
 
-            def momentum_solve(rhs, viscosity, initial):
+            momentum_viscosity = nu[:, :count, :]
+
+            def momentum_solve(rhs, initial):
                 return _solvax_diffusion_pipe(
                     rhs,
-                    viscosity,
-                    dt=dt,
+                    momentum_viscosity,
+                    dt=None if use_compatible_steady_b1 else dt,
                     dx=dx,
                     r_faces=faces,
                     r_centers=centers,
@@ -5192,24 +5790,46 @@ def _solve_extruded_projection(
                     iterations=momentum_iterations,
                     tolerance=momentum_tolerance,
                     initial_field=initial,
-                    _system_solve=diffusion_system_solve,
+                    reaction=steady_reaction,
+                    _system_solve=(
+                        None if use_compatible_steady_b1 else diffusion_system_solve
+                    ),
                 )
 
-            response_fluid, _, _ = _solvax_diffusion_pipe(
-                dt / rho[:, :count, :],
-                nu[:, :count, :],
-                dt=dt,
-                dx=dx,
-                r_faces=faces,
-                r_centers=centers,
-                dtheta=dtheta,
-                iterations=momentum_iterations,
-                tolerance=momentum_tolerance,
+            if use_compatible_steady_b1:
+                momentum_solve = _reuse_fringing_jit(
+                    (
+                        "b1_momentum",
+                        jax.default_backend(),
+                        kernel_key,
+                        _array_fingerprint(momentum_viscosity, steady_reaction),
+                    ),
+                    jax.jit(momentum_solve),
+                )
+            response_rhs = (1.0 if use_compatible_steady_b1 else dt) / rho[
+                :, :count, :
+            ]
+            response_fluid, _, _ = momentum_solve(
+                response_rhs, jnp.zeros_like(response_rhs)
             )
-            response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
-            response_fluid = jnp.broadcast_to(
-                response_cross_section, response_fluid.shape
-            )
+            if not use_compatible_steady_b1:
+                response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
+                response_fluid = jnp.broadcast_to(
+                    response_cross_section, response_fluid.shape
+                )
+                flow_response_matrix = None
+            else:
+                basis_rhs = (
+                    jnp.eye(nx, dtype=u.dtype)[:, :, None, None]
+                    / rho[None, :, :count, :]
+                )
+                zero = jnp.zeros_like(response_fluid)
+                basis_response = jax.vmap(lambda rhs: momentum_solve(rhs, zero)[0])(
+                    basis_rhs
+                )
+                flow_response_matrix = jnp.sum(
+                    basis_response * fluid_cell_area[None, :, :count, :], axis=(2, 3)
+                ).T
             unit_pressure_response = (
                 jnp.zeros_like(u).at[:, :count, :].set(response_fluid)
             )
@@ -5275,10 +5895,21 @@ def _solve_extruded_projection(
                 rhs_w = w[:, :count, :] + dt * (
                     lorentz_theta[:, :count, :] / rho[:, :count, :]
                 )
-                viscosity = nu[:, :count, :]
-                u_fluid, _, _ = momentum_solve(rhs_u, viscosity, u[:, :count, :])
-                v_fluid, _, _ = momentum_solve(rhs_v, viscosity, v[:, :count, :])
-                w_fluid, _, _ = momentum_solve(rhs_w, viscosity, w[:, :count, :])
+                if use_compatible_steady_b1:
+                    rhs_u = (forcing + lorentz_x[:, :count, :]) / rho[
+                        :, :count, :
+                    ] + steady_reaction * u[:, :count, :]
+                    rhs_v = (
+                        lorentz_r[:, :count, :] / rho[:, :count, :]
+                        + steady_reaction * v[:, :count, :]
+                    )
+                    rhs_w = (
+                        lorentz_theta[:, :count, :] / rho[:, :count, :]
+                        + steady_reaction * w[:, :count, :]
+                    )
+                u_fluid, _, _ = momentum_solve(rhs_u, u[:, :count, :])
+                v_fluid, _, _ = momentum_solve(rhs_v, v[:, :count, :])
+                w_fluid, _, _ = momentum_solve(rhs_w, w[:, :count, :])
                 u_star = jnp.zeros_like(u).at[:, :count, :].set(u_fluid)
                 v_star = jnp.zeros_like(v).at[:, :count, :].set(v_fluid)
                 w_star = jnp.zeros_like(w).at[:, :count, :].set(w_fluid)
@@ -5290,48 +5921,91 @@ def _solve_extruded_projection(
                 w_star = w + dt * (
                     laplacian_w * nu + lorentz_theta / rho - dp_dtheta / rho
                 )
-            u_star = _clip_state(u_star, velocity_limit)
-            v_star = _clip_state(v_star, velocity_limit)
-            w_star = _clip_state(w_star, velocity_limit)
+            if not use_compatible_steady_b1:
+                u_star = _clip_state(u_star, velocity_limit)
+                v_star = _clip_state(v_star, velocity_limit)
+                w_star = _clip_state(w_star, velocity_limit)
             if use_alex_b1_finite_volume:
                 u_star = jnp.where(fluid_mask, u_star, 0.0)
                 v_star = jnp.where(fluid_mask, v_star, 0.0)
                 w_star = jnp.where(fluid_mask, w_star, 0.0)
                 if target_flow_rate is None:
                     raise ValueError("ALEX B1 requires its frozen fixed mean flow rate")
-                (
-                    u_next,
-                    v_next,
-                    w_next,
-                    p_corr,
-                    axial_pressure_loss_gradient,
-                    projected_divergence_norm,
-                    fixed_flow_error,
-                ) = _fixed_flow_face_flux_projection_pipe(
-                    u_star,
-                    v_star,
-                    w_star,
-                    rho,
-                    fluid_mask,
-                    unit_pressure_response,
-                    fluid_cell_area,
-                    target_flow_rate=target_flow_rate,
-                    base_pressure_loss_gradient=forcing,
-                    dt=dt,
-                    dx=dx,
-                    r_faces=r_faces,
-                    r_centers=r,
-                    dtheta=dtheta,
-                    iterations=projection_iterations,
-                    tolerance=projection_tolerance,
-                    radial_fluid_count=radial_fluid_count,
-                    initial_pressure=p,
-                    include_theta_fft_line=True,
-                )
-                p_corr = _clip_state(p_corr, scalar_limit)
-                u_next = _clip_state(u_next, velocity_limit)
-                v_next = _clip_state(v_next, velocity_limit)
-                w_next = _clip_state(w_next, velocity_limit)
+                if use_compatible_steady_b1:
+                    zero = jnp.zeros_like(u_fluid)
+                    steady_projection = _steady_stokes_projection_pipe(
+                        u_fluid,
+                        v_fluid,
+                        w_fluid,
+                        rho[:, :count, :],
+                        response_fluid,
+                        fluid_cell_area[:, :count, :],
+                        lambda rhs: momentum_solve(rhs, zero)[0],
+                        target_flow_rate=target_flow_rate,
+                        dx=dx,
+                        r_faces=faces,
+                        r_centers=centers,
+                        dtheta=dtheta,
+                        pressure_iterations=projection_iterations,
+                        pressure_tolerance=momentum_tolerance,
+                        flow_response_matrix=flow_response_matrix,
+                        pressure_preconditioner_mobility=(
+                            pressure_preconditioner_mobility
+                        ),
+                        modal_stabilization=True,
+                        modal_factor_key=modal_factor_key,
+                        physical_tolerance=ALEX_BALANCE_TOLERANCE,
+                    )
+                    u_next = (
+                        jnp.zeros_like(u).at[:, :count, :].set(steady_projection[0])
+                    )
+                    v_next = (
+                        jnp.zeros_like(v).at[:, :count, :].set(steady_projection[1])
+                    )
+                    w_next = (
+                        jnp.zeros_like(w).at[:, :count, :].set(steady_projection[2])
+                    )
+                    p_corr = (
+                        jnp.zeros_like(p).at[:, :count, :].set(steady_projection[3])
+                    )
+                    axial_pressure_loss_gradient = forcing + steady_projection[4]
+                    projected_divergence_norm = steady_projection[5]
+                    fixed_flow_error = steady_projection[6]
+                else:
+                    (
+                        u_next,
+                        v_next,
+                        w_next,
+                        p_corr,
+                        axial_pressure_loss_gradient,
+                        projected_divergence_norm,
+                        fixed_flow_error,
+                    ) = _fixed_flow_face_flux_projection_pipe(
+                        u_star,
+                        v_star,
+                        w_star,
+                        rho,
+                        fluid_mask,
+                        unit_pressure_response,
+                        fluid_cell_area,
+                        target_flow_rate=target_flow_rate,
+                        base_pressure_loss_gradient=forcing,
+                        dt=dt,
+                        dx=dx,
+                        r_faces=r_faces,
+                        r_centers=r,
+                        dtheta=dtheta,
+                        iterations=projection_iterations,
+                        tolerance=projection_tolerance,
+                        radial_fluid_count=radial_fluid_count,
+                        initial_pressure=p,
+                        include_theta_fft_line=True,
+                    )
+                if not use_compatible_steady_b1:
+                    p_corr = _clip_state(p_corr, scalar_limit)
+                    u_next = _clip_state(u_next, velocity_limit)
+                    v_next = _clip_state(v_next, velocity_limit)
+                    w_next = _clip_state(w_next, velocity_limit)
             else:
                 u_star, v_star, w_star = _enforce_pipe_velocity_bc(
                     u_star,
@@ -5417,7 +6091,25 @@ def _solve_extruded_projection(
                 r_centers=r,
                 dtheta=dtheta,
             )
-            if use_alex_b1_finite_volume:
+            if use_compatible_steady_b1:
+                (
+                    phi,
+                    electric_residual,
+                    electric_converged,
+                    electric_relative_residual,
+                    electric_iteration_count,
+                    electric_status,
+                    electric_local_residual,
+                ) = _separable_pressure_poisson_pipe(
+                    emf_rhs,
+                    sigma,
+                    dx=dx,
+                    r_faces=r_faces,
+                    r_centers=r,
+                    dtheta=dtheta,
+                    tolerance=electric_tolerance,
+                )
+            elif use_alex_b1_finite_volume:
                 (
                     phi,
                     electric_residual,

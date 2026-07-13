@@ -55,6 +55,8 @@ from lmx.fringing import (
     _solvax_pressure_poisson_pipe,
     _solvax_implicit_diffusion_duct,
     _solvax_diffusion_pipe,
+    _separable_pressure_poisson_pipe,
+    _steady_stokes_projection_pipe,
     _spacing_vector,
     _station_axial_current_from_fluxes,
     _poisson_jacobi_3d,
@@ -788,6 +790,35 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     assert fft_solved == pytest.approx(solved, abs=1.0e-8)
     assert int(fft_diagnostics[3]) <= int(iterations)
 
+    direct = _separable_pressure_poisson_pipe(
+        rhs,
+        coefficient,
+        dx=0.4,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=2.0 * jnp.pi / 8,
+        tolerance=1.0e-8,
+    )
+    assert bool(direct[2])
+    assert direct[0] == pytest.approx(solved, abs=1.0e-8)
+
+    def direct_objective(scale):
+        field, *_ = _separable_pressure_poisson_pipe(
+            rhs,
+            scale * coefficient,
+            dx=0.4,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=2.0 * jnp.pi / 8,
+            tolerance=1.0e-8,
+        )
+        return jnp.mean(field**2)
+
+    direct_value, direct_gradient = jax.value_and_grad(direct_objective)(jnp.asarray(1.0))
+    assert direct_gradient == pytest.approx(
+        -2.0 * direct_value, rel=1.0e-6, abs=1.0e-8
+    )
+
     def objective(scale):
         field, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
             rhs,
@@ -812,6 +843,11 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     shape = (4, 5, 8)
     manufactured = jnp.arange(np.prod(shape), dtype=float).reshape(shape) / 1000.0
     viscosity = jnp.full(shape, 0.04)
+    reaction = jnp.broadcast_to(
+        jnp.linspace(0.01, 0.03, shape[0])[:, None, None]
+        * (1.0 + r_centers[None, :, None]),
+        shape,
+    )
     dt = 0.02
     laplacian = _masked_laplacian_pipe(
         manufactured,
@@ -822,9 +858,8 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
         dtheta=2.0 * jnp.pi / 8,
         radial_fluid_count=5,
     )
-    rhs = (
-        -viscosity * laplacian if steady else manufactured - dt * viscosity * laplacian
-    )
+    steady_rhs = -viscosity * laplacian + reaction * manufactured
+    rhs = steady_rhs if steady else manufactured + dt * steady_rhs
     solved, residual, converged = _solvax_diffusion_pipe(
         rhs,
         viscosity,
@@ -835,11 +870,11 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
         dtheta=2.0 * jnp.pi / 8,
         iterations=500,
         tolerance=1.0e-10,
+        reaction=reaction,
     )
     assert bool(converged)
     assert float(residual) < 1.0e-8
     assert solved == pytest.approx(manufactured, abs=1.0e-8)
-
 
 def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
     nx, ntheta = 4, 8
@@ -892,6 +927,94 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
         jax.value_and_grad(lambda a: jnp.sum(operator(a * pressure) ** 2))
     )(jnp.asarray(1.0))
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
+
+
+@pytest.mark.parametrize(
+    "modal_stabilization",
+    [False, True],
+    ids=("base", "weighted-modal-rhie-chow"),
+)
+def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
+    modal_stabilization,
+):
+    nx, nr, ntheta = 5, 4, 8
+    r_faces = jnp.asarray([0.0, 0.15, 0.4, 0.7, 1.0])
+    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    dtheta = 2.0 * jnp.pi / ntheta
+    shape = (nx, nr, ntheta)
+    x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
+    radius = r_centers[None, :, None]
+    theta = jnp.arange(ntheta)[None, None, :] * dtheta
+    u = 0.7 + 0.2 * x * (1.0 - radius) * jnp.cos(theta)
+    v = 0.1 * (1.0 - radius) * jnp.sin(theta) * jnp.ones_like(x)
+    w = -0.1 * x * (1.0 - radius) * jnp.cos(theta)
+    cell_area = jnp.broadcast_to(
+        r_centers[None, :, None] * jnp.diff(r_faces)[None, :, None] * dtheta,
+        shape,
+    )
+    result = _steady_stokes_projection_pipe(
+        u,
+        v,
+        w,
+        jnp.ones(shape),
+        jnp.ones(shape),
+        cell_area,
+        lambda rhs: rhs,
+        target_flow_rate=2.0,
+        dx=0.5,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+        pressure_iterations=300,
+        pressure_tolerance=1.0e-10,
+        restart=24,
+        max_restarts=3,
+        modal_stabilization=modal_stabilization,
+        physical_tolerance=1.0e-8,
+    )
+    assert result[-3] < 1.0e-8
+    assert result[-2] < 1.0e-8
+    assert bool(result[-1].converged)
+    assert jnp.isfinite(result[3]).all()
+
+    viscosity = jnp.full(shape, 0.07)
+
+    def inverse(rhs):
+        return _solvax_diffusion_pipe(
+            rhs,
+            viscosity,
+            dt=None,
+            dx=0.5,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            iterations=300,
+            tolerance=1.0e-10,
+        )[0]
+
+    steady_result = _steady_stokes_projection_pipe(
+        inverse(u),
+        inverse(v),
+        inverse(w),
+        jnp.ones(shape),
+        inverse(jnp.ones(shape)),
+        cell_area,
+        inverse,
+        target_flow_rate=2.0,
+        dx=0.5,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+        pressure_iterations=300,
+        pressure_tolerance=1.0e-9,
+        restart=24,
+        max_restarts=3,
+        modal_stabilization=modal_stabilization,
+        physical_tolerance=1.0e-7,
+    )
+    assert steady_result[-3] < 1.0e-7
+    assert steady_result[-2] < 1.0e-7
+    assert bool(steady_result[-1].converged)
 
 
 def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():
