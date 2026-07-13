@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 from functools import lru_cache, partial
+import hashlib
 import math
 import os
 
@@ -99,12 +100,37 @@ MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
 }
 
 _FRINGING_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
+_FRINGING_MODAL_FACTOR_CACHE: dict[tuple[object, ...], object] = {}
 
 
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
     """Reuse an identical compiled production kernel across repeated solves."""
 
     return _FRINGING_JIT_CACHE.setdefault(key, function)
+
+
+def _array_fingerprint(*arrays: jnp.ndarray) -> str:
+    """Return a compact cache key for immutable operator coefficients."""
+
+    digest = hashlib.blake2b(digest_size=16)
+    for array in arrays:
+        host = np.ascontiguousarray(np.asarray(array))
+        digest.update(host.dtype.str.encode())
+        digest.update(np.asarray(host.shape, dtype=np.int64).tobytes())
+        digest.update(host.tobytes())
+    return digest.hexdigest()
+
+
+def _reuse_modal_factors(key: tuple[object, ...], factory: Callable):
+    """Build expensive B1 modal factors once per backend and operator."""
+
+    factors = _FRINGING_MODAL_FACTOR_CACHE.get(key)
+    if factors is None:
+        factors = factory()
+        if len(_FRINGING_MODAL_FACTOR_CACHE) >= 8:
+            _FRINGING_MODAL_FACTOR_CACHE.pop(next(iter(_FRINGING_MODAL_FACTOR_CACHE)))
+        _FRINGING_MODAL_FACTOR_CACHE[key] = factors
+    return factors
 
 
 # Frozen in both ALEX Benchmark B specifications for mass and current closure.
@@ -2666,6 +2692,7 @@ def _steady_stokes_projection_pipe(
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
     modal_stabilization: bool = False,
+    modal_factor_key: tuple[object, ...] | None = None,
     physical_tolerance: float | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Apply the compatible steady ``D A^-1 G`` pipe projection."""
@@ -2889,33 +2916,41 @@ def _steady_stokes_projection_pipe(
             )
 
         stations = jnp.arange(u.shape[0])
-        modal_actions = jax.vmap(
-            lambda source: jax.vmap(
-                lambda basis: modal_restrict(schur(station_prolong(source, basis)))
-            )(local_basis)
-        )(stations)
-        diagonal = jax.vmap(lambda station: modal_actions[station, :, station, :].T)(
-            stations
-        )
-        lower = (
-            jnp.zeros_like(diagonal)
-            .at[1:]
-            .set(
-                jax.vmap(lambda target: modal_actions[target - 1, :, target, :].T)(
-                    stations[1:]
+
+        def build_modal_factors():
+            modal_actions = jax.vmap(
+                lambda source: jax.vmap(
+                    lambda basis: modal_restrict(schur(station_prolong(source, basis)))
+                )(local_basis)
+            )(stations)
+            diagonal = jax.vmap(
+                lambda station: modal_actions[station, :, station, :].T
+            )(stations)
+            lower = (
+                jnp.zeros_like(diagonal)
+                .at[1:]
+                .set(
+                    jax.vmap(lambda target: modal_actions[target - 1, :, target, :].T)(
+                        stations[1:]
+                    )
                 )
             )
-        )
-        upper = (
-            jnp.zeros_like(diagonal)
-            .at[:-1]
-            .set(
-                jax.vmap(lambda target: modal_actions[target + 1, :, target, :].T)(
-                    stations[:-1]
+            upper = (
+                jnp.zeros_like(diagonal)
+                .at[:-1]
+                .set(
+                    jax.vmap(lambda target: modal_actions[target + 1, :, target, :].T)(
+                        stations[:-1]
+                    )
                 )
             )
+            return block_thomas_factor(lower, diagonal, upper)
+
+        modal_factors = (
+            build_modal_factors()
+            if modal_factor_key is None
+            else _reuse_modal_factors(modal_factor_key, build_modal_factors)
         )
-        modal_factors = block_thomas_factor(lower, diagonal, upper)
 
         def modal_prolong(local):
             coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
@@ -5612,8 +5647,21 @@ def _solve_extruded_projection(
                 pressure_preconditioner_mobility = 1.0 / jnp.maximum(
                     rho[:, :count, :] * steady_rate_diagonal, 1.0e-20
                 )
+                modal_factor_key = (
+                    "b1_modal_factors",
+                    jax.default_backend(),
+                    u.dtype.str,
+                    kernel_key,
+                    _array_fingerprint(
+                        rho[:, :count, :],
+                        nu[:, :count, :],
+                        steady_reaction,
+                        fluid_cell_area[:, :count, :],
+                    ),
+                )
             else:
                 pressure_preconditioner_mobility = None
+                modal_factor_key = None
 
             def momentum_solve(rhs, viscosity, initial):
                 return _solvax_diffusion_pipe(
@@ -5785,6 +5833,7 @@ def _solve_extruded_projection(
                             pressure_preconditioner_mobility
                         ),
                         modal_stabilization=True,
+                        modal_factor_key=modal_factor_key,
                         physical_tolerance=ALEX_BALANCE_TOLERANCE,
                     )
                     u_next = (
