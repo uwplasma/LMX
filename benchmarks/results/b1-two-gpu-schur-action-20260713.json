@@ -60,13 +60,26 @@
   },
   "rejected_full_gmres_wiring": {
     "result": "terminated and removed",
-    "reason": "Cold compilation exceeded 180 seconds with both GPUs idle when shard_map was nested under modal-factor and full-GMRES transformations.",
+    "reason": "Cold compilation exceeded 180 seconds with both GPUs idle both before and after Schur/preconditioner JIT separation; nesting shard_map under the monolithic full-GMRES transform remains inadmissible.",
     "retained_code": "Only the exact local-pair kernel and generic component-inverse hook."
+  },
+  "separated_one_gpu_pressure_kernels": {
+    "commit": "3d01ea7",
+    "change": "Materialize modal factors, then cache non-inline Schur and preconditioner JIT boundaries before tracing GMRES.",
+    "baseline_first_solve_seconds": 76.42454510298558,
+    "current_first_solve_seconds": 70.26690167200286,
+    "first_solve_speedup": 1.087632203561868,
+    "baseline_restart_seconds": 8.122742520994507,
+    "current_restart_seconds": 7.134291305963416,
+    "restart_speedup": 1.1385493208281057,
+    "restart_mean_velocity": 0.9999999999998095,
+    "restart_charge_balance_residual": 3.26210169987462e-9,
+    "result": "accepted on the one-GPU path"
   },
   "gates": {
     "ruff_touched_files": "passed",
     "full_fringing_module_81_tests": "passed",
     "exact_compatible_cpu_solve_restart": "passed"
   },
-  "next_gate": "Lift the already-materialized modal factors and preconditioner outside the multi-device GMRES trace, then compile a bounded Krylov loop around the exact Schur action."
+  "next_gate": "Keep GMRES outside a monolithic multi-device XLA transform and invoke the already-compiled exact Schur and preconditioner kernels through bounded differentiable call boundaries."
 }

@@ -1293,6 +1293,15 @@ wall time is acceptable.
    was terminated and removed. The next implementation must materialize modal
    factors and the preconditioner outside the multi-device trace, then wrap only
    the bounded runtime Krylov loop around the exact sharded Schur action.
+   Commit `3d01ea7` closes the first half of that requirement: after modal
+   factors are materialized, Schur and preconditioner are cached as non-inline
+   JIT boundaries. On one A4000 the exact first solve improves from `76.42 s`
+   to `70.27 s`, and restart from `8.12 s` to `7.13 s` (`1.14x`), with unchanged
+   physics. The same boundaries do not make a monolithic two-GPU GMRES
+   admissible: a second bounded screen again exceeds `180 s` in CPU compilation
+   with idle GPUs and is removed. The next Krylov implementation must remain
+   outside one monolithic multi-device XLA transform and call the exact compiled
+   Schur/preconditioner kernels through bounded differentiable boundaries.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
