@@ -2667,7 +2667,9 @@ def _steady_stokes_projection_pipe(
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
     axisymmetric_deflation: bool = False,
+    azimuthal_mode_two_deflation: bool = False,
     rhie_chow: bool = False,
+    orthonormal_pressure: bool = False,
 ) -> tuple[jnp.ndarray, ...]:
     """Apply the compatible steady ``D A^-1 G`` pipe projection."""
 
@@ -2681,16 +2683,37 @@ def _steady_stokes_projection_pipe(
     )
     cross_section_size = u.shape[1] * u.shape[2]
     pressure_size = u.shape[0] * (cross_section_size - 1)
+    flat_area = cell_area.reshape((u.shape[0], cross_section_size))
+    sqrt_area = jnp.sqrt(jnp.maximum(flat_area, 1.0e-30))
+    gauge = sqrt_area / jnp.linalg.norm(sqrt_area, axis=1, keepdims=True)
+    householder = gauge.at[:, -1].add(-1.0)
+    householder_scale = 2.0 / jnp.maximum(
+        jnp.sum(householder**2, axis=1, keepdims=True), 1.0e-30
+    )
+
+    def reflect(field):
+        return field - householder_scale * householder * jnp.sum(
+            householder * field, axis=1, keepdims=True
+        )
 
     def unpack_pressure(reduced):
         reduced = reduced.reshape((u.shape[0], cross_section_size - 1))
-        flat_area = cell_area.reshape((u.shape[0], cross_section_size))
+        if orthonormal_pressure:
+            transformed = reflect(
+                jnp.concatenate(
+                    (reduced, jnp.zeros((u.shape[0], 1), dtype=reduced.dtype)), axis=1
+                )
+            )
+            return (transformed / sqrt_area).reshape(u.shape)
         final = -jnp.sum(reduced * flat_area[:, :-1], axis=1) / jnp.maximum(
             flat_area[:, -1], 1.0e-20
         )
         return jnp.concatenate((reduced, final[:, None]), axis=1).reshape(u.shape)
 
     def reduce_field(field):
+        if orthonormal_pressure:
+            transformed = reflect(sqrt_area * field.reshape(flat_area.shape))
+            return transformed[:, :-1].reshape(-1)
         return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
 
     def velocity_response(state):
@@ -2782,7 +2805,13 @@ def _steady_stokes_projection_pipe(
     if axisymmetric_deflation:
         radial_weights = jnp.sum(cell_area, axis=2)
         coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
-        coarse_size = coarse_pressure_size + u.shape[0]
+        mode_two_size = (
+            2 * u.shape[0] * u.shape[1] if azimuthal_mode_two_deflation else 0
+        )
+        coarse_size = coarse_pressure_size + mode_two_size + u.shape[0]
+        theta = jnp.arange(u.shape[2], dtype=u.dtype) * dtheta
+        mode_two_cosine = jnp.cos(2.0 * theta)
+        mode_two_sine = jnp.sin(2.0 * theta)
 
         def prolong(coarse):
             radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
@@ -2793,28 +2822,66 @@ def _steady_stokes_projection_pipe(
                 jnp.concatenate((radial, final[:, None]), axis=1)[:, :, None],
                 u.shape,
             )
+            if azimuthal_mode_two_deflation:
+                offset = coarse_pressure_size
+                mode_shape = (u.shape[0], u.shape[1])
+                cosine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
+                    mode_shape
+                )
+                offset += u.shape[0] * u.shape[1]
+                sine = coarse[offset : offset + u.shape[0] * u.shape[1]].reshape(
+                    mode_shape
+                )
+                pressure = (
+                    pressure
+                    + cosine[:, :, None] * mode_two_cosine[None, None, :]
+                    + sine[:, :, None] * mode_two_sine[None, None, :]
+                )
             return jnp.concatenate(
-                (reduce_field(pressure), coarse[coarse_pressure_size:])
+                (
+                    reduce_field(pressure),
+                    coarse[coarse_pressure_size + mode_two_size :],
+                )
             )
 
         def restrict(residual):
-            divergence = jnp.mean(unpack_pressure(residual[:pressure_size]), axis=2)
-            return jnp.concatenate(
-                (
-                    divergence[:, :-1].reshape(-1),
-                    residual[pressure_size:],
+            divergence = unpack_pressure(residual[:pressure_size])
+            restricted = [jnp.mean(divergence, axis=2)[:, :-1].reshape(-1)]
+            if azimuthal_mode_two_deflation:
+                restricted.extend(
+                    (
+                        (2.0 * jnp.mean(divergence * mode_two_cosine, axis=2)).reshape(
+                            -1
+                        ),
+                        (2.0 * jnp.mean(divergence * mode_two_sine, axis=2)).reshape(
+                            -1
+                        ),
+                    )
                 )
-            )
+            restricted.append(residual[pressure_size:])
+            return jnp.concatenate(restricted)
 
         coarse_basis = jnp.eye(coarse_size, dtype=u.dtype)
         coarse_action = jax.vmap(lambda basis: restrict(schur(prolong(basis))))(
             coarse_basis
         ).T
+        coarse_row_scale = jnp.maximum(jnp.linalg.norm(coarse_action, axis=1), 1.0e-30)
+        coarse_column_scale = jnp.maximum(
+            jnp.linalg.norm(coarse_action, axis=0), 1.0e-30
+        )
+        scaled_coarse_action = (
+            coarse_action / coarse_row_scale[:, None] / coarse_column_scale[None, :]
+        )
 
         def precondition(residual):
             local = local_precondition(residual)
             coarse_residual = restrict(residual - schur(local))
-            coarse_correction = jnp.linalg.solve(coarse_action, coarse_residual)
+            coarse_correction = (
+                jnp.linalg.solve(
+                    scaled_coarse_action, coarse_residual / coarse_row_scale
+                )
+                / coarse_column_scale
+            )
             return local + prolong(coarse_correction)
 
     else:
@@ -5681,9 +5748,10 @@ def _solve_extruded_projection(
                 w_star = w + dt * (
                     laplacian_w * nu + lorentz_theta / rho - dp_dtheta / rho
                 )
-            u_star = _clip_state(u_star, velocity_limit)
-            v_star = _clip_state(v_star, velocity_limit)
-            w_star = _clip_state(w_star, velocity_limit)
+            if not use_compatible_steady_b1:
+                u_star = _clip_state(u_star, velocity_limit)
+                v_star = _clip_state(v_star, velocity_limit)
+                w_star = _clip_state(w_star, velocity_limit)
             if use_alex_b1_finite_volume:
                 u_star = jnp.where(fluid_mask, u_star, 0.0)
                 v_star = jnp.where(fluid_mask, v_star, 0.0)
@@ -5724,7 +5792,15 @@ def _solve_extruded_projection(
                             "LMX_B1_STOKES_AXISYMMETRIC_DEFLATION"
                         )
                         == "1",
+                        azimuthal_mode_two_deflation=os.environ.get(
+                            "LMX_B1_STOKES_MODE_TWO_DEFLATION"
+                        )
+                        == "1",
                         rhie_chow=os.environ.get("LMX_B1_STOKES_RHIE_CHOW") == "1",
+                        orthonormal_pressure=os.environ.get(
+                            "LMX_B1_STOKES_ORTHONORMAL_PRESSURE"
+                        )
+                        == "1",
                     )
                     if os.environ.get("LMX_B1_COMPATIBLE_DEBUG") == "1":
                         print(
@@ -5781,10 +5857,11 @@ def _solve_extruded_projection(
                         initial_pressure=p,
                         include_theta_fft_line=True,
                     )
-                p_corr = _clip_state(p_corr, scalar_limit)
-                u_next = _clip_state(u_next, velocity_limit)
-                v_next = _clip_state(v_next, velocity_limit)
-                w_next = _clip_state(w_next, velocity_limit)
+                if not use_compatible_steady_b1:
+                    p_corr = _clip_state(p_corr, scalar_limit)
+                    u_next = _clip_state(u_next, velocity_limit)
+                    v_next = _clip_state(v_next, velocity_limit)
+                    w_next = _clip_state(w_next, velocity_limit)
             else:
                 u_star, v_star, w_star = _enforce_pipe_velocity_bc(
                     u_star,
