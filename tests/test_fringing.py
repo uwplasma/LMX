@@ -934,6 +934,43 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
     assert bool(result[-1].converged)
     assert jnp.isfinite(result[3]).all()
 
+    viscosity = jnp.full(shape, 0.07)
+
+    def inverse(rhs):
+        return _solvax_diffusion_pipe(
+            rhs,
+            viscosity,
+            dt=None,
+            dx=0.5,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            iterations=300,
+            tolerance=1.0e-10,
+        )[0]
+
+    steady_result = _steady_stokes_projection_pipe(
+        inverse(u),
+        inverse(v),
+        inverse(w),
+        jnp.ones(shape),
+        inverse(jnp.ones(shape)),
+        cell_area,
+        inverse,
+        target_flow_rate=2.0,
+        dx=0.5,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+        pressure_iterations=300,
+        pressure_tolerance=1.0e-9,
+        restart=24,
+        max_restarts=3,
+    )
+    assert steady_result[-3] < 1.0e-7
+    assert steady_result[-2] < 1.0e-7
+    assert bool(steady_result[-1].converged)
+
 
 def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():
     nx, nr, ntheta = 5, 5, 8
