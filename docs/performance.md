@@ -308,9 +308,18 @@ the periodic azimuthal axis likewise passed a forced two-CPU-device probe
 `6.85 s` warm on one. Both prototypes are rejected and removed. Adding theta
 to the existing non-cyclic line preconditioner is also rejected: the
 manufactured local residual regresses to `4.58e-8` against its `1e-8` gate.
-Until a partition-preserving cyclic SPD line solve exists, run independent B1
-variants one per GPU with the campaign runner rather than claiming spatial
-scaling for the mapped-pipe path.
+Until a partition-preserving cyclic SPD line solve has a reusable, efficient
+accelerator application, run independent B1 variants one per GPU with the
+campaign runner rather than claiming spatial scaling for the mapped-pipe path.
+
+SOLVAX branch checkpoint `47831dd` supplies the missing exact cyclic
+tridiagonal algebra and passes 241 tests with 98.00% branch coverage. LMX's
+manufactured pipe gates pass when it is used as a theta line, but the reduced
+one-A4000 worker exceeds 100 seconds with the GPU saturated, versus `26.62 s`
+cold and `6.85 s` warm without that line. The integration is rejected and
+removed: refactoring the cyclic system inside every PCG application costs more
+than the additional block saves. Revisit it only with persistent reusable
+factors or a demonstrably cheaper periodic accelerator path.
 
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,

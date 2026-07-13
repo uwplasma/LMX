@@ -963,6 +963,13 @@ wall time is acceptable.
    across independent variants. A future spatial path requires a tested cyclic
    SPD/batched line solve that preserves partitioning; do not pad or alter the
    frozen 101-station mesh to manufacture divisibility.
+   SOLVAX branch checkpoint `47831dd` implements the exact batched cyclic
+   tridiagonal solve and passes 241 tests at 98.00% branch coverage. It also
+   passes LMX's manufactured pipe gates, but direct use as a theta block is
+   rejected and removed: the reduced one-A4000 worker exceeds 100 seconds,
+   versus `26.62 s` cold and `6.85 s` warm for the accepted x/r block. The
+   next periodic-line experiment must reuse persistent factors or otherwise
+   prove lower apply cost before another production B1 run.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
