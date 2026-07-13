@@ -297,6 +297,21 @@ three net package lines, preserves exact one/two-GPU physics, and changes the
 two-GPU warm row from `50.18 s` to `22.23 s`. The complete portable gate passes
 899 tests with 8 expected skips and 95.06% branch coverage in `512.04 s`.
 
+B1 needs a different decomposition. Its frozen coarse mesh has 101 axial
+stations, and its cylindrical preconditioner solves complete axial and radial
+lines. An even reduced CPU probe verifies that axial sharding can preserve the
+fields, but the corresponding two-A4000 worker exceeded two minutes with only
+GPU 0 active; the one-GPU row was `26.94 s` cold and `7.37 s` warm. Sharding
+the periodic azimuthal axis likewise passed a forced two-CPU-device probe
+(`6.48 s` to `6.04 s`, velocity agreement `9.2e-15` relative), but exceeded
+70 seconds on two A4000s while GPU 1 remained idle, versus `26.62 s` cold and
+`6.85 s` warm on one. Both prototypes are rejected and removed. Adding theta
+to the existing non-cyclic line preconditioner is also rejected: the
+manufactured local residual regresses to `4.58e-8` against its `1e-8` gate.
+Until a partition-preserving cyclic SPD line solve exists, run independent B1
+variants one per GPU with the campaign runner rather than claiming spatial
+scaling for the mapped-pipe path.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep

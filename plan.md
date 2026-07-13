@@ -951,6 +951,18 @@ wall time is acceptable.
    The obsolete public 2-D stencil microbenchmark is removed now that production
    and 3-D operator paths cover the required evidence; this deletes 237 net
    lines across implementation and tests without removing solver coverage.
+   Two geometry-aware B1 sharding probes are rejected and removed. Axial
+   sharding preserves reduced-case fields but leaves the second A4000 idle and
+   exceeds two minutes, versus `26.94 s` cold and `7.37 s` warm on one GPU.
+   Azimuthal sharding passes a forced two-CPU-device probe with `9.2e-15`
+   relative velocity agreement and a small `6.48 -> 6.04 s` speedup, but also
+   leaves the second A4000 idle and exceeds 70 seconds, versus `26.62 s` cold
+   and `6.85 s` warm on one. The existing tridiagonal line solver cannot be
+   reused as a theta block: its manufactured local residual is `4.58e-8`
+   against the `1e-8` gate because theta is periodic. Keep B1 process-parallel
+   across independent variants. A future spatial path requires a tested cyclic
+   SPD/batched line solve that preserves partitioning; do not pad or alter the
+   frozen 101-station mesh to manufacture divisibility.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
