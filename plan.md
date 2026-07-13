@@ -873,6 +873,12 @@ wall time is acceptable.
    profile's `4.11 s` pressure-response span is therefore tracing/compilation,
    not a persistent kernel bottleneck; prioritize stable larger compiled
    regions rather than a separate cross-section kernel.
+   A vectorized three-component momentum PCG prototype is also rejected and
+   removed. It deletes 36 source lines and batches reductions, but the batched
+   while-loop waits for the slowest component. Its exclusive-A4000 one-GPU
+   worker exceeded 135 seconds before completing two repeats, versus about 100
+   seconds cold-plus-warm for the accepted row. Keep independent component
+   stopping and pursue fusion only outside the iterative loops.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at

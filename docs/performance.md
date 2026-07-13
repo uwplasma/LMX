@@ -250,6 +250,14 @@ the velocity, potential, and current L2 signatures remain exact. The prototype
 is rejected and removed; the trace's `4.11 s` nested span primarily reflects
 tracing/compilation rather than repeatable response work.
 
+Vectorizing the three independent momentum PCG solves is also rejected. It
+removes 36 source lines and could batch scalar reductions, but JAX's batched
+while-loop must remain active until the slowest component converges. On an
+otherwise idle A4000, the two-repeat one-GPU worker was still running after
+135 seconds versus about 100 seconds for the accepted cold-plus-warm row, so it
+was terminated before the longer two-GPU lane. Independent component solves
+remain the accepted path; future fusion must not couple their stopping times.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep
