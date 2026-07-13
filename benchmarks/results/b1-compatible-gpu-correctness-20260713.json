@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-13",
+  "branch": "agent/b1-compatible-stokes",
+  "commit": "be74706",
+  "hardware": {
+    "host": "office",
+    "gpus": [
+      "NVIDIA RTX A4000 16376 MiB",
+      "NVIDIA RTX A4000 16376 MiB"
+    ],
+    "driver": "580.119.02",
+    "topology": "NODE, no NVLink"
+  },
+  "software": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "solvax": "0.7.0",
+    "cuda_wheel": "jax[cuda13]==0.10.2"
+  },
+  "accepted_single_gpu_gate": {
+    "visible_devices": [0],
+    "test": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
+    "scope": "two-step compatible B1 production solve plus restart",
+    "result": "passed",
+    "cold_process_wall_seconds": 137.39,
+    "max_rss_kib": 2866144,
+    "physics": [
+      "fixed mean flow",
+      "mass balance",
+      "charge balance",
+      "boundary current",
+      "finite pressure and potential",
+      "restart pressure residual"
+    ],
+    "note": "The default 120 s per-test timeout interrupted cold XLA compilation; the unchanged gate passed with a 600 s hardware timeout. Modal block factors are now reused across restart."
+  },
+  "rejected_two_gpu_theta_prototypes": [
+    {
+      "variant": "theta placement with distributed FFT line",
+      "wall_seconds": 329.28,
+      "observed_utilization": "both GPUs active during early phases",
+      "result": "rejected",
+      "failure": "returned zero mean flow; a two-CPU-device reproduction raised an invalid distributed FFT layout error"
+    },
+    {
+      "variant": "theta placement without the FFT line",
+      "wall_seconds": 323.79,
+      "observed_utilization": "GPU 1 idle during the dominant Krylov phase",
+      "result": "rejected",
+      "failure": "returned zero mean flow on CUDA despite passing the virtual two-CPU-device gate"
+    }
+  ],
+  "retained_change": "Reuse immutable, backend-keyed B1 modal block factors across solve/restart calls.",
+  "next_gate": "Make the dominant compatible momentum/Schur Krylov executable retain explicit multi-device sharding, then require exact one/two-GPU physics before timing."
+}

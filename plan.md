@@ -1172,8 +1172,23 @@ wall time is acceptable.
    evidence is tracked in
    `benchmarks/results/b1-compatible-projection-refinement-20260713.json`.
    This closes code consolidation, physical/Krylov status agreement, dense
-   fallback removal, and the bounded refinement-cost gate. Proceed next to
-   exact single-/dual-GPU correctness and only then strong-scaling timing.
+   fallback removal, and the bounded refinement-cost gate. Experimental commit
+   `be74706` then passes the exact two-step solve/restart gate on one RTX A4000
+   with JAX 0.10.2, CUDA 13 wheels, and SOLVAX 0.7.0. The cold process takes
+   `137.39 s`; the default 120-second test timeout interrupts compilation, so
+   the hardware lane uses a bounded 600-second timeout while the portable CPU
+   lane remains unchanged. Reusing immutable modal block factors removes their
+   restart rebuild and passes the complete fringing module.
+   Two compatible theta-sharding probes are rejected and removed. Keeping the
+   periodic FFT line drives both GPUs initially but returns zero mean flow in
+   `329.28 s`; two virtual CPU devices expose the underlying invalid distributed
+   FFT layout. Disabling that line passes the virtual CPU gate, but CUDA still
+   returns zero mean flow in `323.79 s` and leaves GPU 1 idle during the
+   dominant Krylov phase. Placement alone is therefore not a multi-GPU solver.
+   Compact evidence is tracked in
+   `benchmarks/results/b1-compatible-gpu-correctness-20260713.json`. Next make
+   the compatible momentum/Schur Krylov executable retain explicit sharding,
+   require exact one/two-GPU physics, and only then record strong-scaling time.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
