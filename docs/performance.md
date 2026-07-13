@@ -241,6 +241,15 @@ cold and `0.636`--`0.692 s` warm; the vectorized path takes `0.476 s` cold and
 This is commit `8a069fe`. Whole-worker timings collected during the SPECTRAX
 contention are quarantined and do not replace the accepted scaling row.
 
+The pressure-response span is not a useful optimization target after isolated
+measurement. Solving one axial copy instead of all 102 reduces that kernel from
+`0.0236 s` to `0.0011 s` warm, but introduces a separate roughly one-second
+compilation. The complete one-GPU restart regresses from the accepted `37.78 s`
+to `39.72 s` warm and increases the maximum charge residual by 6.2%, although
+the velocity, potential, and current L2 signatures remain exact. The prototype
+is rejected and removed; the trace's `4.11 s` nested span primarily reflects
+tracing/compilation rather than repeatable response work.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep

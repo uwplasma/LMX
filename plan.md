@@ -865,6 +865,14 @@ wall time is acceptable.
    `1.283 s` cold and `0.636`--`0.692 s` warm to `0.476 s` cold and
    `0.003`--`0.006 s` warm with identical diagnostics. Contended whole-worker
    timings are not accepted scaling evidence.
+   An axial-invariant pressure-response prototype is rejected and removed.
+   Isolated warm time falls from `0.0236 s` for 102 copies to `0.0011 s` for
+   one copy, but the new shape adds roughly one second of compilation and the
+   clean one-GPU restart regresses from `37.78 s` to `39.72 s` warm while its
+   maximum charge residual rises 6.2%. Main L2 signatures remain exact. The
+   profile's `4.11 s` pressure-response span is therefore tracing/compilation,
+   not a persistent kernel bottleneck; prioritize stable larger compiled
+   regions rather than a separate cross-section kernel.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at
