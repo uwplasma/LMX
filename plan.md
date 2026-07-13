@@ -1302,6 +1302,16 @@ wall time is acceptable.
    with idle GPUs and is removed. The next Krylov implementation must remain
    outside one monolithic multi-device XLA transform and call the exact compiled
    Schur/preconditioner kernels through bounded differentiable boundaries.
+   SOLVAX commit `428d7d3` on `agent/staged-gmres` provides and documents an
+   independently compilable `gmres_cycle`; 16 focused and all 232 SOLVAX tests
+   pass in `84.77 s`, including implicit reverse-mode agreement with a dense
+   solve. It is pushed but not released or pinned by LMX. A disposable LMX
+   consumption screen is rejected and fully removed: even one staged Arnoldi
+   cycle still exceeds `180 s` of CPU compilation because XLA traces through
+   the nested B1 Schur/preconditioner calls. No unreleased SOLVAX dependency or
+   public two-GPU path remains in LMX. The next boundary must be genuinely
+   opaque to XLA—custom call/FFI with a registered implicit derivative—not
+   another composition of nested `jit`.
 
 14. **Pending — prepare the research release.** At one source fingerprint, run the full
     supported-Python matrix, strict docs, provenance, Benchmark A, Benchmark B,
