@@ -56,7 +56,7 @@
           "tests/test_physics.py::test_small_hartmann_solution_matches_analytic_profile"
         ],
         "workflow": [
-          "tests/test_example_runner.py::test_hartmann_validation_ladder_writes_summary"
+          "tests/test_showcase.py::test_showcase_hartmann_validation_ladder_writer_emits_outputs"
         ]
       },
       "title": "Fully developed inductionless duct solver",
@@ -79,7 +79,7 @@
           "tests/test_field_models.py::test_divergence_free_cross_section_field_has_small_discrete_divergence"
         ],
         "workflow": [
-          "tests/test_example_runner.py::test_variable_field_validation_writes_summary"
+          "tests/test_fringing.py::test_solve_extruded_inductionless_supports_analytic_variable_field"
         ]
       },
       "title": "Uniform, analytic, divergence-free, and tabulated imposed fields",
@@ -201,7 +201,7 @@
           "tests/test_autodiff.py::test_mean_velocity_gradients_match_finite_difference"
         ],
         "workflow": [
-          "tests/test_example_runner.py::test_autodiff_profile_design_demo_writes_summary"
+          "tests/test_autodiff.py::test_profile_inverse_design_reduces_loss"
         ]
       },
       "title": "Differentiable observables and inverse-design workflows",
@@ -249,7 +249,7 @@
           "tests/test_q2d.py::test_q2d_decay_validation_passes_on_baseline_case"
         ],
         "workflow": [
-          "tests/test_example_runner.py::test_q2d_decay_validation_writes_summary"
+          "tests/test_q2d.py::test_q2d_decay_validation_passes_on_baseline_case"
         ]
       },
       "title": "Reduced quasi-two-dimensional MHD models",

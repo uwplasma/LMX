@@ -10,6 +10,8 @@ import pytest
 from lmx.cases import make_hartmann_case, make_hunt_case
 from lmx.core import Diagnostics, MHDState, Solution
 from lmx.plotting import (
+    _add_fluid_outline,
+    _format_time_with_units,
     _movie_field_stack,
     _plot_field,
     _safe_writer_candidates,
@@ -22,6 +24,7 @@ from lmx.plotting import (
     write_geometry_preview_plots,
     write_interface_verification_plots,
     write_freemhd_parity_plots,
+    write_magnetic_obstacle_benchmark_plots,
     write_magnetic_obstacle_regime_plots,
     write_magnetic_obstacle_schematic_plots,
     write_operator_verification_plots,
@@ -388,6 +391,23 @@ def test_safe_writer_candidates_prefers_imagemagick_when_available(
     assert _safe_writer_candidates() == [("gif", "imagemagick"), ("gif", "pillow")]
 
 
+def test_small_plot_helpers_cover_units_and_safe_fallback(monkeypatch):
+    assert [_format_time_with_units(value) for value in (1.0e-4, 0.1, 2.0)] == [
+        "100.0 μs",
+        "100.0 ms",
+        "2.00 s",
+    ]
+    monkeypatch.setattr("matplotlib.animation.writers.list", lambda: [])
+    assert _safe_writer_candidates() == [("gif", "pillow")]
+
+    def reject_contour(*args, **kwargs):
+        raise ValueError("constant mask")
+
+    mesh = SimpleNamespace(y_centers=[0.0, 1.0], z_centers=[0.0, 1.0])
+    _add_fluid_outline(SimpleNamespace(), mesh, None)
+    _add_fluid_outline(SimpleNamespace(contour=reject_contour), mesh, np.ones((2, 2)))
+
+
 def test_write_transient_movies_writes_posters_and_stubbed_gifs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -655,6 +675,11 @@ def test_write_magnetic_obstacle_schematic_plots_writes_png_and_pdf(tmp_path: Pa
     ]
     assert outputs[0].exists()
     assert outputs[1].exists()
+
+    benchmark_outputs = write_magnetic_obstacle_benchmark_plots(
+        solution, reference_solution, tmp_path, case_title="Magnetic obstacle"
+    )
+    assert all(path.exists() for path in benchmark_outputs)
 
 
 def test_write_wham_mirror_overview_plots_writes_png_and_pdf(tmp_path: Path):

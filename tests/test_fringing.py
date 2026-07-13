@@ -959,6 +959,7 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
 
 
+@pytest.mark.timeout(300)
 @pytest.mark.parametrize(
     "modal_stabilization",
     [False, True],
