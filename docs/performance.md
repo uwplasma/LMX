@@ -248,6 +248,13 @@ stages to consume the full 1200 combined iterations. This branch is removed;
 future work requires smoothed aggregation or rediscretization with a true
 coarse line solve.
 
+A rediscretized factor-two coarse line solve was then formed by summing fine
+face conductances across aggregate boundaries and using SOLVAX tridiagonal
+blocks. The action is SPD, but adding it to the fine line inverse worsens the
+manufactured solve from 39 to 54 iterations and again consumes all 1200 B2
+iterations, with charge residual `6.7e-5`. Additive overlap is rejected; a
+coarse line solve must be embedded in a balanced symmetric V-cycle.
+
 At the outer-coupling level, checkpoint-matched B2 probes selected SOLVAX
 vector Aitken relaxation capped at two. It approximately doubles the local
 residual decay rate while remaining monotone over the probe; caps three and

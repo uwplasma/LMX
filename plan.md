@@ -869,6 +869,11 @@ wall time is acceptable.
    factor-two improves that probe to 35 but drives both B2 electric stages to
    the full 1200 combined iterations. Proceed only with smoothed aggregation
    or a rediscretized hierarchy with a genuine coarse line solve.
+   A factor-two rediscretized Galerkin coarse line solve is SPD but cannot be
+   added directly to the fine line inverse: the manufactured solve changes
+   from 39 to 54 iterations and B2 again consumes all 1200 combined iterations,
+   with charge residual `6.7e-5`. Reject additive overlap; a future coarse line
+   solve must live inside a properly balanced symmetric V-cycle.
    Hoisting the fixed conductivity and mask into the compiled electric closure
    preserves exact one/two-GPU physics and gives `37.37 s` one-GPU warm time,
    but worsens two-GPU warm time from `109.23 s` to `118.66 s`; reject the
