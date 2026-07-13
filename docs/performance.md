@@ -224,6 +224,23 @@ rebuilding an identical solver call still triggers 102 compile events totaling
 therefore make compiled solver closures stable across calls and fuse larger
 regions independently of the multigrid work.
 
+A newer accepted-path two-GPU trace is also kept external (218 MiB). Its wall
+time is not scaling evidence because an unrelated SPECTRAX process held both
+GPUs at 100% utilization. It nevertheless provides useful structural evidence:
+the projection occupies `103.6 s` of the `166.5 s` public solve span, 580
+`pjit` cache misses total `6.43 s`, 62 backend compile/load events total
+`3.80 s`, and the two pressure-response calls occupy `4.11 s`. Collective
+launches are much smaller (`0.078 s` of all-reduce starts and `0.103 s` of
+collective-permute starts), so the next accepted work targets host orchestration
+and compiled-region reuse before lower-level collective tuning.
+
+The first such cleanup batches the 102-station diagnostic table into one JAX
+stack and one host transfer. On the same restart, the old path takes `1.283 s`
+cold and `0.636`--`0.692 s` warm; the vectorized path takes `0.476 s` cold and
+`0.003`--`0.006 s` warm with identical station count and charge residual.
+This is commit `8a069fe`. Whole-worker timings collected during the SPECTRAX
+contention are quarantined and do not replace the accepted scaling row.
+
 A first stride-four SOLVAX Galerkin prototype used linear prolongation and its
 exact transpose. It reduced a manufactured solve from 39 to 27 PCG iterations,
 but the approximate diagonal coarse solve is not production-safe: one sweep

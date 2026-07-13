@@ -852,6 +852,19 @@ wall time is acceptable.
    events (`7.10 s`), 932 cache misses (`1.30 s`), and six PCG while calls
    (`2.29 s`), with negligible host/device copy time. Stabilize compiled closure
    identities and fuse larger solver regions in parallel with multigrid.
+   A fresh accepted-path two-GPU trace is likewise external (218 MiB). Its
+   `166.5 s` solve duration is quarantined because an unrelated SPECTRAX process
+   saturated both devices, but its phase structure remains actionable:
+   projection occupies `103.6 s`, 580 `pjit` cache misses take `6.43 s`, 62
+   backend compile/load events take `3.80 s`, and two pressure-response calls
+   take `4.11 s`; collective launch spans are much smaller. Batch the output
+   reductions and investigate reuse of the fixed pressure response before
+   tuning collectives further.
+   Commit `8a069fe` completes the first output-path batch: 102 station rows now
+   use one stack and one host transfer. Isolated restart timing improves from
+   `1.283 s` cold and `0.636`--`0.692 s` warm to `0.476 s` cold and
+   `0.003`--`0.006 s` warm with identical diagnostics. Contended whole-worker
+   timings are not accepted scaling evidence.
    A stride-four SOLVAX Galerkin prototype with exact-adjoint restriction
    reduced a manufactured solve from 39 to 27 PCG iterations, but its
    diagonal coarse action is rejected on production B2: one sweep stalls at
