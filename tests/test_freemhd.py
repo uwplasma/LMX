@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from lmx.benchmarks import BENCHMARK_B_SPEC_FILES, load_benchmark_b_reference
+from lmx.benchmarks import (
+    BENCHMARK_B_SPEC_FILES,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
+)
 from lmx.freemhd import (
     audit_freemhd_case_against_spec,
     build_case_from_freemhd_reference,
@@ -22,8 +26,6 @@ from lmx.freemhd import (
     infer_uniform_b0,
     load_benchmark_a_spec,
     load_samper_table_i,
-    parse_freemhd_execution_seconds,
-    run_freemhd_demo,
     side_jet_profile_metrics,
     summarize_observable_ladder_levels,
     summarize_observable_gate,
@@ -40,16 +42,13 @@ pytestmark = pytest.mark.unit
 
 
 def _matched_b_record(case_id: str, *, role: str | None = None) -> dict[str, object]:
-    sections = """equations nondimensional_groups geometry magnetic_field wall
-    boundary_drive mesh_coordinates stopping_rules observable normalization""".split()
-    manifest = {name: {"semantic_contract": name} for name in sections}
+    manifest = load_benchmark_b_spec(case_id)["matched_contract"]
     reference = load_benchmark_b_reference(case_id)
     spec_path = Path("benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
     return {
         "schema_version": 1,
         "case_id": case_id,
-        "acceptance_role": role
-        or ("b1-production" if case_id.startswith("B1") else "b2-production"),
+        "acceptance_role": role or ("b1-production" if case_id.startswith("B1") else "b2-production"),
         "contract": {"lmx": deepcopy(manifest), "freemhd": deepcopy(manifest)},
         "comparison": {
             "x_over_L": list(reference["x_over_L"]),
@@ -118,8 +117,7 @@ def _write_reference_inputs(root: Path, *, b0: str = "internalField uniform ( 0 
     liquid = root / "constant/liquid"
     liquid.mkdir(parents=True)
     (liquid / "thermophysicalProperties.liquidMetal").write_text(
-        "mixture { equationOfState { rho 1000; } transport { mu 0.001; } }\n"
-        "elcond [-1 -3 3 0 0 2 0] 1e6;\n"
+        "mixture { equationOfState { rho 1000; } transport { mu 0.001; } }\nelcond [-1 -3 3 0 0 2 0] 1e6;\n"
     )
     for region, conductivity in (("solidWalls", "5e6"), ("insulator", "1e-6")):
         directory = root / "constant" / region
@@ -150,10 +148,7 @@ def _ladder_record(
     )
     return {
         "case_kind": "hunt",
-        "observables": {
-            name: {"y": cut(y_error), "z": cut(z_error)}
-            for name in ("velocity", "potential", "current", "lorentz")
-        },
+        "observables": {name: {"y": cut(y_error), "z": cut(z_error)} for name in ("velocity", "potential", "current", "lorentz")},
         "layer_resolution": dict(zip(layer_names, layer_resolution)),
     }
 
@@ -178,17 +173,14 @@ def _write_matched_freemhd_case(root: Path, case_kind: str) -> None:
     field = " ".join(str(value) for value in spec["magnetic_field"]["vector"])
     (initial / "B0").write_text(f"internalField uniform ( {field} );\n")
     (initial / "U").write_text(
-        "boundaryField\n{\n"
-        "  inlet\n  {\n    type flowRateInletVelocity;\n"
-        f"    volumetricFlowRate {spec['drive']['target_flow_rate']};\n  }}\n}}\n"
+        f"boundaryField\n{{\n  inlet\n  {{\n    type flowRateInletVelocity;\n    volumetricFlowRate {spec['drive']['target_flow_rate']};\n  }}\n}}\n"
     )
     system = root / "case" / "system"
     system.mkdir(parents=True)
     geometry = spec["geometry"]
     outer = float(geometry["length_scale"]) + float(geometry["wall_thickness"])
     (system / "blockMeshDict").write_text(
-        f"Ly {geometry['length_scale']};\nLy_wall {outer};\n"
-        f"N_wall {geometry['wall_cells']};\nHa {spec['magnetic_field']['hartmann_number']};\n"
+        f"Ly {geometry['length_scale']};\nLy_wall {outer};\nN_wall {geometry['wall_cells']};\nHa {spec['magnetic_field']['hartmann_number']};\n"
     )
 
 
@@ -210,23 +202,16 @@ def _write_demo_template(root: Path) -> None:
         (constant / "thermophysicalProperties").write_text("elcond 1e-6;\n")
         system = root / "system" / region
         system.mkdir(parents=True)
-        (system / "changeDictionaryDict").write_text(
-            "B0 { internalField uniform (0 10 0); value uniform (0 10 0); }\n"
-        )
+        (system / "changeDictionaryDict").write_text("B0 { internalField uniform (0 10 0); value uniform (0 10 0); }\n")
     liquid_constant = root / "constant" / "liquid"
     liquid_constant.mkdir(parents=True)
-    (liquid_constant / "thermophysicalProperties.liquidMetal").write_text(
-        "rho 1000;\nmu 1;\nelcond [-1 -3 3 0 0 2 0] 1e6;\n"
-    )
+    (liquid_constant / "thermophysicalProperties.liquidMetal").write_text("rho 1000;\nmu 1;\nelcond [-1 -3 3 0 0 2 0] 1e6;\n")
     liquid_system = root / "system" / "liquid"
     liquid_system.mkdir(parents=True)
     (liquid_system / "changeDictionaryDict").write_text(
-        "U { internalField uniform ( 0.9725 0 0 ); volumetricFlowRate 0.0389; }\n"
-        "B0 { internalField uniform (0 10 0); value uniform (0 10 0); }\n"
+        "U { internalField uniform ( 0.9725 0 0 ); volumetricFlowRate 0.0389; }\nB0 { internalField uniform (0 10 0); value uniform (0 10 0); }\n"
     )
-    (root / "system" / "blockMeshDict").write_text(
-        "Ly 0.1;\nLy_wall 0.101;\nHa 20;\nN_wall 2;\n"
-    )
+    (root / "system" / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nHa 20;\nN_wall 2;\n")
 
 
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
@@ -241,9 +226,7 @@ def test_matched_benchmark_a_specs_are_dimensionally_consistent(case_kind: str):
 
 
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
-def test_freemhd_case_audit_accepts_only_mechanically_matched_inputs(
-    tmp_path: Path, case_kind: str
-):
+def test_freemhd_case_audit_accepts_only_mechanically_matched_inputs(tmp_path: Path, case_kind: str):
     _write_matched_freemhd_case(tmp_path, case_kind)
     report = audit_freemhd_case_against_spec(tmp_path, case_kind=case_kind)
 
@@ -254,12 +237,8 @@ def test_freemhd_case_audit_accepts_only_mechanically_matched_inputs(
 
 def test_freemhd_case_audit_exposes_mislabeled_ha_and_hunt_wall(tmp_path: Path):
     _write_matched_freemhd_case(tmp_path, "hunt")
-    (tmp_path / "case" / "0" / "liquid" / "B0").write_text(
-        "internalField uniform ( 0 10 0 );\n"
-    )
-    (
-        tmp_path / "case" / "constant" / "solidWalls" / "thermophysicalProperties"
-    ).write_text("elcond 1e-6;\n")
+    (tmp_path / "case" / "0" / "liquid" / "B0").write_text("internalField uniform ( 0 10 0 );\n")
+    (tmp_path / "case" / "constant" / "solidWalls" / "thermophysicalProperties").write_text("elcond 1e-6;\n")
     report = audit_freemhd_case_against_spec(tmp_path, case_kind="hunt")
     failed_names = {check["name"] for check in report["checks"] if not check["pass"]}
 
@@ -291,8 +270,16 @@ def test_matched_b_record_validator_computes_contract_and_comparison(case_id: st
         (("case_id",), "wrong-case", "case_id"),
         (("acceptance_role",), "self-promoted", "acceptance_role"),
         (("contract", "lmx", "wall"), {}, "contract.wall.missing"),
-        (("provenance", "lmx_source_sha256"), "not-a-hash", "provenance.lmx_source_sha256"),
-        (("provenance", "benchmark_spec_sha256"), "b" * 64, "provenance.benchmark_spec_sha256.current"),
+        (
+            ("provenance", "lmx_source_sha256"),
+            "not-a-hash",
+            "provenance.lmx_source_sha256",
+        ),
+        (
+            ("provenance", "benchmark_spec_sha256"),
+            "b" * 64,
+            "provenance.benchmark_spec_sha256.current",
+        ),
         (("comparison", "x_over_L"), [0.0], "comparison.arrays"),
     )
     for path, value, expected_check in mutations:
@@ -308,29 +295,31 @@ def test_matched_b_record_validator_computes_contract_and_comparison(case_id: st
 def test_matched_b_record_roles_and_observables_cannot_self_promote():
     smoke = _matched_b_record("B2-fringing-square", role="harness-smoke")
     report = validate_matched_b_record(smoke, expected_case_id="B2-fringing-square")
-    assert report["contract_pass"] and report["comparison_pass"]
+    assert report["contract_pass"] is False and report["comparison_pass"]
     assert report["role_allows_acceptance"] is report["acceptance_pass"] is False
+    assert "contract.acceptance_role.unavailable" in report["failed_checks"]
+
+    for section, key, wrong in (
+        ("equations", "inertia", "omitted"),
+        ("boundary_drive", "flow_constraint_scope", "stationwise"),
+    ):
+        self_consistent = _matched_b_record("B2-fringing-square")
+        self_consistent["contract"]["lmx"][section][key] = wrong
+        self_consistent["contract"]["freemhd"][section][key] = wrong
+        rejected = validate_matched_b_record(self_consistent, expected_case_id="B2-fringing-square")
+        assert f"contract.{section}.canonical" in rejected["failed_checks"]
 
     poor = _matched_b_record("B2-fringing-square")
-    poor["comparison"]["freemhd_observable"] = [
-        value + 1.0 for value in poor["comparison"]["freemhd_observable"]
-    ]
+    poor["comparison"]["freemhd_observable"] = [value + 1.0 for value in poor["comparison"]["freemhd_observable"]]
     report = validate_matched_b_record(poor, expected_case_id="B2-fringing-square")
     assert report["comparison_pass"] is report["acceptance_pass"] is False
 
     wrong_role = _matched_b_record("B1-fringing-pipe", role="b2-production")
-    assert (
-        validate_matched_b_record(wrong_role, expected_case_id="B1-fringing-pipe")[
-            "acceptance_pass"
-        ]
-        is False
-    )
+    assert validate_matched_b_record(wrong_role, expected_case_id="B1-fringing-pipe")["acceptance_pass"] is False
 
 
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
-def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(
-    tmp_path: Path, case_kind: str
-):
+def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_path: Path, case_kind: str):
     template = tmp_path / "template"
     output = tmp_path / "output"
     second_output = tmp_path / "second-output"
@@ -343,16 +332,9 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(
     assert len(manifest["source_template_sha256"]) == 64
     assert (output / "lmx-benchmark-manifest.json").is_file()
     assert infer_uniform_b0(output) == pytest.approx((0.0, 0.2, 0.0))
-    assert infer_inlet_flow_rate(output) == pytest.approx(
-        load_benchmark_a_spec(case_kind)["drive"]["target_flow_rate"]
-    )
-    assert (
-        materialize_matched_freemhd_case(template, second_output, case_kind=case_kind)
-        == manifest
-    )
-    assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (
-        output / "lmx-benchmark-manifest.json"
-    ).read_bytes()
+    assert infer_inlet_flow_rate(output) == pytest.approx(load_benchmark_a_spec(case_kind)["drive"]["target_flow_rate"])
+    assert materialize_matched_freemhd_case(template, second_output, case_kind=case_kind) == manifest
+    assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (output / "lmx-benchmark-manifest.json").read_bytes()
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         materialize_matched_freemhd_case(template, output, case_kind=case_kind)
 
@@ -392,9 +374,7 @@ def test_benchmark_a_spec_loader_rejects_unsupported_case():
         ),
     ],
 )
-def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(
-    tmp_path: Path, case_kind: str, old: str, new: str, message: str
-):
+def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(tmp_path: Path, case_kind: str, old: str, new: str, message: str):
     source = Path("benchmarks/specs") / f"{case_kind}-ha20.toml"
     (tmp_path / source.name).write_text(source.read_text().replace(old, new, 1))
     with pytest.raises(ValueError, match=message):
@@ -407,17 +387,13 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
 
     assert len(table["sha256"]) == 64
     assert rows[("shercliff", 500)]["analytical_flow_rate"] == pytest.approx(7.680e-3)
-    assert rows[("shercliff", 15000)]["published_numerical_flow_rate"] == pytest.approx(
-        2.648e-4
-    )
+    assert rows[("shercliff", 15000)]["published_numerical_flow_rate"] == pytest.approx(2.648e-4)
     assert rows[("hunt", 500)]["hartmann_wall_conductance"] == pytest.approx(0.01)
     assert rows[("hunt", 15000)]["analytical_flow_rate"] == pytest.approx(2.425e-6)
 
     source = Path("benchmarks/references/samper-table-i.toml")
     invalid = tmp_path / "invalid.toml"
-    invalid.write_text(
-        source.read_text().replace('case_kind = "hunt"', 'case_kind = "other"', 1)
-    )
+    invalid.write_text(source.read_text().replace('case_kind = "hunt"', 'case_kind = "other"', 1))
     with pytest.raises(ValueError, match="Incomplete hunt Hartmann ladder"):
         load_samper_table_i(invalid)
 
@@ -446,9 +422,7 @@ def test_freemhd_audit_reports_missing_inputs_and_explicit_nu(tmp_path: Path):
 @pytest.mark.external
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
 def test_local_freemhd_demo_is_audited_before_parity_claim(case_kind: str):
-    case_dir = (
-        Path("/Users/rogerio/local/tests/freemhd_install/freemhd_output") / case_kind
-    )
+    case_dir = Path("/Users/rogerio/local/tests/freemhd_install/freemhd_output") / case_kind
     if not case_dir.exists():
         pytest.skip("fresh local FreeMHD Docker output is unavailable")
 
@@ -543,9 +517,7 @@ def test_freemhd_inference_helpers_recover_geometry_materials_and_b0(tmp_path: P
 def test_build_case_from_freemhd_reference_adopts_reference_geometry_materials_and_b0(
     tmp_path: Path,
 ):
-    _write_reference_inputs(
-        tmp_path, b0="internalField uniform ( 0 0.2 0 );\nboundaryField {}\n"
-    )
+    _write_reference_inputs(tmp_path, b0="internalField uniform ( 0 0.2 0 );\nboundaryField {}\n")
     initial = tmp_path / "0/liquid"
     (initial / "U").write_text(_FLOW_RATE_U)
     case = _build_reference_case(tmp_path, case_kind="hunt")
@@ -564,37 +536,19 @@ def test_build_case_from_freemhd_reference_adopts_reference_geometry_materials_a
     assert inlet_boundaries[-1].value == pytest.approx(0.0389)
 
 
-def test_parse_freemhd_execution_seconds_returns_latest_value(tmp_path: Path):
-    path = tmp_path / "run.log"
-    path.write_text(
-        "\n".join(
-            [
-                "ExecutionTime = 7.32 s  ClockTime = 19 s",
-                "ExecutionTime = 35.28 s  ClockTime = 91 s",
-            ]
-        )
-    )
-    assert parse_freemhd_execution_seconds(path) == pytest.approx(35.28)
-
-
 def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Path):
     assert len(candidate_u_paths(tmp_path)) >= 6
     assert infer_liquid_properties(tmp_path) is None
     assert infer_uniform_b0(tmp_path) is None
     assert infer_rectangular_geometry(tmp_path) is None
     assert infer_solid_conductivities(tmp_path) == (None, None)
-    assert parse_freemhd_execution_seconds(tmp_path / "missing.log") is None
 
     incomplete_liquid = tmp_path / "case" / "constant" / "liquid"
     incomplete_liquid.mkdir(parents=True)
-    (incomplete_liquid / "thermophysicalProperties").write_text(
-        "sigma 3.0;\nrho 1000;\n"
-    )
+    (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\n")
     assert infer_liquid_properties(tmp_path) is None
 
-    (incomplete_liquid / "thermophysicalProperties").write_text(
-        "sigma 3.0;\nrho 1000;\nmu 0.002;\n"
-    )
+    (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\nmu 0.002;\n")
     assert infer_liquid_properties(tmp_path) == pytest.approx((3.0, 1000.0, 2.0e-6))
 
     b0_dir = tmp_path / "case" / "0" / "liquid"
@@ -631,10 +585,7 @@ def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Pa
     assert infer_inlet_flow_rate(tmp_path) is None
 
     _write_u(u_dir, "inlet { type flowRateInletVelocity; volumetricFlowRate 0.0; }")
-    assert (
-        infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0, initial_velocity=0.2)
-        is None
-    )
+    assert infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0, initial_velocity=0.2) is None
 
     _write_u(
         u_dir,
@@ -674,9 +625,7 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
             },
         }
     ]
-    observable_offenders = summarize_observable_offenders(
-        observable_records, l2_target=1.0e-2
-    )
+    observable_offenders = summarize_observable_offenders(observable_records, l2_target=1.0e-2)
     assert observable_offenders[0]["observable"] == "current"
     assert observable_offenders[0]["axis"] == "y"
     assert observable_offenders[0]["status"] == "offender"
@@ -687,9 +636,7 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
     assert observable_gate["observable_offender_count"] == 3
     assert observable_gate["low_signal_count"] == 1
     assert observable_gate["missing_observable_count"] == 1
-    assert observable_gate["missing_observables"] == [
-        {"case_kind": "shercliff", "observable": "lorentz", "axis": "*"}
-    ]
+    assert observable_gate["missing_observables"] == [{"case_kind": "shercliff", "observable": "lorentz", "axis": "*"}]
 
     profile_records = [
         {
@@ -707,9 +654,7 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
             "z_l2_error": 7.0e-2,
         },
     ]
-    profile_offenders = summarize_profile_error_offenders(
-        profile_records, l2_target=1.0e-2, top_n=2
-    )
+    profile_offenders = summarize_profile_error_offenders(profile_records, l2_target=1.0e-2, top_n=2)
     assert [item["case_kind"] for item in profile_offenders] == ["hunt", "hunt"]
     runtime_offenders = summarize_runtime_offenders(profile_records)
     assert runtime_offenders[0]["case_kind"] == "hunt"
@@ -718,12 +663,8 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
 
 
 def test_observable_ladder_summary_ranks_mesh_and_offender_progress(tmp_path: Path):
-    good_record = _ladder_record(
-        (8.0e-3, 1.0e-2), (7.0e-3, 9.0e-3), (10.0, 7.0, 1.25, 1.1, 0.9)
-    )
-    bad_record = _ladder_record(
-        (2.0e-2, 3.0e-2), (9.0e-3, 1.0e-2), (4.0, 3.0, 0.5, 0.5, 2.0)
-    )
+    good_record = _ladder_record((8.0e-3, 1.0e-2), (7.0e-3, 9.0e-3), (10.0, 7.0, 1.25, 1.1, 0.9))
+    bad_record = _ladder_record((2.0e-2, 3.0e-2), (9.0e-3, 1.0e-2), (4.0, 3.0, 0.5, 0.5, 2.0))
 
     summary = summarize_observable_ladder_levels(
         [
@@ -735,9 +676,7 @@ def test_observable_ladder_summary_ranks_mesh_and_offender_progress(tmp_path: Pa
 
     assert summary["best_level_label"] == "refined"
     assert summary["rows"][0]["observable_offender_count"] == 4
-    assert summary["rows"][0]["max_minimum_mesh_refinement_factor"] == pytest.approx(
-        2.0
-    )
+    assert summary["rows"][0]["max_minimum_mesh_refinement_factor"] == pytest.approx(2.0)
     assert summary["rows"][1]["research_grade_validation_pass"] is True
     assert table.exists()
     assert "top_offender_observable" in table.read_text()
@@ -774,22 +713,3 @@ boundaryField
 
     with pytest.raises(ValueError, match="Unsupported FreeMHD reference case kind"):
         _build_reference_case(tmp_path, case_kind="unknown")
-
-
-def test_run_freemhd_demo_invokes_script_and_returns_output_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    calls: list[dict[str, object]] = []
-
-    def fake_run(args, *, cwd, env, check):
-        calls.append({"args": args, "cwd": cwd, "env": env, "check": check})
-
-    monkeypatch.setattr("lmx.freemhd.subprocess.run", fake_run)
-
-    output = run_freemhd_demo(tmp_path, demo_kind="hunt", nproc=4, extra_env={"A": "B"})
-
-    assert output == tmp_path / "freemhd_output" / "hunt"
-    assert calls[0]["args"] == [str(tmp_path / "run_hunt.sh"), "4"]
-    assert calls[0]["cwd"] == tmp_path
-    assert calls[0]["check"] is True
-    assert calls[0]["env"]["A"] == "B"

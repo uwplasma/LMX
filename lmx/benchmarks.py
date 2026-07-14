@@ -20,6 +20,8 @@ BENCHMARK_B_SPEC_FILES = {
     "B1-fringing-pipe": "alex-b1-pipe.toml",
     "B2-fringing-square": "alex-b2-square.toml",
 }
+_MATCHED_CONTRACT_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
+boundary_drive mesh_coordinates stopping_rules observable normalization""".split()
 
 
 def _repository_root(root: str | Path | None = None) -> Path:
@@ -35,9 +37,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     if case_id not in BENCHMARK_B_SPEC_FILES:
         raise ValueError(f"Unsupported Benchmark B id {case_id!r}")
     if spec.get("schema_version") != 1 or spec.get("status") != "frozen":
-        raise ValueError(
-            "Benchmark B specification must use schema 1 and status=frozen"
-        )
+        raise ValueError("Benchmark B specification must use schema 1 and status=frozen")
     if spec.get("tolerances_frozen_before_production") is not True:
         raise ValueError("Benchmark B tolerances must be frozen before production")
 
@@ -54,23 +54,39 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     if actual != expected:
         raise ValueError(f"Benchmark B frozen parameters differ: {actual!r}")
 
+    contract = spec.get("matched_contract")
+    if not isinstance(contract, dict) or set(contract) != set(_MATCHED_CONTRACT_SECTIONS):
+        raise ValueError("Benchmark B matched formulation contract is incomplete")
+    semantics = (
+        contract["equations"].get("inertia"),
+        float(contract["nondimensional_groups"].get("reynolds_number", 0.0)),
+        *(
+            contract["boundary_drive"].get(name)
+            for name in (
+                "flow_constraint_scope",
+                "pressure_outlet",
+                "electric_axial_ends",
+            )
+        ),
+    )
+    if semantics != (
+        "conservative div(rhoPhi,U)",
+        expected[0] ** 2 / expected[1],
+        "inlet face only",
+        "fixed gauge",
+        "zero normal current",
+    ):
+        raise ValueError("Benchmark B matched formulation semantics differ")
+
     sources = spec.get("sources")
     if not isinstance(sources, list) or {source.get("id") for source in sources} != {
         "smolentsev-vv",
         "alex-results-1987",
     }:
-        raise ValueError(
-            "Benchmark B sources must identify both review and primary ALEX evidence"
-        )
+        raise ValueError("Benchmark B sources must identify both review and primary ALEX evidence")
     for source in sources:
-        if (
-            not source.get("pages")
-            or not source.get("figures")
-            or len(source.get("sha256", "")) != 64
-        ):
-            raise ValueError(
-                "Every Benchmark B source needs pages, figures, and SHA-256"
-            )
+        if not source.get("pages") or not source.get("figures") or len(source.get("sha256", "")) != 64:
+            raise ValueError("Every Benchmark B source needs pages, figures, and SHA-256")
 
     field = spec["field"]
     if (
@@ -95,25 +111,16 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     ):
         values = [int(level[key]) for level in levels]
         if values != sorted(values) or len(set(values)) != 3:
-            raise ValueError(
-                f"Benchmark B mesh requirement {key} must increase by level"
-            )
-    resolution_key = (
-        "radial_cells_min"
-        if case_id == "B1-fringing-pipe"
-        else "cross_section_cells_min"
-    )
+            raise ValueError(f"Benchmark B mesh requirement {key} must increase by level")
+    resolution_key = "radial_cells_min" if case_id == "B1-fringing-pipe" else "cross_section_cells_min"
     resolution = [int(level[resolution_key]) for level in levels]
     if resolution != sorted(resolution) or len(set(resolution)) != 3:
-        raise ValueError(
-            f"Benchmark B mesh requirement {resolution_key} must increase by level"
-        )
+        raise ValueError(f"Benchmark B mesh requirement {resolution_key} must increase by level")
     wall = spec["wall"]
     if (
         not str(wall.get("numerical_realization", "")).startswith("explicit volumetric")
         or float(wall.get("nominal_thickness_over_L", 0.0)) <= 0.0
-        or float(wall.get("confirmation_thickness_over_L", math.inf))
-        >= float(wall.get("nominal_thickness_over_L", 0.0))
+        or float(wall.get("confirmation_thickness_over_L", math.inf)) >= float(wall.get("nominal_thickness_over_L", 0.0))
         or float(wall.get("thickness_independence_relative_max", math.inf)) > 0.02
     ):
         raise ValueError("Benchmark B thin-wall numerical realization is incomplete")
@@ -125,14 +132,10 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         or acceptance.get("matched_freemhd_case_required") is not True
         or acceptance.get("primary_before_secondary") is not True
     ):
-        raise ValueError(
-            "Benchmark B uncertainty-aware acceptance contract is incomplete"
-        )
+        raise ValueError("Benchmark B uncertainty-aware acceptance contract is incomplete")
     solver = spec["solver"]
     reference_uncertainty = float(spec["reference"]["combined_uncertainty_absolute"])
-    steady_uncertainty_fraction = float(
-        solver.get("steady_residual_uncertainty_fraction_max", math.inf)
-    )
+    steady_uncertainty_fraction = float(solver.get("steady_residual_uncertainty_fraction_max", math.inf))
     expected_elliptic_controls = {
         "B1-fringing-pipe": (4000, 1.0e-12, 4000, 1.0e-12),
         "B2-fringing-square": (600, 1.0e-12, 4000, 1.0e-12),
@@ -146,39 +149,26 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     acceleration = solver.get("coupling_acceleration")
     if (
         acceleration not in {"aitken", "anderson", "none"}
-        or (
-            acceleration == "anderson"
-            and int(solver.get("coupling_history_depth", 0)) < 1
-        )
+        or (acceleration == "anderson" and int(solver.get("coupling_history_depth", 0)) < 1)
         or float(solver.get("coupling_regularization", -1.0)) < 0.0
         or not 0.0 <= float(solver.get("coupling_damping", math.inf)) <= 1.0
         or (
             acceleration == "aitken"
             and (
                 float(solver.get("coupling_min_relaxation", 0.0)) <= 0.0
-                or float(solver.get("coupling_max_relaxation", 0.0))
-                < float(solver.get("coupling_min_relaxation", 0.0))
+                or float(solver.get("coupling_max_relaxation", 0.0)) < float(solver.get("coupling_min_relaxation", 0.0))
             )
         )
         or steady_uncertainty_fraction > 0.05
-        or float(solver.get("steady_residual_max", math.inf))
-        > steady_uncertainty_fraction * reference_uncertainty
+        or float(solver.get("steady_residual_max", math.inf)) > steady_uncertainty_fraction * reference_uncertainty
         or actual_elliptic_controls != expected_elliptic_controls
         or float(solver.get("tolerance_independence_factor", math.inf)) != 0.5
-        or float(
-            solver.get("tolerance_independence_uncertainty_fraction_max", math.inf)
-        )
-        > 0.25
+        or float(solver.get("tolerance_independence_uncertainty_fraction_max", math.inf)) > 0.25
         or float(solver.get("iteration_independence_factor", 0.0)) != 2.0
-        or float(
-            solver.get("iteration_independence_uncertainty_fraction_max", math.inf)
-        )
-        > 0.25
+        or float(solver.get("iteration_independence_uncertainty_fraction_max", math.inf)) > 0.25
         or solver.get("time_or_iteration_independence_required") is not True
     ):
-        raise ValueError(
-            "Benchmark B tolerance and iteration independence contract is incomplete"
-        )
+        raise ValueError("Benchmark B tolerance and iteration independence contract is incomplete")
     rights = spec["data_rights"]
     if "extracted numerical facts" not in rights.get("redistribution", ""):
         raise ValueError("Benchmark B reference-data redistribution policy is missing")
@@ -189,9 +179,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         raise ValueError("Benchmark B reference data are missing or fail SHA-256")
 
 
-def load_benchmark_b_spec(
-    case_id: str, root: str | Path | None = None
-) -> dict[str, Any]:
+def load_benchmark_b_spec(case_id: str, root: str | Path | None = None) -> dict[str, Any]:
     """Load and validate one frozen ALEX Benchmark B specification."""
 
     repository = _repository_root(root)
@@ -209,9 +197,7 @@ def load_benchmark_b_spec(
     return spec
 
 
-def load_benchmark_b_reference(
-    case_id: str, root: str | Path | None = None
-) -> dict[str, tuple[float, ...]]:
+def load_benchmark_b_reference(case_id: str, root: str | Path | None = None) -> dict[str, tuple[float, ...]]:
     """Load checksummed field and pressure anchors for Benchmark B."""
 
     repository = _repository_root(root)
@@ -228,35 +214,22 @@ def load_benchmark_b_reference(
     with path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != columns:
-            raise ValueError(
-                "Benchmark B reference columns do not match the frozen schema"
-            )
+            raise ValueError("Benchmark B reference columns do not match the frozen schema")
         for row in reader:
             for name in columns:
                 value = float(row[name])
                 if not math.isfinite(value):
                     raise ValueError("Benchmark B reference values must be finite")
                 values[name].append(value)
-    if len(values["x_over_L"]) < 10 or any(
-        right <= left for left, right in zip(values["x_over_L"], values["x_over_L"][1:])
-    ):
-        raise ValueError(
-            "Benchmark B reference coordinates must be strictly increasing"
-        )
+    if len(values["x_over_L"]) < 10 or any(right <= left for left, right in zip(values["x_over_L"], values["x_over_L"][1:])):
+        raise ValueError("Benchmark B reference coordinates must be strictly increasing")
     geometry = spec["geometry"]
-    if values["x_over_L"][0] != float(geometry["x_over_L_min"]) or values["x_over_L"][
-        -1
-    ] != float(geometry["x_over_L_max"]):
+    if values["x_over_L"][0] != float(geometry["x_over_L_min"]) or values["x_over_L"][-1] != float(geometry["x_over_L_max"]):
         raise ValueError("Benchmark B reference data do not span the frozen domain")
-    if any(
-        value <= 0.0
-        for value in values["b_uncertainty"] + values["pressure_uncertainty"]
-    ):
+    if any(value <= 0.0 for value in values["b_uncertainty"] + values["pressure_uncertainty"]):
         raise ValueError("Benchmark B reference uncertainties must be positive")
     if any(value < 0.0 or value > 1.05 for value in values["b_over_B0"]):
-        raise ValueError(
-            "Benchmark B normalized magnetic field is outside its physical range"
-        )
+        raise ValueError("Benchmark B normalized magnetic field is outside its physical range")
     return {name: tuple(column) for name, column in values.items()}
 
 
@@ -288,9 +261,7 @@ def build_benchmark_b_field_profile(
     )
     anchors_x = jnp.asarray(reference["x_over_L"], dtype=float)
     anchors_b = jnp.asarray(reference["b_over_B0"], dtype=float)
-    if float(x_over_l[0]) < float(anchors_x[0]) or float(x_over_l[-1]) > float(
-        anchors_x[-1]
-    ):
+    if float(x_over_l[0]) < float(anchors_x[0]) or float(x_over_l[-1]) > float(anchors_x[-1]):
         raise ValueError("ALEX field reconstruction cannot extrapolate")
     field_scale = jnp.interp(x_over_l, anchors_x, anchors_b)
     if bool(jnp.any(jnp.diff(field_scale) > 1.0e-12)):
@@ -346,11 +317,7 @@ def build_benchmark_b_problem(
     if num_devices is not None and num_devices < 1:
         raise ValueError("num_devices must be positive")
     nx_min = int(level["axial_stations_min"])
-    nx = (
-        math.ceil(nx_min / num_devices) * num_devices
-        if num_devices is not None
-        else nx_min
-    )
+    nx = math.ceil(nx_min / num_devices) * num_devices if num_devices is not None else nx_min
     wall_cells = int(level["side_layer_cells_min"])
     x_min = float(spec["geometry"]["x_over_L_min"])
     length = float(spec["geometry"]["x_over_L_max"]) - x_min
@@ -393,9 +360,7 @@ def build_benchmark_b_problem(
         geometry=geometry,
         regions=(
             RegionSpec("fluid", "fluid", 1.0, 1.0, viscosity),
-            RegionSpec(
-                "conducting_wall", "solid", wall_conductivity, 1.0, viscosity, thickness
-            ),
+            RegionSpec("conducting_wall", "solid", wall_conductivity, 1.0, viscosity, thickness),
         ),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, peak_field, 0.0)),
         boundary_conditions=(
@@ -423,12 +388,8 @@ def build_benchmark_b_problem(
             coupling_history_depth=int(spec["solver"]["coupling_history_depth"]),
             coupling_regularization=float(spec["solver"]["coupling_regularization"]),
             coupling_damping=float(spec["solver"]["coupling_damping"]),
-            coupling_min_relaxation=float(
-                spec["solver"].get("coupling_min_relaxation", 0.05)
-            ),
-            coupling_max_relaxation=float(
-                spec["solver"].get("coupling_max_relaxation", 100.0)
-            ),
+            coupling_min_relaxation=float(spec["solver"].get("coupling_min_relaxation", 0.05)),
+            coupling_max_relaxation=float(spec["solver"].get("coupling_max_relaxation", 100.0)),
         ),
         forcing=0.0,
         initial_velocity=1.0,
@@ -472,9 +433,7 @@ def benchmark_b_pressure_observable(solution, case_id: str) -> jnp.ndarray:
     return difference / interaction
 
 
-def benchmark_solver(
-    repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48
-) -> dict[str, float | str]:
+def benchmark_solver(repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48) -> dict[str, float | str]:
     case = make_hartmann_case(ha=ha, ny=ny, nz=nz)
     timings = []
     for _ in range(repeats):

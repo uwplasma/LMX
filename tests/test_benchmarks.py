@@ -576,6 +576,14 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
             lambda spec: spec["physics"].update(hartmann_number=1.0),
             "parameters differ",
         ),
+        (
+            lambda spec: spec["matched_contract"]["equations"].update(inertia="omitted"),
+            "matched formulation semantics differ",
+        ),
+        (
+            lambda spec: spec["matched_contract"]["boundary_drive"].update(flow_constraint_scope="stationwise"),
+            "matched formulation semantics differ",
+        ),
         (lambda spec: spec.update(sources=[]), "both review"),
         (lambda spec: spec["sources"][0].update(pages=""), "pages"),
         (

@@ -3,9 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import math
-import os
 import re
-import subprocess
 from dataclasses import replace
 from pathlib import Path
 
@@ -18,16 +16,22 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .specs import BoundaryCondition, CaseSpec
-from .units import dynamic_to_kinematic_viscosity, hartmann_number, wall_conductance_ratio
+from .units import (
+    dynamic_to_kinematic_viscosity,
+    hartmann_number,
+    wall_conductance_ratio,
+)
 
 
 BENCHMARK_A_SPEC_DIR = Path(__file__).resolve().parents[1] / "benchmarks" / "specs"
 SAMPER_TABLE_I_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "references" / "samper-table-i.toml"
-_MATCHED_B_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
-boundary_drive mesh_coordinates stopping_rules observable normalization""".split()
 _MATCHED_B_HASHES = """benchmark_spec_sha256 lmx_source_sha256 freemhd_source_sha256
 lmx_input_sha256 freemhd_input_sha256 evaluator_sha256 lmx_output_sha256
 freemhd_output_sha256""".split()
+
+
+def _is_sha256(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and value != "0" * 64 and set(value) <= set("0123456789abcdef")
 
 
 def candidate_u_paths(case_dir: str | Path) -> list[Path]:
@@ -130,11 +134,7 @@ def summarize_observable_offenders(
             if not isinstance(observable_payload, dict):
                 continue
             observable_reference_peak = max(
-                (
-                    float(cut.get("reference_peak_abs", 1.0))
-                    for axis in ("y", "z")
-                    if isinstance((cut := observable_payload.get(axis)), dict)
-                ),
+                (float(cut.get("reference_peak_abs", 1.0)) for axis in ("y", "z") if isinstance((cut := observable_payload.get(axis)), dict)),
                 default=1.0,
             )
             for axis in ("y", "z"):
@@ -182,7 +182,12 @@ def summarize_observable_gate(
     records: list[dict[str, object]],
     *,
     l2_target: float = 1.0e-2,
-    required_observables: tuple[str, ...] = ("velocity", "potential", "current", "lorentz"),
+    required_observables: tuple[str, ...] = (
+        "velocity",
+        "potential",
+        "current",
+        "lorentz",
+    ),
     required_axes: tuple[str, ...] = ("y", "z"),
     min_reference_peak_fraction: float = 1.0e-3,
 ) -> dict[str, object]:
@@ -206,7 +211,13 @@ def summarize_observable_gate(
                 continue
             for axis in required_axes:
                 if not isinstance(payload.get(axis), dict):
-                    missing.append({"case_kind": case_kind, "observable": observable_name, "axis": axis})
+                    missing.append(
+                        {
+                            "case_kind": case_kind,
+                            "observable": observable_name,
+                            "axis": axis,
+                        }
+                    )
 
     ranked = summarize_observable_offenders(
         records,
@@ -232,7 +243,9 @@ def summarize_observable_gate(
     }
 
 
-def _observable_ladder_layer_summary(records: list[dict[str, object]]) -> dict[str, float | bool]:
+def _observable_ladder_layer_summary(
+    records: list[dict[str, object]],
+) -> dict[str, float | bool]:
     layer_gates = [record.get("layer_resolution") for record in records if isinstance(record.get("layer_resolution"), dict)]
     if not layer_gates:
         return {
@@ -431,9 +444,7 @@ def compare_side_jet_profiles(
         )
         / location_scale,
         "peak_value_relative_error": abs(float(simulated["peak_value"]) - float(reference["peak_value"])) / peak_scale,
-        "peak_to_center_ratio_error": abs(
-            float(simulated["peak_to_center_ratio"]) - float(reference["peak_to_center_ratio"])
-        )
+        "peak_to_center_ratio_error": abs(float(simulated["peak_to_center_ratio"]) - float(reference["peak_to_center_ratio"]))
         / max(abs(float(reference["peak_to_center_ratio"])), 1.0e-20),
     }
 
@@ -467,7 +478,9 @@ def summarize_profile_error_offenders(
     return offenders
 
 
-def summarize_runtime_offenders(records: list[dict[str, object]]) -> list[dict[str, object]]:
+def summarize_runtime_offenders(
+    records: list[dict[str, object]],
+) -> list[dict[str, object]]:
     offenders: list[dict[str, object]] = []
     for record in records:
         freemhd_seconds = float(record.get("freemhd_execution_seconds", 0.0) or 0.0)
@@ -571,7 +584,9 @@ def infer_liquid_properties(case_dir: str | Path) -> tuple[float, float, float] 
     )
 
 
-def infer_solid_conductivities(case_dir: str | Path) -> tuple[float | None, float | None]:
+def infer_solid_conductivities(
+    case_dir: str | Path,
+) -> tuple[float | None, float | None]:
     solid_path = _first_existing(
         case_dir,
         "case/constant/solidWalls/thermophysicalProperties",
@@ -615,7 +630,9 @@ def infer_uniform_b0(case_dir: str | Path) -> tuple[float, float, float] | None:
     return float(match.group(1)), float(match.group(2)), float(match.group(3))
 
 
-def infer_rectangular_geometry(case_dir: str | Path) -> tuple[float, float, float | None, int | None] | None:
+def infer_rectangular_geometry(
+    case_dir: str | Path,
+) -> tuple[float, float, float | None, int | None] | None:
     path = _first_existing(case_dir, "case/system/blockMeshDict", "system/blockMeshDict")
     if path is None:
         return None
@@ -628,7 +645,12 @@ def infer_rectangular_geometry(case_dir: str | Path) -> tuple[float, float, floa
     wall_thickness = None
     if outer_half_width is not None and outer_half_width >= half_width:
         wall_thickness = outer_half_width - half_width
-    return 2.0 * half_width, 2.0 * half_width, wall_thickness, None if wall_cells is None else int(round(wall_cells))
+    return (
+        2.0 * half_width,
+        2.0 * half_width,
+        wall_thickness,
+        None if wall_cells is None else int(round(wall_cells)),
+    )
 
 
 def _infer_control_dict_scalar(case_dir: str | Path, key: str) -> float | None:
@@ -663,9 +685,7 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
     fluid = payload["fluid"]
     geometry = payload["geometry"]
     field = payload["magnetic_field"]
-    expected_nu = dynamic_to_kinematic_viscosity(
-        float(fluid["dynamic_viscosity"]), float(fluid["density"])
-    )
+    expected_nu = dynamic_to_kinematic_viscosity(float(fluid["dynamic_viscosity"]), float(fluid["density"]))
     if not math.isclose(expected_nu, float(fluid["kinematic_viscosity"]), rel_tol=1.0e-12):
         raise ValueError(f"Inconsistent dynamic and kinematic viscosity in {path}")
     vector = [float(value) for value in field["vector"]]
@@ -705,7 +725,12 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
 def validate_matched_b_record(record: dict[str, object], *, expected_case_id: str) -> dict[str, object]:
     """Validate matched Benchmark-B semantics and recompute comparison gates."""
 
-    from .benchmarks import BENCHMARK_B_SPEC_FILES, load_benchmark_b_reference, load_benchmark_b_spec
+    from .benchmarks import (
+        BENCHMARK_B_SPEC_FILES,
+        _MATCHED_CONTRACT_SECTIONS,
+        load_benchmark_b_reference,
+        load_benchmark_b_spec,
+    )
 
     spec = load_benchmark_b_spec(expected_case_id)
     expected_role = {
@@ -713,7 +738,14 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
         "B2-fringing-square": "b2-production",
     }[expected_case_id]
     failed: list[str] = []
-    required = {"schema_version", "case_id", "acceptance_role", "contract", "comparison", "provenance"}
+    required = {
+        "schema_version",
+        "case_id",
+        "acceptance_role",
+        "contract",
+        "comparison",
+        "provenance",
+    }
     if not required.issubset(record) or record.get("schema_version") != 1:
         failed.append("schema")
     if record.get("case_id") != expected_case_id:
@@ -728,24 +760,23 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
     lmx = contract.get("lmx") if isinstance(contract, dict) else None
     freemhd = contract.get("freemhd") if isinstance(contract, dict) else None
     contract_failed: list[str] = []
-    for section in _MATCHED_B_SECTIONS:
+    expected_contract = spec.get("matched_contract") if role == expected_role else None
+    if expected_contract is None:
+        contract_failed.append("contract.acceptance_role.unavailable")
+    for section in _MATCHED_CONTRACT_SECTIONS:
         left = lmx.get(section) if isinstance(lmx, dict) else None
         right = freemhd.get(section) if isinstance(freemhd, dict) else None
         if not isinstance(left, dict) or not left or not isinstance(right, dict) or not right:
             failed.append(f"contract.{section}.missing")
         elif left != right:
             contract_failed.append(f"contract.{section}.mismatch")
+        elif expected_contract is not None and left != expected_contract[section]:
+            contract_failed.append(f"contract.{section}.canonical")
 
     provenance = record.get("provenance")
     provenance = provenance if isinstance(provenance, dict) else {}
     for name in _MATCHED_B_HASHES:
-        value = provenance.get(name)
-        if (
-            not isinstance(value, str)
-            or len(value) != 64
-            or value == "0" * 64
-            or any(character not in "0123456789abcdef" for character in value)
-        ):
+        if not _is_sha256(provenance.get(name)):
             failed.append(f"provenance.{name}")
     spec_path = BENCHMARK_A_SPEC_DIR / BENCHMARK_B_SPEC_FILES[expected_case_id]
     if provenance.get("benchmark_spec_sha256") != hashlib.sha256(spec_path.read_bytes()).hexdigest():
@@ -781,7 +812,10 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
             "weighted_linf": float(np.max(np.abs(delta / uncertainty))),
             "integrated_relative": float(
                 abs(np.trapezoid(delta, x))
-                / max(abs(np.trapezoid(freemhd_values, x)), float(np.trapezoid(uncertainty, x)))
+                / max(
+                    abs(np.trapezoid(freemhd_values, x)),
+                    float(np.trapezoid(uncertainty, x)),
+                )
             ),
         }
     except (KeyError, TypeError, ValueError):
@@ -824,10 +858,7 @@ def load_samper_table_i(path: str | Path | None = None) -> dict[str, object]:
         subset = [case for case in cases if case.get("case_kind") == case_kind]
         if {int(case["hartmann_number"]) for case in subset} != expected_ha:
             raise ValueError(f"Incomplete {case_kind} Hartmann ladder in {source}")
-        if any(
-            not math.isclose(float(case["hartmann_wall_conductance"]), expected_conductance)
-            for case in subset
-        ):
+        if any(not math.isclose(float(case["hartmann_wall_conductance"]), expected_conductance) for case in subset):
             raise ValueError(f"Incorrect {case_kind} wall conductance in {source}")
         if any(float(case["analytical_flow_rate"]) <= 0.0 for case in subset):
             raise ValueError(f"Non-positive {case_kind} flow-rate reference in {source}")
@@ -869,7 +900,11 @@ def audit_freemhd_case_against_spec(
             [
                 _audit_check("geometry.width", expected_geometry["width"], width),
                 _audit_check("geometry.height", expected_geometry["height"], height),
-                _audit_check("geometry.wall_thickness", expected_geometry["wall_thickness"], wall_thickness),
+                _audit_check(
+                    "geometry.wall_thickness",
+                    expected_geometry["wall_thickness"],
+                    wall_thickness,
+                ),
                 _audit_check("geometry.wall_cells", expected_geometry["wall_cells"], wall_cells),
             ]
         )
@@ -878,13 +913,24 @@ def audit_freemhd_case_against_spec(
     if fluid is None:
         checks.append(_audit_check("fluid.available", True, False))
     else:
-        for key in ("conductivity", "density", "dynamic_viscosity", "kinematic_viscosity"):
+        for key in (
+            "conductivity",
+            "density",
+            "dynamic_viscosity",
+            "kinematic_viscosity",
+        ):
             checks.append(_audit_check(f"fluid.{key}", expected_fluid[key], fluid[key]))
 
     expected_field = tuple(float(value) for value in spec["magnetic_field"]["vector"])
     checks.append(_audit_check("magnetic_field.vector", expected_field, b0))
     declared_ha = _infer_block_mesh_scalar(case_dir, "Ha")
-    checks.append(_audit_check("mesh.declared_hartmann", spec["magnetic_field"]["hartmann_number"], declared_ha))
+    checks.append(
+        _audit_check(
+            "mesh.declared_hartmann",
+            spec["magnetic_field"]["hartmann_number"],
+            declared_ha,
+        )
+    )
     physical_ha = None
     if fluid is not None and b0 is not None and geometry is not None:
         physical_ha = hartmann_number(
@@ -1050,36 +1096,3 @@ def build_case_from_freemhd_reference(
         forcing=forcing_value,
         time_stepper=replace(case.time_stepper, dt=dt, t_final=t_final, max_steps=max_steps),
     )
-
-
-def parse_freemhd_execution_seconds(run_log_path: str | Path) -> float | None:
-    path = Path(run_log_path)
-    if not path.exists():
-        return None
-    latest: float | None = None
-    pattern = re.compile(r"ExecutionTime\s*=\s*([0-9eE+.\-]+)\s*s")
-    for line in path.read_text(errors="ignore").splitlines():
-        match = pattern.search(line)
-        if match is not None:
-            latest = float(match.group(1))
-    return latest
-
-
-def run_freemhd_demo(
-    freemhd_install_dir: str | Path,
-    *,
-    demo_kind: str,
-    nproc: int = 2,
-    extra_env: dict[str, str] | None = None,
-) -> Path:
-    root = Path(freemhd_install_dir)
-    script_map = {
-        "shercliff": root / "run_shercliff.sh",
-        "hunt": root / "run_hunt.sh",
-    }
-    script = script_map[demo_kind]
-    env = None
-    if extra_env is not None:
-        env = {**os.environ, **extra_env}
-    subprocess.run([str(script), str(nproc)], cwd=root, env=env, check=True)
-    return root / "freemhd_output" / demo_kind
