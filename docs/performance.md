@@ -8,7 +8,7 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 762 pass, 8 skip, 95.28% branch coverage, 167.6 s | below the ten-minute budget |
+| portable test gate | Apple M4, six workers | 760 pass, 8 skip, 95.28% branch coverage, 192.6 s | below the ten-minute budget |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
 | B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | tolerance, iteration, wall, steady, and conservation gates pass |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |

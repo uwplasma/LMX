@@ -1,6 +1,6 @@
 {
   "date": "2026-07-14",
-  "commit": "d06b177a4842d349982b5b90da9b7552ffb86848",
+  "commit": "54fdb6e20f5e19f26d716a0a4b2a0210a391f5be",
   "lock_sha256": "da69fe6dc887d49e7376c3d747334039e9224625d992604e8e240e7052bfc44d",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
@@ -21,41 +21,41 @@
     "jaxlib": "0.10.2",
     "workers": 6,
     "test_files": 35,
-    "test_lines": 21516,
-    "passed": 762,
+    "test_lines": 21451,
+    "passed": 760,
     "skipped": 8,
-    "pytest_seconds": 165.42,
-    "gate_seconds": 167.6,
+    "pytest_seconds": 190.23,
+    "gate_seconds": 192.6,
     "branch_coverage_percent": 95.28,
     "slowest_tests": [
       {
         "nodeid": "tests/test_fringing.py::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]",
-        "seconds": 54.267
+        "seconds": 53.092
       },
       {
         "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
-        "seconds": 24.196
+        "seconds": 30.636
       },
       {
         "nodeid": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "seconds": 23.66
+        "seconds": 27.657
       },
       {
         "nodeid": "tests/test_autodiff.py::test_fringing_response_inverse_design_reduces_loss",
-        "seconds": 20.629
+        "seconds": 23.638
       },
       {
-        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry",
-        "seconds": 19.319
+        "nodeid": "tests/test_autodiff.py::test_extruded_rect_inverse_design_reduces_loss",
+        "seconds": 19.911
       }
     ],
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 167.5,
-    "wall_time_reduction_percent": -0.06,
-    "current_budget_fraction": 0.279,
-    "current_engineering_target_fraction": 0.465,
+    "previous_gate_seconds": 167.6,
+    "wall_time_reduction_percent": -14.92,
+    "current_budget_fraction": 0.321,
+    "current_engineering_target_fraction": 0.535,
     "current_gate_pass": true
   },
   "hosted_ci": {
