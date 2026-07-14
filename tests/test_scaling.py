@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import subprocess
 from types import SimpleNamespace
 
@@ -26,6 +27,7 @@ from lmx.scaling import (
     write_strong_scaling_summary_table,
 )
 from examples.strong_scaling_demo import _default_visible_devices
+from scripts import run_strong_scaling_worker
 
 
 pytestmark = pytest.mark.unit
@@ -445,3 +447,140 @@ def test_benchmark_sharded_extruded_operator_rejects_missing_devices(
         benchmark_sharded_extruded_operator(
             nx=8, ny=8, nz=8, iterations=1, repeats=1, num_devices=1
         )
+
+
+def test_scaling_worker_writes_expected_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    def fake_benchmark_sharded_extruded_operator(**kwargs):
+        assert kwargs == {
+            "nx": 48,
+            "ny": 64,
+            "nz": 32,
+            "iterations": 5,
+            "repeats": 2,
+            "num_devices": 1,
+        }
+        return StrongScalingRecord(
+            backend="cpu",
+            device_kind="cpu",
+            num_devices=1,
+            ny=64,
+            nz=32,
+            iterations=5,
+            repeats=2,
+            cold_seconds=0.2,
+            warm_seconds=0.1,
+            mean_seconds=0.15,
+            python_version="3.x",
+            jax_version="0.x",
+            nx=48,
+            benchmark_kind="extruded3d",
+        )
+
+    monkeypatch.setattr(
+        run_strong_scaling_worker,
+        "benchmark_sharded_extruded_operator",
+        fake_benchmark_sharded_extruded_operator,
+    )
+    output_path = tmp_path / "worker.json"
+    rc = run_strong_scaling_worker.main(
+        [
+            "--benchmark-kind",
+            "extruded3d",
+            "--nx",
+            "48",
+            "--ny",
+            "64",
+            "--nz",
+            "32",
+            "--iterations",
+            "5",
+            "--repeats",
+            "2",
+            "--num-devices",
+            "1",
+            "--platform",
+            "CPU",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert rc == 0
+    payload = json.loads(output_path.read_text())
+    assert payload["platform"] == "CPU"
+    assert payload["warm_seconds"] == 0.1
+    assert payload["benchmark_kind"] == "extruded3d"
+    assert len(payload["source_fingerprint"]) == 64
+    assert json.loads(capsys.readouterr().out)["num_devices"] == 1
+
+
+def test_scaling_worker_covers_solver_faithful_branch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    def fake_benchmark_extruded_inductionless_solve(**kwargs):
+        assert kwargs == {
+            "nx": 12,
+            "ny": 10,
+            "nz": 8,
+            "max_steps": 6,
+            "repeats": 1,
+            "num_devices": 1,
+            "profile_dir": tmp_path / "profile",
+            "restart_path": tmp_path / "steady.npz",
+        }
+        return StrongScalingRecord(
+            backend="cpu",
+            device_kind="cpu",
+            num_devices=1,
+            ny=10,
+            nz=8,
+            iterations=6,
+            repeats=1,
+            cold_seconds=0.5,
+            warm_seconds=0.5,
+            mean_seconds=0.5,
+            python_version="3.x",
+            jax_version="0.x",
+            nx=12,
+            benchmark_kind="extruded_solve",
+            operator_path="solve_extruded_inductionless",
+        )
+
+    monkeypatch.setattr(
+        run_strong_scaling_worker,
+        "benchmark_extruded_inductionless_solve",
+        fake_benchmark_extruded_inductionless_solve,
+    )
+    output_path = tmp_path / "worker_solve.json"
+    rc = run_strong_scaling_worker.main(
+        [
+            "--benchmark-kind",
+            "extruded_solve",
+            "--nx",
+            "12",
+            "--ny",
+            "10",
+            "--nz",
+            "8",
+            "--iterations",
+            "6",
+            "--repeats",
+            "1",
+            "--num-devices",
+            "1",
+            "--profile-dir",
+            str(tmp_path / "profile"),
+            "--restart",
+            str(tmp_path / "steady.npz"),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert rc == 0
+    payload = json.loads(output_path.read_text())
+    assert payload["benchmark_kind"] == "extruded_solve"
+    assert payload["operator_path"] == "solve_extruded_inductionless"
+    assert len(payload["source_fingerprint"]) == 64
