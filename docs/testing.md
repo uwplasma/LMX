@@ -12,7 +12,9 @@ uv run --locked --extra dev python scripts/run_full_test_suite.py
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
 and a hard ten-minute timeout. The current Apple M4 result is 765 passed, 8
 expected external-data skips, 95.28% branch coverage, and 171.1 seconds with six
-workers.
+workers. The slowest test took 55.1 seconds under worker contention, below the
+120-second per-test timeout; the compact gate record tracks the five slowest
+node IDs for regression review.
 
 The eight skips represent unavailable independent datasets, not disabled source
 paths. The gate must stay below ten minutes as the code grows; its engineering

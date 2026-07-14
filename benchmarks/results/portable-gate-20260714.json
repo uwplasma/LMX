@@ -25,6 +25,28 @@
     "pytest_seconds": 168.81,
     "gate_seconds": 171.1,
     "branch_coverage_percent": 95.28,
+    "slowest_tests": [
+      {
+        "nodeid": "tests/test_fringing.py::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]",
+        "seconds": 55.108
+      },
+      {
+        "nodeid": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
+        "seconds": 24.793
+      },
+      {
+        "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
+        "seconds": 23.47
+      },
+      {
+        "nodeid": "tests/test_autodiff.py::test_fringing_response_inverse_design_reduces_loss",
+        "seconds": 20.569
+      },
+      {
+        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry",
+        "seconds": 18.369
+      }
+    ],
     "passed_gate": true
   },
   "comparison": {
