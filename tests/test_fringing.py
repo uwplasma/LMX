@@ -891,6 +891,7 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
             dx=0.25,
             dy=dy,
             dz=dz,
+            fluid_bounds=(0, ny, 0, nz),
             iterations=200,
             tolerance=1.0e-10,
         )

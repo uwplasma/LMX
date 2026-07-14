@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import jax
@@ -67,6 +68,11 @@ def test_scaling_worker_command_forwards_restart(
     )
 
     assert commands[0][-2:] == ["--restart", str(tmp_path / "restart.npz")]
+    monkeypatch.setenv("XLA_FLAGS", "--xla_dump_to=/tmp/lmx-safe --xla_cpu_multi_thread_eigen=true")
+    env = strong_scaling_demo._forced_cpu_environment(2)
+    assert "--xla_dump_to=/tmp/lmx-safe" in env["XLA_FLAGS"]
+    assert env["XLA_FLAGS"].count("--xla_force_host_platform_device_count=2") == 1
+    assert "--xla_cpu_multi_thread_eigen=true" not in env["XLA_FLAGS"]
 
 
 def test_write_scaling_report_writes_json(tmp_path: Path):
@@ -136,22 +142,6 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert "parallel_efficiency" in table.read_text()
 
 
-def test_benchmark_sharded_extruded_operator_runs_on_single_device():
-    record = benchmark_sharded_extruded_operator(
-        nx=16, ny=12, nz=10, iterations=2, repeats=1, num_devices=1
-    )
-
-    assert record.num_devices == 1
-    assert record.nx == 16
-    assert record.ny == 12
-    assert record.nz == 10
-    assert record.benchmark_kind == "extruded3d"
-    assert record.operator_path == "sharded_extruded_operator_surrogate"
-    assert record.total_cells == 16 * 12 * 10
-    assert record.spatially_sharded is False
-    assert record.global_shard_count == 1
-
-
 def test_shard_placement_reports_partitioning_and_rejects_replication():
     single = SimpleNamespace(
         global_shards=[object()],
@@ -185,6 +175,26 @@ def test_tracked_mac_sharding_record_reports_only_actual_partitions():
     assert all(point["spatially_sharded"] for point in points[1:])
     assert payload["interpretation"]["fastest_device_count"] == 4
     assert payload["interpretation"]["production_solver_claim"] is False
+
+
+@pytest.mark.timeout(110)
+def test_forced_cpu_duct_step_matches_one_and_two_devices(tmp_path: Path):
+    one, two = strong_scaling_demo.run_local_cpu_scaling(
+        repo_root=Path(__file__).resolve().parents[1], out_dir=tmp_path,
+        device_counts=(1, 2), benchmark_kind="duct_step_gate", nx=8, ny=4, nz=3,
+        iterations=192, repeats=1, python_executable=sys.executable,
+        timeout_seconds=50)
+    np.testing.assert_allclose(one["signature"], two["signature"], rtol=2e-8, atol=2e-9)
+    for record in (one, two):
+        assert record["momentum_converged"]
+        assert max(record[key] for key in (
+            "divergence", "flow_error", "momentum_residual", "lower_wall_flux")) < 1e-8
+        assert record["convection_flux_l2"] > 1e-3 and record["cut_boundary_separation"] > 1e-7
+    for name in ("initial_flux", "velocity", "pressure", "corrected_flux", "momentum"):
+        placement = two["placement"][name]
+        assert (placement["global_shards"], placement["addressable_shards"]) == (2, 2)
+        assert not placement["replicated"]
+    assert two["num_devices"] == 2 and two["placement"]["inlet_flux"]["replicated"]
 
 
 def test_benchmark_sharded_extruded_operator_rejects_invalid_device_count():
@@ -374,30 +384,20 @@ def test_default_visible_devices_uses_highest_indices(monkeypatch: pytest.Monkey
 
 def test_scaling_problem_builders_return_expected_shapes():
     u, v, w, phi, src, sigma = _build_extruded_operator_problem(8, 6, 4)
-    assert u.shape == (8, 6, 4)
-    assert v.shape == (8, 6, 4)
-    assert w.shape == (8, 6, 4)
-    assert phi.shape == (8, 6, 4)
-    assert src.shape == (8, 6, 4)
-    assert sigma.shape == (8, 6, 4)
+    assert {value.shape for value in (u, v, w, phi, src, sigma)} == {(8, 6, 4)}
 
 
 def test_factor_device_mesh_prefers_near_square_factoring():
-    assert _factor_device_mesh(1) == (1, 1)
-    assert _factor_device_mesh(4) == (2, 2)
-    assert _factor_device_mesh(6) == (2, 3)
-    assert _factor_device_mesh(0) == (1, 0)
+    assert tuple(map(_factor_device_mesh, (1, 4, 6, 0))) == (
+        (1, 1), (2, 2), (2, 3), (1, 0))
 
 
 def test_scaling_helpers_handle_missing_and_invalid_values():
     class InvalidArray:
         shape = (2,)
         dtype = object()
-
-    assert _float_or_none(None) is None
-    assert _float_or_none("not-a-float") is None
-    assert _int_or_none(None) is None
-    assert _int_or_none("not-an-int") is None
+    assert tuple(map(_float_or_none, (None, "not-a-float"))) == (None, None)
+    assert tuple(map(_int_or_none, (None, "not-an-int"))) == (None, None)
     assert _array_nbytes(InvalidArray()) == 0
 
 

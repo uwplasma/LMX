@@ -309,46 +309,33 @@ def _nonuniform_axis_laplacian(
 
 
 def _neighbor_fields(
-    field: jnp.ndarray, *, mode_x: str, mode_y: str, mode_z: str
+    field: jnp.ndarray, *, mode_x: str, mode_y: str, mode_z: str,
+    sharding: NamedSharding | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    x_west = (
-        jnp.concatenate([field[:1], field[:-1]], axis=0)
-        if mode_x == "neumann"
-        else jnp.concatenate([jnp.zeros_like(field[:1]), field[:-1]], axis=0)
-    )
-    x_east = (
-        jnp.concatenate([field[1:], field[-1:]], axis=0)
-        if mode_x == "neumann"
-        else jnp.concatenate([field[1:], jnp.zeros_like(field[-1:])], axis=0)
-    )
-    y_south = (
-        jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
-        if mode_y == "neumann"
-        else jnp.concatenate(
-            [jnp.zeros_like(field[:, :1, :]), field[:, :-1, :]], axis=1
-        )
-    )
-    y_north = (
-        jnp.concatenate([field[:, 1:, :], field[:, -1:, :]], axis=1)
-        if mode_y == "neumann"
-        else jnp.concatenate(
-            [field[:, 1:, :], jnp.zeros_like(field[:, -1:, :])], axis=1
-        )
-    )
-    z_bottom = (
-        jnp.concatenate([field[:, :, :1], field[:, :, :-1]], axis=2)
-        if mode_z == "neumann"
-        else jnp.concatenate(
-            [jnp.zeros_like(field[:, :, :1]), field[:, :, :-1]], axis=2
-        )
-    )
-    z_top = (
-        jnp.concatenate([field[:, :, 1:], field[:, :, -1:]], axis=2)
-        if mode_z == "neumann"
-        else jnp.concatenate(
-            [field[:, :, 1:], jnp.zeros_like(field[:, :, -1:])], axis=2
-        )
-    )
+    def shifted(value, axis, forward, mode):
+        moved = jnp.moveaxis(value, axis, 0)
+        edge = moved[-1 if forward else 0]
+        boundary = edge if mode == "neumann" else jnp.zeros_like(edge)
+        parts = (moved[1:], boundary[None]) if forward else (boundary[None], moved[:-1])
+        return jnp.moveaxis(jnp.concatenate(parts), 0, axis)
+    if sharding is None:
+        x_west, x_east = (shifted(field, 0, side, mode_x) for side in (False, True))
+    else:  # pragma: no cover - forced-device/hardware gates
+        count = sharding.mesh.size
+        def axial(value):
+            index = jax.lax.axis_index("x")
+            west = jax.lax.ppermute(value[-1], "x", tuple((i, i + 1) for i in range(count - 1)))
+            east = jax.lax.ppermute(value[0], "x", tuple((i, i - 1) for i in range(1, count)))
+            if mode_x == "neumann":
+                west, east = (jnp.where(index == 0, value[0], west),
+                    jnp.where(index == count - 1, value[-1], east))
+            return (jnp.concatenate((west[None], value[:-1])),
+                jnp.concatenate((value[1:], east[None])))
+        x_west, x_east = jax.shard_map(axial, mesh=sharding.mesh,
+            in_specs=sharding.spec, out_specs=(sharding.spec, sharding.spec),
+            check_vma=False)(field)
+    y_south, y_north = (shifted(field, 1, side, mode_y) for side in (False, True))
+    z_bottom, z_top = (shifted(field, 2, side, mode_z) for side in (False, True))
     return x_west, x_east, y_south, y_north, z_bottom, z_top
 
 
@@ -1422,9 +1409,10 @@ def _solvax_pressure_poisson_duct(
             mode_x="neumann",
             mode_y="neumann",
             mode_z="neumann",
+            sharding=field_sharding,
         )
         if mixed_axial_pressure:
-            x_east = jnp.concatenate([field[1:], jnp.zeros_like(field[-1:])], axis=0)
+            x_east = x_east.at[-1].set(0.0)
         return (
             coef_x_w * (x_west - field)
             + coef_x_e * (x_east - field)
@@ -1847,6 +1835,7 @@ def _face_flux_pressure_projection_duct(
     single_reduction: bool = False,
     include_axial_line: bool = True,
     inlet_flow_rate: float | None = None,
+    field_sharding: NamedSharding | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Project duct face fluxes; mixed boundaries also return flow diagnostics."""
 
@@ -1865,10 +1854,11 @@ def _face_flux_pressure_projection_duct(
     dzs = dz[z0:z1]
     nx, ny, nz = us.shape
 
-    uf = jnp.zeros((nx + 1, ny, nz), dtype=u.dtype)
-    uf = uf.at[1:-1].set(0.5 * (us[1:] + us[:-1]))
-    uf = uf.at[0].set(us[0])
-    uf = uf.at[-1].set(us[-1])
+    def axial_neighbors(value):
+        return _neighbor_fields(value, mode_x="neumann", mode_y="neumann",
+            mode_z="neumann", sharding=field_sharding)[:2]
+    uf_plus = 0.5 * (us + axial_neighbors(us)[1])
+    uf_inlet = us[0]
     vf = jnp.zeros((nx, ny + 1, nz), dtype=v.dtype)
     vf = vf.at[:, 1:-1, :].set(0.5 * (vs[:, 1:, :] + vs[:, :-1, :]))
     wf = jnp.zeros((nx, ny, nz + 1), dtype=w.dtype)
@@ -1877,10 +1867,13 @@ def _face_flux_pressure_projection_duct(
     face_area = dys[:, None] * dzs[None, :]
     if inlet_flow_rate is not None:
         target = jnp.asarray(inlet_flow_rate, dtype=u.dtype)
-        uf = uf.at[0].set(_flow_rate_inlet_profile(us[0], face_area, target))
+        uf_inlet = _flow_rate_inlet_profile(us[0], face_area, target)
+
+    def axial_minus(plus, inlet):
+        return axial_neighbors(plus)[0].at[0].set(inlet)
 
     divergence = (
-        (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
+        (uf_plus - axial_minus(uf_plus, uf_inlet)) / max(dx, 1.0e-12)
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
@@ -1901,16 +1894,18 @@ def _face_flux_pressure_projection_duct(
         axial_pressure_mode=(
             _MIXED_AXIAL_PRESSURE_MODE if mixed_axial_pressure else "neumann"
         ),
+        field_sharding=field_sharding,
     )
 
-    mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
-    uf = uf.at[1:-1].add(
-        -mobility_x * (pressure[1:] - pressure[:-1]) / max(dx, 1.0e-12)
-    )
+    pressure_east, mobility_east = (axial_neighbors(value)[1]
+        for value in (pressure, mobility))
+    correction_x = -_harmonic_mean(mobility_east, mobility) * (
+        pressure_east - pressure) / max(dx, 1.0e-12)
     if mixed_axial_pressure:
-        uf = uf.at[-1].add(
+        correction_x = correction_x.at[-1].set(
             -mobility[-1] * (0.0 - pressure[-1]) / max(0.5 * dx, 1.0e-12)
         )
+    uf_plus += correction_x
     mobility_y = _harmonic_mean(mobility[:, 1:, :], mobility[:, :-1, :])
     y_distance = 0.5 * (dys[:-1] + dys[1:])
     vf = vf.at[:, 1:-1, :].add(
@@ -1926,12 +1921,12 @@ def _face_flux_pressure_projection_duct(
         / z_distance[None, None, :]
     )
     divergence_after = (
-        (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
+        (uf_plus - axial_minus(uf_plus, uf_inlet)) / max(dx, 1.0e-12)
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
 
-    projected_u = 0.5 * (uf[:-1] + uf[1:])
+    projected_u = 0.5 * (axial_minus(uf_plus, uf_inlet) + uf_plus)
     projected_v = 0.5 * (vf[:, :-1, :] + vf[:, 1:, :])
     projected_w = 0.5 * (wf[:, :, :-1] + wf[:, :, 1:])
     full_u = jnp.zeros_like(u).at[:, y0:y1, z0:z1].set(projected_u)
@@ -1942,34 +1937,33 @@ def _face_flux_pressure_projection_duct(
     if not mixed_axial_pressure:
         return full_u, full_v, full_w, full_p, divergence_norm
 
-    inlet_flow = jnp.sum(uf[0] * face_area)
-    outlet_flow = jnp.sum(uf[-1] * face_area)
+    inlet_flow = jnp.sum(uf_inlet * face_area)
+    outlet_flow = jnp.sum(uf_plus[-1] * face_area)
     active_mask = fluid_mask[:, y0:y1, z0:z1]
     area = face_area[None, :, :]
     active_area = jnp.sum(jnp.where(active_mask, area, 0.0), axis=(1, 2))
     mean_pressure = (
         jnp.sum(jnp.where(active_mask, pressure * area, 0.0), axis=(1, 2)) / active_area
     )
-    pressure_loss_faces = jnp.zeros((pressure.shape[0] + 1,), dtype=pressure.dtype)
-    pressure_loss_faces = pressure_loss_faces.at[1:-1].set(
-        -(mean_pressure[1:] - mean_pressure[:-1]) / max(dx, 1.0e-12)
-    )
-    pressure_loss_faces = pressure_loss_faces.at[-1].set(
+    mean_pressure_east = axial_neighbors(mean_pressure[:, None, None])[1][:, 0, 0]
+    pressure_loss_plus = -(mean_pressure_east - mean_pressure) / max(dx, 1.0e-12)
+    pressure_loss_plus = pressure_loss_plus.at[-1].set(
         mean_pressure[-1] / max(0.5 * dx, 1.0e-12)
     )
-    pressure_loss = 0.5 * (pressure_loss_faces[:-1] + pressure_loss_faces[1:])
+    pressure_loss = 0.5 * (jnp.concatenate((jnp.zeros((1,), dtype=pressure.dtype),
+        pressure_loss_plus[:-1])) + pressure_loss_plus)
     flow_error = jnp.maximum(
         jnp.abs(inlet_flow - inlet_flow_rate), jnp.abs(outlet_flow - inlet_flow_rate)
     )
-    rho_x = jnp.concatenate((0.5 * (rhos[:-1] + rhos[1:]), rhos[-1:]))
+    rho_x = 0.5 * (rhos + axial_neighbors(rhos)[1])
     wy = (dys[1:] / (dys[:-1] + dys[1:]))[None, :, None]
     rho_y = jnp.concatenate((wy * rhos[:, :-1] + (1.0 - wy) * rhos[:, 1:], rhos[:, -1:]), axis=1)
     wz = (dzs[1:] / (dzs[:-1] + dzs[1:]))[None, None, :]
     rho_z = jnp.concatenate((wz * rhos[:, :, :-1] + (1.0 - wz) * rhos[:, :, 1:], rhos[:, :, -1:]), axis=2)
-    rho_phi_plus = jnp.stack((rho_x * uf[1:] * face_area, rho_y * vf[:, 1:]
+    rho_phi_plus = jnp.stack((rho_x * uf_plus * face_area, rho_y * vf[:, 1:]
         * (dx * dzs[None, None, :]), rho_z * wf[:, :, 1:]
         * (dx * dys[None, :, None])))
-    rho_phi_inlet = rhos[0] * uf[0] * face_area
+    rho_phi_inlet = rhos[0] * uf_inlet * face_area
     return (full_u, full_v, full_w, full_p, pressure_loss, divergence_norm,
         flow_error, rho_phi_plus, rho_phi_inlet)
 
@@ -7353,6 +7347,7 @@ def _solve_extruded_projection(
                 initial_pressure=pressure0,
                 single_reduction=field_sharding is not None,
                 include_axial_line=use_axial_line_preconditioner,
+                field_sharding=field_sharding,
             )
 
         def electric_solve(rhs, initial, conductivity, mask):

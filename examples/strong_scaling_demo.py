@@ -33,6 +33,7 @@ def _run_worker(
     profile_dir: Path | None = None,
     restart_path: Path | None = None,
     env: dict[str, str] | None = None,
+    timeout_seconds: float | None = None,
 ) -> dict[str, object]:
     command = [
         python_executable,
@@ -66,8 +67,30 @@ def _run_worker(
         if not existing_pythonpath
         else f"{repo_root}:{existing_pythonpath}"
     )
-    subprocess.run(command, check=True, cwd=repo_root, env=worker_env)
+    subprocess.run(
+        command, check=True, cwd=repo_root, env=worker_env, timeout=timeout_seconds
+    )
     return json.loads(output_path.read_text())
+
+
+def _forced_cpu_environment(count: int) -> dict[str, str]:
+    """Preserve safe XLA options while selecting a bounded CPU device mesh."""
+
+    env = os.environ.copy()
+    flags = [flag for flag in shlex.split(env.get("XLA_FLAGS", ""))
+        if not flag.startswith(("--xla_force_host_platform_device_count=",
+            "--xla_cpu_multi_thread_eigen=", "intra_op_parallelism_threads="))]
+    for flag in ("--xla_cpu_multi_thread_eigen=false", "intra_op_parallelism_threads=1"):
+        if flag not in flags:
+            flags.append(flag)
+    env.update(JAX_PLATFORMS="cpu", XLA_FLAGS=" ".join(
+        (f"--xla_force_host_platform_device_count={count}", *flags)))
+    for name, value in (("JAX_ENABLE_X64", "true"),
+        ("XLA_PYTHON_CLIENT_PREALLOCATE", "false"), ("OMP_NUM_THREADS", "1"),
+        ("OPENBLAS_NUM_THREADS", "1"), ("MKL_NUM_THREADS", "1"),
+        ("NUMEXPR_NUM_THREADS", "1")):
+        env[name] = value
+    return env
 
 
 def run_local_cpu_scaling(
@@ -84,13 +107,11 @@ def run_local_cpu_scaling(
     python_executable: str,
     profile_dir: Path | None = None,
     restart_path: Path | None = None,
+    timeout_seconds: float | None = None,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
-        env = os.environ.copy()
-        env["JAX_PLATFORMS"] = "cpu"
-        env["OMP_NUM_THREADS"] = "1"
-        env["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={count}"
+        env = _forced_cpu_environment(count)
         output_path = out_dir / f"cpu_{count}.json"
         record = _run_worker(
             python_executable=python_executable,
@@ -109,6 +130,7 @@ def run_local_cpu_scaling(
             if profile_dir is not None
             else None,
             restart_path=restart_path,
+            timeout_seconds=timeout_seconds,
         )
         records.append(record)
     return records
