@@ -6,18 +6,87 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lmx.benchmarks import load_benchmark_b_spec
 from lmx.freemhd import artifact_sha256, audit_freemhd_case_against_spec, load_benchmark_a_spec
 from lmx.reference_data import default_closed_channel_reference_root
 
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
+
+_FREEMHD_SOURCE_NAMES = ("momentum", "limiter", "nvd", "vector_transform")
+
+
+def materialize_freemhd_source_snapshot(
+    source_repo: str | Path,
+    output_dir: str | Path,
+    case_id: str = "B2-fringing-square",
+    spec_root: str | Path | None = None,
+) -> dict[str, object]:
+    """Copy the exact, clean FreeMHD/OpenFOAM source bytes frozen by Benchmark B."""
+
+    repository, destination = Path(source_repo).resolve(), Path(output_dir).resolve()
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FreeMHD source snapshot {destination}")
+    reference = load_benchmark_b_spec(case_id, spec_root)["free_mhd_discretization_reference"]
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["git", "-C", str(repository), *args], capture_output=True, text=True)
+
+    top, head = git("rev-parse", "--show-toplevel"), git("rev-parse", "HEAD")
+    if top.returncode or Path(top.stdout.strip()).resolve() != repository:
+        raise ValueError("FreeMHD source repository must be its Git worktree root")
+    if head.returncode or head.stdout.strip() != reference["repository_commit"]:
+        raise ValueError("FreeMHD repository HEAD does not match the frozen commit")
+    paths: list[str] = []
+    files: dict[str, str] = {}
+    for name in _FREEMHD_SOURCE_NAMES:
+        source_key = f"{name}_source"
+        relative = reference.get(source_key)
+        pure = PurePosixPath(relative) if isinstance(relative, str) else PurePosixPath()
+        if not pure.parts or pure.is_absolute() or ".." in pure.parts or relative != pure.as_posix() or "\\" in relative:
+            raise ValueError(f"Noncanonical FreeMHD source path for {source_key}")
+        path = repository / relative
+        try:
+            path.resolve(strict=True).relative_to(repository)
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"FreeMHD source is missing or escapes its repository: {relative}") from exc
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"FreeMHD source is not a regular nonsymlink: {relative}")
+        tracked = git("ls-files", "--stage", "--error-unmatch", "--", relative)
+        if tracked.returncode or not tracked.stdout.startswith("100"):
+            raise ValueError(f"FreeMHD source is not a tracked regular file: {relative}")
+        paths.append(relative)
+        files[relative] = str(reference[f"{source_key}_sha256"])
+    if git("diff", "--quiet", "--", *paths).returncode or git("diff", "--cached", "--quiet", "--", *paths).returncode:
+        raise ValueError("Frozen FreeMHD source paths have staged or unstaged changes")
+    for relative, expected in files.items():
+        if artifact_sha256(repository / relative, "file") != expected:
+            raise ValueError(f"FreeMHD source SHA-256 does not match the frozen specification: {relative}")
+
+    manifest: dict[str, object] = {
+        "schema_version": 1,
+        "project": "FreeMHD",
+        "commit": reference["repository_commit"],
+        "openfoam_release": reference["openfoam_release"],
+        "files": dict(sorted(files.items())),
+    }
+    destination.mkdir(parents=True)
+    for relative in sorted(paths):
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(repository / relative, target)
+    (destination / "source-pin.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
 
 
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:

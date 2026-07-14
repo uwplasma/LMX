@@ -2,6 +2,7 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -336,6 +337,73 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_p
     assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (output / "lmx-benchmark-manifest.json").read_bytes()
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_freemhd_case(template, output, case_kind=case_kind)
+
+
+def _frozen_source_repo(root: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, dict, Path]:
+    repo = root / "FreeMHD"
+    repo.mkdir()
+    reference = {"openfoam_release": "v2206"}
+    for index, name in enumerate(run_freemhd_parity_suite._FREEMHD_SOURCE_NAMES):
+        source_key, relative = f"{name}_source", f"src/{name}.C"
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"source-{index}\n")
+        reference[source_key] = relative
+        reference[f"{source_key}_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    (repo / "unrelated.txt").write_text("clean\n")
+    for args in (("init", "-q"), ("config", "user.email", "test@example.com"), ("config", "user.name", "Test"), ("add", "."), ("commit", "-qm", "fixture")):
+        subprocess.run(("git", "-C", str(repo), *args), check=True)
+    reference["repository_commit"] = subprocess.check_output(
+        ("git", "-C", str(repo), "rev-parse", "HEAD"), text=True
+    ).strip()
+    spec = {"free_mhd_discretization_reference": reference}
+    monkeypatch.setattr(run_freemhd_parity_suite, "load_benchmark_b_spec", lambda case_id, spec_root=None: spec)
+    return repo, reference, repo / reference["momentum_source"]
+
+
+def test_freemhd_source_snapshot_is_deterministic_and_allows_unrelated_dirt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    repo, reference, _ = _frozen_source_repo(tmp_path, monkeypatch)
+    (repo / "unrelated.txt").write_text("dirty but out of scope\n")
+    first, second = tmp_path / "first", tmp_path / "second"
+
+    manifest = run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, first)
+    assert manifest == json.loads((first / "source-pin.json").read_text())
+    assert manifest == run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, second)
+    assert artifact_sha256(first, "tree") == artifact_sha256(second, "tree")
+    assert len([path for path in first.rglob("*") if path.is_file()]) == 5
+    assert set(manifest) == {"schema_version", "project", "commit", "openfoam_release", "files"}
+    assert manifest["commit"] == reference["repository_commit"]
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, first)
+
+
+@pytest.mark.parametrize("hazard", ["head", "unstaged", "staged", "hash", "missing", "symlink", "noncanonical"])
+def test_freemhd_source_snapshot_rejects_unfrozen_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hazard: str
+):
+    repo, reference, path = _frozen_source_repo(tmp_path, monkeypatch)
+    source_key, relative = "momentum_source", reference["momentum_source"]
+    if hazard == "head":
+        (repo / "new.txt").write_text("new commit\n")
+        subprocess.run(("git", "-C", str(repo), "add", "new.txt"), check=True)
+        subprocess.run(("git", "-C", str(repo), "commit", "-qm", "advance"), check=True)
+    elif hazard in {"unstaged", "staged"}:
+        path.write_text("changed\n")
+        if hazard == "staged":
+            subprocess.run(("git", "-C", str(repo), "add", relative), check=True)
+    elif hazard == "hash":
+        reference[f"{source_key}_sha256"] = "0" * 64
+    elif hazard == "missing":
+        path.unlink()
+    elif hazard == "symlink":
+        path.unlink()
+        path.symlink_to(repo / "unrelated.txt")
+    else:
+        reference[source_key] = f"../{relative}"
+    with pytest.raises(ValueError):
+        run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, tmp_path / "snapshot")
 
 
 def test_parity_command_materializes_without_running_suite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
