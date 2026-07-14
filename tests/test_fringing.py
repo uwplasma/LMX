@@ -25,7 +25,6 @@ from lmx.fringing import (
     _gradient_3d,
     _gauge_invariant_scalar_update,
     _laplacian_3d,
-    _masked_laplacian_duct,
     _normalized_pressure_observable_update,
     _sample_volume_field,
     _pipe_poisson_jacobi_3d,
@@ -593,10 +592,27 @@ def test_implicit_duct_diffusion_reconstructs_manufactured_field_and_gradient():
     shape = (4, 4, 3)
     manufactured = jnp.arange(np.prod(shape), dtype=float).reshape(shape) / 100.0
     viscosity = jnp.full(shape, 0.07)
-    mask = jnp.ones(shape, dtype=bool)
     dt = 0.03
-    laplacian = _masked_laplacian_duct(manufactured, mask, dx=0.4, dy=dy, dz=dz)
-    rhs = manufactured - dt * viscosity * laplacian
+    coefficients = fringing_impl._variable_diffusion_coefficients_3d(
+        viscosity, dx=0.4, dy=dy, dz=dz
+    )
+    neighbours = fringing_impl._neighbor_fields(
+        manufactured, mode_x="neumann", mode_y="neumann", mode_z="neumann"
+    )
+    wall_sink = (
+        jnp.zeros(shape).at[:, 0, :].add(viscosity[:, 0, :] / (0.5 * dy[0] ** 2))
+    )
+    wall_sink = wall_sink.at[:, -1, :].add(viscosity[:, -1, :] / (0.5 * dy[-1] ** 2))
+    wall_sink = wall_sink.at[:, :, 0].add(viscosity[:, :, 0] / (0.5 * dz[0] ** 2))
+    wall_sink = wall_sink.at[:, :, -1].add(viscosity[:, :, -1] / (0.5 * dz[-1] ** 2))
+    diffusion = (
+        sum(
+            c * (n - manufactured)
+            for c, n in zip(coefficients, neighbours, strict=True)
+        )
+        - wall_sink * manufactured
+    )
+    rhs = manufactured - dt * diffusion
     solved, residual, converged = _solvax_implicit_diffusion_duct(
         rhs,
         viscosity,
@@ -691,14 +707,131 @@ def test_nonuniform_conservative_current_uses_face_center_distances():
     assert divergence[:, 1:-1, 1:-1] == pytest.approx(0.0, abs=1.0e-12)
 
 
-def test_masked_diffusion_places_no_slip_at_fluid_solid_face():
-    field = jnp.ones((3, 6, 6))
-    mask = jnp.zeros_like(field, dtype=bool).at[:, 1:5, 1:5].set(True)
-    widths = jnp.asarray([0.2, 0.3, 0.4, 0.35, 0.25, 0.2])
-    laplacian = _masked_laplacian_duct(field, mask, dx=0.5, dy=widths, dz=widths)
-    assert jnp.allclose(jnp.where(mask, 0.0, laplacian), 0.0)
-    assert float(jnp.max(laplacian[:, 2:4, 2:4])) == pytest.approx(0.0)
-    assert float(jnp.min(laplacian[:, 1:5, 1:5])) < 0.0
+def test_limited_linear_vector_convection_matches_manufactured_conservation_and_autodiff():
+    nx, ny, nz = 7, 7, 3
+    dx = jnp.asarray([0.18, 0.24, 0.21, 0.29, 0.23, 0.31, 0.26])
+    dy = jnp.asarray([0.22, 0.17, 0.28, 0.19, 0.26, 0.21, 0.3])
+    dz, rho = jnp.asarray([0.27, 0.34, 0.25]), 1.7
+    x_faces = -0.3 + jnp.concatenate((jnp.zeros(1), jnp.cumsum(dx)))
+    y_faces = 1.0 + jnp.concatenate((jnp.zeros(1), jnp.cumsum(dy)))
+    x, y = 0.5 * (x_faces[:-1] + x_faces[1:]), 0.5 * (y_faces[:-1] + y_faces[1:])
+    xx = jnp.broadcast_to(x[:, None, None], (nx, ny, nz))
+    yy = jnp.broadcast_to(y[None, :, None], (nx, ny, nz))
+    velocity = jnp.stack((yy, xx, jnp.zeros_like(xx)), axis=-1)
+    x_wall = jnp.broadcast_to(x[:, None], (nx, ny))
+    y_wall = jnp.broadcast_to(y[None, :], (nx, ny))
+    west_y = jnp.broadcast_to(y[:, None], (ny, nz))
+    south_x = jnp.broadcast_to(x[:, None], (nx, nz))
+    boundary_velocity = (
+        jnp.stack(
+            (west_y, jnp.full_like(west_y, x_faces[0]), jnp.zeros_like(west_y)), -1
+        ),
+        jnp.stack(
+            (west_y, jnp.full_like(west_y, x_faces[-1]), jnp.zeros_like(west_y)), -1
+        ),
+        jnp.stack(
+            (jnp.full_like(south_x, y_faces[0]), south_x, jnp.zeros_like(south_x)), -1
+        ),
+        jnp.stack(
+            (jnp.full_like(south_x, y_faces[-1]), south_x, jnp.zeros_like(south_x)), -1
+        ),
+        jnp.stack((y_wall, x_wall, jnp.zeros_like(x_wall)), -1),
+        jnp.stack((y_wall, x_wall, jnp.zeros_like(x_wall)), -1),
+    )
+    rho_phi = (
+        jnp.broadcast_to(
+            rho * yy[:1] * dy[None, :, None] * dz[None, None, :],
+            (nx + 1, ny, nz),
+        ),
+        jnp.broadcast_to(
+            rho * x[:, None, None] * dx[:, None, None] * dz[None, None, :],
+            (nx, ny + 1, nz),
+        ),
+        jnp.zeros((nx, ny, nz + 1)),
+    )
+    q = jnp.sum(velocity**2, axis=-1)
+    q_patches = tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity)
+    least_squares = fringing_impl._cell_limited_least_squares_gradient_duct
+    gradients = least_squares(q, q_patches, (dx, dy, dz))
+    j, k = 3, 1
+
+    def x_ls_reference(values, patches, i):
+        lo = patches[0][j, k] if i == 0 else values[i - 1, j, k]
+        hi = values[i + 1, j, k]
+        lo_distance = 0.5 * dx[i] if i == 0 else 0.5 * (dx[i - 1] + dx[i])
+        hi_distance = 0.5 * (dx[i] + dx[i + 1])
+        lo_weight = 1.0 if i == 0 else dx[i] / (dx[i - 1] + dx[i])
+        hi_weight = dx[i] / (dx[i] + dx[i + 1])
+        return (
+            lo_weight * (values[i, j, k] - lo) / lo_distance
+            + hi_weight * (hi - values[i, j, k]) / hi_distance
+        ) / (lo_weight + hi_weight)
+
+    assert gradients[0][4, j, k] == pytest.approx(x_ls_reference(q, q_patches, 4))
+    assert gradients[0][0, j, k] == pytest.approx(x_ls_reference(q, q_patches, 0))
+
+    spike = jnp.broadcast_to(
+        jnp.asarray([0.0, 1.0e-15, 0.0, 0.0, 0.0, 0.0, 0.0])[:, None, None],
+        (nx, ny, nz),
+    )
+    zero_q = tuple(jnp.zeros(value.shape[:-1]) for value in boundary_velocity)
+    spike_gradient = least_squares(spike, zero_q, (dx, dy, dz))[0][1, j, k]
+    assert spike_gradient == pytest.approx(
+        x_ls_reference(spike, zero_q, 1), abs=1.0e-30
+    )
+
+    def convection(scale):
+        state = scale * velocity
+        flux = tuple(scale * values for values in rho_phi)
+        patches = tuple(scale * values for values in boundary_velocity)
+        weights = fringing_impl._limited_linear_vector_face_weights_duct(
+            state, flux, patches, (dx, dy, dz)
+        )
+        return fringing_impl._limited_linear_convection_matrix_action_duct(
+            state, flux, weights, patches, (dx, dy, dz)
+        ), weights
+
+    action, weights = convection(1.0)
+    expected = rho * jnp.stack((xx, yy, jnp.zeros_like(xx)), axis=-1)
+    assert action[4:-1, 2:-2] == pytest.approx(expected[4:-1, 2:-2], abs=2.0e-5)
+    assert weights[0][3:6, 2:-2] == pytest.approx(
+        jnp.broadcast_to((dx[1:] / (dx[:-1] + dx[1:]))[3:6, None, None], (3, 3, nz))
+    )
+    assert weights[1][4:-1, 1:5] == pytest.approx(
+        jnp.broadcast_to((dy[1:] / (dy[:-1] + dy[1:]))[None, 1:5, None], (2, 4, nz))
+    )
+    assert all(
+        bool(jnp.all((face_weight >= 0.0) & (face_weight <= 1.0)))
+        for face_weight in weights
+    )
+    assert weights[0][1] == pytest.approx(1.0)
+    assert weights[2] == pytest.approx(1.0)
+
+    volume = dx[:, None, None] * dy[None, :, None] * dz[None, None, :]
+    boundary_flux = (
+        jnp.sum(rho_phi[0][-1, ..., None] * boundary_velocity[1], axis=(0, 1))
+        - jnp.sum(rho_phi[0][0, ..., None] * boundary_velocity[0], axis=(0, 1))
+        + jnp.sum(rho_phi[1][:, -1, :, None] * boundary_velocity[3], axis=(0, 1))
+        - jnp.sum(rho_phi[1][:, 0, :, None] * boundary_velocity[2], axis=(0, 1))
+    )
+    assert jnp.sum(action * volume[..., None], axis=(0, 1, 2)) == pytest.approx(
+        boundary_flux, abs=2.0e-5
+    )
+    zero_patches = tuple(jnp.zeros_like(value) for value in boundary_velocity)
+    assert fringing_impl._limited_linear_convection_matrix_action_duct(
+        jnp.zeros_like(velocity), rho_phi, weights, zero_patches, (dx, dy, dz)
+    ) == pytest.approx(0.0)
+    scaled, scaled_weights = convection(2.0)
+    assert scaled == pytest.approx(4.0 * action, abs=2.0e-5)
+    assert all(jnp.allclose(a, b) for a, b in zip(weights, scaled_weights, strict=True))
+    compiled = jax.jit(lambda scale: convection(scale)[0])(jnp.asarray(1.0))
+    tangent = jax.jvp(
+        lambda scale: convection(scale)[0],
+        (jnp.asarray(1.0),),
+        (jnp.asarray(1.0),),
+    )[1]
+    assert compiled == pytest.approx(action, abs=2.0e-5)
+    assert tangent == pytest.approx(2.0 * action, abs=3.0e-5)
 
 
 def test_nonuniform_face_flux_projection_closes_discrete_divergence():
@@ -907,10 +1040,10 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
         )
         return jnp.mean(field**2)
 
-    direct_value, direct_gradient = jax.value_and_grad(direct_objective)(jnp.asarray(1.0))
-    assert direct_gradient == pytest.approx(
-        -2.0 * direct_value, rel=1.0e-6, abs=1.0e-8
+    direct_value, direct_gradient = jax.value_and_grad(direct_objective)(
+        jnp.asarray(1.0)
     )
+    assert direct_gradient == pytest.approx(-2.0 * direct_value, rel=1.0e-6, abs=1.0e-8)
 
     def objective(scale):
         field, _, _, _, _, _, _ = _solvax_pressure_poisson_pipe(
@@ -952,7 +1085,10 @@ def test_periodic_line_preconditioner_matches_variable_coefficient_dense_solve()
     assert solved[0, 0] == pytest.approx(
         jnp.linalg.solve(dense, rhs[0, 0]), abs=1.0e-12
     )
-    objective = lambda scale: jnp.sum(solve(scale * rhs) ** 2)
+
+    def objective(scale):
+        return jnp.sum(solve(scale * rhs) ** 2)
+
     value, gradient = jax.value_and_grad(objective)(jnp.asarray(1.0))
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
 
@@ -1220,9 +1356,7 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
         trial = jnp.arange(nx * (3 * nr - 1), dtype=float).reshape(nx, 3 * nr - 1)
         assert fringing_impl._solve_pipe_retained_modal_factors(
             retained, trial
-        ) == pytest.approx(
-            block_thomas_solve(probed, trial), rel=1.0e-10, abs=1.0e-10
-        )
+        ) == pytest.approx(block_thomas_solve(probed, trial), rel=1.0e-10, abs=1.0e-10)
 
 
 def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():
