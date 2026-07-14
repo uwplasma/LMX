@@ -68,7 +68,21 @@
     "effective_completed_steps": 112,
     "observed_residual": 6.504858564232441e-05,
     "target_residual": 5e-05,
-    "stop_reason": "checkpointed after 706.55 continuation seconds because the observed plateau projected several more GPU-hours; optimize the accepted solver before resuming"
+    "stop_reason": "checkpointed after 706.55 continuation seconds because the observed plateau projected several more GPU-hours; optimize the accepted solver before resuming",
+    "bounded_optimization_probe": {
+      "commit": "30a91bb",
+      "source_fingerprint": "687a8668fc50e9c39ed365db710c364ed2a8e6bb826ece4853a45085c6d61f19",
+      "actual_spatial_shards": 2,
+      "steps": 8,
+      "elapsed_seconds": 359.005844617961,
+      "initial_residual": 6.504858564210236e-05,
+      "final_residual": 6.451081317848661e-05,
+      "electric_iterations_per_step": 1200,
+      "conclusion": "the fine grid still requires both PCG stages and resumes its slow asymptotic rate after one transient Aitken update",
+      "restart_bytes": 260135219,
+      "restart_sha256": "81aad950ffb8be85c19b1c78786716a7aad7faf93eb9ab1b874830943c7315c1",
+      "restart_url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-fine-30a91bb-8step-checkpoint.npz"
+    }
   },
   "independence": {
     "iteration_delta_uncertainty_fraction": 0.0004253278085451437,

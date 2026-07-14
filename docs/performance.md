@@ -32,10 +32,12 @@ The source-identical baseline, doubled-iteration, and confirmation-wall runs
 then passed in 57.64, 34.94, and 57.10 seconds. Their tolerance and iteration
 deltas are below `5.79e-4` of the frozen uncertainty; this closes medium-grid
 numerical independence, not the experimental or three-mesh acceptance gate.
-The fine-grid baseline remains outside acceptance at residual `6.505e-5` after
-112 effective updates. Its atomic two-GPU checkpoint is preserved, but the
-continuation was stopped because the measured plateau projected several more
-GPU-hours; profiling and solver optimization now precede another fine run.
+The fine-grid baseline remains outside acceptance. An exact eight-update probe
+from the 112-update checkpoint reached residual `6.451e-5` in 359.01 seconds,
+but every electric solve still used both 600-iteration PCG stages and the
+initial Aitken jump returned to the slow asymptotic rate. The resulting 248 MiB
+checkpoint is a checksummed release asset; a stronger fine-grid preconditioner,
+not more brute-force updates, precedes another acceptance run.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states

@@ -173,9 +173,11 @@ for external research use.
   required 7,720.92 seconds across two restart-safe segments; the three final
   confirmation runs took 57.64, 34.94, and 57.10 seconds from that restart.
   The fine continuation was checkpointed after 112 effective updates at
-  residual `6.505e-5`; its plateau projected several more GPU-hours, so the
-  next tranche optimizes the accepted solver before resuming. Experimental
-  acceptance remains open.
+  residual `6.505e-5`. An exact eight-update two-GPU probe reached `6.451e-5`
+  in 359.01 seconds but still used 1,200 electric iterations per update and
+  returned to the slow asymptotic rate. Its 248 MiB checkpoint is a checksummed
+  release asset; the next tranche improves the fine-grid preconditioner before
+  resuming. Experimental acceptance remains open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.
