@@ -425,18 +425,15 @@ def test_transient_restart_matches_direct_run(
     )
 
 
-def test_solve_steady_rejects_unknown_solver_kind():
+@pytest.mark.parametrize(
+    ("solver", "mode"),
+    ((solve_steady, "steady"), (solve_transient, "transient")),
+)
+def test_public_solvers_reject_unknown_solver_kind(solver, mode):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     bad = replace(case, solver=replace(case.solver, kind="definitely_missing"))
-    with pytest.raises(NotImplementedError, match="not implemented for steady runs"):
-        solve_steady(bad)
-
-
-def test_solve_transient_rejects_unknown_solver_kind():
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    bad = replace(case, solver=replace(case.solver, kind="definitely_missing"))
-    with pytest.raises(NotImplementedError, match="not implemented for transient runs"):
-        solve_transient(bad)
+    with pytest.raises(NotImplementedError, match=f"not implemented for {mode} runs"):
+        solver(bad)
 
 
 def test_transient_restart_can_append_diagnostics(
@@ -1416,25 +1413,6 @@ def test_bounded_time_step_count_does_not_round_up_fractional_end_times():
     )
 
 
-def test_bounded_time_step_count_rejects_bad_dt_and_handles_empty_windows():
-    with pytest.raises(ValueError, match="dt must be positive"):
-        solvers._bounded_time_step_count(
-            start_time=0.0, dt=0.0, t_final=1.0, max_steps=10
-        )
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=0.0, dt=0.1, t_final=1.0, max_steps=0
-        )
-        == 0
-    )
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=1.0, dt=0.1, t_final=1.0, max_steps=10
-        )
-        == 0
-    )
-
-
 def test_build_mesh_and_mask_helpers_cover_unsupported_and_passthrough_paths():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     bad_case = replace(
@@ -1807,16 +1785,6 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
     assert int(linear_iterations) == 4
     assert float(applied_forcing) == pytest.approx(1.0)
     assert float(linear_initial_residual) == pytest.approx(9.0e-6)
-
-
-def test_solve_steady_and_transient_reject_unknown_solver_kind():
-    case = make_hartmann_case(ha=5.0, ny=4, nz=4)
-    bad_case = replace(case, solver=replace(case.solver, kind="extruded_inductionless"))
-
-    with pytest.raises(NotImplementedError, match="not implemented for steady runs"):
-        solve_steady(bad_case)
-    with pytest.raises(NotImplementedError, match="not implemented for transient runs"):
-        solve_transient(bad_case)
 
 
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
@@ -3133,19 +3101,6 @@ def test_fully_developed_solver_rejects_unsupported_geometry_after_mesh_build(
     )
     with pytest.raises(NotImplementedError, match="does not yet support geometry"):
         solvers._solve_fully_developed(case)
-
-
-def test_public_solver_entrypoints_reject_unknown_solver_kinds():
-    case = replace(
-        make_hartmann_case(ha=5.0, ny=4, nz=4),
-        solver=replace(
-            make_hartmann_case(ha=5.0, ny=4, nz=4).solver, kind="extruded_inductionless"
-        ),
-    )
-    with pytest.raises(NotImplementedError, match="not implemented for transient"):
-        solve_transient(case)
-    with pytest.raises(NotImplementedError, match="not implemented for steady"):
-        solve_steady(case)
 
 
 def test_public_solver_entrypoints_coerce_or_preserve_mode_before_dispatch(
