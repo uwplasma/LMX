@@ -23,7 +23,7 @@ jobs:
           OPENBLAS_NUM_THREADS: "1"
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
-        run: python scripts/run_benchmark_suite.py --output artifacts/benchmarks/benchmark.json --repeats 2
+        run: python -m lmx benchmark --output artifacts/benchmarks/benchmark.json --repeats 2
 
       - name: Build benchmark summary
         run: |
