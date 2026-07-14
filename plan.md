@@ -67,19 +67,19 @@ superseded worktrees and branches.
 
 | Area | Status | Next acceptance gate |
 |---|---|---|
-| README/docs | 709-word feature-led README, sourced comparison table, feature-specific compressed media | refresh only from accepted records |
+| README/docs | 567-word feature-led README, conservatively sourced comparison table, feature-specific docs, and a 7-second Hunt loop; tracked media is 387,683 bytes | refresh canonical B2/scaling panels only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
 | Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish canonical B2, then independent input observers and the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | the mixed inlet-flow/outlet-pressure projection passes manufactured and reduced-path gates; old fine-grid and GPU results remain diagnostic for the superseded formulation | implement exact implicit inertia |
-| SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition; main `40fc7a9` adds differentiable nonsymmetric-solve diagnostics and separate transpose solvers | release that backward-compatible API, then replace—not duplicate—the B2 diffusion stack |
-| Portable quality | accepted at `b763b84`: 784 pass, 8 expected skips, 95.28% branch coverage, 149.9 s | restore the live step-5 tree below every architecture cap, then stay below the 300 s target and 600 s limit |
+| SOLVAX | release-preparation commit `255d280` is green as version 0.8.4 and includes differentiable nonsymmetric-solve diagnostics and separate transpose solvers | tag/publish/install-verify 0.8.4, then replace—not duplicate—the B2 diffusion stack |
+| Portable quality | accepted at `b763b84`: 784 pass, 8 expected skips, 95.28% branch coverage, 149.9 s | run the next full gate after the B2 replacement tranche; stay below the 300 s target and 600 s limit |
 
-Accepted structural audit at `b763b84`: 35 modules, 34,987 package lines,
-8,027 maintained-core lines, 32 test files / 21,165 lines, and 18 maintenance
-scripts. In-progress metrics are not status evidence; every tranche must return
-below the enforced live caps before commit.
+Current structural audit at `f7b66c9`: 35 modules, 35,000 package lines, 8,027
+maintained-core lines, 32 test files / 21,299 lines, and 18 maintenance scripts.
+In-progress metrics are not status evidence; every tranche must return below
+the enforced live caps before commit.
 
 The final audit freezes these interpretations:
 
@@ -117,25 +117,26 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    problem: inlet pressure Neumann, outlet pressure Dirichlet at the half-cell
    face, one inlet flow constraint, no compatibility or gauge projection. The
    reduced `7x7x7` caller and restart gate also pass.
-5. Implement the exact v2206 limited-linear face weights and conservative
-   matrix action on a `7x7x3` nonuniform manufactured problem. Include explicit
-   patch-face values in the orthogonal least-squares gradient and cell limiter;
-   preserve the exact guarded NVD sign/upwind rules; keep corrected face fluxes
-   fused/internal; and prove conservation, scaling, JIT, and JVP.
-6. **Upstream implementation complete:** SOLVAX main `40fc7a9` exposes
+5. **Complete at `cb115ab`:** implement the exact v2206 limited-linear face
+   weights and conservative matrix action on a `7x7x3` nonuniform manufactured
+   problem. Include explicit patch-face values in the orthogonal least-squares
+   gradient and cell limiter; preserve the exact guarded NVD sign/upwind rules;
+   keep corrected face fluxes fused/internal; and prove conservation, scaling,
+   JIT, and JVP.
+6. **Release preparation complete at SOLVAX `255d280`:** SOLVAX 0.8.4 exposes
    `has_aux` and a distinct transpose solver through `linear_solve`; its full
-   gate is 263 passes in 60 seconds at 98.88% coverage. Prepare, tag, publish,
-   and independently install-verify SOLVAX 0.8.4 on Python 3.10 and 3.13 before
-   LMX consumes this API; then change the LMX lower bound and minimum CI lane
-   together while retaining an unpinned newest-compatible lane. Never exact-pin
-   ordinary installations.
-7. Apply the cheap user-surface/tooling correction from existing records only:
-   narrow the README differentiation and multi-GPU claims, keep the comparison
-   table restricted to stock documented capability, make a 6–8-second web loop
-   from the existing Hunt movie, embed existing release-hosted visuals in their
-   feature docs, synchronize architecture metrics, and set the full-test warning
-   target to 300 seconds. Run only direct repository/docs/media gates, then
-   commit and push; do not rerun a solver.
+   gate is 263 passes in 68 seconds at 98.88% coverage, and hosted tests/docs
+   are green. Tag, publish, and independently install-verify SOLVAX 0.8.4 on
+   Python 3.10 and 3.13 before LMX consumes this API; then change the LMX lower
+   bound and minimum CI lane together while retaining an unpinned
+   newest-compatible lane. Never exact-pin ordinary installations.
+7. **Complete at `f7b66c9`:** apply the cheap user-surface/tooling correction
+   from existing records only: narrow the README differentiation and multi-GPU
+   claims, keep the comparison table restricted to stock documented capability,
+   make a 6–8-second web loop from the existing Hunt movie, embed existing
+   release-hosted visuals in their feature docs, synchronize architecture
+   metrics, and set the full-test warning target to 300 seconds. Run only direct
+   repository/docs/media gates, then commit and push; do not rerun a solver.
 8. Replace `_solvax_implicit_diffusion_duct` and the nested per-component B2
    diffusion closures with one stacked nonsymmetric momentum operator. Combine
    frozen convection weights with diffusion, use flattened SOLVAX flexible
@@ -337,9 +338,9 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | 34 only after a complete owner disappears |
-| package lines | 34,987 | 34,840–34,864 after the B2 replacement tranche |
+| package lines | 35,000 | 34,840–34,864 after the B2 replacement tranche |
 | maintained-core lines | 8,027 | below 7,900 |
-| test files / lines | 32 / 21,165 | 31 / below 20,900 after generic evidence replaces the dedicated SOLVAX freezer tests |
+| test files / lines | 32 / 21,299 | 31 / below 20,900 after generic evidence replaces the dedicated SOLVAX freezer tests |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or
@@ -372,8 +373,8 @@ Each major feature gets a relevant plot or movie—not a generic media gallery.
 First correct claim scope and place the existing visuals in their feature docs;
 do not wait for new campaigns. Generate later presentation assets from compact
 accepted records without rerunning solvers. Aim for readable 6–8-second loops,
-compact posters, stills below
-100 KiB, and tracked movies below 150 KiB where practical. Keep tracked media
+compact posters, stills below 100 KiB, and tracked movies below 150 KiB where
+practical. Keep tracked media
 below 1 MiB total; host source frames, full-quality movies, and large outputs in
 checksummed releases. Put provenance and acceptance status beside each asset.
 
