@@ -74,7 +74,7 @@ superseded worktrees and branches.
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | old fine-grid and two-GPU results are diagnostic for the superseded no-inertia, stationwise-flow formulation | implement canonical inertia and axial boundaries |
 | SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition | pursue only gated ownership deletions |
-| Portable quality | last fully green gate: 770 pass, 8 expected skips, 95.35% branch coverage, 160.3 s | record a post-contract green gate under 300 s |
+| Portable quality | 770 pass, 8 expected skips, 95.35% branch coverage, 171.1 s | stay below the 300 s target and 600 s limit |
 
 Current structural audit: 35 modules, 34,963 package lines, 7,969
 maintained-core lines, 32 test files / 21,177 lines, and 18 maintenance
@@ -88,8 +88,8 @@ The final audit freezes these interpretations:
 - The previous B2 convergence and 1.66x two-GPU measurements do not validate or
   scale the new canonical path.
 - FreeMHD uses conservative `div(rhoPhi,U)` inertia, Euler time integration,
-  `Gauss limitedLinear 1.0`, inlet integral flow, outlet pressure gauge, and
-  zero-normal-current axial electric conditions in the matched reduction.
+  `Gauss limitedLinear 1.0`, inlet integral flow, and an outlet pressure gauge;
+  the matched reduction also requires zero normal current at both axial ends.
 - No medium or production FreeMHD run is authorized until a tiny exact smoke
   proves those semantics in both codes.
 
@@ -99,8 +99,8 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 
 ## Immediate execution order
 
-1. Regenerate provenance for the canonical-contract tranche, run one complete
-   portable gate, record the result, commit, and push.
+1. **Complete:** regenerate provenance for the canonical-contract tranche and
+   pass the complete portable gate (770 pass, 8 skip, 95.35%, 171.1 s).
 2. Make `harness-smoke` physics-valid but permanently production-ineligible.
    Separate shared physics semantics from role-specific mesh/stopping settings,
    derive observed LMX and FreeMHD contracts independently, and recompute every

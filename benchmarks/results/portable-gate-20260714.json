@@ -1,6 +1,6 @@
 {
   "date": "2026-07-14",
-  "commit": "230be9c3522cc68bab2fd6d43ac9c71b71552359",
+  "commit": "ce8e27d53ba8b6d48d69b7a2b7f24bcfa9e4e7ca",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -19,26 +19,26 @@
   },
   "result": {
     "test_files": 32,
-    "test_lines": 21249,
+    "test_lines": 21177,
     "passed": 770,
     "skipped": 8,
-    "pytest_seconds": 158.10,
-    "gate_seconds": 160.3,
+    "pytest_seconds": 168.79,
+    "gate_seconds": 171.1,
     "branch_coverage_percent": 95.35,
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 182.3,
-    "wall_time_reduction_percent": 12.07,
-    "budget_fraction": 0.267,
-    "engineering_target_fraction": 0.534
+    "previous_gate_seconds": 160.3,
+    "wall_time_reduction_percent": -6.74,
+    "budget_fraction": 0.285,
+    "engineering_target_fraction": 0.570
   },
   "architecture": {
     "package_modules": 35,
-    "package_lines": 34991,
-    "maintained_core_lines": 8010,
+    "package_lines": 34963,
+    "maintained_core_lines": 7969,
     "maintenance_scripts": 18,
-    "tracked_checkout_bytes": 3440679,
+    "tracked_checkout_bytes": 3445791,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

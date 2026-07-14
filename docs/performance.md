@@ -8,19 +8,20 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 770 pass, 8 skip, 95.35% branch coverage, 160.3 s | below the ten-minute budget |
+| portable test gate | Apple M4, six workers | 770 pass, 8 skip, 95.35% branch coverage, 171.1 s | below the five-minute target |
 | SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | timing refresh remains open |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
-| B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
+| B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
 | B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | tolerance, iteration, wall, steady, and conservation gates pass |
 | B2 fine campaign | 2 x RTX A4000, `202 x 149 x 149` | baseline 457.37 s; iteration and wall confirmations 65.23/62.10 s | three gates pass; tight-tolerance independence remains open |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-The B2 result passes the two-device target and exact observable-equivalence
-gate. A general or four-device scaling claim remains open. The B1 timings do
-not promote its experimental physics result.
+The B2 result passes its historical two-device observable-equivalence gate, but
+the measured path omits canonical inertia and uses stationwise flow forcing.
+It therefore does not establish scaling for the matched formulation. The B1
+timings do not promote its experimental physics result.
 
 The accepted compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate

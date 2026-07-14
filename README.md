@@ -95,8 +95,9 @@ volume fields, and tabulated fields share one inductionless solver surface.
 
 ![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-The B2 diagnostics pass conservation, restart, and two-GPU parity checks;
-experimental and exact matched-FreeMHD acceptance remain open.
+The displayed B2 diagnostics pass conservation, restart, and two-GPU parity
+for the earlier stationwise/no-inertia formulation. Canonical finite-inertia
+and exact matched-FreeMHD acceptance remain open.
 [Fringing-field status →](docs/fringing.md)
 
 ## Differentiate the solver
@@ -123,10 +124,10 @@ visuals demonstrate implemented diagnostics and geometry, not validation claims.
 
 ## Scale on CPUs and GPUs
 
-The B2 numerical checkpoint scales from 36.96 s on one RTX A4000 to 22.23 s on
-two: **1.66× speedup at 83.1% efficiency**, with equivalent observables. A
-fine-grid fast-diagonalization update separately reduces matched electric-solve
-time **1.87×**. Broader multi-device scaling remains open.
+The earlier B2 numerical checkpoint scales from 36.96 s on one RTX A4000 to
+22.23 s on two: **1.66× speedup at 83.1% efficiency**, with equivalent
+observables. This is diagnostic for the superseded formulation; strong scaling
+of the canonical finite-inertia path remains open.
 
 ![LMX GPU strong scaling](docs/_static/strong_scaling.webp)
 
@@ -135,7 +136,7 @@ time **1.87×**. Broader multi-device scaling remains open.
 ## Quality, documentation, and citation
 
 The portable gate currently passes **770 tests**, **95.35% branch coverage**,
-and a **160.3 s** wall time on six Apple-Silicon workers. Physics and external
+and a **171.1 s** wall time on six Apple-Silicon workers. Physics and external
 campaigns add analytical, conservation, convergence, FreeMHD, and experimental
 evidence outside that fast gate.
 

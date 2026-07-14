@@ -16,18 +16,19 @@ are authoritative when prose and results differ.
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 770 tests with 8 expected external-data
-  skips and 95.35% branch coverage in 160.3 seconds on the reference Mac.
+  skips and 95.35% branch coverage in 171.1 seconds on the reference Mac.
 
 ## Research-stage
 
 - ALEX B1 conducting-pipe fringing flow: conservation, restart, and bounded
   large-grid pressure convergence pass; experimental pressure agreement and
   the final mesh/observable acceptance record remain open.
-- ALEX B2 square-duct fringing flow: conservation, two-GPU numerical
-  equivalence, the 1.87x fine-checkpoint solver promotion, and fine baseline,
-  doubled-iteration, and wall gates pass; tight-tolerance independence and
-  experimental validation remain open, and the current fine pressure curve
-  misses every frozen ALEX literature-error limit. A checksummed
+- ALEX B2 square-duct fringing flow: the earlier no-inertia, stationwise-flow
+  formulation has conservation, two-GPU numerical equivalence, a 1.87x
+  fine-checkpoint solver promotion, and fine numerical gates. These are
+  diagnostics, not validation of the canonical finite-inertia formulation,
+  whose implementation and exact FreeMHD smoke remain open. The fine pressure
+  curve misses every frozen ALEX literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from
   15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not
   validation evidence; exact matched-field FreeMHD and three-mesh gates remain
