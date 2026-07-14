@@ -176,14 +176,16 @@ the current host has only two GPUs.
 The axisymmetric `101 x 64 x 128` ALEX B1 pipe path now uses an exact batched
 FFT line in periodic `theta`: its checkpointed 133-update campaign completes in
 `2860.11 s` on one A4000, below the one-hour cap and `4.30x` faster than the
-previous rate projection. This accepts the runtime optimization, not the B1
-physics result; the terminal steady and divergence gates still require a more
-stable outer fixed-point policy.
+previous rate projection. This accepts the runtime optimization, not the full
+ALEX B1 result: the three-mesh literature and matched-FreeMHD gates remain open.
 The compatible B1 pressure solver now screens one 24-step GMRES cycle against
 the actual divergence and fixed-flow tolerance, retaining the original tight
 fallback when needed. On the `21 x 24 x 64` solve-plus-restart gate this reduced
 pressure work from a four-projection ceiling of 768 iterations to 669 while all
 physical residuals passed; experimental pressure agreement remains open.
+The same checkpointed runner now combines source-identical coarse, medium, and
+fine campaigns with checksummed exact-case FreeMHD evidence; no notebook or
+large field file is needed to make the final machine-readable decision.
 For independent validation variants, run one process per GPU with explicit
 `CUDA_VISIBLE_DEVICES`; for a single B2 solve, use its `num_devices` setting for
 named axial sharding. Disable default JAX memory preallocation when processes

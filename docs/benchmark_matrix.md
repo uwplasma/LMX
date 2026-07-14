@@ -76,6 +76,24 @@ accepted compatible retained-modal pressure solver; experimental-observable,
 mesh-ladder, and final steady-response acceptance remain open. This is not yet
 a claim that the experimental pressure curve has passed.
 
+After all three source-identical mesh campaigns finish, assemble (without
+rerunning) their literature, independence, refinement, and exact-case FreeMHD
+gates with the existing runner:
+
+```bash
+python scripts/run_benchmark_b_independence.py \
+  --acceptance-mesh coarse=artifacts/b-coarse \
+  --acceptance-mesh medium=artifacts/b-medium \
+  --acceptance-mesh fine=artifacts/b-fine \
+  --freemhd-record B1-fringing-pipe=/release-assets/b1-freemhd.json \
+  --freemhd-record B2-fringing-square=/release-assets/b2-freemhd.json
+```
+
+The compact `benchmark-b-acceptance.json` output reports uncertainty-weighted
+RMS and maximum error, integrated-pressure error, successive mesh changes, all
+solver/wall independence gates, and external-evidence checksums. Full fields
+and restart bundles remain release assets rather than Git content.
+
 ## Required gates
 
 Every promoted physics benchmark must define:

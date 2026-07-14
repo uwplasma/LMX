@@ -273,6 +273,60 @@ def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
         campaign._parse_variant_restarts(["unknown=/tmp/x.npz"])
 
 
+def test_acceptance_assembly_reuses_three_campaigns_without_solver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    case_id = "B1-fringing-pipe"
+    arguments = ["--output", str(tmp_path / "accepted"), "--cases", case_id]
+    for level in campaign.MESH_LEVELS:
+        directory = tmp_path / level
+        runs = directory / "runs"
+        runs.mkdir(parents=True)
+        (directory / "benchmark-b-independence.json").write_text(
+            json.dumps(
+                {
+                    "mesh_level": level,
+                    "source_fingerprint": "source",
+                    "cases": [{"case_id": case_id, "complete": True, "pass": True}],
+                }
+            )
+        )
+        (runs / f"{case_id}-{level}-baseline.json").write_text(
+            json.dumps(
+                {
+                    "case_id": case_id,
+                    "mesh_level": level,
+                    "source_fingerprint": "source",
+                }
+            )
+        )
+        arguments.extend(("--acceptance-mesh", f"{level}={directory}"))
+    freemhd = tmp_path / "freemhd.json"
+    freemhd.write_text(json.dumps({"case_id": case_id, "pass": True}))
+    arguments.extend(("--freemhd-record", f"{case_id}={freemhd}"))
+    monkeypatch.setattr(campaign, "_source_fingerprint", lambda: "source")
+
+    def evaluate(selected, meshes, reference):
+        assert selected == case_id
+        assert set(meshes) == set(campaign.MESH_LEVELS)
+        assert reference["case_id"] == case_id
+        return {"case_id": case_id, "pass": True}
+
+    monkeypatch.setattr(campaign, "evaluate_benchmark_b_acceptance", evaluate)
+    assert campaign.main(arguments) == 0
+    payload = json.loads(
+        (tmp_path / "accepted" / "benchmark-b-acceptance.json").read_text()
+    )
+    assert payload["pass"] is True
+
+
+def test_acceptance_path_parser_requires_every_unique_name():
+    with pytest.raises(ValueError, match="each of coarse, medium, fine once"):
+        campaign._parse_acceptance_paths(
+            ["coarse=/a", "coarse=/b"], campaign.MESH_LEVELS, "--acceptance-mesh"
+        )
+
+
 def test_gpu_device_parser_requires_unique_ids():
     assert campaign._parse_gpu_devices("0, 1") == ("0", "1")
     with pytest.raises(ValueError, match="unique"):

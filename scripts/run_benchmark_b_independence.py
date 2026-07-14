@@ -28,6 +28,7 @@ import lmx
 from lmx.benchmarks import (
     benchmark_b_pressure_observable,
     build_benchmark_b_problem,
+    evaluate_benchmark_b_acceptance,
     load_benchmark_b_spec,
 )
 from lmx.fringing import solve_extruded_inductionless
@@ -44,6 +45,7 @@ if ROOT not in Path(lmx.__file__).resolve().parents:
     )
 
 CASE_IDS = ("B1-fringing-pipe", "B2-fringing-square")
+MESH_LEVELS = ("coarse", "medium", "fine")
 VARIANTS = ("baseline", "tight_tolerance", "extended_iterations", "thin_wall")
 
 
@@ -397,6 +399,82 @@ def _parse_gpu_devices(value: str) -> tuple[str, ...]:
     return devices
 
 
+def _parse_acceptance_paths(
+    values: list[str], choices: tuple[str, ...], option: str
+) -> dict[str, Path]:
+    paths: dict[str, Path] = {}
+    for value in values:
+        name, separator, raw_path = value.partition("=")
+        if not separator or name not in choices or not raw_path or name in paths:
+            raise ValueError(
+                f"{option} NAME=PATH requires each of {', '.join(choices)} once"
+            )
+        paths[name] = Path(raw_path)
+    return paths
+
+
+def _freeze_acceptance(args) -> int:
+    """Combine three completed mesh campaigns without rerunning a solver."""
+
+    mesh_paths = _parse_acceptance_paths(
+        args.acceptance_mesh, MESH_LEVELS, "--acceptance-mesh"
+    )
+    if set(mesh_paths) != set(MESH_LEVELS):
+        raise ValueError(
+            "--acceptance-mesh requires coarse, medium, and fine campaigns"
+        )
+    freemhd_paths = _parse_acceptance_paths(
+        args.freemhd_record, CASE_IDS, "--freemhd-record"
+    )
+    fingerprint = _source_fingerprint()
+    results = []
+    for case_id in args.cases:
+        mesh_campaigns = {}
+        for level, directory in mesh_paths.items():
+            summary = json.loads(
+                (directory / "benchmark-b-independence.json").read_text()
+            )
+            if summary.get("mesh_level") != level:
+                raise ValueError(f"Benchmark B {level} campaign metadata do not match")
+            if summary.get("source_fingerprint") != fingerprint:
+                raise ValueError(f"Benchmark B {level} campaign fingerprint mismatch")
+            comparison = next(
+                (
+                    item
+                    for item in summary.get("cases", [])
+                    if item.get("case_id") == case_id
+                ),
+                None,
+            )
+            if comparison is None:
+                raise ValueError(f"Benchmark B {level} campaign lacks {case_id}")
+            baseline = json.loads(
+                (directory / "runs" / f"{case_id}-{level}-baseline.json").read_text()
+            )
+            mesh_campaigns[level] = {
+                "source_fingerprint": summary.get("source_fingerprint"),
+                "baseline": baseline,
+                "independence": comparison,
+            }
+        freemhd = (
+            json.loads(freemhd_paths[case_id].read_text())
+            if case_id in freemhd_paths
+            else None
+        )
+        results.append(
+            evaluate_benchmark_b_acceptance(case_id, mesh_campaigns, freemhd)
+        )
+    payload = {
+        "schema_version": 1,
+        "source_fingerprint": fingerprint,
+        "cases": results,
+        "pass": bool(results) and all(result["pass"] for result in results),
+    }
+    _atomic_json(args.output / "benchmark-b-acceptance.json", payload)
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["pass"] else 2
+
+
 def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
     command = [
         sys.executable,
@@ -538,9 +616,7 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("artifacts/validation/benchmark_b_independence"),
     )
     parser.add_argument("--cases", nargs="+", choices=CASE_IDS, default=CASE_IDS)
-    parser.add_argument(
-        "--mesh-level", choices=("coarse", "medium", "fine"), default="coarse"
-    )
+    parser.add_argument("--mesh-level", choices=MESH_LEVELS, default="coarse")
     parser.add_argument("--variants", nargs="+", choices=VARIANTS, default=VARIANTS)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument(
@@ -566,11 +642,29 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ID[,ID...]",
         help="Run independent variants concurrently, one subprocess per CUDA GPU.",
     )
+    parser.add_argument(
+        "--acceptance-mesh",
+        action="append",
+        default=[],
+        metavar="LEVEL=DIR",
+        help="Freeze acceptance from completed coarse/medium/fine campaign directories.",
+    )
+    parser.add_argument(
+        "--freemhd-record",
+        action="append",
+        default=[],
+        metavar="CASE=PATH",
+        help="Checksummed exact-case FreeMHD comparison record used for acceptance.",
+    )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     if args.checkpoint_interval <= 0:
         parser.error("--checkpoint-interval must be positive")
+    if args.acceptance_mesh:
+        if args.gpu_devices is not None or args.dry_run or args.worker:
+            parser.error("acceptance assembly cannot run solver, GPU, or dry-run modes")
+        return _freeze_acceptance(args)
     if args.gpu_devices is not None and not args.dry_run:
         return _run_gpu_campaign(args)
     variant_restarts = _parse_variant_restarts(args.variant_restart)

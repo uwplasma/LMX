@@ -109,13 +109,14 @@ functionality/physics claim maps to at least one test.
 
 ### 4. B1/B2 fringing acceptance
 
-- Finish the separated retained-mode B1 pressure path and remove its
-  experimental gate only after small/medium/large parity and restart gates.
-- Reduce the remaining large-grid pressure iteration ceiling using measured
-  phase profiles; reject optimizations that alter conservation or projection
-  residuals.
+- The separated retained-mode B1 pressure path is promoted after
+  small/medium/large parity and restart gates.
+- The large-grid physical-convergence pilot reduces pressure work while
+  preserving conservation and projection residuals.
 - Run matched ALEX B1/B2 meshes and observables against digitized literature
   data and FreeMHD where formulations overlap.
+- Assemble three source-identical mesh campaigns with the tested frozen
+  uncertainty, refinement, wall/tolerance, and checksummed FreeMHD evaluator.
 - Publish compact tables and compressed plots; place full fields and movies in
   a release.
 

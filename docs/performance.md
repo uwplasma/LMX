@@ -34,6 +34,11 @@ python scripts/run_benchmark_b_independence.py \
 Frozen B1 cases use the compatible steady and retained-modal implementations
 directly and record both choices in the result. The superseded environment
 switches were removed after small, medium, large, and restart parity passed.
+Completed coarse, medium, and fine directories can be combined with
+`--acceptance-mesh LEVEL=DIR`; exact-case FreeMHD evidence is supplied with
+`--freemhd-record CASE=PATH`. Assembly rejects missing levels, mixed source
+fingerprints, malformed curves, and unchecked external evidence without
+starting another expensive solve.
 
 Authoritative records:
 

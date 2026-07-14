@@ -550,9 +550,11 @@ def test_benchmark_b_acceptance_combines_literature_mesh_and_freemhd(case_id):
     campaigns = {}
     for level, offset in zip(("coarse", "medium", "fine"), (1.0e-4, 5.0e-5, 0.0)):
         campaigns[level] = {
+            "source_fingerprint": "source",
             "baseline": {
                 "case_id": case_id,
                 "mesh_level": level,
+                "source_fingerprint": "source",
                 "x_over_L": x,
                 "primary_observable": [value + offset for value in expected],
             },
@@ -584,9 +586,11 @@ def test_benchmark_b_acceptance_reports_missing_and_rejects_bad_curves():
 
     bad = {
         level: {
+            "source_fingerprint": "source",
             "baseline": {
                 "case_id": "B1-fringing-pipe",
                 "mesh_level": level,
+                "source_fingerprint": "source",
                 "x_over_L": [0.0, -1.0],
                 "primary_observable": [0.0, 0.0],
             },

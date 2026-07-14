@@ -293,11 +293,16 @@ def evaluate_benchmark_b_acceptance(
     curves: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     literature: dict[str, dict[str, float]] = {}
     independence: dict[str, bool] = {}
+    fingerprints = set()
 
     for level in levels:
         campaign = mesh_campaigns[level]
         record = campaign.get("baseline", {})
         comparison = campaign.get("independence", {})
+        fingerprint = str(campaign.get("source_fingerprint", ""))
+        if not fingerprint or record.get("source_fingerprint") != fingerprint:
+            raise ValueError(f"Benchmark B {level} source provenance does not match")
+        fingerprints.add(fingerprint)
         if record.get("case_id") != case_id or record.get("mesh_level") != level:
             raise ValueError(f"Benchmark B {level} baseline metadata do not match")
         x = np.asarray(record.get("x_over_L"), dtype=float)
@@ -331,6 +336,8 @@ def evaluate_benchmark_b_acceptance(
             and comparison.get("complete") is True
             and comparison.get("pass") is True
         )
+    if len(fingerprints) != 1:
+        raise ValueError("Benchmark B mesh campaigns use different source fingerprints")
 
     uncertainty_floor = float(spec["reference"]["combined_uncertainty_absolute"])
 
@@ -377,7 +384,7 @@ def evaluate_benchmark_b_acceptance(
     }
     return {
         "case_id": case_id,
-        "complete": True,
+        "complete": matched_freemhd is not None,
         "missing_mesh_levels": [],
         "literature": literature,
         "independence": independence,
