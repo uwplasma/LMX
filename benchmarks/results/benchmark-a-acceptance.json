@@ -117,7 +117,7 @@
   "implementation": {
     "lmx_version": "1.1.3",
     "runners": {
-      "acceptance_builder_sha256": "8872e34ee7a5fdfa2f623dfaed86d81ed686d31c0339c8f40938e64c9c618fda",
+      "acceptance_builder_sha256": "6b65fb5f73ea753a5cbc27051be5473a735c87aa85621520dd299f927abbcf52",
       "ha20_ladder_sha256": "b0e1adacd324442c4d8bedbdca44626f21142f74b2ba885475c330b00ac2120f",
       "table_i_sha256": "ad66dd0d33f7e4842855eb59eadde5909bc8f87a788cb398972cde850bc1b0b2"
     },
@@ -162,8 +162,8 @@
           "pressure_power": 0.007698529266525109,
           "viscous_dissipation": 0.003937326135245943
         },
-        "source": "samper-table-i-shercliff-ha500.json",
-        "source_sha256": "6bd41d3ab0d50ab970117b9b57e12cba4aa4903da2a0be7863aba6ab3cb24318",
+        "source": "samper-table-i-accepted.json#shercliff-ha500",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 1.4417338546970915e-10
       },
       {
@@ -201,8 +201,8 @@
           "pressure_power": 0.0007931142763172492,
           "viscous_dissipation": 0.0003994059287960105
         },
-        "source": "samper-table-i-shercliff-ha5000.json",
-        "source_sha256": "2320ed7b91a27d385d00022b089f4eb3763e9e19d0d6cd32337fbb80c5691faf",
+        "source": "samper-table-i-accepted.json#shercliff-ha5000",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 1.576800129810159e-11
       },
       {
@@ -240,8 +240,8 @@
           "pressure_power": 0.000398156168124664,
           "viscous_dissipation": 0.00020010226860502704
         },
-        "source": "samper-table-i-shercliff-ha10000.json",
-        "source_sha256": "392f20364d1fef821decbc112b7a78eb7161cb774563845b9bb4bd3cd3260ad9",
+        "source": "samper-table-i-accepted.json#shercliff-ha10000",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 7.629419787450777e-12
       },
       {
@@ -279,8 +279,8 @@
           "pressure_power": 0.000265595301468529,
           "viscous_dissipation": 0.00013334215841715624
         },
-        "source": "samper-table-i-shercliff-ha15000.json",
-        "source_sha256": "8a3675b87a6c182b04e68cf9e308bace67acd44213dec5e8e0f3d732b5debebe",
+        "source": "samper-table-i-accepted.json#shercliff-ha15000",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 5.242732077192624e-12
       },
       {
@@ -318,8 +318,8 @@
           "pressure_power": 0.0014071645067477358,
           "viscous_dissipation": 0.0001506534259541874
         },
-        "source": "samper-table-i-hunt-ha500.json",
-        "source_sha256": "0e724a636a084df4913ba88ff6013a69e37f1356f53b70566c564b3ce03b2e9b",
+        "source": "samper-table-i-accepted.json#hunt-ha500",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 2.553257735446457e-11
       },
       {
@@ -357,8 +357,8 @@
           "pressure_power": 1.9131911165951988e-05,
           "viscous_dissipation": 1.0574046648338821e-06
         },
-        "source": "samper-table-i-hunt-ha5000.json",
-        "source_sha256": "99f6eec9ff87afc4eda7ea8ff9114400fc5ee3becf66d56fe3b58fe74ec3a948",
+        "source": "samper-table-i-accepted.json#hunt-ha5000",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 3.58297088999288e-13
       },
       {
@@ -396,8 +396,8 @@
           "pressure_power": 5.19107418193074e-06,
           "viscous_dissipation": 3.3198190103626413e-07
         },
-        "source": "samper-table-i-hunt-ha10000.json",
-        "source_sha256": "3569124076ce9c673eed913e0bee4a47443f4d79dc31bd60ed764ff1047fc70e",
+        "source": "samper-table-i-accepted.json#hunt-ha10000",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 1.0207788695532852e-13
       },
       {
@@ -435,8 +435,8 @@
           "pressure_power": 2.4372949846286195e-06,
           "viscous_dissipation": 1.74643130211301e-07
         },
-        "source": "samper-table-i-hunt-ha15000.json",
-        "source_sha256": "d729dfe27d72f39258ecf51dd59ed217d648d25648e00921248f6633274e5a4a",
+        "source": "samper-table-i-accepted.json#hunt-ha15000",
+        "source_sha256": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639",
         "steady_residual": 4.3088247860075446e-14
       }
     ]
@@ -461,13 +461,6 @@
     "benchmark-a-ha20-continuum-reference.json": "68c665524012f5a8c12113a16238608c23e8ee6cc2880b6e981a9e0c97ad1f5c",
     "benchmark-a-ha20-power-balance.json": "73ac4e0bbea73cdc1259df7776a0c0f0f106fbbc15a8725c77a1ff55cc20ee21",
     "benchmark-a-ha20-richardson.json": "7736c6e17fd8ea338f9470d6af8785e5f7e2d17cc72c3a02dcf755f665c00212",
-    "samper-table-i-hunt-ha10000.json": "3569124076ce9c673eed913e0bee4a47443f4d79dc31bd60ed764ff1047fc70e",
-    "samper-table-i-hunt-ha15000.json": "d729dfe27d72f39258ecf51dd59ed217d648d25648e00921248f6633274e5a4a",
-    "samper-table-i-hunt-ha500.json": "0e724a636a084df4913ba88ff6013a69e37f1356f53b70566c564b3ce03b2e9b",
-    "samper-table-i-hunt-ha5000.json": "99f6eec9ff87afc4eda7ea8ff9114400fc5ee3becf66d56fe3b58fe74ec3a948",
-    "samper-table-i-shercliff-ha10000.json": "392f20364d1fef821decbc112b7a78eb7161cb774563845b9bb4bd3cd3260ad9",
-    "samper-table-i-shercliff-ha15000.json": "8a3675b87a6c182b04e68cf9e308bace67acd44213dec5e8e0f3d732b5debebe",
-    "samper-table-i-shercliff-ha500.json": "6bd41d3ab0d50ab970117b9b57e12cba4aa4903da2a0be7863aba6ab3cb24318",
-    "samper-table-i-shercliff-ha5000.json": "2320ed7b91a27d385d00022b089f4eb3763e9e19d0d6cd32337fbb80c5691faf"
+    "samper-table-i-accepted.json": "d627f98cb3448f5636347c1658c33fd8eca15c947ef014f88d8e001503599639"
   }
 }

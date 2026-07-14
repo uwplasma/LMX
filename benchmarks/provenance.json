@@ -278,7 +278,7 @@
       "id": "lmx-benchmark-matrix",
       "kind": "repository_document",
       "path": "docs/benchmark_matrix.md",
-      "sha256": "c5949df52d1e26d78b67ffd7916ead38bdc51e905dbb59018d6210b2b7cd1274",
+      "sha256": "914b9afc91984c1d5cec848ad4f934a09f61d971e4287ea7305cc29d81237a50",
       "title": "LMX Benchmark Matrix"
     },
     {
@@ -337,7 +337,7 @@
       "id": "benchmark-a-acceptance",
       "kind": "repository_document",
       "path": "benchmarks/results/benchmark-a-acceptance.json",
-      "sha256": "a8ab639141722cf2730dcc5aa1c4954610c82b5c18eec93256e32ac576dc0bb9",
+      "sha256": "9f94ea1508d16d1bf3eb55ca6b48a3e48b6e567852450c2c9af38fcee3cd7534",
       "title": "LMX combined Benchmark A acceptance evidence"
     },
     {

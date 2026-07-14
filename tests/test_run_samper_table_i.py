@@ -11,7 +11,7 @@ import pytest
 import scripts.run_samper_table_i as samper_runner
 from lmx.freemhd import load_samper_table_i
 from scripts.build_benchmark_a_acceptance import build_acceptance, write_acceptance
-from scripts.freeze_samper_table_i import freeze_campaign
+from scripts.freeze_samper_table_i import freeze_campaign, merge_campaigns
 from scripts.run_samper_table_i import (
     build_samper_case,
     dimensionless_flow_rate,
@@ -41,7 +41,7 @@ def _compact_campaign(*, passed: bool = True) -> dict[str, object]:
 
 def _copy_acceptance_evidence(destination: Path) -> None:
     destination.mkdir()
-    for pattern in ("benchmark-a-ha20-*.json", "samper-table-i-*-ha*.json"):
+    for pattern in ("benchmark-a-ha20-*.json", "samper-table-i-accepted.json"):
         for path in RESULTS.glob(pattern):
             shutil.copy2(path, destination / path.name)
 
@@ -300,6 +300,30 @@ def test_freeze_campaign_rejects_incomplete_or_failing_evidence(
         freeze_campaign(source, tmp_path / "frozen.json")
 
 
+def test_merge_campaigns_deduplicates_contract_and_preserves_sources(tmp_path: Path) -> None:
+    sources = []
+    for index, mesh in enumerate(([[8, 8]], [[8, 8], [10, 10]])):
+        payload = _compact_campaign()
+        payload["mesh_levels"] = mesh
+        payload["records"][0]["hartmann_number"] = 5000 + index
+        source = tmp_path / f"source-{index}.json"
+        source.write_text(json.dumps(payload))
+        sources.append(source)
+    merged = merge_campaigns(sources, tmp_path / "merged.json")
+    assert merged["mesh_levels"] == [[8, 8], [10, 10]]
+    assert len(merged["records"]) == 2
+    assert set(merged["freeze"]["source_sha256_by_file"]) == {
+        "source-0.json",
+        "source-1.json",
+    }
+
+    incompatible = json.loads(sources[1].read_text())
+    incompatible["schema_version"] = 2
+    sources[1].write_text(json.dumps(incompatible))
+    with pytest.raises(ValueError, match="one contract"):
+        merge_campaigns(sources, tmp_path / "rejected.json")
+
+
 def test_build_acceptance_separates_claims_and_accepts_all_rows() -> None:
     payload = build_acceptance(RESULTS)
     assert payload["research_grade_validation_pass"] is True
@@ -325,12 +349,16 @@ def test_build_acceptance_rejects_inconsistent_or_failing_evidence(
 ) -> None:
     copied = tmp_path / "results"
     _copy_acceptance_evidence(copied)
-    path = copied / "samper-table-i-hunt-ha15000.json"
+    path = copied / "samper-table-i-accepted.json"
     payload = json.loads(path.read_text())
     if failure == "fingerprint":
         payload["implementation"]["solver_core_sha256"] = "0" * 64
     else:
-        payload["research_grade_validation_pass"] = False
+        next(
+            row
+            for row in payload["records"]
+            if row["case_kind"] == "hunt" and row["hartmann_number"] == 15000
+        )["finest_level_pass"] = False
     path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="implementation|not a passing"):
+    with pytest.raises(ValueError, match="implementation|finest-level"):
         build_acceptance(copied)

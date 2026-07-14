@@ -136,7 +136,8 @@ rows pass under one solver fingerprint. Finest analytical-flow errors for
 Shercliff at Ha=500/5000/10000/15000 are 0.241%/0.369%/0.418%/0.300%; the Hunt
 errors are 0.154%/0.325%/0.427%/0.507%. Every row also passes the frozen
 refinement, layer, steady-solver, current, and power gates. The combined
-machine-readable acceptance record is
+eight-row campaign and machine-readable acceptance record are
+`benchmarks/results/samper-table-i-accepted.json` and
 `benchmarks/results/benchmark-a-acceptance.json`. Exact definitions, checksums,
 compact results, and acceptance criteria live in the
 [benchmark matrix](docs/benchmark_matrix.md) and [development plan](plan.md).

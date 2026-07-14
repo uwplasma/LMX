@@ -187,10 +187,10 @@ for external research use.
   seconds including compilation, with two recorded addressable shards.
 - Repository consolidation: the root provenance tree and historical campaign,
   Docker, dashboard, support/security, and duplicate driver surfaces are gone.
-  The maintained checkout has 45 test files, 23 maintenance scripts, and no
-  remote development branches beyond `main`.
+  The maintained checkout has 45 test files, 23 maintenance scripts, 13 compact
+  accepted-result files, and no remote development branches beyond `main`.
 - Architecture: 36 package modules, 35,043 package lines, 8,421 maintained-core
-  lines, a 3.78 MiB tracked checkout, and a 288,481-byte wheel. Live gates cap
+  lines, a 3.66 MiB tracked checkout, and a 288,481-byte wheel. Live gates cap
   modules, lines, bytes, lazy import time, examples, exports, and wheel contents.
 - Documentation media: six anonymous-access derivatives total 516 KB and stay
   out of the wheel; full-resolution fields, plots, and movies remain checksummed
