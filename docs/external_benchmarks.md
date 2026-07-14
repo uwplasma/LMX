@@ -62,20 +62,31 @@ not accepted parity evidence. The audited case specification is authoritative.
 ## Matched Benchmark B contract
 
 Benchmark-B acceptance no longer trusts a record-supplied
-`exact_case_match` boolean. The validator compares the LMX and FreeMHD
-equations, nondimensional groups, geometry, field mapping, wall model,
-boundaries and drive, mesh coordinates, stopping rules, observable, and
-normalization. It also requires current specification, source, input,
-evaluator, and output hashes, then recomputes the pressure-comparison gates.
-An `acceptance_role` separates a bounded `harness-smoke` record from B1 or B2
-production evidence; a smoke record cannot promote itself.
+`exact_case_match` boolean. Production records must equal the canonical
+specification—not merely each other—across equations, nondimensional groups,
+geometry, field mapping, wall model, boundaries and drive, mesh coordinates,
+stopping rules, observable, and normalization. The validator recomputes the
+current specification hash and pressure-comparison gates. It presently checks
+the remaining source, input, evaluator, and output values for SHA-256 syntax;
+the harness must independently resolve and hash those artifacts before a
+production record can be accepted.
+
+The canonical FreeMHD source uses conservative `div(rhoPhi,U)` inertia with
+Euler time integration and `Gauss limitedLinear 1.0` advection. Its axial drive
+is one inlet flow-rate condition plus an outlet pressure gauge, not a flow
+multiplier at every station. A matched reduction must also hold phase fraction
+and temperature constant, disable the stock velocity limiter, and enforce zero
+normal electric current at both axial ends. These requirements are frozen in
+the B1 and B2 TOML specifications.
 
 This machinery is a gate, not a parity result. B2 production remains blocked:
 LMX's present stationwise model omits the convective inertia in FreeMHD's
 finite-inertia momentum equation, and fixed-flow/Neumann axial treatment has
 not been shown equivalent to FreeMHD's inlet-flow/outlet-pressure treatment.
-Reconcile both formulations before creating a tiny matched B2 smoke record;
-do not launch a medium or production FreeMHD campaign before that record
+Implement the complete frozen formulation before creating a tiny matched B2
+smoke record. The smoke needs its own canonical mesh and stopping contract: it
+must be physics-valid while remaining ineligible for production acceptance.
+Do not launch a medium or production FreeMHD campaign before that bounded smoke
 passes.
 
 ## ALEX experiments
