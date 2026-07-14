@@ -118,8 +118,9 @@ Apply this migration sequence:
 3. **Complete:** the periodic-theta line uses SOLVAX
    `cyclic_tridiagonal_solve`; pipe primal, variable-coefficient dense-reference,
    and implicit-gradient gates replace the circulant-only FFT shortcut.
-4. Reformulate anchored Poisson operators symmetrically before moving them to
-   SOLVAX PCG. Do not apply PCG to the current nonsymmetric row-replacement form.
+4. The anchored Poisson action now projects both row and column symmetrically.
+   Complete primal, physical-residual, transpose, gradient, and high-Ha parity
+   before replacing its retained CG loop with SOLVAX PCG.
 5. Add and release a symmetry-preserving additive-line preconditioner in SOLVAX,
    then delete the LMX duplicate. Keep geometry adaptation in LMX.
 

@@ -54,12 +54,13 @@ def apply_poisson_operator(
     phi: jnp.ndarray,
     anchor: tuple[int, int],
 ) -> jnp.ndarray:
-    west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
-    east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
-    south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
-    north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
+    projected = phi.at[anchor].set(0.0)
+    west_phi = jnp.pad(projected[:-1, :], ((1, 0), (0, 0)))
+    east_phi = jnp.pad(projected[1:, :], ((0, 1), (0, 0)))
+    south_phi = jnp.pad(projected[:, :-1], ((0, 0), (1, 0)))
+    north_phi = jnp.pad(projected[:, 1:], ((0, 0), (0, 1)))
     matrix_phi = (
-        diagonal * phi
+        diagonal * projected
         - west * west_phi
         - east * east_phi
         - south * south_phi

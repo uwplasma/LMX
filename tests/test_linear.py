@@ -73,6 +73,16 @@ def test_poisson_residual_norm_is_zero_for_exact_zero_solution():
     assert float(residual) == pytest.approx(0.0)
 
 
+def test_anchored_poisson_operator_is_symmetric_for_arbitrary_fields():
+    coefficients = _poisson_coefficients()[:5]
+    left = jnp.asarray([[0.2, -0.4], [0.7, 0.1]])
+    right = jnp.asarray([[0.9, 0.3], [-0.2, 0.5]])
+    apply = lambda field: linear.apply_poisson_operator(
+        *coefficients, field, anchor=(0, 0)
+    )
+    assert jnp.vdot(left, apply(right)) == pytest.approx(jnp.vdot(apply(left), right))
+
+
 def test_solvax_pcg_recovers_manufactured_five_point_solution():
     scale = 1.0e-8
     diagonal = scale * jnp.full((3, 3), 6.0)
