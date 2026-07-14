@@ -40,32 +40,32 @@ artifacts. See the [case cookbook](docs/case_cookbook.md).
 
 ## Capabilities
 
-✅ native and documented · ◐ partial/research-stage · ❌ not provided natively
+✅ native and documented · ◐ partial/research-stage · — not exposed as the named native workflow
 
 | Capability | LMX | [FreeMHD](https://github.com/PlasmaControl/FreeMHD) | [NekRS](https://nekrs.readthedocs.io/en/latest/) |
 |---|:---:|:---:|:---:|
-| Inductionless liquid-metal MHD | ✅ | ✅ | ❌¹ |
-| Full induction / finite magnetic Reynolds number | ❌ | ❌² | ❌¹ |
-| High-Hartmann-number duct flows | ✅ | ✅ | ❌¹ |
-| 3D imposed and fringing magnetic fields | ◐ | ✅ | ❌¹ |
-| Insulating and conducting wall-current closure | ✅ | ✅ | ❌¹ |
-| Free-surface / two-phase liquid-metal MHD | ❌ | ✅ | ❌¹ |
-| Fluid–solid heat transfer | ❌ | ◐ | ✅ CFD |
-| Turbulence models | ◐ Q2D | ◐ non-MHD | ✅ CFD |
-| Curved / complex 3D meshes | ◐ | ✅ | ✅ |
-| Parallel CPU execution | ✅ | ✅ | ✅ |
-| Single-GPU execution | ✅ | ❌ | ✅ |
-| Multi-GPU execution | ◐ B2 | ❌ | ✅ |
-| Automatic differentiation | ✅ selected | ❌ | ❌ |
-| Experimental-comparison workflows | ◐ | ✅ | ❌¹ |
+| Inductionless electric-potential LM MHD | ✅ | ✅ | — |
+| Full-induction / finite-Rm MHD | — | —¹ | ◐ research |
+| Verified high-Hartmann duct benchmarks | ✅ | ✅ | — |
+| 3D imposed/fringing-field LM workflow | ◐ | ✅ | — |
+| Conducting/insulating wall-current closure | ✅ | ✅ | — |
+| Fully 3D transient MHD | ◐ extruded | ✅ | ◐ research |
+| Free-surface / two-phase MHD | — | ✅ | — |
+| Fluid–solid conjugate heat transfer | — | ✅ | ✅ |
+| Turbulence models | ◐ Q2D | ◐ OpenFOAM | ✅ LES/RANS |
+| Curved / complex 3D meshes | ◐ mapped | ✅ | ✅ |
+| Parallel CPU solver | ◐ | ✅ | ✅ |
+| Single-GPU execution | ✅ | — | ✅ |
+| Multi-GPU execution | ◐ B2 | — | ✅ |
+| Selected reverse-mode AD workflows | ✅ | — | — |
+| Published liquid-metal experiment validation | ◐ | ✅ | — |
 
-¹ Native NekRS solves scalable spectral-element thermal fluids and accepts
-custom sources, but does not document electromagnetic equations or current
-closure. ² [FreeMHD2](https://arxiv.org/abs/2606.18745) is a separate extension
-that adds finite-Rm induction; this column describes native FreeMHD. Sources:
-[FreeMHD validation](https://doi.org/10.1063/5.0230242),
-[NekRS capabilities](https://nekrs.readthedocs.io/en/latest/), and
-[NekRS GPU scaling](https://arxiv.org/abs/2104.05829).
+¹ [FreeMHD2](https://arxiv.org/abs/2606.18745) is a separate finite-Rm
+extension. Sources: [FreeMHD paper](https://doi.org/10.1063/5.0230242) and
+[solver](https://github.com/PlasmaControl/FreeMHD/blob/main/MHD_Solvers/solvers/epotMultiRegionInterFoam/epotMultiRegionInterFoam.C),
+[NekRS native capabilities](https://nekrs.readthedocs.io/en/latest/),
+[research MHD extension](https://doi.org/10.2172/2453867), and
+[GPU scaling](https://doi.org/10.1016/j.parco.2022.102982).
 
 ## Verified duct MHD
 
@@ -118,8 +118,8 @@ solver scaling remains open. [Protocol and results →](docs/performance.md)
 
 ## Quality and citation
 
-The portable gate passes **784 tests**, **95.28% branch coverage**, and **149.9
-s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The last committed portable gate records **784 tests**, **95.28% branch
+coverage**, and **149.9 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

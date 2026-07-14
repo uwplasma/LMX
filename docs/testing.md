@@ -10,11 +10,11 @@ external solvers, long physics campaigns, and hardware scaling.
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
-and a hard ten-minute timeout. The current Apple M4 result is 784 passed, 8
-expected external-data skips, 95.28% branch coverage, and 149.9 seconds with six
-workers. The default warning threshold is five minutes, leaving another five
-minutes before the hard failure. The compact gate record tracks slow node IDs
-for regression review.
+and a hard ten-minute timeout. The last committed Apple M4 record is 784 passed,
+8 expected external-data skips, 95.28% branch coverage, and 149.9 seconds with
+six workers. The default warning threshold is five minutes, leaving another
+five minutes before the hard failure. The next refreshed record will also keep
+the ten slowest node IDs for critical-path review.
 
 The eight skips represent unavailable independent datasets, not disabled source
 paths. The gate must stay below ten minutes as the code grows; its engineering
@@ -23,15 +23,16 @@ target is five minutes to preserve CI margin.
 ## Focused development checks
 
 ```bash
-python -m pytest -m unit
-python -m pytest tests/test_solver.py
-python -m pytest tests/test_fringing.py
-python -m pytest tests/test_validation.py
+python -m pytest tests/test_config.py
+python -m pytest tests/test_freemhd.py -k matched_b2_lmx_input
+python -m pytest tests/test_fringing.py::test_b2_steady_gate_requires_three_consecutive_passing_updates
 ```
 
-Markers describe cost or external requirements, not correctness importance.
-Avoid adding a new test file when a compact test belongs naturally in an
-existing module-level family.
+Prefer direct node IDs or narrow `-k` expressions while developing. The current
+module-level `unit` marker includes some expensive fringing and autodiff tests,
+so it is not yet a guaranteed fast lane. Markers describe cost or external
+requirements, not correctness importance. Avoid adding a new test file when a
+compact test belongs naturally in an existing module-level family.
 
 ## Capability-to-evidence map
 

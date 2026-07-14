@@ -72,9 +72,13 @@ Schema-2 records keep seven source, input, evaluator, and output artifacts
 beneath a caller-selected bundle root. Validation streams and recomputes every
 file or deterministic directory-tree hash, rejecting path escapes, symlinks,
 hard-link aliases, overlapping trees, special files, and changed content. The
-record cannot choose its own root. Production acceptance remains deliberately
-blocked until separate LMX and FreeMHD observers derive the two contracts from
-their real inputs; copying the canonical dictionary twice is not evidence.
+record cannot choose its own root. The pinned FreeMHD source materializer now
+verifies the exact source commit and four file hashes before producing a
+five-file evidence tree. LMX also has a deterministic real B2 JSON input whose
+strict loader reconstructs the solver problem and whose observer derives its
+contract without reading the expected contract. Production acceptance remains
+blocked on the independent FreeMHD input and observer; copying the canonical
+dictionary twice is not evidence.
 
 The canonical FreeMHD source uses conservative `div(rhoPhi,U)` inertia with
 Euler time integration and `Gauss limitedLinear 1.0` advection. Its axial drive
@@ -87,12 +91,14 @@ the B1 and B2 TOML specifications.
 This machinery is a gate, not a parity result. LMX now has the canonical B2
 conservative inertia, mixed axial boundaries, viscous stress, corrected-flux
 carry, CFL/stopping diagnostics, exact restart, and shard-boundary gates.
-Production remains blocked until independent LMX and FreeMHD materializers and
-observers agree on one tiny real input. Its mesh faces, mapped field samples,
-time step, iterations, and stopping rules will be frozen only after that audit;
-no placeholder smoke role is accepted. The eventual smoke remains ineligible
-for production acceptance. Do not launch a medium or production FreeMHD
-campaign before it passes.
+The LMX half of the tiny harness currently reconstructs eight axial cells, a
+`5x5` fluid cross-section plus one wall cell per side, the sampled ALEX field,
+`dt=1/540000`, and two updates ending at `step_limit`. These are not yet shared
+facts: they are frozen only after the separately materialized and observed
+FreeMHD input agrees. No placeholder smoke role is accepted, and the eventual
+smoke remains ineligible for production acceptance. Do not launch any FreeMHD
+solve until the solver-free contract is committed; do not launch a medium or
+production campaign until the tiny solve passes.
 
 ## ALEX experiments
 
