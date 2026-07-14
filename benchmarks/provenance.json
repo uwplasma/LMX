@@ -280,7 +280,7 @@
       "id": "lmx-benchmark-matrix",
       "kind": "repository_document",
       "path": "docs/benchmark_matrix.md",
-      "sha256": "d8d17c6e6715c9c306228714d9c5c09b47babdae96c3e2f0860bc66725d1fe98",
+      "sha256": "04ed70964c5312b5b9a897f900d91d7da5847dd3580a7f69d6195e679ed6d273",
       "title": "LMX Benchmark Matrix"
     },
     {
@@ -288,7 +288,7 @@
       "id": "benchmark-b-specification",
       "kind": "repository_document",
       "path": "benchmarks/results/benchmark-b-specification.json",
-      "sha256": "b42bec77c7ceb7d823fd67743feb019550ca7a781d111ca1604599a3907a5f87",
+      "sha256": "b4719d14a8038cf4dc00dc22975f786adf153a7b3fde6a85fc12ef686f2212e4",
       "title": "LMX frozen Benchmark B specifications and extracted ALEX data index"
     },
     {
