@@ -322,6 +322,8 @@ def write_extruded_bundle_restart_npz(
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    rho_phi_plus, rho_phi_inlet = _compact_flux_restart_arrays(bundle)
+    has_compact_flux = rho_phi_plus is not None
     metadata = {
         "case": case.name,
         "geometry_kind": case.geometry.kind,
@@ -329,6 +331,7 @@ def write_extruded_bundle_restart_npz(
         "station_count": int(bundle.x.shape[0]),
         "description": "LMX extruded inductionless restart bundle",
         "restart_capable": True,
+        "restart_schema": "compact_flux_v1" if has_compact_flux else "legacy_nonexact",
     }
     np.savez_compressed(
         path,
@@ -343,6 +346,8 @@ def write_extruded_bundle_restart_npz(
         w=np.asarray(bundle.w),
         p=np.asarray(bundle.p),
         phi=np.asarray(bundle.phi),
+        rho_phi_plus=np.asarray(rho_phi_plus) if has_compact_flux else np.zeros(0),
+        rho_phi_inlet=np.asarray(rho_phi_inlet) if has_compact_flux else np.zeros(0),
         jx=np.asarray(bundle.jx),
         jy=np.asarray(bundle.jy),
         jz=np.asarray(bundle.jz),
@@ -399,6 +404,13 @@ def _load_optional_array(data: np.lib.npyio.NpzFile, key: str) -> np.ndarray:
     if key not in data:
         return np.zeros((0,), dtype=float)
     return np.asarray(data[key])
+
+
+def _compact_flux_restart_arrays(bundle) -> tuple[object | None, object | None]:
+    plus, inlet = (getattr(bundle, name, None) for name in ("rho_phi_plus", "rho_phi_inlet"))
+    if (plus is None) != (inlet is None):
+        raise ValueError("Compact restart flux requires both plus faces and inlet")
+    return plus, inlet
 
 
 def load_restart_bundle(path: str | Path) -> RestartBundle:
@@ -522,6 +534,9 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         metadata = (
             json.loads(str(data["metadata_json"])) if "metadata_json" in data else {}
         )
+        has_plus = "rho_phi_plus" in data and data["rho_phi_plus"].size > 0
+        has_inlet = "rho_phi_inlet" in data and data["rho_phi_inlet"].size > 0
+        metadata["restart_schema"] = "compact_flux_v1" if has_plus and has_inlet else "legacy_nonexact"
         station_history = (
             tuple(json.loads(str(data["station_history_json"])))
             if "station_history_json" in data
@@ -537,6 +552,8 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             w=jnp.asarray(data["w"]),
             p=jnp.asarray(data["p"]),
             phi=jnp.asarray(data["phi"]),
+            rho_phi_plus=jnp.asarray(data["rho_phi_plus"]) if has_plus else None,
+            rho_phi_inlet=jnp.asarray(data["rho_phi_inlet"]) if has_inlet else None,
             jx=jnp.asarray(data["jx"]),
             jy=jnp.asarray(data["jy"]),
             jz=jnp.asarray(data["jz"]),
@@ -646,6 +663,10 @@ def validate_extruded_restart_bundle(bundle: ExtrudedRestartBundle, *, case) -> 
         raise ValueError(
             "Extruded restart z/theta resolution does not match the current extruded cross-section"
         )
+    plus, inlet = _compact_flux_restart_arrays(bundle.bundle)
+    expected = None if inlet is None or inlet.ndim != 2 else (3, len(bundle.bundle.x), *inlet.shape)
+    if plus is not None and (plus.ndim != 4 or plus.shape != expected):
+        raise ValueError("Compact restart flux has inconsistent shape")
 
 
 def prepare_extruded_output_layout(out_dir: str | Path) -> ExtrudedOutputLayout:

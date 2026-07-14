@@ -36,6 +36,8 @@ class ExtrudedFieldBundle:
     phi: jnp.ndarray
     geometry_kind: str
     solver_kind: str
+    rho_phi_plus: jnp.ndarray | None = None
+    rho_phi_inlet: jnp.ndarray | None = None
     jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jz: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -72,6 +73,21 @@ def _sample_solution(case) -> Solution:
     )
     return Solution(
         mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name
+    )
+
+
+def _extruded_rect_case(*, nx=3, write_plots=False, write_stride=1):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    return replace(
+        case,
+        name="fringing_rect_demo",
+        geometry=replace(
+            case.geometry, kind="rect_duct", length=6.0, nx=nx, ny=2, nz=2
+        ),
+        solver=replace(case.solver, kind="extruded_inductionless"),
+        output=replace(
+            case.output, write_plots=write_plots, write_stride=write_stride
+        ),
     )
 
 
@@ -330,19 +346,7 @@ def test_write_solution_outputs_respects_output_flags(
 
 
 def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
-            "output": case.output.__class__(
-                **{**case.output.__dict__, "write_plots": True}
-            ),
-        }
-    )
+    case = _extruded_rect_case(write_plots=True)
     bundle = SimpleNamespace(
         x=jnp.asarray([0.0, 1.0, 2.0]),
         y=jnp.asarray([-0.5, 0.5]),
@@ -353,6 +357,8 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         w=jnp.zeros((3, 2, 2)),
         p=jnp.zeros((3, 2, 2)),
         phi=jnp.zeros((3, 2, 2)),
+        rho_phi_plus=jnp.ones((3, 3, 1, 2)),
+        rho_phi_inlet=jnp.ones((1, 2)),
         jx=jnp.zeros((3, 2, 2)),
         jy=jnp.zeros((3, 2, 2)),
         jz=jnp.zeros((3, 2, 2)),
@@ -437,29 +443,12 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
     with np.load(npz_path, allow_pickle=False) as data:
         assert data["u"].shape == (3, 2, 2)
         assert data["validation_station_count"] == pytest.approx(3)
+        assert "rho_phi_plus" not in data
+        assert "rho_phi_inlet" not in data
 
 
 def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(
-                **{
-                    **case.geometry.__dict__,
-                    "kind": "rect_duct",
-                    "length": 6.0,
-                    "nx": 3,
-                    "ny": 2,
-                    "nz": 2,
-                }
-            ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
-        }
-    )
+    case = _extruded_rect_case()
     bundle = SimpleNamespace(
         x=jnp.asarray([0.0, 1.0, 2.0]),
         y=jnp.asarray([-0.5, 0.5]),
@@ -470,6 +459,8 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         w=jnp.zeros((3, 2, 2)),
         p=jnp.zeros((3, 2, 2)),
         phi=jnp.zeros((3, 2, 2)),
+        rho_phi_plus=jnp.arange(18.0).reshape((3, 3, 1, 2)),
+        rho_phi_inlet=jnp.asarray([[0.4, 0.6]]),
         jx=jnp.zeros((3, 2, 2)),
         jy=jnp.zeros((3, 2, 2)),
         jz=jnp.zeros((3, 2, 2)),
@@ -504,6 +495,9 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
+    assert restart_bundle.bundle.rho_phi_plus == pytest.approx(bundle.rho_phi_plus)
+    assert restart_bundle.bundle.rho_phi_inlet == pytest.approx(bundle.rho_phi_inlet)
+    assert restart_bundle.metadata["restart_schema"] == "compact_flux_v1"
     assert restart_bundle.bundle.axial_pressure_loss_gradient.tolist() == pytest.approx(
         [1.0, 1.5, 1.0]
     )
@@ -517,12 +511,25 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     assert restart_bundle.bundle.iteration_potential_residual_history.tolist() == (
         pytest.approx([3.0e-5])
     )
-    assert layout.system_dir.exists()
-    assert layout.fields_dir.exists()
-    assert layout.post_dir.exists()
-    assert layout.plots_dir.exists()
-    assert layout.restart_dir.exists()
-    assert layout.logs_dir.exists()
+    assert all(path.exists() for path in vars(layout).values())
+
+    with np.load(restart_path, allow_pickle=False) as data:
+        legacy_payload = {
+            key: data[key]
+            for key in data.files
+            if key not in {"metadata_json", "rho_phi_plus", "rho_phi_inlet"}
+        }
+    legacy_path = tmp_path / "restart" / "legacy.npz"
+    np.savez_compressed(legacy_path, **legacy_payload)
+    legacy = load_extruded_restart_bundle(legacy_path)
+    assert legacy.bundle.rho_phi_plus is legacy.bundle.rho_phi_inlet is None
+    assert legacy.metadata["restart_schema"] == "legacy_nonexact"
+
+    partial = SimpleNamespace(**{**bundle.__dict__, "rho_phi_inlet": None})
+    with pytest.raises(ValueError, match="requires both"):
+        write_extruded_restart_npz(
+            SimpleNamespace(bundle=partial, station_history=()), case, tmp_path / "bad.npz"
+        )
 
 
 def test_validate_extruded_restart_bundle_rejects_mismatch():
@@ -559,26 +566,7 @@ def test_validate_extruded_restart_bundle_rejects_mismatch():
 
 
 def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mismatch():
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(
-                **{
-                    **case.geometry.__dict__,
-                    "kind": "rect_duct",
-                    "length": 6.0,
-                    "nx": 3,
-                    "ny": 2,
-                    "nz": 2,
-                }
-            ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
-        }
-    )
+    case = _extruded_rect_case()
     bundle = SimpleNamespace(
         geometry_kind="rect_duct",
         solver_kind="fully_developed_inductionless",
@@ -623,23 +611,35 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
     with pytest.raises(ValueError, match="z/theta resolution"):
         validate_extruded_restart_bundle(good_y, case=case)
 
+    compact = SimpleNamespace(
+        x=jnp.zeros(3),
+        y=jnp.zeros(2),
+        z=jnp.zeros(2),
+        rho_phi_plus=jnp.zeros((3, 3, 1, 2)),
+        rho_phi_inlet=jnp.zeros((1, 2)),
+    )
+    valid = SimpleNamespace(**{**good_case.__dict__, "bundle": compact})
+    validate_extruded_restart_bundle(valid, case=case)
+    malformed = (
+        (jnp.zeros((2, 3, 1, 2)), jnp.zeros((1, 2)), "shape"),
+        (jnp.zeros((3, 2, 1, 2)), jnp.zeros((1, 2)), "shape"),
+        (jnp.zeros((3, 3, 1, 2)), jnp.zeros((2, 1)), "shape"),
+        (jnp.zeros((3, 3, 1, 2)), None, "requires both"),
+    )
+    for plus, inlet, message in malformed:
+        candidate = SimpleNamespace(
+            **{**compact.__dict__, "rho_phi_plus": plus, "rho_phi_inlet": inlet}
+        )
+        with pytest.raises(ValueError, match=message):
+            validate_extruded_restart_bundle(
+                SimpleNamespace(**{**valid.__dict__, "bundle": candidate}), case=case
+            )
+
 
 def test_write_extruded_solution_outputs_archives_last_station_with_stride(
     tmp_path: Path,
 ):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
-            "output": case.output.__class__(
-                **{**case.output.__dict__, "write_plots": False, "write_stride": 2}
-            ),
-        }
-    )
+    case = _extruded_rect_case(nx=4, write_stride=2)
     bundle = SimpleNamespace(
         x=jnp.asarray([0.0, 1.0, 2.0, 3.0]),
         y=jnp.asarray([-0.5, 0.5]),
