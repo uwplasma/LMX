@@ -19,6 +19,7 @@ from lmx.scaling import (
     _float_or_none,
     _int_or_none,
     _row_or_replicated_sharding,
+    _shard_placement,
     _two_axis_mesh_and_sharding,
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
@@ -147,6 +148,30 @@ def test_benchmark_sharded_extruded_operator_runs_on_single_device():
     assert record.benchmark_kind == "extruded3d"
     assert record.operator_path == "sharded_extruded_operator_surrogate"
     assert record.total_cells == 16 * 12 * 10
+    assert record.spatially_sharded is False
+    assert record.global_shard_count == 1
+
+
+def test_shard_placement_reports_partitioning_and_rejects_replication():
+    single = SimpleNamespace(
+        global_shards=[object()],
+        sharding=SimpleNamespace(is_fully_replicated=True),
+    )
+    distributed = SimpleNamespace(
+        global_shards=[object(), object()],
+        sharding=SimpleNamespace(is_fully_replicated=False),
+    )
+    replicated = SimpleNamespace(
+        global_shards=[object(), object()],
+        sharding=SimpleNamespace(is_fully_replicated=True),
+    )
+
+    assert _shard_placement(single, 1) == (False, 1)
+    assert _shard_placement(distributed, 2) == (True, 2)
+    with pytest.raises(RuntimeError, match="not spatially partitioned"):
+        _shard_placement(replicated, 2)
+    with pytest.raises(RuntimeError, match="global_shards=2"):
+        _shard_placement(distributed, 4)
 
 
 def test_benchmark_sharded_extruded_operator_rejects_invalid_device_count():

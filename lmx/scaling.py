@@ -305,6 +305,21 @@ def _array_nbytes(array: object) -> int:
         return 0
 
 
+def _shard_placement(array: object, expected_shards: int) -> tuple[bool, int]:
+    """Validate a benchmark result and report its actual global placement."""
+
+    global_shards = len(getattr(array, "global_shards", ()))
+    sharding = getattr(array, "sharding", None)
+    replicated = bool(getattr(sharding, "is_fully_replicated", global_shards == 1))
+    if expected_shards > 1 and (global_shards != expected_shards or replicated):
+        raise RuntimeError(
+            "Operator result is not spatially partitioned across the requested "
+            f"{expected_shards} devices (global_shards={global_shards}, "
+            f"replicated={replicated})."
+        )
+    return expected_shards > 1 and not replicated, global_shards
+
+
 def _bundle_memory_bytes(bundle: object) -> int:
     return sum(
         _array_nbytes(getattr(bundle, name, None)) for name in _BUNDLE_FIELD_NAMES
@@ -403,6 +418,7 @@ def benchmark_sharded_extruded_operator(
         result = kernel(u, v, w, phi, forcing, sigma)
         jax.block_until_ready(result)
         timings.append(time.perf_counter() - start)
+    spatially_sharded, global_shard_count = _shard_placement(result, num_devices)
 
     return StrongScalingRecord(
         backend=jax.default_backend(),
@@ -427,6 +443,8 @@ def benchmark_sharded_extruded_operator(
         memory_bytes_estimate=sum(
             _array_nbytes(array) for array in (u, v, w, phi, forcing, sigma)
         ),
+        spatially_sharded=spatially_sharded,
+        global_shard_count=global_shard_count,
     )
 
 
