@@ -333,8 +333,14 @@ def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
         >= solution.bundle.iteration_potential_residual_history
     )
 
+    # A loose accepted-state threshold exercises the settled continuation
+    # update while the independently tight coupling target remains open.
+    settled_case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, steady_tolerance=1.0),
+    )
     restarted = solve_extruded_inductionless(
-        replace(problem, case=case, profile=profile),
+        replace(problem, case=settled_case, profile=profile),
         initial_bundle=solution.bundle,
     )
     assert restarted.bundle.mean_velocity == pytest.approx(1.0, abs=1.0e-8)
