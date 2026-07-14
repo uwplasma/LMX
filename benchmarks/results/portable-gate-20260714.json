@@ -1,6 +1,6 @@
 {
   "date": "2026-07-14",
-  "commit": "54fdb6e20f5e19f26d716a0a4b2a0210a391f5be",
+  "commit": "099be6c6652b2df66c8e34dee6f2e6442e9c6877",
   "lock_sha256": "da69fe6dc887d49e7376c3d747334039e9224625d992604e8e240e7052bfc44d",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
@@ -20,42 +20,42 @@
     "jax": "0.10.2",
     "jaxlib": "0.10.2",
     "workers": 6,
-    "test_files": 35,
-    "test_lines": 21451,
-    "passed": 760,
+    "test_files": 34,
+    "test_lines": 21532,
+    "passed": 767,
     "skipped": 8,
-    "pytest_seconds": 190.23,
-    "gate_seconds": 192.6,
+    "pytest_seconds": 237.96,
+    "gate_seconds": 240.3,
     "branch_coverage_percent": 95.28,
     "slowest_tests": [
       {
         "nodeid": "tests/test_fringing.py::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]",
-        "seconds": 53.092
+        "seconds": 81.143
       },
       {
         "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
-        "seconds": 30.636
+        "seconds": 42.725
       },
       {
         "nodeid": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "seconds": 27.657
+        "seconds": 36.069
       },
       {
         "nodeid": "tests/test_autodiff.py::test_fringing_response_inverse_design_reduces_loss",
-        "seconds": 23.638
+        "seconds": 33.712
       },
       {
-        "nodeid": "tests/test_autodiff.py::test_extruded_rect_inverse_design_reduces_loss",
-        "seconds": 19.911
+        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_returns_finite_payload",
+        "seconds": 31.628
       }
     ],
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 167.6,
-    "wall_time_reduction_percent": -14.92,
-    "current_budget_fraction": 0.321,
-    "current_engineering_target_fraction": 0.535,
+    "previous_gate_seconds": 192.6,
+    "wall_time_reduction_percent": -24.77,
+    "current_budget_fraction": 0.401,
+    "current_engineering_target_fraction": 0.668,
     "current_gate_pass": true
   },
   "hosted_ci": {

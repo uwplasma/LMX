@@ -151,8 +151,8 @@ for external research use.
 
 ## Current checkpoint
 
-- Portable gate: 760 passed, 8 expected external-data skips, 95.28% branch
-  coverage, 192.6 seconds on the reference Mac.
+- Portable gate: 767 passed, 8 expected external-data skips, 95.28% branch
+  coverage, 240.3 seconds on the reference Mac.
 - SOLVAX: compatible `>=0.8,<1`; latest tested package is 0.8.1.
 - B1 retained modes: separated real `m=0` and complex `m=1..4` block factors
   pass factor parity and reduce medium restart time from 24.12 to 10.63 seconds.
@@ -187,10 +187,10 @@ for external research use.
   seconds including compilation, with two recorded addressable shards.
 - Repository consolidation: the root provenance tree and historical campaign,
   Docker, dashboard, support/security, and duplicate driver surfaces are gone.
-  The maintained checkout has 35 test files, 20 maintenance scripts, 13 compact
+  The maintained checkout has 34 test files, 20 maintenance scripts, 13 compact
   accepted-result files, and no remote development branches beyond `main`.
-- Architecture: 36 package modules, 35,043 package lines, 8,421 maintained-core
-  lines, a 3.75 MiB tracked checkout, and a 288,481-byte wheel. Live gates cap
+- Architecture: 36 package modules, 35,133 package lines, 8,421 maintained-core
+  lines, a 3.63 MiB tracked checkout, and a 288,481-byte wheel. Live gates cap
   modules, lines, bytes, lazy import time, examples, exports, and wheel contents.
 - Documentation media: six anonymous-access derivatives total 516 KB and stay
   out of the wheel; full-resolution fields, plots, and movies remain checksummed
