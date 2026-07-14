@@ -267,6 +267,27 @@ def test_partial_restart_requires_matching_progress_provenance(
         campaign._load_partial_restart(restart_path, progress_path, "source")
 
 
+def test_acceptance_observable_is_reloaded_from_persisted_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    bundle = SimpleNamespace(
+        x=campaign.np.asarray([-8.0, 0.0, 6.0]),
+        transverse_pressure_difference=campaign.np.asarray([1.0, 4.0, 3.0]),
+    )
+    monkeypatch.setattr(
+        campaign,
+        "load_extruded_restart_bundle",
+        lambda path: SimpleNamespace(bundle=bundle),
+    )
+
+    x, observable = campaign._load_restart_observable(
+        tmp_path / "accepted.npz", "B2-fringing-square"
+    )
+
+    assert x == pytest.approx([-8.0, 0.0, 6.0])
+    assert observable == pytest.approx([-1.0 / 540.0, 2.0 / 540.0, 1.0 / 540.0])
+
+
 def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
     assert campaign._parse_variant_restarts(
         ["thin_wall=/tmp/thin.npz", "baseline=/tmp/base.npz"]

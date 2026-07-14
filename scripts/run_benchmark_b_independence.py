@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -389,6 +390,16 @@ def _load_partial_restart(
     return load_extruded_restart_bundle(partial_restart_path).bundle
 
 
+def _load_restart_observable(
+    restart_path: Path, case_id: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """Read the acceptance curve from the exact checksummed restart."""
+
+    bundle = load_extruded_restart_bundle(restart_path).bundle
+    observable = benchmark_b_pressure_observable(SimpleNamespace(bundle=bundle), case_id)
+    return np.asarray(bundle.x), np.asarray(observable)
+
+
 def _run_record(
     case_id: str,
     mesh_level: str,
@@ -434,7 +445,7 @@ def _run_record(
     elapsed = time.perf_counter() - started
     restart_path.parent.mkdir(parents=True, exist_ok=True)
     write_extruded_restart_npz(solution, problem.case, restart_path)
-    observable = np.asarray(benchmark_b_pressure_observable(solution, case_id))
+    observable_x, observable = _load_restart_observable(restart_path, case_id)
     validation = solution.validation
     return {
         "case_id": case_id,
@@ -473,7 +484,7 @@ def _run_record(
             "checkpoint_interval": checkpoint_interval,
             "partial_restart_path": str(partial_restart_path),
         },
-        "x_over_L": np.asarray(solution.bundle.x).tolist(),
+        "x_over_L": observable_x.tolist(),
         "primary_observable": observable.tolist(),
         "iteration_residual_history": np.asarray(
             solution.bundle.iteration_residual_history
