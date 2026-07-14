@@ -1,8 +1,8 @@
 # Changelog
 
 LMX follows semantic versioning for the stable public API. Research-stage APIs
-may change between minor releases, but every such API is labeled in the feature
-manifest and documentation.
+may change between minor releases, but every such API is labeled in the
+documentation.
 
 ## Unreleased
 
@@ -16,7 +16,7 @@ manifest and documentation.
   index.
 - Axial JAX sharding with measured two-GPU B2 strong scaling and restart-safe
   checkpointing.
-- One-release warnings for the legacy root namespace and a migration guide.
+- A migration guide from former root aliases to their owning modules.
 
 ### Changed
 
@@ -24,8 +24,8 @@ manifest and documentation.
 - Curated `examples/` to 11 first-run journeys and grouped reusable inputs under
   `examples/cases/`; generated research work now stays under ignored
   `artifacts/`.
-- Consolidated the portable suite to 40 files and 765 passing tests while
-  retaining 95.28% branch coverage and a 171.1-second six-worker gate.
+- Consolidated the portable suite to 35 files and 762 passing tests while
+  retaining 95.28% branch coverage and a 167.6-second six-worker gate.
 - Accepted compatible SOLVAX 0.8 releases below 1.0 instead of pinning one
   patch version.
 - Moved 65 large generated artifacts to the checksummed
