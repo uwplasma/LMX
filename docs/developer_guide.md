@@ -212,10 +212,10 @@ plan rather than being maintained by a separate status-dashboard subsystem.
 
 The latest local evidence pass on this workstation shows:
 
-- default push/PR lane: fast unit/release-readiness checks plus parallel
-  bounded validation-artifact jobs, under the 10-minute wall-clock target
-- broad package lane: 762 tests pass with 95.28% combined line/branch coverage
-  over `lmx/`; workflow-script behavior is exercised by the same suite
+- Python 3.10 compatibility lane: the complete battery without coverage
+  instrumentation, under the 10-minute wall-clock target
+- Python 3.13 coverage lane: 762 tests pass with 95.28% combined line/branch
+  coverage over `lmx/`; workflow behavior is exercised by the same suite
 
 The hard rule for routine CI/CD is that the parallel workflow must stay under
 10 minutes. When a new test exceeds that budget, prefer:

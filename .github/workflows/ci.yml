@@ -20,13 +20,19 @@ env:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
+    name: Python ${{ matrix.python-version }} (${{ matrix.lane }})
     runs-on: ubuntu-latest
     timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        include:
+          - python-version: "3.10"
+            lane: compatibility
+            coverage-args: --no-coverage
+          - python-version: "3.13"
+            lane: coverage
+            coverage-args: ""
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-lmx
@@ -37,7 +43,7 @@ jobs:
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
       - name: Run all tests and branch coverage
-        run: python scripts/run_full_test_suite.py --budget-seconds 600
+        run: python scripts/run_full_test_suite.py --budget-seconds 600 ${{ matrix.coverage-args }}
       - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

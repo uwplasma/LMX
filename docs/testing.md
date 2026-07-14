@@ -75,11 +75,12 @@ and hardware fingerprints. Large raw fields belong in a versioned release.
 
 ## CI contract
 
-Pull requests run the full gate on supported Python endpoints and build the
-documentation with warnings as errors. Release jobs repeat the gate, build the
-docs, build wheel and source distributions, and smoke-test the wheel. Dependency
-compatibility is expressed as a supported range; the lockfile supplies CI
-reproducibility.
+Pull requests run the full test battery on both supported Python endpoints,
+measuring branch coverage once on Python 3.13 and running Python 3.10 without
+instrumentation overhead. Documentation builds with warnings as errors. Release
+jobs repeat the covered gate, build the docs and distributions, and smoke-test
+the wheel. The lockfile supplies CI reproducibility within supported dependency
+ranges.
 
 ## Adding functionality
 
