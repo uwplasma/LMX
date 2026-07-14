@@ -201,9 +201,12 @@ for external research use.
   updates each, and their observables agree to `1.76e-13` relative. The tighter
   variant reached a durable 48-update checkpoint at `3.4770e-5`, above its
   `2.5e-5` target. Dynamic Aitken plateaued while settled relaxation 3 and 4
-  oscillated, so scalar tuning is closed. Test one bounded block or non-scalar
-  outer method from the checksummed release checkpoint; fine numerical
-  independence and experimental acceptance remain open.
+  oscillated; componentwise Aitken then diverged to `5.18e-3`, so the bounded
+  outer search is closed. The fine curve misses the frozen ALEX weighted RMS,
+  weighted maximum, and integrated-error gates at `1.389`, `4.218`, and `0.251`.
+  Diagnose exact-case FreeMHD and observable/model normalization next, before
+  designing another outer method. Fine numerical independence and experimental
+  acceptance remain open; the checksummed tight restart is retained for later.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

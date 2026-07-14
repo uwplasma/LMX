@@ -153,6 +153,27 @@
       "numerical_independence_pass": false,
       "interpretation": "baseline, doubled-iteration, wall, steady, conservation, and placement gates pass; full fine numerical independence remains open until the tight-tolerance variant passes"
     },
+    "literature_diagnostic": {
+      "weighted_rms": 1.3890297620769352,
+      "weighted_linf": 4.218116326564625,
+      "integrated_pressure_relative_error": 0.25050194860052977,
+      "limits": {
+        "weighted_rms": 1.0,
+        "weighted_linf": 2.0,
+        "integrated_pressure_relative_error": 0.1,
+        "finest_mesh_change_relative": 0.02
+      },
+      "gates": {
+        "weighted_rms": false,
+        "weighted_linf": false,
+        "integrated_pressure": false
+      },
+      "directional_medium_to_fine_change": 0.03185496320094044,
+      "directional_medium_record_sha256": "e0dd4f16bcf774e516bc903176ca342e95e5d564c25bb37565ba5952cc0eb244",
+      "directional_medium_record_url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-medium-accepted-baseline.json",
+      "provenance_warning": "the accepted medium and current fine records have different source fingerprints, so their directional change diagnoses trend but is not formal mesh acceptance",
+      "interpretation": "the current fine curve misses every frozen ALEX literature gate and worsens the experimental metrics; resolve model, observable-normalization, and exact-case FreeMHD parity before further outer-iteration optimization"
+    },
     "raw_result_sha256": {
       "B2-fringing-square-fine-baseline.json": "cbdb645c95aeee46e223f0c03ae4e47941957c3530db0846c956fe990b5e54e3",
       "B2-fringing-square-fine-extended_iterations.json": "1c6f7e553998e0b9ed744de02c7b74ece8662c0f733af3dba99e3cdd9d80f270",
@@ -186,16 +207,23 @@
         "seconds": 79.45159836299717,
         "residual_history": [3.4831262432977184e-05, 5.843127501560744e-05, 3.475470905056621e-05, 3.80905039649705e-05],
         "result": "rejected: oscillatory"
+      },
+      "componentwise_aitken_2.0_to_4.0": {
+        "seconds": 99.97160991601413,
+        "electric_iterations": [232, 230, 239, 235],
+        "residual_history": [3.4831262432977184e-05, 3.4815930186726796e-05, 0.002482091057613969, 0.005183385253632448],
+        "result": "rejected: independently accelerated state blocks diverge after two updates"
       }
     },
     "raw_sha256": {
       "lmx-b2-dynamic-aitken-tight-4.json": "367f7fc9d80156ed2bfdfa25281802497ebcda21440e915cb551b42dde131463",
       "lmx-b2-settled3-tight-4.json": "41f9ed7f041740ac92213996db1bead39f9d9d59eb558d49c066253bce76e893",
       "lmx-b2-settled4-tight-4.json": "c7007f7abee9a3b777b8383ab71494ba20a0570575b2bc9a233c9233507522dd",
+      "lmx-b2-block-aitken-fastdiag-tight-4.json": "245ece0e4b7ae6336069302bba7bb6aeefd5075c92cdeac79261d488262545b2",
       "B2-fringing-square-fine-tight_tolerance.progress.json": "6433b99b5e0237741e0c3f6f7f099439e194e65450cd054ba6f5061c2636c18f"
     },
-    "stop_reason": "bounded stop: scalar relaxation either plateaus or oscillates; preserve the checkpoint and move to a block or non-scalar outer method",
-    "next_action": "diagnose the controlling momentum components and test one bounded block/non-scalar coupling method from this exact checkpoint"
+    "stop_reason": "bounded stop: scalar relaxation either plateaus or oscillates, and componentwise Aitken diverges; preserve the checkpoint rather than expanding an unpromising parameter search",
+    "next_action": "diagnose the systematic ALEX observable discrepancy and run an exact matched FreeMHD comparison before designing another outer coupling method"
   },
   "raw_assets": {
     "baseline_warm": {

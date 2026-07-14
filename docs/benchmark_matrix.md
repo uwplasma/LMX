@@ -94,8 +94,11 @@ The fine campaign (`202 x 149 x 149`) now passes baseline, doubled-iteration,
 confirmation-wall, steady, conservation, and two-shard placement gates. Its
 tight variant is preserved at a durable 48-update checkpoint with residual
 `3.4770e-5`, above the `2.5e-5` target. Bounded scalar probes either plateaued
-or oscillated, so fine numerical independence remains open pending a block or
-non-scalar outer coupling method.
+or oscillated, and componentwise Aitken diverged. The fine curve also misses all
+three frozen ALEX literature limits (weighted RMS `1.389`, weighted maximum
+`4.218`, integrated error `0.251`). Fine numerical independence remains open;
+matched-FreeMHD and observable/model normalization are the next validation
+priority.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

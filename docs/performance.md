@@ -76,10 +76,18 @@ updates; their wall observables agree to `1.76e-13` relative.
 The tighter `2.5e-5` variant reached a durable 48-update checkpoint and latest
 recorded residual `3.4770e-5`. A dynamic Aitken probe was monotone but improved
 only about `1.53e-8` per update; settled relaxation 3 and 4 oscillated. Scalar
-tuning is therefore bounded and rejected. The 115 MiB restart and raw records
-are release assets; the next fine-grid task is one block or non-scalar outer
-coupling method from that exact checkpoint. Until it passes, fine numerical
-independence and experimental acceptance remain open.
+tuning is therefore bounded and rejected. Componentwise Aitken was also
+rejected after the residual jumped to `5.18e-3`. The 115 MiB restart and raw
+records are release assets.
+
+The fine curve has weighted RMS `1.389`, weighted maximum `4.218`, and
+integrated pressure error `0.251`, missing the frozen ALEX limits `1.0`, `2.0`,
+and `0.10`. A directional comparison to the accepted medium curve changes by
+`0.0319`, above the `0.02` mesh gate; the records have different source
+fingerprints, so this is diagnosis rather than formal acceptance. Exact-case
+FreeMHD and observable/model normalization now take priority over another outer
+acceleration search. Fine numerical independence and experimental acceptance
+remain open.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.

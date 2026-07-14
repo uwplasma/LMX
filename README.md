@@ -181,7 +181,9 @@ matched two-update time from 183.37 to 98.12 seconds (`1.87x`) with identical
 field norms and residual histories. The resumed fine baseline then passed in
 457.37 seconds, and its doubled-iteration and wall confirmations passed. The
 tighter-tolerance variant is checkpointed at `3.4770e-5`; fine numerical
-independence and experimental ALEX acceptance therefore remain open.
+independence remains open. The current fine pressure curve also misses the
+frozen ALEX error limits, so experimental acceptance and matched-FreeMHD parity
+remain explicit open gates rather than implied solver claims.
 The axisymmetric `101 x 64 x 128` ALEX B1 pipe path now uses an exact batched
 FFT line in periodic `theta`: its checkpointed 133-update campaign completes in
 `2860.11 s` on one A4000, below the one-hour cap and `4.30x` faster than the

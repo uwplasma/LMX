@@ -25,7 +25,8 @@ are authoritative when prose and results differ.
 - ALEX B2 square-duct fringing flow: conservation, two-GPU numerical
   equivalence, the 1.87x fine-checkpoint solver promotion, and fine baseline,
   doubled-iteration, and wall gates pass; tight-tolerance independence and
-  experimental validation remain open.
+  experimental validation remain open, and the current fine pressure curve
+  misses every frozen ALEX literature-error limit.
 - Q2D turbulence, magnetic-obstacle, mapped blanket, and Dean-vortex workflows
   provide model or adapter checks but do not yet support quantitative claims.
 
