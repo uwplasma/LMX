@@ -11,19 +11,6 @@ def test_repository_provenance_manifests_are_canonical_and_lock_is_current():
     assert provenance._check_uv_lock() == []
 
 
-def test_feature_manifest_references_real_tests_and_all_package_modules():
-    payload = provenance._read_json(provenance.FEATURES_PATH)
-    assert provenance.validate_feature_manifest(payload) == []
-
-    missing = provenance._test_reference_error("tests/test_solver.py::test_not_present")
-    malformed = provenance._test_reference_error("tests/test_solver.py")
-    assert (
-        missing
-        == "test function does not exist: tests/test_solver.py::test_not_present"
-    )
-    assert malformed == "test reference must use path::function: tests/test_solver.py"
-
-
 def test_benchmark_registry_has_live_checksums_and_verified_benchmark_a_status():
     payload = provenance._read_json(provenance.BENCHMARKS_PATH)
     assert provenance.validate_benchmark_manifest(payload) == []
@@ -35,6 +22,11 @@ def test_benchmark_registry_has_live_checksums_and_verified_benchmark_a_status()
     assert statuses["A3-high-ha"] == "verified-bounded"
     assert statuses["B1-fringing-pipe"] == "specification-frozen"
     assert statuses["B2-fringing-square"] == "specification-frozen"
+
+    missing = provenance._test_reference_error("tests/test_solver.py::test_not_present")
+    malformed = provenance._test_reference_error("tests/test_solver.py")
+    assert missing == "test function does not exist: tests/test_solver.py::test_not_present"
+    assert malformed == "test reference must use path::function: tests/test_solver.py"
 
 
 def test_external_literature_verifier_reports_missing_and_changed_files(tmp_path: Path):

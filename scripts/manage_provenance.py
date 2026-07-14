@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and verify the compact LMX feature and benchmark manifests."""
+"""Generate and verify the compact LMX benchmark provenance manifest."""
 
 from __future__ import annotations
 
@@ -18,9 +18,7 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE_DIR = ROOT / "provenance"
-FEATURES_PATH = PROVENANCE_DIR / "features.json"
 BENCHMARKS_PATH = PROVENANCE_DIR / "benchmarks.json"
-SCHEMA_DIR = PROVENANCE_DIR / "schemas"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -40,14 +38,6 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _relative_paths(root: Path, pattern: str) -> list[str]:
-    return sorted(
-        path.relative_to(root).as_posix()
-        for path in root.glob(pattern)
-        if path.is_file()
-    )
 
 
 def _canonical_benchmark_manifest(
@@ -104,40 +94,6 @@ def _path_error(relative: str, root: Path = ROOT) -> str | None:
     if not (root / relative).is_file():
         return f"referenced file does not exist: {relative}"
     return None
-
-
-def validate_feature_manifest(
-    payload: Mapping[str, Any], root: Path = ROOT
-) -> list[str]:
-    errors = _schema_errors(payload, "features.schema.json", root)
-    features = payload.get("features", [])
-    ids = [feature.get("id") for feature in features]
-    if len(ids) != len(set(ids)):
-        errors.append("feature ids must be unique")
-
-    mapped_modules: set[str] = set()
-    for feature in features:
-        mapped_modules.update(str(path) for path in feature.get("modules", []))
-        for path in feature.get("modules", []):
-            error = _path_error(str(path), root)
-            if error:
-                errors.append(error)
-        for references in feature.get("tests", {}).values():
-            for reference in references:
-                error = _test_reference_error(str(reference), root)
-                if error:
-                    errors.append(error)
-        for path in feature.get("workflows", []):
-            error = _path_error(str(path), root)
-            if error:
-                errors.append(error)
-
-    actual_modules = set(_relative_paths(root, "lmx/*.py"))
-    for path in sorted(actual_modules - mapped_modules):
-        errors.append(f"module is missing from the feature manifest: {path}")
-    for path in sorted(mapped_modules - actual_modules):
-        errors.append(f"feature manifest maps an unknown module: {path}")
-    return errors
 
 
 def validate_benchmark_manifest(
@@ -205,21 +161,14 @@ def verify_external_literature(
     return errors
 
 
-def _document_state(
-    root: Path = ROOT,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    features = _read_json(root / "provenance" / "features.json")
-    benchmarks = _canonical_benchmark_manifest(
+def _document_state(root: Path = ROOT) -> dict[str, Any]:
+    return _canonical_benchmark_manifest(
         _read_json(root / "provenance" / "benchmarks.json"), root
     )
-    return features, benchmarks
 
 
 def write_manifests(root: Path = ROOT) -> list[str]:
-    features, benchmarks = _document_state(root)
-    (root / "provenance" / "features.json").write_text(
-        _canonical_json(features), encoding="utf-8"
-    )
+    benchmarks = _document_state(root)
     (root / "provenance" / "benchmarks.json").write_text(
         _canonical_json(benchmarks), encoding="utf-8"
     )
@@ -227,16 +176,12 @@ def write_manifests(root: Path = ROOT) -> list[str]:
 
 
 def validate_manifests(root: Path = ROOT) -> list[str]:
-    features, benchmarks = _document_state(root)
-    errors = validate_feature_manifest(features, root)
-    errors.extend(validate_benchmark_manifest(benchmarks, root))
-    return errors
+    return validate_benchmark_manifest(_document_state(root), root)
 
 
 def check_manifests(root: Path = ROOT) -> list[str]:
-    features, benchmarks = _document_state(root)
+    benchmarks = _document_state(root)
     expected = {
-        root / "provenance" / "features.json": _canonical_json(features),
         root / "provenance" / "benchmarks.json": _canonical_json(benchmarks),
     }
     errors: list[str] = []
