@@ -1619,36 +1619,24 @@ def test_run_extruded_inductionless_slice_rejects_invalid_inputs():
         run_extruded_inductionless_slice(bad_field_case, profile)
 
 
-def test_build_square_duct_extruded_problem_marks_solver_family():
-    problem = build_square_duct_extruded_problem(nx_stations=5, ny=8, nz=8)
+@pytest.mark.parametrize(
+    ("builder", "kwargs", "geometry_kind"),
+    (
+        (build_square_duct_extruded_problem, {"ny": 8, "nz": 8}, "rect_duct"),
+        (
+            build_layered_duct_extruded_problem,
+            {"ny": 8, "nz": 8, "wall_cells": 1, "insulator_cells": 1},
+            "layered_duct",
+        ),
+        (build_pipe_ogrid_extruded_problem, {"nr": 6, "ntheta": 12}, "pipe_ogrid"),
+        (build_bent_pipe_extruded_problem, {"nr": 6, "ntheta": 12}, "bent_pipe"),
+    ),
+)
+def test_extruded_problem_builders_mark_solver_family(builder, kwargs, geometry_kind):
+    problem = builder(nx_stations=5, **kwargs)
 
     assert problem.case.solver.kind == "extruded_inductionless"
-    assert problem.profile.x.shape == (5,)
-
-
-def test_build_layered_duct_extruded_problem_marks_solver_family():
-    problem = build_layered_duct_extruded_problem(
-        nx_stations=5, ny=8, nz=8, wall_cells=1, insulator_cells=1
-    )
-
-    assert problem.case.solver.kind == "extruded_inductionless"
-    assert problem.case.geometry.kind == "layered_duct"
-    assert problem.profile.x.shape == (5,)
-
-
-def test_build_pipe_ogrid_extruded_problem_marks_solver_family():
-    problem = build_pipe_ogrid_extruded_problem(nx_stations=5, nr=6, ntheta=12)
-
-    assert problem.case.solver.kind == "extruded_inductionless"
-    assert problem.case.geometry.kind == "pipe_ogrid"
-    assert problem.profile.x.shape == (5,)
-
-
-def test_build_bent_pipe_extruded_problem_marks_solver_family():
-    problem = build_bent_pipe_extruded_problem(nx_stations=5, nr=6, ntheta=12)
-
-    assert problem.case.solver.kind == "extruded_inductionless"
-    assert problem.case.geometry.kind == "bent_pipe"
+    assert problem.case.geometry.kind == geometry_kind
     assert problem.profile.x.shape == (5,)
 
 
