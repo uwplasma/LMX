@@ -66,7 +66,6 @@ from lmx.fringing import (
     _variable_coefficient_residual_3d,
     _conservative_current_fluxes_3d,
     _face_flux_pressure_projection_duct,
-    _inlet_flow_outlet_pressure_projection_duct,
     _face_flux_pressure_projection_pipe,
     _fixed_flow_face_flux_projection_pipe,
     _masked_laplacian_pipe,
@@ -866,7 +865,7 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     assert jnp.isfinite(pressure).all()
 
 
-def test_mixed_pressure_projection_recovers_coefficients_and_boundary_flow():
+def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     shape = (4, 2, 2)
     dx = 0.25
     widths = jnp.asarray([0.5, 0.5])
@@ -887,7 +886,7 @@ def test_mixed_pressure_projection_recovers_coefficients_and_boundary_flow():
     assert pressure == pytest.approx(expected_pressure, abs=1.0e-7)
 
     zeros = jnp.zeros(shape)
-    projected = _inlet_flow_outlet_pressure_projection_duct(
+    projected = _face_flux_pressure_projection_duct(
         zeros,
         zeros,
         zeros,

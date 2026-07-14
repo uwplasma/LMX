@@ -1749,14 +1749,11 @@ def _face_flux_pressure_projection_duct(
     initial_pressure: jnp.ndarray | None = None,
     single_reduction: bool = False,
     include_axial_line: bool = True,
-    axial_pressure_mode: str = "neumann",
     inlet_flow_rate: float | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Project duct face fluxes and return their boundary flow rates."""
+    """Project duct face fluxes; mixed boundaries also return flow diagnostics."""
 
-    mixed_axial_pressure = axial_pressure_mode == _MIXED_AXIAL_PRESSURE_MODE
-    if mixed_axial_pressure != (inlet_flow_rate is not None):
-        raise ValueError("Mixed axial pressure requires one inlet flow rate")
+    mixed_axial_pressure = inlet_flow_rate is not None
     if inlet_flow_rate is not None and inlet_flow_rate <= 0.0:
         raise ValueError("Inlet flow rate must be positive")
 
@@ -1809,7 +1806,9 @@ def _face_flux_pressure_projection_duct(
         ),
         single_reduction=single_reduction,
         include_axial_line=include_axial_line,
-        axial_pressure_mode=axial_pressure_mode,
+        axial_pressure_mode=(
+            _MIXED_AXIAL_PRESSURE_MODE if mixed_axial_pressure else "neumann"
+        ),
     )
 
     mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
@@ -1847,65 +1846,17 @@ def _face_flux_pressure_projection_duct(
     full_v = jnp.zeros_like(v).at[:, y0:y1, z0:z1].set(projected_v)
     full_w = jnp.zeros_like(w).at[:, y0:y1, z0:z1].set(projected_w)
     full_p = jnp.zeros_like(u).at[:, y0:y1, z0:z1].set(pressure)
+    divergence_norm = jnp.max(jnp.abs(divergence_after))
+    if not mixed_axial_pressure:
+        return full_u, full_v, full_w, full_p, divergence_norm
+
     inlet_flow = jnp.sum(uf[0] * face_area)
     outlet_flow = jnp.sum(uf[-1] * face_area)
-    result = (
-        full_u,
-        full_v,
-        full_w,
-        full_p,
-        jnp.max(jnp.abs(divergence_after)),
-        inlet_flow,
-        outlet_flow,
-    )
-    return result if mixed_axial_pressure else result[:5]
-
-
-def _inlet_flow_outlet_pressure_projection_duct(
-    u: jnp.ndarray,
-    v: jnp.ndarray,
-    w: jnp.ndarray,
-    rho: jnp.ndarray,
-    fluid_mask: jnp.ndarray,
-    *,
-    inlet_flow_rate: float,
-    dt: float,
-    dx: float,
-    dy: jnp.ndarray,
-    dz: jnp.ndarray,
-    iterations: int,
-    tolerance: float,
-    fluid_bounds: tuple[int, int, int, int] | None = None,
-    initial_pressure: jnp.ndarray | None = None,
-    single_reduction: bool = False,
-    include_axial_line: bool = True,
-) -> tuple[jnp.ndarray, ...]:
-    """Project with one inlet integral-flow constraint and outlet pressure zero."""
-
-    projected = _face_flux_pressure_projection_duct(
-        u,
-        v,
-        w,
-        rho,
-        fluid_mask,
-        dt=dt,
-        dx=dx,
-        dy=dy,
-        dz=dz,
-        iterations=iterations,
-        tolerance=tolerance,
-        fluid_bounds=fluid_bounds,
-        initial_pressure=initial_pressure,
-        single_reduction=single_reduction,
-        include_axial_line=include_axial_line,
-        axial_pressure_mode=_MIXED_AXIAL_PRESSURE_MODE,
-        inlet_flow_rate=inlet_flow_rate,
-    )
-    u_next, v_next, w_next, pressure, divergence, inlet_flow, outlet_flow = projected
-    area = dy[None, :, None] * dz[None, None, :]
-    active_area = jnp.sum(jnp.where(fluid_mask, area, 0.0), axis=(1, 2))
+    active_mask = fluid_mask[:, y0:y1, z0:z1]
+    area = face_area[None, :, :]
+    active_area = jnp.sum(jnp.where(active_mask, area, 0.0), axis=(1, 2))
     mean_pressure = (
-        jnp.sum(jnp.where(fluid_mask, pressure * area, 0.0), axis=(1, 2)) / active_area
+        jnp.sum(jnp.where(active_mask, pressure * area, 0.0), axis=(1, 2)) / active_area
     )
     pressure_loss_faces = jnp.zeros((pressure.shape[0] + 1,), dtype=pressure.dtype)
     pressure_loss_faces = pressure_loss_faces.at[1:-1].set(
@@ -1918,7 +1869,7 @@ def _inlet_flow_outlet_pressure_projection_duct(
     flow_error = jnp.maximum(
         jnp.abs(inlet_flow - inlet_flow_rate), jnp.abs(outlet_flow - inlet_flow_rate)
     )
-    return u_next, v_next, w_next, pressure, pressure_loss, divergence, flow_error
+    return full_u, full_v, full_w, full_p, pressure_loss, divergence_norm, flow_error
 
 
 def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
@@ -7341,7 +7292,7 @@ def _solve_extruded_projection(
         use_axial_line_preconditioner = False
 
         def mixed_boundary_projection(u0, v0, w0, pressure0, rho0, mask0):
-            return _inlet_flow_outlet_pressure_projection_duct(
+            return _face_flux_pressure_projection_duct(
                 u0,
                 v0,
                 w0,
