@@ -70,16 +70,18 @@ superseded worktrees and branches.
 | README/docs | 567-word feature-led README, conservatively sourced comparison table, feature-specific docs, and a 7-second Hunt loop; tracked media is 387,683 bytes | refresh canonical B2/scaling panels only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish canonical B2, then independent input observers and the smoke role |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish the O(nx) coarse solve and diagnostics, then independent input observers and the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
-| B2 ALEX square duct | the mixed projection and exact frozen limited-linear operator pass tiny gates; one stacked nonsymmetric momentum solve now replaces three component diffusion solves | carry corrected mass flux through time, add the lagged deviatoric-stress correction, and integrate the exact step |
-| SOLVAX | released 0.8.3 already provides the GMRES, implicit differentiation, PCG, additive, and tridiagonal APIs needed now; prepared 0.8.4 adds auxiliary diagnostics and a distinct transpose solver | do not block B2 on 0.8.4; publish it only through the independent SOLVAX release process |
-| Portable quality | accepted at `b763b84`: 784 pass, 8 expected skips, 95.28% branch coverage, 149.9 s | run the next full gate after corrected-flux B2 integration; stay below the 300 s target and 600 s limit |
+| B2 ALEX square duct | exact frozen limited-linear momentum, lagged stress, corrected compact flux, mixed projection, periodic Aitken restart identity, and forced one-/two-CPU equivalence pass bounded gates | replace the dense axial coarse inverse, then materialize and run the exact tiny FreeMHD smoke |
+| SOLVAX | released 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and tridiagonal algebra needed now; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | use 0.8.3 for the O(nx) axial solve; publish 0.8.4 separately before consuming shared Anderson weights |
+| Portable quality | accepted at `cf76c5a`: 769 pass, 8 expected skips, 95.24% combined line/branch coverage, 167.0 s | preserve the 300 s target and 600 s hard limit while consolidating rather than adding test files |
 
-Current structural audit at `09806e9`: 35 modules, 34,936 package lines, 8,027
-maintained-core lines, 32 test files / 21,300 lines, and 18 maintenance scripts.
-In-progress metrics are not status evidence; every tranche must return below
-the enforced live caps before commit.
+Current structural audit at `cf76c5a`: 35 modules, exactly 35,000 package
+lines, 8,049 maintained-core lines, 32 test files / exactly 21,300 lines, and
+18 maintenance scripts. These are ceilings, not targets: every added branch or
+test must consolidate or delete at least as much code in the same tranche.
+The four audited probe worktrees contained only promoted or rejected work;
+their findings are recorded here, and local/remote navigation is now `main` only.
 
 The final audit freezes these interpretations:
 
@@ -109,6 +111,13 @@ The final audit freezes these interpretations:
   and flux.
 - No medium or production FreeMHD run is authorized until a tiny exact smoke
   proves those semantics in both codes.
+- Expanded `(nx+1)` axial face arrays are not shard-safe on an evenly divided
+  cell mesh. Projection now carries `nx` positive faces plus one replicated
+  inlet plane and exchanges the one-cell halo explicitly with `ppermute`.
+- Periodic B2 checkpoints are exact Aitken continuation points: they persist
+  the previous scaled residual, relaxation, convergence streak, compact flux,
+  and all five histories. A deliberately final step still skips acceleration,
+  so a completed run is not reinterpreted as a mid-run checkpoint.
 
 Machine-readable evidence is in `benchmarks/results/`; interpretation belongs
 in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
@@ -117,7 +126,7 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 ## Immediate execution order
 
 1. **Complete:** schema 2, real artifact verification, provenance, and the
-   784-pass portable gate at 95.28% branch coverage in 149.9 seconds.
+   current 769-pass portable gate at 95.24% coverage in 167.0 seconds.
 2. **Complete:** re-audit FreeMHD v2206 limiter, implicit momentum assembly,
    mixed axial boundaries, SOLVAX v0.8.3 ownership, and sharding constraints.
 3. **Complete:** freeze the missing `cellLimited leastSquares 1.0` gradient
@@ -132,13 +141,12 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    gradient and cell limiter; preserve the exact guarded NVD sign/upwind rules;
    keep only expanded full-face arrays fused/internal, persist the compact
    corrected carry, and prove conservation, scaling, JIT, and JVP.
-6. **Release preparation complete at SOLVAX `255d280`:** SOLVAX 0.8.4 exposes
-   `has_aux` and a distinct transpose solver through `linear_solve`; its full
-   gate is 263 passes in 68 seconds at 98.88% coverage, and hosted tests/docs
-   are green. LMX does not need those additions for its current three-value
-   momentum diagnostics: released 0.8.3 supports one differentiable GMRES solve
-   and LMX recomputes the physical residual. Keep `solvax>=0.8.3,<1`; tag,
-   publish, and install-verify 0.8.4 separately before using its new API.
+6. **Release preparation complete at SOLVAX `4808695`:** SOLVAX 0.8.4 exposes
+   auxiliary/transpose solves and reusable `anderson_weights`; 264 tests pass
+   in 22.46 seconds at 98.88% coverage, and build, Twine, and isolated-wheel
+   checks are green. LMX does not need these additions for Aitken or its current
+   momentum diagnostics. Keep `solvax>=0.8.3,<1`; tag, publish, and
+   install-verify 0.8.4 only through the separate SOLVAX release process.
 7. **Complete at `f7b66c9`:** apply the cheap user-surface/tooling correction
    from existing records only: narrow the README differentiation and multi-GPU
    claims, keep the comparison table restricted to stock documented capability,
@@ -151,30 +159,26 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    diffusion closures with one stacked nonsymmetric momentum operator. The
    `4x2x2` independent dense matrix, residual, JIT, placement, JVP/VJP, and
    zero-convection legacy-limit gates pass using released SOLVAX 0.8.3.
-9. Complete canonical B2 in four bounded changes, each with direct tests:
-   (a) add the compact positive-face mass-flux codec, exact fresh initializer,
-   and restart schema; (b) add the lagged component-limited least-squares
-   deviatoric-stress correction and its independent `5x4x3` balance gate;
-   (c) carry corrected flux from projection into the next momentum solve and
-   relax it with the same Aitken affine update as velocity; and (d) remove or
-   explicitly reject velocity clipping that would invalidate flux consistency.
-   Then prove zero-normal-current closure, two-step restart identity with
-   acceleration disabled, persist Aitken residual/relaxation/streak state before
-   claiming accelerated restart identity, add CFL/stopping diagnostics, and
-   prove one-/two-device equivalence on an `8x4x3` forced-CPU mesh.
-   Anderson restart identity remains unclaimed until bounded histories and one
-   shared set of PyTree mixing coefficients are implemented and gated. Ordinary
-   solution output need not store accelerator history; restart output must.
-10. Materialize both tiny inputs, derive their contracts independently, then
-   freeze smoke mesh, mapped field, time step, iterations, and stopping rules.
-11. Run affected modules, then one portable gate. Commit and push before the
-   external smoke.
-12. Extend the existing parity command to run one exact tiny B2 smoke. Compare
+9. **Complete at `ed76e59`–`1373850`:** compact positive-face flux, exact fresh
+   initialization and schema, lagged deviatoric stress, corrected-flux carry,
+   fail-loud clipping removal, affine Aitken flux relaxation, periodic exact
+   Aitken restart, zero-current/flux closure, and the `8x4x3` forced one-/two-CPU
+   production gate. `fa4e2e7` exposed and fixed a real axial shard-boundary bug;
+   the complete portable gate is green at `cf76c5a`. Anderson remains rejected
+   until released shared weights and bounded field/flux histories exist.
+10. Replace the dense axial coarse inverse with released SOLVAX 0.8.3
+   `tridiagonal_solve`: anchor the mixed solve, apply the analytical volume
+   gauge shift where required, and prove dense parity, variable coefficients,
+   JIT/JVP/VJP, residual, and one-/two-device placement on tiny grids. Delete
+   the dense assembly/inverse in the same tranche.
+11. Add explicit CFL and stopping diagnostics to the existing compact B2 record
+   and gate their restart continuity; do not add a new report or test file.
+12. Materialize both tiny inputs independently, derive their observed contracts,
+   then freeze smoke mesh, mapped field, time step, iterations, and stopping
+   rules. Commit and push before invoking FreeMHD.
+13. Extend the existing parity command to run one exact tiny B2 smoke. Compare
    mass/current closure, stopping, hashes, and the same pressure observable. A
    failure returns to the first failed tiny gate.
-13. Replace the dense axial coarse inverse with the audited O(nx) SOLVAX
-   tridiagonal/gauge decomposition and prove dense, gradient, and placement
-   parity on tiny grids.
 14. Prove one-/multi-device equivalence on that accepted tiny path, then measure
    fixed-size Mac 1/2/4-device CPU and office one-/two-GPU warm timings alone.
 15. Advance B2 one level at a time: exact coarse comparison first, then medium
@@ -183,7 +187,11 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 16. Refresh only the canonical B2 and scaling visuals/claims from compact
    accepted records without rerunning solvers.
 17. Complete the release gate. Exact B1 parity is the first post-release physics
-   tranche; existing retained-modal B1 evidence remains explicitly research-stage.
+   tranche. Do not revive composite-map FGMRES: it passed the tiny mesh but
+   stagnated at `3.17e-4` after 64 Krylov iterations on the reduced production
+   case, and its local-rate preconditioner regressed. A future structural steady
+   coupled block solve must first hoist three host `float(...)` validation checks
+   that currently block B1 JIT; never adopt the rejected silent-tracer bypass.
 
 ## Gate 1: authoritative matched harness
 
@@ -297,10 +305,10 @@ Production cells shard axially as `(nx, ny, nz)`. Persist corrected mass flux as
 `rho_phi_plus` with shape `(3,nx,ny,nz)` and sharding
 `P(None,"x",None,None)`, plus a replicated `(ny,nz)` inlet plane. Never
 checkpoint duplicated `nx+1` face arrays. Expand full faces only inside fused
-JIT kernels with nonperiodic concatenation and global slicing; do not use
-periodic `roll`. Profile compiled temporary memory before attempting a more
-complex codec, and do not claim `shard_map` scaling without explicit halo
-exchange.
+JIT kernels that have an explicit shard-cut gate; projection itself stays in
+the compact cell-shaped representation and exchanges axial halos explicitly.
+Do not use periodic `roll`. Profile compiled temporary memory before attempting
+a more complex codec, and do not claim scaling from placement alone.
 
 Exit: the physics-valid path has equivalent observables and useful measured
 speedup on its target host.
@@ -337,23 +345,17 @@ The next ownership audit is evidence-driven:
   SOLVAX tridiagonal solve plus an analytical constant gauge mode. This is the
   smallest high-impact sharding fix; prove mixed modes, variable coefficients,
   JIT/gradient, and placement first.
-- Then delete the complete legacy pipe Jacobi/SciPy Poisson stack by routing it
-  through the accepted SOLVAX-PCG pipe wrapper; follow with duct electric and
-  generic projection only after gauge, sign, flux, residual, and centerline
-  parity. This is worth roughly 450 net core lines—far more than migrating
-  isolated sparse calls.
-- Use generated SOLVAX block-Thomas factors for B1 modal transpose solves only
-  with dense-reference, plain-transpose, gauge, residual, gradient, cache,
-  memory, and timing gates.
-- Additive directional line composition already delegates to SOLVAX. The one
-  remaining line-plus-axial sum may migrate after B2 parity, but its tiny
-  deletion value does not justify interrupting the exact physics path.
-- After the canonical B2 release, schedule the pipe-Poisson deletion, B1
-  block-Thomas transpose migration, and remaining additive-combiner ownership
-  as separate numbered tranches in the next plan revision. They do not block
-  the present B2 release and must not interrupt its exact-parity path.
-- Defer two isolated `splu_solve` substitutions and new nonlinear APIs until
-  after canonical B2 parity; they do not currently buy enough deletion.
+- Keep `_additive_line_preconditioner_3d`: it only maps LMX coefficient axes
+  and periodicity into SOLVAX's existing additive/tridiagonal APIs. Moving it
+  has zero net deletion until SOLVAX has a reusable axis-line builder with a
+  second consumer.
+- Keep the tiny dense flow-response solves and SciPy reference/fallback paths;
+  they encode validation, anchor, gauge, or finite-volume semantics and are not
+  duplicate generic solver ownership.
+- After SOLVAX 0.8.4 is independently published and installed, use one
+  `anderson_weights` vector for scaled fields and both compact-flux histories.
+  That is a correctness tranche with bounded restart histories, not a slimming
+  shortcut, and must update the minimum-version CI lane in the same commit.
 - Do not delegate MHD coupling, finite-volume coefficients, physical
   fixed-point loops, or acceptance logic.
 
@@ -361,10 +363,10 @@ Ratchet only through real ownership deletion:
 
 | Surface | Current | Next target |
 |---|---:|---:|
-| package modules | 35 | 34 only after a complete owner disappears |
-| package lines | 34,936 | below 34,900 after exact B2 integration |
-| maintained-core lines | 8,027 | below 7,900 |
-| test files / lines | 32 / 21,300 | 31 / below 20,900 after generic evidence replaces the dedicated SOLVAX freezer tests |
+| package modules | 35 | stay at 35 until a complete owner disappears |
+| package lines | 35,000 | below 35,000 every tranche; below 34,800 after smoke cleanup |
+| maintained-core lines | 8,049 | below 8,000 after the exact smoke |
+| test files / lines | 32 / 21,300 | 32 / below 21,000 by consolidating post-smoke evidence |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or
