@@ -162,6 +162,7 @@
         "samper-table-i",
         "benchmark-a-acceptance",
         "solvax-pcg-acceptance",
+        "solvax-pcg-current-equivalence",
         "smolentsev-vv",
         "muller-buhler-book"
       ],
@@ -347,6 +348,14 @@
       "path": "benchmarks/results/solvax-pcg-acceptance.json",
       "sha256": "367ad17600913278e1bc6458aa6b5d0c37f8dadecdb25c70e98e15e82a2fede1",
       "title": "LMX released-SOLVAX PCG CPU and Benchmark A acceptance evidence"
+    },
+    {
+      "availability": "repository",
+      "id": "solvax-pcg-current-equivalence",
+      "kind": "repository_document",
+      "path": "benchmarks/results/solvax-pcg-current-equivalence.json",
+      "sha256": "2483008a4147b47defc4489af649516495cc6cf5c4425865b53b94d05b101ff2",
+      "title": "Current released-SOLVAX PCG CPU and GPU equivalence evidence"
     },
     {
       "authors": "S. Smolentsev et al.",

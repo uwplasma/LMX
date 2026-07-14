@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-14",
+  "benchmark": "LMX native versus released SOLVAX PCG",
+  "implementation": {
+    "lmx_version": "1.1.3",
+    "solvax_version": "0.8.1",
+    "benchmark_sha256": "2e420a48cabd77857941e7c3587985145a344c2b117a4c6f68bc8977a9e5b852",
+    "linear_sha256": "e44e03ac39c8728ea491d49918f531032ae50ff0eb2a60d8419bd6dc470fc2eb"
+  },
+  "problem": {
+    "grid": [64, 64],
+    "max_steps": 128,
+    "repeats": 7,
+    "tolerance": 1e-11,
+    "dtype": "float64"
+  },
+  "source_records": {
+    "cpu_sha256": "c026b4cc999bfb7bff5334799c14ce5afbccafc0fad44652200f935dafbbac10",
+    "gpu_sha256": "1a2f2ac5b2000a311b195065979439c72d1e7100ab90970d6e384933e34877b1",
+    "disposition": "external raw evidence"
+  },
+  "backends": {
+    "cpu": {
+      "device": "Apple M4 CPU",
+      "python_version": "3.12.13",
+      "jax_version": "0.10.2",
+      "native_residual": 9.592585786356946e-12,
+      "solvax_residual": 2.337933528080432e-13,
+      "field_relative_difference": 1.5383642716985824e-12,
+      "gradient_relative_error": 1.1277057678523599e-16,
+      "transpose_gradient_relative_error": 1.1277057678523599e-16,
+      "warm_time_ratio": 0.700204039413748,
+      "memory_ratio": 0.7519634703196347,
+      "end_to_end_field_relative_difference": 1.3499635128301586e-12,
+      "end_to_end_flow_relative_difference": 2.7394892230254303e-16,
+      "end_to_end_max_power_relative_difference": 1.5080257557715946e-14,
+      "promotion_pass": true
+    },
+    "gpu": {
+      "device": "NVIDIA RTX A4000",
+      "python_version": "3.11.15",
+      "jax_version": "0.8.0",
+      "native_residual": 9.592565046921381e-12,
+      "solvax_residual": 2.3384865796956566e-13,
+      "field_relative_difference": 1.5383642712569833e-12,
+      "gradient_relative_error": 1.1277057678523596e-16,
+      "transpose_gradient_relative_error": 1.1277057678523596e-16,
+      "warm_time_ratio": 0.8460364176499175,
+      "memory_ratio": 0.9973908918406073,
+      "end_to_end_field_relative_difference": 1.349949983147307e-12,
+      "end_to_end_flow_relative_difference": 1.3697446115127384e-15,
+      "end_to_end_max_power_relative_difference": 1.5950272416814623e-14,
+      "promotion_pass": true
+    }
+  },
+  "acceptance": {
+    "forward_equivalent": true,
+    "implicit_gradient_verified": true,
+    "independent_transpose_verified": true,
+    "native_and_solvax_residuals_pass": true,
+    "warm_time_and_memory_regressions_pass": true,
+    "end_to_end_hartmann_pass": true,
+    "cpu_gpu_promotion_pass": true,
+    "pass": true
+  }
+}

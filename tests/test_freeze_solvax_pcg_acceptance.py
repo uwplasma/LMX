@@ -247,6 +247,28 @@ def test_tracked_solvax_pcg_acceptance_is_complete_and_honest():
     assert payload["m3_promotion_pass"] is True
 
 
+def test_current_solvax_equivalence_is_compact_and_cross_backend():
+    path = Path("benchmarks/results/solvax-pcg-current-equivalence.json")
+    payload = json.loads(path.read_text())
+
+    assert path.stat().st_size < 4_096
+    assert payload["implementation"]["solvax_version"] == "0.8.1"
+    assert payload["problem"]["dtype"] == "float64"
+    assert set(payload["backends"]) == {"cpu", "gpu"}
+    assert all(payload["acceptance"].values())
+    assert all(
+        backend["promotion_pass"]
+        and backend["native_residual"] <= payload["problem"]["tolerance"]
+        and backend["solvax_residual"] <= payload["problem"]["tolerance"]
+        for backend in payload["backends"].values()
+    )
+    assert all(
+        len(source_hash) == 64
+        for name, source_hash in payload["source_records"].items()
+        if name.endswith("sha256")
+    )
+
+
 def test_ha20_validation_rejects_solver_fingerprint_mismatch(tmp_path: Path):
     implementation = {
         "solver_core_sha256": "a" * 64,
