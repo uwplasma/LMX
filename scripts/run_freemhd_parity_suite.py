@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -13,20 +12,12 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.freemhd import audit_freemhd_case_against_spec, load_benchmark_a_spec
+from lmx.freemhd import artifact_sha256, audit_freemhd_case_against_spec, load_benchmark_a_spec
 from lmx.reference_data import default_closed_channel_reference_root
 
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
-
-
-def _tree_sha256(root: Path) -> str:
-    digest = hashlib.sha256()
-    for path in sorted(item for item in root.rglob("*") if item.is_file()):
-        digest.update(path.relative_to(root).as_posix().encode() + b"\0")
-        digest.update(path.read_bytes() + b"\0")
-    return digest.hexdigest()
 
 
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:
@@ -106,12 +97,12 @@ def materialize_matched_freemhd_case(
         "case_kind": case_kind,
         "run_profile": "docker_smoke_only",
         "source_template": source.name,
-        "source_template_sha256": _tree_sha256(source),
+        "source_template_sha256": artifact_sha256(source, "tree"),
         "spec_id": spec["id"],
         "spec_path": spec["path"],
         "spec_sha256": spec["sha256"],
         "changed_files": changed,
-        "case_tree_sha256_before_manifest": _tree_sha256(destination),
+        "case_tree_sha256_before_manifest": artifact_sha256(destination, "tree"),
         "audit": {**audit, "reference_case_dir": "."},
     }
     (destination / "lmx-benchmark-manifest.json").write_text(

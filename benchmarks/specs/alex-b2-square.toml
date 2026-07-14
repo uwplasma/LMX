@@ -40,7 +40,7 @@ nondimensional_mean_velocity = 1.0
 nondimensional_flow_rate = 4.0
 peak_magnetic_field_T = 1.1
 
-[matched_contract.equations]
+[matched_contract.shared.equations]
 momentum = "transient incompressible Navier-Stokes-Lorentz"
 inertia = "conservative div(rhoPhi,U)"
 time_discretization = "Euler"
@@ -50,13 +50,13 @@ electric_model = "inductionless Ohm law with div(J)=0"
 phase_reduction = "alpha=1 invariant"
 thermal_reduction = "constant temperature and properties"
 
-[matched_contract.nondimensional_groups]
+[matched_contract.shared.nondimensional_groups]
 hartmann_number = 2900.0
 interaction_parameter = 540.0
 reynolds_number = 15574.074074074075
 magnetic_reynolds_number_assumption = "Rm << 1"
 
-[matched_contract.geometry]
+[matched_contract.shared.geometry]
 kind = "square_duct"
 length_scale = "duct half-width"
 half_width_m = 0.0439
@@ -64,7 +64,7 @@ x_over_L_min = -15.0
 x_over_L_max = 10.0
 constant_cross_section = true
 
-[matched_contract.magnetic_field]
+[matched_contract.shared.magnetic_field]
 representation = "tabulated monotone interpolation"
 components = "B = (0, B_y(x), 0) in the global Cartesian frame"
 coordinate = "x / half-width"
@@ -72,14 +72,14 @@ normalization = "B_y / B0"
 no_extrapolation = true
 normal_current_at_axial_ends = 0.0
 
-[matched_contract.wall]
+[matched_contract.shared.wall]
 model = "uniform thin conducting wall"
 wall_conductance_ratio = 0.07
 numerical_realization = "explicit volumetric shell preserving c_w"
 thickness_over_L = 0.02
 outer_electric_boundary = "zero normal current"
 
-[matched_contract.boundary_drive]
+[matched_contract.shared.boundary_drive]
 velocity_inlet = "integral flow rate with extrapolated profile"
 velocity_outlet = "zero normal gradient"
 velocity_walls = "no slip"
@@ -90,13 +90,13 @@ flow_constraint_scope = "inlet face only"
 nondimensional_flow_rate = 4.0
 electric_axial_ends = "zero normal current"
 
-[matched_contract.mesh_coordinates]
+[matched_contract.roles.b2-production.mesh_coordinates]
 coordinate_system = "cell-centred Cartesian x-y-z"
 family = "wall-clustered square grid with axial fringe refinement"
 production_level = "fine"
 exact_coordinate_arrays_required = true
 
-[matched_contract.stopping_rules]
+[matched_contract.roles.b2-production.stopping_rules]
 electric_iterations_min = 600
 electric_tolerance_max = 1.0e-12
 projection_iterations_min = 4000
@@ -104,12 +104,12 @@ projection_tolerance_max = 1.0e-12
 steady_residual_max = 5.0e-5
 steady_steps_min = 3
 
-[matched_contract.observable]
+[matched_contract.shared.observable]
 primary = "excess transverse pressure difference between published A/B taps"
 tap_geometry = "top and side wall midpoints at each axial station"
 signed_orientation = "side (+z) minus top (+y)"
 
-[matched_contract.normalization]
+[matched_contract.shared.normalization]
 field = "B_y / B0"
 pressure = "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau"
 coordinate = "x / half-width"

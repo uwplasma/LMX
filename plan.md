@@ -70,14 +70,14 @@ superseded worktrees and branches.
 | README/docs | 709-word feature-led README, sourced comparison table, feature-specific compressed media | refresh only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | B1/B2 production semantics are canonical and same-sided wrong records are rejected | canonical smoke role and independent artifact hashes |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | independent input observers, then canonical smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | old fine-grid and two-GPU results are diagnostic for the superseded no-inertia, stationwise-flow formulation | implement canonical inertia and axial boundaries |
 | SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition | pursue only gated ownership deletions |
 | Portable quality | 770 pass, 8 expected skips, 95.35% branch coverage, 171.1 s | stay below the 300 s target and 600 s limit |
 
-Current structural audit: 35 modules, 34,963 package lines, 7,969
-maintained-core lines, 32 test files / 21,177 lines, and 18 maintenance
+Current structural audit: 35 modules, 34,951 package lines, 7,995
+maintained-core lines, 32 test files / 21,179 lines, and 18 maintenance
 scripts.
 
 The final audit freezes these interpretations:
@@ -101,9 +101,9 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 
 1. **Complete:** regenerate provenance for the canonical-contract tranche and
    pass the complete portable gate (770 pass, 8 skip, 95.35%, 171.1 s).
-2. Split canonical contracts into immutable shared physics and role-specific
-   mesh/stopping sections; introduce artifact-backed schema 2 validation. Do
-   not yet freeze smoke stopping values or claim a smoke contract pass.
+2. **Complete:** split canonical contracts into immutable shared physics and
+   role-specific mesh/stopping sections; schema 2 recomputes deterministic
+   file/tree artifacts and blocks acceptance until independent observers exist.
 3. Implement the complete canonical B2 formulation with tiny tests first:
    projection-consistent conservative advection, frozen discretization,
    inlet-flow/outlet-pressure boundaries, and axial electric closure. Delete
@@ -258,9 +258,9 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | 34 only after a complete owner disappears |
-| package lines | 34,963 | below 34,900 |
-| maintained-core lines | 7,969 | below 7,900 |
-| test files / lines | 32 / 21,177 | at most 32 / below 21,100 |
+| package lines | 34,951 | below 34,900 |
+| maintained-core lines | 7,995 | below 7,900 |
+| test files / lines | 32 / 21,179 | at most 32 / below 21,100 |
 | maintenance scripts | 18 | at most 18 |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or

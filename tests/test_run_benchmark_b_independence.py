@@ -326,10 +326,11 @@ def test_acceptance_assembly_reuses_three_campaigns_without_solver(
     arguments.extend(("--freemhd-record", f"{case_id}={freemhd}"))
     monkeypatch.setattr(campaign, "_source_fingerprint", lambda: "source")
 
-    def evaluate(selected, meshes, reference):
+    def evaluate(selected, meshes, reference, *, matched_freemhd_artifact_root):
         assert selected == case_id
         assert set(meshes) == set(campaign.MESH_LEVELS)
         assert reference["case_id"] == case_id
+        assert matched_freemhd_artifact_root == tmp_path.resolve()
         return {"case_id": case_id, "pass": True}
 
     monkeypatch.setattr(campaign, "_evaluate_acceptance", evaluate)
@@ -366,34 +367,27 @@ def test_acceptance_combines_literature_mesh_and_freemhd(case_id, monkeypatch):
         }
         for level, offset in zip(campaign.MESH_LEVELS, (1.0e-4, 5.0e-5, 0.0))
     }
-    monkeypatch.setattr(
-        campaign,
-        "validate_matched_b_record",
-        lambda record, **_: {
+    roots = []
+
+    def validate(record, **kwargs):
+        roots.append(kwargs["artifact_root"])
+        return {
             "acceptance_pass": record.get("validated") is True,
             "schema_complete": record.get("validated") is True,
-        },
-    )
-    freemhd = {"case_id": case_id, "validated": True}
+        }
 
-    result = campaign._evaluate_acceptance(case_id, meshes, freemhd)
+    monkeypatch.setattr(campaign, "validate_matched_b_record", validate)
+    freemhd = {"case_id": case_id, "validated": True}
+    artifact_root = Path("/evidence")
+
+    result = campaign._evaluate_acceptance(
+        case_id, meshes, freemhd, matched_freemhd_artifact_root=artifact_root
+    )
 
     assert result["pass"]
     assert all(result["gates"].values())
     assert result["literature"]["fine"]["weighted_rms"] == pytest.approx(0.0)
-
-    forged = {
-        "case_id": case_id,
-        "exact_case_match": True,
-        "pass": True,
-        "source_sha256": "a" * 64,
-    }
-    assert (
-        campaign._evaluate_acceptance(case_id, meshes, forged)["gates"][
-            "matched_freemhd"
-        ]
-        is False
-    )
+    assert roots == [artifact_root]
 
 
 def test_acceptance_reports_missing_and_rejects_bad_curves():

@@ -39,7 +39,7 @@ nondimensional_mean_velocity = 1.0
 nondimensional_flow_rate = 3.141592653589793
 peak_magnetic_field_T = 2.1
 
-[matched_contract.equations]
+[matched_contract.shared.equations]
 momentum = "transient incompressible Navier-Stokes-Lorentz"
 inertia = "conservative div(rhoPhi,U)"
 time_discretization = "Euler"
@@ -49,13 +49,13 @@ electric_model = "inductionless Ohm law with div(J)=0"
 phase_reduction = "alpha=1 invariant"
 thermal_reduction = "constant temperature and properties"
 
-[matched_contract.nondimensional_groups]
+[matched_contract.shared.nondimensional_groups]
 hartmann_number = 6600.0
 interaction_parameter = 10700.0
 reynolds_number = 4071.0280373831774
 magnetic_reynolds_number_assumption = "Rm << 1"
 
-[matched_contract.geometry]
+[matched_contract.shared.geometry]
 kind = "pipe_ogrid"
 length_scale = "pipe radius"
 radius_m = 0.0541
@@ -63,7 +63,7 @@ x_over_L_min = -15.0
 x_over_L_max = 10.0
 constant_cross_section = true
 
-[matched_contract.magnetic_field]
+[matched_contract.shared.magnetic_field]
 representation = "tabulated monotone interpolation"
 components = "B = (0, B_y(x), 0) in the global Cartesian frame"
 coordinate = "x / radius"
@@ -71,14 +71,14 @@ normalization = "B_y / B0"
 no_extrapolation = true
 normal_current_at_axial_ends = 0.0
 
-[matched_contract.wall]
+[matched_contract.shared.wall]
 model = "uniform thin conducting wall"
 wall_conductance_ratio = 0.027
 numerical_realization = "explicit volumetric annulus preserving c_w"
 thickness_over_L = 0.02
 outer_electric_boundary = "zero normal current"
 
-[matched_contract.boundary_drive]
+[matched_contract.shared.boundary_drive]
 velocity_inlet = "integral flow rate with extrapolated profile"
 velocity_outlet = "zero normal gradient"
 velocity_walls = "no slip"
@@ -89,24 +89,24 @@ flow_constraint_scope = "inlet face only"
 nondimensional_flow_rate = 3.141592653589793
 electric_axial_ends = "zero normal current"
 
-[matched_contract.mesh_coordinates]
+[matched_contract.roles.b1-production.mesh_coordinates]
 coordinate_system = "cell-centred cylindrical x-r-theta"
 family = "wall-clustered pipe O-grid with axial fringe refinement"
 production_level = "fine"
 exact_coordinate_arrays_required = true
 
-[matched_contract.stopping_rules]
+[matched_contract.roles.b1-production.stopping_rules]
 electric_iterations_min = 4000
 electric_tolerance_max = 1.0e-12
 projection_iterations_min = 4000
 projection_tolerance_max = 1.0e-12
 steady_residual_max = 5.0e-5
 
-[matched_contract.observable]
+[matched_contract.shared.observable]
 primary = "excess axial pressure gradient"
 definition = "outlet-gauge pressure loss per axial distance"
 
-[matched_contract.normalization]
+[matched_contract.shared.normalization]
 field = "B_y / B0"
 pressure = "Delta p / (Delta x * sigma * U * B0^2) minus downstream plateau"
 coordinate = "x / radius"

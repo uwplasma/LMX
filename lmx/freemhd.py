@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import csv
 import hashlib
 import math
+import os
 import re
+import stat
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import unicodedata
 
 import numpy as np
 
@@ -25,13 +27,106 @@ from .units import (
 
 BENCHMARK_A_SPEC_DIR = Path(__file__).resolve().parents[1] / "benchmarks" / "specs"
 SAMPER_TABLE_I_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "references" / "samper-table-i.toml"
-_MATCHED_B_HASHES = """benchmark_spec_sha256 lmx_source_sha256 freemhd_source_sha256
-lmx_input_sha256 freemhd_input_sha256 evaluator_sha256 lmx_output_sha256
-freemhd_output_sha256""".split()
+_MATCHED_B_ARTIFACT_NAMES = (
+    "lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"
+)
+_TREE_HASH_TAG = b"LMX-ARTIFACT-TREE-v1\0"
 
 
-def _is_sha256(value: object) -> bool:
-    return isinstance(value, str) and len(value) == 64 and value != "0" * 64 and set(value) <= set("0123456789abcdef")
+def _frame(value: bytes) -> bytes:
+    return len(value).to_bytes(8, "big") + value
+
+
+def _file_sha256(path: Path) -> str:
+    before = os.stat(path, follow_symlinks=False)
+    if not stat.S_ISREG(before.st_mode) or before.st_size == 0:
+        raise ValueError("content.empty")
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    after = os.stat(path, follow_symlinks=False)
+    before_signature = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+    after_signature = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+    if before_signature != after_signature:
+        raise ValueError("content.changed")
+    return digest.hexdigest()
+
+
+def _tree_entries(root: Path) -> list[tuple[str, Path, bytes]]:
+    entries, aliases, files = [], set(), set()
+    for path in root.rglob("*"):
+        relative = path.relative_to(root).as_posix()
+        alias = unicodedata.normalize("NFC", relative).casefold()
+        if alias in aliases:
+            raise ValueError("tree.name_collision")
+        aliases.add(alias)
+        metadata = os.lstat(path)
+        mode = metadata.st_mode
+        if stat.S_ISLNK(mode):
+            raise ValueError("tree.symlink")
+        if stat.S_ISDIR(mode):
+            kind = b"d"
+        elif stat.S_ISREG(mode):
+            kind = b"f"
+            identity = (metadata.st_dev, metadata.st_ino)
+            if identity in files:
+                raise ValueError("tree.hardlink")
+            files.add(identity)
+        else:
+            raise ValueError("tree.special")
+        entries.append((relative, path, kind))
+    if not entries:
+        raise ValueError("content.empty")
+    return sorted(entries)
+
+
+def artifact_sha256(path: str | Path, kind: str) -> str:
+    """Hash one immutable evidence file or portable directory tree."""
+
+    source = Path(path)
+    mode = os.lstat(source).st_mode
+    if stat.S_ISLNK(mode):
+        raise ValueError("path.symlink")
+    if kind == "file":
+        return _file_sha256(source)
+    if kind != "tree" or not stat.S_ISDIR(mode):
+        raise ValueError("kind")
+    entries = _tree_entries(source)
+    digest = hashlib.sha256(_TREE_HASH_TAG)
+    for relative, child, entry_kind in entries:
+        digest.update(_frame(entry_kind))
+        digest.update(_frame(relative.encode("utf-8")))
+        if entry_kind == b"f":
+            digest.update(_frame(bytes.fromhex(_file_sha256(child))))
+    if [(name, kind) for name, _, kind in entries] != [(name, kind) for name, _, kind in _tree_entries(source)]:
+        raise ValueError("tree.changed")
+    return digest.hexdigest()
+
+
+def _resolve_artifact(root: Path, entry: object) -> tuple[Path, str, str]:
+    if not isinstance(entry, dict) or set(entry) != {"path", "kind", "sha256"}:
+        raise ValueError("entry")
+    raw, kind, expected = entry["path"], entry["kind"], entry["sha256"]
+    if not isinstance(raw, str) or not isinstance(kind, str) or not isinstance(expected, str):
+        raise ValueError("entry")
+    portable = PurePosixPath(raw)
+    if portable.is_absolute() or not portable.parts or portable.parts[0].endswith(":"):
+        raise ValueError("path.absolute")
+    if "\\" in raw or any(part in {"", ".", ".."} for part in portable.parts) or portable.as_posix() != raw:
+        raise ValueError("path.noncanonical")
+    candidate = root.joinpath(*portable.parts)
+    current = root
+    for part in portable.parts:
+        current /= part
+        if current.is_symlink():
+            raise ValueError("path.symlink")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(root)
+    except (FileNotFoundError, ValueError) as error:
+        raise ValueError("path.missing_or_escape") from error
+    return resolved, kind, expected
 
 
 def candidate_u_paths(case_dir: str | Path) -> list[Path]:
@@ -243,131 +338,6 @@ def summarize_observable_gate(
     }
 
 
-def _observable_ladder_layer_summary(
-    records: list[dict[str, object]],
-) -> dict[str, float | bool]:
-    layer_gates = [record.get("layer_resolution") for record in records if isinstance(record.get("layer_resolution"), dict)]
-    if not layer_gates:
-        return {
-            "layer_resolution_available": False,
-            "min_hartmann_layer_cells": 0.0,
-            "min_side_layer_cells": 0.0,
-            "min_hartmann_layer_cell_ratio": 0.0,
-            "min_side_layer_cell_ratio": 0.0,
-            "max_minimum_mesh_refinement_factor": 0.0,
-        }
-
-    def values(key: str) -> list[float]:
-        return [float(gate[key]) for gate in layer_gates if key in gate and gate[key] is not None]
-
-    hartmann_cells = values("hartmann_layer_cells")
-    side_cells = values("side_layer_cells")
-    hartmann_ratios = values("hartmann_layer_cell_ratio")
-    side_ratios = values("side_layer_cell_ratio")
-    refinement_factors = values("minimum_mesh_refinement_factor")
-    return {
-        "layer_resolution_available": True,
-        "min_hartmann_layer_cells": min(hartmann_cells) if hartmann_cells else 0.0,
-        "min_side_layer_cells": min(side_cells) if side_cells else 0.0,
-        "min_hartmann_layer_cell_ratio": min(hartmann_ratios) if hartmann_ratios else 0.0,
-        "min_side_layer_cell_ratio": min(side_ratios) if side_ratios else 0.0,
-        "max_minimum_mesh_refinement_factor": max(refinement_factors) if refinement_factors else 0.0,
-    }
-
-
-def summarize_observable_ladder_levels(
-    levels: list[dict[str, object]],
-    *,
-    l2_target: float = 1.0e-2,
-) -> dict[str, object]:
-    """Summarize a mesh/settings ladder for FreeMHD observable parity.
-
-    Each level must contain a ``label`` and a ``records`` list matching the
-    payload emitted by the closed-channel observable parity example. The result
-    is intentionally scalar and table-friendly so manual validation runs can
-    identify whether the remaining gap is controlled by mesh readiness or by
-    solver/observable physics.
-    """
-
-    rows: list[dict[str, object]] = []
-    for level in levels:
-        label = str(level.get("label", "level"))
-        records = list(level.get("records", [])) if isinstance(level.get("records", []), list) else []
-        ranked = summarize_observable_offenders(records, l2_target=l2_target)
-        gate = summarize_observable_gate(records, l2_target=l2_target)
-        offenders = [item for item in ranked if item["status"] == "offender"]
-        top = offenders[0] if offenders else (ranked[0] if ranked else {})
-        layer_summary = _observable_ladder_layer_summary(records)
-        rows.append(
-            {
-                "label": label,
-                "case_count": gate["case_count"],
-                "research_grade_validation_pass": gate["research_grade_validation_pass"],
-                "observable_offender_count": gate["observable_offender_count"],
-                "missing_observable_count": gate["missing_observable_count"],
-                "low_signal_count": gate["low_signal_count"],
-                "max_offender_l2_error": float(top.get("l2_error", 0.0)) if offenders else 0.0,
-                "max_offender_target_ratio": float(top.get("target_ratio", 0.0)) if offenders else 0.0,
-                "top_offender_case": str(top.get("case_kind", "")),
-                "top_offender_observable": str(top.get("observable", "")),
-                "top_offender_axis": str(top.get("axis", "")),
-                **layer_summary,
-            }
-        )
-
-    best_row = None
-    if rows:
-        best_row = min(
-            rows,
-            key=lambda row: (
-                int(row["missing_observable_count"]),
-                int(row["observable_offender_count"]),
-                float(row["max_offender_target_ratio"]),
-                -float(row["min_hartmann_layer_cell_ratio"]),
-                -float(row["min_side_layer_cell_ratio"]),
-            ),
-        )
-    return {
-        "level_count": len(rows),
-        "l2_target": float(l2_target),
-        "best_level_label": None if best_row is None else best_row["label"],
-        "best_level": best_row,
-        "rows": rows,
-    }
-
-
-def write_observable_ladder_table(summary: dict[str, object], path: str | Path) -> Path:
-    """Write a CSV table from ``summarize_observable_ladder_levels`` output."""
-
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    rows = list(summary.get("rows", []))
-    fieldnames = [
-        "label",
-        "case_count",
-        "research_grade_validation_pass",
-        "observable_offender_count",
-        "missing_observable_count",
-        "low_signal_count",
-        "max_offender_l2_error",
-        "max_offender_target_ratio",
-        "top_offender_case",
-        "top_offender_observable",
-        "top_offender_axis",
-        "layer_resolution_available",
-        "min_hartmann_layer_cells",
-        "min_side_layer_cells",
-        "min_hartmann_layer_cell_ratio",
-        "min_side_layer_cell_ratio",
-        "max_minimum_mesh_refinement_factor",
-    ]
-    with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)  # type: ignore[arg-type]
-    return path
-
-
 def side_jet_profile_metrics(
     coordinate: object,
     values: object,
@@ -447,57 +417,6 @@ def compare_side_jet_profiles(
         "peak_to_center_ratio_error": abs(float(simulated["peak_to_center_ratio"]) - float(reference["peak_to_center_ratio"]))
         / max(abs(float(reference["peak_to_center_ratio"])), 1.0e-20),
     }
-
-
-def summarize_profile_error_offenders(
-    records: list[dict[str, object]],
-    *,
-    l2_target: float = 1.0e-2,
-    top_n: int | None = None,
-) -> list[dict[str, object]]:
-    offenders: list[dict[str, object]] = []
-    for record in records:
-        for axis in ("y", "z"):
-            key = f"{axis}_l2_error"
-            if key not in record:
-                continue
-            l2_error = float(record[key])
-            offenders.append(
-                {
-                    "case_kind": str(record.get("case_kind", "")),
-                    "axis": axis,
-                    "l2_error": l2_error,
-                    "l2_target": float(l2_target),
-                    "target_ratio": l2_error / max(float(l2_target), 1.0e-20),
-                    "status": "pass" if l2_error <= l2_target else "offender",
-                }
-            )
-    offenders.sort(key=lambda item: float(item["target_ratio"]), reverse=True)
-    if top_n is not None:
-        return offenders[: max(0, int(top_n))]
-    return offenders
-
-
-def summarize_runtime_offenders(
-    records: list[dict[str, object]],
-) -> list[dict[str, object]]:
-    offenders: list[dict[str, object]] = []
-    for record in records:
-        freemhd_seconds = float(record.get("freemhd_execution_seconds", 0.0) or 0.0)
-        lmx_seconds = float(record.get("lmx_execution_seconds", 0.0) or 0.0)
-        if freemhd_seconds <= 0.0 or lmx_seconds <= 0.0:
-            continue
-        offenders.append(
-            {
-                "case_kind": str(record.get("case_kind", "")),
-                "freemhd_execution_seconds": freemhd_seconds,
-                "lmx_execution_seconds": lmx_seconds,
-                "lmx_to_freemhd_runtime_ratio": lmx_seconds / freemhd_seconds,
-                "status": "pass" if lmx_seconds <= freemhd_seconds else "offender",
-            }
-        )
-    offenders.sort(key=lambda item: float(item["lmx_to_freemhd_runtime_ratio"]), reverse=True)
-    return offenders
 
 
 def infer_reduced_inlet_flow_rate(
@@ -722,12 +641,15 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
     return payload
 
 
-def validate_matched_b_record(record: dict[str, object], *, expected_case_id: str) -> dict[str, object]:
+def validate_matched_b_record(
+    record: dict[str, object], *, expected_case_id: str, artifact_root: str | Path | None = None
+) -> dict[str, object]:
     """Validate matched Benchmark-B semantics and recompute comparison gates."""
 
     from .benchmarks import (
         BENCHMARK_B_SPEC_FILES,
         _MATCHED_CONTRACT_SECTIONS,
+        canonical_matched_b_contract,
         load_benchmark_b_reference,
         load_benchmark_b_spec,
     )
@@ -737,7 +659,7 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
         "B1-fringing-pipe": "b1-production",
         "B2-fringing-square": "b2-production",
     }[expected_case_id]
-    failed: list[str] = []
+    schema_failed: list[str] = []
     required = {
         "schema_version",
         "case_id",
@@ -746,41 +668,75 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
         "comparison",
         "provenance",
     }
-    if not required.issubset(record) or record.get("schema_version") != 1:
-        failed.append("schema")
+    if set(record) != required or record.get("schema_version") != 2:
+        schema_failed.append("schema")
     if record.get("case_id") != expected_case_id:
-        failed.append("case_id")
+        schema_failed.append("case_id")
     role = record.get("acceptance_role")
     if role not in {"harness-smoke", "b1-production", "b2-production"}:
-        failed.append("acceptance_role")
+        schema_failed.append("acceptance_role")
     if "exact_case_match" in record:
-        failed.append("legacy.exact_case_match")
+        schema_failed.append("legacy.exact_case_match")
 
     contract = record.get("contract")
     lmx = contract.get("lmx") if isinstance(contract, dict) else None
     freemhd = contract.get("freemhd") if isinstance(contract, dict) else None
     contract_failed: list[str] = []
-    expected_contract = spec.get("matched_contract") if role == expected_role else None
-    if expected_contract is None:
+    try:
+        expected_contract = canonical_matched_b_contract(spec, str(role))
+    except ValueError:
+        expected_contract = None
         contract_failed.append("contract.acceptance_role.unavailable")
     for section in _MATCHED_CONTRACT_SECTIONS:
         left = lmx.get(section) if isinstance(lmx, dict) else None
         right = freemhd.get(section) if isinstance(freemhd, dict) else None
         if not isinstance(left, dict) or not left or not isinstance(right, dict) or not right:
-            failed.append(f"contract.{section}.missing")
+            contract_failed.append(f"contract.{section}.missing")
         elif left != right:
             contract_failed.append(f"contract.{section}.mismatch")
         elif expected_contract is not None and left != expected_contract[section]:
             contract_failed.append(f"contract.{section}.canonical")
 
-    provenance = record.get("provenance")
-    provenance = provenance if isinstance(provenance, dict) else {}
-    for name in _MATCHED_B_HASHES:
-        if not _is_sha256(provenance.get(name)):
-            failed.append(f"provenance.{name}")
+    provenance = record.get("provenance") if isinstance(record.get("provenance"), dict) else {}
+    artifacts = provenance.get("artifacts") if isinstance(provenance, dict) else None
+    artifact_failed: list[str] = []
+    calculated_artifacts: dict[str, str] = {}
+    resolved_artifacts: list[Path] = []
+    if artifact_root is None:
+        artifact_failed.append("provenance.artifact_root")
+    else:
+        try:
+            root = Path(artifact_root).resolve(strict=True)
+            if not root.is_dir():
+                raise ValueError
+        except (FileNotFoundError, ValueError):
+            artifact_failed.append("provenance.artifact_root")
+        else:
+            if not isinstance(artifacts, dict) or set(artifacts) != set(_MATCHED_B_ARTIFACT_NAMES):
+                artifact_failed.append("provenance.artifacts")
+            else:
+                for name in _MATCHED_B_ARTIFACT_NAMES:
+                    try:
+                        path, kind, expected_hash = _resolve_artifact(root, artifacts[name])
+                        calculated = artifact_sha256(path, kind)
+                    except (OSError, ValueError) as error:
+                        artifact_failed.append(f"provenance.{name}.{error}")
+                        continue
+                    resolved_artifacts.append(path)
+                    calculated_artifacts[name] = calculated
+                    if calculated != expected_hash:
+                        artifact_failed.append(f"provenance.{name}.sha256.current")
+                identities = [(os.stat(path).st_dev, os.stat(path).st_ino) for path in resolved_artifacts]
+                overlap = len(set(identities)) != len(identities) or any(
+                    left in right.parents or right in left.parents
+                    for index, left in enumerate(resolved_artifacts)
+                    for right in resolved_artifacts[index + 1 :]
+                )
+                if overlap:
+                    artifact_failed.append("provenance.artifacts.overlap")
     spec_path = BENCHMARK_A_SPEC_DIR / BENCHMARK_B_SPEC_FILES[expected_case_id]
     if provenance.get("benchmark_spec_sha256") != hashlib.sha256(spec_path.read_bytes()).hexdigest():
-        failed.append("provenance.benchmark_spec_sha256.current")
+        artifact_failed.append("provenance.benchmark_spec_sha256.current")
 
     comparison = record.get("comparison")
     comparison = comparison if isinstance(comparison, dict) else {}
@@ -819,7 +775,7 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
             ),
         }
     except (KeyError, TypeError, ValueError):
-        failed.append("comparison.arrays")
+        comparison_failed.append("arrays")
     if metrics:
         acceptance = spec["acceptance"]
         limits = {
@@ -829,19 +785,25 @@ def validate_matched_b_record(record: dict[str, object], *, expected_case_id: st
         }
         comparison_failed = [name for name, value in metrics.items() if value > limits[name]]
 
-    schema_complete = not failed
+    schema_complete = not schema_failed
+    artifact_pass = not artifact_failed
     contract_pass = schema_complete and not contract_failed
     comparison_pass = bool(metrics) and not comparison_failed
+    observation_failed = ["contract.observers.unavailable"]
+    observation_pass = False
     role_allows_acceptance = role == expected_role
-    all_failed = failed + contract_failed + [f"comparison.{name}" for name in comparison_failed]
+    all_failed = schema_failed + contract_failed + artifact_failed + observation_failed + [f"comparison.{name}" for name in comparison_failed]
     return {
         "schema_complete": schema_complete,
+        "artifact_pass": artifact_pass,
         "contract_pass": contract_pass,
+        "observation_pass": observation_pass,
         "comparison_pass": comparison_pass,
         "role_allows_acceptance": role_allows_acceptance,
-        "acceptance_pass": contract_pass and comparison_pass and role_allows_acceptance,
+        "acceptance_pass": contract_pass and artifact_pass and observation_pass and comparison_pass and role_allows_acceptance,
         "failed_checks": all_failed,
         "metrics": metrics,
+        "calculated_artifact_sha256": calculated_artifacts,
     }
 
 

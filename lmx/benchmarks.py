@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from copy import deepcopy
 import hashlib
 import json
 import math
@@ -20,8 +21,14 @@ BENCHMARK_B_SPEC_FILES = {
     "B1-fringing-pipe": "alex-b1-pipe.toml",
     "B2-fringing-square": "alex-b2-square.toml",
 }
-_MATCHED_CONTRACT_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
-boundary_drive mesh_coordinates stopping_rules observable normalization""".split()
+_MATCHED_SHARED_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
+boundary_drive observable normalization""".split()
+_MATCHED_ROLE_SECTIONS = ("mesh_coordinates", "stopping_rules")
+_MATCHED_CONTRACT_SECTIONS = (*_MATCHED_SHARED_SECTIONS, *_MATCHED_ROLE_SECTIONS)
+_MATCHED_PRODUCTION_ROLES = {
+    "B1-fringing-pipe": "b1-production",
+    "B2-fringing-square": "b2-production",
+}
 
 
 def _repository_root(root: str | Path | None = None) -> Path:
@@ -30,6 +37,20 @@ def _repository_root(root: str | Path | None = None) -> Path:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def canonical_matched_b_contract(spec: dict[str, Any], role: str) -> dict[str, Any]:
+    """Compose one role without allowing execution settings to override physics."""
+
+    matched = spec.get("matched_contract")
+    shared = matched.get("shared") if isinstance(matched, dict) else None
+    roles = matched.get("roles") if isinstance(matched, dict) else None
+    execution = roles.get(role) if isinstance(roles, dict) else None
+    if not isinstance(shared, dict) or set(shared) != set(_MATCHED_SHARED_SECTIONS):
+        raise ValueError("Benchmark B matched shared contract is incomplete")
+    if not isinstance(execution, dict) or set(execution) != set(_MATCHED_ROLE_SECTIONS):
+        raise ValueError(f"Benchmark B matched role {role!r} is unavailable or incomplete")
+    return {**deepcopy(shared), **deepcopy(execution)}
 
 
 def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
@@ -54,9 +75,14 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     if actual != expected:
         raise ValueError(f"Benchmark B frozen parameters differ: {actual!r}")
 
-    contract = spec.get("matched_contract")
-    if not isinstance(contract, dict) or set(contract) != set(_MATCHED_CONTRACT_SECTIONS):
+    matched = spec.get("matched_contract")
+    roles = matched.get("roles") if isinstance(matched, dict) else None
+    expected_role = _MATCHED_PRODUCTION_ROLES[case_id]
+    if not isinstance(matched, dict) or set(matched) != {"shared", "roles"}:
         raise ValueError("Benchmark B matched formulation contract is incomplete")
+    if not isinstance(roles, dict) or set(roles) != {expected_role}:
+        raise ValueError("Benchmark B matched production role differs")
+    contract = canonical_matched_b_contract(spec, expected_role)
     semantics = (
         contract["equations"].get("inertia"),
         float(contract["nondimensional_groups"].get("reynolds_number", 0.0)),

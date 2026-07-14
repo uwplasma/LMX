@@ -65,11 +65,16 @@ Benchmark-B acceptance no longer trusts a record-supplied
 `exact_case_match` boolean. Production records must equal the canonical
 specification—not merely each other—across equations, nondimensional groups,
 geometry, field mapping, wall model, boundaries and drive, mesh coordinates,
-stopping rules, observable, and normalization. The validator recomputes the
-current specification hash and pressure-comparison gates. It presently checks
-the remaining source, input, evaluator, and output values for SHA-256 syntax;
-the harness must independently resolve and hash those artifacts before a
-production record can be accepted.
+stopping rules, observable, and normalization. Eight immutable physics sections
+are shared; only mesh coordinates and stopping rules vary by evidence role.
+
+Schema-2 records keep seven source, input, evaluator, and output artifacts
+beneath a caller-selected bundle root. Validation streams and recomputes every
+file or deterministic directory-tree hash, rejecting path escapes, symlinks,
+hard-link aliases, overlapping trees, special files, and changed content. The
+record cannot choose its own root. Production acceptance remains deliberately
+blocked until separate LMX and FreeMHD observers derive the two contracts from
+their real inputs; copying the canonical dictionary twice is not evidence.
 
 The canonical FreeMHD source uses conservative `div(rhoPhi,U)` inertia with
 Euler time integration and `Gauss limitedLinear 1.0` advection. Its axial drive
@@ -84,10 +89,11 @@ LMX's present stationwise model omits the convective inertia in FreeMHD's
 finite-inertia momentum equation, and fixed-flow/Neumann axial treatment has
 not been shown equivalent to FreeMHD's inlet-flow/outlet-pressure treatment.
 Implement the complete frozen formulation before creating a tiny matched B2
-smoke record. The smoke needs its own canonical mesh and stopping contract: it
-must be physics-valid while remaining ineligible for production acceptance.
-Do not launch a medium or production FreeMHD campaign before that bounded smoke
-passes.
+smoke record. Its mesh faces, mapped field samples, time step, iterations, and
+stopping rules will be frozen only after both materialized inputs are audited;
+no placeholder smoke role is accepted today. The eventual smoke must be
+physics-valid while remaining ineligible for production acceptance. Do not
+launch a medium or production FreeMHD campaign before it passes.
 
 ## ALEX experiments
 

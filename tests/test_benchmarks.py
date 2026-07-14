@@ -577,12 +577,16 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
             "parameters differ",
         ),
         (
-            lambda spec: spec["matched_contract"]["equations"].update(inertia="omitted"),
+            lambda spec: spec["matched_contract"]["shared"]["equations"].update(inertia="omitted"),
             "matched formulation semantics differ",
         ),
         (
-            lambda spec: spec["matched_contract"]["boundary_drive"].update(flow_constraint_scope="stationwise"),
+            lambda spec: spec["matched_contract"]["shared"]["boundary_drive"].update(flow_constraint_scope="stationwise"),
             "matched formulation semantics differ",
+        ),
+        (
+            lambda spec: spec["matched_contract"]["roles"].clear(),
+            "matched production role differs",
         ),
         (lambda spec: spec.update(sources=[]), "both review"),
         (lambda spec: spec["sources"][0].update(pages=""), "pages"),

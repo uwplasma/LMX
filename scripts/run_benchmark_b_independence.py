@@ -68,6 +68,8 @@ def _evaluate_acceptance(
     case_id: str,
     mesh_campaigns: dict[str, dict[str, Any]],
     matched_freemhd: dict[str, Any] | None = None,
+    *,
+    matched_freemhd_artifact_root: Path | None = None,
 ) -> dict[str, Any]:
     """Evaluate the frozen ALEX literature, mesh, and FreeMHD gates."""
 
@@ -149,7 +151,11 @@ def _evaluate_acceptance(
     medium_fine = relative_change(levels[1], levels[2])
     finest = literature[levels[-1]]
     freemhd_validation = (
-        validate_matched_b_record(matched_freemhd, expected_case_id=case_id)
+        validate_matched_b_record(
+            matched_freemhd,
+            expected_case_id=case_id,
+            artifact_root=matched_freemhd_artifact_root,
+        )
         if matched_freemhd is not None
         else None
     )
@@ -687,12 +693,16 @@ def _freeze_acceptance(args) -> int:
                 "baseline": baseline,
                 "independence": comparison,
             }
-        freemhd = (
-            json.loads(freemhd_paths[case_id].read_text())
-            if case_id in freemhd_paths
-            else None
+        record_path = freemhd_paths.get(case_id)
+        freemhd = json.loads(record_path.read_text()) if record_path is not None else None
+        results.append(
+            _evaluate_acceptance(
+                case_id,
+                mesh_campaigns,
+                freemhd,
+                matched_freemhd_artifact_root=record_path.resolve().parent if record_path is not None else None,
+            )
         )
-        results.append(_evaluate_acceptance(case_id, mesh_campaigns, freemhd))
     payload = {
         "schema_version": 1,
         "source_fingerprint": fingerprint,
@@ -1004,7 +1014,7 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         default=[],
         metavar="CASE=PATH",
-        help="Checksummed exact-case FreeMHD comparison record used for acceptance.",
+        help="Exact-case record; artifact paths resolve relative to its parent directory.",
     )
     parser.add_argument(
         "--plot-evidence",

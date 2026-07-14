@@ -6,10 +6,12 @@ import pytest
 
 from lmx.benchmarks import (
     BENCHMARK_B_SPEC_FILES,
+    canonical_matched_b_contract,
     load_benchmark_b_reference,
     load_benchmark_b_spec,
 )
 from lmx.freemhd import (
+    artifact_sha256,
     audit_freemhd_case_against_spec,
     build_case_from_freemhd_reference,
     candidate_u_paths,
@@ -27,13 +29,9 @@ from lmx.freemhd import (
     load_benchmark_a_spec,
     load_samper_table_i,
     side_jet_profile_metrics,
-    summarize_observable_ladder_levels,
     summarize_observable_gate,
     summarize_observable_offenders,
-    summarize_profile_error_offenders,
-    summarize_runtime_offenders,
     validate_matched_b_record,
-    write_observable_ladder_table,
 )
 from scripts.run_freemhd_parity_suite import materialize_matched_freemhd_case
 
@@ -41,14 +39,40 @@ from scripts.run_freemhd_parity_suite import materialize_matched_freemhd_case
 pytestmark = pytest.mark.unit
 
 
-def _matched_b_record(case_id: str, *, role: str | None = None) -> dict[str, object]:
-    manifest = load_benchmark_b_spec(case_id)["matched_contract"]
+def _test_artifact_sha256(path: Path, kind: str) -> str:
+    if kind == "file":
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256(b"LMX-ARTIFACT-TREE-v1\0")
+    for child in sorted(path.rglob("*"), key=lambda item: item.relative_to(path).as_posix()):
+        entry_kind = b"d" if child.is_dir() else b"f"
+        relative = child.relative_to(path).as_posix().encode()
+        for value in (entry_kind, relative):
+            digest.update(len(value).to_bytes(8, "big") + value)
+        if entry_kind == b"f":
+            value = hashlib.sha256(child.read_bytes()).digest()
+            digest.update(len(value).to_bytes(8, "big") + value)
+    return digest.hexdigest()
+
+
+def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> dict[str, object]:
+    role = role or ("b1-production" if case_id.startswith("B1") else "b2-production")
+    manifest = canonical_matched_b_contract(load_benchmark_b_spec(case_id), role)
     reference = load_benchmark_b_reference(case_id)
     spec_path = Path("benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
+    artifacts = {}
+    for index, name in enumerate(("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output")):
+        kind = "tree" if index < 4 else "file"
+        path = root / name
+        if kind == "tree":
+            path.mkdir(parents=True)
+            (path / "evidence.txt").write_text(name)
+        else:
+            path.write_text(name)
+        artifacts[name] = {"path": name, "kind": kind, "sha256": _test_artifact_sha256(path, kind)}
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "case_id": case_id,
-        "acceptance_role": role or ("b1-production" if case_id.startswith("B1") else "b2-production"),
+        "acceptance_role": role,
         "contract": {"lmx": deepcopy(manifest), "freemhd": deepcopy(manifest)},
         "comparison": {
             "x_over_L": list(reference["x_over_L"]),
@@ -56,19 +80,8 @@ def _matched_b_record(case_id: str, *, role: str | None = None) -> dict[str, obj
             "freemhd_observable": list(reference["pressure_observable"]),
         },
         "provenance": {
-            **{
-                name: "a" * 64
-                for name in (
-                    "lmx_source_sha256",
-                    "freemhd_source_sha256",
-                    "lmx_input_sha256",
-                    "freemhd_input_sha256",
-                    "evaluator_sha256",
-                    "lmx_output_sha256",
-                    "freemhd_output_sha256",
-                )
-            },
             "benchmark_spec_sha256": hashlib.sha256(spec_path.read_bytes()).hexdigest(),
+            "artifacts": artifacts,
         },
     }
 
@@ -129,28 +142,6 @@ def _write_reference_inputs(root: Path, *, b0: str = "internalField uniform ( 0 
     system = root / "system"
     system.mkdir()
     (system / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nN_wall 2;\n")
-
-
-def _ladder_record(
-    y_error: tuple[float, float],
-    z_error: tuple[float, float],
-    layer_resolution: tuple[float, float, float, float, float],
-) -> dict[str, object]:
-    def cut(error: tuple[float, float]) -> dict[str, float]:
-        return {"l2_error": error[0], "linf_error": error[1], "reference_peak_abs": 1.0}
-
-    layer_names = (
-        "hartmann_layer_cells",
-        "side_layer_cells",
-        "hartmann_layer_cell_ratio",
-        "side_layer_cell_ratio",
-        "minimum_mesh_refinement_factor",
-    )
-    return {
-        "case_kind": "hunt",
-        "observables": {name: {"y": cut(y_error), "z": cut(z_error)} for name in ("velocity", "potential", "current", "lorentz")},
-        "layer_resolution": dict(zip(layer_names, layer_resolution)),
-    }
 
 
 def _write_matched_freemhd_case(root: Path, case_kind: str) -> None:
@@ -250,36 +241,38 @@ def test_freemhd_case_audit_exposes_mislabeled_ha_and_hunt_wall(tmp_path: Path):
 
 
 @pytest.mark.parametrize("case_id", ["B1-fringing-pipe", "B2-fringing-square"])
-def test_matched_b_record_validator_computes_contract_and_comparison(case_id: str):
-    record = _matched_b_record(case_id)
-    report = validate_matched_b_record(record, expected_case_id=case_id)
+def test_matched_b_schema2_verifies_contract_comparison_and_real_artifacts(tmp_path: Path, case_id: str):
+    record = _matched_b_record(tmp_path, case_id)
+    report = validate_matched_b_record(record, expected_case_id=case_id, artifact_root=tmp_path)
 
-    assert report["acceptance_pass"] is True
+    assert report["schema_complete"] and report["artifact_pass"] and report["contract_pass"] and report["comparison_pass"]
+    assert report["observation_pass"] is report["acceptance_pass"] is False
+    assert set(report["calculated_artifact_sha256"]) == set(record["provenance"]["artifacts"])
+    assert "contract.observers.unavailable" in report["failed_checks"]
     assert report["metrics"]["weighted_rms"] == pytest.approx(0.0)
+    assert validate_matched_b_record(record, expected_case_id=case_id)["artifact_pass"] is False
 
+
+def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
+    record = _matched_b_record(tmp_path, "B2-fringing-square")
     mismatch = deepcopy(record)
     mismatch["contract"]["freemhd"]["equations"] = {"semantic_contract": "different"}
     mismatch["exact_case_match"] = mismatch["pass"] = True
-    rejected = validate_matched_b_record(mismatch, expected_case_id=case_id)
-    assert rejected["acceptance_pass"] is False
+    rejected = validate_matched_b_record(mismatch, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
     assert "contract.equations.mismatch" in rejected["failed_checks"]
     assert "legacy.exact_case_match" in rejected["failed_checks"]
 
     mutations = (
-        (("schema_version",), 2, "schema"),
+        (("schema_version",), 1, "schema"),
         (("case_id",), "wrong-case", "case_id"),
         (("acceptance_role",), "self-promoted", "acceptance_role"),
         (("contract", "lmx", "wall"), {}, "contract.wall.missing"),
-        (
-            ("provenance", "lmx_source_sha256"),
-            "not-a-hash",
-            "provenance.lmx_source_sha256",
-        ),
         (
             ("provenance", "benchmark_spec_sha256"),
             "b" * 64,
             "provenance.benchmark_spec_sha256.current",
         ),
+        (("provenance", "artifacts"), {}, "provenance.artifacts"),
         (("comparison", "x_over_L"), [0.0], "comparison.arrays"),
     )
     for path, value, expected_check in mutations:
@@ -288,34 +281,89 @@ def test_matched_b_record_validator_computes_contract_and_comparison(case_id: st
         for key in path[:-1]:
             target = target[key]
         target[path[-1]] = value
-        report = validate_matched_b_record(malformed, expected_case_id=case_id)
+        report = validate_matched_b_record(malformed, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
         assert expected_check in report["failed_checks"]
-
-
-def test_matched_b_record_roles_and_observables_cannot_self_promote():
-    smoke = _matched_b_record("B2-fringing-square", role="harness-smoke")
-    report = validate_matched_b_record(smoke, expected_case_id="B2-fringing-square")
-    assert report["contract_pass"] is False and report["comparison_pass"]
-    assert report["role_allows_acceptance"] is report["acceptance_pass"] is False
-    assert "contract.acceptance_role.unavailable" in report["failed_checks"]
 
     for section, key, wrong in (
         ("equations", "inertia", "omitted"),
         ("boundary_drive", "flow_constraint_scope", "stationwise"),
     ):
-        self_consistent = _matched_b_record("B2-fringing-square")
+        self_consistent = deepcopy(record)
         self_consistent["contract"]["lmx"][section][key] = wrong
         self_consistent["contract"]["freemhd"][section][key] = wrong
-        rejected = validate_matched_b_record(self_consistent, expected_case_id="B2-fringing-square")
+        rejected = validate_matched_b_record(self_consistent, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
         assert f"contract.{section}.canonical" in rejected["failed_checks"]
 
-    poor = _matched_b_record("B2-fringing-square")
+    smoke = deepcopy(record)
+    smoke["acceptance_role"] = "harness-smoke"
+    report = validate_matched_b_record(smoke, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+    assert report["contract_pass"] is report["role_allows_acceptance"] is report["acceptance_pass"] is False
+    assert "contract.acceptance_role.unavailable" in report["failed_checks"]
+
+    poor = deepcopy(record)
     poor["comparison"]["freemhd_observable"] = [value + 1.0 for value in poor["comparison"]["freemhd_observable"]]
-    report = validate_matched_b_record(poor, expected_case_id="B2-fringing-square")
+    report = validate_matched_b_record(poor, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
     assert report["comparison_pass"] is report["acceptance_pass"] is False
 
-    wrong_role = _matched_b_record("B1-fringing-pipe", role="b2-production")
-    assert validate_matched_b_record(wrong_role, expected_case_id="B1-fringing-pipe")["acceptance_pass"] is False
+
+@pytest.mark.parametrize(
+    ("hazard", "check"),
+    [
+        ("file_mutation", "provenance.lmx_output.sha256.current"),
+        ("tree_mutation", "provenance.lmx_source.sha256.current"),
+        ("noncanonical", "provenance.lmx_input.path.noncanonical"),
+        ("absolute", "provenance.lmx_input.path.absolute"),
+        ("symlink", "provenance.evaluator.path.symlink"),
+        ("tree_symlink", "provenance.lmx_source.tree.symlink"),
+        ("missing", "provenance.lmx_input.path.missing_or_escape"),
+        ("wrong_kind", "provenance.evaluator.kind"),
+        ("overlap", "provenance.artifacts.overlap"),
+        ("hardlink_tree", "provenance.lmx_source.tree.hardlink"),
+        ("empty_tree", "provenance.lmx_input.content.empty"),
+    ],
+)
+def test_matched_b_schema2_rejects_unsafe_or_changed_artifacts(tmp_path: Path, hazard: str, check: str):
+    record = _matched_b_record(tmp_path, "B2-fringing-square")
+    artifacts = record["provenance"]["artifacts"]
+    if hazard == "file_mutation":
+        (tmp_path / "lmx_output").write_text("changed")
+    elif hazard == "tree_mutation":
+        (tmp_path / "lmx_source" / "evidence.txt").write_text("changed")
+    elif hazard == "noncanonical":
+        artifacts["lmx_input"]["path"] = "../lmx_input"
+    elif hazard == "absolute":
+        artifacts["lmx_input"]["path"] = str((tmp_path / "lmx_input").resolve())
+    elif hazard == "symlink":
+        (tmp_path / "evaluator").unlink()
+        (tmp_path / "evaluator").symlink_to("lmx_output")
+    elif hazard == "tree_symlink":
+        (tmp_path / "lmx_source" / "alias.txt").symlink_to("evidence.txt")
+    elif hazard == "missing":
+        artifacts["lmx_input"]["path"] = "missing"
+    elif hazard == "wrong_kind":
+        artifacts["evaluator"]["kind"] = "tree"
+    elif hazard == "overlap":
+        artifacts["freemhd_output"] = deepcopy(artifacts["lmx_output"])
+    elif hazard == "hardlink_tree":
+        (tmp_path / "lmx_source" / "alias.txt").hardlink_to(tmp_path / "lmx_source" / "evidence.txt")
+    else:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        artifacts["lmx_input"].update(path="empty", sha256="0" * 64)
+    report = validate_matched_b_record(record, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+    assert report["artifact_pass"] is False and check in report["failed_checks"]
+
+
+def test_artifact_tree_hash_is_portable_and_content_sensitive(tmp_path: Path):
+    left, right = tmp_path / "left", tmp_path / "right"
+    for root, order in ((left, ("a", "b")), (right, ("b", "a"))):
+        root.mkdir()
+        for name in order:
+            (root / name).write_text(name)
+    expected = _test_artifact_sha256(left, "tree")
+    assert artifact_sha256(left, "tree") == expected == artifact_sha256(right, "tree")
+    (right / "empty").mkdir()
+    assert artifact_sha256(right, "tree") != expected
 
 
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
@@ -594,7 +642,7 @@ def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Pa
     assert infer_inlet_flow_rate(tmp_path) == pytest.approx(0.125)
 
 
-def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
+def test_freemhd_observable_gate_ranks_accuracy_and_completeness():
     observable_records = [
         {
             "case_kind": "shercliff",
@@ -637,50 +685,6 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
     assert observable_gate["low_signal_count"] == 1
     assert observable_gate["missing_observable_count"] == 1
     assert observable_gate["missing_observables"] == [{"case_kind": "shercliff", "observable": "lorentz", "axis": "*"}]
-
-    profile_records = [
-        {
-            "case_kind": "shercliff",
-            "freemhd_execution_seconds": 10.0,
-            "lmx_execution_seconds": 8.0,
-            "y_l2_error": 2.0e-2,
-            "z_l2_error": 5.0e-3,
-        },
-        {
-            "case_kind": "hunt",
-            "freemhd_execution_seconds": 10.0,
-            "lmx_execution_seconds": 14.0,
-            "y_l2_error": 1.0e-1,
-            "z_l2_error": 7.0e-2,
-        },
-    ]
-    profile_offenders = summarize_profile_error_offenders(profile_records, l2_target=1.0e-2, top_n=2)
-    assert [item["case_kind"] for item in profile_offenders] == ["hunt", "hunt"]
-    runtime_offenders = summarize_runtime_offenders(profile_records)
-    assert runtime_offenders[0]["case_kind"] == "hunt"
-    assert runtime_offenders[0]["status"] == "offender"
-    assert runtime_offenders[1]["status"] == "pass"
-
-
-def test_observable_ladder_summary_ranks_mesh_and_offender_progress(tmp_path: Path):
-    good_record = _ladder_record((8.0e-3, 1.0e-2), (7.0e-3, 9.0e-3), (10.0, 7.0, 1.25, 1.1, 0.9))
-    bad_record = _ladder_record((2.0e-2, 3.0e-2), (9.0e-3, 1.0e-2), (4.0, 3.0, 0.5, 0.5, 2.0))
-
-    summary = summarize_observable_ladder_levels(
-        [
-            {"label": "coarse", "records": [bad_record]},
-            {"label": "refined", "records": [good_record]},
-        ]
-    )
-    table = write_observable_ladder_table(summary, tmp_path / "ladder.csv")
-
-    assert summary["best_level_label"] == "refined"
-    assert summary["rows"][0]["observable_offender_count"] == 4
-    assert summary["rows"][0]["max_minimum_mesh_refinement_factor"] == pytest.approx(2.0)
-    assert summary["rows"][1]["research_grade_validation_pass"] is True
-    assert table.exists()
-    assert "top_offender_observable" in table.read_text()
-
 
 def test_build_case_from_freemhd_reference_covers_hartmann_velocity_mode_and_errors(
     tmp_path: Path,
