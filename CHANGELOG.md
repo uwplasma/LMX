@@ -34,6 +34,8 @@ documentation.
 
 ### Fixed
 
+- Skip the second B2 electric PCG refinement when the first solve already
+  satisfies the local current-balance residual.
 - High-Ha Hunt and Shercliff solver robustness, exact insulating topology,
   scale-invariant PCG stopping, strict coupled convergence certification, and
   conservative current/power diagnostics.

@@ -1255,21 +1255,36 @@ def _finalize_local_pressure_solve(
             jnp.max(jnp.abs(local_residual)),
         )
 
-    correction = pcg_linear_solve(
-        matvec,
-        linear_rhs - matvec(field),
-        x0=jnp.zeros_like(field),
-        precond=precondition,
-        transpose_precond=precondition,
-        rtol=0.0,
-        atol=effective_atol,
-        max_steps=iterations,
-        transpose_rtol=0.0,
-        transpose_atol=effective_atol,
-        transpose_max_steps=iterations,
-        single_reduction=single_reduction,
+    needs_refinement = jnp.max(jnp.abs(local_residual)) > local_tolerance
+
+    def refine(_):
+        correction = pcg_linear_solve(
+            matvec,
+            linear_rhs - matvec(field),
+            x0=jnp.zeros_like(field),
+            precond=precondition,
+            transpose_precond=precondition,
+            rtol=0.0,
+            atol=effective_atol,
+            max_steps=iterations,
+            transpose_rtol=0.0,
+            transpose_atol=effective_atol,
+            transpose_max_steps=iterations,
+            single_reduction=single_reduction,
+        )
+        return correction.x, correction.iterations, correction.status
+
+    correction, correction_iterations, correction_status = jax.lax.cond(
+        needs_refinement,
+        refine,
+        lambda _: (
+            jnp.zeros_like(field),
+            jnp.zeros_like(solution.iterations),
+            jnp.ones_like(solution.status),
+        ),
+        operand=None,
     )
-    field = gauge_fixed(field + correction.x)
+    field = gauge_fixed(field + correction)
     local_residual = local_residual_fn(field)
     final_linear_residual = linear_rhs - matvec(field)
     residual_norm = jnp.linalg.norm(final_linear_residual)
@@ -1282,8 +1297,8 @@ def _finalize_local_pressure_solve(
         residual_norm,
         converged,
         relative_residual_norm,
-        solution.iterations + correction.iterations,
-        jnp.where(converged, jnp.asarray(1), correction.status),
+        solution.iterations + correction_iterations,
+        jnp.where(converged, jnp.asarray(1), correction_status),
         jnp.max(jnp.abs(local_residual)),
     )
 
