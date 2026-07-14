@@ -74,7 +74,7 @@ superseded worktrees and branches.
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | the mixed inlet-flow/outlet-pressure projection passes manufactured and reduced-path gates; old fine-grid and GPU results remain diagnostic for the superseded formulation | implement exact implicit inertia |
 | SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition | pursue only gated ownership deletions |
-| Portable quality | 782 pass, 8 expected skips, 95.30% branch coverage, 162.8 s | stay below the 300 s target and 600 s limit |
+| Portable quality | 784 pass, 8 expected skips, 95.28% branch coverage, 149.9 s | stay below the 300 s target and 600 s limit |
 
 Current structural audit: 35 modules, 34,987 package lines, 8,027
 maintained-core lines, 32 test files / 21,165 lines, and 18 maintenance
@@ -107,7 +107,7 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 ## Immediate execution order
 
 1. **Complete:** schema 2, real artifact verification, provenance, and the
-   782-pass portable gate at 95.30% branch coverage in 162.8 seconds.
+   784-pass portable gate at 95.28% branch coverage in 149.9 seconds.
 2. **Complete:** re-audit FreeMHD v2206 limiter, implicit momentum assembly,
    mixed axial boundaries, SOLVAX v0.8.3 ownership, and sharding constraints.
 3. **Complete:** freeze the missing `cellLimited leastSquares 1.0` gradient
