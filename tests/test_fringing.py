@@ -311,7 +311,7 @@ def test_thin_wall_interface_removes_artificial_normal_resistance(wall_width):
     assert transmissibility == pytest.approx(2.0 / float(fluid_width[0]))
 
 
-def test_fixed_flow_pressure_constraint_recovers_target_and_multiplier():
+def test_fixed_flow_pressure_constraint_and_stationwise_correction():
     u = jnp.zeros((2, 3, 3))
     active = jnp.ones_like(u, dtype=bool)
     area = jnp.ones_like(u)
@@ -329,8 +329,6 @@ def test_fixed_flow_pressure_constraint_recovers_target_and_multiplier():
     assert jnp.sum(corrected, axis=(1, 2)).tolist() == pytest.approx([9.0, 9.0])
     assert pressure_loss.tolist() == pytest.approx([5.0, 5.0])
 
-
-def test_stationwise_flow_correction_accepts_explicit_target():
     u = jnp.asarray([[[1.0, 1.0]], [[3.0, 3.0]]])
     corrected = _enforce_stationwise_flow_rate_3d(
         u,
@@ -342,7 +340,7 @@ def test_stationwise_flow_correction_accepts_explicit_target():
     assert jnp.sum(corrected, axis=(1, 2)).tolist() == pytest.approx([4.0, 4.0])
 
 
-def test_nonuniform_gradient_and_laplacian_use_physical_cell_spacing():
+def test_nonuniform_operators_and_spacing_contract():
     y_faces = jnp.asarray([-1.0, -0.7, -0.2, 0.1, 0.55, 1.0])
     z_faces = jnp.asarray([-0.8, -0.3, 0.0, 0.4, 0.8])
     y = 0.5 * (y_faces[:-1] + y_faces[1:])
@@ -379,8 +377,16 @@ def test_nonuniform_gradient_and_laplacian_use_physical_cell_spacing():
     assert errors[1] < errors[0] / 2.5
     assert errors[1] < 0.03
 
+    constant = jnp.ones((3, 4, 3))
+    wall_laplacian = _laplacian_3d(
+        constant, dx=0.5, dy=jnp.asarray([0.2, 0.3, 0.4, 0.5]),
+        dz=jnp.asarray([0.25, 0.35, 0.4]), mode_y="dirichlet", mode_z="dirichlet"
+    )
+    assert jnp.allclose(wall_laplacian[:, 1:-1, 1:-1], 0.0)
+    for wall in (wall_laplacian[:, 0], wall_laplacian[:, -1],
+                 wall_laplacian[:, :, 0], wall_laplacian[:, :, -1]):
+        assert float(jnp.max(wall)) < 0.0
 
-def test_nonuniform_spacing_contract_rejects_invalid_metrics_and_handles_thin_axes():
     assert _spacing_vector(0.25, 3, dtype=float).tolist() == pytest.approx(
         [0.25, 0.25, 0.25]
     )
@@ -400,23 +406,6 @@ def test_nonuniform_spacing_contract_rejects_invalid_metrics_and_handles_thin_ax
     assert jnp.allclose(d_dz, 0.0)
 
 
-def test_nonuniform_dirichlet_laplacian_uses_half_cell_wall_distance():
-    field = jnp.ones((3, 4, 3))
-    laplacian = _laplacian_3d(
-        field,
-        dx=0.5,
-        dy=jnp.asarray([0.2, 0.3, 0.4, 0.5]),
-        dz=jnp.asarray([0.25, 0.35, 0.4]),
-        mode_y="dirichlet",
-        mode_z="dirichlet",
-    )
-    assert jnp.all(laplacian[:, 1:-1, 1:-1] == pytest.approx(0.0))
-    assert float(jnp.max(laplacian[:, 0, :])) < 0.0
-    assert float(jnp.max(laplacian[:, -1, :])) < 0.0
-    assert float(jnp.max(laplacian[:, :, 0])) < 0.0
-    assert float(jnp.max(laplacian[:, :, -1])) < 0.0
-
-
 def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     y_faces = jnp.asarray([-1.0, -0.8, -0.35, 0.0, 0.2, 0.6, 0.85, 1.0])
     z_faces = jnp.asarray([-1.0, -0.65, -0.1, 0.25, 0.7, 1.0])
@@ -428,6 +417,20 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     )
     manufactured = jnp.broadcast_to(manufactured_2d[None, :, :], (3, 7, 5))
     conductivity = jnp.broadcast_to((1.0 + 0.2 * yy)[None, :, :], manufactured.shape)
+    linear = jnp.broadcast_to((2.0 * yy - 3.0 * zz)[None], manufactured.shape)
+    zeros = jnp.zeros_like(linear)
+    fx, fy, fz = _conservative_current_fluxes_3d(
+        jnp.ones_like(linear), linear, zeros, zeros, zeros,
+        dx=0.4, dy=jnp.diff(y_faces), dz=jnp.diff(z_faces)
+    )
+    assert fy[:, 1:-1] == pytest.approx(-2.0)
+    assert fz[:, :, 1:-1] == pytest.approx(3.0)
+    current_divergence = (
+        (fx[1:] - fx[:-1]) / 0.4
+        + (fy[:, 1:] - fy[:, :-1]) / jnp.diff(y_faces)[None, :, None]
+        + (fz[:, :, 1:] - fz[:, :, :-1]) / jnp.diff(z_faces)[None, None, :]
+    )
+    assert current_divergence[:, 1:-1, 1:-1] == pytest.approx(0.0, abs=1.0e-12)
     rhs = _variable_coefficient_residual_3d(
         manufactured,
         jnp.zeros_like(manufactured),
@@ -475,21 +478,12 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     expected_weighted_gauge = manufactured - jnp.sum(manufactured * volume_weights) / jnp.sum(volume_weights)
     assert warm == pytest.approx(expected_weighted_gauge, abs=1.0e-8)
 
-
-def test_nonuniform_poisson_dispatches_to_metric_solver():
-    rhs = jnp.zeros((3, 4, 3))
-    field, residual, iterations, initial = _poisson_jacobi_3d(
-        rhs,
-        dx=0.4,
-        dy=jnp.asarray([0.2, 0.3, 0.4, 0.5]),
-        dz=jnp.asarray([0.25, 0.35, 0.4]),
-        iterations=4,
-        tolerance=1.0e-12,
+    zero_result = _poisson_jacobi_3d(
+        jnp.zeros((3, 4, 3)), dx=0.4, dy=jnp.asarray([0.2, 0.3, 0.4, 0.5]),
+        dz=jnp.asarray([0.25, 0.35, 0.4]), iterations=4, tolerance=1.0e-12
     )
-    assert jnp.allclose(field, 0.0)
-    assert residual == pytest.approx(0.0)
-    assert initial == pytest.approx(0.0)
-    assert iterations == 1
+    assert jnp.allclose(zero_result[0], 0.0)
+    assert zero_result[1:] == pytest.approx((0.0, 1, 0.0))
 
 
 def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
@@ -645,69 +639,6 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert diffused - dt * diffusion == pytest.approx(velocity, abs=2e-7)
 
 
-def test_metric_face_projection_has_jitted_implicit_gradient():
-    nx, ny, nz = 4, 4, 3
-    dy = jnp.asarray([0.2, 0.3, 0.4, 0.5])
-    dz = jnp.asarray([0.25, 0.35, 0.4])
-    base_u = jnp.arange(nx * ny * nz, dtype=float).reshape(nx, ny, nz) / 100.0
-    zeros = jnp.zeros_like(base_u)
-    rho = jnp.ones_like(base_u)
-    mask = jnp.ones_like(base_u, dtype=bool)
-
-    def objective(amplitude):
-        projected_u, _, _, pressure, divergence = _face_flux_pressure_projection_duct(
-            amplitude * base_u,
-            zeros,
-            zeros,
-            rho,
-            mask,
-            dt=0.05,
-            dx=0.4,
-            dy=dy,
-            dz=dz,
-            iterations=200,
-            tolerance=1.0e-10,
-            fluid_bounds=(0, ny, 0, nz),
-        )
-        return jnp.mean(projected_u**2) + 0.01 * jnp.mean(pressure**2) + divergence**2
-
-    value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
-    step = 1.0e-4
-    finite_difference = (objective(1.0 + step) - objective(1.0 - step)) / (2.0 * step)
-    assert jnp.isfinite(value)
-    assert jnp.isfinite(gradient)
-    assert gradient == pytest.approx(finite_difference, rel=2.0e-5, abs=1.0e-8)
-
-
-def test_nonuniform_conservative_current_uses_face_center_distances():
-    y_faces = jnp.asarray([-1.0, -0.8, -0.35, 0.0, 0.2, 0.6, 0.85, 1.0])
-    z_faces = jnp.asarray([-1.0, -0.65, -0.1, 0.25, 0.7, 1.0])
-    y = 0.5 * (y_faces[:-1] + y_faces[1:])
-    z = 0.5 * (z_faces[:-1] + z_faces[1:])
-    yy, zz = jnp.meshgrid(y, z, indexing="ij")
-    phi = jnp.broadcast_to((2.0 * yy - 3.0 * zz)[None, :, :], (3, 7, 5))
-    sigma = jnp.ones_like(phi)
-    zeros = jnp.zeros_like(phi)
-    fx, fy, fz = _conservative_current_fluxes_3d(
-        sigma,
-        phi,
-        zeros,
-        zeros,
-        zeros,
-        dx=0.4,
-        dy=jnp.diff(y_faces),
-        dz=jnp.diff(z_faces),
-    )
-    assert fy[:, 1:-1, :] == pytest.approx(-2.0)
-    assert fz[:, :, 1:-1] == pytest.approx(3.0)
-    divergence = (
-        (fx[1:] - fx[:-1]) / 0.4
-        + (fy[:, 1:, :] - fy[:, :-1, :]) / jnp.diff(y_faces)[None, :, None]
-        + (fz[:, :, 1:] - fz[:, :, :-1]) / jnp.diff(z_faces)[None, None, :]
-    )
-    assert divergence[:, 1:-1, 1:-1] == pytest.approx(0.0, abs=1.0e-12)
-
-
 def test_limited_linear_vector_convection_matches_manufactured_conservation_and_autodiff():
     nx, ny, nz = 7, 7, 3
     dx = jnp.asarray([0.18, 0.24, 0.21, 0.29, 0.23, 0.31, 0.26])
@@ -835,6 +766,80 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
     assert tangent == pytest.approx(2.0 * action, abs=3.0e-5)
 
 
+def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
+    shape = (5, 4, 3)
+    widths = tuple(np.asarray(value) for value in (
+        [0.2, 0.3, 0.25, 0.35, 0.4], [0.3, 0.2, 0.4, 0.35], [0.25, 0.45, 0.3]))
+    velocity = np.sin(np.arange(np.prod(shape) * 3).reshape((*shape, 3)) / 7.0)
+    zero_y = np.zeros((shape[0], shape[2], 3))
+    zero_z = np.zeros((shape[0], shape[1], 3))
+    patches = (np.zeros((*shape[1:], 3)), velocity[-1], zero_y, zero_y, zero_z, zero_z)
+
+    def reference(field, boundary):
+        gradients, neighbours = [], []
+        for axis, width in enumerate(widths):
+            values = np.moveaxis(field, axis, 0)
+            lo = np.concatenate((boundary[2 * axis][None], values[:-1]))
+            hi = np.concatenate((values[1:], boundary[2 * axis + 1][None]))
+            dm = np.concatenate((width[:1] / 2, (width[:-1] + width[1:]) / 2))[:, None, None, None]
+            dp = np.concatenate(((width[:-1] + width[1:]) / 2, width[-1:] / 2))[:, None, None, None]
+            fraction = width[1:] / (width[:-1] + width[1:])
+            wm = np.concatenate(([1.0], fraction))[:, None, None, None]
+            wp = np.concatenate((1.0 - fraction, [1.0]))[:, None, None, None]
+            gradients.append(np.moveaxis((wm * (values - lo) / dm + wp * (hi - values) / dp) / (wm + wp), 0, axis))
+            neighbours.extend((np.moveaxis(lo, 0, axis), np.moveaxis(hi, 0, axis)))
+        local = np.stack((field, *neighbours))
+        minimum, maximum, limiter = local.min(0), local.max(0), np.ones_like(field)
+        for axis, (gradient, width) in enumerate(zip(gradients, widths, strict=True)):
+            reshape = [1, 1, 1, 1]
+            reshape[axis] = shape[axis]
+            for extrapolate in (-0.5 * width.reshape(reshape) * gradient,
+                                0.5 * width.reshape(reshape) * gradient):
+                delta = np.where(extrapolate > 0, maximum - field, minimum - field)
+                limiter = np.minimum(limiter, np.where(abs(extrapolate) > 1e-15,
+                    np.minimum(delta / np.where(abs(extrapolate) > 1e-15, extrapolate, 1), 1), 1))
+        gradient = np.stack(tuple(limiter * value for value in gradients), axis=-2)
+        result, eye = np.zeros_like(field), np.eye(3)
+        for axis, width in enumerate(widths):
+            def traction(g):
+                return 0.7 * (g[..., :, axis] - 2 / 3 * np.trace(g, axis1=-2, axis2=-1)[..., None] * eye[axis])
+            moved = np.moveaxis(traction(gradient), axis, 0)
+            face_values = []
+            for side, index in ((0, 0), (1, -1)):
+                patch_gradient = np.take(gradient, index, axis=axis).copy()
+                adjacent = np.take(field, index, axis=axis)
+                patch_gradient[..., axis, :] = (2 * side - 1) * (boundary[2 * axis + side] - adjacent) / (width[index] / 2)
+                face_values.append(traction(patch_gradient))
+            weight = (width[1:] / (width[:-1] + width[1:]))[:, None, None, None]
+            faces = np.concatenate((face_values[0][None], weight * moved[:-1] + (1 - weight) * moved[1:], face_values[1][None]))
+            result += np.moveaxis(np.diff(faces, axis=0) / width[:, None, None, None], 0, axis)
+        return result
+
+    def evaluate(scale):
+        return fringing_impl._explicit_deviatoric_stress_duct(
+            scale * jnp.asarray(velocity), jnp.full(shape, 0.7),
+            tuple(scale * jnp.asarray(value) for value in patches), tuple(map(jnp.asarray, widths)))
+    expected = reference(velocity, patches)
+    assert jax.jit(evaluate)(1.0) == pytest.approx(expected, abs=2.0e-6)
+    assert jax.jvp(evaluate, (1.0,), (1.0,))[1] == pytest.approx(expected, abs=3.0e-6)
+
+    uniform = (jnp.full((5,), 0.2), jnp.full((4,), 0.3), jnp.full((3,), 0.4))
+    profile = jnp.arange(12.0).reshape(4, 3) / 20.0
+    developed = jnp.zeros((*shape, 3)).at[..., 0].set(profile[None])
+    developed_patches = (developed[0], developed[-1], *map(jnp.zeros_like, patches[2:]))
+    stress = fringing_impl._explicit_deviatoric_stress_duct
+    assert stress(developed, jnp.full(shape, 0.7), developed_patches, uniform) == pytest.approx(0.0)
+    x = (jnp.arange(5) + 0.5) * uniform[0][0]
+    quadratic = jnp.zeros((*shape, 3)).at[..., 0].set(1.2 * x[:, None, None] ** 2)
+    quadratic_patches = (jnp.zeros_like(patches[0]), quadratic[-1], *map(jnp.zeros_like, patches[2:]))
+    quadratic_stress = stress(quadratic, jnp.full(shape, 0.7), quadratic_patches, uniform)
+    assert quadratic_stress[2, 1:-1, 1:-1, 0] == pytest.approx(2 * 0.7 * 1.2 / 3)
+    affine = jnp.zeros_like(quadratic).at[..., 0].set(1.2 * x[:, None, None])
+    affine_stress = stress(affine, jnp.full(shape, 0.7), (jnp.zeros_like(patches[0]), affine[-1], *map(jnp.zeros_like, patches[2:])), uniform)
+    volume = uniform[0][0] * uniform[1][0] * uniform[2][0]
+    assert jnp.sum(affine_stress[..., 0]) * volume == pytest.approx(-0.7 * 1.2 * 4 * 0.3 * 3 * 0.4 / 3)
+
+
 def test_compact_duct_mass_flux_codec_and_initializer_match_fv_faces():
     shape = (2, 2, 2)
     compact = jnp.arange(24.0).reshape((3, *shape))
@@ -875,12 +880,37 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     u = jnp.cos(2.0 * jnp.pi * x) * (1.0 + 0.1 * y) * jnp.ones_like(z)
     v = 0.2 * jnp.sin(jnp.pi * y) * jnp.ones_like(x + z)
     w = -0.15 * jnp.sin(jnp.pi * z) * jnp.ones_like(x + y)
-    projected_u, projected_v, projected_w, pressure, divergence = _face_flux_pressure_projection_duct(
-        u, v, w, jnp.ones_like(u), jnp.ones((nx, ny, nz), dtype=bool), dt=0.05,
-        dx=0.25, dy=dy, dz=dz, iterations=200, tolerance=1.0e-10)
+    def project(amplitude):
+        return _face_flux_pressure_projection_duct(
+            amplitude * u,
+            v,
+            w,
+            jnp.ones_like(u),
+            jnp.ones((nx, ny, nz), dtype=bool),
+            dt=0.05,
+            dx=0.25,
+            dy=dy,
+            dz=dz,
+            iterations=200,
+            tolerance=1.0e-10,
+        )
+
+    projected_u, projected_v, projected_w, pressure, divergence = project(1.0)
     assert divergence < 1.0e-8
-    assert all(jnp.isfinite(value).all() for value in (
-        projected_u, projected_v, projected_w, pressure))
+    assert all(
+        jnp.isfinite(field).all()
+        for field in (projected_u, projected_v, projected_w, pressure)
+    )
+
+    def objective(amplitude):
+        projected = project(amplitude)
+        return jnp.mean(projected[0] ** 2) + 0.01 * jnp.mean(projected[3] ** 2)
+
+    value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
+    step = 1.0e-4
+    finite_difference = (objective(1.0 + step) - objective(1.0 - step)) / (2 * step)
+    assert jnp.isfinite(value)
+    assert gradient == pytest.approx(finite_difference, rel=2.0e-5, abs=1.0e-8)
 
 
 def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
@@ -1511,7 +1541,7 @@ def test_fixed_flow_pipe_projection_closes_flow_and_rejects_invalid_masks():
         _pipe_radial_fluid_count(partial)
 
 
-def test_pipe_jacobi_pressure_fallback_solves_compatible_zero_rhs():
+def test_pipe_pressure_fallback_and_gauge_invariant_update():
     rhs = jnp.zeros((3, 4, 8))
     r = jnp.linspace(0.1, 0.4, 4)[None, :, None]
     field, residual, iterations, initial = _pipe_poisson_jacobi_3d(
@@ -1528,8 +1558,6 @@ def test_pipe_jacobi_pressure_fallback_solves_compatible_zero_rhs():
     assert initial == pytest.approx(0.0)
     assert iterations == 1
 
-
-def test_scalar_update_ignores_constant_gauge_mode():
     previous = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     physical_update = jnp.asarray([[0.0, 0.2], [-0.1, 0.1]])
     volume = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
@@ -1576,9 +1604,14 @@ def test_duct_boundary_current_is_stationwise_divergence_integral():
     assert boundary.shape == (shape[0],)
     assert boundary == pytest.approx(expected)
     assert float(jnp.max(boundary)) > 0.0
+    fx = jnp.asarray([[[0.0, 1.0]], [[2.0, 3.0]], [[4.0, 5.0]]])
+    axial_current = _station_axial_current_from_fluxes(
+        fx, jnp.asarray([[2.0, 4.0]])
+    )
+    assert axial_current.tolist() == pytest.approx([10.0, 22.0])
 
 
-def test_build_extruded_problem_from_case_preserves_case_and_profile():
+def test_extruded_problem_builder_and_fixed_flow_contract():
     case = build_square_duct_extruded_problem(nx_stations=5, ny=4, nz=4).case
     problem = build_extruded_problem_from_case(
         case,
@@ -1591,8 +1624,6 @@ def test_build_extruded_problem_from_case_preserves_case_and_profile():
     assert problem.profile.axis == "y"
     assert problem.profile.x.shape == (5,)
 
-
-def test_fixed_flow_pressure_constraint_rejects_zero_response():
     field = jnp.zeros((1, 2, 2))
     with pytest.raises(ValueError, match="nonzero"):
         _apply_fixed_flow_pressure_constraint(
@@ -1604,7 +1635,7 @@ def test_fixed_flow_pressure_constraint_rejects_zero_response():
         )
 
 
-def test_cross_duct_pressure_difference_samples_adjacent_wall_midpoints():
+def test_cross_duct_pressure_difference_values_and_contract():
     p_z = jnp.broadcast_to(jnp.arange(4.0)[None, None, :], (2, 3, 4))
     active = jnp.ones_like(p_z, dtype=bool)
     assert _cross_duct_pressure_difference(
@@ -1616,8 +1647,6 @@ def test_cross_duct_pressure_difference_samples_adjacent_wall_midpoints():
         p_y, active_mask=active, magnetic_axis=1, side_axis=2
     ).tolist() == pytest.approx([-1.0, -1.0])
 
-
-def test_cross_duct_pressure_difference_rejects_invalid_contract():
     p = jnp.zeros((1, 2, 2))
     with pytest.raises(ValueError, match="distinct members"):
         _cross_duct_pressure_difference(
@@ -1627,9 +1656,15 @@ def test_cross_duct_pressure_difference_rejects_invalid_contract():
         _cross_duct_pressure_difference(
             p, active_mask=jnp.zeros_like(p, dtype=bool), magnetic_axis=1, side_axis=2
         )
+    assert _normalized_pressure_observable_update(
+        jnp.array([2.0, -1.0]), jnp.zeros(2), jnp.array([25.0, 100.0])
+    ) == pytest.approx(0.02)
+    assert _normalized_pressure_observable_update(
+        jnp.array([2.0]), jnp.zeros(1), jnp.array([0.25])
+    ) == pytest.approx(2.0)
 
 
-def test_extruded_sharding_validates_and_places_fields(
+def test_extruded_sharding_validates_placement_and_supported_paths(
     monkeypatch: pytest.MonkeyPatch,
 ):
     field = jnp.zeros((4, 2, 2))
@@ -1649,26 +1684,12 @@ def test_extruded_sharding_validates_and_places_fields(
     )
     placed = _shard_extruded_fields((field,), num_devices=2)
     assert jnp.all(placed[0] == 1)
-
-
-def test_spatial_sharding_rejects_unimplemented_extruded_paths():
     problem = build_square_duct_extruded_problem(nx_stations=4, ny=4, nz=4)
     with pytest.raises(NotImplementedError, match="ALEX B2"):
         solve_extruded_inductionless(problem, num_devices=2)
 
 
-def test_pressure_observable_update_uses_magnetic_pressure_normalization():
-    assert _normalized_pressure_observable_update(
-        jnp.array([2.0, -1.0]),
-        jnp.zeros(2),
-        jnp.array([25.0, 100.0]),
-    ) == pytest.approx(0.02)
-    assert _normalized_pressure_observable_update(
-        jnp.array([2.0]), jnp.zeros(1), jnp.array([0.25])
-    ) == pytest.approx(2.0)
-
-
-def test_smooth_fringing_profile_produces_bounded_station_scales():
+def test_fringing_profile_and_constant_field_builders():
     profile = smooth_fringing_profile(
         length=6.0,
         nx=9,
@@ -1682,9 +1703,6 @@ def test_smooth_fringing_profile_produces_bounded_station_scales():
     assert profile.x.shape == (9,)
     assert jnp.all(profile.field_scale >= 0.0)
     assert float(jnp.max(profile.field_scale)) <= 1.2
-
-
-def test_smooth_fringing_profile_rejects_invalid_axis():
     with pytest.raises(ValueError, match="Unsupported magnetic axis"):
         smooth_fringing_profile(
             length=1.0,
@@ -1695,45 +1713,18 @@ def test_smooth_fringing_profile_rejects_invalid_axis():
             axis="bad",
         )
 
-
-def test_clone_case_with_field_replaces_constant_field():
     base_case, _ = build_square_duct_fringing_benchmark(nx_stations=5, ny=8, nz=8)
     shifted = clone_case_with_field(base_case, axis="y", magnitude=3.0, suffix="probe")
-
     assert shifted.name.endswith("probe")
     assert shifted.magnetic_field.value == (0.0, 3.0, 0.0)
-
-
-def test_clone_case_with_field_supports_x_axis():
-    base_case, _ = build_square_duct_fringing_benchmark(nx_stations=5, ny=8, nz=8)
-    shifted = clone_case_with_field(base_case, axis="x", magnitude=2.0)
-    assert shifted.magnetic_field.value == (2.0, 0.0, 0.0)
-
-
-def test_clone_case_with_field_rejects_invalid_axis():
-    base_case, _ = build_square_duct_fringing_benchmark(nx_stations=5, ny=8, nz=8)
+    assert clone_case_with_field(
+        base_case, axis="x", magnitude=2.0
+    ).magnetic_field.value == (2.0, 0.0, 0.0)
     with pytest.raises(ValueError, match="Unsupported magnetic axis"):
         clone_case_with_field(base_case, axis="bad", magnitude=1.0)
 
 
-def test_station_axial_current_from_fluxes_averages_adjacent_x_faces():
-    fx = jnp.asarray(
-        [
-            [[0.0, 1.0]],
-            [[2.0, 3.0]],
-            [[4.0, 5.0]],
-        ]
-    )
-    cell_area = jnp.asarray([[2.0, 4.0]])
-
-    axial_current = _station_axial_current_from_fluxes(fx, cell_area)
-
-    assert axial_current.shape == (2,)
-    assert axial_current[0] == pytest.approx(10.0)
-    assert axial_current[1] == pytest.approx(22.0)
-
-
-def test_run_fringing_station_sweep_chains_initial_state(
+def test_run_fringing_station_sweep_chains_state_and_requires_constant_field(
     monkeypatch: pytest.MonkeyPatch,
 ):
     base_case, profile = build_square_duct_fringing_benchmark(nx_stations=3, ny=8, nz=8)
@@ -1769,9 +1760,6 @@ def test_run_fringing_station_sweep_chains_initial_state(
     assert calls[1][1] is not None
     assert history[-1]["current_scaled_pressure_proxy"] == pytest.approx(0.4)
 
-
-def test_run_fringing_station_sweep_requires_constant_field():
-    base_case, profile = build_square_duct_fringing_benchmark(nx_stations=3, ny=8, nz=8)
     bad_case = replace(
         base_case,
         magnetic_field=replace(

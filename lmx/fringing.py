@@ -446,16 +446,6 @@ def _enforce_velocity_bc_3d(
     return bounded
 
 
-def _enforce_fluid_mask_3d(field: jnp.ndarray, active_mask: jnp.ndarray) -> jnp.ndarray:
-    """Mask solids while retaining cell-centred tangential wall values."""
-
-    bounded = jnp.where(active_mask, field, 0.0)
-    if bounded.shape[0] > 1:
-        bounded = bounded.at[0].set(bounded[1])
-        bounded = bounded.at[-1].set(bounded[-2])
-    return bounded
-
-
 def _enforce_stationwise_flow_rate_3d(
     u: jnp.ndarray,
     *,
@@ -1048,42 +1038,25 @@ def _rectangular_fluid_bounds(fluid_mask: jnp.ndarray) -> tuple[int, int, int, i
     return y0, y1, z0, z1
 
 
-def _line_solvers_3d(
-    diagonal: jnp.ndarray,
-    directions: tuple[tuple[int, jnp.ndarray, jnp.ndarray], ...],
-):
-    solvers = []
-    for axis, lower, upper in directions:
-        permutation = (axis,) + tuple(index for index in range(3) if index != axis)
-        inverse = tuple(np.argsort(permutation))
-
-        def solve_line(
-            residual: jnp.ndarray,
-            *,
-            lower=lower,
-            upper=upper,
-            permutation=permutation,
-            inverse=inverse,
-        ) -> jnp.ndarray:
-            solved = tridiagonal_solve(
-                jnp.transpose(lower, permutation),
-                jnp.transpose(diagonal, permutation),
-                jnp.transpose(upper, permutation),
-                jnp.transpose(residual, permutation),
-            )
-            return jnp.transpose(solved, inverse)
-
-        solvers.append(solve_line)
-    return tuple(solvers)
-
-
 def _additive_line_preconditioner_3d(
     diagonal: jnp.ndarray,
     directions: tuple[tuple[int, jnp.ndarray, jnp.ndarray], ...],
     *,
     periodic_last_axis: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ):
-    line_solves = list(_line_solvers_3d(diagonal, directions))
+    line_solves = []
+    for axis, lower, upper in directions:
+        permutation = (axis,) + tuple(index for index in range(3) if index != axis)
+        inverse = tuple(np.argsort(permutation))
+
+        def solve_line(residual, lower=lower, upper=upper, permutation=permutation, inverse=inverse):
+            solved = tridiagonal_solve(
+                jnp.transpose(lower, permutation), jnp.transpose(diagonal, permutation),
+                jnp.transpose(upper, permutation), jnp.transpose(residual, permutation)
+            )
+            return jnp.transpose(solved, inverse)
+
+        line_solves.append(solve_line)
     if periodic_last_axis is not None:
         lower, upper = periodic_last_axis
 
@@ -1696,6 +1669,66 @@ def _cell_limited_least_squares_gradient_duct(
     return tuple(limiter * gradient for gradient in gradients)
 
 
+def _explicit_deviatoric_stress_duct(
+    velocity: jnp.ndarray,
+    dynamic_viscosity: jnp.ndarray,
+    boundary_velocity: tuple[jnp.ndarray, ...],
+    widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+) -> jnp.ndarray:
+    """Return lagged ``div(mu*dev2(T(grad(U))))`` with limited gradients.
+    Parity is claimed only for canonical constant ``mu``."""
+    gradient = jnp.stack(
+        tuple(
+            jnp.stack(
+                _cell_limited_least_squares_gradient_duct(
+                    velocity[..., component],
+                    tuple(patch[..., component] for patch in boundary_velocity),
+                    widths,
+                ),
+                axis=-1,
+            )
+            for component in range(3)
+        ),
+        axis=-1,
+    )
+    identity = jnp.eye(3, dtype=velocity.dtype)
+
+    def traction(value, coefficient, axis):
+        trace = jnp.trace(value, axis1=-2, axis2=-1)
+        return coefficient[..., None] * (
+            value[..., :, axis] - (2.0 / 3.0) * trace[..., None] * identity[axis]
+        )
+    correction = jnp.zeros_like(velocity)
+    for axis, width in enumerate(widths):
+        cell_traction = traction(gradient, dynamic_viscosity, axis)
+        patch_tractions = []
+        for side, index in ((0, 0), (1, -1)):
+            normal = (2 * side - 1) * (
+                boundary_velocity[2 * axis + side]
+                - jnp.take(velocity, index, axis=axis)
+            ) / (0.5 * width[index])
+            patch_tractions.append(
+                traction(
+                    jnp.take(gradient, index, axis=axis).at[..., axis, :].set(normal),
+                    jnp.take(dynamic_viscosity, index, axis=axis),
+                    axis,
+                )
+            )
+        moved = jnp.moveaxis(cell_traction, axis, 0)
+        centered = (width[1:] / (width[:-1] + width[1:]))[:, None, None, None]
+        faces = jnp.concatenate(
+            (
+                patch_tractions[0][None],
+                centered * moved[:-1] + (1.0 - centered) * moved[1:],
+                patch_tractions[1][None],
+            )
+        )
+        correction += jnp.moveaxis(
+            jnp.diff(faces, axis=0) / width[:, None, None, None], 0, axis
+        )
+    return correction
+
+
 def _limited_linear_vector_face_weights_duct(
     velocity: jnp.ndarray,
     rho_phi: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
@@ -1769,18 +1802,13 @@ def _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet):
 
 
 def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz):
-    """Pack ``linearInterpolate(rho*U)&Sf`` for a no-slip rectangular duct.
-
-    The prescribed inlet uses adjacent-cell density, while the zero-gradient
-    outlet uses the adjacent cell. Fluxes are area-integrated and oriented
-    along increasing coordinates rather than outward patch normals.
-    """
+    """Pack oriented, area-integrated ``linearInterpolate(rho*U)&Sf`` faces."""
     momentum = density[..., None] * velocity
     area_x = dy[:, None] * dz[None, :]
     inlet = density[0] * inlet_velocity[..., 0] * area_x
-    plus_x = jnp.concatenate((
-        0.5 * (momentum[:-1, ..., 0] + momentum[1:, ..., 0]),
-        momentum[-1:, ..., 0])) * area_x
+    plus_x = jnp.concatenate(
+        (0.5 * (momentum[:-1, ..., 0] + momentum[1:, ..., 0]), momentum[-1:, ..., 0])
+    ) * area_x
     wy = (dy[1:] / (dy[:-1] + dy[1:]))[None, :, None]
     plus_y = jnp.concatenate((
         wy * momentum[:, :-1, :, 1] + (1.0 - wy) * momentum[:, 1:, :, 1],
@@ -4355,23 +4383,16 @@ def smooth_fringing_profile(
     return FringingProfile(x=x, field_scale=peak_scale * rise * fall, axis=axis)
 
 
-def _constant_field_on_axis(axis: str, magnitude: float) -> tuple[float, float, float]:
-    if axis == "x":
-        return (magnitude, 0.0, 0.0)
-    if axis == "y":
-        return (0.0, magnitude, 0.0)
-    if axis == "z":
-        return (0.0, 0.0, magnitude)
-    raise ValueError(f"Unsupported magnetic axis {axis!r}")
-
-
 def clone_case_with_field(
     case: CaseSpec, *, axis: str, magnitude: float, suffix: str | None = None
 ) -> CaseSpec:
+    if axis not in {"x", "y", "z"}:
+        raise ValueError(f"Unsupported magnetic axis {axis!r}")
+    vector = tuple(magnitude if name == axis else 0.0 for name in "xyz")
     magnetic_field = replace(
         case.magnetic_field,
         kind="constant",
-        value=_constant_field_on_axis(axis, magnitude),
+        value=vector,
     )
     name = case.name if suffix is None else f"{case.name}_{suffix}"
     return replace(case, name=name, magnetic_field=magnetic_field)
