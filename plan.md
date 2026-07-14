@@ -70,14 +70,14 @@ superseded worktrees and branches.
 | README/docs | 567-word feature-led README, conservatively sourced comparison table, feature-specific docs, and a 7-second Hunt loop; tracked media is 387,683 bytes | refresh canonical B2/scaling panels only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish CFL/stopping diagnostics, then independent input observers and the smoke role |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | implement independent LMX/FreeMHD materializers and observers, then freeze the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
-| B2 ALEX square duct | exact frozen momentum/stress/flux/projection, Aitken restart identity, forced one-/two-CPU equivalence, and the O(nx) SOLVAX axial coarse solve pass bounded gates | add restart-continuous CFL/stopping diagnostics, then materialize the exact tiny FreeMHD smoke |
-| SOLVAX | released 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and O(nx) tridiagonal algebra now used by B2; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | publish 0.8.4 separately before consuming shared Anderson weights |
-| Portable quality | accepted at `cf76c5a`: 769 pass, 8 expected skips, 95.24% combined line/branch coverage, 167.0 s | preserve the 300 s target and 600 s hard limit while consolidating rather than adding test files |
+| B2 ALEX square duct | exact frozen momentum/stress/flux/projection, O(nx) SOLVAX coarse solve, restart-continuous CFL/stopping state, and forced one-/two-CPU equivalence pass bounded gates | independently materialize and observe both tiny inputs before running either code |
+| SOLVAX | PyPI/tag 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and O(nx) tridiagonal algebra used by B2; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | publish 0.8.4 separately before consuming shared Anderson weights; move no further MHD assembly |
+| Portable quality | accepted at `9be802f`: 770 pass, 8 expected skips, 95.17% combined line/branch coverage, 166.4 s | preserve the 300 s target and 600 s hard limit while consolidating rather than adding test files |
 
-Current structural audit at `44e52c4`: 35 modules, 34,998 package lines,
-8,049 maintained-core lines, 32 test files / 21,275 lines, and
+Current structural audit at `9be802f`: 35 modules, 34,977 package lines,
+8,003 maintained-core lines, 32 test files / 21,274 lines, and
 18 maintenance scripts. These are ceilings, not targets: every added branch or
 test must consolidate or delete at least as much code in the same tranche.
 The four audited probe worktrees contained only promoted or rejected work;
@@ -118,6 +118,15 @@ The final audit freezes these interpretations:
   the previous scaled residual, relaxation, convergence streak, compact flux,
   and all five histories. A deliberately final step still skips acceleration,
   so a completed run is not reinterpreted as a mid-run checkpoint.
+- B2 now records the effective step, OpenFOAM/FreeMHD volume-mean and maximum
+  Courant numbers from the compact corrected mass flux actually used by each
+  momentum solve, plus completed steps, sustained streak, and the stable reason
+  `in_progress`, `converged`, or `step_limit`. Schema `b2_diagnostics_v2`
+  preserves these exactly while loading older `b2_aitken_v1` records honestly.
+- `max_steps` is the actual per-invocation pseudo-steady update budget, including
+  one step; convergence still takes precedence when the third passing update is
+  the final allowed step. The exact smoke must freeze and compare this executed
+  contract rather than infer physical time from the ignored `t_final` field.
 
 Machine-readable evidence is in `benchmarks/results/`; interpretation belongs
 in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
@@ -176,13 +185,24 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    first-call time from 0.258 s to 0.078 s, warm time from 88.1 to 32.6 us, and
    coarse state from 8 MiB to 40 KiB. This is helper evidence, not full-solver
    strong scaling.
-11. Add explicit CFL and stopping diagnostics to the existing compact B2 record
-   and gate their restart continuity; do not add a new report or test file.
-12. Materialize both tiny inputs independently, derive their observed contracts,
-   then freeze smoke mesh, mapped field, time step, iterations, and stopping
-   rules. Commit and push before invoking FreeMHD.
-13. Extend the existing parity command to run one exact tiny B2 smoke. Compare
-   mass/current closure, stopping, hashes, and the same pressure observable. A
+11. **Complete at `9be802f`:** record `(effective dt, volume-mean Co, maximum Co)`
+   from the compact mass flux consumed by every B2 momentum step and persist the
+   completed-step/streak/reason stopping state in `b2_diagnostics_v2`. The
+   independent nonuniform face-flux oracle, legacy load, schema round trip,
+   exact 3-step versus 1+2 continuation, and forced one-/two-CPU gates pass.
+   The tranche added no file and reduced package/core/test lines to
+   34,977/8,003/21,274. The complete portable gate remains 166.4 seconds.
+12. Extend the existing parity script and `lmx/freemhd.py`, not the repository
+   surface: independently materialize a tiny LMX case and a tiny FreeMHD case,
+   then derive each observed contract only from its own real configuration,
+   coordinates, field samples, boundary files, and pinned source. Unit-test
+   both observers and mismatch attribution without running a solver. Only then
+   freeze the shared mesh, field mapping, effective fixed step, correctors,
+   executed step budget, expected `step_limit`/`converged` reason, and hashes;
+   commit and push that contract before invoking FreeMHD.
+13. Run one exact tiny B2 smoke through the extended parity command. Compare
+   mass/current closure, effective-step/Courant history, stopping state, hashes,
+   and the same pressure observable. A
    failure returns to the first failed tiny gate.
 14. Prove one-/multi-device equivalence on that accepted tiny path, then measure
    fixed-size Mac 1/2/4-device CPU and office one-/two-GPU warm timings alone.
@@ -333,6 +353,11 @@ a newer API, in the same tranche that updates the minimum CI lane. Test both
 the minimum and newest compatible releases and record the resolved environment.
 Do not tie LMX to one patch release or commit a resolver lock.
 
+Final check on 2026-07-14: PyPI and GitHub tags both stop at 0.8.3. The clean
+local 0.8.4 candidate at `4808695` adds reusable Anderson weights and richer
+linear-solve auxiliaries, but no finite-volume, boundary, gauge, MHD, or
+distributed-domain API that can delete further LMX ownership today.
+
 The next ownership audit is evidence-driven:
 
 - Keep the exact limited-linear weights, face fluxes, mixed pressure stencil,
@@ -368,9 +393,9 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | stay at 35 until a complete owner disappears |
-| package lines | 34,998 | below 34,800 after smoke cleanup |
-| maintained-core lines | 8,049 | below 8,000 after the exact smoke |
-| test files / lines | 32 / 21,275 | 32 / below 21,000 by consolidating post-smoke evidence |
+| package lines | 34,977 | below 34,800 after smoke cleanup |
+| maintained-core lines | 8,003 | below 8,000 after the exact smoke |
+| test files / lines | 32 / 21,274 | 32 / below 21,000 by consolidating post-smoke evidence |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or
