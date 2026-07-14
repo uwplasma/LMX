@@ -245,6 +245,11 @@ def test_tracked_solvax_pcg_acceptance_is_complete_and_honest():
     assert payload["gpu_equivalence"]["status"] == "accepted"
     assert payload["ha20_freemhd"]["status"] == "accepted"
     assert payload["m3_promotion_pass"] is True
+    assert all(
+        source["path"].startswith("https://github.com/uwplasma/LMX/releases/")
+        for source in payload["sources"]
+        if "equivalence" in source["path"]
+    )
 
 
 def test_current_solvax_equivalence_is_compact_and_cross_backend():
@@ -255,6 +260,8 @@ def test_current_solvax_equivalence_is_compact_and_cross_backend():
     assert payload["implementation"]["solvax_version"] == "0.8.1"
     assert payload["problem"]["dtype"] == "float64"
     assert set(payload["backends"]) == {"cpu", "gpu"}
+    assert payload["source_records"]["cpu_url"].startswith("https://github.com/")
+    assert payload["source_records"]["gpu_url"].startswith("https://github.com/")
     assert all(payload["acceptance"].values())
     assert all(
         backend["promotion_pass"]

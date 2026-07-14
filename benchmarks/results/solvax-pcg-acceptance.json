@@ -25,11 +25,11 @@
       "sha256": "61d190c6caa482c0e85d5ea178843355cd4ff5a70cb5cbaddf94ee93eada872e"
     },
     {
-      "path": "benchmarks/results/solvax-pcg-equivalence-cpu.json",
+      "path": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.5.1-equivalence-cpu.json",
       "sha256": "cfe4914d3769821894a5ce6e1ea8ce6d8cfc8389e1412688106269c2e0c5fab7"
     },
     {
-      "path": "benchmarks/results/solvax-pcg-equivalence-gpu.json",
+      "path": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.5.1-equivalence-gpu.json",
       "sha256": "6cc9a12d4b8706d26bae04d4494ca6621d64288371dcd1de1db9a16b0d53e42d"
     },
     {

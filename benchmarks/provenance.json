@@ -346,7 +346,7 @@
       "id": "solvax-pcg-acceptance",
       "kind": "repository_document",
       "path": "benchmarks/results/solvax-pcg-acceptance.json",
-      "sha256": "367ad17600913278e1bc6458aa6b5d0c37f8dadecdb25c70e98e15e82a2fede1",
+      "sha256": "b3edf3d231371fcb76404d00eaf02aa526d00ea81e8d7e320d4f8286183c2882",
       "title": "LMX released-SOLVAX PCG CPU and Benchmark A acceptance evidence"
     },
     {
@@ -354,7 +354,7 @@
       "id": "solvax-pcg-current-equivalence",
       "kind": "repository_document",
       "path": "benchmarks/results/solvax-pcg-current-equivalence.json",
-      "sha256": "2483008a4147b47defc4489af649516495cc6cf5c4425865b53b94d05b101ff2",
+      "sha256": "8a9d5beddf327f1dddcb8db3ae5ba2fb81e0c45e56b6cd9632b2aeffb402d6d3",
       "title": "Current released-SOLVAX PCG CPU and GPU equivalence evidence"
     },
     {

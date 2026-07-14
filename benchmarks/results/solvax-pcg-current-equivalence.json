@@ -18,6 +18,8 @@
   "source_records": {
     "cpu_sha256": "c026b4cc999bfb7bff5334799c14ce5afbccafc0fad44652200f935dafbbac10",
     "gpu_sha256": "1a2f2ac5b2000a311b195065979439c72d1e7100ab90970d6e384933e34877b1",
+    "cpu_url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-equivalence-cpu.json",
+    "gpu_url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-equivalence-gpu.json",
     "disposition": "external raw evidence"
   },
   "backends": {
