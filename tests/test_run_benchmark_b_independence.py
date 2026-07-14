@@ -68,6 +68,12 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
         )["electric_iterations"]
         == 600
     )
+    assert (
+        campaign._variant_problem(
+            "B2-fringing-square", "coarse", "baseline", num_devices=2
+        ).case.geometry.nx
+        == 102
+    )
 
     with pytest.raises(ValueError, match="Unsupported independence variant"):
         campaign._variant_problem("B1-fringing-pipe", "coarse", "unknown")
@@ -333,6 +339,22 @@ def test_gpu_device_parser_requires_unique_ids():
         campaign._parse_gpu_devices("")
     with pytest.raises(ValueError, match="unique"):
         campaign._parse_gpu_devices("0,0")
+
+
+def test_spatial_placement_records_and_enforces_actual_shards():
+    field = SimpleNamespace(
+        addressable_shards=(
+            SimpleNamespace(device="cuda:0"),
+            SimpleNamespace(device="cuda:1"),
+        )
+    )
+    assert campaign._spatial_placement(field, 2) == {
+        "spatial_devices": 2,
+        "actual_spatial_shards": 2,
+        "spatial_device_ids": ["cuda:0", "cuda:1"],
+    }
+    with pytest.raises(RuntimeError, match="solution has 2 shards"):
+        campaign._spatial_placement(field, 1)
 
 
 def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch):

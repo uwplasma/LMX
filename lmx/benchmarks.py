@@ -445,8 +445,14 @@ def build_benchmark_b_problem(
     mesh_level: str,
     root: str | Path | None = None,
     wall_realization: str = "nominal",
+    num_devices: int | None = None,
 ):
-    """Build one immutable nondimensional ALEX B1/B2 production problem."""
+    """Build one immutable nondimensional ALEX B1/B2 production problem.
+
+    A sharded mesh rounds the frozen axial minimum upward to the nearest
+    multiple of ``num_devices``; cross-section resolution and physics remain
+    unchanged.
+    """
 
     from ._fringing_types import ExtrudedInductionlessProblem
     from .specs import (
@@ -475,7 +481,14 @@ def build_benchmark_b_problem(
     reynolds = ha**2 / interaction
     viscosity = 1.0 / reynolds
     peak_field = math.sqrt(interaction)
-    nx = int(level["axial_stations_min"])
+    if num_devices is not None and num_devices < 1:
+        raise ValueError("num_devices must be positive")
+    nx_min = int(level["axial_stations_min"])
+    nx = (
+        math.ceil(nx_min / num_devices) * num_devices
+        if num_devices is not None
+        else nx_min
+    )
     wall_cells = int(level["side_layer_cells_min"])
     x_min = float(spec["geometry"]["x_over_L_min"])
     length = float(spec["geometry"]["x_over_L_max"]) - x_min

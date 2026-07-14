@@ -167,6 +167,9 @@ for external research use.
   outside the frozen literature limits, so medium/fine refinement is required.
 - GPU: accepted B2 checkpoint scales from 36.96 seconds on one A4000 to 22.23
   seconds on two (1.66x, 83.1% efficiency).
+- Frozen B2 runner: `--spatial-devices 2` rounds only the odd axial minimum to
+  an equal-shard mesh and records/enforces actual device placement; a bounded
+  two-A4000 production solve passes steady and conservation gates.
 - Repository consolidation is active; historical campaigns and large studies
   are being moved out of the source tree before further solver slimming.
 - Architecture budgets now cap module count, source/core lines, tracked bytes,

@@ -158,6 +158,18 @@ def test_benchmark_b_problem_rejects_unfrozen_choices():
         build_benchmark_b_problem(
             "B1-fringing-pipe", mesh_level="coarse", wall_realization="thick"
         )
+    with pytest.raises(ValueError, match="num_devices"):
+        build_benchmark_b_problem(
+            "B2-fringing-square", mesh_level="coarse", num_devices=0
+        )
+
+
+def test_benchmark_b_sharded_mesh_rounds_frozen_axial_minimum_upward():
+    problem = build_benchmark_b_problem(
+        "B2-fringing-square", mesh_level="coarse", num_devices=2
+    )
+    assert problem.case.geometry.nx == 102
+    assert problem.profile.x.size == 102
 
 
 def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():

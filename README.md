@@ -188,7 +188,10 @@ fine campaigns with checksummed exact-case FreeMHD evidence; no notebook or
 large field file is needed to make the final machine-readable decision.
 For independent validation variants, run one process per GPU with explicit
 `CUDA_VISIBLE_DEVICES`; for a single B2 solve, use its `num_devices` setting for
-named axial sharding. Disable default JAX memory preallocation when processes
+named axial sharding. The production campaign runner exposes this as
+`--spatial-devices 2` and rounds the frozen odd axial minimum upward by one
+station so every shard is equal; the result records and enforces the actual
+JAX shard count and devices. Disable default JAX memory preallocation when processes
 share a host. Long ALEX runs emit progress and atomic partial restarts so a
 source-matched run can resume safely. Normal single-process CPU execution is
 usually fastest on the Mac because compiled kernels already use the host cores.

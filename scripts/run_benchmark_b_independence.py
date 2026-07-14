@@ -62,10 +62,15 @@ def _source_fingerprint(root: Path = ROOT) -> str:
     return digest.hexdigest()
 
 
-def _variant_problem(case_id: str, mesh_level: str, variant: str):
+def _variant_problem(
+    case_id: str, mesh_level: str, variant: str, *, num_devices: int | None = None
+):
     wall = "confirmation" if variant == "thin_wall" else "nominal"
     problem = build_benchmark_b_problem(
-        case_id, mesh_level=mesh_level, wall_realization=wall
+        case_id,
+        mesh_level=mesh_level,
+        wall_realization=wall,
+        num_devices=num_devices,
     )
     spec = load_benchmark_b_spec(case_id)
     tolerance = float(problem.case.solver.coupling_tolerance)
@@ -114,6 +119,23 @@ def _effective_iteration_limits(problem) -> dict[str, int]:
         "electric_iterations": max(requested, 4000 if b1 else 600),
         "projection_iterations": max(requested, 4000),
         "momentum_iterations": max(requested, 400),
+    }
+
+
+def _spatial_placement(field, expected: int | None) -> dict[str, Any]:
+    """Record and enforce actual JAX shard placement for a solved field."""
+
+    shards = tuple(field.addressable_shards)
+    actual = len(shards)
+    requested = expected or 1
+    if actual != requested:
+        raise RuntimeError(
+            f"Requested {requested} spatial devices, but the solution has {actual} shards"
+        )
+    return {
+        "spatial_devices": requested,
+        "actual_spatial_shards": actual,
+        "spatial_device_ids": [str(shard.device) for shard in shards],
     }
 
 
@@ -200,8 +222,9 @@ def _run_record(
     initial_bundle=None,
     initialization: str | None = None,
     initialization_sha256: str | None = None,
+    num_devices: int | None = None,
 ) -> tuple[dict[str, Any], Any]:
-    problem = _variant_problem(case_id, mesh_level, variant)
+    problem = _variant_problem(case_id, mesh_level, variant, num_devices=num_devices)
     started = time.perf_counter()
     progress_path = restart_path.with_suffix(".progress.json")
     partial_restart_path = restart_path.with_suffix(".partial.npz")
@@ -217,8 +240,10 @@ def _run_record(
             started=started,
         ),
         checkpoint_interval=checkpoint_interval,
+        num_devices=num_devices,
     )
     jax.block_until_ready(solution.bundle.u)
+    placement = _spatial_placement(solution.bundle.u, num_devices)
     elapsed = time.perf_counter() - started
     restart_path.parent.mkdir(parents=True, exist_ok=True)
     write_extruded_restart_npz(solution, problem.case, restart_path)
@@ -247,6 +272,7 @@ def _run_record(
                 )
             ),
             "initialization_sha256": initialization_sha256,
+            **placement,
             "b1_compatible_steady": case_id == "B1-fringing-pipe",
             "b1_retained_modal_blocks": case_id == "B1-fringing-pipe",
         },
@@ -643,6 +669,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Run independent variants concurrently, one subprocess per CUDA GPU.",
     )
     parser.add_argument(
+        "--spatial-devices",
+        type=int,
+        help="Shard each B2 solve axially across this many visible JAX devices.",
+    )
+    parser.add_argument(
         "--acceptance-mesh",
         action="append",
         default=[],
@@ -661,6 +692,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.checkpoint_interval <= 0:
         parser.error("--checkpoint-interval must be positive")
+    if args.spatial_devices is not None and args.spatial_devices < 1:
+        parser.error("--spatial-devices must be positive")
+    if args.spatial_devices is not None and args.gpu_devices is not None:
+        parser.error("--spatial-devices and --gpu-devices are separate execution modes")
+    if (
+        args.spatial_devices
+        and args.spatial_devices > 1
+        and any(case_id != "B2-fringing-square" for case_id in args.cases)
+    ):
+        parser.error("multi-device spatial sharding currently supports only ALEX B2")
     if args.acceptance_mesh:
         if args.gpu_devices is not None or args.dry_run or args.worker:
             parser.error("acceptance assembly cannot run solver, GPU, or dry-run modes")
@@ -742,6 +783,7 @@ def main(argv: list[str] | None = None) -> int:
                     initial_bundle=initial_bundle,
                     initialization=initialization,
                     initialization_sha256=initialization_sha256,
+                    num_devices=args.spatial_devices,
                 )
                 if variant == "baseline":
                     baseline_bundle = solution.bundle

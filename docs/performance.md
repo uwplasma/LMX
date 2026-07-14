@@ -31,6 +31,21 @@ python scripts/run_benchmark_b_independence.py \
   --cases B1-fringing-pipe --mesh-level coarse --variants baseline --resume
 ```
 
+Run one frozen B2 solve across both visible GPUs with:
+
+```bash
+XLA_PYTHON_CLIENT_PREALLOCATE=false \
+python scripts/run_benchmark_b_independence.py \
+  --cases B2-fringing-square --mesh-level coarse --variants baseline \
+  --spatial-devices 2 --variant-restart baseline=/release-assets/b2-102.npz
+```
+
+The sharded builder rounds axial minima `101/151/201` to `102/152/202`, which
+still satisfies the frozen minimum-resolution contract. Cross-section grids,
+physics, and tolerances are unchanged. The runner refuses to combine spatial
+sharding with the separate one-process-per-GPU campaign mode and fails if the
+result does not actually have the requested number of addressable JAX shards.
+
 Frozen B1 cases use the compatible steady and retained-modal implementations
 directly and record both choices in the result. The superseded environment
 switches were removed after small, medium, large, and restart parity passed.
