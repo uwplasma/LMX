@@ -122,6 +122,22 @@ def test_fringing_jit_cache_reuses_the_first_compiled_kernel():
     assert fringing_impl._reuse_fringing_jit(key, object()) is first
 
 
+def test_axial_mean_preconditioner_exactly_inverts_its_galerkin_space():
+    shape = (4, 2, 2)
+    volume = jnp.ones(shape)
+    west = jnp.ones(shape).at[0].set(0.0)
+    east = jnp.ones(shape).at[-1].set(0.0)
+    mode = jnp.asarray([1.0, -1.0, 2.0, -2.0])
+    field = jnp.broadcast_to(mode[:, None, None] / 2.0, shape)
+    field_west = jnp.concatenate((field[:1], field[:-1]))
+    field_east = jnp.concatenate((field[1:], field[-1:]))
+    rhs = -volume * (west * (field_west - field) + east * (field_east - field))
+
+    precondition = fringing_impl._axial_mean_preconditioner_3d(volume, west, east)
+
+    assert precondition(rhs) == pytest.approx(field)
+
+
 def test_duct_solvers_forward_single_reduction_to_solvax(
     monkeypatch: pytest.MonkeyPatch,
 ):

@@ -1191,6 +1191,34 @@ def _additive_line_preconditioner_3d(
     return apply
 
 
+def _axial_mean_preconditioner_3d(
+    volume: jnp.ndarray,
+    coef_x_w: jnp.ndarray,
+    coef_x_e: jnp.ndarray,
+):
+    """Invert the Galerkin operator for cross-section-constant axial modes."""
+
+    nx, ny, nz = volume.shape
+    normalization = math.sqrt(ny * nz)
+    west = -jnp.sum(volume * coef_x_w, axis=(1, 2)) / (ny * nz)
+    east = -jnp.sum(volume * coef_x_e, axis=(1, 2)) / (ny * nz)
+    diagonal = -(west + east)
+    coarse = jnp.diag(diagonal)
+    coarse = coarse + jnp.diag(west[1:], -1) + jnp.diag(east[:-1], 1)
+    gauge = jnp.sum(volume, axis=(1, 2)) / normalization
+    coarse = coarse + jnp.outer(gauge, gauge) / jnp.sum(volume)
+    coarse_inverse = jnp.linalg.inv(coarse)
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        reduced = jnp.sum(residual, axis=(1, 2)) / normalization
+        correction = coarse_inverse @ reduced
+        return jnp.broadcast_to(
+            correction[:, None, None] / normalization, residual.shape
+        )
+
+    return apply
+
+
 def _finalize_local_pressure_solve(
     solution,
     *,
@@ -1335,7 +1363,13 @@ def _solvax_pressure_poisson_duct(
     )
     if not include_axial_line:
         directions = directions[1:]
-    precondition = _additive_line_preconditioner_3d(diagonal, directions)
+    line_precondition = _additive_line_preconditioner_3d(diagonal, directions)
+    axial_precondition = _axial_mean_preconditioner_3d(
+        volume, coef_x_w, coef_x_e
+    )
+
+    def precondition(residual):
+        return line_precondition(residual) + axial_precondition(residual)
 
     linear_rhs = -volume * rhs_compatible
     effective_rtol = tolerance
