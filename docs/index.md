@@ -82,6 +82,5 @@ developer_guide
 Useful anchors for that work include the [Samper et al. MHD validation
 ladder](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf),
 the [differentiable simulation review](https://mpan31415.github.io/assets/pdf/papers/2024/IEEEAccess24_DiffSim.pdf),
-[PhiFlow](https://proceedings.mlr.press/v235/holl24a.html),
-[Lineax](https://docs.kidger.site/lineax/api/solvers/), and
+[PhiFlow](https://proceedings.mlr.press/v235/holl24a.html), and
 [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/).

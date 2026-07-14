@@ -46,7 +46,7 @@ __all__ = [
 
 
 _EXPORTS = {
-    "enable_compilation_cache": ("lmx.jax_setup", "enable_compilation_cache"),
+    "enable_compilation_cache": ("lmx.io", "enable_compilation_cache"),
     "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),
     "make_shercliff_case": ("lmx.cases", "make_shercliff_case"),
     "make_hunt_case": ("lmx.cases", "make_hunt_case"),

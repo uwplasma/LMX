@@ -89,7 +89,7 @@ def build_samper_case(
     max_steps: int = 12,
     potential_iterations: int = 4000,
     coupling_iterations: int = 512,
-    linear_solver: str = "cg",
+    linear_solver: str = "solvax_pcg",
 ):
     """Build Table I in units where the reported dimensionless flow equals Q."""
 
@@ -532,7 +532,9 @@ def main() -> int:
     parser.add_argument("--max-steps", type=int, default=12)
     parser.add_argument("--potential-iterations", type=int, default=4000)
     parser.add_argument("--coupling-iterations", type=int, default=512)
-    parser.add_argument("--linear-solver", choices=("cg", "solvax_pcg"), default="cg")
+    parser.add_argument(
+        "--linear-solver", choices=("cg", "solvax_pcg"), default="solvax_pcg"
+    )
     parser.add_argument("--wall-thickness", type=float, default=0.01)
     parser.add_argument("--wall-cells", type=int, default=4)
     parser.add_argument("--resume", action="store_true")

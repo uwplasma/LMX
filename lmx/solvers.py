@@ -17,10 +17,9 @@ from .linear import (
     apply_poisson_operator,
     five_point_residual_norm,
     poisson_residual_norm,
-    solve_five_point_system,
+    solve_five_point_solvax_pcg_state,
     solve_poisson_cg_state,
     solve_poisson_jacobi_state,
-    solve_poisson_lineax,
 )
 from .mesh import (
     StructuredMesh,
@@ -641,23 +640,24 @@ def _solve_velocity_system(
         rhs_masked * cell_metric,
         jnp.zeros_like(rhs_masked),
     )
-    field, info = solve_five_point_system(
+    if linear_solver.lower() not in {"auto", "cg", "solvax_pcg"}:
+        raise ValueError(f"Unsupported linear solver {linear_solver!r}")
+    field, residual, iterations = solve_five_point_solvax_pcg_state(
         diagonal * cell_metric,
         west * cell_metric,
         east * cell_metric,
         south * cell_metric,
         north * cell_metric,
         rhs_masked * cell_metric,
-        linear_solver=linear_solver,
-        preconditioner=preconditioner,
+        max_steps,
         tolerance=tolerance,
-        max_steps=max_steps,
+        preconditioner=preconditioner,
     )
     field = jnp.where(active_mask, field, 0.0)
     return (
         field,
-        jnp.asarray(info.residual, dtype=rhs.dtype),
-        jnp.asarray(info.iterations, dtype=jnp.int32),
+        jnp.asarray(residual, dtype=rhs.dtype),
+        jnp.asarray(iterations, dtype=jnp.int32),
         jnp.asarray(initial_residual, dtype=rhs.dtype),
     )
 
@@ -843,21 +843,6 @@ def _solve_potential(
                 preconditioner=selected_preconditioner,
             )
         residual = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
-    elif solver == "lineax_cg":
-        phi, info = solve_poisson_lineax(
-            diagonal,
-            west,
-            east,
-            south,
-            north,
-            rhs,
-            anchor,
-            fallback_iterations=iterations,
-            max_steps=iterations,
-        )
-        residual = jnp.asarray(info.residual, dtype=rhs.dtype)
-        solver_residual = residual
-        iteration_count = jnp.asarray(info.iterations, dtype=jnp.int32)
     else:
         raise ValueError(f"Unsupported potential solver backend {solver!r}")
     result = (phi, residual, iteration_count, initial_residual)

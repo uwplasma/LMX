@@ -10,11 +10,10 @@ uv run --locked --extra dev python scripts/run_full_test_suite.py
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
-and a hard ten-minute timeout. The current Apple M4 result is 771 passed, 8
-expected external-data skips, 95.31% branch coverage, and 194.4 seconds with six
-workers. The slowest test took 47.9 seconds under worker contention, below the
-120-second per-test timeout; the compact gate record tracks the five slowest
-node IDs for regression review.
+and a hard ten-minute timeout. The current Apple M4 result is 760 passed, 8
+expected external-data skips, 95.31% branch coverage, and 193.4 seconds with six
+workers. The compact gate record tracks the slowest node IDs for regression
+review.
 
 The eight skips represent unavailable independent datasets, not disabled source
 paths. The gate must stay below ten minutes as the code grows; its engineering
@@ -33,18 +32,23 @@ Markers describe cost or external requirements, not correctness importance.
 Avoid adding a new test file when a compact test belongs naturally in an
 existing module-level family.
 
-## What is tested
+## Capability-to-evidence map
 
-| Layer | Examples |
-|---|---|
-| API and configuration | constructors, TOML, CLI, errors, restart metadata |
-| numerics | operators, linear solves, manufactured solutions, observed order |
-| physics | analytical profiles, charge closure, wall currents, power balance |
-| solver integration | steady/transient paths, diagnostics, backend equivalence |
-| differentiability | finite differences, implicit gradients, transpose solves |
-| parallelism | shard placement, one/two-device equivalence, scaling summaries |
-| outputs | compact plots, tables, NPZ/JSON round trips |
-| examples | every curated portable workflow |
+Exact benchmark node IDs and source hashes remain in the
+[benchmark matrix](benchmark_matrix.md) and `benchmarks/provenance.json`.
+
+| Capability | Portable test owner | Physics or external evidence | Status |
+|---|---|---|---|
+| CLI, config, restart, and I/O | CLI, config, I/O, and example-runner tests | portable workflow catalog | stable |
+| Operators, mesh, and conservation | operator, mesh, physics, and convergence tests | manufactured solutions and observed order | stable |
+| Ducts and high Ha | solver, physics, and validation tests | A1/A2/A3 analytical and FreeMHD records | accepted |
+| Linear algebra and SOLVAX | linear plus focused solver/fringing tests | frozen SOLVAX CPU/GPU acceptance records | accepted |
+| B1/B2 fringing | benchmark, fringing, and independence-runner tests | B1/B2 ALEX evidence | exact FreeMHD open |
+| Fields, geometry, walls, and blanket models | field, mesh, wall, and blanket tests | limiting cases and convergence | scoped external status |
+| Differentiability | autodiff and gradient-focused solver tests | finite-difference and transpose evidence | stable paths accepted |
+| Q2D and external adapters | Q2D and external-validation tests | independent-data readiness | quantitative parity open |
+| Sharding and scaling | scaling and placement tests | Mac and GPU records | accepted-case scaling open |
+| Plots, examples, and packaging | plotting, showcase, repository, and reporting tests | media, docs, wheel, and provenance gates | stable |
 
 Coverage is a floor, not a validation claim. Physics acceptance requires
 quantitative reference and conservation gates even when code coverage is 100%.

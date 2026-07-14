@@ -982,7 +982,6 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "interpax" },
-    { name = "lineax" },
     { name = "magpylib-jax" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -1013,7 +1012,6 @@ requires-dist = [
     { name = "interpax", marker = "extra == 'dev'" },
     { name = "jax" },
     { name = "jaxlib" },
-    { name = "lineax", marker = "extra == 'dev'" },
     { name = "magpylib-jax", marker = "extra == 'dev'" },
     { name = "magpylib-jax", marker = "extra == 'magnetic'" },
     { name = "matplotlib" },

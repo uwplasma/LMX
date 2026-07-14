@@ -157,6 +157,8 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
                 "owner": role,
             }
         )
+    test_files = sorted((root / "tests").glob("test_*.py"))
+    maintenance_scripts = sorted((root / "scripts").glob("*.py"))
     examples = sorted(
         path.relative_to(root).as_posix()
         for pattern in ("*.py", "*.toml")
@@ -208,6 +210,12 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
                 for module in modules
                 if module["role"] in {"stable_core", "compatibility_facade"}
             ),
+            "test_file_count": len(test_files),
+            "test_lines": sum(
+                len(path.read_text(encoding="utf-8").splitlines())
+                for path in test_files
+            ),
+            "maintenance_script_count": len(maintenance_scripts),
             "package_modules": modules,
             "root_export_count": len(exports),
             "root_exports": exports,
@@ -234,9 +242,12 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             },
         },
         "targets": {
-            "package_module_count_max": 36,
-            "total_package_lines_max": 35500,
-            "maintained_core_lines_max": 8500,
+            "package_module_count_max": 35,
+            "total_package_lines_max": 35000,
+            "maintained_core_lines_max": 8100,
+            "test_file_count_max": 33,
+            "test_lines_max": 21300,
+            "maintenance_script_count_max": 19,
             "stable_root_exports_max": 30,
             "curated_examples_max": 12,
             "checkout_bytes_max": 4 * 1024 * 1024,
@@ -302,6 +313,9 @@ def architecture_budget_errors(
         "package_module_count": "package_module_count_max",
         "total_package_lines": "total_package_lines_max",
         "maintained_core_lines": "maintained_core_lines_max",
+        "test_file_count": "test_file_count_max",
+        "test_lines": "test_lines_max",
+        "maintenance_script_count": "maintenance_script_count_max",
         "root_export_count": "stable_root_exports_max",
         "curated_example_count": "curated_examples_max",
         "checkout_bytes_excluding_build_artifacts": "checkout_bytes_max",

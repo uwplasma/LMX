@@ -21,12 +21,12 @@ BoundaryKind = Literal[
     "imposed_current_density",
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
-PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume", "lineax_cg"]
+PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume"]
 CurrentReconstructionKind = Literal[
     "cell_centered", "face_averaged", "hybrid_face_lorentz"
 ]
 VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
-LinearSolverKind = Literal["auto", "cg", "solvax_pcg", "gmres", "bicgstab"]
+LinearSolverKind = Literal["auto", "cg", "solvax_pcg"]
 PreconditionerKind = Literal["none", "jacobi", "block_jacobi"]
 TimeSchemeKind = Literal["implicit_euler", "crank_nicolson"]
 CouplingAccelerationKind = Literal["none", "aitken", "anderson"]

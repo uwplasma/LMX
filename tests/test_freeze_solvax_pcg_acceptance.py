@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-from importlib.metadata import version
 from pathlib import Path
 
 import pytest
 
-from scripts.benchmark_solvax_pcg_backend import run_backend_comparison
 from scripts.freeze_solvax_pcg_acceptance import (
     EXPECTED_ROWS,
     build_acceptance,
@@ -17,39 +15,6 @@ from scripts.freeze_solvax_pcg_acceptance import (
 def _write(path: Path, payload: dict) -> Path:
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
-
-
-def test_solvax_backend_records_equivalence_and_resources() -> None:
-    # The 4x4 system exercises the same primal, transpose, gradient, resource,
-    # and end-to-end paths without paying campaign-scale timing repetitions.
-    result = run_backend_comparison(grid=4, repeats=1, max_steps=8)
-    assert result["implementation"]["solvax_version"] == version("solvax")
-    for gate in (
-        "forward_equivalent",
-        "gradient_verified",
-        "transpose_gradient_verified",
-        "transpose_residual_pass",
-        "end_to_end_hartmann_pass",
-    ):
-        assert result["acceptance"][gate] is True
-    components = [
-        value
-        for name, value in result["acceptance"].items()
-        if name not in {"backend_promotion_pass", "cpu_promotion_pass"}
-    ]
-    assert result["acceptance"]["backend_promotion_pass"] is all(components)
-    assert result["acceptance"]["cpu_promotion_pass"] is result["acceptance"][
-        "backend_promotion_pass"
-    ]
-    for backend in ("native", "solvax"):
-        assert result[backend]["residual"] <= result["problem"]["tolerance"] + 1e-15
-        assert result[backend]["warm_median_seconds"] > 0.0
-        assert result[backend]["memory"]["temp_size_in_bytes"] is not None
-    assert result["transpose_audit"]["residual"] <= result["problem"]["tolerance"]
-    assert result["end_to_end_hartmann"]["acceptance"]["pass"] is True
-    assert result["end_to_end_hartmann"]["native"]["steps"] == result[
-        "end_to_end_hartmann"
-    ]["solvax"]["steps"]
 
 
 def _campaign(records: list[dict], *, solvax_version: str = "0.5.1") -> dict:

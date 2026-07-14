@@ -66,7 +66,7 @@ def test_build_samper_shercliff_case_makes_q_equal_q_tilde() -> None:
     assert case.solver.coupling_acceleration == "anderson"
     assert case.solver.coupling_history_depth == 6
     assert case.solver.coupling_iterations == 512
-    assert case.solver.linear_solver == "cg"
+    assert case.solver.linear_solver == "solvax_pcg"
     assert case.time_stepper.max_steps == 12
     assert case.time_stepper.steady_tolerance == pytest.approx(
         samper_runner.STEADY_RELATIVE_UPDATE_TARGET

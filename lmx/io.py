@@ -4,11 +4,28 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
 from .core import Diagnostics, MHDState, Solution
 from .mesh import StructuredMesh
+
+
+def enable_compilation_cache(
+    cache_dir: str | Path | None = None,
+    *,
+    min_compile_time_secs: float = 0.0,
+    min_entry_size_bytes: int = -1,
+) -> Path:
+    """Enable JAX's persistent compilation cache before a heavy compile."""
+
+    target = Path(cache_dir or (Path.home() / ".cache" / "lmx" / "jax_compilation"))
+    target.mkdir(parents=True, exist_ok=True)
+    jax.config.update("jax_compilation_cache_dir", str(target))
+    jax.config.update("jax_persistent_cache_min_entry_size_bytes", min_entry_size_bytes)
+    jax.config.update("jax_persistent_cache_min_compile_time_secs", min_compile_time_secs)
+    return target
 
 
 @dataclass(frozen=True)

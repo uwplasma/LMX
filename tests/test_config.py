@@ -42,7 +42,7 @@ ramp_duration = 0.0
 [solver]
 kind = "fully_developed_inductionless"
 mode = "steady"
-linear_solver = "gmres"
+linear_solver = "solvax_pcg"
 preconditioner = "block_jacobi"
 time_scheme = "implicit_euler"
 coupling_iterations = 9
@@ -133,7 +133,7 @@ side = "max"
     assert config.case.output.directory == str((tmp_path / "out").resolve())
     assert config.case.solver.kind == "fully_developed_inductionless"
     assert config.case.solver.mode == "steady"
-    assert config.case.solver.linear_solver == "gmres"
+    assert config.case.solver.linear_solver == "solvax_pcg"
     assert config.case.solver.preconditioner == "block_jacobi"
     assert config.case.solver.coupling_iterations == 9
     assert config.case.solver.coupling_acceleration == "aitken"

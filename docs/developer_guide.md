@@ -99,7 +99,6 @@ more pragmatic. They do not define the differentiable contract.
 Useful references:
 
 - [JAX gradient checkpointing](https://docs.jax.dev/en/latest/gradient-checkpointing.html)
-- [Lineax solvers](https://docs.kidger.site/lineax/api/solvers/)
 - [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/)
 
 ## Performance lane

@@ -41,7 +41,6 @@ dev = [
   "pytest-timeout",
   "pytest-xdist",
   "magpylib-jax",
-  "lineax",
   "interpax",
 ]
 docs = [

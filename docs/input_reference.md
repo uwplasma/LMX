@@ -191,8 +191,8 @@ side = "max"
   - `steady`
   - `transient`
 - `linear_solver`
-  - `auto` (released SOLVAX PCG), `solvax_pcg`, `cg`, `gmres`, or `bicgstab`
-  - use explicit `cg` to reproduce the retained native comparison path
+  - `auto` (SOLVAX PCG) or `solvax_pcg`
+  - `cg` remains a compatibility alias for SOLVAX PCG
 - `preconditioner`
   - `none`
   - `jacobi`

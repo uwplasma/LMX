@@ -1155,7 +1155,7 @@ def test_solve_velocity_system_returns_zero_outside_active_mask():
     assert float(initial_residual) >= 0.0
 
 
-def test_solvax_pcg_velocity_backend_matches_native_and_preserves_mask():
+def test_velocity_solver_cg_alias_uses_solvax_and_preserves_mask():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=6, nz=6)
     diffusivity = jnp.ones(mesh.yz_shape) * 0.1
     reaction = jnp.ones(mesh.yz_shape) * 0.05
@@ -1174,48 +1174,20 @@ def test_solvax_pcg_velocity_backend_matches_native_and_preserves_mask():
         max_steps=80,
         tolerance=1.0e-10,
     )
-    native = solvers._solve_velocity_system(linear_solver="cg", **common)
+    aliased = solvers._solve_velocity_system(linear_solver="cg", **common)
     released = solvers._solve_velocity_system(linear_solver="solvax_pcg", **common)
 
-    native_field, native_residual, _, native_initial = native
+    aliased_field, aliased_residual, _, aliased_initial = aliased
     solvax_field, solvax_residual, _, solvax_initial = released
     assert jnp.all(solvax_field[~active_mask] == 0.0)
-    assert jnp.allclose(solvax_field, native_field, rtol=1.0e-9, atol=1.0e-10)
-    assert float(native_residual) <= 1.0e-10
+    assert jnp.allclose(solvax_field, aliased_field, rtol=1.0e-9, atol=1.0e-10)
+    assert float(aliased_residual) <= 1.0e-10
     assert float(solvax_residual) <= 1.0e-10
-    assert float(native_initial) == pytest.approx(float(solvax_initial))
+    assert float(aliased_initial) == pytest.approx(float(solvax_initial))
 
-
-def test_solvax_pcg_backend_matches_native_end_to_end_hartmann_step():
-    base = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    base = replace(
-        base,
-        time_stepper=replace(
-            base.time_stepper,
-            max_steps=4,
-            t_final=0.008,
-            steady_tolerance=0.0,
-            potential_iterations=40,
-        ),
-        solver=replace(base.solver, coupling_iterations=2, coupling_tolerance=1.0e-7),
-    )
-    native = solve_steady(
-        replace(base, solver=replace(base.solver, linear_solver="cg"))
-    )
-    released = solve_steady(
-        replace(base, solver=replace(base.solver, linear_solver="solvax_pcg"))
-    )
-
-    assert jnp.allclose(released.state.u, native.state.u, rtol=1.0e-12, atol=1.0e-12)
-    assert jnp.allclose(
-        released.state.phi, native.state.phi, rtol=1.0e-12, atol=1.0e-12
-    )
-    assert released.state.residual == pytest.approx(native.state.residual)
-    assert float(released.diagnostics.linear_residual_history[-1]) <= 1.0e-12
-    native_power = solvers.fully_developed_power_balance(base, native)
-    released_power = solvers.fully_developed_power_balance(base, released)
-    for key in native_power:
-        assert released_power[key] == pytest.approx(native_power[key], rel=1.0e-12)
+    for unsupported in ("gmres", "bicgstab", "bad"):
+        with pytest.raises(ValueError, match="Unsupported linear solver"):
+            solvers._solve_velocity_system(linear_solver=unsupported, **common)
 
 
 def test_velocity_system_coefficients_cover_connected_and_boundary_fallback_paths():
@@ -1935,40 +1907,13 @@ def test_fully_developed_steady_can_require_potential_residual_when_requested(
     assert solution.state.residual == pytest.approx(1.0e-5)
 
 
-def test_potential_solver_supports_lineax_and_rejects_unknown_backend(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_potential_solver_rejects_unknown_backend():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     sigma = jnp.ones(mesh.yz_shape)
     fluid_mask = jnp.ones(mesh.yz_shape, dtype=bool)
     u = jnp.ones(mesh.yz_shape) * 0.05
     by = jnp.zeros(mesh.yz_shape)
     bz = jnp.ones(mesh.yz_shape)
-
-    def fake_lineax(*args, **kwargs):
-        return jnp.zeros(mesh.yz_shape), type(
-            "Info", (), {"residual": 1.0e-9, "iterations": 7}
-        )()
-
-    monkeypatch.setattr(solvers, "solve_poisson_lineax", fake_lineax)
-
-    phi, residual, iterations, initial_residual = solvers._solve_potential(
-        mesh,
-        sigma,
-        fluid_mask,
-        u,
-        by,
-        bz,
-        anchor=(0, 0),
-        iterations=25,
-        tolerance=1e-8,
-        solver="lineax_cg",
-    )
-
-    assert jnp.isfinite(phi).all()
-    assert float(initial_residual) >= 0.0
-    assert float(residual) >= 0.0
-    assert int(iterations) >= 0
 
     with pytest.raises(ValueError, match="Unsupported potential solver backend"):
         solvers._solve_potential(
@@ -3195,7 +3140,7 @@ for _unit_test_name in (
     "test_fully_developed_steady_stops_once_residual_reaches_tolerance",
     "test_fully_developed_steady_requires_outer_state_convergence",
     "test_fully_developed_steady_can_require_potential_residual_when_requested",
-    "test_potential_solver_supports_lineax_and_rejects_unknown_backend",
+    "test_potential_solver_rejects_unknown_backend",
     "test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask",
     "test_enforce_velocity_bc_supports_direct_wall_interpolation",
     "test_velocity_update_limiters_cover_local_clip_and_validation_errors",

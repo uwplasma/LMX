@@ -77,7 +77,7 @@ superseded worktrees and branches.
 | B2 ALEX square duct | fine numerical baseline converged; experimental acceptance open | resolve transverse-only versus Maxwell-consistent field with matched FreeMHD |
 | SOLVAX | 0.8.2 primal, gradient, transpose, CPU/GPU, and existing integration gates pass | remove remaining safe LMX duplicates; repeat interleaved timing |
 | Parallel execution | two-GPU B2 numerical checkpoint shows 1.66x speedup and parity | accepted-case CPU/GPU scaling and four-device evidence |
-| Portable quality | 771 pass, 8 expected external-data skips, 95.31% branch coverage, 194.4 s | stay below 300 s target and 600 s hard limit |
+| Portable quality | 760 pass, 8 expected external-data skips, 95.31% branch coverage, 193.4 s | stay below 300 s target and 600 s hard limit |
 
 Machine-readable evidence is in `benchmarks/results/`; current interpretation is
 in `docs/validation_report.md` and `docs/performance.md`.
@@ -110,11 +110,11 @@ physical acceptance. SOLVAX owns generic linear algebra once parity is proved.
 
 Apply this migration sequence:
 
-1. Remove obsolete optional-SOLVAX guards, empty accelerator extras, and stale
-   version errors; SOLVAX is a required compatible dependency.
-2. Consolidate five-point SPD velocity solves on `pcg_linear_solve`, retaining
-   LMX physical maximum-residual recertification; remove duplicate CG/Lineax
-   implementations and mock-only tests.
+1. **Complete:** obsolete optional-SOLVAX guards, empty accelerator extras, and
+   stale version errors are gone; SOLVAX is a required compatible dependency.
+2. **Complete:** five-point SPD velocity solves use `pcg_linear_solve` with LMX
+   maximum-residual recertification. Native CG, Lineax, mock-only tests, and the
+   obsolete live promotion script are gone; `cg` is only a compatibility alias.
 3. Replace the custom periodic-theta line solve with SOLVAX
    `cyclic_tridiagonal_solve` after duct/pipe primal and gradient parity.
 4. Reformulate anchored Poisson operators symmetrically before moving them to
@@ -139,16 +139,17 @@ Near-term ratchets after this workstream:
 
 | Surface | Current | Next target |
 |---|---:|---:|
-| package modules | 36 | at most 35 |
-| package lines | 35,328 | below 35,000 |
-| maintained-core lines | 8,456 | below 8,300 |
-| test files / lines | 34 / 21,643 | at most 33 / below 21,400 |
-| maintenance scripts | 20 | at most 19; reusable logic moves into `lmx/` or an existing command |
+| package modules | 35 | at most 34 |
+| package lines | 34,939 | below 34,750 |
+| maintained-core lines | 8,067 | below 7,900 |
+| test files / lines | 33 / 21,273 | at most 32 / below 21,100 |
+| maintenance scripts | 19 | at most 18; reusable logic moves into `lmx/` or an existing command |
 
 Count semantic maintenance cost across the whole package; do not satisfy a
 budget through formatting or by relabelling a large module “research-stage.”
-Ratchet each cap downward after an accepted migration; this workstream does not
-exit until both a package module and a test file have been removed.
+Ratchet each enforced cap downward after an accepted migration. The first
+file-count gate is complete: one package module, one test file, and one
+maintenance script have been removed without dropping a supported workflow.
 
 ## Priority 3: one exact matched FreeMHD harness
 
