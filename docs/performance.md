@@ -38,6 +38,9 @@ but every electric solve still used both 600-iteration PCG stages and the
 initial Aitken jump returned to the slow asymptotic rate. The resulting 248 MiB
 checkpoint is a checksummed release asset; a stronger fine-grid preconditioner,
 not more brute-force updates, precedes another acceptance run.
+Enabling an axial line block across the sharded dimension was rejected: the
+same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
+iteration electric solves and equivalent residuals.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states

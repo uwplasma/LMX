@@ -81,7 +81,13 @@
       "conclusion": "the fine grid still requires both PCG stages and resumes its slow asymptotic rate after one transient Aitken update",
       "restart_bytes": 260135219,
       "restart_sha256": "81aad950ffb8be85c19b1c78786716a7aad7faf93eb9ab1b874830943c7315c1",
-      "restart_url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-fine-30a91bb-8step-checkpoint.npz"
+      "restart_url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-fine-30a91bb-8step-checkpoint.npz",
+      "rejected_axial_line_probe": {
+        "elapsed_seconds": 209.74663139303448,
+        "baseline_elapsed_seconds": 109.18361319904216,
+        "electric_iterations_per_step": 1200,
+        "result": "rejected: 1.92x slower with equivalent residuals"
+      }
     }
   },
   "independence": {
