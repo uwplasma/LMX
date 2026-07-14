@@ -76,8 +76,8 @@ superseded worktrees and branches.
 | SOLVAX | PyPI/tag 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and O(nx) tridiagonal algebra used by B2; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | publish 0.8.4 separately before consuming shared Anderson weights; move no further MHD assembly |
 | Portable quality | accepted at `9be802f`: 770 pass, 8 expected skips, 95.17% combined line/branch coverage, 166.4 s | preserve the 300 s target and 600 s hard limit while consolidating rather than adding test files |
 
-Current structural audit at `e7e9b35`: 35 modules, 34,800 package lines,
-8,003 maintained-core lines, 31 test files / 21,036 lines, and
+Current structural audit at `90d159a`: 35 modules, 34,798 package lines,
+8,001 maintained-core lines, 31 test files / 21,036 lines, and
 18 maintenance scripts. These are ceilings, not targets: every added branch or
 test must consolidate or delete at least as much code in the same tranche.
 The four audited probe worktrees contained only promoted or rejected work;
@@ -236,19 +236,21 @@ Completed foundation:
 
 Execute this solver-free tranche in order:
 
-1. **Complete at `e7e9b35`: create line budget before adding observers.** Merge the essential parity
-   command gates into `tests/test_freemhd.py`, delete the superseded parity
+1. **Complete at `e7e9b35`: create line budget before adding observers.** The
+   essential parity command gates moved into `tests/test_freemhd.py`; the superseded parity
    test file, replace the hand-built case fixture with the real materializer,
    and remove the nonportable local-install assertion. After verifying that it
    has no public export or repository caller, delete
    `build_case_from_freemhd_reference` and its adapter-only inference helpers
-   and tests. Preserve raw dictionary parsers needed by the observers. Target
-   The focused 40-test gate and strict docs build pass; the result is 31 test
+   and tests. Raw dictionary parsers needed by the observers remain. The
+   focused 40-test gate and strict docs build pass; the result is 31 test
    files, 21,036 test lines, and 34,800 package lines with no new file.
-2. **Bind the external source without vendoring it.** Verify commit
+2. **Source bytes frozen at `90d159a`; materialized snapshot next.** Both B1
+   and B2 now bind the same four source paths to exact SHA-256 values, and the
+   deterministic index/provenance gates pass. The materializer must verify commit
    `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and cleanliness of the four
    relevant paths, then copy only those four files plus `source-pin.json` into
-   the generated evidence tree. Freeze their SHA-256 values in the B2 spec:
+   the generated evidence tree. The frozen SHA-256 values are:
    `ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6`,
    `f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e`,
    `ee85d9b26c257ccdd3ab6d2fa0403daed9df30d63f483c35bea1586ce6d4fd07`,
@@ -455,8 +457,8 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | stay at 35 until a complete owner disappears |
-| package lines | 34,800 | below 34,800 after observers; below 34,700 after smoke cleanup |
-| maintained-core lines | 8,003 | below 8,000 after the exact smoke |
+| package lines | 34,798 | below 34,798 after observers; below 34,700 after smoke cleanup |
+| maintained-core lines | 8,001 | below 8,000 after the exact smoke |
 | test files / lines | 31 / 21,036 | 31 / below 21,000 after observers and smoke cleanup |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
