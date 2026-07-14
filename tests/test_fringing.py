@@ -932,9 +932,13 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     projected = _face_flux_pressure_projection_duct(
         zeros, zeros, zeros, jnp.ones(shape), jnp.ones(shape, dtype=bool),
         inlet_flow_rate=0.2, dt=0.1, **settings)
-    _, _, _, projected_pressure, pressure_loss, divergence, flow_error = projected
+    _, _, _, projected_pressure, pressure_loss, divergence, flow_error, plus, inlet = projected
     assert divergence < 1.0e-8
     assert flow_error < 1.0e-8
+    fx, fy, fz = fringing_impl._unpack_duct_mass_flux(plus, inlet)
+    assert jnp.sum(inlet) == pytest.approx(0.2) and jnp.sum(plus[0, -1]) == pytest.approx(0.2)
+    assert jnp.max(jnp.abs(jnp.diff(fx, axis=0) + jnp.diff(fy, axis=1)
+        + jnp.diff(fz, axis=2))) < 1.0e-10
     assert jnp.isfinite(pressure_loss).all()
     assert jnp.isfinite(projected_pressure).all()
     assert jnp.max(jnp.abs(projected_pressure - projected_pressure[:, :1, :1])) < 1.0e-7

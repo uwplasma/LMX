@@ -419,6 +419,12 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert all(item.checkpoint is not None for item in progress)
     assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
     assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
+    assert progress[-1].checkpoint.rho_phi_plus == pytest.approx(
+        solution.bundle.rho_phi_plus
+    )
+    assert progress[-1].checkpoint.rho_phi_inlet == pytest.approx(
+        solution.bundle.rho_phi_inlet
+    )
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-8
     )
