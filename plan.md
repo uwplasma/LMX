@@ -152,8 +152,15 @@ for external research use.
 ## Current checkpoint
 
 - Portable gate: 767 passed, 8 expected external-data skips, 95.28% branch
-  coverage, 190.6 seconds on the reference Mac.
-- SOLVAX: compatible `>=0.8,<1`; latest tested package is 0.8.1.
+  coverage, 174.2 seconds on the reference Mac.
+- SOLVAX: compatible `>=0.8.2,<1`; 0.8.2 supplies the tested SPD Galerkin
+  deflation primitive and passes its Linux/macOS, minimum/current-stack, JIT,
+  positive-definiteness, accuracy, and PCG-acceleration gates.
+- SOLVAX GPU refresh: 0.8.2 passes forward, gradient, independent-transpose,
+  residual, memory, placement, and Hartmann gates. Its one-shot warm-time ratio
+  was 1.184 against a 1.10 ceiling; an immediate 0.8.1 control also failed at
+  1.155. The PCG source is unchanged, so timing promotion remains open pending
+  a repeated, interleaved protocol; both raw records are release assets.
 - B1 retained modes: separated real `m=0` and complex `m=1..4` block factors
   pass factor parity and reduce medium restart time from 24.12 to 10.63 seconds.
 - Large B1 pressure gate: a one-cycle physical-convergence pilot reduces the
@@ -179,10 +186,11 @@ for external research use.
   release asset; the next tranche improves the fine-grid preconditioner before
   resuming. Experimental acceptance remains open.
   Exact axial-line, transverse-only, and multiplicative-coarse probes were all
-  slower than the 109.18-second two-update baseline. The next candidate is a
-  SOLVAX Galerkin multigrid hierarchy that coarsens only transverse directions,
-  retains the shard-local axial coarse mode, and must pass identical-state and
-  wall-time gates before promotion.
+  slower than the 109.18-second two-update baseline. LMX now delegates its
+  balanced SPD two-level algebra to SOLVAX 0.8.2. The next candidate builds a
+  transverse Galerkin hierarchy on that primitive, retains the shard-local
+  axial coarse mode, and must pass identical-state and wall-time gates before
+  promotion.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.
@@ -199,8 +207,8 @@ for external research use.
   Docker, dashboard, support/security, and duplicate driver surfaces are gone.
   The maintained checkout has 34 test files, 20 maintenance scripts, 13 compact
   accepted-result files, and no remote development branches beyond `main`.
-- Architecture: 36 package modules, 35,148 package lines, 8,485 maintained-core
-  lines, a 3.63 MiB tracked checkout, and a 289,731-byte wheel. Live gates cap
+- Architecture: 36 package modules, 35,137 package lines, 8,474 maintained-core
+  lines, a 3.63 MiB tracked checkout, and a 289,644-byte wheel. Live gates cap
   modules, lines, bytes, lazy import time, examples, exports, and wheel contents.
 - Documentation media: six anonymous-access derivatives total 516 KB and stay
   out of the wheel; full-resolution fields, plots, and movies remain checksummed

@@ -149,11 +149,13 @@ gradients must agree with finite differences or an independent adjoint, and
 the linear solves must use implicit differentiation with controlled primal and
 transpose residuals. Released
 [SOLVAX](https://github.com/uwplasma/SOLVAX/releases) is the
-default `auto` backend; LMX accepts compatible SOLVAX 0.8+ releases below 1.0
-instead of pinning one patch. Current CPU and RTX A4000 forward, implicit-gradient,
-independent-transpose, resource, and end-to-end Hartmann gates pass on 0.8.1. The
-four-level Ha=20 FreeMHD and all-eight-row high-Ha acceptance record remains the
-historical 0.5.1 promotion baseline until the current physics refresh completes.
+default `auto` backend; LMX accepts compatible SOLVAX 0.8.2+ releases below 1.0
+instead of pinning one patch. SOLVAX 0.8.2 passes the current forward,
+implicit-gradient, independent-transpose, memory, and end-to-end Hartmann gates;
+the one-shot RTX warm-time promotion is being replaced by a repeated protocol.
+The four-level Ha=20 FreeMHD and all-eight-row high-Ha acceptance record remains
+the historical 0.5.1 promotion baseline until the current physics refresh
+completes.
 Select `linear_solver = "cg"` explicitly for the retained native comparison
 path.
 
@@ -234,7 +236,7 @@ convergence, analytical profiles, and independent reference data. Heavy
 FreeMHD and scaling campaigns remain explicit workflows because they require
 external software or hardware.
 The latest complete local gate passes 767 tests with 8 expected external-data
-skips and 95.28% branch coverage in 190.6 seconds on six Mac workers. Its 34
+skips and 95.28% branch coverage in 174.2 seconds on six Mac workers. Its 34
 test files cover physics, numerics, adapters, plotting, and curated workflows.
 
 ## Repository policy

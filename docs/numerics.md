@@ -77,7 +77,7 @@ solver pipeline is:
 
 The default coupling remains unaccelerated for backward compatibility. Set
 `solver.coupling_acceleration = "aitken"` or `"anderson"` to enable a released
-SOLVAX accelerator. The pinned SOLVAX scalar Aitken update is useful for a
+SOLVAX accelerator. The compatible SOLVAX scalar Aitken update is useful for a
 single dominant slow mode; bounded-memory Anderson mixing is the production
 choice for the multimode high-Hartmann-number campaign. LMX checks the
 **unaccelerated** residual `max(abs(G(u)-u))` and the change across outer steady
@@ -92,8 +92,8 @@ direction), volume-scaled potential PCG uses a symmetric additive y+z line
 preconditioner built from SOLVAX batched tridiagonal solves. When the scaled
 diagonal range exceeds `3e4`, it adds a balanced Galerkin coarse correction:
 linear prolongation and its exact transpose define the coarse operator, a
-small Cholesky solve removes the global modes, and SOLVAX `p_multigrid`
-applies that correction without tracing through a Python iteration. The line
+small Cholesky solve removes the global modes, and SOLVAX
+`galerkin_deflation` applies the balanced correction. The line
 solve follows the dominant coupling direction (or uses both directions when
 neither dominates), and the balanced composition remains suitable for PCG.
 The preconditioner is built once per coupled step and reused by every

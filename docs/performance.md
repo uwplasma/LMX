@@ -8,8 +8,8 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 767 pass, 8 skip, 95.28% branch coverage, 190.6 s | below the ten-minute budget |
-| SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.1 forward, gradient, transpose, memory, timing, and Hartmann gates pass | compact current record; raw evidence external |
+| portable test gate | Apple M4, six workers | 767 pass, 8 skip, 95.28% branch coverage, 174.2 s | below the ten-minute budget |
+| SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | timing refresh remains open |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
 | B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | tolerance, iteration, wall, steady, and conservation gates pass |
@@ -20,6 +20,19 @@ devices alone is not evidence of parallel execution.
 The B2 result passes the two-device target and exact observable-equivalence
 gate. A general or four-device scaling claim remains open. The B1 timings do
 not promote its experimental physics result.
+
+The accepted compact SOLVAX timing record remains the 0.8.1 measurement. A
+matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
+0.8.1 control and 1.184 for 0.8.2, so both miss the one-shot 1.10 threshold
+despite passing every forward, gradient, transpose, residual, memory, device,
+and Hartmann gate. SOLVAX PCG is unchanged between those releases; this is not
+evidence of a 0.8.2 regression. A repeated, interleaved protocol must replace
+the noisy one-shot promotion before the compact timing record is refreshed.
+The raw [0.8.1 control](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-control-gpu.json)
+(`ab54c5aa4a4787e1024d72d29ac5cd1c465c951bcaed82f179539cf75544fc7b`)
+and [0.8.2 probe](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.2-equivalence-gpu.json)
+(`092fb878cd0182b0856b41afea9b90c99931a29b4b1976b4b5fd6c29272c8d36`)
+remain outside Git.
 
 On the Mac, `512` axial stations silently forced replication at six devices;
 the placement gate now rejects that invalid point. The divisible `516`-station
@@ -45,9 +58,10 @@ Removing the shard-local axial coarse correction was also rejected: it reduced
 only 1--2 iterations and raised wall time to 155.88 seconds. The next candidate
 must add a multilevel transverse correction while retaining that coarse mode.
 A multiplicative line-then-coarse correction saved only 3--4 iterations and
-took 135.59 seconds, so it was rejected as well. The next design uses SOLVAX's
-Galerkin `p_multigrid` interface with shard-local transverse coarsening; it must
-beat the 109.18-second two-update baseline before any production campaign.
+took 135.59 seconds, so it was rejected as well. SOLVAX 0.8.2 now owns the
+tested SPD Galerkin balancing algebra used by LMX. The next design builds the
+missing shard-local transverse hierarchy on that primitive; it must beat the
+109.18-second two-update baseline before any production campaign.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states

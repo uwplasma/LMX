@@ -1,7 +1,7 @@
 {
   "date": "2026-07-14",
-  "commit": "30a91bb9e5603e9c46705ef1b5dc6a56d884aa2c",
-  "lock_sha256": "da69fe6dc887d49e7376c3d747334039e9224625d992604e8e240e7052bfc44d",
+  "commit": "5049cf5f7a3d17c7a03b7caf808a98f403c248c0",
+  "lock_sha256": "ade621421197b8264dc6c197028dc23938a90d6716a536f2ccc504c6ba0826ec",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -24,39 +24,48 @@
     "test_lines": 21534,
     "passed": 767,
     "skipped": 8,
-    "pytest_seconds": 188.30,
-    "gate_seconds": 190.6,
+    "pytest_seconds": 171.98,
+    "gate_seconds": 174.2,
     "branch_coverage_percent": 95.28,
+    "slowest_tests_source": "source-identical six-worker replay without coverage, 147.42 seconds",
     "slowest_tests": [
       {
         "nodeid": "tests/test_fringing.py::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]",
-        "seconds": 67.612
-      },
-      {
-        "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
-        "seconds": 29.530
+        "seconds": 47.90
       },
       {
         "nodeid": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "seconds": 28.479
+        "seconds": 24.02
+      },
+      {
+        "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
+        "seconds": 20.29
       },
       {
         "nodeid": "tests/test_autodiff.py::test_fringing_response_inverse_design_reduces_loss",
-        "seconds": 25.063
+        "seconds": 18.69
       },
       {
-        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_returns_finite_payload",
-        "seconds": 23.141
+        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry",
+        "seconds": 18.30
       }
     ],
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 240.3,
-    "wall_time_reduction_percent": 20.68,
-    "current_budget_fraction": 0.318,
-    "current_engineering_target_fraction": 0.529,
+    "previous_gate_seconds": 190.6,
+    "wall_time_reduction_percent": 8.60,
+    "current_budget_fraction": 0.290,
+    "current_engineering_target_fraction": 0.484,
     "current_gate_pass": true
+  },
+  "architecture": {
+    "package_modules": 36,
+    "package_lines": 35137,
+    "maintained_core_lines": 8474,
+    "tracked_checkout_bytes": 3810553,
+    "wheel_bytes": 289644,
+    "root_import_median_seconds": 0.01947
   },
   "hosted_ci": {
     "status": "administratively_not_started",

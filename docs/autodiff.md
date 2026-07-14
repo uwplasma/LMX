@@ -16,7 +16,7 @@ design update. Outputs go under `artifacts/`.
 
 ## Solver backends
 
-The default `auto` path uses a compatible SOLVAX `0.8+` release below `1.0` when
+The default `auto` path uses a compatible SOLVAX `0.8.2+` release below `1.0` when
 available. The retained native CG path is available for independent comparison.
 The lockfile records the exact CI environment; package metadata deliberately
 does not pin one SOLVAX patch release.
