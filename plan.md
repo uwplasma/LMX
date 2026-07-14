@@ -115,8 +115,9 @@ Apply this migration sequence:
 2. **Complete:** five-point SPD velocity solves use `pcg_linear_solve` with LMX
    maximum-residual recertification. Native CG, Lineax, mock-only tests, and the
    obsolete live promotion script are gone; `cg` is only a compatibility alias.
-3. Replace the custom periodic-theta line solve with SOLVAX
-   `cyclic_tridiagonal_solve` after duct/pipe primal and gradient parity.
+3. **Complete:** the periodic-theta line uses SOLVAX
+   `cyclic_tridiagonal_solve`; pipe primal, variable-coefficient dense-reference,
+   and implicit-gradient gates replace the circulant-only FFT shortcut.
 4. Reformulate anchored Poisson operators symmetrically before moving them to
    SOLVAX PCG. Do not apply PCG to the current nonsymmetric row-replacement form.
 5. Add and release a symmetry-preserving additive-line preconditioner in SOLVAX,
@@ -140,9 +141,9 @@ Near-term ratchets after this workstream:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | at most 34 |
-| package lines | 34,939 | below 34,750 |
+| package lines | 34,938 | below 34,750 |
 | maintained-core lines | 8,067 | below 7,900 |
-| test files / lines | 33 / 21,273 | at most 32 / below 21,100 |
+| test files / lines | 33 / 21,300 | at most 32 / below 21,100 |
 | maintenance scripts | 19 | at most 18; reusable logic moves into `lmx/` or an existing command |
 
 Count semantic maintenance cost across the whole package; do not satisfy a

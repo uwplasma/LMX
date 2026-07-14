@@ -242,14 +242,13 @@ between Cartesian and pipe-local frames only at the assembly boundaries; the
 rest of the control-volume bookkeeping remains metric-aware inside
 `lmx/fringing.py`.
 
-The frozen ALEX B1 coefficients are axisymmetric, so its pressure and electric
-PCG preconditioners augment the axial and radial line solves with an exact
-circulant solve in periodic `theta`. A batched real FFT diagonalizes that line:
-for diagonal `d`, azimuthal off-diagonal `c`, and mode `k`, the eigenvalue is
-`d + 2 c cos(2 pi k / n_theta)`. This is an additive preconditioner only; it
-does not change the cylindrical finite-volume operator or its converged
-solution. Generic mapped-pipe calls retain the axial/radial preconditioner
-unless they explicitly satisfy the same axisymmetric contract.
+The ALEX B1 pressure and electric PCG preconditioners augment the axial and
+radial lines with SOLVAX's exact cyclic-tridiagonal solve in periodic `theta`.
+Unlike the former circulant FFT shortcut, this remains correct when line
+coefficients vary azimuthally. It is an additive preconditioner only; it does
+not change the cylindrical finite-volume operator or its converged solution.
+Generic mapped-pipe calls retain the axial/radial preconditioner unless the
+periodic line is explicitly enabled.
 
 The compatible B1 projection uses a bounded physical-convergence pilot: one
 GMRES restart cycle is tested against the mean-free face-flux divergence and

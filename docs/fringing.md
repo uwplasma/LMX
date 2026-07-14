@@ -90,7 +90,7 @@ The retained specifications and references are:
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
 
-B1 uses an exact periodic azimuthal line and retained modal setup factors. A
+B1 uses SOLVAX's exact cyclic azimuthal line solve and retained modal factors. A
 one-cycle physical-convergence pilot now reduces the large solve-plus-restart
 pressure ceiling from 768 to 669 Krylov iterations while preserving divergence,
 fixed-flow, charge, and restart gates. Experimental pressure-observable and mesh

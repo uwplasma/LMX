@@ -909,7 +909,7 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     assert float(local_residual) < 1.0e-8
     assert solved == pytest.approx(expected, abs=1.0e-8)
 
-    fft_solved, *fft_diagnostics = _solvax_pressure_poisson_pipe(
+    cyclic_solved, *cyclic_diagnostics = _solvax_pressure_poisson_pipe(
         rhs,
         coefficient,
         dx=0.4,
@@ -918,10 +918,10 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
         dtheta=2.0 * jnp.pi / 8,
         iterations=500,
         tolerance=1.0e-10,
-        include_theta_fft_line=True,
+        include_theta_line=True,
     )
-    assert fft_solved == pytest.approx(solved, abs=1.0e-8)
-    assert int(fft_diagnostics[3]) <= int(iterations)
+    assert cyclic_solved == pytest.approx(solved, abs=1.0e-8)
+    assert int(cyclic_diagnostics[3]) <= int(iterations)
 
     direct = _separable_pressure_poisson_pipe(
         rhs,
@@ -962,11 +962,39 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
             dtheta=2.0 * jnp.pi / 8,
             iterations=500,
             tolerance=1.0e-10,
+            include_theta_line=True,
         )
         return jnp.mean(field**2)
 
     value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
     assert gradient == pytest.approx(-2.0 * value, rel=1.0e-6, abs=1.0e-8)
+
+
+def test_periodic_line_preconditioner_matches_variable_coefficient_dense_solve():
+    weights = jnp.asarray([0.4, 0.7, 0.5, 0.9, 0.6])
+    upper_1d = -weights
+    lower_1d = -jnp.roll(weights, 1)
+    diagonal_1d = 1.0 + weights + jnp.roll(weights, 1)
+    diagonal = diagonal_1d[None, None, :]
+    lower = lower_1d[None, None, :]
+    upper = upper_1d[None, None, :]
+    rhs = jnp.asarray([0.3, -0.1, 0.8, 0.2, -0.4])[None, None, :]
+
+    solve = fringing_impl._additive_line_preconditioner_3d(
+        diagonal, (), periodic_last_axis=(lower, upper)
+    )
+    solved = solve(rhs)
+    dense = jnp.diag(diagonal_1d)
+    dense = dense.at[jnp.arange(1, 5), jnp.arange(4)].set(lower_1d[1:])
+    dense = dense.at[jnp.arange(4), jnp.arange(1, 5)].set(upper_1d[:-1])
+    dense = dense.at[0, -1].set(lower_1d[0])
+    dense = dense.at[-1, 0].set(upper_1d[-1])
+    assert solved[0, 0] == pytest.approx(
+        jnp.linalg.solve(dense, rhs[0, 0]), abs=1.0e-12
+    )
+    objective = lambda scale: jnp.sum(solve(scale * rhs) ** 2)
+    value, gradient = jax.value_and_grad(objective)(jnp.asarray(1.0))
+    assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
 
 
 @pytest.mark.parametrize("steady", [False, True])

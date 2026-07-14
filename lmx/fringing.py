@@ -20,6 +20,7 @@ from solvax import (
     anderson_mixing,
     block_thomas_factor,
     block_thomas_solve,
+    cyclic_tridiagonal_solve,
     gmres,
     pcg_linear_solve,
     tridiagonal_solve,
@@ -1173,17 +1174,15 @@ def _additive_line_preconditioner_3d(
     line_solves = list(_line_solvers_3d(diagonal, directions))
     if periodic_last_axis is not None:
         lower, upper = periodic_last_axis
-        off_diagonal = 0.5 * (lower[..., :1] + upper[..., :1])
-        wave = 2.0 * jnp.pi * jnp.fft.rfftfreq(diagonal.shape[-1])
-        eigenvalues = diagonal[..., :1] + 2.0 * off_diagonal * jnp.cos(wave)
 
         def solve_periodic(residual: jnp.ndarray) -> jnp.ndarray:
-            transformed = jnp.fft.rfft(residual, axis=-1)
-            return jnp.fft.irfft(
-                transformed / eigenvalues,
-                n=diagonal.shape[-1],
-                axis=-1,
+            solved = cyclic_tridiagonal_solve(
+                jnp.moveaxis(lower, -1, 0),
+                jnp.moveaxis(diagonal, -1, 0),
+                jnp.moveaxis(upper, -1, 0),
+                jnp.moveaxis(residual, -1, 0),
             )
+            return jnp.moveaxis(solved, 0, -1)
 
         line_solves.append(solve_periodic)
 
@@ -2681,7 +2680,7 @@ def _solvax_pressure_poisson_pipe(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
     local_tolerance: float | None = None,
-    include_theta_fft_line: bool = False,
+    include_theta_line: bool = False,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -2725,7 +2724,7 @@ def _solvax_pressure_poisson_pipe(
         diagonal,
         directions,
         periodic_last_axis=(
-            (-volume * coef_t_i, -volume * coef_t_o) if include_theta_fft_line else None
+            (-volume * coef_t_i, -volume * coef_t_o) if include_theta_line else None
         ),
     )
 
@@ -3373,7 +3372,7 @@ def _steady_stokes_projection_pipe(
             dtheta=dtheta,
             iterations=pressure_iterations,
             tolerance=pressure_tolerance,
-            include_theta_fft_line=True,
+            include_theta_line=True,
         )
         flow_residual = residual[pressure_size:]
         pressure_loss = (
@@ -3754,7 +3753,7 @@ def _face_flux_pressure_projection_pipe(
     tolerance: float,
     radial_fluid_count: int | None = None,
     initial_pressure: jnp.ndarray | None = None,
-    include_theta_fft_line: bool = False,
+    include_theta_line: bool = False,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Project mapped-pipe velocity using the same cylindrical face flux."""
 
@@ -3792,7 +3791,7 @@ def _face_flux_pressure_projection_pipe(
         initial_field=(
             None if initial_pressure is None else initial_pressure[:, :count, :]
         ),
-        include_theta_fft_line=include_theta_fft_line,
+        include_theta_line=include_theta_line,
     )
 
     correction = _pipe_pressure_face_correction(
@@ -3841,7 +3840,7 @@ def _fixed_flow_face_flux_projection_pipe(
     tolerance: float,
     radial_fluid_count: int,
     initial_pressure: jnp.ndarray | None = None,
-    include_theta_fft_line: bool = False,
+    include_theta_line: bool = False,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -3878,7 +3877,7 @@ def _fixed_flow_face_flux_projection_pipe(
             tolerance=tolerance,
             radial_fluid_count=radial_fluid_count,
             initial_pressure=initial_pressure,
-            include_theta_fft_line=include_theta_fft_line,
+            include_theta_line=include_theta_line,
         )
     )
     projected_flow = jnp.sum(
@@ -6593,7 +6592,7 @@ def _solve_extruded_projection(
                         tolerance=projection_tolerance,
                         radial_fluid_count=radial_fluid_count,
                         initial_pressure=p,
-                        include_theta_fft_line=True,
+                        include_theta_line=True,
                     )
                 if not use_compatible_steady_b1:
                     p_corr = _clip_state(p_corr, scalar_limit)
@@ -6723,7 +6722,7 @@ def _solve_extruded_projection(
                     tolerance=electric_tolerance,
                     initial_field=phi,
                     local_tolerance=ALEX_BALANCE_TOLERANCE,
-                    include_theta_fft_line=True,
+                    include_theta_line=True,
                 )
             else:
                 # The sparse pipe operator represents -div(sigma grad(phi)); J
