@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from lmx.config import LoggingSpec, _parse_boundary_value, load_run_config
+from lmx.cases import _wall_conductivity_from_conductance_ratio
 
 
 pytestmark = pytest.mark.unit
@@ -526,3 +527,19 @@ def test_logging_spec_from_user_controls_supports_verbose_alias_and_quiet():
 def test_logging_spec_rejects_invalid_verbosity():
     with pytest.raises(ValueError, match="Unsupported logging verbosity"):
         LoggingSpec.from_user_controls(verbosity="loud")
+
+
+@pytest.mark.parametrize(
+    ("wall_thickness", "hartmann_half_spacing", "message"),
+    ((0.0, 1.0, "wall_thickness"), (1.0, 0.0, "hartmann_half_spacing")),
+)
+def test_wall_conductivity_rejects_nonpositive_geometry(
+    wall_thickness: float, hartmann_half_spacing: float, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        _wall_conductivity_from_conductance_ratio(
+            wall_conductance_ratio=1.0,
+            fluid_conductivity=1.0,
+            wall_thickness=wall_thickness,
+            hartmann_half_spacing=hartmann_half_spacing,
+        )
