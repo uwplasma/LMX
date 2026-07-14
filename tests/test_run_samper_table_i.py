@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from pathlib import Path
+import json
+import shutil
 
 import jax.numpy as jnp
 import pytest
 
 import scripts.run_samper_table_i as samper_runner
 from lmx.freemhd import load_samper_table_i
+from scripts.build_benchmark_a_acceptance import build_acceptance, write_acceptance
+from scripts.freeze_samper_table_i import freeze_campaign
 from scripts.run_samper_table_i import (
     build_samper_case,
     dimensionless_flow_rate,
@@ -16,6 +20,30 @@ from scripts.run_samper_table_i import (
     select_rows,
     summarize_refinement,
 )
+
+
+RESULTS = Path("benchmarks/results")
+
+
+def _compact_campaign(*, passed: bool = True) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "records": [
+            {
+                "case_kind": "shercliff",
+                "hartmann_number": 5000,
+                "finest_level_pass": passed,
+            }
+        ],
+        "research_grade_validation_pass": passed,
+    }
+
+
+def _copy_acceptance_evidence(destination: Path) -> None:
+    destination.mkdir()
+    for pattern in ("benchmark-a-ha20-*.json", "samper-table-i-*-ha*.json"):
+        for path in RESULTS.glob(pattern):
+            shutil.copy2(path, destination / path.name)
 
 
 def _row(case_kind: str, ha: int = 500):
@@ -246,3 +274,63 @@ def test_reassess_campaign_uses_physical_current_gate_for_potential() -> None:
     assert "potential_residual_target" not in reassessed
     reassessed["records"][0]["levels"][-1]["solver"]["residual"] = 2.0e-9
     assert reassess_campaign(reassessed)["research_grade_validation_pass"] is False
+
+
+def test_freeze_campaign_writes_deterministic_compact_evidence(tmp_path: Path) -> None:
+    source = tmp_path / "source.json"
+    destination = tmp_path / "frozen.json"
+    source.write_text(json.dumps(_compact_campaign()))
+    payload = freeze_campaign(source, destination)
+    assert payload["freeze"]["format"] == "compact-json"
+    assert len(payload["freeze"]["source_sha256"]) == 64
+    assert destination.read_text().endswith("\n")
+
+
+def test_freeze_campaign_rejects_incomplete_or_failing_evidence(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.json"
+    incomplete = _compact_campaign()
+    incomplete["active_record"] = {}
+    source.write_text(json.dumps(incomplete))
+    with pytest.raises(ValueError, match="incomplete"):
+        freeze_campaign(source, tmp_path / "frozen.json")
+    source.write_text(json.dumps(_compact_campaign(passed=False)))
+    with pytest.raises(ValueError, match="failing"):
+        freeze_campaign(source, tmp_path / "frozen.json")
+
+
+def test_build_acceptance_separates_claims_and_accepts_all_rows() -> None:
+    payload = build_acceptance(RESULTS)
+    assert payload["research_grade_validation_pass"] is True
+    assert payload["finite_grid_freemhd"]["pass"] is True
+    assert payload["analytical_continuum_audit"]["pass"] is True
+    assert payload["conservation_and_power"]["pass"] is True
+    assert payload["richardson_diagnostic"]["acceptance_gate"] is False
+    assert payload["richardson_diagnostic"]["all_extrapolated_primary_pass"] is False
+    assert len(payload["literature_table_i"]["rows"]) == 8
+
+
+def test_write_acceptance_is_deterministic(tmp_path: Path) -> None:
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    write_acceptance(RESULTS, first)
+    write_acceptance(RESULTS, second)
+    assert first.read_bytes() == second.read_bytes()
+
+
+@pytest.mark.parametrize("failure", ("fingerprint", "row"))
+def test_build_acceptance_rejects_inconsistent_or_failing_evidence(
+    tmp_path: Path, failure: str
+) -> None:
+    copied = tmp_path / "results"
+    _copy_acceptance_evidence(copied)
+    path = copied / "samper-table-i-hunt-ha15000.json"
+    payload = json.loads(path.read_text())
+    if failure == "fingerprint":
+        payload["implementation"]["solver_core_sha256"] = "0" * 64
+    else:
+        payload["research_grade_validation_pass"] = False
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="implementation|not a passing"):
+        build_acceptance(copied)

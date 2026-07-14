@@ -172,8 +172,8 @@
         "tests/test_physics.py::test_high_ha_rect_duct_mesh_uses_smooth_boundary_layer_layout",
         "tests/test_run_samper_table_i.py::test_build_samper_shercliff_case_makes_q_equal_q_tilde",
         "tests/test_run_samper_table_i.py::test_build_samper_hunt_case_preserves_wall_conductance",
-        "tests/test_freeze_samper_table_i.py::test_freeze_campaign_writes_deterministic_compact_evidence",
-        "tests/test_build_benchmark_a_acceptance.py::test_build_acceptance_separates_claims_and_accepts_all_rows"
+        "tests/test_run_samper_table_i.py::test_freeze_campaign_writes_deterministic_compact_evidence",
+        "tests/test_run_samper_table_i.py::test_build_acceptance_separates_claims_and_accepts_all_rows"
       ],
       "tier": "A",
       "title": "High-Hartmann-number integral duct validation",
@@ -217,7 +217,7 @@
         "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
         "tests/test_benchmarks.py::test_benchmark_b_problem_binds_frozen_nondimensional_contract",
         "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "tests/test_freeze_benchmark_b_specs.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
+        "tests/test_benchmarks.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
         "tests/test_fringing.py::test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle"
       ],
       "tier": "B",
@@ -261,7 +261,7 @@
         "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
         "tests/test_benchmarks.py::test_benchmark_b_problem_binds_frozen_nondimensional_contract",
         "tests/test_benchmarks.py::test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "tests/test_freeze_benchmark_b_specs.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
+        "tests/test_benchmarks.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
         "tests/test_fringing.py::test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle"
       ],
       "tier": "B",
