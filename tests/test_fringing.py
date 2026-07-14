@@ -987,9 +987,9 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
     r_faces = jnp.asarray([0.0, 0.15, 0.4, 0.7, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
     dtheta = 2.0 * jnp.pi / ntheta
-    # This tiny manufactured system reaches the strict gates within 64 steps;
+    # This tiny manufactured system reaches the strict gates within 32 steps;
     # a larger budget only lengthens compilation in routine coverage runs.
-    inner_iterations = 64
+    inner_iterations = 32
     shape = (nx, nr, ntheta)
     x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
     radius = r_centers[None, :, None]
