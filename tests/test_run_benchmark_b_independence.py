@@ -166,17 +166,6 @@ def test_dry_run_writes_deterministic_campaign_plan(tmp_path: Path):
     ]
 
 
-def test_b1_runner_selects_characterized_pressure_path(monkeypatch):
-    monkeypatch.delenv("LMX_B1_COMPATIBLE_STEADY", raising=False)
-    monkeypatch.delenv("LMX_B1_RETAINED_MODAL_BLOCKS", raising=False)
-    monkeypatch.setattr(campaign, "_run_gpu_campaign", lambda args: 0)
-    assert campaign.main(
-        ["--cases", "B1-fringing-pipe", "--variants", "baseline", "--gpu-devices", "0"]
-    ) == 0
-    assert campaign.os.environ["LMX_B1_COMPATIBLE_STEADY"] == "1"
-    assert campaign.os.environ["LMX_B1_RETAINED_MODAL_BLOCKS"] == "1"
-
-
 def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
     output = tmp_path / "campaign"
     checkpoint = output / "runs" / "B1-fringing-pipe-coarse-baseline.json"

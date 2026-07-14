@@ -159,10 +159,7 @@ def test_benchmark_b_problem_rejects_unfrozen_choices():
         )
 
 
-def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite(
-    monkeypatch,
-):
-    monkeypatch.setenv("LMX_B1_COMPATIBLE_STEADY", "1")
+def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     problem = build_benchmark_b_problem("B1-fringing-pipe", mesh_level="coarse")
     case = replace(
         problem.case,

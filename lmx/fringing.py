@@ -7,7 +7,6 @@ from dataclasses import replace
 from functools import lru_cache, partial
 import hashlib
 import math
-import os
 
 import jax
 import jax.numpy as jnp
@@ -5801,9 +5800,7 @@ def _solve_extruded_projection(
         case.name.startswith("alex_b1-fringing-pipe_")
         and case.geometry.kind == "pipe_ogrid"
     )
-    use_compatible_steady_b1 = (
-        use_alex_b1_finite_volume and os.environ.get("LMX_B1_COMPATIBLE_STEADY") == "1"
-    )
+    use_compatible_steady_b1 = use_alex_b1_finite_volume
     if case.name.startswith("alex_") and not (
         use_alex_b1_finite_volume or use_alex_b2_finite_volume
     ):
@@ -6044,9 +6041,6 @@ def _solve_extruded_projection(
                 else None
             )
             if use_compatible_steady_b1:
-                use_retained_modal_blocks = (
-                    os.environ.get("LMX_B1_RETAINED_MODAL_BLOCKS") == "1"
-                )
                 steady_coefficients = _pipe_variable_diffusion_coefficients_3d(
                     nu[:, :count, :],
                     dx=dx,
@@ -6075,7 +6069,7 @@ def _solve_extruded_projection(
                 )
                 modal_factor_key = (
                     "b1_modal_factors",
-                    "retained" if use_retained_modal_blocks else "probed",
+                    "retained",
                     jax.default_backend(),
                     u.dtype.str,
                     kernel_key,
@@ -6087,7 +6081,6 @@ def _solve_extruded_projection(
                     ),
                 )
             else:
-                use_retained_modal_blocks = False
                 pressure_preconditioner_mobility = None
                 modal_factor_key = None
 
@@ -6295,14 +6288,8 @@ def _solve_extruded_projection(
                             pressure_preconditioner_mobility
                         ),
                         apply_modal_momentum_inverse=modal_momentum_solve,
-                        modal_momentum_coefficients=(
-                            steady_coefficients if use_retained_modal_blocks else None
-                        ),
-                        modal_momentum_sink=(
-                            wall_sink + steady_reaction
-                            if use_retained_modal_blocks
-                            else None
-                        ),
+                        modal_momentum_coefficients=steady_coefficients,
+                        modal_momentum_sink=wall_sink + steady_reaction,
                         modal_stabilization=True,
                         modal_factor_key=modal_factor_key,
                         physical_tolerance=ALEX_BALANCE_TOLERANCE,

@@ -1,7 +1,7 @@
 {
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3596274,
-    "checkout_bytes_excluding_release_candidates": 3596274,
+    "checkout_bytes_excluding_build_artifacts": 3594774,
+    "checkout_bytes_excluding_release_candidates": 3594774,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -314,8 +314,8 @@
         "role": "validation_and_evidence"
       },
       {
-        "bytes": 292505,
-        "lines": 7927,
+        "bytes": 291948,
+        "lines": 7914,
         "owner": "research_stage_extension",
         "path": "lmx/fringing.py",
         "role": "research_stage_extension"
@@ -482,7 +482,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 35001,
+    "total_package_lines": 34988,
     "uncurated_example_count": 0
   },
   "schema_version": 1,
