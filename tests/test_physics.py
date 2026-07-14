@@ -52,6 +52,40 @@ from lmx.validation import (
 from lmx.wall_models import WallLayer
 
 
+_EXPECTED_HARTMANN_CENTERLINE = jnp.asarray(
+    [
+        0.0,
+        0.06030579,
+        0.08260150,
+        0.09641168,
+        0.10430133,
+        0.10786588,
+        0.10786589,
+        0.10430134,
+        0.09641170,
+        0.08260150,
+        0.06030578,
+        0.0,
+    ]
+)
+_EXPECTED_SHERCLIFF_CENTERLINE = jnp.asarray(
+    [
+        0.0,
+        0.12307610,
+        0.17726284,
+        0.21458733,
+        0.23789105,
+        0.24907115,
+        0.24907114,
+        0.23789103,
+        0.21458730,
+        0.17726278,
+        0.12307601,
+        0.0,
+    ]
+)
+
+
 def _synthetic_solution(case, profile: jnp.ndarray) -> Solution:
     mesh = _build_mesh(case)
     zeros = jnp.zeros_like(profile)
@@ -80,6 +114,22 @@ def _closed_channel_root_or_skip() -> Path:
     if not root.exists():
         pytest.skip("optional FreeMHD closed-channel reference data are not available")
     return root
+
+
+@pytest.mark.regression
+@pytest.mark.parametrize(
+    ("case", "expected"),
+    [
+        (make_hartmann_case(ha=2.0, ny=12, nz=12), _EXPECTED_HARTMANN_CENTERLINE),
+        (make_shercliff_case(ha=2.0, ny=12, nz=12), _EXPECTED_SHERCLIFF_CENTERLINE),
+    ],
+    ids=("hartmann", "shercliff"),
+)
+def test_closed_channel_centerline_regression(case, expected):
+    profile = jnp.tile(expected[:, None], (1, case.geometry.nz))
+    solution = _synthetic_solution(case, profile)
+    centerline = solution.state.u[:, solution.state.u.shape[1] // 2]
+    assert jnp.allclose(centerline, expected, atol=1.0e-6)
 
 
 @pytest.mark.unit
