@@ -401,48 +401,98 @@ def main(argv: list[str] | None = None) -> int:
         run_from_toml(argv[0])
         return 0
 
-    parser = argparse.ArgumentParser(prog="lmx")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    formatter = argparse.ArgumentDefaultsHelpFormatter
+    parser = argparse.ArgumentParser(
+        prog="lmx",
+        description="Run and validate differentiable inductionless MHD cases.",
+        epilog="A TOML case may also be passed directly: lmx CASE.toml",
+        formatter_class=formatter,
+    )
+    subparsers = parser.add_subparsers(
+        dest="command", title="commands", required=True
+    )
 
-    run_parser = subparsers.add_parser("run")
-    run_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt", "fringing_rect", "fringing_layered", "fringing_pipe"])
-    run_parser.add_argument("--ha", type=float, default=20.0)
-    run_parser.add_argument("--output", type=str, default="./out")
-    run_parser.add_argument("--mode", choices=["steady", "transient"], default="steady")
-    run_parser.add_argument("--plots", action="store_true")
-    run_parser.add_argument("--quiet", action="store_true")
-    run_parser.add_argument("--verbose", action="store_true")
-    run_parser.add_argument("--verbosity", choices=["quiet", "normal", "detailed", "debug"], default=None)
-    run_parser.add_argument("--width", type=float, default=2.0)
-    run_parser.add_argument("--height", type=float, default=2.0)
-    run_parser.add_argument("--ny", type=int, default=48)
-    run_parser.add_argument("--nz", type=int, default=48)
-    run_parser.add_argument("--length", type=float, default=6.0)
-    run_parser.add_argument("--nx-stations", type=int, default=21)
-    run_parser.add_argument("--entry-center", type=float, default=1.5)
-    run_parser.add_argument("--exit-center", type=float, default=4.5)
-    run_parser.add_argument("--transition-width", type=float, default=0.35)
-    run_parser.add_argument("--wall-cells", type=int, default=4)
-    run_parser.add_argument("--insulator-cells", type=int, default=4)
-    run_parser.add_argument("--radius", type=float, default=0.5)
-    run_parser.add_argument("--nr", type=int, default=24)
-    run_parser.add_argument("--ntheta", type=int, default=48)
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run a named built-in case.",
+        description="Run a fully developed or three-dimensional fringing-field case.",
+        formatter_class=formatter,
+    )
+    run_parser.add_argument(
+        "case",
+        choices=[
+            "hartmann",
+            "shercliff",
+            "hunt",
+            "fringing_rect",
+            "fringing_layered",
+            "fringing_pipe",
+        ],
+        help="Built-in case or solver family.",
+    )
+    run_parser.add_argument("--ha", type=float, default=20.0, help="Peak Hartmann number.")
+    run_parser.add_argument("--output", default="./out", help="Output directory.")
+    run_parser.add_argument(
+        "--mode",
+        choices=["steady", "transient"],
+        default="steady",
+        help="Solve mode for fully developed cases.",
+    )
+    run_parser.add_argument("--plots", action="store_true", help="Write summary plots.")
+    run_parser.add_argument("--quiet", action="store_true", help="Disable solver logging.")
+    run_parser.add_argument("--verbose", action="store_true", help="Enable debug logging.")
+    run_parser.add_argument(
+        "--verbosity",
+        choices=["quiet", "normal", "detailed", "debug"],
+        help="Explicit logging detail.",
+    )
+    geometry = run_parser.add_argument_group("geometry and resolution")
+    geometry.add_argument("--width", type=float, default=2.0, help="Duct width.")
+    geometry.add_argument("--height", type=float, default=2.0, help="Duct height.")
+    geometry.add_argument("--ny", type=int, default=48, help="Cross-stream y cells.")
+    geometry.add_argument("--nz", type=int, default=48, help="Cross-stream z cells.")
+    geometry.add_argument("--length", type=float, default=6.0, help="Extruded length.")
+    geometry.add_argument("--nx-stations", type=int, default=21, help="Axial stations.")
+    geometry.add_argument("--entry-center", type=float, default=1.5, help="Field entry center.")
+    geometry.add_argument("--exit-center", type=float, default=4.5, help="Field exit center.")
+    geometry.add_argument("--transition-width", type=float, default=0.35, help="Field ramp width.")
+    geometry.add_argument("--wall-cells", type=int, default=4, help="Conducting-wall cells.")
+    geometry.add_argument("--insulator-cells", type=int, default=4, help="Insulating-wall cells.")
+    geometry.add_argument("--radius", type=float, default=0.5, help="Pipe radius.")
+    geometry.add_argument("--nr", type=int, default=24, help="Pipe radial cells.")
+    geometry.add_argument("--ntheta", type=int, default=48, help="Pipe azimuthal cells.")
 
-    bench_parser = subparsers.add_parser("benchmark")
-    bench_parser.add_argument("--repeats", type=int, default=3)
-    bench_parser.add_argument("--ha", type=float, default=20.0)
-    bench_parser.add_argument("--ny", type=int, default=48)
-    bench_parser.add_argument("--nz", type=int, default=48)
-    bench_parser.add_argument("--output", type=str, default="")
+    bench_parser = subparsers.add_parser(
+        "benchmark",
+        help="Time a bounded Hartmann solve.",
+        description="Measure cold and warm runtime for a portable Hartmann case.",
+        formatter_class=formatter,
+    )
+    bench_parser.add_argument("--repeats", type=int, default=3, help="Timed repetitions.")
+    bench_parser.add_argument("--ha", type=float, default=20.0, help="Hartmann number.")
+    bench_parser.add_argument("--ny", type=int, default=48, help="Mesh y cells.")
+    bench_parser.add_argument("--nz", type=int, default=48, help="Mesh z cells.")
+    bench_parser.add_argument("--output", default="", help="Optional JSON report path.")
 
-    validate_parser = subparsers.add_parser("validate")
-    validate_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"])
-    validate_parser.add_argument("--ha", type=float, default=20.0)
-    validate_parser.add_argument("--output", type=str, default="./out")
-    validate_parser.add_argument("--reference-root", type=str, default="")
-    validate_parser.add_argument("--x-slice", type=str, default="1m")
-    validate_parser.add_argument("--hartmann-l2-threshold", type=float, default=0.05)
-    validate_parser.add_argument("--hartmann-linf-threshold", type=float, default=0.1)
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="Compare a duct case with reference data.",
+        description="Solve a duct case and write analytical or FreeMHD validation metrics.",
+        formatter_class=formatter,
+    )
+    validate_parser.add_argument(
+        "case", choices=["hartmann", "shercliff", "hunt"], help="Validation case."
+    )
+    validate_parser.add_argument("--ha", type=float, default=20.0, help="Hartmann number.")
+    validate_parser.add_argument("--output", default="./out", help="Output directory.")
+    validate_parser.add_argument("--reference-root", default="", help="FreeMHD data root.")
+    validate_parser.add_argument("--x-slice", default="1m", help="Processed slice label.")
+    validate_parser.add_argument(
+        "--hartmann-l2-threshold", type=float, default=0.05, help="Hartmann L2 gate."
+    )
+    validate_parser.add_argument(
+        "--hartmann-linf-threshold", type=float, default=0.1, help="Hartmann Linf gate."
+    )
 
     args = parser.parse_args(argv)
 

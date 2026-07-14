@@ -11,6 +11,24 @@ from lmx.config import FringingSpec, LoggingSpec, RestartSpec, RunConfig
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    (
+        (["--help"], ("Run and validate", "Run a named", "CASE.toml")),
+        (["run", "--help"], ("solver family", "geometry and resolution", "Hartmann")),
+        (["benchmark", "--help"], ("cold and warm", "Timed repetitions", "JSON")),
+        (["validate", "--help"], ("FreeMHD", "reference", "L2 gate")),
+    ),
+)
+def test_cli_help_describes_each_user_workflow(arguments, expected, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(arguments)
+
+    assert exit_info.value.code == 0
+    output = capsys.readouterr().out
+    assert all(fragment in output for fragment in expected)
+
+
 def test_cli_benchmark_branch_writes_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
