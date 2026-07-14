@@ -1,15 +1,7 @@
 {
-  "import_measurement": {
-    "command": "python -c 'import lmx'",
-    "jax_loaded": false,
-    "max_seconds": 0.018988833006005734,
-    "median_seconds": 0.01870199997210875,
-    "min_seconds": 0.018426041991915554,
-    "repeats": 5
-  },
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3632637,
-    "checkout_bytes_excluding_release_candidates": 3632637,
+    "checkout_bytes_excluding_build_artifacts": 3604023,
+    "checkout_bytes_excluding_release_candidates": 3604023,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -322,8 +314,8 @@
         "role": "validation_and_evidence"
       },
       {
-        "bytes": 293315,
-        "lines": 7950,
+        "bytes": 293470,
+        "lines": 7954,
         "owner": "research_stage_extension",
         "path": "lmx/fringing.py",
         "role": "research_stage_extension"
@@ -490,7 +482,7 @@
       "load_closed_channel_analytical",
       "load_processed_slice"
     ],
-    "total_package_lines": 35037,
+    "total_package_lines": 35041,
     "uncurated_example_count": 0
   },
   "schema_version": 1,
