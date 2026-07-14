@@ -1024,7 +1024,7 @@ requires-dist = [
     { name = "pytest-timeout", marker = "extra == 'dev'" },
     { name = "pytest-xdist", marker = "extra == 'dev'" },
     { name = "scipy" },
-    { name = "solvax", specifier = ">=0.8,<1" },
+    { name = "solvax", specifier = ">=0.8.2,<1" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
@@ -2018,16 +2018,16 @@ wheels = [
 
 [[package]]
 name = "solvax"
-version = "0.8.1"
+version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "equinox" },
     { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "jax", version = "0.10.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/ec/b64a4fbe7377cff13362d2f6c5a151b2de1d03728f01602d06cee8ef4a60/solvax-0.8.1.tar.gz", hash = "sha256:580d4d0b07df5bec671e92422ba9b3b451f4c3a189362cae0c6ccdac149a0af1", size = 230604, upload-time = "2026-07-13T19:58:13.315Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/98/fd33851df1d72c7eba8d952206e652819646aa487d6a0f6a3ab7787b4e6d/solvax-0.8.2.tar.gz", hash = "sha256:cb81bfa60947df997a8ab4ca4c5b71eb2c1bb7a662d1d0ce9e597d7b10ff8768", size = 231991, upload-time = "2026-07-14T11:08:04.985Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/83/b8/fd1a170a9735dd6972956c35fe9061df198461b9bbca100e7663907c5b73/solvax-0.8.1-py3-none-any.whl", hash = "sha256:08476eab219a39cf0b042142ca40b27d1f13386f100ebbc9d96df598c753aa6b", size = 63519, upload-time = "2026-07-13T19:58:12.043Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/1e/efb990716a614916b4d0d830ee9d22be0fd51ea062c5484664e512f82ae8/solvax-0.8.2-py3-none-any.whl", hash = "sha256:3d9c3ce465c45728bb79e70a288d9df20760df41e42e63fd9c018bf2cee64387", size = 63998, upload-time = "2026-07-14T11:08:03.654Z" },
 ]
 
 [[package]]

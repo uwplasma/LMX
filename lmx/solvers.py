@@ -37,15 +37,15 @@ try:
     from solvax import (
         aitken_relaxation as _solvax_aitken_relaxation,
         anderson_mixing as _solvax_anderson_mixing,
+        galerkin_deflation as _solvax_galerkin_deflation,
         gmres as _solvax_gmres,
-        p_multigrid as _solvax_p_multigrid,
         tridiagonal_solve as _solvax_tridiagonal_solve,
     )
 except ImportError:  # pragma: no cover - exercised in minimum installs
     _solvax_aitken_relaxation = None
     _solvax_anderson_mixing = None
+    _solvax_galerkin_deflation = None
     _solvax_gmres = None
-    _solvax_p_multigrid = None
     _solvax_tridiagonal_solve = None
 
 
@@ -166,7 +166,7 @@ def _potential_deflated_line_preconditioner(
     coarse_stride: int = _POTENTIAL_COARSE_STRIDE,
 ):
     """Combine SPD line solves with an exact Galerkin coarse correction."""
-    if _solvax_p_multigrid is None or coarse_stride < 2:
+    if _solvax_galerkin_deflation is None or coarse_stride < 2:
         return None
     mean_y = float(np.asarray(jnp.mean(west + east)))
     mean_z = float(np.asarray(jnp.mean(south + north)))
@@ -214,24 +214,13 @@ def _potential_deflated_line_preconditioner(
     def coarse_solve(rhs: jnp.ndarray) -> jnp.ndarray:
         return cho_solve(coarse_factors, rhs.reshape(-1)).reshape(coarse_shape)
 
-    def no_smoothing(_matvec, iterate: jnp.ndarray, _rhs: jnp.ndarray) -> jnp.ndarray:
-        return iterate
-
-    coarse_correction = _solvax_p_multigrid(
-        (fine_matvec,),
-        (restrict,),
-        (prolong,),
+    return _solvax_galerkin_deflation(
+        fine_matvec,
+        line,
+        prolong,
         coarse_solve,
-        smoothers=(no_smoothing,),
+        coarse_zero,
     )
-
-    def apply(residual: jnp.ndarray) -> jnp.ndarray:
-        line_part = line(residual)
-        coarse_part = coarse_correction(residual - fine_matvec(line_part))
-        corrected = line_part + coarse_part - line(fine_matvec(coarse_part))
-        return corrected.at[anchor].set(0.0)
-
-    return apply
 
 
 @partial(jax.jit, static_argnames=("anchor", "preconditioner"))
