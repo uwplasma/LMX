@@ -38,6 +38,7 @@ class ExtrudedFieldBundle:
     solver_kind: str
     rho_phi_plus: jnp.ndarray | None = None
     rho_phi_inlet: jnp.ndarray | None = None
+    aitken_state: tuple[jnp.ndarray | None, float, int] | None = None
     jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jz: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
@@ -49,37 +50,16 @@ class ExtrudedFieldBundle:
     mean_velocity: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     axial_current: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     wall_current_leakage: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    current_scaled_pressure_proxy: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    charge_balance_residual: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    boundary_current_residual: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    axial_pressure_loss_gradient: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    transverse_pressure_difference: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    iteration_residual_history: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    iteration_component_residual_history: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0, 6))
-    )
-    iteration_pressure_residual_history: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-    iteration_electric_linear_history: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0, 6))
-    )
-    iteration_potential_residual_history: jnp.ndarray = field(
-        default_factory=lambda: jnp.zeros((0,))
-    )
-
+    current_scaled_pressure_proxy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    charge_balance_residual: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    boundary_current_residual: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    axial_pressure_loss_gradient: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    transverse_pressure_difference: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    iteration_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    iteration_component_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
+    iteration_pressure_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    iteration_electric_linear_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
+    iteration_potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
 
 @dataclass(frozen=True)
 class ExtrudedIterationProgress:

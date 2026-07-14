@@ -16,7 +16,8 @@ from lmx.benchmarks import (
     load_benchmark_b_spec,
     write_benchmark_report,
 )
-from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
+from lmx.fringing import _cross_section_mesh, _unpack_duct_mass_flux, solve_extruded_inductionless
+from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
 from scripts.analyze_freemhd_benchmark_a_ladder import analyze_ladder
 from scripts.freeze_benchmark_b_specs import build_specification_index
 from scripts.freeze_freemhd_benchmark_a import compact_evidence, freeze_summary
@@ -419,12 +420,6 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert all(item.checkpoint is not None for item in progress)
     assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
     assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
-    assert progress[-1].checkpoint.rho_phi_plus == pytest.approx(
-        solution.bundle.rho_phi_plus
-    )
-    assert progress[-1].checkpoint.rho_phi_inlet == pytest.approx(
-        solution.bundle.rho_phi_inlet
-    )
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-8
     )
@@ -474,7 +469,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         solve_extruded_inductionless(reduced_problem, checkpoint_interval=0)
 
 
-def test_benchmark_b2_reduced_path_closes_mixed_boundaries_and_is_finite():
+def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_path):
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse")
     case = replace(
         problem.case,
@@ -489,7 +484,7 @@ def test_benchmark_b2_reduced_path_closes_mixed_boundaries_and_is_finite():
         ),
         time_stepper=replace(
             problem.case.time_stepper,
-            max_steps=2,
+            max_steps=3,
             potential_iterations=160,
         ),
         solver=replace(
@@ -510,6 +505,8 @@ def test_benchmark_b2_reduced_path_closes_mixed_boundaries_and_is_finite():
 
     assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
     assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
+    assert progress[-1].checkpoint.rho_phi_plus == pytest.approx(solution.bundle.rho_phi_plus)
+    assert progress[-1].checkpoint.rho_phi_inlet == pytest.approx(solution.bundle.rho_phi_inlet)
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-10
     )
@@ -517,47 +514,46 @@ def test_benchmark_b2_reduced_path_closes_mixed_boundaries_and_is_finite():
     assert solution.validation.volumetric_flow_rate_span < 4.0e-6
     assert solution.validation.max_charge_balance_residual < 1.0e-3
     assert solution.validation.net_boundary_current_residual < 1.0e-3
-    assert benchmarks.jnp.isfinite(solution.bundle.p).all()
-    assert benchmarks.jnp.isfinite(solution.bundle.phi).all()
-    assert benchmarks.jnp.isfinite(solution.bundle.axial_pressure_loss_gradient).all()
-    assert benchmarks.jnp.isfinite(solution.bundle.transverse_pressure_difference).all()
-    assert solution.bundle.iteration_pressure_residual_history.shape == (
-        solution.bundle.iteration_residual_history.shape
-    )
+    for field in (solution.bundle.p, solution.bundle.phi,
+                  solution.bundle.axial_pressure_loss_gradient,
+                  solution.bundle.transverse_pressure_difference):
+        assert benchmarks.jnp.isfinite(field).all()
+    history = solution.bundle.iteration_residual_history
+    assert solution.bundle.iteration_pressure_residual_history.shape == history.shape
+    assert solution.bundle.iteration_potential_residual_history.shape == history.shape
     assert benchmarks.jnp.all(
         solution.bundle.iteration_residual_history
         >= solution.bundle.iteration_pressure_residual_history
     )
-    assert solution.bundle.iteration_electric_linear_history.shape == (
-        solution.bundle.iteration_residual_history.size,
-        6,
-    )
-    assert benchmarks.jnp.all(
-        solution.bundle.iteration_electric_linear_history[:, 3] > 0
-    )
-    assert benchmarks.jnp.all(
-        solution.bundle.iteration_electric_linear_history[:, 2] <= 1.0e-3
-    )
-    assert solution.bundle.iteration_potential_residual_history.shape == (
-        solution.bundle.iteration_residual_history.shape
-    )
+    electric = solution.bundle.iteration_electric_linear_history
+    assert electric.shape == (history.size, 6)
+    assert benchmarks.jnp.all(electric[:, 3] > 0)
+    assert benchmarks.jnp.all(electric[:, 2] <= 1.0e-3)
     assert benchmarks.jnp.all(
         solution.bundle.iteration_residual_history
         >= solution.bundle.iteration_potential_residual_history
     )
 
-    # A loose accepted-state threshold exercises the settled continuation
-    # update while the independently tight coupling target remains open.
-    settled_case = replace(
-        case,
-        time_stepper=replace(case.time_stepper, steady_tolerance=1.0),
-    )
-    restarted = solve_extruded_inductionless(
-        replace(problem, case=settled_case, profile=profile),
-        initial_bundle=solution.bundle,
-    )
-    assert restarted.bundle.mean_velocity == pytest.approx(1.0, abs=1.0e-8)
-    assert restarted.validation.max_charge_balance_residual < 1.0e-3
+    fx, fy, fz = _unpack_duct_mass_flux(solution.bundle.rho_phi_plus,
+                                        solution.bundle.rho_phi_inlet)
+    flux_divergence = fx[1:] - fx[:-1] + fy[:, 1:] - fy[:, :-1] + fz[:, :, 1:] - fz[:, :, :-1]
+    inlet_flux, outlet_flux = map(float, (benchmarks.jnp.sum(fx[0]), benchmarks.jnp.sum(fx[-1])))
+    assert inlet_flux > 0.0
+    assert outlet_flux == pytest.approx(inlet_flux, abs=1.0e-10)
+    assert float(benchmarks.jnp.max(benchmarks.jnp.abs(flux_divergence))) < 1.0e-8
+
+    path = write_extruded_bundle_restart_npz(progress[0].checkpoint, case, tmp_path / "b2.npz")
+    restart = load_extruded_restart_bundle(path)
+    continuation_case = replace(case, time_stepper=replace(case.time_stepper, max_steps=2))
+    resumed = solve_extruded_inductionless(
+        replace(problem, case=continuation_case, profile=profile), initial_bundle=restart.bundle)
+    assert restart.metadata["restart_schema"] == "b2_aitken_v1"
+    for name in ("u", "v", "w", "p", "phi", "rho_phi_plus", "rho_phi_inlet",
+                 "iteration_residual_history", "iteration_component_residual_history",
+                 "iteration_pressure_residual_history", "iteration_electric_linear_history",
+                 "iteration_potential_residual_history"):
+        assert benchmarks.jnp.allclose(getattr(resumed.bundle, name),
+                                       getattr(solution.bundle, name), rtol=0.0, atol=1.0e-12)
 
 
 def test_benchmark_b_primary_pressure_observables_use_direct_fields():

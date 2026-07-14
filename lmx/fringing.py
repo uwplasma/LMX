@@ -6019,6 +6019,7 @@ def _iteration_checkpoint_bundle(
     potential_history: list[float],
     rho_phi_plus: jnp.ndarray | None = None,
     rho_phi_inlet: jnp.ndarray | None = None,
+    aitken_state: tuple[jnp.ndarray | None, float, int] | None = None,
 ) -> ExtrudedFieldBundle:
     """Build the minimal existing-schema bundle needed to resume a solve."""
 
@@ -6034,6 +6035,7 @@ def _iteration_checkpoint_bundle(
         phi=phi,
         rho_phi_plus=rho_phi_plus,
         rho_phi_inlet=rho_phi_inlet,
+        aitken_state=aitken_state,
         geometry_kind=case.geometry.kind,
         solver_kind=case.solver.kind,
         axial_pressure_loss_gradient=(
@@ -7223,16 +7225,29 @@ def _solve_extruded_projection(
     electric_potential_scale = max(
         1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2)))
     )
-    residual_by_step: list[float] = []
-    component_residual_by_step: list[tuple[float, ...]] = []
-    pressure_residual_by_step: list[float] = []
-    electric_linear_by_step: list[tuple[float, ...]] = []
-    potential_residual_by_step: list[float] = []
+    history_names = ("iteration_residual_history", "iteration_component_residual_history",
+        "iteration_pressure_residual_history", "iteration_electric_linear_history",
+        "iteration_potential_residual_history")
+    histories = tuple([] if initial_bundle is None else np.asarray(
+        getattr(initial_bundle, name, jnp.zeros((0,)))).tolist() for name in history_names)
+    if len({len(history) for history in histories}) != 1:
+        raise ValueError("B2 restart iteration histories have inconsistent lengths")
+    (residual_by_step, component_residual_by_step, pressure_residual_by_step,
+        electric_linear_by_step, potential_residual_by_step) = histories
+    completed_steps = len(residual_by_step)
     fixed_point_iterates: list[jnp.ndarray] = []
     fixed_point_residuals: list[jnp.ndarray] = []
     previous_fixed_point_residual: jnp.ndarray | None = None
     steady_streak = 0
     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
+    restart_aitken = None if initial_bundle is None else getattr(initial_bundle, "aitken_state", None)
+    if use_alex_b2_finite_volume and restart_aitken is not None:
+        previous_fixed_point_residual, fixed_point_relaxation, steady_streak = restart_aitken
+        previous_fixed_point_residual = (None if previous_fixed_point_residual is None
+            else jnp.asarray(previous_fixed_point_residual, dtype=u.dtype))
+        fixed_point_relaxation = jnp.asarray(fixed_point_relaxation, dtype=u.dtype)
+        if previous_fixed_point_residual is not None and previous_fixed_point_residual.shape != (4, nx, ny, nz):
+            raise ValueError("B2 restart Aitken residual has inconsistent shape")
     fixed_point_scale = jnp.asarray(
         [
             velocity_limit,
@@ -7528,7 +7543,8 @@ def _solve_extruded_projection(
                 )
             )
 
-    for step in range(outer_steps):
+    stop_step = completed_steps + outer_steps
+    for step in range(completed_steps, stop_step):
         flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
         phi_previous = phi
         pressure_observable_previous = (
@@ -7819,7 +7835,7 @@ def _solve_extruded_projection(
             )
         else:
             converged = instantaneous_convergence
-        if use_alex_b2_finite_volume and not converged and step + 1 < outer_steps:
+        if use_alex_b2_finite_volume and not converged and step + 1 < stop_step:
             current_state = scaled_state(u, v, w, phi_previous)
             mapped_state = scaled_state(u_next, v_next, w_next, phi)
             fixed_point_residual = state_difference(mapped_state, current_state)
@@ -7901,7 +7917,7 @@ def _solve_extruded_projection(
             progress_callback,
             checkpoint_interval=checkpoint_interval,
             step=step + 1,
-            total_steps=outer_steps,
+            total_steps=stop_step,
             converged=converged,
             residual=update_residual,
             component_residuals=component_residual_by_step[-1],
@@ -7927,6 +7943,9 @@ def _solve_extruded_projection(
                 potential_history=potential_residual_by_step,
                 rho_phi_plus=(current_rho_phi_plus if use_alex_b2_finite_volume else None),
                 rho_phi_inlet=(current_rho_phi_inlet if use_alex_b2_finite_volume else None),
+                aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
+                    steady_streak) if use_alex_b2_finite_volume and
+                    case.solver.coupling_acceleration == "aitken" else None),
             ),
         )
         if converged:
@@ -8019,6 +8038,9 @@ def _solve_extruded_projection(
         phi=phi,
         rho_phi_plus=(current_rho_phi_plus if use_alex_b2_finite_volume else None),
         rho_phi_inlet=(current_rho_phi_inlet if use_alex_b2_finite_volume else None),
+        aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
+            steady_streak) if use_alex_b2_finite_volume and
+            case.solver.coupling_acceleration == "aitken" else None),
         jx=jx,
         jy=jy,
         jz=jz,

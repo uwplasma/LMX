@@ -324,6 +324,7 @@ def write_extruded_bundle_restart_npz(
     path.parent.mkdir(parents=True, exist_ok=True)
     rho_phi_plus, rho_phi_inlet = _compact_flux_restart_arrays(bundle)
     has_compact_flux = rho_phi_plus is not None
+    aitken_state = getattr(bundle, "aitken_state", None)
     metadata = {
         "case": case.name,
         "geometry_kind": case.geometry.kind,
@@ -331,7 +332,8 @@ def write_extruded_bundle_restart_npz(
         "station_count": int(bundle.x.shape[0]),
         "description": "LMX extruded inductionless restart bundle",
         "restart_capable": True,
-        "restart_schema": "compact_flux_v1" if has_compact_flux else "legacy_nonexact",
+        "restart_schema": ("b2_aitken_v1" if has_compact_flux and aitken_state is not None
+                           else "compact_flux_v1" if has_compact_flux else "legacy_nonexact"),
     }
     np.savez_compressed(
         path,
@@ -348,6 +350,9 @@ def write_extruded_bundle_restart_npz(
         phi=np.asarray(bundle.phi),
         rho_phi_plus=np.asarray(rho_phi_plus) if has_compact_flux else np.zeros(0),
         rho_phi_inlet=np.asarray(rho_phi_inlet) if has_compact_flux else np.zeros(0),
+        aitken_residual=np.asarray(aitken_state[0]) if aitken_state is not None and aitken_state[0] is not None else np.zeros(0),
+        aitken_relaxation=np.asarray(aitken_state[1] if aitken_state is not None else 1.0),
+        steady_streak=np.asarray(aitken_state[2] if aitken_state is not None else 0),
         jx=np.asarray(bundle.jx),
         jy=np.asarray(bundle.jy),
         jz=np.asarray(bundle.jz),
@@ -368,15 +373,11 @@ def write_extruded_bundle_restart_npz(
         ),
         charge_balance_residual=np.asarray(bundle.charge_balance_residual),
         boundary_current_residual=np.asarray(bundle.boundary_current_residual),
-        iteration_residual_history=np.asarray(
-            getattr(bundle, "iteration_residual_history", np.zeros((0,)))
-        ),
+        iteration_residual_history=np.asarray(getattr(bundle, "iteration_residual_history", np.zeros((0,)))),
         iteration_component_residual_history=np.asarray(
             getattr(bundle, "iteration_component_residual_history", np.zeros((0, 6)))
         ),
-        iteration_pressure_residual_history=np.asarray(
-            getattr(bundle, "iteration_pressure_residual_history", np.zeros((0,)))
-        ),
+        iteration_pressure_residual_history=np.asarray(getattr(bundle, "iteration_pressure_residual_history", np.zeros((0,)))),
         iteration_electric_linear_history=np.asarray(
             getattr(bundle, "iteration_electric_linear_history", np.zeros((0, 6)))
         ),
@@ -536,7 +537,11 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         )
         has_plus = "rho_phi_plus" in data and data["rho_phi_plus"].size > 0
         has_inlet = "rho_phi_inlet" in data and data["rho_phi_inlet"].size > 0
-        metadata["restart_schema"] = "compact_flux_v1" if has_plus and has_inlet else "legacy_nonexact"
+        has_aitken = metadata.get("restart_schema") == "b2_aitken_v1"
+        if has_aitken and not {"aitken_residual", "aitken_relaxation", "steady_streak"} <= set(data.files):
+            raise ValueError("B2 Aitken restart is missing accelerator state")
+        metadata["restart_schema"] = ("b2_aitken_v1" if has_plus and has_inlet and has_aitken
+                                      else "compact_flux_v1" if has_plus and has_inlet else "legacy_nonexact")
         station_history = (
             tuple(json.loads(str(data["station_history_json"])))
             if "station_history_json" in data
@@ -554,6 +559,8 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             phi=jnp.asarray(data["phi"]),
             rho_phi_plus=jnp.asarray(data["rho_phi_plus"]) if has_plus else None,
             rho_phi_inlet=jnp.asarray(data["rho_phi_inlet"]) if has_inlet else None,
+            aitken_state=((jnp.asarray(data["aitken_residual"]) if data["aitken_residual"].size else None,
+                           float(data["aitken_relaxation"]), int(data["steady_streak"])) if has_aitken else None),
             jx=jnp.asarray(data["jx"]),
             jy=jnp.asarray(data["jy"]),
             jz=jnp.asarray(data["jz"]),
@@ -578,15 +585,11 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             transverse_pressure_difference=jnp.asarray(
                 _load_optional_array(data, "transverse_pressure_difference")
             ),
-            iteration_residual_history=jnp.asarray(
-                _load_optional_array(data, "iteration_residual_history")
-            ),
+            iteration_residual_history=jnp.asarray(_load_optional_array(data, "iteration_residual_history")),
             iteration_component_residual_history=jnp.asarray(
                 _load_optional_array(data, "iteration_component_residual_history")
             ).reshape((-1, 6)),
-            iteration_pressure_residual_history=jnp.asarray(
-                _load_optional_array(data, "iteration_pressure_residual_history")
-            ),
+            iteration_pressure_residual_history=jnp.asarray(_load_optional_array(data, "iteration_pressure_residual_history")),
             iteration_electric_linear_history=jnp.asarray(
                 _load_optional_array(data, "iteration_electric_linear_history")
             ).reshape((-1, 6)),
