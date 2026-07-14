@@ -51,7 +51,6 @@ performance
 autodiff
 fringing
 external_benchmarks
-research_directions
 ```
 
 ## Developer and maintenance notes
@@ -79,3 +78,10 @@ developer_guide
 - extend the passing primal and transpose gradient gates to new objectives
 - freeze and close the published pipe and square-duct fringing-field cases
 - profile and strongly scale only the externally accepted 3D path
+
+Useful anchors for that work include the [Samper et al. MHD validation
+ladder](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf),
+the [differentiable simulation review](https://mpan31415.github.io/assets/pdf/papers/2024/IEEEAccess24_DiffSim.pdf),
+[PhiFlow](https://proceedings.mlr.press/v235/holl24a.html),
+[Lineax](https://docs.kidger.site/lineax/api/solvers/), and
+[Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/).
