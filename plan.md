@@ -178,6 +178,11 @@ for external research use.
   returned to the slow asymptotic rate. Its 248 MiB checkpoint is a checksummed
   release asset; the next tranche improves the fine-grid preconditioner before
   resuming. Experimental acceptance remains open.
+  Exact axial-line, transverse-only, and multiplicative-coarse probes were all
+  slower than the 109.18-second two-update baseline. The next candidate is a
+  SOLVAX Galerkin multigrid hierarchy that coarsens only transverse directions,
+  retains the shard-local axial coarse mode, and must pass identical-state and
+  wall-time gates before promotion.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

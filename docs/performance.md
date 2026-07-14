@@ -44,6 +44,10 @@ iteration electric solves and equivalent residuals.
 Removing the shard-local axial coarse correction was also rejected: it reduced
 only 1--2 iterations and raised wall time to 155.88 seconds. The next candidate
 must add a multilevel transverse correction while retaining that coarse mode.
+A multiplicative line-then-coarse correction saved only 3--4 iterations and
+took 135.59 seconds, so it was rejected as well. The next design uses SOLVAX's
+Galerkin `p_multigrid` interface with shard-local transverse coarsening; it must
+beat the 109.18-second two-update baseline before any production campaign.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states

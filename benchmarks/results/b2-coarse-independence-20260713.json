@@ -93,6 +93,12 @@
         "baseline_elapsed_seconds": 109.18361319904216,
         "electric_iterations": [1198, 1199],
         "result": "rejected: 1.43x slower; the axial coarse correction is necessary"
+      },
+      "rejected_multiplicative_coarse_probe": {
+        "elapsed_seconds": 135.593809471,
+        "baseline_elapsed_seconds": 109.18361319904216,
+        "electric_iterations": [1196, 1197],
+        "result": "rejected: 1.24x slower; four saved iterations do not repay the extra matvec"
       }
     }
   },
