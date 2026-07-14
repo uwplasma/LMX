@@ -70,14 +70,14 @@ superseded worktrees and branches.
 | README/docs | 567-word feature-led README, conservatively sourced comparison table, feature-specific docs, and a 7-second Hunt loop; tracked media is 387,683 bytes | refresh canonical B2/scaling panels only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish the O(nx) coarse solve and diagnostics, then independent input observers and the smoke role |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish CFL/stopping diagnostics, then independent input observers and the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
-| B2 ALEX square duct | exact frozen limited-linear momentum, lagged stress, corrected compact flux, mixed projection, periodic Aitken restart identity, and forced one-/two-CPU equivalence pass bounded gates | replace the dense axial coarse inverse, then materialize and run the exact tiny FreeMHD smoke |
-| SOLVAX | released 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and tridiagonal algebra needed now; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | use 0.8.3 for the O(nx) axial solve; publish 0.8.4 separately before consuming shared Anderson weights |
+| B2 ALEX square duct | exact frozen momentum/stress/flux/projection, Aitken restart identity, forced one-/two-CPU equivalence, and the O(nx) SOLVAX axial coarse solve pass bounded gates | add restart-continuous CFL/stopping diagnostics, then materialize the exact tiny FreeMHD smoke |
+| SOLVAX | released 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and O(nx) tridiagonal algebra now used by B2; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | publish 0.8.4 separately before consuming shared Anderson weights |
 | Portable quality | accepted at `cf76c5a`: 769 pass, 8 expected skips, 95.24% combined line/branch coverage, 167.0 s | preserve the 300 s target and 600 s hard limit while consolidating rather than adding test files |
 
-Current structural audit at `cf76c5a`: 35 modules, exactly 35,000 package
-lines, 8,049 maintained-core lines, 32 test files / exactly 21,300 lines, and
+Current structural audit at `44e52c4`: 35 modules, 34,998 package lines,
+8,049 maintained-core lines, 32 test files / 21,275 lines, and
 18 maintenance scripts. These are ceilings, not targets: every added branch or
 test must consolidate or delete at least as much code in the same tranche.
 The four audited probe worktrees contained only promoted or rejected work;
@@ -166,11 +166,16 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    production gate. `fa4e2e7` exposed and fixed a real axial shard-boundary bug;
    the complete portable gate is green at `cf76c5a`. Anderson remains rejected
    until released shared weights and bounded field/flux histories exist.
-10. Replace the dense axial coarse inverse with released SOLVAX 0.8.3
-   `tridiagonal_solve`: anchor the mixed solve, apply the analytical volume
-   gauge shift where required, and prove dense parity, variable coefficients,
-   JIT/JVP/VJP, residual, and one-/two-device placement on tiny grids. Delete
-   the dense assembly/inverse in the same tranche.
+10. **Complete at `44e52c4`:** replace the dense axial inverse with released
+   SOLVAX 0.8.3 `tridiagonal_solve`, an anchored Neumann solve, and analytical
+   volume-gauge shift. Independent variable-volume dense oracles pass for mixed
+   and gauge modes with residual, JIT, JVP, and VJP errors below `1e-11`; both
+   modes pass the forced one-/two-CPU gate. The stacked replicated boundary
+   lowers to one O(nx)-data gather and returns a genuinely sharded correction.
+   At nx=1024 on the reference Mac, a bounded helper microbenchmark reduced
+   first-call time from 0.258 s to 0.078 s, warm time from 88.1 to 32.6 us, and
+   coarse state from 8 MiB to 40 KiB. This is helper evidence, not full-solver
+   strong scaling.
 11. Add explicit CFL and stopping diagnostics to the existing compact B2 record
    and gate their restart continuity; do not add a new report or test file.
 12. Materialize both tiny inputs independently, derive their observed contracts,
@@ -341,10 +346,9 @@ The next ownership audit is evidence-driven:
   with one stacked momentum solve and folded the one-caller mixed projection
   wrapper into `_face_flux_pressure_projection_duct`. Retain the shared line
   preconditioner, general face-flux projection, and generic/pipe paths.
-- Replace the dense `nx`-by-`nx` axial coarse inverse with an anchored
-  SOLVAX tridiagonal solve plus an analytical constant gauge mode. This is the
-  smallest high-impact sharding fix; prove mixed modes, variable coefficients,
-  JIT/gradient, and placement first.
+- The dense axial coarse inverse is deleted. Released SOLVAX now solves one
+  stacked replicated tridiagonal system with an analytical constant gauge
+  shift; mixed/gauge dense, gradient, and shard-placement gates pass.
 - Keep `_additive_line_preconditioner_3d`: it only maps LMX coefficient axes
   and periodicity into SOLVAX's existing additive/tridiagonal APIs. Moving it
   has zero net deletion until SOLVAX has a reusable axis-line builder with a
@@ -364,9 +368,9 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | stay at 35 until a complete owner disappears |
-| package lines | 35,000 | below 35,000 every tranche; below 34,800 after smoke cleanup |
+| package lines | 34,998 | below 34,800 after smoke cleanup |
 | maintained-core lines | 8,049 | below 8,000 after the exact smoke |
-| test files / lines | 32 / 21,300 | 32 / below 21,000 by consolidating post-smoke evidence |
+| test files / lines | 32 / 21,275 | 32 / below 21,000 by consolidating post-smoke evidence |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or
