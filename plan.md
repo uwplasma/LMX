@@ -165,6 +165,9 @@ for external research use.
 - B2 coarse independence: all steady, conservation, tolerance, iteration, and
   confirmation-wall gates pass on current source; the coarse ALEX curve remains
   outside the frozen literature limits, so medium/fine refinement is required.
+- B2 mesh initialization: tested physical-coordinate trilinear prolongation
+  maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
+  fields remain provisional until the solver reprojects and passes every gate.
 - GPU: accepted B2 checkpoint scales from 36.96 seconds on one A4000 to 22.23
   seconds on two (1.66x, 83.1% efficiency).
 - Frozen B2 runner: `--spatial-devices 2` rounds only the odd axial minimum to

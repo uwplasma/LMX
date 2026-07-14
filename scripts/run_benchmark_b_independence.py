@@ -31,7 +31,7 @@ from lmx.benchmarks import (
     load_benchmark_b_reference,
     load_benchmark_b_spec,
 )
-from lmx.fringing import solve_extruded_inductionless
+from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
 from lmx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
@@ -266,6 +266,56 @@ def _spatial_placement(field, expected: int | None) -> dict[str, Any]:
     }
 
 
+def _interpolate_axis(values, old, new, axis: int):
+    """Linearly interpolate one tensor axis in physical coordinates."""
+
+    moved = np.moveaxis(np.asarray(values), axis, -1)
+    flat = moved.reshape((-1, moved.shape[-1]))
+    interpolated = np.stack([np.interp(new, old, row) for row in flat])
+    shape = (*moved.shape[:-1], len(new))
+    return np.moveaxis(interpolated.reshape(shape), -1, axis)
+
+
+def _prolong_b2_restart(bundle, problem):
+    """Trilinearly prolong a B2 restart for initialization on a finer mesh."""
+
+    if not problem.case.name.startswith("alex_b2-fringing-square_"):
+        raise ValueError("Restart prolongation currently supports only ALEX B2")
+    mesh = _cross_section_mesh(problem.case)
+    target = tuple(
+        np.asarray(axis) for axis in (mesh.x_centers, mesh.y_centers, mesh.z_centers)
+    )
+    source = tuple(np.asarray(axis) for axis in (bundle.x, bundle.y, bundle.z))
+    expected_shape = tuple(len(axis) for axis in source)
+    if any(
+        np.asarray(getattr(bundle, name)).shape != expected_shape
+        for name in ("u", "v", "w", "p", "phi")
+    ):
+        raise ValueError("Restart coordinates and field shapes do not match")
+
+    def interpolate(values):
+        for axis, (old, new) in enumerate(zip(source, target)):
+            values = _interpolate_axis(values, old, new, axis)
+        return values
+
+    fields = {
+        name: interpolate(getattr(bundle, name)) for name in ("u", "v", "w", "p", "phi")
+    }
+    prolonged = replace(
+        bundle,
+        x=target[0],
+        y=target[1],
+        z=target[2],
+        field_scale=np.asarray(problem.profile.field_scale),
+        **fields,
+    )
+    return prolonged, {
+        "method": "trilinear_physical_coordinates",
+        "source_shape": list(expected_shape),
+        "target_shape": [len(axis) for axis in target],
+    }
+
+
 def _progress_writer(
     *,
     problem,
@@ -350,8 +400,18 @@ def _run_record(
     initialization: str | None = None,
     initialization_sha256: str | None = None,
     num_devices: int | None = None,
+    prolong_restart: bool = False,
 ) -> tuple[dict[str, Any], Any]:
     problem = _variant_problem(case_id, mesh_level, variant, num_devices=num_devices)
+    prolongation = None
+    mesh = _cross_section_mesh(problem.case)
+    target_shape = (mesh.nx, mesh.ny, mesh.nz)
+    if initial_bundle is not None and initial_bundle.u.shape != target_shape:
+        if not prolong_restart:
+            raise ValueError(
+                "Restart shape differs from the target mesh; pass --prolong-restart"
+            )
+        initial_bundle, prolongation = _prolong_b2_restart(initial_bundle, problem)
     started = time.perf_counter()
     progress_path = restart_path.with_suffix(".progress.json")
     partial_restart_path = restart_path.with_suffix(".partial.npz")
@@ -399,6 +459,7 @@ def _run_record(
                 )
             ),
             "initialization_sha256": initialization_sha256,
+            "restart_prolongation": prolongation,
             **placement,
             "b1_compatible_steady": case_id == "B1-fringing-pipe",
             "b1_retained_modal_blocks": case_id == "B1-fringing-pipe",
@@ -644,6 +705,8 @@ def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
     ]
     if args.resume:
         command.append("--resume")
+    if getattr(args, "prolong_restart", False):
+        command.append("--prolong-restart")
     if variant == "baseline" and args.initial_restart is not None:
         command.extend(("--initial-restart", str(args.initial_restart)))
     for restart in args.variant_restart:
@@ -789,6 +852,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Explicit restart for a newly run variant; repeat for multiple variants.",
     )
     parser.add_argument(
+        "--prolong-restart",
+        action="store_true",
+        help="Trilinearly initialize a finer B2 mesh from an explicit restart.",
+    )
+    parser.add_argument(
         "--gpu-devices",
         metavar="ID[,ID...]",
         help="Run independent variants concurrently, one subprocess per CUDA GPU.",
@@ -909,6 +977,7 @@ def main(argv: list[str] | None = None) -> int:
                     initialization=initialization,
                     initialization_sha256=initialization_sha256,
                     num_devices=args.spatial_devices,
+                    prolong_restart=args.prolong_restart,
                 )
                 if variant == "baseline":
                     baseline_bundle = solution.bundle

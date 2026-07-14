@@ -36,8 +36,9 @@ Run one frozen B2 solve across both visible GPUs with:
 ```bash
 XLA_PYTHON_CLIENT_PREALLOCATE=false \
 python scripts/run_benchmark_b_independence.py \
-  --cases B2-fringing-square --mesh-level coarse --variants baseline \
-  --spatial-devices 2 --variant-restart baseline=/release-assets/b2-102.npz
+  --cases B2-fringing-square --mesh-level medium --variants baseline \
+  --spatial-devices 2 --prolong-restart \
+  --variant-restart baseline=/release-assets/b2-coarse-102.npz
 ```
 
 The sharded builder rounds axial minima `101/151/201` to `102/152/202`, which
@@ -45,6 +46,12 @@ still satisfies the frozen minimum-resolution contract. Cross-section grids,
 physics, and tolerances are unchanged. The runner refuses to combine spatial
 sharding with the separate one-process-per-GPU campaign mode and fails if the
 result does not actually have the requested number of addressable JAX shards.
+`--prolong-restart` is explicit: it trilinearly interpolates only B2 initial
+fields in physical coordinates, records source/target shapes and method, and
+then subjects the solved state to the normal projection and physics gates. It
+does not present the interpolated state as a mesh result. The real coarse-to-
+medium initialization (`102 x 77 x 77` to `152 x 113 x 113`) takes 1.70 seconds
+and produces finite fields.
 The exact pushed `8f003d0` production gate reported two shards on `cuda:0` and
 `cuda:1`, converged three updates in 38.81 seconds including compilation, and
 kept divergence below `5.8e-7` and charge residual below `2.9e-5`.

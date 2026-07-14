@@ -98,6 +98,9 @@ The compact `benchmark-b-acceptance.json` output reports uncertainty-weighted
 RMS and maximum error, integrated-pressure error, successive mesh changes, all
 solver/wall independence gates, and external-evidence checksums. Full fields
 and restart bundles remain release assets rather than Git content.
+Medium and fine B2 campaigns may explicitly pass `--prolong-restart` with the
+matching coarser baseline or confirmation-wall asset. This is an initialization
+optimization only; every refined solve must still converge and pass all gates.
 
 ## Required gates
 

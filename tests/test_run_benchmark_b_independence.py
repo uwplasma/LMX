@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from lmx._fringing_types import ExtrudedFieldBundle
 from scripts import run_benchmark_b_independence as campaign
 
 
@@ -413,6 +414,51 @@ def test_spatial_placement_records_and_enforces_actual_shards():
     }
     with pytest.raises(RuntimeError, match="solution has 2 shards"):
         campaign._spatial_placement(field, 1)
+
+
+def test_b2_restart_prolongation_is_trilinear_in_physical_coordinates():
+    problem = campaign._variant_problem("B2-fringing-square", "coarse", "baseline")
+    geometry = campaign.replace(problem.case.geometry, nx=4)
+    case = campaign.replace(problem.case, geometry=geometry)
+    mesh = campaign._cross_section_mesh(case)
+    profile = campaign.replace(
+        problem.profile,
+        x=mesh.x_centers,
+        field_scale=campaign.np.ones(mesh.nx),
+    )
+    problem = campaign.replace(problem, case=case, profile=profile)
+    axes = tuple(
+        campaign.np.asarray([values[0], values[-1]])
+        for values in (mesh.x_centers, mesh.y_centers, mesh.z_centers)
+    )
+    x, y, z = campaign.np.meshgrid(*axes, indexing="ij")
+    linear = x + 2.0 * y + 3.0 * z
+    bundle = ExtrudedFieldBundle(
+        x=axes[0],
+        y=axes[1],
+        z=axes[2],
+        field_scale=campaign.np.ones(2),
+        u=linear,
+        v=linear,
+        w=linear,
+        p=linear,
+        phi=linear,
+        geometry_kind="layered_duct",
+        solver_kind="extruded_inductionless",
+    )
+
+    prolonged, record = campaign._prolong_b2_restart(bundle, problem)
+
+    target_x, target_y, target_z = campaign.np.meshgrid(
+        mesh.x_centers, mesh.y_centers, mesh.z_centers, indexing="ij"
+    )
+    assert prolonged.u.shape == (mesh.nx, mesh.ny, mesh.nz)
+    assert prolonged.u == pytest.approx(target_x + 2.0 * target_y + 3.0 * target_z)
+    assert record == {
+        "method": "trilinear_physical_coordinates",
+        "source_shape": [2, 2, 2],
+        "target_shape": [mesh.nx, mesh.ny, mesh.nz],
+    }
 
 
 def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch):
