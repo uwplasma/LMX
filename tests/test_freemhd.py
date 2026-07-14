@@ -1,9 +1,12 @@
 from copy import deepcopy
 import hashlib
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import examples
 from lmx.benchmarks import (
     BENCHMARK_B_SPEC_FILES,
     canonical_matched_b_contract,
@@ -13,17 +16,12 @@ from lmx.benchmarks import (
 from lmx.freemhd import (
     artifact_sha256,
     audit_freemhd_case_against_spec,
-    build_case_from_freemhd_reference,
     candidate_u_paths,
     compare_side_jet_profiles,
-    infer_initial_velocity_x,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
     infer_liquid_material_properties,
-    infer_liquid_properties,
-    infer_magnetic_ramp,
     infer_rectangular_geometry,
-    infer_reduced_inlet_flow_rate,
     infer_solid_conductivities,
     infer_uniform_b0,
     load_benchmark_a_spec,
@@ -33,7 +31,7 @@ from lmx.freemhd import (
     summarize_observable_offenders,
     validate_matched_b_record,
 )
-from scripts.run_freemhd_parity_suite import materialize_matched_freemhd_case
+from scripts import run_freemhd_parity_suite
 
 
 pytestmark = pytest.mark.unit
@@ -103,29 +101,6 @@ def _write_u(root: Path, boundary: str) -> None:
     (root / "U").write_text(f"internalField uniform ( 0.2 0 0 );\nboundaryField {{ {boundary} }}\n")
 
 
-def _build_reference_case(
-    root: Path,
-    *,
-    case_kind: str = "shercliff",
-    ha: float = 20.0,
-    cells: int = 12,
-    dt: float = 1.0e-5,
-    t_final: float = 1.0e-4,
-    forcing: float | None = None,
-):
-    return build_case_from_freemhd_reference(
-        case_kind=case_kind,
-        ha=ha,
-        ny=cells,
-        nz=cells,
-        dt=dt,
-        t_final=t_final,
-        max_steps=10,
-        reference_run_dir=root,
-        forcing=forcing,
-    )
-
-
 def _write_reference_inputs(root: Path, *, b0: str = "internalField uniform ( 0 0.2 0 );\n") -> None:
     liquid = root / "constant/liquid"
     liquid.mkdir(parents=True)
@@ -142,37 +117,6 @@ def _write_reference_inputs(root: Path, *, b0: str = "internalField uniform ( 0 
     system = root / "system"
     system.mkdir()
     (system / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nN_wall 2;\n")
-
-
-def _write_matched_freemhd_case(root: Path, case_kind: str) -> None:
-    spec = load_benchmark_a_spec(case_kind)
-    liquid = root / "case" / "constant" / "liquid"
-    liquid.mkdir(parents=True)
-    fluid = spec["fluid"]
-    (liquid / "thermophysicalProperties.liquidMetal").write_text(
-        f"rho {fluid['density']};\nmu {fluid['dynamic_viscosity']};\nelcond {fluid['conductivity']};\n"
-    )
-    for region, conductivity in (
-        ("solidWalls", spec["wall"]["conducting_wall_conductivity"]),
-        ("insulator", spec["wall"]["insulating_wall_conductivity"]),
-    ):
-        directory = root / "case" / "constant" / region
-        directory.mkdir(parents=True)
-        (directory / "thermophysicalProperties").write_text(f"elcond {conductivity};\n")
-    initial = root / "case" / "0" / "liquid"
-    initial.mkdir(parents=True)
-    field = " ".join(str(value) for value in spec["magnetic_field"]["vector"])
-    (initial / "B0").write_text(f"internalField uniform ( {field} );\n")
-    (initial / "U").write_text(
-        f"boundaryField\n{{\n  inlet\n  {{\n    type flowRateInletVelocity;\n    volumetricFlowRate {spec['drive']['target_flow_rate']};\n  }}\n}}\n"
-    )
-    system = root / "case" / "system"
-    system.mkdir(parents=True)
-    geometry = spec["geometry"]
-    outer = float(geometry["length_scale"]) + float(geometry["wall_thickness"])
-    (system / "blockMeshDict").write_text(
-        f"Ly {geometry['length_scale']};\nLy_wall {outer};\nN_wall {geometry['wall_cells']};\nHa {spec['magnetic_field']['hartmann_number']};\n"
-    )
 
 
 def _write_demo_template(root: Path) -> None:
@@ -205,6 +149,14 @@ def _write_demo_template(root: Path) -> None:
     (root / "system" / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nHa 20;\nN_wall 2;\n")
 
 
+def _materialize_matched_case(root: Path, case_kind: str) -> Path:
+    _write_demo_template(root / "template")
+    run_freemhd_parity_suite.materialize_matched_freemhd_case(
+        root / "template", root / "case", case_kind=case_kind
+    )
+    return root / "case"
+
+
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
 def test_matched_benchmark_a_specs_are_dimensionally_consistent(case_kind: str):
     spec = load_benchmark_a_spec(case_kind)
@@ -218,8 +170,7 @@ def test_matched_benchmark_a_specs_are_dimensionally_consistent(case_kind: str):
 
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
 def test_freemhd_case_audit_accepts_only_mechanically_matched_inputs(tmp_path: Path, case_kind: str):
-    _write_matched_freemhd_case(tmp_path, case_kind)
-    report = audit_freemhd_case_against_spec(tmp_path, case_kind=case_kind)
+    report = audit_freemhd_case_against_spec(_materialize_matched_case(tmp_path, case_kind), case_kind=case_kind)
 
     assert report["matched"] is True
     assert report["failed_check_count"] == 0
@@ -227,10 +178,10 @@ def test_freemhd_case_audit_accepts_only_mechanically_matched_inputs(tmp_path: P
 
 
 def test_freemhd_case_audit_exposes_mislabeled_ha_and_hunt_wall(tmp_path: Path):
-    _write_matched_freemhd_case(tmp_path, "hunt")
-    (tmp_path / "case" / "0" / "liquid" / "B0").write_text("internalField uniform ( 0 10 0 );\n")
-    (tmp_path / "case" / "constant" / "solidWalls" / "thermophysicalProperties").write_text("elcond 1e-6;\n")
-    report = audit_freemhd_case_against_spec(tmp_path, case_kind="hunt")
+    case = _materialize_matched_case(tmp_path, "hunt")
+    (case / "0/liquid/B0").write_text("internalField uniform ( 0 10 0 );\n")
+    (case / "constant/solidWalls/thermophysicalProperties").write_text("elcond 1e-6;\n")
+    report = audit_freemhd_case_against_spec(case, case_kind="hunt")
     failed_names = {check["name"] for check in report["checks"] if not check["pass"]}
 
     assert report["matched"] is False
@@ -373,7 +324,7 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_p
     second_output = tmp_path / "second-output"
     _write_demo_template(template)
 
-    manifest = materialize_matched_freemhd_case(template, output, case_kind=case_kind)
+    manifest = run_freemhd_parity_suite.materialize_matched_freemhd_case(template, output, case_kind=case_kind)
 
     assert manifest["run_profile"] == "docker_smoke_only"
     assert manifest["audit"]["matched"] is True
@@ -381,10 +332,107 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_p
     assert (output / "lmx-benchmark-manifest.json").is_file()
     assert infer_uniform_b0(output) == pytest.approx((0.0, 0.2, 0.0))
     assert infer_inlet_flow_rate(output) == pytest.approx(load_benchmark_a_spec(case_kind)["drive"]["target_flow_rate"])
-    assert materialize_matched_freemhd_case(template, second_output, case_kind=case_kind) == manifest
+    assert run_freemhd_parity_suite.materialize_matched_freemhd_case(template, second_output, case_kind=case_kind) == manifest
     assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (output / "lmx-benchmark-manifest.json").read_bytes()
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
-        materialize_matched_freemhd_case(template, output, case_kind=case_kind)
+        run_freemhd_parity_suite.materialize_matched_freemhd_case(template, output, case_kind=case_kind)
+
+
+def test_parity_command_materializes_without_running_suite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    install, output = tmp_path / "freemhd", tmp_path / "case"
+    called = {}
+
+    def materialize(template, destination, *, case_kind):
+        called.update(template=template, destination=destination, case_kind=case_kind)
+        return {"case_kind": case_kind, "audit": {"matched": True}}
+
+    monkeypatch.setattr(run_freemhd_parity_suite, "materialize_matched_freemhd_case", materialize)
+    monkeypatch.setattr(run_freemhd_parity_suite, "run_suite", lambda **_: pytest.fail("parity must not run"))
+    assert run_freemhd_parity_suite.main(
+        ["--output", str(output), "--freemhd-install-dir", str(install), "--materialize", "hunt"]
+    ) == 0
+    assert called == {
+        "template": install / "cases/hunt_demo",
+        "destination": output,
+        "case_kind": "hunt",
+    }
+
+
+def test_parity_command_portably_skips_missing_references(tmp_path: Path):
+    output = tmp_path / "parity"
+    assert run_freemhd_parity_suite.main(
+        [
+            "--output",
+            str(output),
+            "--freemhd-install-dir",
+            str(tmp_path / "missing-freemhd"),
+            "--processed-root",
+            str(tmp_path / "missing-processed"),
+        ]
+    ) == 0
+    assert json.loads((output / "summary.json").read_text())["status"] == "skipped"
+    assert (output / "summary.md").is_file()
+
+
+@pytest.mark.parametrize("matched", [True, False])
+def test_parity_suite_gates_profile_comparison_on_audited_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matched: bool
+):
+    install = tmp_path / "freemhd"
+    for case_kind in ("shercliff", "hunt"):
+        (install / "freemhd_output" / case_kind).mkdir(parents=True)
+    transient = SimpleNamespace(OUTPUT_DIR=tmp_path / "unset", FREEMHD_INSTALL_DIR=tmp_path / "unset")
+    transient.run_freemhd_closed_channel_parity = lambda: {
+        "records": [{"y_l2_error": 0.03, "z_l2_error": 0.02, "u_max_abs_diff": 0.01}]
+    }
+    monkeypatch.setattr(examples, "freemhd_closed_channel_parity", transient, raising=False)
+    processed = tmp_path / ("processed" if matched else "missing")
+    if matched:
+        processed.mkdir()
+        observable = SimpleNamespace(OUTPUT_DIR=tmp_path / "unset", REFERENCE_ROOT=tmp_path / "unset")
+        observable.run_freemhd_closed_channel_observable_parity = lambda: {
+            "records": [
+                {
+                    "observables": {
+                        "velocity": {"y": {"l2_error": 0.04}, "z": {"l2_error": 0.05}},
+                        "current": {"y": {"l2_error": 0.06}, "z": {"l2_error": 0.01}},
+                    }
+                }
+            ],
+            "observable_gate": {"research_grade_validation_pass": True},
+        }
+        monkeypatch.setattr(examples, "freemhd_closed_channel_observable_parity", observable, raising=False)
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "audit_freemhd_case_against_spec",
+        lambda *_args, case_kind, **_kwargs: {
+            "case_kind": case_kind,
+            "matched": matched,
+            "failed_check_count": 0 if matched else 1,
+        },
+    )
+
+    summary = run_freemhd_parity_suite.run_suite(
+        output=tmp_path / "out",
+        freemhd_install_dir=install,
+        processed_root=processed,
+    )
+
+    assert summary["status"] == ("completed" if matched else "invalid_reference")
+    assert summary["matched_case_gate"] is matched
+    assert ("closed_channel_parity" in summary["runs"]) is matched
+    metrics = summary["parity_report"]["metrics"]
+    assert metrics["reference_sample_y_l2_error"] == (0.06 if matched else None)
+    assert metrics["reference_sample_z_l2_error"] == (0.05 if matched else None)
+    if matched:
+        markdown = tmp_path / "summary.md"
+        run_freemhd_parity_suite._write_markdown(markdown, summary)
+        rendered = markdown.read_text()
+        assert "Research-grade pass: `True`" in rendered
+        assert "shercliff: matched=`True`" in rendered
+    else:
+        monkeypatch.setattr(run_freemhd_parity_suite, "run_suite", lambda **_: summary)
+        assert run_freemhd_parity_suite.main(["--output", str(tmp_path / "invalid")]) == 2
 
 
 def test_benchmark_a_spec_loader_rejects_unsupported_case():
@@ -467,22 +515,6 @@ def test_freemhd_audit_reports_missing_inputs_and_explicit_nu(tmp_path: Path):
     )
 
 
-@pytest.mark.external
-@pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
-def test_local_freemhd_demo_is_audited_before_parity_claim(case_kind: str):
-    case_dir = Path("/Users/rogerio/local/tests/freemhd_install/freemhd_output") / case_kind
-    if not case_dir.exists():
-        pytest.skip("fresh local FreeMHD Docker output is unavailable")
-
-    report = audit_freemhd_case_against_spec(case_dir, case_kind=case_kind)
-    failed_names = {check["name"] for check in report["checks"] if not check["pass"]}
-    assert report["matched"] is False
-    assert report["physical_hartmann_number"] == pytest.approx(1000.0)
-    assert "magnetic_field.vector" in failed_names
-    if case_kind == "hunt":
-        assert "wall.conducting_wall_conductivity" in failed_names
-
-
 def test_side_jet_profile_metrics_and_comparison_capture_peak_locations():
     coordinate = [-1.0, -0.7, 0.0, 0.7, 1.0]
     reference = [0.0, 1.4, 1.0, 1.4, 0.0]
@@ -498,53 +530,16 @@ def test_side_jet_profile_metrics_and_comparison_capture_peak_locations():
     assert comparison["peak_value_relative_error"] == pytest.approx((1.4 - 1.3) / 1.4)
 
 
-def test_inference_helpers_read_case_zero_and_latesttime_fallbacks(tmp_path: Path):
+def test_inlet_drive_mode_reads_case_zero(tmp_path: Path):
     case_zero = tmp_path / "case" / "0" / "liquid"
     case_zero.mkdir(parents=True)
     (case_zero / "U").write_text(_FLOW_RATE_U)
-    assert infer_initial_velocity_x(tmp_path) == pytest.approx(0.9725)
     assert infer_inlet_drive_mode(tmp_path) == "inlet_flow_rate"
-
-    fallback_root = tmp_path / "fallback"
-    latest = fallback_root / "latestTime" / "liquid"
-    latest.mkdir(parents=True)
-    (latest / "U").write_text("internalField   uniform ( 0.123 0 0 );\n")
-    assert infer_initial_velocity_x(fallback_root) == pytest.approx(0.123)
-
-
-def test_build_case_from_freemhd_reference_preserves_default_forcing_for_shercliff(
-    tmp_path: Path,
-):
-    u_path = tmp_path / "case" / "0" / "liquid"
-    u_path.mkdir(parents=True)
-    (u_path / "U").write_text("internalField   uniform ( 0.9725 0 0 );\n")
-
-    case = _build_reference_case(tmp_path)
-
-    assert case.forcing == pytest.approx(1.0)
-    assert case.initial_velocity == pytest.approx(0.9725)
-
-
-def test_build_case_from_freemhd_reference_switches_to_inlet_flow_rate_when_reference_uses_it(
-    tmp_path: Path,
-):
-    u_path = tmp_path / "case" / "0" / "liquid"
-    u_path.mkdir(parents=True)
-    (u_path / "U").write_text(_FLOW_RATE_U)
-
-    case = _build_reference_case(tmp_path)
-
-    inlet_boundaries = [bc for bc in case.boundary_conditions if bc.name == "inlet"]
-    assert case.forcing == pytest.approx(0.0)
-    assert inlet_boundaries
-    assert inlet_boundaries[-1].kind == "inlet_flow_rate"
-    assert inlet_boundaries[-1].value == pytest.approx(3.89)
 
 
 def test_freemhd_inference_helpers_recover_geometry_materials_and_b0(tmp_path: Path):
     _write_reference_inputs(tmp_path)
 
-    assert infer_liquid_properties(tmp_path) == pytest.approx((1.0e6, 1000.0, 1.0e-6))
     assert infer_liquid_material_properties(tmp_path) == pytest.approx(
         {
             "conductivity": 1.0e6,
@@ -562,31 +557,8 @@ def test_freemhd_inference_helpers_recover_geometry_materials_and_b0(tmp_path: P
     assert infer_solid_conductivities(tmp_path) == pytest.approx((5.0e6, 1.0e-6))
 
 
-def test_build_case_from_freemhd_reference_adopts_reference_geometry_materials_and_b0(
-    tmp_path: Path,
-):
-    _write_reference_inputs(tmp_path, b0="internalField uniform ( 0 0.2 0 );\nboundaryField {}\n")
-    initial = tmp_path / "0/liquid"
-    (initial / "U").write_text(_FLOW_RATE_U)
-    case = _build_reference_case(tmp_path, case_kind="hunt")
-
-    assert case.geometry.width == pytest.approx(0.2)
-    assert case.geometry.height == pytest.approx(0.2)
-    assert case.geometry.wall_thickness == pytest.approx((0.001, 0.001, 0.001, 0.001))
-    assert case.geometry.wall_cells == (2, 2, 2, 2)
-    assert case.regions[0].conductivity == pytest.approx(1.0e6)
-    assert case.regions[0].density == pytest.approx(1000.0)
-    assert case.regions[0].viscosity == pytest.approx(1.0e-6)
-    assert case.magnetic_field.value == pytest.approx((0.0, 0.2, 0.0))
-    inlet_boundaries = [bc for bc in case.boundary_conditions if bc.name == "inlet"]
-    assert inlet_boundaries
-    assert inlet_boundaries[-1].kind == "inlet_flow_rate"
-    assert inlet_boundaries[-1].value == pytest.approx(0.0389)
-
-
 def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Path):
     assert len(candidate_u_paths(tmp_path)) >= 6
-    assert infer_liquid_properties(tmp_path) is None
     assert infer_uniform_b0(tmp_path) is None
     assert infer_rectangular_geometry(tmp_path) is None
     assert infer_solid_conductivities(tmp_path) == (None, None)
@@ -594,10 +566,8 @@ def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Pa
     incomplete_liquid = tmp_path / "case" / "constant" / "liquid"
     incomplete_liquid.mkdir(parents=True)
     (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\n")
-    assert infer_liquid_properties(tmp_path) is None
-
     (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\nmu 0.002;\n")
-    assert infer_liquid_properties(tmp_path) == pytest.approx((3.0, 1000.0, 2.0e-6))
+    assert infer_liquid_material_properties(tmp_path)["kinematic_viscosity"] == pytest.approx(2.0e-6)
 
     b0_dir = tmp_path / "case" / "0" / "liquid"
     b0_dir.mkdir(parents=True, exist_ok=True)
@@ -615,12 +585,6 @@ def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Pa
     assert wall_thickness is None
     assert wall_cells is None
 
-    control = tmp_path / "system"
-    control.mkdir(exist_ok=True)
-    (control / "controlDict").write_text("application epotMultiRegionFoam;\n")
-    assert infer_magnetic_ramp(tmp_path) == pytest.approx((0.0, 0.0))
-
-
 def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Path):
     u_dir = tmp_path / "0"
     u_dir.mkdir()
@@ -633,7 +597,7 @@ def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Pa
     assert infer_inlet_flow_rate(tmp_path) is None
 
     _write_u(u_dir, "inlet { type flowRateInletVelocity; volumetricFlowRate 0.0; }")
-    assert infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0, initial_velocity=0.2) is None
+    assert infer_inlet_flow_rate(tmp_path) == pytest.approx(0.0)
 
     _write_u(
         u_dir,
@@ -685,35 +649,3 @@ def test_freemhd_observable_gate_ranks_accuracy_and_completeness():
     assert observable_gate["low_signal_count"] == 1
     assert observable_gate["missing_observable_count"] == 1
     assert observable_gate["missing_observables"] == [{"case_kind": "shercliff", "observable": "lorentz", "axis": "*"}]
-
-def test_build_case_from_freemhd_reference_covers_hartmann_velocity_mode_and_errors(
-    tmp_path: Path,
-):
-    u_dir = tmp_path / "0"
-    u_dir.mkdir()
-    (u_dir / "U").write_text(
-        """internalField uniform ( 0.3 0 0 );
-boundaryField
-{
-    inlet
-    {
-        type fixedValue;
-        value uniform (0.3 0 0);
-    }
-}
-"""
-    )
-    hartmann = dict(case_kind="hartmann", ha=10.0, cells=8, dt=1.0e-4, t_final=1.0e-3)
-    case = _build_reference_case(tmp_path, **hartmann)
-    inlet = [bc for bc in case.boundary_conditions if bc.name == "inlet"][-1]
-    assert case.name == "hartmann_ha10"
-    assert case.forcing == pytest.approx(0.0)
-    assert inlet.kind == "inlet_velocity"
-    assert inlet.value == pytest.approx((0.3, 0.0, 0.0))
-
-    forced = _build_reference_case(tmp_path, forcing=2.5, **hartmann)
-    assert forced.forcing == pytest.approx(2.5)
-    assert not [bc for bc in forced.boundary_conditions if bc.name == "inlet"]
-
-    with pytest.raises(ValueError, match="Unsupported FreeMHD reference case kind"):
-        _build_reference_case(tmp_path, case_kind="unknown")

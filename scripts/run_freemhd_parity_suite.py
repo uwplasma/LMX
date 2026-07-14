@@ -174,24 +174,20 @@ def _skip_payload(output: Path, reason: str) -> dict[str, Any]:
     }
 
 
-def _max_record_metric(records: list[dict[str, Any]], key: str) -> float | None:
-    values = [float(record[key]) for record in records if key in record]
-    return max(values) if values else None
-
-
-def _observable_max_l2(records: list[dict[str, Any]], *, axis: str) -> float | None:
-    values: list[float] = []
-    for record in records:
-        observables = record.get("observables", {})
-        if not isinstance(observables, dict):
-            continue
-        for observable in observables.values():
-            if not isinstance(observable, dict):
-                continue
-            cut = observable.get(axis)
-            if isinstance(cut, dict) and "l2_error" in cut:
-                values.append(float(cut["l2_error"]))
-    return max(values) if values else None
+def _max_metric(records: list[dict[str, Any]], path: tuple[str | None, ...]) -> float | None:
+    values: list[Any] = list(records)
+    for segment in path:
+        values = [
+            child
+            for value in values
+            if isinstance(value, dict)
+            for child in (
+                value.values()
+                if segment is None
+                else ([value[segment]] if segment in value else [])
+            )
+        ]
+    return max(map(float, values)) if values else None
 
 
 def run_suite(
@@ -247,7 +243,7 @@ def run_suite(
             summary["parity_output"] = str(transient.OUTPUT_DIR / "freemhd_closed_channel_parity_summary.json")
             records = list(transient_summary.get("records", []))
             for key, target in (("y_l2_error", y_errors), ("z_l2_error", z_errors), ("u_max_abs_diff", u_diffs)):
-                value = _max_record_metric(records, key)
+                value = _max_metric(records, (key,))
                 if value is not None:
                     target.append(value)
         else:
@@ -269,8 +265,8 @@ def run_suite(
             observable_gate = gate
         summary["parity_output"] = str(observable.OUTPUT_DIR / "freemhd_closed_channel_observable_parity_summary.json")
         records = list(observable_summary.get("records", []))
-        y_value = _observable_max_l2(records, axis="y")
-        z_value = _observable_max_l2(records, axis="z")
+        y_value = _max_metric(records, ("observables", None, "y", "l2_error"))
+        z_value = _max_metric(records, ("observables", None, "z", "l2_error"))
         if y_value is not None:
             y_errors.append(y_value)
         if z_value is not None:

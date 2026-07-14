@@ -5,7 +5,6 @@ import math
 import os
 import re
 import stat
-from dataclasses import replace
 from pathlib import Path, PurePosixPath
 import unicodedata
 
@@ -16,8 +15,6 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib
 
-from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from .specs import BoundaryCondition, CaseSpec
 from .units import (
     dynamic_to_kinematic_viscosity,
     hartmann_number,
@@ -159,18 +156,6 @@ def _first_existing(case_dir: str | Path, *relative_paths: str) -> Path | None:
 def _extract_first_scalar(text: str, *patterns: str) -> float | None:
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.MULTILINE)
-        if match is not None:
-            return float(match.group(1))
-    return None
-
-
-def infer_initial_velocity_x(case_dir: str | Path) -> float | None:
-    pattern = re.compile(r"internalField\s+uniform\s+\(\s*(\S+)\s+\S+\s+\S+\s*\)")
-    for path in candidate_u_paths(case_dir):
-        if not path.exists():
-            continue
-        text = path.read_text()
-        match = pattern.search(text)
         if match is not None:
             return float(match.group(1))
     return None
@@ -337,7 +322,6 @@ def summarize_observable_gate(
         "research_grade_validation_pass": offender_count == 0 and len(missing) == 0,
     }
 
-
 def side_jet_profile_metrics(
     coordinate: object,
     values: object,
@@ -419,24 +403,6 @@ def compare_side_jet_profiles(
     }
 
 
-def infer_reduced_inlet_flow_rate(
-    case_dir: str | Path,
-    *,
-    reduced_area: float,
-    initial_velocity: float | None = None,
-) -> float | None:
-    recovered_flow_rate = infer_inlet_flow_rate(case_dir)
-    if recovered_flow_rate is None:
-        return None
-    speed = infer_initial_velocity_x(case_dir) if initial_velocity is None else initial_velocity
-    if speed is None or abs(speed) <= 1.0e-20:
-        return None
-    recovered_area = recovered_flow_rate / speed
-    if abs(recovered_area) <= 1.0e-20:
-        return None
-    return recovered_flow_rate * (reduced_area / recovered_area)
-
-
 def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
     type_pattern = re.compile(r"type\s+(\S+)\s*;")
     for path in candidate_u_paths(case_dir):
@@ -488,19 +454,6 @@ def infer_liquid_material_properties(case_dir: str | Path) -> dict[str, float] |
         "dynamic_viscosity": float(dynamic_viscosity),
         "kinematic_viscosity": float(kinematic_viscosity),
     }
-
-
-def infer_liquid_properties(case_dir: str | Path) -> tuple[float, float, float] | None:
-    """Return ``(sigma, rho, nu)`` using LMX's kinematic-viscosity convention."""
-
-    properties = infer_liquid_material_properties(case_dir)
-    if properties is None:
-        return None
-    return (
-        properties["conductivity"],
-        properties["density"],
-        properties["kinematic_viscosity"],
-    )
 
 
 def infer_solid_conductivities(
@@ -570,17 +523,6 @@ def infer_rectangular_geometry(
         wall_thickness,
         None if wall_cells is None else int(round(wall_cells)),
     )
-
-
-def _infer_control_dict_scalar(case_dir: str | Path, key: str) -> float | None:
-    path = _first_existing(case_dir, "case/system/controlDict", "system/controlDict", "controlDict.used")
-    if path is None:
-        return None
-    pattern = re.compile(rf"{re.escape(key)}\s+(\S+)\s*;")
-    match = pattern.search(path.read_text())
-    if match is None:
-        return None
-    return float(match.group(1))
 
 
 def _infer_block_mesh_scalar(case_dir: str | Path, key: str) -> float | None:
@@ -939,122 +881,3 @@ def audit_freemhd_case_against_spec(
         "physical_hartmann_number": physical_ha,
         "declared_mesh_hartmann_number": declared_ha,
     }
-
-
-def infer_magnetic_ramp(case_dir: str | Path) -> tuple[float, float]:
-    start = _infer_control_dict_scalar(case_dir, "BtStartTime")
-    duration = _infer_control_dict_scalar(case_dir, "BtDuration")
-    return (0.0 if start is None else start, 0.0 if duration is None else duration)
-
-
-def build_case_from_freemhd_reference(
-    *,
-    case_kind: str,
-    ha: float,
-    ny: int,
-    nz: int,
-    dt: float,
-    t_final: float,
-    max_steps: int,
-    reference_run_dir: str | Path,
-    forcing: float | None = None,
-) -> CaseSpec:
-    liquid_properties = infer_liquid_properties(reference_run_dir)
-    geometry = infer_rectangular_geometry(reference_run_dir)
-    b0 = infer_uniform_b0(reference_run_dir)
-    solid_conductivity, insulator_conductivity = infer_solid_conductivities(reference_run_dir)
-    conductivity = 1.0
-    density = 1.0
-    viscosity = 1.0
-    if liquid_properties is not None:
-        conductivity, density, viscosity = liquid_properties
-    width = 2.0
-    height = 2.0
-    wall_thickness = 0.1
-    wall_cells = 8
-    if geometry is not None:
-        width, height, inferred_wall_thickness, inferred_wall_cells = geometry
-        if inferred_wall_thickness is not None and inferred_wall_thickness > 0.0:
-            wall_thickness = inferred_wall_thickness
-        if inferred_wall_cells is not None and inferred_wall_cells > 0:
-            wall_cells = inferred_wall_cells
-    if case_kind == "hartmann":
-        case = make_hartmann_case(
-            ha=ha,
-            width=width,
-            height=height,
-            ny=ny,
-            nz=nz,
-            conductivity=conductivity,
-            density=density,
-            viscosity=viscosity,
-        )
-    elif case_kind == "shercliff":
-        case = make_shercliff_case(
-            ha=ha,
-            width=width,
-            height=height,
-            ny=ny,
-            nz=nz,
-            conductivity=conductivity,
-            density=density,
-            viscosity=viscosity,
-        )
-    elif case_kind == "hunt":
-        case = make_hunt_case(
-            ha=ha,
-            width=width,
-            height=height,
-            ny=ny,
-            nz=nz,
-            wall_cells=wall_cells,
-            wall_thickness=wall_thickness,
-            fluid_conductivity=conductivity,
-            wall_conductivity=solid_conductivity,
-            insulator_conductivity=insulator_conductivity,
-            density=density,
-            viscosity=viscosity,
-        )
-    else:
-        raise ValueError(f"Unsupported FreeMHD reference case kind {case_kind!r}")
-    initial_velocity = infer_initial_velocity_x(reference_run_dir) or 0.0
-    ramp_start, ramp_duration = infer_magnetic_ramp(reference_run_dir)
-    boundary_conditions = case.boundary_conditions
-    if forcing is None:
-        forcing_value = case.forcing
-    else:
-        forcing_value = forcing
-
-    if forcing is None:
-        drive_mode = infer_inlet_drive_mode(reference_run_dir)
-        reduced_area = case.geometry.width * case.geometry.height
-        reduced_inlet_flow_rate = infer_reduced_inlet_flow_rate(
-            reference_run_dir,
-            reduced_area=reduced_area,
-            initial_velocity=initial_velocity,
-        )
-        if drive_mode == "inlet_flow_rate":
-            forcing_value = 0.0
-            flow_rate = reduced_inlet_flow_rate
-            if flow_rate is None:
-                flow_rate = initial_velocity * reduced_area
-            inlet_bc = BoundaryCondition("inlet", "inlet_flow_rate", value=flow_rate, axis="x")
-            boundary_conditions = boundary_conditions + (inlet_bc,)
-        elif drive_mode == "inlet_velocity":
-            forcing_value = 0.0
-            inlet_bc = BoundaryCondition("inlet", "inlet_velocity", value=(initial_velocity, 0.0, 0.0), axis="x")
-            boundary_conditions = boundary_conditions + (inlet_bc,)
-
-    return replace(
-        case,
-        boundary_conditions=boundary_conditions,
-        magnetic_field=replace(
-            case.magnetic_field,
-            value=case.magnetic_field.value if b0 is None else b0,
-            ramp_start=ramp_start,
-            ramp_duration=ramp_duration,
-        ),
-        initial_velocity=initial_velocity,
-        forcing=forcing_value,
-        time_stepper=replace(case.time_stepper, dt=dt, t_final=t_final, max_steps=max_steps),
-    )

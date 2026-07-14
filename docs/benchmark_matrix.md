@@ -144,7 +144,7 @@ placement.
 |---|---|
 | analytical cases | `lmx/cases.py`, `lmx/validation.py` |
 | benchmark construction | `lmx/benchmarks.py` |
-| FreeMHD audit and adapters | `lmx/freemhd.py` |
+| FreeMHD input observers and audits | `lmx/freemhd.py` |
 | external observable adapters | `lmx/external_validation.py` |
 | frozen specs and references | `benchmarks/specs/`, `benchmarks/references/` |
 | accepted compact results | `benchmarks/results/` |

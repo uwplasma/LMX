@@ -1,16 +1,16 @@
 # External benchmark comparisons
 
 External solvers and experiments provide independent evidence; they are not
-dependencies of an ordinary LMX installation. LMX keeps adapters, frozen input
-specifications, and compact observables in Git while raw solver trees and field
-dumps remain local or in versioned releases.
+dependencies of an ordinary LMX installation. LMX keeps input observers,
+frozen specifications, and compact observables in Git while raw solver trees
+and field dumps remain local or in versioned releases.
 
 ## FreeMHD
 
-The closed-channel parity lane audits FreeMHD dictionaries before constructing
-the matching LMX case. It checks geometry, material properties, magnetic field,
-Hartmann number, inlet drive, wall conductivities, mesh, and observable
-normalization.
+The closed-channel parity lane audits materialized FreeMHD dictionaries against
+the canonical LMX specification before comparing observables. It checks
+geometry, material properties, magnetic field, Hartmann number, inlet drive,
+wall conductivities, mesh, and normalization.
 
 Run against a local installation or container:
 
@@ -84,16 +84,15 @@ and temperature constant, disable the stock velocity limiter, and enforce zero
 normal electric current at both axial ends. These requirements are frozen in
 the B1 and B2 TOML specifications.
 
-This machinery is a gate, not a parity result. B2 production remains blocked:
-LMX's present stationwise model omits the convective inertia in FreeMHD's
-finite-inertia momentum equation, and fixed-flow/Neumann axial treatment has
-not been shown equivalent to FreeMHD's inlet-flow/outlet-pressure treatment.
-Implement the complete frozen formulation before creating a tiny matched B2
-smoke record. Its mesh faces, mapped field samples, time step, iterations, and
-stopping rules will be frozen only after both materialized inputs are audited;
-no placeholder smoke role is accepted today. The eventual smoke must be
-physics-valid while remaining ineligible for production acceptance. Do not
-launch a medium or production FreeMHD campaign before it passes.
+This machinery is a gate, not a parity result. LMX now has the canonical B2
+conservative inertia, mixed axial boundaries, viscous stress, corrected-flux
+carry, CFL/stopping diagnostics, exact restart, and shard-boundary gates.
+Production remains blocked until independent LMX and FreeMHD materializers and
+observers agree on one tiny real input. Its mesh faces, mapped field samples,
+time step, iterations, and stopping rules will be frozen only after that audit;
+no placeholder smoke role is accepted. The eventual smoke remains ineligible
+for production acceptance. Do not launch a medium or production FreeMHD
+campaign before it passes.
 
 ## ALEX experiments
 

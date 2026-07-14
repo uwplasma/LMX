@@ -27,8 +27,11 @@ The same rule applies to research-stage families:
 | Extruded/fringing solvers | `lmx.fringing` |
 | Q2D models | `lmx.q2d` |
 | Plotting | `lmx.plotting` |
-| External-code adapters | `lmx.external_validation` or `lmx.freemhd` |
+| External-code observables and audits | `lmx.external_validation` or `lmx.freemhd` |
 | Blanket and wall-stack studies | `lmx.blanket_flow`, `lmx.wall_study` |
 
-This change affects only import locations; the owning-module APIs and solver
-functionality are unchanged.
+The obsolete, undocumented `build_case_from_freemhd_reference` policy adapter
+and its adapter-only inference wrappers were removed after their repository
+callers disappeared. Use canonical LMX builders plus independently materialized
+and audited external inputs; raw FreeMHD dictionary parsers remain available in
+`lmx.freemhd`.
