@@ -14,8 +14,8 @@ are authoritative when prose and results differ.
   the 1% finite-grid gate.
 - SOLVAX 0.8 integration passes primal, implicit-gradient, independent
   transpose, CPU/GPU, and bounded end-to-end gates.
-- The portable package gate passes 790 tests with 8 expected external-data
-  skips and 95.32% branch coverage in 154.3 seconds on the reference Mac.
+- The portable package gate passes 789 tests with 8 expected external-data
+  skips and 95.33% branch coverage in 181.2 seconds on the reference Mac.
 
 ## Research-stage
 

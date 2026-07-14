@@ -8,7 +8,7 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 790 pass, 8 skip, 95.32% branch coverage, 154.3 s | below the ten-minute budget |
+| portable test gate | Apple M4, six workers | 789 pass, 8 skip, 95.33% branch coverage, 181.2 s | below the ten-minute budget |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
@@ -31,9 +31,9 @@ python scripts/run_benchmark_b_independence.py \
   --cases B1-fringing-pipe --mesh-level coarse --variants baseline --resume
 ```
 
-The runner selects the compatible steady and retained-modal implementations
-explicitly and records both choices in the result. Direct library calls keep
-those research-stage paths opt-in until the remaining acceptance gates close.
+Frozen B1 cases use the compatible steady and retained-modal implementations
+directly and record both choices in the result. The superseded environment
+switches were removed after small, medium, large, and restart parity passed.
 
 Authoritative records:
 

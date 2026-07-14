@@ -77,7 +77,7 @@ The retained specifications and references are:
 
 | Case | Geometry | Reference | Status |
 |---|---|---|---|
-| B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure/steady gate open |
+| B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure solver accepted; experimental observable open |
 | B2 | conducting square duct | `alex-b2-square.csv` | physics research-stage; 2-GPU scaling passes |
 
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
@@ -88,6 +88,10 @@ one-cycle physical-convergence pilot now reduces the large solve-plus-restart
 pressure ceiling from 768 to 669 Krylov iterations while preserving divergence,
 fixed-flow, charge, and restart gates. Experimental pressure-observable and mesh
 acceptance remain open.
+
+The compatible retained-modal solver is the sole frozen B1 pressure path after
+small factor parity, medium and large field/pressure-observable parity, and a
+large solve/restart gate passed. No B1 environment switch is required.
 
 B2 supports named axial sharding. On two RTX A4000 GPUs the current fixed-size
 run improves from 36.96 s to 22.23 s with matching solution signatures. This is

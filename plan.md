@@ -150,14 +150,17 @@ for external research use.
 
 ## Current checkpoint
 
-- Portable gate: 790 passed, 8 expected external-data skips, 95.32% branch
-  coverage, 154.3 seconds on the reference Mac.
+- Portable gate: 789 passed, 8 expected external-data skips, 95.33% branch
+  coverage, 181.2 seconds on the reference Mac.
 - SOLVAX: compatible `>=0.8,<1`; latest tested package is 0.8.1.
 - B1 retained modes: separated real `m=0` and complex `m=1..4` block factors
   pass factor parity and reduce medium restart time from 24.12 to 10.63 seconds.
 - Large B1 pressure gate: a one-cycle physical-convergence pilot reduces the
   `21 x 24 x 64` solve-plus-restart ceiling from 768 to 669 Krylov iterations;
   all four projections, divergence, fixed-flow, and charge gates pass.
+- B1 promotion: small factor parity, medium and large field/pressure-observable
+  parity, and large restart gates pass; the compatible retained-modal solver is
+  now the sole frozen B1 pressure path.
 - GPU: accepted B2 checkpoint scales from 36.96 seconds on one A4000 to 22.23
   seconds on two (1.66x, 83.1% efficiency).
 - Repository consolidation is active; historical campaigns and large studies

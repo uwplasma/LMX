@@ -71,10 +71,10 @@ observable extraction:
 python examples/fringing_benchmark_demo.py --help
 ```
 
-B2 has exact-parity axial sharding on two RTX A4000 GPUs. B1 now uses retained
-azimuthal modal factors, but its large-grid pressure projection and steady
-outer iteration remain the bottleneck. These are performance advances, not a
-claim that the experimental pressure curve has passed.
+B2 has exact-parity axial sharding on two RTX A4000 GPUs. B1 now uses its
+accepted compatible retained-modal pressure solver; experimental-observable,
+mesh-ladder, and final steady-response acceptance remain open. This is not yet
+a claim that the experimental pressure curve has passed.
 
 ## Required gates
 
