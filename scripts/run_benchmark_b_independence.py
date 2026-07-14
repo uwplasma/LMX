@@ -840,6 +840,115 @@ def _run_gpu_campaign(args) -> int:
     return main(summary_args)
 
 
+def _write_b2_evidence_plot(
+    reference_csv: Path,
+    transverse_record: Path,
+    consistent_record: Path,
+    field_record: Path,
+    output: Path,
+) -> Path:
+    """Plot existing B2 field and pressure evidence without running a solver."""
+
+    import matplotlib.pyplot as plt
+
+    reference = np.genfromtxt(reference_csv, delimiter=",", names=True)
+
+    def curve(path: Path) -> tuple[np.ndarray, np.ndarray]:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        x = np.asarray(payload["x_over_L"], dtype=float)
+        pressure = np.asarray(payload["primary_observable"], dtype=float)
+        if x.ndim != 1 or pressure.shape != x.shape or x.size < 2:
+            raise ValueError(f"Invalid B2 pressure record: {path}")
+        return x, pressure
+
+    transverse_x, transverse_p = curve(transverse_record)
+    consistent_x, consistent_p = curve(consistent_record)
+    with np.load(field_record) as field:
+        x = np.asarray(field["x"], dtype=float)
+        y = np.asarray(field["y"], dtype=float)
+        bx = np.asarray(field["bx"], dtype=float)
+        by = np.asarray(field["by"], dtype=float)
+    if bx.shape != by.shape or bx.shape[:2] != (x.size, y.size):
+        raise ValueError("B2 field coordinates and arrays do not match")
+    section = bx.shape[2] // 2
+    bx, by = bx[:, :, section], by[:, :, section]
+    center = int(np.argmin(np.abs(y)))
+    b0 = float(np.max(np.abs(by[:, center])))
+    if not np.isfinite(b0) or b0 <= 0.0:
+        raise ValueError("B2 field normalization must be positive")
+    x_over_l = x - 15.0 if float(np.min(x)) >= 0.0 else x
+    magnitude = np.hypot(bx, by) / b0
+
+    fig, (field_ax, pressure_ax) = plt.subplots(1, 2, figsize=(12, 4.6))
+    image = field_ax.pcolormesh(
+        x_over_l, y, magnitude.T, shading="auto", cmap="Blues", vmin=0.0
+    )
+    field_ax.streamplot(
+        x_over_l,
+        y,
+        (bx / b0).T,
+        (by / b0).T,
+        color="#17324d",
+        density=1.15,
+        linewidth=0.7,
+        arrowsize=0.7,
+    )
+    fig.colorbar(image, ax=field_ax, label=r"$|\mathbf{B}|/B_0$")
+    field_ax.set(title="Maxwell-consistent fringe field", xlabel=r"$x/L$", ylabel=r"$y/L$")
+
+    pressure_ax.errorbar(
+        reference["x_over_L"],
+        reference["pressure_observable"],
+        yerr=reference["pressure_uncertainty"],
+        fmt="o",
+        ms=4,
+        capsize=2,
+        color="black",
+        label="ALEX experiment",
+    )
+    pressure_ax.plot(
+        transverse_x,
+        transverse_p,
+        lw=2.0,
+        color="#2563eb",
+        label="fine, transverse-only diagnostic",
+    )
+    pressure_ax.plot(
+        consistent_x,
+        consistent_p,
+        lw=2.0,
+        color="#d97706",
+        label="coarse, Maxwell-consistent diagnostic",
+    )
+    pressure_ax.axhline(0.0, color="0.75", lw=0.8)
+    pressure_ax.set(
+        title="ALEX pressure response",
+        xlabel=r"$x/L$",
+        ylabel="normalized pressure observable",
+    )
+    pressure_ax.legend(frameon=False, fontsize=8)
+    fig.text(
+        0.5,
+        0.985,
+        "B2 / ALEX — ACCEPTANCE OPEN",
+        ha="center",
+        va="top",
+        color="#92400e",
+        weight="bold",
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "#fef3c7", "edgecolor": "#f59e0b"},
+    )
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    save_options = (
+        {"pil_kwargs": {"quality": 82, "method": 6}}
+        if output.suffix.lower() == ".webp"
+        else {}
+    )
+    fig.savefig(output, dpi=120, bbox_inches="tight", **save_options)
+    plt.close(fig)
+    return output
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -898,9 +1007,41 @@ def main(argv: list[str] | None = None) -> int:
         metavar="CASE=PATH",
         help="Checksummed exact-case FreeMHD comparison record used for acceptance.",
     )
+    parser.add_argument(
+        "--plot-evidence",
+        type=Path,
+        metavar="OUTPUT",
+        help="Write the B2/ALEX evidence panel from existing records and exit.",
+    )
+    parser.add_argument("--plot-transverse-record", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--plot-consistent-record", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--plot-field-record", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--plot-reference-csv",
+        type=Path,
+        default=ROOT / "benchmarks" / "references" / "alex-b2-square.csv",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.plot_evidence is not None:
+        records = (
+            args.plot_transverse_record,
+            args.plot_consistent_record,
+            args.plot_field_record,
+        )
+        if any(path is None for path in records):
+            parser.error("--plot-evidence requires all three --plot-*-record inputs")
+        _write_b2_evidence_plot(
+            args.plot_reference_csv,
+            args.plot_transverse_record,
+            args.plot_consistent_record,
+            args.plot_field_record,
+            args.plot_evidence,
+        )
+        print(args.plot_evidence)
+        return 0
     if args.checkpoint_interval <= 0:
         parser.error("--checkpoint-interval must be positive")
     if args.spatial_devices is not None and args.spatial_devices < 1:

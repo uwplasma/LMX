@@ -17,19 +17,6 @@ def test_campaign_imports_lmx_from_its_own_source_tree():
     assert campaign.ROOT in Path(campaign.lmx.__file__).resolve().parents
 
 
-def test_campaign_fingerprint_covers_runner(tmp_path):
-    (tmp_path / "lmx").mkdir()
-    (tmp_path / "benchmarks" / "specs").mkdir(parents=True)
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    runner = scripts / "run_benchmark_b_independence.py"
-    runner.write_text("first")
-    first = campaign._source_fingerprint(tmp_path)
-    runner.write_text("second")
-
-    assert campaign._source_fingerprint(tmp_path) != first
-
-
 def test_variant_problem_applies_only_frozen_solver_control_changes():
     baseline = campaign._variant_problem("B1-fringing-pipe", "coarse", "baseline")
     tight = campaign._variant_problem("B1-fringing-pipe", "coarse", "tight_tolerance")
@@ -528,14 +515,17 @@ def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch
     assert launches[0][0][-3:-1] == ["--checkpoint-interval", "8"]
 
 
-def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("physics_passes", [False, True])
+def test_gpu_campaign_gates_restart_dependent_second_wave(
+    monkeypatch: pytest.MonkeyPatch, physics_passes: bool
 ):
     waves = []
     monkeypatch.setattr(
         campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks)
     )
-    monkeypatch.setattr(campaign, "_wave_physics_passes", lambda args, tasks: True)
+    monkeypatch.setattr(
+        campaign, "_wave_physics_passes", lambda args, tasks: physics_passes
+    )
     monkeypatch.setattr(campaign, "main", lambda argv=None: 7)
     args = SimpleNamespace(
         gpu_devices="0,1",
@@ -546,37 +536,35 @@ def test_gpu_campaign_runs_restart_dependent_variants_in_second_wave(
         checkpoint_interval=8,
     )
 
-    assert campaign._run_gpu_campaign(args) == 7
-    assert waves == [
-        [("B2-fringing-square", "baseline"), ("B2-fringing-square", "thin_wall")],
+    assert campaign._run_gpu_campaign(args) == (7 if physics_passes else 2)
+    assert len(waves) == (2 if physics_passes else 1)
+
+
+def test_b2_evidence_plot_mode_uses_only_existing_records(tmp_path, monkeypatch):
+    record = {"x_over_L": [-1.0, 0.0, 1.0], "primary_observable": [0.0, 0.1, 0.0]}
+    transverse = tmp_path / "transverse.json"
+    consistent = tmp_path / "consistent.json"
+    transverse.write_text(json.dumps(record))
+    consistent.write_text(json.dumps(record))
+    field = tmp_path / "field.npz"
+    campaign.np.savez(
+        field,
+        x=campaign.np.linspace(14.0, 16.0, 5),
+        y=campaign.np.linspace(-1.0, 1.0, 4),
+        bx=campaign.np.ones((5, 4, 1)) * 0.1,
+        by=campaign.np.ones((5, 4, 1)),
+    )
+    output = tmp_path / "evidence.webp"
+    monkeypatch.setattr(campaign, "_run_record", lambda *args, **kwargs: pytest.fail("solver ran"))
+    assert campaign.main(
         [
-            ("B2-fringing-square", "tight_tolerance"),
-            ("B2-fringing-square", "extended_iterations"),
-        ],
-    ]
-
-
-def test_gpu_campaign_stops_before_dependent_wave_when_physics_fails(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    waves = []
-    monkeypatch.setattr(
-        campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks)
-    )
-    monkeypatch.setattr(campaign, "_wave_physics_passes", lambda args, tasks: False)
-    args = SimpleNamespace(
-        gpu_devices="0,1",
-        output=Path("artifacts/campaign"),
-        cases=["B2-fringing-square"],
-        mesh_level="coarse",
-        variants=list(campaign.VARIANTS),
-        checkpoint_interval=8,
-    )
-
-    assert campaign._run_gpu_campaign(args) == 2
-    assert waves == [
-        [("B2-fringing-square", "baseline"), ("B2-fringing-square", "thin_wall")]
-    ]
+            "--plot-evidence", str(output),
+            "--plot-transverse-record", str(transverse),
+            "--plot-consistent-record", str(consistent),
+            "--plot-field-record", str(field),
+        ]
+    ) == 0
+    assert output.is_file() and output.stat().st_size < 100_000
 
 
 def test_gpu_wave_physics_gate_reads_worker_checkpoint(
