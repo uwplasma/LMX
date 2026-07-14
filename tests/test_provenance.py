@@ -6,19 +6,9 @@ from pathlib import Path
 from scripts import manage_provenance as provenance
 
 
-def test_repository_provenance_manifests_are_canonical_and_complete():
+def test_repository_provenance_manifests_are_canonical_and_lock_is_current():
     assert provenance.check_manifests() == []
-
-    environment = provenance.build_environment_manifest()
-    assert environment["python"]["ci_tested"] == ["3.10", "3.13"]
-    assert environment["numerical_policy"]["jax_enable_x64"] is True
-    assert environment["portable_gate"]["budget_seconds"] == 600
-    assert environment["portable_gate"]["branch_coverage_percent"] >= 95.0
-    assert "lmx/solvers.py" in environment["repository_inventory"]["modules"]
-    assert "tests/test_provenance.py" in environment["repository_inventory"]["tests"]
-    examples = environment["repository_inventory"]["examples"]
-    assert "examples/autodiff_design_demo.py" in examples
-    assert "examples/cases/ducts/hunt_case.toml" in examples
+    assert provenance._check_uv_lock() == []
 
 
 def test_feature_manifest_references_real_tests_and_all_package_modules():

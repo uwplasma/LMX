@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and verify LMX environment, feature, and benchmark manifests."""
+"""Generate and verify the compact LMX feature and benchmark manifests."""
 
 from __future__ import annotations
 
@@ -16,15 +16,8 @@ from typing import Any, Mapping
 
 from jsonschema import Draft202012Validator
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib
-
-
 ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE_DIR = ROOT / "provenance"
-ENVIRONMENT_PATH = PROVENANCE_DIR / "environment.json"
 FEATURES_PATH = PROVENANCE_DIR / "features.json"
 BENCHMARKS_PATH = PROVENANCE_DIR / "benchmarks.json"
 SCHEMA_DIR = PROVENANCE_DIR / "schemas"
@@ -55,58 +48,6 @@ def _relative_paths(root: Path, pattern: str) -> list[str]:
         for path in root.glob(pattern)
         if path.is_file()
     )
-
-
-def build_environment_manifest(root: Path = ROOT) -> dict[str, Any]:
-    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-    lock_path = root / "uv.lock"
-    lock = tomllib.loads(lock_path.read_text(encoding="utf-8"))
-    project = pyproject["project"]
-    policy = pyproject["tool"]["lmx"]["provenance"]
-    optional = project.get("optional-dependencies", {})
-    coverage = pyproject["tool"]["coverage"]["report"]
-
-    return {
-        "schema_version": 1,
-        "generated_by": "scripts/manage_provenance.py",
-        "project": {"name": project["name"], "version": project["version"]},
-        "python": {
-            "requires": project["requires-python"],
-            "ci_tested": sorted(policy["tested-python"]),
-        },
-        "dependencies": {
-            "runtime": sorted(project.get("dependencies", [])),
-            **{
-                group: sorted(requirements)
-                for group, requirements in sorted(optional.items())
-            },
-        },
-        "lock": {
-            "format": "uv",
-            "path": "uv.lock",
-            "sha256": _sha256(lock_path),
-            "version": int(lock["version"]),
-            "revision": int(lock["revision"]),
-        },
-        "numerical_policy": {"jax_enable_x64": bool(policy["jax-enable-x64"])},
-        "portable_gate": {
-            "command": "python scripts/run_full_test_suite.py",
-            "budget_seconds": int(policy["full-gate-budget-seconds"]),
-            "warning_seconds": int(policy["warning-budget-seconds"]),
-            "default_workers": int(policy["default-workers"]),
-            "branch_coverage_percent": float(coverage["fail_under"]),
-        },
-        "repository_inventory": {
-            "modules": _relative_paths(root, "lmx/*.py"),
-            "tests": _relative_paths(root, "tests/test_*.py"),
-            "examples": sorted(
-                _relative_paths(root, "examples/**/*.py")
-                + _relative_paths(root, "examples/**/*.toml")
-            ),
-            "scripts": _relative_paths(root, "scripts/*.py"),
-            "benchmark_specs": _relative_paths(root, "benchmarks/specs/*.toml"),
-        },
-    }
 
 
 def _canonical_benchmark_manifest(
@@ -266,20 +207,16 @@ def verify_external_literature(
 
 def _document_state(
     root: Path = ROOT,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    environment = build_environment_manifest(root)
+) -> tuple[dict[str, Any], dict[str, Any]]:
     features = _read_json(root / "provenance" / "features.json")
     benchmarks = _canonical_benchmark_manifest(
         _read_json(root / "provenance" / "benchmarks.json"), root
     )
-    return environment, features, benchmarks
+    return features, benchmarks
 
 
 def write_manifests(root: Path = ROOT) -> list[str]:
-    environment, features, benchmarks = _document_state(root)
-    (root / "provenance" / "environment.json").write_text(
-        _canonical_json(environment), encoding="utf-8"
-    )
+    features, benchmarks = _document_state(root)
     (root / "provenance" / "features.json").write_text(
         _canonical_json(features), encoding="utf-8"
     )
@@ -290,17 +227,15 @@ def write_manifests(root: Path = ROOT) -> list[str]:
 
 
 def validate_manifests(root: Path = ROOT) -> list[str]:
-    environment, features, benchmarks = _document_state(root)
-    errors = _schema_errors(environment, "environment.schema.json", root)
-    errors.extend(validate_feature_manifest(features, root))
+    features, benchmarks = _document_state(root)
+    errors = validate_feature_manifest(features, root)
     errors.extend(validate_benchmark_manifest(benchmarks, root))
     return errors
 
 
 def check_manifests(root: Path = ROOT) -> list[str]:
-    environment, features, benchmarks = _document_state(root)
+    features, benchmarks = _document_state(root)
     expected = {
-        root / "provenance" / "environment.json": _canonical_json(environment),
         root / "provenance" / "features.json": _canonical_json(features),
         root / "provenance" / "benchmarks.json": _canonical_json(benchmarks),
     }
@@ -368,7 +303,6 @@ def main(argv: list[str] | None = None) -> int:
         OSError,
         ValueError,
         json.JSONDecodeError,
-        tomllib.TOMLDecodeError,
     ) as exc:
         errors = [str(exc)]
 
