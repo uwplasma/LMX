@@ -70,8 +70,7 @@ lmx examples/hartmann_case.toml
 Or use the Python API:
 
 ```python
-from lmx.cases import make_hartmann_case
-from lmx.solvers import solve_steady
+from lmx import make_hartmann_case, solve_steady
 
 case = make_hartmann_case(ha=20.0, ny=48, nz=48)
 solution = solve_steady(case)

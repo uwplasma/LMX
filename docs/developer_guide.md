@@ -9,16 +9,15 @@ dependency, or large generated-asset change:
 uv run --locked --extra dev python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current classified baseline is 36 package modules and 35,041 total package
-lines. The maintained stable core plus compatibility facades are 8,421 lines;
+The current classified baseline is 36 package modules and 35,043 total package
+lines. The maintained stable core is 8,421 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
-about 18 ms on the audited development machine. Former root attributes
-remain available for one deprecation release from their owning submodules; see
-the [migration guide](migration.md).
+about 18 ms on the audited development machine. Advanced APIs import from their
+owning submodules; see the [migration guide](migration.md).
 
-The tracked source checkout is 3.86 MiB, below its 4 MiB hard cap. Sixty-five
+The tracked source checkout is 3.75 MiB, below its 4 MiB hard cap. Sixty-five
 generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
