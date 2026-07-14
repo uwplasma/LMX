@@ -2,9 +2,8 @@
 
 ## Architecture and slimming audit
 
-The tracked M2 inventory is `provenance/architecture-baseline.json`. Regenerate
-it after any module, public API, curated example, dependency, or large generated
-asset changes:
+Run the live architecture audit after any module, public API, curated example,
+dependency, or large generated-asset change:
 
 ```bash
 uv run --locked --extra dev python scripts/audit_architecture.py --check --measure-import
@@ -21,7 +20,7 @@ the [migration guide](migration.md).
 
 The tracked source checkout is 3.86 MiB, below its 4 MiB hard cap. Sixty-five
 generated files larger than 128 KiB were bundled in the versioned release
-indexed by [`provenance/release-assets.json`](../provenance/release-assets.json)
+indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
 SHA-256 verification. Six compressed web derivatives (516 KB total) remain in
 `docs/_static/` for anonymous documentation access; full-resolution media and

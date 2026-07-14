@@ -19,7 +19,7 @@ except ModuleNotFoundError:  # direct ``python scripts/...`` execution
     from audit_architecture import ROOT, _release_asset_candidates
 
 
-MANIFEST_PATH = ROOT / "provenance" / "release-assets.json"
+MANIFEST_PATH = ROOT / "docs" / "release-assets.json"
 RELEASE_TAG = "lmx-research-assets-v1"
 ARCHIVE_NAME = f"{RELEASE_TAG}.tar.gz"
 DOWNLOAD_URL = (

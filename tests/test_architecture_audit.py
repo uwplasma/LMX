@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import ast
 from pathlib import Path
 import zipfile
@@ -15,14 +14,6 @@ from scripts.audit_architecture import (
     measure_import,
     write_inventory,
 )
-
-
-def test_tracked_architecture_baseline_matches_repository() -> None:
-    tracked = json.loads(Path("provenance/architecture-baseline.json").read_text())
-    current = build_inventory()
-    assert tracked["inventory"] == current["inventory"]
-    assert tracked["targets"] == current["targets"]
-    assert architecture_budget_errors(current) == []
 
 
 def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) -> None:

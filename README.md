@@ -245,7 +245,7 @@ suite tests physics, numerics, adapters, plotting, and curated workflows directl
   belong in versioned GitHub/Zenodo releases with checksums and provenance.
 - The first 65-file generated-media bundle is published as
   [`lmx-research-assets-v1`](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
-  and indexed by `provenance/release-assets.json`.
+  and indexed by `docs/release-assets.json`.
 - Six compressed documentation derivatives (516 KB total) stay in Git so
   anonymous readers can see the principal results; full-resolution media stay
   in versioned releases. Every figure retains its command and fingerprints.

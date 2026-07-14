@@ -31,7 +31,6 @@ EXCLUDED_PARTS = {
     "_build",
 }
 EXCLUDED_FILES = {".coverage", "coverage.xml"}
-EXCLUDED_RELATIVE_FILES = {"provenance/architecture-baseline.json"}
 
 RESEARCH_STAGE = {
     "autodiff.py",
@@ -114,8 +113,6 @@ def _checkout_size(root: Path) -> int:
             or path.name in EXCLUDED_FILES
             or path.name.startswith(".coverage.")
         ):
-            continue
-        if relative.as_posix() in EXCLUDED_RELATIVE_FILES:
             continue
         if any(
             part in EXCLUDED_PARTS or part.endswith(".egg-info")
@@ -357,7 +354,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("provenance/architecture-baseline.json"),
+        help="optionally write the current JSON inventory",
     )
     parser.add_argument("--measure-import", action="store_true")
     parser.add_argument("--check", action="store_true")
@@ -366,7 +363,7 @@ def main() -> int:
     payload = build_inventory()
     if args.measure_import:
         payload["import_measurement"] = measure_import()
-    if not args.check:
+    if args.output is not None:
         write_inventory(args.output, measure=args.measure_import)
     errors = architecture_budget_errors(payload, wheel=args.wheel)
     if errors:

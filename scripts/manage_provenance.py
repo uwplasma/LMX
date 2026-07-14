@@ -15,8 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
-PROVENANCE_DIR = ROOT / "provenance"
-BENCHMARKS_PATH = PROVENANCE_DIR / "benchmarks.json"
+BENCHMARKS_PATH = ROOT / "benchmarks" / "provenance.json"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -179,13 +178,13 @@ def verify_external_literature(
 
 def _document_state(root: Path = ROOT) -> dict[str, Any]:
     return _canonical_benchmark_manifest(
-        _read_json(root / "provenance" / "benchmarks.json"), root
+        _read_json(root / "benchmarks" / "provenance.json"), root
     )
 
 
 def write_manifests(root: Path = ROOT) -> list[str]:
     benchmarks = _document_state(root)
-    (root / "provenance" / "benchmarks.json").write_text(
+    (root / "benchmarks" / "provenance.json").write_text(
         _canonical_json(benchmarks), encoding="utf-8"
     )
     return validate_manifests(root)
@@ -198,7 +197,7 @@ def validate_manifests(root: Path = ROOT) -> list[str]:
 def check_manifests(root: Path = ROOT) -> list[str]:
     benchmarks = _document_state(root)
     expected = {
-        root / "provenance" / "benchmarks.json": _canonical_json(benchmarks),
+        root / "benchmarks" / "provenance.json": _canonical_json(benchmarks),
     }
     errors: list[str] = []
     for path, content in expected.items():

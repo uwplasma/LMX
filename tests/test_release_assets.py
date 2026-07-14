@@ -16,7 +16,7 @@ from scripts.manage_release_assets import (
 
 
 def test_tracked_release_asset_manifest_matches_sources() -> None:
-    tracked = json.loads(Path("provenance/release-assets.json").read_text())
+    tracked = json.loads(Path("docs/release-assets.json").read_text())
     assert tracked["release"]["status"] == "uploaded"
     assert len(tracked["release"]["archive_sha256"]) == 64
     assert tracked["release"]["download_url"].startswith("https://github.com/")
