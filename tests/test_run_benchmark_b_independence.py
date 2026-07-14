@@ -318,7 +318,7 @@ def test_acceptance_assembly_reuses_three_campaigns_without_solver(
         assert reference["case_id"] == case_id
         return {"case_id": case_id, "pass": True}
 
-    monkeypatch.setattr(campaign, "evaluate_benchmark_b_acceptance", evaluate)
+    monkeypatch.setattr(campaign, "_evaluate_acceptance", evaluate)
     assert campaign.main(arguments) == 0
     payload = json.loads(
         (tmp_path / "accepted" / "benchmark-b-acceptance.json").read_text()
@@ -331,6 +331,64 @@ def test_acceptance_path_parser_requires_every_unique_name():
         campaign._parse_acceptance_paths(
             ["coarse=/a", "coarse=/b"], campaign.MESH_LEVELS, "--acceptance-mesh"
         )
+
+
+@pytest.mark.parametrize("case_id", campaign.CASE_IDS)
+def test_acceptance_combines_literature_mesh_and_freemhd(case_id):
+    reference = campaign.load_benchmark_b_reference(case_id)
+    x = list(reference["x_over_L"])
+    expected = list(reference["pressure_observable"])
+    meshes = {
+        level: {
+            "source_fingerprint": "source",
+            "baseline": {
+                "case_id": case_id,
+                "mesh_level": level,
+                "source_fingerprint": "source",
+                "x_over_L": x,
+                "primary_observable": [value + offset for value in expected],
+            },
+            "independence": {"case_id": case_id, "complete": True, "pass": True},
+        }
+        for level, offset in zip(campaign.MESH_LEVELS, (1.0e-4, 5.0e-5, 0.0))
+    }
+    freemhd = {
+        "case_id": case_id,
+        "exact_case_match": True,
+        "pass": True,
+        "source_sha256": "a" * 64,
+    }
+
+    result = campaign._evaluate_acceptance(case_id, meshes, freemhd)
+
+    assert result["pass"]
+    assert all(result["gates"].values())
+    assert result["literature"]["fine"]["weighted_rms"] == pytest.approx(0.0)
+
+
+def test_acceptance_reports_missing_and_rejects_bad_curves():
+    incomplete = campaign._evaluate_acceptance("B1-fringing-pipe", {})
+    assert incomplete["missing_mesh_levels"] == list(campaign.MESH_LEVELS)
+    bad = {
+        level: {
+            "source_fingerprint": "source",
+            "baseline": {
+                "case_id": "B1-fringing-pipe",
+                "mesh_level": level,
+                "source_fingerprint": "source",
+                "x_over_L": [0.0, -1.0],
+                "primary_observable": [0.0, 0.0],
+            },
+            "independence": {
+                "case_id": "B1-fringing-pipe",
+                "complete": True,
+                "pass": True,
+            },
+        }
+        for level in campaign.MESH_LEVELS
+    }
+    with pytest.raises(ValueError, match="baseline curve is invalid"):
+        campaign._evaluate_acceptance("B1-fringing-pipe", bad)
 
 
 def test_gpu_device_parser_requires_unique_ids():

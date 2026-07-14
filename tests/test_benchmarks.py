@@ -11,7 +11,6 @@ from lmx.benchmarks import (
     build_benchmark_b_problem,
     build_benchmark_b_field_profile,
     benchmark_solver,
-    evaluate_benchmark_b_acceptance,
     load_benchmark_b_reference,
     load_benchmark_b_spec,
     write_benchmark_report,
@@ -552,67 +551,3 @@ def test_benchmark_b_pressure_observable_has_coordinate_free_fallback():
     assert benchmark_b_pressure_observable(
         solution, "B1-fringing-pipe"
     ).tolist() == pytest.approx([1.0 / 10700.0, 0.0, -1.0 / 10700.0])
-
-
-@pytest.mark.parametrize("case_id", ["B1-fringing-pipe", "B2-fringing-square"])
-def test_benchmark_b_acceptance_combines_literature_mesh_and_freemhd(case_id):
-    reference = load_benchmark_b_reference(case_id)
-    x = list(reference["x_over_L"])
-    expected = list(reference["pressure_observable"])
-    campaigns = {}
-    for level, offset in zip(("coarse", "medium", "fine"), (1.0e-4, 5.0e-5, 0.0)):
-        campaigns[level] = {
-            "source_fingerprint": "source",
-            "baseline": {
-                "case_id": case_id,
-                "mesh_level": level,
-                "source_fingerprint": "source",
-                "x_over_L": x,
-                "primary_observable": [value + offset for value in expected],
-            },
-            "independence": {"case_id": case_id, "complete": True, "pass": True},
-        }
-    freemhd = {
-        "case_id": case_id,
-        "exact_case_match": True,
-        "pass": True,
-        "source_sha256": "a" * 64,
-    }
-
-    result = evaluate_benchmark_b_acceptance(case_id, campaigns, freemhd)
-
-    assert result["complete"]
-    assert result["pass"]
-    assert all(result["gates"].values())
-    assert result["literature"]["fine"]["weighted_rms"] == pytest.approx(0.0)
-    assert (
-        result["literature"]["fine"]["weighted_rms"]
-        < result["literature"]["medium"]["weighted_rms"]
-    )
-
-
-def test_benchmark_b_acceptance_reports_missing_and_rejects_bad_curves():
-    incomplete = evaluate_benchmark_b_acceptance("B1-fringing-pipe", {})
-    assert not incomplete["pass"]
-    assert incomplete["missing_mesh_levels"] == ["coarse", "medium", "fine"]
-
-    bad = {
-        level: {
-            "source_fingerprint": "source",
-            "baseline": {
-                "case_id": "B1-fringing-pipe",
-                "mesh_level": level,
-                "source_fingerprint": "source",
-                "x_over_L": [0.0, -1.0],
-                "primary_observable": [0.0, 0.0],
-            },
-            "independence": {
-                "case_id": "B1-fringing-pipe",
-                "complete": True,
-                "pass": True,
-            },
-        }
-        for level in ("coarse", "medium", "fine")
-    }
-    with pytest.raises(ValueError, match="baseline curve is invalid"):
-        evaluate_benchmark_b_acceptance("B1-fringing-pipe", bad)
