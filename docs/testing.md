@@ -10,8 +10,8 @@ external solvers, long physics campaigns, and hardware scaling.
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
-and a hard ten-minute timeout. The current Apple M4 result is 770 passed, 8
-expected external-data skips, 95.35% branch coverage, and 171.1 seconds with six
+and a hard ten-minute timeout. The current Apple M4 result is 782 passed, 8
+expected external-data skips, 95.30% branch coverage, and 162.8 seconds with six
 workers. The compact gate record tracks the slowest node IDs for regression
 review.
 

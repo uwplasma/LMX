@@ -135,8 +135,8 @@ of the canonical finite-inertia path remains open.
 
 ## Quality, documentation, and citation
 
-The portable gate currently passes **770 tests**, **95.35% branch coverage**,
-and a **171.1 s** wall time on six Apple-Silicon workers. Physics and external
+The portable gate currently passes **782 tests**, **95.30% branch coverage**,
+and a **162.8 s** wall time on six Apple-Silicon workers. Physics and external
 campaigns add analytical, conservation, convergence, FreeMHD, and experimental
 evidence outside that fast gate.
 

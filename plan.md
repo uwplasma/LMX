@@ -74,7 +74,7 @@ superseded worktrees and branches.
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | old fine-grid and two-GPU results are diagnostic for the superseded no-inertia, stationwise-flow formulation | implement canonical inertia and axial boundaries |
 | SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition | pursue only gated ownership deletions |
-| Portable quality | 770 pass, 8 expected skips, 95.35% branch coverage, 171.1 s | stay below the 300 s target and 600 s limit |
+| Portable quality | 782 pass, 8 expected skips, 95.30% branch coverage, 162.8 s | stay below the 300 s target and 600 s limit |
 
 Current structural audit: 35 modules, 34,951 package lines, 7,995
 maintained-core lines, 32 test files / 21,179 lines, and 18 maintenance
@@ -100,7 +100,7 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 ## Immediate execution order
 
 1. **Complete:** regenerate provenance for the canonical-contract tranche and
-   pass the complete portable gate (770 pass, 8 skip, 95.35%, 171.1 s).
+   pass the complete portable gate (superseded by the 782-pass schema-2 gate).
 2. **Complete:** split canonical contracts into immutable shared physics and
    role-specific mesh/stopping sections; schema 2 recomputes deterministic
    file/tree artifacts and blocks acceptance until independent observers exist.
