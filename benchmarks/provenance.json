@@ -32,7 +32,7 @@
       ],
       "status": "verified-bounded",
       "tests": [
-        "tests/test_operators.py::test_gradient_observed_order_for_smooth_manufactured_solution",
+        "tests/test_mesh.py::test_gradient_observed_order_for_smooth_manufactured_solution",
         "tests/test_physics.py::test_small_hartmann_solution_matches_analytic_profile"
       ],
       "tier": "A",
