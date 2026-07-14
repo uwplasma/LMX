@@ -71,12 +71,9 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
         "projection_iterations": 4000,
         "momentum_iterations": 400,
     }
-    assert (
-        campaign._effective_iteration_limits(
-            campaign._variant_problem("B2-fringing-square", "coarse", "baseline")
-        )["electric_iterations"]
-        == 600
-    )
+    b2 = campaign._variant_problem("B2-fringing-square", "coarse", "baseline")
+    assert campaign._effective_iteration_limits(b2)["electric_iterations"] == 600
+    assert b2.case.solver.coupling_min_relaxation == pytest.approx(2.0)
     assert (
         campaign._variant_problem(
             "B2-fringing-square", "coarse", "baseline", num_devices=2

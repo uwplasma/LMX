@@ -59,6 +59,56 @@
       "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-fine-fastdiag-c36c5d5-12step-checkpoint.npz"
     }
   },
+  "outer_acceleration": {
+    "checkpoint_sha256": "7d34ee95dc1b64ffeb2853b575284078a404bc9d9d914ff479825410a3281f14",
+    "matched_four_update_probes": {
+      "aitken_minimum_0.05": {
+        "seconds": 72.58328006399097,
+        "residual_history": [6.358766291653106e-05, 6.325751056884821e-05, 6.324184863931714e-05, 6.322618994863971e-05],
+        "result": "rejected: restart transient returns to the under-relaxed plateau"
+      },
+      "anderson": {
+        "seconds": 79.17031539801974,
+        "residual_history": [6.358766291653106e-05, 6.325751056873719e-05, 7.136365608267914e-05, 7.223969586078738e-05],
+        "result": "rejected: residual and divergence increase"
+      },
+      "none": {
+        "seconds": 75.143837429001,
+        "residual_history": [6.358766291653106e-05, 6.325751056751594e-05, 6.294427135000724e-05, 6.26323396907269e-05],
+        "result": "accepted control: stable full Picard steps expose the low Aitken floor"
+      },
+      "aitken_minimum_1.0": {
+        "seconds": 75.56470210303087,
+        "final_residual": 6.263233968928361e-05,
+        "result": "matches the unaccelerated control to recorded precision"
+      },
+      "aitken_minimum_2.0": {
+        "seconds": 76.14349330903497,
+        "residual_history": [6.358766291653106e-05, 6.32575105687927e-05, 6.263103220455202e-05, 6.200978399428791e-05],
+        "result": "promoted after longer confirmation"
+      }
+    },
+    "eight_update_confirmation": {
+      "minimum_relaxation": 2.0,
+      "seconds": 133.92983914294746,
+      "residual_history": [6.358766291653106e-05, 6.32575105687927e-05, 6.263103220655042e-05, 6.200978398795964e-05, 6.139384293357697e-05, 6.078327674496897e-05, 6.0178144264788624e-05, 5.9578495854306635e-05],
+      "max_charge_balance_residual": 0.0002141217487405811,
+      "max_divergence_residual": 6.551115337308535e-06,
+      "electric_iterations_range": [231, 234],
+      "monotone": true,
+      "restart_safe": true,
+      "promotion_pass": true
+    },
+    "raw_asset_prefix": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-b2-outer-",
+    "raw_sha256": {
+      "aitken-4.json": "1f5b389f72b12b5636245e6e7451f718cf4088157cb2bd88729967b41bc28240",
+      "aitken-min1-4.json": "aeb72375d6fa487ae23c04f75a3c1ce09e6729f83034b7d5e8c878387936abfb",
+      "aitken-min2-4.json": "86f088c6d6758928fc6801a45e3f491ffdc411c016c4a84dfb264f9f44b9d7ad",
+      "aitken-min2-8.json": "55da16072675801250ead22225521172ea1d8e7fc0668255cc39cd9b7d543e7c",
+      "anderson-4.json": "f2676b64e6e77b6353c0320078be610ff4d039d223e18da83e31b9194aa207c4",
+      "none-4.json": "5993f36f98547d1caf0bd9812c188ab0a47eecacf1e9dfbb3419069c0fc3a463"
+    }
+  },
   "raw_assets": {
     "baseline_warm": {
       "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-fastdiag-baseline-warm.json",

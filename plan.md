@@ -191,9 +191,13 @@ for external research use.
   fine acceptance continuation with this solver. A bounded 12-update replay
   then reached `6.3606e-5` in 177.37 seconds, but its asymptotic reduction of
   `1.80e-8` per update projects only `6.152e-5` at the 128-update ceiling. The
-  valid 115 MiB checkpoint is a release asset; compare bounded outer fixed-point
-  accelerators before another continuation. Experimental acceptance remains
-  open.
+  valid 115 MiB checkpoint is a release asset. Matched probes rejected Anderson
+  (residual growth) and the frozen Aitken floor of 0.05 (under-relaxed plateau).
+  Aitken with minimum relaxation 2.0 decreased monotonically to `5.9578e-5` in
+  eight restart-safe updates, with charge/divergence and 231--234-iteration
+  electric gates passing. The frozen B2 specification now uses that floor;
+  resume the fine continuation from the exact checkpoint. Experimental
+  acceptance remains open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

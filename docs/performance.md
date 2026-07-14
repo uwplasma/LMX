@@ -61,7 +61,13 @@ reached `6.3606e-5`. Its post-transient slope is only `1.80e-8` per update, so
 the 128-update ceiling projects to `6.152e-5`, not the `5e-5` fine gate. The
 valid 115 MiB checkpoint is a release asset. This bounded stop moves the next
 optimization target from the inner electric solve to the outer fixed-point
-map; brute-force continuation is not accepted evidence.
+map; brute-force continuation is not accepted evidence. Matched four-update
+probes rejected Anderson because the residual grew to `7.2240e-5`. They showed
+that the previous Aitken minimum of 0.05 caused the plateau: minimum 1.0 exactly
+matched stable Picard steps, while minimum 2.0 doubled the sustained reduction.
+An eight-update restart-safe confirmation decreased monotonically to
+`5.9578e-5` in 133.93 seconds with all balance gates passing, so the frozen B2
+specification now uses a minimum relaxation of 2.0.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.
