@@ -207,6 +207,12 @@ def _variant_problem(
     max_steps = int(problem.case.time_stepper.max_steps)
     if variant == "tight_tolerance":
         tolerance *= float(spec["solver"]["tolerance_independence_factor"])
+        coupling_iterations = int(
+            round(
+                coupling_iterations
+                * float(spec["solver"]["iteration_independence_factor"])
+            )
+        )
         potential_iterations *= 2
     elif variant == "extended_iterations":
         factor = float(spec["solver"]["iteration_independence_factor"])

@@ -42,8 +42,16 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
         0.5 * baseline.case.solver.coupling_tolerance
     )
     assert (
+        tight.case.time_stepper.steady_tolerance
+        == baseline.case.time_stepper.steady_tolerance
+    )
+    assert (
         tight.case.time_stepper.potential_iterations
         == 2 * baseline.case.time_stepper.potential_iterations
+    )
+    assert (
+        tight.case.solver.coupling_iterations
+        == 2 * baseline.case.solver.coupling_iterations
     )
     assert (
         extended.case.solver.coupling_iterations
