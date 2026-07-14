@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 import lmx
 from lmx.fringing import (
+    _axial_mean_preconditioner_3d,
     _axial_field_sharding,
     _explicit_deviatoric_stress_duct,
     _face_flux_pressure_projection_duct,
@@ -120,6 +121,17 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
     projected_velocity = jnp.stack(projected[:3], axis=-1)
     rho_phi_plus, rho_phi_inlet = projected[-2:]
 
+    def gauge_precondition(residual):
+        volume = jnp.broadcast_to(area[None], residual.shape)
+        west = jnp.full_like(residual, 1.0 / dx**2).at[0].set(0.0)
+        east = jnp.full_like(residual, 1.0 / dx**2).at[-1].set(0.0)
+        return _axial_mean_preconditioner_3d(
+            volume, west, east, field_sharding=field_sharding)(residual)
+
+    gauge_precondition = jax.jit(gauge_precondition, in_shardings=field_sharding,
+        out_shardings=field_sharding)
+    gauge_correction = gauge_precondition(force[..., 0])
+
     def momentum(velocity0, force0, density0, viscosity0, plus0, inlet0):
         inlet_patch = velocity0[0].at[..., 0].set(inlet0 / (density0[0] * area))
         zero_y, zero_z = jnp.zeros_like(velocity0[:, 0]), jnp.zeros_like(velocity0[:, :, 0])
@@ -139,15 +151,17 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         out_shardings=(vector_sharding, replicated, replicated))
     solved, momentum_residual, momentum_converged = momentum(
         projected_velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet)
-    jax.block_until_ready((projected, solved, momentum_residual))
+    jax.block_until_ready((projected, gauge_correction, solved, momentum_residual))
     full_flux = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
     signature = np.concatenate([np.asarray(value).reshape(-1) for value in (
-        initial_plus, initial_inlet, *projected[:5], rho_phi_plus, rho_phi_inlet, solved)])
+        initial_plus, initial_inlet, *projected[:5], rho_phi_plus, rho_phi_inlet,
+        gauge_correction, solved)])
     cut = np.asarray(rho_phi_plus[0, nx // 2 - 1])
     return {"benchmark_kind": "duct_step_gate", "num_devices": num_devices,
         "signature": signature.tolist(), "divergence": float(projected[5]),
         "flow_error": float(projected[6]), "momentum_residual": float(momentum_residual),
         "momentum_converged": bool(momentum_converged),
+        "gauge_response_l2": float(jnp.linalg.norm(gauge_correction)),
         "convection_flux_l2": float(sum(jnp.linalg.norm(value) for value in full_flux)),
         "lower_wall_flux": float(max(jnp.max(jnp.abs(full_flux[1][:, 0])),
             jnp.max(jnp.abs(full_flux[2][:, :, 0])))),
@@ -156,6 +170,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         "placement": {name: _placement(value) for name, value in (
             ("initial_flux", initial_plus), ("velocity", projected[0]),
             ("pressure", projected[3]), ("corrected_flux", rho_phi_plus),
+            ("gauge_correction", gauge_correction),
             ("inlet_flux", rho_phi_inlet), ("momentum", solved))}}
 
 

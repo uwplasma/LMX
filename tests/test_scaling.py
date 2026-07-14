@@ -189,8 +189,9 @@ def test_forced_cpu_duct_step_matches_one_and_two_devices(tmp_path: Path):
         assert record["momentum_converged"]
         assert max(record[key] for key in (
             "divergence", "flow_error", "momentum_residual", "lower_wall_flux")) < 1e-8
-        assert record["convection_flux_l2"] > 1e-3 and record["cut_boundary_separation"] > 1e-7
-    for name in ("initial_flux", "velocity", "pressure", "corrected_flux", "momentum"):
+        assert min(record["convection_flux_l2"], record["gauge_response_l2"]) > 1e-3
+        assert record["cut_boundary_separation"] > 1e-7
+    for name in ("initial_flux", "velocity", "pressure", "corrected_flux", "gauge_correction", "momentum"):
         placement = two["placement"][name]
         assert (placement["global_shards"], placement["addressable_shards"]) == (2, 2)
         assert not placement["replicated"]

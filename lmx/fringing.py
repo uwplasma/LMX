@@ -1061,34 +1061,31 @@ def _additive_line_preconditioner_3d(
     return additive_preconditioner(line_solves)
 
 
-def _axial_mean_preconditioner_3d(
-    volume: jnp.ndarray,
-    coef_x_w: jnp.ndarray,
-    coef_x_e: jnp.ndarray,
-    *,
-    gauge: bool = True,
-):
+def _axial_mean_preconditioner_3d(volume: jnp.ndarray, coef_x_w: jnp.ndarray, coef_x_e: jnp.ndarray, *, gauge: bool = True,
+    field_sharding: NamedSharding | None = None):
     """Invert the Galerkin operator for cross-section-constant axial modes."""
-
-    nx, ny, nz = volume.shape
+    _, ny, nz = volume.shape
     normalization = math.sqrt(ny * nz)
-    west = -jnp.sum(volume * coef_x_w, axis=(1, 2)) / (ny * nz)
-    east = -jnp.sum(volume * coef_x_e, axis=(1, 2)) / (ny * nz)
-    diagonal = -(west + east)
-    coarse = jnp.diag(diagonal)
-    coarse = coarse + jnp.diag(west[1:], -1) + jnp.diag(east[:-1], 1)
+    west, east = (-jnp.sum(volume * coefficient, axis=(1, 2)) / (ny * nz)
+        for coefficient in (coef_x_w, coef_x_e))
+    diagonal, gauge_vector = -(west + east), jnp.sum(volume, axis=(1, 2)) / normalization
     if gauge:
-        gauge_vector = jnp.sum(volume, axis=(1, 2)) / normalization
-        coarse = coarse + jnp.outer(gauge_vector, gauge_vector) / jnp.sum(volume)
-    coarse_inverse = jnp.linalg.inv(coarse)
-
+        diagonal, east = diagonal.at[0].set(1.0), east.at[0].set(0.0)
+    def solve_coarse(system):
+        lower, center, upper, weights, reduced = jnp.moveaxis(system, -1, 0)
+        if gauge:
+            coefficient = jnp.sum(reduced) / jnp.sum(weights)
+            reduced = (reduced - coefficient * weights).at[0].set(0.0)
+        correction = tridiagonal_solve(lower, center, upper, reduced)
+        if gauge:
+            correction += (coefficient * normalization * jnp.sum(weights) - jnp.vdot(weights, correction)) / jnp.sum(weights)
+        return correction
+    replicated = None if field_sharding is None else NamedSharding(field_sharding.mesh, P())
+    coarse_solve = jax.jit(solve_coarse, in_shardings=replicated, out_shardings=replicated)
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
         reduced = jnp.sum(residual, axis=(1, 2)) / normalization
-        correction = coarse_inverse @ reduced
-        return jnp.broadcast_to(
-            correction[:, None, None] / normalization, residual.shape
-        )
-
+        correction = coarse_solve(jnp.stack((west, diagonal, east, gauge_vector, reduced), axis=-1))
+        return jnp.broadcast_to(correction[:, None, None] / normalization, residual.shape)
     return apply
 
 
@@ -1442,7 +1439,8 @@ def _solvax_pressure_poisson_duct(
         directions = directions[1:]
     line_precondition = _additive_line_preconditioner_3d(diagonal, directions)
     axial_precondition = _axial_mean_preconditioner_3d(
-        volume, coef_x_w, coef_x_e, gauge=not mixed_axial_pressure
+        volume, coef_x_w, coef_x_e, gauge=not mixed_axial_pressure,
+        field_sharding=field_sharding,
     )
 
     def precondition(residual):

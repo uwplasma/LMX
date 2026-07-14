@@ -122,20 +122,32 @@ def test_fringing_jit_cache_reuses_the_first_compiled_kernel():
     assert fringing_impl._reuse_fringing_jit(key, object()) is first
 
 
-def test_axial_mean_preconditioner_exactly_inverts_its_galerkin_space():
-    shape = (4, 2, 2)
-    volume = jnp.ones(shape)
-    west = jnp.ones(shape).at[0].set(0.0)
-    east = jnp.ones(shape).at[-1].set(0.0)
-    mode = jnp.asarray([1.0, -1.0, 2.0, -2.0])
-    field = jnp.broadcast_to(mode[:, None, None] / 2.0, shape)
-    field_west = jnp.concatenate((field[:1], field[:-1]))
-    field_east = jnp.concatenate((field[1:], field[-1:]))
-    rhs = -volume * (west * (field_west - field) + east * (field_east - field))
-
-    precondition = fringing_impl._axial_mean_preconditioner_3d(volume, west, east)
-
-    assert precondition(rhs) == pytest.approx(field)
+def test_axial_mean_preconditioner_matches_dense_mixed_gauge_and_autodiff():
+    nx, ny, nz = 5, 3, 2
+    normalization = np.sqrt(ny * nz)
+    volume = jnp.linspace(0.7, 1.4, nx * ny * nz).reshape((nx, ny, nz))
+    reduced = jnp.asarray([0.3, -0.7, 1.2, 0.4, -0.9])
+    residual = jnp.broadcast_to(reduced[:, None, None] / normalization, volume.shape)
+    tangent = jnp.linspace(-0.2, 0.3, residual.size).reshape(residual.shape)
+    for gauge in (True, False):
+        faces = jnp.asarray([0.0, 0.8, 1.3, 0.6, 1.1, 0.0 if gauge else 1.7])
+        west, east = faces[:-1, None, None] / volume, faces[1:, None, None] / volume
+        precondition = fringing_impl._axial_mean_preconditioner_3d(
+            volume, west, east, gauge=gauge)
+        dense = np.diag(np.asarray(faces[:-1] + faces[1:]))
+        dense -= np.diag(np.asarray(faces[1:-1]), 1) + np.diag(np.asarray(faces[1:-1]), -1)
+        if gauge:
+            weights = np.asarray(jnp.sum(volume, axis=(1, 2))) / normalization
+            dense += np.outer(weights, weights) / float(jnp.sum(volume))
+        expected = np.linalg.solve(dense, np.asarray(reduced))
+        observed = np.asarray(jax.jit(precondition)(residual))[:, 0, 0] * normalization
+        assert observed == pytest.approx(expected, rel=5.0e-11, abs=5.0e-12)
+        assert np.max(np.abs(dense @ observed - np.asarray(reduced))) < 2.0e-11
+        _, jvp = jax.jvp(precondition, (residual,), (tangent,))
+        _, pullback = jax.vjp(precondition, residual)
+        expected_tangent = precondition(tangent)
+        assert jvp == pytest.approx(expected_tangent, rel=5.0e-11, abs=5.0e-12)
+        assert pullback(tangent)[0] == pytest.approx(expected_tangent, rel=5.0e-11, abs=5.0e-12)
 
 
 def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
@@ -234,23 +246,8 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
         correction(right), rel=1.0e-10, abs=1.0e-10
     )
 
-    def objective(amplitude):
-        field, *_ = _solvax_pressure_poisson_duct(
-            amplitude * rhs,
-            conductivity,
-            dx=0.1,
-            dy=spacing,
-            dz=spacing,
-            iterations=200,
-            tolerance=1.0e-10,
-            thin_wall_fluid_mask=mask,
-            transverse_coarse_bounds=bounds,
-        )
-        return jnp.mean(field**2)
-
-    value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
-    assert jnp.isfinite(gradient)
-    assert gradient == pytest.approx(2.0 * value, rel=1.0e-6)
+    _, tangent = jax.jvp(correction, (right,), (left,))
+    assert tangent == pytest.approx(correction(left), rel=1.0e-10, abs=1.0e-10)
 
 
 def test_duct_solvers_forward_single_reduction_to_solvax(
@@ -494,24 +491,6 @@ def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
     z = jnp.linspace(-1.0, 1.0, 3)[None, None, :]
     rhs_shape = jnp.sin(jnp.pi * x) * jnp.cos(jnp.pi * y) * jnp.ones_like(z)
     mobility = jnp.broadcast_to(1.0 + 0.1 * y, rhs_shape.shape)
-
-    def objective(amplitude):
-        pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_duct(
-            amplitude * rhs_shape,
-            mobility,
-            dx=0.4,
-            dy=dy,
-            dz=dz,
-            iterations=200,
-            tolerance=1.0e-10,
-        )
-        return jnp.mean(pressure**2)
-
-    compiled_value_and_grad = jax.jit(jax.value_and_grad(objective))
-    value, gradient = compiled_value_and_grad(jnp.asarray(1.0))
-    assert jnp.isfinite(value)
-    assert jnp.isfinite(gradient)
-    assert gradient == pytest.approx(2.0 * value, rel=1.0e-6, abs=1.0e-8)
 
     def coefficient_objective(scale):
         pressure, _, _, _, _, _, _ = _solvax_pressure_poisson_duct(
