@@ -139,7 +139,9 @@ def _reuse_modal_factors(key: tuple[object, ...], factory: Callable):
 ALEX_BALANCE_TOLERANCE = 1.0e-3
 ALEX_B2_STEADY_STEPS = 3
 ALEX_B2_CANONICAL_SHELL_THICKNESS = 0.02
-ALEX_B2_SETTLED_RELAXATION = 1.25
+# The frozen Aitken ceiling is monotone on the accepted medium B2 restart and
+# shortens tight-tolerance continuation without changing unconverged states.
+ALEX_B2_SETTLED_RELAXATION = 2.0
 
 
 def _sustained_convergence(streak: int, passed: bool) -> tuple[int, bool]:
