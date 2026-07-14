@@ -33,6 +33,8 @@ _FREEMHD_DISCRETIZATION_REFERENCE = {
     "openfoam_release": "v2206",
     "momentum_source": "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H",
     "momentum_source_sha256": "ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6",
+    "electric_source": "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/ePotEqn.H",
+    "electric_source_sha256": "605058509958d14d2c44d10d0b671573027f712ec59fa56d9aa6611e8f38f0e1",
     "limiter_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.H",
     "limiter_source_sha256": "f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e",
     "nvd_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/NVDTVD.H",

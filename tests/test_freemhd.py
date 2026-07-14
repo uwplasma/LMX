@@ -349,7 +349,7 @@ def test_freemhd_source_snapshot_is_deterministic_and_allows_unrelated_dirt(
     assert manifest == json.loads((first / "source-pin.json").read_text())
     assert manifest == run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, second)
     assert artifact_sha256(first, "tree") == artifact_sha256(second, "tree")
-    assert len([path for path in first.rglob("*") if path.is_file()]) == 5
+    assert len([path for path in first.rglob("*") if path.is_file()]) == 6
     assert set(manifest) == {"schema_version", "project", "commit", "openfoam_release", "files"}
     assert manifest["commit"] == reference["repository_commit"]
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):

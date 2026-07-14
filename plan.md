@@ -120,8 +120,8 @@ Completed foundation:
   empty inputs, special files, type mismatches, and changed content.
 - At `a4c83ab`, the source materializer verifies FreeMHD commit
   `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5`, scoped cleanliness, and exact
-  hashes for four pinned source files. The generated five-file source tree hash
-  is `366e3a6a9464192183db9383dead47f5e3c8719a065ce4982e7c2b4586306289`.
+  hashes for five pinned source files. The generated six-file source tree hash
+  is `bcec06b62514a60f8f18bc691e616d7555e591da44cad889858319585039eaff`.
 - At `f033a4b`, the LMX materializer writes a deterministic strict JSON input;
   the loader reconstructs a real `CaseSpec`/`FringingProfile`; and the observer
   derives the contract without reading the expected contract.
