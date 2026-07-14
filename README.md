@@ -16,7 +16,7 @@ that runs on CPUs and GPUs.
 [Benchmark matrix](docs/benchmark_matrix.md) ·
 [Development plan](plan.md)
 
-![Analytical and LMX duct-flow profiles](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/analytic_velocity_profiles.png)
+![Analytical and LMX duct-flow profiles](docs/_static/analytic_velocity_profiles.webp)
 
 ## Why LMX
 
@@ -202,18 +202,17 @@ the acceptance protocol.
 ## Selected plots and movies
 
 <p align="center">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/freemhd_closed_channel_observable_parity.png" alt="LMX and FreeMHD observable parity" width="48%">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/strong_scaling.png" alt="GPU strong scaling" width="48%">
+  <img src="docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD observable parity" width="48%">
+  <img src="docs/_static/strong_scaling.webp" alt="GPU strong scaling" width="48%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme_hunt_startup_2d.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme_hunt_startup_2d_poster.png" alt="Hunt-flow startup movie" width="48%"></a>
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_flow.gif" alt="Research-stage blanket-flow response" width="48%">
+  <a href="docs/_static/readme_hunt_startup_2d.mp4"><img src="docs/_static/readme_hunt_startup_2d_poster.webp" alt="Hunt-flow startup movie" width="60%"></a>
 </p>
 
-The Hunt poster opens a 130&nbsp;KB H.264 movie; the blanket movie is a
-research-stage demonstration, not validation evidence. All media are served
-from a checksummed release and add nothing to the repository or wheel.
+The Hunt poster opens a 130&nbsp;KB H.264 movie. The six anonymous-access web
+assets total 516&nbsp;KB and stay out of the wheel; full-resolution media and
+field bundles remain checksummed release assets.
 
 ## Tests
 
@@ -247,8 +246,9 @@ suite tests physics, numerics, adapters, plotting, and curated workflows directl
 - The first 65-file generated-media bundle is published as
   [`lmx-research-assets-v1`](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
   and indexed by `provenance/release-assets.json`.
-- Documentation media is served from versioned releases; every published
-  figure must retain its generating command and fingerprints.
+- Six compressed documentation derivatives (516 KB total) stay in Git so
+  anonymous readers can see the principal results; full-resolution media stay
+  in versioned releases. Every figure retains its command and fingerprints.
 - New public API is added only when it represents a stable user concept.
 
 ## Contributing and citing

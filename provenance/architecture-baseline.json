@@ -1,7 +1,15 @@
 {
+  "import_measurement": {
+    "command": "python -c 'import lmx'",
+    "jax_loaded": false,
+    "max_seconds": 0.019378374970983714,
+    "median_seconds": 0.018237459007650614,
+    "min_seconds": 0.017547749972436577,
+    "repeats": 5
+  },
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 3530565,
-    "checkout_bytes_excluding_release_candidates": 3530565,
+    "checkout_bytes_excluding_build_artifacts": 4045959,
+    "checkout_bytes_excluding_release_candidates": 4045959,
     "curated_example_count": 11,
     "curated_examples": [
       {

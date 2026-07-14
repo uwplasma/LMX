@@ -10,22 +10,22 @@ asset changes:
 uv run --locked --extra dev python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current classified baseline is 45 package modules and 36,545 total package
-lines. The maintained stable core plus compatibility facades are 9,006 lines;
+The current classified baseline is 36 package modules and 35,041 total package
+lines. The maintained stable core plus compatibility facades are 8,421 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
-about 20 ms on the audited development machine. Former root attributes
+about 18 ms on the audited development machine. Former root attributes
 remain available for one deprecation release from their owning submodules; see
 the [migration guide](migration.md).
 
-The source checkout is now 6.46 MiB, below the 10 MiB M2 target. Sixty-five
-generated files larger than 128 KiB were bundled in the non-latest
-[`lmx-research-assets-v1`](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
-release and removed only after a fresh download passed archive membership, size,
-and SHA-256 verification. `provenance/release-assets.json` is the immutable
-path/content manifest; large documentation media are also attached individually
-so published documentation can render them without restoring the archive.
+The tracked source checkout is 3.86 MiB, below its 4 MiB hard cap. Sixty-five
+generated files larger than 128 KiB were bundled in the versioned release
+indexed by [`provenance/release-assets.json`](../provenance/release-assets.json)
+and removed only after a fresh download passed archive membership, size, and
+SHA-256 verification. Six compressed web derivatives (516 KB total) remain in
+`docs/_static/` for anonymous documentation access; full-resolution media and
+field bundles remain release assets and never enter the wheel.
 
 Maintain that boundary with:
 
