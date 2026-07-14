@@ -50,11 +50,11 @@ def test_solvax_backend_records_equivalence_and_resources() -> None:
     ]["solvax"]["steps"]
 
 
-def _campaign(records: list[dict]) -> dict:
+def _campaign(records: list[dict], *, solvax_version: str = "0.5.1") -> dict:
     return {
         "implementation": {
             "lmx_version": "1.1.3",
-            "solvax_version": "0.5.1",
+            "solvax_version": solvax_version,
             "solver_core_sha256": "a" * 64,
         },
         "controls": {"linear_solver": "solvax_pcg"},
@@ -166,6 +166,7 @@ def test_acceptance_merges_confirmation_and_keeps_gpu_gate_open(tmp_path: Path):
     cpu = {
         "acceptance": {"backend_promotion_pass": True},
         "environment": {"backend": "cpu", "dtype": "float64"},
+        "implementation": {"solvax_version": "0.5.1"},
     }
     result = build_acceptance(
         _write(tmp_path / "campaign.json", _campaign(records)),
@@ -187,7 +188,7 @@ def test_acceptance_closes_with_matching_gpu_record(tmp_path: Path):
         "benchmark_sha256": "b" * 64,
         "linear_sha256": "c" * 64,
         "lmx_version": "1.1.3",
-        "solvax_version": "0.5.1",
+        "solvax_version": "0.8.1",
         "solver_core_sha256": "a" * 64,
     }
     cpu = {
@@ -203,8 +204,14 @@ def test_acceptance_closes_with_matching_gpu_record(tmp_path: Path):
         "problem": {"grid": [8, 8]},
     }
     result = build_acceptance(
-        _write(tmp_path / "campaign.json", _campaign(records)),
-        _write(tmp_path / "confirmation.json", _campaign([])),
+        _write(
+            tmp_path / "campaign.json",
+            _campaign(records, solvax_version="0.8.1"),
+        ),
+        _write(
+            tmp_path / "confirmation.json",
+            _campaign([], solvax_version="0.8.1"),
+        ),
         _write(tmp_path / "cpu.json", cpu),
         _write(tmp_path / "gpu.json", gpu),
         _ha20(tmp_path / "ha20", implementation),

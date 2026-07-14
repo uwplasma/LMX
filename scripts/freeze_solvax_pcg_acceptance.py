@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freeze SOLVAX-PCG Benchmark-A and CPU-equivalence evidence."""
+"""Freeze version-consistent SOLVAX-PCG benchmark evidence."""
 
 from __future__ import annotations
 
@@ -160,8 +160,9 @@ def build_acceptance(
     if campaign.get("controls") != confirmation.get("controls"):
         raise ValueError("SOLVAX campaign controls differ")
     implementation = campaign["implementation"]
-    if implementation.get("solvax_version") != "0.5.1":
-        raise ValueError("SOLVAX Benchmark A must use released version 0.5.1")
+    solvax_version = implementation.get("solvax_version")
+    if not isinstance(solvax_version, str) or not solvax_version:
+        raise ValueError("SOLVAX Benchmark A must record its SOLVAX version")
     if campaign["controls"].get("linear_solver") != "solvax_pcg":
         raise ValueError("SOLVAX Benchmark A must select linear_solver=solvax_pcg")
     records = {
@@ -178,6 +179,8 @@ def build_acceptance(
     compact_records = [_compact_table_record(record) for record in ordered]
     table_i_pass = all(bool(record.get("finest_level_pass")) for record in ordered)
     cpu_acceptance = cpu.get("acceptance", {})
+    if cpu.get("implementation", {}).get("solvax_version") != solvax_version:
+        raise ValueError("CPU/campaign SOLVAX versions differ")
     cpu_pass = bool(
         cpu_acceptance.get(
             "backend_promotion_pass", cpu_acceptance.get("cpu_promotion_pass")
@@ -281,7 +284,7 @@ def main() -> int:
     parser.add_argument(
         "--cpu-comparison",
         type=Path,
-        default=Path("benchmarks/results/solvax-pcg-equivalence-cpu.json"),
+        default=Path("artifacts/solvax/pcg-equivalence-cpu.json"),
     )
     parser.add_argument("--gpu-comparison", type=Path)
     parser.add_argument("--ha20-results-dir", type=Path)

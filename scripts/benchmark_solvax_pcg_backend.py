@@ -384,7 +384,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("benchmarks/results/solvax-pcg-equivalence-cpu.json"),
+        default=Path("artifacts/solvax/pcg-equivalence.json"),
     )
     args = parser.parse_args()
     result = run_backend_comparison(
