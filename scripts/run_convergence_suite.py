@@ -3,13 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import replace
+from dataclasses import is_dataclass, replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.solvers import solve_steady
+from lmx.solvers import _bounded_time_step_count, solve_steady
 from lmx.validation import (
     closed_channel_validation,
     combined_profile_error,
@@ -26,8 +26,20 @@ def _parse_csv_numbers(raw: str) -> list[int]:
     return [int(item.strip()) for item in raw.split(",") if item.strip()]
 
 
+def _parse_csv_floats(raw: str) -> list[float]:
+    return [float(item.strip()) for item in raw.split(",") if item.strip()]
+
+
 def _hunt_wall_cells(resolution: int) -> int:
     return max(2, round(resolution * 8 / 72))
+
+
+def _replace_like(obj, **changes):
+    if is_dataclass(obj):
+        return replace(obj, **changes)
+    if hasattr(obj, "__dict__"):
+        return obj.__class__(**{**vars(obj), **changes})
+    raise TypeError(f"Unsupported object replacement for {type(obj)!r}")
 
 
 def _build_case(case_kind: str, ha: float, resolution: int, output_dir: Path):
@@ -115,7 +127,9 @@ def _collect_metrics(
     return metrics
 
 
-def _observed_orders(levels: list[dict[str, float | str]]) -> dict[str, list[dict[str, float]]]:
+def _observed_orders(
+    levels: list[dict[str, float | str]], *, scale_key: str = "mesh_spacing"
+) -> dict[str, list[dict[str, float]]]:
     orders: dict[str, list[dict[str, float]]] = {}
     if len(levels) < 2:
         return orders
@@ -133,45 +147,77 @@ def _observed_orders(levels: list[dict[str, float | str]]) -> dict[str, list[dic
             order = estimate_observed_order(
                 float(coarse[key]),
                 float(fine[key]),
-                float(coarse["mesh_spacing"]),
-                float(fine["mesh_spacing"]),
+                float(coarse[scale_key]),
+                float(fine[scale_key]),
             )
             if order is None:
                 continue
-            entries.append(
-                {
-                    "coarse_resolution": float(coarse["resolution"]),
-                    "fine_resolution": float(fine["resolution"]),
-                    "order": order,
-                }
-            )
+            label = "dt" if scale_key == "dt" else "resolution"
+            entries.append({
+                f"coarse_{label}": float(coarse[label]),
+                f"fine_{label}": float(fine[label]),
+                "order": order,
+            })
         if entries:
             orders[key] = entries
     return orders
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run native LMX mesh-convergence studies.")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/convergence"))
+    parser = argparse.ArgumentParser(description="Run native LMX convergence studies.")
+    parser.add_argument("--mode", choices=("mesh", "time"), default="mesh")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--cases", type=str, default="hartmann,shercliff,hunt")
     parser.add_argument("--ha", type=float, default=20.0)
     parser.add_argument("--resolutions", type=str, default="16,32,48")
+    parser.add_argument("--resolution", type=int, default=32)
+    parser.add_argument("--dts", type=str, default="0.002,0.001,0.0005")
+    parser.add_argument("--t-final", type=float)
     parser.add_argument("--reference-root", type=Path, default=None)
     parser.add_argument("--x-slice", type=str, default="1m")
     parser.add_argument("--hartmann-l2-threshold", type=float, default=0.05)
     parser.add_argument("--hartmann-linf-threshold", type=float, default=0.1)
     args = parser.parse_args(argv)
 
-    args.output.mkdir(parents=True, exist_ok=True)
+    output = args.output or Path(f"artifacts/{'time_' if args.mode == 'time' else ''}convergence")
+    output.mkdir(parents=True, exist_ok=True)
     cases = [case.strip() for case in args.cases.split(",") if case.strip()]
-    resolutions = _parse_csv_numbers(args.resolutions)
-    payload: dict[str, object] = {"ha": args.ha, "cases": {}}
+    payload: dict[str, object] = {"mode": args.mode, "ha": args.ha, "cases": {}}
 
     for case_kind in cases:
         levels: list[dict[str, float | str]] = []
-        for resolution in resolutions:
-            case_dir = args.output / case_kind / f"n{resolution}"
+        scales = (
+            _parse_csv_numbers(args.resolutions)
+            if args.mode == "mesh"
+            else _parse_csv_floats(args.dts)
+        )
+        for scale in scales:
+            resolution = int(scale) if args.mode == "mesh" else args.resolution
+            case_dir = output / case_kind / (
+                f"n{resolution}" if args.mode == "mesh" else f"dt{scale:g}"
+            )
             case = _build_case(case_kind, args.ha, resolution, case_dir)
+            if args.mode == "time":
+                t_final = (
+                    case.time_stepper.t_final
+                    if args.t_final is None
+                    else float(args.t_final)
+                )
+                max_steps = _bounded_time_step_count(
+                    start_time=0.0,
+                    dt=float(scale),
+                    t_final=float(t_final),
+                    max_steps=case.time_stepper.max_steps,
+                )
+                case = _replace_like(
+                    case,
+                    time_stepper=_replace_like(
+                        case.time_stepper,
+                        dt=float(scale),
+                        t_final=float(t_final),
+                        max_steps=max_steps,
+                    ),
+                )
             solution = solve_steady(case)
             metrics = _collect_metrics(
                 solution,
@@ -182,27 +228,33 @@ def main(argv: list[str] | None = None) -> int:
                 hartmann_l2_threshold=args.hartmann_l2_threshold,
                 hartmann_linf_threshold=args.hartmann_linf_threshold,
             )
-            level = {
+            common = {
                 "case": case.name,
-                "resolution": float(resolution),
-                "mesh_spacing": _mesh_spacing(case),
                 "dt": case.time_stepper.dt,
                 "max_steps": float(case.time_stepper.max_steps),
-                **(
-                    duct_layer_resolution_metrics(case, solution.mesh)
-                    if hasattr(solution, "mesh")
-                    else {}
-                ),
+                **duct_layer_resolution_metrics(case, solution.mesh),
                 **metrics,
             }
+            level = (
+                {
+                    **common,
+                    "resolution": float(resolution),
+                    "mesh_spacing": _mesh_spacing(case),
+                }
+                if args.mode == "mesh"
+                else {**common, "dt": float(scale), "t_final": float(t_final)}
+            )
             levels.append(level)
+        scale_name = "resolutions" if args.mode == "mesh" else "dts"
         payload["cases"][case_kind] = {
-            "resolutions": resolutions,
+            scale_name: scales,
             "levels": levels,
-            "observed_orders": _observed_orders(levels),
+            "observed_orders": _observed_orders(
+                levels, scale_key="mesh_spacing" if args.mode == "mesh" else "dt"
+            ),
         }
 
-    summary_path = args.output / "summary.json"
+    summary_path = output / "summary.json"
     summary_path.write_text(json.dumps(payload, indent=2))
     print(summary_path.read_text())
     return 0

@@ -160,6 +160,7 @@ def test_run_convergence_suite_writes_summary(
         suite.argparse.ArgumentParser,
         "parse_args",
         lambda self, argv=None: SimpleNamespace(
+            mode="mesh",
             output=output,
             cases="hartmann,shercliff",
             ha=20.0,

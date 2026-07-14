@@ -30,7 +30,7 @@ conductance through the constructor rather than private arrays.
 lmx validate hartmann --ha 20 --output artifacts/validation/hartmann
 python scripts/run_validation_suite.py --output artifacts/validation
 python scripts/run_convergence_suite.py --help
-python scripts/run_time_convergence_suite.py --help
+python scripts/run_convergence_suite.py --mode time --help
 ```
 
 The suite records analytical error, conservation, power balance, mesh/time

@@ -64,7 +64,7 @@ These commands are intentionally not part of the portable gate:
 ```bash
 python scripts/run_freemhd_parity_suite.py --help
 python scripts/run_convergence_suite.py --help
-python scripts/run_time_convergence_suite.py --help
+python scripts/run_convergence_suite.py --mode time --help
 python scripts/run_strong_scaling_worker.py --help
 ```
 

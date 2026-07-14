@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import run_time_convergence_suite as suite
+from scripts import run_convergence_suite as suite
 
 
 pytestmark = pytest.mark.unit
@@ -34,18 +34,19 @@ def test_observed_orders_reports_first_order_drop():
         {"dt": 2.0e-3, "y_l2_error": 4.0e-2},
         {"dt": 1.0e-3, "y_l2_error": 2.0e-2},
     ]
-    orders = suite._observed_orders(levels)
+    orders = suite._observed_orders(levels, scale_key="dt")
     assert orders["y_l2_error"][0]["order"] == pytest.approx(1.0)
 
 
 def test_observed_orders_skips_invalid_pairs():
-    assert suite._observed_orders([{"dt": 0.1}]) == {}
+    assert suite._observed_orders([{"dt": 0.1}], scale_key="dt") == {}
     assert (
         suite._observed_orders(
             [
                 {"dt": 0.1, "y_l2_error": 0.1},
                 {"dt": 0.1, "y_l2_error": 0.05},
-            ]
+            ],
+            scale_key="dt",
         )
         == {}
     )
@@ -117,7 +118,9 @@ def test_collect_metrics_hartmann_branch(
     monkeypatch.setattr(
         suite,
         "hartmann_acceptance",
-        lambda *args, **kwargs: SimpleNamespace(passed=False),
+        lambda *args, **kwargs: SimpleNamespace(
+            passed=False, l2_threshold=0.05, linf_threshold=0.1
+        ),
     )
 
     metrics = suite._collect_metrics(
@@ -145,6 +148,7 @@ def test_run_time_convergence_suite_writes_summary(
         suite.argparse.ArgumentParser,
         "parse_args",
         lambda self, argv=None: SimpleNamespace(
+            mode="time",
             output=output,
             cases="hartmann,hunt",
             ha=20.0,
@@ -204,6 +208,7 @@ def test_run_time_convergence_suite_applies_t_final_override(
         suite.argparse.ArgumentParser,
         "parse_args",
         lambda self, argv=None: SimpleNamespace(
+            mode="time",
             output=output,
             cases="hartmann",
             ha=20.0,
