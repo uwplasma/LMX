@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-14",
+  "commit": "3152fd061126d9100f02c17e2ffe463f517df79c",
+  "source_fingerprint": "c20f276741f6d6f79d3c284b856f56231e8d9c48f03437c4254a16b305883f98",
+  "hardware": "Apple M4, 10 CPU cores",
+  "benchmark_kind": "sharded_extruded_operator_surrogate",
+  "problem": {
+    "shape": [516, 32, 32],
+    "iterations": 128,
+    "repeats": 3,
+    "cell_updates": 67633152
+  },
+  "points": [
+    {
+      "devices": 1,
+      "global_shards": 1,
+      "spatially_sharded": false,
+      "warm_seconds": 0.47112016699975356,
+      "speedup": 1.0,
+      "parallel_efficiency": 1.0
+    },
+    {
+      "devices": 2,
+      "global_shards": 2,
+      "spatially_sharded": true,
+      "warm_seconds": 0.4053532080142759,
+      "speedup": 1.1622460552554983,
+      "parallel_efficiency": 0.5811230276277491
+    },
+    {
+      "devices": 4,
+      "global_shards": 4,
+      "spatially_sharded": true,
+      "warm_seconds": 0.36783016700064763,
+      "speedup": 1.2808089419129238,
+      "parallel_efficiency": 0.32020223547823096
+    },
+    {
+      "devices": 6,
+      "global_shards": 6,
+      "spatially_sharded": true,
+      "warm_seconds": 0.50733420799952,
+      "speedup": 0.9286189647203906,
+      "parallel_efficiency": 0.15476982745339843
+    }
+  ],
+  "gates": {
+    "requested_multi_device_points_are_partitioned": true,
+    "replicated_incompatible_shape_is_rejected": true,
+    "fixed_problem_across_points": true,
+    "pass": true
+  },
+  "interpretation": {
+    "fastest_device_count": 4,
+    "best_speedup": 1.2808089419129238,
+    "six_device_overhead_visible": true,
+    "production_solver_claim": false
+  }
+}

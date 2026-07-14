@@ -205,6 +205,7 @@
       "source_ids": [
         "lmx-benchmark-matrix",
         "benchmark-b-specification",
+        "mac-cpu-sharding-20260714",
         "alex-results-1987",
         "smolentsev-vv",
         "smolentsev-blanket-review",
@@ -289,6 +290,14 @@
       "path": "benchmarks/results/benchmark-b-specification.json",
       "sha256": "b42bec77c7ceb7d823fd67743feb019550ca7a781d111ca1604599a3907a5f87",
       "title": "LMX frozen Benchmark B specifications and extracted ALEX data index"
+    },
+    {
+      "availability": "repository",
+      "id": "mac-cpu-sharding-20260714",
+      "kind": "repository_document",
+      "path": "benchmarks/results/mac-cpu-sharding-20260714.json",
+      "sha256": "a7e2176d32921aa7082ed11cb62c8d6adeb60bebb7f8adaff73b839f28e47de0",
+      "title": "Apple M4 sharded-operator placement and scaling diagnostic"
     },
     {
       "authors": "C. B. Reed, B. F. Picologlou, T. Q. Hua, and J. S. Walker",

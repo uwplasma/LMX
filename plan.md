@@ -178,6 +178,9 @@ for external research use.
   fields remain provisional until the solver reprojects and passes every gate.
 - GPU: accepted B2 checkpoint scales from 36.96 seconds on one A4000 to 22.23
   seconds on two (1.66x, 83.1% efficiency).
+- Mac CPU placement: the sharded operator reaches 1.28x on four devices for a
+  divisible fixed problem; six devices are slower, and production-solve scaling
+  remains open until matching validated restarts are available.
 - Frozen B2 runner: `--spatial-devices 2` rounds only the odd axial minimum to
   an equal-shard mesh and records/enforces actual device placement; a bounded
   two-A4000 production solve passes steady and conservation gates in 38.81

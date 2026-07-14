@@ -174,6 +174,19 @@ def test_shard_placement_reports_partitioning_and_rejects_replication():
         _shard_placement(distributed, 4)
 
 
+def test_tracked_mac_sharding_record_reports_only_actual_partitions():
+    payload = json.loads(
+        Path("benchmarks/results/mac-cpu-sharding-20260714.json").read_text()
+    )
+    points = payload["points"]
+
+    assert all(payload["gates"].values())
+    assert all(point["global_shards"] == point["devices"] for point in points)
+    assert all(point["spatially_sharded"] for point in points[1:])
+    assert payload["interpretation"]["fastest_device_count"] == 4
+    assert payload["interpretation"]["production_solver_claim"] is False
+
+
 def test_benchmark_sharded_extruded_operator_rejects_invalid_device_count():
     with pytest.raises(ValueError):
         benchmark_sharded_extruded_operator(

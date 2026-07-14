@@ -10,6 +10,7 @@ devices alone is not evidence of parallel execution.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 760 pass, 8 skip, 95.28% branch coverage, 192.6 s | below the ten-minute budget |
 | SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.1 forward, gradient, transpose, memory, timing, and Hartmann gates pass | compact current record; raw evidence external |
+| sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
 | B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | tolerance, iteration, wall, steady, and conservation gates pass |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
@@ -19,6 +20,11 @@ devices alone is not evidence of parallel execution.
 The B2 result passes the two-device target and exact observable-equivalence
 gate. A general or four-device scaling claim remains open. The B1 timings do
 not promote its experimental physics result.
+
+On the Mac, `512` axial stations silently forced replication at six devices;
+the placement gate now rejects that invalid point. The divisible `516`-station
+diagnostic verifies 2/4/6 real shards and shows that four CPU devices are best
+for this small operator workload. It is not a production-solver speedup claim.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
