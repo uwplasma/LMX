@@ -18,13 +18,14 @@ before a validation, differentiability, or performance claim.
 ```bash
 git clone https://github.com/uwplasma/LMX.git
 cd LMX
-uv sync --locked --extra dev --extra docs
+uv venv
+uv pip install -e '.[dev,docs]'
 ```
 
 Run focused tests while developing, then the complete gate:
 
 ```bash
-uv run --locked --extra dev python scripts/run_full_test_suite.py
+.venv/bin/python scripts/run_full_test_suite.py
 ```
 
 The complete portable gate must retain at least 95% branch coverage and finish

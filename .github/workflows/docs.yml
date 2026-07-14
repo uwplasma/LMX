@@ -17,7 +17,7 @@ jobs:
         with:
           extras: docs,dev
 
-      - name: Verify provenance and dependency lock
+      - name: Verify provenance
         run: python scripts/manage_provenance.py --check
 
       - name: Build documentation

@@ -18,11 +18,15 @@ For tests and documentation:
 python -m pip install -e '.[dev,docs]'
 ```
 
-CI uses the committed lockfile:
+To reproduce the CI installation without adding a repository lockfile:
 
 ```bash
-uv sync --locked --extra dev --extra docs
+uv venv
+uv pip install -e '.[dev,docs]'
 ```
+
+CI resolves the declared compatible ranges and tests both the minimum supported
+and newest compatible SOLVAX releases.
 
 LMX supports Python 3.10 and newer. Install the JAX wheel appropriate for your
 accelerator before installing LMX when using CUDA.

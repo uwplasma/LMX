@@ -1,5 +1,5 @@
-name: Set up locked LMX environment
-description: Install a supported Python and synchronize the committed uv lockfile
+name: Set up LMX environment
+description: Install a supported Python and resolve declared compatible dependencies
 
 inputs:
   python-version:
@@ -10,6 +10,10 @@ inputs:
     description: Comma-separated optional dependency groups to install
     required: false
     default: dev
+  solvax-version:
+    description: Optional exact SOLVAX compatibility endpoint
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -23,19 +27,20 @@ runs:
       with:
         version: "0.11.28"
         enable-cache: true
-        cache-dependency-glob: uv.lock
+        cache-dependency-glob: pyproject.toml
 
-    - name: Synchronize locked environment
+    - name: Install LMX
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}
       run: |
-        extra_args=()
-        IFS=',' read -ra extras <<< "${{ inputs.extras }}"
-        for extra in "${extras[@]}"; do
-          if [[ -n "$extra" ]]; then
-            extra_args+=(--extra "$extra")
-          fi
-        done
-        uv sync --locked "${extra_args[@]}"
+        uv venv --python "${{ inputs.python-version }}" .venv
+        requirements=(-e .)
+        if [[ -n "${{ inputs.extras }}" ]]; then
+          requirements=(-e ".[${{ inputs.extras }}]")
+        fi
+        if [[ -n "${{ inputs.solvax-version }}" ]]; then
+          requirements+=("solvax==${{ inputs.solvax-version }}")
+        fi
+        uv pip install --python .venv/bin/python "${requirements[@]}"
         echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"

@@ -6,7 +6,7 @@ external solvers, long physics campaigns, and hardware scaling.
 ## Complete portable gate
 
 ```bash
-uv run --locked --extra dev python scripts/run_full_test_suite.py
+.venv/bin/python scripts/run_full_test_suite.py
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
@@ -83,8 +83,8 @@ Pull requests run the full test battery on both supported Python endpoints,
 measuring branch coverage once on Python 3.13 and running Python 3.10 without
 instrumentation overhead. Documentation builds with warnings as errors. Release
 jobs repeat the covered gate, build the docs and distributions, and smoke-test
-the wheel. The lockfile supplies CI reproducibility within supported dependency
-ranges.
+the wheel. CI exercises the minimum and newest compatible SOLVAX endpoints;
+release records preserve the resolved environment and versions as evidence.
 
 ## Adding functionality
 

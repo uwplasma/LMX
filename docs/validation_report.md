@@ -57,7 +57,7 @@ convergence or experimental validation.
 Portable source gate:
 
 ```bash
-uv run --locked --extra dev python scripts/run_full_test_suite.py
+.venv/bin/python scripts/run_full_test_suite.py
 ```
 
 Benchmark A aggregate:

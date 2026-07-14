@@ -11,7 +11,7 @@ jobs:
 
       - uses: ./.github/actions/setup-lmx
 
-      - name: Verify provenance and dependency lock
+      - name: Verify provenance
         run: python scripts/manage_provenance.py --check
 
       - name: Run benchmark suite

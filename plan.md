@@ -131,9 +131,9 @@ Every delegation must pass primal, residual, gradient/transpose, JIT, placement,
 memory, and repeated interleaved warm-timing gates. Delete the LMX duplicate in
 the same tranche when SOLVAX passes.
 
-Keep a compatible runtime range rather than an exact SOLVAX pin. CI tests both
-the minimum supported release and the newest release satisfying that range;
-the lockfile remains exact only for reproducible development and release jobs.
+Keep a compatible runtime range rather than an exact SOLVAX pin or repository
+lockfile. CI tests both the minimum supported release and the newest release
+satisfying that range; release evidence records the resolved environment.
 
 Near-term ratchets after this workstream:
 

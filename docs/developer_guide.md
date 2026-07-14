@@ -6,11 +6,11 @@ Run the live architecture audit after any module, public API, curated example,
 dependency, or large generated-asset change:
 
 ```bash
-uv run --locked --extra dev python scripts/audit_architecture.py --check --measure-import
+.venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current classified baseline is 36 package modules and 35,320 total package
-lines. The maintained stable core is 8,474 lines;
+The current classified baseline is 35 package modules and 34,939 total package
+lines. The maintained stable core is 8,067 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is

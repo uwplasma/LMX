@@ -151,9 +151,8 @@ def test_curated_examples_declare_user_facing_contracts() -> None:
         assert Path(item["docs"]).is_file()
 
 
-def test_benchmark_provenance_and_lock_are_current() -> None:
+def test_benchmark_provenance_is_current() -> None:
     assert provenance.check_manifests() == []
-    assert provenance._check_uv_lock() == []
     payload = provenance._read_json(provenance.BENCHMARKS_PATH)
     assert provenance.validate_benchmark_manifest(payload) == []
     statuses = {item["id"]: item["status"] for item in payload["benchmarks"]}

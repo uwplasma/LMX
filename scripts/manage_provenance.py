@@ -8,8 +8,6 @@ import ast
 import copy
 import hashlib
 import json
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -210,23 +208,6 @@ def check_manifests(root: Path = ROOT) -> list[str]:
     return errors
 
 
-def _check_uv_lock(root: Path = ROOT) -> list[str]:
-    executable = shutil.which("uv")
-    if executable is None:
-        return ["uv is required to verify that uv.lock matches pyproject.toml"]
-    completed = subprocess.run(
-        [executable, "lock", "--check"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode == 0:
-        return []
-    detail = (completed.stderr or completed.stdout).strip()
-    return [f"uv.lock is stale: {detail}"]
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
@@ -245,7 +226,6 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         errors = write_manifests(ROOT) if args.write else check_manifests(ROOT)
-        errors.extend(_check_uv_lock(ROOT))
         if args.external_literature_root is not None:
             if not args.external_literature_root.is_dir():
                 errors.append(
