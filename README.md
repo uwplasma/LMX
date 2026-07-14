@@ -199,6 +199,22 @@ usually fastest on the Mac because compiled kernels already use the host cores.
 See [Performance and scaling](docs/performance.md) for the current commands and
 the acceptance protocol.
 
+## Selected plots and movies
+
+<p align="center">
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/freemhd_closed_channel_observable_parity.png" alt="LMX and FreeMHD observable parity" width="48%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/strong_scaling.png" alt="GPU strong scaling" width="48%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme_hunt_startup_2d.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme_hunt_startup_2d_poster.png" alt="Hunt-flow startup movie" width="48%"></a>
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/wham_blanket_flow.gif" alt="Research-stage blanket-flow response" width="48%">
+</p>
+
+The Hunt poster opens a 130&nbsp;KB H.264 movie; the blanket movie is a
+research-stage demonstration, not validation evidence. All media are served
+from a checksummed release and add nothing to the repository or wheel.
+
 ## Tests
 
 Fast focused development checks:
