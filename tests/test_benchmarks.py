@@ -17,10 +17,176 @@ from lmx.benchmarks import (
     write_benchmark_report,
 )
 from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
+from scripts.analyze_freemhd_benchmark_a_ladder import analyze_ladder
 from scripts.freeze_benchmark_b_specs import build_specification_index
+from scripts.freeze_freemhd_benchmark_a import compact_evidence, freeze_summary
 
 
 pytestmark = pytest.mark.unit
+
+
+def _freemhd_record(case_kind: str, cells: int) -> dict:
+    h = 1.0 / cells
+    reference = [0.0, 1.0, 0.0]
+    shape = [0.5, -1.0, 0.5]
+    simulated = [value + h**2 * delta for value, delta in zip(reference, shape)]
+    cut = {
+        "coordinate": [-1.0, 0.0, 1.0],
+        "reference": reference,
+        "simulated": simulated,
+        "l2_error": (0.5 * h**4) ** 0.5,
+    }
+    return {
+        "case_kind": case_kind,
+        "settings": {"ny": cells, "nz": cells},
+        "benchmark_spec": {
+            "id": f"A2-{case_kind}-ha20",
+            "path": f"{case_kind}.toml",
+            "sha256": "a" * 64,
+        },
+        "solver_diagnostics": {
+            "potential_iterations_used": 20,
+            "potential_residual": 1.0e-10,
+        },
+        "integral_observables": {
+            "applied_pressure_gradient": 10.0 + 100.0 * h**2,
+            "reference_pressure_gradient": 10.0,
+            "pressure_gradient_relative_error": 0.006,
+        },
+        "observables": {
+            name: {axis: deepcopy(cut) for axis in ("y", "z")}
+            for name in ("velocity", "potential", "current", "lorentz")
+        },
+        "current_balance": {"acceptance_target": 0.001},
+        "power_balance": {"mechanical_power_relative_error": 1.0e-5},
+        "continuum_velocity_audit": {
+            "reference_path": f"/nonportable/reference/{case_kind}.txt",
+            "axes": {"y": {"lmx_raw_analytical": {"l2_error": 0.007}}},
+        },
+    }
+
+
+def _freemhd_levels() -> list[dict]:
+    return [
+        {
+            "label": label,
+            "records": [
+                _freemhd_record("shercliff", cells),
+                _freemhd_record("hunt", cells),
+            ],
+        }
+        for label, cells in (("coarse", 10), ("medium", 20), ("fine", 40))
+    ]
+
+
+def _freemhd_summary() -> dict[str, object]:
+    levels = [
+        {
+            "label": label,
+            "records": [
+                _freemhd_record("shercliff", 85),
+                _freemhd_record("hunt", 85),
+            ],
+        }
+        for label in ("coarse", "medium", "fine", "confirmation")
+    ]
+    return {
+        "best_level_label": "confirmation",
+        "implementation": {
+            "runner_sha256": "1" * 64,
+            "solver_core_sha256": "2" * 64,
+            "lmx_version": "1.2.3",
+            "solvax_version": "0.4.0",
+        },
+        "ladder": levels,
+        "richardson": {
+            "schema_version": 1,
+            "levels": ["medium", "fine", "confirmation"],
+            "cases": {},
+            "research_grade_validation_pass": False,
+        },
+    }
+
+
+def test_analyze_freemhd_ladder_recovers_second_order() -> None:
+    result = analyze_ladder(_freemhd_levels())
+    for case in result["cases"].values():
+        assert case["profiles"]["velocity_y"]["observed_order"] == pytest.approx(2.0)
+        assert case["profiles"]["velocity_y"]["extrapolated_l2"] == pytest.approx(
+            0.0, abs=1.0e-14
+        )
+        assert case["pressure_gradient"]["observed_order"] == pytest.approx(2.0)
+        assert case["pressure_gradient"]["extrapolated_relative_error"] == pytest.approx(
+            0.0, abs=1.0e-14
+        )
+        assert case["extrapolated_primary_pass"] is True
+    assert result["research_grade_validation_pass"] is True
+
+
+def test_analyze_freemhd_ladder_rejects_bad_inputs_and_unavailable_order() -> None:
+    with pytest.raises(ValueError, match="exactly three levels"):
+        analyze_ladder(_freemhd_levels()[:2])
+    levels = _freemhd_levels()
+    levels[1]["records"][0]["benchmark_spec"]["sha256"] = "b" * 64
+    with pytest.raises(ValueError, match="specification changed"):
+        analyze_ladder(levels)
+
+    levels = _freemhd_levels()
+    for level in levels:
+        cut = level["records"][0]["observables"]["velocity"]["y"]
+        cut["simulated"] = cut["reference"]
+        cut["l2_error"] = 0.0
+    profile = analyze_ladder(levels)["cases"]["shercliff"]["profiles"]["velocity_y"]
+    assert profile["observed_order"] is None
+    assert profile["extrapolation_status"] == "order_unavailable"
+    assert profile["extrapolated_pass"] is False
+
+
+def test_compact_freemhd_evidence_is_portable_and_deterministic(tmp_path: Path) -> None:
+    summary = _freemhd_summary()
+    evidence = compact_evidence(summary, source_sha256="b" * 64)
+    assert set(evidence) == {"richardson", "continuum", "power"}
+    assert evidence["power"]["confirmation_level"] == "confirmation"
+    assert evidence["power"]["implementation"]["solver_core_sha256"] == "2" * 64
+    continuum = evidence["continuum"]["cases"]["shercliff"]
+    assert continuum["reference_file"] == "shercliff.txt"
+    assert "reference_path" not in continuum
+
+    source = tmp_path / "summary.json"
+    source.write_text(json.dumps(summary), encoding="utf-8")
+    first = freeze_summary(source, tmp_path / "first")
+    second = freeze_summary(source, tmp_path / "second")
+    assert first.keys() == second.keys()
+    assert all(first[kind].read_bytes() == second[kind].read_bytes() for kind in first)
+
+
+@pytest.mark.parametrize(
+    "mutation, message",
+    [
+        (lambda summary: summary.update(ladder=summary["ladder"][:3]), "at least four"),
+        (lambda summary: summary.update(best_level_label="fine"), "Best level"),
+        (lambda summary: summary.pop("implementation"), "implementation fingerprint"),
+        (
+            lambda summary: summary["richardson"].update(
+                levels=["coarse", "medium", "fine"]
+            ),
+            "final three",
+        ),
+        (
+            lambda summary: summary["ladder"][-1].update(
+                records=[_freemhd_record("hunt", 85)]
+            ),
+            "one Shercliff",
+        ),
+    ],
+)
+def test_compact_freemhd_evidence_rejects_inconsistent_campaign(
+    mutation, message: str
+) -> None:
+    summary = _freemhd_summary()
+    mutation(summary)
+    with pytest.raises(ValueError, match=message):
+        compact_evidence(summary, source_sha256="c" * 64)
 
 
 def test_benchmark_b_specification_index_is_complete_and_deterministic():

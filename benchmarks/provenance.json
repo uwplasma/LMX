@@ -73,7 +73,7 @@
       "spec_path": "benchmarks/specs/shercliff-ha20.toml",
       "status": "verified-bounded",
       "tests": [
-        "tests/test_freeze_freemhd_benchmark_a.py::test_compact_evidence_is_portable_and_uses_confirmation",
+        "tests/test_benchmarks.py::test_compact_freemhd_evidence_is_portable_and_deterministic",
         "tests/test_physics.py::test_small_shercliff_solution_matches_bundled_reference_profiles",
         "tests/test_freemhd.py::test_observable_ladder_summary_ranks_mesh_and_offender_progress"
       ],
@@ -114,7 +114,7 @@
       "spec_path": "benchmarks/specs/hunt-ha20.toml",
       "status": "verified-bounded",
       "tests": [
-        "tests/test_freeze_freemhd_benchmark_a.py::test_compact_evidence_is_portable_and_uses_confirmation",
+        "tests/test_benchmarks.py::test_compact_freemhd_evidence_is_portable_and_deterministic",
         "tests/test_physics.py::test_small_hunt_solution_matches_bundled_reference_profiles",
         "tests/test_freemhd.py::test_side_jet_profile_metrics_and_comparison_capture_peak_locations"
       ],
