@@ -33,6 +33,7 @@ from lmx.benchmarks import (
     load_benchmark_b_spec,
 )
 from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
+from lmx.freemhd import validate_matched_b_record
 from lmx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
@@ -147,15 +148,12 @@ def _evaluate_acceptance(
     coarse_medium = relative_change(levels[0], levels[1])
     medium_fine = relative_change(levels[1], levels[2])
     finest = literature[levels[-1]]
-    evidence_sha = str((matched_freemhd or {}).get("source_sha256", ""))
-    exact_freemhd = bool(
-        matched_freemhd
-        and matched_freemhd.get("case_id") == case_id
-        and matched_freemhd.get("exact_case_match") is True
-        and matched_freemhd.get("pass") is True
-        and len(evidence_sha) == 64
-        and all(character in "0123456789abcdef" for character in evidence_sha.lower())
+    freemhd_validation = (
+        validate_matched_b_record(matched_freemhd, expected_case_id=case_id)
+        if matched_freemhd is not None
+        else None
     )
+    exact_freemhd = bool(freemhd_validation and freemhd_validation["acceptance_pass"])
     acceptance = spec["acceptance"]
     gates = {
         "all_mesh_independence": all(independence.values()),
@@ -176,7 +174,7 @@ def _evaluate_acceptance(
     }
     return {
         "case_id": case_id,
-        "complete": matched_freemhd is not None,
+        "complete": bool(freemhd_validation and freemhd_validation["schema_complete"]),
         "missing_mesh_levels": [],
         "literature": literature,
         "independence": independence,
@@ -185,6 +183,7 @@ def _evaluate_acceptance(
             "medium_to_fine": medium_fine,
         },
         "freemhd": matched_freemhd,
+        "freemhd_validation": freemhd_validation,
         "gates": gates,
         "pass": all(gates.values()),
     }

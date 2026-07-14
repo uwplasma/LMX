@@ -348,7 +348,7 @@ def test_acceptance_path_parser_requires_every_unique_name():
 
 
 @pytest.mark.parametrize("case_id", campaign.CASE_IDS)
-def test_acceptance_combines_literature_mesh_and_freemhd(case_id):
+def test_acceptance_combines_literature_mesh_and_freemhd(case_id, monkeypatch):
     reference = campaign.load_benchmark_b_reference(case_id)
     x = list(reference["x_over_L"])
     expected = list(reference["pressure_observable"])
@@ -366,18 +366,34 @@ def test_acceptance_combines_literature_mesh_and_freemhd(case_id):
         }
         for level, offset in zip(campaign.MESH_LEVELS, (1.0e-4, 5.0e-5, 0.0))
     }
-    freemhd = {
-        "case_id": case_id,
-        "exact_case_match": True,
-        "pass": True,
-        "source_sha256": "a" * 64,
-    }
+    monkeypatch.setattr(
+        campaign,
+        "validate_matched_b_record",
+        lambda record, **_: {
+            "acceptance_pass": record.get("validated") is True,
+            "schema_complete": record.get("validated") is True,
+        },
+    )
+    freemhd = {"case_id": case_id, "validated": True}
 
     result = campaign._evaluate_acceptance(case_id, meshes, freemhd)
 
     assert result["pass"]
     assert all(result["gates"].values())
     assert result["literature"]["fine"]["weighted_rms"] == pytest.approx(0.0)
+
+    forged = {
+        "case_id": case_id,
+        "exact_case_match": True,
+        "pass": True,
+        "source_sha256": "a" * 64,
+    }
+    assert (
+        campaign._evaluate_acceptance(case_id, meshes, forged)["gates"][
+            "matched_freemhd"
+        ]
+        is False
+    )
 
 
 def test_acceptance_reports_missing_and_rejects_bad_curves():
@@ -555,15 +571,24 @@ def test_b2_evidence_plot_mode_uses_only_existing_records(tmp_path, monkeypatch)
         by=campaign.np.ones((5, 4, 1)),
     )
     output = tmp_path / "evidence.webp"
-    monkeypatch.setattr(campaign, "_run_record", lambda *args, **kwargs: pytest.fail("solver ran"))
-    assert campaign.main(
-        [
-            "--plot-evidence", str(output),
-            "--plot-transverse-record", str(transverse),
-            "--plot-consistent-record", str(consistent),
-            "--plot-field-record", str(field),
-        ]
-    ) == 0
+    monkeypatch.setattr(
+        campaign, "_run_record", lambda *args, **kwargs: pytest.fail("solver ran")
+    )
+    assert (
+        campaign.main(
+            [
+                "--plot-evidence",
+                str(output),
+                "--plot-transverse-record",
+                str(transverse),
+                "--plot-consistent-record",
+                str(consistent),
+                "--plot-field-record",
+                str(field),
+            ]
+        )
+        == 0
+    )
     assert output.is_file() and output.stat().st_size < 100_000
 
 

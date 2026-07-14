@@ -75,7 +75,7 @@ superseded worktrees and branches.
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerics, conservation, and restart accepted | exact matched FreeMHD plus literature/mesh acceptance |
 | B2 ALEX square duct | fine numerical baseline converged; current LMX and FreeMHD formulations are not yet equation-identical | reconcile inertia and axial drive before any matched run |
-| SOLVAX | velocity, cyclic-line, and symmetric anchored-Poisson PCG paths use 0.8.2 | contribute additive-line ownership; repeat interleaved timing |
+| SOLVAX | 0.8.3 owns velocity PCG, cyclic lines, anchored-Poisson PCG, and additive composition | finish the combined full gate and repeat interleaved timing |
 | Parallel execution | two-GPU B2 numerical checkpoint shows 1.66x speedup and parity | accepted-case CPU/GPU scaling and four-device evidence |
 | Portable quality | 761 pass, 8 expected external-data skips, 95.30% branch coverage, 182.3 s | stay below 300 s target and 600 s hard limit |
 
@@ -127,11 +127,11 @@ Apply this migration sequence:
    stopping uses `atol = physical_tol * min(residual_scale)`. Uniform,
    anisotropic, physical-residual, RHS/coefficient-gradient, JIT, transpose, and
    tiny high-Ha gates pass. LMX retains physical maximum-norm recertification.
-5. Add and release a symmetry-preserving additive-line preconditioner in SOLVAX,
-   then delete the two LMX averaging closures. SOLVAX's current multiplicative
-   `line_smoother` is not a PCG-safe substitute; geometry and axis adaptation
-   remain in LMX. Use a clean SOLVAX worktree from `origin/main`, because the
-   existing local checkout contains unrelated work.
+5. **Focused gates complete:** SOLVAX 0.8.3 provides the symmetry-preserving
+   `additive_preconditioner`; both LMX averaging closures delegate to it while
+   geometry, line construction, anchoring, and axis adaptation remain in LMX.
+   The seven direct solver/JIT/gradient gates pass; the combined full gate is
+   the remaining acceptance check.
 6. Treat migration of two direct SciPy sparse solves to `solvax.splu_solve` as
    low-value cleanup after the PCG and additive-line deletions; sparse FV
    assembly remains LMX-owned.
@@ -150,19 +150,20 @@ the same tranche when SOLVAX passes.
 
 Keep a compatible runtime range rather than an exact SOLVAX pin or repository
 lockfile. CI tests both the minimum supported release and the newest release
-satisfying that range; release evidence records the resolved environment. The
-installed release and current SOLVAX `origin/main` are both 0.8.2, so
-`solvax>=0.8.2,<1` currently expresses that policy without a stale exact pin.
+satisfying that range; release evidence records the resolved environment.
+SOLVAX 0.8.3 is tagged on `origin/main`, and LMX now requires
+`solvax>=0.8.3,<1` because additive composition is part of the owned solver
+surface.
 
 Near-term ratchets after this workstream:
 
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | hold; reach 34 only through real ownership deletion |
-| package lines | 34,895 | below 34,875 |
-| maintained-core lines | 8,024 | below 8,000 |
-| test files / lines | 32 / 21,295 | hold 32 / below 21,250 |
-| maintenance scripts | 19 | at most 18; reusable logic moves into `lmx/` or an existing command |
+| package lines | 34,991 | below 34,950 through ownership deletion |
+| maintained-core lines | 8,010 | below 8,000 |
+| test files / lines | 32 / 21,249 | hold 32 / below 21,250 |
+| maintenance scripts | 18 | hold at most 18 |
 
 Count semantic maintenance cost across the whole package; do not satisfy a
 budget through formatting or by relabelling a large module “research-stage.”
@@ -172,28 +173,32 @@ removal must follow real ownership consolidation, not arbitrary merging.
 
 ### Immediate execution order
 
-1. Harden the FreeMHD record validator and consolidate the standalone case
-   materializer into the existing parity command; run no solver in this step.
-2. In parallel from a clean SOLVAX worktree, contribute the symmetric
-   additive-line combinator, release it, and delete the two LMX averaging
-   closures after parity gates pass.
-3. Reconcile B2 momentum advection and the axial boundary/drive contract.
-4. Prove one-/multi-device equivalence and bounded strong scaling for that path.
-5. Run the tiny matched B2-family smoke case; only a passing contract and smoke
+1. **Focused checks and architecture caps pass.** Run repository, docs,
+   provenance, and one full portable gate for the combined tranche. Run no
+   solver or timing job here.
+2. Reconcile B2 momentum advection and the axial boundary/drive contract with
+   static contracts and tiny manufactured cases.
+3. Prove one-/multi-device equivalence and bounded strong scaling for the
+   reconciled path, with timing jobs run alone.
+4. Run the tiny matched B2-family smoke case; only a passing contract and smoke
    can authorize medium or production B2 work.
 
-Steps 1--3 use focused tests and tiny manufactured cases. The full portable
-gate runs once after the combined tranche, not after each edit.
+Development stays agile: run the directly affected node IDs first, then their
+owning files. For this tranche that means the matched-record/materializer tests
+and the additive-line tests in `test_solver.py` and `test_fringing.py`; do not
+re-run unrelated physics campaigns after each edit. The full portable gate runs
+once after the coherent combined tranche, not after each change.
 
 ## Priority 3: one exact matched FreeMHD harness
 
-- Add a machine-enforced record validator before another external run. It must
-  compare equations, nondimensional groups, geometry, field data and mapping,
-  wall properties, boundaries and drive, mesh coordinates, stopping rules,
-  observables, normalization, and source/input/evaluator/output hashes.
-- Replace the permissive boolean `exact_case_match` gate with computed contract
-  checks and an `acceptance_role`. A tiny `harness-smoke` record can test the
-  machinery but can never unlock `b2-production` acceptance.
+- **Complete in code:** the machine-enforced validator compares equations,
+  nondimensional groups, geometry, field data and mapping, wall properties,
+  boundaries and drive, mesh coordinates, stopping rules, observables,
+  normalization, and source/input/evaluator/output hashes. Benchmark-B
+  acceptance calls this validator and recomputes its observable metrics.
+- **Complete in code:** the permissive `exact_case_match` boolean is rejected;
+  `acceptance_role` prevents a tiny `harness-smoke` record from unlocking
+  `b2-production` acceptance.
 - Reconcile the known B2 mismatch first: LMX currently omits convective inertia
   used by FreeMHD's finite-inertia momentum equation, and LMX stationwise
   fixed-flow/Neumann axial treatment is not yet shown equivalent to FreeMHD's
@@ -201,10 +206,13 @@ gate runs once after the combined tranche, not after each edit.
   record is impossible and no production FreeMHD run is authorized.
 - Establish one frozen, tiny B2-family case only after formulation parity, then
   use the same harness for production B2 and B1.
-- Keep FreeMHD cases and large outputs outside the LMX repository; retain only
-  compact specifications, evaluators, and accepted summaries.
-- Move reusable case materialization and hashing into `lmx.freemhd`, expose it
-  through the existing parity command, and delete the standalone materializer.
+- Keep FreeMHD cases, manifests, logs, VTK, restarts, and raw fields outside the
+  LMX repository; retain only compact specifications, evaluators, and accepted
+  summaries. Large durable artifacts belong in a checksummed release.
+- **Complete in code:** the existing parity command materializes audited
+  Benchmark-A smoke cases and exits without running a solver; the standalone
+  materializer is deleted. Run a generated case with the external Docker
+  installation's `run_case.sh`, because its demo wrappers recopy the originals.
 
 Exit: an exact-case record cannot pass unless both codes demonstrably solved the
 same problem and evaluated the same observable.

@@ -23,6 +23,11 @@ from .units import dynamic_to_kinematic_viscosity, hartmann_number, wall_conduct
 
 BENCHMARK_A_SPEC_DIR = Path(__file__).resolve().parents[1] / "benchmarks" / "specs"
 SAMPER_TABLE_I_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "references" / "samper-table-i.toml"
+_MATCHED_B_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
+boundary_drive mesh_coordinates stopping_rules observable normalization""".split()
+_MATCHED_B_HASHES = """benchmark_spec_sha256 lmx_source_sha256 freemhd_source_sha256
+lmx_input_sha256 freemhd_input_sha256 evaluator_sha256 lmx_output_sha256
+freemhd_output_sha256""".split()
 
 
 def candidate_u_paths(case_dir: str | Path) -> list[Path]:
@@ -695,6 +700,115 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
     payload["path"] = path.relative_to(path.parents[2]).as_posix()
     payload["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     return payload
+
+
+def validate_matched_b_record(record: dict[str, object], *, expected_case_id: str) -> dict[str, object]:
+    """Validate matched Benchmark-B semantics and recompute comparison gates."""
+
+    from .benchmarks import BENCHMARK_B_SPEC_FILES, load_benchmark_b_reference, load_benchmark_b_spec
+
+    spec = load_benchmark_b_spec(expected_case_id)
+    expected_role = {
+        "B1-fringing-pipe": "b1-production",
+        "B2-fringing-square": "b2-production",
+    }[expected_case_id]
+    failed: list[str] = []
+    required = {"schema_version", "case_id", "acceptance_role", "contract", "comparison", "provenance"}
+    if not required.issubset(record) or record.get("schema_version") != 1:
+        failed.append("schema")
+    if record.get("case_id") != expected_case_id:
+        failed.append("case_id")
+    role = record.get("acceptance_role")
+    if role not in {"harness-smoke", "b1-production", "b2-production"}:
+        failed.append("acceptance_role")
+    if "exact_case_match" in record:
+        failed.append("legacy.exact_case_match")
+
+    contract = record.get("contract")
+    lmx = contract.get("lmx") if isinstance(contract, dict) else None
+    freemhd = contract.get("freemhd") if isinstance(contract, dict) else None
+    contract_failed: list[str] = []
+    for section in _MATCHED_B_SECTIONS:
+        left = lmx.get(section) if isinstance(lmx, dict) else None
+        right = freemhd.get(section) if isinstance(freemhd, dict) else None
+        if not isinstance(left, dict) or not left or not isinstance(right, dict) or not right:
+            failed.append(f"contract.{section}.missing")
+        elif left != right:
+            contract_failed.append(f"contract.{section}.mismatch")
+
+    provenance = record.get("provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
+    for name in _MATCHED_B_HASHES:
+        value = provenance.get(name)
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or value == "0" * 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            failed.append(f"provenance.{name}")
+    spec_path = BENCHMARK_A_SPEC_DIR / BENCHMARK_B_SPEC_FILES[expected_case_id]
+    if provenance.get("benchmark_spec_sha256") != hashlib.sha256(spec_path.read_bytes()).hexdigest():
+        failed.append("provenance.benchmark_spec_sha256.current")
+
+    comparison = record.get("comparison")
+    comparison = comparison if isinstance(comparison, dict) else {}
+    metrics: dict[str, float] = {}
+    comparison_failed: list[str] = []
+    try:
+        x = np.asarray(comparison["x_over_L"], dtype=float)
+        lmx_values = np.asarray(comparison["lmx_observable"], dtype=float)
+        freemhd_values = np.asarray(comparison["freemhd_observable"], dtype=float)
+        reference = load_benchmark_b_reference(expected_case_id)
+        reference_x = np.asarray(reference["x_over_L"], dtype=float)
+        valid = (
+            x.ndim == 1
+            and x.size >= 2
+            and lmx_values.shape == x.shape == freemhd_values.shape
+            and np.all(np.isfinite(x))
+            and np.all(np.isfinite(lmx_values))
+            and np.all(np.isfinite(freemhd_values))
+            and np.all(np.diff(x) > 0.0)
+            and x[0] >= reference_x[0]
+            and x[-1] <= reference_x[-1]
+        )
+        if not valid:
+            raise ValueError
+        uncertainty = np.interp(x, reference_x, np.asarray(reference["pressure_uncertainty"], dtype=float))
+        delta = lmx_values - freemhd_values
+        metrics = {
+            "weighted_rms": float(np.sqrt(np.mean((delta / uncertainty) ** 2))),
+            "weighted_linf": float(np.max(np.abs(delta / uncertainty))),
+            "integrated_relative": float(
+                abs(np.trapezoid(delta, x))
+                / max(abs(np.trapezoid(freemhd_values, x)), float(np.trapezoid(uncertainty, x)))
+            ),
+        }
+    except (KeyError, TypeError, ValueError):
+        failed.append("comparison.arrays")
+    if metrics:
+        acceptance = spec["acceptance"]
+        limits = {
+            "weighted_rms": float(acceptance["weighted_rms_max"]),
+            "weighted_linf": float(acceptance["weighted_linf_max"]),
+            "integrated_relative": float(acceptance["integrated_pressure_relative_error_max"]),
+        }
+        comparison_failed = [name for name, value in metrics.items() if value > limits[name]]
+
+    schema_complete = not failed
+    contract_pass = schema_complete and not contract_failed
+    comparison_pass = bool(metrics) and not comparison_failed
+    role_allows_acceptance = role == expected_role
+    all_failed = failed + contract_failed + [f"comparison.{name}" for name in comparison_failed]
+    return {
+        "schema_complete": schema_complete,
+        "contract_pass": contract_pass,
+        "comparison_pass": comparison_pass,
+        "role_allows_acceptance": role_allows_acceptance,
+        "acceptance_pass": contract_pass and comparison_pass and role_allows_acceptance,
+        "failed_checks": all_failed,
+        "metrics": metrics,
+    }
 
 
 def load_samper_table_i(path: str | Path | None = None) -> dict[str, object]:

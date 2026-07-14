@@ -1,7 +1,10 @@
+from copy import deepcopy
+import hashlib
 from pathlib import Path
 
 import pytest
 
+from lmx.benchmarks import BENCHMARK_B_SPEC_FILES, load_benchmark_b_reference
 from lmx.freemhd import (
     audit_freemhd_case_against_spec,
     build_case_from_freemhd_reference,
@@ -27,12 +30,132 @@ from lmx.freemhd import (
     summarize_observable_offenders,
     summarize_profile_error_offenders,
     summarize_runtime_offenders,
+    validate_matched_b_record,
     write_observable_ladder_table,
 )
-from scripts.materialize_freemhd_benchmark_a import materialize_matched_freemhd_case
+from scripts.run_freemhd_parity_suite import materialize_matched_freemhd_case
 
 
 pytestmark = pytest.mark.unit
+
+
+def _matched_b_record(case_id: str, *, role: str | None = None) -> dict[str, object]:
+    sections = """equations nondimensional_groups geometry magnetic_field wall
+    boundary_drive mesh_coordinates stopping_rules observable normalization""".split()
+    manifest = {name: {"semantic_contract": name} for name in sections}
+    reference = load_benchmark_b_reference(case_id)
+    spec_path = Path("benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
+    return {
+        "schema_version": 1,
+        "case_id": case_id,
+        "acceptance_role": role
+        or ("b1-production" if case_id.startswith("B1") else "b2-production"),
+        "contract": {"lmx": deepcopy(manifest), "freemhd": deepcopy(manifest)},
+        "comparison": {
+            "x_over_L": list(reference["x_over_L"]),
+            "lmx_observable": list(reference["pressure_observable"]),
+            "freemhd_observable": list(reference["pressure_observable"]),
+        },
+        "provenance": {
+            **{
+                name: "a" * 64
+                for name in (
+                    "lmx_source_sha256",
+                    "freemhd_source_sha256",
+                    "lmx_input_sha256",
+                    "freemhd_input_sha256",
+                    "evaluator_sha256",
+                    "lmx_output_sha256",
+                    "freemhd_output_sha256",
+                )
+            },
+            "benchmark_spec_sha256": hashlib.sha256(spec_path.read_bytes()).hexdigest(),
+        },
+    }
+
+
+_FLOW_RATE_U = """internalField   uniform ( 0.9725 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        type flowRateInletVelocity;
+        volumetricFlowRate 0.0389;
+    }
+}
+"""
+
+
+def _write_u(root: Path, boundary: str) -> None:
+    (root / "U").write_text(f"internalField uniform ( 0.2 0 0 );\nboundaryField {{ {boundary} }}\n")
+
+
+def _build_reference_case(
+    root: Path,
+    *,
+    case_kind: str = "shercliff",
+    ha: float = 20.0,
+    cells: int = 12,
+    dt: float = 1.0e-5,
+    t_final: float = 1.0e-4,
+    forcing: float | None = None,
+):
+    return build_case_from_freemhd_reference(
+        case_kind=case_kind,
+        ha=ha,
+        ny=cells,
+        nz=cells,
+        dt=dt,
+        t_final=t_final,
+        max_steps=10,
+        reference_run_dir=root,
+        forcing=forcing,
+    )
+
+
+def _write_reference_inputs(root: Path, *, b0: str = "internalField uniform ( 0 0.2 0 );\n") -> None:
+    liquid = root / "constant/liquid"
+    liquid.mkdir(parents=True)
+    (liquid / "thermophysicalProperties.liquidMetal").write_text(
+        "mixture { equationOfState { rho 1000; } transport { mu 0.001; } }\n"
+        "elcond [-1 -3 3 0 0 2 0] 1e6;\n"
+    )
+    for region, conductivity in (("solidWalls", "5e6"), ("insulator", "1e-6")):
+        directory = root / "constant" / region
+        directory.mkdir(parents=True)
+        (directory / "thermophysicalProperties").write_text(f"elcond {conductivity};\n")
+    initial = root / "0/liquid"
+    initial.mkdir(parents=True)
+    (initial / "B0").write_text(b0)
+    system = root / "system"
+    system.mkdir()
+    (system / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nN_wall 2;\n")
+
+
+def _ladder_record(
+    y_error: tuple[float, float],
+    z_error: tuple[float, float],
+    layer_resolution: tuple[float, float, float, float, float],
+) -> dict[str, object]:
+    def cut(error: tuple[float, float]) -> dict[str, float]:
+        return {"l2_error": error[0], "linf_error": error[1], "reference_peak_abs": 1.0}
+
+    layer_names = (
+        "hartmann_layer_cells",
+        "side_layer_cells",
+        "hartmann_layer_cell_ratio",
+        "side_layer_cell_ratio",
+        "minimum_mesh_refinement_factor",
+    )
+    return {
+        "case_kind": "hunt",
+        "observables": {
+            name: {"y": cut(y_error), "z": cut(z_error)}
+            for name in ("velocity", "potential", "current", "lorentz")
+        },
+        "layer_resolution": dict(zip(layer_names, layer_resolution)),
+    }
 
 
 def _write_matched_freemhd_case(root: Path, case_kind: str) -> None:
@@ -147,6 +270,63 @@ def test_freemhd_case_audit_exposes_mislabeled_ha_and_hunt_wall(tmp_path: Path):
     assert "wall.conducting_wall_conductivity" in failed_names
 
 
+@pytest.mark.parametrize("case_id", ["B1-fringing-pipe", "B2-fringing-square"])
+def test_matched_b_record_validator_computes_contract_and_comparison(case_id: str):
+    record = _matched_b_record(case_id)
+    report = validate_matched_b_record(record, expected_case_id=case_id)
+
+    assert report["acceptance_pass"] is True
+    assert report["metrics"]["weighted_rms"] == pytest.approx(0.0)
+
+    mismatch = deepcopy(record)
+    mismatch["contract"]["freemhd"]["equations"] = {"semantic_contract": "different"}
+    mismatch["exact_case_match"] = mismatch["pass"] = True
+    rejected = validate_matched_b_record(mismatch, expected_case_id=case_id)
+    assert rejected["acceptance_pass"] is False
+    assert "contract.equations.mismatch" in rejected["failed_checks"]
+    assert "legacy.exact_case_match" in rejected["failed_checks"]
+
+    mutations = (
+        (("schema_version",), 2, "schema"),
+        (("case_id",), "wrong-case", "case_id"),
+        (("acceptance_role",), "self-promoted", "acceptance_role"),
+        (("contract", "lmx", "wall"), {}, "contract.wall.missing"),
+        (("provenance", "lmx_source_sha256"), "not-a-hash", "provenance.lmx_source_sha256"),
+        (("provenance", "benchmark_spec_sha256"), "b" * 64, "provenance.benchmark_spec_sha256.current"),
+        (("comparison", "x_over_L"), [0.0], "comparison.arrays"),
+    )
+    for path, value, expected_check in mutations:
+        malformed = deepcopy(record)
+        target = malformed
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+        report = validate_matched_b_record(malformed, expected_case_id=case_id)
+        assert expected_check in report["failed_checks"]
+
+
+def test_matched_b_record_roles_and_observables_cannot_self_promote():
+    smoke = _matched_b_record("B2-fringing-square", role="harness-smoke")
+    report = validate_matched_b_record(smoke, expected_case_id="B2-fringing-square")
+    assert report["contract_pass"] and report["comparison_pass"]
+    assert report["role_allows_acceptance"] is report["acceptance_pass"] is False
+
+    poor = _matched_b_record("B2-fringing-square")
+    poor["comparison"]["freemhd_observable"] = [
+        value + 1.0 for value in poor["comparison"]["freemhd_observable"]
+    ]
+    report = validate_matched_b_record(poor, expected_case_id="B2-fringing-square")
+    assert report["comparison_pass"] is report["acceptance_pass"] is False
+
+    wrong_role = _matched_b_record("B1-fringing-pipe", role="b2-production")
+    assert (
+        validate_matched_b_record(wrong_role, expected_case_id="B1-fringing-pipe")[
+            "acceptance_pass"
+        ]
+        is False
+    )
+
+
 @pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
 def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(
     tmp_path: Path, case_kind: str
@@ -177,46 +357,48 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(
         materialize_matched_freemhd_case(template, output, case_kind=case_kind)
 
 
-def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(tmp_path: Path):
+def test_benchmark_a_spec_loader_rejects_unsupported_case():
     with pytest.raises(ValueError, match="Unsupported matched Benchmark-A"):
         load_benchmark_a_spec("hartmann")
 
-    source_dir = Path("benchmarks/specs")
 
-    def rejected(case_kind: str, old: str, new: str, message: str) -> None:
-        case_dir = tmp_path / message.replace(" ", "_")
-        case_dir.mkdir()
-        source = source_dir / f"{case_kind}-ha20.toml"
-        text = source.read_text().replace(old, new, 1)
-        (case_dir / source.name).write_text(text)
-        with pytest.raises(ValueError, match=message):
-            load_benchmark_a_spec(case_kind, case_dir)
-
-    rejected(
-        "shercliff",
-        "schema_version = 1",
-        "schema_version = 2",
-        "Invalid matched benchmark identity",
-    )
-    rejected(
-        "shercliff",
-        "kinematic_viscosity = 1.0e-3",
-        "kinematic_viscosity = 2.0e-3",
-        "Inconsistent dynamic",
-    )
-    rejected(
-        "shercliff",
-        "vector = [0.0, 0.2, 0.0]",
-        "vector = [0.0, 0.3, 0.0]",
-        "do not reproduce Ha",
-    )
-    rejected("shercliff", "[65, 49]", "[57, 43]", "refinement ratios are too uneven")
-    rejected(
-        "hunt",
-        "conductance_ratio = 0.05",
-        "conductance_ratio = 0.06",
-        "do not reproduce the conductance ratio",
-    )
+@pytest.mark.parametrize(
+    ("case_kind", "old", "new", "message"),
+    [
+        (
+            "shercliff",
+            "schema_version = 1",
+            "schema_version = 2",
+            "Invalid matched benchmark identity",
+        ),
+        (
+            "shercliff",
+            "kinematic_viscosity = 1.0e-3",
+            "kinematic_viscosity = 2.0e-3",
+            "Inconsistent dynamic",
+        ),
+        (
+            "shercliff",
+            "vector = [0.0, 0.2, 0.0]",
+            "vector = [0.0, 0.3, 0.0]",
+            "do not reproduce Ha",
+        ),
+        ("shercliff", "[65, 49]", "[57, 43]", "refinement ratios are too uneven"),
+        (
+            "hunt",
+            "conductance_ratio = 0.05",
+            "conductance_ratio = 0.06",
+            "do not reproduce the conductance ratio",
+        ),
+    ],
+)
+def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(
+    tmp_path: Path, case_kind: str, old: str, new: str, message: str
+):
+    source = Path("benchmarks/specs") / f"{case_kind}-ha20.toml"
+    (tmp_path / source.name).write_text(source.read_text().replace(old, new, 1))
+    with pytest.raises(ValueError, match=message):
+        load_benchmark_a_spec(case_kind, tmp_path)
 
 
 def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
@@ -297,20 +479,7 @@ def test_side_jet_profile_metrics_and_comparison_capture_peak_locations():
 def test_inference_helpers_read_case_zero_and_latesttime_fallbacks(tmp_path: Path):
     case_zero = tmp_path / "case" / "0" / "liquid"
     case_zero.mkdir(parents=True)
-    (case_zero / "U").write_text(
-        """internalField   uniform ( 0.9725 0 0 );
-
-boundaryField
-{
-    inlet
-    {
-        type            flowRateInletVelocity;
-        value           uniform ( 0.9725 0 0 );
-        volumetricFlowRate 0.0389;
-    }
-}
-"""
-    )
+    (case_zero / "U").write_text(_FLOW_RATE_U)
     assert infer_initial_velocity_x(tmp_path) == pytest.approx(0.9725)
     assert infer_inlet_drive_mode(tmp_path) == "inlet_flow_rate"
 
@@ -328,17 +497,7 @@ def test_build_case_from_freemhd_reference_preserves_default_forcing_for_shercli
     u_path.mkdir(parents=True)
     (u_path / "U").write_text("internalField   uniform ( 0.9725 0 0 );\n")
 
-    case = build_case_from_freemhd_reference(
-        case_kind="shercliff",
-        ha=20.0,
-        ny=12,
-        nz=12,
-        dt=1.0e-5,
-        t_final=1.0e-4,
-        max_steps=10,
-        reference_run_dir=tmp_path,
-        forcing=None,
-    )
+    case = _build_reference_case(tmp_path)
 
     assert case.forcing == pytest.approx(1.0)
     assert case.initial_velocity == pytest.approx(0.9725)
@@ -349,32 +508,9 @@ def test_build_case_from_freemhd_reference_switches_to_inlet_flow_rate_when_refe
 ):
     u_path = tmp_path / "case" / "0" / "liquid"
     u_path.mkdir(parents=True)
-    (u_path / "U").write_text(
-        """internalField   uniform ( 0.9725 0 0 );
+    (u_path / "U").write_text(_FLOW_RATE_U)
 
-boundaryField
-{
-    inlet
-    {
-        type            flowRateInletVelocity;
-        value           uniform ( 0.9725 0 0 );
-        volumetricFlowRate 0.0389;
-    }
-}
-"""
-    )
-
-    case = build_case_from_freemhd_reference(
-        case_kind="shercliff",
-        ha=20.0,
-        ny=12,
-        nz=12,
-        dt=1.0e-5,
-        t_final=1.0e-4,
-        max_steps=10,
-        reference_run_dir=tmp_path,
-        forcing=None,
-    )
+    case = _build_reference_case(tmp_path)
 
     inlet_boundaries = [bc for bc in case.boundary_conditions if bc.name == "inlet"]
     assert case.forcing == pytest.approx(0.0)
@@ -384,36 +520,7 @@ boundaryField
 
 
 def test_freemhd_inference_helpers_recover_geometry_materials_and_b0(tmp_path: Path):
-    liquid = tmp_path / "constant" / "liquid"
-    liquid.mkdir(parents=True)
-    (liquid / "thermophysicalProperties.liquidMetal").write_text(
-        """mixture
-{
-    equationOfState
-    {
-        rho 1000;
-    }
-    transport
-    {
-        mu 0.001;
-    }
-}
-
-elcond [-1 -3  3 0 0 2 0]1e6;
-"""
-    )
-    solid = tmp_path / "constant" / "solidWalls"
-    solid.mkdir(parents=True)
-    (solid / "thermophysicalProperties").write_text("elcond 5e6;\n")
-    insulator = tmp_path / "constant" / "insulator"
-    insulator.mkdir(parents=True)
-    (insulator / "thermophysicalProperties").write_text("elcond 1e-6;\n")
-    initial = tmp_path / "0" / "liquid"
-    initial.mkdir(parents=True)
-    (initial / "B0").write_text("internalField uniform ( 0 0.2 0 );\n")
-    system = tmp_path / "system"
-    system.mkdir()
-    (system / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nN_wall 2;\n")
+    _write_reference_inputs(tmp_path)
 
     assert infer_liquid_properties(tmp_path) == pytest.approx((1.0e6, 1000.0, 1.0e-6))
     assert infer_liquid_material_properties(tmp_path) == pytest.approx(
@@ -436,65 +543,12 @@ elcond [-1 -3  3 0 0 2 0]1e6;
 def test_build_case_from_freemhd_reference_adopts_reference_geometry_materials_and_b0(
     tmp_path: Path,
 ):
-    liquid = tmp_path / "constant" / "liquid"
-    liquid.mkdir(parents=True)
-    (liquid / "thermophysicalProperties.liquidMetal").write_text(
-        """mixture
-{
-    equationOfState
-    {
-        rho 1000;
-    }
-    transport
-    {
-        mu 0.001;
-    }
-}
-
-elcond [-1 -3  3 0 0 2 0]1e6;
-"""
+    _write_reference_inputs(
+        tmp_path, b0="internalField uniform ( 0 0.2 0 );\nboundaryField {}\n"
     )
-    solid = tmp_path / "constant" / "solidWalls"
-    solid.mkdir(parents=True)
-    (solid / "thermophysicalProperties").write_text("elcond 5e6;\n")
-    insulator = tmp_path / "constant" / "insulator"
-    insulator.mkdir(parents=True)
-    (insulator / "thermophysicalProperties").write_text("elcond 1e-6;\n")
-    initial = tmp_path / "0" / "liquid"
-    initial.mkdir(parents=True)
-    (initial / "B0").write_text(
-        """internalField   uniform ( 0 0.2 0 );
-boundaryField {}
-"""
-    )
-    (initial / "U").write_text(
-        """internalField   uniform ( 0.9725 0 0 );
-
-boundaryField
-{
-    inlet
-    {
-        type flowRateInletVelocity;
-        volumetricFlowRate 0.0389;
-    }
-}
-"""
-    )
-    system = tmp_path / "system"
-    system.mkdir()
-    (system / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nN_wall 2;\n")
-
-    case = build_case_from_freemhd_reference(
-        case_kind="hunt",
-        ha=20.0,
-        ny=12,
-        nz=12,
-        dt=1.0e-5,
-        t_final=1.0e-4,
-        max_steps=10,
-        reference_run_dir=tmp_path,
-        forcing=None,
-    )
+    initial = tmp_path / "0/liquid"
+    (initial / "U").write_text(_FLOW_RATE_U)
+    case = _build_reference_case(tmp_path, case_kind="hunt")
 
     assert case.geometry.width == pytest.approx(0.2)
     assert case.geometry.height == pytest.approx(0.2)
@@ -568,62 +622,23 @@ def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Pa
 def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Path):
     u_dir = tmp_path / "0"
     u_dir.mkdir()
-    (u_dir / "U").write_text(
-        """internalField uniform ( 0.2 0 0 );
-boundaryField
-{
-    outlet
-    {
-        type zeroGradient;
-    }
-}
-"""
-    )
+    _write_u(u_dir, "outlet { type zeroGradient; }")
     assert infer_inlet_drive_mode(tmp_path) is None
     assert infer_inlet_flow_rate(tmp_path) is None
 
-    (u_dir / "U").write_text(
-        """internalField uniform ( 0.2 0 0 );
-boundaryField
-{
-    inlet
-    {
-        value uniform (0.2 0 0);
-    }
-}
-"""
-    )
+    _write_u(u_dir, "inlet { value uniform (0.2 0 0); }")
     assert infer_inlet_drive_mode(tmp_path) is None
     assert infer_inlet_flow_rate(tmp_path) is None
 
-    (u_dir / "U").write_text(
-        """internalField uniform ( 0.2 0 0 );
-boundaryField
-{
-    inlet
-    {
-        type flowRateInletVelocity;
-        volumetricFlowRate 0.0;
-    }
-}
-"""
-    )
+    _write_u(u_dir, "inlet { type flowRateInletVelocity; volumetricFlowRate 0.0; }")
     assert (
         infer_reduced_inlet_flow_rate(tmp_path, reduced_area=1.0, initial_velocity=0.2)
         is None
     )
 
-    (u_dir / "U").write_text(
-        """internalField uniform ( 0.2 0 0 );
-boundaryField
-{
-    inlet
-    {
-        type flowRateInletVelocity;
-        volumetricFlowRate constant 0.125;
-    }
-}
-"""
+    _write_u(
+        u_dir,
+        "inlet { type flowRateInletVelocity; volumetricFlowRate constant 0.125; }",
     )
     assert infer_inlet_flow_rate(tmp_path) == pytest.approx(0.125)
 
@@ -703,56 +718,12 @@ def test_freemhd_offender_summaries_rank_accuracy_and_runtime():
 
 
 def test_observable_ladder_summary_ranks_mesh_and_offender_progress(tmp_path: Path):
-    good_record = {
-        "case_kind": "hunt",
-        "observables": {
-            name: {
-                "y": {
-                    "l2_error": 8.0e-3,
-                    "linf_error": 1.0e-2,
-                    "reference_peak_abs": 1.0,
-                },
-                "z": {
-                    "l2_error": 7.0e-3,
-                    "linf_error": 9.0e-3,
-                    "reference_peak_abs": 1.0,
-                },
-            }
-            for name in ("velocity", "potential", "current", "lorentz")
-        },
-        "layer_resolution": {
-            "hartmann_layer_cells": 10.0,
-            "side_layer_cells": 7.0,
-            "hartmann_layer_cell_ratio": 1.25,
-            "side_layer_cell_ratio": 1.1,
-            "minimum_mesh_refinement_factor": 0.9,
-        },
-    }
-    bad_record = {
-        **good_record,
-        "observables": {
-            name: {
-                "y": {
-                    "l2_error": 2.0e-2,
-                    "linf_error": 3.0e-2,
-                    "reference_peak_abs": 1.0,
-                },
-                "z": {
-                    "l2_error": 9.0e-3,
-                    "linf_error": 1.0e-2,
-                    "reference_peak_abs": 1.0,
-                },
-            }
-            for name in ("velocity", "potential", "current", "lorentz")
-        },
-        "layer_resolution": {
-            "hartmann_layer_cells": 4.0,
-            "side_layer_cells": 3.0,
-            "hartmann_layer_cell_ratio": 0.5,
-            "side_layer_cell_ratio": 0.5,
-            "minimum_mesh_refinement_factor": 2.0,
-        },
-    }
+    good_record = _ladder_record(
+        (8.0e-3, 1.0e-2), (7.0e-3, 9.0e-3), (10.0, 7.0, 1.25, 1.1, 0.9)
+    )
+    bad_record = _ladder_record(
+        (2.0e-2, 3.0e-2), (9.0e-3, 1.0e-2), (4.0, 3.0, 0.5, 0.5, 2.0)
+    )
 
     summary = summarize_observable_ladder_levels(
         [
@@ -789,48 +760,20 @@ boundaryField
 }
 """
     )
-    case = build_case_from_freemhd_reference(
-        case_kind="hartmann",
-        ha=10.0,
-        ny=8,
-        nz=8,
-        dt=1.0e-4,
-        t_final=1.0e-3,
-        max_steps=10,
-        reference_run_dir=tmp_path,
-        forcing=None,
-    )
+    hartmann = dict(case_kind="hartmann", ha=10.0, cells=8, dt=1.0e-4, t_final=1.0e-3)
+    case = _build_reference_case(tmp_path, **hartmann)
     inlet = [bc for bc in case.boundary_conditions if bc.name == "inlet"][-1]
     assert case.name == "hartmann_ha10"
     assert case.forcing == pytest.approx(0.0)
     assert inlet.kind == "inlet_velocity"
     assert inlet.value == pytest.approx((0.3, 0.0, 0.0))
 
-    forced = build_case_from_freemhd_reference(
-        case_kind="hartmann",
-        ha=10.0,
-        ny=8,
-        nz=8,
-        dt=1.0e-4,
-        t_final=1.0e-3,
-        max_steps=10,
-        reference_run_dir=tmp_path,
-        forcing=2.5,
-    )
+    forced = _build_reference_case(tmp_path, forcing=2.5, **hartmann)
     assert forced.forcing == pytest.approx(2.5)
     assert not [bc for bc in forced.boundary_conditions if bc.name == "inlet"]
 
     with pytest.raises(ValueError, match="Unsupported FreeMHD reference case kind"):
-        build_case_from_freemhd_reference(
-            case_kind="unknown",
-            ha=10.0,
-            ny=8,
-            nz=8,
-            dt=1.0e-4,
-            t_final=1.0e-3,
-            max_steps=10,
-            reference_run_dir=tmp_path,
-        )
+        _build_reference_case(tmp_path, case_kind="unknown")
 
 
 def test_run_freemhd_demo_invokes_script_and_returns_output_path(

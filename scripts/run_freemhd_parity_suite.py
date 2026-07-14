@@ -2,20 +2,122 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.freemhd import audit_freemhd_case_against_spec
+from lmx.freemhd import audit_freemhd_case_against_spec, load_benchmark_a_spec
 from lmx.reference_data import default_closed_channel_reference_root
 
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
+
+
+def _tree_sha256(root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        digest.update(path.relative_to(root).as_posix().encode() + b"\0")
+        digest.update(path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:
+    updated, count = re.subn(pattern, replacement, path.read_text(encoding="utf-8"))
+    if required and count == 0:
+        raise ValueError(f"Expected input was not found in FreeMHD template file {path}")
+    if count:
+        path.write_text(updated, encoding="utf-8")
+    return count
+
+
+def materialize_matched_freemhd_case(
+    template_dir: str | Path,
+    output_dir: str | Path,
+    *,
+    case_kind: str,
+    spec_dir: str | Path | None = None,
+) -> dict[str, object]:
+    """Copy and patch a demo into an audited canonical Benchmark-A smoke case."""
+
+    source, destination = Path(template_dir).resolve(), Path(output_dir).resolve()
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FreeMHD case {destination}")
+    spec = load_benchmark_a_spec(case_kind, spec_dir)
+    shutil.copytree(source, destination)
+    vector = " ".join(f"{float(value):.16g}" for value in spec["magnetic_field"]["vector"])
+    old_b0 = r"\(\s*0(?:\.0+)?\s+10(?:\.0+)?\s+0(?:\.0+)?\s*\)"
+    changed: dict[str, int] = {}
+    for path in sorted((destination / "0").glob("*/B0")):
+        if count := _replace(path, old_b0, f"( {vector} )", required=False):
+            changed[path.relative_to(destination).as_posix()] = count
+    for path in sorted((destination / "system").glob("*/changeDictionaryDict")):
+        if re.search(r"\bB0\s*\{", path.read_text(encoding="utf-8")):
+            changed[path.relative_to(destination).as_posix()] = _replace(path, old_b0, f"( {vector} )")
+
+    velocity, flow_rate = float(spec["drive"]["reference_mean_velocity"]), float(spec["drive"]["target_flow_rate"])
+    for path in (destination / "0/liquid/U", destination / "system/liquid/changeDictionaryDict"):
+        count = _replace(path, r"(?<![0-9.])0\.9725(?![0-9.])", f"{velocity:.16g}")
+        count += _replace(path, r"(volumetricFlowRate\s+(?:constant\s+)?)[0-9eE+.\-]+", rf"\g<1>{flow_rate:.16g}")
+        changed[path.relative_to(destination).as_posix()] = count
+
+    fluid = spec["fluid"]
+    liquid = destination / "constant/liquid/thermophysicalProperties.liquidMetal"
+    substitutions = (
+        (r"(\brho\s+)[0-9eE+.\-]+(\s*;)", float(fluid["density"])),
+        (r"(\bmu\s+)[0-9eE+.\-]+(\s*;)", float(fluid["dynamic_viscosity"])),
+        (r"(\belcond(?:\s+\[[^\]]+\])?\s*)[0-9eE+.\-]+(\s*;)", float(fluid["conductivity"])),
+    )
+    changed[liquid.relative_to(destination).as_posix()] = sum(
+        _replace(liquid, pattern, rf"\g<1>{value:.16g}\g<2>") for pattern, value in substitutions
+    )
+    wall = spec["wall"]
+    for region, conductivity in (("solidWalls", wall["conducting_wall_conductivity"]), ("insulator", wall["insulating_wall_conductivity"])):
+        path = destination / "constant" / region / "thermophysicalProperties"
+        changed[path.relative_to(destination).as_posix()] = _replace(
+            path, r"(\belcond\s+)[0-9eE+.\-]+(\s*;)", rf"\g<1>{float(conductivity):.16g}\g<2>"
+        )
+
+    geometry = spec["geometry"]
+    mesh = destination / "system/blockMeshDict"
+    mesh_values = {
+        "Ly": float(geometry["length_scale"]),
+        "Ly_wall": float(geometry["length_scale"]) + float(geometry["wall_thickness"]),
+        "Ha": float(spec["magnetic_field"]["hartmann_number"]),
+        "N_wall": int(geometry["wall_cells"]),
+    }
+    changed[mesh.relative_to(destination).as_posix()] = sum(
+        _replace(mesh, rf"(?m)^(\s*{key}\s+)[^;]+;", rf"\g<1>{value:.16g};")
+        for key, value in mesh_values.items()
+    )
+    audit = audit_freemhd_case_against_spec(destination, case_kind=case_kind, spec_dir=spec_dir)
+    if not audit["matched"]:
+        failures = [check["name"] for check in audit["checks"] if not check["pass"]]
+        raise ValueError(f"Generated FreeMHD case failed its canonical audit: {failures}")
+    manifest = {
+        "schema_version": 1,
+        "case_kind": case_kind,
+        "run_profile": "docker_smoke_only",
+        "source_template": source.name,
+        "source_template_sha256": _tree_sha256(source),
+        "spec_id": spec["id"],
+        "spec_path": spec["path"],
+        "spec_sha256": spec["sha256"],
+        "changed_files": changed,
+        "case_tree_sha256_before_manifest": _tree_sha256(destination),
+        "audit": {**audit, "reference_case_dir": "."},
+    }
+    (destination / "lmx-benchmark-manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -197,6 +299,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run available FreeMHD parity artifact checks.")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
+        "--materialize",
+        choices=("shercliff", "hunt"),
+        help="materialize an audited smoke case at --output and exit without running a solver",
+    )
+    parser.add_argument(
         "--freemhd-install-dir",
         type=Path,
         default=Path(os.environ.get("LMX_FREEMHD_INSTALL_DIR", DEFAULT_FREEMHD_INSTALL_DIR)),
@@ -207,6 +314,15 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(os.environ.get("LMX_FREEMHD_PROCESSED_ROOT", DEFAULT_PROCESSED_ROOT)),
     )
     args = parser.parse_args(argv)
+
+    if args.materialize:
+        manifest = materialize_matched_freemhd_case(
+            args.freemhd_install_dir / "cases" / f"{args.materialize}_demo",
+            args.output,
+            case_kind=args.materialize,
+        )
+        print(json.dumps(manifest, indent=2, sort_keys=True))
+        return 0
 
     summary = run_suite(
         output=args.output,

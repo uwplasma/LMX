@@ -12,19 +12,43 @@ from scripts import run_freemhd_parity_suite
 pytestmark = pytest.mark.unit
 
 
+def test_materialize_mode_dispatches_without_running_parity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    install, output = tmp_path / "freemhd", tmp_path / "case"
+    called = {}
+
+    def materialize(template, destination, *, case_kind):
+        called.update(template=template, destination=destination, case_kind=case_kind)
+        return {"case_kind": case_kind, "audit": {"matched": True}}
+
+    monkeypatch.setattr(
+        run_freemhd_parity_suite, "materialize_matched_freemhd_case", materialize
+    )
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "run_suite",
+        lambda **_: pytest.fail("materialize mode must not run parity"),
+    )
+    rc = run_freemhd_parity_suite.main([
+        "--output", str(output), "--freemhd-install-dir", str(install), "--materialize", "hunt",
+    ])
+
+    assert rc == 0
+    assert called == {
+        "template": install / "cases/hunt_demo",
+        "destination": output,
+        "case_kind": "hunt",
+    }
+
+
 def test_run_freemhd_parity_suite_skips_without_external_references(tmp_path: Path):
     output = tmp_path / "parity"
 
-    rc = run_freemhd_parity_suite.main(
-        [
-            "--output",
-            str(output),
-            "--freemhd-install-dir",
-            str(tmp_path / "missing_freemhd"),
-            "--processed-root",
-            str(tmp_path / "missing_processed"),
-        ]
-    )
+    rc = run_freemhd_parity_suite.main([
+        "--output", str(output), "--freemhd-install-dir", str(tmp_path / "missing_freemhd"),
+        "--processed-root", str(tmp_path / "missing_processed"),
+    ])
 
     assert rc == 0
     payload = json.loads((output / "summary.json").read_text())
@@ -34,19 +58,10 @@ def test_run_freemhd_parity_suite_skips_without_external_references(tmp_path: Pa
 
 
 def test_observable_max_l2_reads_nested_axis_payloads():
-    records = [
-        {
-            "observables": {
-                "velocity": {
-                    "y": {"l2_error": 0.01},
-                    "z": {"l2_error": 0.02},
-                },
-                "current": {
-                    "y": {"l2_error": 0.03},
-                },
-            }
-        }
-    ]
+    records = [{"observables": {
+        "velocity": {"y": {"l2_error": 0.01}, "z": {"l2_error": 0.02}},
+        "current": {"y": {"l2_error": 0.03}},
+    }}]
 
     assert run_freemhd_parity_suite._observable_max_l2(records, axis="y") == 0.03
     assert run_freemhd_parity_suite._observable_max_l2(records, axis="z") == 0.02
@@ -56,22 +71,14 @@ def test_freemhd_parity_markdown_includes_observable_gate(tmp_path: Path):
     path = tmp_path / "summary.md"
     run_freemhd_parity_suite._write_markdown(
         path,
-        {
-            "status": "completed",
-            "reason": "",
-            "case_dir": "/tmp/reference",
-            "sample_output": "/tmp/sample",
-            "parity_output": "/tmp/parity",
-            "parity_report": {
-                "metrics": {"reference_sample_y_l2_error": 0.02},
-                "observable_gate": {
-                    "research_grade_validation_pass": False,
-                    "observable_offender_count": 3,
-                    "missing_observable_count": 0,
-                    "low_signal_count": 1,
-                },
-            },
-        },
+        {"status": "completed", "reason": "", "case_dir": "/tmp/reference",
+         "sample_output": "/tmp/sample", "parity_output": "/tmp/parity",
+         "parity_report": {
+             "metrics": {"reference_sample_y_l2_error": 0.02},
+             "observable_gate": {"research_grade_validation_pass": False,
+                                 "observable_offender_count": 3,
+                                 "missing_observable_count": 0, "low_signal_count": 1},
+         }},
     )
 
     text = path.read_text()
@@ -89,48 +96,27 @@ def test_run_freemhd_parity_suite_uses_available_reference_branches(
     processed_root = tmp_path / "processed"
     processed_root.mkdir()
 
-    transient = SimpleNamespace(
-        OUTPUT_DIR=tmp_path / "unset", FREEMHD_INSTALL_DIR=tmp_path / "unset"
-    )
+    transient = SimpleNamespace(OUTPUT_DIR=tmp_path / "unset", FREEMHD_INSTALL_DIR=tmp_path / "unset")
     transient.run_freemhd_closed_channel_parity = lambda: {
         "records": [
             {"y_l2_error": 0.01, "z_l2_error": 0.02, "u_max_abs_diff": 0.03},
             {"y_l2_error": 0.04, "z_l2_error": 0.01, "u_max_abs_diff": 0.02},
         ]
     }
-    observable = SimpleNamespace(
-        OUTPUT_DIR=tmp_path / "unset", REFERENCE_ROOT=tmp_path / "unset"
-    )
+    observable = SimpleNamespace(OUTPUT_DIR=tmp_path / "unset", REFERENCE_ROOT=tmp_path / "unset")
     observable.run_freemhd_closed_channel_observable_parity = lambda: {
-        "records": [
-            {
-                "observables": {
-                    "velocity": {
-                        "y": {"l2_error": 0.05},
-                        "z": {"l2_error": 0.06},
-                    }
-                }
-            }
-        ],
-        "observable_gate": {
-            "research_grade_validation_pass": False,
-            "observable_offender_count": 2,
-            "missing_observable_count": 1,
-            "low_signal_count": 0,
-        },
+        "records": [{"observables": {"velocity": {
+            "y": {"l2_error": 0.05}, "z": {"l2_error": 0.06},
+        }}}],
+        "observable_gate": {"research_grade_validation_pass": False,
+                            "observable_offender_count": 2,
+                            "missing_observable_count": 1, "low_signal_count": 0},
     }
-    monkeypatch.setitem(
-        sys.modules, "campaigns.freemhd.freemhd_closed_channel_parity", transient
-    )
-    monkeypatch.setitem(
-        sys.modules, "examples.freemhd_closed_channel_observable_parity", observable
-    )
-    monkeypatch.setattr(
-        examples, "freemhd_closed_channel_parity", transient, raising=False
-    )
-    monkeypatch.setattr(
-        examples, "freemhd_closed_channel_observable_parity", observable, raising=False
-    )
+    for name, module in (("freemhd_closed_channel_parity", transient),
+                         ("freemhd_closed_channel_observable_parity", observable)):
+        prefix = "campaigns.freemhd" if module is transient else "examples"
+        monkeypatch.setitem(sys.modules, f"{prefix}.{name}", module)
+        monkeypatch.setattr(examples, name, module, raising=False)
     monkeypatch.setattr(
         run_freemhd_parity_suite,
         "audit_freemhd_case_against_spec",
