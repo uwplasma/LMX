@@ -58,6 +58,18 @@
       }
     ]
   },
+  "fine_followup": {
+    "acceptance_pass": false,
+    "source_fingerprint": "c846c8a6733e9d0f17636034545234bc8e45602dff0c4188331cca0dd2d7b3e0",
+    "initial_checkpoint_step": 96,
+    "initial_checkpoint_sha256": "8267ccbd08861ae5c449f410b4e84065c2b46ba4f0cc718cda8593aa60869455",
+    "continuation_checkpoint_step": 16,
+    "continuation_checkpoint_sha256": "96b9937b17934442d2dd688b2efecf22d58f8426488abe4b734dfbcd89cae964",
+    "effective_completed_steps": 112,
+    "observed_residual": 6.504858564232441e-05,
+    "target_residual": 5e-05,
+    "stop_reason": "checkpointed after 706.55 continuation seconds because the observed plateau projected several more GPU-hours; optimize the accepted solver before resuming"
+  },
   "independence": {
     "iteration_delta_uncertainty_fraction": 0.0004253278085451437,
     "pass": true,

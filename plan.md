@@ -172,7 +172,10 @@ for external research use.
   `5.784e-4`; the thin-wall relative difference is `9.26e-14`. Tight convergence
   required 7,720.92 seconds across two restart-safe segments; the three final
   confirmation runs took 57.64, 34.94, and 57.10 seconds from that restart.
-  Fine-mesh reprojection is now running; experimental acceptance remains open.
+  The fine continuation was checkpointed after 112 effective updates at
+  residual `6.505e-5`; its plateau projected several more GPU-hours, so the
+  next tranche optimizes the accepted solver before resuming. Experimental
+  acceptance remains open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

@@ -32,6 +32,10 @@ The source-identical baseline, doubled-iteration, and confirmation-wall runs
 then passed in 57.64, 34.94, and 57.10 seconds. Their tolerance and iteration
 deltas are below `5.79e-4` of the frozen uncertainty; this closes medium-grid
 numerical independence, not the experimental or three-mesh acceptance gate.
+The fine-grid baseline remains outside acceptance at residual `6.505e-5` after
+112 effective updates. Its atomic two-GPU checkpoint is preserved, but the
+continuation was stopped because the measured plateau projected several more
+GPU-hours; profiling and solver optimization now precede another fine run.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states
