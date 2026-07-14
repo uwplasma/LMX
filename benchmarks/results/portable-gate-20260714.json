@@ -1,6 +1,6 @@
 {
   "date": "2026-07-14",
-  "commit": "f4e41fab0e8e8b4c1ef1adfc08b5f90958758aa6",
+  "commit": "2313d0c5c08a24b44b268bd773b6df8466c6f27e",
   "lock_sha256": "da69fe6dc887d49e7376c3d747334039e9224625d992604e8e240e7052bfc44d",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
@@ -20,40 +20,42 @@
     "jax": "0.10.2",
     "jaxlib": "0.10.2",
     "workers": 6,
+    "test_files": 35,
+    "test_lines": 21759,
     "passed": 765,
     "skipped": 8,
-    "pytest_seconds": 168.81,
-    "gate_seconds": 171.1,
+    "pytest_seconds": 165.37,
+    "gate_seconds": 167.5,
     "branch_coverage_percent": 95.28,
     "slowest_tests": [
       {
         "nodeid": "tests/test_fringing.py::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]",
-        "seconds": 55.108
+        "seconds": 53.135
       },
       {
         "nodeid": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "seconds": 24.793
+        "seconds": 24.136
       },
       {
         "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
-        "seconds": 23.47
+        "seconds": 23.942
       },
       {
         "nodeid": "tests/test_autodiff.py::test_fringing_response_inverse_design_reduces_loss",
-        "seconds": 20.569
+        "seconds": 20.097
       },
       {
-        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry",
-        "seconds": 18.369
+        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_returns_finite_payload",
+        "seconds": 19.654
       }
     ],
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 200.3,
-    "wall_time_reduction_percent": 14.578,
-    "current_budget_fraction": 0.285,
-    "current_engineering_target_fraction": 0.475,
+    "previous_gate_seconds": 171.1,
+    "wall_time_reduction_percent": 2.104,
+    "current_budget_fraction": 0.279,
+    "current_engineering_target_fraction": 0.465,
     "current_gate_pass": true
   },
   "hosted_ci": {
