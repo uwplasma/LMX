@@ -845,6 +845,16 @@ def test_compact_duct_mass_flux_codec_and_initializer_match_fv_faces():
         np.zeros_like(momentum[:, :, :1, 2])), axis=2) * dx * dy[None, :, None]
     assert plus == pytest.approx(np.stack((expected_x, expected_y, expected_z)))
     assert initialized_inlet == pytest.approx(density[0] * inlet_velocity[..., 0] * jnp.outer(dy, dz))
+    fx, fy, fz = map(np.asarray, fringing_impl._unpack_duct_mass_flux(plus, initialized_inlet))
+    volume = np.broadcast_to(dx * np.outer(dy, dz), shape)
+    surface = (abs(fx[:-1]) + abs(fx[1:]) + abs(fy[:, :-1]) + abs(fy[:, 1:]) +
+               abs(fz[:, :, :-1]) + abs(fz[:, :, 1:])) / np.asarray(density)
+    cell_courant = 0.5 * 0.13 * surface / volume
+    courant = jax.jit(lambda p, i: fringing_impl._compact_duct_courant_numbers(
+        p, i, density, dt=0.13, dx=dx, dy=dy, dz=dz))(plus, initialized_inlet)
+    assert tuple(map(float, courant)) == pytest.approx(
+        (np.sum(cell_courant * volume) / np.sum(volume), np.max(cell_courant))
+    )
     tangent = jax.jvp(initialize, (1.0,), (1.0,))[1]
     assert all(jnp.allclose(a, b) for a, b in zip(tangent, (plus, initialized_inlet), strict=True))
 

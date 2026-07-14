@@ -1787,6 +1787,22 @@ def _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet):
     )
 
 
+def _compact_duct_courant_numbers(
+    rho_phi_plus, rho_phi_inlet, density, *, dt, dx, dy, dz, sharding=None,
+):
+    """Return OpenFOAM-style volume-mean and maximum mass-flux Courant numbers."""
+
+    east, north, top = rho_phi_plus
+    west = _neighbor_fields(east, mode_x="dirichlet", mode_y="neumann",
+        mode_z="neumann", sharding=sharding)[0].at[0].set(rho_phi_inlet)
+    south = jnp.concatenate((jnp.zeros_like(north[:, :1]), north[:, :-1]), axis=1)
+    bottom = jnp.concatenate((jnp.zeros_like(top[:, :, :1]), top[:, :, :-1]), axis=2)
+    widths = _coerce_spacing_vector(dx, density.shape[0], dtype=density.dtype)
+    volume = widths[:, None, None] * dy[None, :, None] * dz[None, None, :]
+    sum_phi = sum(map(jnp.abs, (west, east, south, north, bottom, top))) / density
+    return 0.5 * dt * jnp.sum(sum_phi) / jnp.sum(volume), 0.5 * dt * jnp.max(sum_phi / volume)
+
+
 def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz):
     """Pack oriented, area-integrated ``linearInterpolate(rho*U)&Sf`` faces."""
     momentum = density[..., None] * velocity
@@ -5996,6 +6012,19 @@ def _shard_extruded_fields(
     return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
 
 
+def _iteration_history_arrays(residual, component, pressure, electric, potential,
+                              courant=None):
+    """Build consistently shaped outer-iteration histories."""
+    return {
+        "iteration_residual_history": jnp.asarray(residual, dtype=float),
+        "iteration_component_residual_history": jnp.asarray(component, dtype=float).reshape((-1, 6)),
+        "iteration_pressure_residual_history": jnp.asarray(pressure, dtype=float),
+        "iteration_electric_linear_history": jnp.asarray(electric, dtype=float).reshape((-1, 6)),
+        "iteration_potential_residual_history": jnp.asarray(potential, dtype=float),
+        "iteration_courant_history": jnp.asarray(courant or (), dtype=float).reshape((-1, 3)),
+    }
+
+
 def _iteration_checkpoint_bundle(
     *,
     case: CaseSpec,
@@ -6018,6 +6047,8 @@ def _iteration_checkpoint_bundle(
     rho_phi_plus: jnp.ndarray | None = None,
     rho_phi_inlet: jnp.ndarray | None = None,
     aitken_state: tuple[jnp.ndarray | None, float, int] | None = None,
+    stopping_state: tuple[int, int, str] = (0, 0, "not_recorded"),
+    courant_history: list[tuple[float, float, float]] | None = None,
 ) -> ExtrudedFieldBundle:
     """Build the minimal existing-schema bundle needed to resume a solve."""
 
@@ -6034,6 +6065,7 @@ def _iteration_checkpoint_bundle(
         rho_phi_plus=rho_phi_plus,
         rho_phi_inlet=rho_phi_inlet,
         aitken_state=aitken_state,
+        stopping_state=stopping_state,
         geometry_kind=case.geometry.kind,
         solver_kind=case.solver.kind,
         axial_pressure_loss_gradient=(
@@ -6046,17 +6078,8 @@ def _iteration_checkpoint_bundle(
             if transverse_pressure_difference is None
             else transverse_pressure_difference
         ),
-        iteration_residual_history=jnp.asarray(residual_history, dtype=float),
-        iteration_component_residual_history=jnp.asarray(
-            component_history, dtype=float
-        ).reshape((-1, 6)),
-        iteration_pressure_residual_history=jnp.asarray(pressure_history, dtype=float),
-        iteration_electric_linear_history=jnp.asarray(
-            electric_history, dtype=float
-        ).reshape((-1, 6)),
-        iteration_potential_residual_history=jnp.asarray(
-            potential_history, dtype=float
-        ),
+        **_iteration_history_arrays(residual_history, component_history,
+            pressure_history, electric_history, potential_history, courant_history),
     )
 
 
@@ -6274,12 +6297,8 @@ def _solve_extruded_projection(
             if initial_bundle is not None or case.initial_velocity != 0.0
             else None
         )
-        outer_steps = max(
-            2,
-            min(
-                case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2)
-            ),
-        )
+        outer_steps = min(case.time_stepper.max_steps,
+                          max(6, case.solver.coupling_iterations * 2))
         poisson_iterations = (
             case.time_stepper.potential_iterations
             if use_alex_b1_finite_volume
@@ -7039,19 +7058,9 @@ def _solve_extruded_projection(
             solver_kind=case.solver.kind,
             axial_pressure_loss_gradient=jnp.nan_to_num(axial_pressure_loss_gradient),
             transverse_pressure_difference=jnp.zeros((nx,), dtype=float),
-            iteration_residual_history=jnp.asarray(residual_by_step, dtype=float),
-            iteration_component_residual_history=jnp.asarray(
-                component_residual_by_step, dtype=float
-            ).reshape((-1, 6)),
-            iteration_pressure_residual_history=jnp.asarray(
-                pressure_residual_by_step, dtype=float
-            ),
-            iteration_electric_linear_history=jnp.asarray(
-                electric_linear_by_step, dtype=float
-            ).reshape((-1, 6)),
-            iteration_potential_residual_history=jnp.asarray(
-                potential_residual_by_step, dtype=float
-            ),
+            **_iteration_history_arrays(residual_by_step, component_residual_by_step,
+                pressure_residual_by_step, electric_linear_by_step,
+                potential_residual_by_step),
         )
     materials = build_material_fields(case, mesh)
     x = jnp.asarray(mesh.x_centers, dtype=float)
@@ -7200,9 +7209,8 @@ def _solve_extruded_projection(
             if initial_bundle is not None or case.initial_velocity != 0.0
             else None
         )
-    outer_steps = max(
-        2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
-    )
+    outer_steps = min(case.time_stepper.max_steps,
+                      max(6, case.solver.coupling_iterations * 2))
     poisson_iterations = (
         case.time_stepper.potential_iterations
         if use_alex_b2_finite_volume
@@ -7233,14 +7241,28 @@ def _solve_extruded_projection(
     (residual_by_step, component_residual_by_step, pressure_residual_by_step,
         electric_linear_by_step, potential_residual_by_step) = histories
     completed_steps = len(residual_by_step)
+    courant_by_step = ([] if initial_bundle is None else np.asarray(getattr(
+        initial_bundle, "iteration_courant_history", jnp.zeros((0, 3)))).tolist())
+    if completed_steps and not courant_by_step:
+        courant_by_step = [[-1.0, -1.0, -1.0]] * completed_steps
+    if len(courant_by_step) != completed_steps:
+        raise ValueError("B2 restart CFL histories have inconsistent lengths")
     fixed_point_iterates: list[jnp.ndarray] = []
     fixed_point_residuals: list[jnp.ndarray] = []
     previous_fixed_point_residual: jnp.ndarray | None = None
-    steady_streak = 0
+    restart_stopping = ((0, 0, "not_recorded") if initial_bundle is None else
+        getattr(initial_bundle, "stopping_state", (0, 0, "not_recorded")))
+    if restart_stopping[0] not in (0, completed_steps):
+        raise ValueError("B2 restart stopping state has inconsistent step count")
+    steady_streak = int(restart_stopping[1])
     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
     restart_aitken = None if initial_bundle is None else getattr(initial_bundle, "aitken_state", None)
     if use_alex_b2_finite_volume and restart_aitken is not None:
-        previous_fixed_point_residual, fixed_point_relaxation, steady_streak = restart_aitken
+        previous_fixed_point_residual, fixed_point_relaxation, legacy_streak = restart_aitken
+        if restart_stopping[2] == "not_recorded":
+            steady_streak = legacy_streak
+        elif steady_streak != legacy_streak:
+            raise ValueError("B2 restart stopping and Aitken streaks disagree")
         previous_fixed_point_residual = (None if previous_fixed_point_residual is None
             else jnp.asarray(previous_fixed_point_residual, dtype=u.dtype))
         fixed_point_relaxation = jnp.asarray(fixed_point_relaxation, dtype=u.dtype)
@@ -7544,6 +7566,10 @@ def _solve_extruded_projection(
     stop_step = completed_steps + outer_steps
     for step in range(completed_steps, stop_step):
         flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
+        step_courant = (_compact_duct_courant_numbers(
+            current_rho_phi_plus, current_rho_phi_inlet,
+            rho[:, y0:y1, z0:z1], dt=dt, dx=dx, dy=local_dy, dz=local_dz,
+            sharding=field_sharding) if use_alex_b2_finite_volume else (-1.0, -1.0))
         phi_previous = phi
         pressure_observable_previous = (
             _cross_duct_pressure_difference(
@@ -7797,6 +7823,8 @@ def _solve_extruded_projection(
             *electric_diagnostics,
         ) = map(float, diagnostics)
         electric_linear_by_step.append(tuple(electric_diagnostics))
+        courant_by_step.append((dt if use_alex_b2_finite_volume else -1.0,
+                                *map(float, step_courant)))
         update_residual = max(
             u_update,
             v_update,
@@ -7944,6 +7972,10 @@ def _solve_extruded_projection(
                 aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
                     steady_streak) if use_alex_b2_finite_volume and
                     case.solver.coupling_acceleration == "aitken" else None),
+                stopping_state=(step + 1, steady_streak,
+                    "converged" if converged else
+                    "step_limit" if step + 1 == stop_step else "in_progress"),
+                courant_history=courant_by_step,
             ),
         )
         if converged:
@@ -8039,6 +8071,8 @@ def _solve_extruded_projection(
         aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
             steady_streak) if use_alex_b2_finite_volume and
             case.solver.coupling_acceleration == "aitken" else None),
+        stopping_state=(len(residual_by_step), steady_streak,
+            "converged" if converged else "step_limit"),
         jx=jx,
         jy=jy,
         jz=jz,
@@ -8063,19 +8097,9 @@ def _solve_extruded_projection(
         transverse_pressure_difference=jnp.asarray(
             transverse_pressure_difference, dtype=float
         ),
-        iteration_residual_history=jnp.asarray(residual_by_step, dtype=float),
-        iteration_component_residual_history=jnp.asarray(
-            component_residual_by_step, dtype=float
-        ).reshape((-1, 6)),
-        iteration_pressure_residual_history=jnp.asarray(
-            pressure_residual_by_step, dtype=float
-        ),
-        iteration_electric_linear_history=jnp.asarray(
-            electric_linear_by_step, dtype=float
-        ).reshape((-1, 6)),
-        iteration_potential_residual_history=jnp.asarray(
-            potential_residual_by_step, dtype=float
-        ),
+        **_iteration_history_arrays(residual_by_step, component_residual_by_step,
+            pressure_residual_by_step, electric_linear_by_step,
+            potential_residual_by_step, courant_by_step),
     )
 
 

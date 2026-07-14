@@ -461,6 +461,8 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         phi=jnp.zeros((3, 2, 2)),
         rho_phi_plus=jnp.arange(18.0).reshape((3, 3, 1, 2)),
         rho_phi_inlet=jnp.asarray([[0.4, 0.6]]),
+        aitken_state=(jnp.ones((4, 3, 2, 2)), 0.75, 1),
+        stopping_state=(1, 1, "in_progress"),
         jx=jnp.zeros((3, 2, 2)),
         jy=jnp.zeros((3, 2, 2)),
         jz=jnp.zeros((3, 2, 2)),
@@ -477,10 +479,15 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
+        iteration_residual_history=jnp.asarray([1.0e-3]),
+        iteration_component_residual_history=jnp.asarray(
+            [[1.0e-3, 2.0e-4, 3.0e-5, 1.0e-6, 2.0e-6, 3.0e-6]]),
+        iteration_pressure_residual_history=jnp.asarray([2.0e-4]),
         iteration_electric_linear_history=jnp.asarray(
             [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
         ),
         iteration_potential_residual_history=jnp.asarray([3.0e-5]),
+        iteration_courant_history=jnp.asarray([[1.0e-3, 0.02, 0.04]]),
         geometry_kind="rect_duct",
         solver_kind="extruded_inductionless",
     )
@@ -495,35 +502,23 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
-    assert restart_bundle.bundle.rho_phi_plus == pytest.approx(bundle.rho_phi_plus)
-    assert restart_bundle.bundle.rho_phi_inlet == pytest.approx(bundle.rho_phi_inlet)
-    assert restart_bundle.metadata["restart_schema"] == "compact_flux_v1"
-    assert restart_bundle.bundle.axial_pressure_loss_gradient.tolist() == pytest.approx(
-        [1.0, 1.5, 1.0]
-    )
-    assert (
-        restart_bundle.bundle.transverse_pressure_difference.tolist()
-        == pytest.approx([0.0, 0.25, 0.0])
-    )
-    assert restart_bundle.bundle.iteration_electric_linear_history.tolist() == [
-        pytest.approx([1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0])
-    ]
-    assert restart_bundle.bundle.iteration_potential_residual_history.tolist() == (
-        pytest.approx([3.0e-5])
-    )
+    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v2"
+    for name in ("rho_phi_plus", "rho_phi_inlet", "axial_pressure_loss_gradient",
+                 "transverse_pressure_difference", "iteration_electric_linear_history",
+                 "iteration_potential_residual_history", "iteration_courant_history"):
+        assert getattr(restart_bundle.bundle, name) == pytest.approx(getattr(bundle, name))
+    assert restart_bundle.bundle.stopping_state == (1, 1, "in_progress")
     assert all(path.exists() for path in vars(layout).values())
 
     with np.load(restart_path, allow_pickle=False) as data:
-        legacy_payload = {
-            key: data[key]
-            for key in data.files
-            if key not in {"metadata_json", "rho_phi_plus", "rho_phi_inlet"}
-        }
+        legacy_payload = {key: data[key] for key in data.files if key not in {
+            "metadata_json", "rho_phi_plus", "rho_phi_inlet", "iteration_courant_history"}}
     legacy_path = tmp_path / "restart" / "legacy.npz"
     np.savez_compressed(legacy_path, **legacy_payload)
     legacy = load_extruded_restart_bundle(legacy_path)
     assert legacy.bundle.rho_phi_plus is legacy.bundle.rho_phi_inlet is None
     assert legacy.metadata["restart_schema"] == "legacy_nonexact"
+    assert not legacy.bundle.iteration_courant_history.size
 
     partial = SimpleNamespace(**{**bundle.__dict__, "rho_phi_inlet": None})
     with pytest.raises(ValueError, match="requires both"):

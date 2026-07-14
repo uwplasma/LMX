@@ -462,6 +462,9 @@ def _run_record(
     write_extruded_restart_npz(solution, problem.case, restart_path)
     observable_x, observable = _load_restart_observable(restart_path, case_id)
     validation = solution.validation
+    courant_history = np.asarray(solution.bundle.iteration_courant_history, dtype=float)
+    measured_courant = courant_history[:, 2][courant_history[:, 2] >= 0.0]
+    completed_steps, final_streak, stop_reason = solution.bundle.stopping_state
     return {
         "case_id": case_id,
         "mesh_level": mesh_level,
@@ -516,6 +519,7 @@ def _run_record(
         "iteration_potential_residual_history": np.asarray(
             solution.bundle.iteration_potential_residual_history
         ).tolist(),
+        "iteration_courant_history": courant_history.tolist(),
         "diagnostics": {
             "max_residual": validation.max_residual,
             "max_divergence_residual": validation.max_divergence_residual,
@@ -523,6 +527,10 @@ def _run_record(
             "volumetric_flow_rate_span": validation.volumetric_flow_rate_span,
             "max_wall_current_leakage": validation.max_wall_current_leakage,
             "net_boundary_current_residual": validation.net_boundary_current_residual,
+            "max_courant": float(np.max(measured_courant)) if measured_courant.size else None,
+            "completed_steps": completed_steps,
+            "final_steady_streak": final_streak,
+            "stop_reason": stop_reason,
         },
     }, solution
 
@@ -543,6 +551,7 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
     uncertainty = float(spec["reference"]["combined_uncertainty_absolute"])
     base_diagnostics = records["baseline"]["diagnostics"]
     steady_max = float(spec["solver"]["steady_residual_max"])
+    steady_steps = int(spec["solver"]["steady_steps_min"])
 
     def steady_limit(record: dict[str, Any]) -> float:
         """Honor a variant's tighter requested tolerance in its steady gate."""
@@ -562,6 +571,10 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         <= float(spec["solver"]["current_balance_max"]),
         "boundary_current": float(base_diagnostics["net_boundary_current_residual"])
         <= float(spec["solver"]["current_balance_max"]),
+        "sustained_stopping": (
+            base_diagnostics.get("stop_reason") == "converged"
+            and int(base_diagnostics.get("final_steady_streak", -1)) >= steady_steps
+        ),
     }
     for variant, record in records.items():
         if variant == "baseline":
@@ -581,6 +594,10 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         gates[f"{prefix}_boundary_current"] = float(
             diagnostics["net_boundary_current_residual"]
         ) <= float(spec["solver"]["current_balance_max"])
+        gates[f"{prefix}_sustained_stopping"] = (
+            diagnostics.get("stop_reason") == "converged"
+            and int(diagnostics.get("final_steady_streak", -1)) >= steady_steps
+        )
     result: dict[str, Any] = {
         "case_id": case_id,
         "complete": not missing,

@@ -87,6 +87,8 @@ def _record(observable, *, residual=1.0e-9, coupling_tolerance=None):
             "volumetric_flow_rate_span": 1.0e-5,
             "max_wall_current_leakage": 0.0,
             "net_boundary_current_residual": 0.0,
+            "final_steady_streak": 3,
+            "stop_reason": "converged",
         },
     }
 
@@ -132,10 +134,11 @@ def test_comparison_applies_uncertainty_and_thin_wall_gates():
     assert failed["gates"]["mass_balance"] is False
 
     records["baseline"] = _record([0.1, 0.2, 0.1])
-    records["thin_wall"] = _record([0.1001, 0.2001, 0.1001], residual=1.0)
+    records["thin_wall"] = _record([0.1001, 0.2001, 0.1001])
+    records["thin_wall"]["diagnostics"]["final_steady_streak"] = 2
     failed = campaign._comparison("B2-fringing-square", records)
     assert failed["pass"] is False
-    assert failed["gates"]["thin-wall_steady_residual"] is False
+    assert failed["gates"]["thin-wall_sustained_stopping"] is False
 
     incomplete = campaign._comparison(
         "B2-fringing-square", {"baseline": records["baseline"]}

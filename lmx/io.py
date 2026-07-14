@@ -12,6 +12,16 @@ from .core import Diagnostics, MHDState, Solution
 from .mesh import StructuredMesh
 
 
+_EXTRUDED_HISTORY_WIDTHS = (
+    ("iteration_residual_history", 0), ("iteration_component_residual_history", 6),
+    ("iteration_pressure_residual_history", 0), ("iteration_electric_linear_history", 6),
+    ("iteration_potential_residual_history", 0), ("iteration_courant_history", 3),
+)
+_EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
+residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
+charge_balance_residual boundary_current_residual""".split()
+
+
 def enable_compilation_cache(
     cache_dir: str | Path | None = None,
     *,
@@ -260,34 +270,13 @@ def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
     np.savez_compressed(
         path,
         metadata_json=json.dumps(metadata),
-        x=np.asarray(bundle.x),
-        y=np.asarray(bundle.y),
-        z=np.asarray(bundle.z),
-        field_scale=np.asarray(bundle.field_scale),
-        u=np.asarray(bundle.u),
-        v=np.asarray(bundle.v),
-        w=np.asarray(bundle.w),
-        p=np.asarray(bundle.p),
-        phi=np.asarray(bundle.phi),
-        jx=np.asarray(bundle.jx),
-        jy=np.asarray(bundle.jy),
-        jz=np.asarray(bundle.jz),
-        lorentz_x=np.asarray(bundle.lorentz_x),
-        lorentz_y=np.asarray(bundle.lorentz_y),
-        lorentz_z=np.asarray(bundle.lorentz_z),
-        residual=np.asarray(bundle.residual),
-        volumetric_flow_rate=np.asarray(bundle.volumetric_flow_rate),
-        mean_velocity=np.asarray(bundle.mean_velocity),
-        axial_current=np.asarray(bundle.axial_current),
-        wall_current_leakage=np.asarray(bundle.wall_current_leakage),
-        current_scaled_pressure_proxy=np.asarray(bundle.current_scaled_pressure_proxy),
+        **{name: np.asarray(getattr(bundle, name)) for name in _EXTRUDED_ARRAY_FIELDS},
         axial_pressure_loss_gradient=np.asarray(
             getattr(bundle, "axial_pressure_loss_gradient", np.zeros_like(bundle.x))
         ),
         transverse_pressure_difference=np.asarray(
             getattr(bundle, "transverse_pressure_difference", np.zeros_like(bundle.x))
         ),
-        charge_balance_residual=np.asarray(bundle.charge_balance_residual),
         validation_station_count=np.asarray(validation.station_count),
         validation_max_residual=np.asarray(validation.max_residual),
         validation_max_charge_balance_residual=np.asarray(
@@ -325,6 +314,11 @@ def write_extruded_bundle_restart_npz(
     rho_phi_plus, rho_phi_inlet = _compact_flux_restart_arrays(bundle)
     has_compact_flux = rho_phi_plus is not None
     aitken_state = getattr(bundle, "aitken_state", None)
+    courant_history = np.asarray(getattr(
+        bundle, "iteration_courant_history", np.zeros((0, 3))))
+    stopping_state = getattr(bundle, "stopping_state", (0, 0, "not_recorded"))
+    has_diagnostics = (aitken_state is not None and courant_history.shape[1:] == (3,)
+                       and stopping_state[0] == len(courant_history))
     metadata = {
         "case": case.name,
         "geometry_kind": case.geometry.kind,
@@ -332,58 +326,29 @@ def write_extruded_bundle_restart_npz(
         "station_count": int(bundle.x.shape[0]),
         "description": "LMX extruded inductionless restart bundle",
         "restart_capable": True,
-        "restart_schema": ("b2_aitken_v1" if has_compact_flux and aitken_state is not None
+        "restart_schema": ("b2_diagnostics_v2" if has_compact_flux and has_diagnostics
+                           else "b2_aitken_v1" if has_compact_flux and aitken_state is not None
                            else "compact_flux_v1" if has_compact_flux else "legacy_nonexact"),
+        "stopping_state": list(stopping_state),
     }
     np.savez_compressed(
         path,
         metadata_json=json.dumps(metadata),
         station_history_json=json.dumps(station_history),
-        x=np.asarray(bundle.x),
-        y=np.asarray(bundle.y),
-        z=np.asarray(bundle.z),
-        field_scale=np.asarray(bundle.field_scale),
-        u=np.asarray(bundle.u),
-        v=np.asarray(bundle.v),
-        w=np.asarray(bundle.w),
-        p=np.asarray(bundle.p),
-        phi=np.asarray(bundle.phi),
+        **{name: np.asarray(getattr(bundle, name)) for name in _EXTRUDED_ARRAY_FIELDS},
         rho_phi_plus=np.asarray(rho_phi_plus) if has_compact_flux else np.zeros(0),
         rho_phi_inlet=np.asarray(rho_phi_inlet) if has_compact_flux else np.zeros(0),
         aitken_residual=np.asarray(aitken_state[0]) if aitken_state is not None and aitken_state[0] is not None else np.zeros(0),
         aitken_relaxation=np.asarray(aitken_state[1] if aitken_state is not None else 1.0),
         steady_streak=np.asarray(aitken_state[2] if aitken_state is not None else 0),
-        jx=np.asarray(bundle.jx),
-        jy=np.asarray(bundle.jy),
-        jz=np.asarray(bundle.jz),
-        lorentz_x=np.asarray(bundle.lorentz_x),
-        lorentz_y=np.asarray(bundle.lorentz_y),
-        lorentz_z=np.asarray(bundle.lorentz_z),
-        residual=np.asarray(bundle.residual),
-        volumetric_flow_rate=np.asarray(bundle.volumetric_flow_rate),
-        mean_velocity=np.asarray(bundle.mean_velocity),
-        axial_current=np.asarray(bundle.axial_current),
-        wall_current_leakage=np.asarray(bundle.wall_current_leakage),
-        current_scaled_pressure_proxy=np.asarray(bundle.current_scaled_pressure_proxy),
         axial_pressure_loss_gradient=np.asarray(
             getattr(bundle, "axial_pressure_loss_gradient", np.zeros_like(bundle.x))
         ),
         transverse_pressure_difference=np.asarray(
             getattr(bundle, "transverse_pressure_difference", np.zeros_like(bundle.x))
         ),
-        charge_balance_residual=np.asarray(bundle.charge_balance_residual),
-        boundary_current_residual=np.asarray(bundle.boundary_current_residual),
-        iteration_residual_history=np.asarray(getattr(bundle, "iteration_residual_history", np.zeros((0,)))),
-        iteration_component_residual_history=np.asarray(
-            getattr(bundle, "iteration_component_residual_history", np.zeros((0, 6)))
-        ),
-        iteration_pressure_residual_history=np.asarray(getattr(bundle, "iteration_pressure_residual_history", np.zeros((0,)))),
-        iteration_electric_linear_history=np.asarray(
-            getattr(bundle, "iteration_electric_linear_history", np.zeros((0, 6)))
-        ),
-        iteration_potential_residual_history=np.asarray(
-            getattr(bundle, "iteration_potential_residual_history", np.zeros((0,)))
-        ),
+        **{name: np.asarray(getattr(bundle, name, np.zeros((0, width)) if width
+            else np.zeros(0))) for name, width in _EXTRUDED_HISTORY_WIDTHS},
     )
     return path
 
@@ -537,46 +502,35 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         )
         has_plus = "rho_phi_plus" in data and data["rho_phi_plus"].size > 0
         has_inlet = "rho_phi_inlet" in data and data["rho_phi_inlet"].size > 0
-        has_aitken = metadata.get("restart_schema") == "b2_aitken_v1"
+        schema = metadata.get("restart_schema")
+        has_aitken = schema in {"b2_aitken_v1", "b2_diagnostics_v2"}
         if has_aitken and not {"aitken_residual", "aitken_relaxation", "steady_streak"} <= set(data.files):
             raise ValueError("B2 Aitken restart is missing accelerator state")
-        metadata["restart_schema"] = ("b2_aitken_v1" if has_plus and has_inlet and has_aitken
+        if schema == "b2_diagnostics_v2" and not {
+            "iteration_courant_history"
+        } <= set(data.files):
+            raise ValueError("B2 diagnostic restart is missing CFL history")
+        metadata["restart_schema"] = (schema if has_plus and has_inlet and has_aitken
                                       else "compact_flux_v1" if has_plus and has_inlet else "legacy_nonexact")
         station_history = (
             tuple(json.loads(str(data["station_history_json"])))
             if "station_history_json" in data
             else ()
         )
+        completed_steps = _load_optional_array(data, "iteration_residual_history").size
+        stopping_state = metadata.get("stopping_state")
+        if stopping_state is None:
+            stopping_state = (completed_steps, int(data["steady_streak"]) if has_aitken else 0,
+                              "legacy_unknown")
+        if len(stopping_state) != 3 or int(stopping_state[0]) != completed_steps:
+            raise ValueError("B2 restart stopping state has inconsistent step count")
         bundle = ExtrudedFieldBundle(
-            x=jnp.asarray(data["x"]),
-            y=jnp.asarray(data["y"]),
-            z=jnp.asarray(data["z"]),
-            field_scale=jnp.asarray(data["field_scale"]),
-            u=jnp.asarray(data["u"]),
-            v=jnp.asarray(data["v"]),
-            w=jnp.asarray(data["w"]),
-            p=jnp.asarray(data["p"]),
-            phi=jnp.asarray(data["phi"]),
+            **{name: jnp.asarray(data[name]) for name in _EXTRUDED_ARRAY_FIELDS},
             rho_phi_plus=jnp.asarray(data["rho_phi_plus"]) if has_plus else None,
             rho_phi_inlet=jnp.asarray(data["rho_phi_inlet"]) if has_inlet else None,
             aitken_state=((jnp.asarray(data["aitken_residual"]) if data["aitken_residual"].size else None,
                            float(data["aitken_relaxation"]), int(data["steady_streak"])) if has_aitken else None),
-            jx=jnp.asarray(data["jx"]),
-            jy=jnp.asarray(data["jy"]),
-            jz=jnp.asarray(data["jz"]),
-            lorentz_x=jnp.asarray(data["lorentz_x"]),
-            lorentz_y=jnp.asarray(data["lorentz_y"]),
-            lorentz_z=jnp.asarray(data["lorentz_z"]),
-            residual=jnp.asarray(data["residual"]),
-            volumetric_flow_rate=jnp.asarray(data["volumetric_flow_rate"]),
-            mean_velocity=jnp.asarray(data["mean_velocity"]),
-            axial_current=jnp.asarray(data["axial_current"]),
-            wall_current_leakage=jnp.asarray(data["wall_current_leakage"]),
-            current_scaled_pressure_proxy=jnp.asarray(
-                data["current_scaled_pressure_proxy"]
-            ),
-            charge_balance_residual=jnp.asarray(data["charge_balance_residual"]),
-            boundary_current_residual=jnp.asarray(data["boundary_current_residual"]),
+            stopping_state=(int(stopping_state[0]), int(stopping_state[1]), str(stopping_state[2])),
             geometry_kind=str(metadata.get("geometry_kind", "unknown")),
             solver_kind=str(metadata.get("solver_kind", "extruded_inductionless")),
             axial_pressure_loss_gradient=jnp.asarray(
@@ -585,18 +539,14 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             transverse_pressure_difference=jnp.asarray(
                 _load_optional_array(data, "transverse_pressure_difference")
             ),
-            iteration_residual_history=jnp.asarray(_load_optional_array(data, "iteration_residual_history")),
-            iteration_component_residual_history=jnp.asarray(
-                _load_optional_array(data, "iteration_component_residual_history")
-            ).reshape((-1, 6)),
-            iteration_pressure_residual_history=jnp.asarray(_load_optional_array(data, "iteration_pressure_residual_history")),
-            iteration_electric_linear_history=jnp.asarray(
-                _load_optional_array(data, "iteration_electric_linear_history")
-            ).reshape((-1, 6)),
-            iteration_potential_residual_history=jnp.asarray(
-                _load_optional_array(data, "iteration_potential_residual_history")
-            ),
+            **{name: jnp.asarray(_load_optional_array(data, name)).reshape((-1, width))
+               if width else jnp.asarray(_load_optional_array(data, name))
+               for name, width in _EXTRUDED_HISTORY_WIDTHS},
         )
+        if schema == "b2_diagnostics_v2" and (
+            bundle.iteration_courant_history.shape[0] != completed_steps
+        ):
+            raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
         return ExtrudedRestartBundle(
             path=path,
             bundle=bundle,

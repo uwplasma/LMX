@@ -111,6 +111,9 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         "zero normal current",
     ):
         raise ValueError("Benchmark B matched formulation semantics differ")
+    if (case_id == "B2-fringing-square" and
+            int(contract["stopping_rules"].get("steady_steps_min", 0)) != 3):
+        raise ValueError("Benchmark B matched stopping contract differs")
 
     discretization_reference = spec.get("free_mhd_discretization_reference")
     if not isinstance(discretization_reference, dict) or (
@@ -211,6 +214,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
             )
         )
         or steady_uncertainty_fraction > 0.05
+        or (case_id == "B2-fringing-square" and int(solver.get("steady_steps_min", 0)) != 3)
         or float(solver.get("steady_residual_max", math.inf)) > steady_uncertainty_fraction * reference_uncertainty
         or actual_elliptic_controls != expected_elliptic_controls
         or float(solver.get("tolerance_independence_factor", math.inf)) != 0.5

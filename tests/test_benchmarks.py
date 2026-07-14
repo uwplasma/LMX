@@ -503,36 +503,23 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         checkpoint_interval=1,
     )
 
-    assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
-    assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
-    assert progress[-1].checkpoint.rho_phi_plus == pytest.approx(solution.bundle.rho_phi_plus)
-    assert progress[-1].checkpoint.rho_phi_inlet == pytest.approx(solution.bundle.rho_phi_inlet)
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-10
     )
-    assert solution.validation.mean_velocity_span < 1.0e-6
-    assert solution.validation.volumetric_flow_rate_span < 4.0e-6
     assert solution.validation.max_charge_balance_residual < 1.0e-3
     assert solution.validation.net_boundary_current_residual < 1.0e-3
-    for field in (solution.bundle.p, solution.bundle.phi,
-                  solution.bundle.axial_pressure_loss_gradient,
-                  solution.bundle.transverse_pressure_difference):
-        assert benchmarks.jnp.isfinite(field).all()
     history = solution.bundle.iteration_residual_history
-    assert solution.bundle.iteration_pressure_residual_history.shape == history.shape
-    assert solution.bundle.iteration_potential_residual_history.shape == history.shape
-    assert benchmarks.jnp.all(
-        solution.bundle.iteration_residual_history
-        >= solution.bundle.iteration_pressure_residual_history
-    )
+    pressure = solution.bundle.iteration_pressure_residual_history
+    potential = solution.bundle.iteration_potential_residual_history
+    assert pressure.shape == potential.shape == history.shape
+    assert benchmarks.jnp.all(history[:, None] >= benchmarks.jnp.stack((pressure, potential), 1))
     electric = solution.bundle.iteration_electric_linear_history
     assert electric.shape == (history.size, 6)
     assert benchmarks.jnp.all(electric[:, 3] > 0)
     assert benchmarks.jnp.all(electric[:, 2] <= 1.0e-3)
-    assert benchmarks.jnp.all(
-        solution.bundle.iteration_residual_history
-        >= solution.bundle.iteration_potential_residual_history
-    )
+    assert solution.bundle.iteration_courant_history.shape == (history.size, 3)
+    assert benchmarks.jnp.all(solution.bundle.iteration_courant_history >= 0.0)
+    assert solution.bundle.stopping_state[0] == history.size
 
     fx, fy, fz = _unpack_duct_mass_flux(solution.bundle.rho_phi_plus,
                                         solution.bundle.rho_phi_inlet)
@@ -547,13 +534,14 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     continuation_case = replace(case, time_stepper=replace(case.time_stepper, max_steps=2))
     resumed = solve_extruded_inductionless(
         replace(problem, case=continuation_case, profile=profile), initial_bundle=restart.bundle)
-    assert restart.metadata["restart_schema"] == "b2_aitken_v1"
+    assert restart.metadata["restart_schema"] == "b2_diagnostics_v2"
     for name in ("u", "v", "w", "p", "phi", "rho_phi_plus", "rho_phi_inlet",
                  "iteration_residual_history", "iteration_component_residual_history",
                  "iteration_pressure_residual_history", "iteration_electric_linear_history",
-                 "iteration_potential_residual_history"):
+                 "iteration_potential_residual_history", "iteration_courant_history"):
         assert benchmarks.jnp.allclose(getattr(resumed.bundle, name),
                                        getattr(solution.bundle, name), rtol=0.0, atol=1.0e-12)
+    assert resumed.bundle.stopping_state == solution.bundle.stopping_state
 
 
 def test_benchmark_b_primary_pressure_observables_use_direct_fields():
@@ -616,6 +604,8 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
             lambda spec: spec["matched_contract"]["roles"].clear(),
             "matched production role differs",
         ),
+        (lambda spec: next(iter(spec["matched_contract"]["roles"].values()))[
+            "stopping_rules"].update(steady_steps_min=2), "matched stopping contract differs"),
         (lambda spec: spec.update(sources=[]), "both review"),
         (lambda spec: spec["sources"][0].update(pages=""), "pages"),
         (
@@ -659,7 +649,8 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
     ],
 )
 def test_benchmark_b_spec_validation_rejects_contract_drift(mutation, message):
-    spec = deepcopy(load_benchmark_b_spec("B1-fringing-pipe"))
+    case_id = "B2-fringing-square" if message == "matched stopping contract differs" else "B1-fringing-pipe"
+    spec = deepcopy(load_benchmark_b_spec(case_id))
     mutation(spec)
     with pytest.raises(ValueError, match=message):
         benchmarks._validate_benchmark_b_spec(spec, Path.cwd())

@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 
 import jax.numpy as jnp
 
@@ -39,6 +38,7 @@ class ExtrudedFieldBundle:
     rho_phi_plus: jnp.ndarray | None = None
     rho_phi_inlet: jnp.ndarray | None = None
     aitken_state: tuple[jnp.ndarray | None, float, int] | None = None
+    stopping_state: tuple[int, int, str] = (0, 0, "not_recorded")
     jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jz: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
@@ -60,6 +60,7 @@ class ExtrudedFieldBundle:
     iteration_pressure_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     iteration_electric_linear_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
     iteration_potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    iteration_courant_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 3)))
 
 @dataclass(frozen=True)
 class ExtrudedIterationProgress:
