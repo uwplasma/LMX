@@ -100,6 +100,30 @@ def make_divergence_free_cross_section_field(
     return field
 
 
+def make_maxwell_consistent_fringe_field(
+    *, peak_field: float, center: float, transition_width: float, axis: str = "y"
+):
+    """Return a curl- and divergence-free transverse tanh fringe field."""
+
+    if transition_width <= 0.0:
+        raise ValueError("transition_width must be positive")
+    if axis not in {"y", "z"}:
+        raise ValueError("axis must be 'y' or 'z'")
+
+    def field(x: jnp.ndarray, y: jnp.ndarray, z: jnp.ndarray) -> jnp.ndarray:
+        transverse = y if axis == "y" else z
+        continued = 0.5 * peak_field * (
+            1.0 - jnp.tanh(((x - center) + 1j * transverse) / transition_width)
+        )
+        zero = jnp.zeros_like(x)
+        components = ((jnp.imag(continued), jnp.real(continued), zero)
+                      if axis == "y" else
+                      (jnp.imag(continued), zero, jnp.real(continued)))
+        return jnp.stack(components, axis=-1)
+
+    return field
+
+
 def make_localized_divergence_free_obstacle_field(
     *,
     width: float,

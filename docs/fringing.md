@@ -43,6 +43,7 @@ field is imposed and is not evolved. See [Theory](theory.md) for assumptions and
 - extruded rectangular and layered rectangular ducts;
 - mapped pipe O-grid construction and preview;
 - analytical axial fringe profiles;
+- analytic full-volume fields with streamwise and transverse components;
 - divergence-free cross-section fields;
 - checked tabulated fields from NPZ data;
 - restartable steady/transient outer iterations.
@@ -55,6 +56,12 @@ lmx examples/cases/fringing/fringing_tabulated_case.toml
 
 LMX validates coordinates, units, shape, finite values, interpolation bounds,
 and field-quality metrics before a tabulated field reaches the solver.
+
+For source-free fringe regions, use
+`make_maxwell_consistent_fringe_field(...)` from `lmx.field_models` as a
+`FringingProfile.volume_field`. Its complex-analytic tanh reconstruction is
+JAX-differentiable and satisfies both `div(B) = 0` and `curl(B) = 0`; the
+one-dimensional station scale remains the simpler transverse-only option.
 
 ## Diagnostics and acceptance
 
@@ -100,6 +107,12 @@ gate separately reduces electric iterations 5.18x and matched two-update time
 doubled-iteration and wall confirmations pass; its tighter-tolerance variant
 remains open. These are solver and numerical results, not experimental
 validation.
+
+The ALEX tap and normalization audit passes. A bounded, checksummed B2 pilot
+with the full Maxwell-consistent field improved peak-pressure underprediction
+from 15.6% to 8.2%, but a far-field offset worsened the aggregate experimental
+error. It therefore remains diagnostic pending matched-field FreeMHD and
+three-mesh evidence.
 
 ## Limitations
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field
 
@@ -12,11 +13,12 @@ from .specs import CaseSpec
 
 @dataclass(frozen=True)
 class FringingProfile:
-    """Axial magnetic-field profile used by extruded fringing problems."""
+    """Axial field scale and optional full vector field for extruded problems."""
 
     x: jnp.ndarray
     field_scale: jnp.ndarray
     axis: str
+    volume_field: Callable[..., jnp.ndarray] | None = None
 
 
 @dataclass(frozen=True)

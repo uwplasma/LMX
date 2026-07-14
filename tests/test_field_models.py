@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import jax
+import jax.numpy as jnp
 import pytest
 import numpy as np
 
@@ -22,6 +24,7 @@ from lmx.field_models import (
     load_wham_coil_model_script,
     make_localized_divergence_free_obstacle_field,
     make_divergence_free_cross_section_field,
+    make_maxwell_consistent_fringe_field,
     sample_cross_section_field,
     sample_tabulated_cross_section_field,
     sample_tabulated_field_volume,
@@ -162,6 +165,38 @@ def test_divergence_free_cross_section_field_has_small_discrete_divergence():
     )
     assert metrics["max_abs_divergence"] < 0.2
     assert metrics["rms_divergence"] < 0.05
+
+
+@pytest.mark.parametrize("axis", ["y", "z"])
+def test_maxwell_consistent_fringe_field_satisfies_symmetry_and_maxwell(axis):
+    field = make_maxwell_consistent_fringe_field(
+        peak_field=2.0, center=0.25, transition_width=1.2, axis=axis
+    )
+    transverse_index = 1 if axis == "y" else 2
+
+    def point_field(x, transverse):
+        coordinates = [x, 0.0, 0.0]
+        coordinates[transverse_index] = transverse
+        return field(*map(jnp.asarray, coordinates))
+
+    jacobian = jax.jacfwd(lambda coordinates: point_field(*coordinates))(
+        jnp.asarray([0.1, 0.3])
+    )
+    assert jacobian[0, 0] + jacobian[transverse_index, 1] == pytest.approx(0.0, abs=1.0e-12)
+    assert jacobian[transverse_index, 0] - jacobian[0, 1] == pytest.approx(0.0, abs=1.0e-12)
+    positive = point_field(0.1, 0.3)
+    negative = point_field(0.1, -0.3)
+    assert positive[0] == pytest.approx(-float(negative[0]))
+    assert positive[transverse_index] == pytest.approx(float(negative[transverse_index]))
+
+
+def test_maxwell_consistent_fringe_field_rejects_invalid_parameters():
+    with pytest.raises(ValueError, match="positive"):
+        make_maxwell_consistent_fringe_field(peak_field=1.0, center=0.0, transition_width=0.0)
+    with pytest.raises(ValueError, match="axis"):
+        make_maxwell_consistent_fringe_field(
+            peak_field=1.0, center=0.0, transition_width=1.0, axis="x"
+        )
 
 
 def test_sample_cross_section_field_returns_expected_shape():

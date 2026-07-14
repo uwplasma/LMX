@@ -1985,15 +1985,30 @@ def _cross_section_mesh(case: CaseSpec):
     return mesh
 
 
+def _sample_volume_field(volume_field, x, y, z):
+    """Validate and unpack one analytic magnetic field sampled on a volume."""
+
+    sampled = jnp.asarray(volume_field(x, y, z), dtype=float)
+    if sampled.shape != (*x.shape, 3):
+        raise ValueError("Fringing volume field must append one three-component axis")
+    return sampled[..., 0], sampled[..., 1], sampled[..., 2]
+
+
 def _sample_station_magnetic_field_duct(
     case: CaseSpec,
     mesh,
     *,
     field_scale: jnp.ndarray,
+    volume_field: Callable[..., jnp.ndarray] | None = None,
     nx: int,
     ny: int,
     nz: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    if volume_field is not None:
+        xx, yy, zz = jnp.meshgrid(
+            mesh.x_centers, mesh.y_centers, mesh.z_centers, indexing="ij"
+        )
+        return _sample_volume_field(volume_field, xx, yy, zz)
     x_coords = np.asarray(
         case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float
     )
@@ -2045,12 +2060,19 @@ def _sample_station_magnetic_field_pipe(
     rr: jnp.ndarray,
     theta_grid: jnp.ndarray,
     field_scale: jnp.ndarray,
+    x: jnp.ndarray,
+    volume_field: Callable[..., jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     x_coords = np.asarray(
         case.geometry.length * jnp.linspace(0.0, 1.0, rr.shape[0]), dtype=float
     )
     yy = np.asarray(rr[0] * jnp.cos(theta_grid[0]), dtype=float)
     zz = np.asarray(rr[0] * jnp.sin(theta_grid[0]), dtype=float)
+    if volume_field is not None:
+        xx = jnp.broadcast_to(jnp.asarray(x)[:, None, None], rr.shape)
+        yy3 = rr * jnp.cos(theta_grid)
+        zz3 = rr * jnp.sin(theta_grid)
+        return _sample_volume_field(volume_field, xx, yy3, zz3)
     if case.magnetic_field.kind == "constant":
         base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         bx = jnp.broadcast_to(
@@ -6070,7 +6092,8 @@ def _solve_extruded_projection(
         forcing = float(case.forcing)
         field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
         bx, by, bz = _sample_station_magnetic_field_pipe(
-            case, rr=rr, theta_grid=theta_grid, field_scale=field_scale
+            case, rr=rr, theta_grid=theta_grid, field_scale=field_scale,
+            x=problem.profile.x, volume_field=problem.profile.volume_field
         )
         br = by * jnp.cos(theta_grid) + bz * jnp.sin(theta_grid)
         btheta = -by * jnp.sin(theta_grid) + bz * jnp.cos(theta_grid)
@@ -6993,7 +7016,8 @@ def _solve_extruded_projection(
     forcing = float(case.forcing)
     field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
     bx, by, bz = _sample_station_magnetic_field_duct(
-        case, mesh, field_scale=field_scale, nx=nx, ny=ny, nz=nz
+        case, mesh, field_scale=field_scale, volume_field=problem.profile.volume_field,
+        nx=nx, ny=ny, nz=nz
     )
 
     if initial_bundle is not None:

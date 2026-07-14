@@ -10,6 +10,7 @@ from solvax import block_thomas_solve
 
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
+    make_maxwell_consistent_fringe_field,
     sample_cross_section_field,
     write_tabulated_field_npz,
 )
@@ -26,6 +27,7 @@ from lmx.fringing import (
     _laplacian_3d,
     _masked_laplacian_duct,
     _normalized_pressure_observable_update,
+    _sample_volume_field,
     _pipe_poisson_jacobi_3d,
     build_bent_pipe_extruded_problem,
     build_extruded_problem_from_case,
@@ -1905,6 +1907,10 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(
 
 def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():
     problem = build_square_duct_extruded_problem(ha_peak=8.0, nx_stations=4, ny=4, nz=4)
+    field = make_maxwell_consistent_fringe_field(
+        peak_field=8.0, center=3.0, transition_width=0.5
+    )
+    problem = replace(problem, profile=replace(problem.profile, volume_field=field))
 
     solution = solve_extruded_inductionless(problem)
 
@@ -1920,6 +1926,14 @@ def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bund
     assert solution.validation.max_wall_current_leakage >= 0.0
     assert solution.validation.net_boundary_current_residual >= 0.0
     assert solution.validation.station_count == 4
+
+    with pytest.raises(ValueError, match="three-component"):
+        _sample_volume_field(
+            lambda x, y, z: jnp.zeros_like(x),
+            jnp.zeros((2, 2, 2)),
+            jnp.zeros((2, 2, 2)),
+            jnp.zeros((2, 2, 2)),
+        )
 
 
 def test_rectangular_projection_uses_sparse_electric_solve(
@@ -2020,6 +2034,10 @@ def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
     problem = build_pipe_ogrid_extruded_problem(
         ha_peak=6.0, nx_stations=4, nr=4, ntheta=8
     )
+    field = make_maxwell_consistent_fringe_field(
+        peak_field=6.0, center=3.0, transition_width=0.5
+    )
+    problem = replace(problem, profile=replace(problem.profile, volume_field=field))
 
     solution = solve_extruded_inductionless(problem)
 
