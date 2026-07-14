@@ -3,6 +3,15 @@
 This page summarizes current claims. Machine-readable records in `benchmarks/`
 are authoritative when prose and results differ.
 
+<p align="center">
+  <img src="_static/analytic_velocity_profiles.webp" alt="Analytical and LMX duct profiles" width="47%">
+  <img src="_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="47%">
+</p>
+
+<p align="center">
+  <a href="_static/readme_hunt_startup_2d.mp4"><img src="_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt startup loop" width="55%"></a>
+</p>
+
 ## Accepted
 
 - Hartmann, Shercliff, and Hunt fully developed inductionless duct cases have
@@ -12,7 +21,7 @@ are authoritative when prose and results differ.
   `Ha = 500, 5000, 10000, 15000` pass.
 - Audited `85 x 63` FreeMHD closed-channel Shercliff and Hunt observables pass
   the 1% finite-grid gate.
-- SOLVAX 0.8.3 integration, including symmetric additive-line composition,
+- SOLVAX integration, including symmetric additive-line composition,
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 784 tests with 8 expected external-data

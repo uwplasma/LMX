@@ -18,7 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=_default_workers())
     parser.add_argument("--budget-seconds", type=float, default=600.0)
-    parser.add_argument("--warning-seconds", type=float, default=450.0)
+    parser.add_argument("--warning-seconds", type=float, default=300.0)
     parser.add_argument("--no-coverage", action="store_true")
     parser.add_argument("--coverage-xml", default="coverage.xml")
     parser.add_argument("--junit-xml", default="artifacts/tests/full-suite-junit.xml")

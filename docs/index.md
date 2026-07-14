@@ -46,7 +46,6 @@ testing
 
 benchmark_matrix
 validation_report
-media
 performance
 autodiff
 fringing

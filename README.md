@@ -6,11 +6,11 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **LMX is a JAX-native code for inductionless liquid-metal MHD on CPUs and
-GPUs.** It combines verified duct solvers, conducting walls, nonuniform magnetic
-fields, automatic differentiation, and research-stage 3D flow workflows.
+GPUs.** It combines verified duct solvers, conducting walls, imposed 3D fields,
+selected differentiable workflows, and research-stage extruded flows.
 
-> Hartmann, Shercliff, and Hunt ducts are verified. Extruded fringe fields,
-> magnetic obstacles, Q2D turbulence, and blanket models remain research-stage.
+> Hartmann, Shercliff, and Hunt ducts are verified. Fringe fields, magnetic
+> obstacles, Q2D turbulence, and blanket models remain research-stage.
 
 [Documentation](https://lmx.readthedocs.io/) ·
 [Quickstart](docs/getting_started.md) ·
@@ -28,8 +28,6 @@ cd LMX && python -m pip install -e .
 lmx examples/hartmann_case.toml
 ```
 
-Or from Python:
-
 ```python
 from lmx import make_hartmann_case, solve_steady
 
@@ -37,111 +35,92 @@ solution = solve_steady(make_hartmann_case(ha=20, ny=48, nz=48))
 print(solution.diagnostics.volumetric_flow_rate_history[-1])
 ```
 
-LMX provides TOML and Python inputs, restarts, diagnostics, plotting, and
-checksummed research artifacts. See the [case cookbook](docs/case_cookbook.md)
-for ducts, walls, fringe fields, custom fields, and mapped pipes.
+TOML and Python inputs support restarts, diagnostics, plotting, and checksummed
+artifacts. See the [case cookbook](docs/case_cookbook.md).
 
-## Features
+## Capabilities
 
 ✅ native and documented · ◐ partial/research-stage · ❌ not provided natively
 
 | Capability | LMX | [FreeMHD](https://github.com/PlasmaControl/FreeMHD) | [NekRS](https://nekrs.readthedocs.io/en/latest/) |
 |---|:---:|:---:|:---:|
 | Inductionless liquid-metal MHD | ✅ | ✅ | ❌¹ |
-| Full induction / finite magnetic Reynolds number | ❌ | ✅² | ❌¹ |
+| Full induction / finite magnetic Reynolds number | ❌ | ❌² | ❌¹ |
 | High-Hartmann-number duct flows | ✅ | ✅ | ❌¹ |
 | 3D imposed and fringing magnetic fields | ◐ | ✅ | ❌¹ |
 | Insulating and conducting wall-current closure | ✅ | ✅ | ❌¹ |
 | Free-surface / two-phase liquid-metal MHD | ❌ | ✅ | ❌¹ |
 | Fluid–solid heat transfer | ❌ | ◐ | ✅ CFD |
 | Turbulence models | ◐ Q2D | ◐ non-MHD | ✅ CFD |
-| General curved / complex 3D meshes | ◐ | ✅ | ✅ |
+| Curved / complex 3D meshes | ◐ | ✅ | ✅ |
 | Parallel CPU execution | ✅ | ✅ | ✅ |
-| Native GPU and multi-GPU execution | ✅ | ❌ | ✅ |
-| End-to-end automatic differentiation | ✅ | ❌ | ❌ |
-| Published liquid-metal experimental validation | ◐ | ✅ | ❌¹ |
+| Single-GPU execution | ✅ | ❌ | ✅ |
+| Multi-GPU execution | ◐ B2 | ❌ | ✅ |
+| Automatic differentiation | ✅ selected | ❌ | ❌ |
+| Experimental-comparison workflows | ◐ | ✅ | ❌¹ |
 
-¹ Stock NekRS is a scalable spectral-element thermal-fluids solver with custom
-source hooks, but no native electromagnetic equations or current closure.
-² The 2026 [FreeMHD2 extension](https://arxiv.org/abs/2606.18745) adds verified
-finite-Rm vector-potential induction. Sources: the peer-reviewed
-[FreeMHD validation paper](https://doi.org/10.1063/5.0230242), the
-[NekRS capability guide](https://nekrs.readthedocs.io/en/latest/), and its
-[multi-GPU paper](https://arxiv.org/abs/2104.05829). The table compares stock,
-documented capability—not what could be implemented through extensions.
+¹ Native NekRS solves scalable spectral-element thermal fluids and accepts
+custom sources, but does not document electromagnetic equations or current
+closure. ² [FreeMHD2](https://arxiv.org/abs/2606.18745) is a separate extension
+that adds finite-Rm induction; this column describes native FreeMHD. Sources:
+[FreeMHD validation](https://doi.org/10.1063/5.0230242),
+[NekRS capabilities](https://nekrs.readthedocs.io/en/latest/), and
+[NekRS GPU scaling](https://arxiv.org/abs/2104.05829).
 
 ## Verified duct MHD
 
-Hartmann, Shercliff, and Hunt profiles are tested against analytical solutions,
-conservation identities, and mesh ladders. All eight frozen high-Hartmann rows
-pass; audited closed-channel FreeMHD observables pass the 1% finite-grid gate.
+Eight frozen high-Hartmann rows pass, and audited closed-channel FreeMHD
+observables pass the 1% finite-grid gate.
 
 <p align="center">
   <img src="docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="58%">
-  <a href="docs/_static/readme_hunt_startup_2d.mp4"><img src="docs/_static/readme_hunt_startup_2d_poster.webp" alt="Hunt-flow startup movie" width="38%"></a>
+  <a href="docs/_static/readme_hunt_startup_2d.mp4"><img src="docs/_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt-flow startup loop" width="38%"></a>
 </p>
 
-[Evidence, definitions, and acceptance criteria →](docs/validation_report.md)
+[Validation evidence →](docs/validation_report.md)
 
 ## Real geometries and nonuniform fields
 
-Rectangular ducts, layered conducting walls, mapped pipe O-grids, analytic
-volume fields, and tabulated fields share one inductionless solver surface.
-
 <p align="center">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-geometries.webp" alt="LMX rectangular, layered, and mapped-pipe geometries" width="48%">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform-field duct response and charge conservation" width="48%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-geometries.webp" alt="Rectangular, layered, and mapped-pipe geometries" width="48%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform-field response and charge conservation" width="48%">
 </p>
 
-![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
+![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-The displayed B2 diagnostics pass conservation, restart, and two-GPU parity
-for the earlier stationwise/no-inertia formulation. Canonical finite-inertia
-and exact matched-FreeMHD acceptance remain open.
-[Fringing-field status →](docs/fringing.md)
+B2 conservation and two-GPU results are experimental diagnostics from a
+superseded formulation; canonical finite-inertia validation remains open.
+[Fringing status →](docs/fringing.md)
 
-## Differentiate the solver
-
-Selected steady and extruded objectives support JAX gradients and inverse
-design. Promoted gradients are checked against finite differences or independent
-transpose solves—not merely whether `jax.grad` runs.
+## Differentiate selected workflows
 
 ![LMX sensitivity and inverse design](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-autodiff.webp)
 
+Promoted objectives pass finite-difference or independent-transpose checks.
 [Differentiable workflows →](docs/autodiff.md)
 
-## Explore research-stage flows
-
-LMX also exposes bounded magnetic-obstacle and reduced blanket workflows. These
-visuals demonstrate implemented diagnostics and geometry, not validation claims.
+## Explore research flows
 
 <p align="center">
   <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
-  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Reduced WHAM blanket-flow movie" width="48%"></a>
+  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Reduced blanket-flow movie" width="48%"></a>
 </p>
 
-[Geometry and field workflows →](docs/geometry.md)
+These visuals demonstrate implemented workflows, not quantitative validation.
+[Geometry and fields →](docs/geometry.md)
 
 ## Scale on CPUs and GPUs
 
-The earlier B2 numerical checkpoint scales from 36.96 s on one RTX A4000 to
-22.23 s on two: **1.66× speedup at 83.1% efficiency**, with equivalent
-observables. This is diagnostic for the superseded formulation; strong scaling
-of the canonical finite-inertia path remains open.
+![Experimental B2 GPU strong scaling](docs/_static/strong_scaling.webp)
 
-![LMX GPU strong scaling](docs/_static/strong_scaling.webp)
+The superseded B2 checkpoint measured 1.66× on two RTX A4000 GPUs; canonical
+solver scaling remains open. [Protocol and results →](docs/performance.md)
 
-[Measurement protocol and full results →](docs/performance.md)
+## Quality and citation
 
-## Quality, documentation, and citation
+The portable gate passes **784 tests**, **95.28% branch coverage**, and **149.9
+s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+[Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
+[Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 
-The portable gate currently passes **784 tests**, **95.28% branch coverage**,
-and a **149.9 s** wall time on six Apple-Silicon workers. Physics and external
-campaigns add analytical, conservation, convergence, FreeMHD, and experimental
-evidence outside that fast gate.
-
-[Testing](docs/testing.md) · [Theory](docs/theory.md) ·
-[Numerics](docs/numerics.md) · [Contributing](CONTRIBUTING.md) ·
-[Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
-
-LMX is MIT licensed. Cite the project using [CITATION.cff](CITATION.cff).
+LMX is MIT licensed. Cite it with [CITATION.cff](CITATION.cff).

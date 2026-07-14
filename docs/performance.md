@@ -4,6 +4,8 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
+![Experimental B2 strong scaling across two GPUs](_static/strong_scaling.webp)
+
 ## Current evidence
 
 | Path | Hardware and grid | Result | Interpretation |

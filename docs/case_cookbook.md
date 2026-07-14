@@ -51,6 +51,10 @@ python examples/fringing_benchmark_demo.py --help
 These workflows are research-stage. Begin with the rectangular case, then add
 layers, mapped geometry, or tabulated fields one change at a time.
 
+<p align="center">
+  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Reduced blanket-flow research workflow" width="62%"></a>
+</p>
+
 ## Restart
 
 ```bash

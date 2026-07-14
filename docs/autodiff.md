@@ -4,6 +4,8 @@ LMX uses JAX to differentiate selected liquid-metal flow observables through
 case construction and linear solves. A successful `jax.grad` call is only the
 first gate: gradients must also be accurate, converged, and affordable.
 
+![Checked sensitivities and a bounded inverse-design trace](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-autodiff.webp)
+
 ## Run the bounded example
 
 ```bash
@@ -16,9 +18,9 @@ design update. Outputs go under `artifacts/`.
 
 ## Solver backends
 
-The default `auto` path requires a compatible SOLVAX `0.8.3+` release below
-`1.0`; `cg` is only a compatibility name for the same SOLVAX PCG path. CI tests
-both dependency-range endpoints instead of committing a repository lockfile.
+The default `auto` path requires a compatible SOLVAX release in the supported
+dependency range; `cg` is only a compatibility name for the same SOLVAX PCG
+path. CI tests dependency-range endpoints instead of committing a lockfile.
 
 SOLVAX integration is accepted only when the following agree:
 

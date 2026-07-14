@@ -9,19 +9,19 @@ dependency, or large generated-asset change:
 .venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current classified baseline is 35 package modules and 34,895 total package
-lines. The maintained stable core is 8,024 lines;
+The accepted `b763b84` checkpoint records 35 package modules and 34,987 total
+package lines. The maintained stable core is 8,027 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The tracked source checkout is 3.75 MiB, below its 4 MiB hard cap. Sixty-five
+The checkpoint's tracked checkout is 3,452,492 bytes, below its 4 MiB hard cap. Sixty-five
 generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
-SHA-256 verification. Six compressed web derivatives (516 KB total) remain in
+SHA-256 verification. Six compressed web derivatives (about 379 KiB total) remain in
 `docs/_static/` for anonymous documentation access; full-resolution media and
 field bundles remain release assets and never enter the wheel.
 
@@ -36,11 +36,13 @@ python scripts/manage_release_assets.py --verify-archive PATH_TO_ARCHIVE
 New generated files above 128 KiB fail the manifest check until deliberately
 assigned to a new versioned asset release.
 
-The architecture gate also caps the package at 36 modules, 35,500 source lines,
-8,500 maintained-core lines, 30 root exports, 12 curated examples, a 4 MiB
-tracked checkout, and a 0.25 s median lazy root import. Release builds cap the
-wheel at 384 KiB and reject benchmark, documentation, or generated payloads
-outside `lmx/` and wheel metadata.
+The live architecture gate caps the package at 35 modules, 35,000 source lines,
+8,100 maintained-core lines, 32 test files, 21,300 test lines, 18 maintenance
+scripts, 30 root exports, 12 curated examples, a 4 MiB tracked checkout, and a
+0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and
+reject benchmark, documentation, or generated payloads outside `lmx/` and
+wheel metadata. The [media provenance index](media.md) records the web
+derivatives without adding a gallery to the primary navigation.
 
 ## Architecture
 

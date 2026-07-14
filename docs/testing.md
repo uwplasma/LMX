@@ -12,8 +12,9 @@ external solvers, long physics campaigns, and hardware scaling.
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
 and a hard ten-minute timeout. The current Apple M4 result is 784 passed, 8
 expected external-data skips, 95.28% branch coverage, and 149.9 seconds with six
-workers. The compact gate record tracks the slowest node IDs for regression
-review.
+workers. The default warning threshold is five minutes, leaving another five
+minutes before the hard failure. The compact gate record tracks slow node IDs
+for regression review.
 
 The eight skips represent unavailable independent datasets, not disabled source
 paths. The gate must stay below ten minutes as the code grows; its engineering

@@ -3,6 +3,11 @@
 LMX keeps geometry construction separate from physics and field sampling. A
 case should be inspectable before an expensive solve begins.
 
+<p align="center">
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-geometries.webp" alt="Rectangular, layered, and mapped-pipe geometries" width="48%">
+  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform imposed field and charge-conservation diagnostics" width="48%">
+</p>
+
 ## Supported geometry
 
 - structured rectangular ducts;
@@ -69,3 +74,5 @@ WHAM-specific blanket geometry and field adapters remain available through
 `lmx.blanket_geometry`, `lmx.blanket_flow`, and `lmx.field_models`, but they are
 research APIs rather than first-run examples. Their promotion requires an
 independent geometry/field reference and a closed physics benchmark.
+
+![Magnetic-obstacle research workflow](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-magnetic-obstacle.webp)
