@@ -320,10 +320,13 @@ def _prolong_b2_restart(bundle, problem):
         y=target[1],
         z=target[2],
         field_scale=np.asarray(problem.profile.field_scale),
+        rho_phi_plus=None,
+        rho_phi_inlet=None,
         **fields,
     )
     return prolonged, {
         "method": "trilinear_physical_coordinates",
+        "compact_flux": "reinitialized_on_target_mesh",
         "source_shape": list(expected_shape),
         "target_shape": [len(axis) for axis in target],
     }

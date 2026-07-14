@@ -461,13 +461,11 @@ def test_b2_restart_prolongation_is_trilinear_in_physical_coordinates():
         y=axes[1],
         z=axes[2],
         field_scale=campaign.np.ones(2),
-        u=linear,
-        v=linear,
-        w=linear,
-        p=linear,
-        phi=linear,
         geometry_kind="layered_duct",
         solver_kind="extruded_inductionless",
+        rho_phi_plus=campaign.np.ones((3, 2, 2, 2)),
+        rho_phi_inlet=campaign.np.ones((2, 2)),
+        **dict.fromkeys(("u", "v", "w", "p", "phi"), linear),
     )
 
     prolonged, record = campaign._prolong_b2_restart(bundle, problem)
@@ -477,8 +475,10 @@ def test_b2_restart_prolongation_is_trilinear_in_physical_coordinates():
     )
     assert prolonged.u.shape == (mesh.nx, mesh.ny, mesh.nz)
     assert prolonged.u == pytest.approx(target_x + 2.0 * target_y + 3.0 * target_z)
+    assert prolonged.rho_phi_plus is prolonged.rho_phi_inlet is None
     assert record == {
         "method": "trilinear_physical_coordinates",
+        "compact_flux": "reinitialized_on_target_mesh",
         "source_shape": [2, 2, 2],
         "target_shape": [mesh.nx, mesh.ny, mesh.nz],
     }
