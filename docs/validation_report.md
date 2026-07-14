@@ -22,8 +22,9 @@ are authoritative when prose and results differ.
 - ALEX B1 conducting-pipe fringing flow: conservation, restart, and bounded
   large-grid pressure convergence pass; experimental pressure agreement and
   the final mesh/observable acceptance record remain open.
-- ALEX B2 square-duct fringing flow: conservation and two-GPU numerical
-  equivalence pass; experimental validation remains open.
+- ALEX B2 square-duct fringing flow: conservation, two-GPU numerical
+  equivalence, and the 1.87x fine-checkpoint solver promotion pass;
+  experimental validation remains open.
 - Q2D turbulence, magnetic-obstacle, mapped blanket, and Dean-vortex workflows
   provide model or adapter checks but do not yet support quantitative claims.
 

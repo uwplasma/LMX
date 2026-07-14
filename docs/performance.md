@@ -45,23 +45,26 @@ The source-identical baseline, doubled-iteration, and confirmation-wall runs
 then passed in 57.64, 34.94, and 57.10 seconds. Their tolerance and iteration
 deltas are below `5.79e-4` of the frozen uncertainty; this closes medium-grid
 numerical independence, not the experimental or three-mesh acceptance gate.
-The fine-grid baseline remains outside acceptance. An exact eight-update probe
-from the 112-update checkpoint reached residual `6.451e-5` in 359.01 seconds,
-but every electric solve still used both 600-iteration PCG stages and the
-initial Aitken jump returned to the slow asymptotic rate. The resulting 248 MiB
-checkpoint is a checksummed release asset; a stronger fine-grid preconditioner,
-not more brute-force updates, precedes another acceptance run.
+The fine-grid baseline remains outside acceptance. A region-preserving
+transverse Galerkin correction is now added to the accepted line and axial-mean
+preconditioners. Each shard diagonalizes its local Neumann axial block with a
+DCT; one generalized transverse eigendecomposition serves every axial mode, so
+the correction introduces no cross-shard FFT. On the identical `202 x 149 x
+149` checkpoint, electric PCG fell from 1,200/1,200 to 232/231 iterations and
+matched warm time fell from 183.37 to 98.12 seconds (1.87x). It also beats the
+previously accepted 109.18-second control. Residual histories agree within
+`1.67e-16`, field norms are identical, and two-shard conservation gates pass.
+The raw records are release assets; the compact accepted summary is
+`benchmarks/results/b2-fine-fast-diagonalization-20260714.json`.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.
 Removing the shard-local axial coarse correction was also rejected: it reduced
-only 1--2 iterations and raised wall time to 155.88 seconds. The next candidate
-must add a multilevel transverse correction while retaining that coarse mode.
+only 1--2 iterations and raised wall time to 155.88 seconds.
 A multiplicative line-then-coarse correction saved only 3--4 iterations and
-took 135.59 seconds, so it was rejected as well. SOLVAX 0.8.2 now owns the
-tested SPD Galerkin balancing algebra used by LMX. The next design builds the
-missing shard-local transverse hierarchy on that primitive; it must beat the
-109.18-second two-update baseline before any production campaign.
+took 135.59 seconds, so it was rejected as well. A rediscretized balanced
+hierarchy also regressed the bounded CPU probe; exact Galerkin fast
+diagonalization supplied the accuracy and cost reduction needed for promotion.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states

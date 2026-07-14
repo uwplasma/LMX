@@ -180,17 +180,16 @@ for external research use.
   required 7,720.92 seconds across two restart-safe segments; the three final
   confirmation runs took 57.64, 34.94, and 57.10 seconds from that restart.
   The fine continuation was checkpointed after 112 effective updates at
-  residual `6.505e-5`. An exact eight-update two-GPU probe reached `6.451e-5`
-  in 359.01 seconds but still used 1,200 electric iterations per update and
-  returned to the slow asymptotic rate. Its 248 MiB checkpoint is a checksummed
-  release asset; the next tranche improves the fine-grid preconditioner before
-  resuming. Experimental acceptance remains open.
-  Exact axial-line, transverse-only, and multiplicative-coarse probes were all
-  slower than the 109.18-second two-update baseline. LMX now delegates its
-  balanced SPD two-level algebra to SOLVAX 0.8.2. The next candidate builds a
-  transverse Galerkin hierarchy on that primitive, retains the shard-local
-  axial coarse mode, and must pass identical-state and wall-time gates before
-  promotion.
+  residual `6.505e-5`. Axial-line, transverse-only, rediscretized, and
+  multiplicative-coarse probes were rejected. The promoted region-preserving
+  transverse Galerkin correction uses shard-local fast diagonalization and
+  retains the axial coarse mode. On the identical fine checkpoint it reduced
+  electric PCG from 1,200/1,200 to 232/231 iterations and warm two-update time
+  from 183.37 to 98.12 seconds (1.87x); it also beat the previously accepted
+  109.18-second baseline by 1.11x. Residual histories agree within `1.67e-16`,
+  field norms are identical, and physical and placement gates pass. Resume the
+  fine acceptance continuation with this solver; experimental acceptance
+  remains open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

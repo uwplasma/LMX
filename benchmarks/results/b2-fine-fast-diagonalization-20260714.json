@@ -1,0 +1,57 @@
+{
+  "case_id": "B2-fringing-square",
+  "date": "2026-07-14",
+  "commit": "8aa335f",
+  "scope": "two source-identical fine-grid updates from the accepted 112-update checkpoint; solver promotion, not experimental acceptance",
+  "checkpoint": {
+    "sha256": "81aad950ffb8be85c19b1c78786716a7aad7faf93eb9ab1b874830943c7315c1",
+    "shape": [202, 149, 149]
+  },
+  "environment": {
+    "hardware": "2 x NVIDIA RTX A4000",
+    "actual_spatial_shards": 2,
+    "jax": "0.8.0",
+    "solvax": "0.8.2"
+  },
+  "candidate": {
+    "method": "region-preserving transverse Galerkin interpolation, shard-local axial DCT, and one generalized transverse eigendecomposition added symmetrically to the accepted line and axial-mean preconditioners",
+    "coarse_shape_per_shard": [101, 15, 15],
+    "cold_seconds": 109.59464983700309,
+    "warm_seconds": 98.1228413360077,
+    "electric_iterations": [232, 231],
+    "residual_history": [6.41470760150975e-05, 6.378529358236351e-05],
+    "max_charge_balance_residual": 0.00021420780672087858,
+    "max_divergence_residual": 4.559068943810196e-06
+  },
+  "baseline": {
+    "matched_warm_seconds": 183.37257650500396,
+    "previously_accepted_seconds": 109.18361319904216,
+    "electric_iterations": [1200, 1200],
+    "residual_history": [6.41470760150975e-05, 6.378529358253004e-05]
+  },
+  "gates": {
+    "matched_speedup": 1.8688062229778966,
+    "speedup_over_previously_accepted_baseline": 1.1127235872238586,
+    "electric_iteration_reduction": 5.183585313174946,
+    "max_residual_history_difference": 1.6653345369377348e-16,
+    "velocity_l2_difference": 0.0,
+    "potential_l2_difference": 0.0,
+    "physical_balance_pass": true,
+    "placement_pass": true,
+    "promotion_pass": true
+  },
+  "raw_assets": {
+    "baseline_warm": {
+      "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-fastdiag-baseline-warm.json",
+      "sha256": "73b7e7e02c416d1d088f118143b2aea69a13f7615d183e2df1a398cc3d9b8b80"
+    },
+    "candidate_cold": {
+      "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-fastdiag-candidate-cold.json",
+      "sha256": "9331f6c0a60936b360c6ad89ffa61510db5eef4e991e187dc9d9ac01ba6c7b03"
+    },
+    "candidate_warm": {
+      "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-fastdiag-candidate-warm.json",
+      "sha256": "cbbbe9d79e061cf25ad738ecab53ab70d682520d1397cf334ee33e95e176c0af"
+    }
+  }
+}

@@ -93,9 +93,11 @@ The compatible retained-modal solver is the sole frozen B1 pressure path after
 small factor parity, medium and large field/pressure-observable parity, and a
 large solve/restart gate passed. No B1 environment switch is required.
 
-B2 supports named axial sharding. On two RTX A4000 GPUs the current fixed-size
-run improves from 36.96 s to 22.23 s with matching solution signatures. This is
-a scaling result, not experimental validation.
+B2 supports named axial sharding. On two RTX A4000 GPUs the fixed-size scaling
+gate improves from 36.96 s to 22.23 s. The fine-checkpoint transverse Galerkin
+gate separately reduces electric iterations 5.18x and matched two-update time
+1.87x with equivalent fields and residuals. These are solver and scaling
+results, not experimental validation.
 
 ## Limitations
 
