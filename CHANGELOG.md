@@ -25,7 +25,7 @@ documentation.
   `examples/cases/`; generated research work now stays under ignored
   `artifacts/`.
 - Consolidated the portable suite to 34 files and 767 passing tests while
-  retaining 95.28% branch coverage and a 240.3-second six-worker gate.
+  retaining 95.28% branch coverage and a 190.6-second six-worker gate.
 - Accepted compatible SOLVAX 0.8 releases below 1.0 instead of pinning one
   patch version.
 - Moved 65 large generated artifacts to the checksummed
