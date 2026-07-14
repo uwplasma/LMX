@@ -101,30 +101,32 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 
 1. **Complete:** regenerate provenance for the canonical-contract tranche and
    pass the complete portable gate (770 pass, 8 skip, 95.35%, 171.1 s).
-2. Make `harness-smoke` physics-valid but permanently production-ineligible.
-   Separate shared physics semantics from role-specific mesh/stopping settings,
-   derive observed LMX and FreeMHD contracts independently, and recompute every
-   artifact hash from the actual file.
+2. Split canonical contracts into immutable shared physics and role-specific
+   mesh/stopping sections; introduce artifact-backed schema 2 validation. Do
+   not yet freeze smoke stopping values or claim a smoke contract pass.
 3. Implement the complete canonical B2 formulation with tiny tests first:
    projection-consistent conservative advection, frozen discretization,
    inlet-flow/outlet-pressure boundaries, and axial electric closure. Delete
    the obsolete B2 stationwise projection path in the same tranche.
-4. Replace the dense axial coarse inverse with the audited O(nx) SOLVAX
-   tridiagonal/gauge decomposition and prove dense, gradient, and placement
-   parity on tiny grids.
-5. Run affected modules, then one portable gate. Commit and push before any
-   external or timing work.
+4. Materialize both tiny inputs, derive their contracts independently, then
+   freeze the smoke mesh, mapped field, time step, iterations, and stopping
+   rules only after their exact mapping and bounded convergence are audited.
+5. Run affected modules, then one portable gate. Commit and push before the
+   external smoke.
 6. Extend the existing parity command to run one exact tiny B2 smoke. Compare
    mass/current closure, stopping, hashes, and the same pressure observable. A
    failure returns to step 3.
-7. Prove one-/multi-device equivalence on that accepted tiny path, then measure
+7. Replace the dense axial coarse inverse with the audited O(nx) SOLVAX
+   tridiagonal/gauge decomposition and prove dense, gradient, and placement
+   parity on tiny grids.
+8. Prove one-/multi-device equivalence on that accepted tiny path, then measure
    fixed-size Mac 1/2/4-device CPU and office one-/two-GPU warm timings alone.
-8. Advance B2 one level at a time: exact coarse comparison first, then medium
+9. Advance B2 one level at a time: exact coarse comparison first, then medium
    and fine only if literature, FreeMHD, conservation, restart, wall, and
    tolerance gates pass for the correct reason.
-9. Refresh the README/docs from compact accepted records without rerunning
+10. Refresh the README/docs from compact accepted records without rerunning
    solvers; then apply the proven harness/formulation path to B1.
-10. Complete the release gate.
+11. Complete the release gate.
 
 ## Gate 1: authoritative matched harness
 
@@ -135,15 +137,23 @@ self-promoting.
 
 Remaining work:
 
-- Freeze one tiny smoke mesh and stopping contract while reusing canonical
-  equations, groups, geometry family, wall model, field mapping, boundary
-  semantics, observable, and normalization.
+- Store equations, groups, geometry family, wall model, field mapping, boundary
+  semantics, observable, and normalization once as immutable shared sections;
+  roles may supply only mesh coordinates and stopping rules.
+- Bump matched records to schema 2. Resolve file/tree artifacts beneath an
+  explicit root, reject escapes, symlinks, duplicates, missing/empty inputs,
+  and type mismatches, and recompute deterministic hashes from their contents.
+- Freeze the B2 smoke mesh and stopping contract only after the canonical
+  solver and both materializers exist. Time step, iteration caps, correctors,
+  and fixed step count are candidates—not evidence—until then.
 - Report `contract_pass=True` and `acceptance_pass=False` for a valid smoke.
 - Materialize LMX and FreeMHD inputs independently. Never populate observed
   contracts by copying the expected dictionary twice.
-- Resolve and hash the actual source trees, inputs, evaluator, and outputs.
-  The current validator recomputes only the specification hash and validates
-  syntax for the other SHA-256 fields.
+- Derive each observed contract from its real config, coordinates, field
+  samples, boundary files, and source snapshot; neither observer receives the
+  expected dictionary.
+- Separate schema, contract, artifact, and comparison failures so an unrelated
+  comparison error cannot make a valid physics contract appear invalid.
 - Keep generated cases, logs, VTK, restarts, and raw histories outside Git.
   Only compact specifications, evaluators, and accepted summaries are tracked.
 
