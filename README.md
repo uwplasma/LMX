@@ -235,7 +235,7 @@ convergence, analytical profiles, and independent reference data. Heavy
 FreeMHD and scaling campaigns remain explicit workflows because they require
 external software or hardware.
 The latest complete local gate passes 771 tests with 8 expected external-data
-skips and 95.25% branch coverage in 165.6 seconds on six Mac workers. The compact
+skips and 95.28% branch coverage in 167.4 seconds on six Mac workers. The compact
 suite tests physics, numerics, adapters, plotting, and curated workflows directly.
 
 ## Repository policy

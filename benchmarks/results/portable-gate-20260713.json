@@ -1,6 +1,6 @@
 {
   "date": "2026-07-13",
-  "commit": "06f5f6272770adf4e17ab6304509c9d829dd7d30",
+  "commit": "68dc7ccb3bc41fd5ec16ea335177c9be536663e9",
   "lock_sha256": "7cc9e566ba686ea741f68086c8dbbf2d2e21b6b02acc6d372b9b313db8460232",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
@@ -22,16 +22,16 @@
     "workers": 6,
     "passed": 771,
     "skipped": 8,
-    "pytest_seconds": 163.33,
-    "gate_seconds": 165.6,
-    "branch_coverage_percent": 95.25,
+    "pytest_seconds": 165.15,
+    "gate_seconds": 167.4,
+    "branch_coverage_percent": 95.28,
     "passed_gate": true
   },
   "comparison": {
     "previous_gate_seconds": 200.3,
-    "wall_time_reduction_percent": 17.323,
-    "current_budget_fraction": 0.276,
-    "current_engineering_target_fraction": 0.46,
+    "wall_time_reduction_percent": 16.425,
+    "current_budget_fraction": 0.279,
+    "current_engineering_target_fraction": 0.465,
     "current_gate_pass": true
   },
   "hosted_ci": {
