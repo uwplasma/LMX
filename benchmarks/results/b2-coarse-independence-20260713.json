@@ -1,29 +1,30 @@
 {
   "case_id": "B2-fringing-square",
-  "commit": "94f5bdc",
+  "commit": "59e31bf",
   "date": "2026-07-13",
   "external_assets": {
     "location": "release asset staging; not stored in Git",
-    "summary_sha256": "bef984cb1c105aa04f066e1cca711128629bb123d2e3e27cab851971a079cb1e"
+    "summary_sha256": "c853fb531eae70ae30bf3825f155ffc3699845c6a6d94aafa80fdf9df3f79ac7"
   },
-  "hardware": "two NVIDIA RTX A4000 workers, one independent variant per GPU",
+  "hardware": "two NVIDIA RTX A4000 GPUs, each variant spatially sharded across both devices",
   "independence": {
-    "iteration_delta_uncertainty_fraction": 0.00042664821611401726,
+    "iteration_delta_uncertainty_fraction": 0.0004253278085451437,
     "pass": true,
-    "thin_wall_relative_difference": 5.86433499111346e-13,
-    "tolerance_delta_uncertainty_fraction": 0.08384388339038785
+    "thin_wall_relative_difference": 6.248268284781083e-13,
+    "tolerance_delta_uncertainty_fraction": 0.08344286695884713
   },
   "literature_diagnostic": {
     "acceptance_scope": "diagnostic only; three-mesh acceptance remains open",
-    "integrated_pressure_relative_error": 0.13796165650970316,
-    "weighted_linf": 3.5942517479728986,
-    "weighted_rms": 1.2261869179951794
+    "integrated_pressure_relative_error": 0.1387871719479431,
+    "weighted_linf": 3.5947717217395425,
+    "weighted_rms": 1.2210602205362824
   },
   "mesh_level": "coarse",
   "medium_baseline_followup": {
     "acceptance_scope": "baseline physics and persisted-observable gate only; medium independence remains open",
     "actual_spatial_shards": 2,
     "commit": "59e31bf",
+    "completed_variants": ["baseline", "extended_iterations"],
     "diagnostics": {
       "max_charge_balance_residual": 0.00012040138244628906,
       "max_divergence_residual": 1.2336584385500856e-06,
@@ -32,6 +33,14 @@
       "volumetric_flow_rate_span": 1.0658141036401503e-13
     },
     "initialization_sha256": "b7b3cbad1b6885deb35b8861c9fcc4717d86b3d1cdeb6b4d8afac0d8ba40c4d5",
+    "extended_iterations": {
+      "max_charge_balance_residual": 0.00012169778347015381,
+      "max_divergence_residual": 1.0248521660415347e-06,
+      "max_residual": 4.820367768720857e-05,
+      "record_sha256": "b3d6c0606ef468acfdca8f424c370dee336b4bdcbc70666fa3c6be0928c88dde",
+      "restart_sha256": "08f33f871623cc349d1c7d0a751e27d89596cafbbf0848aa03a3ae6891ba5973",
+      "runtime_seconds": 168.3387077570078
+    },
     "literature_diagnostic": {
       "integrated_pressure_relative_error": 0.20613096897044395,
       "weighted_linf": 3.9672023642492404,
@@ -46,39 +55,43 @@
     "spatial_device_ids": ["cuda:0", "cuda:1"],
     "summary_sha256": "b71b498407036b58abe5b6bbf7bacab1ff000c205fa8509de4dc8dd33972f8c2"
   },
-  "shape": [101, 77, 77],
-  "source_fingerprint": "addc08a477703e36f4cd727bf5da29cbe0c44f6b2be919fb9e1613dac59989ab",
+  "shape": [102, 77, 77],
+  "source_fingerprint": "a90ccdc82327f4d230bc1425241779d233c68118c4c5fd1f72a82942a1da99cf",
   "variants": [
     {
-      "max_charge_balance_residual": 2.4907290935516357e-05,
-      "max_divergence_residual": 5.980271609216069e-07,
-      "max_residual": 3.1305878019027844e-05,
-      "restart_sha256": "fe66e317765c1c182ed6ae856f94b109f51411a29558743f0322460701609c1c",
-      "runtime_seconds": 51.1470169989625,
+      "max_charge_balance_residual": 2.6173889636993408e-05,
+      "max_divergence_residual": 4.802912178802909e-07,
+      "max_residual": 3.19850133508881e-05,
+      "record_sha256": "6ed7b16867e181ed3eaf5ddf1668925952df4639bb1e624ffb5af2eb7caacddf",
+      "restart_sha256": "147261bb412f8cab05b9839798f3dfcf4d25defe577bd5b93bb899c9fdcd4cc9",
+      "runtime_seconds": 95.58568345697131,
       "variant": "baseline"
     },
     {
-      "max_charge_balance_residual": 2.871081233024597e-05,
-      "max_divergence_residual": 5.921548299972703e-07,
-      "max_residual": 2.475702090509735e-05,
-      "restart_sha256": "b431690017b395787466289d0bdff7f9cb01479b0474edd2eb4236f24a81da76",
-      "runtime_seconds": 50.41929370601429,
+      "max_charge_balance_residual": 2.3774802684783936e-05,
+      "max_divergence_residual": 4.46165386858155e-07,
+      "max_residual": 2.4087729342703312e-05,
+      "record_sha256": "5661ac72a5e8312e2c5398a9dc153a7aa8a5f5e06a32f5bf8c5831b25aa1662a",
+      "restart_sha256": "cd0ccd33df7d728e43ba04fd9bf333f70f7deed5843c82e6df6b350db8a4deaa",
+      "runtime_seconds": 79.90571118699154,
       "variant": "tight_tolerance"
     },
     {
-      "max_charge_balance_residual": 2.6144087314605713e-05,
-      "max_divergence_residual": 5.08616200028207e-07,
-      "max_residual": 3.113686470901378e-05,
-      "restart_sha256": "2bc5c70875524ab26a88f3a6714b353e82d19bb54db1f4c7cf44bf30720b5b27",
-      "runtime_seconds": 51.82204365899088,
+      "max_charge_balance_residual": 2.3700296878814697e-05,
+      "max_divergence_residual": 4.797781322854466e-07,
+      "max_residual": 3.1699148429931157e-05,
+      "record_sha256": "cbef3e4dc6de98678fb8bafff761e432ceb420b49d231379c79db6b65816494e",
+      "restart_sha256": "622769b8a5bf2f7c812ada915bcacff1909d175b925f9682e61e56fab08de056",
+      "runtime_seconds": 70.88117779098684,
       "variant": "extended_iterations"
     },
     {
-      "max_charge_balance_residual": 2.4043023586273193e-05,
-      "max_divergence_residual": 5.980226015105984e-07,
-      "max_residual": 3.1305878019027844e-05,
-      "restart_sha256": "45bf331bc32de8012f7103378a06892d98eec9880466d72fbacf359f2c61c5cc",
-      "runtime_seconds": 51.482889922044706,
+      "max_charge_balance_residual": 2.7157366275787354e-05,
+      "max_divergence_residual": 4.801317299435448e-07,
+      "max_residual": 3.19850133508881e-05,
+      "record_sha256": "39b762a850ffd7310553b4615dfd202649ae7b64ddf50d10e1b5d68692cafea6",
+      "restart_sha256": "d321ab34b1f189dc682699c1cf927950be73fe63747860180039fd56c7b38ed6",
+      "runtime_seconds": 81.68251896003494,
       "variant": "thin_wall"
     }
   ]
