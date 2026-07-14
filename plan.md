@@ -70,7 +70,7 @@ superseded worktrees and branches.
 | README/docs | 567-word feature-led README, conservatively sourced comparison table, feature-specific docs, and a 7-second Hunt loop; tracked media is 387,683 bytes | refresh canonical B2/scaling panels only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | implement independent LMX/FreeMHD materializers and observers, then freeze the smoke role |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | consolidate the old adapter/tests, then implement independent real-input materializers and observers before freezing the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | exact frozen momentum/stress/flux/projection, O(nx) SOLVAX coarse solve, restart-continuous CFL/stopping state, and forced one-/two-CPU equivalence pass bounded gates | independently materialize and observe both tiny inputs before running either code |
 | SOLVAX | PyPI/tag 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and O(nx) tridiagonal algebra used by B2; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | publish 0.8.4 separately before consuming shared Anderson weights; move no further MHD assembly |
@@ -192,15 +192,15 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    exact 3-step versus 1+2 continuation, and forced one-/two-CPU gates pass.
    The tranche added no file and reduced package/core/test lines to
    34,977/8,003/21,274. The complete portable gate remains 166.4 seconds.
-12. Extend the existing parity script and `lmx/freemhd.py`, not the repository
-   surface: independently materialize a tiny LMX case and a tiny FreeMHD case,
-   then derive each observed contract only from its own real configuration,
-   coordinates, field samples, boundary files, and pinned source. Unit-test
-   both observers and mismatch attribution without running a solver. Only then
-   freeze the shared mesh, field mapping, effective fixed step, correctors,
-   executed step budget, expected `step_limit`/`converged` reason, and hashes;
-   commit and push that contract before invoking FreeMHD.
-13. Run one exact tiny B2 smoke through the extended parity command. Compare
+12. Complete the matched-input tranche without running either solver:
+   consolidate the obsolete reference adapter and parity-script tests; add one
+   deterministic LMX JSON input/load path and one selectively rewritten
+   FreeMHD case path; derive both contracts from those real inputs; prove
+   deterministic hashes and one-sided mismatch attribution; then freeze the
+   agreed `harness-smoke` role and commit/push it. Detailed order and literal
+   gates are in Gate 1 below.
+13. Run one exact tiny B2 smoke through the extended parity command only from
+   the committed materialized inputs. Compare
    mass/current closure, effective-step/Courant history, stopping state, hashes,
    and the same pressure observable. A
    failure returns to the first failed tiny gate.
@@ -234,21 +234,82 @@ Completed foundation:
   escapes, aliases, links, overlaps, missing/empty inputs, and type mismatches,
   and recomputes deterministic hashes from their contents.
 
-Remaining work:
+Execute this solver-free tranche in order:
 
-- Freeze the B2 smoke mesh and stopping contract only after the canonical
-  solver and both materializers exist. Time step, iteration caps, correctors,
-  and fixed step count are candidates—not evidence—until then.
-- Report `contract_pass=True` and `acceptance_pass=False` for a valid smoke.
-- Materialize LMX and FreeMHD inputs independently. Never populate observed
-  contracts by copying the expected dictionary twice.
-- Derive each observed contract from its real config, coordinates, field
-  samples, boundary files, and source snapshot; neither observer receives the
-  expected dictionary.
-- Separate schema, contract, artifact, and comparison failures so an unrelated
-  comparison error cannot make a valid physics contract appear invalid.
-- Keep generated cases, logs, VTK, restarts, and raw histories outside Git.
-  Only compact specifications, evaluators, and accepted summaries are tracked.
+1. **Create line budget before adding observers.** Merge the essential parity
+   command gates into `tests/test_freemhd.py`, delete the superseded parity
+   test file, replace the hand-built case fixture with the real materializer,
+   and remove the nonportable local-install assertion. After verifying that it
+   has no public export or repository caller, delete
+   `build_case_from_freemhd_reference` and its adapter-only inference helpers
+   and tests. Preserve raw dictionary parsers needed by the observers. Target
+   31 test files, below 21,050 test lines, and a net package-line reduction.
+2. **Bind the external source without vendoring it.** Verify commit
+   `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and cleanliness of the four
+   relevant paths, then copy only those four files plus `source-pin.json` into
+   the generated evidence tree. Freeze their SHA-256 values in the B2 spec:
+   `ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6`,
+   `f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e`,
+   `ee85d9b26c257ccdd3ab6d2fa0403daed9df30d63f483c35bea1586ce6d4fd07`,
+   and `f99e4011a0a4ac957c992493b9391796dd12191c16293ba07c127168640c53b3`.
+   Record the install-template commit/tree hash separately;
+   it is not solver-source evidence. Validation remains portable and offline.
+3. **Materialize LMX from one real dedicated input.** Extend the existing
+   parity script with a deterministic, sorted B2 JSON schema rather than
+   widening public TOML. Store the actual case controls, materials, boundaries,
+   half-width scaling, exact x/y/z faces, original checked ALEX field anchors,
+   interpolation rule, and recomputed cell-centre samples. Its loader rebuilds
+   a real `CaseSpec`/`FringingProfile` and refuses any face, anchor, sample, or
+   control mismatch before the eventual solver consumes it. Refuse overwrite.
+4. **Materialize FreeMHD independently.** Selectively reuse only the small
+   multi-region dictionary skeleton from `hunt_demo`; never copy its generated
+   fields or treat that uniform, mixed-wall million-cell case as B2 evidence.
+   Rewrite the mesh, all-conducting shell, ALEX field expression, flow/pressure/
+   electric boundaries, fixed-step controls, and material properties. Disable
+   `fvOptions` velocity clipping and adaptive stepping; require `alpha=1`, zero
+   gravity, constant temperature/properties, laminar flow, zero-duration field
+   ramp, and conservative current. Reuse and observe the template's exact
+   `Euler`, `limitedLinear 1.0`, and `cellLimited leastSquares 1.0` dictionaries.
+5. **Observe facts, never claims.** The LMX observer reconstructs its loaded
+   problem; the FreeMHD observer parses block mesh, topology, material, field,
+   boundary, phase/thermal, numerical, and control dictionaries. Both derive
+   dimensionless groups, coordinates, normalized field samples, execution
+   controls, and source identities without calling
+   `canonical_matched_b_contract`, loading an expected contract, or trusting a
+   generated manifest. Schema-2 validation reruns each observer against the
+   resolved input artifact and compares the result with the recorded contract.
+6. **Prove independence before freezing.** Use literal expected facts and
+   parameterized mutations of one side only: mesh face, field anchor/sample,
+   viscosity/conductivity, wall property, inlet/outlet/electric boundary, time
+   step/corrector/step budget, and pinned source byte. Require deterministic
+   hashes, refusal to overwrite, unchanged opposite-side observation, and the
+   exact failed contract path. These are unit tests; do not invoke FreeMHD.
+7. **Freeze only agreed materialized output.** Add `harness-smoke` beside, not
+   instead of, `b2-production`. A valid smoke reports `contract_pass=True` and
+   `acceptance_pass=False`; it can never self-promote. Freeze exact coordinates,
+   field mapping, effective step, correctors, two executed steps, expected
+   `step_limit`, and all hashes only after both observers agree. Commit and push
+   this contract before any solver launch.
+
+The preferred explicit nondimensional realization mirrors LMX raw fields:
+`L=U=rho=sigma_f=1`, `nu=mu=1/Re`, `B0=sqrt(N)`, `Q=4`, wall thickness
+`0.02`, and `sigma_w=c_w/t=3.5`, giving `Re=Ha^2/N`, `Ha=2900`, and
+`N=540`. This is preferable to the algebraically equivalent
+`sigma_f=N, B0=1` realization because potential and current need no extra
+cross-code scaling. The tentative smoke is 7–8 axial cells over `[-15,10]`, a
+`5x5` fluid cross-section plus one wall cell per side, fixed
+`dt=0.001/N=1/540000`, and two updates ending at `step_limit`. These literals
+become contract facts only after both independent materializers reproduce them;
+otherwise fix the first materializer discrepancy rather than weakening the
+observer.
+
+SOLVAX is deliberately outside this tranche: released 0.8.3 already owns every
+generic solve used by B2, while materialization, finite-volume/OpenFOAM
+semantics, physical observers, and acceptance remain LMX responsibilities.
+Publishing 0.8.4 is neither authorized here nor a prerequisite for the smoke.
+
+Keep generated cases, logs, VTK, restarts, and raw histories outside Git. Only
+compact specifications, evaluators, and accepted summaries are tracked.
 
 Exit: a record can pass its role-specific contract only when both codes
 demonstrably solved the same problem; a smoke can never unlock production
@@ -393,9 +454,9 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | stay at 35 until a complete owner disappears |
-| package lines | 34,977 | below 34,800 after smoke cleanup |
+| package lines | 34,977 | below 34,940 after observers; below 34,800 after smoke cleanup |
 | maintained-core lines | 8,003 | below 8,000 after the exact smoke |
-| test files / lines | 32 / 21,274 | 32 / below 21,000 by consolidating post-smoke evidence |
+| test files / lines | 32 / 21,274 | 31 / below 21,050 with observer consolidation; below 21,000 after smoke cleanup |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or
