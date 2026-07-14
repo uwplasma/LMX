@@ -75,6 +75,11 @@ B2 has exact-parity axial sharding on two RTX A4000 GPUs. B1 now uses its
 accepted compatible retained-modal pressure solver; experimental-observable,
 mesh-ladder, and final steady-response acceptance remain open. This is not yet
 a claim that the experimental pressure curve has passed.
+The current-source B2 coarse campaign passes steady, conservation, tighter
+tolerance, doubled-iteration, and confirmation-wall gates. Its coarse ALEX
+curve alone does not pass the frozen literature limits (`weighted RMS 1.226`,
+`weighted max 3.594`, integrated error `0.138`), so it is correctly retained as
+mesh evidence rather than promoted as an experimental result.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

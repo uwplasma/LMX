@@ -162,6 +162,9 @@ for external research use.
 - B1 promotion: small factor parity, medium and large field/pressure-observable
   parity, and large restart gates pass; the compatible retained-modal solver is
   now the sole frozen B1 pressure path.
+- B2 coarse independence: all steady, conservation, tolerance, iteration, and
+  confirmation-wall gates pass on current source; the coarse ALEX curve remains
+  outside the frozen literature limits, so medium/fine refinement is required.
 - GPU: accepted B2 checkpoint scales from 36.96 seconds on one A4000 to 22.23
   seconds on two (1.66x, 83.1% efficiency).
 - Repository consolidation is active; historical campaigns and large studies
