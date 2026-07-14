@@ -1,6 +1,6 @@
 {
   "date": "2026-07-14",
-  "commit": "49c8c9efad4e0a48303ed8753793d5cf18e4343a",
+  "commit": "10abb4324cd412b6222aa8b66dffde550c8bcd85",
   "lock_sha256": "ade621421197b8264dc6c197028dc23938a90d6716a536f2ccc504c6ba0826ec",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
@@ -24,8 +24,8 @@
     "test_lines": 21649,
     "passed": 768,
     "skipped": 8,
-    "pytest_seconds": 173.76,
-    "gate_seconds": 175.9,
+    "pytest_seconds": 170.51,
+    "gate_seconds": 172.9,
     "branch_coverage_percent": 95.30,
     "slowest_tests_source": "source-identical six-worker replay without coverage, 147.42 seconds",
     "slowest_tests": [
@@ -53,19 +53,19 @@
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 174.2,
-    "wall_time_reduction_percent": -0.98,
-    "current_budget_fraction": 0.293,
-    "current_engineering_target_fraction": 0.489,
+    "previous_gate_seconds": 175.9,
+    "wall_time_reduction_percent": 1.71,
+    "current_budget_fraction": 0.288,
+    "current_engineering_target_fraction": 0.480,
     "current_gate_pass": true
   },
   "architecture": {
     "package_modules": 36,
     "package_lines": 35320,
     "maintained_core_lines": 8474,
-    "tracked_checkout_bytes": 3826440,
-    "wheel_bytes": 291587,
-    "root_import_median_seconds": 0.01706
+    "tracked_checkout_bytes": 3841578,
+    "wheel_bytes": 291697,
+    "root_import_median_seconds": 0.01875
   },
   "hosted_ci": {
     "status": "administratively_not_started",
