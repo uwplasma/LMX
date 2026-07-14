@@ -41,6 +41,9 @@ not more brute-force updates, precedes another acceptance run.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.
+Removing the shard-local axial coarse correction was also rejected: it reduced
+only 1--2 iterations and raised wall time to 155.88 seconds. The next candidate
+must add a multilevel transverse correction while retaining that coarse mode.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states
