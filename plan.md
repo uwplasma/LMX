@@ -168,10 +168,13 @@ for external research use.
 - B2 medium baseline: the `152 x 113 x 113` state passes steady and conservation
   gates on two real GPU shards in 86.52 seconds from its converged restart. The
   acceptance curve is now reloaded from the checksummed restart and agrees
-  exactly; doubled-iteration independence also passes in 168.34 seconds. The
-  tight continuation exposes a real efficiency blocker: vector Aitken remains
-  at its `0.05` lower safeguard, so acceleration must be improved before that
-  variant, the confirmation wall, fine refinement, and matched FreeMHD close.
+  exactly; doubled-iteration independence also passes in 168.34 seconds.
+  Restart-aware steady continuation removes the spurious `0.05` Aitken damping,
+  and a less conservative but physically gated electric target reduces a
+  two-update probe from 64.89 to 57.05 seconds. The tight run remains open: its
+  measured trajectory still projects beyond one hour, so pressure/electric
+  conditioning must improve before this variant, the confirmation wall, fine
+  refinement, and matched FreeMHD close.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

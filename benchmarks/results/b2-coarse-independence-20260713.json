@@ -53,7 +53,20 @@
     "shape": [152, 113, 113],
     "source_fingerprint": "a90ccdc82327f4d230bc1425241779d233c68118c4c5fd1f72a82942a1da99cf",
     "spatial_device_ids": ["cuda:0", "cuda:1"],
-    "summary_sha256": "b71b498407036b58abe5b6bbf7bacab1ff000c205fa8509de4dc8dd33972f8c2"
+    "summary_sha256": "b71b498407036b58abe5b6bbf7bacab1ff000c205fa8509de4dc8dd33972f8c2",
+    "tight_tolerance_diagnostic": {
+      "acceptance_scope": "stopped at the atomic checkpoint because projected convergence exceeded one hour",
+      "checkpoint_sha256": "8f5578ac20618976a49995e50bf2504c18388fa95a6d02b1f4f577825220a2fd",
+      "checkpoint_step": 8,
+      "commit": "87223e9",
+      "compile_inclusive_two_update_seconds": 57.054923593997955,
+      "electric_iteration_range": [846, 866],
+      "max_charge_balance_residual": 0.00011735666157619562,
+      "observed_elapsed_seconds": 174.31660735304467,
+      "observed_residual": 4.5845909383390726e-05,
+      "observed_step": 10,
+      "source_fingerprint": "ebfe50f4dfeb308f85c13d9d50687b28f95f6d3dc11af5ae2abd2376af684183"
+    }
   },
   "shape": [102, 77, 77],
   "source_fingerprint": "a90ccdc82327f4d230bc1425241779d233c68118c4c5fd1f72a82942a1da99cf",
