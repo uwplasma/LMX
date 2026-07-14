@@ -75,9 +75,9 @@ superseded worktrees and branches.
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerics, conservation, and restart accepted | exact matched FreeMHD plus literature/mesh acceptance |
 | B2 ALEX square duct | fine numerical baseline converged; current LMX and FreeMHD formulations are not yet equation-identical | reconcile inertia and axial drive before any matched run |
-| SOLVAX | 0.8.2 primal, gradient, transpose, CPU/GPU, and existing integration gates pass | migrate symmetric anchored Poisson PCG; repeat interleaved timing |
+| SOLVAX | velocity, cyclic-line, and symmetric anchored-Poisson PCG paths use 0.8.2 | contribute additive-line ownership; repeat interleaved timing |
 | Parallel execution | two-GPU B2 numerical checkpoint shows 1.66x speedup and parity | accepted-case CPU/GPU scaling and four-device evidence |
-| Portable quality | 760 pass, 8 expected external-data skips, 95.31% branch coverage, 193.4 s | stay below 300 s target and 600 s hard limit |
+| Portable quality | 761 pass, 8 expected external-data skips, 95.30% branch coverage, 182.3 s | stay below 300 s target and 600 s hard limit |
 
 Machine-readable evidence is in `benchmarks/results/`; current interpretation is
 in `docs/validation_report.md` and `docs/performance.md`.
@@ -118,18 +118,15 @@ Apply this migration sequence:
 3. **Complete:** the periodic-theta line uses SOLVAX
    `cyclic_tridiagonal_solve`; pipe primal, variable-coefficient dense-reference,
    and implicit-gradient gates replace the circulant-only FFT shortcut.
-4. The anchored Poisson action now projects both row and column symmetrically.
-   A dense nonuniform audit found symmetry to `8.88e-16` and a positive minimum
-   eigenvalue. Lift each preconditioner as
-   `P M(P r) + e_a e_a^T r`, route explicit nonuniform `cg` through the
-   volume-scaled formulation, then replace the retained loop with SOLVAX PCG.
-   Preserve LMX physical-residual recertification and the distinct `cg` and
-   `cg_volume` residual contracts. Translate unscaled tolerance conservatively
-   as `rtol = physical_tol / sqrt(N)`; use
-   `atol = physical_tol * min(residual_scale)` for volume-scaled solves, then
-   recompute the physical maximum norm. Gate the deletion with uniform and
-   anisotropic primal parity, RHS and coefficient gradients, transpose parity,
-   JIT, and a tiny high-Ha row.
+4. **Complete:** the anchored Poisson action projects both row and column
+   symmetrically; a dense nonuniform audit found symmetry to `8.88e-16` and a
+   positive minimum eigenvalue. Preconditioners are lifted as
+   `P M(P r) + e_a e_a^T r`, explicit nonuniform `cg` routes through the
+   volume-scaled formulation, and SOLVAX PCG replaces the retained recurrence.
+   Unscaled stopping uses `rtol = physical_tol / sqrt(N)`; volume-scaled
+   stopping uses `atol = physical_tol * min(residual_scale)`. Uniform,
+   anisotropic, physical-residual, RHS/coefficient-gradient, JIT, transpose, and
+   tiny high-Ha gates pass. LMX retains physical maximum-norm recertification.
 5. Add and release a symmetry-preserving additive-line preconditioner in SOLVAX,
    then delete the two LMX averaging closures. SOLVAX's current multiplicative
    `line_smoother` is not a PCG-safe substitute; geometry and axis adaptation
@@ -162,9 +159,9 @@ Near-term ratchets after this workstream:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | hold; reach 34 only through real ownership deletion |
-| package lines | 34,939 | below 34,900 |
-| maintained-core lines | 8,068 | below 8,025 |
-| test files / lines | 32 / 21,291 | hold 32 / below 21,250 |
+| package lines | 34,895 | below 34,875 |
+| maintained-core lines | 8,024 | below 8,000 |
+| test files / lines | 32 / 21,295 | hold 32 / below 21,250 |
 | maintenance scripts | 19 | at most 18; reusable logic moves into `lmx/` or an existing command |
 
 Count semantic maintenance cost across the whole package; do not satisfy a
@@ -175,13 +172,11 @@ removal must follow real ownership consolidation, not arbitrary merging.
 
 ### Immediate execution order
 
-1. Lift the anchored preconditioner, add dense SPD and gradient gates, then
-   migrate retained Poisson CG to SOLVAX and delete the duplicate loop.
-2. Harden the FreeMHD record validator and consolidate the standalone case
+1. Harden the FreeMHD record validator and consolidate the standalone case
    materializer into the existing parity command; run no solver in this step.
-3. Reconcile B2 momentum advection and the axial boundary/drive contract.
-4. Prove one-/multi-device equivalence and bounded strong scaling for that path.
-5. Run the tiny matched B2-family smoke case; only a passing contract and smoke
+2. Reconcile B2 momentum advection and the axial boundary/drive contract.
+3. Prove one-/multi-device equivalence and bounded strong scaling for that path.
+4. Run the tiny matched B2-family smoke case; only a passing contract and smoke
    can authorize medium or production B2 work.
 
 Steps 1--3 use focused tests and tiny manufactured cases. The full portable

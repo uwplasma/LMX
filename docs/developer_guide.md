@@ -9,8 +9,8 @@ dependency, or large generated-asset change:
 .venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current classified baseline is 35 package modules and 34,939 total package
-lines. The maintained stable core is 8,067 lines;
+The current classified baseline is 35 package modules and 34,895 total package
+lines. The maintained stable core is 8,024 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
@@ -213,7 +213,7 @@ The latest local evidence pass on this workstation shows:
 
 - Python 3.10 compatibility lane: the complete battery without coverage
   instrumentation, under the 10-minute wall-clock target
-- Reference coverage lane: 771 tests pass with 95.31% combined line/branch
+- Reference coverage lane: 761 tests pass with 95.30% combined line/branch
   coverage over `lmx/`; workflow behavior is exercised by the same suite
 
 The hard rule for routine CI/CD is that the parallel workflow must stay under

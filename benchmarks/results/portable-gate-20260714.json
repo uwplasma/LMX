@@ -1,7 +1,6 @@
 {
   "date": "2026-07-14",
-  "commit": "fd3152da5cb8328201c1b3a3440dcdaa26971640",
-  "lock_sha256": "ade621421197b8264dc6c197028dc23938a90d6716a536f2ccc504c6ba0826ec",
+  "commit": "cdb94092427ababba2ea5663edc5c72d30bc2fe4",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -10,62 +9,38 @@
     "platform": "Darwin arm64"
   },
   "gate": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
     "workers": 6,
     "budget_seconds": 600,
     "engineering_target_seconds": 360,
     "minimum_branch_coverage_percent": 95.0
   },
-  "current_local_gate": {
-    "python": "3.12.13",
-    "jax": "0.10.2",
-    "jaxlib": "0.10.2",
-    "workers": 6,
-    "test_files": 34,
-    "test_lines": 21699,
-    "passed": 771,
+  "result": {
+    "test_files": 32,
+    "test_lines": 21295,
+    "passed": 761,
     "skipped": 8,
-    "pytest_seconds": 192.13,
-    "gate_seconds": 194.4,
-    "branch_coverage_percent": 95.31,
-    "slowest_tests_source": "source-identical six-worker replay without coverage, 147.42 seconds",
-    "slowest_tests": [
-      {
-        "nodeid": "tests/test_fringing.py::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]",
-        "seconds": 47.90
-      },
-      {
-        "nodeid": "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite",
-        "seconds": 24.02
-      },
-      {
-        "nodeid": "tests/test_freeze_solvax_pcg_acceptance.py::test_solvax_backend_records_equivalence_and_resources",
-        "seconds": 20.29
-      },
-      {
-        "nodeid": "tests/test_autodiff.py::test_fringing_response_inverse_design_reduces_loss",
-        "seconds": 18.69
-      },
-      {
-        "nodeid": "tests/test_autodiff.py::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry",
-        "seconds": 18.30
-      }
-    ],
+    "pytest_seconds": 180.12,
+    "gate_seconds": 182.3,
+    "branch_coverage_percent": 95.30,
     "passed_gate": true
   },
   "comparison": {
-    "previous_gate_seconds": 172.9,
-    "wall_time_reduction_percent": -12.43,
-    "current_budget_fraction": 0.324,
-    "current_engineering_target_fraction": 0.540,
-    "current_gate_pass": true
+    "previous_gate_seconds": 194.4,
+    "wall_time_reduction_percent": 6.22,
+    "budget_fraction": 0.304,
+    "engineering_target_fraction": 0.506
   },
   "architecture": {
-    "package_modules": 36,
-    "package_lines": 35370,
-    "maintained_core_lines": 8498,
-    "tracked_checkout_bytes": 3841565,
-    "wheel_bytes": 291697,
-    "root_import_median_seconds": 0.01875
+    "package_modules": 35,
+    "package_lines": 34895,
+    "maintained_core_lines": 8024,
+    "maintenance_scripts": 19,
+    "tracked_checkout_bytes": 3432203,
+    "stable_root_exports": 30,
+    "curated_examples": 11
   },
   "hosted_ci": {
     "status": "administratively_not_started",

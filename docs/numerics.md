@@ -307,7 +307,8 @@ The current public linear-solver options are:
 - `auto` (released SOLVAX PCG)
 - `solvax_pcg`
 - `cg` (compatibility alias for SOLVAX PCG)
-- `jacobi` / `cg_volume` for selected potential solves
+- finite-iteration `jacobi` or volume-scaled SOLVAX PCG (`cg_volume`) for
+  selected potential solves
 
 The actual use of those controls depends on solver family and mode, and is
 parsed through `lmx/config.py`.

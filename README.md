@@ -134,8 +134,8 @@ time **1.87×**. Broader multi-device scaling remains open.
 
 ## Quality, documentation, and citation
 
-The portable gate currently passes **760 tests**, **95.31% branch coverage**,
-and a **193.4 s** wall time on six Apple-Silicon workers. Physics and external
+The portable gate currently passes **761 tests**, **95.30% branch coverage**,
+and a **182.3 s** wall time on six Apple-Silicon workers. Physics and external
 campaigns add analytical, conservation, convergence, FreeMHD, and experimental
 evidence outside that fast gate.
 
