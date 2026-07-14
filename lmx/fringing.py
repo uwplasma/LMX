@@ -16,6 +16,7 @@ from jax.scipy.linalg import solve_triangular
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
     KrylovSolution,
+    additive_preconditioner,
     aitken_relaxation,
     anderson_mixing,
     block_thomas_factor,
@@ -1186,12 +1187,7 @@ def _additive_line_preconditioner_3d(
 
         line_solves.append(solve_periodic)
 
-    def apply(residual: jnp.ndarray) -> jnp.ndarray:
-        return sum(solve_line(residual) for solve_line in line_solves) / len(
-            line_solves
-        )
-
-    return apply
+    return additive_preconditioner(line_solves)
 
 
 def _axial_mean_preconditioner_3d(

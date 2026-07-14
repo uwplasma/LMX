@@ -33,6 +33,7 @@ from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec
 
 from solvax import (
+    additive_preconditioner as _solvax_additive_preconditioner,
     aitken_relaxation as _solvax_aitken_relaxation,
     anderson_mixing as _solvax_anderson_mixing,
     galerkin_deflation as _solvax_galerkin_deflation,
@@ -121,23 +122,8 @@ def _potential_additive_line_preconditioner(
     anchor: tuple[int, int],
 ):
     y_line = _potential_y_line_preconditioner(diagonal, west, east, anchor)
-    anchor_t = (anchor[1], anchor[0])
-    z_diagonal = diagonal.T.at[anchor_t].set(1.0)
-    z_lower = (-south.T).at[anchor_t].set(0.0)
-    z_upper = (-north.T).at[anchor_t].set(0.0)
-
-    def apply(residual: jnp.ndarray) -> jnp.ndarray:
-        rhs = residual.at[anchor].set(0.0)
-        solved_y = y_line(rhs)
-        solved_z = _solvax_tridiagonal_solve(
-            z_lower,
-            z_diagonal,
-            z_upper,
-            rhs.T,
-        ).T
-        return (0.5 * (solved_y + solved_z)).at[anchor].set(0.0)
-
-    return apply
+    z_line = _potential_z_line_preconditioner(diagonal, south, north, anchor)
+    return _solvax_additive_preconditioner((y_line, z_line))
 
 
 def _potential_deflated_line_preconditioner(

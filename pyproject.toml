@@ -17,7 +17,7 @@ dependencies = [
   "matplotlib",
   "numpy",
   "scipy",
-  "solvax>=0.8.2,<1",
+  "solvax>=0.8.3,<1",
   "tomli; python_version < '3.11'",
 ]
 classifiers = [
