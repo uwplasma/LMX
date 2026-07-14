@@ -9,7 +9,7 @@ dependency, or large generated-asset change:
 uv run --locked --extra dev python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current classified baseline is 36 package modules and 35,137 total package
+The current classified baseline is 36 package modules and 35,320 total package
 lines. The maintained stable core is 8,474 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
@@ -214,7 +214,7 @@ The latest local evidence pass on this workstation shows:
 
 - Python 3.10 compatibility lane: the complete battery without coverage
   instrumentation, under the 10-minute wall-clock target
-- Python 3.13 coverage lane: 767 tests pass with 95.28% combined line/branch
+- Python 3.13 coverage lane: 768 tests pass with 95.30% combined line/branch
   coverage over `lmx/`; workflow behavior is exercised by the same suite
 
 The hard rule for routine CI/CD is that the parallel workflow must stay under

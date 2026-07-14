@@ -151,8 +151,8 @@ for external research use.
 
 ## Current checkpoint
 
-- Portable gate: 767 passed, 8 expected external-data skips, 95.28% branch
-  coverage, 174.2 seconds on the reference Mac.
+- Portable gate: 768 passed, 8 expected external-data skips, 95.30% branch
+  coverage, 175.9 seconds on the reference Mac.
 - SOLVAX: compatible `>=0.8.2,<1`; 0.8.2 supplies the tested SPD Galerkin
   deflation primitive and passes its Linux/macOS, minimum/current-stack, JIT,
   positive-definiteness, accuracy, and PCG-acceleration gates.
@@ -206,8 +206,8 @@ for external research use.
   Docker, dashboard, support/security, and duplicate driver surfaces are gone.
   The maintained checkout has 34 test files, 20 maintenance scripts, 13 compact
   accepted-result files, and no remote development branches beyond `main`.
-- Architecture: 36 package modules, 35,137 package lines, 8,474 maintained-core
-  lines, a 3.63 MiB tracked checkout, and a 289,644-byte wheel. Live gates cap
+- Architecture: 36 package modules, 35,320 package lines, 8,474 maintained-core
+  lines, a 3.65 MiB tracked checkout, and a 291,587-byte wheel. Live gates cap
   modules, lines, bytes, lazy import time, examples, exports, and wheel contents.
 - Documentation media: six anonymous-access derivatives total 516 KB and stay
   out of the wheel; full-resolution fields, plots, and movies remain checksummed
