@@ -294,6 +294,7 @@ def test_freemhd_closed_channel_observable_parity_writes_summary(
                         "simulated": [0.0, 0.98, 0.0],
                         "l2_error": 2.0e-2,
                         "linf_error": 2.0e-2,
+                        "reference_peak_abs": 1.0e-8 if name == "potential" else 1.0,
                     },
                     "z": {
                         "coordinate": [-1.0, 0.0, 1.0],
@@ -304,7 +305,11 @@ def test_freemhd_closed_channel_observable_parity_writes_summary(
                     },
                     "peak_ratio": 0.99,
                 }
-                for name in ("velocity", "potential", "current", "lorentz")
+                for name in (
+                    ("velocity", "potential", "current")
+                    if case_kind == "shercliff"
+                    else ("velocity", "potential", "current", "lorentz")
+                )
             },
         },
     )
@@ -321,6 +326,11 @@ def test_freemhd_closed_channel_observable_parity_writes_summary(
     summary = module.run_freemhd_closed_channel_observable_parity()
     assert summary["case"] == "freemhd_closed_channel_observable_parity"
     assert len(summary["records"]) == 2
+    jets = module._compare_side_jets([-1, -0.7, 0, 0.7, 1], [0, 1.2, 1, 1.3, 0], [-1, -0.7, 0, 0.7, 1], [0, 1.4, 1, 1.4, 0])
+    assert jets["normalized_location_error"] == 0.0
+    assert summary["observable_gate"]["low_signal_count"] == 2
+    assert summary["observable_gate"]["missing_observable_count"] == 1
+    assert summary["observable_gate"]["research_grade_validation_pass"] is False
     assert (tmp_path / "freemhd_closed_channel_observable_parity_summary.json").exists()
 
 

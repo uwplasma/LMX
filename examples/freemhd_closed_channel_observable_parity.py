@@ -5,13 +5,9 @@ import os
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 
-from lmx.freemhd import (
-    compare_side_jet_profiles,
-    load_benchmark_a_spec,
-    summarize_observable_gate,
-    summarize_observable_offenders,
-)
+from lmx.freemhd import load_benchmark_a_spec
 from lmx.reference_data import (
     default_closed_channel_reference_root,
     extract_processed_profile,
@@ -68,6 +64,129 @@ CASE_SETTINGS = {
 INITIAL_PROFILE = "analytic"
 DRIVE_MODE = "flow_rate"
 FLOW_RATE_TARGET_MEAN_VELOCITY: float | None = None
+
+
+def _side_jet_metrics(coordinate: object, values: object) -> dict[str, float]:
+    coord, value = np.asarray(coordinate, dtype=float), np.asarray(values, dtype=float)
+    if not coord.size or coord.shape != value.shape:
+        raise ValueError("Hunt side-jet profiles require matching nonempty coordinates and values")
+    order = np.argsort(coord)
+    coord, value = coord[order], value[order]
+    cut = 0.02 * max(float(np.max(np.abs(coord))), 1.0e-20)
+    indices = [np.flatnonzero(coord <= -cut), np.flatnonzero(coord >= cut)]
+    peaks = [int(ids[np.argmax(value[ids])]) for ids in indices]
+    center, peak = float(np.interp(0.0, coord, value)), float(max(value[peaks[0]], value[peaks[1]]))
+    return {
+        "negative_location": float(coord[peaks[0]]),
+        "positive_location": float(coord[peaks[1]]),
+        "negative_value": float(value[peaks[0]]),
+        "positive_value": float(value[peaks[1]]),
+        "center_value": center,
+        "peak_value": peak,
+        "peak_to_center_ratio": peak / max(abs(center), 1.0e-20),
+    }
+
+
+def _compare_side_jets(simulated_coordinate, simulated_values, reference_coordinate, reference_values):
+    simulated = _side_jet_metrics(simulated_coordinate, simulated_values)
+    reference = _side_jet_metrics(reference_coordinate, reference_values)
+    location_errors = [
+        abs(simulated[f"{side}_location"] - reference[f"{side}_location"])
+        for side in ("negative", "positive")
+    ]
+    return {
+        "simulated": simulated,
+        "reference": reference,
+        "negative_location_error": location_errors[0],
+        "positive_location_error": location_errors[1],
+        "normalized_location_error": max(location_errors)
+        / max(abs(reference["negative_location"]), abs(reference["positive_location"]), 1.0e-20),
+        "peak_value_relative_error": abs(simulated["peak_value"] - reference["peak_value"])
+        / max(abs(reference["peak_value"]), 1.0e-20),
+        "peak_to_center_ratio_error": abs(
+            simulated["peak_to_center_ratio"] - reference["peak_to_center_ratio"]
+        ) / max(abs(reference["peak_to_center_ratio"]), 1.0e-20),
+    }
+
+
+def summarize_observable_offenders(
+    records, *, l2_target=1.0e-2, min_reference_peak_fraction=1.0e-3, top_n=None
+):
+    """Rank inaccurate physical cuts while separating numerically low-signal data."""
+
+    ranked = []
+    for record in records:
+        observables = record.get("observables", {})
+        if not isinstance(observables, dict):
+            continue
+        for name, observable in observables.items():
+            if not isinstance(observable, dict):
+                continue
+            cuts = {axis: observable.get(axis) for axis in ("y", "z")}
+            peak = max(
+                (float(cut.get("reference_peak_abs", 1.0)) for cut in cuts.values() if isinstance(cut, dict)),
+                default=1.0,
+            )
+            for axis, cut in cuts.items():
+                if not isinstance(cut, dict):
+                    continue
+                l2, linf = float(cut.get("l2_error", 0.0)), float(cut.get("linf_error", 0.0))
+                fraction = float(cut.get("reference_peak_abs", peak)) / max(peak, 1.0e-20)
+                status = "low_signal" if fraction < min_reference_peak_fraction else (
+                    "pass" if l2 <= l2_target else "offender"
+                )
+                ranked.append({
+                    "case_kind": str(record.get("case_kind", "")),
+                    "drive_mode": str(record.get("drive_mode", "")),
+                    "observable": str(name), "axis": axis, "l2_error": l2,
+                    "linf_error": linf, "peak_ratio": float(cut.get("peak_ratio", observable.get("peak_ratio", 1.0))),
+                    "reference_peak_abs": float(cut.get("reference_peak_abs", peak)),
+                    "reference_peak_fraction": fraction, "l2_target": float(l2_target),
+                    "target_ratio": l2 / max(float(l2_target), 1.0e-20), "status": status,
+                })
+    rank = {"offender": 2, "pass": 1, "low_signal": 0}
+    ranked.sort(
+        key=lambda item: (rank[item["status"]], item["target_ratio"], item["linf_error"]),
+        reverse=True,
+    )
+    return ranked if top_n is None else ranked[: max(0, int(top_n))]
+
+
+def summarize_observable_gate(
+    records, *, l2_target=1.0e-2,
+    required_observables=("velocity", "potential", "current", "lorentz"),
+    required_axes=("y", "z"), min_reference_peak_fraction=1.0e-3,
+):
+    """Summarize required physical cuts and their normalized-error gate."""
+
+    missing = []
+    for record in records:
+        observables = record.get("observables", {})
+        observables = observables if isinstance(observables, dict) else {}
+        for name in required_observables:
+            observable = observables.get(name)
+            if not isinstance(observable, dict):
+                missing.append({"case_kind": str(record.get("case_kind", "")), "observable": name, "axis": "*"})
+                continue
+            missing.extend(
+                {"case_kind": str(record.get("case_kind", "")), "observable": name, "axis": axis}
+                for axis in required_axes if not isinstance(observable.get(axis), dict)
+            )
+    ranked = summarize_observable_offenders(
+        records, l2_target=l2_target,
+        min_reference_peak_fraction=min_reference_peak_fraction,
+    )
+    counts = {status: sum(item["status"] == status for item in ranked) for status in ("pass", "offender", "low_signal")}
+    return {
+        "case_count": len(records),
+        "cases": sorted(str(record.get("case_kind", "")) for record in records),
+        "l2_target": float(l2_target), "required_observables": list(required_observables),
+        "required_axes": list(required_axes), "observable_pass_count": counts["pass"],
+        "observable_offender_count": counts["offender"], "low_signal_count": counts["low_signal"],
+        "missing_observable_count": len(missing), "missing_observables": missing,
+        "top_observable_offenders": ranked[:8],
+        "research_grade_validation_pass": counts["offender"] == 0 and not missing,
+    }
 
 
 def _max_abs(value: jnp.ndarray) -> float:
@@ -342,7 +461,7 @@ def _observable_record(
     hunt_side_jet = None
     if case_kind == "hunt":
         velocity_z = observables["velocity"]["z"]
-        hunt_side_jet = compare_side_jet_profiles(
+        hunt_side_jet = _compare_side_jets(
             velocity_z["coordinate"],
             velocity_z["simulated"],
             velocity_z["coordinate"],

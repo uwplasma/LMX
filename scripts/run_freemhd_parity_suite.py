@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict, replace
+import hashlib
 import json
 import os
 import re
@@ -11,9 +13,11 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.benchmarks import load_benchmark_b_spec
+from lmx.benchmarks import build_benchmark_b_problem, load_benchmark_b_reference, load_benchmark_b_spec
 from lmx.freemhd import artifact_sha256, audit_freemhd_case_against_spec, load_benchmark_a_spec
 from lmx.reference_data import default_closed_channel_reference_root
 
@@ -87,6 +91,93 @@ def materialize_freemhd_source_snapshot(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return manifest
+
+
+def _tiny_b2_problem(spec_root: str | Path | None = None) -> tuple[object, dict[str, object]]:
+    from lmx._fringing_types import ExtrudedInductionlessProblem, FringingProfile
+    from lmx.fringing import _cross_section_mesh
+
+    problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse", root=spec_root)
+    dt = 1.0 / 540000.0
+    case = replace(
+        problem.case,
+        name="alex_b2-fringing-square_harness-smoke",
+        geometry=replace(problem.case.geometry, nx=8, ny=5, nz=5, wall_cells=(1, 1, 1, 1)),
+        time_stepper=replace(problem.case.time_stepper, dt=dt, t_final=2.0 * dt, max_steps=2),
+    )
+    mesh = _cross_section_mesh(case)
+    reference = load_benchmark_b_reference("B2-fringing-square", spec_root)
+    anchors_x = np.asarray(reference["x_over_L"], dtype=float)
+    anchors_b = np.asarray(reference["b_over_B0"], dtype=float)
+    sample_x = np.asarray(mesh.x_centers, dtype=float)
+    sample_b = np.interp(sample_x, anchors_x, anchors_b)
+    profile = FringingProfile(x=sample_x, field_scale=sample_b, axis="y")
+    spec = load_benchmark_b_spec("B2-fringing-square", spec_root)
+    anchors = {"x_over_L": anchors_x.tolist(), "b_over_B0": anchors_b.tolist()}
+    anchor_bytes = json.dumps(anchors, sort_keys=True, separators=(",", ":")).encode()
+    payload: dict[str, object] = {
+        "schema_version": 1,
+        "kind": "lmx-matched-b2-input",
+        "case_id": "B2-fringing-square",
+        "case": asdict(case),
+        "scaling": {
+            "length_scale": "duct half-width",
+            "half_width_m": float(spec["geometry"]["half_width_m"]),
+            "nondimensional_length": 1.0,
+            "velocity": 1.0,
+            "density": 1.0,
+            "conductivity": 1.0,
+        },
+        "mesh": {
+            "coordinate_system": "Cartesian x-y-z faces in duct-half-width units",
+            **{
+                f"{axis}_faces": np.asarray(getattr(mesh, f"{axis}_faces"), dtype=float).tolist()
+                for axis in "xyz"
+            },
+        },
+        "field_profile": {
+            "axis": "y",
+            "interpolation": "linear",
+            "extrapolation": "forbidden",
+            "source_name": Path(spec["reference"]["data_path"]).name,
+            "source_sha256": spec["reference"]["data_sha256"],
+            "anchors_sha256": hashlib.sha256(anchor_bytes).hexdigest(),
+            "anchor_x_over_L": anchors_x.tolist(),
+            "anchor_b_over_B0": anchors_b.tolist(),
+            "sample_x_over_L": sample_x.tolist(),
+            "sample_b_over_B0": sample_b.tolist(),
+        },
+        "effective_controls": {
+            "dt": dt,
+            "electric_iterations": 600,
+            "electric_tolerance": 1.0e-12,
+            "projection_iterations": 4000,
+            "projection_tolerance": 1.0e-12,
+            "momentum_iterations": 400,
+            "momentum_tolerance": 1.0e-10,
+            "executed_steps": 2,
+            "steady_steps_required": 3,
+            "expected_stop_reason": "step_limit",
+        },
+    }
+    return ExtrudedInductionlessProblem(case=case, profile=profile), payload
+
+
+def materialize_matched_b2_lmx_input(
+    output_file: str | Path, *, spec_root: str | Path | None = None
+) -> dict[str, object]:
+    """Write the deterministic real LMX input for the tiny matched-B2 smoke."""
+
+    destination = Path(output_file)
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing LMX B2 input {destination}")
+    _, payload = _tiny_b2_problem(spec_root)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(payload, allow_nan=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return payload
 
 
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:

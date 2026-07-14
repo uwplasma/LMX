@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import re
@@ -18,6 +19,8 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 from .units import (
     dynamic_to_kinematic_viscosity,
     hartmann_number,
+    interaction_parameter,
+    reynolds_number,
     wall_conductance_ratio,
 )
 
@@ -126,28 +129,18 @@ def _resolve_artifact(root: Path, entry: object) -> tuple[Path, str, str]:
     return resolved, kind, expected
 
 
-def candidate_u_paths(case_dir: str | Path) -> list[Path]:
+def _candidate_u_paths(case_dir: str | Path):
     root = Path(case_dir)
-    return [
-        root / "case" / "0" / "liquid" / "U",
-        root / "case" / "0" / "fluid" / "U",
-        root / "case" / "0" / "U",
-        root / "0" / "liquid" / "U",
-        root / "0" / "fluid" / "U",
-        root / "0" / "U",
-        root / "latestTime" / "liquid" / "U",
-        root / "latestTime" / "fluid" / "U",
-        root / "latestTime" / "U",
-    ]
-
-
-def _candidate_paths(case_dir: str | Path, *relative_paths: str) -> list[Path]:
-    root = Path(case_dir)
-    return [root / relative for relative in relative_paths]
+    return (
+        root / base / region / "U"
+        for base in ("case/0", "0", "latestTime")
+        for region in ("liquid", "fluid", "")
+    )
 
 
 def _first_existing(case_dir: str | Path, *relative_paths: str) -> Path | None:
-    for path in _candidate_paths(case_dir, *relative_paths):
+    for relative in relative_paths:
+        path = Path(case_dir) / relative
         if path.exists():
             return path
     return None
@@ -184,241 +177,28 @@ def _extract_inlet_block(text: str) -> str | None:
     return boundary_text[start : index - 1]
 
 
-def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
-    pattern = re.compile(r"volumetricFlowRate\s+(?:constant\s+)?([0-9eE+.\-]+)\s*;")
-    for path in candidate_u_paths(case_dir):
+def _infer_inlet_value(case_dir: str | Path, pattern: str) -> str | None:
+    expression = re.compile(pattern)
+    for path in _candidate_u_paths(case_dir):
         if not path.exists():
             continue
         inlet_block = _extract_inlet_block(path.read_text())
-        if inlet_block is None:
-            continue
-        match = pattern.search(inlet_block)
+        match = expression.search(inlet_block) if inlet_block is not None else None
         if match is not None:
-            return float(match.group(1))
+            return match.group(1)
     return None
 
 
-def summarize_observable_offenders(
-    records: list[dict[str, object]],
-    *,
-    l2_target: float = 1.0e-2,
-    min_reference_peak_fraction: float = 1.0e-3,
-    top_n: int | None = None,
-) -> list[dict[str, object]]:
-    offenders: list[dict[str, object]] = []
-    for record in records:
-        observables = record.get("observables", {})
-        if not isinstance(observables, dict):
-            continue
-        for observable_name, observable_payload in observables.items():
-            if not isinstance(observable_payload, dict):
-                continue
-            observable_reference_peak = max(
-                (float(cut.get("reference_peak_abs", 1.0)) for axis in ("y", "z") if isinstance((cut := observable_payload.get(axis)), dict)),
-                default=1.0,
-            )
-            for axis in ("y", "z"):
-                cut = observable_payload.get(axis)
-                if not isinstance(cut, dict):
-                    continue
-                l2_error = float(cut.get("l2_error", 0.0))
-                linf_error = float(cut.get("linf_error", 0.0))
-                peak_ratio = float(cut.get("peak_ratio", observable_payload.get("peak_ratio", 1.0)))
-                reference_peak_abs = float(cut.get("reference_peak_abs", observable_reference_peak))
-                reference_peak_fraction = reference_peak_abs / max(observable_reference_peak, 1.0e-20)
-                low_signal = reference_peak_fraction < float(min_reference_peak_fraction)
-                status = "low_signal" if low_signal else ("pass" if l2_error <= l2_target else "offender")
-                offenders.append(
-                    {
-                        "case_kind": str(record.get("case_kind", "")),
-                        "drive_mode": str(record.get("drive_mode", "")),
-                        "observable": str(observable_name),
-                        "axis": axis,
-                        "l2_error": l2_error,
-                        "linf_error": linf_error,
-                        "peak_ratio": peak_ratio,
-                        "reference_peak_abs": reference_peak_abs,
-                        "reference_peak_fraction": reference_peak_fraction,
-                        "l2_target": float(l2_target),
-                        "target_ratio": l2_error / max(float(l2_target), 1.0e-20),
-                        "status": status,
-                    }
-                )
-    status_rank = {"offender": 2, "pass": 1, "low_signal": 0}
-    offenders.sort(
-        key=lambda item: (
-            status_rank.get(str(item["status"]), 0),
-            float(item["target_ratio"]),
-            float(item["linf_error"]),
-        ),
-        reverse=True,
-    )
-    if top_n is not None:
-        return offenders[: max(0, int(top_n))]
-    return offenders
-
-
-def summarize_observable_gate(
-    records: list[dict[str, object]],
-    *,
-    l2_target: float = 1.0e-2,
-    required_observables: tuple[str, ...] = (
-        "velocity",
-        "potential",
-        "current",
-        "lorentz",
-    ),
-    required_axes: tuple[str, ...] = ("y", "z"),
-    min_reference_peak_fraction: float = 1.0e-3,
-) -> dict[str, object]:
-    """Summarize whether a FreeMHD parity artifact has the required observables.
-
-    The gate is intentionally based on physical outputs rather than image
-    similarity: each case must carry the requested midplane cuts and every
-    non-low-signal cut must stay below the configured normalized L2 target.
-    """
-
-    missing: list[dict[str, str]] = []
-    for record in records:
-        case_kind = str(record.get("case_kind", ""))
-        observables = record.get("observables", {})
-        if not isinstance(observables, dict):
-            observables = {}
-        for observable_name in required_observables:
-            payload = observables.get(observable_name)
-            if not isinstance(payload, dict):
-                missing.append({"case_kind": case_kind, "observable": observable_name, "axis": "*"})
-                continue
-            for axis in required_axes:
-                if not isinstance(payload.get(axis), dict):
-                    missing.append(
-                        {
-                            "case_kind": case_kind,
-                            "observable": observable_name,
-                            "axis": axis,
-                        }
-                    )
-
-    ranked = summarize_observable_offenders(
-        records,
-        l2_target=l2_target,
-        min_reference_peak_fraction=min_reference_peak_fraction,
-    )
-    offender_count = sum(1 for item in ranked if item["status"] == "offender")
-    low_signal_count = sum(1 for item in ranked if item["status"] == "low_signal")
-    pass_count = sum(1 for item in ranked if item["status"] == "pass")
-    return {
-        "case_count": len(records),
-        "cases": sorted(str(record.get("case_kind", "")) for record in records),
-        "l2_target": float(l2_target),
-        "required_observables": list(required_observables),
-        "required_axes": list(required_axes),
-        "observable_pass_count": pass_count,
-        "observable_offender_count": offender_count,
-        "low_signal_count": low_signal_count,
-        "missing_observable_count": len(missing),
-        "missing_observables": missing,
-        "top_observable_offenders": ranked[:8],
-        "research_grade_validation_pass": offender_count == 0 and len(missing) == 0,
-    }
-
-def side_jet_profile_metrics(
-    coordinate: object,
-    values: object,
-    *,
-    center_exclusion_fraction: float = 0.02,
-) -> dict[str, float]:
-    """Return side-jet peak locations and amplitudes for a Hunt-style profile."""
-
-    coord = np.asarray(coordinate, dtype=float)
-    value = np.asarray(values, dtype=float)
-    if coord.size == 0 or value.size == 0:
-        return {
-            "negative_location": 0.0,
-            "positive_location": 0.0,
-            "negative_value": 0.0,
-            "positive_value": 0.0,
-            "center_value": 0.0,
-            "peak_value": 0.0,
-            "peak_to_center_ratio": 0.0,
-        }
-    order = np.argsort(coord)
-    coord = coord[order]
-    value = value[order]
-    half_width = max(float(np.max(np.abs(coord))), 1.0e-20)
-    center_cut = float(center_exclusion_fraction) * half_width
-    negative_mask = coord <= -center_cut
-    positive_mask = coord >= center_cut
-    if not negative_mask.any():
-        negative_mask = coord <= 0.0
-    if not positive_mask.any():
-        positive_mask = coord >= 0.0
-
-    negative_indices = np.flatnonzero(negative_mask)
-    positive_indices = np.flatnonzero(positive_mask)
-    negative_index = int(negative_indices[np.argmax(value[negative_indices])]) if negative_indices.size else int(np.argmax(value))
-    positive_index = int(positive_indices[np.argmax(value[positive_indices])]) if positive_indices.size else int(np.argmax(value))
-    center_value = float(np.interp(0.0, coord, value))
-    peak_value = float(max(value[negative_index], value[positive_index]))
-    return {
-        "negative_location": float(coord[negative_index]),
-        "positive_location": float(coord[positive_index]),
-        "negative_value": float(value[negative_index]),
-        "positive_value": float(value[positive_index]),
-        "center_value": center_value,
-        "peak_value": peak_value,
-        "peak_to_center_ratio": peak_value / max(abs(center_value), 1.0e-20),
-    }
-
-
-def compare_side_jet_profiles(
-    simulated_coordinate: object,
-    simulated_values: object,
-    reference_coordinate: object,
-    reference_values: object,
-) -> dict[str, object]:
-    """Compare Hunt side-jet observables between a simulation and reference cut."""
-
-    simulated = side_jet_profile_metrics(simulated_coordinate, simulated_values)
-    reference = side_jet_profile_metrics(reference_coordinate, reference_values)
-    location_scale = max(
-        abs(float(reference["negative_location"])),
-        abs(float(reference["positive_location"])),
-        1.0e-20,
-    )
-    peak_scale = max(abs(float(reference["peak_value"])), 1.0e-20)
-    return {
-        "simulated": simulated,
-        "reference": reference,
-        "negative_location_error": abs(float(simulated["negative_location"]) - float(reference["negative_location"])),
-        "positive_location_error": abs(float(simulated["positive_location"]) - float(reference["positive_location"])),
-        "normalized_location_error": max(
-            abs(float(simulated["negative_location"]) - float(reference["negative_location"])),
-            abs(float(simulated["positive_location"]) - float(reference["positive_location"])),
-        )
-        / location_scale,
-        "peak_value_relative_error": abs(float(simulated["peak_value"]) - float(reference["peak_value"])) / peak_scale,
-        "peak_to_center_ratio_error": abs(float(simulated["peak_to_center_ratio"]) - float(reference["peak_to_center_ratio"]))
-        / max(abs(float(reference["peak_to_center_ratio"])), 1.0e-20),
-    }
+def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
+    value = _infer_inlet_value(case_dir, r"volumetricFlowRate\s+(?:constant\s+)?([0-9eE+.\-]+)\s*;")
+    return None if value is None else float(value)
 
 
 def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
-    type_pattern = re.compile(r"type\s+(\S+)\s*;")
-    for path in candidate_u_paths(case_dir):
-        if not path.exists():
-            continue
-        inlet_block = _extract_inlet_block(path.read_text())
-        if inlet_block is None:
-            continue
-        match = type_pattern.search(inlet_block)
-        if match is None:
-            continue
-        inlet_type = match.group(1)
-        if inlet_type == "flowRateInletVelocity":
-            return "inlet_flow_rate"
-        return "inlet_velocity"
-    return None
+    inlet_type = _infer_inlet_value(case_dir, r"type\s+(\S+)\s*;")
+    return None if inlet_type is None else (
+        "inlet_flow_rate" if inlet_type == "flowRateInletVelocity" else "inlet_velocity"
+    )
 
 
 def infer_liquid_material_properties(case_dir: str | Path) -> dict[str, float] | None:
@@ -459,29 +239,16 @@ def infer_liquid_material_properties(case_dir: str | Path) -> dict[str, float] |
 def infer_solid_conductivities(
     case_dir: str | Path,
 ) -> tuple[float | None, float | None]:
-    solid_path = _first_existing(
-        case_dir,
-        "case/constant/solidWalls/thermophysicalProperties",
-        "constant/solidWalls/thermophysicalProperties",
-    )
-    insulator_path = _first_existing(
-        case_dir,
-        "case/constant/insulator/thermophysicalProperties",
-        "constant/insulator/thermophysicalProperties",
-    )
-    solid_conductivity = None
-    insulator_conductivity = None
-    if solid_path is not None:
-        solid_conductivity = _extract_first_scalar(
-            solid_path.read_text(),
-            r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;",
+    def conductivity(region: str) -> float | None:
+        path = _first_existing(
+            case_dir, f"case/constant/{region}/thermophysicalProperties",
+            f"constant/{region}/thermophysicalProperties",
         )
-    if insulator_path is not None:
-        insulator_conductivity = _extract_first_scalar(
-            insulator_path.read_text(),
-            r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;",
+        return None if path is None else _extract_first_scalar(
+            path.read_text(), r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;"
         )
-    return solid_conductivity, insulator_conductivity
+
+    return conductivity("solidWalls"), conductivity("insulator")
 
 
 def infer_uniform_b0(case_dir: str | Path) -> tuple[float, float, float] | None:
@@ -581,6 +348,278 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
     payload["path"] = path.relative_to(path.parents[2]).as_posix()
     payload["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     return payload
+
+
+def _decode_matched_b2_lmx_input(path: str | Path):
+    from dataclasses import fields
+
+    from ._fringing_types import ExtrudedInductionlessProblem, FringingProfile
+    from .fringing import _cross_section_mesh
+    from .specs import (
+        BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec, OutputSpec,
+        RegionSpec, SolverConfig, TimeStepperConfig,
+    )
+
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    expected_top = {
+        "schema_version", "kind", "case_id", "case", "scaling", "mesh",
+        "field_profile", "effective_controls",
+    }
+    if not isinstance(payload, dict) or set(payload) != expected_top or (
+        payload.get("schema_version"), payload.get("kind"), payload.get("case_id")
+    ) != (1, "lmx-matched-b2-input", "B2-fringing-square"):
+        raise ValueError("Invalid matched B2 LMX input schema")
+
+    def checked(cls, value, name):
+        if not isinstance(value, dict) or set(value) != {item.name for item in fields(cls)}:
+            raise ValueError(f"Invalid matched B2 {name} schema")
+        return dict(value)
+
+    raw = checked(CaseSpec, payload["case"], "case")
+    geometry = checked(GeometrySpec, raw.pop("geometry"), "geometry")
+    geometry["wall_thickness"], geometry["wall_cells"] = (
+        tuple(geometry["wall_thickness"]), tuple(geometry["wall_cells"])
+    )
+    magnetic = checked(MagneticFieldSpec, raw.pop("magnetic_field"), "magnetic field")
+    magnetic["value"] = None if magnetic["value"] is None else tuple(magnetic["value"])
+    boundary_payload = raw.pop("boundary_conditions")
+    region_payload = raw.pop("regions")
+    if not isinstance(boundary_payload, list) or not isinstance(region_payload, list):
+        raise ValueError("Invalid matched B2 region or boundary schema")
+    boundaries = []
+    for item in boundary_payload:
+        item = checked(BoundaryCondition, item, "boundary")
+        item["value"] = tuple(item["value"]) if isinstance(item["value"], list) else item["value"]
+        boundaries.append(BoundaryCondition(**item))
+    regions = tuple(RegionSpec(**checked(RegionSpec, item, "region")) for item in region_payload)
+    time_stepper = TimeStepperConfig(**checked(TimeStepperConfig, raw.pop("time_stepper"), "time stepper"))
+    solver = SolverConfig(**checked(SolverConfig, raw.pop("solver"), "solver"))
+    output = OutputSpec(**checked(OutputSpec, raw.pop("output"), "output"))
+    raw["reference_phi_cell"] = tuple(raw["reference_phi_cell"])
+    case = CaseSpec(
+        **raw, geometry=GeometrySpec(**geometry), regions=regions,
+        magnetic_field=MagneticFieldSpec(**magnetic), boundary_conditions=tuple(boundaries),
+        time_stepper=time_stepper, solver=solver, output=output,
+    )
+    if case.name != "alex_b2-fringing-square_harness-smoke" or case.geometry.kind != "layered_duct":
+        raise ValueError("Matched B2 LMX input does not select the canonical solver path")
+    mesh = _cross_section_mesh(case)
+    mesh_payload = payload["mesh"]
+    if not isinstance(mesh_payload, dict) or set(mesh_payload) != {
+        "coordinate_system", "x_faces", "y_faces", "z_faces"
+    } or mesh_payload["coordinate_system"] != "Cartesian x-y-z faces in duct-half-width units":
+        raise ValueError("Invalid matched B2 mesh schema")
+    if any(
+        not np.array_equal(np.asarray(mesh_payload[f"{axis}_faces"], dtype=float), np.asarray(getattr(mesh, f"{axis}_faces")))
+        for axis in "xyz"
+    ):
+        raise ValueError("Matched B2 stored mesh faces do not reproduce the case")
+
+    profile = payload["field_profile"]
+    profile_keys = {
+        "axis", "interpolation", "extrapolation", "source_name", "source_sha256",
+        "anchors_sha256", "anchor_x_over_L", "anchor_b_over_B0",
+        "sample_x_over_L", "sample_b_over_B0",
+    }
+    if not isinstance(profile, dict) or set(profile) != profile_keys or (
+        profile["axis"], profile["interpolation"], profile["extrapolation"]
+    ) != ("y", "linear", "forbidden"):
+        raise ValueError("Invalid matched B2 field-profile schema")
+    anchors_x = np.asarray(profile["anchor_x_over_L"], dtype=float)
+    anchors_b = np.asarray(profile["anchor_b_over_B0"], dtype=float)
+    sample_x = np.asarray(mesh.x_centers, dtype=float)
+    sample_b = np.asarray(profile["sample_b_over_B0"], dtype=float)
+    encoded = json.dumps(
+        {"x_over_L": anchors_x.tolist(), "b_over_B0": anchors_b.tolist()},
+        sort_keys=True, separators=(",", ":"),
+    ).encode()
+    if (
+        anchors_x.ndim != 1 or anchors_x.shape != anchors_b.shape or anchors_x.size < 2
+        or np.any(~np.isfinite(anchors_x)) or np.any(~np.isfinite(anchors_b))
+        or np.any(np.diff(anchors_x) <= 0.0) or np.any(np.diff(anchors_b) > 1.0e-12)
+        or sample_x[0] < anchors_x[0] or sample_x[-1] > anchors_x[-1]
+        or not np.array_equal(np.asarray(profile["sample_x_over_L"], dtype=float), sample_x)
+        or not np.array_equal(sample_b, np.interp(sample_x, anchors_x, anchors_b))
+        or hashlib.sha256(encoded).hexdigest() != profile["anchors_sha256"]
+        or re.fullmatch(r"[0-9a-f]{64}", str(profile["source_sha256"])) is None
+    ):
+        raise ValueError("Matched B2 field samples do not reproduce their anchors and mesh")
+
+    scaling, controls = payload["scaling"], payload["effective_controls"]
+    if not isinstance(scaling, dict) or set(scaling) != {
+        "length_scale", "half_width_m", "nondimensional_length", "velocity", "density", "conductivity"
+    } or scaling["length_scale"] != "duct half-width":
+        raise ValueError("Invalid matched B2 scaling schema")
+    fluid = [region for region in regions if region.kind == "fluid"]
+    wall = [region for region in regions if region.kind == "solid"]
+    inlet = [bc for bc in boundaries if bc.kind == "inlet_flow_rate"]
+    outlet = [bc for bc in boundaries if bc.kind == "outlet_pressure"]
+    if len(fluid) != 1 or len(wall) != 1 or len(inlet) != 1 or len(outlet) != 1:
+        raise ValueError("Matched B2 input requires one fluid, wall, and inlet-flow region")
+    length, velocity = float(scaling["nondimensional_length"]), float(scaling["velocity"])
+    field_vector = np.asarray(case.magnetic_field.value, dtype=float)
+    base_b = float(np.linalg.norm(field_vector))
+    mean_velocity = float(inlet[0].value) / (case.geometry.width * case.geometry.height)
+    ha = hartmann_number(
+        magnetic_field=base_b, length_scale=length, conductivity=float(fluid[0].conductivity),
+        density=float(fluid[0].density), kinematic_viscosity=float(fluid[0].viscosity),
+    )
+    interaction = interaction_parameter(
+        magnetic_field=base_b, length_scale=length, conductivity=float(fluid[0].conductivity),
+        density=float(fluid[0].density), velocity=velocity,
+    )
+    reynolds = reynolds_number(
+        velocity=velocity, length_scale=length, kinematic_viscosity=float(fluid[0].viscosity)
+    )
+    conductance = wall_conductance_ratio(
+        wall_conductivity=wall[0].conductivity, wall_thickness=float(wall[0].wall_thickness),
+        fluid_conductivity=fluid[0].conductivity, length_scale=length,
+    )
+    if not (
+        math.isclose(length, case.geometry.width / 2.0)
+        and math.isclose(velocity, mean_velocity)
+        and math.isclose(float(scaling["density"]), float(fluid[0].density))
+        and math.isclose(float(scaling["conductivity"]), float(fluid[0].conductivity))
+        and float(scaling["half_width_m"]) > 0.0
+        and np.array_equal(field_vector[[0, 2]], np.zeros(2))
+        and math.isclose(float(case.geometry.target_ha), ha)
+        and math.isclose(ha * ha / interaction, reynolds)
+        and conductance > 0.0
+        and outlet[0].value == 0.0
+    ):
+        raise ValueError("Matched B2 materials, drive, and scaling are inconsistent")
+    expected_controls = {
+        "dt": min(float(case.time_stepper.dt), 0.001 / interaction),
+        "electric_iterations": max(case.time_stepper.potential_iterations, 600),
+        "electric_tolerance": min(case.solver.coupling_tolerance, 1.0e-12),
+        "projection_iterations": max(case.time_stepper.potential_iterations, 4000),
+        "projection_tolerance": min(case.solver.coupling_tolerance, 1.0e-12),
+        "momentum_iterations": max(case.time_stepper.potential_iterations, 400),
+        "momentum_tolerance": min(case.solver.coupling_tolerance, 1.0e-10),
+        "executed_steps": case.time_stepper.max_steps,
+        "steady_steps_required": 3,
+        "expected_stop_reason": "step_limit" if case.time_stepper.max_steps < 3 else "in_progress",
+    }
+    if controls != expected_controls or not math.isclose(
+        float(case.time_stepper.dt), float(controls.get("dt", math.nan))
+    ):
+        raise ValueError("Matched B2 effective controls do not reproduce the solver contract")
+    problem = ExtrudedInductionlessProblem(
+        case=case,
+        profile=FringingProfile(x=sample_x, field_scale=sample_b, axis="y"),
+    )
+    return problem, mesh, payload
+
+
+def load_matched_b2_lmx_input(path: str | Path):
+    """Return the real solver input after independently validating stored facts."""
+
+    return _decode_matched_b2_lmx_input(path)[0]
+
+
+def observe_lmx_b2_contract(path: str | Path) -> dict[str, object]:
+    """Derive the matched-B2 contract from a real LMX input, never its expected spec."""
+
+    problem, mesh, payload = _decode_matched_b2_lmx_input(path)
+    case, scaling, profile, controls = (
+        problem.case, payload["scaling"], payload["field_profile"], payload["effective_controls"]
+    )
+    fluid = next(region for region in case.regions if region.kind == "fluid")
+    wall = next(region for region in case.regions if region.kind == "solid")
+    inlet = next(bc for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate")
+    length, velocity = float(scaling["nondimensional_length"]), float(scaling["velocity"])
+    magnetic_field = float(np.linalg.norm(np.asarray(case.magnetic_field.value, dtype=float)))
+    ha = hartmann_number(
+        magnetic_field=magnetic_field, length_scale=length, conductivity=fluid.conductivity,
+        density=fluid.density, kinematic_viscosity=fluid.viscosity,
+    )
+    interaction = interaction_parameter(
+        magnetic_field=magnetic_field, length_scale=length, conductivity=fluid.conductivity,
+        density=fluid.density, velocity=velocity,
+    )
+    contract: dict[str, object] = {
+        "equations": {
+            "momentum": "transient incompressible Navier-Stokes-Lorentz",
+            "inertia": "conservative div(rhoPhi,U)",
+            "time_discretization": "Euler",
+            "advection_discretization": "Gauss limitedLinear 1.0",
+            "advection_assembly": "implicit fvm::div with frozen rhoPhi and limiter weights",
+            "advection_vector_limiter": "single magSqr(U) limiter applied to all components",
+            "gradient_discretization": "cellLimited leastSquares 1.0",
+            "viscous_stress": "laminar divDevRhoReff",
+            "electric_model": "inductionless Ohm law with div(J)=0",
+            "phase_reduction": "alpha=1 invariant",
+            "thermal_reduction": "constant temperature and properties",
+        },
+        "nondimensional_groups": {
+            "hartmann_number": ha,
+            "interaction_parameter": interaction,
+            "reynolds_number": reynolds_number(
+                velocity=velocity, length_scale=length, kinematic_viscosity=fluid.viscosity
+            ),
+            "magnetic_reynolds_number_assumption": "Rm << 1",
+        },
+        "geometry": {
+            "kind": "square_duct",
+            "length_scale": scaling["length_scale"],
+            "half_width_m": scaling["half_width_m"],
+            "x_over_L_min": float(mesh.x_faces[0]),
+            "x_over_L_max": float(mesh.x_faces[-1]),
+            "constant_cross_section": True,
+        },
+        "magnetic_field": {
+            "representation": "tabulated monotone interpolation",
+            "components": "B = (0, B_y(x), 0) in the global Cartesian frame",
+            "coordinate": "x / half-width",
+            "normalization": "B_y / B0",
+            "no_extrapolation": profile["extrapolation"] == "forbidden",
+            "normal_current_at_axial_ends": 0.0,
+        },
+        "wall": {
+            "model": "uniform thin conducting wall",
+            "wall_conductance_ratio": wall_conductance_ratio(
+                wall_conductivity=wall.conductivity, wall_thickness=wall.wall_thickness,
+                fluid_conductivity=fluid.conductivity, length_scale=length,
+            ),
+            "numerical_realization": "explicit volumetric shell preserving c_w",
+            "thickness_over_L": wall.wall_thickness / length,
+            "outer_electric_boundary": "zero normal current",
+        },
+        "boundary_drive": {
+            "velocity_inlet": "integral flow rate with extrapolated profile",
+            "velocity_outlet": "zero normal gradient",
+            "velocity_walls": "no slip",
+            "pressure_inlet": "zero normal gradient",
+            "pressure_outlet": "fixed gauge",
+            "pressure_outlet_gauge": 0.0,
+            "flow_constraint_scope": "inlet face only",
+            "nondimensional_flow_rate": float(inlet.value),
+            "electric_axial_ends": "zero normal current",
+        },
+        "observable": {
+            "primary": "excess transverse pressure difference between published A/B taps",
+            "tap_geometry": "top and side wall midpoints at each axial station",
+            "signed_orientation": "side (+z) minus top (+y)",
+        },
+        "normalization": {
+            "field": "B_y / B0",
+            "pressure": "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau",
+            "coordinate": "x / half-width",
+        },
+        "mesh_coordinates": {
+            "coordinate_system": payload["mesh"]["coordinate_system"],
+            "family": "uniform 5x5 fluid grid with one explicit wall cell per side",
+            "exact_coordinate_arrays_required": True,
+            **{f"{axis}_faces": np.asarray(getattr(mesh, f"{axis}_faces")).tolist() for axis in "xyz"},
+            "field_source": profile["source_name"],
+            "field_source_sha256": profile["source_sha256"],
+            "field_anchors_sha256": profile["anchors_sha256"],
+            "field_sample_x_over_L": profile["sample_x_over_L"],
+            "field_sample_b_over_B0": profile["sample_b_over_B0"],
+        },
+        "stopping_rules": dict(controls),
+    }
+    return contract
 
 
 def validate_matched_b_record(

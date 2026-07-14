@@ -17,19 +17,16 @@ from lmx.benchmarks import (
 from lmx.freemhd import (
     artifact_sha256,
     audit_freemhd_case_against_spec,
-    candidate_u_paths,
-    compare_side_jet_profiles,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
     infer_liquid_material_properties,
     infer_rectangular_geometry,
     infer_solid_conductivities,
     infer_uniform_b0,
+    load_matched_b2_lmx_input,
     load_benchmark_a_spec,
     load_samper_table_i,
-    side_jet_profile_metrics,
-    summarize_observable_gate,
-    summarize_observable_offenders,
+    observe_lmx_b2_contract,
     validate_matched_b_record,
 )
 from scripts import run_freemhd_parity_suite
@@ -83,19 +80,6 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
             "artifacts": artifacts,
         },
     }
-
-
-_FLOW_RATE_U = """internalField   uniform ( 0.9725 0 0 );
-
-boundaryField
-{
-    inlet
-    {
-        type flowRateInletVelocity;
-        volumetricFlowRate 0.0389;
-    }
-}
-"""
 
 
 def _write_u(root: Path, boundary: str) -> None:
@@ -167,15 +151,6 @@ def test_matched_benchmark_a_specs_are_dimensionally_consistent(case_kind: str):
     assert spec["normalization"]["per_profile_peak_fitting"] is False
     assert len(spec["mesh"]["levels"]) == 4
     assert len(spec["sha256"]) == 64
-
-
-@pytest.mark.parametrize("case_kind", ["shercliff", "hunt"])
-def test_freemhd_case_audit_accepts_only_mechanically_matched_inputs(tmp_path: Path, case_kind: str):
-    report = audit_freemhd_case_against_spec(_materialize_matched_case(tmp_path, case_kind), case_kind=case_kind)
-
-    assert report["matched"] is True
-    assert report["failed_check_count"] == 0
-    assert report["physical_hartmann_number"] == pytest.approx(20.0)
 
 
 def test_freemhd_case_audit_exposes_mislabeled_ha_and_hunt_wall(tmp_path: Path):
@@ -329,9 +304,11 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_p
 
     assert manifest["run_profile"] == "docker_smoke_only"
     assert manifest["audit"]["matched"] is True
+    assert manifest["audit"]["physical_hartmann_number"] == pytest.approx(20.0)
     assert len(manifest["source_template_sha256"]) == 64
     assert (output / "lmx-benchmark-manifest.json").is_file()
     assert infer_uniform_b0(output) == pytest.approx((0.0, 0.2, 0.0))
+    assert infer_inlet_drive_mode(output) == "inlet_flow_rate"
     assert infer_inlet_flow_rate(output) == pytest.approx(load_benchmark_a_spec(case_kind)["drive"]["target_flow_rate"])
     assert run_freemhd_parity_suite.materialize_matched_freemhd_case(template, second_output, case_kind=case_kind) == manifest
     assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (output / "lmx-benchmark-manifest.json").read_bytes()
@@ -404,6 +381,50 @@ def test_freemhd_source_snapshot_rejects_unfrozen_evidence(
         reference[source_key] = f"../{relative}"
     with pytest.raises(ValueError):
         run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, tmp_path / "snapshot")
+
+
+def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path):
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(second)
+    problem, contract = load_matched_b2_lmx_input(first), observe_lmx_b2_contract(first)
+
+    assert first.read_bytes() == second.read_bytes()
+    assert payload["mesh"]["x_faces"] == [-15.0, -11.875, -8.75, -5.625, -2.5, 0.625, 3.75, 6.875, 10.0]
+    assert payload["field_profile"]["sample_b_over_B0"] == [1.0, 1.0, 0.991875, 0.9371875, 0.69, 0.16125, 0.00875, 0.0]
+    assert problem.case.name == "alex_b2-fringing-square_harness-smoke"
+    groups = contract["nondimensional_groups"]
+    assert {name: groups[name] for name in ("hartmann_number", "interaction_parameter", "reynolds_number")} == pytest.approx(
+        {"hartmann_number": 2900.0, "interaction_parameter": 540.0, "reynolds_number": 2900.0**2 / 540.0}
+    )
+    assert groups["magnetic_reynolds_number_assumption"] == "Rm << 1"
+    assert contract["stopping_rules"]["expected_stop_reason"] == "step_limit"
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("mesh", "y_faces", 0), -2.0),
+        (("field_profile", "anchor_b_over_B0", 2), 0.0),
+        (("field_profile", "sample_b_over_B0", 2), 0.0),
+        (("case", "regions", 0, "viscosity"), 1.0),
+        (("case", "boundary_conditions", 1, "value"), 5.0),
+        (("case", "time_stepper", "dt"), 1.0),
+        (("effective_controls", "dt"), 1.0),
+    ],
+)
+def test_matched_b2_lmx_input_rejects_mutated_facts(tmp_path: Path, path, value):
+    source = tmp_path / "source.json"
+    payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(source)
+    target = payload
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    source.write_text(json.dumps(payload, sort_keys=True))
+    with pytest.raises(ValueError, match="Matched B2|Invalid matched B2"):
+        load_matched_b2_lmx_input(source)
 
 
 def test_parity_command_materializes_without_running_suite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -583,28 +604,6 @@ def test_freemhd_audit_reports_missing_inputs_and_explicit_nu(tmp_path: Path):
     )
 
 
-def test_side_jet_profile_metrics_and_comparison_capture_peak_locations():
-    coordinate = [-1.0, -0.7, 0.0, 0.7, 1.0]
-    reference = [0.0, 1.4, 1.0, 1.4, 0.0]
-    simulated = [0.0, 1.2, 1.0, 1.3, 0.0]
-
-    metrics = side_jet_profile_metrics(coordinate, reference)
-    assert metrics["negative_location"] == pytest.approx(-0.7)
-    assert metrics["positive_location"] == pytest.approx(0.7)
-    assert metrics["peak_to_center_ratio"] == pytest.approx(1.4)
-
-    comparison = compare_side_jet_profiles(coordinate, simulated, coordinate, reference)
-    assert comparison["normalized_location_error"] == pytest.approx(0.0)
-    assert comparison["peak_value_relative_error"] == pytest.approx((1.4 - 1.3) / 1.4)
-
-
-def test_inlet_drive_mode_reads_case_zero(tmp_path: Path):
-    case_zero = tmp_path / "case" / "0" / "liquid"
-    case_zero.mkdir(parents=True)
-    (case_zero / "U").write_text(_FLOW_RATE_U)
-    assert infer_inlet_drive_mode(tmp_path) == "inlet_flow_rate"
-
-
 def test_freemhd_inference_helpers_recover_geometry_materials_and_b0(tmp_path: Path):
     _write_reference_inputs(tmp_path)
 
@@ -626,14 +625,12 @@ def test_freemhd_inference_helpers_recover_geometry_materials_and_b0(tmp_path: P
 
 
 def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Path):
-    assert len(candidate_u_paths(tmp_path)) >= 6
     assert infer_uniform_b0(tmp_path) is None
     assert infer_rectangular_geometry(tmp_path) is None
     assert infer_solid_conductivities(tmp_path) == (None, None)
 
     incomplete_liquid = tmp_path / "case" / "constant" / "liquid"
     incomplete_liquid.mkdir(parents=True)
-    (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\n")
     (incomplete_liquid / "thermophysicalProperties").write_text("sigma 3.0;\nrho 1000;\nmu 0.002;\n")
     assert infer_liquid_material_properties(tmp_path)["kinematic_viscosity"] == pytest.approx(2.0e-6)
 
@@ -652,6 +649,7 @@ def test_freemhd_inference_helpers_cover_missing_and_fallback_paths(tmp_path: Pa
     assert height == pytest.approx(0.2)
     assert wall_thickness is None
     assert wall_cells is None
+
 
 def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Path):
     u_dir = tmp_path / "0"
@@ -672,48 +670,3 @@ def test_inlet_flow_rate_helpers_cover_malformed_and_fallback_cases(tmp_path: Pa
         "inlet { type flowRateInletVelocity; volumetricFlowRate constant 0.125; }",
     )
     assert infer_inlet_flow_rate(tmp_path) == pytest.approx(0.125)
-
-
-def test_freemhd_observable_gate_ranks_accuracy_and_completeness():
-    observable_records = [
-        {
-            "case_kind": "shercliff",
-            "drive_mode": "forcing",
-            "observables": {
-                "velocity": {
-                    "y": {"l2_error": 2.0e-2, "linf_error": 5.0e-2},
-                    "z": {"l2_error": 4.0e-3, "linf_error": 1.0e-2},
-                    "peak_ratio": 0.95,
-                },
-                "current": {
-                    "y": {"l2_error": 8.0e-2, "linf_error": 2.0e-1, "peak_ratio": 1.4},
-                    "z": {"l2_error": 1.0e-2, "linf_error": 2.0e-2},
-                    "peak_ratio": 1.1,
-                },
-                "potential": {
-                    "y": {
-                        "l2_error": 1.0,
-                        "linf_error": 1.0,
-                        "reference_peak_abs": 1.0e-8,
-                    },
-                    "z": {
-                        "l2_error": 2.0e-2,
-                        "linf_error": 5.0e-2,
-                        "reference_peak_abs": 1.0,
-                    },
-                },
-            },
-        }
-    ]
-    observable_offenders = summarize_observable_offenders(observable_records, l2_target=1.0e-2)
-    assert observable_offenders[0]["observable"] == "current"
-    assert observable_offenders[0]["axis"] == "y"
-    assert observable_offenders[0]["status"] == "offender"
-    assert observable_offenders[-1]["status"] == "low_signal"
-
-    observable_gate = summarize_observable_gate(observable_records, l2_target=1.0e-2)
-    assert observable_gate["research_grade_validation_pass"] is False
-    assert observable_gate["observable_offender_count"] == 3
-    assert observable_gate["low_signal_count"] == 1
-    assert observable_gate["missing_observable_count"] == 1
-    assert observable_gate["missing_observables"] == [{"case_kind": "shercliff", "observable": "lorentz", "axis": "*"}]
