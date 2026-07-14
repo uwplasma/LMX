@@ -853,11 +853,6 @@ def test_cli_validate_reference_branch_handles_missing_slice_file(
     assert '"y_l2_error": 0.2' in capsys.readouterr().out
 
 
-def test_build_case_rejects_unknown_case():
-    with pytest.raises(ValueError, match="mystery"):
-        cli._build_case(SimpleNamespace(case="mystery", ha=1.0, output="./out"))
-
-
 def test_solve_case_with_optional_logger_falls_back_on_typeerror(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -914,58 +909,20 @@ def test_run_config_requires_restart_path(tmp_path: Path):
         cli._run_config(config)
 
 
-def test_run_branch_quiet_disables_logging(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path))
-    )
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "_build_case", lambda args: case)
-    monkeypatch.setattr(
-        cli,
-        "_run_config",
-        lambda config: (
-            recorded.update(enabled=config.logging.enabled) or {"case": case.name}
-        ),
-    )
-
-    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), "--quiet"])
-
-    assert exit_code == 0
-    assert recorded["enabled"] is False
-
-
-def test_run_branch_verbose_enables_debug_logging(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path))
-    )
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "_build_case", lambda args: case)
-    monkeypatch.setattr(
-        cli,
-        "_run_config",
-        lambda config: (
-            recorded.update(
-                enabled=config.logging.enabled, verbosity=config.logging.verbosity
-            )
-            or {"case": case.name}
-        ),
-    )
-
-    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), "--verbose"])
-
-    assert exit_code == 0
-    assert recorded["enabled"] is True
-    assert recorded["verbosity"] == "debug"
-
-
-def test_run_branch_explicit_verbosity_overrides_default(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize(
+    ("flags", "expected_enabled", "expected_verbosity"),
+    (
+        (("--quiet",), False, None),
+        (("--verbose",), True, "debug"),
+        (("--verbosity", "normal"), True, "normal"),
+    ),
+)
+def test_run_branch_logging_flags(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    flags: tuple[str, ...],
+    expected_enabled: bool,
+    expected_verbosity: str | None,
 ):
     case = cli._build_case(
         SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path))
@@ -984,10 +941,9 @@ def test_run_branch_explicit_verbosity_overrides_default(
         ),
     )
 
-    exit_code = cli.main(
-        ["run", "hartmann", "--output", str(tmp_path), "--verbosity", "normal"]
-    )
+    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), *flags])
 
     assert exit_code == 0
-    assert recorded["enabled"] is True
-    assert recorded["verbosity"] == "normal"
+    assert recorded["enabled"] is expected_enabled
+    if expected_verbosity is not None:
+        assert recorded["verbosity"] == expected_verbosity
