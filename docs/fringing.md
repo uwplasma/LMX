@@ -90,6 +90,12 @@ The retained specifications and references are:
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
 
+![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
+
+The panel uses only frozen, checksummed evidence. Both LMX curves are
+diagnostics; B2 experimental, three-mesh, and exact matched-FreeMHD acceptance
+remain open.
+
 B1 uses SOLVAX's exact cyclic azimuthal line solve and retained modal factors. A
 one-cycle physical-convergence pilot now reduces the large solve-plus-restart
 pressure ceiling from 768 to 669 Krylov iterations while preserving divergence,

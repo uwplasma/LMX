@@ -93,8 +93,10 @@ volume fields, and tabulated fields share one inductionless solver surface.
   <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform-field duct response and charge conservation" width="48%">
 </p>
 
-The 3D fringe-pressure path passes conservation, restart, and two-GPU parity
-checks; ALEX experimental and exact matched-FreeMHD acceptance remain open.
+![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
+
+The B2 diagnostics pass conservation, restart, and two-GPU parity checks;
+experimental and exact matched-FreeMHD acceptance remain open.
 [Fringing-field status →](docs/fringing.md)
 
 ## Differentiate the solver
@@ -121,7 +123,7 @@ visuals demonstrate implemented diagnostics and geometry, not validation claims.
 
 ## Scale on CPUs and GPUs
 
-The accepted B2 checkpoint scales from 36.96 s on one RTX A4000 to 22.23 s on
+The B2 numerical checkpoint scales from 36.96 s on one RTX A4000 to 22.23 s on
 two: **1.66× speedup at 83.1% efficiency**, with equivalent observables. A
 fine-grid fast-diagonalization update separately reduces matched electric-solve
 time **1.87×**. Broader multi-device scaling remains open.
@@ -132,8 +134,8 @@ time **1.87×**. Broader multi-device scaling remains open.
 
 ## Quality, documentation, and citation
 
-The portable gate currently passes **771 tests**, **95.31% branch coverage**,
-and a **194.4 s** wall time on six Apple-Silicon workers. Physics and external
+The portable gate currently passes **760 tests**, **95.31% branch coverage**,
+and a **193.4 s** wall time on six Apple-Silicon workers. Physics and external
 campaigns add analytical, conservation, convergence, FreeMHD, and experimental
 evidence outside that fast gate.
 

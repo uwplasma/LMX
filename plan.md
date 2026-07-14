@@ -95,8 +95,8 @@ in `docs/validation_report.md` and `docs/performance.md`.
 - Keep tracked documentation media below 1 MiB, stills below 100 KiB, and
   movies below 150 KiB where practical. Store full-resolution sources and large
   outputs in checksummed releases.
-- Add a plotting-only B2/ALEX field and pressure panel from existing compact
-  records, explicitly labelled “acceptance open”; do not rerun a solver for it.
+- **Complete:** the plotting-only B2/ALEX field and pressure panel uses existing
+  compact records, is labelled “acceptance open,” and runs no solver.
 
 Exit: a new user can understand scope, run a first case, see representative
 results, and distinguish verified from research-stage functionality without
@@ -143,7 +143,7 @@ Near-term ratchets after this workstream:
 | package modules | 35 | at most 34 |
 | package lines | 34,938 | below 34,750 |
 | maintained-core lines | 8,067 | below 7,900 |
-| test files / lines | 33 / 21,300 | at most 32 / below 21,100 |
+| test files / lines | 33 / 21,288 | at most 32 / below 21,100 |
 | maintenance scripts | 19 | at most 18; reusable logic moves into `lmx/` or an existing command |
 
 Count semantic maintenance cost across the whole package; do not satisfy a
