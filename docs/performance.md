@@ -56,6 +56,12 @@ previously accepted 109.18-second control. Residual histories agree within
 `1.67e-16`, field norms are identical, and two-shard conservation gates pass.
 The raw records are release assets; the compact accepted summary is
 `benchmarks/results/b2-fine-fast-diagonalization-20260714.json`.
+The first promoted continuation checkpointed 12 updates in 177.37 seconds and
+reached `6.3606e-5`. Its post-transient slope is only `1.80e-8` per update, so
+the 128-update ceiling projects to `6.152e-5`, not the `5e-5` fine gate. The
+valid 115 MiB checkpoint is a release asset. This bounded stop moves the next
+optimization target from the inner electric solve to the outer fixed-point
+map; brute-force continuation is not accepted evidence.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.

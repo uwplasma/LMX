@@ -40,6 +40,25 @@
     "placement_pass": true,
     "promotion_pass": true
   },
+  "fine_continuation": {
+    "source_commit": "c36c5d5",
+    "source_fingerprint": "0a45c1c7a13fe5dc41d19ea45f22e1209fb5a6b005cbf0bd7611575c6ea4be85",
+    "completed_updates": 12,
+    "effective_total_updates": 124,
+    "checkpoint_seconds": 177.37347634299658,
+    "initial_residual": 6.41470760150975e-05,
+    "checkpoint_residual": 6.360560472545851e-05,
+    "asymptotic_reduction_per_update": 1.795904482534001e-08,
+    "projected_residual_at_128_updates": 6.152235552571107e-05,
+    "target_residual": 5e-05,
+    "stop_reason": "bounded checkpoint stop: the accelerated inner solve exposed an outer fixed-point plateau that cannot close the fine gate within the 128-update ceiling",
+    "next_action": "compare bounded outer-acceleration candidates from this exact checkpoint before resuming",
+    "checkpoint": {
+      "bytes": 119660553,
+      "sha256": "7d34ee95dc1b64ffeb2853b575284078a404bc9d9d914ff479825410a3281f14",
+      "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-fine-fastdiag-c36c5d5-12step-checkpoint.npz"
+    }
+  },
   "raw_assets": {
     "baseline_warm": {
       "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-fastdiag-baseline-warm.json",

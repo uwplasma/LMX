@@ -188,8 +188,12 @@ for external research use.
   from 183.37 to 98.12 seconds (1.87x); it also beat the previously accepted
   109.18-second baseline by 1.11x. Residual histories agree within `1.67e-16`,
   field norms are identical, and physical and placement gates pass. Resume the
-  fine acceptance continuation with this solver; experimental acceptance
-  remains open.
+  fine acceptance continuation with this solver. A bounded 12-update replay
+  then reached `6.3606e-5` in 177.37 seconds, but its asymptotic reduction of
+  `1.80e-8` per update projects only `6.152e-5` at the 128-update ceiling. The
+  valid 115 MiB checkpoint is a release asset; compare bounded outer fixed-point
+  accelerators before another continuation. Experimental acceptance remains
+  open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.
