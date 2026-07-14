@@ -1,6 +1,6 @@
 {
   "date": "2026-07-13",
-  "commit": "6f30d29a328a25a0e55b9387bc19313f75192f03",
+  "commit": "06f5f6272770adf4e17ab6304509c9d829dd7d30",
   "lock_sha256": "7cc9e566ba686ea741f68086c8dbbf2d2e21b6b02acc6d372b9b313db8460232",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
@@ -15,64 +15,24 @@
     "engineering_target_seconds": 360,
     "minimum_branch_coverage_percent": 95.0
   },
-  "records": [
-    {
-      "python": "3.10.20",
-      "jax": "0.6.2",
-      "jaxlib": "0.6.2",
-      "passed": 899,
-      "skipped": 8,
-      "pytest_seconds": 140.82,
-      "gate_seconds": 142.8,
-      "branch_coverage_percent": 95.07,
-      "passed_gate": true
-    },
-    {
-      "python": "3.13.7",
-      "jax": "0.10.2",
-      "jaxlib": "0.10.2",
-      "passed": 899,
-      "skipped": 8,
-      "pytest_seconds": 193.58,
-      "gate_seconds": 196.3,
-      "branch_coverage_percent": 95.06,
-      "passed_gate": true
-    }
-  ],
   "current_local_gate": {
     "python": "3.12.13",
     "jax": "0.10.2",
     "jaxlib": "0.10.2",
     "workers": 6,
-    "passed": 796,
+    "passed": 771,
     "skipped": 8,
-    "pytest_seconds": 197.79,
-    "gate_seconds": 200.3,
-    "branch_coverage_percent": 95.33,
+    "pytest_seconds": 163.33,
+    "gate_seconds": 165.6,
+    "branch_coverage_percent": 95.25,
     "passed_gate": true
   },
   "comparison": {
-    "slowest_gate_seconds": 200.3,
-    "slowest_budget_fraction": 0.3338333333333333,
-    "slowest_engineering_target_fraction": 0.5563888888888889,
-    "all_supported_endpoints_pass": true
-  },
-  "local_worker_scaling": {
-    "source_commit": "80f4ed73976a7e6b8a6f5b3f4184c9491e67ced8",
-    "python": "3.10.20",
-    "jax": "0.6.2",
-    "jaxlib": "0.6.2",
-    "reference_workers": 4,
-    "reference_gate_seconds": 141.1,
-    "candidate_workers": 6,
-    "candidate_gate_seconds": 113.0,
-    "speedup": 1.2486725663716813,
-    "wall_time_reduction_percent": 19.914953933380577,
-    "passed": 900,
-    "skipped": 8,
-    "branch_coverage_percent": 95.09,
-    "swaps": 0,
-    "accepted": true
+    "previous_gate_seconds": 200.3,
+    "wall_time_reduction_percent": 17.323,
+    "current_budget_fraction": 0.276,
+    "current_engineering_target_fraction": 0.46,
+    "current_gate_pass": true
   },
   "hosted_ci": {
     "status": "administratively_not_started",

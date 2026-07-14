@@ -151,8 +151,8 @@ for external research use.
 
 ## Current checkpoint
 
-- Portable gate: 796 passed, 8 expected external-data skips, 95.33% branch
-  coverage, 200.3 seconds on the reference Mac.
+- Portable gate: 771 passed, 8 expected external-data skips, 95.25% branch
+  coverage, 165.6 seconds on the reference Mac.
 - SOLVAX: compatible `>=0.8,<1`; latest tested package is 0.8.1.
 - B1 retained modes: separated real `m=0` and complex `m=1..4` block factors
   pass factor parity and reduce medium restart time from 24.12 to 10.63 seconds.
