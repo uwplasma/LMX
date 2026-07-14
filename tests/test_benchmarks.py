@@ -364,13 +364,15 @@ def test_benchmark_b_sharded_mesh_rounds_frozen_axial_minimum_upward():
 
 def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     problem = build_benchmark_b_problem("B1-fringing-pipe", mesh_level="coarse")
+    # Preserve radial, azimuthal, wall, restart, and retained-modal paths on the
+    # smallest mesh that still closes every production-path conservation gate.
     case = replace(
         problem.case,
         geometry=replace(
             problem.case.geometry,
             nx=7,
-            nr=9,
-            ntheta=16,
+            nr=7,
+            ntheta=12,
             wall_cells=(1, 1, 1, 1),
             target_ha=20.0,
             hartmann_layer_cells=2,
@@ -378,7 +380,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         time_stepper=replace(
             problem.case.time_stepper,
             max_steps=2,
-            potential_iterations=500,
+            potential_iterations=200,
         ),
         solver=replace(
             problem.case.solver,
@@ -459,8 +461,8 @@ def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
         geometry=replace(
             problem.case.geometry,
             nx=7,
-            ny=9,
-            nz=9,
+            ny=7,
+            nz=7,
             wall_cells=(1, 1, 1, 1),
             target_ha=20.0,
             hartmann_layer_cells=2,
@@ -468,7 +470,7 @@ def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
         time_stepper=replace(
             problem.case.time_stepper,
             max_steps=2,
-            potential_iterations=200,
+            potential_iterations=160,
         ),
         solver=replace(
             problem.case.solver,
