@@ -1030,7 +1030,7 @@ requires-dist = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "twine", marker = "extra == 'release'" },
 ]
-provides-extras = ["dev", "docs", "release", "magnetic", "accelerated"]
+provides-extras = ["dev", "docs", "release", "magnetic"]
 
 [[package]]
 name = "magpylib-jax"

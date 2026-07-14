@@ -33,20 +33,13 @@ from .physics import build_material_fields, magnetic_field_components
 from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec
 
-try:
-    from solvax import (
-        aitken_relaxation as _solvax_aitken_relaxation,
-        anderson_mixing as _solvax_anderson_mixing,
-        galerkin_deflation as _solvax_galerkin_deflation,
-        gmres as _solvax_gmres,
-        tridiagonal_solve as _solvax_tridiagonal_solve,
-    )
-except ImportError:  # pragma: no cover - exercised in minimum installs
-    _solvax_aitken_relaxation = None
-    _solvax_anderson_mixing = None
-    _solvax_galerkin_deflation = None
-    _solvax_gmres = None
-    _solvax_tridiagonal_solve = None
+from solvax import (
+    aitken_relaxation as _solvax_aitken_relaxation,
+    anderson_mixing as _solvax_anderson_mixing,
+    galerkin_deflation as _solvax_galerkin_deflation,
+    gmres as _solvax_gmres,
+    tridiagonal_solve as _solvax_tridiagonal_solve,
+)
 
 
 _POTENTIAL_ADDITIVE_LINE_MIN_CELLS = 110
@@ -89,8 +82,6 @@ def _potential_y_line_preconditioner(
     east: jnp.ndarray,
     anchor: tuple[int, int],
 ):
-    if _solvax_tridiagonal_solve is None:
-        return None
     line_diagonal = diagonal.at[anchor].set(1.0)
     lower = (-west).at[anchor].set(0.0)
     upper = (-east).at[anchor].set(0.0)
@@ -116,9 +107,6 @@ def _potential_z_line_preconditioner(
     transposed = _potential_y_line_preconditioner(
         diagonal.T, south.T, north.T, (anchor[1], anchor[0])
     )
-    if transposed is None:
-        return None
-
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
         return transposed(residual.T).T
 
@@ -133,8 +121,6 @@ def _potential_additive_line_preconditioner(
     north: jnp.ndarray,
     anchor: tuple[int, int],
 ):
-    if _solvax_tridiagonal_solve is None:
-        return None
     y_line = _potential_y_line_preconditioner(diagonal, west, east, anchor)
     anchor_t = (anchor[1], anchor[0])
     z_diagonal = diagonal.T.at[anchor_t].set(1.0)
@@ -166,7 +152,7 @@ def _potential_deflated_line_preconditioner(
     coarse_stride: int = _POTENTIAL_COARSE_STRIDE,
 ):
     """Combine SPD line solves with an exact Galerkin coarse correction."""
-    if _solvax_galerkin_deflation is None or coarse_stride < 2:
+    if coarse_stride < 2:
         return None
     mean_y = float(np.asarray(jnp.mean(west + east)))
     mean_z = float(np.asarray(jnp.mean(south + north)))
@@ -178,9 +164,6 @@ def _potential_deflated_line_preconditioner(
         line = _potential_additive_line_preconditioner(
             diagonal, west, east, south, north, anchor
         )
-    if line is None:
-        return None
-
     fine_shape = diagonal.shape
     coarse_shape = tuple(
         (size - 1 + coarse_stride - 1) // coarse_stride + 1 for size in fine_shape
@@ -238,8 +221,6 @@ def _solve_potential_fgmres_state(
     preconditioner: Callable[[jnp.ndarray], jnp.ndarray],
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve the anchored potential system with SOLVAX flexible GMRES."""
-    if _solvax_gmres is None:
-        raise ImportError("SOLVAX flexible GMRES is unavailable")
     shape = rhs.shape
 
     def matvec_flat(vector: jnp.ndarray) -> jnp.ndarray:
@@ -287,8 +268,6 @@ def _potential_fast_diagonalization_preconditioner(
     stretched Hartmann direction is substantially more accurate; outer PCG
     removes the remaining z-eigensolver roundoff.
     """
-    if _solvax_tridiagonal_solve is None:
-        return None
     dy = mesh.dy.astype(west.dtype)
     dz = mesh.dz.astype(west.dtype)
     west_y = jnp.mean(west / dz[None, :], axis=1)
@@ -385,8 +364,6 @@ def _potential_conducting_rectangle_preconditioner(
         north[y_slice, z_slice],
         subanchor,
     )
-    if subsolve is None:
-        return None
     conductive_array = jnp.asarray(conductive)
 
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
@@ -409,11 +386,9 @@ def _select_potential_preconditioner(
     positive = diagonal_host[diagonal_host > 0.0]
     diagonal_ratio = float(positive.max() / positive.min()) if positive.size else 1.0
     if diagonal_ratio >= _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO:
-        deflated = _potential_deflated_line_preconditioner(
+        return _potential_deflated_line_preconditioner(
             diagonal, west, east, south, north, anchor
         )
-        if deflated is not None:
-            return deflated
     if (
         min(diagonal.shape) < _POTENTIAL_ADDITIVE_LINE_MIN_CELLS
         and diagonal_ratio < _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO
@@ -445,7 +420,7 @@ def _potential_preconditioner_for_materials(
         mesh, sigma, west, east, south, north, anchor
     )
     if preconditioner is not None:
-        return preconditioner, _solvax_gmres is not None
+        return preconditioner, True
 
     preconditioner = _select_potential_preconditioner(
         diagonal, west, east, south, north, anchor
@@ -1560,16 +1535,6 @@ def _fully_developed_case_step(
         or case.solver.coupling_max_relaxation < case.solver.coupling_min_relaxation
     ):
         raise ValueError("Coupling relaxation bounds must satisfy 0 < min <= max")
-    if acceleration == "aitken" and _solvax_aitken_relaxation is None:
-        raise ImportError(
-            "coupling_acceleration='aitken' requires the optional accelerated dependencies; "
-            "install LMX with `pip install lmx[accelerated]`"
-        )
-    if acceleration == "anderson" and _solvax_anderson_mixing is None:
-        raise ImportError(
-            "coupling_acceleration='anderson' requires the optional accelerated dependencies; "
-            "install LMX with `pip install lmx[accelerated]`"
-        )
     if case.solver.coupling_history_depth < 1:
         raise ValueError("Anderson coupling history depth must be positive")
     if case.solver.coupling_regularization < 0.0:

@@ -57,7 +57,6 @@ release = [
 magnetic = [
   "magpylib-jax",
 ]
-accelerated = []
 
 [project.scripts]
 lmx = "lmx.cli:main"
@@ -75,6 +74,7 @@ timeout_method = "signal"
 filterwarnings = ["error"]
 markers = [
   "unit: fast local checks for isolated functionality",
+  "numerical: discretization, solver, conservation, and convergence checks",
   "regression: deterministic golden-profile and serialized-output checks",
   "physics: physics-level invariants for the current solver implementation",
   "validation: validation and parity harness checks",

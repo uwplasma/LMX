@@ -283,19 +283,6 @@ def test_solvax_pcg_five_point_gradient_is_implicit_and_matches_exact_solution()
     assert jnp.allclose(jax.grad(objective)(scale), expected, rtol=1.0e-10)
 
 
-def test_solvax_pcg_backend_requires_optional_dependency(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setattr(linear, "_solvax_pcg_linear_solve", None)
-    coefficients = _five_point_coefficients()
-    with pytest.raises(ImportError, match="solvax>=0.5"):
-        linear.solve_five_point_solvax_pcg_state.__wrapped__(
-            *coefficients,
-            iterations=4,
-            tolerance=1.0e-8,
-        )
-
-
 def test_solve_five_point_lineax_falls_back_without_lineax(
     monkeypatch: pytest.MonkeyPatch,
 ):

@@ -32,7 +32,8 @@ a stop rule, and a go/no-go threshold before launch. Escalation is:
 1. static, analytical, plotting-only, or tiny-grid check;
 2. bounded one-device smoke run;
 3. medium confirmation only after the smoke gate passes;
-4. fine, external-code, or multi-hour campaign only after all earlier gates.
+4. fine, external-code, or multi-hour campaign only after all earlier gates,
+   with a durable restart, bounded stages, and an interim stop/go check.
 
 Existing checksummed data are reused when they answer the question. A failed or
 unpromising bounded probe stops; parameter searches do not expand by inertia.
@@ -51,6 +52,11 @@ unpromising bounded probe stops; parameter searches do not expand by inertia.
 Branch coverage of `lmx/` remains at least 95%. Coverage is not physics
 validation; promoted claims also need the relevant conservation, convergence,
 gradient, literature, or independent-code gate.
+
+Maintain a capability-to-evidence map linking every public workflow to one
+bounded portable test and, where required, a numerical/physics/external gate.
+Enforce the `unit`, `numerical`, `regression`, `physics`, `validation`, and
+`external` markers so future test consolidation cannot silently drop a layer.
 
 ### Parallel work without contaminated evidence
 
@@ -84,6 +90,8 @@ in `docs/validation_report.md` and `docs/performance.md`.
 - Verify LMX/FreeMHD/NekRS comparisons against primary papers or official docs.
 - Give every major feature a relevant plot or movie poster; never use a generic
   “selected media” gallery.
+- Put the richer feature-specific plots and movies in the relevant docs pages,
+  with provenance and acceptance status beside each compressed asset.
 - Keep tracked documentation media below 1 MiB, stills below 100 KiB, and
   movies below 150 KiB where practical. Store full-resolution sources and large
   outputs in checksummed releases.
@@ -123,18 +131,24 @@ Every delegation must pass primal, residual, gradient/transpose, JIT, placement,
 memory, and repeated interleaved warm-timing gates. Delete the LMX duplicate in
 the same tranche when SOLVAX passes.
 
+Keep a compatible runtime range rather than an exact SOLVAX pin. CI tests both
+the minimum supported release and the newest release satisfying that range;
+the lockfile remains exact only for reproducible development and release jobs.
+
 Near-term ratchets after this workstream:
 
 | Surface | Current | Next target |
 |---|---:|---:|
-| package modules | 36 | no growth; remove a module when ownership permits |
-| package lines | 35,370 | below 35,100 |
-| maintained-core lines | 8,498 | below 8,300 |
-| test files / lines | 34 / 21,699 | no new files; below 21,550 lines |
-| maintenance scripts | 20 | below 19; reusable logic moves into `lmx/` or an existing command |
+| package modules | 36 | at most 35 |
+| package lines | 35,328 | below 35,000 |
+| maintained-core lines | 8,456 | below 8,300 |
+| test files / lines | 34 / 21,643 | at most 33 / below 21,400 |
+| maintenance scripts | 20 | at most 19; reusable logic moves into `lmx/` or an existing command |
 
 Count semantic maintenance cost across the whole package; do not satisfy a
 budget through formatting or by relabelling a large module “research-stage.”
+Ratchet each cap downward after an accepted migration; this workstream does not
+exit until both a package module and a test file have been removed.
 
 ## Priority 3: one exact matched FreeMHD harness
 
@@ -191,6 +205,8 @@ capability. Build docs with warnings as errors, verify provenance and media,
 build and inspect wheel/sdist, install the wheel in a clean environment, run the
 portable gate and selected accepted external/gradient/scaling lanes, then publish
 exact commits, environments, references, tolerances, limitations, and assets.
+Public APIs retain concise docstrings and type hints; non-obvious discretizations
+and numerical choices retain comments explaining the reason, not the syntax.
 
 Exit: the release is small, installable, reproducible, honestly scoped, and
 suitable for external research use.

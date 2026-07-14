@@ -15,10 +15,7 @@ except (
 ):  # pragma: no cover - exercised by environment-dependent paths
     lx = None
 
-try:
-    from solvax import pcg_linear_solve as _solvax_pcg_linear_solve
-except ModuleNotFoundError:  # pragma: no cover - exercised by minimal installations
-    _solvax_pcg_linear_solve = None
+from solvax import pcg_linear_solve as _solvax_pcg_linear_solve
 
 
 @dataclass(frozen=True)
@@ -284,10 +281,6 @@ def solve_five_point_solvax_pcg_state(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve a five-point SPD system with the released SOLVAX PCG backend."""
 
-    if _solvax_pcg_linear_solve is None:
-        raise ImportError(
-            "linear_solver='solvax_pcg' requires the optional solvax>=0.5 dependency"
-        )
     tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
     inverse_diagonal = 1.0 / jnp.maximum(diagonal, tiny)
 

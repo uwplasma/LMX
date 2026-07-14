@@ -2103,12 +2103,6 @@ def test_potential_y_line_preconditioner_uses_solvax_and_anchors_gauge(
     assert captured["lower"][anchor] == captured["upper"][anchor] == 0.0
     assert captured["rhs"][anchor] == result[anchor] == 0.0
 
-    monkeypatch.setattr(solvers, "_solvax_tridiagonal_solve", None)
-    assert (
-        solvers._potential_y_line_preconditioner(diagonal, west, east, anchor) is None
-    )
-
-
 def test_potential_additive_line_preconditioner_solves_both_directions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2129,15 +2123,6 @@ def test_potential_additive_line_preconditioner_solves_both_directions(
     assert calls == [(4, 3), (3, 4)]
     assert result.shape == shape
     assert result[2, 1] == 0.0
-
-    monkeypatch.setattr(solvers, "_solvax_tridiagonal_solve", None)
-    assert (
-        solvers._potential_additive_line_preconditioner(
-            diagonal, neighbor, neighbor, neighbor, neighbor, (2, 1)
-        )
-        is None
-    )
-
 
 def test_potential_deflated_line_preconditioner_accelerates_anisotropic_system() -> (
     None
@@ -2186,9 +2171,7 @@ def test_potential_deflated_line_preconditioner_accelerates_anisotropic_system()
     )
 
 
-def test_fast_diagonalization_preconditioner_closes_stretched_tensor_system(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_fast_diagonalization_preconditioner_closes_stretched_tensor_system() -> None:
     mesh = generate_rect_duct_mesh(
         width=2.0,
         height=2.0,
@@ -2235,15 +2218,6 @@ def test_fast_diagonalization_preconditioner_closes_stretched_tensor_system(
     recovered = preconditioner(compatible_rhs)
     assert jnp.linalg.norm(recovered - known) / jnp.linalg.norm(known) <= 1.0e-7
 
-    monkeypatch.setattr(solvers, "_solvax_tridiagonal_solve", None)
-    assert (
-        solvers._potential_fast_diagonalization_preconditioner(
-            mesh, scaled[1], scaled[2], scaled[3], scaled[4], anchor
-        )
-        is None
-    )
-
-
 def test_conducting_rectangle_preconditioner_crops_exact_insulators() -> None:
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=9, nz=9)
     sigma = jnp.ones((9, 9)).at[:, :2].set(0.0).at[:, -2:].set(0.0)
@@ -2267,24 +2241,23 @@ def test_conducting_rectangle_preconditioner_crops_exact_insulators() -> None:
         mesh, sigma, *scaled[:5], anchor
     )
     assert selected is not None
-    assert flexible is (solvers._solvax_gmres is not None)
+    assert flexible is True
     selected_recovery = selected(rhs)
     assert (
         jnp.linalg.norm(selected_recovery - known) / jnp.linalg.norm(known) <= 1.0e-10
     )
-    if flexible:
-        physical_rhs = solvers.apply_five_point_operator(*scaled[:5], known)
-        solved, residual, iterations = solvers._solve_potential_fgmres_state(
-            *scaled[:5],
-            physical_rhs,
-            anchor,
-            initial=jnp.zeros_like(rhs),
-            residual_scale=jnp.ones_like(rhs),
-            preconditioner=selected,
-        )
-        assert int(iterations) <= 3
-        assert float(residual) <= 1.0e-12
-        assert jnp.linalg.norm(solved - known) / jnp.linalg.norm(known) <= 1.0e-10
+    physical_rhs = solvers.apply_five_point_operator(*scaled[:5], known)
+    solved, residual, iterations = solvers._solve_potential_fgmres_state(
+        *scaled[:5],
+        physical_rhs,
+        anchor,
+        initial=jnp.zeros_like(rhs),
+        residual_scale=jnp.ones_like(rhs),
+        preconditioner=selected,
+    )
+    assert int(iterations) <= 3
+    assert float(residual) <= 1.0e-12
+    assert jnp.linalg.norm(solved - known) / jnp.linalg.norm(known) <= 1.0e-10
 
     nonrectangular = sigma.at[4, 4].set(0.0)
     assert (
@@ -3167,9 +3140,7 @@ def test_steady_solver_supports_opt_in_solvax_anderson_coupling():
     assert jnp.isfinite(solution.state.phi).all()
 
 
-def test_steady_solver_rejects_unknown_or_unavailable_coupling_acceleration(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_steady_solver_rejects_invalid_coupling_acceleration_controls():
     case = make_shercliff_case(ha=5.0, ny=4, nz=4)
     invalid = replace(case, solver=replace(case.solver, coupling_acceleration="other"))
     with pytest.raises(ValueError, match="Unsupported coupling acceleration"):
@@ -3196,20 +3167,6 @@ def test_steady_solver_rejects_unknown_or_unavailable_coupling_acceleration(
         )
         with pytest.raises(ValueError, match=message):
             solve_steady(invalid_anderson)
-    accelerated = replace(
-        case, solver=replace(case.solver, coupling_acceleration="aitken")
-    )
-    monkeypatch.setattr(solvers, "_solvax_aitken_relaxation", None)
-    with pytest.raises(ImportError, match="optional accelerated dependencies"):
-        solve_steady(accelerated)
-    monkeypatch.setattr(solvers, "_solvax_anderson_mixing", None)
-    accelerated = replace(
-        case, solver=replace(case.solver, coupling_acceleration="anderson")
-    )
-    with pytest.raises(ImportError, match="optional accelerated dependencies"):
-        solve_steady(accelerated)
-
-
 for _unit_test_name in (
     "test_hartmann_solver_runs",
     "test_hunt_solver_keeps_solid_velocity_zero",
@@ -3246,6 +3203,6 @@ for _unit_test_name in (
     "test_fully_developed_case_step_rejects_crank_nicolson_in_transient_mode",
     "test_steady_solver_supports_opt_in_solvax_aitken_coupling",
     "test_steady_solver_supports_opt_in_solvax_anderson_coupling",
-    "test_steady_solver_rejects_unknown_or_unavailable_coupling_acceleration",
+    "test_steady_solver_rejects_invalid_coupling_acceleration_controls",
 ):
     globals()[_unit_test_name] = pytest.mark.unit(globals()[_unit_test_name])
