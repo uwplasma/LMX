@@ -45,6 +45,9 @@ still satisfies the frozen minimum-resolution contract. Cross-section grids,
 physics, and tolerances are unchanged. The runner refuses to combine spatial
 sharding with the separate one-process-per-GPU campaign mode and fails if the
 result does not actually have the requested number of addressable JAX shards.
+The exact pushed `8f003d0` production gate reported two shards on `cuda:0` and
+`cuda:1`, converged three updates in 38.81 seconds including compilation, and
+kept divergence below `5.8e-7` and charge residual below `2.9e-5`.
 
 Frozen B1 cases use the compatible steady and retained-modal implementations
 directly and record both choices in the result. The superseded environment

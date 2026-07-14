@@ -169,7 +169,8 @@ for external research use.
   seconds on two (1.66x, 83.1% efficiency).
 - Frozen B2 runner: `--spatial-devices 2` rounds only the odd axial minimum to
   an equal-shard mesh and records/enforces actual device placement; a bounded
-  two-A4000 production solve passes steady and conservation gates.
+  two-A4000 production solve passes steady and conservation gates in 38.81
+  seconds including compilation, with two recorded addressable shards.
 - Repository consolidation is active; historical campaigns and large studies
   are being moved out of the source tree before further solver slimming.
 - Architecture budgets now cap module count, source/core lines, tracked bytes,
