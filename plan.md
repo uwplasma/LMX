@@ -75,9 +75,9 @@ superseded worktrees and branches.
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerics, conservation, and restart accepted | exact matched FreeMHD plus literature/mesh acceptance |
 | B2 ALEX square duct | fine numerical baseline converged; current LMX and FreeMHD formulations are not yet equation-identical | reconcile inertia and axial drive before any matched run |
-| SOLVAX | 0.8.3 owns velocity PCG, cyclic lines, anchored-Poisson PCG, and additive composition | finish the combined full gate and repeat interleaved timing |
+| SOLVAX | 0.8.3 owns velocity PCG, cyclic lines, anchored-Poisson PCG, and additive composition; combined full gate passes | repeat interleaved timing |
 | Parallel execution | two-GPU B2 numerical checkpoint shows 1.66x speedup and parity | accepted-case CPU/GPU scaling and four-device evidence |
-| Portable quality | 761 pass, 8 expected external-data skips, 95.30% branch coverage, 182.3 s | stay below 300 s target and 600 s hard limit |
+| Portable quality | 770 pass, 8 expected external-data skips, 95.35% branch coverage, 160.3 s | stay below 300 s target and 600 s hard limit |
 
 Machine-readable evidence is in `benchmarks/results/`; current interpretation is
 in `docs/validation_report.md` and `docs/performance.md`.
@@ -127,11 +127,11 @@ Apply this migration sequence:
    stopping uses `atol = physical_tol * min(residual_scale)`. Uniform,
    anisotropic, physical-residual, RHS/coefficient-gradient, JIT, transpose, and
    tiny high-Ha gates pass. LMX retains physical maximum-norm recertification.
-5. **Focused gates complete:** SOLVAX 0.8.3 provides the symmetry-preserving
+5. **Complete:** SOLVAX 0.8.3 provides the symmetry-preserving
    `additive_preconditioner`; both LMX averaging closures delegate to it while
    geometry, line construction, anchoring, and axis adaptation remain in LMX.
-   The seven direct solver/JIT/gradient gates pass; the combined full gate is
-   the remaining acceptance check.
+   The seven direct solver/JIT/gradient gates and the combined portable gate
+   pass.
 6. Treat migration of two direct SciPy sparse solves to `solvax.splu_solve` as
    low-value cleanup after the PCG and additive-line deletions; sparse FV
    assembly remains LMX-owned.
@@ -173,21 +173,17 @@ removal must follow real ownership consolidation, not arbitrary merging.
 
 ### Immediate execution order
 
-1. **Focused checks and architecture caps pass.** Run repository, docs,
-   provenance, and one full portable gate for the combined tranche. Run no
-   solver or timing job here.
-2. Reconcile B2 momentum advection and the axial boundary/drive contract with
+1. Reconcile B2 momentum advection and the axial boundary/drive contract with
    static contracts and tiny manufactured cases.
-3. Prove one-/multi-device equivalence and bounded strong scaling for the
+2. Prove one-/multi-device equivalence and bounded strong scaling for the
    reconciled path, with timing jobs run alone.
-4. Run the tiny matched B2-family smoke case; only a passing contract and smoke
+3. Run the tiny matched B2-family smoke case; only a passing contract and smoke
    can authorize medium or production B2 work.
 
 Development stays agile: run the directly affected node IDs first, then their
-owning files. For this tranche that means the matched-record/materializer tests
-and the additive-line tests in `test_solver.py` and `test_fringing.py`; do not
-re-run unrelated physics campaigns after each edit. The full portable gate runs
-once after the coherent combined tranche, not after each change.
+owning files, and do not re-run unrelated physics campaigns after each edit.
+The full portable gate runs once after each coherent code tranche, not after
+each change.
 
 ## Priority 3: one exact matched FreeMHD harness
 

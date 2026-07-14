@@ -89,8 +89,9 @@ through the iteration count.
 
 On confirmation-sized stretched cross-sections (at least 110 cells in each
 direction), volume-scaled potential PCG uses a symmetric additive y+z line
-preconditioner built from SOLVAX batched tridiagonal solves. When the scaled
-diagonal range exceeds `3e4`, it adds a balanced Galerkin coarse correction:
+preconditioner built from SOLVAX batched tridiagonal solves and its released
+additive combinator. LMX retains gauge projection and line geometry. When the
+scaled diagonal range exceeds `3e4`, it adds a balanced Galerkin coarse correction:
 linear prolongation and its exact transpose define the coarse operator, a
 small Cholesky solve removes the global modes, and SOLVAX
 `galerkin_deflation` applies the balanced correction. The line

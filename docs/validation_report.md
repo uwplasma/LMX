@@ -12,10 +12,11 @@ are authoritative when prose and results differ.
   `Ha = 500, 5000, 10000, 15000` pass.
 - Audited `85 x 63` FreeMHD closed-channel Shercliff and Hunt observables pass
   the 1% finite-grid gate.
-- SOLVAX 0.8.2 integration passes primal, implicit-gradient, independent
-  transpose, CPU/GPU, and bounded end-to-end gates.
-- The portable package gate passes 761 tests with 8 expected external-data
-  skips and 95.30% branch coverage in 182.3 seconds on the reference Mac.
+- SOLVAX 0.8.3 integration, including symmetric additive-line composition,
+  passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
+  end-to-end gates.
+- The portable package gate passes 770 tests with 8 expected external-data
+  skips and 95.35% branch coverage in 160.3 seconds on the reference Mac.
 
 ## Research-stage
 

@@ -16,7 +16,7 @@ design update. Outputs go under `artifacts/`.
 
 ## Solver backends
 
-The default `auto` path requires a compatible SOLVAX `0.8.2+` release below
+The default `auto` path requires a compatible SOLVAX `0.8.3+` release below
 `1.0`; `cg` is only a compatibility name for the same SOLVAX PCG path. CI tests
 both dependency-range endpoints instead of committing a repository lockfile.
 
