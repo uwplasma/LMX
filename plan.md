@@ -187,7 +187,7 @@ for external research use.
   seconds including compilation, with two recorded addressable shards.
 - Repository consolidation: the root provenance tree and historical campaign,
   Docker, dashboard, support/security, and duplicate driver surfaces are gone.
-  The maintained checkout has 39 test files, 22 maintenance scripts, 13 compact
+  The maintained checkout has 38 test files, 22 maintenance scripts, 13 compact
   accepted-result files, and no remote development branches beyond `main`.
 - Architecture: 36 package modules, 35,043 package lines, 8,421 maintained-core
   lines, a 3.77 MiB tracked checkout, and a 288,481-byte wheel. Live gates cap
