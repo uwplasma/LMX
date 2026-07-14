@@ -29,6 +29,18 @@ _MATCHED_PRODUCTION_ROLES = {
     "B1-fringing-pipe": "b1-production",
     "B2-fringing-square": "b2-production",
 }
+_FREEMHD_DISCRETIZATION_REFERENCE = {
+    "repository_commit": "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5",
+    "openfoam_release": "v2206",
+    "momentum_source": "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H",
+    "momentum_source_sha256": "ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6",
+    "limiter_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.H",
+    "limiter_source_sha256": "f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e",
+    "nvd_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/NVDTVD.H",
+    "nvd_source_sha256": "ee85d9b26c257ccdd3ab6d2fa0403daed9df30d63f483c35bea1586ce6d4fd07",
+    "vector_transform_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitFuncs.C",
+    "vector_transform_source_sha256": "f99e4011a0a4ac957c992493b9391796dd12191c16293ba07c127168640c53b3",
+}
 
 
 def _repository_root(root: str | Path | None = None) -> Path:
@@ -115,21 +127,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
             int(contract["stopping_rules"].get("steady_steps_min", 0)) != 3):
         raise ValueError("Benchmark B matched stopping contract differs")
 
-    discretization_reference = spec.get("free_mhd_discretization_reference")
-    if not isinstance(discretization_reference, dict) or (
-        discretization_reference.get("repository_commit")
-        != "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
-        or discretization_reference.get("openfoam_release") != "v2206"
-        or set(discretization_reference)
-        != {
-            "repository_commit",
-            "openfoam_release",
-            "momentum_source",
-            "limiter_source",
-            "nvd_source",
-            "vector_transform_source",
-        }
-    ):
+    if spec.get("free_mhd_discretization_reference") != _FREEMHD_DISCRETIZATION_REFERENCE:
         raise ValueError("Benchmark B FreeMHD discretization reference differs")
 
     sources = spec.get("sources")
