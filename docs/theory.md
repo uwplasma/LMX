@@ -366,7 +366,7 @@ Useful references:
 - [arXiv:2409.08950, multi-region electrically conductive flow solver validation study](https://arxiv.org/abs/2409.08950)
 - [Hunt, *Magnetohydrodynamic flow in rectangular ducts*](https://doi.org/10.1017/S0022112065000344)
 - [Shercliff, *The Theory of Electromagnetic Flow-Measurement*](https://assets.cambridge.org/97805213/35546/excerpt/9780521335546_excerpt.pdf)
-- [JAX advanced autodiff](https://docs.jax.dev/en/latest/advanced-autodiff.html)
+- [JAX advanced autodiff](https://docs.jax.dev/en/latest/advanced_autodiff.html)
 - [Lineax solvers](https://docs.kidger.site/lineax/api/solvers/)
 - [Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/)
 
