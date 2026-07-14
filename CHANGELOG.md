@@ -12,18 +12,25 @@ manifest and documentation.
   and all eight Samper/Bühler high-Hartmann-number rows.
 - A deterministic full-suite runner with a ten-minute hard limit and 95% branch-
   coverage floor.
-- Machine-checked architecture, feature, benchmark, workflow-disposition, and
-  release-asset manifests.
+- Machine-checked architecture budgets, benchmark provenance, and release-asset
+  index.
+- Axial JAX sharding with measured two-GPU B2 strong scaling and restart-safe
+  checkpointing.
 - One-release warnings for the legacy root namespace and a migration guide.
 
 ### Changed
 
 - Reduced the stable root API to 30 deliberate exports.
-- Curated `examples/` to 11 first-run journeys; moved research/evidence work to
-  `campaigns/` and reusable configurations to `cases/`.
+- Curated `examples/` to 11 first-run journeys and grouped reusable inputs under
+  `examples/cases/`; generated research work now stays under ignored
+  `artifacts/`.
+- Consolidated the portable suite to 40 files and 765 passing tests while
+  retaining 95.28% branch coverage and a 171.1-second six-worker gate.
+- Accepted compatible SOLVAX 0.8 releases below 1.0 instead of pinning one
+  patch version.
 - Moved 65 large generated artifacts to the checksummed
-  `lmx-research-assets-v1` GitHub release, reducing the source checkout below
-  10 MiB.
+  `lmx-research-assets-v1` GitHub release; six compressed documentation
+  derivatives remain in Git and the tracked checkout stays below 4 MiB.
 
 ### Fixed
 
