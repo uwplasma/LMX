@@ -74,8 +74,8 @@ superseded worktrees and branches.
 | Fully developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerics, conservation, and restart accepted | exact matched FreeMHD plus literature/mesh acceptance |
-| B2 ALEX square duct | fine numerical baseline converged; experimental acceptance open | resolve transverse-only versus Maxwell-consistent field with matched FreeMHD |
-| SOLVAX | 0.8.2 primal, gradient, transpose, CPU/GPU, and existing integration gates pass | remove remaining safe LMX duplicates; repeat interleaved timing |
+| B2 ALEX square duct | fine numerical baseline converged; current LMX and FreeMHD formulations are not yet equation-identical | reconcile inertia and axial drive before any matched run |
+| SOLVAX | 0.8.2 primal, gradient, transpose, CPU/GPU, and existing integration gates pass | migrate symmetric anchored Poisson PCG; repeat interleaved timing |
 | Parallel execution | two-GPU B2 numerical checkpoint shows 1.66x speedup and parity | accepted-case CPU/GPU scaling and four-device evidence |
 | Portable quality | 760 pass, 8 expected external-data skips, 95.31% branch coverage, 193.4 s | stay below 300 s target and 600 s hard limit |
 
@@ -119,15 +119,33 @@ Apply this migration sequence:
    `cyclic_tridiagonal_solve`; pipe primal, variable-coefficient dense-reference,
    and implicit-gradient gates replace the circulant-only FFT shortcut.
 4. The anchored Poisson action now projects both row and column symmetrically.
-   Complete primal, physical-residual, transpose, gradient, and high-Ha parity
-   before replacing its retained CG loop with SOLVAX PCG.
+   A dense nonuniform audit found symmetry to `8.88e-16` and a positive minimum
+   eigenvalue. Lift each preconditioner as
+   `P M(P r) + e_a e_a^T r`, route explicit nonuniform `cg` through the
+   volume-scaled formulation, then replace the retained loop with SOLVAX PCG.
+   Preserve LMX physical-residual recertification and the distinct `cg` and
+   `cg_volume` residual contracts. Translate unscaled tolerance conservatively
+   as `rtol = physical_tol / sqrt(N)`; use
+   `atol = physical_tol * min(residual_scale)` for volume-scaled solves, then
+   recompute the physical maximum norm. Gate the deletion with uniform and
+   anisotropic primal parity, RHS and coefficient gradients, transpose parity,
+   JIT, and a tiny high-Ha row.
 5. Add and release a symmetry-preserving additive-line preconditioner in SOLVAX,
-   then delete the LMX duplicate. Keep geometry adaptation in LMX.
+   then delete the two LMX averaging closures. SOLVAX's current multiplicative
+   `line_smoother` is not a PCG-safe substitute; geometry and axis adaptation
+   remain in LMX. Use a clean SOLVAX worktree from `origin/main`, because the
+   existing local checkout contains unrelated work.
+6. Treat migration of two direct SciPy sparse solves to `solvax.splu_solve` as
+   low-value cleanup after the PCG and additive-line deletions; sparse FV
+   assembly remains LMX-owned.
 
 Do not yet delegate finite-iteration autodiff Jacobi, modal B1 geometry solves,
 variable-coefficient FV assembly, physical fixed-point loops, or nonlinear
-coupling to affine/Newton–Krylov APIs. SOLVAX single-reduction PCG and sharding-
-preserving GMRES need real 1/2/4-device evidence before distributed claims.
+coupling to affine/Newton–Krylov APIs. SOLVAX single-reduction PCG and
+sharding-preserving GMRES need real 1/2/4-device evidence before distributed
+claims. Keep the accepted high-Ha fast-diagonalization/FGMRES route unchanged
+during the Poisson migration; operator symmetry alone does not establish parity
+for that specialized path.
 
 Every delegation must pass primal, residual, gradient/transpose, JIT, placement,
 memory, and repeated interleaved warm-timing gates. Delete the LMX duplicate in
@@ -135,37 +153,82 @@ the same tranche when SOLVAX passes.
 
 Keep a compatible runtime range rather than an exact SOLVAX pin or repository
 lockfile. CI tests both the minimum supported release and the newest release
-satisfying that range; release evidence records the resolved environment.
+satisfying that range; release evidence records the resolved environment. The
+installed release and current SOLVAX `origin/main` are both 0.8.2, so
+`solvax>=0.8.2,<1` currently expresses that policy without a stale exact pin.
 
 Near-term ratchets after this workstream:
 
 | Surface | Current | Next target |
 |---|---:|---:|
-| package modules | 35 | at most 34 |
-| package lines | 34,938 | below 34,750 |
-| maintained-core lines | 8,067 | below 7,900 |
-| test files / lines | 33 / 21,288 | at most 32 / below 21,100 |
+| package modules | 35 | hold; reach 34 only through real ownership deletion |
+| package lines | 34,939 | below 34,900 |
+| maintained-core lines | 8,068 | below 8,025 |
+| test files / lines | 32 / 21,291 | hold 32 / below 21,250 |
 | maintenance scripts | 19 | at most 18; reusable logic moves into `lmx/` or an existing command |
 
 Count semantic maintenance cost across the whole package; do not satisfy a
 budget through formatting or by relabelling a large module “research-stage.”
-Ratchet each enforced cap downward after an accepted migration. The first
-file-count gate is complete: one package module, one test file, and one
-maintenance script have been removed without dropping a supported workflow.
+Ratchet each enforced cap downward after an accepted migration. Mesh and
+discrete-operator tests now share one independently runnable file; further file
+removal must follow real ownership consolidation, not arbitrary merging.
+
+### Immediate execution order
+
+1. Lift the anchored preconditioner, add dense SPD and gradient gates, then
+   migrate retained Poisson CG to SOLVAX and delete the duplicate loop.
+2. Harden the FreeMHD record validator and consolidate the standalone case
+   materializer into the existing parity command; run no solver in this step.
+3. Reconcile B2 momentum advection and the axial boundary/drive contract.
+4. Prove one-/multi-device equivalence and bounded strong scaling for that path.
+5. Run the tiny matched B2-family smoke case; only a passing contract and smoke
+   can authorize medium or production B2 work.
+
+Steps 1--3 use focused tests and tiny manufactured cases. The full portable
+gate runs once after the combined tranche, not after each edit.
 
 ## Priority 3: one exact matched FreeMHD harness
 
-- Freeze equations, nondimensionalization, geometry, magnetic field, wall
-  model, boundaries, mesh mapping, drive, stopping rules, and observables.
-- Record source, input, evaluator, dependency, and output hashes for both codes.
-- Establish tiny exact cases first, then use the same harness for B2 and B1.
+- Add a machine-enforced record validator before another external run. It must
+  compare equations, nondimensional groups, geometry, field data and mapping,
+  wall properties, boundaries and drive, mesh coordinates, stopping rules,
+  observables, normalization, and source/input/evaluator/output hashes.
+- Replace the permissive boolean `exact_case_match` gate with computed contract
+  checks and an `acceptance_role`. A tiny `harness-smoke` record can test the
+  machinery but can never unlock `b2-production` acceptance.
+- Reconcile the known B2 mismatch first: LMX currently omits convective inertia
+  used by FreeMHD's finite-inertia momentum equation, and LMX stationwise
+  fixed-flow/Neumann axial treatment is not yet shown equivalent to FreeMHD's
+  inlet-flow/outlet-pressure treatment. Until both checks pass, an exact B2
+  record is impossible and no production FreeMHD run is authorized.
+- Establish one frozen, tiny B2-family case only after formulation parity, then
+  use the same harness for production B2 and B1.
 - Keep FreeMHD cases and large outputs outside the LMX repository; retain only
   compact specifications, evaluators, and accepted summaries.
+- Move reusable case materialization and hashing into `lmx.freemhd`, expose it
+  through the existing parity command, and delete the standalone materializer.
 
 Exit: an exact-case record cannot pass unless both codes demonstrably solved the
 same problem and evaluated the same observable.
 
-## Priority 4: B2 field correctness, then acceptance
+## Priority 4: parallel correctness before expensive campaigns
+
+- Make one-solve sharding, device placement, and collectives explicit for each
+  promoted solver. A process pool of independent cases is throughput, not
+  strong scaling.
+- Use tiny numerical-equivalence checks first, then repeated warm timings run
+  alone. Separate compilation, report uncertainty and memory, and require
+  identical physical observables.
+- Measure fixed-size Mac 1/2/4-device CPU scaling and office one-/two-GPU
+  scaling before launching the next medium B1/B2 campaign. Keep the same global
+  problem size; weak scaling is reported separately.
+- Treat host launch scripts and large timing records as release assets or
+  external infrastructure, not package surface.
+
+Exit: the solver path selected for the next external campaign has verified
+one-/multi-device equivalence and useful measured speedup on its target host.
+
+## Priority 5: B2 field correctness, then acceptance
 
 - Compare transverse-only and Maxwell-consistent fringe fields in tiny/coarse
   LMX and FreeMHD cases. Check field curl/divergence, conservation, steady state,
@@ -179,7 +242,7 @@ same problem and evaluated the same observable.
 Exit: B2 has source-identical three-mesh, wall/tolerance, literature, and exact
 FreeMHD evidence with frozen tolerances and a reproducible accepted record.
 
-## Priority 5: B1 external acceptance
+## Priority 6: B1 external acceptance
 
 Apply the shared exact-case protocol to the promoted retained-modal solver:
 small parity, medium mesh independence, then one final large confirmation only
@@ -188,7 +251,7 @@ keep full fields in release assets.
 
 Exit: B1 has frozen literature, mesh, conservation, and exact-FreeMHD acceptance.
 
-## Priority 6: accepted-case CPU/GPU scaling
+## Priority 7: accepted-case CPU/GPU scaling
 
 - Confirm CPU/GPU and one-/multi-device numerical equivalence before timing.
 - Separate compilation from repeated warm solves and report uncertainty, memory,
@@ -201,7 +264,7 @@ Exit: B1 has frozen literature, mesh, conservation, and exact-FreeMHD acceptance
 Exit: at least one physics-accepted production case demonstrates useful strong
 scaling with identical observables.
 
-## Priority 7: release
+## Priority 8: release
 
 Consolidate tests and scripts while preserving one bounded check per public
 capability. Build docs with warnings as errors, verify provenance and media,

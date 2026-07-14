@@ -4,17 +4,11 @@ LMX keeps source, compact reference observables, tests, and a sub-megabyte web
 media set in Git. Generated fields, meshes, full tables, and full-resolution
 media are checksummed release assets. The package wheel contains no media.
 
-## Selected results
+## Verified duct physics
 
 ![Analytical and LMX duct-flow profiles](_static/analytic_velocity_profiles.webp)
 
 ![LMX versus FreeMHD observable parity](_static/freemhd_closed_channel_observable_parity.webp)
-
-![B1 pipe reference comparison](_static/pipe_reference_comparison.webp)
-
-![GPU strong scaling](_static/strong_scaling.webp)
-
-## Movies
 
 <p align="center">
   <a href="_static/readme_hunt_startup_2d.mp4"><img src="_static/readme_hunt_startup_2d_poster.webp" alt="Hunt-flow startup movie" width="60%"></a>
@@ -24,9 +18,25 @@ The Hunt poster links to a 130 KB H.264 movie derived from the original
 10.6 MB GIF with the duration preserved (SHA-256
 `6dfcb77f5c849b9a3858ce0b82df05bae1bf0294a4111abd32798696f0a4c073`).
 
+## Fringing-field experiments
+
+![B1 pipe reference comparison](_static/pipe_reference_comparison.webp)
+
+The B1 comparison is research-stage evidence; its acceptance gates are tracked
+in the [benchmark matrix](benchmark_matrix.md).
+
+## Parallel performance
+
+![GPU strong scaling](_static/strong_scaling.webp)
+
+Compilation, numerical-equivalence, and timing conditions are reported in the
+[performance guide](performance.md).
+
+## Release-hosted research workflows
+
 The README also uses seven release-hosted derivatives so geometry, nonuniform
-fields, differentiation, magnetic obstacles, B2 evidence, and blanket transients are visible
-without enlarging the checkout. Together they are about 330 KB: WebP stills
+fields, differentiation, magnetic obstacles, B2 evidence, and blanket transients
+are visible without enlarging the checkout. Together they are about 330 KB: WebP stills
 are 28--64 KB and the H.264 movie is 72 KB. Their SHA-256 values are:
 
 - `readme-autodiff.webp`: `f2add9fe96a044a082a3b0ca28a3de50b71a0961399ac362caf2ebcaa049aa28`
