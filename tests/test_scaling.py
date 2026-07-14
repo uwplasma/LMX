@@ -9,6 +9,7 @@ import pytest
 from jax.sharding import Mesh, NamedSharding
 
 import lmx.scaling as scaling
+from examples import strong_scaling_demo
 from lmx.scaling import (
     StrongScalingRecord,
     _array_nbytes,
@@ -28,6 +29,41 @@ from examples.strong_scaling_demo import _default_visible_devices
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_scaling_demo_requires_restart_for_production() -> None:
+    with pytest.raises(SystemExit):
+        strong_scaling_demo.main(["--benchmark-kind", "extruded_solve"])
+
+
+def test_scaling_worker_command_forwards_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "record.json"
+    output.write_text("{}")
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        strong_scaling_demo.subprocess,
+        "run",
+        lambda command, **kwargs: commands.append(command),
+    )
+
+    strong_scaling_demo._run_worker(
+        python_executable="python",
+        repo_root=tmp_path,
+        output_path=output,
+        platform="CPU",
+        benchmark_kind="extruded_solve",
+        nx=8,
+        num_devices=2,
+        ny=6,
+        nz=4,
+        iterations=3,
+        repeats=1,
+        restart_path=tmp_path / "restart.npz",
+    )
+
+    assert commands[0][-2:] == ["--restart", str(tmp_path / "restart.npz")]
 
 
 def test_write_scaling_report_writes_json(tmp_path: Path):

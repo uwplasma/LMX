@@ -31,6 +31,7 @@ def _run_worker(
     iterations: int,
     repeats: int,
     profile_dir: Path | None = None,
+    restart_path: Path | None = None,
     env: dict[str, str] | None = None,
 ) -> dict[str, object]:
     command = [
@@ -54,6 +55,7 @@ def _run_worker(
         "--output",
         str(output_path),
         *(["--profile-dir", str(profile_dir)] if profile_dir is not None else []),
+        *(["--restart", str(restart_path)] if restart_path is not None else []),
     ]
     worker_env = os.environ.copy()
     if env is not None:
@@ -81,6 +83,7 @@ def run_local_cpu_scaling(
     repeats: int,
     python_executable: str,
     profile_dir: Path | None = None,
+    restart_path: Path | None = None,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
@@ -105,6 +108,7 @@ def run_local_cpu_scaling(
             profile_dir=profile_dir / f"cpu_{count}"
             if profile_dir is not None
             else None,
+            restart_path=restart_path,
         )
         records.append(record)
     return records
@@ -192,10 +196,17 @@ def run_remote_gpu_scaling(
     repeats: int,
     python_executable: str = "python3",
     profile_dir: Path | None = None,
+    restart_path: Path | None = None,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(
         repo_root=repo_root, remote_host=remote_host, remote_dir=remote_dir
     )
+    remote_restart = None
+    if restart_path is not None:
+        remote_restart = f"{remote_dir}/initial_restart.npz"
+        subprocess.run(
+            ["scp", str(restart_path), f"{remote_host}:{remote_restart}"], check=True
+        )
     local_records: list[dict[str, object]] = []
     for count in device_counts:
         visible_devices = _default_visible_devices(remote_host, count)
@@ -217,6 +228,7 @@ def run_remote_gpu_scaling(
             f"{'' if nx is None else f'--nx {nx} '}--ny {ny} --nz {nz} "
             f"--iterations {iterations} --repeats {repeats} --output {shlex.quote(remote_json)}"
             f"{profile_arg}"
+            f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
         )
         subprocess.run(["ssh", remote_host, remote_command], check=True)
         local_output = out_dir / f"gpu_{count}.json"
@@ -242,6 +254,8 @@ def run_strong_scaling_demo(
     remote_host: str | None = None,
     remote_dir: str = "/home/rjorge/tmp/lmx_scaling_repo",
     profile_dir: Path | None = None,
+    cpu_restart_path: Path | None = None,
+    gpu_restart_path: Path | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -257,6 +271,7 @@ def run_strong_scaling_demo(
         repeats=repeats,
         python_executable=python_executable,
         profile_dir=profile_dir,
+        restart_path=cpu_restart_path,
     )
     if remote_host is not None:
         records.extend(
@@ -273,6 +288,7 @@ def run_strong_scaling_demo(
                 iterations=gpu_iterations,
                 repeats=repeats,
                 profile_dir=profile_dir,
+                restart_path=gpu_restart_path,
             )
         )
 
@@ -324,6 +340,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-ny", type=int, default=96)
     parser.add_argument("--gpu-nz", type=int, default=96)
     parser.add_argument(
+        "--cpu-restart",
+        type=Path,
+        help="Validated restart matching the CPU production-solve grid.",
+    )
+    parser.add_argument(
+        "--gpu-restart",
+        type=Path,
+        help="Validated restart matching the GPU production-solve grid.",
+    )
+    parser.add_argument(
         "--profile",
         action="store_true",
         help="Collect a JAX trace for the first repeat of each worker.",
@@ -345,6 +371,12 @@ def main(argv: list[str] | None = None) -> int:
     cpu_problem = (args.cpu_nx, args.cpu_ny, args.cpu_nz)
     gpu_problem = (args.gpu_nx, args.gpu_ny, args.gpu_nz)
     if args.benchmark_kind == "extruded_solve":
+        if args.cpu_restart is None:
+            parser.error("--cpu-restart is required for --benchmark-kind extruded_solve")
+        if args.remote_host is not None and args.gpu_restart is None:
+            parser.error(
+                "--gpu-restart is required for remote extruded_solve scaling"
+            )
         if cpu_problem == (2048, 64, 64):
             cpu_problem = (48, 24, 24)
         if gpu_problem == (6144, 96, 96):
@@ -368,6 +400,8 @@ def main(argv: list[str] | None = None) -> int:
         remote_dir=args.remote_dir,
         repeats=args.repeats,
         profile_dir=args.output / "profiles" if args.profile else None,
+        cpu_restart_path=args.cpu_restart,
+        gpu_restart_path=args.gpu_restart,
     )
     return 0
 

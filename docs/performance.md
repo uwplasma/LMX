@@ -93,6 +93,17 @@ For controlled workers and machine-readable records:
 python scripts/run_strong_scaling_worker.py --help
 ```
 
+The solver-faithful example requires a validated restart matching each timed
+grid; it fails before launching workers when one is missing:
+
+```bash
+python examples/strong_scaling_demo.py --benchmark-kind extruded_solve \
+  --cpu-restart artifacts/restarts/b2_cpu.npz
+```
+
+Use `--gpu-restart` as well when `--remote-host` is set. Cold-start convergence
+belongs outside the timed strong-scaling region.
+
 Select a backend before importing JAX:
 
 ```bash
