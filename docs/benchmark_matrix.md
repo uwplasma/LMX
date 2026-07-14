@@ -90,6 +90,12 @@ are `5.781e-4` and `5.784e-4` of the frozen uncertainty; the wall-thickness
 difference is `9.26e-14`. Its curve still has weighted RMS `1.324`, weighted
 maximum `3.967`, and integrated error `0.206`, so medium numerical independence
 is closed while experimental and three-mesh acceptance remain open.
+The fine campaign (`202 x 149 x 149`) now passes baseline, doubled-iteration,
+confirmation-wall, steady, conservation, and two-shard placement gates. Its
+tight variant is preserved at a durable 48-update checkpoint with residual
+`3.4770e-5`, above the `2.5e-5` target. Bounded scalar probes either plateaued
+or oscillated, so fine numerical independence remains open pending a block or
+non-scalar outer coupling method.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

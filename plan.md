@@ -196,8 +196,14 @@ for external research use.
   Aitken with minimum relaxation 2.0 decreased monotonically to `5.9578e-5` in
   eight restart-safe updates, with charge/divergence and 231--234-iteration
   electric gates passing. The frozen B2 specification now uses that floor;
-  resume the fine continuation from the exact checkpoint. Experimental
-  acceptance remains open.
+  the resumed fine baseline passed in 28 updates and 457.37 seconds at residual
+  `4.8760e-5`. Doubled-iteration and confirmation-wall runs passed in three
+  updates each, and their observables agree to `1.76e-13` relative. The tighter
+  variant reached a durable 48-update checkpoint at `3.4770e-5`, above its
+  `2.5e-5` target. Dynamic Aitken plateaued while settled relaxation 3 and 4
+  oscillated, so scalar tuning is closed. Test one bounded block or non-scalar
+  outer method from the checksummed release checkpoint; fine numerical
+  independence and experimental acceptance remain open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

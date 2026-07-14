@@ -13,6 +13,7 @@ devices alone is not evidence of parallel execution.
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
 | B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | tolerance, iteration, wall, steady, and conservation gates pass |
+| B2 fine campaign | 2 x RTX A4000, `202 x 149 x 149` | baseline 457.37 s; iteration and wall confirmations 65.23/62.10 s | three gates pass; tight-tolerance independence remains open |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
@@ -67,7 +68,18 @@ that the previous Aitken minimum of 0.05 caused the plateau: minimum 1.0 exactly
 matched stable Picard steps, while minimum 2.0 doubled the sustained reduction.
 An eight-update restart-safe confirmation decreased monotonically to
 `5.9578e-5` in 133.93 seconds with all balance gates passing, so the frozen B2
-specification now uses a minimum relaxation of 2.0.
+specification now uses a minimum relaxation of 2.0. The resumed production
+baseline then reached `4.8760e-5` in 28 updates and 457.37 seconds. Its
+doubled-iteration and confirmation-wall variants each converged in three
+updates; their wall observables agree to `1.76e-13` relative.
+
+The tighter `2.5e-5` variant reached a durable 48-update checkpoint and latest
+recorded residual `3.4770e-5`. A dynamic Aitken probe was monotone but improved
+only about `1.53e-8` per update; settled relaxation 3 and 4 oscillated. Scalar
+tuning is therefore bounded and rejected. The 115 MiB restart and raw records
+are release assets; the next fine-grid task is one block or non-scalar outer
+coupling method from that exact checkpoint. Until it passes, fine numerical
+independence and experimental acceptance remain open.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.

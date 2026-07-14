@@ -96,8 +96,10 @@ large solve/restart gate passed. No B1 environment switch is required.
 B2 supports named axial sharding. On two RTX A4000 GPUs the fixed-size scaling
 gate improves from 36.96 s to 22.23 s. The fine-checkpoint transverse Galerkin
 gate separately reduces electric iterations 5.18x and matched two-update time
-1.87x with equivalent fields and residuals. These are solver and scaling
-results, not experimental validation.
+1.87x with equivalent fields and residuals. The resulting fine baseline plus
+doubled-iteration and wall confirmations pass; its tighter-tolerance variant
+remains open. These are solver and numerical results, not experimental
+validation.
 
 ## Limitations
 

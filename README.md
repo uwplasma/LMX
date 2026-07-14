@@ -178,8 +178,10 @@ the current host has only two GPUs.
 On the fine `202 x 149 x 149` checkpoint, shard-local transverse Galerkin fast
 diagonalization reduces electric PCG from 1,200/1,200 to 232/231 iterations and
 matched two-update time from 183.37 to 98.12 seconds (`1.87x`) with identical
-field norms and residual histories. This is a solver promotion; experimental
-ALEX acceptance still requires the completed fine continuation.
+field norms and residual histories. The resumed fine baseline then passed in
+457.37 seconds, and its doubled-iteration and wall confirmations passed. The
+tighter-tolerance variant is checkpointed at `3.4770e-5`; fine numerical
+independence and experimental ALEX acceptance therefore remain open.
 The axisymmetric `101 x 64 x 128` ALEX B1 pipe path now uses an exact batched
 FFT line in periodic `theta`: its checkpointed 133-update campaign completes in
 `2860.11 s` on one A4000, below the one-hour cap and `4.30x` faster than the

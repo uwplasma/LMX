@@ -23,8 +23,9 @@ are authoritative when prose and results differ.
   large-grid pressure convergence pass; experimental pressure agreement and
   the final mesh/observable acceptance record remain open.
 - ALEX B2 square-duct fringing flow: conservation, two-GPU numerical
-  equivalence, and the 1.87x fine-checkpoint solver promotion pass;
-  experimental validation remains open.
+  equivalence, the 1.87x fine-checkpoint solver promotion, and fine baseline,
+  doubled-iteration, and wall gates pass; tight-tolerance independence and
+  experimental validation remain open.
 - Q2D turbulence, magnetic-obstacle, mapped blanket, and Dean-vortex workflows
   provide model or adapter checks but do not yet support quantitative claims.
 
