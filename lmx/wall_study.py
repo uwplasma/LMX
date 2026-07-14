@@ -34,7 +34,6 @@ from .units import (
     hartmann_number,
     interaction_parameter,
     magnetic_reynolds_number,
-    normal_leakage_ratio,
     reynolds_number,
     wall_conductance_ratio,
 )

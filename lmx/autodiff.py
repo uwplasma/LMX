@@ -116,7 +116,6 @@ def _extruded_rect_response_history_from_field_scale(
         u, phi = solve_differentiable_hartmann(problem.base_problem, forcing=forcing_value, hartmann_number=bz_slice[0, 0])
         dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
         uxb_y = -u * bz_slice
-        jx = jnp.zeros_like(u)
         jy = sigma[0] * (-dphi_dy + uxb_y)
         jz = sigma[0] * (-dphi_dz)
         div_j = jnp.gradient(jy, float(jnp.mean(mesh.dy)), axis=0) + jnp.gradient(jz, float(jnp.mean(mesh.dz)), axis=1)
@@ -770,7 +769,6 @@ def extruded_rect_projection_iteration_history(
         uxb_z = jnp.zeros_like(u)
         jx = sigma * (-dphi_dx + uxb_x)
         jy = sigma * (-dphi_dy + uxb_y)
-        jz = sigma * (-dphi_dz + uxb_z)
         lorentz_x = jy * bz
         lorentz_y = -jx * bz
         lorentz_z = jnp.zeros_like(u)

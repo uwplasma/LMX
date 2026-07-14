@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import write_paraview
-from .physics import build_material_fields, magnetic_field_components
+from .physics import build_material_fields
 from .plotting import write_case_overview_plots
 from .reference_data import default_closed_channel_reference_root
 from .solvers import solve_steady
@@ -58,7 +58,6 @@ def solve_case_snapshots(
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
     target_mean_velocity = solvers._target_mean_velocity(case)
-    reference_mean_velocity = solvers._reference_mean_velocity(case)
     potential_solver = solvers._resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     interpolate_direct_fluid_walls = not bool(materials.fluid_mask.all())
     (
@@ -171,7 +170,6 @@ def solve_case_snapshots(
                     "mean_velocity": float(mean_velocity),
                     "applied_forcing": float(applied_forcing),
                     "pressure_proxy": float(pressure_proxy),
-                    "fluid_mask": materials.fluid_mask,
                     "mesh": mesh,
                 }
             )

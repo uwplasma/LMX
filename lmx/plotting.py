@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -369,8 +368,6 @@ def _add_layer_annotations(
     show_side_layers: bool,
     case_hint: str = "",
 ) -> None:
-    y0, y1 = float(mesh.y_faces[0]), float(mesh.y_faces[-1])
-    z0, z1 = float(mesh.z_faces[0]), float(mesh.z_faces[-1])
     case_hint = case_hint.lower()
     side_label = "Side layers"
     hartmann_vertical = "hunt" in case_hint or "shercliff" in case_hint
@@ -509,7 +506,6 @@ def write_transient_movies(
     mesh = frames[0]["mesh"]
     display_fields, frame_peaks, movie_label, colorbar_label = _movie_field_stack(frames, field_mode=field_mode)
     raw_u_fields = [np.asarray(frame["u"], dtype=float) for frame in frames]
-    u_stack = jnp.asarray(np.stack(display_fields))
     fluid_mask = jnp.asarray(frames[0].get("fluid_mask", jnp.ones_like(display_fields[0], dtype=bool)))
 
     def _symmetrize(field: np.ndarray) -> np.ndarray:
@@ -609,8 +605,6 @@ def write_transient_movies(
             show_side_layers=show_side_layers,
             case_hint=case_title,
         )
-        mid_z = int(len(mesh.z_centers) // 2)
-        mid_y = int(len(mesh.y_centers) // 2)
         y_profile_coord, current_y_profile = _profile_data(0, "y")
         z_profile_coord, current_z_profile = _profile_data(0, "z")
         peak_profile = max(frame_peaks[0], 1.0e-12)
@@ -743,7 +737,6 @@ def write_transient_movies(
         fig3d = plt.figure(figsize=(7.4, 5.8), constrained_layout=True)
         ax3d = fig3d.add_subplot(111, projection="3d")
         cmap_obj = plt.get_cmap(cmap)
-        x_plane = 0.42 * x_extent
 
         def update_3d(index: int):
             ax3d.cla()
@@ -896,7 +889,6 @@ def write_cross_section_field_plots(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     yy, zz = np.meshgrid(y, z, indexing="ij")
-    bx = field[..., 0]
     by = field[..., 1]
     bz = field[..., 2]
     bmag = np.sqrt(np.sum(field**2, axis=-1))
@@ -1530,7 +1522,6 @@ def write_magnetic_obstacle_benchmark_plots(
     z_edges = _centers_to_edges(z)
 
     u_peak = np.asarray(bundle.u[peak_index], dtype=float)
-    u_ref_peak = np.asarray(reference_bundle.u[peak_index], dtype=float)
     y_cut = np.asarray(bundle.u[peak_index, :, mid_z], dtype=float)
     y_cut_ref = np.asarray(reference_bundle.u[peak_index, :, mid_z], dtype=float)
     z_cut = np.asarray(bundle.u[peak_index, mid_y, :], dtype=float)
@@ -2290,7 +2281,6 @@ def write_interface_verification_plots(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    resolution = np.asarray([float(item["resolution"]) for item in records], dtype=float)
     spacing = np.asarray([float(item["max_spacing"]) for item in records], dtype=float)
     profile_error = np.asarray([float(item["profile_l2_error"]) for item in records], dtype=float)
     flux_error = np.asarray([float(item["flux_error"]) for item in records], dtype=float)

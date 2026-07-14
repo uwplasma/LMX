@@ -14,7 +14,6 @@ import numpy as np
 
 from .core import Solution
 from .mesh import StructuredMesh
-from .operators import center_coordinates
 from .reference_data import (
     ClosedChannelAnalyticalReference,
     ProcessedSliceReference,

@@ -225,7 +225,6 @@ def solve_wham_blanket_transient_flow(
     properties = flow["properties"]
     flow_settings = flow["settings"]
     radius = float(geometry.pipe_radius)
-    diameter = 2.0 * radius
     rho = float(properties.density)
     mu = float(properties.dynamic_viscosity)
     sigma = float(properties.electrical_conductivity)
@@ -694,8 +693,6 @@ def write_wham_blanket_flow_plots(
     _set_flow_plot_style()
 
     station = np.asarray(flow["station"], dtype=float)
-    centerline = flow["centerline"]
-    geometry = flow["geometry"]
     metrics = flow["metrics"]
     pressure = np.asarray(flow["cumulative_pressure_drop"], dtype=float)
     b_perp = np.asarray(flow["b_perp"], dtype=float)

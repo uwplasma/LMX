@@ -100,7 +100,7 @@ class StreamingSolverLogger:
             self._write("=" * width)
             self._write(f"{'LMX Solver Run':^{width}}")
             self._write("=" * width)
-        self._write(f"Create time")
+        self._write("Create time")
         self._write(f"Create mesh for case        : {case.name}")
         solver = getattr(case, "solver", None)
         solver_kind = getattr(solver, "kind", "fully_developed_inductionless")
@@ -258,7 +258,7 @@ class StreamingSolverLogger:
             return
         elapsed = time.perf_counter() - self._start_time
         self._write("-" * 92)
-        self._write(f"End")
+        self._write("End")
         self._write(f"Final time                    : {solution.state.time:.6e}")
         self._write(f"Final residual                : {solution.state.residual:.6e}")
         self._write(f"Output case                   : {solution.case_name}")
