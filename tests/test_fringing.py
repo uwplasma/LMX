@@ -138,6 +138,121 @@ def test_axial_mean_preconditioner_exactly_inverts_its_galerkin_space():
     assert precondition(rhs) == pytest.approx(field)
 
 
+def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
+    nx, cross = 12, 18
+    bounds = (3, 15, 3, 15)
+    spacing = jnp.concatenate(
+        (jnp.full(3, 0.02 / 3.0), jnp.full(12, 2.0 / 12.0), jnp.full(3, 0.02 / 3.0))
+    )
+    mask = jnp.zeros((nx, cross, cross), dtype=bool)
+    mask = mask.at[:, 3:15, 3:15].set(True)
+    conductivity = jnp.where(mask, 1.0, 3.5)
+    x = jnp.linspace(0.0, 1.0, nx)[:, None, None]
+    y = jnp.linspace(-1.0, 1.0, cross)[None, :, None]
+    z = jnp.linspace(-1.0, 1.0, cross)[None, None, :]
+    expected = (
+        jnp.sin(2.0 * jnp.pi * x)
+        * jnp.cos(0.5 * jnp.pi * y)
+        * jnp.cos(0.5 * jnp.pi * z)
+    )
+    coefficients = fringing_impl._variable_diffusion_coefficients_3d(
+        conductivity,
+        dx=0.1,
+        dy=spacing,
+        dz=spacing,
+        validated_spacing=True,
+        thin_wall_fluid_mask=mask,
+    )
+    neighbors = fringing_impl._neighbor_fields(
+        expected, mode_x="neumann", mode_y="neumann", mode_z="neumann"
+    )
+    rhs = sum(
+        coefficient * (neighbor - expected)
+        for coefficient, neighbor in zip(coefficients, neighbors, strict=True)
+    )
+
+    baseline = _solvax_pressure_poisson_duct(
+        rhs,
+        conductivity,
+        dx=0.1,
+        dy=spacing,
+        dz=spacing,
+        iterations=200,
+        tolerance=1.0e-10,
+        thin_wall_fluid_mask=mask,
+    )
+    accelerated = _solvax_pressure_poisson_duct(
+        rhs,
+        conductivity,
+        dx=0.1,
+        dy=spacing,
+        dz=spacing,
+        iterations=200,
+        tolerance=1.0e-10,
+        thin_wall_fluid_mask=mask,
+        transverse_coarse_bounds=bounds,
+    )
+
+    assert bool(accelerated[2])
+    assert int(accelerated[4]) < 0.75 * int(baseline[4])
+    assert accelerated[0] == pytest.approx(baseline[0], abs=5.0e-9)
+
+    volume = jnp.broadcast_to(
+        spacing[None, :, None] * spacing[None, None, :], conductivity.shape
+    )
+    correction = fringing_impl._transverse_modal_correction_3d(
+        volume,
+        conductivity,
+        coefficients,
+        dx=0.1,
+        dy=spacing,
+        dz=spacing,
+        fluid_bounds=bounds,
+        stride=2,
+    )
+    left = jnp.sin(jnp.arange(expected.size, dtype=float)).reshape(expected.shape)
+    right = jnp.cos(jnp.arange(expected.size, dtype=float)).reshape(expected.shape)
+    assert jnp.vdot(left, correction(right)) == pytest.approx(
+        jnp.vdot(correction(left), right), rel=1.0e-10, abs=1.0e-10
+    )
+    assert float(jnp.vdot(left, correction(left))) > 0.0
+
+    mesh = fringing_impl.Mesh(np.asarray(jax.devices()[:1]), ("x",))
+    sharding = fringing_impl.NamedSharding(mesh, fringing_impl.P("x", None, None))
+    sharded_correction = fringing_impl._transverse_modal_correction_3d(
+        volume,
+        conductivity,
+        coefficients,
+        dx=0.1,
+        dy=spacing,
+        dz=spacing,
+        fluid_bounds=bounds,
+        stride=2,
+        sharding=sharding,
+    )
+    assert sharded_correction(jax.device_put(right, sharding)) == pytest.approx(
+        correction(right), rel=1.0e-10, abs=1.0e-10
+    )
+
+    def objective(amplitude):
+        field, *_ = _solvax_pressure_poisson_duct(
+            amplitude * rhs,
+            conductivity,
+            dx=0.1,
+            dy=spacing,
+            dz=spacing,
+            iterations=200,
+            tolerance=1.0e-10,
+            thin_wall_fluid_mask=mask,
+            transverse_coarse_bounds=bounds,
+        )
+        return jnp.mean(field**2)
+
+    value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
+    assert jnp.isfinite(gradient)
+    assert gradient == pytest.approx(2.0 * value, rel=1.0e-6)
+
+
 def test_duct_solvers_forward_single_reduction_to_solvax(
     monkeypatch: pytest.MonkeyPatch,
 ):

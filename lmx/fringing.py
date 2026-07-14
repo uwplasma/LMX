@@ -12,6 +12,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.fft import dct, idct
+from jax.scipy.linalg import solve_triangular
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
     KrylovSolution,
@@ -1222,6 +1223,162 @@ def _axial_mean_preconditioner_3d(
     return apply
 
 
+def _region_interpolation(
+    widths: jnp.ndarray,
+    lower: int,
+    upper: int,
+    stride: int,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, int]:
+    """Build physical-coordinate interpolation without crossing an interface."""
+
+    centers = jnp.cumsum(widths) - 0.5 * widths
+    left_parts = []
+    right_parts = []
+    weight_parts = []
+    offset = 0
+    for start, stop in ((0, lower), (lower, upper), (upper, widths.size)):
+        size = stop - start
+        count = max(1, math.ceil(size / stride))
+        local_widths = widths[start:stop]
+        local_centers = centers[start:stop]
+        groups = jnp.minimum(jnp.arange(size) * count // size, count - 1)
+        coarse_widths = (
+            jnp.zeros(count, dtype=widths.dtype).at[groups].add(local_widths)
+        )
+        coarse_centers = (
+            jnp.zeros(count, dtype=widths.dtype)
+            .at[groups]
+            .add(local_widths * local_centers)
+            / coarse_widths
+        )
+        high = jnp.clip(jnp.searchsorted(coarse_centers, local_centers), 1, count - 1)
+        high = jnp.where(count == 1, 0, high)
+        low = jnp.where(count == 1, 0, high - 1)
+        span = jnp.where(count == 1, 1.0, coarse_centers[high] - coarse_centers[low])
+        left_parts.append(low + offset)
+        right_parts.append(high + offset)
+        weight_parts.append(
+            jnp.clip((local_centers - coarse_centers[low]) / span, 0.0, 1.0)
+        )
+        offset += count
+    return (
+        jnp.concatenate(left_parts),
+        jnp.concatenate(right_parts),
+        jnp.concatenate(weight_parts),
+        offset,
+    )
+
+
+def _transverse_modal_correction_3d(
+    volume: jnp.ndarray,
+    coefficient: jnp.ndarray,
+    coefficients: tuple[jnp.ndarray, ...],
+    *,
+    dx: float,
+    dy: jnp.ndarray,
+    dz: jnp.ndarray,
+    fluid_bounds: tuple[int, int, int, int],
+    stride: int,
+    sharding: NamedSharding | None = None,
+):
+    """Return a shard-local fast-diagonalization Galerkin correction.
+
+    A DCT diagonalizes each local Neumann axial block. One generalized
+    transverse eigendecomposition then inverts every axial mode, avoiding a
+    dense factorization per mode and all communication inside the correction.
+    """
+
+    nx = volume.shape[0]
+    y0, y1, z0, z1 = fluid_bounds
+    yl, yr, yw, ncy = _region_interpolation(dy, y0, y1, stride)
+    zl, zr, zw, ncz = _region_interpolation(dz, z0, z1, stride)
+    coarse_shape = (nx, ncy, ncz)
+    coarse_cross_shape = coarse_shape[1:]
+    coarse_cross_zero = jnp.zeros(coarse_cross_shape, dtype=volume.dtype)
+    yw = yw[:, None]
+    zw = zw[None, :]
+
+    def prolong_cross(coarse: jnp.ndarray) -> jnp.ndarray:
+        fine_y = (1.0 - yw) * coarse[yl, :] + yw * coarse[yr, :]
+        return (1.0 - zw) * fine_y[:, zl] + zw * fine_y[:, zr]
+
+    def restrict_cross(fine: jnp.ndarray) -> jnp.ndarray:
+        return jax.linear_transpose(prolong_cross, coarse_cross_zero)(fine)[0]
+
+    volume_cross = volume[0]
+
+    def transverse_matvec(field: jnp.ndarray) -> jnp.ndarray:
+        south, north, bottom, top = _neighbor_fields(
+            field[None], mode_x="neumann", mode_y="neumann", mode_z="neumann"
+        )[2:]
+        diffusion = (
+            coefficients[2][0] * (south[0] - field)
+            + coefficients[3][0] * (north[0] - field)
+            + coefficients[4][0] * (bottom[0] - field)
+            + coefficients[5][0] * (top[0] - field)
+        )
+        return -volume_cross * diffusion
+
+    def galerkin(apply: Callable[[jnp.ndarray], jnp.ndarray], coarse: jnp.ndarray):
+        return restrict_cross(apply(prolong_cross(coarse)))
+
+    coarse_size = ncy * ncz
+    basis = jnp.eye(coarse_size, dtype=volume.dtype).reshape((coarse_size, ncy, ncz))
+    stiffness = jax.vmap(
+        lambda column: galerkin(transverse_matvec, column).reshape(-1)
+    )(basis).T
+    mass = jax.vmap(
+        lambda column: galerkin(
+            lambda field: volume_cross * coefficient[0] * field / dx**2,
+            column,
+        ).reshape(-1)
+    )(basis).T
+    mass_factor = jnp.linalg.cholesky(0.5 * (mass + mass.T))
+    whitened_left = solve_triangular(mass_factor, stiffness, lower=True)
+    whitened = solve_triangular(mass_factor, whitened_left.T, lower=True).T
+    eigenvalues, modes = jnp.linalg.eigh(0.5 * (whitened + whitened.T))
+    inverse_modes = solve_triangular(mass_factor.T, modes, lower=False)
+    coarse_volume = restrict_cross(volume_cross).reshape(-1)
+    whitened_gauge = solve_triangular(mass_factor, coarse_volume, lower=True)
+    gauge_eigenvalue = jnp.dot(modes[:, 0], whitened_gauge) ** 2 / jnp.sum(volume_cross)
+
+    partitions = 1 if sharding is None else sharding.mesh.size
+    local_nx = nx // partitions
+    axial_eigenvalues = 2.0 - 2.0 * jnp.cos(
+        jnp.pi * jnp.arange(local_nx, dtype=volume.dtype) / local_nx
+    )
+    denominators = axial_eigenvalues[:, None] + jnp.maximum(eigenvalues[None], 0.0)
+    denominators = denominators.at[0, 0].add(gauge_eigenvalue)
+
+    def solve_local(rhs: jnp.ndarray) -> jnp.ndarray:
+        transformed = dct(rhs, type=2, axis=0, norm="ortho").reshape(local_nx, -1)
+        spectral = transformed @ inverse_modes
+        solved = (spectral / denominators) @ inverse_modes.T
+        return idct(solved.reshape((local_nx, ncy, ncz)), type=2, axis=0, norm="ortho")
+
+    coarse_solve = solve_local
+    if sharding is not None:  # pragma: no cover - exercised by hardware gates
+        coarse_solve = jax.shard_map(
+            solve_local,
+            mesh=sharding.mesh,
+            in_specs=sharding.spec,
+            out_specs=sharding.spec,
+            check_vma=False,
+        )
+    coarse_zero = jnp.zeros(coarse_shape, dtype=volume.dtype)
+
+    def prolong(coarse: jnp.ndarray) -> jnp.ndarray:
+        return jax.vmap(prolong_cross)(coarse)
+
+    def restrict(fine: jnp.ndarray) -> jnp.ndarray:
+        return jax.linear_transpose(prolong, coarse_zero)(fine)[0]
+
+    def apply(residual: jnp.ndarray) -> jnp.ndarray:
+        return prolong(coarse_solve(restrict(residual)))
+
+    return apply
+
+
 def _finalize_local_pressure_solve(
     solution,
     *,
@@ -1318,6 +1475,8 @@ def _solvax_pressure_poisson_duct(
     single_reduction: bool = False,
     include_axial_line: bool = True,
     thin_wall_fluid_mask: jnp.ndarray | None = None,
+    transverse_coarse_bounds: tuple[int, int, int, int] | None = None,
+    field_sharding: NamedSharding | None = None,
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -1382,12 +1541,34 @@ def _solvax_pressure_poisson_duct(
     if not include_axial_line:
         directions = directions[1:]
     line_precondition = _additive_line_preconditioner_3d(diagonal, directions)
-    axial_precondition = _axial_mean_preconditioner_3d(
-        volume, coef_x_w, coef_x_e
-    )
+    axial_precondition = _axial_mean_preconditioner_3d(volume, coef_x_w, coef_x_e)
 
     def precondition(residual):
         return line_precondition(residual) + axial_precondition(residual)
+
+    if transverse_coarse_bounds is not None:
+        fluid_cells = min(
+            transverse_coarse_bounds[1] - transverse_coarse_bounds[0],
+            transverse_coarse_bounds[3] - transverse_coarse_bounds[2],
+        )
+        coarse_correction = _transverse_modal_correction_3d(
+            volume,
+            mobility,
+            coefficients,
+            dx=dx,
+            dy=dy_widths,
+            dz=dz_widths,
+            fluid_bounds=transverse_coarse_bounds,
+            stride=max(2, math.ceil(fluid_cells / 13)),
+            sharding=field_sharding,
+        )
+
+        def precondition(residual):
+            return (
+                line_precondition(residual)
+                + axial_precondition(residual)
+                + coarse_correction(residual)
+            )
 
     linear_rhs = -volume * rhs_compatible
     effective_rtol = tolerance
@@ -7154,6 +7335,8 @@ def _solve_extruded_projection(
                 single_reduction=field_sharding is not None,
                 include_axial_line=use_axial_line_preconditioner,
                 thin_wall_fluid_mask=mask,
+                transverse_coarse_bounds=fluid_bounds,
+                field_sharding=field_sharding,
             )
 
         def emf_operator(conductivity, emf_x, emf_y, emf_z, mask):
