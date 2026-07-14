@@ -80,6 +80,10 @@ tolerance, doubled-iteration, and confirmation-wall gates. Its coarse ALEX
 curve alone does not pass the frozen literature limits (`weighted RMS 1.226`,
 `weighted max 3.594`, integrated error `0.138`), so it is correctly retained as
 mesh evidence rather than promoted as an experimental result.
+The current-source medium baseline (`152 x 113 x 113`) also passes its physics
+gates on two actual GPU shards. Its persisted-restart curve has weighted RMS
+`1.324`, weighted maximum `3.967`, and integrated error `0.206`; the medium
+independence variants must finish before this becomes acceptance evidence.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

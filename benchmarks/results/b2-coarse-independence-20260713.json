@@ -20,6 +20,32 @@
     "weighted_rms": 1.2261869179951794
   },
   "mesh_level": "coarse",
+  "medium_baseline_followup": {
+    "acceptance_scope": "baseline physics and persisted-observable gate only; medium independence remains open",
+    "actual_spatial_shards": 2,
+    "commit": "59e31bf",
+    "diagnostics": {
+      "max_charge_balance_residual": 0.00012040138244628906,
+      "max_divergence_residual": 1.2336584385500856e-06,
+      "max_residual": 4.874009410849034e-05,
+      "net_boundary_current_residual": 4.128341631684664e-15,
+      "volumetric_flow_rate_span": 1.0658141036401503e-13
+    },
+    "initialization_sha256": "b7b3cbad1b6885deb35b8861c9fcc4717d86b3d1cdeb6b4d8afac0d8ba40c4d5",
+    "literature_diagnostic": {
+      "integrated_pressure_relative_error": 0.20613096897044395,
+      "weighted_linf": 3.9672023642492404,
+      "weighted_rms": 1.3244724151031773
+    },
+    "observable_restart_max_absolute_difference": 0.0,
+    "record_sha256": "e0dd4f16bcf774e516bc903176ca342e95e5d564c25bb37565ba5952cc0eb244",
+    "restart_sha256": "38f6bf50d2473576f86bd8d16ba6ac9676eaf3aed0968c43217402f13f454ca9",
+    "runtime_seconds": 86.51535673503531,
+    "shape": [152, 113, 113],
+    "source_fingerprint": "a90ccdc82327f4d230bc1425241779d233c68118c4c5fd1f72a82942a1da99cf",
+    "spatial_device_ids": ["cuda:0", "cuda:1"],
+    "summary_sha256": "b71b498407036b58abe5b6bbf7bacab1ff000c205fa8509de4dc8dd33972f8c2"
+  },
   "shape": [101, 77, 77],
   "source_fingerprint": "addc08a477703e36f4cd727bf5da29cbe0c44f6b2be919fb9e1613dac59989ab",
   "variants": [

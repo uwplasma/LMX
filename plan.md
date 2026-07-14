@@ -165,6 +165,10 @@ for external research use.
 - B2 coarse independence: all steady, conservation, tolerance, iteration, and
   confirmation-wall gates pass on current source; the coarse ALEX curve remains
   outside the frozen literature limits, so medium/fine refinement is required.
+- B2 medium baseline: the `152 x 113 x 113` state passes steady and conservation
+  gates on two real GPU shards in 86.52 seconds from its converged restart. The
+  acceptance curve is now reloaded from the checksummed restart and agrees
+  exactly; medium variants, fine refinement, and matched FreeMHD remain open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.
