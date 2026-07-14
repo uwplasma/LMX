@@ -44,10 +44,21 @@ momentum = "transient incompressible Navier-Stokes-Lorentz"
 inertia = "conservative div(rhoPhi,U)"
 time_discretization = "Euler"
 advection_discretization = "Gauss limitedLinear 1.0"
+advection_assembly = "implicit fvm::div with frozen rhoPhi and limiter weights"
+advection_vector_limiter = "single magSqr(U) limiter applied to all components"
+gradient_discretization = "cellLimited leastSquares 1.0"
 viscous_stress = "laminar divDevRhoReff"
 electric_model = "inductionless Ohm law with div(J)=0"
 phase_reduction = "alpha=1 invariant"
 thermal_reduction = "constant temperature and properties"
+
+[free_mhd_discretization_reference]
+repository_commit = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
+openfoam_release = "v2206"
+momentum_source = "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H"
+limiter_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.H"
+nvd_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/NVDTVD.H"
+vector_transform_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitFuncs.C"
 
 [matched_contract.shared.nondimensional_groups]
 hartmann_number = 6600.0

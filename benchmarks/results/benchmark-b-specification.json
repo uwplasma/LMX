@@ -38,7 +38,7 @@
         "alex-results-1987"
       ],
       "spec_path": "benchmarks/specs/alex-b1-pipe.toml",
-      "spec_sha256": "dc5fb921bb60870b776af9675d76d31b234edfbe71b6250d763901f2806e5322",
+      "spec_sha256": "099548128ceb0a6cda095feace3767c90c962f9d0b8022cbd9a9f1471b9c9bf1",
       "tolerances_frozen_before_production": true
     },
     {
@@ -78,7 +78,7 @@
         "alex-results-1987"
       ],
       "spec_path": "benchmarks/specs/alex-b2-square.toml",
-      "spec_sha256": "df88bd628cc6f68343a5fceb63e7b480e631099b919b1a1b9b56ff9281580d46",
+      "spec_sha256": "636981dea15001db6e4347ce993a8a9060fcbab932c1bbfa27c8f29d3c85afd6",
       "tolerances_frozen_before_production": true
     }
   ],

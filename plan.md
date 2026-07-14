@@ -70,7 +70,7 @@ superseded worktrees and branches.
 | README/docs | 709-word feature-led README, sourced comparison table, feature-specific compressed media | refresh only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | independent input observers, then canonical smoke role |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish canonical B2, then independent input observers and the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | old fine-grid and two-GPU results are diagnostic for the superseded no-inertia, stationwise-flow formulation | implement canonical inertia and axial boundaries |
 | SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition | pursue only gated ownership deletions |
@@ -87,9 +87,16 @@ The final audit freezes these interpretations:
   prerequisite unless the contract is deliberately reopened.
 - The previous B2 convergence and 1.66x two-GPU measurements do not validate or
   scale the new canonical path.
-- FreeMHD uses conservative `div(rhoPhi,U)` inertia, Euler time integration,
-  `Gauss limitedLinear 1.0`, inlet integral flow, and an outlet pressure gauge;
-  the matched reduction also requires zero normal current at both axial ends.
+- FreeMHD v2206 uses implicit conservative `fvm::div(rhoPhi,U)` inertia and
+  Euler time integration. `Gauss limitedLinear 1.0` on vector `U` is one
+  `magSqr(U)`-derived scalar limiter applied to every velocity component; its
+  limiter gradient is `cellLimited leastSquares 1.0`. A componentwise MUSCL
+  approximation or explicit convection source is not exact parity.
+- The same pressure-corrected, oriented, area-integrated mass flux must feed
+  projection and momentum convection. The inlet constrains one integral flow,
+  the outlet fixes pressure and extrapolates velocity, walls have zero normal
+  mass flux, and the matched electric reduction has zero normal current at
+  both axial ends.
 - No medium or production FreeMHD run is authorized until a tiny exact smoke
   proves those semantics in both codes.
 
@@ -99,34 +106,42 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
 
 ## Immediate execution order
 
-1. **Complete:** regenerate provenance for the canonical-contract tranche and
-   pass the complete portable gate (superseded by the 782-pass schema-2 gate).
-2. **Complete:** split canonical contracts into immutable shared physics and
-   role-specific mesh/stopping sections; schema 2 recomputes deterministic
-   file/tree artifacts and blocks acceptance until independent observers exist.
-3. Implement the complete canonical B2 formulation with tiny tests first:
-   projection-consistent conservative advection, frozen discretization,
-   inlet-flow/outlet-pressure boundaries, and axial electric closure. Delete
-   the obsolete B2 stationwise projection path in the same tranche.
-4. Materialize both tiny inputs, derive their contracts independently, then
-   freeze the smoke mesh, mapped field, time step, iterations, and stopping
-   rules only after their exact mapping and bounded convergence are audited.
-5. Run affected modules, then one portable gate. Commit and push before the
+1. **Complete:** schema 2, real artifact verification, provenance, and the
+   782-pass portable gate at 95.30% branch coverage in 162.8 seconds.
+2. **Complete:** re-audit FreeMHD v2206 limiter, implicit momentum assembly,
+   mixed axial boundaries, SOLVAX v0.8.3 ownership, and sharding constraints.
+3. Freeze the missing `cellLimited leastSquares 1.0` gradient contract and its
+   pinned source evidence. This contract-only change precedes solver claims.
+4. Implement and prove the B2 mixed projection on a `4x2x2` manufactured
+   problem: inlet pressure Neumann, outlet pressure Dirichlet at the half-cell
+   face, one inlet flow constraint, no compatibility or gauge projection.
+5. Implement the exact v2206 limited-linear face weights and conservative
+   matrix action on a `7x7x3` manufactured problem. Keep corrected face fluxes
+   fused/internal and prove conservation, scaling, JIT, and JVP.
+6. Combine frozen convection weights with diffusion in a nonsymmetric B2
+   momentum operator. Gate SOLVAX GMRES plus `linear_solve` against a tiny
+   dense matrix, residual, transpose/gradient, JIT, and placement reference.
+7. Integrate the canonical B2 step, zero-normal-current axial closure, restart
+   identity, and CFL/stopping diagnostics. Delete the obsolete stationwise
+   projection and pressure-response plumbing in the same green tranche.
+8. Materialize both tiny inputs, derive their contracts independently, then
+   freeze smoke mesh, mapped field, time step, iterations, and stopping rules.
+9. Run affected modules, then one portable gate. Commit and push before the
    external smoke.
-6. Extend the existing parity command to run one exact tiny B2 smoke. Compare
+10. Extend the existing parity command to run one exact tiny B2 smoke. Compare
    mass/current closure, stopping, hashes, and the same pressure observable. A
-   failure returns to step 3.
-7. Replace the dense axial coarse inverse with the audited O(nx) SOLVAX
+   failure returns to the first failed tiny gate.
+11. Replace the dense axial coarse inverse with the audited O(nx) SOLVAX
    tridiagonal/gauge decomposition and prove dense, gradient, and placement
    parity on tiny grids.
-8. Prove one-/multi-device equivalence on that accepted tiny path, then measure
+12. Prove one-/multi-device equivalence on that accepted tiny path, then measure
    fixed-size Mac 1/2/4-device CPU and office one-/two-GPU warm timings alone.
-9. Advance B2 one level at a time: exact coarse comparison first, then medium
+13. Advance B2 one level at a time: exact coarse comparison first, then medium
    and fine only if literature, FreeMHD, conservation, restart, wall, and
    tolerance gates pass for the correct reason.
-10. Refresh the README/docs from compact accepted records without rerunning
+14. Refresh the README/docs from compact accepted records without rerunning
    solvers; then apply the proven harness/formulation path to B1.
-11. Complete the release gate.
+15. Complete the release gate.
 
 ## Gate 1: authoritative matched harness
 
@@ -135,14 +150,17 @@ specification; equality between two submitted dictionaries is insufficient.
 It rejects the legacy `exact_case_match` flag and prevents a smoke role from
 self-promoting.
 
+Completed foundation:
+
+- Equations, groups, geometry family, wall model, field mapping, boundary
+  semantics, observable, and normalization live in immutable shared sections;
+  roles supply only mesh coordinates and stopping rules.
+- Schema 2 resolves file/tree artifacts beneath an explicit root, rejects
+  escapes, aliases, links, overlaps, missing/empty inputs, and type mismatches,
+  and recomputes deterministic hashes from their contents.
+
 Remaining work:
 
-- Store equations, groups, geometry family, wall model, field mapping, boundary
-  semantics, observable, and normalization once as immutable shared sections;
-  roles may supply only mesh coordinates and stopping rules.
-- Bump matched records to schema 2. Resolve file/tree artifacts beneath an
-  explicit root, reject escapes, symlinks, duplicates, missing/empty inputs,
-  and type mismatches, and recompute deterministic hashes from their contents.
 - Freeze the B2 smoke mesh and stopping contract only after the canonical
   solver and both materializers exist. Time step, iteration caps, correctors,
   and fixed step count are candidates—not evidence—until then.
@@ -165,8 +183,10 @@ acceptance.
 
 Implement the frozen formulation without changing legacy generic behavior:
 
-- conservative finite-volume `div(rhoPhi,U)` using projection-consistent face
-  mass flux and the frozen `limitedLinear 1.0` interpolation;
+- implicit conservative finite-volume `fvm::div(rhoPhi,U)` using the exact
+  pressure-corrected face mass flux and frozen v2206 `limitedLinear 1.0`
+  vector semantics: one `magSqr(U)` limiter, guarded NVD ratio, owner/upwind
+  blend, and `cellLimited leastSquares 1.0` gradients;
 - Euler update and the matched laminar viscous-stress convention;
 - inlet-only integral flow constraint, outlet zero-gradient velocity, inlet
   zero-gradient pressure, and fixed outlet pressure gauge;
@@ -176,12 +196,23 @@ Implement the frozen formulation without changing legacy generic behavior:
 
 Tiny gates precede any solve campaign:
 
-1. divergence-free manufactured convection with exact vector result,
-   quadratic velocity scaling, conservation, JIT, and JVP;
-2. mixed Neumann-inlet/Dirichlet-outlet pressure reconstruction;
-3. inlet/outlet flux closure without stationwise flow forcing;
-4. builder mutations against every formulation switch;
-5. conservation, restart identity, and bounded differentiability checks.
+1. a `4x2x2` cross-section-constant pressure field that exactly exercises the
+   inlet-Neumann/outlet-half-cell-Dirichlet pressure coefficients;
+2. inlet/outlet flux closure without stationwise forcing, including restart
+   independence of the prescribed flow rate;
+3. a `7x7x3` divergence-free manufactured velocity with exact conservative
+   vector result, limiter weights, telescoping balance, quadratic scaling,
+   JIT, and JVP away from limiter switches;
+4. a tiny dense reference for the combined nonsymmetric implicit momentum
+   matrix, SOLVAX GMRES residual, transpose/gradient, JIT, and placement;
+5. builder mutations, conservation, restart identity, CFL, and bounded
+   differentiability checks.
+
+PCG is valid for the mixed pressure SPD operator. It is not valid for the
+convection-diffusion momentum operator. Use SOLVAX flexible GMRES wrapped by
+`linear_solve` only after the dense and adjoint gates pass. Freeze face flux
+and limiter weights for each outer momentum solve, matching the segregated
+FreeMHD algebra rather than differentiating through an invented explicit term.
 
 Delete `_fixed_flow_face_flux_projection_duct` and its long legacy test when the
 new path owns B2. Retain generic fixed-flow helpers only where still used.
@@ -215,16 +246,24 @@ memory, placement, speedup, and efficiency. Measure fixed-size Mac 1/2/4-device
 CPU and office one-/two-GPU scaling; add four GPUs only on suitable hardware.
 Optimize demonstrated bottlenecks rather than the superseded B2 path.
 
+Production cells shard axially as `(nx, ny, nz)`, while axial faces have
+`nx+1` entries and generally cannot share that partition. Construct face
+arrays inside fused JIT kernels, return only cell-shaped fields and replicated
+scalars, and never checkpoint or assign explicit output sharding to face
+arrays. Use global slicing for neighbour exchange; do not use periodic
+`roll`, and do not claim `shard_map` scaling without explicit halo exchange.
+
 Exit: the physics-valid path has equivalent observables and useful measured
 speedup on its target host.
 
 ## Architecture and SOLVAX ownership
 
 LMX owns MHD equations, geometry, materials, boundary/interface conditions,
-finite-volume assembly, gauges, observables, sharding policy, checkpoints, and
-physical acceptance. SOLVAX owns generic linear algebra after primal,
-residual, gradient/transpose, JIT, placement, memory, and repeated interleaved
-timing gates pass. Delete the LMX duplicate in the same tranche.
+finite-volume interpolation and assembly, gauges, observables, sharding
+policy, checkpoints, and physical acceptance. SOLVAX owns generic linear
+algebra after primal, residual, gradient/transpose, JIT, placement, memory,
+and repeated interleaved timing gates pass. Delete the LMX duplicate in the
+same tranche.
 
 Keep `solvax>=0.8.3,<1`, test both the minimum and newest compatible release,
 and record the resolved environment. Do not tie LMX to one patch release or
@@ -234,6 +273,13 @@ already uses 0.8.3.
 
 The next ownership audit is evidence-driven:
 
+- Keep the exact limited-linear weights, face fluxes, mixed pressure stencil,
+  and open-boundary semantics in LMX. SOLVAX has no finite-volume limiter or
+  open-boundary assembly API, and moving them would obscure ownership without
+  reducing domain code.
+- Use SOLVAX PCG for the mixed pressure SPD system and SOLVAX GMRES plus
+  `linear_solve` for the frozen-weight nonsymmetric momentum system. Do not use
+  `FourierHelmholtz` for the open axial topology.
 - Replace the dense `nx`-by-`nx` axial coarse inverse with an anchored
   SOLVAX tridiagonal solve plus an analytical constant gauge mode. This is the
   smallest high-impact sharding fix; prove mixed modes, variable coefficients,

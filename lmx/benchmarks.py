@@ -85,6 +85,10 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     contract = canonical_matched_b_contract(spec, expected_role)
     semantics = (
         contract["equations"].get("inertia"),
+        contract["equations"].get("advection_discretization"),
+        contract["equations"].get("advection_assembly"),
+        contract["equations"].get("advection_vector_limiter"),
+        contract["equations"].get("gradient_discretization"),
         float(contract["nondimensional_groups"].get("reynolds_number", 0.0)),
         *(
             contract["boundary_drive"].get(name)
@@ -97,12 +101,33 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     )
     if semantics != (
         "conservative div(rhoPhi,U)",
+        "Gauss limitedLinear 1.0",
+        "implicit fvm::div with frozen rhoPhi and limiter weights",
+        "single magSqr(U) limiter applied to all components",
+        "cellLimited leastSquares 1.0",
         expected[0] ** 2 / expected[1],
         "inlet face only",
         "fixed gauge",
         "zero normal current",
     ):
         raise ValueError("Benchmark B matched formulation semantics differ")
+
+    discretization_reference = spec.get("free_mhd_discretization_reference")
+    if not isinstance(discretization_reference, dict) or (
+        discretization_reference.get("repository_commit")
+        != "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
+        or discretization_reference.get("openfoam_release") != "v2206"
+        or set(discretization_reference)
+        != {
+            "repository_commit",
+            "openfoam_release",
+            "momentum_source",
+            "limiter_source",
+            "nvd_source",
+            "vector_transform_source",
+        }
+    ):
+        raise ValueError("Benchmark B FreeMHD discretization reference differs")
 
     sources = spec.get("sources")
     if not isinstance(sources, list) or {source.get("id") for source in sources} != {

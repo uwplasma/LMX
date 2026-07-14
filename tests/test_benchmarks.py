@@ -581,8 +581,20 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
             "matched formulation semantics differ",
         ),
         (
+            lambda spec: spec["matched_contract"]["shared"]["equations"].update(
+                gradient_discretization="Gauss linear"
+            ),
+            "matched formulation semantics differ",
+        ),
+        (
             lambda spec: spec["matched_contract"]["shared"]["boundary_drive"].update(flow_constraint_scope="stationwise"),
             "matched formulation semantics differ",
+        ),
+        (
+            lambda spec: spec["free_mhd_discretization_reference"].update(
+                repository_commit="0" * 40
+            ),
+            "FreeMHD discretization reference differs",
         ),
         (
             lambda spec: spec["matched_contract"]["roles"].clear(),
