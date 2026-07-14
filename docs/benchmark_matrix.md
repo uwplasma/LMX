@@ -84,7 +84,10 @@ The current-source medium baseline (`152 x 113 x 113`) also passes its physics
 gates on two actual GPU shards. Its persisted-restart curve has weighted RMS
 `1.324`, weighted maximum `3.967`, and integrated error `0.206`; the medium
 doubled-iteration variant passes, while tighter-tolerance and confirmation-wall
-variants must finish before this becomes acceptance evidence.
+variants must finish before this becomes acceptance evidence. A current-source
+medium screen at the frozen relaxation ceiling of 2.0 is strictly monotone and
+passes divergence/current gates; the full tight continuation remains explicitly
+open and checkpointed rather than being inferred from that short screen.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

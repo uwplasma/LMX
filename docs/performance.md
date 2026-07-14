@@ -10,6 +10,7 @@ devices alone is not evidence of parallel execution.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 768 pass, 8 skip, 95.28% branch coverage, 170.9 s | below the ten-minute budget |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | 1.66x speedup, 83.1% efficiency |
+| B2 tight-continuation screen | 2 x RTX A4000, `152 x 113 x 113` | 12 monotone updates in 144.90 s; `3.28e-8` mean decrement | relaxation 2.0 passes the bounded physics preflight; full independence gate open |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
@@ -17,6 +18,11 @@ devices alone is not evidence of parallel execution.
 The B2 result passes the two-device target and exact observable-equivalence
 gate. A general or four-device scaling claim remains open. The B1 timings do
 not promote its experimental physics result.
+
+The medium B2 screen starts from the checksummed accepted restart, uses two
+addressable spatial shards, retains 845 electric iterations, and ends with
+divergence `5.68e-6` and charge residual `1.23e-4`. It is acceleration evidence,
+not a substitute for the complete tight-tolerance record.
 
 The B1 pressure path first screens one 24-iteration GMRES cycle against the
 actual mean-free divergence and normalized fixed-flow tolerance. Passing states

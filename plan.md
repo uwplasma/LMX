@@ -169,12 +169,13 @@ for external research use.
   gates on two real GPU shards in 86.52 seconds from its converged restart. The
   acceptance curve is now reloaded from the checksummed restart and agrees
   exactly; doubled-iteration independence also passes in 168.34 seconds.
-  Restart-aware steady continuation removes the spurious `0.05` Aitken damping,
-  and a less conservative but physically gated electric target reduces a
-  two-update probe from 64.89 to 57.05 seconds. The tight run remains open: its
-  measured trajectory still projects beyond one hour, so pressure/electric
-  conditioning must improve before this variant, the confirmation wall, fine
-  refinement, and matched FreeMHD close.
+  Restart-aware steady continuation removes the spurious `0.05` Aitken damping;
+  global axial preconditioning and physical electric stopping retain 845--847
+  electric iterations. At the frozen Aitken ceiling of 2.0, a 12-update,
+  two-shard screen is strictly monotone with a `3.28e-8` mean decrement,
+  `5.68e-6` divergence, and `1.23e-4` charge residual. The exact-source tight
+  continuation remains open and is checkpointed for a short follow-on after its
+  bounded 512-update run; no incomplete state is acceptance evidence.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.
@@ -184,10 +185,16 @@ for external research use.
   an equal-shard mesh and records/enforces actual device placement; a bounded
   two-A4000 production solve passes steady and conservation gates in 38.81
   seconds including compilation, with two recorded addressable shards.
-- Repository consolidation is active; historical campaigns and large studies
-  are being moved out of the source tree before further solver slimming.
-- Architecture budgets now cap module count, source/core lines, tracked bytes,
-  lazy import time, curated examples, root exports, and release-wheel contents.
+- Repository consolidation: the root provenance tree and historical campaign,
+  Docker, dashboard, support/security, and duplicate driver surfaces are gone.
+  The maintained checkout has 45 test files, 23 maintenance scripts, and no
+  remote development branches beyond `main`.
+- Architecture: 36 package modules, 35,043 package lines, 8,421 maintained-core
+  lines, a 3.78 MiB tracked checkout, and a 288,481-byte wheel. Live gates cap
+  modules, lines, bytes, lazy import time, examples, exports, and wheel contents.
+- Documentation media: six anonymous-access derivatives total 516 KB and stay
+  out of the wheel; full-resolution fields, plots, and movies remain checksummed
+  release assets.
 
 ## Decision rule
 
