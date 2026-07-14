@@ -28,14 +28,16 @@ conductance through the constructor rather than private arrays.
 
 ```bash
 lmx validate hartmann --ha 20 --output artifacts/validation/hartmann
-python scripts/run_validation_suite.py --output artifacts/validation
+lmx validate shercliff --ha 20 --output artifacts/validation/shercliff
+lmx validate hunt --ha 20 --output artifacts/validation/hunt
 python scripts/run_convergence_suite.py --help
 python scripts/run_convergence_suite.py --mode time --help
 ```
 
-The suite records analytical error, conservation, power balance, mesh/time
-change, solver convergence, and fingerprints. Long or external comparisons are
-not hidden inside the portable test run.
+The validation commands record profiles, solver metrics, and available
+analytical comparisons. The convergence driver adds mesh/time change and
+fingerprints. Long or external comparisons are not hidden inside the portable
+test run.
 
 ## Fringing fields
 
