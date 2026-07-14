@@ -139,6 +139,7 @@ def _reuse_modal_factors(key: tuple[object, ...], factory: Callable):
 ALEX_BALANCE_TOLERANCE = 1.0e-3
 ALEX_B2_STEADY_STEPS = 3
 ALEX_B2_CANONICAL_SHELL_THICKNESS = 0.02
+ALEX_B2_SETTLED_RELAXATION = 1.25
 
 
 def _sustained_convergence(streak: int, passed: bool) -> tuple[int, bool]:
@@ -7645,9 +7646,12 @@ def _solve_extruded_projection(
                     accelerated = mix_history(iterates, residuals)
             elif case.solver.coupling_acceleration == "aitken":
                 if accepted_state_converged:
-                    # A global Aitken reduction can amplify decomposition-order
-                    # roundoff after the accepted physical fields have settled.
-                    accelerated = mapped_state
+                    # Avoid reduction noise after settling while retaining a
+                    # conservative, empirically monotone coupled acceleration.
+                    accelerated = (
+                        current_state
+                        + ALEX_B2_SETTLED_RELAXATION * fixed_point_residual
+                    )
                     previous_fixed_point_residual = None
                     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
                 elif previous_fixed_point_residual is not None:
