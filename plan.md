@@ -70,14 +70,14 @@ superseded worktrees and branches.
 | README/docs | 567-word feature-led README, conservatively sourced comparison table, feature-specific docs, and a 7-second Hunt loop; tracked media is 387,683 bytes | refresh canonical B2/scaling panels only from accepted records |
 | Developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
-| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | consolidate the old adapter/tests, then implement independent real-input materializers and observers before freezing the smoke role |
+| Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; the old reference adapter/tests are consolidated and acceptance is observer-blocked | implement independent real-input materializers and observers before freezing the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
 | B2 ALEX square duct | exact frozen momentum/stress/flux/projection, O(nx) SOLVAX coarse solve, restart-continuous CFL/stopping state, and forced one-/two-CPU equivalence pass bounded gates | independently materialize and observe both tiny inputs before running either code |
 | SOLVAX | PyPI/tag 0.8.3 owns the GMRES, implicit differentiation, PCG, additive, Aitken, and O(nx) tridiagonal algebra used by B2; prepared 0.8.4 commit `4808695` adds reusable Anderson weights | publish 0.8.4 separately before consuming shared Anderson weights; move no further MHD assembly |
 | Portable quality | accepted at `9be802f`: 770 pass, 8 expected skips, 95.17% combined line/branch coverage, 166.4 s | preserve the 300 s target and 600 s hard limit while consolidating rather than adding test files |
 
-Current structural audit at `9be802f`: 35 modules, 34,977 package lines,
-8,003 maintained-core lines, 32 test files / 21,274 lines, and
+Current structural audit at `e7e9b35`: 35 modules, 34,800 package lines,
+8,003 maintained-core lines, 31 test files / 21,036 lines, and
 18 maintenance scripts. These are ceilings, not targets: every added branch or
 test must consolidate or delete at least as much code in the same tranche.
 The four audited probe worktrees contained only promoted or rejected work;
@@ -236,14 +236,15 @@ Completed foundation:
 
 Execute this solver-free tranche in order:
 
-1. **Create line budget before adding observers.** Merge the essential parity
+1. **Complete at `e7e9b35`: create line budget before adding observers.** Merge the essential parity
    command gates into `tests/test_freemhd.py`, delete the superseded parity
    test file, replace the hand-built case fixture with the real materializer,
    and remove the nonportable local-install assertion. After verifying that it
    has no public export or repository caller, delete
    `build_case_from_freemhd_reference` and its adapter-only inference helpers
    and tests. Preserve raw dictionary parsers needed by the observers. Target
-   31 test files, below 21,050 test lines, and a net package-line reduction.
+   The focused 40-test gate and strict docs build pass; the result is 31 test
+   files, 21,036 test lines, and 34,800 package lines with no new file.
 2. **Bind the external source without vendoring it.** Verify commit
    `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and cleanliness of the four
    relevant paths, then copy only those four files plus `source-pin.json` into
@@ -454,9 +455,9 @@ Ratchet only through real ownership deletion:
 | Surface | Current | Next target |
 |---|---:|---:|
 | package modules | 35 | stay at 35 until a complete owner disappears |
-| package lines | 34,977 | below 34,940 after observers; below 34,800 after smoke cleanup |
+| package lines | 34,800 | below 34,800 after observers; below 34,700 after smoke cleanup |
 | maintained-core lines | 8,003 | below 8,000 after the exact smoke |
-| test files / lines | 32 / 21,274 | 31 / below 21,050 with observer consolidation; below 21,000 after smoke cleanup |
+| test files / lines | 31 / 21,036 | 31 / below 21,000 after observers and smoke cleanup |
 | maintenance scripts | 18 | 17 after `freeze_solvax_pcg_acceptance.py` is retired by the generic evidence gate |
 
 Do not meet a budget through unreadable formatting, arbitrary test merging, or
