@@ -1,7 +1,7 @@
 {
   "date": "2026-07-13",
-  "commit": "b42403f8b87c04fd27cb9ac7d83df142d35d6970",
-  "lock_sha256": "1dffb65406e764958df2438d978d72de7471894036739920bd223de2b5c45d59",
+  "commit": "6f30d29a328a25a0e55b9387bc19313f75192f03",
+  "lock_sha256": "7cc9e566ba686ea741f68086c8dbbf2d2e21b6b02acc6d372b9b313db8460232",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -10,7 +10,7 @@
     "platform": "Darwin arm64"
   },
   "gate": {
-    "workers": 4,
+    "workers": 6,
     "budget_seconds": 600,
     "engineering_target_seconds": 360,
     "minimum_branch_coverage_percent": 95.0
@@ -39,10 +39,22 @@
       "passed_gate": true
     }
   ],
+  "current_local_gate": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "workers": 6,
+    "passed": 796,
+    "skipped": 8,
+    "pytest_seconds": 197.79,
+    "gate_seconds": 200.3,
+    "branch_coverage_percent": 95.33,
+    "passed_gate": true
+  },
   "comparison": {
-    "slowest_gate_seconds": 196.3,
-    "slowest_budget_fraction": 0.32716666666666666,
-    "slowest_engineering_target_fraction": 0.5452777777777778,
+    "slowest_gate_seconds": 200.3,
+    "slowest_budget_fraction": 0.3338333333333333,
+    "slowest_engineering_target_fraction": 0.5563888888888889,
     "all_supported_endpoints_pass": true
   },
   "local_worker_scaling": {
