@@ -26,7 +26,11 @@ are authoritative when prose and results differ.
   equivalence, the 1.87x fine-checkpoint solver promotion, and fine baseline,
   doubled-iteration, and wall gates pass; tight-tolerance independence and
   experimental validation remain open, and the current fine pressure curve
-  misses every frozen ALEX literature-error limit.
+  misses every frozen ALEX literature-error limit. A checksummed
+  Maxwell-consistent coarse-field diagnostic improves peak underprediction from
+  15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not
+  validation evidence; exact matched-field FreeMHD and three-mesh gates remain
+  required.
 - Q2D turbulence, magnetic-obstacle, mapped blanket, and Dean-vortex workflows
   provide model or adapter checks but do not yet support quantitative claims.
 

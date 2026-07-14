@@ -225,6 +225,68 @@
     "stop_reason": "bounded stop: scalar relaxation either plateaus or oscillates, and componentwise Aitken diverges; preserve the checkpoint rather than expanding an unpromising parameter search",
     "next_action": "diagnose the systematic ALEX observable discrepancy and run an exact matched FreeMHD comparison before designing another outer coupling method"
   },
+  "field_consistency_audit": {
+    "sources": {
+      "alex_report": "https://www.osti.gov/servlets/purl/5332375",
+      "alex_report_sha256": "d67bfc6181a780e1a13f104f443746d1d05d359ba9886e4a0a2563542e6aa16a",
+      "maxwell_consistent_field_study": "https://arxiv.org/abs/0901.0624",
+      "doi": "10.1016/j.fusengdes.2010.12.025"
+    },
+    "observable_audit": {
+      "result": "confirmed",
+      "definition": "side-minus-top transverse pressure difference at one axial station, normalized by sigma * U * B0^2 * half-width and corrected by the far-field plateau",
+      "interpretation": "the LMX ALEX tap geometry, interaction-parameter scaling, and sign convention match the published N=540, M=2900 observable"
+    },
+    "frozen_transverse_only_field": {
+      "components": "B = (0, By(x), 0)",
+      "divergence": "zero",
+      "curl": "nonzero wherever dBy/dx is nonzero",
+      "fine_peak": 0.04220155891996866,
+      "alex_peak": 0.05,
+      "peak_underprediction_fraction": 0.15596882160062686
+    },
+    "bounded_maxwell_consistent_pilot": {
+      "status": "diagnostic_only",
+      "model": "complex analytic continuation of 0.5 * (1 - tanh((x - center) / width)); By is the real part and Bx the imaginary part",
+      "fit": {
+        "center_x_over_L": 0.07275763,
+        "width_over_L": 2.56980101,
+        "midplane_rms_error": 0.008416,
+        "midplane_max_error": 0.01617,
+        "frozen_field_uncertainty": 0.03,
+        "max_streamwise_to_peak_field": 0.2095
+      },
+      "run": {
+        "mesh": [102, 77, 77],
+        "devices": "2 x NVIDIA RTX A4000",
+        "actual_spatial_shards": 2,
+        "updates": 64,
+        "seconds": 91.52572296996368,
+        "final_residual": 4.8740896174848114e-05,
+        "last_three_updates_pass_steady_limit": true,
+        "max_divergence_residual": 3.1053660664163577e-07,
+        "max_charge_balance_residual": 0.00021481886506080627,
+        "peak": 0.04589360529461488,
+        "peak_x_over_L": -0.9068627450980395,
+        "peak_underprediction_fraction": 0.08212789410770247,
+        "weighted_rms": 1.8141205707792463,
+        "weighted_linf": 3.98772288096749,
+        "integrated_pressure_relative_error": 0.650438413278753
+      },
+      "assets": {
+        "field": {
+          "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/b2-consistent-tanh-coarse.npz",
+          "sha256": "987e1e1fd4430e32eef2b3217914a9b6df3394054a9dee3c43476ae6b490b5e5"
+        },
+        "result": {
+          "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-b2-consistent-tanh-coarse-64.json",
+          "sha256": "8162fc8603d320619b98207afa56b13239affdf3f17a68125d467ddc274df5d9"
+        }
+      },
+      "interpretation": "the peak improvement from 15.6% to 8.2% underprediction follows the independent published field-consistency result, but the nonzero far-field offset worsens aggregate error; promote no physics claim until an in-source vector-field implementation, matched initialization, three-mesh evidence, and exact-case FreeMHD comparison pass"
+    },
+    "next_action": "add one concise opt-in Maxwell-consistent volume-field path to the existing fringing implementation, test its curl/divergence and JAX behavior in existing test files, then run matched transverse-only and vector-field FreeMHD comparisons before repeating expensive fine campaigns"
+  },
   "raw_assets": {
     "baseline_warm": {
       "url": "https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/lmx-fastdiag-baseline-warm.json",

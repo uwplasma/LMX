@@ -204,9 +204,16 @@ for external research use.
   oscillated; componentwise Aitken then diverged to `5.18e-3`, so the bounded
   outer search is closed. The fine curve misses the frozen ALEX weighted RMS,
   weighted maximum, and integrated-error gates at `1.389`, `4.218`, and `0.251`.
-  Diagnose exact-case FreeMHD and observable/model normalization next, before
-  designing another outer method. Fine numerical independence and experimental
-  acceptance remain open; the checksummed tight restart is retained for later.
+  The original ALEX report confirms the implemented transverse-pressure tap and
+  normalization. A Maxwell-consistent coarse field pilot reduced peak
+  underprediction from 15.6% to 8.2%, consistent with the independent published
+  field study, and passed steady, divergence, charge, and two-shard gates in
+  91.53 seconds. Its far-field pressure offset worsened aggregate error, so it
+  remains diagnostic. Add one opt-in in-source vector-field path and compare it
+  with matched transverse-only and vector-field FreeMHD cases before another
+  fine campaign or outer-method search. Fine numerical independence and
+  experimental acceptance remain open; checksummed raw fields, results, and the
+  tight restart are release assets.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.
