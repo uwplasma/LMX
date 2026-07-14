@@ -165,17 +165,14 @@ for external research use.
 - B2 coarse independence: all steady, conservation, tolerance, iteration, and
   confirmation-wall gates pass on current source; the coarse ALEX curve remains
   outside the frozen literature limits, so medium/fine refinement is required.
-- B2 medium baseline: the `152 x 113 x 113` state passes steady and conservation
-  gates on two real GPU shards in 86.52 seconds from its converged restart. The
-  acceptance curve is now reloaded from the checksummed restart and agrees
-  exactly; doubled-iteration independence also passes in 168.34 seconds.
-  Restart-aware steady continuation removes the spurious `0.05` Aitken damping;
-  global axial preconditioning and physical electric stopping retain 845--847
-  electric iterations. At the frozen Aitken ceiling of 2.0, a 12-update,
-  two-shard screen is strictly monotone with a `3.28e-8` mean decrement,
-  `5.68e-6` divergence, and `1.23e-4` charge residual. The exact-source tight
-  continuation remains open and is checkpointed for a short follow-on after its
-  bounded 512-update run; no incomplete state is acceptance evidence.
+- B2 medium independence: the source-identical `152 x 113 x 113` baseline,
+  tight-tolerance, doubled-iteration, and confirmation-wall records pass every
+  steady and conservation gate on two real GPU shards. Relative to the frozen
+  uncertainty, the tolerance and iteration deltas are `5.781e-4` and
+  `5.784e-4`; the thin-wall relative difference is `9.26e-14`. Tight convergence
+  required 7,720.92 seconds across two restart-safe segments; the three final
+  confirmation runs took 57.64, 34.94, and 57.10 seconds from that restart.
+  Fine-mesh reprojection is now running; experimental acceptance remains open.
 - B2 mesh initialization: tested physical-coordinate trilinear prolongation
   maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
   fields remain provisional until the solver reprojects and passes every gate.

@@ -83,14 +83,13 @@ tolerance, doubled-iteration, and confirmation-wall gates. Its coarse ALEX
 curve alone does not pass the frozen literature limits (`weighted RMS 1.221`,
 `weighted max 3.595`, integrated error `0.139`), so it is correctly retained as
 mesh evidence rather than promoted as an experimental result.
-The current-source medium baseline (`152 x 113 x 113`) also passes its physics
-gates on two actual GPU shards. Its persisted-restart curve has weighted RMS
-`1.324`, weighted maximum `3.967`, and integrated error `0.206`; the medium
-doubled-iteration variant passes, while tighter-tolerance and confirmation-wall
-variants must finish before this becomes acceptance evidence. A current-source
-medium screen at the frozen relaxation ceiling of 2.0 is strictly monotone and
-passes divergence/current gates; the full tight continuation remains explicitly
-open and checkpointed rather than being inferred from that short screen.
+The source-identical medium campaign (`152 x 113 x 113`) now passes baseline,
+tighter-tolerance, doubled-iteration, confirmation-wall, steady, and
+conservation gates on two actual GPU shards. The tolerance and iteration deltas
+are `5.781e-4` and `5.784e-4` of the frozen uncertainty; the wall-thickness
+difference is `9.26e-14`. Its curve still has weighted RMS `1.324`, weighted
+maximum `3.967`, and integrated error `0.206`, so medium numerical independence
+is closed while experimental and three-mesh acceptance remain open.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD
