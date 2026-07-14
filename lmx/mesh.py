@@ -275,6 +275,8 @@ def generate_rect_duct_mesh(
     target_ha: float | None = None,
     magnetic_axis: str | None = None,
 ) -> StructuredMesh:
+    """Generate a rectangular duct mesh with optional MHD layer clustering."""
+
     x_faces = jnp.linspace(0.0, length, nx + 1)
     if target_ha and target_ha > 0.0:
         side_y = 0.5 * width / jnp.sqrt(target_ha)
@@ -348,6 +350,8 @@ def generate_layered_duct_mesh(
     target_ha: float | None = None,
     magnetic_axis: str | None = None,
 ) -> StructuredMesh:
+    """Generate a rectangular fluid mesh plus explicit surrounding wall cells."""
+
     left_t, right_t, bottom_t, top_t = wall_thickness
     left_c, right_c, bottom_c, top_c = wall_cells
 

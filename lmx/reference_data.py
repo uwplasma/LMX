@@ -91,6 +91,8 @@ def _pressure_drop_from_name(path: Path) -> float | None:
 
 
 def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+    """Load a bundled or user-supplied analytical closed-channel profile."""
+
     path = analytical_reference_path(case_kind, ha, reference_root)
     rows = path.read_text().strip().splitlines()
     _, *body = rows
@@ -114,10 +116,14 @@ def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str 
 
 
 def load_shercliff_analytical(ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+    """Load an analytical Shercliff profile at the requested Hartmann number."""
+
     return load_closed_channel_analytical("shercliff", ha, reference_root)
 
 
 def load_hunt_analytical(ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+    """Load an analytical Hunt profile at the requested Hartmann number."""
+
     return load_closed_channel_analytical("hunt", ha, reference_root)
 
 
@@ -127,6 +133,8 @@ def load_processed_slice(
     x_slice: str = "1m",
     reference_root: str | Path | None = None,
 ) -> ProcessedSliceReference:
+    """Load a processed FreeMHD slice and its named field columns."""
+
     path = processed_slice_reference_path(case_kind, ha, x_slice=x_slice, reference_root=reference_root)
     with path.open() as handle:
         reader = csv.DictReader(handle)

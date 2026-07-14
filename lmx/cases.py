@@ -103,6 +103,8 @@ def make_hartmann_case(
     viscosity: float = 1.0,
     output_dir: str | None = None,
 ) -> CaseSpec:
+    """Build an insulating rectangular Hartmann-duct reference case."""
+
     bmag = _ha_to_b(ha, 0.5 * height, conductivity, density, viscosity)
     anchor = (ny // 2, nz // 2)
     return CaseSpec(
@@ -135,6 +137,8 @@ def make_shercliff_case(
     viscosity: float = 1.0,
     output_dir: str | None = None,
 ) -> CaseSpec:
+    """Build an all-insulating rectangular Shercliff-duct case."""
+
     bmag = _ha_to_b(ha, 0.5 * width, conductivity, density, viscosity)
     anchor = (ny // 2, nz // 2)
     return CaseSpec(
@@ -175,6 +179,8 @@ def make_hunt_case(
     viscosity: float = 1.0,
     output_dir: str | None = None,
 ) -> CaseSpec:
+    """Build a Hunt duct with conducting Hartmann and insulating side walls."""
+
     bmag = _ha_to_b(ha, 0.5 * width, fluid_conductivity, density, viscosity)
     if wall_conductivity is None:
         wall_conductivity = _wall_conductivity_from_conductance_ratio(

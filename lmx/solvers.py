@@ -2158,6 +2158,8 @@ def solve_transient(
     append_diagnostics: bool = False,
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
+    """Advance a supported case in transient mode, optionally from a restart."""
+
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     if solver_kind == "fully_developed_inductionless":
         transient_case = case if case.solver.mode == "transient" else case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "mode": "transient"})})
@@ -2183,6 +2185,8 @@ def solve_steady(
     append_diagnostics: bool = False,
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
+    """Solve a supported case to its configured steady-state stopping gate."""
+
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     if solver_kind == "fully_developed_inductionless":
         steady_case = case if case.solver.mode == "steady" else case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "mode": "steady"})})

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import copy
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import zipfile
@@ -74,6 +75,7 @@ def test_stable_root_api_is_small_lazy_and_resolvable() -> None:
     assert set(lmx.__all__) == EXPECTED_ROOT_API
     assert EXPECTED_ROOT_API <= set(dir(lmx))
     assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
+    assert all(inspect.getdoc(getattr(lmx, name)) for name in lmx.__all__)
 
 
 def test_advanced_api_uses_owning_module() -> None:
