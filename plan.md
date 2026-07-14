@@ -174,9 +174,12 @@ removal must follow real ownership consolidation, not arbitrary merging.
 
 1. Harden the FreeMHD record validator and consolidate the standalone case
    materializer into the existing parity command; run no solver in this step.
-2. Reconcile B2 momentum advection and the axial boundary/drive contract.
-3. Prove one-/multi-device equivalence and bounded strong scaling for that path.
-4. Run the tiny matched B2-family smoke case; only a passing contract and smoke
+2. In parallel from a clean SOLVAX worktree, contribute the symmetric
+   additive-line combinator, release it, and delete the two LMX averaging
+   closures after parity gates pass.
+3. Reconcile B2 momentum advection and the axial boundary/drive contract.
+4. Prove one-/multi-device equivalence and bounded strong scaling for that path.
+5. Run the tiny matched B2-family smoke case; only a passing contract and smoke
    can authorize medium or production B2 work.
 
 Steps 1--3 use focused tests and tiny manufactured cases. The full portable
