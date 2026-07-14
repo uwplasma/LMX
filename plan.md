@@ -104,8 +104,9 @@ The final audit freezes these interpretations:
   but not for axially varying canonical B2 flow.
 - Corrected face flux cannot be reconstructed exactly from cell velocity. Store
   one positive-direction face per cell plus the inlet plane, initialize it from
-  `linearInterpolate(rho*U)&Sf`, and treat velocity, pressure, and flux as one
-  coupled state for relaxation and restart.
+  `linearInterpolate(rho*U)&Sf`, checkpoint velocity, pressure, and flux
+  atomically, and apply identical affine relaxation coefficients to velocity
+  and flux.
 - No medium or production FreeMHD run is authorized until a tiny exact smoke
   proves those semantics in both codes.
 
@@ -129,8 +130,8 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    weights and conservative matrix action on a `7x7x3` nonuniform manufactured
    problem. Include explicit patch-face values in the orthogonal least-squares
    gradient and cell limiter; preserve the exact guarded NVD sign/upwind rules;
-   keep corrected face fluxes fused/internal; and prove conservation, scaling,
-   JIT, and JVP.
+   keep only expanded full-face arrays fused/internal, persist the compact
+   corrected carry, and prove conservation, scaling, JIT, and JVP.
 6. **Release preparation complete at SOLVAX `255d280`:** SOLVAX 0.8.4 exposes
    `has_aux` and a distinct transpose solver through `linear_solve`; its full
    gate is 263 passes in 68 seconds at 98.88% coverage, and hosted tests/docs
@@ -161,6 +162,9 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    acceleration disabled, persist Aitken residual/relaxation/streak state before
    claiming accelerated restart identity, add CFL/stopping diagnostics, and
    prove one-/two-device equivalence on an `8x4x3` forced-CPU mesh.
+   Anderson restart identity remains unclaimed until bounded histories and one
+   shared set of PyTree mixing coefficients are implemented and gated. Ordinary
+   solution output need not store accelerator history; restart output must.
 10. Materialize both tiny inputs, derive their contracts independently, then
    freeze smoke mesh, mapped field, time step, iterations, and stopping rules.
 11. Run affected modules, then one portable gate. Commit and push before the
