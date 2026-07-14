@@ -7056,7 +7056,9 @@ def _solve_extruded_projection(
         )
 
     if use_alex_b2_finite_volume:
-        electric_volume_min = float(jnp.min(dy) * jnp.min(dz))
+        # The strict corner-cell bound oversolves the global PCG system; the
+        # returned local residual is still checked against the physical gate.
+        electric_volume_min = 4.0 * float(jnp.min(dy) * jnp.min(dz))
         # Transverse lines capture the dominant wall-normal coupling; an axial
         # line crosses shards, dilutes those blocks, and regresses PCG scaling.
         use_axial_line_preconditioner = False
