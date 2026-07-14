@@ -51,7 +51,7 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
     )
     assert (
         tight.case.solver.coupling_iterations
-        == 2 * baseline.case.solver.coupling_iterations
+        == 4 * baseline.case.solver.coupling_iterations
     )
     assert (
         extended.case.solver.coupling_iterations

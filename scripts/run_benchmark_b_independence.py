@@ -206,12 +206,13 @@ def _variant_problem(
     potential_iterations = int(problem.case.time_stepper.potential_iterations)
     max_steps = int(problem.case.time_stepper.max_steps)
     if variant == "tight_tolerance":
-        tolerance *= float(spec["solver"]["tolerance_independence_factor"])
+        tolerance_factor = float(spec["solver"]["tolerance_independence_factor"])
+        iteration_factor = float(spec["solver"]["iteration_independence_factor"])
+        tolerance *= tolerance_factor
+        # Budget both independent perturbations; early convergence preserves
+        # the normal runtime while slow refined meshes retain bounded headroom.
         coupling_iterations = int(
-            round(
-                coupling_iterations
-                * float(spec["solver"]["iteration_independence_factor"])
-            )
+            round(coupling_iterations * iteration_factor / tolerance_factor)
         )
         potential_iterations *= 2
     elif variant == "extended_iterations":
