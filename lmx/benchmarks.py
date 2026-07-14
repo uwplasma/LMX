@@ -417,6 +417,13 @@ def build_benchmark_b_problem(
         boundary_conditions=(
             BoundaryCondition("walls", "no_slip"),
             BoundaryCondition(
+                "inlet",
+                "inlet_flow_rate",
+                value=float(spec["drive"]["nondimensional_flow_rate"]),
+                axis="x",
+            ),
+            BoundaryCondition("outlet", "outlet_pressure", value=0.0, axis="x"),
+            BoundaryCondition(
                 "uniform_conducting_wall",
                 "conducting_wall",
                 region="conducting_wall",

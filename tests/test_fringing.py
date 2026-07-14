@@ -67,7 +67,7 @@ from lmx.fringing import (
     _variable_coefficient_residual_3d,
     _conservative_current_fluxes_3d,
     _face_flux_pressure_projection_duct,
-    _fixed_flow_face_flux_projection_duct,
+    _inlet_flow_outlet_pressure_projection_duct,
     _face_flux_pressure_projection_pipe,
     _fixed_flow_face_flux_projection_pipe,
     _masked_laplacian_pipe,
@@ -733,6 +733,49 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     assert jnp.isfinite(pressure).all()
 
 
+def test_mixed_pressure_projection_recovers_coefficients_and_boundary_flow():
+    shape = (4, 2, 2)
+    dx = 0.25
+    widths = jnp.asarray([0.5, 0.5])
+    expected_pressure = jnp.broadcast_to(
+        jnp.asarray([4.0, 3.0, 2.0, 1.0])[:, None, None], shape
+    )
+    rhs = jnp.broadcast_to(jnp.asarray([-16.0, 0.0, 0.0, -16.0])[:, None, None], shape)
+    pressure, *_ = _solvax_pressure_poisson_duct(
+        rhs,
+        jnp.ones(shape),
+        dx=dx,
+        dy=widths,
+        dz=widths,
+        iterations=100,
+        tolerance=1.0e-10,
+        axial_pressure_mode=fringing_impl._MIXED_AXIAL_PRESSURE_MODE,
+    )
+    assert pressure == pytest.approx(expected_pressure, abs=1.0e-7)
+
+    zeros = jnp.zeros(shape)
+    projected = _inlet_flow_outlet_pressure_projection_duct(
+        zeros,
+        zeros,
+        zeros,
+        jnp.ones(shape),
+        jnp.ones(shape, dtype=bool),
+        inlet_flow_rate=0.2,
+        dt=0.1,
+        dx=dx,
+        dy=widths,
+        dz=widths,
+        iterations=100,
+        tolerance=1.0e-10,
+    )
+    _, _, _, projected_pressure, pressure_loss, divergence, flow_error = projected
+    assert divergence < 1.0e-8
+    assert flow_error < 1.0e-8
+    assert jnp.isfinite(pressure_loss).all()
+    assert jnp.isfinite(projected_pressure).all()
+    assert jnp.max(jnp.abs(projected_pressure - projected_pressure[:, :1, :1])) < 1.0e-7
+
+
 def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():
     empty = jnp.zeros((3, 4, 4), dtype=bool)
     with pytest.raises(ValueError, match="nonempty"):
@@ -741,89 +784,6 @@ def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():
     nonrectangular = empty.at[:, 1:3, 1:3].set(True).at[:, 1, 1].set(False)
     with pytest.raises(ValueError, match="rectangular"):
         _rectangular_fluid_bounds(nonrectangular)
-
-
-def test_fixed_flow_face_projection_closes_divergence_and_flow_constraint():
-    nx, ny, nz = 5, 6, 5
-    dy = jnp.asarray([0.2, 0.3, 0.45, 0.4, 0.35, 0.3])
-    dz = jnp.asarray([0.25, 0.4, 0.5, 0.45, 0.3])
-    x = jnp.linspace(0.0, 1.0, nx)[:, None, None]
-    y = jnp.linspace(-1.0, 1.0, ny)[None, :, None]
-    z = jnp.linspace(-1.0, 1.0, nz)[None, None, :]
-    u = 0.7 + 0.1 * jnp.cos(2.0 * jnp.pi * x) * jnp.ones_like(y + z)
-    v = 0.2 * jnp.sin(jnp.pi * y) * jnp.ones_like(x + z)
-    w = -0.15 * jnp.sin(jnp.pi * z) * jnp.ones_like(x + y)
-    mask = jnp.ones((nx, ny, nz), dtype=bool)
-    rho = jnp.ones_like(u)
-    cell_area = jnp.broadcast_to(dy[None, :, None] * dz[None, None, :], u.shape)
-    dt = 0.05
-    response = jnp.full_like(u, dt)
-    target = 1.25
-    projected = _fixed_flow_face_flux_projection_duct(
-        u,
-        v,
-        w,
-        rho,
-        mask,
-        response,
-        cell_area,
-        target_flow_rate=target,
-        base_pressure_loss_gradient=0.0,
-        dt=dt,
-        dx=0.25,
-        dy=dy,
-        dz=dz,
-        iterations=200,
-        tolerance=1.0e-10,
-    )
-    projected_u, _, _, pressure, pressure_loss, divergence, flow_error = projected
-    flow = jnp.sum(projected_u * cell_area, axis=(1, 2))
-    assert flow == pytest.approx(target, abs=1.0e-8)
-    assert divergence < 1.0e-8
-    assert flow_error < 1.0e-8
-    assert jnp.isfinite(pressure).all()
-    assert jnp.isfinite(pressure_loss).all()
-
-    warm = _fixed_flow_face_flux_projection_duct(
-        u,
-        v,
-        w,
-        rho,
-        mask,
-        response,
-        cell_area,
-        target_flow_rate=target,
-        base_pressure_loss_gradient=0.0,
-        dt=dt,
-        dx=0.25,
-        dy=dy,
-        dz=dz,
-        iterations=200,
-        tolerance=1.0e-10,
-        initial_pressure=pressure,
-        include_axial_line=False,
-    )
-    assert warm[3] == pytest.approx(pressure, rel=1.0e-8, abs=1.0e-8)
-
-    varying_response = response.at[-1].multiply(2.0)
-    with pytest.raises(ValueError, match="x-invariant"):
-        _fixed_flow_face_flux_projection_duct(
-            u,
-            v,
-            w,
-            rho,
-            mask,
-            varying_response,
-            cell_area,
-            target_flow_rate=target,
-            base_pressure_loss_gradient=0.0,
-            dt=dt,
-            dx=0.25,
-            dy=dy,
-            dz=dz,
-            iterations=2,
-            tolerance=1.0e-8,
-        )
 
 
 def test_nonuniform_pipe_radial_metrics_pass_manufactured_convergence():

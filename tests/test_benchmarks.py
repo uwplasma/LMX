@@ -324,6 +324,20 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
     assert case.forcing == 0.0
     assert case.geometry.axial_origin == -15.0
     assert problem.profile.axis == "y"
+    inlet, outlet = case.boundary_conditions[1:3]
+    expected_flow = 3.141592653589793 if case_id == "B1-fringing-pipe" else 4.0
+    assert (inlet.name, inlet.kind, inlet.axis, inlet.value) == (
+        "inlet",
+        "inlet_flow_rate",
+        "x",
+        pytest.approx(expected_flow),
+    )
+    assert (outlet.name, outlet.kind, outlet.axis, outlet.value) == (
+        "outlet",
+        "outlet_pressure",
+        "x",
+        0.0,
+    )
 
     mesh = _cross_section_mesh(case)
     assert mesh.x_centers.tolist() == pytest.approx(problem.profile.x.tolist())
@@ -454,7 +468,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         solve_extruded_inductionless(reduced_problem, checkpoint_interval=0)
 
 
-def test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite():
+def test_benchmark_b2_reduced_path_closes_mixed_boundaries_and_is_finite():
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse")
     case = replace(
         problem.case,

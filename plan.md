@@ -72,12 +72,12 @@ superseded worktrees and branches.
 | FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
 | Benchmark-B contracts | schema 2 composes shared physics with production execution roles and recomputes real artifact hashes; acceptance is observer-blocked | finish canonical B2, then independent input observers and the smoke role |
 | B1 ALEX pipe | retained-modal numerical evidence exists | implement/prove the canonical formulation, then exact parity |
-| B2 ALEX square duct | old fine-grid and two-GPU results are diagnostic for the superseded no-inertia, stationwise-flow formulation | implement canonical inertia and axial boundaries |
+| B2 ALEX square duct | the mixed inlet-flow/outlet-pressure projection passes manufactured and reduced-path gates; old fine-grid and GPU results remain diagnostic for the superseded formulation | implement exact implicit inertia |
 | SOLVAX | v0.8.3 owns PCG, cyclic lines, anchored Poisson PCG, and additive composition | pursue only gated ownership deletions |
 | Portable quality | 782 pass, 8 expected skips, 95.30% branch coverage, 162.8 s | stay below the 300 s target and 600 s limit |
 
-Current structural audit: 35 modules, 34,951 package lines, 7,995
-maintained-core lines, 32 test files / 21,179 lines, and 18 maintenance
+Current structural audit: 35 modules, 34,987 package lines, 8,027
+maintained-core lines, 32 test files / 21,165 lines, and 18 maintenance
 scripts.
 
 The final audit freezes these interpretations:
@@ -110,20 +110,22 @@ in `docs/validation_report.md`, `docs/external_benchmarks.md`, and
    782-pass portable gate at 95.30% branch coverage in 162.8 seconds.
 2. **Complete:** re-audit FreeMHD v2206 limiter, implicit momentum assembly,
    mixed axial boundaries, SOLVAX v0.8.3 ownership, and sharding constraints.
-3. Freeze the missing `cellLimited leastSquares 1.0` gradient contract and its
-   pinned source evidence. This contract-only change precedes solver claims.
-4. Implement and prove the B2 mixed projection on a `4x2x2` manufactured
+3. **Complete:** freeze the missing `cellLimited leastSquares 1.0` gradient
+   contract and pinned FreeMHD/OpenFOAM source evidence.
+4. **Complete:** implement and prove the B2 mixed projection on a `4x2x2` manufactured
    problem: inlet pressure Neumann, outlet pressure Dirichlet at the half-cell
-   face, one inlet flow constraint, no compatibility or gauge projection.
+   face, one inlet flow constraint, no compatibility or gauge projection. The
+   reduced `7x7x7` caller and restart gate also pass.
 5. Implement the exact v2206 limited-linear face weights and conservative
    matrix action on a `7x7x3` manufactured problem. Keep corrected face fluxes
    fused/internal and prove conservation, scaling, JIT, and JVP.
 6. Combine frozen convection weights with diffusion in a nonsymmetric B2
    momentum operator. Gate SOLVAX GMRES plus `linear_solve` against a tiny
    dense matrix, residual, transpose/gradient, JIT, and placement reference.
-7. Integrate the canonical B2 step, zero-normal-current axial closure, restart
-   identity, and CFL/stopping diagnostics. Delete the obsolete stationwise
-   projection and pressure-response plumbing in the same green tranche.
+7. Integrate implicit inertia into the mixed-boundary B2 step, then prove
+   zero-normal-current axial closure, restart identity, and CFL/stopping
+   diagnostics. Delete any diffusion-only transitional plumbing in the same
+   green tranche.
 8. Materialize both tiny inputs, derive their contracts independently, then
    freeze smoke mesh, mapped field, time step, iterations, and stopping rules.
 9. Run affected modules, then one portable gate. Commit and push before the
@@ -214,8 +216,9 @@ convection-diffusion momentum operator. Use SOLVAX flexible GMRES wrapped by
 and limiter weights for each outer momentum solve, matching the segregated
 FreeMHD algebra rather than differentiating through an invented explicit term.
 
-Delete `_fixed_flow_face_flux_projection_duct` and its long legacy test when the
-new path owns B2. Retain generic fixed-flow helpers only where still used.
+The mixed path now owns B2; `_fixed_flow_face_flux_projection_duct`, its
+pressure-response plumbing, and its long legacy test are deleted. Retain
+generic and pipe fixed-flow helpers only where still used.
 
 Exit: tiny manufactured, gradient, boundary, conservation, and restart gates
 all pass; the affected files and portable suite remain below their budgets.

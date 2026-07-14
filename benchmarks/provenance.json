@@ -262,7 +262,7 @@
       "tests": [
         "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
         "tests/test_benchmarks.py::test_benchmark_b_problem_binds_frozen_nondimensional_contract",
-        "tests/test_benchmarks.py::test_benchmark_b2_reduced_production_path_closes_fixed_flow_and_is_finite",
+        "tests/test_benchmarks.py::test_benchmark_b2_reduced_path_closes_mixed_boundaries_and_is_finite",
         "tests/test_benchmarks.py::test_benchmark_b_specification_index_is_complete_and_deterministic",
         "tests/test_fringing.py::test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle"
       ],

@@ -106,6 +106,7 @@ MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
 
 _FRINGING_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
 _FRINGING_MODAL_FACTOR_CACHE: dict[tuple[object, ...], object] = {}
+_MIXED_AXIAL_PRESSURE_MODE = "inlet_neumann_outlet_dirichlet_zero"
 
 
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
@@ -1194,6 +1195,8 @@ def _axial_mean_preconditioner_3d(
     volume: jnp.ndarray,
     coef_x_w: jnp.ndarray,
     coef_x_e: jnp.ndarray,
+    *,
+    gauge: bool = True,
 ):
     """Invert the Galerkin operator for cross-section-constant axial modes."""
 
@@ -1204,8 +1207,9 @@ def _axial_mean_preconditioner_3d(
     diagonal = -(west + east)
     coarse = jnp.diag(diagonal)
     coarse = coarse + jnp.diag(west[1:], -1) + jnp.diag(east[:-1], 1)
-    gauge = jnp.sum(volume, axis=(1, 2)) / normalization
-    coarse = coarse + jnp.outer(gauge, gauge) / jnp.sum(volume)
+    if gauge:
+        gauge_vector = jnp.sum(volume, axis=(1, 2)) / normalization
+        coarse = coarse + jnp.outer(gauge_vector, gauge_vector) / jnp.sum(volume)
     coarse_inverse = jnp.linalg.inv(coarse)
 
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
@@ -1386,13 +1390,16 @@ def _finalize_local_pressure_solve(
     effective_atol: float,
     local_tolerance: float | None,
     single_reduction: bool = False,
+    gauge: bool = True,
 ) -> tuple[jnp.ndarray, ...]:
-    """Gauge-fix a pressure solve and optionally apply one refinement correction."""
+    """Finalize a pressure solve and optionally apply one refinement correction."""
 
     volume_sum = jnp.sum(volume)
 
     def gauge_fixed(field: jnp.ndarray) -> jnp.ndarray:
-        return field - jnp.sum(field * volume) / volume_sum
+        if gauge:
+            return field - jnp.sum(field * volume) / volume_sum
+        return field
 
     field = gauge_fixed(solution.x)
     local_residual = local_residual_fn(field)
@@ -1472,6 +1479,7 @@ def _solvax_pressure_poisson_duct(
     thin_wall_fluid_mask: jnp.ndarray | None = None,
     transverse_coarse_bounds: tuple[int, int, int, int] | None = None,
     field_sharding: NamedSharding | None = None,
+    axial_pressure_mode: str = "neumann",
 ) -> tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -1481,12 +1489,18 @@ def _solvax_pressure_poisson_duct(
     jnp.ndarray,
     jnp.ndarray,
 ]:
-    """Solve the compatible Neumann pressure equation with implicit PCG.
+    """Solve the finite-volume pressure equation with implicit PCG.
 
-    Multiplication by cell volume converts the finite-volume operator into a
-    Euclidean-symmetric positive-semidefinite system.  A symmetric rank-one
-    term fixes the constant nullspace without altering a compatible RHS.
+    The default all-Neumann system retains its compatible RHS and symmetric
+    rank-one gauge.  The private mixed mode instead applies zero pressure at
+    the outlet face and zero pressure gradient at the inlet.
     """
+
+    if axial_pressure_mode not in {"neumann", _MIXED_AXIAL_PRESSURE_MODE}:
+        raise ValueError(f"Unsupported axial pressure mode {axial_pressure_mode!r}")
+    mixed_axial_pressure = axial_pressure_mode == _MIXED_AXIAL_PRESSURE_MODE
+    if mixed_axial_pressure and transverse_coarse_bounds is not None:
+        raise ValueError("Mixed axial pressure does not support the Neumann coarse correction")
 
     dy_widths = _coerce_spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
     dz_widths = _coerce_spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
@@ -1494,7 +1508,11 @@ def _solvax_pressure_poisson_duct(
         dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape
     )
     volume_sum = jnp.sum(volume)
-    rhs_compatible = rhs - jnp.sum(rhs * volume) / volume_sum
+    solved_rhs = (
+        rhs
+        if mixed_axial_pressure
+        else rhs - jnp.sum(rhs * volume) / volume_sum
+    )
     coefficients = _variable_diffusion_coefficients_3d(
         mobility,
         dx=dx,
@@ -1504,6 +1522,18 @@ def _solvax_pressure_poisson_duct(
         thin_wall_fluid_mask=thin_wall_fluid_mask,
     )
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
+    if mixed_axial_pressure:
+        coef_x_e = coef_x_e.at[-1].set(
+            2.0 * mobility[-1] / max(dx**2, 1.0e-12)
+        )
+        coefficients = (
+            coef_x_w,
+            coef_x_e,
+            coef_y_s,
+            coef_y_n,
+            coef_z_b,
+            coef_z_t,
+        )
 
     def diffusion_operator(field: jnp.ndarray) -> jnp.ndarray:
         x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
@@ -1512,6 +1542,10 @@ def _solvax_pressure_poisson_duct(
             mode_y="neumann",
             mode_z="neumann",
         )
+        if mixed_axial_pressure:
+            x_east = jnp.concatenate(
+                [field[1:], jnp.zeros_like(field[-1:])], axis=0
+            )
         return (
             coef_x_w * (x_west - field)
             + coef_x_e * (x_east - field)
@@ -1523,10 +1557,14 @@ def _solvax_pressure_poisson_duct(
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
         diffusion = diffusion_operator(field)
-        gauge = volume * jnp.sum(volume * field) / volume_sum
-        return -volume * diffusion + gauge
+        if mixed_axial_pressure:
+            return -volume * diffusion
+        gauge_term = volume * jnp.sum(volume * field) / volume_sum
+        return -volume * diffusion + gauge_term
 
-    diagonal = volume * sum(coefficients) + volume**2 / volume_sum
+    diagonal = volume * sum(coefficients)
+    if not mixed_axial_pressure:
+        diagonal = diagonal + volume**2 / volume_sum
 
     directions = (
         (0, -volume * coef_x_w, -volume * coef_x_e),
@@ -1536,7 +1574,9 @@ def _solvax_pressure_poisson_duct(
     if not include_axial_line:
         directions = directions[1:]
     line_precondition = _additive_line_preconditioner_3d(diagonal, directions)
-    axial_precondition = _axial_mean_preconditioner_3d(volume, coef_x_w, coef_x_e)
+    axial_precondition = _axial_mean_preconditioner_3d(
+        volume, coef_x_w, coef_x_e, gauge=not mixed_axial_pressure
+    )
 
     def precondition(residual):
         return line_precondition(residual) + axial_precondition(residual)
@@ -1565,7 +1605,7 @@ def _solvax_pressure_poisson_duct(
                 + coarse_correction(residual)
             )
 
-    linear_rhs = -volume * rhs_compatible
+    linear_rhs = -volume * solved_rhs
     effective_rtol = tolerance
     effective_atol = tolerance
     if local_tolerance is not None:
@@ -1593,13 +1633,14 @@ def _solvax_pressure_poisson_duct(
         solution,
         linear_rhs=linear_rhs,
         matvec=matvec,
-        local_residual_fn=lambda field: diffusion_operator(field) - rhs_compatible,
+        local_residual_fn=lambda field: diffusion_operator(field) - solved_rhs,
         volume=volume,
         precondition=precondition,
         iterations=iterations,
         effective_atol=effective_atol,
         local_tolerance=local_tolerance,
         single_reduction=single_reduction,
+        gauge=not mixed_axial_pressure,
     )
 
 
@@ -1707,8 +1748,16 @@ def _face_flux_pressure_projection_duct(
     initial_pressure: jnp.ndarray | None = None,
     single_reduction: bool = False,
     include_axial_line: bool = True,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Project duct velocities with a compatible finite-volume face flux."""
+    axial_pressure_mode: str = "neumann",
+    inlet_flow_rate: float | None = None,
+) -> tuple[jnp.ndarray, ...]:
+    """Project duct face fluxes and return their boundary flow rates."""
+
+    mixed_axial_pressure = axial_pressure_mode == _MIXED_AXIAL_PRESSURE_MODE
+    if mixed_axial_pressure != (inlet_flow_rate is not None):
+        raise ValueError("Mixed axial pressure requires one inlet flow rate")
+    if inlet_flow_rate is not None and inlet_flow_rate <= 0.0:
+        raise ValueError("Inlet flow rate must be positive")
 
     y0, y1, z0, z1 = (
         _rectangular_fluid_bounds(fluid_mask) if fluid_bounds is None else fluid_bounds
@@ -1730,6 +1779,16 @@ def _face_flux_pressure_projection_duct(
     wf = jnp.zeros((nx, ny, nz + 1), dtype=w.dtype)
     wf = wf.at[:, :, 1:-1].set(0.5 * (ws[:, :, 1:] + ws[:, :, :-1]))
 
+    face_area = dys[:, None] * dzs[None, :]
+    if inlet_flow_rate is not None:
+        target = jnp.asarray(inlet_flow_rate, dtype=u.dtype)
+        inlet_profile = jnp.maximum(us[0], 0.0)
+        estimated = jnp.sum(inlet_profile * face_area)
+        scaled = inlet_profile * target / jnp.maximum(estimated, 1.0e-20)
+        shifted = inlet_profile + (target - estimated) / jnp.sum(face_area)
+        inlet_profile = jnp.where(estimated > 0.5 * target, scaled, shifted)
+        uf = uf.at[0].set(inlet_profile)
+
     divergence = (
         (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
@@ -1749,12 +1808,17 @@ def _face_flux_pressure_projection_duct(
         ),
         single_reduction=single_reduction,
         include_axial_line=include_axial_line,
+        axial_pressure_mode=axial_pressure_mode,
     )
 
     mobility_x = _harmonic_mean(mobility[1:], mobility[:-1])
     uf = uf.at[1:-1].add(
         -mobility_x * (pressure[1:] - pressure[:-1]) / max(dx, 1.0e-12)
     )
+    if mixed_axial_pressure:
+        uf = uf.at[-1].add(
+            -mobility[-1] * (0.0 - pressure[-1]) / max(0.5 * dx, 1.0e-12)
+        )
     mobility_y = _harmonic_mean(mobility[:, 1:, :], mobility[:, :-1, :])
     y_distance = 0.5 * (dys[:-1] + dys[1:])
     vf = vf.at[:, 1:-1, :].add(
@@ -1782,20 +1846,28 @@ def _face_flux_pressure_projection_duct(
     full_v = jnp.zeros_like(v).at[:, y0:y1, z0:z1].set(projected_v)
     full_w = jnp.zeros_like(w).at[:, y0:y1, z0:z1].set(projected_w)
     full_p = jnp.zeros_like(u).at[:, y0:y1, z0:z1].set(pressure)
-    return full_u, full_v, full_w, full_p, jnp.max(jnp.abs(divergence_after))
+    inlet_flow = jnp.sum(uf[0] * face_area)
+    outlet_flow = jnp.sum(uf[-1] * face_area)
+    result = (
+        full_u,
+        full_v,
+        full_w,
+        full_p,
+        jnp.max(jnp.abs(divergence_after)),
+        inlet_flow,
+        outlet_flow,
+    )
+    return result if mixed_axial_pressure else result[:5]
 
 
-def _fixed_flow_face_flux_projection_duct(
+def _inlet_flow_outlet_pressure_projection_duct(
     u: jnp.ndarray,
     v: jnp.ndarray,
     w: jnp.ndarray,
     rho: jnp.ndarray,
     fluid_mask: jnp.ndarray,
-    unit_pressure_response: jnp.ndarray,
-    cell_area: jnp.ndarray,
     *,
-    target_flow_rate: float,
-    base_pressure_loss_gradient: float | jnp.ndarray,
+    inlet_flow_rate: float,
     dt: float,
     dx: float,
     dy: jnp.ndarray,
@@ -1804,92 +1876,49 @@ def _fixed_flow_face_flux_projection_duct(
     tolerance: float,
     fluid_bounds: tuple[int, int, int, int] | None = None,
     initial_pressure: jnp.ndarray | None = None,
-    validate_response: bool = True,
     single_reduction: bool = False,
     include_axial_line: bool = True,
-) -> tuple[
-    jnp.ndarray,
-    jnp.ndarray,
-    jnp.ndarray,
-    jnp.ndarray,
-    jnp.ndarray,
-    jnp.ndarray,
-    jnp.ndarray,
-    jnp.ndarray,
-]:
-    """Project a duct predictor while retaining its fixed-flow constraint.
+) -> tuple[jnp.ndarray, ...]:
+    """Project with one inlet integral-flow constraint and outlet pressure zero."""
 
-    The stationwise multiplier first supplies the spatially varying axial
-    pressure loss.  Projection then makes the face flux discretely solenoidal.
-    Its remaining *global* flow offset is removed with the x-invariant unit
-    response, which is itself divergence free and therefore cannot reopen the
-    projected continuity residual.
-    """
-
-    response_delta = unit_pressure_response - unit_pressure_response[:1]
-    if validate_response and float(jnp.max(jnp.abs(response_delta))) > 1.0e-12:
-        raise ValueError("Fixed-flow face projection requires an x-invariant response")
-    constrained_u, pressure_loss_gradient = _apply_fixed_flow_pressure_constraint(
+    projected = _face_flux_pressure_projection_duct(
         u,
-        unit_pressure_response=unit_pressure_response,
-        active_mask=fluid_mask,
-        cell_area=cell_area,
-        target_flow_rate=target_flow_rate,
-        base_pressure_loss_gradient=base_pressure_loss_gradient,
-        validate_response=validate_response,
-    )
-    projected_u, projected_v, projected_w, pressure, divergence = (
-        _face_flux_pressure_projection_duct(
-            constrained_u,
-            v,
-            w,
-            rho,
-            fluid_mask,
-            dt=dt,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=iterations,
-            tolerance=tolerance,
-            fluid_bounds=fluid_bounds,
-            initial_pressure=initial_pressure,
-            single_reduction=single_reduction,
-            include_axial_line=include_axial_line,
-        )
-    )
-    projected_flow = jnp.sum(
-        jnp.where(fluid_mask, projected_u * cell_area, 0.0), axis=(1, 2)
-    )
-    response_flow = jnp.sum(
-        jnp.where(fluid_mask, unit_pressure_response * cell_area, 0.0), axis=(1, 2)
-    )
-    mean_response = jnp.mean(response_flow)
-    if validate_response and float(jnp.abs(mean_response)) <= 1.0e-20:
-        raise ValueError("Fixed-flow face projection pressure response must be nonzero")
-    global_multiplier = (
-        jnp.asarray(target_flow_rate, dtype=u.dtype) - jnp.mean(projected_flow)
-    ) / mean_response
-    projected_u = jnp.where(
+        v,
+        w,
+        rho,
         fluid_mask,
-        projected_u + global_multiplier * unit_pressure_response,
-        0.0,
+        dt=dt,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+        iterations=iterations,
+        tolerance=tolerance,
+        fluid_bounds=fluid_bounds,
+        initial_pressure=initial_pressure,
+        single_reduction=single_reduction,
+        include_axial_line=include_axial_line,
+        axial_pressure_mode=_MIXED_AXIAL_PRESSURE_MODE,
+        inlet_flow_rate=inlet_flow_rate,
     )
-    pressure_loss_gradient = pressure_loss_gradient + global_multiplier
-    final_flow = jnp.sum(
-        jnp.where(fluid_mask, projected_u * cell_area, 0.0), axis=(1, 2)
+    u_next, v_next, w_next, pressure, divergence, inlet_flow, outlet_flow = projected
+    area = dy[None, :, None] * dz[None, None, :]
+    active_area = jnp.sum(jnp.where(fluid_mask, area, 0.0), axis=(1, 2))
+    mean_pressure = (
+        jnp.sum(jnp.where(fluid_mask, pressure * area, 0.0), axis=(1, 2))
+        / active_area
     )
-    flow_error = jnp.max(
-        jnp.abs(final_flow - jnp.asarray(target_flow_rate, dtype=u.dtype))
+    pressure_loss_faces = jnp.zeros((pressure.shape[0] + 1,), dtype=pressure.dtype)
+    pressure_loss_faces = pressure_loss_faces.at[1:-1].set(
+        -(mean_pressure[1:] - mean_pressure[:-1]) / max(dx, 1.0e-12)
     )
-    return (
-        projected_u,
-        projected_v,
-        projected_w,
-        pressure,
-        pressure_loss_gradient,
-        divergence,
-        flow_error,
+    pressure_loss_faces = pressure_loss_faces.at[-1].set(
+        mean_pressure[-1] / max(0.5 * dx, 1.0e-12)
     )
+    pressure_loss = 0.5 * (pressure_loss_faces[:-1] + pressure_loss_faces[1:])
+    flow_error = jnp.maximum(
+        jnp.abs(inlet_flow - inlet_flow_rate), jnp.abs(outlet_flow - inlet_flow_rate)
+    )
+    return u_next, v_next, w_next, pressure, pressure_loss, divergence, flow_error
 
 
 def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
@@ -6988,9 +7017,6 @@ def _solve_extruded_projection(
     dz_momentum = float(jnp.mean(dz))
     sigma = _broadcast_cross_section(materials.conductivity, nx)
     rho = _broadcast_cross_section(materials.density, nx)
-    minimum_fluid_density = float(
-        jnp.min(jnp.where(materials.fluid_mask, materials.density, jnp.inf))
-    )
     nu = _broadcast_cross_section(materials.viscosity, nx)
     fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
     fluid_bounds = (
@@ -7098,11 +7124,23 @@ def _solve_extruded_projection(
         1.0e-12,
     )
     dt = min(float(case.time_stepper.dt), stable_dt)
-    target_flow_rate = (
-        float(jnp.mean(jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))))
-        if initial_bundle is not None or case.initial_velocity != 0.0
-        else None
-    )
+    if use_alex_b2_finite_volume:
+        inlet = [bc for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate"]
+        outlet = [bc for bc in case.boundary_conditions if bc.kind == "outlet_pressure"]
+        if (
+            len(inlet) != 1
+            or len(outlet) != 1
+            or not isinstance(inlet[0].value, (int, float))
+            or outlet[0].value != 0.0
+        ):
+            raise ValueError("ALEX B2 requires one inlet flow rate and zero outlet pressure")
+        target_flow_rate = float(inlet[0].value)
+    else:
+        target_flow_rate = (
+            float(jnp.mean(jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))))
+            if initial_bundle is not None or case.initial_velocity != 0.0
+            else None
+        )
     outer_steps = max(
         2, min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
     )
@@ -7242,24 +7280,6 @@ def _solve_extruded_projection(
                 _enforce_fluid_mask_3d(w_full, mask),
             )
 
-        def pressure_response(density, viscosity, mask):
-            rhs = dt / density[:, y0:y1, z0:z1]
-            scale = dt / minimum_fluid_density
-            response, _, _ = diffusion_solve(
-                rhs / scale,
-                viscosity[:, y0:y1, z0:z1],
-                jnp.zeros_like(rhs),
-            )
-            response = scale * response
-            response = jnp.broadcast_to(
-                jnp.mean(response, axis=0, keepdims=True), response.shape
-            )
-            return (
-                jnp.zeros_like(mask, dtype=response.dtype)
-                .at[:, y0:y1, z0:z1]
-                .set(response)
-            )
-
         if field_sharding is not None:  # pragma: no cover - hardware gate
             axial_momentum_solve = jax.jit(
                 axial_momentum_solve,
@@ -7284,11 +7304,6 @@ def _solve_extruded_projection(
                 in_shardings=(field_sharding,) * 4,
                 out_shardings=(field_sharding,) * 3,
             )
-            pressure_response = jax.jit(
-                pressure_response,
-                in_shardings=(field_sharding,) * 3,
-                out_shardings=field_sharding,
-            )
             axial_momentum_solve = _reuse_fringing_jit(
                 ("axial_momentum", *kernel_key), axial_momentum_solve
             )
@@ -7298,10 +7313,7 @@ def _solve_extruded_projection(
             embed_velocity = _reuse_fringing_jit(
                 ("embed_velocity", *kernel_key), embed_velocity
             )
-            pressure_response = _reuse_fringing_jit(
-                ("pressure_response", *kernel_key), pressure_response
-            )
-        unit_pressure_response = pressure_response(rho, nu, fluid_mask)
+
     else:
         unit_pressure_response = _enforce_velocity_bc_3d(
             jnp.where(fluid_mask, dt / rho, 0.0), fluid_mask
@@ -7315,17 +7327,14 @@ def _solve_extruded_projection(
         # line crosses shards, dilutes those blocks, and regresses PCG scaling.
         use_axial_line_preconditioner = False
 
-        def fixed_flow_projection(u0, v0, w0, pressure0, rho0, mask0, response0, area0):
-            return _fixed_flow_face_flux_projection_duct(
+        def mixed_boundary_projection(u0, v0, w0, pressure0, rho0, mask0):
+            return _inlet_flow_outlet_pressure_projection_duct(
                 u0,
                 v0,
                 w0,
                 rho0,
                 mask0,
-                response0,
-                area0,
-                target_flow_rate=target_flow_rate,
-                base_pressure_loss_gradient=forcing,
+                inlet_flow_rate=target_flow_rate,
                 dt=dt,
                 dx=dx,
                 dy=dy,
@@ -7334,7 +7343,6 @@ def _solve_extruded_projection(
                 tolerance=projection_tolerance,
                 fluid_bounds=fluid_bounds,
                 initial_pressure=pressure0,
-                validate_response=field_sharding is None,
                 single_reduction=field_sharding is not None,
                 include_axial_line=use_axial_line_preconditioner,
             )
@@ -7444,9 +7452,9 @@ def _solve_extruded_projection(
             state_sharding = NamedSharding(
                 field_sharding.mesh, P(None, "x", None, None)
             )
-            fixed_flow_projection = jax.jit(
-                fixed_flow_projection,
-                in_shardings=(field_sharding,) * 8,
+            mixed_boundary_projection = jax.jit(
+                mixed_boundary_projection,
+                in_shardings=(field_sharding,) * 6,
                 out_shardings=(
                     field_sharding,
                     field_sharding,
@@ -7493,7 +7501,7 @@ def _solve_extruded_projection(
                 out_shardings=(field_sharding,) * 4,
             )
             (
-                fixed_flow_projection,
+                mixed_boundary_projection,
                 electric_solve,
                 emf_operator,
                 reconstruct_electric,
@@ -7504,7 +7512,7 @@ def _solve_extruded_projection(
             ) = tuple(
                 _reuse_fringing_jit((name, *kernel_key), function)
                 for name, function in (
-                    ("fixed_flow", fixed_flow_projection),
+                    ("mixed_boundary", mixed_boundary_projection),
                     ("electric", electric_solve),
                     ("emf", emf_operator),
                     ("reconstruct", reconstruct_electric),
@@ -7572,8 +7580,6 @@ def _solve_extruded_projection(
             w_star = _enforce_velocity_bc_3d(w_star, fluid_mask)
 
         if use_alex_b2_finite_volume:
-            if target_flow_rate is None:
-                raise ValueError("ALEX B2 requires its frozen fixed mean flow rate")
             (
                 u_next,
                 v_next,
@@ -7582,15 +7588,13 @@ def _solve_extruded_projection(
                 axial_pressure_loss_gradient,
                 projected_divergence_norm,
                 fixed_flow_error,
-            ) = fixed_flow_projection(
+            ) = mixed_boundary_projection(
                 u_star,
                 v_star,
                 w_star,
                 p,
                 rho,
                 fluid_mask,
-                unit_pressure_response,
-                cell_area,
             )
             p_corr = _clip_state(p_corr, scalar_limit)
             u_next = _clip_state(u_next, velocity_limit)
