@@ -24,6 +24,18 @@ The Hunt poster links to a 130 KB H.264 movie derived from the original
 10.6 MB GIF with the duration preserved (SHA-256
 `6dfcb77f5c849b9a3858ce0b82df05bae1bf0294a4111abd32798696f0a4c073`).
 
+The README also uses six release-hosted derivatives so geometry, nonuniform
+fields, differentiation, magnetic obstacles, and blanket transients are visible
+without enlarging the checkout. Together they are about 288 KB: WebP stills
+are 28--64 KB and the H.264 movie is 72 KB. Their SHA-256 values are:
+
+- `readme-autodiff.webp`: `f2add9fe96a044a082a3b0ca28a3de50b71a0961399ac362caf2ebcaa049aa28`
+- `readme-geometries.webp`: `e844f069475fa625279e229a3e8499ae816308b88c8d1d33afb4fb14077bf700`
+- `readme-variable-field.webp`: `5d4b593c26a55cb031678988133ba2f6ddeae5e0cbee16a0e166282584bce569`
+- `readme-magnetic-obstacle.webp`: `6e351e80531742b1aed6f951d6155cc55d3f5fd4f3e9b556a15336f76a74bc84`
+- `readme-blanket-flow-poster.webp`: `f40dff36a41bdfc1fa9df7371cf9c4907a367d70c5603a4658a18d27f708260d`
+- `readme-blanket-flow.mp4`: `fb426241143c3e6f4d726b0d40b9918de55271b5990888077d9181834035b2cc`
+
 Examples write new media beneath `artifacts/`. Before publication, compress
 PNG files, encode movies for the web, create a poster image, and upload the
 bundle to a versioned GitHub or Zenodo release. The release record must include

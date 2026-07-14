@@ -1,245 +1,196 @@
 # LMX authoritative development plan
 
-This is the single project plan. It replaces historical task logs and campaign
-ledgers. Evidence belongs in compact benchmark records, tests, documentation,
-or versioned release assets—not in new top-level project trees.
+This is the single project plan. It records priorities and gates, not campaign
+history. Detailed metrics, rejected probes, checksums, and raw outputs belong in
+`benchmarks/results/`, the validation docs, or versioned release assets.
 
 ## Product target
 
 LMX will be a lightweight JAX code for accurate, end-to-end differentiable
-inductionless liquid-metal MHD on CPUs and GPUs. FreeMHD and published
-solutions are independent references. Stable claims require reproducible
-physics, numerical, gradient, and performance evidence.
+inductionless liquid-metal MHD on CPUs and GPUs. Stable claims require
+analytical or manufactured verification, conservation and convergence,
+independent-code or experimental evidence where available, and reproducible
+performance measurements.
 
 The public repository has four working surfaces:
 
-- `lmx/`: source code and the `lmx` command
-- `tests/`: unit, numerical, physics, regression, and workflow tests
-- `examples/`: bounded first-run programs and reusable TOML inputs
-- `docs/`: theory, inputs, validation, performance, and development guidance
+- `lmx/`: source and the `lmx` command;
+- `tests/`: bounded unit, numerical, physics, regression, and workflow checks;
+- `examples/`: small runnable Python and TOML workflows;
+- `docs/`: theory, inputs, validation, performance, and development guidance.
 
-Root files are limited to packaging, licensing, citation, contribution,
-changelog, README, and this plan. Large outputs, raw external-code runs,
-movies, meshes, and manuscript bundles belong in GitHub or Zenodo releases.
+Large fields, raw external-code runs, meshes, full-resolution figures, and
+movies belong in GitHub or Zenodo releases, not Git.
 
-## Non-negotiable gates
+## Operating contract
 
-Every promoted change must satisfy all applicable gates:
+### Small first
 
-1. The complete portable suite finishes within 600 seconds on the reference
-   Mac and in CI.
-2. Branch coverage of `lmx/` remains at least 95%.
-3. All public functionality has a bounded test; physics claims additionally
-   have conservation, convergence, manufactured-solution, analytical, or
-   independent-reference evidence.
-4. Differentiable paths compare gradients with finite differences or an
-   independent transpose/adjoint and control primal and transpose residuals.
-5. CPU and GPU performance reports separate compilation from warm runtime,
-   verify equivalent solutions, report memory, and state device placement.
-6. Multi-device claims use real sharding and include one-device baselines,
-   speedup, efficiency, and numerical parity.
-7. The wheel contains no benchmark archives or generated media.
-8. Dependencies use compatible release ranges unless an upstream regression
-   is documented with an issue and a temporary bounded pin.
+Every experiment declares one hypothesis, frozen metrics, a wall-time ceiling,
+a stop rule, and a go/no-go threshold before launch. Escalation is:
 
-## Validation ladder
+1. static, analytical, plotting-only, or tiny-grid check;
+2. bounded one-device smoke run;
+3. medium confirmation only after the smoke gate passes;
+4. fine, external-code, or multi-hour campaign only after all earlier gates.
 
-| Level | Required evidence | Current state |
+Existing checksummed data are reused when they answer the question. A failed or
+unpromising bounded probe stops; parameter searches do not expand by inertia.
+
+### Test only what changed
+
+- During development: lint/static checks plus the directly affected tests,
+  normally under two minutes.
+- At a coherent subsystem boundary: the affected test modules and repository
+  gates, normally under five minutes.
+- Once per green tranche and in CI/release: the complete covered portable gate,
+  with a 300-second engineering target and 600-second hard limit.
+- External FreeMHD, accelerator, and mesh-refinement campaigns remain explicit
+  manual or scheduled lanes with portable representative tests.
+
+Branch coverage of `lmx/` remains at least 95%. Coverage is not physics
+validation; promoted claims also need the relevant conservation, convergence,
+gradient, literature, or independent-code gate.
+
+### Parallel work without contaminated evidence
+
+Use subagents for disjoint literature, code-ownership, media, and validation
+audits. One integrator owns shared files. Run independent non-timing checks in
+parallel; run performance measurements alone on the measured host. Commit and
+push every coherent green tranche, keep `main` authoritative, and remove
+superseded worktrees and branches.
+
+## Current status
+
+| Area | Status | Next acceptance gate |
 |---|---|---|
-| A: fully developed ducts | Hartmann, Shercliff, Hunt profiles; current and power balance; mesh convergence | verified for documented bounded cases |
-| A-high: high-Ha ducts | all Samper Table I rows under one solver policy | accepted baseline |
-| FreeMHD parity | matched equations, geometry, mesh ladder, observables, checksums | closed-channel bounded parity accepted |
-| B1: fringing pipe | ALEX specification, conservative current, pressure projection, steady response | solver path improved; final external acceptance open |
-| B2: fringing square duct | published profile/pressure observables and mesh ladder | specification frozen; acceptance open |
-| Q2D and magnetic obstacle | model invariants first, independent turbulent/experimental reference second | research-stage |
-| Blanket and wall models | unit audits, limiting cases, mesh convergence, current closure | research-stage |
+| README and docs | concise feature-led README, sourced comparison, compressed release media | keep claims and media checks current |
+| Fully developed ducts | Hartmann, Shercliff, Hunt, and all eight high-Ha rows accepted | preserve regression gates |
+| FreeMHD closed channels | bounded Shercliff/Hunt parity accepted | do not generalize to full FreeMHD parity |
+| B1 ALEX pipe | retained-modal numerics, conservation, and restart accepted | exact matched FreeMHD plus literature/mesh acceptance |
+| B2 ALEX square duct | fine numerical baseline converged; experimental acceptance open | resolve transverse-only versus Maxwell-consistent field with matched FreeMHD |
+| SOLVAX | 0.8.2 primal, gradient, transpose, CPU/GPU, and existing integration gates pass | remove remaining safe LMX duplicates; repeat interleaved timing |
+| Parallel execution | two-GPU B2 numerical checkpoint shows 1.66x speedup and parity | accepted-case CPU/GPU scaling and four-device evidence |
+| Portable quality | 771 pass, 8 expected external-data skips, 95.31% branch coverage, 194.4 s | stay below 300 s target and 600 s hard limit |
 
-Results that fail a strict gate remain useful diagnostic evidence but are never
-presented as validation.
+Machine-readable evidence is in `benchmarks/results/`; current interpretation is
+in `docs/validation_report.md` and `docs/performance.md`.
 
-## Work sequence
+## Priority 1: user surface and claim audit
 
-### 1. Repository consolidation
+- Keep the README below roughly 800 words: pitch, quickstart, sourced capability
+  table, and short visual sections for verified ducts, geometries/fringe fields,
+  differentiation, research workflows, and scaling.
+- Verify LMX/FreeMHD/NekRS comparisons against primary papers or official docs.
+- Give every major feature a relevant plot or movie poster; never use a generic
+  “selected media” gallery.
+- Keep tracked documentation media below 1 MiB, stills below 100 KiB, and
+  movies below 150 KiB where practical. Store full-resolution sources and large
+  outputs in checksummed releases.
+- Add a plotting-only B2/ALEX field and pressure panel from existing compact
+  records, explicitly labelled “acceptance open”; do not rerun a solver for it.
 
-- Remove internal campaign, study, external-code Docker, and status-dashboard
-  trees from the source repository.
-- Keep reusable inputs under `examples/cases/`.
-- Retain only compact benchmark specifications, reference observables, and
-  accepted summaries needed by tests.
-- Reduce maintenance scripts to a small set of package/release commands;
-  migrate reusable logic into `lmx/` and call it through the CLI.
-- Collapse historical closure documents into current validation and
-  development pages.
-- Keep a small compressed image set in docs; serve movies and full result
-  bundles from releases with hashes.
-- Consolidate accepted work onto `main`, then delete superseded local and
-  remote branches.
+Exit: a new user can understand scope, run a first case, see representative
+results, and distinguish verified from research-stage functionality without
+reading internal campaign history.
 
-Exit: a new user can understand the repository from README, `examples/`, and
-the docs index without learning internal campaign terminology.
+## Priority 2: SOLVAX ownership and measurable slimming
 
-### 2. Solver architecture slimming
+LMX owns MHD equations, geometry, materials, boundary/interface conditions,
+finite-volume assembly, gauges, observables, sharding policy, checkpoints, and
+physical acceptance. SOLVAX owns generic linear algebra once parity is proved.
 
-- Split oversized implementation modules only at stable conceptual boundaries;
-  remove compatibility wrappers and duplicate diagnostic/plotting paths first.
-- Prefer pure array kernels, immutable configuration, explicit diagnostics, and
-  short public functions with type hints and concise docstrings.
-- Delegate generic linear algebra to current SOLVAX releases where parity,
-  differentiation, compilation, and performance gates pass.
-- Keep one implementation per numerical operation; retain alternatives only as
-  tested backends with a documented purpose.
-- Establish file, line, import-time, and wheel-size budgets in the architecture
-  test.
+Apply this migration sequence:
 
-Exit: public APIs are documented, implementation ownership is obvious, and
-source lines decrease without reducing tested functionality.
+1. Remove obsolete optional-SOLVAX guards, empty accelerator extras, and stale
+   version errors; SOLVAX is a required compatible dependency.
+2. Consolidate five-point SPD velocity solves on `pcg_linear_solve`, retaining
+   LMX physical maximum-residual recertification; remove duplicate CG/Lineax
+   implementations and mock-only tests.
+3. Replace the custom periodic-theta line solve with SOLVAX
+   `cyclic_tridiagonal_solve` after duct/pipe primal and gradient parity.
+4. Reformulate anchored Poisson operators symmetrically before moving them to
+   SOLVAX PCG. Do not apply PCG to the current nonsymmetric row-replacement form.
+5. Add and release a symmetry-preserving additive-line preconditioner in SOLVAX,
+   then delete the LMX duplicate. Keep geometry adaptation in LMX.
 
-### 3. Fast portable test architecture
+Do not yet delegate finite-iteration autodiff Jacobi, modal B1 geometry solves,
+variable-coefficient FV assembly, physical fixed-point loops, or nonlinear
+coupling to affine/Newton–Krylov APIs. SOLVAX single-reduction PCG and sharding-
+preserving GMRES need real 1/2/4-device evidence before distributed claims.
 
-- Merge tests by subsystem and behavior, not by historical task.
-- Mark tests as unit, numerical, physics, regression, validation, or external.
-- Run bounded representative grids in the full gate; keep expensive refinement
-  and external-solver campaigns manual or scheduled.
-- Cache JAX compilation where safe, group same-shape tests, and use process
-  parallelism only where it reduces wall time and memory remains bounded.
-- Record test count, skips, branch coverage, wall time, and slowest tests.
+Every delegation must pass primal, residual, gradient/transpose, JIT, placement,
+memory, and repeated interleaved warm-timing gates. Delete the LMX duplicate in
+the same tranche when SOLVAX passes.
 
-Exit: the full suite is under ten minutes, over 95% branch coverage, and each
-functionality/physics claim maps to at least one test.
+Near-term ratchets after this workstream:
 
-### 4. B1/B2 fringing acceptance
+| Surface | Current | Next target |
+|---|---:|---:|
+| package modules | 36 | no growth; remove a module when ownership permits |
+| package lines | 35,370 | below 35,100 |
+| maintained-core lines | 8,498 | below 8,300 |
+| test files / lines | 34 / 21,699 | no new files; below 21,550 lines |
+| maintenance scripts | 20 | below 19; reusable logic moves into `lmx/` or an existing command |
 
-- The separated retained-mode B1 pressure path is promoted after
-  small/medium/large parity and restart gates.
-- The large-grid physical-convergence pilot reduces pressure work while
-  preserving conservation and projection residuals.
-- Run matched ALEX B1/B2 meshes and observables against digitized literature
-  data and FreeMHD where formulations overlap.
-- Assemble three source-identical mesh campaigns with the tested frozen
-  uncertainty, refinement, wall/tolerance, and checksummed FreeMHD evaluator.
-- Publish compact tables and compressed plots; place full fields and movies in
-  a release.
+Count semantic maintenance cost across the whole package; do not satisfy a
+budget through formatting or by relabelling a large module “research-stage.”
 
-Exit: both benchmarks have frozen inputs, reference provenance, mesh evidence,
-observable tolerances, and reproducible accepted records.
+## Priority 3: one exact matched FreeMHD harness
 
-### 5. Parallel CPU/GPU execution
+- Freeze equations, nondimensionalization, geometry, magnetic field, wall
+  model, boundaries, mesh mapping, drive, stopping rules, and observables.
+- Record source, input, evaluator, dependency, and output hashes for both codes.
+- Establish tiny exact cases first, then use the same harness for B2 and B1.
+- Keep FreeMHD cases and large outputs outside the LMX repository; retain only
+  compact specifications, evaluators, and accepted summaries.
 
-- Make the production state explicitly shardable and remove host-staged
-  collectives from timed regions.
-- Validate single-device CPU/GPU equivalence before scaling.
-- Measure fixed-size strong scaling on Mac CPU cores and the two office GPUs,
-  including compilation, warm solve time, memory, speedup, and efficiency.
-- Use multi-process GPU assignment only for independent cases; use JAX sharding
-  for one distributed solve.
-- Add performance regression thresholds only for stable, low-variance kernels.
+Exit: an exact-case record cannot pass unless both codes demonstrably solved the
+same problem and evaluated the same observable.
 
-Exit: at least one accepted production benchmark demonstrates useful
-multi-device scaling with identical physics; unsupported paths say so clearly.
+## Priority 4: B2 field correctness, then acceptance
 
-### 6. Research release
+- Compare transverse-only and Maxwell-consistent fringe fields in tiny/coarse
+  LMX and FreeMHD cases. Check field curl/divergence, conservation, steady state,
+  restart identity, and the ALEX pressure observable.
+- Decide the field model from source-backed matched evidence, not peak agreement
+  alone. The current Maxwell-consistent pilot is diagnostic, not validation.
+- Advance to medium and fine only when coarse FreeMHD/literature error improves
+  for the correct physical reason.
+- Resume tight-tolerance or outer-acceleration work only after formulation parity.
 
-- Build docs with warnings as errors, build and inspect wheel/sdist, and install
-  the wheel in a clean environment.
-- Run the portable quality gate, selected external validations, gradient gates,
-  and accepted CPU/GPU scaling protocol.
-- Publish package artifacts plus checksummed research assets and cite exact
-  commits, environments, references, tolerances, and known limitations.
+Exit: B2 has source-identical three-mesh, wall/tolerance, literature, and exact
+FreeMHD evidence with frozen tolerances and a reproducible accepted record.
 
-Exit: the release is installable, reproducible, honestly scoped, and suitable
-for external research use.
+## Priority 5: B1 external acceptance
 
-## Current checkpoint
+Apply the shared exact-case protocol to the promoted retained-modal solver:
+small parity, medium mesh independence, then one final large confirmation only
+if required. Publish compact pressure/conservation tables and compressed plots;
+keep full fields in release assets.
 
-- Portable gate: 768 passed, 8 expected external-data skips, 95.30% branch
-  coverage, 172.9 seconds on the reference Mac.
-- SOLVAX: compatible `>=0.8.2,<1`; 0.8.2 supplies the tested SPD Galerkin
-  deflation primitive and passes its Linux/macOS, minimum/current-stack, JIT,
-  positive-definiteness, accuracy, and PCG-acceleration gates.
-- SOLVAX GPU refresh: 0.8.2 passes forward, gradient, independent-transpose,
-  residual, memory, placement, and Hartmann gates. Its one-shot warm-time ratio
-  was 1.184 against a 1.10 ceiling; an immediate 0.8.1 control also failed at
-  1.155. The PCG source is unchanged, so timing promotion remains open pending
-  a repeated, interleaved protocol; both raw records are release assets.
-- B1 retained modes: separated real `m=0` and complex `m=1..4` block factors
-  pass factor parity and reduce medium restart time from 24.12 to 10.63 seconds.
-- Large B1 pressure gate: a one-cycle physical-convergence pilot reduces the
-  `21 x 24 x 64` solve-plus-restart ceiling from 768 to 669 Krylov iterations;
-  all four projections, divergence, fixed-flow, and charge gates pass.
-- B1 promotion: small factor parity, medium and large field/pressure-observable
-  parity, and large restart gates pass; the compatible retained-modal solver is
-  now the sole frozen B1 pressure path.
-- B2 coarse independence: all steady, conservation, tolerance, iteration, and
-  confirmation-wall gates pass on current source; the coarse ALEX curve remains
-  outside the frozen literature limits, so medium/fine refinement is required.
-- B2 medium independence: the source-identical `152 x 113 x 113` baseline,
-  tight-tolerance, doubled-iteration, and confirmation-wall records pass every
-  steady and conservation gate on two real GPU shards. Relative to the frozen
-  uncertainty, the tolerance and iteration deltas are `5.781e-4` and
-  `5.784e-4`; the thin-wall relative difference is `9.26e-14`. Tight convergence
-  required 7,720.92 seconds across two restart-safe segments; the three final
-  confirmation runs took 57.64, 34.94, and 57.10 seconds from that restart.
-  The fine continuation was checkpointed after 112 effective updates at
-  residual `6.505e-5`. Axial-line, transverse-only, rediscretized, and
-  multiplicative-coarse probes were rejected. The promoted region-preserving
-  transverse Galerkin correction uses shard-local fast diagonalization and
-  retains the axial coarse mode. On the identical fine checkpoint it reduced
-  electric PCG from 1,200/1,200 to 232/231 iterations and warm two-update time
-  from 183.37 to 98.12 seconds (1.87x); it also beat the previously accepted
-  109.18-second baseline by 1.11x. Residual histories agree within `1.67e-16`,
-  field norms are identical, and physical and placement gates pass. Resume the
-  fine acceptance continuation with this solver. A bounded 12-update replay
-  then reached `6.3606e-5` in 177.37 seconds, but its asymptotic reduction of
-  `1.80e-8` per update projects only `6.152e-5` at the 128-update ceiling. The
-  valid 115 MiB checkpoint is a release asset. Matched probes rejected Anderson
-  (residual growth) and the frozen Aitken floor of 0.05 (under-relaxed plateau).
-  Aitken with minimum relaxation 2.0 decreased monotonically to `5.9578e-5` in
-  eight restart-safe updates, with charge/divergence and 231--234-iteration
-  electric gates passing. The frozen B2 specification now uses that floor;
-  the resumed fine baseline passed in 28 updates and 457.37 seconds at residual
-  `4.8760e-5`. Doubled-iteration and confirmation-wall runs passed in three
-  updates each, and their observables agree to `1.76e-13` relative. The tighter
-  variant reached a durable 48-update checkpoint at `3.4770e-5`, above its
-  `2.5e-5` target. Dynamic Aitken plateaued while settled relaxation 3 and 4
-  oscillated; componentwise Aitken then diverged to `5.18e-3`, so the bounded
-  outer search is closed. The fine curve misses the frozen ALEX weighted RMS,
-  weighted maximum, and integrated-error gates at `1.389`, `4.218`, and `0.251`.
-  The original ALEX report confirms the implemented transverse-pressure tap and
-  normalization. A Maxwell-consistent coarse field pilot reduced peak
-  underprediction from 15.6% to 8.2%, consistent with the independent published
-  field study, and passed steady, divergence, charge, and two-shard gates in
-  91.53 seconds. Its far-field pressure offset worsened aggregate error, so it
-  remains diagnostic. Add one opt-in in-source vector-field path and compare it
-  with matched transverse-only and vector-field FreeMHD cases before another
-  fine campaign or outer-method search. Fine numerical independence and
-  experimental acceptance remain open; checksummed raw fields, results, and the
-  tight restart are release assets.
-- B2 mesh initialization: tested physical-coordinate trilinear prolongation
-  maps the real coarse state to the two-GPU medium mesh in 1.70 seconds; refined
-  fields remain provisional until the solver reprojects and passes every gate.
-- GPU: accepted B2 checkpoint scales from 36.96 seconds on one A4000 to 22.23
-  seconds on two (1.66x, 83.1% efficiency).
-- Mac CPU placement: the sharded operator reaches 1.28x on four devices for a
-  divisible fixed problem; six devices are slower, and production-solve scaling
-  remains open until matching validated restarts are available.
-- Frozen B2 runner: `--spatial-devices 2` rounds only the odd axial minimum to
-  an equal-shard mesh and records/enforces actual device placement; a bounded
-  two-A4000 production solve passes steady and conservation gates in 38.81
-  seconds including compilation, with two recorded addressable shards.
-- Repository consolidation: the root provenance tree and historical campaign,
-  Docker, dashboard, support/security, and duplicate driver surfaces are gone.
-  The maintained checkout has 34 test files, 20 maintenance scripts, 13 compact
-  accepted-result files, and no remote development branches beyond `main`.
-- Architecture: 36 package modules, 35,320 package lines, 8,474 maintained-core
-  lines, a 3.66 MiB tracked checkout, and a 291,697-byte wheel. Live gates cap
-  modules, lines, bytes, lazy import time, examples, exports, and wheel contents.
-- Documentation media: six anonymous-access derivatives total 516 KB and stay
-  out of the wheel; full-resolution fields, plots, and movies remain checksummed
-  release assets.
+Exit: B1 has frozen literature, mesh, conservation, and exact-FreeMHD acceptance.
 
-## Decision rule
+## Priority 6: accepted-case CPU/GPU scaling
 
-Optimize the accepted physics path, not a proxy kernel. When two approaches are
-equivalent, choose the one with fewer concepts, files, and lines. When evidence
-is incomplete, label the feature research-stage and keep the stable surface
-small.
+- Confirm CPU/GPU and one-/multi-device numerical equivalence before timing.
+- Separate compilation from repeated warm solves and report uncertainty, memory,
+  placement, speedup, and efficiency.
+- Measure fixed-size Mac 1/2/4-device CPU scaling and office one-/two-GPU
+  sharding; add a four-GPU point only on suitable hardware.
+- Independent-case multiprocessing is throughput evidence, not one-solve scaling.
+- Add CI timing thresholds only for stable, low-variance kernels.
+
+Exit: at least one physics-accepted production case demonstrates useful strong
+scaling with identical observables.
+
+## Priority 7: release
+
+Consolidate tests and scripts while preserving one bounded check per public
+capability. Build docs with warnings as errors, verify provenance and media,
+build and inspect wheel/sdist, install the wheel in a clean environment, run the
+portable gate and selected accepted external/gradient/scaling lanes, then publish
+exact commits, environments, references, tolerances, limitations, and assets.
+
+Exit: the release is small, installable, reproducible, honestly scoped, and
+suitable for external research use.
