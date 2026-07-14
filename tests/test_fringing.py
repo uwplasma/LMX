@@ -835,42 +835,58 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
     assert tangent == pytest.approx(2.0 * action, abs=3.0e-5)
 
 
+def test_compact_duct_mass_flux_codec_and_initializer_match_fv_faces():
+    shape = (2, 2, 2)
+    compact = jnp.arange(24.0).reshape((3, *shape))
+    inlet = jnp.arange(4.0).reshape(shape[1:])
+    full = jax.jit(fringing_impl._unpack_duct_mass_flux)(compact, inlet)
+    repacked = jax.jit(fringing_impl._pack_duct_mass_flux)(full)
+    assert all(jnp.array_equal(a, b) for a, b in zip(repacked, (compact, inlet), strict=True))
+    assert jnp.all(full[1][:, 0] == 0.0) and jnp.all(full[2][:, :, 0] == 0.0)
+    assert compact.size + inlet.size == 3 * np.prod(shape) + np.prod(shape[1:])
+    velocity = jnp.arange(24.0).reshape((*shape, 3)) / 7.0
+    density = 1.0 + jnp.arange(8.0).reshape(shape) / 10.0
+    inlet_velocity = velocity[0] + jnp.asarray([0.4, -2.0, 3.0])
+    dy, dz, dx = jnp.asarray([0.3, 0.7]), jnp.asarray([0.2, 0.8]), 0.4
+    def initialize(scale):
+        return fringing_impl._initialize_duct_mass_flux(
+            scale * velocity, density, scale * inlet_velocity, dx=dx, dy=dy, dz=dz)
+    plus, initialized_inlet = jax.jit(initialize)(jnp.asarray(1.0))
+    momentum = np.asarray(density[..., None] * velocity)
+    expected_x = np.concatenate((0.5 * (momentum[:-1, ..., 0] + momentum[1:, ..., 0]),
+        momentum[-1:, ..., 0])) * np.outer(dy, dz)
+    expected_y = np.concatenate((0.7 * momentum[:, :-1, :, 1] + 0.3 * momentum[:, 1:, :, 1],
+        np.zeros_like(momentum[:, :1, :, 1])), axis=1) * dx * dz[None, None]
+    expected_z = np.concatenate((0.8 * momentum[:, :, :-1, 2] + 0.2 * momentum[:, :, 1:, 2],
+        np.zeros_like(momentum[:, :, :1, 2])), axis=2) * dx * dy[None, :, None]
+    assert plus == pytest.approx(np.stack((expected_x, expected_y, expected_z)))
+    assert initialized_inlet == pytest.approx(density[0] * inlet_velocity[..., 0] * jnp.outer(dy, dz))
+    tangent = jax.jvp(initialize, (1.0,), (1.0,))[1]
+    assert all(jnp.allclose(a, b) for a, b in zip(tangent, (plus, initialized_inlet), strict=True))
+
+
 def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     nx, ny, nz = 5, 6, 5
     dy = jnp.asarray([0.2, 0.3, 0.45, 0.4, 0.35, 0.3])
     dz = jnp.asarray([0.25, 0.4, 0.5, 0.45, 0.3])
-    x = jnp.linspace(0.0, 1.0, nx)[:, None, None]
-    y = jnp.linspace(-1.0, 1.0, ny)[None, :, None]
-    z = jnp.linspace(-1.0, 1.0, nz)[None, None, :]
+    x = jnp.linspace(0.0, 1.0, nx).reshape(nx, 1, 1)
+    y = jnp.linspace(-1.0, 1.0, ny).reshape(1, ny, 1)
+    z = jnp.linspace(-1.0, 1.0, nz).reshape(1, 1, nz)
     u = jnp.cos(2.0 * jnp.pi * x) * (1.0 + 0.1 * y) * jnp.ones_like(z)
     v = 0.2 * jnp.sin(jnp.pi * y) * jnp.ones_like(x + z)
     w = -0.15 * jnp.sin(jnp.pi * z) * jnp.ones_like(x + y)
-    mask = jnp.ones((nx, ny, nz), dtype=bool)
-    projected = _face_flux_pressure_projection_duct(
-        u,
-        v,
-        w,
-        jnp.ones_like(u),
-        mask,
-        dt=0.05,
-        dx=0.25,
-        dy=dy,
-        dz=dz,
-        iterations=200,
-        tolerance=1.0e-10,
-    )
-    projected_u, projected_v, projected_w, pressure, divergence = projected
+    projected_u, projected_v, projected_w, pressure, divergence = _face_flux_pressure_projection_duct(
+        u, v, w, jnp.ones_like(u), jnp.ones((nx, ny, nz), dtype=bool), dt=0.05,
+        dx=0.25, dy=dy, dz=dz, iterations=200, tolerance=1.0e-10)
     assert divergence < 1.0e-8
-    assert jnp.isfinite(projected_u).all()
-    assert jnp.isfinite(projected_v).all()
-    assert jnp.isfinite(projected_w).all()
-    assert jnp.isfinite(pressure).all()
+    assert all(jnp.isfinite(value).all() for value in (
+        projected_u, projected_v, projected_w, pressure))
 
 
 def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     shape = (4, 2, 2)
-    dx = 0.25
-    widths = jnp.asarray([0.5, 0.5])
+    dx, widths = 0.25, jnp.asarray([0.5, 0.5])
+    settings = dict(dx=dx, dy=widths, dz=widths, iterations=100, tolerance=1.0e-10)
     expected_pressure = jnp.broadcast_to(
         jnp.asarray([4.0, 3.0, 2.0, 1.0])[:, None, None], shape
     )
@@ -878,30 +894,14 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     pressure, *_ = _solvax_pressure_poisson_duct(
         rhs,
         jnp.ones(shape),
-        dx=dx,
-        dy=widths,
-        dz=widths,
-        iterations=100,
-        tolerance=1.0e-10,
+        **settings,
         axial_pressure_mode=fringing_impl._MIXED_AXIAL_PRESSURE_MODE,
     )
     assert pressure == pytest.approx(expected_pressure, abs=1.0e-7)
-
     zeros = jnp.zeros(shape)
     projected = _face_flux_pressure_projection_duct(
-        zeros,
-        zeros,
-        zeros,
-        jnp.ones(shape),
-        jnp.ones(shape, dtype=bool),
-        inlet_flow_rate=0.2,
-        dt=0.1,
-        dx=dx,
-        dy=widths,
-        dz=widths,
-        iterations=100,
-        tolerance=1.0e-10,
-    )
+        zeros, zeros, zeros, jnp.ones(shape), jnp.ones(shape, dtype=bool),
+        inlet_flow_rate=0.2, dt=0.1, **settings)
     _, _, _, projected_pressure, pressure_loss, divergence, flow_error = projected
     assert divergence < 1.0e-8
     assert flow_error < 1.0e-8

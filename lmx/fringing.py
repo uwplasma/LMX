@@ -1753,6 +1753,45 @@ def _limited_linear_convection_matrix_action_duct(
     return action
 
 
+def _pack_duct_mass_flux(rho_phi):
+    """Pack coordinate-oriented duct fluxes as positive faces plus the inlet."""
+    fx, fy, fz = rho_phi
+    return jnp.stack((fx[1:], fy[:, 1:], fz[:, :, 1:])), fx[0]
+
+
+def _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet):
+    """Restore full face fluxes; lower transverse walls are implicit zeros."""
+    return (
+        jnp.concatenate((rho_phi_inlet[None], rho_phi_plus[0]), axis=0),
+        jnp.concatenate((jnp.zeros_like(rho_phi_plus[1, :, :1]), rho_phi_plus[1]), axis=1),
+        jnp.concatenate((jnp.zeros_like(rho_phi_plus[2, :, :, :1]), rho_phi_plus[2]), axis=2),
+    )
+
+
+def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz):
+    """Pack ``linearInterpolate(rho*U)&Sf`` for a no-slip rectangular duct.
+
+    The prescribed inlet uses adjacent-cell density, while the zero-gradient
+    outlet uses the adjacent cell. Fluxes are area-integrated and oriented
+    along increasing coordinates rather than outward patch normals.
+    """
+    momentum = density[..., None] * velocity
+    area_x = dy[:, None] * dz[None, :]
+    inlet = density[0] * inlet_velocity[..., 0] * area_x
+    plus_x = jnp.concatenate((
+        0.5 * (momentum[:-1, ..., 0] + momentum[1:, ..., 0]),
+        momentum[-1:, ..., 0])) * area_x
+    wy = (dy[1:] / (dy[:-1] + dy[1:]))[None, :, None]
+    plus_y = jnp.concatenate((
+        wy * momentum[:, :-1, :, 1] + (1.0 - wy) * momentum[:, 1:, :, 1],
+        jnp.zeros_like(momentum[:, :1, :, 1])), axis=1) * (dx * dz[None, None, :])
+    wz = (dz[1:] / (dz[:-1] + dz[1:]))[None, None, :]
+    plus_z = jnp.concatenate((
+        wz * momentum[:, :, :-1, 2] + (1.0 - wz) * momentum[:, :, 1:, 2],
+        jnp.zeros_like(momentum[:, :, :1, 2])), axis=2) * (dx * dy[None, :, None])
+    return jnp.stack((plus_x, plus_y, plus_z)), inlet
+
+
 def _face_flux_pressure_projection_duct(
     u: jnp.ndarray,
     v: jnp.ndarray,
