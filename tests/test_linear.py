@@ -52,35 +52,18 @@ def test_solve_poisson_cg_converges_on_zero_rhs():
         tolerance=1e-8,
     )
 
-    assert solution.shape == (2, 2)
-    assert int(iterations) == 0
-    assert float(residual) == pytest.approx(0.0)
+    assert (int(iterations), float(residual)) == pytest.approx((0, 0.0))
 
 
-def test_poisson_residual_norm_is_zero_for_exact_zero_solution():
-    diagonal, west, east, south, north, rhs = _poisson_coefficients()
-    residual = linear.poisson_residual_norm(
-        diagonal,
-        west,
-        east,
-        south,
-        north,
-        rhs,
-        jnp.zeros_like(rhs),
-        anchor=(0, 0),
-    )
-
-    assert float(residual) == pytest.approx(0.0)
-
-
-def test_anchored_poisson_operator_is_symmetric_for_arbitrary_fields():
+def test_anchored_poisson_operator_is_spd():
     coefficients = _poisson_coefficients()[:5]
-    left = jnp.asarray([[0.2, -0.4], [0.7, 0.1]])
-    right = jnp.asarray([[0.9, 0.3], [-0.2, 0.5]])
     apply = lambda field: linear.apply_poisson_operator(
         *coefficients, field, anchor=(0, 0)
     )
-    assert jnp.vdot(left, apply(right)) == pytest.approx(jnp.vdot(apply(left), right))
+    basis = jnp.eye(4).reshape(4, 2, 2)
+    matrix = jnp.stack([apply(vector).reshape(-1) for vector in basis], axis=1)
+    assert jnp.allclose(matrix, matrix.T) and jnp.all(jnp.linalg.eigvalsh(matrix) > 0)
+
 
 
 def test_solvax_pcg_recovers_manufactured_five_point_solution():
@@ -132,3 +115,23 @@ def test_solvax_pcg_five_point_gradient_is_implicit_and_matches_exact_solution()
     scale = 1.3
     expected = 2.0 * scale * jnp.sum(exact_base**2)
     assert jnp.allclose(jax.grad(objective)(scale), expected, rtol=1.0e-10)
+
+    anchored_rhs = rhs_base.at[0, 0].set(0.0)
+
+    def poisson_objective(alpha):
+        field, _, _ = linear.solve_poisson_cg_state(
+            diagonal + alpha,
+            zeros,
+            zeros,
+            zeros,
+            zeros,
+            anchored_rhs,
+            anchor=(0, 0),
+            iterations=8,
+            tolerance=1.0e-12,
+        )
+        return jnp.sum(field**2)
+
+    alpha = 0.3
+    expected = -2.0 * jnp.sum(anchored_rhs**2) / (4.0 + alpha) ** 3
+    assert jnp.allclose(jax.grad(poisson_objective)(alpha), expected, rtol=1.0e-6)

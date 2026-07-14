@@ -788,6 +788,7 @@ def _solve_potential(
         )
         solver_residual = residual
     elif solver == "cg_volume":
+        residual_scale = _cell_metric(mesh)
         diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled, rhs_scaled = _volume_scaled_potential_system(
             mesh,
             diagonal,
@@ -839,7 +840,8 @@ def _solve_potential(
                 iterations,
                 tolerance=tolerance,
                 initial=solve_start,
-                residual_scale=_cell_metric(mesh),
+                residual_scale=residual_scale,
+                residual_scale_min=float(np.min(np.asarray(residual_scale))),
                 preconditioner=selected_preconditioner,
             )
         residual = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
@@ -1808,11 +1810,7 @@ def _solve_fully_developed(
     target_mean_velocity = _target_mean_velocity(case)
     reference_mean_velocity = _reference_mean_velocity(case)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
-    if (
-        case.time_stepper.potential_solver == "auto"
-        and potential_solver == "cg"
-        and not _has_uniform_spacing(mesh)
-    ):
+    if potential_solver == "cg" and not _has_uniform_spacing(mesh):
         potential_solver = "cg_volume"
     linear_solver = (
         "solvax_pcg"

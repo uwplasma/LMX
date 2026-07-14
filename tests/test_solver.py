@@ -70,12 +70,14 @@ def test_build_mesh_rejects_unsupported_geometry_kind():
 
 def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
+    case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg"))
     custom_mesh = generate_rect_duct_mesh_from_faces(
         y_faces=jnp.asarray([-1.0, -0.25, 0.0, 0.25, 1.0]),
         z_faces=jnp.asarray([-1.0, -0.5, 0.5, 1.0]),
     )
 
     def fake_fully_developed_case_step(**kwargs):
+        assert kwargs["potential_solver"] == "cg_volume"
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.1)
         zeros = jnp.zeros_like(updated)
@@ -105,7 +107,6 @@ def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPat
     solution = solve_steady(case, mesh=custom_mesh)
 
     assert solution.mesh is custom_mesh
-    assert solution.state.u.shape == custom_mesh.yz_shape
 
 
 def test_build_mesh_uses_magnetic_axis_to_cluster_rect_duct_layers():

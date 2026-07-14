@@ -207,7 +207,10 @@ def solve_five_point_solvax_pcg_state(
     return solution.x, residual, solution.iterations
 
 
-@partial(jax.jit, static_argnames=("anchor", "preconditioner"))
+@partial(
+    jax.jit,
+    static_argnames=("anchor", "iterations", "tolerance", "residual_scale_min", "preconditioner"),
+)
 def solve_poisson_cg_state(
     diagonal: jnp.ndarray,
     west: jnp.ndarray,
@@ -220,13 +223,12 @@ def solve_poisson_cg_state(
     tolerance: float | None = None,
     initial: jnp.ndarray | None = None,
     residual_scale: jnp.ndarray | None = None,
+    residual_scale_min: float | None = None,
     preconditioner: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    phi0 = (
-        jnp.zeros_like(rhs)
-        if initial is None
-        else jnp.asarray(initial).at[anchor].set(0.0)
-    )
+    """Solve a symmetric anchored Poisson system with SOLVAX implicit PCG."""
+
+    phi0 = jnp.zeros_like(rhs) if initial is None else jnp.asarray(initial).at[anchor].set(0.0)
     if phi0.shape != rhs.shape:
         raise ValueError(
             "Poisson CG initial guess must match the right-hand side shape"
@@ -237,85 +239,41 @@ def solve_poisson_cg_state(
             raise ValueError(
                 "Poisson CG residual scale must match the right-hand side shape"
             )
-    rhs_masked = rhs.at[anchor].set(0.0)
-    inv_diagonal = 1.0 / jnp.maximum(diagonal, 1e-12)
-    tolerance_value = (
-        -jnp.ones((), dtype=rhs.dtype)
-        if tolerance is None
-        else jnp.asarray(tolerance, dtype=rhs.dtype)
-    )
     tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
-
-    residual0 = rhs_masked - apply_poisson_operator(
-        diagonal, west, east, south, north, phi0, anchor
-    )
+    inverse_diagonal = 1.0 / jnp.maximum(diagonal, tiny)
 
     def apply_preconditioner(residual: jnp.ndarray) -> jnp.ndarray:
-        return (
-            inv_diagonal * residual
-            if preconditioner is None
-            else preconditioner(residual)
-        )
+        # Extend the gauge-subspace preconditioner with an identity anchor.
+        projected = residual.at[anchor].set(0.0)
+        solved = inverse_diagonal * projected if preconditioner is None else preconditioner(projected)
+        return solved.at[anchor].set(residual[anchor])
 
-    z0 = apply_preconditioner(residual0)
-    p0 = z0
-    rz0 = jnp.sum(residual0 * z0)
+    def matvec(field: jnp.ndarray) -> jnp.ndarray:
+        return apply_poisson_operator(diagonal, west, east, south, north, field, anchor)
+
+    requested = 0.0 if tolerance is None else tolerance
+    scaled_stopping = residual_scale is not None and residual_scale_min is not None
+    rtol = 0.0 if scaled_stopping else requested / (rhs.size**0.5)
+    atol = requested * residual_scale_min if scaled_stopping else 0.0
+    solution = _solvax_pcg_linear_solve(
+        matvec,
+        rhs.at[anchor].set(0.0),
+        x0=phi0,
+        precond=apply_preconditioner,
+        rtol=rtol,
+        atol=atol,
+        max_steps=iterations,
+    )
+    phi = solution.x.at[anchor].set(0.0)
     if residual_scale is None:
-        norm0 = poisson_residual_norm(
-            diagonal, west, east, south, north, rhs, phi0, anchor
+        residual = poisson_residual_norm(
+            diagonal, west, east, south, north, rhs, phi, anchor
         )
     else:
-        physical_residual0 = rhs - apply_five_point_operator(
-            diagonal, west, east, south, north, phi0
+        physical_residual = rhs - apply_five_point_operator(
+            diagonal, west, east, south, north, phi
         )
-        norm0 = jnp.max(
-            jnp.abs(physical_residual0) / jnp.maximum(residual_scale, 1.0e-30)
+        residual = jnp.max(
+            jnp.abs(physical_residual) / jnp.maximum(residual_scale, tiny)
         )
-
-    def cond_fun(state):
-        count, _, residual, _, _, rz_old, active = state
-        return jnp.logical_and(
-            count < iterations, jnp.logical_and(active, residual > tolerance_value)
-        )
-
-    def body_fun(state):
-        count, phi, residual, r, p, rz_old, _ = state
-        ap = apply_poisson_operator(diagonal, west, east, south, north, p, anchor)
-        denom = jnp.sum(p * ap)
-        safe_denom = jnp.where(jnp.abs(denom) > tiny, denom, 1.0)
-        alpha = rz_old / safe_denom
-        phi_next = phi + alpha * p
-        phi_next = phi_next.at[anchor].set(0.0)
-        r_next = r - alpha * ap
-        z_next = apply_preconditioner(r_next)
-        rz_next = jnp.sum(r_next * z_next)
-        safe_rz_old = jnp.where(jnp.abs(rz_old) > tiny, rz_old, 1.0)
-        beta = rz_next / safe_rz_old
-        p_next = z_next + beta * p
-        if residual_scale is None:
-            residual_next = poisson_residual_norm(
-                diagonal, west, east, south, north, rhs, phi_next, anchor
-            )
-        else:
-            physical_residual = rhs - apply_five_point_operator(
-                diagonal, west, east, south, north, phi_next
-            )
-            residual_next = jnp.max(
-                jnp.abs(physical_residual) / jnp.maximum(residual_scale, 1.0e-30)
-            )
-        active_next = jnp.logical_and(jnp.abs(denom) > tiny, rz_next > tiny)
-        return count + 1, phi_next, residual_next, r_next, p_next, rz_next, active_next
-
-    init_state = (
-        jnp.asarray(0, dtype=jnp.int32),
-        phi0,
-        norm0,
-        residual0,
-        p0,
-        rz0,
-        jnp.asarray(rz0 > tiny),
-    )
-    iteration_count, phi, residual, _, _, _, _ = jax.lax.while_loop(
-        cond_fun, body_fun, init_state
-    )
-    return phi, residual, iteration_count
+    return phi, residual, solution.iterations
