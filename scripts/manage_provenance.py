@@ -14,8 +14,6 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
-from jsonschema import Draft202012Validator
-
 ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE_DIR = ROOT / "provenance"
 BENCHMARKS_PATH = PROVENANCE_DIR / "benchmarks.json"
@@ -53,21 +51,6 @@ def _canonical_benchmark_manifest(
     return canonical
 
 
-def _schema_errors(
-    payload: Mapping[str, Any], schema_name: str, root: Path = ROOT
-) -> list[str]:
-    schema = _read_json(root / "provenance" / "schemas" / schema_name)
-    validator = Draft202012Validator(schema)
-    errors = sorted(
-        validator.iter_errors(payload), key=lambda item: list(item.absolute_path)
-    )
-    rendered = []
-    for error in errors:
-        location = ".".join(str(piece) for piece in error.absolute_path) or "<root>"
-        rendered.append(f"{schema_name}:{location}: {error.message}")
-    return rendered
-
-
 def _test_reference_error(reference: str, root: Path = ROOT) -> str | None:
     path_text, separator, node = reference.partition("::")
     path = root / path_text
@@ -99,9 +82,42 @@ def _path_error(relative: str, root: Path = ROOT) -> str | None:
 def validate_benchmark_manifest(
     payload: Mapping[str, Any], root: Path = ROOT
 ) -> list[str]:
-    errors = _schema_errors(payload, "benchmarks.schema.json", root)
+    errors: list[str] = []
     sources = payload.get("sources", [])
     benchmarks = payload.get("benchmarks", [])
+    if payload.get("schema_version") != 1:
+        errors.append("benchmark manifest schema_version must be 1")
+    if not isinstance(sources, list) or not sources:
+        return [*errors, "benchmark manifest requires at least one source"]
+    if not isinstance(benchmarks, list) or not benchmarks:
+        return [*errors, "benchmark manifest requires at least one benchmark"]
+    if not all(isinstance(item, dict) for item in sources + benchmarks):
+        return [*errors, "benchmark manifest entries must be JSON objects"]
+    source_required = {"id", "kind", "title", "availability"}
+    benchmark_required = {
+        "id",
+        "tier",
+        "title",
+        "status",
+        "source_ids",
+        "primary_observables",
+        "acceptance",
+        "tests",
+        "workflows",
+        "runtime_lane",
+    }
+    for index, source in enumerate(sources):
+        missing = source_required - set(source)
+        if missing:
+            errors.append(f"source {index} lacks: {', '.join(sorted(missing))}")
+        if source.get("availability") not in {"repository", "external", "missing"}:
+            errors.append(f"source {index} has an invalid availability")
+    for index, benchmark in enumerate(benchmarks):
+        missing = benchmark_required - set(benchmark)
+        if missing:
+            errors.append(f"benchmark {index} lacks: {', '.join(sorted(missing))}")
+        if benchmark.get("tier") not in {"A", "B", "C", "D", "E"}:
+            errors.append(f"benchmark {index} has an invalid tier")
     source_ids = [source.get("id") for source in sources]
     benchmark_ids = [benchmark.get("id") for benchmark in benchmarks]
     if len(source_ids) != len(set(source_ids)):

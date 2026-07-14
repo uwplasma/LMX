@@ -40,7 +40,6 @@ dev = [
   "pytest-cov",
   "pytest-timeout",
   "pytest-xdist",
-  "jsonschema",
   "magpylib-jax",
   "lineax",
   "interpax",

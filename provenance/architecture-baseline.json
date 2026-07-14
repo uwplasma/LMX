@@ -2,14 +2,14 @@
   "import_measurement": {
     "command": "python -c 'import lmx'",
     "jax_loaded": false,
-    "max_seconds": 0.017531415971461684,
-    "median_seconds": 0.01729104103287682,
-    "min_seconds": 0.017057208984624594,
+    "max_seconds": 0.0181095419684425,
+    "median_seconds": 0.01805654203053564,
+    "min_seconds": 0.017279667023103684,
     "repeats": 5
   },
   "inventory": {
-    "checkout_bytes_excluding_build_artifacts": 4017783,
-    "checkout_bytes_excluding_release_candidates": 4017783,
+    "checkout_bytes_excluding_build_artifacts": 3964767,
+    "checkout_bytes_excluding_release_candidates": 3964767,
     "curated_example_count": 11,
     "curated_examples": [
       {
@@ -153,7 +153,6 @@
         "accelerated": [],
         "dev": [
           "interpax",
-          "jsonschema",
           "lineax",
           "magpylib-jax",
           "pytest",

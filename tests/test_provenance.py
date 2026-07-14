@@ -28,6 +28,12 @@ def test_benchmark_registry_has_live_checksums_and_verified_benchmark_a_status()
     assert missing == "test function does not exist: tests/test_solver.py::test_not_present"
     assert malformed == "test reference must use path::function: tests/test_solver.py"
 
+    invalid = {"schema_version": 0, "sources": [], "benchmarks": []}
+    assert provenance.validate_benchmark_manifest(invalid) == [
+        "benchmark manifest schema_version must be 1",
+        "benchmark manifest requires at least one source",
+    ]
+
 
 def test_external_literature_verifier_reports_missing_and_changed_files(tmp_path: Path):
     content = b"independent literature artifact"
