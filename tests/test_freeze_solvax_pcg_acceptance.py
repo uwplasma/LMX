@@ -20,7 +20,9 @@ def _write(path: Path, payload: dict) -> Path:
 
 
 def test_solvax_backend_records_equivalence_and_resources() -> None:
-    result = run_backend_comparison(grid=6, repeats=2, max_steps=32)
+    # The 4x4 system exercises the same primal, transpose, gradient, resource,
+    # and end-to-end paths without paying campaign-scale timing repetitions.
+    result = run_backend_comparison(grid=4, repeats=1, max_steps=8)
     assert result["implementation"]["solvax_version"] == version("solvax")
     for gate in (
         "forward_equivalent",
