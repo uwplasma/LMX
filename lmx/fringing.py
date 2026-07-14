@@ -23,6 +23,7 @@ from solvax import (
     block_thomas_solve,
     cyclic_tridiagonal_solve,
     gmres,
+    linear_solve,
     pcg_linear_solve,
     tridiagonal_solve,
 )
@@ -1549,9 +1550,13 @@ def _solvax_pressure_poisson_duct(
     )
 
 
-def _solvax_implicit_diffusion_duct(
-    rhs: jnp.ndarray,
+def _solvax_implicit_momentum_duct(
+    velocity: jnp.ndarray,
+    force: jnp.ndarray,
+    density: jnp.ndarray,
     viscosity: jnp.ndarray,
+    rho_phi: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    boundary_velocity: tuple[jnp.ndarray, ...],
     *,
     dt: float,
     dx: float,
@@ -1559,58 +1564,63 @@ def _solvax_implicit_diffusion_duct(
     dz: jnp.ndarray,
     iterations: int,
     tolerance: float,
-    initial_field: jnp.ndarray | None = None,
     include_axial_line: bool = True,
-    single_reduction: bool = False,
+    prescribed_inlet: bool = True,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Solve ``(I - dt div(nu grad)) u = rhs`` with no-slip wall faces."""
+    """Solve one frozen, conservative three-component momentum system.
 
-    dy_widths = _coerce_spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
-    dz_widths = _coerce_spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
-    volume = jnp.broadcast_to(
-        dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape
-    )
+    ``force`` includes explicit deviatoric stresses and body forces.  The inlet
+    is prescribed and the outlet is zero-gradient; ``prescribed_inlet=False``
+    retains the boundary-neutral diffusion limit.  Affine terms stay outside GMRES.
+    """
+
+    shape = velocity.shape
+    if shape != (*density.shape, 3) or force.shape != shape:
+        raise ValueError("Momentum fields must share one (nx, ny, nz, 3) shape")
+    dy_widths = _coerce_spacing_vector(dy, shape[1], dtype=velocity.dtype)
+    dz_widths = _coerce_spacing_vector(dz, shape[2], dtype=velocity.dtype)
+    dx_widths = jnp.full((shape[0],), dx, dtype=velocity.dtype)
+    volume = dx_widths[:, None, None] * dy_widths[None, :, None] * dz_widths[None, None, :]
+    dynamic_viscosity = density * viscosity
     coefficients = _variable_diffusion_coefficients_3d(
-        viscosity,
-        dx=dx,
-        dy=dy_widths,
-        dz=dz_widths,
-        validated_spacing=True,
+        dynamic_viscosity, dx=dx, dy=dy_widths, dz=dz_widths, validated_spacing=True
     )
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
-    wall_sink = jnp.zeros_like(rhs)
-    wall_sink = wall_sink.at[:, 0, :].add(
-        viscosity[:, 0, :] / (0.5 * dy_widths[0] ** 2)
+    wall_sink = jnp.zeros_like(density)
+    wall_sink = wall_sink.at[:, 0, :].add(dynamic_viscosity[:, 0, :] / (0.5 * dy_widths[0] ** 2))
+    wall_sink = wall_sink.at[:, -1, :].add(dynamic_viscosity[:, -1, :] / (0.5 * dy_widths[-1] ** 2))
+    wall_sink = wall_sink.at[:, :, 0].add(dynamic_viscosity[:, :, 0] / (0.5 * dz_widths[0] ** 2))
+    wall_sink = wall_sink.at[:, :, -1].add(dynamic_viscosity[:, :, -1] / (0.5 * dz_widths[-1] ** 2))
+    inlet_sink = jnp.zeros_like(density)
+    if prescribed_inlet:
+        inlet_sink = inlet_sink.at[0].set(2.0 * dynamic_viscosity[0] / dx**2)
+    diffusion_sink = wall_sink + inlet_sink
+    widths = (dx_widths, dy_widths, dz_widths)
+    weights = _limited_linear_vector_face_weights_duct(
+        velocity, rho_phi, boundary_velocity, widths
     )
-    wall_sink = wall_sink.at[:, -1, :].add(
-        viscosity[:, -1, :] / (0.5 * dy_widths[-1] ** 2)
-    )
-    wall_sink = wall_sink.at[:, :, 0].add(
-        viscosity[:, :, 0] / (0.5 * dz_widths[0] ** 2)
-    )
-    wall_sink = wall_sink.at[:, :, -1].add(
-        viscosity[:, :, -1] / (0.5 * dz_widths[-1] ** 2)
+    zero_patches = tuple(jnp.zeros_like(value) for value in boundary_velocity)
+    prescribed_patches = (boundary_velocity[0], zero_patches[1], *boundary_velocity[2:])
+    boundary_action = _limited_linear_convection_matrix_action_duct(
+        jnp.zeros_like(velocity), rho_phi, weights, prescribed_patches, widths
     )
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+        neighbours = _neighbor_fields(
             field,
             mode_x="neumann",
             mode_y="neumann",
             mode_z="neumann",
         )
-        diffusion = (
-            coef_x_w * (x_west - field)
-            + coef_x_e * (x_east - field)
-            + coef_y_s * (y_south - field)
-            + coef_y_n * (y_north - field)
-            + coef_z_b * (z_bottom - field)
-            + coef_z_t * (z_top - field)
-            - wall_sink * field
+        diffusion = sum(c[..., None] * (n - field) for c, n in zip(
+            coefficients, neighbours, strict=True)) - diffusion_sink[..., None] * field
+        homogeneous_patches = (zero_patches[0], field[-1], *zero_patches[2:])
+        convection = _limited_linear_convection_matrix_action_duct(
+            field, rho_phi, weights, homogeneous_patches, widths
         )
-        return volume * (field - dt * diffusion)
+        return volume[..., None] * (density[..., None] * field + dt * (convection - diffusion))
 
-    diagonal = volume * (1.0 + dt * (sum(coefficients) + wall_sink))
+    diagonal = volume * (density + dt * (sum(coefficients) + diffusion_sink))
     directions = (
         (0, -volume * dt * coef_x_w, -volume * dt * coef_x_e),
         (1, -volume * dt * coef_y_s, -volume * dt * coef_y_n),
@@ -1618,22 +1628,33 @@ def _solvax_implicit_diffusion_duct(
     )
     if not include_axial_line:
         directions = directions[1:]
-    precondition = _additive_line_preconditioner_3d(diagonal, directions)
-    solution = pcg_linear_solve(
-        matvec,
-        volume * rhs,
-        x0=initial_field,
-        precond=precondition,
-        transpose_precond=precondition,
-        rtol=tolerance,
-        atol=tolerance,
-        max_steps=iterations,
-        transpose_rtol=tolerance,
-        transpose_atol=tolerance,
-        transpose_max_steps=iterations,
-        single_reduction=single_reduction,
-    )
-    return solution.x, solution.residual_norm, solution.converged
+    scalar_precondition = _additive_line_preconditioner_3d(diagonal, directions)
+
+    def precondition(flat: jnp.ndarray) -> jnp.ndarray:
+        return jax.vmap(scalar_precondition, in_axes=-1, out_axes=-1)(
+            flat.reshape(shape)).reshape(-1)
+
+    inlet_velocity = jnp.zeros_like(velocity).at[0].set(boundary_velocity[0])
+    source = force - boundary_action + inlet_sink[..., None] * inlet_velocity
+    linear_rhs = volume[..., None] * (density[..., None] * velocity + dt * source)
+    flat_rhs = linear_rhs.reshape(-1)
+
+    def flat_matvec(flat: jnp.ndarray) -> jnp.ndarray:
+        return matvec(flat.reshape(shape)).reshape(-1)
+
+    restart = min(12, flat_rhs.size)
+
+    def krylov(operator, rhs):
+        return gmres(
+            operator, rhs, x0=jnp.zeros_like(rhs), precond=precondition,
+            restart=restart, rtol=tolerance, atol=tolerance,
+            max_restarts=max(1, math.ceil(iterations / restart))
+        ).x
+
+    solved = linear_solve(flat_matvec, flat_rhs, krylov).reshape(shape)
+    residual = jnp.linalg.norm(flat_rhs - flat_matvec(solved.reshape(-1)))
+    target = jnp.maximum(tolerance, tolerance * jnp.linalg.norm(flat_rhs))
+    return solved, residual, residual <= target
 
 
 def _cell_limited_least_squares_gradient_duct(
@@ -7174,105 +7195,70 @@ def _solve_extruded_projection(
             scalar_limit,
         )
 
-        def diffusion_solve(rhs, viscosity, initial):
-            return _solvax_implicit_diffusion_duct(
-                rhs,
-                viscosity,
+        fluid_shape = (nx, y1 - y0, z1 - z0)
+        zero_rho_phi = (
+            jnp.zeros((nx + 1, *fluid_shape[1:]), dtype=u.dtype),
+            jnp.zeros((nx, fluid_shape[1] + 1, fluid_shape[2]), dtype=u.dtype),
+            jnp.zeros((*fluid_shape[:2], fluid_shape[2] + 1), dtype=u.dtype),
+        )
+        zero_boundary_velocity = (
+            jnp.zeros((*fluid_shape[1:], 3), dtype=u.dtype),
+            jnp.zeros((*fluid_shape[1:], 3), dtype=u.dtype),
+            jnp.zeros((nx, fluid_shape[2], 3), dtype=u.dtype),
+            jnp.zeros((nx, fluid_shape[2], 3), dtype=u.dtype),
+            jnp.zeros((nx, fluid_shape[1], 3), dtype=u.dtype),
+            jnp.zeros((nx, fluid_shape[1], 3), dtype=u.dtype),
+        )
+
+        def momentum_solve(velocity, force, density, viscosity):
+            return _solvax_implicit_momentum_duct(
+                velocity[:, y0:y1, z0:z1],
+                force[:, y0:y1, z0:z1],
+                density[:, y0:y1, z0:z1],
+                viscosity[:, y0:y1, z0:z1],
+                zero_rho_phi,
+                zero_boundary_velocity,
                 dt=dt,
                 dx=dx,
                 dy=local_dy,
                 dz=local_dz,
                 iterations=momentum_iterations,
                 tolerance=momentum_tolerance,
-                initial_field=initial,
                 include_axial_line=False,
-                single_reduction=field_sharding is not None,
+                prescribed_inlet=False,
             )
 
         # The multi-device branches require a real device mesh and are covered
         # by the GPU scaling gate documented in ``docs/performance.md``.
         if field_sharding is not None:  # pragma: no cover - hardware gate
             replicated_sharding = NamedSharding(field_sharding.mesh, P())
-            diffusion_solve = jax.jit(
-                diffusion_solve,
-                in_shardings=(field_sharding,) * 3,
+            momentum_solve = jax.jit(
+                momentum_solve,
+                in_shardings=(field_sharding,) * 4,
                 out_shardings=(
                     field_sharding,
                     replicated_sharding,
                     replicated_sharding,
                 ),
             )
-            diffusion_solve = _reuse_fringing_jit(
-                ("diffusion", *kernel_key), diffusion_solve
+            momentum_solve = _reuse_fringing_jit(
+                ("momentum", *kernel_key), momentum_solve
             )
 
-        def axial_momentum_solve(state, force, density, viscosity):
-            state = state[:, y0:y1, z0:z1]
-            force = force[:, y0:y1, z0:z1]
-            density = density[:, y0:y1, z0:z1]
-            viscosity = viscosity[:, y0:y1, z0:z1]
-            rhs = state + dt * (forcing / density + force / density)
-            return diffusion_solve(rhs, viscosity, state)
-
-        def transverse_momentum_solve(state, force, density, viscosity):
-            state = state[:, y0:y1, z0:z1]
-            force = force[:, y0:y1, z0:z1]
-            density = density[:, y0:y1, z0:z1]
-            viscosity = viscosity[:, y0:y1, z0:z1]
-            rhs = state + dt * force / density
-            return diffusion_solve(rhs, viscosity, state)
-
-        def embed_velocity(u_fluid, v_fluid, w_fluid, mask):
-            u_full = (
-                jnp.zeros_like(mask, dtype=u_fluid.dtype)
+        def embed_velocity(velocity, mask):
+            full = (
+                jnp.zeros((*mask.shape, 3), dtype=velocity.dtype)
                 .at[:, y0:y1, z0:z1]
-                .set(u_fluid)
+                .set(velocity)
             )
-            v_full = (
-                jnp.zeros_like(mask, dtype=v_fluid.dtype)
-                .at[:, y0:y1, z0:z1]
-                .set(v_fluid)
-            )
-            w_full = (
-                jnp.zeros_like(mask, dtype=w_fluid.dtype)
-                .at[:, y0:y1, z0:z1]
-                .set(w_fluid)
-            )
-            return (
-                _enforce_fluid_mask_3d(u_full, mask),
-                _enforce_fluid_mask_3d(v_full, mask),
-                _enforce_fluid_mask_3d(w_full, mask),
-            )
+            full = jnp.where(mask[..., None], full, 0.0)
+            return full[..., 0], full[..., 1], full[..., 2]
 
         if field_sharding is not None:  # pragma: no cover - hardware gate
-            axial_momentum_solve = jax.jit(
-                axial_momentum_solve,
-                in_shardings=(field_sharding,) * 4,
-                out_shardings=(
-                    field_sharding,
-                    replicated_sharding,
-                    replicated_sharding,
-                ),
-            )
-            transverse_momentum_solve = jax.jit(
-                transverse_momentum_solve,
-                in_shardings=(field_sharding,) * 4,
-                out_shardings=(
-                    field_sharding,
-                    replicated_sharding,
-                    replicated_sharding,
-                ),
-            )
             embed_velocity = jax.jit(
                 embed_velocity,
-                in_shardings=(field_sharding,) * 4,
+                in_shardings=(field_sharding,) * 2,
                 out_shardings=(field_sharding,) * 3,
-            )
-            axial_momentum_solve = _reuse_fringing_jit(
-                ("axial_momentum", *kernel_key), axial_momentum_solve
-            )
-            transverse_momentum_solve = _reuse_fringing_jit(
-                ("transverse_momentum", *kernel_key), transverse_momentum_solve
             )
             embed_velocity = _reuse_fringing_jit(
                 ("embed_velocity", *kernel_key), embed_velocity
@@ -7522,13 +7508,12 @@ def _solve_extruded_projection(
             laplacian_v = _laplacian_3d(v, dx=dx, dy=dy_momentum, dz=dz_momentum)
             laplacian_w = _laplacian_3d(w, dx=dx, dy=dy_momentum, dz=dz_momentum)
         if use_alex_b2_finite_volume:
-            y0, y1, z0, z1 = fluid_bounds
-            u_fluid, _, _ = axial_momentum_solve(u, lorentz_x, rho, nu)
-            v_fluid, _, _ = transverse_momentum_solve(v, lorentz_y, rho, nu)
-            w_fluid, _, _ = transverse_momentum_solve(w, lorentz_z, rho, nu)
-            u_star, v_star, w_star = embed_velocity(
-                u_fluid, v_fluid, w_fluid, fluid_mask
+            velocity = jnp.stack((u, v, w), axis=-1)
+            momentum_force = jnp.stack(
+                (lorentz_x + forcing, lorentz_y, lorentz_z), axis=-1
             )
+            velocity_fluid, _, _ = momentum_solve(velocity, momentum_force, rho, nu)
+            u_star, v_star, w_star = embed_velocity(velocity_fluid, fluid_mask)
         else:
             u_star = u + dt * (
                 nu * laplacian_u + forcing / rho + lorentz_x / rho - dp_dx / rho

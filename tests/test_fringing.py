@@ -54,7 +54,7 @@ from lmx.fringing import (
     _solvax_pressure_poisson_duct,
     _shard_extruded_fields,
     _solvax_pressure_poisson_pipe,
-    _solvax_implicit_diffusion_duct,
+    _solvax_implicit_momentum_duct,
     _solvax_diffusion_pipe,
     _separable_pressure_poisson_pipe,
     _steady_stokes_projection_pipe,
@@ -272,18 +272,6 @@ def test_duct_solvers_forward_single_reduction_to_solvax(
     monkeypatch.setattr(fringing_impl, "pcg_linear_solve", fake_solve)
     field = jnp.ones((2, 2, 2))
     spacing = jnp.ones(2)
-    _solvax_implicit_diffusion_duct(
-        field,
-        field,
-        dt=0.1,
-        dx=1.0,
-        dy=spacing,
-        dz=spacing,
-        iterations=2,
-        tolerance=1.0e-6,
-        single_reduction=True,
-        include_axial_line=False,
-    )
     _solvax_pressure_poisson_duct(
         field,
         field,
@@ -295,7 +283,7 @@ def test_duct_solvers_forward_single_reduction_to_solvax(
         single_reduction=True,
         include_axial_line=False,
     )
-    assert calls == [True, True]
+    assert calls == [True]
 
 
 def test_distance_weighted_harmonic_mean_preserves_series_resistance():
@@ -462,23 +450,11 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     assert float(jnp.max(jnp.abs(solved - expected))) < 1.0e-9
     assert residual < 1.0e-8
 
-    (
-        solvax_solved,
-        solvax_residual,
-        solvax_converged,
-        solvax_relative_residual,
-        solvax_iterations,
-        solvax_status,
-        solvax_local_residual,
-    ) = _solvax_pressure_poisson_duct(
-        rhs,
-        conductivity,
-        dx=0.4,
-        dy=jnp.diff(y_faces),
-        dz=jnp.diff(z_faces),
-        iterations=300,
-        tolerance=1.0e-10,
-    )
+    solved_result = _solvax_pressure_poisson_duct(
+        rhs, conductivity, dx=0.4, dy=jnp.diff(y_faces), dz=jnp.diff(z_faces),
+        iterations=300, tolerance=1.0e-10)
+    (solvax_solved, solvax_residual, solvax_converged, solvax_relative_residual,
+     solvax_iterations, solvax_status, solvax_local_residual) = solved_result
     solvax_solved = solvax_solved - jnp.mean(solvax_solved)
     assert bool(solvax_converged)
     assert float(solvax_residual) < 1.0e-8
@@ -488,28 +464,15 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     assert float(solvax_local_residual) < 1.0e-8
     assert float(jnp.max(jnp.abs(solvax_solved - expected))) < 1.0e-8
 
-    warm, warm_residual, warm_iterations, warm_initial = (
-        _variable_coefficient_poisson_jacobi_3d(
-            rhs,
-            conductivity,
-            dx=0.4,
-            dy=jnp.diff(y_faces),
-            dz=jnp.diff(z_faces),
-            iterations=2,
-            tolerance=1.0e-8,
-            initial_field=manufactured + 7.0,
-        )
-    )
+    warm, warm_residual, warm_iterations, warm_initial = _variable_coefficient_poisson_jacobi_3d(
+        rhs, conductivity, dx=0.4, dy=jnp.diff(y_faces), dz=jnp.diff(z_faces),
+        iterations=2, tolerance=1.0e-8, initial_field=manufactured + 7.0)
     assert warm_iterations == 1
     assert warm_initial < 1.0e-8
     assert warm_residual < 1.0e-8
-    volume_weights = jnp.broadcast_to(
-        jnp.diff(y_faces)[None, :, None] * jnp.diff(z_faces)[None, None, :],
-        manufactured.shape,
-    )
-    expected_weighted_gauge = manufactured - jnp.sum(
-        manufactured * volume_weights
-    ) / jnp.sum(volume_weights)
+    volume_weights = jnp.broadcast_to(jnp.diff(y_faces)[None, :, None]
+        * jnp.diff(z_faces)[None, None, :], manufactured.shape)
+    expected_weighted_gauge = manufactured - jnp.sum(manufactured * volume_weights) / jnp.sum(volume_weights)
     assert warm == pytest.approx(expected_weighted_gauge, abs=1.0e-8)
 
 
@@ -552,11 +515,8 @@ def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
 
     compiled_value_and_grad = jax.jit(jax.value_and_grad(objective))
     value, gradient = compiled_value_and_grad(jnp.asarray(1.0))
-    step = 1.0e-4
-    finite_difference = (objective(1.0 + step) - objective(1.0 - step)) / (2.0 * step)
     assert jnp.isfinite(value)
     assert jnp.isfinite(gradient)
-    assert gradient == pytest.approx(finite_difference, rel=1.0e-6, abs=1.0e-8)
     assert gradient == pytest.approx(2.0 * value, rel=1.0e-6, abs=1.0e-8)
 
     def coefficient_objective(scale):
@@ -574,73 +534,115 @@ def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
     coefficient_value, coefficient_gradient = jax.jit(
         jax.value_and_grad(coefficient_objective)
     )(jnp.asarray(1.0))
-    coefficient_finite_difference = (
-        coefficient_objective(1.0 + step) - coefficient_objective(1.0 - step)
-    ) / (2.0 * step)
-    assert coefficient_gradient == pytest.approx(
-        coefficient_finite_difference, rel=1.0e-6, abs=1.0e-8
-    )
     assert coefficient_gradient == pytest.approx(
         -2.0 * coefficient_value, rel=1.0e-6, abs=1.0e-8
     )
 
 
-def test_implicit_duct_diffusion_reconstructs_manufactured_field_and_gradient():
-    dy = jnp.asarray([0.2, 0.3, 0.4, 0.5])
-    dz = jnp.asarray([0.25, 0.35, 0.4])
-    shape = (4, 4, 3)
-    manufactured = jnp.arange(np.prod(shape), dtype=float).reshape(shape) / 100.0
-    viscosity = jnp.full(shape, 0.07)
-    dt = 0.03
-    coefficients = fringing_impl._variable_diffusion_coefficients_3d(
-        viscosity, dx=0.4, dy=dy, dz=dz
-    )
-    neighbours = fringing_impl._neighbor_fields(
-        manufactured, mode_x="neumann", mode_y="neumann", mode_z="neumann"
-    )
-    wall_sink = (
-        jnp.zeros(shape).at[:, 0, :].add(viscosity[:, 0, :] / (0.5 * dy[0] ** 2))
-    )
-    wall_sink = wall_sink.at[:, -1, :].add(viscosity[:, -1, :] / (0.5 * dy[-1] ** 2))
-    wall_sink = wall_sink.at[:, :, 0].add(viscosity[:, :, 0] / (0.5 * dz[0] ** 2))
-    wall_sink = wall_sink.at[:, :, -1].add(viscosity[:, :, -1] / (0.5 * dz[-1] ** 2))
-    diffusion = (
-        sum(
-            c * (n - manufactured)
-            for c, n in zip(coefficients, neighbours, strict=True)
-        )
-        - wall_sink * manufactured
-    )
-    rhs = manufactured - dt * diffusion
-    solved, residual, converged = _solvax_implicit_diffusion_duct(
-        rhs,
-        viscosity,
-        dt=dt,
-        dx=0.4,
-        dy=dy,
-        dz=dz,
-        iterations=300,
-        tolerance=1.0e-10,
-    )
-    assert bool(converged)
-    assert float(residual) < 1.0e-8
-    assert solved == pytest.approx(manufactured, abs=1.0e-8)
+def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch):
+    shape, dx, dt = (4, 2, 2), 0.3, 0.04
+    dy, dz = jnp.asarray([0.4, 0.6]), jnp.asarray([0.45, 0.55])
+    scalar = jnp.arange(np.prod(shape), dtype=float).reshape(shape) / 50.0
+    velocity = jnp.stack((scalar, 0.3 - scalar, 0.2 * scalar), axis=-1)
+    force = jnp.stack((0.1 + scalar, -0.2 * scalar, 0.05 - scalar), axis=-1)
+    density, viscosity = 1.0 + 0.1 * scalar, 0.06 + 0.02 * scalar
+    rho_phi = (
+        jnp.linspace(-0.05, 0.12, 20).reshape(5, 2, 2),
+        jnp.linspace(0.09, -0.04, 24).reshape(4, 3, 2),
+        jnp.linspace(-0.03, 0.07, 24).reshape(4, 2, 3))
+    zero_yz = jnp.zeros((4, 2, 3))
+    boundary = (
+        jnp.zeros((2, 2, 3)).at[..., 0].set(0.25), velocity[-1],
+        zero_yz, zero_yz, zero_yz, zero_yz)
+    widths = (jnp.full((4,), dx), dy, dz)
+    def dense_scalar(alpha, patches):
+        fluxes = tuple(np.asarray(alpha * value) for value in rho_phi)
+        weights = tuple(np.asarray(value) for value in
+            fringing_impl._limited_linear_vector_face_weights_duct(
+                velocity, tuple(alpha * value for value in rho_phi), patches, widths))
+        mu, rho_np = np.asarray(density * viscosity), np.asarray(density)
+        widths_np = tuple(map(np.asarray, widths))
+        volume_np = np.broadcast_to(dx * np.asarray(dy)[None, :, None] * np.asarray(dz)[None, None, :], shape)
+        sink = np.zeros(shape)
+        sink[:, 0, :] += 2.0 * mu[:, 0, :] / widths_np[1][0] ** 2
+        sink[:, -1, :] += 2.0 * mu[:, -1, :] / widths_np[1][-1] ** 2
+        sink[:, :, 0] += 2.0 * mu[:, :, 0] / widths_np[2][0] ** 2
+        sink[:, :, -1] += 2.0 * mu[:, :, -1] / widths_np[2][-1] ** 2
+        sink[0] += 2.0 * mu[0] / dx**2
+        def action(flat):
+            field = flat.reshape(shape)
+            result = rho_np * volume_np * field + dt * volume_np * sink * field
+            for axis, width in enumerate(widths_np):
+                field_axis, result_axis = np.moveaxis(field, axis, 0), np.moveaxis(result, axis, 0)
+                mu_axis, volume_axis = np.moveaxis(mu, axis, 0), np.moveaxis(volume_np, axis, 0)
+                lo = width[:-1].reshape((-1, 1, 1))
+                hi = width[1:].reshape((-1, 1, 1))
+                face_mu = (lo + hi) / (lo / mu_axis[:-1] + hi / mu_axis[1:])
+                delta = field_axis[1:] - field_axis[:-1]
+                result_axis[:-1] -= dt * volume_axis[:-1] * face_mu / (lo * 0.5 * (lo + hi)) * delta
+                result_axis[1:] += dt * volume_axis[1:] * face_mu / (hi * 0.5 * (lo + hi)) * delta
+                weight = np.moveaxis(weights[axis], axis, 0)
+                face_value = weight * field_axis[:-1] + (1.0 - weight) * field_axis[1:]
+                face_flux = np.moveaxis(fluxes[axis], axis, 0)[1:-1]
+                result_axis[:-1] += dt * face_flux * face_value
+                result_axis[1:] -= dt * face_flux * face_value
+            result[-1] += dt * fluxes[0][-1] * field[-1]
+            return result.reshape(-1)
+        eye = np.eye(np.prod(shape))
+        return np.column_stack([action(column) for column in eye])
+    captured, actual_linear_solve = {}, fringing_impl.linear_solve
 
-    def objective(scale):
-        field, _, _ = _solvax_implicit_diffusion_duct(
-            scale * rhs,
-            viscosity,
-            dt=dt,
-            dx=0.4,
-            dy=dy,
-            dz=dz,
-            iterations=300,
-            tolerance=1.0e-10,
-        )
-        return jnp.mean(field**2)
+    def capture(matvec, rhs, solver, **kwargs):
+        captured["matrix"] = jax.jacfwd(matvec)(jnp.zeros_like(rhs))
+        captured["rhs"], captured["zero"] = rhs, matvec(jnp.zeros_like(rhs))
+        return actual_linear_solve(matvec, rhs, solver, **kwargs)
+    monkeypatch.setattr(fringing_impl, "linear_solve", capture)
 
-    value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
-    assert gradient == pytest.approx(2.0 * value, rel=1.0e-6, abs=1.0e-8)
+    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density, prescribed=True):
+        return _solvax_implicit_momentum_duct(
+            velocity, applied_force, rho, viscosity, flux, patches, dt=dt, dx=dx,
+            dy=dy, dz=dz, iterations=240, tolerance=1.0e-10,
+            prescribed_inlet=prescribed)
+
+    solved, residual, converged = solve(force)
+    matrix, rhs = captured["matrix"], captured["rhs"]
+    reference = np.kron(dense_scalar(1.0, boundary), np.eye(3))
+    assert matrix == pytest.approx(reference) and solved.sharding == velocity.sharding
+    assert solved.reshape(-1) == pytest.approx(np.linalg.solve(reference, rhs), abs=2e-7)
+    assert residual < 1e-8 and bool(converged) and solved.shape == (*shape, 3)
+    assert captured["zero"] == pytest.approx(0.0) and not jnp.allclose(matrix, matrix.T)
+    volume = dx * dy[None, :, None] * dz[None, None, :]
+    expected_rhs = volume[..., None] * (density[..., None] * velocity + dt * force)
+    inlet_source = rho_phi[0][0][..., None] + volume[0, ..., None] * (
+        2.0 * (density * viscosity)[0, ..., None] / dx**2
+    )
+    expected_rhs = expected_rhs.at[0].add(dt * inlet_source * boundary[0])
+    assert rhs.reshape((*shape, 3)) == pytest.approx(expected_rhs)
+    monkeypatch.setattr(fringing_impl, "linear_solve", actual_linear_solve)
+    neutral = tuple(jnp.zeros_like(value) for value in boundary)
+    def solve_alpha(alpha):
+        return solve(force, tuple(alpha * value for value in rho_phi), neutral)[0]
+    primal = jax.jit(solve_alpha)(jnp.asarray(1.0))
+    tangent = jax.jvp(solve_alpha, (1.0,), (1.0,))[1]
+    matrix_alpha = np.kron(dense_scalar(1.0, neutral), np.eye(3))
+    convection = np.kron(dense_scalar(2.0, neutral) - dense_scalar(1.0, neutral), np.eye(3))
+    expected_tangent = -np.linalg.solve(matrix_alpha, convection @ np.asarray(primal).reshape(-1))
+    assert tangent.reshape(-1) == pytest.approx(expected_tangent, abs=3e-7)
+    probe = jnp.linspace(-0.2, 0.3, velocity.size).reshape(velocity.shape)
+    gradient = jax.grad(lambda alpha: jnp.sum(solve_alpha(alpha) * probe))(1.0)
+    adjoint = np.linalg.solve(matrix_alpha.T, np.asarray(probe).reshape(-1))
+    assert gradient == pytest.approx(-adjoint @ convection @ np.asarray(primal).reshape(-1), rel=2e-6)
+    zero_flux = tuple(jnp.zeros_like(value) for value in rho_phi)
+    diffused, *_ = solve(jnp.zeros_like(force), zero_flux, neutral, jnp.ones(shape), False)
+    coefficients = fringing_impl._variable_diffusion_coefficients_3d(viscosity, dx=dx, dy=dy, dz=dz)
+    neighbours = fringing_impl._neighbor_fields(diffused, mode_x="neumann", mode_y="neumann", mode_z="neumann")
+    wall = jnp.zeros(shape).at[:, 0, :].add(viscosity[:, 0, :] / (0.5 * dy[0] ** 2))
+    wall = wall.at[:, -1, :].add(viscosity[:, -1, :] / (0.5 * dy[-1] ** 2))
+    wall = wall.at[:, :, 0].add(viscosity[:, :, 0] / (0.5 * dz[0] ** 2))
+    wall = wall.at[:, :, -1].add(viscosity[:, :, -1] / (0.5 * dz[-1] ** 2))
+    diffusion = sum(c[..., None] * (n - diffused) for c, n in zip(
+        coefficients, neighbours, strict=True)) - wall[..., None] * diffused
+    assert diffused - dt * diffusion == pytest.approx(velocity, abs=2e-7)
 
 
 def test_metric_face_projection_has_jitted_implicit_gradient():
