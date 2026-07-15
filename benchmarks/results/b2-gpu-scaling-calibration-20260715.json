@@ -1,9 +1,9 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-07-15",
-  "acceptance_commit": "3e53d8bf529b2542b2a1251053ea3eb9a006bce8",
-  "execution_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
-  "source_fingerprint": "409dc706ca20dc2df2f0979962de8e75fa6882db4ac7339b51750d6dae45ec27",
+  "acceptance_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
+  "execution_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
+  "source_fingerprint": "dd41db01268c9623231ca5a05ffbe8c719157e14e5570b174565cc8da9eb392c",
   "case_id": "B2-fringing-square",
   "acceptance_role": "scaling-calibration",
   "environment": {
@@ -25,6 +25,7 @@
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
   },
   "restart_gate": {
+    "deterministic_evidence_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
     "nonflux_state_absolute_tolerance": 1e-12,
     "flux_absolute_tolerance": 1e-6,
     "flux_relative_l2_tolerance": 1e-5,
@@ -38,38 +39,43 @@
   "default_xla_lane": {
     "runs": {
       "1": {
-        "cold_seconds": 46.92683005699655,
-        "warm_samples_seconds": [20.986780314007774, 21.089390269014984, 21.15679006197024],
-        "warm_median_seconds": 21.089390269014984,
-        "warm_cv": 0.0033163370564646215,
-        "peak_device_bytes": 1015340288,
-        "restart_state_max_abs": 0.0
+        "cold_seconds": 42.79689490806777,
+        "warm_samples_seconds": [21.07164214493241, 21.138721036957577, 21.14465511206072],
+        "warm_median_seconds": 21.138721036957577,
+        "warm_cv": 0.0015677708597257793,
+        "peak_device_bytes": 1015341056,
+        "restart_state_max_abs": 0.0,
+        "restart_flux_max_abs": 0.0
       },
       "2": {
-        "cold_seconds": 44.260095571982674,
-        "warm_samples_seconds": [16.291103107039817, 16.970708978013135, 16.39931946498109],
-        "warm_median_seconds": 16.39931946498109,
-        "warm_cv": 0.01801129382484795,
-        "peak_device_bytes": [530048512, 657611776],
-        "restart_state_max_abs": 0.0
+        "cold_seconds": 35.596992890001275,
+        "warm_samples_seconds": [11.889716164092533, 11.979289191076532, 11.988575660972856],
+        "warm_median_seconds": 11.979289191076532,
+        "warm_cv": 0.003729377585139145,
+        "peak_device_bytes": [530019072, 665798144],
+        "restart_state_max_abs": 0.0,
+        "restart_flux_max_abs": 5.067069216201761e-7,
+        "restart_flux_relative_l2": 5.6143084587593224e-6
       }
     },
-    "speedup": 1.2859917946015391,
-    "parallel_efficiency": 0.6429958973007696,
+    "speedup": 1.7646056205658662,
+    "parallel_efficiency": 0.8823028102829331,
     "equivalence": {
-      "pressure_observable_max_abs": 3.3485506034658385e-12,
-      "courant_mean_max_abs": 1.3182365287789204e-14,
-      "courant_max_abs": 8.644445565180597e-16,
+      "pressure_observable_max_abs": 3.2688227125099445e-12,
+      "courant_mean_max_abs": 1.3182370369986887e-14,
+      "courant_max_abs": 2.0106021068975327e-15,
       "dt_max_abs": 0.0,
       "velocity_l2_relative": 2.4024087950155475e-10,
-      "potential_l2_relative": 8.907807282944513e-13,
-      "current_l2_relative": 3.838896792826188e-9,
+      "potential_l2_relative": 8.897552708175203e-13,
+      "current_l2_relative": 3.838927190609076e-9,
       "rtol": 2e-8,
       "atol": 2e-9,
       "pass": true
     }
   },
   "deterministic_lane": {
+    "execution_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
+    "source_fingerprint": "409dc706ca20dc2df2f0979962de8e75fa6882db4ac7339b51750d6dae45ec27",
     "xla_flags": "--xla_gpu_exclude_nondeterministic_ops",
     "runs": {
       "1": {
@@ -99,14 +105,14 @@
   },
   "interpretation": {
     "bounded_fast_scaling_calibration": true,
-    "fast_two_update_speedup": 1.2859917946015391,
+    "fast_two_update_speedup": 1.7646056205658662,
     "production_speedup_claim": false,
-    "reason": "The current real solver passes state, flux, placement, conservation, and device-equivalence gates with stable default-XLA timings. Two updates and a shared host preclude a steady-production or publishable scaling claim."
+    "reason": "Fusing the sharded current-flux diagnostics removed an eager-dispatch bottleneck. The current real solver passes state, flux, placement, conservation, and device-equivalence gates with stable default-XLA timings. Two updates and a shared host still preclude a steady-production or publishable scaling claim."
   },
   "raw_assets": {
     "location": "external workspace",
-    "gpu1_fast_sha256": "67c953ed3118097fcdd578cbd9667a5c27fff4261adca11786fc7ff5da622fe6",
-    "gpu2_fast_sha256": "e28ce6b49c64233e193cc46f3e14534c58428731cc4b5438264e7388894f4261",
+    "gpu1_fast_sha256": "3299a208d98e4ab9f06716a42bace75c3ce87e601f6285cc7fc18cce5d4dfc48",
+    "gpu2_fast_sha256": "5ca02c60d9581f47b0213acc033b0782d1c271fc45e2e4cfc248ce1c54e41f9b",
     "gpu1_deterministic_sha256": "2bd5904ee219429a3bee1b06c5a56eb23536713265664d1f36b658dc6aaaf6bf",
     "gpu2_deterministic_sha256": "e974d6de10d36c39f94b552490e08abaa5281c4ec90f4fdce70a365c0d0263ba",
     "restart_relative_probe_sha256": "6cb74ac7f3e99b63b0018c5a86ef1d884bf5370730831ef4da659e8d7afffbbc",

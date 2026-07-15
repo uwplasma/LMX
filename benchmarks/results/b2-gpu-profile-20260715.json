@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "case_id": "B2-fringing-square",
+  "execution_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
+  "environment": {
+    "hardware": "2 NVIDIA RTX A4000, shared host without NVLink",
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "solvax": "0.8.3",
+    "precision": "float64"
+  },
+  "large_diagnostic_trace": {
+    "shape": [128, 67, 67],
+    "updates": 2,
+    "complete": false,
+    "timed_event_count": 1000000,
+    "truncation": "CUPTI dropped buffers and the trace event cap stopped device activity midway through the first momentum solve.",
+    "first_momentum_module_seconds": 5.344240245,
+    "captured_device_time": {
+      "summed_seconds": 4.577803363,
+      "tridiagonal_signature_fraction": 0.970251,
+      "two_diagonal_pivot_fraction": 0.775871,
+      "nccl_fraction": 0.023750
+    },
+    "interpretation": "Captured-device-time shares are not end-to-end wall-time shares. The trace identifies SOLVAX tridiagonal line preconditioning as the dominant captured momentum work but cannot apportion projection, electric, or halo costs."
+  },
+  "complete_small_trace": {
+    "shape": [64, 15, 15],
+    "updates": 2,
+    "input_sha256": "fbad1d4c015f843ca964844cdcd24400e86814a522d3aa09b89c2a8eaf9ac562",
+    "before": {
+      "execution_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
+      "user_solve_seconds": 4.226366183,
+      "projection_path_seconds": 3.694680260,
+      "current_flux_diagnostic_seconds": 2.037416696
+    },
+    "after": {
+      "execution_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
+      "user_solve_seconds": 1.513998297,
+      "projection_path_seconds": 0.987061311,
+      "current_flux_diagnostic_seconds": 0.001812811,
+      "four_run_worker_validation_passed": true,
+      "four_run_warm_median_seconds": 1.43667105701752,
+      "four_run_warm_cv": 0.0018645176304519996
+    },
+    "speedups": {
+      "user_solve": 2.791526378,
+      "projection_path": 3.743111212,
+      "current_flux_diagnostic": 1123.899125
+    }
+  },
+  "promoted_full_rung": {
+    "shape": [128, 67, 67],
+    "one_gpu_warm_median_seconds": 21.138721036957577,
+    "two_gpu_warm_median_seconds": 11.979289191076532,
+    "two_gpu_improvement_from_previous_fraction": 0.269525225,
+    "speedup": 1.7646056205658662,
+    "parallel_efficiency": 0.8823028102829331,
+    "validation_and_equivalence_passed": true
+  },
+  "raw_assets": {
+    "location": "external workspace and office GPU host",
+    "probe_sha256": "c305e2594893bfea7fec8bb4bf15f9e1a36648334af5d803dbbed27c711a0ba8",
+    "large_perfetto_sha256": "c362a1dffd36e51f336beae7d0f396cafe09c5ba4057cbb67cbf6b2b1ff9ed52",
+    "small_before_perfetto_sha256": "d33ba8a778baf16d5c6f9db470bc99f958eee7ed7103dd77222fa2c6960b8729",
+    "small_after_perfetto_sha256": "9345dfeed6281c89f7faad9f869e452dc53a6c585748dffe6450bd4d2cfecc3f"
+  }
+}

@@ -108,7 +108,7 @@ large solve/restart gate passed. No B1 environment switch is required.
 
 B2 supports named axial sharding. The canonical tiny path has equivalent
 observables and exact restart on one and two deterministic GPUs. The current
-`128 x 67 x 67` two-update calibration reaches 1.29x on two GPUs with exact
+`128 x 67 x 67` two-update calibration reaches 1.76x on two GPUs with exact
 primary-state replay and bounded face-flux noise. Production scaling remains open. A superseded
 formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
 current scaling claim. The fine-checkpoint transverse Galerkin

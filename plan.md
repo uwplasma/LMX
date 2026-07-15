@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The current source/scaling baseline is `3e53d8b`; the latest
+Status: 2026-07-15. The current source/scaling baseline is `9d28f99`; the latest
 complete portable-gate artifact is keyed to `ad9b9b3`.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
@@ -101,11 +101,11 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,872 | stay below 35,000 through the scaling tranche | 35,100 |
+| package lines | 34,874 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,508,671 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,490,502 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -238,7 +238,7 @@ production-speed claim. The compact record is
 
 The current `128 x 67 x 67` default-XLA rung passes validation, placement,
 restart, and device equivalence on one and two RTX A4000 GPUs. Warm medians are
-21.09 and 16.40 seconds with CV below 1.9%, a bounded 1.29x two-update speedup.
+21.14 and 11.98 seconds with CV below 0.4%, a bounded 1.76x two-update speedup.
 The stricter deterministic probe isolated `4.40e-6` relative reduction noise
 to corrected face flux; a direct-three versus restart-one-plus-two trajectory
 preserved every primary field exactly and reduced that difference to
@@ -248,9 +248,20 @@ keeps its stricter all-field gate. The compact record is
 `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; two updates and
 the shared host preclude a publishable or production-speed claim.
 
-Next profile one warm 1/2-GPU update and separate projection, electric, momentum,
-and halo costs. Only a measured compute/communication bottleneck may justify
-one larger bounded rung; steady-production scaling remains the promotion gate.
+A complete `64 x 15 x 15` trace showed that eager sharded current-flux
+diagnostics dominated its non-solver cost. JIT fusion reduced that user solve
+from 4.23 to 1.51 seconds and the full-size two-GPU median by 27%. A full-size
+trace then hit the CUPTI event cap midway through momentum; 97.0% of captured
+device time was in cuSPARSE tridiagonal kernels reached through SOLVAX line
+preconditioning, versus 2.38% in NCCL. These are incomplete captured shares,
+not phase timings.
+
+Next retain projection and momentum iteration counts, then profile one warmed
+phase at a time with explicit blocking. First reduce line-preconditioner calls
+through a mixed-boundary-compatible coarse correction or improved stopping;
+do not replace the already-batched SOLVAX GPU tridiagonal path without a bounded
+forward/gradient/timing win. Steady-production scaling remains the promotion
+gate, so no larger rung starts from the truncated trace.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing

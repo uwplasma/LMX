@@ -42,7 +42,7 @@ are authoritative when prose and results differ.
   smoke gate, and its production path has exact restart plus equivalent
   observables on 1/2/4 CPU devices and 1/2 deterministic GPUs. These tiny runs
   establish orchestration and sharding correctness. A current `128 x 67 x 67`
-  two-GPU calibration reaches 1.29x with equivalent observables and bounded
+  two-GPU calibration reaches 1.76x with equivalent observables and bounded
   face-flux replay; a three-update trajectory preserves all primary fields
   exactly. This is not production parity or steady scaling. The fine pressure curve misses every frozen ALEX
   literature-error limit. A checksummed

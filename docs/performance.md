@@ -14,7 +14,7 @@ devices alone is not evidence of parallel execution.
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.768/0.649/0.647 s; 1.18x/1.19x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
-| B2 scaling calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | 21.09/16.40 s; 1.29x speedup; CV below 1.9%, restart and device equivalence pass | current real solver, two fixed updates; shared-host calibration only |
+| B2 scaling calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | 21.14/11.98 s; 1.76x speedup; CV below 0.4%, restart and device equivalence pass | current real solver, two fixed updates; shared-host calibration only |
 | SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | timing refresh remains open |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
@@ -36,6 +36,16 @@ larger GPU B2 result passes its historical two-device equivalence gate, but
 the measured path omits canonical inertia and uses stationwise flow forcing.
 It therefore does not establish scaling for the matched formulation. The B1
 timings do not promote its experimental physics result.
+
+A complete small-rung trace exposed eager sharded current-flux diagnostics as
+the dominant non-solver cost. Fusing those diagnostics reduced the `64 x 15 x
+15` user solve from 4.23 to 1.51 seconds and the full-size two-GPU median from
+16.40 to 11.98 seconds; the one-GPU median remained 21.14 seconds. A separate
+full-size diagnostic trace hit the CUPTI event cap midway through momentum, but
+97.0% of its captured device time was in cuSPARSE tridiagonal kernels reached
+through SOLVAX line preconditioning, versus 2.38% in NCCL. These captured shares
+are not end-to-end phase shares. The compact profile record is
+`benchmarks/results/b2-gpu-profile-20260715.json`.
 
 The accepted compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
@@ -164,6 +174,7 @@ Authoritative records:
 
 - `benchmarks/results/b2-cpu-strong-scaling-20260715.json`
 - `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`
+- `benchmarks/results/b2-gpu-profile-20260715.json`
 - `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`
 - `benchmarks/results/b1-retained-modal-blocks-20260713.json`
 - `benchmarks/results/portable-gate-20260715.json`
