@@ -90,16 +90,17 @@ large reusable artifacts go in checksummed releases.
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 
 Current structure after moving the script-only Benchmark-A auditor out of the
-package:
+package and retiring the undocumented non-projection rectangular autodiff lane
+(the richer projection and target-driven paths remain):
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,030 | below 34,850 after smoke cleanup | 35,100 |
+| package lines | 34,818 | stay below 34,850 through smoke implementation | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,287 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,188 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,432,839 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,421,637 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

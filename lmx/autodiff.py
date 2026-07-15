@@ -97,49 +97,6 @@ def _smooth_fringing_scale(
     return jnp.asarray(peak_scale) * rise * fall
 
 
-def _extruded_rect_response_history_from_field_scale(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    field_scale: jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    mesh = problem.base_problem.mesh
-    dy = float(jnp.mean(mesh.dy))
-    dz = float(jnp.mean(mesh.dz))
-    scale = jnp.asarray(field_scale, dtype=problem.base_problem.sigma.dtype)
-    bz = jnp.broadcast_to(jnp.asarray(peak_hartmann_number) * scale[:, None, None], (scale.shape[0], *mesh.yz_shape))
-    sigma = jnp.broadcast_to(problem.base_problem.sigma[None, :, :], bz.shape)
-    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
-
-    def station_response(bz_slice: jnp.ndarray) -> dict[str, jnp.ndarray]:
-        u, phi = solve_differentiable_hartmann(problem.base_problem, forcing=forcing_value, hartmann_number=bz_slice[0, 0])
-        dphi_dy, dphi_dz = gradient_scalar(phi, mesh)
-        uxb_y = -u * bz_slice
-        jy = sigma[0] * (-dphi_dy + uxb_y)
-        jz = sigma[0] * (-dphi_dz)
-        div_j = jnp.gradient(jy, float(jnp.mean(mesh.dy)), axis=0) + jnp.gradient(jz, float(jnp.mean(mesh.dz)), axis=1)
-        boundary_current_residual = jnp.abs(
-            -jnp.sum(jy[0, :]) * dz
-            + jnp.sum(jy[-1, :]) * dz
-            - jnp.sum(jz[:, 0]) * dy
-            + jnp.sum(jz[:, -1]) * dy
-        )
-        return {
-            "mean_velocity": jnp.mean(u),
-            "current_proxy": jnp.mean(jnp.abs(jy)),
-            "charge_balance_residual": jnp.max(jnp.abs(div_j)),
-            "boundary_current_residual": boundary_current_residual,
-        }
-
-    payload = jax.vmap(station_response)(bz)
-    return {
-        "x": problem.x,
-        "field_scale": scale,
-        **payload,
-    }
-
-
 def _extruded_rect_projection_history_from_field_scale(
     problem: FringingAutodiffProblem,
     *,
@@ -589,30 +546,6 @@ def fringing_response_history(
     }
 
 
-def extruded_rect_response_history(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    field_scale = _smooth_fringing_scale(
-        problem.x,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-    )
-    return _extruded_rect_response_history_from_field_scale(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        field_scale=field_scale,
-    )
-
-
 def extruded_rect_projection_history(
     problem: FringingAutodiffProblem,
     *,
@@ -977,41 +910,6 @@ def fringing_response_loss(
     return velocity_loss + current_weight * current_loss
 
 
-def extruded_rect_response_loss(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    target_charge_balance: jnp.ndarray,
-    target_boundary_current: jnp.ndarray,
-    current_weight: float = 1.0,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-) -> jnp.ndarray:
-    response = extruded_rect_response_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    velocity_scale = jnp.maximum(jnp.max(jnp.abs(target_mean_velocity)), 1.0e-12)
-    current_scale = jnp.maximum(jnp.max(jnp.abs(target_current_proxy)), 1.0e-12)
-    charge_scale = jnp.maximum(jnp.max(jnp.abs(target_charge_balance)), 1.0e-12)
-    boundary_scale = jnp.maximum(jnp.max(jnp.abs(target_boundary_current)), 1.0e-12)
-    velocity_loss = jnp.mean(((response["mean_velocity"] - target_mean_velocity) / velocity_scale) ** 2)
-    current_loss = jnp.mean(((response["current_proxy"] - target_current_proxy) / current_scale) ** 2)
-    charge_loss = jnp.mean(((response["charge_balance_residual"] - target_charge_balance) / charge_scale) ** 2)
-    boundary_loss = jnp.mean(((response["boundary_current_residual"] - target_boundary_current) / boundary_scale) ** 2)
-    return velocity_loss + current_weight * current_loss + charge_balance_weight * charge_loss + boundary_current_weight * boundary_loss
-
-
 def extruded_rect_projection_loss(
     problem: FringingAutodiffProblem,
     *,
@@ -1231,53 +1129,6 @@ def fringing_response_loss_gradients(
         target_mean_velocity=target_mean_velocity,
         target_current_proxy=target_current_proxy,
         current_weight=current_weight,
-    )
-    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
-    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
-        peak_hartmann_number,
-        entry_center,
-        exit_center,
-        transition_width,
-    )
-    return {
-        "loss": loss,
-        "d_peak_hartmann_number": d_peak_ha,
-        "d_entry_center": d_entry,
-        "d_exit_center": d_exit,
-        "d_transition_width": d_width,
-    }
-
-
-def extruded_rect_response_loss_gradients(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    target_charge_balance: jnp.ndarray,
-    target_boundary_current: jnp.ndarray,
-    current_weight: float = 1.0,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-) -> dict[str, jnp.ndarray]:
-    objective = lambda peak_ha, entry, exit_, width: extruded_rect_response_loss(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_ha,
-        entry_center=entry,
-        exit_center=exit_,
-        transition_width=width,
-        target_mean_velocity=target_mean_velocity,
-        target_current_proxy=target_current_proxy,
-        target_charge_balance=target_charge_balance,
-        target_boundary_current=target_boundary_current,
-        current_weight=current_weight,
-        charge_balance_weight=charge_balance_weight,
-        boundary_current_weight=boundary_current_weight,
     )
     loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
     d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
@@ -1645,69 +1496,6 @@ def run_fringing_response_inverse_design(
         "recovered_current_proxy": recovered["current_proxy"],
         "recovered_field_scale": recovered["field_scale"],
         "x": recovered["x"],
-    }
-
-
-def run_extruded_rect_inverse_design(
-    problem: FringingAutodiffProblem,
-    *,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    target_charge_balance: jnp.ndarray,
-    target_boundary_current: jnp.ndarray,
-    forcing: float,
-    peak_hartmann_init: float,
-    entry_center_init: float,
-    exit_center_init: float,
-    transition_width_init: float,
-    current_weight: float = 1.0,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-    learning_rate_peak_ha: float = 0.8,
-    learning_rate_entry: float = 0.15,
-    learning_rate_exit: float = 0.15,
-    learning_rate_width: float = 0.08,
-    steps: int = 12,
-) -> dict[str, object]:
-    """Recover field parameters from direct extruded-duct observables."""
-    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
-        problem,
-        gradient_function=extruded_rect_response_loss_gradients,
-        gradient_kwargs={
-            "forcing": forcing,
-            "target_mean_velocity": target_mean_velocity,
-            "target_current_proxy": target_current_proxy,
-            "target_charge_balance": target_charge_balance,
-            "target_boundary_current": target_boundary_current,
-            "current_weight": current_weight,
-            "charge_balance_weight": charge_balance_weight,
-            "boundary_current_weight": boundary_current_weight,
-        },
-        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
-        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
-        steps=steps,
-    )
-    recovered = extruded_rect_response_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    return {
-        "peak_hartmann_number": float(peak_hartmann_number),
-        "entry_center": float(entry_center),
-        "exit_center": float(exit_center),
-        "transition_width": float(transition_width),
-        "history": history,
-        "recovered_mean_velocity": recovered["mean_velocity"],
-        "recovered_current_proxy": recovered["current_proxy"],
-        "recovered_charge_balance": recovered["charge_balance_residual"],
-        "recovered_boundary_current": recovered["boundary_current_residual"],
-        "recovered_field_scale": recovered["field_scale"],
-        "x": recovered["x"],
-        "model": "direct_extruded_rect",
     }
 
 
