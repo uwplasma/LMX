@@ -7638,7 +7638,10 @@ def _solve_extruded_projection(
             valid &= all(bool(jnp.all(jnp.abs(field) <= velocity_limit))
                 for field in (u_next, v_next, w_next))
             if not valid:
-                raise FloatingPointError("ALEX B2 projection reached its inactive guard")
+                state = tuple((name, bool(jnp.all(jnp.isfinite(field))),
+                    float(jnp.nanmax(jnp.abs(field)))) for name, field in
+                    zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p_corr)))
+                raise FloatingPointError(f"ALEX B2 projection inactive guard: {state}")
         else:
             du_dx, _, _ = _gradient_3d(u_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
             _, dv_dy, _ = _gradient_3d(v_star, dx=dx, dy=dy_momentum, dz=dz_momentum)

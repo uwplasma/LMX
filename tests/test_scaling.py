@@ -603,6 +603,8 @@ def test_scaling_worker_covers_solver_faithful_branch(
             "benchmark_kind": "matched_b2_smoke", "warm_seconds": 0.2,
             "validation_passed": options == {"repeats": 4, "num_devices": 1}
             and input_path.name == "input.json" and evaluator.name == "evaluator.json"})
+    (tmp_path / "input.json").write_text("input")
+    (tmp_path / "evaluator.json").write_text("evaluator")
     output_path = tmp_path / "matched.json"
     assert run_strong_scaling_worker.main([
         "--benchmark-kind", "matched_b2_smoke", "--matched-input", str(tmp_path / "input.json"),
@@ -611,3 +613,10 @@ def test_scaling_worker_covers_solver_faithful_branch(
     matched = json.loads(output_path.read_text())
     assert matched["validation_passed"]
     assert len(matched["source_fingerprint"]) == 64
+    monkeypatch.setattr(run_strong_scaling_worker, "_matched_b2_smoke_benchmark",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("stopped")))
+    assert run_strong_scaling_worker.main([
+        "--benchmark-kind", "matched_b2_smoke", "--matched-input", str(tmp_path / "input.json"),
+        "--evaluator", str(tmp_path / "evaluator.json"), "--repeats", "4",
+        "--num-devices", "1", "--output", str(output_path)]) == 0
+    assert json.loads(output_path.read_text())["failure"]["message"] == "stopped"

@@ -235,6 +235,7 @@ def run_remote_gpu_scaling(
     restart_path: Path | None = None,
     matched_input: Path | None = None,
     evaluator: Path | None = None,
+    timeout_seconds: float = 600.0,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(
         repo_root=repo_root, remote_host=remote_host, remote_dir=remote_dir
@@ -282,7 +283,8 @@ def run_remote_gpu_scaling(
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
             f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
         )
-        subprocess.run(["ssh", remote_host, remote_command], check=True)
+        subprocess.run(["ssh", remote_host, remote_command], check=True,
+            timeout=timeout_seconds)
         local_output = out_dir / f"gpu_{count}.json"
         subprocess.run(
             ["scp", f"{remote_host}:{remote_json}", str(local_output)], check=True
@@ -360,6 +362,7 @@ def run_strong_scaling_demo(
                 nz=gpu_problem[2],
                 iterations=gpu_iterations,
                 repeats=repeats,
+                python_executable=python_executable,
                 profile_dir=profile_dir,
                 restart_path=gpu_restart_path,
                 matched_input=matched_input,

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from importlib.metadata import version
 import json
 from pathlib import Path
+import platform
 import resource
 import sys
 import tempfile
@@ -214,9 +216,24 @@ def _matched_b2_smoke_benchmark(
             problem, num_devices=num_devices
         )
         timings.append(time.perf_counter() - started)
-    resumed = _resume_matched_b2_lmx(
-        problem, checkpoint, num_devices=num_devices
-    )
+    try:
+        resumed = _resume_matched_b2_lmx(
+            problem, checkpoint, num_devices=num_devices
+        )
+    except Exception as error:
+        warm = np.asarray(timings[1:])
+        return {
+            "benchmark_kind": "matched_b2_smoke",
+            "operator_path": "solve_extruded_inductionless",
+            "backend": jax.default_backend(), "device_kind": jax.devices()[0].device_kind,
+            "num_devices": num_devices, "nx": direct.u.shape[0],
+            "ny": direct.u.shape[1], "nz": direct.u.shape[2], "iterations": 2,
+            "repeats": repeats, "cold_seconds": timings[0],
+            "warm_samples_seconds": warm.tolist(),
+            "warm_seconds": float(np.median(warm)), "validation_passed": False,
+            "failure": {"phase": "restart", "type": type(error).__name__,
+                "message": str(error)},
+        }
     with tempfile.TemporaryDirectory(prefix="lmx-b2-scaling-") as temporary:
         evidence = Path(temporary) / "output"
         _write_matched_b2_lmx_output(
@@ -259,8 +276,10 @@ def _matched_b2_smoke_benchmark(
     return {
         "benchmark_kind": "matched_b2_smoke", "operator_path": "solve_extruded_inductionless",
         "backend": jax.default_backend(), "device_kind": jax.devices()[0].device_kind,
-        "num_devices": num_devices, "nx": 8, "ny": 7, "nz": 7,
-        "iterations": 2, "repeats": repeats, "cold_seconds": timings[0],
+        "num_devices": num_devices, "nx": direct.u.shape[0],
+        "ny": direct.u.shape[1], "nz": direct.u.shape[2],
+        "iterations": observed["steps"], "repeats": repeats,
+        "cold_seconds": timings[0],
         "warm_seconds": float(np.median(warm)), "mean_seconds": float(np.mean(timings)),
         "warm_samples_seconds": warm.tolist(), "warm_std_seconds": float(np.std(warm)),
         "warm_cv": float(np.std(warm) / max(np.mean(warm), 1.0e-30)),
@@ -308,9 +327,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.benchmark_kind == "matched_b2_smoke":
         if args.matched_input is None or args.evaluator is None:
             parser.error("matched_b2_smoke requires --matched-input and --evaluator")
-        payload = _matched_b2_smoke_benchmark(
-            args.matched_input, args.evaluator, repeats=args.repeats,
-            num_devices=args.num_devices)
+        try:
+            payload = _matched_b2_smoke_benchmark(
+                args.matched_input, args.evaluator, repeats=args.repeats,
+                num_devices=args.num_devices)
+        except Exception as error:
+            payload = {
+                "benchmark_kind": "matched_b2_smoke", "num_devices": args.num_devices,
+                "validation_passed": False,
+                "failure": {"phase": "worker", "type": type(error).__name__,
+                    "message": str(error)},
+            }
     elif args.benchmark_kind == "duct_step_gate":
         payload = _duct_step_gate(nx=args.nx, ny=args.ny, nz=args.nz,
             iterations=args.iterations, num_devices=args.num_devices)
@@ -336,7 +363,12 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.benchmark_kind not in {"duct_step_gate", "matched_b2_smoke"}:
         payload = {**record.__dict__}
-    payload.update(platform=args.platform, source_fingerprint=_source_fingerprint())
+    payload.update(platform=args.platform, source_fingerprint=_source_fingerprint(),
+        python_version=platform.python_version(), jax_version=jax.__version__,
+        jaxlib_version=version("jaxlib"), solvax_version=version("solvax"))
+    if args.matched_input is not None and args.evaluator is not None:
+        payload.update(input_sha256=hashlib.sha256(args.matched_input.read_bytes()).hexdigest(),
+            evaluator_sha256=hashlib.sha256(args.evaluator.read_bytes()).hexdigest())
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2))
     printed = payload if args.benchmark_kind != "duct_step_gate" else {
