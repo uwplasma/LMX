@@ -150,6 +150,23 @@ executed_steps = 2
 steady_steps_required = 3
 expected_stop_reason = "step_limit"
 
+[harness_smoke_execution]
+output_schema_version = 1
+executed_steps = 2
+dt_absolute_tolerance = 1.0e-18
+courant_max = 0.4
+mass_balance_max = 1.0e-3
+current_balance_max = 1.0e-3
+interface_current_balance_max = 1.0e-3
+interface_current_activity_min = 1.0e-12
+restart_absolute_tolerance = 1.0e-12
+cross_code_courant_relative_tolerance = 0.05
+cross_code_courant_absolute_tolerance = 1.0e-8
+cross_code_pressure_rms_max = 0.16
+cross_code_pressure_linf_max = 0.32
+pressure_tolerance_basis = "second-order smoke-grid truncation scale: h=0.4, RMS<=h^2 and Linf<=2h^2"
+outer_current_evidence = "zero normal current from the independently observed solid zeroGradient boundary; no reconstructed solid flux"
+
 [matched_contract.shared.observable]
 primary = "excess transverse pressure difference between published A/B taps"
 tap_geometry = "top and side wall midpoints at each axial station"

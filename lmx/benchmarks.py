@@ -106,6 +106,25 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         ).encode()
         if hashlib.sha256(encoded_smoke).hexdigest() != "3ef7c6f58900629221bc83c90fe3afef8a656efddd1d455cd60a71e8b38ac4d5":
             raise ValueError("Benchmark B matched smoke role differs")
+        smoke = spec.get("harness_smoke_execution")
+        expected_smoke = {
+            "output_schema_version": 1, "executed_steps": 2,
+            "dt_absolute_tolerance": 1.0e-18, "courant_max": 0.4,
+            "mass_balance_max": 1.0e-3, "current_balance_max": 1.0e-3,
+            "interface_current_balance_max": 1.0e-3,
+            "interface_current_activity_min": 1.0e-12,
+            "restart_absolute_tolerance": 1.0e-12,
+            "cross_code_courant_relative_tolerance": 0.05,
+            "cross_code_courant_absolute_tolerance": 1.0e-8,
+            "cross_code_pressure_rms_max": 0.16,
+            "cross_code_pressure_linf_max": 0.32,
+            "pressure_tolerance_basis": "second-order smoke-grid truncation scale: h=0.4, RMS<=h^2 and Linf<=2h^2",
+            "outer_current_evidence": "zero normal current from the independently observed solid zeroGradient boundary; no reconstructed solid flux",
+        }
+        if smoke != expected_smoke:
+            raise ValueError("Benchmark B harness smoke execution contract differs")
+    elif "harness_smoke_execution" in spec:
+        raise ValueError("Benchmark B1 cannot define the B2 harness smoke execution contract")
     contract = canonical_matched_b_contract(spec, expected_role)
     semantics = (
         contract["equations"].get("inertia"),

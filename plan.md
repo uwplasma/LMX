@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15, through native-current checkpoint `42e671a` and the
-ownership move recorded here. This is the single active
+Status: 2026-07-15, through ownership checkpoint `9996de2` and the execution
+tolerance freeze recorded here. This is the single active
 plan. It records accepted baselines, active gates, and stop/go criteria—not
 campaign history. Completed campaign details belong in checksummed result
 records and the validation or performance documentation.
@@ -95,11 +95,11 @@ package:
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,939 | below 34,850 after smoke cleanup | 35,100 |
-| maintained-core lines | 8,015 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,228 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| package lines | 34,958 | below 34,850 after smoke cleanup | 35,100 |
+| maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
+| test files / lines | 31 / 21,229 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,419,706 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,422,838 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -188,6 +188,12 @@ not identical to the solver's face-normal `snGrad` flux. Therefore the harness
 measures signed and absolute liquid-to-solid interface current and treats zero
 outer-wall current as an independently observed boundary-contract fact; it
 does not claim a reconstructed solid face flux.
+
+The schema-3 execution limits are now frozen separately from production
+acceptance. They require exact two-step controls, `Co_max <= 0.4`, the existing
+`1e-3` mass/current bounds, `1e-12` restart agreement, 5% cross-code CFL
+agreement, and coarse-grid pressure differences below one second-order
+truncation scale (`h^2 = 0.16` RMS and `2h^2 = 0.32` maximum for `h = 0.4`).
 
 Then declare one ten-minute wall budget for both codes. Run LMX first as one
 uninterrupted two-update path and as one update, restart, and one update; require

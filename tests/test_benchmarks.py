@@ -621,6 +621,7 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
         (_FREEMHD_COMMIT, "0" * 40, "FreeMHD discretization reference differs"),
         (("matched_contract", "roles"), {}, "matched production role differs"),
         (_STEADY_STEPS, 2, _STOPPING),
+        (("harness_smoke_execution", "restart_absolute_tolerance"), 1.0e-6, "smoke execution contract"),
         (("sources",), [], "both review"),
         (("sources", 0, "pages"), "", "pages"),
         (("field", "representation"), "spline", "field reconstruction"),
@@ -634,7 +635,7 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
     ],
 )
 def test_benchmark_b_spec_validation_rejects_contract_drift(path, value, message):
-    case_id = "B2-fringing-square" if message == _STOPPING else "B1-fringing-pipe"
+    case_id = "B2-fringing-square" if message in {_STOPPING, "smoke execution contract"} else "B1-fringing-pipe"
     spec = deepcopy(load_benchmark_b_spec(case_id))
     _set_nested(spec, path, value)
     with pytest.raises(ValueError, match=message):

@@ -45,6 +45,23 @@
       "combined_uncertainty_absolute": 0.004,
       "data_path": "benchmarks/references/alex-b2-square.csv",
       "data_sha256": "6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483",
+      "harness_smoke_execution": {
+        "courant_max": 0.4,
+        "cross_code_courant_absolute_tolerance": 1e-08,
+        "cross_code_courant_relative_tolerance": 0.05,
+        "cross_code_pressure_linf_max": 0.32,
+        "cross_code_pressure_rms_max": 0.16,
+        "current_balance_max": 0.001,
+        "dt_absolute_tolerance": 1e-18,
+        "executed_steps": 2,
+        "interface_current_activity_min": 1e-12,
+        "interface_current_balance_max": 0.001,
+        "mass_balance_max": 0.001,
+        "outer_current_evidence": "zero normal current from the independently observed solid zeroGradient boundary; no reconstructed solid flux",
+        "output_schema_version": 1,
+        "pressure_tolerance_basis": "second-order smoke-grid truncation scale: h=0.4, RMS<=h^2 and Linf<=2h^2",
+        "restart_absolute_tolerance": 1e-12
+      },
       "id": "B2-fringing-square",
       "mesh_levels": [
         "coarse",
@@ -78,7 +95,7 @@
         "alex-results-1987"
       ],
       "spec_path": "benchmarks/specs/alex-b2-square.toml",
-      "spec_sha256": "96a2bba86bc77e845a5cf7946014b60c51ae18f3cb0ed21ee90dba78ac90e61e",
+      "spec_sha256": "ff25b098e656671e605485ff771a89fe787a70c1c32cb67a5ea97461337f557c",
       "tolerances_frozen_before_production": true
     }
   ],

@@ -81,6 +81,11 @@ def build_specification_index(root: Path = ROOT) -> dict[str, Any]:
                 "tolerances_frozen_before_production": spec[
                     "tolerances_frozen_before_production"
                 ],
+                **(
+                    {"harness_smoke_execution": spec["harness_smoke_execution"]}
+                    if case_id == "B2-fringing-square"
+                    else {}
+                ),
             }
         )
     return {
