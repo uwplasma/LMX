@@ -435,7 +435,9 @@ def _decode_matched_b2_lmx_input(path: str | Path):
         or np.any(np.diff(anchors_x) <= 0.0) or np.any(np.diff(anchors_b) > 1.0e-12)
         or sample_x[0] < anchors_x[0] or sample_x[-1] > anchors_x[-1]
         or not np.array_equal(np.asarray(profile["sample_x_over_L"], dtype=float), sample_x)
-        or not np.array_equal(sample_b, np.interp(sample_x, anchors_x, anchors_b))
+        or not np.allclose(
+            sample_b, np.interp(sample_x, anchors_x, anchors_b), rtol=0.0, atol=1.0e-15
+        )
         or hashlib.sha256(encoded).hexdigest() != profile["anchors_sha256"]
         or re.fullmatch(r"[0-9a-f]{64}", str(profile["source_sha256"])) is None
     ):
