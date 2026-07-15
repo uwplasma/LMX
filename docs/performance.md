@@ -10,11 +10,12 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.00% combined line/branch coverage, 154.0 s | below the five-minute target |
+| portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.00% combined line/branch coverage, 161.3 s | below the five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
-| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.740/0.639/0.623 s; 1.16x/1.19x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
-| B2 scaling calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | 21.14/11.98 s; 1.76x speedup; CV below 0.4%, restart and device equivalence pass | current real solver, two fixed updates; shared-host calibration only |
+| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
+| B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | initial medians 3.09/3.19 s; restart and device equivalence pass | shared-host confirmations are noisy, so no current scaling claim |
+| B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | stable but below the 1.2x promotion threshold |
 | historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | predates the 0.8.3 package minimum; refresh pending |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
@@ -37,19 +38,23 @@ the measured path omits canonical inertia and uses stationwise flow forcing.
 It therefore does not establish scaling for the matched formulation. The B1
 timings do not promote its experimental physics result.
 
-A complete small-rung trace exposed eager sharded current-flux diagnostics as
-the dominant non-solver cost. Fusing those diagnostics reduced the `64 x 15 x
-15` user solve from 4.23 to 1.51 seconds and the full-size two-GPU median from
-16.40 to 11.98 seconds; the one-GPU median remained 21.14 seconds. On the
-current complete small trace, momentum occupies 84.5% of named solver-phase
-wall time, versus 10.5% for electric potential and 5.0% for mixed projection.
-Tridiagonal kernels are 91.0% of summed momentum device activity and NCCL is
-8.7%. A current full-rung trace reached the event cap after its first
-6.19-second momentum call and corroborates the same tridiagonal bottleneck.
-Device-activity shares are not wall-time shares. The compact profile record is
+The first complete trace exposed eager current-flux diagnostics, then momentum
+line solves. Fusing the diagnostics and replacing momentum's line
+preconditioner with diagonal scaling reduced the full-rung warm medians from
+21.14 to 3.09 seconds on one GPU and from 11.98 to 3.19 seconds on two. The
+diagonal solve passes dense-reference, implicit-gradient, restart, placement,
+and device-equivalence gates and removes all momentum tridiagonal events.
+
+The new complete `128 x 67 x 67` trace assigns 66.0% of named solver wall time
+to mixed pressure projection, 28.5% to electric potential, and 5.5% to
+momentum. Projection and electric device activity are each about 60%
+tridiagonal/PCR work; device-activity shares include overlapping devices and
+are not wall-time shares. Seven-repeat one-GPU confirmations have 6.0–12.5% CV
+because unrelated processes share both cards, so the initial 0.968x fixed-grid
+ratio is not promoted as strong scaling. Doubling the axial extent gives a
+stable 1.125x speedup, below the predeclared 1.2x promotion threshold; larger
+blind rungs therefore stop. The compact profile record is
 `benchmarks/results/b2-gpu-profile-20260715.json`.
-Enabling the existing axial momentum line preserved validation but raised the
-small two-GPU warm median from 1.437 to 1.523 seconds, so that path is rejected.
 
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
@@ -266,8 +271,8 @@ than silently reused.
 
 ## Next performance work
 
-1. Reduce momentum line-preconditioner calls or cost on the small current rung.
-2. Promote only a forward-, gradient-, and timing-gated improvement to the full rung.
+1. Re-measure the current GPU rungs in an isolated window.
+2. Reduce mixed-projection line-solve cost on a tiny forward/gradient/timing gate.
 3. Close canonical B1/B2 mesh and experimental-observable acceptance.
 4. Add four-GPU points only with suitable hardware and a steady-production case.
 

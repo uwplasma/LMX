@@ -137,6 +137,12 @@ the steady Hartmann/Shercliff/Hunt operator from double-counting the
 streamwise Lorentz damping while still retaining the potential-coupled current
 terms in the conservative face-current reconstruction.
 
+The transient mass term dominates the canonical B2 momentum matrix. Its
+SOLVAX GMRES solve therefore uses diagonal scaling: dense-reference and
+implicit-gradient gates preserve the solution, while avoiding repeated GPU
+line solves. Pressure and electric operators retain their stronger structured
+preconditioners because profiling still shows them to be conditioning-limited.
+
 For `inlet_flow_rate` / constant-`Q` fully developed runs, the solver treats
 the requested mean velocity as a hard area-weighted constraint after the
 bounded velocity update and wall interpolation. This keeps direct-wall

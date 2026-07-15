@@ -108,8 +108,12 @@ large solve/restart gate passed. No B1 environment switch is required.
 
 B2 supports named axial sharding. The canonical tiny path has equivalent
 observables and exact restart on one and two deterministic GPUs. The current
-`128 x 67 x 67` two-update calibration reaches 1.76x on two GPUs with exact
-primary-state replay and bounded face-flux noise. Production scaling remains open. A superseded
+`128 x 67 x 67` two-update calibration preserves primary-state replay and
+bounded face-flux noise. Diagonal momentum preconditioning reduces its warm
+runtime from 21.14 to 3.09 seconds on one GPU and from 11.98 to 3.19 seconds on
+two; shared-host variance prevents a stable scaling claim.
+The doubled-axial `256 x 67 x 67` rung is stable but reaches only 1.125x, below
+the promotion threshold. Production scaling remains open. A superseded
 formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
 current scaling claim. The fine-checkpoint transverse Galerkin
 gate separately reduces electric iterations 5.18x and matched two-update time

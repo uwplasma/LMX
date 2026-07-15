@@ -1,8 +1,8 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-07-15",
   "case_id": "B2-fringing-square",
-  "execution_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
+  "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "environment": {
     "hardware": "2 NVIDIA RTX A4000, shared host without NVLink",
     "python": "3.12.13",
@@ -11,7 +11,7 @@
     "solvax": "0.8.3",
     "precision": "float64"
   },
-  "current_large_diagnostic_trace": {
+  "pre_diagonal_large_trace": {
     "shape": [128, 67, 67],
     "updates": 2,
     "complete": false,
@@ -23,7 +23,7 @@
       "tridiagonal_signature_fraction": 0.964126832,
       "nccl_fraction": 0.030495756
     },
-    "interpretation": "This incomplete trace corroborates the momentum bottleneck but cannot apportion later full-rung phases. Captured-device-activity shares are not wall-time shares."
+    "interpretation": "This superseded trace identified the former momentum bottleneck. Captured-device-activity shares are not wall-time shares."
   },
   "complete_small_trace": {
     "shape": [64, 15, 15],
@@ -49,7 +49,7 @@
       "projection_path": 3.743111212,
       "current_flux_diagnostic": 1123.899125
     },
-    "complete_phase_trace_after": {
+    "pre_diagonal_phase_trace_after_flux_fusion": {
       "timed_event_count": 248145,
       "named_solver_phase_wall_seconds": {
         "momentum": 0.498043584,
@@ -66,16 +66,68 @@
         "tridiagonal_signature_fraction": 0.910306774,
         "nccl_fraction": 0.086776875
       },
-      "interpretation": "Momentum dominates the named solver phases on the complete small current path; pressure projection is not the first optimization target. Device-activity shares sum concurrent GPU streams and are not wall-time shares."
+      "interpretation": "This superseded trace selected momentum as the next bounded target. Device-activity shares sum concurrent GPU streams and are not wall-time shares."
     }
   },
-  "promoted_full_rung": {
+  "diagonal_momentum_promotion": {
+    "small_probe": {
+      "shape": [64, 15, 15],
+      "devices": 2,
+      "baseline_warm_median_seconds": 1.434475966,
+      "diagonal_warm_median_seconds": 1.118281325,
+      "wall_time_reduction_fraction": 0.220424066,
+      "momentum_wall_seconds_before": 0.498043584,
+      "momentum_wall_seconds_after": 0.036321244,
+      "momentum_wall_reduction_fraction": 0.927073714,
+      "tridiagonal_events_after": 0,
+      "validation_passed": true
+    },
+    "complete_full_trace": {
+      "shape": [128, 67, 67],
+      "devices": 2,
+      "updates": 2,
+      "timed_event_count": 227431,
+      "named_solver_phase_wall_seconds": {
+        "mixed_projection": 1.786296567,
+        "electric": 0.771452341,
+        "momentum": 0.149811407
+      },
+      "named_solver_phase_fraction": {
+        "mixed_projection": 0.659744,
+        "electric": 0.284925,
+        "momentum": 0.055331
+      },
+      "device_activity": {
+        "mixed_projection_tridiagonal_fraction": 0.608104,
+        "mixed_projection_nccl_fraction": 0.279765,
+        "electric_tridiagonal_fraction": 0.597412,
+        "electric_nccl_fraction": 0.196753,
+        "momentum_tridiagonal_events": 0,
+        "momentum_nccl_fraction": 0.633082
+      },
+      "interpretation": "Mixed projection is the new primary target; device activity overlaps across streams and devices and is not wall time."
+    },
+    "correctness_gates": [
+      "dense-reference",
+      "implicit-gradient",
+      "restart",
+      "placement",
+      "device-equivalence"
+    ],
+    "source_line_change": -10,
+    "decision": "promote"
+  },
+  "current_full_rung": {
     "shape": [128, 67, 67],
-    "one_gpu_warm_median_seconds": 21.138721036957577,
-    "two_gpu_warm_median_seconds": 11.979289191076532,
-    "two_gpu_improvement_from_previous_fraction": 0.269525225,
-    "speedup": 1.7646056205658662,
-    "parallel_efficiency": 0.8823028102829331,
+    "before_diagonal_warm_median_seconds": {"1": 21.138721036957577, "2": 11.979289191076532},
+    "after_diagonal_initial_warm_median_seconds": {"1": 3.090575286070816, "2": 3.1934915269957855},
+    "absolute_speedup": {"1": 6.839736645, "2": 3.751157343},
+    "initial_fixed_grid_speedup": 0.9677731285,
+    "doubled_axial_shape": [256, 67, 67],
+    "doubled_axial_speedup": 1.1247855634,
+    "doubled_axial_cv_below_0.05": true,
+    "stable_scaling_claim": false,
+    "reason": "The stable doubled-axial rung remains below the 1.2x promotion threshold.",
     "validation_and_equivalence_passed": true
   },
   "rejected_momentum_probe": {
@@ -89,12 +141,35 @@
     "decision": "reject",
     "worker_sha256": "d51d53829c3f66a8bce262b16e414f4cc1393288aed87c89a06fbe7045e3987e"
   },
+  "rejected_followups": [
+    {
+      "probe": "GMRES restart 24",
+      "control_seconds": 1.434475966,
+      "candidate_seconds": 1.427509109,
+      "reason": "0.49% change is below measured noise",
+      "sha256": "8a4f734543f48e6286f23b4f77bd4195120f97c55e2547da58c4a99ecd3787a4"
+    },
+    {
+      "probe": "native batched vector right-hand side",
+      "candidate_seconds": 1.421061426,
+      "reason": "trace retained 73,216 tridiagonal kernels and showed no profiled momentum win",
+      "sha256": "3fb672fe38e8249e7ec7cd395deb0ac4288b462522c8feb89b0ab17ee8f27e74"
+    },
+    {
+      "probe": "separate primal and transpose warm starts on pending SOLVAX 0.8.4",
+      "candidate_seconds": 1.546588637,
+      "reason": "7.8% slower than the matched control",
+      "sha256": "66a03f52cf6d7fa262e87a9c075df82e36907a3b7d88d6f8f78c3b934785fc6a"
+    }
+  ],
   "raw_assets": {
     "location": "external workspace and office GPU host",
     "probe_sha256": "c6e67e442f252907d8a4c8e041557f2bb68521242036db3b7558bce6feff4200",
     "current_large_perfetto_sha256": "a4d52548ffc9ad4267f0725c4896747738441dcfe1bf7ba3403ed133906e1c51",
     "small_before_perfetto_sha256": "d33ba8a778baf16d5c6f9db470bc99f958eee7ed7103dd77222fa2c6960b8729",
     "small_after_perfetto_sha256": "9345dfeed6281c89f7faad9f869e452dc53a6c585748dffe6450bd4d2cfecc3f",
-    "small_phase_perfetto_sha256": "9cac8daa188120c93b942b8195b8ca3e5c8a5d2740d2eb875688a162c47289c6"
+    "small_phase_perfetto_sha256": "9cac8daa188120c93b942b8195b8ca3e5c8a5d2740d2eb875688a162c47289c6",
+    "diagonal_small_perfetto_sha256": "acff7fedfdc8c14dcfb54f7ca8724dd09fb9bf115b3de30ef0067b02f1484d47",
+    "diagonal_full_perfetto_sha256": "ac93ab23cd03bdd2ce1a4acf07930362ae6699164b206d8707510175062ecc1e"
   }
 }

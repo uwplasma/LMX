@@ -25,7 +25,7 @@ are authoritative when prose and results differ.
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 823 tests with 8 expected external-data
-  skips and 95.00% combined line/branch coverage in 154.0 seconds on the
+  skips and 95.00% combined line/branch coverage in 161.3 seconds on the
   reference Mac.
 
 ## Research-stage
@@ -42,9 +42,12 @@ are authoritative when prose and results differ.
   smoke gate, and its production path has exact restart plus equivalent
   observables on 1/2/4 CPU devices and 1/2 deterministic GPUs. These tiny runs
   establish orchestration and sharding correctness. A current `128 x 67 x 67`
-  two-GPU calibration reaches 1.76x with equivalent observables and bounded
-  face-flux replay; a three-update trajectory preserves all primary fields
-  exactly. This is not production parity or steady scaling. The fine pressure curve misses every frozen ALEX
+  calibration has equivalent observables and bounded face-flux replay; diagonal
+  momentum preconditioning cuts its GPU runtime by 3.75–6.84x, but shared-host
+  variance leaves that fixed-grid ratio open. A stable doubled-axial rung
+  reaches only 1.125x, below the scaling-promotion threshold. A three-update
+  trajectory preserves all primary fields exactly. This is not production
+  parity or steady scaling. The fine pressure curve misses every frozen ALEX
   literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from
   15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not

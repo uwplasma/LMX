@@ -1,13 +1,13 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The optimized source and GPU baseline is `9d28f99`, the
-current CPU scaling refresh is keyed to `d9d3f79`, and the latest complete
-portable-gate artifact is keyed to `9636fa7`.
+Status: 2026-07-15. The optimized source, current CPU calibration, and latest
+complete portable-gate artifact are keyed to `413185a`; the GPU workers use its
+matching source fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
-acceptance. The current `128 x 67 x 67` GPU rung closes deterministic sharding
-and a bounded two-update calibration, not fast or production scaling. This
+acceptance. The current `128/256 x 67 x 67` GPU rungs close deterministic
+sharding and bounded two-update calibration, not production scaling. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -102,21 +102,21 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,874 | stay below 35,000 through the scaling tranche | 35,100 |
+| package lines | 34,864 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,489,557 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,499,019 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `9636fa7` records 823 passes, 8 expected
-external-data skips, 95.0043% combined line/branch coverage, and 154.0 seconds on
+The portable-gate artifact keyed to `413185a` records 823 passes, 8 expected
+external-data skips, 95.0023% combined line/branch coverage, and 161.3 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 54.4 seconds for the
-weighted-modal node and 40.8 seconds for reduced B2. Parallel JUnit durations
+95.5% engineering target. The six-worker record reports 58.2 seconds for the
+weighted-modal node and 42.8 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
@@ -156,7 +156,7 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it nevertheless reports 54.4 seconds, versus 40.8 seconds for reduced B2
+gate it nevertheless reports 58.2 seconds, versus 42.8 seconds for reduced B2
 and 25.1 seconds for reduced B1. Isolated measurement attributed roughly half
 of that modal duration to worker contention. Reducing only its manufactured
 radial grid, while preserving every physical and independent-factor assertion,
@@ -187,14 +187,19 @@ records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 An explicit one-device request uses the same named-sharding kernels as the
 multi-device path. On the current source, the `128 x 31 x 31` rung passes
 validation, placement, exact restart, and device-equivalence gates. Warm
-medians are 0.740, 0.639, and 0.623 seconds on 1/2/4 devices: 1.16x and 1.19x
+medians are 0.857, 0.652, and 0.633 seconds on 1/2/4 devices: 1.31x and 1.35x
 speedups, with modest gain beyond two devices. This is a two-update scaling calibration, not a steady
 production-speed claim. The compact record is
 `benchmarks/results/b2-cpu-strong-scaling-20260715.json`.
 
 The current `128 x 67 x 67` default-XLA rung passes validation, placement,
-restart, and device equivalence on one and two RTX A4000 GPUs. Warm medians are
-21.14 and 11.98 seconds with CV below 0.4%, a bounded 1.76x two-update speedup.
+restart, and device equivalence on one and two RTX A4000 GPUs. Diagonal momentum
+preconditioning reduced its initial warm medians from 21.14 to 3.09 seconds on
+one GPU and from 11.98 to 3.19 seconds on two: 6.84x and 3.75x absolute
+improvements. The initial fixed-grid ratio is 0.968x, and seven-repeat
+one-device confirmations on both physical cards have 6.0--12.5% CV because
+unrelated workloads share the host. No current GPU strong-scaling speedup is
+therefore promoted.
 The stricter deterministic probe isolated `4.40e-6` relative reduction noise
 to corrected face flux; a direct-three versus restart-one-plus-two trajectory
 preserved every primary field exactly and reduced that difference to
@@ -204,24 +209,24 @@ keeps its stricter all-field gate. The compact record is
 `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; two updates and
 the shared host preclude a publishable or production-speed claim.
 
-A complete `64 x 15 x 15` trace showed that eager sharded current-flux
-diagnostics dominated its non-solver cost. JIT fusion reduced that user solve
-from 4.23 to 1.51 seconds and the full-size two-GPU median by 27%. A current
-complete small trace attributes 84.5% of named solver-phase wall time to
-momentum, 10.5% to electric potential, and 5.0% to mixed projection. Within
-momentum, tridiagonal kernels are 91.0% of summed device activity and NCCL is
-8.7%. A current full-rung trace again reached the event cap after its first
-6.19-second momentum call; that call was 96.4% tridiagonal activity and 3.05%
-NCCL. Device-activity shares are not wall-time shares.
+Earlier complete traces showed first that eager sharded current-flux diagnostics
+and then momentum line solves dominated. JIT fusion and diagonal momentum
+scaling remove both bottlenecks. Dense-reference, implicit-gradient, restart,
+placement, and equivalence gates pass, while the implementation deletes ten net
+source lines. On the new complete `128 x 67 x 67` trace, mixed pressure
+projection occupies 66.0% of named solver wall time, electric potential 28.5%,
+and momentum 5.5%. Projection and electric device activity are each about 60%
+tridiagonal/PCR work; momentum has no tridiagonal events. Device-activity shares
+sum overlapping devices and streams and are not wall-time shares.
 
-Next reduce momentum line-preconditioner calls or per-call cost in a bounded
-small-rung experiment with forward, gradient, and timing gates. Retain momentum
-auxiliary data only after the released SOLVAX API supports it without another solve;
-the existing axial line is already rejected because it slowed the validated
-small two-GPU path by 6.0%. Do not replace the already-batched SOLVAX GPU
-tridiagonal path without a bounded
-forward/gradient/timing win. Steady-production scaling remains the promotion
-gate, so no larger rung starts from the truncated trace.
+The single trace-justified `256 x 67 x 67` calibration is complete. It passes
+validation, exact restart, placement, and device equivalence; warm medians are
+8.474 and 7.534 seconds with CV below 3.7%, a stable but sub-threshold 1.125x
+speedup. Stop larger blind rungs. Next reduce mixed-projection line-preconditioner
+calls or cost on the `64 x 15 x 15` forward/gradient/timing gate; electric is
+second. Re-measure the accepted rungs in an isolated GPU window before any
+publishable scaling claim. Retain solver auxiliary data only after a released
+SOLVAX API provides it without an extra solve.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -307,10 +312,10 @@ acceptance. SOLVAX owns generic linear algebra after primal, residual,
 transpose/gradient, JIT, placement, memory, and repeated timing gates pass.
 Delete an LMX duplicate in the same tranche that adopts SOLVAX.
 
-The released-0.8.3 additive-preconditioner migration is already complete in
-both line-preconditioner owners. A later `solvax.jacobi` substitution is worth
-considering only if it deletes LMX code while preserving the tiny diagonal
-guard and `none` behavior; ownership movement alone is not a performance win.
+The released-0.8.3 additive-preconditioner migration is complete in the
+remaining line-preconditioner owners. Momentum's single diagonal division is
+clearer and smaller than wrapping `solvax.jacobi`; ownership movement without
+code deletion is not a performance win.
 After 0.8.4 is published, use one
 `anderson_weights` result for scaled fields and compact-flux histories, and use
 `linear_solve(has_aux=True)` to retain momentum diagnostics without a final

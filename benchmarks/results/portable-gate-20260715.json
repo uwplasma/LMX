@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "date": "2026-07-15",
-  "commit": "9636fa7c0ccc0ea82743593d84e523163667dae1",
+  "commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -23,45 +23,45 @@
     "test_lines": 21282,
     "passed": 823,
     "skipped": 8,
-    "pytest_seconds": 151.77,
-    "gate_seconds": 154.0,
-    "covered_lines": 14205,
-    "total_lines": 14655,
-    "covered_branches": 2511,
-    "total_branches": 2940,
-    "combined_line_branch_coverage_percent": 95.00426,
+    "pytest_seconds": 159.01,
+    "gate_seconds": 161.3,
+    "covered_lines": 14200,
+    "total_lines": 14650,
+    "covered_branches": 2509,
+    "total_branches": 2938,
+    "combined_line_branch_coverage_percent": 95.00227427791676,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "88b5d10ff52774e8be8144add6b940013f30d9e11804499aa54691e148069ff1",
-    "junit_xml_sha256": "bfd5d881038691fd1d526f13911ff34333149b609b0575f2653df539561c022b"
+    "coverage_xml_sha256": "6d0378c24fcf7fe5086147ef398b11c201fc6248e8d9accd1e2e069fb7746b2a",
+    "junit_xml_sha256": "7eeaf7e2c7048af7251d3c122d2ae65e51bdc76f0373872150e6c081325e9bbc"
   },
   "duration_note": "Durations come from the six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 54.409, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
-    {"seconds": 40.801, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 25.090, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 20.666, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 19.581, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 18.459, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
-    {"seconds": 16.573, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
-    {"seconds": 16.553, "nodeid": "tests.test_autodiff::test_extruded_rect_projection_inverse_design_reduces_loss"},
-    {"seconds": 16.249, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 15.593, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"}
+    {"seconds": 58.182, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 42.762, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 26.999, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 20.589, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 20.147, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 19.167, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 18.317, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 17.209, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 16.290, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 15.867, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"}
   ],
   "comparison": {
-    "previous_gate_seconds": 152.1,
-    "wall_time_change_percent": 1.2,
-    "budget_fraction": 0.257,
-    "engineering_target_fraction": 0.513,
-    "interpretation": "The current scaling tranche keeps the complete gate below three minutes and above 95%; modal-grid slimming reduces, but does not eliminate, six-worker contention."
+    "previous_gate_seconds": 154.0,
+    "wall_time_change_percent": 4.74,
+    "budget_fraction": 0.269,
+    "engineering_target_fraction": 0.538,
+    "interpretation": "Diagonal momentum preconditioning keeps the complete gate below three minutes and above 95%; the weighted-modal node remains the six-worker critical path."
   },
   "architecture": {
     "package_modules": 35,
-    "package_lines": 34874,
+    "package_lines": 34864,
     "maintained_core_lines": 8034,
     "maintenance_scripts": 18,
-    "tracked_checkout_bytes": 3490502,
+    "tracked_checkout_bytes": 3490920,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

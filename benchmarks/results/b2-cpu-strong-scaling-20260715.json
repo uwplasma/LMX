@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "date": "2026-07-15",
-  "commit": "d9d3f79ca30f24ce060b1cd00502cd46cca0381f",
-  "source_fingerprint": "dd41db01268c9623231ca5a05ffbe8c719157e14e5570b174565cc8da9eb392c",
+  "commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
+  "source_fingerprint": "fff3a0a190d21a413bd0bcac73fef50812811f3f1837299d547b40a57cd9a3d3",
   "case_id": "B2-fringing-square",
   "acceptance_role": "scaling-calibration",
   "environment": {
@@ -24,22 +24,22 @@
     "explicit_named_sharding_at_one_device": true
   },
   "timings": {
-    "cold_seconds": {"1": 4.938294499996118, "2": 6.794406000059098, "4": 5.283295708009973},
+    "cold_seconds": {"1": 5.027720541926101, "2": 5.9424284170381725, "4": 5.4079727090429515},
     "warm_samples_seconds": {
-      "1": [0.7456851250026375, 0.736228666966781, 0.7402946660295129],
-      "2": [0.6385074999416247, 0.6216208330588415, 0.6405172080267221],
-      "4": [0.6231221250491217, 0.6217958749039099, 0.6486097499728203]
+      "1": [0.7996696670306846, 0.857370457961224, 0.8831605410668999],
+      "2": [0.632503250031732, 0.6648068749345839, 0.6523842080496252],
+      "4": [0.6321837500436231, 0.6422912910347804, 0.6334446250693873]
     },
-    "warm_median_seconds": {"1": 0.7402946660295129, "2": 0.6385074999416247, "4": 0.6231221250491217},
-    "warm_cv": {"1": 0.005228830907346094, "2": 0.013375386739848902, "4": 0.01954996378539442},
-    "speedup": {"2": 1.1594142059368042, "4": 1.1880410537038053},
-    "parallel_efficiency": {"2": 0.5797071029684021, "4": 0.2970102634259513}
+    "warm_median_seconds": {"1": 0.857370457961224, "2": 0.6523842080496252, "4": 0.6334446250693873},
+    "warm_cv": {"1": 0.041223129654514024, "2": 0.02047174661838206, "4": 0.007071219652868652},
+    "speedup": {"2": 1.3142109318133681, "4": 1.3535049853289196},
+    "parallel_efficiency": {"2": 0.6571054659066841, "4": 0.3383762463322299}
   },
   "equivalence": {
-    "pressure_observable_max_abs": 8.62243918334281e-14,
-    "field_norm_max_relative": 2.1647647433636083e-15,
-    "courant_mean_max_abs": 2.710505431213761e-20,
-    "courant_max_max_abs": 4.84147091991613e-16,
+    "pressure_observable_max_abs": 1.0725182677737144e-13,
+    "field_norm_max_relative": 2.195758389583414e-15,
+    "courant_mean_max_abs": 6.268043809681823e-20,
+    "courant_max_max_abs": 3.4446627679169534e-16,
     "restart_max_abs": 0.0
   },
   "gates": {
@@ -50,18 +50,18 @@
     "shared_input": true
   },
   "raw_assets": {
-    "location": "/Users/rogerio/local/tests/lmx_b2_cpu_scaling_128x31x31_d9d3f79",
+    "location": "/Users/rogerio/local/tests/lmx_b2_cpu_scaling_128x31x31_413185a",
     "input_sha256": "a073900b9dead2de204eeb90deb8eb455e03b1404ec7380c3f22352c2b1602b8",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
     "worker_sha256": {
-      "1": "0554a6d22efb0006a1931809b61fd9be3b2d05b530ed0bd058d34c3a6aabf372",
-      "2": "2ab8ce1f837de668c91bb3d4cec7960bd8680897a600fdea4e6f20ee0d034145",
-      "4": "3eedf7e9eac6ea9dff349ed7fa7db82df01e3383302b7c701f890513464e097a"
+      "1": "36963fecc026e36d84d598e5672f7def6f91cbb3422c439e9c3fdc7a89403b84",
+      "2": "3368e900d9ea8d56d9dcab0706780df03cc6c6530a262ded7aad3cd7a95d4ee1",
+      "4": "d6de949ae7ad05e0e4500b564865930ddd6823c83db786c60b8e51d4b13ebd57"
     }
   },
   "interpretation": {
     "strong_scaling_calibration": true,
     "production_speedup_claim": false,
-    "reason": "The current real solver path executes only two fixed updates; four forced CPU devices give a bounded 1.19x speedup, not a steady-production claim."
+    "reason": "The current real solver path executes only two fixed updates; four forced CPU devices give a bounded 1.35x speedup, not a steady-production claim."
   }
 }

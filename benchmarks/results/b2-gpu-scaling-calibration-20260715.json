@@ -1,9 +1,9 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "date": "2026-07-15",
-  "acceptance_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
-  "execution_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
-  "source_fingerprint": "dd41db01268c9623231ca5a05ffbe8c719157e14e5570b174565cc8da9eb392c",
+  "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
+  "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
+  "source_fingerprint": "fff3a0a190d21a413bd0bcac73fef50812811f3f1837299d547b40a57cd9a3d3",
   "case_id": "B2-fringing-square",
   "acceptance_role": "scaling-calibration",
   "environment": {
@@ -39,39 +39,87 @@
   "default_xla_lane": {
     "runs": {
       "1": {
-        "cold_seconds": 42.79689490806777,
-        "warm_samples_seconds": [21.07164214493241, 21.138721036957577, 21.14465511206072],
-        "warm_median_seconds": 21.138721036957577,
-        "warm_cv": 0.0015677708597257793,
-        "peak_device_bytes": 1015341056,
+        "cold_seconds": 46.51097517891321,
+        "warm_samples_seconds": [3.090575286070816, 3.031097889994271, 3.446432812954299],
+        "warm_median_seconds": 3.090575286070816,
+        "warm_cv": 0.05749928827339619,
+        "peak_device_bytes": 989359104,
         "restart_state_max_abs": 0.0,
         "restart_flux_max_abs": 0.0
       },
       "2": {
-        "cold_seconds": 35.596992890001275,
-        "warm_samples_seconds": [11.889716164092533, 11.979289191076532, 11.988575660972856],
-        "warm_median_seconds": 11.979289191076532,
-        "warm_cv": 0.003729377585139145,
-        "peak_device_bytes": [530019072, 665798144],
+        "cold_seconds": 51.91309381707106,
+        "warm_samples_seconds": [3.169849485042505, 3.228173151030205, 3.1934915269957855],
+        "warm_median_seconds": 3.1934915269957855,
+        "warm_cv": 0.007491713905461616,
+        "peak_device_bytes": [521183744, 665762560],
         "restart_state_max_abs": 0.0,
-        "restart_flux_max_abs": 5.067069216201761e-7,
-        "restart_flux_relative_l2": 5.6143084587593224e-6
+        "restart_flux_max_abs": 3.9723385172485804e-7,
+        "restart_flux_relative_l2": 4.401379058436642e-6
       }
     },
-    "speedup": 1.7646056205658662,
-    "parallel_efficiency": 0.8823028102829331,
+    "speedup": 0.9677731284771768,
+    "parallel_efficiency": 0.4838865642385884,
     "equivalence": {
-      "pressure_observable_max_abs": 3.2688227125099445e-12,
-      "courant_mean_max_abs": 1.3182370369986887e-14,
-      "courant_max_abs": 2.0106021068975327e-15,
+      "pressure_observable_max_abs": 3.290784311715811e-12,
+      "courant_mean_max_abs": 1.3178226684808919e-14,
+      "courant_max_abs": 7.04262155862799e-16,
       "dt_max_abs": 0.0,
-      "velocity_l2_relative": 2.4024087950155475e-10,
-      "potential_l2_relative": 8.897552708175203e-13,
-      "current_l2_relative": 3.838927190609076e-9,
+      "velocity_l2_relative": 2.4018976558027874e-10,
+      "potential_l2_relative": 8.899261718437396e-13,
+      "current_l2_relative": 3.836411212311813e-9,
       "rtol": 2e-8,
       "atol": 2e-9,
       "pass": true
     }
+  },
+  "shared_host_confirmation": {
+    "repeats": 7,
+    "physical_gpu_0": {
+      "warm_median_seconds": 3.5070174415013753,
+      "warm_cv": 0.12465694945090407
+    },
+    "physical_gpu_1": {
+      "warm_median_seconds": 3.8917730315588415,
+      "warm_cv": 0.05966130898649958
+    },
+    "timing_gate_pass": false,
+    "cause": "Unrelated persistent processes occupied both GPUs during confirmation."
+  },
+  "doubled_axial_rung": {
+    "shape": [256, 67, 67],
+    "cells": 1149184,
+    "updates": 2,
+    "input_sha256": "e0afbb9d261f74db559f9839d1137b054206d253194ae046056f5522474cf838",
+    "runs": {
+      "1": {
+        "warm_samples_seconds": [8.473801539978012, 8.389920336077921, 8.477104977006093],
+        "warm_median_seconds": 8.473801539978012,
+        "warm_cv": 0.004776066018891184,
+        "peak_device_bytes": 1997078528
+      },
+      "2": {
+        "warm_samples_seconds": [7.533704036963172, 6.962189067038707, 7.5422167759388685],
+        "warm_median_seconds": 7.533704036963172,
+        "warm_cv": 0.03695100833060272,
+        "peak_device_bytes": [1034870528, 1059395328]
+      }
+    },
+    "speedup": 1.1247855634363084,
+    "parallel_efficiency": 0.5623927817181542,
+    "equivalence": {
+      "pressure_observable_max_abs": 1.107959557433702e-11,
+      "courant_mean_max_abs": 2.257182206985911e-14,
+      "courant_max_abs": 2.9136916946011227e-16,
+      "velocity_l2_relative": 4.114170241808116e-10,
+      "potential_l2_relative": 1.5396653361903879e-12,
+      "current_l2_relative": 6.631997534555094e-9,
+      "pass": true
+    },
+    "timing_cv_below_0.05": true,
+    "promotion_threshold": 1.2,
+    "promoted_scaling_claim": false,
+    "decision": "Stop larger blind rungs and optimize the profiled mixed projection."
   },
   "deterministic_lane": {
     "execution_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
@@ -100,19 +148,26 @@
     "restart_state": true,
     "restart_flux": true,
     "device_equivalence": true,
-    "default_xla_warm_cv_below_0.05": true,
-    "deterministic_warm_cv_below_0.05": false
+    "default_xla_warm_cv_below_0.05": false,
+    "deterministic_warm_cv_below_0.05": false,
+    "doubled_axial_validation_and_equivalence": true,
+    "doubled_axial_warm_cv_below_0.05": true,
+    "doubled_axial_speedup_at_least_1.2": false
   },
   "interpretation": {
-    "bounded_fast_scaling_calibration": true,
-    "fast_two_update_speedup": 1.7646056205658662,
+    "bounded_fast_scaling_calibration": false,
+    "initial_two_update_speedup": 0.9677731284771768,
     "production_speedup_claim": false,
-    "reason": "Fusing the sharded current-flux diagnostics removed an eager-dispatch bottleneck. The current real solver passes state, flux, placement, conservation, and device-equivalence gates with stable default-XLA timings. Two updates and a shared host still preclude a steady-production or publishable scaling claim."
+    "reason": "Diagonal momentum preconditioning passes every correctness gate and cuts absolute runtime by 3.75--6.84x. The stable doubled-axial rung reaches only 1.125x, below the 1.2x promotion threshold; optimize mixed projection before another larger rung."
   },
   "raw_assets": {
-    "location": "external workspace",
-    "gpu1_fast_sha256": "3299a208d98e4ab9f06716a42bace75c3ce87e601f6285cc7fc18cce5d4dfc48",
-    "gpu2_fast_sha256": "5ca02c60d9581f47b0213acc033b0782d1c271fc45e2e4cfc248ce1c54e41f9b",
+    "location": "/Users/rogerio/local/tests/lmx_b2_gpu_scaling_413185a and office GPU host",
+    "gpu1_initial_sha256": "02855c5f3466c96194ab5f20541512fb3e79dde753a6d4ff4e67e6b279f44d4f",
+    "gpu2_initial_sha256": "87bfdd6fc1144b931393a976747c9ae3e00b4a65acbde73fb8c39680ac9fe5dc",
+    "gpu1_physical0_confirmation_sha256": "0d60c602ddf90a843d1978892e3edf56b9532116cc499ff82b17b590630b5730",
+    "gpu1_physical1_confirmation_sha256": "8f69f12a8673041ea055da3e72bfb8def9bddffe4c5f8dbd64e1fae1062e8c29",
+    "gpu1_doubled_axial_sha256": "bead2d8d6fd71f92f8662444ebc1abb6d4cacbccc9d576ddbaffd6c8fa12689f",
+    "gpu2_doubled_axial_sha256": "293209da4dc5c48f007734e27bc860a46b162f3a0c0be101be3626ef999afa41",
     "gpu1_deterministic_sha256": "2bd5904ee219429a3bee1b06c5a56eb23536713265664d1f36b658dc6aaaf6bf",
     "gpu2_deterministic_sha256": "e974d6de10d36c39f94b552490e08abaa5281c4ec90f4fdce70a365c0d0263ba",
     "restart_relative_probe_sha256": "6cb74ac7f3e99b63b0018c5a86ef1d884bf5370730831ef4da659e8d7afffbbc",
