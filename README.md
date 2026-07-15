@@ -120,8 +120,8 @@ two GPUs. Steady-production scaling remains open.
 
 ## Quality and citation
 
-The portable gate records **823 passing tests**, **95.01% combined line/branch
-coverage**, and **153.7 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **823 passing tests**, **95.00% combined line/branch
+coverage**, and **152.1 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

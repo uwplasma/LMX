@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The current source/scaling baseline is `3e53d8b`; the latest
-complete portable-gate artifact remains keyed to `6c63710`.
+complete portable-gate artifact is keyed to `ad9b9b3`.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
@@ -105,17 +105,17 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,508,676 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,508,671 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `6c63710` records 823 passes, 8 expected
-external-data skips, 95.0134% combined line/branch coverage, and 153.7 seconds on
+The portable-gate artifact keyed to `ad9b9b3` records 823 passes, 8 expected
+external-data skips, 95.0037% combined line/branch coverage, and 152.1 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
 95.5% engineering target. The six-worker record reports 54.6 seconds for the
-weighted-modal node and 41.5 seconds for reduced B2. Parallel JUnit durations
+weighted-modal node and 41.1 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
