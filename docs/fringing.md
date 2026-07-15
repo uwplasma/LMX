@@ -85,7 +85,7 @@ The retained specifications and references are:
 | Case | Geometry | Reference | Status |
 |---|---|---|---|
 | B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure solver accepted; experimental observable open |
-| B2 | conducting square duct | `alex-b2-square.csv` | research-stage; deterministic 1/2-GPU calibration passes, fast/steady scaling open |
+| B2 | conducting square duct | `alex-b2-square.csv` | research-stage; bounded 1/2-GPU calibration passes, steady scaling open |
 
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
@@ -108,8 +108,8 @@ large solve/restart gate passed. No B1 environment switch is required.
 
 B2 supports named axial sharding. The canonical tiny path has equivalent
 observables and exact restart on one and two deterministic GPUs. The current
-`128 x 67 x 67` two-update calibration reaches 1.45x on two deterministic GPUs;
-default-XLA replay still fails, so fast and production scaling remain open. A superseded
+`128 x 67 x 67` two-update calibration reaches 1.29x on two GPUs with exact
+primary-state replay and bounded face-flux noise. Production scaling remains open. A superseded
 formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
 current scaling claim. The fine-checkpoint transverse Galerkin
 gate separately reduces electric iterations 5.18x and matched two-update time

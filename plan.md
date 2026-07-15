@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The current source/scaling baseline is `da8a53b`; the latest
+Status: 2026-07-15. The current source/scaling baseline is `3e53d8b`; the latest
 complete portable-gate artifact remains keyed to `6c63710`.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
@@ -88,7 +88,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, exact device equivalence, and current CPU plus deterministic GPU two-update calibrations have bounded gates | production parity, default-XLA GPU restart, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, strict smoke replay, exact device equivalence, and current CPU/GPU two-update calibrations have bounded gates | production parity and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
@@ -105,7 +105,7 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,509,563 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,508,676 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -222,8 +222,8 @@ vector, embedding, initialization, CFL, and relaxation layouts explicit and
 keeps compact flux components separate until explicit packing. Both device
 ladders have exact restart replay; the GPU pressure observable differs by at
 most `1.05e-14`. Deterministic GPU correctness uses
-`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode remains a diagnostic
-performance lane because exact restart is not yet preserved. Compact
+`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode is the separate
+timing lane. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
 An explicit one-device request now uses the same named-sharding kernels as the
@@ -236,19 +236,21 @@ beyond two devices. This is a two-update scaling calibration, not a steady
 production-speed claim. The compact record is
 `benchmarks/results/b2-cpu-strong-scaling-20260715.json`.
 
-The current `128 x 67 x 67` deterministic rung passes validation, placement,
-exact restart, and device equivalence on one and two RTX A4000 GPUs. Warm
-medians are 21.83 and 15.06 seconds with CV below 0.7%, a bounded 1.45x
-two-update speedup. The separate default-XLA one-GPU lane was stable at 21.20
-seconds but failed exact restart with a unit maximum difference, so its stop
-rule correctly prevented a two-GPU timing run. The compact record is
-`benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; the shared host
-and failed fast lane preclude a publishable or production-speed claim.
+The current `128 x 67 x 67` default-XLA rung passes validation, placement,
+restart, and device equivalence on one and two RTX A4000 GPUs. Warm medians are
+21.09 and 16.40 seconds with CV below 1.9%, a bounded 1.29x two-update speedup.
+The stricter deterministic probe isolated `4.40e-6` relative reduction noise
+to corrected face flux; a direct-three versus restart-one-plus-two trajectory
+preserved every primary field exactly and reduced that difference to
+`6.25e-7`. The calibration therefore requires nonflux state within `1e-12`
+and flux within `1e-6` absolute and `1e-5` relative. The exact tiny harness
+keeps its stricter all-field gate. The compact record is
+`benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; two updates and
+the shared host preclude a publishable or production-speed claim.
 
-Next identify the mismatching restart field on a tiny default-XLA GPU probe,
-repair or explicitly constrain that path, and rerun its one-GPU gate. Only a
-passing one-GPU replay may unlock the identical two-GPU fast lane; only then
-decide whether a larger grid is justified.
+Next profile one warm 1/2-GPU update and separate projection, electric, momentum,
+and halo costs. Only a measured compute/communication bottleneck may justify
+one larger bounded rung; steady-production scaling remains the promotion gate.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -263,8 +265,8 @@ the physics-valid path.
 Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
-CPU scaling calibration are complete. Deterministic GPU correctness and
-calibration are complete; default-XLA and steady-production scaling remain open.
+CPU scaling calibration and bounded GPU state/flux calibration are complete;
+steady-production scaling remains open.
 
 ## Priority 3: canonical B2 validation
 

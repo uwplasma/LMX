@@ -11,10 +11,10 @@ The package wheel contains no media.
 
 ## Tracked web set
 
-Six files in `docs/_static/` total 413,409 bytes: duct profiles, FreeMHD parity,
+Six files in `docs/_static/` total 411,169 bytes: duct profiles, FreeMHD parity,
 the B1 comparison, current CPU/GPU scaling, and the Hunt movie/poster pair. The
-67,366-byte scaling WebP has SHA-256
-`4d4acb251fb9be7d17817f656facb227d078f556296077286dae778cc7598a35`.
+65,126-byte scaling WebP has SHA-256
+`8b6f949c7cb5f6ee3b51654a1d380657d368776ac30ebe6138623018909f5dea`.
 
 The 35,171-byte Hunt H.264 loop (SHA-256
 `ad1095279f4af84ebdb5c2b1d4677aed322c8b54a11107cdc7ceda40268563b7`)

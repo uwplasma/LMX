@@ -111,11 +111,11 @@ These visuals demonstrate implemented workflows, not quantitative validation.
 
 ## Scale on CPUs and GPUs
 
-![Current B2 two-update CPU and deterministic GPU scaling calibration](docs/_static/strong_scaling.webp)
+![Current B2 two-update CPU and GPU scaling calibration](docs/_static/strong_scaling.webp)
 
 The exact B2 smoke agrees on 1/2/4 CPU devices and 1/2 deterministic GPUs. A
-current two-update calibration reaches 1.19× on four CPU devices and 1.45× on
-two GPUs. Default-XLA restart and steady-production scaling remain open.
+current two-update calibration reaches 1.19× on four CPU devices and 1.29× on
+two GPUs. Steady-production scaling remains open.
 [Protocol and results →](docs/performance.md)
 
 ## Quality and citation
