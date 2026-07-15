@@ -30,8 +30,11 @@ from lmx.freemhd import (
     infer_uniform_b0,
     load_benchmark_a_spec,
     load_matched_b2_lmx_input,
+    observe_freemhd_b2_contract,
     observe_freemhd_b2_output,
+    observe_lmx_b2_contract,
     observe_lmx_b2_output,
+    validate_matched_b_record,
 )
 from lmx.reference_data import default_closed_channel_reference_root
 from lmx.units import hartmann_number
@@ -182,6 +185,42 @@ def materialize_freemhd_source_snapshot(
     (destination / "source-pin.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    return manifest
+
+
+def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]:
+    """Copy the clean tracked LMX package and parity driver used by the smoke."""
+
+    repo, destination = Path(__file__).resolve().parents[1], Path(output_dir)
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing LMX source snapshot {destination}")
+    scope = ("lmx", "pyproject.toml", "scripts/run_freemhd_parity_suite.py")
+    status = subprocess.run(
+        ("git", "-C", str(repo), "status", "--porcelain", "--", *scope),
+        check=True, capture_output=True, text=True,
+    ).stdout
+    if status:
+        raise ValueError("LMX source scope has staged or unstaged changes")
+    files = subprocess.run(
+        ("git", "-C", str(repo), "ls-files", "--", *scope),
+        check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    destination.mkdir(parents=True)
+    hashes = {}
+    for relative in files:
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repo / relative, target)
+        hashes[relative] = artifact_sha256(target, "file")
+    manifest = {
+        "schema_version": 1,
+        "commit": subprocess.run(
+            ("git", "-C", str(repo), "rev-parse", "HEAD"),
+            check=True, capture_output=True, text=True,
+        ).stdout.strip(),
+        "files": dict(sorted(hashes.items())),
+    }
+    _write_json(destination / "source-pin.json", manifest)
     return manifest
 
 
@@ -766,6 +805,86 @@ for name in {objects}; do cp -a "postProcessing/$name" /output/postProcessing/; 
     return observe_freemhd_b2_output(destination, source, evaluator)
 
 
+def run_matched_b2_smoke_bundle(
+    template_dir: str | Path,
+    source_repo: str | Path,
+    output_dir: str | Path,
+    *,
+    image: str = "freemhd-install:latest",
+    nproc: int = 2,
+    total_timeout_seconds: float = 600.0,
+) -> dict[str, object]:
+    """Run LMX then FreeMHD inside one budget and validate the independent record."""
+
+    destination = Path(output_dir)
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing matched B2 bundle {destination}")
+    if total_timeout_seconds <= 0.0:
+        raise ValueError("Matched B2 smoke budget must be positive")
+    started = time.perf_counter()
+    materialize_matched_b2_preflight(template_dir, source_repo, destination)
+    materialize_lmx_source_snapshot(destination / "lmx_source")
+    paths = {
+        "lmx_source": destination / "lmx_source",
+        "freemhd_source": destination / "freemhd_source",
+        "lmx_input": destination / "lmx_input.json",
+        "freemhd_input": destination / "freemhd_input",
+        "evaluator": destination / "evaluator.json",
+        "lmx_output": destination / "lmx_output",
+        "freemhd_output": destination / "freemhd_output",
+    }
+    lmx = run_matched_b2_lmx_smoke(paths["lmx_input"], paths["evaluator"], paths["lmx_output"])
+    limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
+    lmx_failed = (
+        lmx["steps"] != 2 or lmx["stop_reason"] != "step_limit"
+        or any(abs(value - 1.0 / 540000.0) > limits["dt_absolute_tolerance"] for value in lmx["dt"])
+        or max(lmx["courant_max"]) > limits["courant_max"]
+        or any(lmx[name] > limits[f"{name}_max"] for name in (
+            "mass_balance", "current_balance", "interface_current_balance"
+        ))
+        or lmx["interface_current_activity"] < limits["interface_current_activity_min"]
+        or lmx["restart_max_abs"] > limits["restart_absolute_tolerance"]
+    )
+    if lmx_failed:
+        raise ValueError("LMX B2 smoke failed its frozen execution gate; FreeMHD was not started")
+    remaining = total_timeout_seconds - (time.perf_counter() - started)
+    if remaining <= 0.0:
+        raise TimeoutError("LMX B2 smoke exhausted the shared execution budget")
+    run_matched_b2_freemhd_smoke(
+        paths["freemhd_input"], paths["evaluator"], paths["freemhd_output"],
+        image=image, nproc=nproc, timeout_seconds=remaining,
+    )
+    artifacts = {}
+    for name, path in paths.items():
+        kind = "tree" if path.is_dir() else "file"
+        artifacts[name] = {
+            "path": path.relative_to(destination).as_posix(),
+            "kind": kind,
+            "sha256": artifact_sha256(path, kind),
+        }
+    spec_path = Path(__file__).resolve().parents[1] / "benchmarks/specs/alex-b2-square.toml"
+    record = {
+        "schema_version": 3, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
+        "contract": {
+            "lmx": observe_lmx_b2_contract(paths["lmx_input"], paths["evaluator"]),
+            "freemhd": observe_freemhd_b2_contract(
+                paths["freemhd_input"], paths["freemhd_source"], paths["evaluator"]
+            ),
+        },
+        "comparison": {"source": "independent-output-observers"},
+        "provenance": {
+            "benchmark_spec_sha256": hashlib.sha256(spec_path.read_bytes()).hexdigest(),
+            "artifacts": artifacts,
+        },
+    }
+    _write_json(destination / "record.json", record)
+    report = validate_matched_b_record(
+        record, expected_case_id="B2-fringing-square", artifact_root=destination
+    )
+    _write_json(destination / "report.json", report)
+    return report
+
+
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:
     updated, count = re.subn(pattern, replacement, path.read_text(encoding="utf-8"))
     if required and count == 0:
@@ -1042,6 +1161,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="materialize and observe the matched-B2 inputs at --output without running a solver",
     )
+    mode.add_argument(
+        "--matched-b2-smoke",
+        action="store_true",
+        help="run and independently validate the exact two-update LMX/FreeMHD smoke",
+    )
+    parser.add_argument("--freemhd-image", default=os.environ.get("LMX_FREEMHD_IMAGE", "freemhd-install:latest"))
+    parser.add_argument("--nproc", type=int, default=2)
+    parser.add_argument("--smoke-timeout", type=float, default=600.0)
     parser.add_argument(
         "--freemhd-install-dir",
         type=Path,
@@ -1075,6 +1202,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if args.matched_b2_smoke:
+        report = run_matched_b2_smoke_bundle(
+            args.freemhd_install_dir / "cases/hunt_demo",
+            args.freemhd_source_repo,
+            args.output,
+            image=args.freemhd_image,
+            nproc=args.nproc,
+            total_timeout_seconds=args.smoke_timeout,
+        )
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report.get("execution_pass") and report.get("comparison_pass") else 2
 
     summary = run_suite(
         output=args.output,

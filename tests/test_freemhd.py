@@ -831,6 +831,19 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
     assert run_freemhd_parity_suite.main(
         ["--output", str(output), "--freemhd-install-dir", str(install), "--matched-b2-preflight"]
     ) == 0
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "run_matched_b2_smoke_bundle",
+        lambda template, source, destination, **options: {
+            "execution_pass": template == install / "cases/hunt_demo",
+            "comparison_pass": destination == output and options["nproc"] == 3,
+        },
+    )
+    assert run_freemhd_parity_suite.main([
+        "--output", str(output), "--freemhd-install-dir", str(install),
+        "--freemhd-source-repo", str(tmp_path / "source"),
+        "--matched-b2-smoke", "--nproc", "3", "--smoke-timeout", "9",
+    ]) == 0
 
 
 @pytest.mark.parametrize("times_out", [False, True])
@@ -871,6 +884,61 @@ def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
     assert {"--rm", "--name", "--cidfile"} <= set(rendered.split()) and "readonly" in rendered
     assert cleanup[0][1:3] == ["rm", "-f"]
     assert (source / "input.txt").read_text() == "immutable\n"
+
+
+def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    order, captured = [], {}
+
+    def preflight(_template, _source, root):
+        root.mkdir()
+        for name in ("freemhd_input", "freemhd_source"):
+            (root / name).mkdir()
+            (root / name / "evidence").write_text(name)
+        for name in ("lmx_input.json", "evaluator.json"):
+            (root / name).write_text(name)
+
+    def snapshot(root):
+        root.mkdir()
+        (root / "evidence").write_text("source")
+
+    def lmx(_input, _evaluator, root):
+        order.append("lmx")
+        root.mkdir()
+        (root / "evidence").write_text("lmx")
+        return {
+            "steps": 2, "stop_reason": "step_limit", "dt": [1 / 540000] * 2,
+            "courant_max": [0.0, 0.0], "mass_balance": 0.0, "current_balance": 0.0,
+            "interface_current_balance": 0.0, "interface_current_activity": 1.0,
+            "restart_max_abs": 0.0,
+        }
+
+    def freemhd(_input, _evaluator, root, **options):
+        order.append("freemhd")
+        assert 0.0 < options["timeout_seconds"] <= 10.0
+        root.mkdir()
+        (root / "evidence").write_text("freemhd")
+
+    monkeypatch.setattr(run_freemhd_parity_suite, "materialize_matched_b2_preflight", preflight)
+    monkeypatch.setattr(run_freemhd_parity_suite, "materialize_lmx_source_snapshot", snapshot)
+    monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_lmx_smoke", lmx)
+    monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_freemhd_smoke", freemhd)
+    monkeypatch.setattr(run_freemhd_parity_suite, "observe_lmx_b2_contract", lambda *_: {"code": "lmx"})
+    monkeypatch.setattr(run_freemhd_parity_suite, "observe_freemhd_b2_contract", lambda *_: {"code": "freemhd"})
+
+    def validate(record, **_):
+        captured["record"] = record
+        return {"execution_pass": True, "comparison_pass": True}
+
+    monkeypatch.setattr(run_freemhd_parity_suite, "validate_matched_b_record", validate)
+    report = run_freemhd_parity_suite.run_matched_b2_smoke_bundle(
+        tmp_path / "template", tmp_path / "source", tmp_path / "bundle", total_timeout_seconds=10.0
+    )
+
+    assert order == ["lmx", "freemhd"] and report["execution_pass"]
+    assert captured["record"]["comparison"] == {"source": "independent-output-observers"}
+    assert all(item["kind"] == "tree" for name, item in captured["record"]["provenance"]["artifacts"].items() if name.endswith("output"))
 
 
 def test_parity_command_portably_skips_missing_references(tmp_path: Path):
