@@ -17,7 +17,7 @@ exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The current tracked checkout is 3,495,545 bytes, below its 4 MiB hard cap. Sixty-five
+The current tracked checkout is 3,495,232 bytes, below its 4 MiB hard cap. Sixty-five
 generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
@@ -37,7 +37,7 @@ New generated files above 128 KiB fail the manifest check until deliberately
 assigned to a new versioned asset release.
 
 The live architecture gate caps the package at 35 modules, 35,100 source lines,
-8,100 maintained-core lines, 31 test files, 21,100 test lines, 15 maintenance
+8,100 maintained-core lines, 31 test files, 21,100 test lines, 14 maintenance
 scripts, 30 root exports, 12 curated examples, a 4 MiB tracked checkout, and a
 0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and
 reject benchmark, documentation, or generated payloads outside `lmx/` and

@@ -11,10 +11,11 @@ import pytest
 import scripts.run_samper_table_i as samper_runner
 from lmx.freemhd import load_samper_table_i
 from scripts.build_benchmark_a_acceptance import build_acceptance, write_acceptance
-from scripts.freeze_samper_table_i import freeze_campaign, merge_campaigns
 from scripts.run_samper_table_i import (
     build_samper_case,
     dimensionless_flow_rate,
+    freeze_campaign,
+    merge_campaigns,
     parse_mesh_levels,
     reassess_campaign,
     select_rows,

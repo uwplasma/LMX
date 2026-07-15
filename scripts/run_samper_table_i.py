@@ -30,6 +30,8 @@ STEADY_RESIDUAL_TARGET = 1.0e-9
 STEADY_RELATIVE_UPDATE_TARGET = 2.0e-8
 POTENTIAL_RESIDUAL_STOPPING_CEILING = 1.0e-2
 POTENTIAL_CURRENT_GATE_SAFETY = 0.1
+MAX_COMPACT_BYTES = 128 * 1024
+_MERGED_FIELDS = {"freeze", "mesh_levels", "records"}
 
 
 def parse_mesh_levels(value: str) -> tuple[tuple[int, int], ...]:
@@ -364,6 +366,97 @@ def _write_checkpoint(output: Path, summary: dict[str, Any]) -> None:
     temporary.replace(output)
 
 
+def _load_campaign(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read Samper campaign artifact: {path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("Samper campaign artifact must be a JSON object")
+    return payload
+
+
+def _passing_records(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    if "active_record" in payload:
+        raise ValueError("Cannot freeze an incomplete Samper campaign")
+    records = payload.get("records")
+    if not isinstance(records, list) or not records:
+        raise ValueError("Samper campaign must contain at least one completed row")
+    if not payload.get("research_grade_validation_pass") or not all(
+        record.get("finest_level_pass") for record in records
+    ):
+        raise ValueError("Cannot freeze a failing Samper campaign")
+    return records
+
+
+def _write_compact(payload: dict[str, Any], destination: Path) -> None:
+    encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+    if len(encoded) > MAX_COMPACT_BYTES:
+        raise ValueError(
+            f"Samper compact evidence is {len(encoded)} bytes; limit is {MAX_COMPACT_BYTES}"
+        )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_bytes(encoded)
+    temporary.replace(destination)
+
+
+def freeze_campaign(source: Path, destination: Path) -> dict[str, Any]:
+    """Validate a passing campaign and write deterministic compact evidence."""
+
+    payload = _load_campaign(source)
+    _passing_records(payload)
+    payload["freeze"] = {
+        "format": "compact-json",
+        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+    }
+    _write_compact(payload, destination)
+    return payload
+
+
+def merge_campaigns(sources: list[Path], destination: Path) -> dict[str, Any]:
+    """Merge compatible passing campaigns while retaining their source hashes."""
+
+    if not sources:
+        raise ValueError("At least one Samper campaign is required")
+    payloads = [(path, _load_campaign(path)) for path in sources]
+    common = {
+        key: value
+        for key, value in payloads[0][1].items()
+        if key not in _MERGED_FIELDS
+    }
+    records: dict[tuple[str, int], dict[str, Any]] = {}
+    meshes: set[tuple[int, int]] = set()
+    hashes: dict[str, str] = {}
+    for path, payload in payloads:
+        _passing_records(payload)
+        candidate = {
+            key: value for key, value in payload.items() if key not in _MERGED_FIELDS
+        }
+        if candidate != common:
+            raise ValueError(f"Samper campaigns do not share one contract: {path}")
+        if path.name in hashes:
+            raise ValueError(f"Samper source filenames must be unique: {path.name}")
+        hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        meshes.update(tuple(map(int, level)) for level in payload.get("mesh_levels", []))
+        for record in payload["records"]:
+            key = (str(record.get("case_kind")), int(record.get("hartmann_number", -1)))
+            if key in records:
+                raise ValueError(f"Duplicate Samper row: {key[0]} Ha={key[1]}")
+            records[key] = record
+    merged = {
+        **common,
+        "mesh_levels": [list(level) for level in sorted(meshes)],
+        "records": [records[key] for key in sorted(records)],
+        "freeze": {
+            "format": "compact-json",
+            "source_sha256_by_file": dict(sorted(hashes.items())),
+        },
+    }
+    _write_compact(merged, destination)
+    return merged
+
+
 def _implementation_fingerprint() -> dict[str, str]:
     runner = Path(__file__).resolve()
     repository = runner.parent.parent
@@ -538,7 +631,19 @@ def main() -> int:
     parser.add_argument("--wall-thickness", type=float, default=0.01)
     parser.add_argument("--wall-cells", type=int, default=4)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--freeze-summary",
+        type=Path,
+        metavar="SOURCE",
+        help="validate and freeze SOURCE at --output without running simulations",
+    )
     args = parser.parse_args()
+    if args.freeze_summary is not None:
+        try:
+            freeze_campaign(args.freeze_summary, args.output)
+        except ValueError as exc:
+            parser.error(str(exc))
+        return 0
     cases = tuple(value.strip() for value in args.cases.split(",") if value.strip())
     if not cases or any(case not in {"shercliff", "hunt"} for case in cases):
         parser.error("--cases must contain shercliff and/or hunt")

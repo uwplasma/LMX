@@ -86,9 +86,9 @@ Benchmark A aggregate:
 
 ```bash
 python scripts/run_samper_table_i.py
-python scripts/freeze_samper_table_i.py \
-  artifacts/samper/table-i-summary.json \
-  benchmarks/results/samper-table-i-accepted.json
+python scripts/run_samper_table_i.py \
+  --freeze-summary artifacts/samper/table-i-summary.json \
+  --output benchmarks/results/samper-table-i-accepted.json
 python scripts/build_benchmark_a_acceptance.py
 ```
 
