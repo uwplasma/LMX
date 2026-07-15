@@ -6,7 +6,10 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import resource
 import sys
+import tempfile
+import time
 
 import jax
 import jax.numpy as jnp
@@ -28,6 +31,7 @@ from lmx.fringing import (
     _unpack_duct_mass_flux,
 )
 from lmx.scaling import (
+    _bundle_memory_bytes,
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
 )
@@ -41,7 +45,8 @@ if ROOT not in Path(lmx.__file__).resolve().parents:
 def _source_fingerprint() -> str:
     """Hash the source and frozen specifications used by this worker."""
 
-    paths = [*sorted((ROOT / "lmx").glob("*.py")), Path(__file__).resolve()]
+    paths = [*sorted((ROOT / "lmx").glob("*.py")), Path(__file__).resolve(),
+        ROOT / "scripts" / "run_freemhd_parity_suite.py"]
     paths.extend(
         sorted(
             path
@@ -49,6 +54,7 @@ def _source_fingerprint() -> str:
             if path.is_file()
         )
     )
+    paths.extend(sorted((ROOT / "benchmarks" / "references").glob("*.csv")))
     digest = hashlib.sha256()
     for path in paths:
         digest.update(path.relative_to(ROOT).as_posix().encode())
@@ -185,13 +191,101 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
             ("inlet_flux", rho_phi_inlet), ("momentum", solved))}}
 
 
+def _matched_b2_smoke_benchmark(
+    input_path: Path, evaluator: Path, *, repeats: int, num_devices: int
+) -> dict[str, object]:
+    """Time the exact direct smoke; replay, I/O, and observation stay untimed."""
+
+    if repeats < 4:
+        raise ValueError("matched_b2_smoke requires one cold and three warm runs")
+    from lmx.benchmarks import load_benchmark_b_spec
+    from lmx.freemhd import load_matched_b2_lmx_input, observe_lmx_b2_output
+    from scripts.run_freemhd_parity_suite import (
+        _resume_matched_b2_lmx,
+        _run_matched_b2_lmx_direct,
+        _write_matched_b2_lmx_output,
+    )
+
+    problem = load_matched_b2_lmx_input(input_path)
+    timings, checkpoint, direct = [], None, None
+    for _ in range(repeats):
+        started = time.perf_counter()
+        checkpoint, direct = _run_matched_b2_lmx_direct(
+            problem, num_devices=num_devices
+        )
+        timings.append(time.perf_counter() - started)
+    resumed = _resume_matched_b2_lmx(
+        problem, checkpoint, num_devices=num_devices
+    )
+    with tempfile.TemporaryDirectory(prefix="lmx-b2-scaling-") as temporary:
+        evidence = Path(temporary) / "output"
+        _write_matched_b2_lmx_output(
+            input_path, evaluator, evidence, (checkpoint, direct, resumed),
+            num_devices=num_devices, wall_seconds=timings[-1],
+        )
+        observed = observe_lmx_b2_output(evidence, input_path, evaluator)
+
+    arrays = {name: getattr(direct, name) for name in (
+        "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus",
+        "rho_phi_inlet")}
+    placement = {name: _placement(value) for name, value in arrays.items()}
+    for name, value in placement.items():
+        expected_replicated = name == "rho_phi_inlet"
+        if value["global_shards"] != num_devices or (
+            num_devices > 1 and value["replicated"] != expected_replicated
+        ):
+            raise RuntimeError(f"Matched B2 field {name} has invalid placement {value}")
+    limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
+    validation_passed = bool(
+        observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
+        and max(observed["courant_max"]) <= limits["courant_max"]
+        and all(observed[name] <= limits[f"{name}_max"] for name in (
+            "mass_balance", "current_balance", "interface_current_balance"))
+        and observed["interface_current_activity"] >= limits["interface_current_activity_min"]
+        and observed["restart_max_abs"] <= limits["restart_absolute_tolerance"]
+    )
+    if not validation_passed:
+        raise RuntimeError(f"Matched B2 smoke observables failed: {observed}")
+    warm = np.asarray(timings[1:])
+    velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
+        for name in ("u", "v", "w"))))
+    current_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
+        for name in ("jx", "jy", "jz"))))
+    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    device_memory = []
+    for device in jax.devices()[:num_devices]:
+        stats = device.memory_stats() or {}
+        device_memory.append({"device": str(device), **{
+            key: int(value) for key, value in stats.items()
+            if "byte" in key.lower() and isinstance(value, (int, np.integer))}})
+    return {
+        "benchmark_kind": "matched_b2_smoke", "operator_path": "solve_extruded_inductionless",
+        "backend": jax.default_backend(), "device_kind": jax.devices()[0].device_kind,
+        "num_devices": num_devices, "nx": 8, "ny": 7, "nz": 7,
+        "iterations": 2, "repeats": repeats, "cold_seconds": timings[0],
+        "warm_seconds": float(np.median(warm)), "mean_seconds": float(np.mean(timings)),
+        "warm_samples_seconds": warm.tolist(), "warm_std_seconds": float(np.std(warm)),
+        "warm_cv": float(np.std(warm) / max(np.mean(warm), 1.0e-30)),
+        "total_cells": int(direct.u.size), "cell_updates": int(2 * direct.u.size),
+        "warm_cell_updates_per_second": float(2 * direct.u.size / np.median(warm)),
+        "velocity_l2": velocity_l2, "potential_l2": float(np.linalg.norm(np.asarray(direct.phi))),
+        "current_l2": current_l2,
+        "memory_bytes_estimate": _bundle_memory_bytes(direct),
+        "peak_host_rss_bytes": int(peak_rss if sys.platform == "darwin" else 1024 * peak_rss),
+        "device_memory": device_memory, "placement": placement,
+        "spatially_sharded": num_devices > 1, "global_shard_count": num_devices,
+        "validation_passed": validation_passed, "steady_state_passed": False,
+        "signature_relative_tolerance": 2.0e-8, "observables": observed,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a single strong-scaling benchmark worker."
     )
     parser.add_argument(
         "--benchmark-kind",
-        choices=("extruded3d", "extruded_solve", "duct_step_gate"),
+        choices=("extruded3d", "extruded_solve", "duct_step_gate", "matched_b2_smoke"),
         default="extruded3d",
     )
     parser.add_argument("--nx", type=int, default=384)
@@ -203,6 +297,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", type=str, default="cpu")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--profile-dir", type=Path, default=None)
+    parser.add_argument("--matched-input", type=Path, default=None)
+    parser.add_argument("--evaluator", type=Path, default=None)
     parser.add_argument(
         "--restart",
         type=Path,
@@ -211,7 +307,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.benchmark_kind == "duct_step_gate":
+    if args.benchmark_kind == "matched_b2_smoke":
+        if args.matched_input is None or args.evaluator is None:
+            parser.error("matched_b2_smoke requires --matched-input and --evaluator")
+        payload = _matched_b2_smoke_benchmark(
+            args.matched_input, args.evaluator, repeats=args.repeats,
+            num_devices=args.num_devices)
+    elif args.benchmark_kind == "duct_step_gate":
         payload = _duct_step_gate(nx=args.nx, ny=args.ny, nz=args.nz,
             iterations=args.iterations, num_devices=args.num_devices)
     elif args.benchmark_kind == "extruded_solve":
@@ -234,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
             repeats=args.repeats,
             num_devices=args.num_devices,
         )
-    if args.benchmark_kind != "duct_step_gate":
+    if args.benchmark_kind not in {"duct_step_gate", "matched_b2_smoke"}:
         payload = {**record.__dict__}
     payload.update(platform=args.platform, source_fingerprint=_source_fingerprint())
     args.output.parent.mkdir(parents=True, exist_ok=True)

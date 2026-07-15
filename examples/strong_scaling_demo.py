@@ -32,6 +32,8 @@ def _run_worker(
     repeats: int,
     profile_dir: Path | None = None,
     restart_path: Path | None = None,
+    matched_input: Path | None = None,
+    evaluator: Path | None = None,
     env: dict[str, str] | None = None,
     timeout_seconds: float | None = None,
 ) -> dict[str, object]:
@@ -57,6 +59,8 @@ def _run_worker(
         str(output_path),
         *(["--profile-dir", str(profile_dir)] if profile_dir is not None else []),
         *(["--restart", str(restart_path)] if restart_path is not None else []),
+        *(["--matched-input", str(matched_input)] if matched_input is not None else []),
+        *(["--evaluator", str(evaluator)] if evaluator is not None else []),
     ]
     worker_env = os.environ.copy()
     if env is not None:
@@ -107,6 +111,8 @@ def run_local_cpu_scaling(
     python_executable: str,
     profile_dir: Path | None = None,
     restart_path: Path | None = None,
+    matched_input: Path | None = None,
+    evaluator: Path | None = None,
     timeout_seconds: float | None = None,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
@@ -130,6 +136,8 @@ def run_local_cpu_scaling(
             if profile_dir is not None
             else None,
             restart_path=restart_path,
+            matched_input=matched_input,
+            evaluator=evaluator,
             timeout_seconds=timeout_seconds,
         )
         records.append(record)
@@ -150,6 +158,10 @@ def _sync_repo_to_remote(*, repo_root: Path, remote_host: str, remote_dir: str) 
             archive.add(
                 repo_root / "scripts" / "run_strong_scaling_worker.py",
                 arcname="scripts/run_strong_scaling_worker.py",
+            )
+            archive.add(
+                repo_root / "scripts" / "run_freemhd_parity_suite.py",
+                arcname="scripts/run_freemhd_parity_suite.py",
             )
         subprocess.run(
             [
@@ -219,6 +231,8 @@ def run_remote_gpu_scaling(
     python_executable: str = "python3",
     profile_dir: Path | None = None,
     restart_path: Path | None = None,
+    matched_input: Path | None = None,
+    evaluator: Path | None = None,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(
         repo_root=repo_root, remote_host=remote_host, remote_dir=remote_dir
@@ -228,6 +242,18 @@ def run_remote_gpu_scaling(
         remote_restart = f"{remote_dir}/initial_restart.npz"
         subprocess.run(
             ["scp", str(restart_path), f"{remote_host}:{remote_restart}"], check=True
+        )
+    remote_matched = remote_evaluator = None
+    if matched_input is not None and evaluator is not None:
+        remote_matched, remote_evaluator = (
+            f"{remote_dir}/matched_b2_input.json",
+            f"{remote_dir}/matched_b2_evaluator.json",
+        )
+        subprocess.run(
+            ["scp", str(matched_input), f"{remote_host}:{remote_matched}"], check=True
+        )
+        subprocess.run(
+            ["scp", str(evaluator), f"{remote_host}:{remote_evaluator}"], check=True
         )
     local_records: list[dict[str, object]] = []
     for count in device_counts:
@@ -251,6 +277,7 @@ def run_remote_gpu_scaling(
             f"--iterations {iterations} --repeats {repeats} --output {shlex.quote(remote_json)}"
             f"{profile_arg}"
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
+            f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
         )
         subprocess.run(["ssh", remote_host, remote_command], check=True)
         local_output = out_dir / f"gpu_{count}.json"
@@ -281,12 +308,28 @@ def run_strong_scaling_demo(
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir.mkdir(parents=True, exist_ok=True)
+    matched_input = evaluator = None
+    if benchmark_kind == "matched_b2_smoke":
+        if repeats < 4:
+            raise ValueError("matched_b2_smoke requires one cold and three warm runs")
+        from scripts.run_freemhd_parity_suite import (
+            materialize_matched_b2_evaluator,
+            materialize_matched_b2_lmx_input,
+        )
+        matched_input, evaluator = (
+            out_dir / "matched_b2_input.json",
+            out_dir / "matched_b2_evaluator.json",
+        )
+        if not matched_input.exists():
+            materialize_matched_b2_lmx_input(matched_input)
+        if not evaluator.exists():
+            materialize_matched_b2_evaluator(evaluator)
     records = run_local_cpu_scaling(
         repo_root=repo_root,
         out_dir=out_dir,
         device_counts=cpu_counts,
         benchmark_kind=benchmark_kind,
-        nx=cpu_problem[0],
+        nx=None if matched_input is not None else cpu_problem[0],
         ny=cpu_problem[1],
         nz=cpu_problem[2],
         iterations=cpu_iterations,
@@ -294,6 +337,8 @@ def run_strong_scaling_demo(
         python_executable=python_executable,
         profile_dir=profile_dir,
         restart_path=cpu_restart_path,
+        matched_input=matched_input,
+        evaluator=evaluator,
     )
     if remote_host is not None:
         records.extend(
@@ -304,13 +349,15 @@ def run_strong_scaling_demo(
                 remote_dir=remote_dir,
                 device_counts=gpu_counts,
                 benchmark_kind=benchmark_kind,
-                nx=gpu_problem[0],
+                nx=None if matched_input is not None else gpu_problem[0],
                 ny=gpu_problem[1],
                 nz=gpu_problem[2],
                 iterations=gpu_iterations,
                 repeats=repeats,
                 profile_dir=profile_dir,
                 restart_path=gpu_restart_path,
+                matched_input=matched_input,
+                evaluator=evaluator,
             )
         )
 
@@ -341,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--benchmark-kind",
-        choices=("extruded3d", "extruded_solve"),
+        choices=("extruded3d", "extruded_solve", "matched_b2_smoke"),
         default="extruded3d",
     )
     parser.add_argument("--python", type=str, default=sys.executable)
@@ -377,6 +424,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Collect a JAX trace for the first repeat of each worker.",
     )
     args = parser.parse_args(argv)
+    if args.benchmark_kind == "matched_b2_smoke" and args.repeats < 4:
+        parser.error("matched_b2_smoke requires --repeats 4 or greater")
+    if args.benchmark_kind == "matched_b2_smoke" and args.profile:
+        parser.error("profile matched_b2_smoke in a separate untimed run")
 
     shared_iterations = args.iterations
     cpu_iterations = (

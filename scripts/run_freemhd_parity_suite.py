@@ -674,33 +674,12 @@ def materialize_matched_b2_preflight(
     return summary
 
 
-def run_matched_b2_lmx_smoke(
-    input_path: str | Path,
-    evaluator: str | Path,
-    output_dir: str | Path,
-    *,
-    num_devices: int = 1,
-) -> dict[str, object]:
-    """Run direct and checkpoint-resumed LMX paths and write replayable evidence."""
+def _run_matched_b2_lmx_direct(problem, *, num_devices: int):
+    """Run the exact two-step path and return its step-one checkpoint."""
 
+    import jax
     from lmx.fringing import solve_extruded_inductionless
-    from lmx.io import write_extruded_bundle_restart_npz
 
-    destination = Path(output_dir)
-    destination.mkdir(parents=True)
-    problem = load_matched_b2_lmx_input(input_path)
-    replay_step = replace(
-        problem,
-        case=replace(
-            problem.case,
-            time_stepper=replace(
-                problem.case.time_stepper,
-                t_final=problem.case.time_stepper.dt,
-                max_steps=1,
-            ),
-        ),
-    )
-    started = time.perf_counter()
     progress = []
     direct = solve_extruded_inductionless(
         problem,
@@ -710,16 +689,41 @@ def run_matched_b2_lmx_smoke(
     )
     if len(progress) != 2 or progress[0].checkpoint is None:
         raise ValueError("LMX B2 direct path did not emit its step-one checkpoint")
-    checkpoint = progress[0].checkpoint
-    resumed = solve_extruded_inductionless(
-        replay_step, initial_bundle=checkpoint, num_devices=num_devices
-    )
-    if np.asarray(direct.bundle.u).dtype != np.float64:
+    jax.block_until_ready((direct.bundle.u, direct.bundle.p, direct.bundle.phi))
+    if direct.bundle.u.dtype != np.float64:
         raise ValueError("LMX B2 smoke requires float64 execution")
+    return progress[0].checkpoint, direct.bundle
+
+
+def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
+    """Replay the second update from an exact matched-B2 checkpoint."""
+
+    import jax
+    from lmx.fringing import solve_extruded_inductionless
+
+    replay = replace(problem, case=replace(problem.case, time_stepper=replace(
+        problem.case.time_stepper, t_final=problem.case.time_stepper.dt, max_steps=1)))
+    resumed = solve_extruded_inductionless(
+        replay, initial_bundle=checkpoint, num_devices=num_devices
+    ).bundle
+    jax.block_until_ready((resumed.u, resumed.p, resumed.phi))
+    return resumed
+
+
+def _write_matched_b2_lmx_output(
+    input_path, evaluator, output_dir, bundles, *, num_devices: int, wall_seconds: float
+):
+    """Serialize already-executed matched-B2 bundles outside timing regions."""
+
+    from lmx.io import write_extruded_bundle_restart_npz
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True)
+    problem = load_matched_b2_lmx_input(input_path)
     for name, bundle in (
-        ("checkpoint.npz", checkpoint),
-        ("direct.npz", direct.bundle),
-        ("resumed.npz", resumed.bundle),
+        ("checkpoint.npz", bundles[0]),
+        ("direct.npz", bundles[1]),
+        ("resumed.npz", bundles[2]),
     ):
         write_extruded_bundle_restart_npz(bundle, problem.case, destination / name)
     _write_json(
@@ -728,10 +732,35 @@ def run_matched_b2_lmx_smoke(
             "schema_version": 1, "code": "LMX", "case_id": "B2-fringing-square",
             "input_sha256": artifact_sha256(input_path, "file"),
             "evaluator_sha256": artifact_sha256(evaluator, "file"),
-            "wall_seconds": time.perf_counter() - started,
+            "wall_seconds": wall_seconds,
             "num_devices": num_devices, "float_precision": "float64",
         },
     )
+
+
+def run_matched_b2_lmx_smoke(
+    input_path: str | Path,
+    evaluator: str | Path,
+    output_dir: str | Path,
+    *,
+    num_devices: int = 1,
+) -> dict[str, object]:
+    """Run direct and checkpoint-resumed LMX paths and write replayable evidence."""
+
+    problem = load_matched_b2_lmx_input(input_path)
+    started = time.perf_counter()
+    checkpoint, direct = _run_matched_b2_lmx_direct(
+        problem, num_devices=num_devices
+    )
+    resumed = _resume_matched_b2_lmx(
+        problem, checkpoint, num_devices=num_devices
+    )
+    wall_seconds = time.perf_counter() - started
+    _write_matched_b2_lmx_output(
+        input_path, evaluator, output_dir, (checkpoint, direct, resumed),
+        num_devices=num_devices, wall_seconds=wall_seconds,
+    )
+    destination = Path(output_dir)
     return observe_lmx_b2_output(destination, input_path, evaluator)
 
 
