@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "date": "2026-07-15",
-  "commit": "3a2207804781f7b3f6383becdc82039480729cac",
+  "commit": "6c6371037ebf6e92b22abad20f25bc04b007a4ad",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,40 +20,40 @@
   },
   "result": {
     "test_files": 31,
-    "test_lines": 21278,
+    "test_lines": 21279,
     "passed": 823,
     "skipped": 8,
-    "pytest_seconds": 158.41,
-    "gate_seconds": 160.7,
-    "combined_line_branch_coverage_percent": 95.00199,
+    "pytest_seconds": 151.48,
+    "gate_seconds": 153.7,
+    "combined_line_branch_coverage_percent": 95.01338,
     "passed_gate": true
   },
   "duration_note": "Durations come from the six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 64.713, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
-    {"seconds": 43.539, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 26.822, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 22.852, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 20.531, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 19.246, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
-    {"seconds": 16.776, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"},
-    {"seconds": 16.694, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
-    {"seconds": 16.502, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 15.863, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"}
+    {"seconds": 54.550, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 41.483, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 25.487, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 20.132, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 20.088, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 17.896, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 16.622, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 16.602, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 15.903, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 15.056, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"}
   ],
   "comparison": {
-    "previous_gate_seconds": 154.1,
-    "wall_time_change_percent": 4.3,
-    "budget_fraction": 0.268,
-    "engineering_target_fraction": 0.536,
-    "interpretation": "The exact GPU-sharding tranche keeps the gate below three minutes and above 95%; the weighted-modal node is the next CI critical-path target."
+    "previous_gate_seconds": 160.7,
+    "wall_time_change_percent": -4.4,
+    "budget_fraction": 0.256,
+    "engineering_target_fraction": 0.512,
+    "interpretation": "The current scaling tranche keeps the complete gate below three minutes and above 95%; modal-grid slimming reduces, but does not eliminate, six-worker contention."
   },
   "architecture": {
     "package_modules": 35,
-    "package_lines": 34839,
+    "package_lines": 34842,
     "maintained_core_lines": 8034,
     "maintenance_scripts": 18,
-    "tracked_checkout_bytes": 3465425,
+    "tracked_checkout_bytes": 3475587,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

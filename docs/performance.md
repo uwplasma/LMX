@@ -10,7 +10,7 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.00% combined line/branch coverage, 160.7 s | below the five-minute target |
+| portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.01% combined line/branch coverage, 153.7 s | below the five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.768/0.649/0.647 s; 1.18x/1.19x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |

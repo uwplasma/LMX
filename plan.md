@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The complete portable-gate baseline is `3a22078`; current
-matched-B2 scaling code and focused gates are at `3b50da5`.
+Status: 2026-07-15. The complete portable-gate and current scaling baseline is
+`6c63710`.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
@@ -104,17 +104,17 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,279 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,475,587 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,475,555 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `3a22078` records 823 passes, 8 expected
-external-data skips, 95.0020% combined line/branch coverage, and 160.7 seconds on
+The portable-gate artifact keyed to `6c63710` records 823 passes, 8 expected
+external-data skips, 95.0134% combined line/branch coverage, and 153.7 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 64.7 seconds for the
-weighted-modal node and 43.5 seconds for reduced B2. Parallel JUnit durations
+95.5% engineering target. The six-worker record reports 54.6 seconds for the
+weighted-modal node and 41.5 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
@@ -199,8 +199,8 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it nevertheless reports 64.7 seconds, versus 43.5 seconds for reduced B2
-and 26.8 seconds for reduced B1. Isolated measurement attributed roughly half
+gate it nevertheless reports 54.6 seconds, versus 41.5 seconds for reduced B2
+and 25.5 seconds for reduced B1. Isolated measurement attributed roughly half
 of that modal duration to worker contention. Reducing only its manufactured
 radial grid, while preserving every physical and independent-factor assertion,
 lowered the isolated weighted path from 33.7 to 23.5--26.1 seconds and the base
