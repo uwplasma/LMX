@@ -232,8 +232,13 @@ correction passed dense, symmetry, gradient, manufactured-flow, and sharding
 gates, but gained only 0.47% and missed the strict restart-state tolerance;
 it is also rejected. Do not drop the accepted line blocks, weaken tolerance,
 or revive additive coarse corrections. Next isolate projection iteration and
-collective costs before selecting another algorithm; require at least a 15%
-small phase-timing win before a full rung. Electric remains second.
+collective costs before selecting another algorithm. A single released-SOLVAX
+batch for both equal-length transverse systems is also exact, symmetry-safe,
+gradient-safe, and restart-exact, but is 1.0% slower than its paired control;
+do not revive launch-only batching. Stop projection preconditioner
+micro-experiments until iteration/collective diagnostics identify a different
+algorithmic target; require at least a 15% small phase-timing win before a full
+rung. Electric remains second.
 Re-measure accepted rungs in an isolated GPU window before any publishable
 scaling claim. Retain solver auxiliary data only after a released SOLVAX API
 provides it without an extra solve.

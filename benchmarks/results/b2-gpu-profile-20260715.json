@@ -213,6 +213,27 @@
         "decision": "reject below 15% timing threshold and strict restart contract",
         "source_fingerprint": "faf6bdf6843394b1d49b85c676f104a9c7c3097cb04f31c5879a97770bcdff21",
         "sha256": "47e9650786901777bec1d26c66a1ed486acd992c0d50d78a451b7039b1c3f5b0"
+      },
+      {
+        "probe": "single SOLVAX batch for equal-length transverse line solves",
+        "paired_control_warm_median_seconds": 0.970480035059154,
+        "paired_control_warm_cv": 0.03248393391538132,
+        "paired_control_sha256": "7eee242b4d55dcc57c53ef89684113bb9270d664fe36e3415779f7f733b6a7ca",
+        "warm_median_seconds": 0.9805947304703295,
+        "warm_cv": 0.021648453201363726,
+        "wall_time_increase_fraction": 0.01042236320766657,
+        "validation_passed": true,
+        "restart_state_max_abs": 0.0,
+        "restart_flux_max_abs": 0.0,
+        "bounded_correctness_gates": [
+          "exact separate-versus-batched action",
+          "positive energy and bilinear symmetry",
+          "JVP and VJP",
+          "manufactured mixed flow"
+        ],
+        "decision": "reject 1.0% slower than same-window control; no trace or full rung",
+        "source_fingerprint": "aededfdb45b7a13a71f58a489e84ce309efd2af014c9798871a3c5a577f6bba4",
+        "sha256": "efb17a4a717ab532f586f1c9129f8489ce7a0422bc985d56c520caaaa8a4b5bc"
       }
     ]
   },

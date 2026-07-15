@@ -61,7 +61,10 @@ plus axial mean, a relaxed projection tolerance, and a mixed-boundary DCT-IV
 coarse correction. The first two are slower; the tolerance change gains only
 1.0% outside the frozen numerical contract. The coarse correction passes its
 dense, symmetry, gradient, flow, and sharding gates, but gains only 0.47% and
-misses the strict restart-state tolerance. The accepted source is unchanged.
+misses the strict restart-state tolerance. Combining both transverse line
+systems into one released-SOLVAX batch is algebraically and restart exact, but
+is 1.0% slower than its same-window control. The accepted source is unchanged;
+neither rejected candidate advanced to a full trace or larger grid.
 
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
