@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "commit": "9f66ace76d8d3f077dd10aa7aa428f8c2b90f465",
+  "case_id": "B2-fringing-square",
+  "role": "accepted-smoke-device-equivalence",
+  "inputs": {
+    "lmx_input_sha256": "b5cc1d5457d554bf5a32f7db09637799f901e8fee03e83bb51c75a32dbfaaa3e",
+    "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
+  },
+  "environment": {
+    "hardware": "Apple M4",
+    "platform": "macOS-26.5.1-arm64",
+    "jax": "0.10.2",
+    "numpy": "2.4.6",
+    "precision": "float64",
+    "forced_cpu_devices": [1, 2, 4]
+  },
+  "problem": {
+    "shape": [8, 7, 7],
+    "updates": 2,
+    "restart_replay_updates": 1
+  },
+  "one_device": {
+    "wall_seconds": 13.056060125003569,
+    "mass_balance": 1.9095836023552692e-14,
+    "current_balance": 2.5362035206799373e-14,
+    "interface_current_balance": 3.660716174636036e-11,
+    "interface_current_activity": 74.7667483352138,
+    "restart_max_abs": 0.0
+  },
+  "two_devices": {
+    "wall_seconds": 5.715097332955338,
+    "mass_balance": 1.9095836023552692e-14,
+    "current_balance": 8.905497999231701e-15,
+    "interface_current_balance": 4.199307568342192e-11,
+    "interface_current_activity": 74.76674833521368,
+    "restart_max_abs": 0.0
+  },
+  "four_devices": {
+    "wall_seconds": 5.842204125015996,
+    "mass_balance": 1.9095836023552692e-14,
+    "current_balance": 1.549938730581166e-13,
+    "interface_current_balance": 2.7760904686147114e-11,
+    "interface_current_activity": 74.76674833521368,
+    "restart_max_abs": 0.0
+  },
+  "equivalence": {
+    "pressure_observable_max_abs": 5.289171878253285e-15,
+    "courant_max_abs": 1.0587911840678754e-22,
+    "field_max_abs": {
+      "u": 4.440892098500626e-16,
+      "v": 7.631766854761246e-18,
+      "w": 7.869791229649465e-18,
+      "p": 3.6857272789347917e-10,
+      "phi": 9.237055564881302e-14,
+      "current": 2.4868995751603507e-13,
+      "compact_mass_flux": 5.551115123125783e-17
+    },
+    "rtol": 2e-8,
+    "atol": 2e-9,
+    "pass": true
+  },
+  "gates": {
+    "steps_and_stop": true,
+    "conservation": true,
+    "interface_activity": true,
+    "restart_exact": true,
+    "device_equivalence": true
+  },
+  "interpretation": {
+    "production_sharding_correctness": true,
+    "strong_scaling_claim": false,
+    "reason": "Compile-inclusive single samples include serialization; warm repeats, uncertainty, memory, and useful larger fixed-size work remain open."
+  },
+  "raw_assets": "external workspace; three 35.5 kB serialized solution bundles"
+}

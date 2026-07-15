@@ -113,13 +113,14 @@ These visuals demonstrate implemented workflows, not quantitative validation.
 
 ![Experimental B2 GPU strong scaling](docs/_static/strong_scaling.webp)
 
-The superseded B2 checkpoint measured 1.66× on two RTX A4000 GPUs; canonical
-solver scaling remains open. [Protocol and results →](docs/performance.md)
+The exact B2 smoke agrees on 1/2/4 CPU devices. A superseded checkpoint measured
+1.66× on two RTX A4000 GPUs; canonical warm scaling remains open.
+[Protocol and results →](docs/performance.md)
 
 ## Quality and citation
 
-The portable gate records **823 passing tests**, **95.02% combined line/branch
-coverage**, and **165.7 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **823 passing tests**, **95.01% combined line/branch
+coverage**, and **154.1 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

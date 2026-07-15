@@ -9,15 +9,15 @@ dependency, or large generated-asset change:
 .venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The accepted `b763b84` checkpoint records 35 package modules and 34,987 total
-package lines. The maintained stable core is 8,027 lines;
+The accepted `a87a28b` checkpoint records 35 package modules and 34,745 total
+package lines. The maintained stable core is 8,034 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The checkpoint's tracked checkout is 3,452,492 bytes, below its 4 MiB hard cap. Sixty-five
+The checkpoint's tracked checkout is 3,446,643 bytes, below its 4 MiB hard cap. Sixty-five
 generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
@@ -215,7 +215,7 @@ The latest local evidence pass on this workstation shows:
 
 - Python 3.10 compatibility lane: the complete battery without coverage
   instrumentation, under the 10-minute wall-clock target
-- Reference coverage lane: 823 tests pass with 95.02% combined line/branch
+- Reference coverage lane: 823 tests pass with 95.01% combined line/branch
   coverage over `lmx/`; workflow behavior is exercised by the same suite
 
 The hard rule for routine CI/CD is that the parallel workflow must stay under

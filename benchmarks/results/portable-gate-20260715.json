@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "date": "2026-07-15",
-  "commit": "9f037c0bc44cc4309ae028d1b301e3036843189b",
+  "commit": "a87a28b214ba164ee39dfa6be7b5b5dd6ec7fae0",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,39 +20,40 @@
   },
   "result": {
     "test_files": 31,
-    "test_lines": 21290,
+    "test_lines": 21275,
     "passed": 823,
     "skipped": 8,
-    "pytest_seconds": 163.37,
-    "gate_seconds": 165.7,
-    "combined_line_branch_coverage_percent": 95.02,
+    "pytest_seconds": 151.47,
+    "gate_seconds": 154.1,
+    "combined_line_branch_coverage_percent": 95.0108,
     "passed_gate": true
   },
+  "duration_note": "Unchanged nodes retain the preceding full-gate timings; changed nodes were retimed selectively in isolated pytest processes.",
   "slowest_tests": [
-    {"seconds": 74.274, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
     {"seconds": 40.879, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 24.998, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 30.87, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]", "measurement": "current selective"},
     {"seconds": 22.01, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
     {"seconds": 19.738, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 19.223, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
     {"seconds": 16.055, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
     {"seconds": 15.958, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"},
     {"seconds": 15.591, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 15.493, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"}
+    {"seconds": 15.493, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 12.37, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite", "measurement": "current selective"},
+    {"seconds": 7.28, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]", "measurement": "current selective"}
   ],
   "comparison": {
-    "previous_gate_seconds": 208.2,
-    "wall_time_change_percent": -20.41,
-    "budget_fraction": 0.276,
-    "engineering_target_fraction": 0.552,
-    "interpretation": "Strict native-output failure coverage increased while the gate became faster and remains below the five-minute engineering target."
+    "previous_gate_seconds": 165.7,
+    "wall_time_change_percent": -7.0,
+    "budget_fraction": 0.257,
+    "engineering_target_fraction": 0.514,
+    "interpretation": "The distributed-pressure regression was added while redundant modal projections were removed; coverage remains above 95% and the gate became faster."
   },
   "architecture": {
     "package_modules": 35,
-    "package_lines": 34742,
+    "package_lines": 34745,
     "maintained_core_lines": 8034,
     "maintenance_scripts": 18,
-    "tracked_checkout_bytes": 3442297,
+    "tracked_checkout_bytes": 3446643,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
