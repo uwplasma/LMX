@@ -106,7 +106,12 @@ Promoted objectives pass finite-difference or independent-transpose checks.
   <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Reduced blanket-flow movie" width="48%"></a>
 </p>
 
-These visuals demonstrate implemented workflows, not quantitative validation.
+<p align="center">
+  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence-poster.webp" alt="Seven-second nonlinear Q2D vorticity loop" width="58%"></a>
+</p>
+
+These visuals demonstrate implemented workflows. Quantitative turbulent
+Q2DmdFoam parity and blanket validation remain open.
 [Geometry and fields →](docs/geometry.md)
 
 ## Scale on CPUs and GPUs

@@ -34,6 +34,14 @@ No solver was rerun.
 | `readme-blanket-flow-poster.webp` | `f40dff36a41bdfc1fa9df7371cf9c4907a367d70c5603a4658a18d27f708260d` |
 | `readme-blanket-flow.mp4` | `fb426241143c3e6f4d726b0d40b9918de55271b5990888077d9181834035b2cc` |
 | `readme-alex-b2-field-pressure.webp` | `f186f109ed9f0dc25134baaee22069e521140134ff984be94a60fe1bc825bf2f` |
+| `readme-q2d-turbulence-poster.webp` | `97a9e5c418012f1591344ea131a846933a2c60fc2ba47eaf9f93f86e79e1bfb5` |
+| `readme-q2d-turbulence.mp4` | `fd6e60bfdeb99f1c0123a8dc68f2198cfde91904b09cfdcde7caa34667492a62` |
+
+The 71,043-byte Q2D H.264 loop and 13,724-byte poster derive from the existing
+72-frame source GIF (SHA-256
+`feb9e145cee2a5a87f13381803855a34ad16d44f4d63d0c31c155ad07f74bd96`),
+stretched from 5.04 to 7.00 seconds at 600 × 520 and 12 fps. No solver was
+rerun; quantitative Q2DmdFoam parity remains open.
 
 New examples write beneath ignored `artifacts/`. Publish new large media only
 with the generating commit, command, environment, input hashes, and output
