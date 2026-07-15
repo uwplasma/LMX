@@ -216,6 +216,7 @@ def _write_freemhd_b2_output(root: Path, input_dir: Path, evaluator: Path) -> No
     root.mkdir()
     (root / "controlDict.used").write_bytes((input_dir / "system/controlDict").read_bytes())
     (root / "run.log").write_text(
+        "trapFpe: Floating point exception trapping enabled (FOAM_SIGFPE).\n"
         "Region: liquid Courant Number mean: 0 max: 0\n"
         + "".join(
             f"Time = {time:.17g}\nRegion: liquid Courant Number mean: 1e-6 max: 2e-6\n"
@@ -232,7 +233,7 @@ def _write_freemhd_b2_output(root: Path, input_dir: Path, evaluator: Path) -> No
     headers += [f"# Probe {i + 8} ({value:.15g} 0 0.8)" for i, value in enumerate(x)]
     delta = np.asarray([0, 0, 1, 2, 3, 2, 0, 0], dtype=float)
     rows = [" ".join([f"{time:.17g}", *map(str, np.zeros(8)), *map(str, delta)]) for time in times]
-    probes.write_text("\n".join([*headers, "# Time 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15", *rows]) + "\n")
+    probes.write_text("\n".join([*headers, "# Time", *rows]) + "\n")
     values = {
         "massIn": (-4.0, "sum(rhoPhi)"), "massOut": (4.0, "sum(rhoPhi)"),
         "currentIn": (-0.1, "sum(jn)"), "currentOut": (0.1, "sum(jn)"),
@@ -577,6 +578,7 @@ def test_matched_b2_freemhd_input_is_deterministic_slim_and_solver_free(tmp_path
     assert "hex (0 1 2 3 4 5 6 7) liquid ($Nx $Ny $Nz)" in (first / "system/blockMeshDict").read_text()
     assert "xa=-15" in (first / "system/liquid/setExprFieldsDict").read_text()
     functions = (first / "system/controlDict").read_text()
+    assert "maxCo 0.4; maxAlphaCo 0.3;" in functions and "timePrecision 16;" in functions
     assert functions.count("type probes;") == 1 and functions.count("type surfaceFieldValue;") == 6
     assert "currentIntoSolidMagnitude" in functions and "operation sumMag;" in functions
     assert "solidGradPotE" not in functions and "region solidWalls;" not in functions
@@ -846,9 +848,9 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
     ]) == 0
 
 
-@pytest.mark.parametrize("times_out", [False, True])
+@pytest.mark.parametrize("result", ["success", "timeout", "failure"])
 def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, times_out: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, result: str
 ):
     source, evaluator, output = tmp_path / "input", tmp_path / "evaluator", tmp_path / "output"
     source.mkdir()
@@ -858,9 +860,11 @@ def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
 
     def run(command, **kwargs):
         calls.append((command, kwargs))
-        if command[1] == "run" and times_out:
+        if command[1] == "run" and result == "timeout":
             raise subprocess.TimeoutExpired(command, kwargs["timeout"])
-        if command[1] == "rm" and times_out:
+        if command[1] == "run" and result == "failure":
+            raise subprocess.CalledProcessError(1, command, output="setup failed")
+        if command[1] == "rm" and result == "timeout":
             raise OSError("cleanup race")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
@@ -868,11 +872,15 @@ def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
     monkeypatch.setattr(
         run_freemhd_parity_suite, "observe_freemhd_b2_output", lambda *args: {"observed": args}
     )
-    invoke = lambda: run_freemhd_parity_suite.run_matched_b2_freemhd_smoke(
-        source, evaluator, output, image="freemhd:test", nproc=2, timeout_seconds=7.0
-    )
-    if times_out:
+    def invoke():
+        return run_freemhd_parity_suite.run_matched_b2_freemhd_smoke(
+            source, evaluator, output, image="freemhd:test", nproc=2, timeout_seconds=7.0
+        )
+    if result == "timeout":
         with pytest.raises(TimeoutError, match="exceeded 7 seconds"):
+            invoke()
+    elif result == "failure":
+        with pytest.raises(RuntimeError, match="setup failed"):
             invoke()
     else:
         assert "observed" in invoke()

@@ -549,8 +549,8 @@ elcond 3.5;
     dt = 1.0 / 540000.0
     control = f"""
 application epotMultiRegionInterFoam; startFrom startTime; startTime 0; stopAt endTime;
-endTime {2 * dt:.17g}; deltaT {dt:.17g}; adjustTimeStep off; maxDeltaT {dt:.17g};
-writeControl timeStep; writeInterval 2; purgeWrite 0; writeFormat ascii; writePrecision 16;
+endTime {2 * dt:.17g}; deltaT {dt:.17g}; adjustTimeStep off; maxCo 0.4; maxAlphaCo 0.3; maxDeltaT {dt:.17g};
+writeControl timeStep; writeInterval 2; purgeWrite 0; writeFormat ascii; writePrecision 16; timeFormat general; timePrecision 16;
 runTimeModifiable false; BtStartTime 0; BtDuration 0; JConservativeForm true;
 lmxSteadyStepsRequired 3; {_b2_function_objects(sample_x)}
 """
@@ -599,7 +599,7 @@ PIMPLE { nNonOrthogonalCorrectors 0; } potE { nCorrectors 0; nNonOrthogonalCorre
     liquid_change = """
 alpha.liquidMetal { internalField uniform 1; boundaryField { inlet { type fixedValue; value uniform 1; } ".*" { type zeroGradient; } } }
 U { internalField uniform (1 0 0); boundaryField { inlet { type flowRateInletVelocity; volumetricFlowRate 4; extrapolateProfile yes; value uniform (1 0 0); } sink { type zeroGradient; value uniform (1 0 0); } ".*" { type noSlip; } } }
-T { internalField uniform 300; boundaryField { inlet { type fixedValue; value uniform 300; } sink { type fixedValue; value uniform 300; } "liquid_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr T; kappaMethod fluidThermo; value uniform 300; } ".*" { type fixedValue; value uniform 300; } } }
+T { internalField uniform 300; boundaryField { ".*" { type fixedValue; value uniform 300; } "liquid_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr T; kappaMethod fluidThermo; value uniform 300; } inlet { type fixedValue; value uniform 300; } sink { type fixedValue; value uniform 300; } } }
 p_rgh { internalField uniform 0; boundaryField { sink { type fixedValue; value uniform 0; } inlet { type zeroGradient; } ".*" { type fixedFluxPressure; value uniform 0; } } }
 p { internalField uniform 0; boundaryField { ".*" { type calculated; value uniform 0; } } }
 B0 { internalField uniform (0 23.2379000772445 0); boundaryField { ".*" { type zeroGradient; value $internalField; } } }
@@ -757,8 +757,8 @@ def run_matched_b2_freemhd_smoke(
     container = f"lmx-b2-{os.getpid()}-{time.time_ns()}"
     objects = "b2PressureTaps massIn massOut currentIn currentOut currentIntoSolid currentIntoSolidMagnitude"
     shell = f"""
-set -euo pipefail
 source /usr/lib/openfoam/openfoam2206/etc/bashrc
+set -euo pipefail
 work=/tmp/lmx-b2-case
 rm -rf "$work" && mkdir -p "$work"
 rsync -a /input/ "$work/" && cd "$work"
@@ -773,7 +773,10 @@ cp system/controlDict /output/controlDict.used
 export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 mpirun -np {nproc} epotMultiRegionInterFoam -parallel 2>&1 | tee /output/run.log
 mkdir /output/postProcessing
-for name in {objects}; do cp -a "postProcessing/$name" /output/postProcessing/; done
+for name in {objects}; do
+  path="$(find postProcessing -type d -name "$name" -print -quit)"
+  test -n "$path" && cp -a "$path" "/output/postProcessing/$name"
+done
 """
     command = [
         "docker", "run", "--rm", "--name", container, "--cidfile", str(cidfile),
@@ -787,6 +790,11 @@ for name in {objects}; do cp -a "postProcessing/$name" /output/postProcessing/; 
             subprocess.run(command, check=True, timeout=timeout_seconds, text=True, capture_output=True)
         except subprocess.TimeoutExpired as error:
             raise TimeoutError(f"FreeMHD B2 smoke exceeded {timeout_seconds:g} seconds") from error
+        except subprocess.CalledProcessError as error:
+            output = "\n".join(part.strip() for part in (error.stdout, error.stderr) if part)
+            raise RuntimeError(
+                f"FreeMHD B2 smoke exited {error.returncode}:\n{output[-4000:]}"
+            ) from error
     finally:
         try:
             subprocess.run(["docker", "rm", "-f", container], check=False, capture_output=True, text=True)

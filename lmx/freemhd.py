@@ -771,8 +771,10 @@ def observe_freemhd_b2_output(
 
     log = (root / "run.log").read_text(encoding="utf-8")
     if any(marker.lower() in log.lower() for marker in (
-        "FOAM FATAL", "Segmentation fault", "Floating point exception", "MPI_ABORT", "killed"
-    )) or re.search(r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log):
+        "FOAM FATAL", "Segmentation fault", "MPI_ABORT", "killed"
+    )) or re.search(r"(?im)^(?!.*trapping enabled).*Floating point exception", log) or re.search(
+        r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log
+    ):
         raise ValueError("FreeMHD B2 log reports a fatal failure")
     times = np.asarray([float(value) for value in re.findall(r"(?m)^Time = ([0-9eE+.\-]+)\s*$", log)])
     courant = np.asarray([
@@ -817,7 +819,10 @@ def observe_freemhd_b2_output(
     locations = re.findall(r"(?m)^# Probe (\d+) \(([^)]+)\)$", probe_text)
     if len(locations) != 16 or [int(index) for index, _ in locations] != list(range(16)):
         raise ValueError("FreeMHD B2 pressure probe headers differ")
-    if re.search(r"(?m)^# Time\s+" + r"\s+".join(map(str, range(16))) + r"\s*$", probe_text) is None:
+    time_header = re.search(r"(?m)^#[ \t]+Time(?:[ \t]+(.*))?$", probe_text)
+    if time_header is None or (
+        time_header.group(1) and time_header.group(1).split() != list(map(str, range(16)))
+    ):
         raise ValueError("FreeMHD B2 pressure probe columns differ")
     probe_points = np.asarray([[float(value) for value in point.split()] for _, point in locations])
     if not (
@@ -847,7 +852,7 @@ def observe_freemhd_b2_output(
     activity = np.abs(fluxes["currentIntoSolidMagnitude"]) / math.sqrt(540.0)
     residuals: dict[str, float] = {}
     for field, value in re.findall(
-        r"Solving for ([^,]+), Initial residual =\s*[0-9eE+.\-]+, Final residual =\s*([0-9eE+.\-]+)", log
+        r"Solving for ([^,\n]+), Initial residual =\s*[0-9eE+.\-]+, Final residual =\s*([0-9eE+.\-]+)", log
     ):
         residuals[field] = max(residuals.get(field, 0.0), float(value))
     return {
@@ -944,7 +949,8 @@ def observe_freemhd_b2_contract(
     anchors_sha = hashlib.sha256(json.dumps(
         {"x_over_L": anchors_x.tolist(), "b_over_B0": anchors_b.tolist()}, sort_keys=True, separators=(",", ":")
     ).encode()).hexdigest()
-    quoted = lambda key: re.search(rf"\b{key}\s+\"([^\"]+)\"\s*;", field_text).group(1)
+    def quoted(key):
+        return re.search(rf"\b{key}\s+\"([^\"]+)\"\s*;", field_text).group(1)
     if quoted("lmxFieldAnchorsSHA256") != anchors_sha:
         raise ValueError("FreeMHD B2 field anchor hash differs")
 
