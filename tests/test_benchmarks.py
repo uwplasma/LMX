@@ -23,8 +23,11 @@ from lmx.fringing import (
     solve_extruded_inductionless,
 )
 from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
-from scripts.analyze_freemhd_benchmark_a_ladder import analyze_ladder
-from scripts.freeze_freemhd_benchmark_a import compact_evidence, freeze_summary
+from scripts.analyze_freemhd_benchmark_a_ladder import (
+    analyze_ladder,
+    compact_evidence,
+    freeze_summary,
+)
 
 
 pytestmark = pytest.mark.unit
