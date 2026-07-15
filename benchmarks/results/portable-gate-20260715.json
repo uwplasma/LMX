@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "date": "2026-07-15",
-  "commit": "9b04d98697bb63afe75b8b21ada8663a1074751a",
+  "commit": "b2746fa89707281f502a7b42810bc2181271c807",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,48 +20,48 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21028,
+    "test_lines": 20965,
     "passed": 817,
     "skipped": 8,
-    "pytest_seconds": 154.77,
-    "gate_seconds": 157.0,
-    "covered_lines": 14200,
-    "total_lines": 14650,
-    "covered_branches": 2509,
-    "total_branches": 2938,
-    "combined_line_branch_coverage_percent": 95.00227427791676,
+    "pytest_seconds": 165.31,
+    "gate_seconds": 167.6,
+    "covered_lines": 14237,
+    "total_lines": 14687,
+    "covered_branches": 2519,
+    "total_branches": 2948,
+    "combined_line_branch_coverage_percent": 95.01559398922596,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "0752fdf4168c142df23158df59cd84637431850befd59b4b5952bf57da5fd66a",
-    "junit_xml_sha256": "1f5ec9962f82c68fff86d42af9160faab6c3e310f019bf3673b07afb0a9d5d32"
+    "coverage_xml_sha256": "ec27f793fadba7048a0c1f247dbd72a2867312a6264a8d82c57e98ea2954784a",
+    "junit_xml_sha256": "7d60d2ccfe3b5240ce5227ffb9078530792643218009d9fc88ce0d41afba870c"
   },
   "duration_note": "Durations come from the six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 56.718, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
-    {"seconds": 42.957, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 26.594, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 21.660, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 18.640, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 17.248, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
-    {"seconds": 16.196, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 15.915, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
-    {"seconds": 15.890, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
-    {"seconds": 15.466, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"}
+    {"seconds": 60.670, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 46.665, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 29.620, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 22.608, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 19.088, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 18.536, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 18.221, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
+    {"seconds": 17.075, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 17.064, "nodeid": "tests.test_autodiff::test_extruded_rect_projection_field_inverse_design_reduces_loss"},
+    {"seconds": 16.933, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"}
   ],
   "comparison": {
-    "previous_gate_seconds": 161.3,
-    "wall_time_change_percent": -2.67,
-    "budget_fraction": 0.262,
-    "engineering_target_fraction": 0.523,
-    "interpretation": "Ownership deletion lowers the complete gate while preserving 95% combined coverage; the weighted-modal node remains the six-worker critical path."
+    "previous_gate_seconds": 157.0,
+    "wall_time_change_percent": 6.75,
+    "budget_fraction": 0.279,
+    "engineering_target_fraction": 0.559,
+    "interpretation": "Fixture consolidation removes 63 test lines from the recorded gate while pressure diagnostics remain covered; worker contention leaves the weighted-modal node as the critical path."
   },
   "architecture": {
     "package_modules": 35,
-    "package_lines": 34864,
-    "maintained_core_lines": 8034,
-    "maintenance_scripts": 16,
-    "tracked_checkout_bytes": 3477996,
+    "package_lines": 34997,
+    "maintained_core_lines": 8052,
+    "maintenance_scripts": 15,
+    "tracked_checkout_bytes": 3490592,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

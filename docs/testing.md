@@ -11,7 +11,7 @@ external solvers, long physics campaigns, and hardware scaling.
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
 and a hard ten-minute timeout. The last committed Apple M4 record is 817 passed,
-8 expected external-data skips, 95.00% combined line/branch coverage, and 157.0
+8 expected external-data skips, 95.02% combined line/branch coverage, and 167.6
 seconds with six workers. The default warning threshold is five minutes,
 leaving another five minutes before the hard failure. The record keeps the ten
 slowest node IDs for critical-path review.

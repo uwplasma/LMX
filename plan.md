@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The optimized B2 source and current CPU calibration are
-keyed to `413185a`; the latest complete portable gate is keyed to `06075d1`.
+keyed to `413185a`; the latest complete portable gate is keyed to `b2746fa`.
 The GPU workers use the optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
@@ -109,17 +109,17 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 20,965 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 15 | no new script without retiring an owner | 15 |
-| tracked checkout | 3,490,592 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,494,671 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `06075d1` records 817 passes, 8 expected
-external-data skips, 95.0023% combined line/branch coverage, and 157.0 seconds on
+The portable-gate artifact keyed to `b2746fa` records 817 passes, 8 expected
+external-data skips, 95.0156% combined line/branch coverage, and 167.6 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 58.2 seconds for the
-weighted-modal node and 42.8 seconds for reduced B2. Parallel JUnit durations
+95.5% engineering target. The six-worker record reports 60.7 seconds for the
+weighted-modal node and 46.7 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
@@ -250,8 +250,15 @@ agree to `6.2e-19`, and the full signatures differ by at most `5.33e-15`. For
 `k=24`, the source-level model is 26 global-reduction stages, 25 preconditioner
 applications, 50 transverse line solves, 25 axial-mean line solves, and 26
 pressure halo pairs per projection. These are algorithmic counts, not device
-kernel counts. Next measure diagnostic-retention overhead on the frozen small
-GPU phase before considering another pressure algorithm.
+kernel counts. The frozen `64 x 15 x 15` GPU phase records 33 and 35 iterations
+on both one and two GPUs: 72 reduction stages, 70 preconditioner applications,
+140 transverse line invocations, 70 axial-mean invocations, and 72 halo pairs
+over two updates. ABBA diagnostic/control ratios are 0.902 and 1.039 with up to
+27% shared-host CV, so retention is within noise and no speedup is claimed. The
+two-GPU tiny rung is correctly collective-dominated. Next obtain compiler-level
+collective counts on an isolated representative rung; do not start another
+preconditioner probe until that trace identifies a reducible communication or
+iteration cost.
 Re-measure accepted rungs in an isolated GPU window before any publishable
 scaling claim.
 

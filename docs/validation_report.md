@@ -25,7 +25,7 @@ are authoritative when prose and results differ.
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 817 tests with 8 expected external-data
-  skips and 95.00% combined line/branch coverage in 157.0 seconds on the
+  skips and 95.02% combined line/branch coverage in 167.6 seconds on the
   reference Mac.
 
 ## Research-stage

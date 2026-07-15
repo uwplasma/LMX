@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "date": "2026-07-15",
   "case_id": "B2-fringing-square",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -236,6 +236,69 @@
         "sha256": "efb17a4a717ab532f586f1c9129f8489ce7a0422bc985d56c520caaaa8a4b5bc"
       }
     ]
+  },
+  "projection_pcg_diagnostics": {
+    "shape": [64, 15, 15],
+    "updates": 2,
+    "production_source_commit": "b2746fa89707281f502a7b42810bc2181271c807",
+    "columns": [
+      "residual_norm",
+      "relative_residual_norm",
+      "iterations",
+      "converged",
+      "status"
+    ],
+    "one_gpu_history": [
+      [8.969189403898498e-13, 1.1085406359331538e-09, 33, 1, 1],
+      [6.994838859413074e-13, 3.4751250043295463e-09, 35, 1, 1]
+    ],
+    "two_gpu_history": [
+      [8.969189403898500e-13, 1.1085406359331543e-09, 33, 1, 1],
+      [6.994838859448901e-13, 3.4751250043544812e-09, 35, 1, 1]
+    ],
+    "source_level_work": {
+      "formulas": {
+        "global_reduction_stages": "k + 2",
+        "preconditioner_applications": "k + 1",
+        "transverse_line_invocations": "2 * (k + 1)",
+        "axial_mean_line_invocations": "k + 1",
+        "pressure_halo_pairs": "k + 2"
+      },
+      "two_update_totals": {
+        "global_reduction_stages": 72,
+        "preconditioner_applications": 70,
+        "transverse_line_invocations": 140,
+        "axial_mean_line_invocations": 70,
+        "pressure_halo_pairs": 72
+      },
+      "compiler_kernel_counts_measured": false,
+      "interpretation": "These are algorithmic source counts. Compiler fusion and NCCL kernel counts require a separate trace."
+    },
+    "retention_overhead_probe": {
+      "design": "ABBA one-GPU matched control/diagnostic runs on a shared host",
+      "control_commits": ["5d3ec5b3da442c7a00cd4a9f11f69bc3eaf67e21"],
+      "control_warm_medians_seconds": [0.1361439325264655, 0.25133099302183837],
+      "diagnostic_warm_medians_seconds": [0.12275562004651874, 0.2610968420631252],
+      "paired_diagnostic_to_control_ratios": [0.9016606011630804, 1.0388565251100499],
+      "geometric_mean_ratio": 0.967830563142597,
+      "maximum_run_cv": 0.2712767835735873,
+      "decision": "retain diagnostics; no measurable overhead beyond shared-host noise and no speedup claim"
+    },
+    "two_gpu_confirmation": {
+      "validation_passed": true,
+      "warm_median_seconds": 0.9590025310171768,
+      "warm_cv": 0.003493714780063115,
+      "history_matches_one_gpu": true,
+      "interpretation": "The deliberately tiny rung is collective-dominated and is a placement/diagnostic gate, not strong-scaling evidence."
+    },
+    "raw_record_sha256": {
+      "control_a": "c3eba3ba1c4e175d1b64ebfc83b4b8dd521cfa7aa179dc78aa1a27109e06ff7f",
+      "control_b": "69ac91d3782b209455e96fb3adf419c7d0f28b995666da9716ae4b419cc02b47",
+      "diagnostics_a": "3189dc68f7f61128bb78029fab68bdb968fbee7fb14ce6ecdca35cc5eeb08aec",
+      "diagnostics_b": "8898dbc7f9002fdcda14407b7fb2ce82ae188020819d9d32c8b43d91315e8a6e",
+      "diagnostics_history": "f72ff953da5b69455e709eb760c26f6c47e1387dafb16d677d03e8371c7ec504",
+      "diagnostics_two_gpu": "8b70a2494217cb5889f04629c34e4ed5326699746090b2cdf80abd46d1a194df"
+    }
   },
   "raw_assets": {
     "location": "external workspace and office GPU host",

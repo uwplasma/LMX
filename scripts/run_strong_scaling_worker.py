@@ -283,8 +283,9 @@ def _matched_b2_smoke_benchmark(
             num_devices > 1 and value["replicated"] != expected_replicated
         ):
             raise RuntimeError(f"Matched B2 field {name} has invalid placement {value}")
+    pressure_history = np.asarray(direct.iteration_pressure_linear_history, dtype=float)
     pressure_diagnostics = summarize_pressure_linear_history(
-        direct.iteration_pressure_linear_history, expected_steps=observed["steps"])
+        pressure_history, expected_steps=observed["steps"])
     limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
     validation_passed = bool(
         observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
@@ -333,6 +334,7 @@ def _matched_b2_smoke_benchmark(
         "spatially_sharded": num_devices > 1, "global_shard_count": num_devices,
         "validation_passed": validation_passed, "steady_state_passed": False,
         **pressure_diagnostics,
+        "pressure_linear_history": pressure_history.tolist(),
         "signature_relative_tolerance": 2.0e-8, "observables": observed,
         "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
         "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,
