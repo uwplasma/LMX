@@ -206,17 +206,17 @@ the shared host preclude a publishable or production-speed claim.
 
 A complete `64 x 15 x 15` trace showed that eager sharded current-flux
 diagnostics dominated its non-solver cost. JIT fusion reduced that user solve
-from 4.23 to 1.51 seconds and the full-size two-GPU median by 27%. A full-size
-trace then hit the CUPTI event cap midway through momentum; 97.0% of captured
-device time was in cuSPARSE tridiagonal kernels reached through SOLVAX line
-preconditioning, versus 2.38% in NCCL. These are incomplete captured shares,
-not phase timings.
+from 4.23 to 1.51 seconds and the full-size two-GPU median by 27%. A current
+complete small trace attributes 84.5% of named solver-phase wall time to
+momentum, 10.5% to electric potential, and 5.0% to mixed projection. Within
+momentum, tridiagonal kernels are 91.0% of summed device activity and NCCL is
+8.7%. A current full-rung trace again reached the event cap after its first
+6.19-second momentum call; that call was 96.4% tridiagonal activity and 3.05%
+NCCL. Device-activity shares are not wall-time shares.
 
-Next profile one warmed GPU phase at a time with explicit blocking and retain
-pressure iteration counts through a private diagnostic return only if the
-phase evidence requires them. Retain momentum auxiliary data only after the
-released SOLVAX API supports it without another solve. First reduce line-preconditioner calls
-through a mixed-boundary-compatible coarse correction or improved stopping;
+Next reduce momentum line-preconditioner calls or per-call cost in a bounded
+small-rung experiment with forward, gradient, and timing gates. Retain momentum
+auxiliary data only after the released SOLVAX API supports it without another solve;
 do not replace the already-batched SOLVAX GPU tridiagonal path without a bounded
 forward/gradient/timing win. Steady-production scaling remains the promotion
 gate, so no larger rung starts from the truncated trace.

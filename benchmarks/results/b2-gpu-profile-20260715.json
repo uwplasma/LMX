@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "date": "2026-07-15",
   "case_id": "B2-fringing-square",
   "execution_commit": "9d28f995e9309320270694816c08a8c4b205be4a",
@@ -11,20 +11,19 @@
     "solvax": "0.8.3",
     "precision": "float64"
   },
-  "large_diagnostic_trace": {
+  "current_large_diagnostic_trace": {
     "shape": [128, 67, 67],
     "updates": 2,
     "complete": false,
     "timed_event_count": 1000000,
-    "truncation": "CUPTI dropped buffers and the trace event cap stopped device activity midway through the first momentum solve.",
-    "first_momentum_module_seconds": 5.344240245,
-    "captured_device_time": {
-      "summed_seconds": 4.577803363,
-      "tridiagonal_signature_fraction": 0.970251,
-      "two_diagonal_pivot_fraction": 0.775871,
-      "nccl_fraction": 0.023750
+    "truncation": "The trace reached the global timed-event cap after the first momentum call and before projection or electric phases.",
+    "first_momentum_wall_seconds": 6.186693922,
+    "first_momentum_device_activity": {
+      "summed_seconds": 5.302016617,
+      "tridiagonal_signature_fraction": 0.964126832,
+      "nccl_fraction": 0.030495756
     },
-    "interpretation": "Captured-device-time shares are not end-to-end wall-time shares. The trace identifies SOLVAX tridiagonal line preconditioning as the dominant captured momentum work but cannot apportion projection, electric, or halo costs."
+    "interpretation": "This incomplete trace corroborates the momentum bottleneck but cannot apportion later full-rung phases. Captured-device-activity shares are not wall-time shares."
   },
   "complete_small_trace": {
     "shape": [64, 15, 15],
@@ -49,6 +48,25 @@
       "user_solve": 2.791526378,
       "projection_path": 3.743111212,
       "current_flux_diagnostic": 1123.899125
+    },
+    "complete_phase_trace_after": {
+      "timed_event_count": 248145,
+      "named_solver_phase_wall_seconds": {
+        "momentum": 0.498043584,
+        "electric": 0.062095567,
+        "mixed_projection": 0.029206907
+      },
+      "named_solver_phase_fraction": {
+        "momentum": 0.845078333,
+        "electric": 0.105363506,
+        "mixed_projection": 0.049558161
+      },
+      "momentum_device_activity": {
+        "summed_seconds": 0.935903994,
+        "tridiagonal_signature_fraction": 0.910306774,
+        "nccl_fraction": 0.086776875
+      },
+      "interpretation": "Momentum dominates the named solver phases on the complete small current path; pressure projection is not the first optimization target. Device-activity shares sum concurrent GPU streams and are not wall-time shares."
     }
   },
   "promoted_full_rung": {
@@ -62,9 +80,10 @@
   },
   "raw_assets": {
     "location": "external workspace and office GPU host",
-    "probe_sha256": "c305e2594893bfea7fec8bb4bf15f9e1a36648334af5d803dbbed27c711a0ba8",
-    "large_perfetto_sha256": "c362a1dffd36e51f336beae7d0f396cafe09c5ba4057cbb67cbf6b2b1ff9ed52",
+    "probe_sha256": "c6e67e442f252907d8a4c8e041557f2bb68521242036db3b7558bce6feff4200",
+    "current_large_perfetto_sha256": "a4d52548ffc9ad4267f0725c4896747738441dcfe1bf7ba3403ed133906e1c51",
     "small_before_perfetto_sha256": "d33ba8a778baf16d5c6f9db470bc99f958eee7ed7103dd77222fa2c6960b8729",
-    "small_after_perfetto_sha256": "9345dfeed6281c89f7faad9f869e452dc53a6c585748dffe6450bd4d2cfecc3f"
+    "small_after_perfetto_sha256": "9345dfeed6281c89f7faad9f869e452dc53a6c585748dffe6450bd4d2cfecc3f",
+    "small_phase_perfetto_sha256": "9cac8daa188120c93b942b8195b8ca3e5c8a5d2740d2eb875688a162c47289c6"
   }
 }

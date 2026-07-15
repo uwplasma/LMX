@@ -40,11 +40,13 @@ timings do not promote its experimental physics result.
 A complete small-rung trace exposed eager sharded current-flux diagnostics as
 the dominant non-solver cost. Fusing those diagnostics reduced the `64 x 15 x
 15` user solve from 4.23 to 1.51 seconds and the full-size two-GPU median from
-16.40 to 11.98 seconds; the one-GPU median remained 21.14 seconds. A separate
-full-size diagnostic trace hit the CUPTI event cap midway through momentum, but
-97.0% of its captured device time was in cuSPARSE tridiagonal kernels reached
-through SOLVAX line preconditioning, versus 2.38% in NCCL. These captured shares
-are not end-to-end phase shares. The compact profile record is
+16.40 to 11.98 seconds; the one-GPU median remained 21.14 seconds. On the
+current complete small trace, momentum occupies 84.5% of named solver-phase
+wall time, versus 10.5% for electric potential and 5.0% for mixed projection.
+Tridiagonal kernels are 91.0% of summed momentum device activity and NCCL is
+8.7%. A current full-rung trace reached the event cap after its first
+6.19-second momentum call and corroborates the same tridiagonal bottleneck.
+Device-activity shares are not wall-time shares. The compact profile record is
 `benchmarks/results/b2-gpu-profile-20260715.json`.
 
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
@@ -262,9 +264,9 @@ than silently reused.
 
 ## Next performance work
 
-1. Profile projection, electric, momentum, and halo costs on the current 1/2-GPU rung.
-2. Run one larger bounded rung only if the profile predicts useful scaling.
-3. Close B1/B2 mesh and experimental-observable acceptance.
+1. Reduce momentum line-preconditioner calls or cost on the small current rung.
+2. Promote only a forward-, gradient-, and timing-gated improvement to the full rung.
+3. Close canonical B1/B2 mesh and experimental-observable acceptance.
 4. Add four-GPU points only with suitable hardware and a steady-production case.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)
