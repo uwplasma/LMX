@@ -78,6 +78,17 @@
     "parallel_efficiency": 0.8823028102829331,
     "validation_and_equivalence_passed": true
   },
+  "rejected_momentum_probe": {
+    "hypothesis": "Adding the existing axial line solve might reduce momentum Krylov work enough to offset its cost.",
+    "shape": [64, 15, 15],
+    "devices": 2,
+    "baseline_warm_median_seconds": 1.43667105701752,
+    "axial_line_warm_median_seconds": 1.5228567889425904,
+    "wall_time_change_fraction": 0.059989885,
+    "validation_passed": true,
+    "decision": "reject",
+    "worker_sha256": "d51d53829c3f66a8bce262b16e414f4cc1393288aed87c89a06fbe7045e3987e"
+  },
   "raw_assets": {
     "location": "external workspace and office GPU host",
     "probe_sha256": "c6e67e442f252907d8a4c8e041557f2bb68521242036db3b7558bce6feff4200",

@@ -217,7 +217,9 @@ NCCL. Device-activity shares are not wall-time shares.
 Next reduce momentum line-preconditioner calls or per-call cost in a bounded
 small-rung experiment with forward, gradient, and timing gates. Retain momentum
 auxiliary data only after the released SOLVAX API supports it without another solve;
-do not replace the already-batched SOLVAX GPU tridiagonal path without a bounded
+the existing axial line is already rejected because it slowed the validated
+small two-GPU path by 6.0%. Do not replace the already-batched SOLVAX GPU
+tridiagonal path without a bounded
 forward/gradient/timing win. Steady-production scaling remains the promotion
 gate, so no larger rung starts from the truncated trace.
 

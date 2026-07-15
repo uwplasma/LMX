@@ -48,6 +48,8 @@ Tridiagonal kernels are 91.0% of summed momentum device activity and NCCL is
 6.19-second momentum call and corroborates the same tridiagonal bottleneck.
 Device-activity shares are not wall-time shares. The compact profile record is
 `benchmarks/results/b2-gpu-profile-20260715.json`.
+Enabling the existing axial momentum line preserved validation but raised the
+small two-GPU warm median from 1.437 to 1.523 seconds, so that path is rejected.
 
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
