@@ -118,8 +118,8 @@ solver scaling remains open. [Protocol and results →](docs/performance.md)
 
 ## Quality and citation
 
-The last committed portable gate records **784 tests**, **95.28% branch
-coverage**, and **149.9 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **788 passing tests**, **95.04% combined line/branch
+coverage**, and **208.2 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

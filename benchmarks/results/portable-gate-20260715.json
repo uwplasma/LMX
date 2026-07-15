@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "date": "2026-07-15",
+  "commit": "a97eeaf1c5cd0a1f3aeddf2ccf605434a5a0e990",
+  "hardware": {
+    "model": "Mac mini (Mac16,10)",
+    "chip": "Apple M4",
+    "cores": 10,
+    "memory_gib": 24,
+    "platform": "Darwin arm64"
+  },
+  "gate": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "workers": 6,
+    "budget_seconds": 600,
+    "engineering_target_seconds": 300,
+    "minimum_combined_coverage_percent": 95.0
+  },
+  "result": {
+    "test_files": 31,
+    "test_lines": 21211,
+    "passed": 788,
+    "skipped": 8,
+    "pytest_seconds": 205.9,
+    "gate_seconds": 208.2,
+    "combined_line_branch_coverage_percent": 95.04,
+    "passed_gate": true
+  },
+  "slowest_tests": [
+    {"seconds": 57.642, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 48.581, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 28.226, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 27.121, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 26.161, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 21.128, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 20.008, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 19.538, "nodeid": "tests.test_autodiff::test_extruded_rect_inverse_design_reduces_loss"},
+    {"seconds": 18.717, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_analytic_variable_field"},
+    {"seconds": 16.489, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"}
+  ],
+  "comparison": {
+    "previous_gate_seconds": 149.9,
+    "wall_time_increase_percent": 38.89,
+    "budget_fraction": 0.347,
+    "engineering_target_fraction": 0.694,
+    "interpretation": "Observer and mutation coverage added; the gate remains below the five-minute engineering target."
+  },
+  "architecture": {
+    "package_modules": 35,
+    "package_lines": 35059,
+    "maintained_core_lines": 8015,
+    "maintenance_scripts": 18,
+    "tracked_checkout_bytes": 3412001,
+    "stable_root_exports": 30,
+    "curated_examples": 11
+  },
+  "hosted_ci": {
+    "status": "administratively_not_started",
+    "reason": "GitHub Actions reported an account billing or spending-limit failure before runner assignment; every affected job had zero executed steps.",
+    "code_failure_observed": false,
+    "rerun_required_after_billing_resolution": true
+  }
+}

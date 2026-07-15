@@ -36,7 +36,7 @@ python scripts/manage_release_assets.py --verify-archive PATH_TO_ARCHIVE
 New generated files above 128 KiB fail the manifest check until deliberately
 assigned to a new versioned asset release.
 
-The live architecture gate caps the package at 35 modules, 35,000 source lines,
+The live architecture gate caps the package at 35 modules, 35,100 source lines,
 8,100 maintained-core lines, 32 test files, 21,300 test lines, 18 maintenance
 scripts, 30 root exports, 12 curated examples, a 4 MiB tracked checkout, and a
 0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and
@@ -215,7 +215,7 @@ The latest local evidence pass on this workstation shows:
 
 - Python 3.10 compatibility lane: the complete battery without coverage
   instrumentation, under the 10-minute wall-clock target
-- Reference coverage lane: 784 tests pass with 95.28% combined line/branch
+- Reference coverage lane: 788 tests pass with 95.04% combined line/branch
   coverage over `lmx/`; workflow behavior is exercised by the same suite
 
 The hard rule for routine CI/CD is that the parallel workflow must stay under

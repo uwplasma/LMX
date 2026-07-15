@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15, through LMX commit `b24b64d`. This is the single active
+Status: 2026-07-15, through implementation commit `a97eeaf`. This is the single active
 plan. It records accepted baselines, active gates, and stop/go criteria—not
 campaign history. Completed campaign details belong in checksummed result
 records and the validation or performance documentation.
@@ -83,36 +83,34 @@ large reusable artifacts go in checksummed releases.
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
 | B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, and forced one-/two-CPU equivalence have bounded gates | canonical LMX/FreeMHD parity and scaling remain open |
-| Matched B2 harness | pinned source snapshot and a real deterministic LMX input/loader/observer are complete | FreeMHD input/observer and cross-observer agreement remain |
+| Matched B2 harness | deterministic LMX and FreeMHD inputs, pinned source evidence, independent observers, exact mismatch attribution, and OpenFOAM setup checks pass | execute the exact two-update smoke; production acceptance remains impossible for this role |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 
-Current structure after the compact FreeMHD materializer at `b24b64d`:
+Current structure after the independent observer tranche at `a97eeaf`:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,844 | at most 35,000 while adding the FreeMHD observer; below 34,850 after smoke cleanup | 35,100 |
-| maintained-core lines | 8,008 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,057 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| package lines | 35,059 | below 34,850 after smoke cleanup | 35,100 |
+| maintained-core lines | 8,015 | below 8,000 after smoke cleanup | 8,100 |
+| test files / lines | 31 / 21,211 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,384,265 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,412,001 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The last committed portable-gate artifact records 784 passes, 8 expected
-external-data skips, 95.28% combined line/branch coverage, and 149.9 seconds on
-the reference Apple M4. It predates the current observer tranche. Refresh one
-single authoritative result after the FreeMHD observer is complete, and update
-the README/docs from that record only.
+The portable-gate artifact keyed to `a97eeaf` records 788 passes, 8 expected
+external-data skips, 95.04% combined line/branch coverage, and 208.2 seconds on
+the reference Apple M4. It remains below the 300-second engineering target and
+600-second hard limit. Coverage remains above the enforced floor but below the
+95.5% engineering target.
 
-## Priority 0: finish the solver-free matched B2 harness
+## Priority 0: solver-free matched B2 harness — complete
 
-No solver run is authorized until this gate is committed and green.
-
-Completed foundation:
+Completed at `a97eeaf`:
 
 - Schema 2 compares both observed contracts with a frozen canonical contract;
   two equal submitted dictionaries cannot self-certify.
@@ -125,67 +123,78 @@ Completed foundation:
   source files plus the manifest. The source-snapshot tree SHA-256 is
   `18c33bda110e92ad9d0e1872b776af373a18ba75075baffb88a9838432fcb333`.
 - At `f033a4b`, the LMX materializer writes a deterministic strict JSON input;
-  the loader reconstructs a real `CaseSpec`/`FringingProfile`; and the observer
+  its loader reconstructs a real `CaseSpec`/`FringingProfile`, and its observer
   derives the contract without reading the expected contract.
-
-Next tranche, still without running either solver:
-
-1. Materialize FreeMHD independently from the small multi-region `hunt_demo`
-   dictionary skeleton. Do not copy generated fields or treat its original
-   million-cell case as B2 evidence.
-2. Rewrite the block mesh, all-conducting shell, ALEX field, material values,
-   inlet-flow/outlet-pressure/electric boundaries, and fixed-step controls.
-   Require `alpha=1`, zero gravity, constant temperature/properties, laminar
-   flow, zero-duration field ramp, conservative current, no velocity clipping,
-   and no adaptive step.
-3. Preserve and independently parse the exact `Euler`, `limitedLinear 1.0`,
-   and `cellLimited leastSquares 1.0` dictionaries.
-4. Derive the FreeMHD contract from mesh, topology, materials, field,
-   boundaries, phase/thermal, numerical, and control dictionaries. The observer
-   must not read a manifest, expected contract, or LMX input.
-5. Mutate one side at a time—mesh face, field sample, material, wall,
-   inlet/outlet/electric boundary, step/corrector budget, and pinned source
-   byte—and require the exact failed contract path while the other observer is
-   unchanged.
-6. Freeze `harness-smoke` only after both real observers agree. This role must
-   report `contract_pass=True` and `acceptance_pass=False`; it can never promote
-   itself to `b2-production`.
+- The compact FreeMHD input contains 392 cells across fluid and conducting-wall
+  regions, direct block cell zones, exact B2 material/field/boundary facts, and
+  fixed Euler controls for two updates. Generated meshes and fields stay out of
+  Git.
+- The FreeMHD observer independently parses input dictionaries and seven pinned
+  source files plus their manifest. Both observers agree on the shared evaluator
+  and normalized pressure contract.
+- Ten one-sided mutations cover mesh, field, fluid, wall, velocity, pressure,
+  electric boundary, scheme, iteration budget, and source content while proving
+  that the opposite observation is unchanged.
+- OpenFOAM setup utilities pass through mesh generation, region splitting,
+  dictionary changes, field expression evaluation, and region listing. No
+  FreeMHD or LMX solver process ran in this tranche.
+- `harness-smoke` now reports schema, artifact, contract, and observation passes,
+  while comparison and acceptance remain false. The role cannot promote itself
+  to `b2-production`.
 
 The LMX smoke realization is `L=U=rho=sigma_f=1`, `Ha=2900`, `N=540`,
 `Re=Ha^2/N`, `Q=4`, wall thickness `0.02`, and wall conductivity `3.5`. It has
 eight axial cells over `[-15,10]`, a `5x5` fluid cross-section plus one wall
 cell on each side, `dt=1/540000`, and two updates ending at `step_limit`. These
-become shared contract facts only when the independent FreeMHD input reproduces
-them; otherwise fix the first materializer discrepancy rather than weakening
-the contract.
+are shared contract facts because the independent FreeMHD input reproduces them
+exactly.
 
-Exit: deterministic FreeMHD input and source hashes, two independent observers,
-one-sided mismatch attribution, frozen smoke role, strict docs, one complete
-portable gate, and a pushed commit. No FreeMHD process has run.
+Exit met: deterministic inputs and source hashes, two independent observers,
+one-sided mismatch attribution, the frozen non-accepting role, strict docs, and
+one complete portable gate are green and pushed.
 
-## Priority 1: run one exact tiny B2 smoke
+## Priority 1: freeze, then run one exact tiny B2 smoke
 
-Use the existing parity command and the committed materialized inputs. Declare
-a ten-minute wall ceiling for the entire LMX-plus-FreeMHD smoke and stop at the
-first contract, execution, or closure failure.
+The current parity command handles Benchmark A and materializes B2 inputs, but
+does not execute B2 or observe its outputs. Complete one small solver-free
+tranche in the existing script before launching either solver:
 
-Compare:
+1. Add explicit B2 materialize, preflight, run, and postprocess modes without a
+   new script or package module.
+2. Define compact independent LMX and FreeMHD output observers for executed
+   steps, effective `dt`, volume-mean and maximum Courant histories, stopping
+   reason, mass/current closure, pressure gauge/orientation, restart identity,
+   and the shared normalized pressure observable.
+3. Add only the necessary FreeMHD pressure probes and mass/current surface
+   sums. Bypass its demo plotter and VTK conversion; raw fields are not evidence
+   for this gate.
+4. Freeze smoke-specific tolerances before seeing solver output. Base exact
+   controls and hashes on the input contract, restart tolerance on arithmetic
+   precision, and closure/cross-code tolerances on the discrete schemes. Do not
+   reuse the production ALEX experimental-error thresholds.
+5. Rematerialize a clean external bundle, verify every hash and both input
+   observations, and stop if any byte or contract fact differs.
 
-- independently observed contracts and artifact hashes;
-- executed steps, effective `dt`, volume-mean and maximum Courant histories,
-  convergence streak, and `step_limit` reason;
-- mass and current closure, pressure gauge/orientation, and identical normalized
-  ALEX pressure observable definitions;
-- restart state where the two-step path crosses a checkpoint boundary.
+Then declare one ten-minute wall budget for both codes. Run LMX first as one
+uninterrupted two-update path and as one update, restart, and one update; require
+their compact outputs to agree. Run FreeMHD only if the LMX execution and output
+contract pass, using the remaining budget. Invoke it directly with exact runtime
+controls, a named container, deadline-aware termination, and unconditional
+container cleanup; capture the effective controls. Stop at the first contract,
+execution, restart, closure, or comparison failure.
 
 The smoke keeps nonzero inertia, Lorentz force, diffusion, conducting-shell
 topology, and the canonical axial conditions. It may reduce mesh and duration,
-not equations. Commit only compact checksummed inputs and a summary; raw cases,
-logs, fields, and restarts remain external.
+not equations. Commit only compact checksummed specifications, evaluator, and
+summary; raw cases, logs, meshes, fields, and restarts remain external.
 
-Exit: the tiny run is contract-valid and numerically consistent, and remains
-explicitly ineligible for production acceptance. Failure returns to the first
-failed tiny gate; no medium run starts.
+Implement this by consolidating the existing parity script: no new script or
+package module, and no package-line increase. Use mocked child-process, timeout,
+cleanup, and parser tests before the one real run.
+
+Exit: the tiny run is contract-valid and numerically consistent under the
+predeclared smoke gates, yet remains explicitly ineligible for production
+acceptance. Failure returns to the first failed tiny gate; no medium run starts.
 
 ## Priority 2: unblock fast iteration and real strong scaling
 
@@ -194,9 +203,9 @@ measurements themselves run alone.
 
 ### CI critical path
 
-The current serial-duration leaders are approximately 78.5 seconds for the
-pipe weighted-modal physics node, 42.7 seconds for the reduced B2 path, 27.7
-seconds for reduced B1, and 22.0 seconds for autodiff. Reduce their exact grids,
+The current serial-duration leaders are approximately 57.6 seconds for the
+pipe weighted-modal physics node, 48.6 seconds for the reduced B2 path, 27.1
+seconds for reduced B1, and 28.2 seconds for autodiff/nonrectangular work. Reduce their exact grids,
 share safe compilation, or replace redundant integration work with independent
 manufactured operators while preserving the same physics and tolerances.
 
