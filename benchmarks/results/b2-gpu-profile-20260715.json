@@ -194,6 +194,25 @@
         "validation_passed": true,
         "decision": "reject 1.0% gain below promotion margin and frozen 1e-12 contract",
         "sha256": "fd03ec9f1329020e53c1e43269977ae77b37a4e421cd4a6644d200ebe6feb528"
+      },
+      {
+        "probe": "mixed-boundary DCT-IV modal coarse correction",
+        "warm_median_seconds": 0.9554745309869759,
+        "warm_cv": 0.008930150035558136,
+        "wall_time_reduction_fraction": 0.004668955697260452,
+        "validation_passed": false,
+        "restart_state_max_abs": 4.831690603168681e-12,
+        "restart_state_tolerance": 1e-12,
+        "bounded_correctness_gates": [
+          "dense mixed finite-volume inverse",
+          "positive energy and bilinear symmetry",
+          "JVP and VJP",
+          "manufactured mixed flow",
+          "one- and two-device correction placement"
+        ],
+        "decision": "reject below 15% timing threshold and strict restart contract",
+        "source_fingerprint": "faf6bdf6843394b1d49b85c676f104a9c7c3097cb04f31c5879a97770bcdff21",
+        "sha256": "47e9650786901777bec1d26c66a1ed486acd992c0d50d78a451b7039b1c3f5b0"
       }
     ]
   },

@@ -226,10 +226,13 @@ validation, exact restart, placement, and device equivalence; warm medians are
 speedup. Stop larger blind rungs. Bounded `64 x 15 x 15` probes rejected one
 transverse line plus axial mean (40% slower), SOLVAX Jacobi plus axial mean
 (22% slower), and a relaxed internal projection tolerance (only 1.0% faster
-and outside the frozen `1e-12` contract). Do not drop the accepted line blocks
-or weaken tolerance. Next design a mixed-boundary coarse correction that keeps
-both transverse lines but reduces PCG work; require dense, mixed-gradient, and
-at least 15% phase-timing wins before a full rung. Electric remains second.
+and outside the frozen `1e-12` contract). An exact mixed-boundary DCT-IV coarse
+correction passed dense, symmetry, gradient, manufactured-flow, and sharding
+gates, but gained only 0.47% and missed the strict restart-state tolerance;
+it is also rejected. Do not drop the accepted line blocks, weaken tolerance,
+or revive additive coarse corrections. Next isolate projection iteration and
+collective costs before selecting another algorithm; require at least a 15%
+small phase-timing win before a full rung. Electric remains second.
 Re-measure accepted rungs in an isolated GPU window before any publishable
 scaling claim. Retain solver auxiliary data only after a released SOLVAX API
 provides it without an extra solve.

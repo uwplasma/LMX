@@ -57,9 +57,11 @@ blind rungs therefore stop. The compact profile record is
 `benchmarks/results/b2-gpu-profile-20260715.json`.
 
 Small paired probes also reject one transverse projection line, SOLVAX Jacobi
-plus axial mean, and a relaxed projection tolerance: the first two are slower,
-while the tolerance change gains only 1.0% and violates the frozen numerical
-contract. The accepted source is unchanged.
+plus axial mean, a relaxed projection tolerance, and a mixed-boundary DCT-IV
+coarse correction. The first two are slower; the tolerance change gains only
+1.0% outside the frozen numerical contract. The coarse correction passes its
+dense, symmetry, gradient, flow, and sharding gates, but gains only 0.47% and
+misses the strict restart-state tolerance. The accepted source is unchanged.
 
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
