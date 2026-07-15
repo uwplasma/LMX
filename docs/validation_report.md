@@ -24,8 +24,8 @@ are authoritative when prose and results differ.
 - SOLVAX integration, including symmetric additive-line composition,
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
-- The portable package gate passes 788 tests with 8 expected external-data
-  skips and 95.04% combined line/branch coverage in 208.2 seconds on the
+- The portable package gate passes 823 tests with 8 expected external-data
+  skips and 95.02% combined line/branch coverage in 165.7 seconds on the
   reference Mac.
 
 ## Research-stage

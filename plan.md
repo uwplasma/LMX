@@ -1,9 +1,8 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The pushed baseline is `ba7351e`; strict native output
-observation, the non-accepting schema-3 gate, Docker timeout/cleanup, and the
-end-to-end LMX-first command are green under focused or mocked tests. Both
-physical smoke executions remain open. This is the
+Status: 2026-07-15. The tested code baseline is `9f037c0`; the exact two-update
+LMX/FreeMHD B2 smoke and the portable coverage gate are green. The smoke closes
+bounded orchestration and comparison, not production B2 acceptance. This is the
 single active plan. It records accepted baselines,
 active gates, and stop/go criteria—not campaign history. Completed campaign
 details belong in checksummed result records and the validation or performance
@@ -87,7 +86,7 @@ large reusable artifacts go in checksummed releases.
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
 | B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, and forced one-/two-CPU equivalence have bounded gates | canonical LMX/FreeMHD parity and scaling remain open |
-| Matched B2 harness | deterministic LMX and FreeMHD inputs, pinned source evidence, independent observers, exact mismatch attribution, and OpenFOAM setup checks pass | execute the exact two-update smoke; production acceptance remains impossible for this role |
+| Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
@@ -99,20 +98,21 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,736 | stay below 34,850 through smoke implementation | 35,100 |
+| package lines | 34,742 | stay below 34,850 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,190 | no new file; below 21,000 after further fixture consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,290 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,436,133 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,442,122 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `a97eeaf` records 788 passes, 8 expected
-external-data skips, 95.04% combined line/branch coverage, and 208.2 seconds on
+The portable-gate artifact keyed to `9f037c0` records 823 passes, 8 expected
+external-data skips, 95.02% combined line/branch coverage, and 165.7 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target.
+95.5% engineering target; the 74.3-second weighted-modal pipe node is the first
+critical-path reduction target.
 
 ## Priority 0: solver-free matched B2 harness — complete
 
@@ -161,89 +161,30 @@ Exit met: deterministic inputs and source hashes, two independent observers,
 one-sided mismatch attribution, the frozen non-accepting role, strict docs, and
 one complete portable gate are green and pushed.
 
-## Priority 1: freeze, then run one exact tiny B2 smoke
+## Priority 1: matched B2 smoke — complete
 
-The current parity command handles Benchmark A and materializes B2 inputs, but
-does not yet expose or execute a B2 run. The externally generated preflight was
-byte-identical across two trials and passed both independent input observers
-with contract SHA-256
-`e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`;
-the temporary bundle was intentionally not retained. Complete the remaining
-orchestration tranche before launching either solver:
+The exact external bundle keyed to LMX source commit `a7693c8` passed every
+permitted schema-3 gate under a shared 600-second deadline. LMX ran first on one
+JAX device in 13.31 seconds; native FreeMHD then ran with two MPI ranks in 5.48
+seconds. Both executed two fixed Euler updates and stopped at `step_limit`.
 
-1. Extend the existing preflight with explicit B2 run and postprocess modes,
-   without a new script or package module.
-2. Keep the now-implemented independent LMX and FreeMHD output observers strict
-   over executed steps, effective `dt`, Courant histories, stopping reason,
-   mass/current closure, pressure gauge/orientation, restart identity, and the
-   shared normalized pressure observable.
-3. Add only the necessary FreeMHD pressure probes and mass/current surface
-   sums. Bypass its demo plotter and VTK conversion; raw fields are not evidence
-   for this gate.
-4. Freeze smoke-specific tolerances before seeing solver output. Base exact
-   controls and hashes on the input contract, restart tolerance on arithmetic
-   precision, and closure/cross-code tolerances on the discrete schemes. Do not
-   reuse the production ALEX experimental-error thresholds.
-5. Rematerialize a clean external bundle, verify every hash and both input
-   observations, and stop if any byte or contract fact differs.
+The independent observers report zero LMX restart difference, machine-precision
+mass/current closure, nonzero interface-current activity, and closely matching
+Courant histories. Cross-code normalized pressure differences are 0.00452 RMS
+and 0.01092 maximum, well inside the predeclared 0.16 and 0.32 smoke limits.
+Schema, artifacts, contracts, observations, execution, and comparison all pass
+with no failed checks. `acceptance_pass` remains false solely because
+`harness-smoke` is intentionally ineligible for production acceptance.
 
-The instrumentation checkpoint is now materialized and setup-valid in the
-FreeMHD container. Sixteen pressure taps use the same adjacent-cell centers as
-LMX; liquid mass/current sums use registered `rhoPhi`/`jn`. FreeMHD does not
-register solid `jn`, and the native `flux(grad(potE))` function-object chain is
-not identical to the solver's face-normal `snGrad` flux. Therefore the harness
-measures signed and absolute liquid-to-solid interface current and treats zero
-outer-wall current as an independently observed boundary-contract fact; it
-does not claim a reconstructed solid face flux.
+The compact tracked summary is
+`benchmarks/results/b2-freemhd-harness-smoke-20260715.json`. The 97-file,
+1.64 MB raw bundle remains outside Git with a recorded tree hash; future runs
+must also record the immutable container image digest and orchestration wall
+clock directly. No medium B2 physics run starts from this result.
 
-The schema-3 execution limits are now frozen separately from production
-acceptance. They require exact two-step controls, `Co_max <= 0.4`, the existing
-`1e-3` mass/current bounds, `1e-12` restart agreement, 5% cross-code CFL
-agreement, and coarse-grid pressure differences below one second-order
-truncation scale (`h^2 = 0.16` RMS and `2h^2 = 0.32` maximum for `h = 0.4`).
-
-The LMX output path is now replayable: it writes one-step, uninterrupted
-two-step, and resumed two-step `b2_diagnostics_v2` restart records. The observer
-reloads and validates every record, recomputes pressure and closure metrics, and
-compares all retained state/history arrays rather than trusting reported pass
-booleans. Only the synthetic observer fixture has run; the physical smoke has
-not started.
-
-The FreeMHD output observer now requires the exact compact output tree, effective
-control bytes, clean terminal log, native pressure-probe and surface-sum tables,
-and all 16 tap coordinates. Schema 3 independently replays both output trees,
-applies the frozen execution and cross-code gates, and remains ineligible for
-production acceptance. These paths are green only on synthetic native-format
-fixtures; no FreeMHD B2 solver process has run.
-
-The direct Docker runner is also mock-validated: it uses a read-only input
-mount, named container and cidfile, fixed deadline, and unconditional forced
-cleanup, while bypassing reconstruction, VTK, and plotting. The end-to-end CLI
-now snapshots clean tracked LMX source, runs and gates LMX before FreeMHD, passes
-only the remaining shared budget to Docker, and assembles the schema-3 record
-from independent observers. Its ordering, budget, artifact-kind, and CLI paths
-are mock-validated; the physical smoke is the next gate.
-
-Then declare one ten-minute wall budget for both codes. Run LMX first as one
-uninterrupted two-update path and as one update, restart, and one update; require
-their compact outputs to agree. Run FreeMHD only if the LMX execution and output
-contract pass, using the remaining budget. Invoke it directly with exact runtime
-controls, a named container, deadline-aware termination, and unconditional
-container cleanup; capture the effective controls. Stop at the first contract,
-execution, restart, closure, or comparison failure.
-
-The smoke keeps nonzero inertia, Lorentz force, diffusion, conducting-shell
-topology, and the canonical axial conditions. It may reduce mesh and duration,
-not equations. Commit only compact checksummed specifications, evaluator, and
-summary; raw cases, logs, meshes, fields, and restarts remain external.
-
-Implement this by consolidating the existing parity script: no new script or
-package module, and no package-line increase. Use mocked child-process, timeout,
-cleanup, and parser tests before the one real run.
-
-Exit: the tiny run is contract-valid and numerically consistent under the
-predeclared smoke gates, yet remains explicitly ineligible for production
-acceptance. Failure returns to the first failed tiny gate; no medium run starts.
+Exit met: the exact tiny run is contract-valid and numerically consistent under
+the frozen smoke gates. Production parity, a three-mesh ladder, experimental
+acceptance, and measured strong scaling remain open.
 
 ## Priority 2: unblock fast iteration and real strong scaling
 

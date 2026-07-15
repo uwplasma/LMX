@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "case_id": "B2-fringing-square",
+  "acceptance_role": "harness-smoke",
+  "execution_commit": "a7693c87b4c3153ce973ca3748e5ef74acbd3acd",
+  "source_pins": {
+    "lmx": "a7693c87b4c3153ce973ca3748e5ef74acbd3acd",
+    "freemhd": "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5",
+    "openfoam": "v2206",
+    "docker_image": "freemhd-install:latest",
+    "docker_image_id": "sha256:29b2415490cbba93f745003ee59611088fd0322958e271a43c05f31b1e018089"
+  },
+  "verdict": {
+    "smoke_gate_pass": true,
+    "schema_complete": true,
+    "artifact_pass": true,
+    "contract_pass": true,
+    "observation_pass": true,
+    "execution_pass": true,
+    "comparison_pass": true,
+    "failed_checks": [],
+    "production_acceptance_pass": false,
+    "production_acceptance_reason": "The frozen harness-smoke role cannot confer production acceptance."
+  },
+  "limits": {
+    "shared_wall_seconds": 600.0,
+    "pressure_rms": 0.16,
+    "pressure_linf": 0.32,
+    "closure": 0.001,
+    "restart_absolute": 1e-12
+  },
+  "comparison": {
+    "pressure_rms": 0.004517977101775715,
+    "pressure_linf": 0.010917245284654544
+  },
+  "lmx": {
+    "devices": 1,
+    "steps": 2,
+    "stop_reason": "step_limit",
+    "wall_seconds": 13.310642792028375,
+    "restart_max_abs": 0.0,
+    "mass_balance": 1.9095836023552692e-14,
+    "current_balance": 2.5362035206799373e-14,
+    "interface_current_balance": 3.660716174636036e-11,
+    "interface_current_activity": 74.7667483352138,
+    "pressure_observable": [-0.00011028279165161371, 0.0003434425389322962, 0.002994504345332028, 0.012581581631898337, 0.022314508133154037, 0.004049759373993118, -9.934750853539696e-05, -0.00013381223874528553]
+  },
+  "freemhd": {
+    "mpi_ranks": 2,
+    "steps": 2,
+    "stop_reason": "step_limit",
+    "wall_seconds": 5.483495166990906,
+    "mass_balance": 0.0,
+    "current_balance": 2.954356274787756e-17,
+    "interface_current_balance": 6.555685285272496e-14,
+    "interface_current_activity": 52.30397240304778,
+    "pressure_observable": [-0.002376488485759296, 0.0008071343913675305, 0.00225325852972322, 0.007139179324598869, 0.011397262848499493, 0.006683291252102296, 0.0009259805383555759, 0.00064337355603619]
+  },
+  "x_over_L": [-13.4375, -10.3125, -7.1875, -4.0625, -0.9375, 2.1875, 5.3125, 8.4375],
+  "raw_assets": {
+    "location": "external workspace; release asset pending",
+    "files": 97,
+    "logical_bytes": 1636815,
+    "tree_sha256": "d622c99879fa065260a387d6b812a46c77f92570aa510fe39403ee35eba4d51a",
+    "preflight_sha256": "f40ec10955e43bc04165e8b11d607cd77d2886562530b2b1136401366c347a77",
+    "record_sha256": "06576fa1c0d90c2dec9061a3b7da6dbfde372b5b7cff4c719e6f5d258d0d7599",
+    "report_sha256": "ddfe11daaa5e95177ed183bc7d83a6d2e418c9e2a4eac937736f5e97fdc2d0db"
+  },
+  "artifact_sha256": {
+    "lmx_source": "d7a8f86d6ac89eb1bc53ae2f4541ef193e533caae89d3bdd8b101fccb03acd96",
+    "freemhd_source": "18c33bda110e92ad9d0e1872b776af373a18ba75075baffb88a9838432fcb333",
+    "lmx_input": "b5cc1d5457d554bf5a32f7db09637799f901e8fee03e83bb51c75a32dbfaaa3e",
+    "freemhd_input": "a25e437a765c06f3b5c72015d8cd76c49cc5a20280d35ff703d9d24c3ba7930e",
+    "evaluator": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
+    "lmx_output": "96cbb2edcb4c99bae03c58c53a373d36338286eb3a56ba342743137aaf20cc7c",
+    "freemhd_output": "c130dbf8cbb9a89ba3c20c9be765f94c8b46edad7539ea5be7872178118d23dd"
+  }
+}

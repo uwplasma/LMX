@@ -10,7 +10,7 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 788 pass, 8 skip, 95.04% combined line/branch coverage, 208.2 s | below the five-minute target |
+| portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.02% combined line/branch coverage, 165.7 s | below the five-minute target |
 | SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | timing refresh remains open |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
