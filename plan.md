@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-14, through LMX commit `f033a4b`. This is the single active
+Status: 2026-07-15, through LMX commit `475789e`. This is the single active
 plan. It records accepted baselines, active gates, and stop/go criteria—not
 campaign history. Completed campaign details belong in checksummed result
 records and the validation or performance documentation.
@@ -88,16 +88,16 @@ large reusable artifacts go in checksummed releases.
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 
-Current structure at `f033a4b`:
+Current structure at `475789e`:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,838 | at most 34,850 while adding the FreeMHD observer; below 34,800 after smoke cleanup | 35,000 |
-| maintained-core lines | 8,002 | below 8,000 after smoke cleanup | 8,100 |
+| package lines | 34,840 | at most 34,850 while adding the FreeMHD observer; below 34,800 after smoke cleanup | 35,000 |
+| maintained-core lines | 8,004 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,023 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,378,869 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,366,616 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -119,9 +119,10 @@ Completed foundation:
 - Artifact verification rejects escapes, aliases, links, overlaps, missing or
   empty inputs, special files, type mismatches, and changed content.
 - At `a4c83ab`, the source materializer verifies FreeMHD commit
-  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5`, scoped cleanliness, and exact
-  hashes for five pinned source files. The generated six-file source tree hash
-  is `bcec06b62514a60f8f18bc691e616d7555e591da44cad889858319585039eaff`.
+  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and scoped cleanliness. At
+  `475789e`, the frozen evidence includes exact hashes for five source files,
+  including the electric equation. Its generated six-file tree hash is
+  `bcec06b62514a60f8f18bc691e616d7555e591da44cad889858319585039eaff`.
 - At `f033a4b`, the LMX materializer writes a deterministic strict JSON input;
   the loader reconstructs a real `CaseSpec`/`FringingProfile`; and the observer
   derives the contract without reading the expected contract.
@@ -274,11 +275,11 @@ self-promote unrelated features.
 ## SOLVAX ownership
 
 Keep `solvax>=0.8.3,<1`. PyPI and the latest GitHub tag are 0.8.3, and CI tests
-both that minimum and the newest compatible release. The unpublished 0.8.4
-candidate is the dedicated `release/0.8.4` worktree at `4808695`; the ordinary
-local `SOLVAX/main` checkout is dirty and divergent and is not release evidence.
-Reconcile the SOLVAX branches and publish through its separate release process
-before LMX consumes a 0.8.4-only API. No tag or publication is authorized here.
+both that minimum and the newest compatible release. SOLVAX `origin/main` is
+prepared for 0.8.4 at `255d280`, while the untagged `release/0.8.4` worktree at
+`4808695` contains the Anderson-weight API. Reconcile and publish those changes
+through SOLVAX's separate release process before LMX consumes a 0.8.4-only API.
+No tag or publication is authorized here.
 
 LMX owns MHD equations, finite-volume stencils and limiters, geometry,
 materials, interfaces, open-boundary and gauge semantics, corrected flux,

@@ -134,6 +134,13 @@ def _write_demo_template(root: Path) -> None:
     (root / "system" / "blockMeshDict").write_text("Ly 0.1;\nLy_wall 0.101;\nHa 20;\nN_wall 2;\n")
 
 
+def _write_b2_skeleton(root: Path) -> None:
+    for relative in run_freemhd_parity_suite._B2_SKELETON_FILES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"skeleton {relative}\n")
+
+
 def _materialize_matched_case(root: Path, case_kind: str) -> Path:
     _write_demo_template(root / "template")
     run_freemhd_parity_suite.materialize_matched_freemhd_case(
@@ -401,6 +408,33 @@ def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path)
     assert contract["stopping_rules"]["expected_stop_reason"] == "step_limit"
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
+
+
+def test_matched_b2_freemhd_input_is_deterministic_slim_and_solver_free(tmp_path: Path):
+    template, first, second = tmp_path / "hunt_demo", tmp_path / "first", tmp_path / "second"
+    _write_b2_skeleton(template)
+    (template / "0/cellToRegion").write_text("generated junk must not be copied\n")
+    (template / "0/insulator").mkdir()
+    manifest = run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, first)
+
+    assert manifest == run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, second)
+    assert artifact_sha256(first, "tree") == artifact_sha256(second, "tree")
+    assert manifest["excluded_generated_data"] is True
+    assert len([path for path in first.rglob("*") if path.is_file()]) == 32
+    assert sum(path.stat().st_size for path in first.rglob("*") if path.is_file()) < 30_000
+    assert not any("insulator" in path.parts or path.name == "cellToRegion" for path in first.rglob("*"))
+    assert "hex (0 1 2 3 4 5 6 7) liquid ($Nx $Ny $Nz)" in (first / "system/blockMeshDict").read_text()
+    assert "x0=-15" in (first / "system/liquid/setExprFieldsDict").read_text()
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, first)
+
+
+def test_matched_b2_freemhd_input_requires_complete_skeleton(tmp_path: Path):
+    template = tmp_path / "hunt_demo"
+    _write_b2_skeleton(template)
+    (template / "system/blockMeshDict").unlink()
+    with pytest.raises(ValueError, match="skeleton is incomplete"):
+        run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, tmp_path / "case")
 
 
 @pytest.mark.parametrize(

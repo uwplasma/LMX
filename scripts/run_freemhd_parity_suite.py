@@ -180,6 +180,262 @@ def materialize_matched_b2_lmx_input(
     return payload
 
 
+_B2_SKELETON_FILES = (
+    "0/B0", "0/JxB", "0/T", "0/U", "0/alpha.liquidMetal", "0/p", "0/p_rgh", "0/potE",
+    "constant/g", "constant/regionProperties", "constant/liquid/thermophysicalProperties.liquidMetal",
+    "constant/solidWalls/thermophysicalProperties", "system/blockMeshDict", "system/controlDict",
+    "system/liquid/changeDictionaryDict", "system/liquid/fvSchemes", "system/liquid/fvSolution",
+    "system/solidWalls/changeDictionaryDict", "system/solidWalls/fvSchemes", "system/solidWalls/fvSolution",
+)
+
+
+def _foam_text(object_name: str, body: str, *, class_name: str = "dictionary", location: str = "") -> str:
+    location_entry = f'    location    "{location}";\n' if location else ""
+    return (
+        "FoamFile\n{\n    version 2.0;\n    format ascii;\n"
+        f"    class {class_name};\n{location_entry}    object {object_name};\n}}\n\n{body.strip()}\n"
+    )
+
+
+def _write_foam(path: Path, body: str, *, class_name: str = "dictionary") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        _foam_text(path.name, body, class_name=class_name),
+        encoding="utf-8",
+    )
+
+
+def _b2_field_expression(anchor_count: int) -> str:
+    expression = f"b{anchor_count - 1}"
+    for index in range(anchor_count - 2, -1, -1):
+        slope = f"(b{index + 1}-b{index})/(x{index + 1}-x{index})"
+        segment = f"b{index}+(x-x{index})*{slope}"
+        expression = f"x<=x{index} ? b{index} : (x<=x{index + 1} ? ({segment}) : ({expression}))"
+    return expression
+
+
+def _b2_block_mesh() -> str:
+    return """
+scale 1;
+xMin -15; xMax 10; Ly 1; Ly_wall 1.02;
+Nx 8; Ny 5; Nz 5; N_wall 1;
+vertices
+(
+ ($xMin -$Ly -$Ly) ($xMax -$Ly -$Ly) ($xMax $Ly -$Ly) ($xMin $Ly -$Ly)
+ ($xMin -$Ly $Ly) ($xMax -$Ly $Ly) ($xMax $Ly $Ly) ($xMin $Ly $Ly)
+ ($xMin -$Ly -$Ly_wall) ($xMax -$Ly -$Ly_wall) ($xMax $Ly -$Ly_wall) ($xMin $Ly -$Ly_wall)
+ ($xMin -$Ly_wall -$Ly_wall) ($xMax -$Ly_wall -$Ly_wall) ($xMax $Ly_wall -$Ly_wall) ($xMin $Ly_wall -$Ly_wall)
+ ($xMin -$Ly_wall -$Ly) ($xMax -$Ly_wall -$Ly) ($xMax $Ly_wall -$Ly) ($xMin $Ly_wall -$Ly)
+ ($xMin -$Ly $Ly_wall) ($xMax -$Ly $Ly_wall) ($xMax $Ly $Ly_wall) ($xMin $Ly $Ly_wall)
+ ($xMin -$Ly_wall $Ly_wall) ($xMax -$Ly_wall $Ly_wall) ($xMax $Ly_wall $Ly_wall) ($xMin $Ly_wall $Ly_wall)
+ ($xMin -$Ly_wall $Ly) ($xMax -$Ly_wall $Ly) ($xMax $Ly_wall $Ly) ($xMin $Ly_wall $Ly)
+);
+blocks
+(
+ hex (0 1 2 3 4 5 6 7) liquid ($Nx $Ny $Nz) simpleGrading (1 1 1)
+ hex (12 13 9 8 16 17 1 0) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (11 10 14 15 3 2 18 19) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (8 9 10 11 0 1 2 3) solidWalls ($Nx $Ny $N_wall) simpleGrading (1 1 1)
+ hex (28 29 5 4 24 25 21 20) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (7 6 30 31 23 22 26 27) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (4 5 6 7 20 21 22 23) solidWalls ($Nx $Ny $N_wall) simpleGrading (1 1 1)
+ hex (16 17 1 0 28 29 5 4) solidWalls ($Nx $N_wall $Nz) simpleGrading (1 1 1)
+ hex (3 2 18 19 7 6 30 31) solidWalls ($Nx $N_wall $Nz) simpleGrading (1 1 1)
+);
+edges ();
+boundary
+(
+ inlet { type patch; faces ((0 4 7 3)); }
+ sink { type patch; faces ((2 6 5 1)); }
+ outerWalls
+ {
+  type wall;
+  faces
+  (
+   (12 16 0 8) (8 0 3 11) (11 3 19 15) (3 7 31 19)
+   (7 23 27 31) (4 20 23 7) (28 24 20 4) (16 28 4 0)
+   (13 17 16 12) (17 29 28 16) (29 25 24 28) (25 21 20 24)
+   (21 22 23 20) (22 26 27 23) (30 26 27 31) (18 30 31 19)
+   (14 18 19 15) (10 14 15 11) (9 10 11 8) (13 9 8 12)
+   (13 17 1 9) (9 1 2 10) (10 2 18 14) (17 29 5 1)
+   (2 6 30 18) (29 25 21 5) (5 21 22 6) (6 22 26 30)
+  );
+ }
+);
+mergePatchPairs ();
+"""
+
+
+def _b2_set_expr(reference: dict[str, object]) -> str:
+    x_values = [float(value) for value in reference["x_over_L"]]
+    b_values = [float(value) for value in reference["b_over_B0"]]
+    variables = ["\"x=pos().x()\"", "\"Bscale=sqrt(540)\""]
+    variables += [f'"x{i}={value:.17g}"' for i, value in enumerate(x_values)]
+    variables += [f'"b{i}={value:.17g}"' for i, value in enumerate(b_values)]
+    anchors = {"x_over_L": x_values, "b_over_B0": b_values}
+    anchors_sha = hashlib.sha256(
+        json.dumps(anchors, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return f"""
+lmxFieldSource \"alex-b2-square.csv\";
+lmxFieldSourceSHA256 \"6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483\";
+lmxFieldAnchorsSHA256 \"{anchors_sha}\";
+lmxInterpolation linear;
+lmxExtrapolation forbidden;
+expressions
+(
+ B0
+ {{
+  field B0;
+  dimensions [1 0 -2 0 0 -1 0];
+  variables ({' '.join(variables)});
+  expression #{{ vector(0,Bscale*({_b2_field_expression(len(x_values))}),0) #}};
+ }}
+);
+"""
+
+
+def materialize_matched_b2_freemhd_input(
+    template_dir: str | Path,
+    output_dir: str | Path,
+    *,
+    spec_root: str | Path | None = None,
+) -> dict[str, object]:
+    """Write a compact, deterministic two-step FreeMHD B2 input without generated data."""
+
+    source, destination = Path(template_dir).resolve(), Path(output_dir).resolve()
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FreeMHD B2 input {destination}")
+    missing = [relative for relative in _B2_SKELETON_FILES if not (source / relative).is_file()]
+    if missing:
+        raise ValueError(f"FreeMHD hunt_demo skeleton is incomplete: {missing}")
+    skeleton_hashes = {
+        relative: artifact_sha256(source / relative, "file") for relative in _B2_SKELETON_FILES
+    }
+    destination.mkdir(parents=True)
+
+    field_specs = {
+        "B0": ("volVectorField", "[1 0 -2 0 0 -1 0]", "uniform (0 23.2379000772445 0)"),
+        "JxB": ("volVectorField", "[1 -2 -2 0 0 0 0]", "uniform (0 0 0)"),
+        "T": ("volScalarField", "[0 0 0 1 0 0 0]", "uniform 300"),
+        "U": ("volVectorField", "[0 1 -1 0 0 0 0]", "uniform (1 0 0)"),
+        "alpha.liquidMetal": ("volScalarField", "[0 0 0 0 0 0 0]", "uniform 1"),
+        "p": ("volScalarField", "[1 -1 -2 0 0 0 0]", "uniform 0"),
+        "p_rgh": ("volScalarField", "[1 -1 -2 0 0 0 0]", "uniform 0"),
+        "potE": ("volScalarField", "[1 2 -3 0 0 -1 0]", "uniform 0"),
+    }
+    for name, (class_name, dimensions, internal) in field_specs.items():
+        _write_foam(
+            destination / "0" / name,
+            f'dimensions {dimensions};\ninternalField {internal};\nboundaryField {{ ".*" {{ type calculated; value $internalField; }} }}',
+            class_name=class_name,
+        )
+
+    mu = 540.0 / 2900.0**2
+    _write_foam(destination / "constant/g", "dimensions [0 1 -2 0 0 0 0];\nvalue (0 0 0);", class_name="uniformDimensionedVectorField")
+    _write_foam(destination / "constant/regionProperties", "regions ( fluid (liquid) solid (solidWalls) );")
+    _write_foam(destination / "constant/liquid/fvOptions", "{}")
+    _write_foam(destination / "constant/liquid/turbulenceProperties", "simulationType laminar;")
+    _write_foam(destination / "constant/liquid/thermophysicalProperties", "phases (liquidMetal air);\npMin 0;\nsigma [1 0 -2 0 0 0 0] 0;")
+    fluid_body = f"""
+thermoType {{ type heRhoThermo; mixture pureMixture; transport const; thermo hConst; equationOfState rhoConst; specie specie; energy sensibleInternalEnergy; }}
+mixture {{ specie {{ molWeight 1; }} equationOfState {{ rho 1; }} thermodynamics {{ Cp 1; Cv 1; Hf 0; }} transport {{ mu {mu:.17g}; Pr 1; }} }}
+elcond [-1 -3 3 0 0 2 0] 1;
+"""
+    _write_foam(destination / "constant/liquid/thermophysicalProperties.liquidMetal", fluid_body)
+    _write_foam(destination / "constant/liquid/thermophysicalProperties.air", fluid_body.replace("elcond [-1 -3 3 0 0 2 0] 1;", "elcond [-1 -3 3 0 0 2 0] 0;"))
+    solid_body = """
+thermoType { type heSolidThermo; mixture pureMixture; transport constIso; thermo hConst; equationOfState rhoConst; specie specie; energy sensibleEnthalpy; }
+mixture { specie { molWeight 1; } transport { kappa 1; } thermodynamics { Hf 0; Cp 1; } equationOfState { rho 1; } }
+elcond 3.5;
+"""
+    _write_foam(destination / "constant/solidWalls/thermophysicalProperties", solid_body)
+
+    dt = 1.0 / 540000.0
+    control = f"""
+application epotMultiRegionInterFoam; startFrom startTime; startTime 0; stopAt endTime;
+endTime {2 * dt:.17g}; deltaT {dt:.17g}; adjustTimeStep off; maxDeltaT {dt:.17g};
+writeControl timeStep; writeInterval 2; purgeWrite 0; writeFormat ascii; writePrecision 16;
+runTimeModifiable false; BtStartTime 0; BtDuration 0; JConservativeForm true;
+lmxSteadyStepsRequired 3; functions {{}}
+"""
+    _write_foam(destination / "system/controlDict", control)
+    _write_foam(destination / "system/blockMeshDict", _b2_block_mesh())
+    _write_foam(destination / "system/fvSchemes", "ddtSchemes {} gradSchemes {} divSchemes {} laplacianSchemes {} interpolationSchemes {} snGradSchemes {}")
+    _write_foam(destination / "system/fvSolution", "PIMPLE { nOuterCorrectors 1; }")
+    for region in ("", "liquid", "solidWalls"):
+        _write_foam(destination / "system" / region / "decomposeParDict", "numberOfSubdomains 2;\nmethod scotch;")
+
+    liquid_schemes = """
+ddtSchemes { default Euler; }
+gradSchemes { default cellLimited leastSquares 1.0; }
+divSchemes { default Gauss linear; div(rhoPhi,U) Gauss limitedLinear 1.0; div(phi,alpha) Gauss vanLeer; div(phirb,alpha) Gauss interfaceCompression; div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear; }
+laplacianSchemes { default Gauss linear uncorrected; }
+interpolationSchemes { default linear; }
+snGradSchemes { default uncorrected; }
+"""
+    _write_foam(destination / "system/liquid/fvSchemes", liquid_schemes)
+    liquid_solution = """
+solvers {
+ "alpha.liquidMetal.*" { nAlphaCorr 1; nAlphaSubCycles 1; cAlpha 1; solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; }
+ p_rgh { solver PCG; preconditioner DIC; tolerance 1e-12; relTol 0; maxIter 4000; }
+ p_rghFinal { $p_rgh; }
+ "(U).*" { solver PBiCG; preconditioner DILU; tolerance 1e-10; relTol 0; maxIter 400; }
+ "(h|T).*" { solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; maxIter 0; }
+ potE { solver PCG; preconditioner DIC; tolerance 1e-12; relTol 0; maxIter 600; }
+ potEFinal { $potE; }
+}
+PIMPLE { correctPhi yes; momentumPredictor yes; nCorrectors 1; nOuterCorrectors 1; nNonOrthogonalCorrectors 0; }
+potentialFlow { nNonOrthogonalCorrectors 0; PhiRefCell 0; PhiRefValue 0; }
+potE { nCorrectors 0; nNonOrthogonalCorrectors 0; PotERefCell 0; PotERefValue 0; }
+"""
+    _write_foam(destination / "system/liquid/fvSolution", liquid_solution)
+    solid_schemes = """
+ddtSchemes { default Euler; } gradSchemes { default Gauss linear; } divSchemes { default Gauss linear; }
+laplacianSchemes { default Gauss linear corrected; } interpolationSchemes { default linear; } snGradSchemes { default corrected; }
+"""
+    _write_foam(destination / "system/solidWalls/fvSchemes", solid_schemes)
+    solid_solution = """
+solvers { "(h|T).*" { solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; maxIter 0; } potE { solver PCG; preconditioner DIC; tolerance 1e-12; relTol 0; maxIter 600; } potEFinal { $potE; } }
+PIMPLE { nNonOrthogonalCorrectors 0; } potE { nCorrectors 0; nNonOrthogonalCorrectors 0; PotERefCell 0; PotERefValue 0; }
+"""
+    _write_foam(destination / "system/solidWalls/fvSolution", solid_solution)
+
+    liquid_change = """
+alpha.liquidMetal { internalField uniform 1; boundaryField { inlet { type fixedValue; value uniform 1; } ".*" { type zeroGradient; } } }
+U { internalField uniform (1 0 0); boundaryField { inlet { type flowRateInletVelocity; volumetricFlowRate 4; extrapolateProfile yes; value uniform (1 0 0); } sink { type zeroGradient; value uniform (1 0 0); } ".*" { type noSlip; } } }
+T { internalField uniform 300; boundaryField { inlet { type fixedValue; value uniform 300; } sink { type fixedValue; value uniform 300; } "liquid_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr T; kappaMethod fluidThermo; value uniform 300; } ".*" { type fixedValue; value uniform 300; } } }
+p_rgh { internalField uniform 0; boundaryField { sink { type fixedValue; value uniform 0; } inlet { type zeroGradient; } ".*" { type fixedFluxPressure; value uniform 0; } } }
+p { internalField uniform 0; boundaryField { ".*" { type calculated; value uniform 0; } } }
+B0 { internalField uniform (0 23.2379000772445 0); boundaryField { ".*" { type zeroGradient; value $internalField; } } }
+potE { internalField uniform 0; boundaryField { inlet { type zeroGradient; } sink { type zeroGradient; } "liquid_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr potE; kappaMethod lookup; kappa elcond; kappaName elcond; value uniform 0; } } }
+"""
+    _write_foam(destination / "system/liquid/changeDictionaryDict", liquid_change)
+    solid_change = """
+T { internalField uniform 300; boundaryField { outerWalls { type fixedValue; value uniform 300; } "solidWalls_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr T; kappaMethod solidThermo; value uniform 300; } } }
+B0 { internalField uniform (0 23.2379000772445 0); boundaryField { ".*" { type zeroGradient; value $internalField; } } }
+potE { internalField uniform 0; boundaryField { outerWalls { type zeroGradient; value uniform 0; } "solidWalls_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr potE; kappaMethod lookup; kappa elcond; kappaName elcond; value uniform 0; } } }
+"""
+    _write_foam(destination / "system/solidWalls/changeDictionaryDict", solid_change)
+    field_dict = _b2_set_expr(load_benchmark_b_reference("B2-fringing-square", spec_root))
+    for region in ("liquid", "solidWalls"):
+        _write_foam(destination / "system" / region / "setExprFieldsDict", field_dict)
+
+    manifest: dict[str, object] = {
+        "schema_version": 1,
+        "kind": "freemhd-matched-b2-input",
+        "case_id": "B2-fringing-square",
+        "source_template": source.name,
+        "source_skeleton_sha256": dict(sorted(skeleton_hashes.items())),
+        "excluded_generated_data": True,
+        "case_tree_sha256_before_manifest": artifact_sha256(destination, "tree"),
+    }
+    (destination / "lmx-benchmark-manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:
     updated, count = re.subn(pattern, replacement, path.read_text(encoding="utf-8"))
     if required and count == 0:
