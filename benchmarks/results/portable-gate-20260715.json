@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "date": "2026-07-15",
-  "commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
+  "commit": "9b04d98697bb63afe75b8b21ada8663a1074751a",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -19,12 +19,12 @@
     "minimum_combined_coverage_percent": 95.0
   },
   "result": {
-    "test_files": 31,
-    "test_lines": 21282,
-    "passed": 823,
+    "test_files": 30,
+    "test_lines": 21028,
+    "passed": 817,
     "skipped": 8,
-    "pytest_seconds": 159.01,
-    "gate_seconds": 161.3,
+    "pytest_seconds": 154.77,
+    "gate_seconds": 157.0,
     "covered_lines": 14200,
     "total_lines": 14650,
     "covered_branches": 2509,
@@ -33,35 +33,35 @@
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "6d0378c24fcf7fe5086147ef398b11c201fc6248e8d9accd1e2e069fb7746b2a",
-    "junit_xml_sha256": "7eeaf7e2c7048af7251d3c122d2ae65e51bdc76f0373872150e6c081325e9bbc"
+    "coverage_xml_sha256": "0752fdf4168c142df23158df59cd84637431850befd59b4b5952bf57da5fd66a",
+    "junit_xml_sha256": "1f5ec9962f82c68fff86d42af9160faab6c3e310f019bf3673b07afb0a9d5d32"
   },
   "duration_note": "Durations come from the six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 58.182, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
-    {"seconds": 42.762, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 26.999, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 20.589, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 20.147, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 19.167, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
-    {"seconds": 18.317, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
-    {"seconds": 17.209, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 16.290, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 15.867, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"}
+    {"seconds": 56.718, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 42.957, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 26.594, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 21.660, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 18.640, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 17.248, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 16.196, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 15.915, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
+    {"seconds": 15.890, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 15.466, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"}
   ],
   "comparison": {
-    "previous_gate_seconds": 154.0,
-    "wall_time_change_percent": 4.74,
-    "budget_fraction": 0.269,
-    "engineering_target_fraction": 0.538,
-    "interpretation": "Diagonal momentum preconditioning keeps the complete gate below three minutes and above 95%; the weighted-modal node remains the six-worker critical path."
+    "previous_gate_seconds": 161.3,
+    "wall_time_change_percent": -2.67,
+    "budget_fraction": 0.262,
+    "engineering_target_fraction": 0.523,
+    "interpretation": "Ownership deletion lowers the complete gate while preserving 95% combined coverage; the weighted-modal node remains the six-worker critical path."
   },
   "architecture": {
     "package_modules": 35,
     "package_lines": 34864,
     "maintained_core_lines": 8034,
-    "maintenance_scripts": 18,
-    "tracked_checkout_bytes": 3490920,
+    "maintenance_scripts": 16,
+    "tracked_checkout_bytes": 3477996,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

@@ -1,8 +1,8 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The optimized source, current CPU calibration, and latest
-complete portable-gate artifact are keyed to `413185a`; the GPU workers use its
-matching source fingerprint.
+Status: 2026-07-15. The optimized B2 source and current CPU calibration are
+keyed to `413185a`; the latest complete portable gate is keyed to `9b04d98`.
+The GPU workers use the optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
@@ -108,13 +108,13 @@ replacing the single-owner Benchmark-B freeze generator with direct hash gates
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 21,028 | no new file; below 21,000 after fixture consolidation | 31 / 21,100 |
 | maintenance scripts | 16 | no new script without retiring an owner | 16 |
-| tracked checkout | 3,476,260 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,477,996 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `413185a` records 823 passes, 8 expected
-external-data skips, 95.0023% combined line/branch coverage, and 161.3 seconds on
+The portable-gate artifact keyed to `9b04d98` records 817 passes, 8 expected
+external-data skips, 95.0023% combined line/branch coverage, and 157.0 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
 95.5% engineering target. The six-worker record reports 58.2 seconds for the
