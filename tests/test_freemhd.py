@@ -636,7 +636,8 @@ def test_lmx_b2_output_observer_replays_restart_evidence(tmp_path: Path):
 
     assert observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
     assert all(observed[name] == 0.0 for name in (
-        "restart_max_abs", "restart_state_max_abs", "restart_derived_max_abs",
+        "restart_max_abs", "restart_state_max_abs", "restart_flux_max_abs",
+        "restart_flux_relative_l2", "restart_derived_max_abs",
         "restart_history_max_abs", "mass_balance"))
     assert observed["current_balance"] == observed["interface_current_balance"] == pytest.approx(1.0e-5)
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)

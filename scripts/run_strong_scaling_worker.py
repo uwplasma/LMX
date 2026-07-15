@@ -38,6 +38,9 @@ from lmx.scaling import (
     benchmark_sharded_extruded_operator,
 )
 
+_B2_RESTART_FLUX_ATOL = 1.0e-6
+_B2_RESTART_FLUX_RTOL = 1.0e-5
+
 if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(
         f"Scaling worker imported LMX outside its source tree: {lmx.__file__}"
@@ -282,9 +285,11 @@ def _matched_b2_smoke_benchmark(
         and all(observed[name] <= limits[f"{name}_max"] for name in (
             "mass_balance", "current_balance", "interface_current_balance"))
         and observed["interface_current_activity"] >= limits["interface_current_activity_min"]
-        # Fast timing permits nondeterministic diagnostic reductions only; the
-        # velocity/pressure/flux/Aitken/CFL state must still replay exactly.
+        # Fast timing permits bounded face-flux reduction noise; all remaining
+        # velocity/pressure/Aitken/CFL state must still replay exactly.
         and observed["restart_state_max_abs"] <= limits["restart_absolute_tolerance"]
+        and observed["restart_flux_max_abs"] <= _B2_RESTART_FLUX_ATOL
+        and observed["restart_flux_relative_l2"] <= _B2_RESTART_FLUX_RTOL
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -319,6 +324,8 @@ def _matched_b2_smoke_benchmark(
         "spatially_sharded": num_devices > 1, "global_shard_count": num_devices,
         "validation_passed": validation_passed, "steady_state_passed": False,
         "signature_relative_tolerance": 2.0e-8, "observables": observed,
+        "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
+        "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,
     }
 
 

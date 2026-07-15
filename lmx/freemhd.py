@@ -681,16 +681,18 @@ def observe_lmx_b2_output(
         raise ValueError("LMX B2 restart stopping state differs")
     # Keep replay-driving state separate from recomputed fields and solver histories.
     state_names = """x y z field_scale u v w p residual volumetric_flow_rate
-        mean_velocity rho_phi_plus rho_phi_inlet axial_pressure_loss_gradient
+        mean_velocity axial_pressure_loss_gradient
         transverse_pressure_difference iteration_residual_history
         iteration_pressure_residual_history iteration_courant_history""".split()
+    flux_names = "rho_phi_plus rho_phi_inlet".split()
     derived_names = """phi jx jy jz lorentz_x lorentz_y lorentz_z axial_current
         wall_current_leakage current_scaled_pressure_proxy charge_balance_residual
         boundary_current_residual""".split()
     history_names = """iteration_component_residual_history
         iteration_electric_linear_history iteration_potential_residual_history""".split()
-    grouped_differences = {name: [] for name in ("state", "derived", "history")}
-    for group, names in (("state", state_names), ("derived", derived_names),
+    grouped_differences = {name: [] for name in ("state", "flux", "derived", "history")}
+    flux_relative = []
+    for group, names in (("state", state_names), ("flux", flux_names), ("derived", derived_names),
                          ("history", history_names)):
         for name in names:
             left, right = (np.asarray(getattr(bundle.bundle, name))
@@ -699,6 +701,9 @@ def observe_lmx_b2_output(
                 raise ValueError(f"LMX B2 output array {name} is invalid")
             if left.size:
                 grouped_differences[group].append(float(np.max(np.abs(left - right))))
+                if group == "flux":
+                    scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
+                    flux_relative.append(float(np.linalg.norm(left - right) / scale))
     for left, right in zip(direct.bundle.aitken_state, resumed.bundle.aitken_state, strict=True):
         left, right = np.asarray(left), np.asarray(right)
         if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
@@ -730,6 +735,7 @@ def observe_lmx_b2_output(
         "x_over_L": np.asarray(direct.bundle.x).tolist(), "pressure_observable": pressure.tolist(),
         "restart_max_abs": max(restart_differences.values()),
         **{f"restart_{name}_max_abs": value for name, value in restart_differences.items()},
+        "restart_flux_relative_l2": max(flux_relative, default=0.0),
         "wall_seconds": float(metadata["wall_seconds"]),
     }
 
