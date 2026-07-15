@@ -110,7 +110,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 20,966 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 14 | no new script without retiring an owner | 14 |
-| tracked checkout | 3,496,245 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,497,343 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -160,13 +160,14 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it nevertheless reports 58.2 seconds, versus 42.8 seconds for reduced B2
-and 25.1 seconds for reduced B1. Isolated measurement attributed roughly half
-of that modal duration to worker contention. Reducing only its manufactured
-radial grid, while preserving every physical and independent-factor assertion,
-lowered the isolated weighted path from 33.7 to 23.5--26.1 seconds and the base
-path to 7.5--8.9 seconds. Next profile reduced B2, then the autodiff nodes; refresh the
-full-gate wall time only after the next coherent test tranche.
+gate it reports 60.7 seconds, versus 46.7 seconds for reduced B2 and 29.6
+seconds for reduced B1. Isolated measurement attributes most of that tail to
+worker contention: reducing only the manufactured modal grid lowered its
+weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
+physics node now measures 15.1 seconds alone. Preserve those coverage-rich
+tests. Profile an autodiff node only if an isolated measurement crosses the
+45-second trigger; otherwise assess worker count/scheduling at the next
+coherent full-gate refresh rather than shrinking physics grids blindly.
 
 Keep the top ten concurrent node durations in the portable-gate record and
 treat any node above 45 seconds as a critical-path review trigger. The suite
@@ -260,6 +261,20 @@ two-GPU tiny rung is correctly collective-dominated. Next obtain compiler-level
 collective counts on an isolated representative rung; do not start another
 preconditioner probe until that trace identifies a reducible communication or
 iteration cost.
+Use one untraced warm solve plus one trace of the accepted `128 x 67 x 67`,
+two-update, two-GPU rung. Accept the trace only when both history rows converge,
+warm and traced histories match, exactly two projection intervals and both GPU
+tracks are present, per-GPU category counts agree within one event or 1%, and
+phase wall time remains within 25% of the accepted 0.84--0.95 seconds/update.
+Count GPU kernels only, attributing interval overlaps rather than duplicated
+host annotations. If no collective or line-solve category reaches 15% of
+normalized device time, stop. Otherwise test only the smallest implicated
+candidate: remove the replicated axial-mean correction while retaining both
+transverse lines for axial gather/solve cost; design a SOLVAX factor/apply API
+for fixed tridiagonals if line solves dominate; or leave all-reduce/halo work to
+a separately gated Krylov algorithm if communication dominates. Require at
+least a 15% projection-phase win with no more than 15% iteration growth before
+escalating beyond the bounded probe.
 Re-measure accepted rungs in an isolated GPU window before any publishable
 scaling claim.
 
