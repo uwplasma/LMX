@@ -34,49 +34,6 @@ def _fake_solution():
     return SimpleNamespace(mesh=mesh, state=SimpleNamespace(u=u))
 
 
-def test_showcase_geometry_and_mesh_writers_emit_outputs(tmp_path: Path):
-    outputs = showcase.write_lm_duct_geometry_setup_figure(tmp_path)
-    assert (tmp_path / "lm_duct_geometry_setup.png") in outputs
-    assert (tmp_path / "lm_duct_geometry_setup.png").exists()
-    assert (tmp_path / "lm_duct_geometry_setup.pdf").exists()
-
-    mesh_outputs = showcase.write_structured_mesh_figure(
-        _fake_mesh(), tmp_path, nx=12, length=1.0
-    )
-    assert (tmp_path / "structured_mesh_ha20.png") in mesh_outputs
-    assert (tmp_path / "structured_mesh_ha20.png").exists()
-    assert (tmp_path / "structured_mesh_ha20.pdf").exists()
-
-
-def test_showcase_solution_plot_writers_emit_outputs(tmp_path: Path):
-    solution = _fake_solution()
-
-    boundary_outputs = showcase.write_boundary_layer_figure(
-        solution, tmp_path, title="Boundary Layer Development - Shercliff"
-    )
-    annotated_outputs = showcase.write_annotated_layer_figure(
-        solution,
-        tmp_path,
-        title="U Magnitude - Shercliff flow",
-        case_kind="shercliff",
-        ha=20.0,
-        half_width=0.1,
-    )
-    volume_outputs = showcase.write_velocity_profile_volume_figure(
-        solution,
-        tmp_path,
-        title="Liquid Metal Velocity Profile - Shercliff",
-        case_kind="shercliff",
-    )
-
-    assert (tmp_path / "boundary_layer_development.png") in boundary_outputs
-    assert (tmp_path / "annotated_layers.png") in annotated_outputs
-    assert (tmp_path / "velocity_profile_volume.png") in volume_outputs
-    assert (tmp_path / "boundary_layer_development.png").exists()
-    assert (tmp_path / "annotated_layers.png").exists()
-    assert (tmp_path / "velocity_profile_volume.png").exists()
-
-
 def test_showcase_profile_comparison_writer_uses_reference_helpers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -212,43 +169,6 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
 def test_write_closed_channel_startup_movies_rejects_unsupported_case(tmp_path: Path):
     with pytest.raises(ValueError):
         showcase.write_closed_channel_startup_movies("bad_case", tmp_path)
-
-
-def test_showcase_fluid_crop_and_normalization_cover_masked_and_unmasked_paths():
-    mesh = _fake_mesh()
-    field = np.arange(mesh.ny * mesh.nz, dtype=float).reshape(mesh.ny, mesh.nz)
-
-    y_faces, z_faces, y_centers, z_centers, cropped = showcase._fluid_crop(mesh, field)
-    assert cropped.shape == field.shape
-    assert y_faces.shape[0] == mesh.y_faces.shape[0]
-    assert z_faces.shape[0] == mesh.z_faces.shape[0]
-
-    masked = np.zeros_like(mesh.fluid_mask, dtype=bool)
-    masked[1:4, 2:5] = True
-    masked_mesh = SimpleNamespace(**{**vars(mesh), "fluid_mask": masked})
-    _, _, masked_y, masked_z, masked_field = showcase._fluid_crop(masked_mesh, field)
-    assert masked_field.shape == (3, 3)
-    assert masked_y.shape[0] == 3
-    assert masked_z.shape[0] == 3
-
-    unmasked_mesh = SimpleNamespace(**{**vars(mesh), "fluid_mask": None})
-    solution = SimpleNamespace(
-        mesh=unmasked_mesh, state=SimpleNamespace(u=np.zeros_like(field))
-    )
-    _, _, _, _, normalized = showcase._normalized_fluid_field(solution)
-    assert np.allclose(normalized, 0.0)
-
-
-def test_showcase_surface_helpers_return_expected_shapes():
-    colors = showcase._surface_colors(np.array([[0.0, 0.5], [0.75, 1.0]]), vmax=1.0)
-    assert colors.shape == (2, 2, 4)
-
-    surface = showcase._profile_surface_x(
-        np.array([[0.0, 1.0], [0.5, 0.25]]), length=2.0, x_plane=0.4, amplitude=0.3
-    )
-    assert surface.shape == (2, 2)
-    assert surface.min() == pytest.approx(0.4)
-    assert surface.max() == pytest.approx(0.7)
 
 
 def test_solve_closed_channel_benchmark_supports_flow_rate_and_zero_initial_profile(

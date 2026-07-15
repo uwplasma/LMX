@@ -707,6 +707,162 @@ def observe_lmx_b2_output(
     }
 
 
+def _foam_numeric_rows(path: Path, width: int) -> np.ndarray:
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        values = [float(value) for value in re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", line)]
+        if len(values) != width:
+            raise ValueError(f"FreeMHD B2 table width differs: {path.name}")
+        rows.append(values)
+    result = np.asarray(rows, dtype=float)
+    if result.shape != (2, width) or not np.all(np.isfinite(result)) or np.any(np.diff(result[:, 0]) <= 0.0):
+        raise ValueError(f"FreeMHD B2 table rows differ: {path.name}")
+    return result
+
+
+def observe_freemhd_b2_output(
+    output_dir: str | Path, input_dir: str | Path, evaluator: str | Path
+) -> dict[str, object]:
+    """Recompute the two-update FreeMHD smoke observables from native text output."""
+
+    root, case = Path(output_dir), Path(input_dir)
+    required = {"run.json", "controlDict.used", "run.log", "postProcessing"}
+    if not root.is_dir() or {path.name for path in root.iterdir()} != required:
+        raise ValueError("FreeMHD B2 output tree is incomplete")
+    metadata = json.loads((root / "run.json").read_text(encoding="utf-8"))
+    keys = {
+        "schema_version", "code", "case_id", "input_sha256", "evaluator_sha256",
+        "wall_seconds", "nproc", "image", "float_precision",
+    }
+    control = root / "controlDict.used"
+    if set(metadata) != keys or (metadata.get("schema_version"), metadata.get("code"), metadata.get("case_id")) != (
+        1, "FreeMHD", "B2-fringing-square"
+    ):
+        raise ValueError("FreeMHD B2 output metadata are invalid")
+    if (
+        metadata.get("input_sha256") != artifact_sha256(case, "tree")
+        or metadata.get("evaluator_sha256") != artifact_sha256(evaluator, "file")
+        or control.read_bytes() != (case / "system/controlDict").read_bytes()
+        or int(metadata.get("nproc", 0)) < 1 or not str(metadata.get("image", "")).strip()
+        or metadata.get("float_precision") != "float64"
+        or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
+        or float(metadata["wall_seconds"]) < 0.0
+    ):
+        raise ValueError("FreeMHD B2 output provenance differs")
+
+    control_text = control.read_text(encoding="utf-8")
+    dt_expected = 1.0 / 540000.0
+    control_scalars = {
+        name: _extract_first_scalar(control_text, rf"\b{name}\s+([0-9eE+.\-]+)\s*;")
+        for name in ("startTime", "endTime", "deltaT", "maxDeltaT", "writeInterval")
+    }
+    if (
+        re.search(r"\bapplication\s+epotMultiRegionInterFoam\s*;", control_text) is None
+        or re.search(r"\badjustTimeStep\s+off\s*;", control_text) is None
+        or re.search(r"\bwriteControl\s+timeStep\s*;", control_text) is None
+        or control_scalars != {
+            "startTime": 0.0, "endTime": 2.0 * dt_expected, "deltaT": dt_expected,
+            "maxDeltaT": dt_expected, "writeInterval": 2.0,
+        }
+    ):
+        raise ValueError("FreeMHD B2 effective controls differ")
+
+    log = (root / "run.log").read_text(encoding="utf-8")
+    if any(marker.lower() in log.lower() for marker in (
+        "FOAM FATAL", "Segmentation fault", "Floating point exception", "MPI_ABORT", "killed"
+    )) or re.search(r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log):
+        raise ValueError("FreeMHD B2 log reports a fatal failure")
+    times = np.asarray([float(value) for value in re.findall(r"(?m)^Time = ([0-9eE+.\-]+)\s*$", log)])
+    courant = np.asarray([
+        [float(mean), float(maximum)]
+        for line in log.splitlines() if line.startswith("Region: liquid Courant Number mean:")
+        for mean, maximum in re.findall(r"Courant Number mean:\s*([0-9eE+.\-]+)\s+max:\s*([0-9eE+.\-]+)", line)
+    ])[-2:]
+    if (
+        times.shape != (2,) or not np.all(np.isfinite(times)) or np.any(np.diff(times) <= 0.0)
+        or courant.shape != (2, 2) or not np.all(np.isfinite(courant))
+        or re.search(r"(?m)^End\s*$", log) is None
+    ):
+        raise ValueError("FreeMHD B2 log execution shape differs")
+    dt = np.diff(np.concatenate(([0.0], times)))
+
+    post = root / "postProcessing"
+    objects = {
+        "b2PressureTaps", "massIn", "massOut", "currentIn", "currentOut",
+        "currentIntoSolid", "currentIntoSolidMagnitude",
+    }
+    if not post.is_dir() or {path.name for path in post.iterdir()} != objects:
+        raise ValueError("FreeMHD B2 postprocessing tree differs")
+
+    def table(
+        name: str, filename: str = "surfaceFieldValue.dat", width: int = 2, header: str | None = None
+    ) -> np.ndarray:
+        matches = list((post / name).rglob(filename))
+        if len(matches) != 1 or matches[0].is_symlink() or not matches[0].is_file():
+            raise ValueError(f"FreeMHD B2 output table {name} is unavailable")
+        if header is not None and re.search(rf"(?m)^# Time\s+{re.escape(header)}\s*$", matches[0].read_text()) is None:
+            raise ValueError(f"FreeMHD B2 output table {name} header differs")
+        values = _foam_numeric_rows(matches[0], width)
+        if not np.array_equal(values[:, 0], times):
+            raise ValueError(f"FreeMHD B2 output table {name} times differ")
+        return values[:, 1:]
+
+    probe_files = list((post / "b2PressureTaps").rglob("p"))
+    if len(probe_files) != 1 or probe_files[0].is_symlink() or not probe_files[0].is_file():
+        raise ValueError("FreeMHD B2 pressure probe table is unavailable")
+    probe_path = probe_files[0]
+    probe_text = probe_path.read_text(encoding="utf-8")
+    locations = re.findall(r"(?m)^# Probe (\d+) \(([^)]+)\)$", probe_text)
+    if len(locations) != 16 or [int(index) for index, _ in locations] != list(range(16)):
+        raise ValueError("FreeMHD B2 pressure probe headers differ")
+    if re.search(r"(?m)^# Time\s+" + r"\s+".join(map(str, range(16))) + r"\s*$", probe_text) is None:
+        raise ValueError("FreeMHD B2 pressure probe columns differ")
+    probe_points = np.asarray([[float(value) for value in point.split()] for _, point in locations])
+    if not (
+        np.all(np.diff(probe_points[:8, 0]) > 0.0)
+        and np.array_equal(probe_points[:8, 0], probe_points[8:, 0])
+        and np.allclose(probe_points[:8, 1:], (0.8, 0.0))
+        and np.allclose(probe_points[8:, 1:], (0.0, 0.8))
+    ):
+        raise ValueError("FreeMHD B2 pressure probe geometry differs")
+    probes = table("b2PressureTaps", "p", 17)
+    fields = {
+        "massIn": "sum(rhoPhi)", "massOut": "sum(rhoPhi)",
+        "currentIn": "sum(jn)", "currentOut": "sum(jn)",
+        "currentIntoSolid": "sum(jn)", "currentIntoSolidMagnitude": "sumMag(jn)",
+    }
+    fluxes = {name: table(name, header=header)[:, 0] for name, header in fields.items()}
+    if np.any(fluxes["currentIntoSolidMagnitude"] < 0.0):
+        raise ValueError("FreeMHD B2 interface current magnitude is negative")
+    mesh = (case / "system/blockMeshDict").read_text(encoding="utf-8")
+    x_min, x_max, nx = (_extract_first_scalar(mesh, rf"\b{name}\s+([0-9eE+.\-]+)\s*;") for name in ("xMin", "xMax", "Nx"))
+    if None in (x_min, x_max, nx) or int(nx) != 8:
+        raise ValueError("FreeMHD B2 pressure stations differ")
+    x = np.linspace(float(x_min), float(x_max), int(nx) + 1)
+    x = 0.5 * (x[:-1] + x[1:])
+    pressure = probes[-1, 8:] - probes[-1, :8]
+    pressure = (pressure - np.mean(pressure[(x <= -7.5) | (x >= 5.0)])) / 540.0
+    activity = np.abs(fluxes["currentIntoSolidMagnitude"]) / math.sqrt(540.0)
+    residuals: dict[str, float] = {}
+    for field, value in re.findall(
+        r"Solving for ([^,]+), Initial residual =\s*[0-9eE+.\-]+, Final residual =\s*([0-9eE+.\-]+)", log
+    ):
+        residuals[field] = max(residuals.get(field, 0.0), float(value))
+    return {
+        "steps": 2, "stop_reason": "step_limit", "dt": dt.tolist(),
+        "courant_mean": courant[:, 0].tolist(), "courant_max": courant[:, 1].tolist(),
+        "mass_balance": float(np.max(np.abs(fluxes["massIn"] + fluxes["massOut"])) / 4.0),
+        "current_balance": float(np.max(np.abs(fluxes["currentIn"] + fluxes["currentOut"])) / math.sqrt(540.0)),
+        "interface_current_balance": float(np.max(np.abs(fluxes["currentIntoSolid"]) / np.maximum(np.abs(fluxes["currentIntoSolidMagnitude"]), 1.0e-30))),
+        "interface_current_activity": float(np.max(activity)),
+        "x_over_L": x.tolist(), "pressure_observable": pressure.tolist(),
+        "residual_max": residuals,
+        "wall_seconds": float(metadata["wall_seconds"]),
+    }
+
+
 def observe_freemhd_b2_contract(
     case_dir: str | Path, source_dir: str | Path, evaluator: str | Path | None = None
 ) -> dict[str, object]:
@@ -851,6 +1007,71 @@ def observe_freemhd_b2_contract(
     }
 
 
+def _validate_b2_smoke_execution(
+    lmx: dict[str, object], freemhd: dict[str, object], limits: dict[str, object]
+) -> tuple[list[str], list[str], dict[str, float]]:
+    execution_failed: list[str] = []
+    expected_dt = 1.0 / 540000.0
+    for name, observed in (("lmx", lmx), ("freemhd", freemhd)):
+        def fail(gate: str) -> None:
+            execution_failed.append(f"execution.{name}.{gate}")
+
+        try:
+            dt = np.asarray(observed["dt"], dtype=float)
+            co_mean = np.asarray(observed["courant_mean"], dtype=float)
+            co_max = np.asarray(observed["courant_max"], dtype=float)
+            if observed["steps"] != limits["executed_steps"] or observed["stop_reason"] != "step_limit":
+                fail("stopping")
+            if dt.shape != (2,) or not np.all(np.isfinite(dt)) or np.any(np.abs(dt - expected_dt) > limits["dt_absolute_tolerance"]):
+                fail("dt")
+            courant = np.concatenate((co_mean, co_max))
+            if (
+                co_mean.shape != (2,) or co_max.shape != (2,)
+                or not np.all(np.isfinite(courant)) or np.any(co_max > limits["courant_max"])
+            ):
+                fail("courant")
+            for gate in ("mass_balance", "current_balance", "interface_current_balance"):
+                if not math.isfinite(float(observed[gate])) or float(observed[gate]) > limits[f"{gate}_max"]:
+                    fail(gate)
+            activity = float(observed["interface_current_activity"])
+            if not math.isfinite(activity) or activity < limits["interface_current_activity_min"]:
+                fail("interface_current_activity")
+            if name == "lmx":
+                restart = float(observed["restart_max_abs"])
+                if not math.isfinite(restart) or restart > limits["restart_absolute_tolerance"]:
+                    fail("restart")
+        except (KeyError, TypeError, ValueError):
+            fail("schema")
+
+    comparison_failed: list[str] = []
+    metrics: dict[str, float] = {}
+    try:
+        x_lmx, x_freemhd = (np.asarray(item["x_over_L"], dtype=float) for item in (lmx, freemhd))
+        p_lmx, p_freemhd = (np.asarray(item["pressure_observable"], dtype=float) for item in (lmx, freemhd))
+        if not np.array_equal(x_lmx, x_freemhd):
+            comparison_failed.append("x")
+        for key in ("courant_mean", "courant_max"):
+            if not np.allclose(
+                np.asarray(lmx[key]), np.asarray(freemhd[key]),
+                rtol=limits["cross_code_courant_relative_tolerance"],
+                atol=limits["cross_code_courant_absolute_tolerance"],
+            ):
+                comparison_failed.append(key)
+        if (
+            p_lmx.shape != x_lmx.shape or p_freemhd.shape != x_freemhd.shape
+            or not np.all(np.isfinite(np.concatenate((x_lmx, x_freemhd, p_lmx, p_freemhd))))
+        ):
+            raise ValueError
+        delta = p_lmx - p_freemhd
+        metrics = {"pressure_rms": float(np.sqrt(np.mean(delta**2))), "pressure_linf": float(np.max(np.abs(delta)))}
+        for key in metrics:
+            if metrics[key] > limits[f"cross_code_{key}_max"]:
+                comparison_failed.append(key)
+    except (KeyError, TypeError, ValueError):
+        comparison_failed.append("arrays")
+    return execution_failed, comparison_failed, metrics
+
+
 def validate_matched_b_record(
     record: dict[str, object], *, expected_case_id: str, artifact_root: str | Path | None = None
 ) -> dict[str, object]:
@@ -878,11 +1099,13 @@ def validate_matched_b_record(
         "comparison",
         "provenance",
     }
-    if set(record) != required or record.get("schema_version") != 2:
+    schema_version = record.get("schema_version")
+    role = record.get("acceptance_role")
+    executed_smoke = schema_version == 3 and expected_case_id == "B2-fringing-square" and role == "harness-smoke"
+    if set(record) != required or schema_version not in {2, 3} or (schema_version == 3 and not executed_smoke):
         schema_failed.append("schema")
     if record.get("case_id") != expected_case_id:
         schema_failed.append("case_id")
-    role = record.get("acceptance_role")
     if role not in {"harness-smoke", "b1-production", "b2-production"}:
         schema_failed.append("acceptance_role")
     if "exact_case_match" in record:
@@ -928,7 +1151,8 @@ def validate_matched_b_record(
                 for name in _MATCHED_B_ARTIFACT_NAMES:
                     try:
                         path, kind, expected_hash = _resolve_artifact(root, artifacts[name])
-                        if kind != _MATCHED_B_ARTIFACT_KINDS[name]:
+                        expected_kind = "tree" if executed_smoke and name in {"lmx_output", "freemhd_output"} else _MATCHED_B_ARTIFACT_KINDS[name]
+                        if kind != expected_kind:
                             raise ValueError("kind")
                         calculated = artifact_sha256(path, kind)
                     except (OSError, ValueError) as error:
@@ -971,54 +1195,59 @@ def validate_matched_b_record(
     comparison = comparison if isinstance(comparison, dict) else {}
     metrics: dict[str, float] = {}
     comparison_failed: list[str] = []
-    try:
-        x = np.asarray(comparison["x_over_L"], dtype=float)
-        lmx_values = np.asarray(comparison["lmx_observable"], dtype=float)
-        freemhd_values = np.asarray(comparison["freemhd_observable"], dtype=float)
-        reference = load_benchmark_b_reference(expected_case_id)
-        reference_x = np.asarray(reference["x_over_L"], dtype=float)
-        valid = (
-            x.ndim == 1
-            and x.size >= 2
-            and lmx_values.shape == x.shape == freemhd_values.shape
-            and np.all(np.isfinite(x))
-            and np.all(np.isfinite(lmx_values))
-            and np.all(np.isfinite(freemhd_values))
-            and np.all(np.diff(x) > 0.0)
-            and x[0] >= reference_x[0]
-            and x[-1] <= reference_x[-1]
-        )
-        if not valid:
-            raise ValueError
-        uncertainty = np.interp(x, reference_x, np.asarray(reference["pressure_uncertainty"], dtype=float))
-        delta = lmx_values - freemhd_values
-        metrics = {
-            "weighted_rms": float(np.sqrt(np.mean((delta / uncertainty) ** 2))),
-            "weighted_linf": float(np.max(np.abs(delta / uncertainty))),
-            "integrated_relative": float(
-                abs(np.trapezoid(delta, x))
-                / max(
-                    abs(np.trapezoid(freemhd_values, x)),
-                    float(np.trapezoid(uncertainty, x)),
-                )
-            ),
-        }
-    except (KeyError, TypeError, ValueError):
-        comparison_failed.append("arrays")
-    if metrics:
-        acceptance = spec["acceptance"]
-        limits = {
-            "weighted_rms": float(acceptance["weighted_rms_max"]),
-            "weighted_linf": float(acceptance["weighted_linf_max"]),
-            "integrated_relative": float(acceptance["integrated_pressure_relative_error_max"]),
-        }
-        comparison_failed = [name for name, value in metrics.items() if value > limits[name]]
+    if executed_smoke:
+        if comparison != {"source": "independent-output-observers"}:
+            schema_failed.append("comparison.source")
+    else:
+        try:
+            x = np.asarray(comparison["x_over_L"], dtype=float)
+            lmx_values = np.asarray(comparison["lmx_observable"], dtype=float)
+            freemhd_values = np.asarray(comparison["freemhd_observable"], dtype=float)
+            reference = load_benchmark_b_reference(expected_case_id)
+            reference_x = np.asarray(reference["x_over_L"], dtype=float)
+            valid = (
+                x.ndim == 1
+                and x.size >= 2
+                and lmx_values.shape == x.shape == freemhd_values.shape
+                and np.all(np.isfinite(x))
+                and np.all(np.isfinite(lmx_values))
+                and np.all(np.isfinite(freemhd_values))
+                and np.all(np.diff(x) > 0.0)
+                and x[0] >= reference_x[0]
+                and x[-1] <= reference_x[-1]
+            )
+            if not valid:
+                raise ValueError
+            uncertainty = np.interp(x, reference_x, np.asarray(reference["pressure_uncertainty"], dtype=float))
+            delta = lmx_values - freemhd_values
+            metrics = {
+                "weighted_rms": float(np.sqrt(np.mean((delta / uncertainty) ** 2))),
+                "weighted_linf": float(np.max(np.abs(delta / uncertainty))),
+                "integrated_relative": float(
+                    abs(np.trapezoid(delta, x))
+                    / max(
+                        abs(np.trapezoid(freemhd_values, x)),
+                        float(np.trapezoid(uncertainty, x)),
+                    )
+                ),
+            }
+        except (KeyError, TypeError, ValueError):
+            comparison_failed.append("arrays")
+        if metrics:
+            acceptance = spec["acceptance"]
+            limits = {
+                "weighted_rms": float(acceptance["weighted_rms_max"]),
+                "weighted_linf": float(acceptance["weighted_linf_max"]),
+                "integrated_relative": float(acceptance["integrated_pressure_relative_error_max"]),
+            }
+            comparison_failed = [name for name, value in metrics.items() if value > limits[name]]
 
     schema_complete = not schema_failed
     artifact_pass = not artifact_failed
     contract_pass = schema_complete and not contract_failed
     comparison_pass = bool(metrics) and not comparison_failed
     observation_failed: list[str] = []
+    observed_outputs: dict[str, dict[str, object]] = {}
     if expected_case_id == "B2-fringing-square" and role == "harness-smoke" and all(
         name in resolved_artifacts for name in ("lmx_input", "freemhd_input", "freemhd_source", "evaluator")
     ):
@@ -1039,14 +1268,29 @@ def validate_matched_b_record(
             observation_failed += [f"{path}.lmx_observed" for path in differences(lmx, observed_lmx, "contract")]
             observation_failed += [f"{path}.freemhd_observed" for path in differences(freemhd, observed_freemhd, "contract")]
             observation_failed += [f"{path}.observer_mismatch" for path in differences(observed_lmx, observed_freemhd, "contract")]
+            if executed_smoke:
+                observed_outputs = {
+                    "lmx": observe_lmx_b2_output(
+                        resolved_artifacts["lmx_output"], resolved_artifacts["lmx_input"], resolved_artifacts["evaluator"]
+                    ),
+                    "freemhd": observe_freemhd_b2_output(
+                        resolved_artifacts["freemhd_output"], resolved_artifacts["freemhd_input"], resolved_artifacts["evaluator"]
+                    ),
+                }
         except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
             observation_failed.append(f"contract.observers.error.{type(error).__name__}")
     else:
         observation_failed.append("contract.observers.unavailable")
     observation_pass = not observation_failed
+    execution_failed: list[str] = []
+    if executed_smoke:
+        execution_failed, comparison_failed, metrics = _validate_b2_smoke_execution(
+            observed_outputs.get("lmx", {}), observed_outputs.get("freemhd", {}), spec["harness_smoke_execution"]
+        )
+        comparison_pass = not comparison_failed
     role_allows_acceptance = role == expected_role
-    all_failed = schema_failed + contract_failed + artifact_failed + observation_failed + [f"comparison.{name}" for name in comparison_failed]
-    return {
+    all_failed = schema_failed + contract_failed + artifact_failed + observation_failed + execution_failed + [f"comparison.{name}" for name in comparison_failed]
+    report = {
         "schema_complete": schema_complete,
         "artifact_pass": artifact_pass,
         "contract_pass": contract_pass,
@@ -1058,6 +1302,9 @@ def validate_matched_b_record(
         "metrics": metrics,
         "calculated_artifact_sha256": calculated_artifacts,
     }
+    if executed_smoke:
+        report["execution_pass"] = schema_complete and artifact_pass and contract_pass and observation_pass and not execution_failed
+    return report
 
 
 def load_samper_table_i(path: str | Path | None = None) -> dict[str, object]:

@@ -1,10 +1,12 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15, through tolerance checkpoint `e875542` and the LMX replay
-observer recorded here. This is the single active
-plan. It records accepted baselines, active gates, and stop/go criteria—not
-campaign history. Completed campaign details belong in checksummed result
-records and the validation or performance documentation.
+Status: 2026-07-15. The pushed baseline is `e3e4813`; the strict FreeMHD output
+observer and non-accepting schema-3 execution gate are green under focused
+tests. Docker timeout/cleanup orchestration and both physical smoke executions
+remain open. This is the single active plan. It records accepted baselines,
+active gates, and stop/go criteria—not campaign history. Completed campaign
+details belong in checksummed result records and the validation or performance
+documentation.
 
 ## Product outcome
 
@@ -96,11 +98,11 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,818 | stay below 34,850 through smoke implementation | 35,100 |
+| package lines | 34,736 | stay below 34,850 through smoke implementation | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,188 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,231 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,421,637 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,424,389 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -113,7 +115,9 @@ the reference Apple M4. It remains below the 300-second engineering target and
 
 ## Priority 0: solver-free matched B2 harness — complete
 
-Completed at `a97eeaf`:
+Core schema-2 harness completed at `a97eeaf`; source, setup,
+instrumentation, tolerance, and replay-observer checkpoints continued through
+`9b41441`:
 
 - Schema 2 compares both observed contracts with a frozen canonical contract;
   two equal submitted dictionaries cannot self-certify.
@@ -159,18 +163,19 @@ one complete portable gate are green and pushed.
 ## Priority 1: freeze, then run one exact tiny B2 smoke
 
 The current parity command handles Benchmark A and materializes B2 inputs, but
-does not execute B2 or observe its outputs. The first solver-free checkpoint now
-adds a real `--matched-b2-preflight` mode: the local bundle passes both
-independent observers with contract SHA-256
-`e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
-Complete the remaining small solver-free tranche before launching either solver:
+does not yet expose or execute a B2 run. The externally generated preflight was
+byte-identical across two trials and passed both independent input observers
+with contract SHA-256
+`e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`;
+the temporary bundle was intentionally not retained. Complete the remaining
+orchestration tranche before launching either solver:
 
 1. Extend the existing preflight with explicit B2 run and postprocess modes,
    without a new script or package module.
-2. Define compact independent LMX and FreeMHD output observers for executed
-   steps, effective `dt`, volume-mean and maximum Courant histories, stopping
-   reason, mass/current closure, pressure gauge/orientation, restart identity,
-   and the shared normalized pressure observable.
+2. Keep the now-implemented independent LMX and FreeMHD output observers strict
+   over executed steps, effective `dt`, Courant histories, stopping reason,
+   mass/current closure, pressure gauge/orientation, restart identity, and the
+   shared normalized pressure observable.
 3. Add only the necessary FreeMHD pressure probes and mass/current surface
    sums. Bypass its demo plotter and VTK conversion; raw fields are not evidence
    for this gate.
@@ -202,6 +207,13 @@ reloads and validates every record, recomputes pressure and closure metrics, and
 compares all retained state/history arrays rather than trusting reported pass
 booleans. Only the synthetic observer fixture has run; the physical smoke has
 not started.
+
+The FreeMHD output observer now requires the exact compact output tree, effective
+control bytes, clean terminal log, native pressure-probe and surface-sum tables,
+and all 16 tap coordinates. Schema 3 independently replays both output trees,
+applies the frozen execution and cross-code gates, and remains ineligible for
+production acceptance. These paths are green only on synthetic native-format
+fixtures; no FreeMHD B2 solver process has run.
 
 Then declare one ten-minute wall budget for both codes. Run LMX first as one
 uninterrupted two-update path and as one update, restart, and one update; require

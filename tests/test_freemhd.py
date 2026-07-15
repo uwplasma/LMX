@@ -6,6 +6,7 @@ import re
 import subprocess
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 import examples
@@ -29,6 +30,7 @@ from lmx.freemhd import (
     load_benchmark_a_spec,
     load_samper_table_i,
     observe_freemhd_b2_contract,
+    observe_freemhd_b2_output,
     observe_lmx_b2_contract,
     observe_lmx_b2_output,
     validate_matched_b_record,
@@ -208,7 +210,50 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
     }))
 
 
-def _matched_b2_smoke_record(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+def _write_freemhd_b2_output(root: Path, input_dir: Path, evaluator: Path) -> None:
+    dt = 1.0 / 540000.0
+    times = (dt, 2.0 * dt)
+    root.mkdir()
+    (root / "controlDict.used").write_bytes((input_dir / "system/controlDict").read_bytes())
+    (root / "run.log").write_text(
+        "Region: liquid Courant Number mean: 0 max: 0\n"
+        + "".join(
+            f"Time = {time:.17g}\nRegion: liquid Courant Number mean: 1e-6 max: 2e-6\n"
+            "PCG: Solving for potE, Initial residual = 1e-4, Final residual = 1e-8, No Iterations 2\n"
+            for time in times
+        )
+        + "End\n"
+    )
+    post = root / "postProcessing"
+    x = np.linspace(-15.0 + 25.0 / 16.0, 10.0 - 25.0 / 16.0, 8)
+    probes = post / "b2PressureTaps/0/p"
+    probes.parent.mkdir(parents=True)
+    headers = [f"# Probe {i} ({value:.15g} 0.8 0)" for i, value in enumerate(x)]
+    headers += [f"# Probe {i + 8} ({value:.15g} 0 0.8)" for i, value in enumerate(x)]
+    delta = np.asarray([0, 0, 1, 2, 3, 2, 0, 0], dtype=float)
+    rows = [" ".join([f"{time:.17g}", *map(str, np.zeros(8)), *map(str, delta)]) for time in times]
+    probes.write_text("\n".join([*headers, "# Time 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15", *rows]) + "\n")
+    values = {
+        "massIn": (-4.0, "sum(rhoPhi)"), "massOut": (4.0, "sum(rhoPhi)"),
+        "currentIn": (-0.1, "sum(jn)"), "currentOut": (0.1, "sum(jn)"),
+        "currentIntoSolid": (1.0e-5, "sum(jn)"),
+        "currentIntoSolidMagnitude": (1.0, "sumMag(jn)"),
+    }
+    for name, (value, header) in values.items():
+        path = post / name / "0/surfaceFieldValue.dat"
+        path.parent.mkdir(parents=True)
+        path.write_text(f"# Time {header}\n" + "".join(f"{time:.17g} {value}\n" for time in times))
+    (root / "run.json").write_text(json.dumps({
+        "schema_version": 1, "code": "FreeMHD", "case_id": "B2-fringing-square",
+        "input_sha256": artifact_sha256(input_dir, "tree"),
+        "evaluator_sha256": artifact_sha256(evaluator, "file"),
+        "wall_seconds": 1.0, "nproc": 2, "image": "freemhd:test", "float_precision": "float64",
+    }))
+
+
+def _matched_b2_smoke_record(
+    root: Path, monkeypatch: pytest.MonkeyPatch, *, executed: bool = False
+) -> dict[str, object]:
     template, source = root / "hunt_demo", root / "freemhd_source"
     _write_b2_skeleton(template)
     manifest = _write_observer_source_snapshot(source)
@@ -217,8 +262,12 @@ def _matched_b2_smoke_record(root: Path, monkeypatch: pytest.MonkeyPatch) -> dic
     run_freemhd_parity_suite.materialize_matched_b2_evaluator(root / "evaluator")
     (root / "lmx_source").mkdir()
     (root / "lmx_source/evidence.txt").write_text("LMX source fixture\n")
-    for name in ("lmx_output", "freemhd_output"):
-        (root / name).write_text("not executed\n")
+    if executed:
+        _write_lmx_b2_output(root / "lmx_output", root / "lmx_input", root / "evaluator")
+        _write_freemhd_b2_output(root / "freemhd_output", root / "freemhd_input", root / "evaluator")
+    else:
+        for name in ("lmx_output", "freemhd_output"):
+            (root / name).write_text("not executed\n")
     spec = deepcopy(load_benchmark_b_spec("B2-fringing-square"))
     reference = spec["free_mhd_discretization_reference"]
     reference["repository_commit"] = manifest["commit"]
@@ -229,13 +278,13 @@ def _matched_b2_smoke_record(root: Path, monkeypatch: pytest.MonkeyPatch) -> dic
     monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
     artifacts = {}
     for name in ("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"):
-        kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} else "file"
+        kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} or executed and name.endswith("_output") else "file"
         artifacts[name] = {"path": name, "kind": kind, "sha256": artifact_sha256(root / name, kind)}
     contract = canonical_matched_b_contract(spec, "harness-smoke")
     return {
-        "schema_version": 2, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
+        "schema_version": 3 if executed else 2, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
         "contract": {"lmx": deepcopy(contract), "freemhd": deepcopy(contract)},
-        "comparison": {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
+        "comparison": {"source": "independent-output-observers"} if executed else {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
         "provenance": {
             "benchmark_spec_sha256": hashlib.sha256(Path("benchmarks/specs/alex-b2-square.toml").read_bytes()).hexdigest(),
             "artifacts": artifacts,
@@ -573,6 +622,43 @@ def test_lmx_b2_output_observer_replays_restart_evidence(tmp_path: Path):
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
 
 
+def test_freemhd_b2_output_observer_reads_only_native_tables(tmp_path: Path):
+    template, case, evaluator = tmp_path / "template", tmp_path / "case", tmp_path / "evaluator"
+    _write_b2_skeleton(template)
+    run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, case)
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+    _write_freemhd_b2_output(tmp_path / "output", case, evaluator)
+
+    observed = observe_freemhd_b2_output(tmp_path / "output", case, evaluator)
+
+    assert observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
+    assert observed["mass_balance"] == observed["current_balance"] == 0.0
+    assert observed["interface_current_balance"] == pytest.approx(1.0e-5)
+    assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
+    assert observed["residual_max"] == {"potE": pytest.approx(1.0e-8)}
+
+
+@pytest.mark.parametrize("mutation", ["fatal", "probe", "magnitude"])
+def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
+    tmp_path: Path, mutation: str
+):
+    template, case, evaluator = tmp_path / "template", tmp_path / "case", tmp_path / "evaluator"
+    _write_b2_skeleton(template)
+    run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, case)
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+    output = tmp_path / "output"
+    _write_freemhd_b2_output(output, case, evaluator)
+    path, old, new = {
+        "fatal": (output / "run.log", "End", "FOAM FATAL ERROR\nEnd"),
+        "probe": (output / "postProcessing/b2PressureTaps/0/p", "0.8 0)", "0.7 0)"),
+        "magnitude": (output / "postProcessing/currentIntoSolidMagnitude/0/surfaceFieldValue.dat", " 1.0", " -1.0"),
+    }[mutation]
+    path.write_text(path.read_text().replace(old, new, 1))
+
+    with pytest.raises(ValueError, match="FreeMHD B2"):
+        observe_freemhd_b2_output(output, case, evaluator)
+
+
 def test_matched_b2_smoke_observation_passes_without_claiming_acceptance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -583,6 +669,43 @@ def test_matched_b2_smoke_observation_passes_without_claiming_acceptance(
     assert report["observation_pass"] is True
     assert report["comparison_pass"] is report["role_allows_acceptance"] is report["acceptance_pass"] is False
     assert report["failed_checks"] == ["comparison.arrays"]
+
+
+def test_matched_b2_executed_smoke_passes_without_claiming_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    record = _matched_b2_smoke_record(tmp_path, monkeypatch, executed=True)
+    report = validate_matched_b_record(record, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+
+    assert report["schema_complete"] and report["artifact_pass"] and report["contract_pass"]
+    assert report["observation_pass"] and report["execution_pass"] and report["comparison_pass"]
+    assert report["role_allows_acceptance"] is report["acceptance_pass"] is False
+    assert report["metrics"] == {"pressure_rms": 0.0, "pressure_linf": 0.0}
+    assert report["failed_checks"] == []
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failed"),
+    [("mass", "execution.freemhd.mass_balance"), ("source", "comparison.source")],
+)
+def test_matched_b2_executed_smoke_attributes_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str, failed: str
+):
+    record = _matched_b2_smoke_record(tmp_path, monkeypatch, executed=True)
+    if mutation == "mass":
+        path = tmp_path / "freemhd_output/postProcessing/massOut/0/surfaceFieldValue.dat"
+        path.write_text(path.read_text().replace(" 4.0", " 5.0"))
+        record["provenance"]["artifacts"]["freemhd_output"]["sha256"] = artifact_sha256(
+            tmp_path / "freemhd_output", "tree"
+        )
+    else:
+        record["comparison"] = {"source": "claimed"}
+
+    report = validate_matched_b_record(record, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+
+    assert failed in report["failed_checks"]
+    assert report.get("execution_pass", False) is False
+    assert report["acceptance_pass"] is False
 
 
 @pytest.mark.parametrize(
