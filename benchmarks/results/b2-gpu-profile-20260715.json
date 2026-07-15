@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "date": "2026-07-15",
   "case_id": "B2-fringing-square",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -299,6 +299,197 @@
       "diagnostics_history": "f72ff953da5b69455e709eb760c26f6c47e1387dafb16d677d03e8371c7ec504",
       "diagnostics_two_gpu": "8b70a2494217cb5889f04629c34e4ed5326699746090b2cdf80abd46d1a194df"
     }
+  },
+  "representative_projection_compiler_trace": {
+    "execution_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
+    "shape": [128, 67, 67],
+    "updates": 2,
+    "devices": 2,
+    "isolated_host": true,
+    "input_sha256": "c448b4cf684605ac83e7333bb16381072f53d47883a10b4ac03d361d4990be6e",
+    "source_fringing_sha256": "ea0f7b5071df073a82bad510a74a22490419e8082c0dac590e625c5e86a58de2",
+    "environment": {
+      "hardware": "2 NVIDIA RTX A4000 without NVLink",
+      "python": "3.13.12",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "solvax": "0.8.3",
+      "precision": "float64"
+    },
+    "protocol": "one untraced warm solve followed by one traced solve; Python tracer disabled",
+    "warm_history": [
+      [9.393865180149158e-13, 5.999537963353793e-10, 204, 1, 1],
+      [9.306913174096442e-13, 2.9453104926530717e-09, 207, 1, 1]
+    ],
+    "traced_history": [
+      [9.393865180149158e-13, 5.999537963353793e-10, 204, 1, 1],
+      [9.306913202980858e-13, 2.9453105017939415e-09, 207, 1, 1]
+    ],
+    "history_max_absolute_difference": 9.140869787629008e-18,
+    "history_max_relative_scalar_difference": 3.103544150123424e-09,
+    "timed_event_count": 228296,
+    "activity_event_cap": 4000000,
+    "projection_phase_wall_seconds": [0.5538635919999999, 0.567061071],
+    "gpu_kernel_counts": {
+      "per_gpu_identical_for_named_categories": true,
+      "updates_both_gpus": [
+        {
+          "all_reduce": 830,
+          "all_gather": 416,
+          "halo_send_recv": 832,
+          "pcr": 1640,
+          "spike": 1640,
+          "marshal": 2050,
+          "tiled_diagonal": 410
+        },
+        {
+          "all_reduce": 840,
+          "all_gather": 420,
+          "halo_send_recv": 844,
+          "pcr": 1664,
+          "spike": 1664,
+          "marshal": 2080,
+          "tiled_diagonal": 416
+        }
+      ]
+    },
+    "normalized_device_activity_fraction": [
+      {
+        "tridiagonal": 0.75406412794149,
+        "all_collectives": 0.08849181767484404,
+        "all_reduce": 0.007328894801229921,
+        "all_gather": 0.010755292613636523,
+        "halo_send_recv": 0.0704076302599776
+      },
+      {
+        "tridiagonal": 0.7481286887704217,
+        "all_collectives": 0.0922291313487134,
+        "all_reduce": 0.007950283012816629,
+        "all_gather": 0.011095394873262296,
+        "halo_send_recv": 0.07318345346263447
+      }
+    ],
+    "interpretation": "Both transverse SOLVAX line solves dominate device activity. Axial gather and axial tridiagonal signatures are small, while collectives remain below the 15% action threshold. Device activity sums two GPU streams and is normalized by twice the phase wall time.",
+    "decision": "Stop Krylov-communication and projection-preconditioner probes on released SOLVAX; neither collective work nor the axial block is the primary cost.",
+    "raw_assets": {
+      "location": "office GPU host; not tracked in Git",
+      "trace_json_gzip_bytes": 4999728,
+      "trace_json_gzip_sha256": "30178f46a571cbd526dccb150defc4135068137ef7501a7326d6ab3ada1a2d5a",
+      "perfetto_gzip_bytes": 4593981,
+      "perfetto_gzip_sha256": "db070f3d9a5d920f645da34b550d5ac911345770f1908be178fce02522ee15eb",
+      "parsed_counts_sha256": "57a2c285911d7dfe65a9c2eba77874bbbb1fd10056d13f4465b392b9c54f4a3c",
+      "trace_probe_sha256": "980add0cfcdb684de4aec9a0810483bf60fca44df3883ab0134a46d383c7faa5",
+      "parser_sha256": "8545528601aaace907d5d8558970db952b8c005f13c90352365ee25ab0df9379"
+    }
+  },
+  "representative_electric_compiler_trace": {
+    "source_trace": "representative_projection_compiler_trace",
+    "history_columns": [
+      "residual_norm",
+      "relative_residual_norm",
+      "local_residual_max",
+      "iterations",
+      "converged",
+      "status"
+    ],
+    "history": [
+      [1.4118414946650463e-08, 2.1923866690657297e-13, 0.0002993345260620117, 95, 1, 1],
+      [1.2652465012611254e-08, 2.540532748433976e-13, 0.00033396482467651367, 82, 1, 1]
+    ],
+    "phase_wall_seconds": [0.291186531, 0.247181183],
+    "gpu_kernel_counts": {
+      "per_gpu_identical_for_named_categories": true,
+      "updates_both_gpus": [
+        {
+          "all_reduce": 590,
+          "all_gather": 192,
+          "halo_send_recv": 396,
+          "pcr": 768,
+          "spike": 768,
+          "marshal": 960,
+          "tiled_diagonal": 192
+        },
+        {
+          "all_reduce": 512,
+          "all_gather": 166,
+          "halo_send_recv": 344,
+          "pcr": 664,
+          "spike": 664,
+          "marshal": 830,
+          "tiled_diagonal": 166
+        }
+      ]
+    },
+    "normalized_device_activity_fraction": [
+      {
+        "tridiagonal": 0.6677013178882408,
+        "all_collectives": 0.06602677477551637
+      },
+      {
+        "tridiagonal": 0.6748088506396791,
+        "all_collectives": 0.05645551910802289
+      }
+    ],
+    "interpretation": "The existing trace also attributes electric potential without another solve. Both transverse SOLVAX line systems dominate; compiler PCR counts are four per PCG preconditioner application per GPU. Collectives remain below the 15% action threshold.",
+    "decision": "Stop electric communication probes; no released-SOLVAX scalar factor/apply path can replace the fused vendor tridiagonal solve with an evidenced win.",
+    "raw_assets": {
+      "parsed_counts_sha256": "399d935e713fd4f94497767a08adf520df51fa69da318f3534c89fe11ca8ffd3",
+      "phase_parser_sha256": "829d18e80e5bf08163b93535d56752af8d9559cfc11765877ad86c09afd3e276",
+      "history_probe_sha256": "83c2aa8f6a652cd287a9162538d9f2ee648650420cb1402518ac5e8f1208db1b"
+    }
+  },
+  "rejected_axial_mean_removal": {
+    "shape": [64, 15, 15],
+    "devices": 2,
+    "control_warm_median_seconds": 0.9477997975191101,
+    "candidate_warm_median_seconds": 1.0052028270438313,
+    "wall_time_change_fraction": 0.060564509166360914,
+    "control_pressure_iterations": [33, 35],
+    "candidate_pressure_iterations": [180, 180],
+    "maximum_iteration_growth_fraction": 4.454545454545454,
+    "validation_passed": true,
+    "decision": "reject; 6.1% slower and iteration growth exceeds the 15% stop rule",
+    "control_sha256": "fca46858204ecfa53789a61ae55df4959b1b8f38c804ed88104613818f0404e0",
+    "candidate_sha256": "480bcdb44c4037c9322b794cfd9b6caba573d6d8d9c6a6dfadab0f0bbec8f78b"
+  },
+  "rejected_b1_solvax_generated_factors": {
+    "solvax_api": "block_thomas_factor_fn in released 0.8.3",
+    "hypothesis": "Generate retained-modal block rows without materializing the quadratic axial Jacobian tensors.",
+    "correctness": {
+      "retained_vs_materialized_tolerance": 1e-10,
+      "jvp_passed": true,
+      "solution_l2_baseline_candidate": [
+        [136.60280917427986, 136.60280917427988],
+        [748.6117287631154, 748.6117287631148]
+      ]
+    },
+    "measurements": [
+      {
+        "shape": [7, 9, 16],
+        "baseline_cold_seconds": 4.586927526048385,
+        "candidate_cold_seconds": 5.924358984921128,
+        "baseline_warm_seconds": 1.3573895660229027,
+        "candidate_warm_seconds": 1.879571835976094,
+        "candidate_to_baseline_cold_ratio": 1.2915745782504076,
+        "candidate_to_baseline_warm_ratio": 1.3846959509812387,
+        "device_peak_change_fraction": -0.0015922826176411053,
+        "host_peak_rss_change_fraction": 0.04104147709305406
+      },
+      {
+        "shape": [11, 17, 32],
+        "baseline_cold_seconds": 5.277059461106546,
+        "candidate_cold_seconds": 6.696884256089106,
+        "baseline_warm_seconds": 1.7252863049507141,
+        "candidate_warm_seconds": 2.3967908079503104,
+        "candidate_to_baseline_cold_ratio": 1.2690560539344078,
+        "candidate_to_baseline_warm_ratio": 1.3892133734979013,
+        "device_peak_change_fraction": -0.011635954819329997,
+        "host_peak_rss_change_fraction": 0.039973806519621125
+      }
+    ],
+    "decision": "reject; exact generated factors increase setup time and host peak while reducing device peak by at most 1.2% on bounded probes",
+    "candidate_source_sha256": "10dfb5110a799e5ce7964816915a92cf4cb5b75cac165f2e955fa5ed3c75873b",
+    "probe_sha256": "05b4ec05af6c3085785f6dbd67f00c13297373f532063bad459c4875057da904"
   },
   "raw_assets": {
     "location": "external workspace and office GPU host",

@@ -2,7 +2,8 @@
 
 Status: 2026-07-15. The optimized B2 source and current CPU calibration are
 keyed to `413185a`; the latest complete portable gate is keyed to `b2746fa`.
-The GPU workers use the optimized source's matching fingerprint.
+The isolated compiler trace is keyed to `f379f6b`; GPU workers use the
+optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
@@ -110,7 +111,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 20,966 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 14 | no new script without retiring an owner | 14 |
-| tracked checkout | 3,497,343 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,507,788 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -165,9 +166,11 @@ seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
 physics node now measures 15.1 seconds alone. Preserve those coverage-rich
-tests. Profile an autodiff node only if an isolated measurement crosses the
-45-second trigger; otherwise assess worker count/scheduling at the next
-coherent full-gate refresh rather than shrinking physics grids blindly.
+tests. A fresh-process A/B of the same six expensive JAX nodes takes 37.69
+seconds with six workers and 36.41 with four. The 3.4% change misses the frozen
+10% promotion threshold, so retain six-worker work stealing; module grouping
+would imbalance the fringing and autodiff owners. Profile another node only if
+an isolated measurement crosses the 45-second trigger.
 
 Keep the top ten concurrent node durations in the portable-gate record and
 treat any node above 45 seconds as a critical-path review trigger. The suite
@@ -234,17 +237,12 @@ and outside the frozen `1e-12` contract). An exact mixed-boundary DCT-IV coarse
 correction passed dense, symmetry, gradient, manufactured-flow, and sharding
 gates, but gained only 0.47% and missed the strict restart-state tolerance;
 it is also rejected. Do not drop the accepted line blocks, weaken tolerance,
-or revive additive coarse corrections. Next isolate projection iteration and
-collective costs before selecting another algorithm. A single released-SOLVAX
+or revive additive coarse corrections. A single released-SOLVAX
 batch for both equal-length transverse systems is also exact, symmetry-safe,
 gradient-safe, and restart-exact, but is 1.0% slower than its paired control;
-do not revive launch-only batching. Stop projection preconditioner
-micro-experiments until iteration/collective diagnostics identify a different
-algorithmic target. Pressure-PCG residuals, relative residuals, iterations,
-convergence, and status are now retained without another solve or synchronization
-phase; run one bounded current-source projection probe before selecting an
-algorithm, and require at least a 15% small phase-timing win before a full rung.
-Electric remains second.
+do not revive launch-only batching. Pressure-PCG residuals, relative residuals,
+iterations, convergence, and status remain retained without another solve or
+synchronization phase.
 
 The bounded `8 x 4 x 3` current-source CPU probe is green on one and two forced
 devices: both converge in 24 PCG iterations, their maximum relative residuals
@@ -257,24 +255,28 @@ on both one and two GPUs: 72 reduction stages, 70 preconditioner applications,
 140 transverse line invocations, 70 axial-mean invocations, and 72 halo pairs
 over two updates. ABBA diagnostic/control ratios are 0.902 and 1.039 with up to
 27% shared-host CV, so retention is within noise and no speedup is claimed. The
-two-GPU tiny rung is correctly collective-dominated. Next obtain compiler-level
-collective counts on an isolated representative rung; do not start another
-preconditioner probe until that trace identifies a reducible communication or
-iteration cost.
-Use one untraced warm solve plus one trace of the accepted `128 x 67 x 67`,
-two-update, two-GPU rung. Accept the trace only when both history rows converge,
-warm and traced histories match, exactly two projection intervals and both GPU
-tracks are present, per-GPU category counts agree within one event or 1%, and
-phase wall time remains within 25% of the accepted 0.84--0.95 seconds/update.
-Count GPU kernels only, attributing interval overlaps rather than duplicated
-host annotations. If no collective or line-solve category reaches 15% of
-normalized device time, stop. Otherwise test only the smallest implicated
-candidate: remove the replicated axial-mean correction while retaining both
-transverse lines for axial gather/solve cost; design a SOLVAX factor/apply API
-for fixed tridiagonals if line solves dominate; or leave all-reduce/halo work to
-a separately gated Krylov algorithm if communication dominates. Require at
-least a 15% projection-phase win with no more than 15% iteration growth before
-escalating beyond the bounded probe.
+two-GPU tiny rung is correctly collective-dominated.
+
+The isolated `128 x 67 x 67` compiler trace is complete on two RTX A4000s.
+Warm and traced pressure histories agree within `9.2e-18`; both converge in
+204/207 iterations, both GPU tracks have identical named kernel counts, and
+only 228,296 of four million permitted events are used. Projection takes
+0.554/0.567 seconds: fixed-coefficient tridiagonal kernels occupy 74.8--75.4%
+of normalized device activity, while all collectives occupy only 8.8--9.2%.
+The same trace closes electric attribution without another simulation. Its
+95/82-iteration solves take 0.291/0.247 seconds, with 66.8--67.5%
+tridiagonal and 5.6--6.6% collective activity. Communication tuning therefore
+stops for both phases.
+
+Removing only the replicated axial-mean correction retains validation but
+raises pressure work from 33--35 to 180 iterations and is 6.1% slower; reject
+it before a full trace. Both transverse SOLVAX line systems are the measured
+cost and the required convergence mechanism. Released SOLVAX 0.8.3 exposes no
+reusable scalar factor/apply path for its fused GPU tridiagonal solve, so stop
+B2 preconditioner microprobes rather than replace the vendor kernel with an
+unevidenced sequential implementation. The next physics work is Priority 3,
+not another small solver variant.
+
 Re-measure accepted rungs in an isolated GPU window before any publishable
 scaling claim.
 
@@ -371,9 +373,13 @@ After 0.8.4 is published, use one
 `linear_solve(has_aux=True)` to retain momentum diagnostics without a final
 extra matvec. Raise the minimum dependency in that same correctness tranche.
 
-Benchmark-gated later, evaluate `block_thomas_factor_fn` for B1 modal setup and
-`chunked_jacfwd` only if memory profiling identifies the retained-modal
-Jacobian. Do not move finite-volume assembly into SOLVAX, and do not substitute
+The released `block_thomas_factor_fn` B1 prototype is exact against the current
+materialized retained-modal factors and through JVP. At `7 x 9 x 16` and
+`11 x 17 x 32`, however, it is 27--29% slower cold and 38--39% slower warm;
+device peak falls by at most 1.2% while host peak rises about 4%. Reject it
+before a production run. Reconsider generated factors or `chunked_jacfwd` only
+if a measured production B1 memory blocker outweighs that setup regression.
+Do not move finite-volume assembly into SOLVAX, and do not substitute
 Fourier–Helmholtz, Newton–Krylov, generic multigrid, or affine fixed-point GMRES
 into parity-critical paths without new topology, stopping, gradient, and timing
 evidence. No credible SOLVAX-driven module deletion exists today.

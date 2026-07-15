@@ -60,9 +60,17 @@ The same record now exposes mixed-pressure PCG work directly. The frozen small
 phase takes 33 and 35 iterations on both one and two GPUs, for 72 source-level
 reduction stages over two updates. Paired diagnostic/control timing changes
 sign across repeats while shared-host CV reaches 27%; retaining five SOLVAX
-scalars is therefore within noise, not a performance claim. The next useful
-measurement is a compiler trace of collectives on an isolated representative
-rung, not another blind preconditioner variant.
+scalars is therefore within noise, not a performance claim.
+
+The isolated representative trace is now complete. At `128 x 67 x 67`, mixed
+projection converges in 204 and 207 iterations and takes 0.554 and 0.567
+seconds. Fixed-coefficient tridiagonal kernels occupy 75% of normalized device
+activity; all-reduce, all-gather, and halo kernels together occupy only
+8.8--9.2%. The same raw trace assigns electric solves of 95 and 82 iterations:
+they take 0.291 and 0.247 seconds, with 67% tridiagonal and 5.6--6.6%
+collective activity. Named kernel counts agree on both GPUs, and the trace has
+228,296 events versus its four-million-event cap. Activity sums concurrent GPU
+streams and is not wall time.
 
 Small paired probes also reject one transverse projection line, SOLVAX Jacobi
 plus axial mean, a relaxed projection tolerance, and a mixed-boundary DCT-IV
@@ -73,6 +81,17 @@ misses the strict restart-state tolerance. Combining both transverse line
 systems into one released-SOLVAX batch is algebraically and restart exact, but
 is 1.0% slower than its same-window control. The accepted source is unchanged;
 neither rejected candidate advanced to a full trace or larger grid.
+Removing only the axial-mean block is also rejected: pressure iterations rise
+from 33--35 to 180 and the tiny two-GPU solve becomes 6.1% slower. Projection
+and electric communication experiments therefore stop on released SOLVAX;
+their retained transverse line systems are the measured cost and the required
+convergence mechanism.
+
+A separate released-SOLVAX `block_thomas_factor_fn` prototype generated B1
+retained-modal factors without materializing the quadratic axial action tuple.
+It is algebraically and JVP exact, but at `7 x 9 x 16` and `11 x 17 x 32` it is
+27--29% slower cold and 38--39% slower warm. Device peak falls by at most 1.2%
+while host peak rises about 4%, so it is rejected before a production B1 run.
 
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate

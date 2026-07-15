@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "date": "2026-07-15",
   "commit": "b2746fa89707281f502a7b42810bc2181271c807",
   "hardware": {
@@ -55,6 +55,16 @@
     "budget_fraction": 0.279,
     "engineering_target_fraction": 0.559,
     "interpretation": "Fixture consolidation removes 63 test lines from the recorded gate while pressure diagnostics remain covered; worker contention leaves the weighted-modal node as the critical path."
+  },
+  "scheduling_probe": {
+    "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
+    "protocol": "The same six slow JAX nodes in fresh no-coverage processes using worksteal; 180-second ceiling per arm.",
+    "all_nodes_passed": true,
+    "six_workers_seconds": 37.689,
+    "four_workers_seconds": 36.410,
+    "four_worker_reduction_fraction": 0.03393563108599335,
+    "promotion_threshold_fraction": 0.10,
+    "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
     "package_modules": 35,

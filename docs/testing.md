@@ -16,6 +16,12 @@ seconds with six workers. The default warning threshold is five minutes,
 leaving another five minutes before the hard failure. The record keeps the ten
 slowest node IDs for critical-path review.
 
+A focused fresh-process A/B ran the same six expensive JAX nodes with six and
+four work-stealing workers. All pass in 37.69 and 36.41 seconds respectively;
+the 3.4% reduction misses the predeclared 10% promotion threshold, so the
+six-worker default remains. Coarse file grouping is not used because fringing
+and autodiff would dominate separate workers.
+
 The eight skips represent unavailable independent datasets, not disabled source
 paths. The gate must stay below ten minutes as the code grows; its engineering
 target is five minutes to preserve CI margin.
