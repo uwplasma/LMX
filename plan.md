@@ -1,6 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15, through implementation commit `a97eeaf`. This is the single active
+Status: 2026-07-15, through native-current checkpoint `42e671a` and the
+ownership move recorded here. This is the single active
 plan. It records accepted baselines, active gates, and stop/go criteria—not
 campaign history. Completed campaign details belong in checksummed result
 records and the validation or performance documentation.
@@ -88,16 +89,17 @@ large reusable artifacts go in checksummed releases.
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 
-Current structure after the independent observer tranche at `a97eeaf`:
+Current structure after moving the script-only Benchmark-A auditor out of the
+package:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,059 | below 34,850 after smoke cleanup | 35,100 |
+| package lines | 34,939 | below 34,850 after smoke cleanup | 35,100 |
 | maintained-core lines | 8,015 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,211 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,228 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,412,001 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,419,706 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

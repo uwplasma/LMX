@@ -5,6 +5,7 @@ import argparse
 from dataclasses import asdict, replace
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -18,8 +19,18 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lmx.benchmarks import build_benchmark_b_problem, load_benchmark_b_reference, load_benchmark_b_spec
-from lmx.freemhd import artifact_sha256, audit_freemhd_case_against_spec, load_benchmark_a_spec
+from lmx.freemhd import (
+    artifact_sha256,
+    infer_inlet_drive_mode,
+    infer_inlet_flow_rate,
+    infer_liquid_material_properties,
+    infer_rectangular_geometry,
+    infer_solid_conductivities,
+    infer_uniform_b0,
+    load_benchmark_a_spec,
+)
 from lmx.reference_data import default_closed_channel_reference_root
+from lmx.units import hartmann_number
 
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
@@ -29,6 +40,80 @@ DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
 _FREEMHD_SOURCE_NAMES = (
     "momentum", "electric", "limiter", "scheme_macro", "limiter_registration", "nvd", "vector_transform",
 )
+
+
+def audit_freemhd_case_against_spec(
+    case_dir: str | Path,
+    *,
+    case_kind: str,
+    spec_dir: str | Path | None = None,
+) -> dict[str, object]:
+    """Audit one Benchmark-A case without fitting its physical parameters."""
+
+    def check(name: str, expected: object, observed: object) -> dict[str, object]:
+        passed = (
+            math.isclose(float(observed), float(expected), rel_tol=1.0e-9, abs_tol=1.0e-14)
+            if isinstance(expected, (int, float)) and isinstance(observed, (int, float))
+            else observed == expected
+        )
+        return {"name": name, "expected": expected, "observed": observed, "pass": passed}
+
+    root = Path(case_dir)
+    mesh = next((path for path in (root / "case/system/blockMeshDict", root / "system/blockMeshDict") if path.is_file()), None)
+    declared_ha = None
+    if mesh is not None and (match := re.search(r"\bHa\s+([0-9eE+.\-]+)\s*;", mesh.read_text())):
+        declared_ha = float(match.group(1))
+    spec = load_benchmark_a_spec(case_kind, spec_dir)
+    geometry = infer_rectangular_geometry(root)
+    fluid = infer_liquid_material_properties(root)
+    b0 = infer_uniform_b0(root)
+    solid, insulator = infer_solid_conductivities(root)
+    checks: list[dict[str, object]] = []
+    expected_geometry = spec["geometry"]
+    if geometry is None:
+        checks.append(check("geometry.available", True, False))
+    else:
+        width, height, thickness, wall_cells = geometry
+        checks += [
+            check("geometry.width", expected_geometry["width"], width),
+            check("geometry.height", expected_geometry["height"], height),
+            check("geometry.wall_thickness", expected_geometry["wall_thickness"], thickness),
+            check("geometry.wall_cells", expected_geometry["wall_cells"], wall_cells),
+        ]
+    expected_fluid = spec["fluid"]
+    if fluid is None:
+        checks.append(check("fluid.available", True, False))
+    else:
+        checks += [check(f"fluid.{key}", expected_fluid[key], fluid[key]) for key in (
+            "conductivity", "density", "dynamic_viscosity", "kinematic_viscosity"
+        )]
+    expected_field = tuple(map(float, spec["magnetic_field"]["vector"]))
+    physical_ha = None
+    if fluid is not None and b0 is not None and geometry is not None:
+        physical_ha = hartmann_number(
+            magnetic_field=math.sqrt(sum(value * value for value in b0)),
+            length_scale=float(expected_geometry["length_scale"]),
+            conductivity=fluid["conductivity"], density=fluid["density"],
+            kinematic_viscosity=fluid["kinematic_viscosity"],
+        )
+    expected_wall = spec["wall"]
+    checks += [
+        check("magnetic_field.vector", expected_field, b0),
+        check("mesh.declared_hartmann", spec["magnetic_field"]["hartmann_number"], declared_ha),
+        check("physics.hartmann", spec["magnetic_field"]["hartmann_number"], physical_ha),
+        check("wall.conducting_wall_conductivity", expected_wall["conducting_wall_conductivity"], solid),
+        check("wall.insulating_wall_conductivity", expected_wall["insulating_wall_conductivity"], insulator),
+        check("drive.mode", spec["drive"]["mode"], infer_inlet_drive_mode(root)),
+        check("drive.target_flow_rate", spec["drive"].get("target_flow_rate"), infer_inlet_flow_rate(root)),
+    ]
+    failed = [item for item in checks if not item["pass"]]
+    return {
+        "case_kind": case_kind, "spec_id": spec["id"], "spec_path": spec["path"],
+        "spec_sha256": spec["sha256"], "reference_case_dir": str(root),
+        "matched": not failed, "failed_check_count": len(failed), "checks": checks,
+        "physical_hartmann_number": physical_ha,
+        "declared_mesh_hartmann_number": declared_ha,
+    }
 
 
 def materialize_freemhd_source_snapshot(

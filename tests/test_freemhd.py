@@ -18,7 +18,6 @@ from lmx.benchmarks import (
 )
 from lmx.freemhd import (
     artifact_sha256,
-    audit_freemhd_case_against_spec,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
     infer_liquid_material_properties,
@@ -223,7 +222,7 @@ def test_freemhd_case_audit_exposes_mislabeled_ha_and_hunt_wall(tmp_path: Path):
     case = _materialize_matched_case(tmp_path, "hunt")
     (case / "0/liquid/B0").write_text("internalField uniform ( 0 10 0 );\n")
     (case / "constant/solidWalls/thermophysicalProperties").write_text("elcond 1e-6;\n")
-    report = audit_freemhd_case_against_spec(case, case_kind="hunt")
+    report = run_freemhd_parity_suite.audit_freemhd_case_against_spec(case, case_kind="hunt")
     failed_names = {check["name"] for check in report["checks"] if not check["pass"]}
 
     assert report["matched"] is False
@@ -790,7 +789,7 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
 
 
 def test_freemhd_audit_reports_missing_inputs_and_explicit_nu(tmp_path: Path):
-    report = audit_freemhd_case_against_spec(tmp_path, case_kind="shercliff")
+    report = run_freemhd_parity_suite.audit_freemhd_case_against_spec(tmp_path, case_kind="shercliff")
     failed_names = {check["name"] for check in report["checks"] if not check["pass"]}
     assert "geometry.available" in failed_names
     assert "fluid.available" in failed_names

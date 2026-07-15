@@ -295,13 +295,6 @@ def infer_rectangular_geometry(
     )
 
 
-def _infer_block_mesh_scalar(case_dir: str | Path, key: str) -> float | None:
-    path = _first_existing(case_dir, "case/system/blockMeshDict", "system/blockMeshDict")
-    if path is None:
-        return None
-    return _extract_first_scalar(path.read_text(), rf"\b{re.escape(key)}\s+([0-9eE+.\-]+)\s*;")
-
-
 def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) -> dict[str, object]:
     """Load and internally validate a canonical matched Benchmark-A TOML spec."""
 
@@ -351,7 +344,6 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
     payload["path"] = path.relative_to(path.parents[2]).as_posix()
     payload["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     return payload
-
 
 def _decode_matched_b2_lmx_input(path: str | Path):
     from dataclasses import fields
@@ -1016,115 +1008,3 @@ def load_samper_table_i(path: str | Path | None = None) -> dict[str, object]:
     payload["path"] = source.relative_to(source.parents[2]).as_posix()
     payload["sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
     return payload
-
-
-def _audit_check(name: str, expected: object, observed: object, *, rel_tol: float = 1.0e-9) -> dict[str, object]:
-    if isinstance(expected, (int, float)) and isinstance(observed, (int, float)):
-        passed = math.isclose(float(observed), float(expected), rel_tol=rel_tol, abs_tol=1.0e-14)
-    else:
-        passed = observed == expected
-    return {"name": name, "expected": expected, "observed": observed, "pass": passed}
-
-
-def audit_freemhd_case_against_spec(
-    case_dir: str | Path,
-    *,
-    case_kind: str,
-    spec_dir: str | Path | None = None,
-) -> dict[str, object]:
-    """Audit a FreeMHD case against the matched spec without fitting parameters."""
-
-    spec = load_benchmark_a_spec(case_kind, spec_dir)
-    geometry = infer_rectangular_geometry(case_dir)
-    fluid = infer_liquid_material_properties(case_dir)
-    b0 = infer_uniform_b0(case_dir)
-    solid_conductivity, insulator_conductivity = infer_solid_conductivities(case_dir)
-    drive_mode = infer_inlet_drive_mode(case_dir)
-    checks: list[dict[str, object]] = []
-
-    expected_geometry = spec["geometry"]
-    if geometry is None:
-        checks.append(_audit_check("geometry.available", True, False))
-    else:
-        width, height, wall_thickness, wall_cells = geometry
-        checks.extend(
-            [
-                _audit_check("geometry.width", expected_geometry["width"], width),
-                _audit_check("geometry.height", expected_geometry["height"], height),
-                _audit_check(
-                    "geometry.wall_thickness",
-                    expected_geometry["wall_thickness"],
-                    wall_thickness,
-                ),
-                _audit_check("geometry.wall_cells", expected_geometry["wall_cells"], wall_cells),
-            ]
-        )
-
-    expected_fluid = spec["fluid"]
-    if fluid is None:
-        checks.append(_audit_check("fluid.available", True, False))
-    else:
-        for key in (
-            "conductivity",
-            "density",
-            "dynamic_viscosity",
-            "kinematic_viscosity",
-        ):
-            checks.append(_audit_check(f"fluid.{key}", expected_fluid[key], fluid[key]))
-
-    expected_field = tuple(float(value) for value in spec["magnetic_field"]["vector"])
-    checks.append(_audit_check("magnetic_field.vector", expected_field, b0))
-    declared_ha = _infer_block_mesh_scalar(case_dir, "Ha")
-    checks.append(
-        _audit_check(
-            "mesh.declared_hartmann",
-            spec["magnetic_field"]["hartmann_number"],
-            declared_ha,
-        )
-    )
-    physical_ha = None
-    if fluid is not None and b0 is not None and geometry is not None:
-        physical_ha = hartmann_number(
-            magnetic_field=math.sqrt(sum(value * value for value in b0)),
-            length_scale=float(expected_geometry["length_scale"]),
-            conductivity=fluid["conductivity"],
-            density=fluid["density"],
-            kinematic_viscosity=fluid["kinematic_viscosity"],
-        )
-    checks.append(_audit_check("physics.hartmann", spec["magnetic_field"]["hartmann_number"], physical_ha))
-
-    expected_wall = spec["wall"]
-    checks.extend(
-        [
-            _audit_check(
-                "wall.conducting_wall_conductivity",
-                expected_wall["conducting_wall_conductivity"],
-                solid_conductivity,
-            ),
-            _audit_check(
-                "wall.insulating_wall_conductivity",
-                expected_wall["insulating_wall_conductivity"],
-                insulator_conductivity,
-            ),
-            _audit_check("drive.mode", spec["drive"]["mode"], drive_mode),
-            _audit_check(
-                "drive.target_flow_rate",
-                spec["drive"].get("target_flow_rate"),
-                infer_inlet_flow_rate(case_dir),
-            ),
-        ]
-    )
-
-    failed = [check for check in checks if not bool(check["pass"])]
-    return {
-        "case_kind": case_kind,
-        "spec_id": spec["id"],
-        "spec_path": spec["path"],
-        "spec_sha256": spec["sha256"],
-        "reference_case_dir": str(Path(case_dir)),
-        "matched": not failed,
-        "failed_check_count": len(failed),
-        "checks": checks,
-        "physical_hartmann_number": physical_ha,
-        "declared_mesh_hartmann_number": declared_ha,
-    }
