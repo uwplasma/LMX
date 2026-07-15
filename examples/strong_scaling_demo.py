@@ -316,22 +316,38 @@ def run_strong_scaling_demo(
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir.mkdir(parents=True, exist_ok=True)
-    matched_input = evaluator = None
+    matched_input = gpu_matched_input = evaluator = None
     if benchmark_kind == "matched_b2_smoke":
+        if cpu_problem == (2048, 64, 64):
+            cpu_problem = (8, 7, 7)
+        if gpu_problem == (6144, 96, 96):
+            gpu_problem = (8, 7, 7)
         if repeats < 4:
             raise ValueError("matched_b2_smoke requires one cold and three warm runs")
+        if any(cpu_problem[0] % count for count in cpu_counts) or (
+            remote_host is not None
+            and any(gpu_problem[0] % count for count in gpu_counts)
+        ):
+            raise ValueError("Matched B2 axial size must divide every device count")
         from scripts.run_freemhd_parity_suite import (
             materialize_matched_b2_evaluator,
             materialize_matched_b2_lmx_input,
         )
+        shape_label = "x".join(map(str, cpu_problem))
         matched_input, evaluator = (
-            out_dir / "matched_b2_input.json",
+            out_dir / f"matched_b2_cpu_{shape_label}.json",
             out_dir / "matched_b2_evaluator.json",
         )
         if not matched_input.exists():
-            materialize_matched_b2_lmx_input(matched_input)
+            materialize_matched_b2_lmx_input(matched_input, solver_shape=cpu_problem)
         if not evaluator.exists():
             materialize_matched_b2_evaluator(evaluator)
+        gpu_label = "x".join(map(str, gpu_problem))
+        gpu_matched_input = out_dir / f"matched_b2_gpu_{gpu_label}.json"
+        if remote_host is not None and not gpu_matched_input.exists():
+            materialize_matched_b2_lmx_input(
+                gpu_matched_input, solver_shape=gpu_problem
+            )
     records = run_local_cpu_scaling(
         repo_root=repo_root,
         out_dir=out_dir,
@@ -365,7 +381,7 @@ def run_strong_scaling_demo(
                 python_executable=python_executable,
                 profile_dir=profile_dir,
                 restart_path=gpu_restart_path,
-                matched_input=matched_input,
+                matched_input=gpu_matched_input,
                 evaluator=evaluator,
             )
         )
@@ -452,6 +468,15 @@ def main(argv: list[str] | None = None) -> int:
 
     cpu_problem = (args.cpu_nx, args.cpu_ny, args.cpu_nz)
     gpu_problem = (args.gpu_nx, args.gpu_ny, args.gpu_nz)
+    if args.benchmark_kind == "matched_b2_smoke":
+        cpu_problem = tuple(
+            default if value == old else value
+            for value, old, default in zip(cpu_problem, (2048, 64, 64), (8, 7, 7))
+        )
+        gpu_problem = tuple(
+            default if value == old else value
+            for value, old, default in zip(gpu_problem, (6144, 96, 96), (8, 7, 7))
+        )
     if args.benchmark_kind == "extruded_solve":
         if args.cpu_restart is None:
             parser.error("--cpu-restart is required for --benchmark-kind extruded_solve")

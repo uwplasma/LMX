@@ -224,19 +224,36 @@ def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]
     return manifest
 
 
-def _tiny_b2_problem(spec_root: str | Path | None = None) -> tuple[object, dict[str, object]]:
+def _tiny_b2_problem(
+    spec_root: str | Path | None = None,
+    *,
+    solver_shape: tuple[int, int, int] = (8, 7, 7),
+) -> tuple[object, dict[str, object]]:
     from lmx._fringing_types import ExtrudedInductionlessProblem, FringingProfile
     from lmx.fringing import _cross_section_mesh
 
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse", root=spec_root)
     dt = 1.0 / 540000.0
+    nx, ny, nz = solver_shape
+    wall_cells = (1, 1, 1, 1)
+    if nx < 2 or ny < 5 or nz < 5:
+        raise ValueError("Matched B2 shape requires nx >= 2 and three transverse fluid cells")
     case = replace(
         problem.case,
         name="alex_b2-fringing-square_harness-smoke",
-        geometry=replace(problem.case.geometry, nx=8, ny=5, nz=5, wall_cells=(1, 1, 1, 1)),
+        geometry=replace(
+            problem.case.geometry,
+            nx=nx,
+            ny=ny - sum(wall_cells[:2]),
+            nz=nz - sum(wall_cells[2:]),
+            wall_cells=wall_cells,
+        ),
         time_stepper=replace(problem.case.time_stepper, dt=dt, t_final=2.0 * dt, max_steps=2),
     )
     mesh = _cross_section_mesh(case)
+    generated_shape = tuple(len(getattr(mesh, f"{axis}_centers")) for axis in "xyz")
+    if generated_shape != solver_shape:
+        raise RuntimeError(f"Matched B2 mesh shape is {generated_shape}, expected {solver_shape}")
     reference = load_benchmark_b_reference("B2-fringing-square", spec_root)
     anchors_x = np.asarray(reference["x_over_L"], dtype=float)
     anchors_b = np.asarray(reference["b_over_B0"], dtype=float)
@@ -295,14 +312,17 @@ def _tiny_b2_problem(spec_root: str | Path | None = None) -> tuple[object, dict[
 
 
 def materialize_matched_b2_lmx_input(
-    output_file: str | Path, *, spec_root: str | Path | None = None
+    output_file: str | Path,
+    *,
+    spec_root: str | Path | None = None,
+    solver_shape: tuple[int, int, int] = (8, 7, 7),
 ) -> dict[str, object]:
-    """Write the deterministic real LMX input for the tiny matched-B2 smoke."""
+    """Write a deterministic matched-B2 input; the default is the exact smoke."""
 
     destination = Path(output_file)
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite existing LMX B2 input {destination}")
-    _, payload = _tiny_b2_problem(spec_root)
+    _, payload = _tiny_b2_problem(spec_root, solver_shape=solver_shape)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
         json.dumps(payload, allow_nan=False, indent=2, sort_keys=True) + "\n",

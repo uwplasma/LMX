@@ -548,7 +548,7 @@ def test_freemhd_source_snapshot_rejects_unfrozen_evidence(
 
 
 def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path):
-    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    first, second, scaled = (tmp_path / name for name in ("first.json", "second.json", "scaled.json"))
     payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
     run_freemhd_parity_suite.materialize_matched_b2_lmx_input(second)
     problem, contract = load_matched_b2_lmx_input(first), observe_lmx_b2_contract(first)
@@ -566,6 +566,14 @@ def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path)
     )
     assert groups["magnetic_reynolds_number_assumption"] == "Rm << 1"
     assert contract["stopping_rules"]["expected_stop_reason"] == "step_limit"
+    scaled_payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(scaled, solver_shape=(16, 7, 7))
+    scaled_problem = load_matched_b2_lmx_input(scaled)
+    geometry = scaled_problem.case.geometry
+    assert (geometry.nx, geometry.ny, geometry.nz) == (16, 5, 5)
+    assert len(scaled_payload["field_profile"]["sample_x_over_L"]) == 16
+    with pytest.raises(ValueError, match="requires nx"):
+        run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+            tmp_path / "bad", solver_shape=(8, 2, 7))
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
 

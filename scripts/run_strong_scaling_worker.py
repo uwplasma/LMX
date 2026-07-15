@@ -235,6 +235,9 @@ def _matched_b2_smoke_benchmark(
             problem, num_devices=num_devices
         )
         timings.append(time.perf_counter() - started)
+    acceptance_role = (
+        "harness-smoke" if direct.u.shape == (8, 7, 7) else "scaling-calibration"
+    )
     try:
         resumed = _resume_matched_b2_lmx(
             problem, checkpoint, num_devices=num_devices
@@ -243,6 +246,7 @@ def _matched_b2_smoke_benchmark(
         warm = np.asarray(timings[1:])
         return {
             "benchmark_kind": "matched_b2_smoke",
+            "acceptance_role": acceptance_role,
             "operator_path": "solve_extruded_inductionless",
             "backend": jax.default_backend(), "device_kind": jax.devices()[0].device_kind,
             "num_devices": num_devices, "nx": direct.u.shape[0],
@@ -294,6 +298,7 @@ def _matched_b2_smoke_benchmark(
             if "byte" in key.lower() and isinstance(value, (int, np.integer))}})
     return {
         "benchmark_kind": "matched_b2_smoke", "operator_path": "solve_extruded_inductionless",
+        "acceptance_role": acceptance_role,
         "backend": jax.default_backend(), "device_kind": jax.devices()[0].device_kind,
         "num_devices": num_devices, "nx": direct.u.shape[0],
         "ny": direct.u.shape[1], "nz": direct.u.shape[2],

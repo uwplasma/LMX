@@ -35,11 +35,16 @@ from scripts import run_strong_scaling_worker
 pytestmark = pytest.mark.unit
 
 
-def test_scaling_demo_requires_restart_for_production() -> None:
+def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     with pytest.raises(SystemExit):
         strong_scaling_demo.main(["--benchmark-kind", "extruded_solve"])
     with pytest.raises(SystemExit):
         strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke"])
+    options = {}
+    monkeypatch.setattr(strong_scaling_demo, "run_strong_scaling_demo", options.update)
+    arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4", "--cpu-nx", "16"]
+    assert strong_scaling_demo.main(arguments) == 0
+    assert options["cpu_problem"] == (16, 7, 7) and options["gpu_problem"] == (8, 7, 7)
 
 
 def test_scaling_worker_command_forwards_restart(

@@ -691,7 +691,11 @@ def observe_lmx_b2_output(
     pressure = np.asarray(benchmark_b_pressure_observable(
         SimpleNamespace(bundle=direct.bundle), "B2-fringing-square"
     ))
-    if courant.shape != (2, 3) or pressure.shape != (8,) or direct.bundle.stopping_state[0] != 2:
+    if (
+        courant.shape != (2, 3)
+        or pressure.shape != (problem.case.geometry.nx,)
+        or direct.bundle.stopping_state[0] != 2
+    ):
         raise ValueError("LMX B2 output execution shape differs")
     return {
         "steps": 2, "stop_reason": direct.bundle.stopping_state[2],
