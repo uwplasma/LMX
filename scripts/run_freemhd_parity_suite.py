@@ -182,6 +182,31 @@ def materialize_matched_b2_lmx_input(
     return payload
 
 
+def materialize_matched_b2_evaluator(output_file: str | Path) -> dict[str, object]:
+    """Write the shared pressure-tap and normalization contract used by both solvers."""
+
+    destination = Path(output_file)
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing matched B2 evaluator {destination}")
+    payload = {
+        "schema_version": 1,
+        "case_id": "B2-fringing-square",
+        "observable": {
+            "primary": "excess transverse pressure difference between published A/B taps",
+            "tap_geometry": "top and side wall midpoints at each axial station",
+            "signed_orientation": "side (+z) minus top (+y)",
+        },
+        "normalization": {
+            "field": "B_y / B0",
+            "pressure": "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau",
+            "coordinate": "x / half-width",
+        },
+    }
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return payload
+
+
 _B2_SKELETON_FILES = (
     "0/B0", "0/JxB", "0/T", "0/U", "0/alpha.liquidMetal", "0/p", "0/p_rgh", "0/potE",
     "constant/g", "constant/regionProperties", "constant/liquid/thermophysicalProperties.liquidMetal",
@@ -208,18 +233,20 @@ def _write_foam(path: Path, body: str, *, class_name: str = "dictionary") -> Non
 
 
 def _b2_field_expression(anchor_count: int) -> str:
-    expression = f"b{anchor_count - 1}"
-    for index in range(anchor_count - 2, -1, -1):
-        slope = f"(b{index + 1}-b{index})/(x{index + 1}-x{index})"
-        segment = f"b{index}+(x-x{index})*{slope}"
-        expression = f"x<=x{index} ? b{index} : (x<=x{index + 1} ? ({segment}) : ({expression}))"
-    return expression
+    labels = [chr(ord("a") + index) for index in range(anchor_count)]
+    slopes = [f"(b{right}-b{left})/(x{right}-x{left})" for left, right in zip(labels, labels[1:])]
+    terms = [f"b{labels[0]}", f"{slopes[0]}*(x-x{labels[0]})"]
+    terms += [
+        f"({slopes[index]}-{slopes[index - 1]})*pos(x-x{labels[index]})*(x-x{labels[index]})"
+        for index in range(1, anchor_count - 1)
+    ]
+    return "+".join(terms)
 
 
 def _b2_block_mesh() -> str:
     return """
 scale 1;
-xMin -15; xMax 10; Ly 1; Ly_wall 1.02;
+xMin -15; xMax 10; Ly 1; Ly_wall 1.02; physicalHalfWidth 0.0439;
 Nx 8; Ny 5; Nz 5; N_wall 1;
 vertices
 (
@@ -272,8 +299,8 @@ def _b2_set_expr(reference: dict[str, object]) -> str:
     x_values = [float(value) for value in reference["x_over_L"]]
     b_values = [float(value) for value in reference["b_over_B0"]]
     variables = ["\"x=pos().x()\"", "\"Bscale=sqrt(540)\""]
-    variables += [f'"x{i}={value:.17g}"' for i, value in enumerate(x_values)]
-    variables += [f'"b{i}={value:.17g}"' for i, value in enumerate(b_values)]
+    variables += [f'"x{chr(97 + i)}={value:.17g}"' for i, value in enumerate(x_values)]
+    variables += [f'"b{chr(97 + i)}={value:.17g}"' for i, value in enumerate(b_values)]
     anchors = {"x_over_L": x_values, "b_over_B0": b_values}
     anchors_sha = hashlib.sha256(
         json.dumps(anchors, sort_keys=True, separators=(",", ":")).encode()

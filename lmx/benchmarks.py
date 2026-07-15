@@ -97,8 +97,15 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     expected_role = _MATCHED_PRODUCTION_ROLES[case_id]
     if not isinstance(matched, dict) or set(matched) != {"shared", "roles"}:
         raise ValueError("Benchmark B matched formulation contract is incomplete")
-    if not isinstance(roles, dict) or set(roles) != {expected_role}:
+    expected_roles = {expected_role, "harness-smoke"} if case_id == "B2-fringing-square" else {expected_role}
+    if not isinstance(roles, dict) or set(roles) != expected_roles:
         raise ValueError("Benchmark B matched production role differs")
+    if case_id == "B2-fringing-square":
+        encoded_smoke = json.dumps(
+            roles["harness-smoke"], sort_keys=True, separators=(",", ":")
+        ).encode()
+        if hashlib.sha256(encoded_smoke).hexdigest() != "3ef7c6f58900629221bc83c90fe3afef8a656efddd1d455cd60a71e8b38ac4d5":
+            raise ValueError("Benchmark B matched smoke role differs")
     contract = canonical_matched_b_contract(spec, expected_role)
     semantics = (
         contract["equations"].get("inertia"),

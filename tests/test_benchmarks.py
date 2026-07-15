@@ -35,7 +35,7 @@ _EQUATIONS = _SHARED + ("equations",)
 _MESH_LEVELS = ("mesh", "levels")
 _SEMANTICS = "matched formulation semantics differ"
 _FREEMHD_COMMIT = ("free_mhd_discretization_reference", "repository_commit")
-_STEADY_STEPS = _MATCHED + ("roles", None, "stopping_rules", "steady_steps_min")
+_STEADY_STEPS = _MATCHED + ("roles", "b2-production", "stopping_rules", "steady_steps_min")
 _STOPPING = "matched stopping contract differs"
 _REFERENCE_HEADER = (
     "x_over_L,b_over_B0,b_uncertainty,pressure_observable,pressure_uncertainty"

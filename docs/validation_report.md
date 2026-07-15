@@ -35,9 +35,10 @@ are authoritative when prose and results differ.
 - ALEX B2 square-duct fringing flow: the earlier no-inertia, stationwise-flow
   formulation has conservation, two-GPU numerical equivalence, a 1.87x
   fine-checkpoint solver promotion, and fine numerical gates. These are
-  diagnostics, not validation of the canonical finite-inertia formulation,
-  whose implementation and exact FreeMHD smoke remain open. The fine pressure
-  curve misses every frozen ALEX literature-error limit. A checksummed
+  diagnostics, not validation of the canonical finite-inertia formulation.
+  That formulation and its independently observed LMX/FreeMHD tiny inputs are
+  implemented; executing the exact two-update smoke remains open. The fine
+  pressure curve misses every frozen ALEX literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from
   15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not
   validation evidence; exact matched-field FreeMHD and three-mesh gates remain

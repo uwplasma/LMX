@@ -30,6 +30,10 @@ SAMPER_TABLE_I_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "refe
 _MATCHED_B_ARTIFACT_NAMES = (
     "lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"
 )
+_MATCHED_B_ARTIFACT_KINDS = {
+    "lmx_source": "tree", "freemhd_source": "tree", "lmx_input": "file",
+    "freemhd_input": "tree", "evaluator": "file", "lmx_output": "file", "freemhd_output": "file",
+}
 _TREE_HASH_TAG = b"LMX-ARTIFACT-TREE-v1\0"
 
 
@@ -154,27 +158,26 @@ def _extract_first_scalar(text: str, *patterns: str) -> float | None:
     return None
 
 
-def _extract_inlet_block(text: str) -> str | None:
-    boundary_match = re.search(r"boundaryField\s*\{", text)
-    if boundary_match is None:
+def _extract_foam_block(text: str, name: str) -> str | None:
+    match = re.search(rf"(?<![\w.]){re.escape(name)}\s*\{{", text)
+    if match is None:
         return None
-    boundary_text = text[boundary_match.end() :]
-    inlet_match = re.search(r"\binlet\b\s*\{", boundary_text)
-    if inlet_match is None:
-        return None
-    start = inlet_match.end()
+    start = match.end()
     depth = 1
     index = start
-    while index < len(boundary_text) and depth > 0:
-        char = boundary_text[index]
+    while index < len(text) and depth > 0:
+        char = text[index]
         if char == "{":
             depth += 1
         elif char == "}":
             depth -= 1
         index += 1
-    if depth != 0:
-        return None
-    return boundary_text[start : index - 1]
+    return None if depth else text[start : index - 1]
+
+
+def _extract_inlet_block(text: str) -> str | None:
+    boundary = _extract_foam_block(text, "boundaryField")
+    return None if boundary is None else _extract_foam_block(boundary, "inlet")
 
 
 def _infer_inlet_value(case_dir: str | Path, pattern: str) -> str | None:
@@ -517,7 +520,32 @@ def load_matched_b2_lmx_input(path: str | Path):
     return _decode_matched_b2_lmx_input(path)[0]
 
 
-def observe_lmx_b2_contract(path: str | Path) -> dict[str, object]:
+def _matched_b2_evaluator(path: str | Path | None) -> tuple[dict[str, object], dict[str, object]]:
+    if path is None:
+        return (
+            {"primary": "excess transverse pressure difference between published A/B taps", "tap_geometry": "top and side wall midpoints at each axial station", "signed_orientation": "side (+z) minus top (+y)"},
+            {"field": "B_y / B0", "pressure": "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau", "coordinate": "x / half-width"},
+        )
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or set(payload) != {"schema_version", "case_id", "observable", "normalization"}:
+        raise ValueError("Invalid matched B2 evaluator schema")
+    if (payload["schema_version"], payload["case_id"]) != (1, "B2-fringing-square"):
+        raise ValueError("Invalid matched B2 evaluator identity")
+    observable, normalization = payload["observable"], payload["normalization"]
+    if not isinstance(observable, dict) or not isinstance(normalization, dict):
+        raise ValueError("Invalid matched B2 evaluator sections")
+    return observable, normalization
+
+
+def _contract_array(values) -> list[float]:
+    return [float(f"{float(value):.15g}") for value in values]
+
+
+def _contract_scalar(value: float) -> float:
+    return float(f"{float(value):.14g}")
+
+
+def observe_lmx_b2_contract(path: str | Path, evaluator: str | Path | None = None) -> dict[str, object]:
     """Derive the matched-B2 contract from a real LMX input, never its expected spec."""
 
     problem, mesh, payload = _decode_matched_b2_lmx_input(path)
@@ -537,6 +565,7 @@ def observe_lmx_b2_contract(path: str | Path) -> dict[str, object]:
         magnetic_field=magnetic_field, length_scale=length, conductivity=fluid.conductivity,
         density=fluid.density, velocity=velocity,
     )
+    observable, normalization = _matched_b2_evaluator(evaluator)
     contract: dict[str, object] = {
         "equations": {
             "momentum": "transient incompressible Navier-Stokes-Lorentz",
@@ -596,30 +625,166 @@ def observe_lmx_b2_contract(path: str | Path) -> dict[str, object]:
             "nondimensional_flow_rate": float(inlet.value),
             "electric_axial_ends": "zero normal current",
         },
-        "observable": {
-            "primary": "excess transverse pressure difference between published A/B taps",
-            "tap_geometry": "top and side wall midpoints at each axial station",
-            "signed_orientation": "side (+z) minus top (+y)",
-        },
-        "normalization": {
-            "field": "B_y / B0",
-            "pressure": "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau",
-            "coordinate": "x / half-width",
-        },
+        "observable": observable,
+        "normalization": normalization,
         "mesh_coordinates": {
             "coordinate_system": payload["mesh"]["coordinate_system"],
             "family": "uniform 5x5 fluid grid with one explicit wall cell per side",
             "exact_coordinate_arrays_required": True,
-            **{f"{axis}_faces": np.asarray(getattr(mesh, f"{axis}_faces")).tolist() for axis in "xyz"},
+            **{f"{axis}_faces": _contract_array(getattr(mesh, f"{axis}_faces")) for axis in "xyz"},
             "field_source": profile["source_name"],
             "field_source_sha256": profile["source_sha256"],
             "field_anchors_sha256": profile["anchors_sha256"],
-            "field_sample_x_over_L": profile["sample_x_over_L"],
-            "field_sample_b_over_B0": profile["sample_b_over_B0"],
+            "field_sample_x_over_L": _contract_array(profile["sample_x_over_L"]),
+            "field_sample_b_over_B0": _contract_array(profile["sample_b_over_B0"]),
         },
         "stopping_rules": dict(controls),
     }
     return contract
+
+
+def observe_freemhd_b2_contract(
+    case_dir: str | Path, source_dir: str | Path, evaluator: str | Path | None = None
+) -> dict[str, object]:
+    """Derive the tiny B2 contract from effective OpenFOAM dictionaries and source bytes."""
+
+    case, source = Path(case_dir), Path(source_dir)
+
+    def read(relative: str) -> str:
+        return (case / relative).read_text(encoding="utf-8")
+
+    def scalar(text: str, key: str) -> float:
+        value = _extract_first_scalar(text, rf"\b{re.escape(key)}\s+([0-9eE+.\-]+)\s*;")
+        if value is None:
+            raise ValueError(f"FreeMHD B2 input omits {key}")
+        return value
+
+    def block(text: str, name: str) -> str:
+        value = _extract_foam_block(text, name)
+        if value is None:
+            raise ValueError(f"FreeMHD B2 input omits {name}")
+        return value
+
+    source_pin = json.loads((source / "source-pin.json").read_text(encoding="utf-8"))
+    files = source_pin.get("files") if isinstance(source_pin, dict) else None
+    if not isinstance(files, dict) or not files:
+        raise ValueError("FreeMHD B2 source snapshot is incomplete")
+    source_text: dict[str, str] = {}
+    for relative, expected in files.items():
+        path = source / relative
+        if artifact_sha256(path, "file") != expected:
+            raise ValueError(f"FreeMHD B2 source snapshot changed: {relative}")
+        source_text[Path(relative).name] = path.read_text(encoding="utf-8")
+    required_sources = {"mhdUEqn.H", "ePotEqn.H", "limitedLinear.H", "limitedLinear.C", "LimitedScheme.H", "NVDTVD.H", "LimitFuncs.C"}
+    if not required_sources <= set(source_text):
+        raise ValueError("FreeMHD B2 source snapshot lacks solver or limiter evidence")
+    momentum, electric = source_text["mhdUEqn.H"], source_text["ePotEqn.H"]
+    source_semantics = all((
+        "fvm::ddt(rho, U) + fvm::div(rhoPhi, U)" in momentum,
+        "turbulence.divDevRhoReff(U)" in momentum,
+        "fvm::laplacian(elcond,potE)" in electric,
+        "fvc::div(psiub)" in electric,
+        "JConservativeForm" in electric,
+        "makeLimitedSurfaceInterpolationScheme(limitedLinear, limitedLinearLimiter)" in source_text["limitedLinear.C"],
+        "makeLimitedSurfaceInterpolationTypeScheme(SS,LIMITER,NVDTVD,magSqr,vector)" in source_text["LimitedScheme.H"],
+        "return Foam::magSqr(phi);" in source_text["LimitFuncs.C"],
+    ))
+    if not source_semantics:
+        raise ValueError("FreeMHD B2 pinned sources do not implement the matched equations")
+
+    mesh_text, schemes = read("system/blockMeshDict"), read("system/liquid/fvSchemes")
+    x_min, x_max, half, outer = (scalar(mesh_text, key) for key in ("xMin", "xMax", "Ly", "Ly_wall"))
+    nx, ny, nz, wall_cells = (int(scalar(mesh_text, key)) for key in ("Nx", "Ny", "Nz", "N_wall"))
+    if len(re.findall(r"\bhex\s*\(", mesh_text)) != 9 or len(re.findall(r"\bsolidWalls\s*\(", mesh_text)) != 8:
+        raise ValueError("FreeMHD B2 block zones do not form one fluid plus one shell")
+    x_faces = np.linspace(x_min, x_max, nx + 1)
+    fluid_faces = np.linspace(-half, half, ny + 1)
+    y_faces = np.concatenate(([-outer], fluid_faces, [outer]))
+    z_faces = np.concatenate(([-outer], np.linspace(-half, half, nz + 1), [outer]))
+
+    field_text = read("system/liquid/setExprFieldsDict")
+    if field_text != read("system/solidWalls/setExprFieldsDict"):
+        raise ValueError("FreeMHD B2 fluid and wall fields differ")
+    variables = dict(re.findall(r'"([A-Za-z][A-Za-z0-9]*)=([^";]+)"', field_text))
+    labels = sorted(name[1:] for name in variables if re.fullmatch(r"x[a-z]", name))
+    if labels != [chr(97 + index) for index in range(len(labels))] or {f"b{label}" for label in labels} - set(variables):
+        raise ValueError("FreeMHD B2 field anchors are incomplete")
+    anchors_x = np.asarray([float(variables[f"x{label}"]) for label in labels])
+    anchors_b = np.asarray([float(variables[f"b{label}"]) for label in labels])
+    slopes = [f"(b{right}-b{left})/(x{right}-x{left})" for left, right in zip(labels, labels[1:])]
+    terms = [f"b{labels[0]}", f"{slopes[0]}*(x-x{labels[0]})"]
+    terms += [f"({slopes[index]}-{slopes[index - 1]})*pos(x-x{labels[index]})*(x-x{labels[index]})" for index in range(1, len(labels) - 1)]
+    expression = "+".join(terms)
+    actual_expression = re.search(r"expression\s*#\{\s*vector\(0,Bscale\*\((.*)\),0\)\s*#\};", field_text, re.DOTALL)
+    if actual_expression is None or re.sub(r"\s+", "", actual_expression.group(1)) != expression:
+        raise ValueError("FreeMHD B2 field expression differs from its anchors")
+    field_scale = math.sqrt(float(re.fullmatch(r"sqrt\(([^)]+)\)", variables["Bscale"]).group(1)))
+    sample_x = 0.5 * (x_faces[:-1] + x_faces[1:])
+    sample_b = np.interp(sample_x, anchors_x, anchors_b)
+    anchors_sha = hashlib.sha256(json.dumps(
+        {"x_over_L": anchors_x.tolist(), "b_over_B0": anchors_b.tolist()}, sort_keys=True, separators=(",", ":")
+    ).encode()).hexdigest()
+    quoted = lambda key: re.search(rf"\b{key}\s+\"([^\"]+)\"\s*;", field_text).group(1)
+    if quoted("lmxFieldAnchorsSHA256") != anchors_sha:
+        raise ValueError("FreeMHD B2 field anchor hash differs")
+
+    fluid = infer_liquid_material_properties(case)
+    wall_conductivity, insulator = infer_solid_conductivities(case)
+    if fluid is None or wall_conductivity is None or insulator is not None:
+        raise ValueError("FreeMHD B2 material topology is incomplete")
+    change, solution, control = read("system/liquid/changeDictionaryDict"), read("system/liquid/fvSolution"), read("system/controlDict")
+    u, pressure, potential = (block(change, name) for name in ("U", "p_rgh", "potE"))
+    inlet, sink = block(block(u, "boundaryField"), "inlet"), block(block(u, "boundaryField"), "sink")
+    flow_rate = scalar(inlet, "volumetricFlowRate")
+    velocity = flow_rate / (4.0 * half * half)
+    length = half
+    ha = hartmann_number(magnetic_field=field_scale, length_scale=length, conductivity=fluid["conductivity"], density=fluid["density"], kinematic_viscosity=fluid["kinematic_viscosity"])
+    interaction = interaction_parameter(magnetic_field=field_scale, length_scale=length, conductivity=fluid["conductivity"], density=fluid["density"], velocity=velocity)
+    solvers = block(solution, "solvers")
+    p_solver, u_solver, e_solver = block(solvers, "p_rgh"), block(solvers, '"(U).*"'), block(solvers, "potE")
+    solid_e_solver = block(block(read("system/solidWalls/fvSolution"), "solvers"), "potE")
+    alpha, temperature = block(change, "alpha.liquidMetal"), block(change, "T")
+    solid_potential = block(read("system/solidWalls/changeDictionaryDict"), "potE")
+    reductions_hold = all((
+        "internalField uniform 1;" in alpha,
+        "internalField uniform 300;" in temperature,
+        "simulationType laminar;" in read("constant/liquid/turbulenceProperties"),
+        "limitVelocity" not in read("constant/liquid/fvOptions"),
+        "value (0 0 0);" in read("constant/g"),
+        scalar(control, "BtStartTime") == scalar(control, "BtDuration") == 0.0,
+        "JConservativeForm true;" in control and "adjustTimeStep off;" in control,
+        scalar(solid_e_solver, "maxIter") == scalar(e_solver, "maxIter"),
+        scalar(solid_e_solver, "tolerance") == scalar(e_solver, "tolerance"),
+        "type zeroGradient" in block(block(solid_potential, "boundaryField"), "outerWalls"),
+    ))
+    if not reductions_hold:
+        raise ValueError("FreeMHD B2 phase, thermal, electric, or fixed-step reduction differs")
+    observable, normalization = _matched_b2_evaluator(evaluator)
+    zero_current = all("type zeroGradient" in block(block(potential, "boundaryField"), name) for name in ("inlet", "sink"))
+    return {
+        "equations": {
+            "momentum": "transient incompressible Navier-Stokes-Lorentz", "inertia": "conservative div(rhoPhi,U)",
+            "time_discretization": "Euler" if re.search(r"default\s+Euler\s*;", schemes) else "unmatched",
+            "advection_discretization": "Gauss limitedLinear 1.0" if "div(rhoPhi,U) Gauss limitedLinear 1.0;" in schemes else "unmatched",
+            "advection_assembly": "implicit fvm::div with frozen rhoPhi and limiter weights",
+            "advection_vector_limiter": "single magSqr(U) limiter applied to all components",
+            "gradient_discretization": "cellLimited leastSquares 1.0" if "default cellLimited leastSquares 1.0;" in schemes else "unmatched",
+            "viscous_stress": "laminar divDevRhoReff", "electric_model": "inductionless Ohm law with div(J)=0",
+            "phase_reduction": "alpha=1 invariant", "thermal_reduction": "constant temperature and properties",
+        },
+        "nondimensional_groups": {
+            "hartmann_number": ha, "interaction_parameter": interaction,
+            "reynolds_number": reynolds_number(velocity=velocity, length_scale=length, kinematic_viscosity=fluid["kinematic_viscosity"]),
+            "magnetic_reynolds_number_assumption": "Rm << 1",
+        },
+        "geometry": {"kind": "square_duct", "length_scale": "duct half-width", "half_width_m": scalar(mesh_text, "physicalHalfWidth"), "x_over_L_min": x_min, "x_over_L_max": x_max, "constant_cross_section": True},
+        "magnetic_field": {"representation": "tabulated monotone interpolation", "components": "B = (0, B_y(x), 0) in the global Cartesian frame", "coordinate": "x / half-width", "normalization": "B_y / B0", "no_extrapolation": bool(re.search(r"\blmxExtrapolation\s+forbidden\s*;", field_text)), "normal_current_at_axial_ends": 0.0 if zero_current else math.nan},
+        "wall": {"model": "uniform thin conducting wall", "wall_conductance_ratio": _contract_scalar(wall_conductance_ratio(wall_conductivity=wall_conductivity, wall_thickness=outer - half, fluid_conductivity=fluid["conductivity"], length_scale=length)), "numerical_realization": "explicit volumetric shell preserving c_w", "thickness_over_L": _contract_scalar((outer - half) / length), "outer_electric_boundary": "zero normal current"},
+        "boundary_drive": {"velocity_inlet": "integral flow rate with extrapolated profile", "velocity_outlet": "zero normal gradient" if "type zeroGradient" in sink else "unmatched", "velocity_walls": "no slip", "pressure_inlet": "zero normal gradient", "pressure_outlet": "fixed gauge", "pressure_outlet_gauge": scalar(block(block(pressure, "boundaryField"), "sink"), "value uniform"), "flow_constraint_scope": "inlet face only", "nondimensional_flow_rate": flow_rate, "electric_axial_ends": "zero normal current" if zero_current else "unmatched"},
+        "observable": observable, "normalization": normalization,
+        "mesh_coordinates": {"coordinate_system": "Cartesian x-y-z faces in duct-half-width units", "family": "uniform 5x5 fluid grid with one explicit wall cell per side", "exact_coordinate_arrays_required": True, "x_faces": _contract_array(x_faces), "y_faces": _contract_array(y_faces), "z_faces": _contract_array(z_faces), "field_source": quoted("lmxFieldSource"), "field_source_sha256": quoted("lmxFieldSourceSHA256"), "field_anchors_sha256": anchors_sha, "field_sample_x_over_L": _contract_array(sample_x), "field_sample_b_over_B0": _contract_array(sample_b)},
+        "stopping_rules": {"dt": scalar(control, "deltaT"), "electric_iterations": int(scalar(e_solver, "maxIter")), "electric_tolerance": scalar(e_solver, "tolerance"), "projection_iterations": int(scalar(p_solver, "maxIter")), "projection_tolerance": scalar(p_solver, "tolerance"), "momentum_iterations": int(scalar(u_solver, "maxIter")), "momentum_tolerance": scalar(u_solver, "tolerance"), "executed_steps": round(scalar(control, "endTime") / scalar(control, "deltaT")), "steady_steps_required": int(scalar(control, "lmxSteadyStepsRequired")), "expected_stop_reason": "step_limit"},
+    }
 
 
 def validate_matched_b_record(
@@ -682,7 +847,7 @@ def validate_matched_b_record(
     artifacts = provenance.get("artifacts") if isinstance(provenance, dict) else None
     artifact_failed: list[str] = []
     calculated_artifacts: dict[str, str] = {}
-    resolved_artifacts: list[Path] = []
+    resolved_artifacts: dict[str, Path] = {}
     if artifact_root is None:
         artifact_failed.append("provenance.artifact_root")
     else:
@@ -699,25 +864,44 @@ def validate_matched_b_record(
                 for name in _MATCHED_B_ARTIFACT_NAMES:
                     try:
                         path, kind, expected_hash = _resolve_artifact(root, artifacts[name])
+                        if kind != _MATCHED_B_ARTIFACT_KINDS[name]:
+                            raise ValueError("kind")
                         calculated = artifact_sha256(path, kind)
                     except (OSError, ValueError) as error:
                         artifact_failed.append(f"provenance.{name}.{error}")
                         continue
-                    resolved_artifacts.append(path)
+                    resolved_artifacts[name] = path
                     calculated_artifacts[name] = calculated
                     if calculated != expected_hash:
                         artifact_failed.append(f"provenance.{name}.sha256.current")
-                identities = [(os.stat(path).st_dev, os.stat(path).st_ino) for path in resolved_artifacts]
+                paths = list(resolved_artifacts.values())
+                identities = [(os.stat(path).st_dev, os.stat(path).st_ino) for path in paths]
                 overlap = len(set(identities)) != len(identities) or any(
                     left in right.parents or right in left.parents
-                    for index, left in enumerate(resolved_artifacts)
-                    for right in resolved_artifacts[index + 1 :]
+                    for index, left in enumerate(paths)
+                    for right in paths[index + 1 :]
                 )
                 if overlap:
                     artifact_failed.append("provenance.artifacts.overlap")
     spec_path = BENCHMARK_A_SPEC_DIR / BENCHMARK_B_SPEC_FILES[expected_case_id]
     if provenance.get("benchmark_spec_sha256") != hashlib.sha256(spec_path.read_bytes()).hexdigest():
         artifact_failed.append("provenance.benchmark_spec_sha256.current")
+    if role == "harness-smoke" and "freemhd_source" in resolved_artifacts:
+        try:
+            source_pin = json.loads((resolved_artifacts["freemhd_source"] / "source-pin.json").read_text())
+            reference = spec["free_mhd_discretization_reference"]
+            expected_files = {
+                reference[key]: reference[f"{key}_sha256"]
+                for key in reference if key.endswith("_source")
+            }
+            if (
+                source_pin.get("commit") != reference["repository_commit"]
+                or source_pin.get("openfoam_release") != reference["openfoam_release"]
+                or source_pin.get("files") != dict(sorted(expected_files.items()))
+            ):
+                raise ValueError
+        except (AttributeError, KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+            artifact_failed.append("provenance.freemhd_source.pin")
 
     comparison = record.get("comparison")
     comparison = comparison if isinstance(comparison, dict) else {}
@@ -770,8 +954,32 @@ def validate_matched_b_record(
     artifact_pass = not artifact_failed
     contract_pass = schema_complete and not contract_failed
     comparison_pass = bool(metrics) and not comparison_failed
-    observation_failed = ["contract.observers.unavailable"]
-    observation_pass = False
+    observation_failed: list[str] = []
+    if expected_case_id == "B2-fringing-square" and role == "harness-smoke" and all(
+        name in resolved_artifacts for name in ("lmx_input", "freemhd_input", "freemhd_source", "evaluator")
+    ):
+        try:
+            observed_lmx = observe_lmx_b2_contract(resolved_artifacts["lmx_input"], resolved_artifacts["evaluator"])
+            observed_freemhd = observe_freemhd_b2_contract(
+                resolved_artifacts["freemhd_input"], resolved_artifacts["freemhd_source"], resolved_artifacts["evaluator"]
+            )
+
+            def differences(left: object, right: object, prefix: str) -> list[str]:
+                if isinstance(left, dict) and isinstance(right, dict):
+                    keys = sorted(set(left) | set(right))
+                    return [item for key in keys for item in differences(left.get(key), right.get(key), f"{prefix}.{key}")]
+                if isinstance(left, list) and isinstance(right, list):
+                    return [] if left == right else [prefix]
+                return [] if left == right else [prefix]
+
+            observation_failed += [f"{path}.lmx_observed" for path in differences(lmx, observed_lmx, "contract")]
+            observation_failed += [f"{path}.freemhd_observed" for path in differences(freemhd, observed_freemhd, "contract")]
+            observation_failed += [f"{path}.observer_mismatch" for path in differences(observed_lmx, observed_freemhd, "contract")]
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            observation_failed.append(f"contract.observers.error.{type(error).__name__}")
+    else:
+        observation_failed.append("contract.observers.unavailable")
+    observation_pass = not observation_failed
     role_allows_acceptance = role == expected_role
     all_failed = schema_failed + contract_failed + artifact_failed + observation_failed + [f"comparison.{name}" for name in comparison_failed]
     return {

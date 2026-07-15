@@ -2,12 +2,14 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 from types import SimpleNamespace
 
 import pytest
 
 import examples
+import lmx.benchmarks as benchmarks
 from lmx.benchmarks import (
     BENCHMARK_B_SPEC_FILES,
     canonical_matched_b_contract,
@@ -26,6 +28,7 @@ from lmx.freemhd import (
     load_matched_b2_lmx_input,
     load_benchmark_a_spec,
     load_samper_table_i,
+    observe_freemhd_b2_contract,
     observe_lmx_b2_contract,
     validate_matched_b_record,
 )
@@ -56,8 +59,8 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
     reference = load_benchmark_b_reference(case_id)
     spec_path = Path("benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
     artifacts = {}
-    for index, name in enumerate(("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output")):
-        kind = "tree" if index < 4 else "file"
+    for name in ("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"):
+        kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} else "file"
         path = root / name
         if kind == "tree":
             path.mkdir(parents=True)
@@ -139,6 +142,62 @@ def _write_b2_skeleton(root: Path) -> None:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"skeleton {relative}\n")
+
+
+def _write_observer_source_snapshot(root: Path) -> dict[str, object]:
+    snippets = {
+        "mhdUEqn.H": "fvm::ddt(rho, U) + fvm::div(rhoPhi, U); turbulence.divDevRhoReff(U);",
+        "ePotEqn.H": "fvm::laplacian(elcond,potE); fvc::div(psiub); JConservativeForm;",
+        "limitedLinear.H": "limitedLinearLimiter NVDTVD",
+        "limitedLinear.C": "makeLimitedSurfaceInterpolationScheme(limitedLinear, limitedLinearLimiter)",
+        "LimitedScheme.H": "makeLimitedSurfaceInterpolationTypeScheme(SS,LIMITER,NVDTVD,magSqr,vector)",
+        "NVDTVD.H": "class NVDTVD {};",
+        "LimitFuncs.C": "return Foam::magSqr(phi);",
+    }
+    files = {}
+    for name, content in snippets.items():
+        path = root / "src" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        files[f"src/{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    manifest = {"commit": "fixture", "openfoam_release": "v2206", "files": files}
+    (root / "source-pin.json").write_text(json.dumps(manifest, sort_keys=True))
+    return manifest
+
+
+def _matched_b2_smoke_record(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    template, source = root / "hunt_demo", root / "freemhd_source"
+    _write_b2_skeleton(template)
+    manifest = _write_observer_source_snapshot(source)
+    run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, root / "freemhd_input")
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(root / "lmx_input")
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(root / "evaluator")
+    (root / "lmx_source").mkdir()
+    (root / "lmx_source/evidence.txt").write_text("LMX source fixture\n")
+    for name in ("lmx_output", "freemhd_output"):
+        (root / name).write_text("not executed\n")
+    spec = deepcopy(load_benchmark_b_spec("B2-fringing-square"))
+    reference = spec["free_mhd_discretization_reference"]
+    reference["repository_commit"] = manifest["commit"]
+    for name in run_freemhd_parity_suite._FREEMHD_SOURCE_NAMES:
+        key = f"{name}_source"
+        relative = f"src/{Path(reference[key]).name}"
+        reference[key], reference[f"{key}_sha256"] = relative, manifest["files"][relative]
+    monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
+    artifacts = {}
+    for name in ("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"):
+        kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} else "file"
+        artifacts[name] = {"path": name, "kind": kind, "sha256": artifact_sha256(root / name, kind)}
+    contract = canonical_matched_b_contract(spec, "harness-smoke")
+    return {
+        "schema_version": 2, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
+        "contract": {"lmx": deepcopy(contract), "freemhd": deepcopy(contract)},
+        "comparison": {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
+        "provenance": {
+            "benchmark_spec_sha256": hashlib.sha256(Path("benchmarks/specs/alex-b2-square.toml").read_bytes()).hexdigest(),
+            "artifacts": artifacts,
+        },
+    }
 
 
 def _materialize_matched_case(root: Path, case_kind: str) -> Path:
@@ -232,7 +291,7 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
     smoke["acceptance_role"] = "harness-smoke"
     report = validate_matched_b_record(smoke, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
     assert report["contract_pass"] is report["role_allows_acceptance"] is report["acceptance_pass"] is False
-    assert "contract.acceptance_role.unavailable" in report["failed_checks"]
+    assert "contract.mesh_coordinates.canonical" in report["failed_checks"]
 
     poor = deepcopy(record)
     poor["comparison"]["freemhd_observable"] = [value + 1.0 for value in poor["comparison"]["freemhd_observable"]]
@@ -253,7 +312,7 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
         ("wrong_kind", "provenance.evaluator.kind"),
         ("overlap", "provenance.artifacts.overlap"),
         ("hardlink_tree", "provenance.lmx_source.tree.hardlink"),
-        ("empty_tree", "provenance.lmx_input.content.empty"),
+        ("empty_tree", "provenance.lmx_source.content.empty"),
     ],
 )
 def test_matched_b_schema2_rejects_unsafe_or_changed_artifacts(tmp_path: Path, hazard: str, check: str):
@@ -283,7 +342,7 @@ def test_matched_b_schema2_rejects_unsafe_or_changed_artifacts(tmp_path: Path, h
     else:
         empty = tmp_path / "empty"
         empty.mkdir()
-        artifacts["lmx_input"].update(path="empty", sha256="0" * 64)
+        artifacts["lmx_source"].update(path="empty", sha256="0" * 64)
     report = validate_matched_b_record(record, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
     assert report["artifact_pass"] is False and check in report["failed_checks"]
 
@@ -424,7 +483,7 @@ def test_matched_b2_freemhd_input_is_deterministic_slim_and_solver_free(tmp_path
     assert sum(path.stat().st_size for path in first.rglob("*") if path.is_file()) < 30_000
     assert not any("insulator" in path.parts or path.name == "cellToRegion" for path in first.rglob("*"))
     assert "hex (0 1 2 3 4 5 6 7) liquid ($Nx $Ny $Nz)" in (first / "system/blockMeshDict").read_text()
-    assert "x0=-15" in (first / "system/liquid/setExprFieldsDict").read_text()
+    assert "xa=-15" in (first / "system/liquid/setExprFieldsDict").read_text()
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, first)
 
@@ -435,6 +494,101 @@ def test_matched_b2_freemhd_input_requires_complete_skeleton(tmp_path: Path):
     (template / "system/blockMeshDict").unlink()
     with pytest.raises(ValueError, match="skeleton is incomplete"):
         run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, tmp_path / "case")
+
+
+def test_independent_matched_b2_input_observers_agree(tmp_path: Path):
+    template, case, source = tmp_path / "hunt_demo", tmp_path / "freemhd", tmp_path / "source"
+    lmx_input, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
+    _write_b2_skeleton(template)
+    _write_observer_source_snapshot(source)
+    run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, case)
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(lmx_input)
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+
+    assert observe_freemhd_b2_contract(case, source, evaluator) == observe_lmx_b2_contract(lmx_input, evaluator)
+
+
+def test_matched_b2_smoke_observation_passes_without_claiming_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    record = _matched_b2_smoke_record(tmp_path, monkeypatch)
+    report = validate_matched_b_record(record, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+
+    assert report["schema_complete"] and report["artifact_pass"] and report["contract_pass"]
+    assert report["observation_pass"] is True
+    assert report["comparison_pass"] is report["role_allows_acceptance"] is report["acceptance_pass"] is False
+    assert report["failed_checks"] == ["comparison.arrays"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failed_path"),
+    [
+        ("mesh", "contract.geometry.half_width_m.freemhd_observed"),
+        ("field", "contract.mesh_coordinates.field_anchors_sha256.freemhd_observed"),
+        ("fluid", "contract.nondimensional_groups.hartmann_number.freemhd_observed"),
+        ("wall", "contract.wall.wall_conductance_ratio.freemhd_observed"),
+        ("velocity", "contract.boundary_drive.velocity_outlet.freemhd_observed"),
+        ("pressure", "contract.boundary_drive.pressure_outlet_gauge.freemhd_observed"),
+        ("electric", "contract.boundary_drive.electric_axial_ends.freemhd_observed"),
+        ("scheme", "contract.equations.advection_discretization.freemhd_observed"),
+        ("iterations", "contract.stopping_rules.electric_iterations.freemhd_observed"),
+        ("source", "provenance.freemhd_source.pin"),
+    ],
+)
+def test_matched_b2_smoke_attributes_one_sided_mutations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str, failed_path: str
+):
+    record = _matched_b2_smoke_record(tmp_path, monkeypatch)
+    lmx_before = observe_lmx_b2_contract(tmp_path / "lmx_input", tmp_path / "evaluator")
+    case = tmp_path / "freemhd_input"
+
+    def replace(relative: str, old: str, new: str) -> None:
+        path = case / relative
+        text = path.read_text()
+        assert old in text
+        path.write_text(text.replace(old, new))
+
+    if mutation == "mesh":
+        replace("system/blockMeshDict", "physicalHalfWidth 0.0439", "physicalHalfWidth 0.05")
+    elif mutation == "field":
+        path = case / "system/liquid/setExprFieldsDict"
+        text = path.read_text().replace('"bc=1"', '"bc=0.99"')
+        values = dict(re.findall(r'"([xb][a-z])=([^\"]+)"', text))
+        labels = sorted(name[1:] for name in values if name.startswith("x"))
+        anchors = {"x_over_L": [float(values[f"x{label}"]) for label in labels], "b_over_B0": [float(values[f"b{label}"]) for label in labels]}
+        digest = hashlib.sha256(json.dumps(anchors, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        text = re.sub(r'(lmxFieldAnchorsSHA256 ")[0-9a-f]{64}', rf'\g<1>{digest}', text)
+        for region in ("liquid", "solidWalls"):
+            (case / f"system/{region}/setExprFieldsDict").write_text(text)
+    elif mutation == "fluid":
+        path = case / "constant/liquid/thermophysicalProperties.liquidMetal"
+        path.write_text(re.sub(r"(\bmu\s+)[^;]+", r"\g<1>0.0001", path.read_text(), count=1))
+    elif mutation == "wall":
+        replace("constant/solidWalls/thermophysicalProperties", "elcond 3.5", "elcond 3.6")
+    elif mutation == "velocity":
+        replace("system/liquid/changeDictionaryDict", "sink { type zeroGradient", "sink { type fixedValue")
+    elif mutation == "pressure":
+        replace("system/liquid/changeDictionaryDict", "sink { type fixedValue; value uniform 0; }", "sink { type fixedValue; value uniform 1; }")
+    elif mutation == "electric":
+        replace("system/liquid/changeDictionaryDict", "inlet { type zeroGradient; } sink", "inlet { type fixedValue; value uniform 0; } sink")
+    elif mutation == "scheme":
+        replace("system/liquid/fvSchemes", "div(rhoPhi,U) Gauss limitedLinear 1.0", "div(rhoPhi,U) Gauss limitedLinear 0.5")
+    elif mutation == "iterations":
+        for region in ("liquid", "solidWalls"):
+            replace(f"system/{region}/fvSolution", "maxIter 600", "maxIter 601")
+    else:
+        path = tmp_path / "freemhd_source/src/LimitFuncs.C"
+        path.write_text(path.read_text() + "\n// byte mutation\n")
+        pin = json.loads((tmp_path / "freemhd_source/source-pin.json").read_text())
+        pin["files"]["src/LimitFuncs.C"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        (tmp_path / "freemhd_source/source-pin.json").write_text(json.dumps(pin, sort_keys=True))
+
+    artifact = "freemhd_source" if mutation == "source" else "freemhd_input"
+    record["provenance"]["artifacts"][artifact]["sha256"] = artifact_sha256(tmp_path / artifact, "tree")
+    report = validate_matched_b_record(record, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+
+    assert failed_path in report["failed_checks"]
+    assert observe_lmx_b2_contract(tmp_path / "lmx_input", tmp_path / "evaluator") == lmx_before
 
 
 @pytest.mark.parametrize(
