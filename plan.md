@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15, through LMX commit `475789e`. This is the single active
+Status: 2026-07-15, through LMX commit `b24b64d`. This is the single active
 plan. It records accepted baselines, active gates, and stop/go criteria—not
 campaign history. Completed campaign details belong in checksummed result
 records and the validation or performance documentation.
@@ -88,16 +88,16 @@ large reusable artifacts go in checksummed releases.
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 
-Current structure at `475789e`:
+Current structure after the compact FreeMHD materializer at `b24b64d`:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,840 | at most 34,850 while adding the FreeMHD observer; below 34,800 after smoke cleanup | 35,000 |
-| maintained-core lines | 8,004 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,023 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| package lines | 34,844 | at most 35,000 while adding the FreeMHD observer; below 34,850 after smoke cleanup | 35,100 |
+| maintained-core lines | 8,008 | below 8,000 after smoke cleanup | 8,100 |
+| test files / lines | 31 / 21,057 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,366,616 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,384,265 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -120,9 +120,10 @@ Completed foundation:
   empty inputs, special files, type mismatches, and changed content.
 - At `a4c83ab`, the source materializer verifies FreeMHD commit
   `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and scoped cleanliness. At
-  `475789e`, the frozen evidence includes exact hashes for five source files,
-  including the electric equation. Its generated six-file tree hash is
-  `bcec06b62514a60f8f18bc691e616d7555e591da44cad889858319585039eaff`.
+  `475789e`, the frozen evidence added the electric equation. The observer
+  audit then added the vector-scheme macro and registration, for seven exact
+  source files plus the manifest. The source-snapshot tree SHA-256 is
+  `18c33bda110e92ad9d0e1872b776af373a18ba75075baffb88a9838432fcb333`.
 - At `f033a4b`, the LMX materializer writes a deterministic strict JSON input;
   the loader reconstructs a real `CaseSpec`/`FringingProfile`; and the observer
   derives the contract without reading the expected contract.

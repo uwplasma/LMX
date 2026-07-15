@@ -25,7 +25,9 @@ from lmx.reference_data import default_closed_channel_reference_root
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
 
-_FREEMHD_SOURCE_NAMES = ("momentum", "electric", "limiter", "nvd", "vector_transform")
+_FREEMHD_SOURCE_NAMES = (
+    "momentum", "electric", "limiter", "scheme_macro", "limiter_registration", "nvd", "vector_transform",
+)
 
 
 def materialize_freemhd_source_snapshot(

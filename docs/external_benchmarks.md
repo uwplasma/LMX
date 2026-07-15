@@ -73,8 +73,8 @@ beneath a caller-selected bundle root. Validation streams and recomputes every
 file or deterministic directory-tree hash, rejecting path escapes, symlinks,
 hard-link aliases, overlapping trees, special files, and changed content. The
 record cannot choose its own root. The pinned FreeMHD source materializer now
-verifies the exact source commit and five file hashes before producing a
-six-file evidence tree. LMX also has a deterministic real B2 JSON input whose
+verifies the exact source commit and seven file hashes before producing an
+eight-file evidence tree. LMX also has a deterministic real B2 JSON input whose
 strict loader reconstructs the solver problem and whose observer derives its
 contract without reading the expected contract. Production acceptance remains
 blocked on the independent FreeMHD input and observer; copying the canonical
