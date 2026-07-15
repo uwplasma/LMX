@@ -19,6 +19,7 @@ from lmx.benchmarks import (
     load_benchmark_b_spec,
 )
 from lmx.freemhd import (
+    _validate_b2_smoke_execution,
     artifact_sha256,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
@@ -337,6 +338,10 @@ def test_matched_b_schema2_verifies_contract_comparison_and_real_artifacts(tmp_p
     assert "contract.observers.unavailable" in report["failed_checks"]
     assert report["metrics"]["weighted_rms"] == pytest.approx(0.0)
     assert validate_matched_b_record(record, expected_case_id=case_id)["artifact_pass"] is False
+    (tmp_path / "not-directory").write_text("not a directory\n")
+    assert not validate_matched_b_record(
+        record, expected_case_id=case_id, artifact_root=tmp_path / "not-directory"
+    )["artifact_pass"]
 
 
 def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
@@ -624,6 +629,22 @@ def test_lmx_b2_output_observer_replays_restart_evidence(tmp_path: Path):
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
 
 
+@pytest.mark.parametrize("mutation", ("root", "metadata", "provenance"))
+def test_lmx_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mutation: str):
+    input_path, evaluator, output = tmp_path / "lmx.json", tmp_path / "evaluator.json", tmp_path / "output"
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path)
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+    _write_lmx_b2_output(output, input_path, evaluator)
+    path, old, new = {
+        "root": (output / "unexpected", None, "unexpected\n"),
+        "metadata": (output / "run.json", '"code": "LMX"', '"code": "bad"'),
+        "provenance": (output / "run.json", '"float_precision": "float64"', '"float_precision": "bad"'),
+    }[mutation]
+    path.write_text(new if old is None else path.read_text().replace(old, new, 1))
+    with pytest.raises(ValueError, match="LMX B2"):
+        observe_lmx_b2_output(output, input_path, evaluator)
+
+
 def test_freemhd_b2_output_observer_reads_only_native_tables(tmp_path: Path):
     template, case, evaluator = tmp_path / "template", tmp_path / "case", tmp_path / "evaluator"
     _write_b2_skeleton(template)
@@ -640,7 +661,14 @@ def test_freemhd_b2_output_observer_reads_only_native_tables(tmp_path: Path):
     assert observed["residual_max"] == {"potE": pytest.approx(1.0e-8)}
 
 
-@pytest.mark.parametrize("mutation", ["fatal", "probe", "magnitude"])
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "root", "metadata", "provenance", "controls", "fatal", "execution", "post",
+        "width", "rows", "table_missing", "header", "time", "probe_missing",
+        "probe_headers", "columns", "probe", "magnitude", "stations",
+    ),
+)
 def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
     tmp_path: Path, mutation: str
 ):
@@ -651,14 +679,75 @@ def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
     output = tmp_path / "output"
     _write_freemhd_b2_output(output, case, evaluator)
     path, old, new = {
+        "root": (output / "unexpected", None, "unexpected\n"),
+        "metadata": (output / "run.json", '"code": "FreeMHD"', '"code": "bad"'),
+        "provenance": (output / "run.json", '"float_precision": "float64"', '"float_precision": "bad"'),
+        "controls": (output / "controlDict.used", "adjustTimeStep off", "adjustTimeStep on"),
         "fatal": (output / "run.log", "End", "FOAM FATAL ERROR\nEnd"),
+        "execution": (output / "run.log", "End", "Stopped"),
+        "post": (output / "postProcessing/unexpected", None, "unexpected\n"),
+        "width": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", " -4.0\n", " -4.0 0\n"),
+        "rows": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", "3.7037037037037037e-06", "1.8518518518518519e-06"),
+        "table_missing": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", None, None),
+        "header": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", "sum(rhoPhi)", "sum(phi)"),
+        "time": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", "1.8518518518518519e-06", "1e-6"),
+        "probe_missing": (output / "postProcessing/b2PressureTaps/0/p", None, None),
+        "probe_headers": (output / "postProcessing/b2PressureTaps/0/p", "# Probe 0", "# Probe 1"),
+        "columns": (output / "postProcessing/b2PressureTaps/0/p", "# Time\n", "# Bad\n"),
         "probe": (output / "postProcessing/b2PressureTaps/0/p", "0.8 0)", "0.7 0)"),
         "magnitude": (output / "postProcessing/currentIntoSolidMagnitude/0/surfaceFieldValue.dat", " 1.0", " -1.0"),
+        "stations": (case / "system/blockMeshDict", "Nx 8;", "Nx 7;"),
     }[mutation]
-    path.write_text(path.read_text().replace(old, new, 1))
+    if old is None:
+        path.unlink() if new is None else path.write_text(new)
+    else:
+        assert old in path.read_text()
+        path.write_text(path.read_text().replace(old, new, 1))
+    if mutation == "controls":
+        control = case / "system/controlDict"
+        control.write_text(control.read_text().replace(old, new, 1))
+    if mutation in {"stations", "controls"}:
+        metadata = json.loads((output / "run.json").read_text())
+        metadata["input_sha256"] = artifact_sha256(case, "tree")
+        (output / "run.json").write_text(json.dumps(metadata))
 
     with pytest.raises(ValueError, match="FreeMHD B2"):
         observe_freemhd_b2_output(output, case, evaluator)
+
+
+@pytest.mark.parametrize(
+    ("target", "key", "value", "failed"),
+    (
+        ("lmx", "steps", 1, "execution.lmx.stopping"),
+        ("lmx", "dt", [0.0], "execution.lmx.dt"),
+        ("lmx", "courant_max", [1.0], "execution.lmx.courant"),
+        ("lmx", "mass_balance", 1.0, "execution.lmx.mass_balance"),
+        ("lmx", "interface_current_activity", 0.0, "execution.lmx.interface_current_activity"),
+        ("lmx", "restart_max_abs", 1.0, "execution.lmx.restart"),
+        ("lmx", "dt", None, "execution.lmx.schema"),
+        ("freemhd", "x_over_L", [0.0, 2.0], "x"),
+        ("freemhd", "courant_mean", [0.1, 0.1], "courant_mean"),
+        ("lmx", "pressure_observable", [0.0], "arrays"),
+        ("freemhd", "pressure_observable", [1.0, 1.0], "pressure_rms"),
+    ),
+)
+def test_b2_smoke_execution_attributes_each_gate(target, key, value, failed):
+    dt = 1.0 / 540000.0
+    observed = {
+        "steps": 2, "stop_reason": "step_limit", "dt": [dt, dt],
+        "courant_mean": [0.0, 0.0], "courant_max": [0.0, 0.0],
+        "mass_balance": 0.0, "current_balance": 0.0,
+        "interface_current_balance": 0.0, "interface_current_activity": 1.0,
+        "restart_max_abs": 0.0, "x_over_L": [0.0, 1.0],
+        "pressure_observable": [0.0, 0.0],
+    }
+    lmx, freemhd = deepcopy(observed), deepcopy(observed)
+    selected = {"lmx": lmx, "freemhd": freemhd}[target]
+    selected.pop(key) if value is None else selected.__setitem__(key, value)
+    execution, comparison, _ = _validate_b2_smoke_execution(
+        lmx, freemhd, load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
+    )
+    assert failed in execution + comparison
 
 
 def test_matched_b2_smoke_observation_passes_without_claiming_acceptance(
@@ -1082,6 +1171,9 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
     invalid = tmp_path / "invalid.toml"
     invalid.write_text(source.read_text().replace('case_kind = "hunt"', 'case_kind = "other"', 1))
     with pytest.raises(ValueError, match="Incomplete hunt Hartmann ladder"):
+        load_samper_table_i(invalid)
+    invalid.write_text(source.read_text().replace("schema_version = 1", "schema_version = 0"))
+    with pytest.raises(ValueError, match="Invalid Samper Table I"):
         load_samper_table_i(invalid)
 
 
