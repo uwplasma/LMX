@@ -23,6 +23,22 @@ from lmx.specs import BoundaryCondition, GeometrySpec
 from lmx.solvers import solve_steady, solve_transient
 
 
+def _fake_step_result(u, **overrides):
+    """Build the 17-value private step result used by orchestration tests."""
+    zero = jnp.zeros_like(u)
+    values = {
+        "phi": zero, "jy": zero, "jz": zero, "lorentz": zero,
+        "velocity_residual": 0.0, "potential_residual": 0.0,
+        "potential_iterations": 1.0, "linear_residual": 0.0,
+        "linear_iterations": 1.0, "face_current_max": 0.0,
+        "emf_max": 0.0, "face_lorentz_max": 0.0,
+        "mean_velocity": float(jnp.mean(u)), "applied_forcing": 0.0,
+        "potential_initial_residual": 0.0, "linear_initial_residual": 0.0,
+    }
+    values.update(overrides)
+    return (u, *(values[name] for name in values))
+
+
 def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=10.0, ny=12, nz=12)
     assert case.solver.kind == "fully_developed_inductionless"
@@ -30,25 +46,10 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
     def fake_fully_developed_case_step(**kwargs):
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.2)
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-6,
-            1.0e-6,
-            1.0,
-            2.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            float(jnp.mean(updated)),
-            0.0,
-            1.0e-3,
-            1.0e-3,
+        return _fake_step_result(
+            updated, velocity_residual=1e-6, potential_residual=1e-6,
+            linear_residual=2.0, potential_initial_residual=1e-3,
+            linear_initial_residual=1e-3,
         )
 
     monkeypatch.setattr(
@@ -80,25 +81,10 @@ def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPat
         assert kwargs["potential_solver"] == "cg_volume"
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.1)
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-9,
-            1.0e-9,
-            1.0,
-            1.0e-9,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            float(jnp.mean(updated)),
-            0.0,
-            1.0e-9,
-            1.0e-9,
+        return _fake_step_result(
+            updated, velocity_residual=1e-9, potential_residual=1e-9,
+            linear_residual=1e-9, potential_initial_residual=1e-9,
+            linear_initial_residual=1e-9,
         )
 
     monkeypatch.setattr(
@@ -328,25 +314,12 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient(
         target = kwargs["target_mean_velocity"]
         increment = 0.05 if target is not None else 0.0
         updated = u_prev + increment
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-6,
-            1.0e-6,
-            1.0,
-            2.0,
-            increment,
-            increment,
-            increment,
-            0.0,
-            0.0,
-            0.0,
-            1.0e-3,
-            1.0e-3,
+        return _fake_step_result(
+            updated, velocity_residual=1e-6, potential_residual=1e-6,
+            linear_residual=2.0, linear_iterations=increment,
+            face_current_max=increment, emf_max=increment,
+            mean_velocity=0.0, potential_initial_residual=1e-3,
+            linear_initial_residual=1e-3,
         )
 
     monkeypatch.setattr(
@@ -378,25 +351,12 @@ def test_transient_restart_matches_direct_run(
         u_prev = kwargs["u_previous"]
         step_time = kwargs["step_time"]
         updated = jnp.full_like(u_prev, step_time * 10.0)
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-6,
-            1.0e-6,
-            1.0,
-            2.0,
-            0.3,
-            0.2,
-            0.1,
-            0.05,
-            float(jnp.mean(updated)),
-            0.3,
-            1.0e-3,
-            1.0e-3,
+        return _fake_step_result(
+            updated, velocity_residual=1e-6, potential_residual=1e-6,
+            linear_residual=2.0, linear_iterations=0.3,
+            face_current_max=0.2, emf_max=0.1, face_lorentz_max=0.05,
+            applied_forcing=0.3, potential_initial_residual=1e-3,
+            linear_initial_residual=1e-3,
         )
 
     monkeypatch.setattr(
@@ -454,25 +414,12 @@ def test_transient_restart_can_append_diagnostics(
         u_prev = kwargs["u_previous"]
         step_time = kwargs["step_time"]
         updated = jnp.full_like(u_prev, step_time * 10.0)
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-6,
-            1.0e-6,
-            1.0,
-            2.0,
-            0.3,
-            0.2,
-            0.1,
-            0.05,
-            float(jnp.mean(updated)),
-            0.3,
-            1.0e-3,
-            1.0e-3,
+        return _fake_step_result(
+            updated, velocity_residual=1e-6, potential_residual=1e-6,
+            linear_residual=2.0, linear_iterations=0.3,
+            face_current_max=0.2, emf_max=0.1, face_lorentz_max=0.05,
+            applied_forcing=0.3, potential_initial_residual=1e-3,
+            linear_initial_residual=1e-3,
         )
 
     monkeypatch.setattr(
@@ -737,25 +684,12 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response(
         updated = u_prev + 0.01
         jy = jnp.full_like(updated, 0.2 * scale)
         lorentz = jnp.full_like(updated, 0.05 * scale)
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            jy,
-            zeros,
-            lorentz,
-            1.0e-6,
-            1.0e-6,
-            1.0,
-            2.0,
-            0.2 * scale,
-            0.15 * scale,
-            0.1 * scale,
-            0.05 * scale,
-            float(jnp.mean(updated)),
-            0.0,
-            1.0e-3,
-            1.0e-3,
+        return _fake_step_result(
+            updated, jy=jy, lorentz=lorentz, velocity_residual=1e-6,
+            potential_residual=1e-6, linear_residual=2.0,
+            linear_iterations=0.2 * scale, face_current_max=0.15 * scale,
+            emf_max=0.1 * scale, face_lorentz_max=0.05 * scale,
+            potential_initial_residual=1e-3, linear_initial_residual=1e-3,
         )
 
     monkeypatch.setattr(
@@ -1310,25 +1244,11 @@ def test_solve_steady_respects_t_final_when_tolerance_not_reached(
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
-        zeros = jnp.zeros_like(u)
-        return (
-            u,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-2,
-            1.0e-2,
-            25,
-            1.0e-2,
-            8.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0e-2,
-            1.0e-2,
+        return _fake_step_result(
+            u, velocity_residual=1e-2, potential_residual=1e-2,
+            potential_iterations=25, linear_residual=1e-2,
+            linear_iterations=8.0, mean_velocity=0.0, applied_forcing=1.0,
+            potential_initial_residual=1e-2, linear_initial_residual=1e-2,
         )
 
     monkeypatch.setattr(
@@ -1777,25 +1697,11 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
-        zeros = jnp.zeros_like(u)
-        return (
-            u,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            next(residuals),
-            1.0e-2,
-            25,
-            0.0,
-            8.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0e-2,
-            1.0e-2,
+        return _fake_step_result(
+            u, velocity_residual=next(residuals), potential_residual=1e-2,
+            potential_iterations=25, linear_iterations=8.0,
+            mean_velocity=0.0, applied_forcing=1.0,
+            potential_initial_residual=1e-2, linear_initial_residual=1e-2,
         )
 
     monkeypatch.setattr(
@@ -1827,25 +1733,11 @@ def test_fully_developed_steady_requires_outer_state_convergence(
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"] + next(updates)
-        zeros = jnp.zeros_like(u)
-        return (
-            u,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            1.0e-6,
-            1.0e-3,
-            5,
-            0.0,
-            2.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0e-3,
-            1.0e-3,
+        return _fake_step_result(
+            u, velocity_residual=1e-6, potential_residual=1e-3,
+            potential_iterations=5, linear_iterations=2.0,
+            mean_velocity=0.0, applied_forcing=1.0,
+            potential_initial_residual=1e-3, linear_initial_residual=1e-3,
         )
 
     monkeypatch.setattr(
@@ -1876,25 +1768,11 @@ def test_fully_developed_steady_can_require_potential_residual_when_requested(
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
-        zeros = jnp.zeros_like(u)
-        return (
-            u,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            next(residuals),
-            next(potential_residuals),
-            20,
-            0.0,
-            8.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0e-2,
-            1.0e-2,
+        return _fake_step_result(
+            u, velocity_residual=next(residuals),
+            potential_residual=next(potential_residuals), potential_iterations=20,
+            linear_iterations=8.0, mean_velocity=0.0, applied_forcing=1.0,
+            potential_initial_residual=1e-2, linear_initial_residual=1e-2,
         )
 
     monkeypatch.setattr(
@@ -2822,26 +2700,7 @@ def test_solve_steady_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatc
     def fake_case_step(**kwargs):
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.1)
-        zeros = jnp.zeros_like(updated)
-        return (
-            updated,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            0.0,
-            0.0,
-            1.0,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            float(jnp.mean(updated)),
-            0.0,
-            0.0,
-            0.0,
-        )
+        return _fake_step_result(updated)
 
     monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_case_step)
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
