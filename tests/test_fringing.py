@@ -1651,7 +1651,7 @@ def test_extruded_sharding_validates_placement_and_supported_paths(
     monkeypatch: pytest.MonkeyPatch,
 ):
     field = jnp.zeros((4, 2, 2))
-    assert _shard_extruded_fields((field,), num_devices=1)[0] is field
+    assert _shard_extruded_fields((field,), num_devices=None)[0] is field
 
     devices = [object(), object()]
     monkeypatch.setattr("lmx.fringing.jax.devices", lambda: devices)
@@ -1665,8 +1665,9 @@ def test_extruded_sharding_validates_placement_and_supported_paths(
     monkeypatch.setattr(
         "lmx.fringing.jax.device_put", lambda value, sharding: value + 1
     )
-    placed = _shard_extruded_fields((field,), num_devices=2)
-    assert jnp.all(placed[0] == 1)
+    for count in (1, 2):
+        placed = _shard_extruded_fields((field,), num_devices=count)
+        assert jnp.all(placed[0] == 1)
     problem = build_square_duct_extruded_problem(nx_stations=4, ny=4, nz=4)
     with pytest.raises(NotImplementedError, match="ALEX B2"):
         solve_extruded_inductionless(problem, num_devices=2)

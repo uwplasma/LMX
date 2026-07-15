@@ -6008,10 +6008,11 @@ def _shard_extruded_fields(
 
     JAX propagates this named sharding through the production operators and
     inserts the required neighbor communication at axial stencil boundaries.
-    One device retains the normal single-device placement.
+    An explicit one-device request uses the same named-sharding kernels as a
+    multi-device run, which keeps strong-scaling baselines comparable.
     """
 
-    if num_devices is None or num_devices == 1:
+    if num_devices is None:
         return fields
     devices = jax.devices()
     if not 1 <= num_devices <= len(devices):
@@ -7300,9 +7301,7 @@ def _solve_extruded_projection(
         y0, y1, z0, z1 = fluid_bounds
         local_dy = dy[y0:y1]
         local_dz = dz[z0:z1]
-        field_sharding = (
-            u.sharding if num_devices is not None and num_devices > 1 else None
-        )
+        field_sharding = u.sharding if num_devices is not None else None
         replicated_sharding = (None if field_sharding is None else
             NamedSharding(field_sharding.mesh, P()))
         flux_sharding = (None if field_sharding is None else
