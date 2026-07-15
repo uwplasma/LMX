@@ -58,7 +58,7 @@ artifacts. See the [case cookbook](docs/case_cookbook.md).
 | Single-GPU execution | ✅ | — | ✅ |
 | Multi-GPU execution | ◐ B2 | — | ✅ |
 | Selected reverse-mode AD workflows | ✅ | — | — |
-| Published liquid-metal experiment validation | ◐ | ✅ | — |
+| Published liquid-metal experiment comparison | ◐ | ✅ | — |
 
 ¹ [FreeMHD2](https://arxiv.org/abs/2606.18745) is a separate finite-Rm
 extension. Sources: [FreeMHD paper](https://doi.org/10.1063/5.0230242) and
@@ -88,9 +88,17 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-The canonical B2 smoke has exact restart and deterministic 1/2-GPU equivalence;
-the plotted current-formulation calibration remains short of production validation.
+The canonical B2 smoke has exact restart and deterministic 1/2-GPU equivalence.
+These smoke checks do not establish steady-production scaling or B2 validation.
 [Fringing status →](docs/fringing.md)
+
+## Model conducting multilayer walls
+
+![Li/AlN multilayer pressure and current mesh convergence](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-li-aln-multilayer-convergence.webp)
+
+Research-stage Li/AlN wall results retain pressure and current mesh-step changes
+below 10% at `Ha = 220`; experimental and blanket-level validation remain open.
+[Wall models →](docs/wall_models.md)
 
 ## Differentiate selected workflows
 
@@ -111,17 +119,19 @@ Promoted objectives pass finite-difference or independent-transpose checks.
 </p>
 
 These visuals demonstrate implemented workflows. Quantitative turbulent
-Q2DmdFoam parity and blanket validation remain open.
-[Geometry and fields →](docs/geometry.md)
+Q2D-MHDfoam parity and blanket validation remain open.
+[Geometry and fields →](docs/geometry.md) ·
+[External benchmarks →](docs/external_benchmarks.md)
 
 ## Scale on CPUs and GPUs
 
 ![Current B2 two-update CPU and GPU scaling calibration](docs/_static/strong_scaling.webp)
 
-The exact B2 smoke agrees on 1/2/4 CPU devices and 1/2 deterministic GPUs. The
-current two-update calibration reaches 1.35× on four CPU devices; diagonal
-momentum preconditioning cut GPU runtime by 3.75–6.84×. The doubled-axial
-calibration reaches 1.125×; production scaling remains open.
+The exact B2 smoke agrees on 1/2/4 CPU devices and 1/2 deterministic GPUs.
+The two-update CPU calibration reaches 1.35× on four devices. On the same GPU
+device counts, diagonal momentum preconditioning cuts warm runtime by
+3.75–6.84×; this is an optimization result, not multi-GPU speedup. The
+doubled-axial calibration reaches 1.125×; production scaling remains open.
 [Protocol and results →](docs/performance.md)
 
 ## Quality and citation

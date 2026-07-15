@@ -92,7 +92,7 @@ large reusable artifacts go in checksummed releases.
 | B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, strict smoke replay, exact device equivalence, and current CPU/GPU two-update calibrations have bounded gates | production parity and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
-| README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, and seven-second Hunt/Q2D loops | refresh B2/scaling panels only from accepted canonical records |
+| README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 
 Current structure after moving the script-only Benchmark-A auditor out of the
@@ -110,7 +110,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 20,966 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 14 | no new script without retiring an owner | 14 |
-| tracked checkout | 3,495,232 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,496,245 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
