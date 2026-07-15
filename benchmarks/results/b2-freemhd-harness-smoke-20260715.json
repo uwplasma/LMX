@@ -3,9 +3,9 @@
   "date": "2026-07-15",
   "case_id": "B2-fringing-square",
   "acceptance_role": "harness-smoke",
-  "execution_commit": "a7693c87b4c3153ce973ca3748e5ef74acbd3acd",
+  "execution_commit": "3a2207804781f7b3f6383becdc82039480729cac",
   "source_pins": {
-    "lmx": "a7693c87b4c3153ce973ca3748e5ef74acbd3acd",
+    "lmx": "3a2207804781f7b3f6383becdc82039480729cac",
     "freemhd": "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5",
     "openfoam": "v2206",
     "docker_image": "freemhd-install:latest",
@@ -38,7 +38,7 @@
     "devices": 1,
     "steps": 2,
     "stop_reason": "step_limit",
-    "wall_seconds": 13.310642792028375,
+    "wall_seconds": 13.117489458061755,
     "restart_max_abs": 0.0,
     "mass_balance": 1.9095836023552692e-14,
     "current_balance": 2.5362035206799373e-14,
@@ -50,7 +50,7 @@
     "mpi_ranks": 2,
     "steps": 2,
     "stop_reason": "step_limit",
-    "wall_seconds": 5.483495166990906,
+    "wall_seconds": 7.064801500062458,
     "mass_balance": 0.0,
     "current_balance": 2.954356274787756e-17,
     "interface_current_balance": 6.555685285272496e-14,
@@ -61,19 +61,19 @@
   "raw_assets": {
     "location": "external workspace; release asset pending",
     "files": 97,
-    "logical_bytes": 1636815,
-    "tree_sha256": "d622c99879fa065260a387d6b812a46c77f92570aa510fe39403ee35eba4d51a",
+    "logical_bytes": 1643086,
+    "tree_sha256": "aae9e2be43e949e053fedc543675b6182ad521b1e5ceecf405ced75cc1b8dc73",
     "preflight_sha256": "f40ec10955e43bc04165e8b11d607cd77d2886562530b2b1136401366c347a77",
-    "record_sha256": "06576fa1c0d90c2dec9061a3b7da6dbfde372b5b7cff4c719e6f5d258d0d7599",
-    "report_sha256": "ddfe11daaa5e95177ed183bc7d83a6d2e418c9e2a4eac937736f5e97fdc2d0db"
+    "record_sha256": "cb2e9f844fa72a183c044bc290b566c0779b44a89785f82ff5fae61f6a6de7bd",
+    "report_sha256": "3d5b2007ed5b7fdca9d5d2a5d8c57bd4adfe932ca7063c9f36aada4b3ea3c6a3"
   },
   "artifact_sha256": {
-    "lmx_source": "d7a8f86d6ac89eb1bc53ae2f4541ef193e533caae89d3bdd8b101fccb03acd96",
+    "lmx_source": "0f7c32f4951feac21edd867c6c334269892bc092e47c58cb09368b58cc8a2216",
     "freemhd_source": "18c33bda110e92ad9d0e1872b776af373a18ba75075baffb88a9838432fcb333",
     "lmx_input": "b5cc1d5457d554bf5a32f7db09637799f901e8fee03e83bb51c75a32dbfaaa3e",
     "freemhd_input": "a25e437a765c06f3b5c72015d8cd76c49cc5a20280d35ff703d9d24c3ba7930e",
     "evaluator": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
-    "lmx_output": "96cbb2edcb4c99bae03c58c53a373d36338286eb3a56ba342743137aaf20cc7c",
-    "freemhd_output": "c130dbf8cbb9a89ba3c20c9be765f94c8b46edad7539ea5be7872178118d23dd"
+    "lmx_output": "667d269fd147415dff2ff0ce602502364d92f1159279158171e0dddd51ca9d0f",
+    "freemhd_output": "f638726a7bd3154008776b0c6bfd5ec3f7724926efda2e72e78038d8322b6023"
   }
 }
