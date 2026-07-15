@@ -106,8 +106,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         inlet = velocity0[0].at[..., 0].set(
             _flow_rate_inlet_profile(velocity0[0, ..., 0], area, target_flow))
         return _initialize_duct_mass_flux(
-            velocity0, density0, inlet, dx=dx, dy=dy, dz=dz,
-            sharding=field_sharding)
+            velocity0, density0, inlet, dx=dx, dy=dy, dz=dz)
 
     initialize = jax.jit(initialize,
         in_shardings=(vector_sharding, field_sharding),
