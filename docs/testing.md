@@ -96,7 +96,7 @@ A new stable feature is complete only when it has:
 2. unit and failure-path coverage;
 3. a numerics or physics validation appropriate to its claim;
 4. one bounded example if it introduces a distinct user workflow;
-5. no regression of the ten-minute gate or 95% branch-coverage floor.
+5. no regression of the ten-minute gate or 95% combined line/branch floor.
 
 See [Benchmark matrix](benchmark_matrix.md) for research acceptance and
 [Developer guide](developer_guide.md) for contribution mechanics.

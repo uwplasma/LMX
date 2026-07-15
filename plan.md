@@ -121,75 +121,30 @@ are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 
 ## Priority 0: solver-free matched B2 harness — complete
 
-Core schema-2 harness completed at `a97eeaf`; source, setup,
-instrumentation, tolerance, and replay-observer checkpoints continued through
-`9b41441`:
+The schema-3 harness materializes deterministic LMX and 392-cell FreeMHD inputs,
+pins FreeMHD commit `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5`, verifies the
+source snapshot, and derives each observed contract independently. Frozen
+one-sided mutations cover geometry, materials, fields, boundaries, numerics,
+and source drift. The `harness-smoke` role is deliberately unable to promote
+itself to `b2-production`.
 
-- Schema 2 compares both observed contracts with a frozen canonical contract;
-  two equal submitted dictionaries cannot self-certify.
-- Artifact verification rejects escapes, aliases, links, overlaps, missing or
-  empty inputs, special files, type mismatches, and changed content.
-- At `a4c83ab`, the source materializer verifies FreeMHD commit
-  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and scoped cleanliness. At
-  `475789e`, the frozen evidence added the electric equation. The observer
-  audit then added the vector-scheme macro and registration, for seven exact
-  source files plus the manifest. The source-snapshot tree SHA-256 is
-  `18c33bda110e92ad9d0e1872b776af373a18ba75075baffb88a9838432fcb333`.
-- At `f033a4b`, the LMX materializer writes a deterministic strict JSON input;
-  its loader reconstructs a real `CaseSpec`/`FringingProfile`, and its observer
-  derives the contract without reading the expected contract.
-- The compact FreeMHD input contains 392 cells across fluid and conducting-wall
-  regions, direct block cell zones, exact B2 material/field/boundary facts, and
-  fixed Euler controls for two updates. Generated meshes and fields stay out of
-  Git.
-- The FreeMHD observer independently parses input dictionaries and seven pinned
-  source files plus their manifest. Both observers agree on the shared evaluator
-  and normalized pressure contract.
-- Ten one-sided mutations cover mesh, field, fluid, wall, velocity, pressure,
-  electric boundary, scheme, iteration budget, and source content while proving
-  that the opposite observation is unchanged.
-- OpenFOAM setup utilities pass through mesh generation, region splitting,
-  dictionary changes, field expression evaluation, and region listing. No
-  FreeMHD or LMX solver process ran in this tranche.
-- `harness-smoke` now reports schema, artifact, contract, and observation passes,
-  while comparison and acceptance remain false. The role cannot promote itself
-  to `b2-production`.
-
-The LMX smoke realization is `L=U=rho=sigma_f=1`, `Ha=2900`, `N=540`,
-`Re=Ha^2/N`, `Q=4`, wall thickness `0.02`, and wall conductivity `3.5`. It has
-eight axial cells over `[-15,10]`, a `5x5` fluid cross-section plus one wall
-cell on each side, `dt=1/540000`, and two updates ending at `step_limit`. These
-are shared contract facts because the independent FreeMHD input reproduces them
-exactly.
-
-Exit met: deterministic inputs and source hashes, two independent observers,
-one-sided mismatch attribution, the frozen non-accepting role, strict docs, and
-one complete portable gate are green and pushed.
+Exit met: source, artifact, contract, observer-independence, and setup gates are
+green. Exact implementation history belongs in the tracked harness record and
+validation documentation.
 
 ## Priority 1: matched B2 smoke — complete
 
-The refreshed external bundle keyed to LMX source commit `3a22078` passed every
-permitted schema-3 gate under a shared 600-second deadline. LMX ran first on one
-JAX device in 13.12 seconds; native FreeMHD then ran with two MPI ranks in 7.06
-seconds. Both executed two fixed Euler updates and stopped at `step_limit`.
+The record keyed to LMX `3a22078` and the pinned FreeMHD source runs two fixed
+Euler updates in 13.12 seconds on one JAX device and 7.06 seconds on two native
+FreeMHD MPI ranks. Restart, mass/current closure, interface-current activity,
+and Courant gates pass. Cross-code normalized pressure differences are 0.00452
+RMS and 0.01092 maximum, within the frozen 0.16 and 0.32 smoke limits.
 
-The independent observers report zero LMX restart difference, machine-precision
-mass/current closure, nonzero interface-current activity, and closely matching
-Courant histories. Cross-code normalized pressure differences are 0.00452 RMS
-and 0.01092 maximum, well inside the predeclared 0.16 and 0.32 smoke limits.
-Schema, artifacts, contracts, observations, execution, and comparison all pass
-with no failed checks. `acceptance_pass` remains false solely because
-`harness-smoke` is intentionally ineligible for production acceptance.
-
-The compact tracked summary is
-`benchmarks/results/b2-freemhd-harness-smoke-20260715.json`. The 97-file,
-1.64 MB raw bundle remains outside Git with a recorded tree hash; future runs
-must also record the immutable container image digest and orchestration wall
-clock directly. No medium B2 physics run starts from this result.
-
-Exit met: the exact tiny run is contract-valid and numerically consistent under
-the frozen smoke gates. Production parity, a three-mesh ladder, experimental
-acceptance, and production/steady strong scaling remain open.
+Authoritative evidence is
+`benchmarks/results/b2-freemhd-harness-smoke-20260715.json`; its 1.64 MB raw
+bundle remains outside Git. Exit met for orchestration and two-update numerical
+consistency only. Production parity, the canonical three-mesh ladder,
+experimental acceptance, and steady scaling remain open.
 
 ## Priority 2: unblock fast iteration and real strong scaling
 
@@ -208,8 +163,10 @@ lowered the isolated weighted path from 33.7 to 23.5--26.1 seconds and the base
 path to 7.5--8.9 seconds. Next profile reduced B2, then the autodiff nodes; refresh the
 full-gate wall time only after the next coherent test tranche.
 
-Add the top ten node durations to the portable-gate record and warn on any
-portable node above 45 seconds. Preserve the 300-second engineering target,
+Keep the top ten concurrent node durations in the portable-gate record and
+treat any node above 45 seconds as a critical-path review trigger. The suite
+driver's warning remains the separate 300-second wall-time warning. Preserve
+the 300-second engineering target,
 600-second hard limit, and at least 95% combined line/branch coverage. Prefer
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
@@ -227,7 +184,7 @@ timing lane. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
 An explicit one-device request now uses the same named-sharding kernels as the
-multi-device path. With that fair baseline, the current-formulation CPU ladder
+multi-device path. With that fair baseline, the accepted pre-current-flux-JIT CPU ladder
 passes validation, placement, exact restart, and device-equivalence gates at
 `16 x 7 x 7`, `64 x 15 x 15`, and `128 x 31 x 31`. The two smaller grids are
 communication-bound. At `128 x 31 x 31`, warm medians are 0.768, 0.649, and
@@ -256,8 +213,12 @@ device time was in cuSPARSE tridiagonal kernels reached through SOLVAX line
 preconditioning, versus 2.38% in NCCL. These are incomplete captured shares,
 not phase timings.
 
-Next retain projection and momentum iteration counts, then profile one warmed
-phase at a time with explicit blocking. First reduce line-preconditioner calls
+First refresh the bounded `128 x 31 x 31` CPU rung on the current source; the
+accepted 1.19x record predates the diagnostic fusion that materially changed
+the sharded path. Then profile one warmed GPU phase at a time with explicit blocking and retain
+pressure iteration counts through a private diagnostic return only if the
+phase evidence requires them. Retain momentum auxiliary data only after the
+released SOLVAX API supports it without another solve. First reduce line-preconditioner calls
 through a mixed-boundary-compatible coarse correction or improved stopping;
 do not replace the already-batched SOLVAX GPU tridiagonal path without a bounded
 forward/gradient/timing win. Steady-production scaling remains the promotion
@@ -347,15 +308,11 @@ acceptance. SOLVAX owns generic linear algebra after primal, residual,
 transpose/gradient, JIT, placement, memory, and repeated timing gates pass.
 Delete an LMX duplicate in the same tranche that adopts SOLVAX.
 
-Near-term, released-0.8.3 candidates are deliberately small:
-
-- replace manual pressure-preconditioner sums with
-  `additive_preconditioner(..., weights=(1,...))`;
-- consider `solvax.jacobi` for the five-point PCG preconditioner while
-  preserving its tiny guard and `none` behavior.
-
-Together these can save roughly 10–20 package lines; they do not justify
-interrupting the matched harness. After 0.8.4 is published, use one
+The released-0.8.3 additive-preconditioner migration is already complete in
+both line-preconditioner owners. A later `solvax.jacobi` substitution is worth
+considering only if it deletes LMX code while preserving the tiny diagonal
+guard and `none` behavior; ownership movement alone is not a performance win.
+After 0.8.4 is published, use one
 `anderson_weights` result for scaled fields and compact-flux histories, and use
 `linear_solve(has_aux=True)` to retain momentum diagnostics without a final
 extra matvec. Raise the minimum dependency in that same correctness tranche.
@@ -404,5 +361,5 @@ billing/spending failure and require green Python 3.10 with minimum SOLVAX,
 Python 3.13 with newest-compatible SOLVAX, strict docs, wheel, and release jobs.
 
 Exit: LMX is small, installable, reproducible, honestly scoped, documented with
-useful visuals, above 95% branch coverage, below the ten-minute portable-test
+useful visuals, at least 95% combined line/branch coverage, below the ten-minute portable-test
 limit, and research-grade for every feature it labels accepted.
