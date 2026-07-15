@@ -521,8 +521,12 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         )
 
     with np.load(restart_path, allow_pickle=False) as data:
-        v3_missing = {key: data[key] for key in data.files
-                      if key != "iteration_pressure_linear_history"}
+        missing_v3 = [(message, {key: data[key] for key in data.files if key != field})
+                      for field, message in (
+                          ("steady_streak", "missing accelerator state"),
+                          ("iteration_courant_history", "missing CFL history"),
+                          ("iteration_pressure_linear_history", "missing pressure linear history"),
+                      )]
         v3_short = {key: data[key] for key in data.files}
         v3_short["iteration_pressure_linear_history"] = np.zeros((0, 5))
         v2_metadata = json.loads(str(data["metadata_json"]))
@@ -536,10 +540,11 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         v1_payload["metadata_json"] = json.dumps(v1_metadata)
         legacy_payload = {key: data[key] for key in data.files if key not in {
             "metadata_json", "rho_phi_plus", "rho_phi_inlet", "iteration_courant_history"}}
-    missing_path = tmp_path / "restart" / "diagnostics_v3_missing.npz"
-    np.savez_compressed(missing_path, **v3_missing)
-    with pytest.raises(ValueError, match="missing pressure linear history"):
-        load_extruded_restart_bundle(missing_path)
+    for index, (message, payload) in enumerate(missing_v3):
+        missing_path = tmp_path / "restart" / f"diagnostics_v3_missing_{index}.npz"
+        np.savez_compressed(missing_path, **payload)
+        with pytest.raises(ValueError, match=message):
+            load_extruded_restart_bundle(missing_path)
     short_path = tmp_path / "restart" / "diagnostics_v3_short.npz"
     np.savez_compressed(short_path, **v3_short)
     with pytest.raises(ValueError, match="inconsistent lengths"):
