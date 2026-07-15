@@ -25,7 +25,7 @@ are authoritative when prose and results differ.
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 823 tests with 8 expected external-data
-  skips and 95.01% combined line/branch coverage in 154.1 seconds on the
+  skips and 95.00% combined line/branch coverage in 160.7 seconds on the
   reference Mac.
 
 ## Research-stage
@@ -38,8 +38,12 @@ are authoritative when prose and results differ.
   fine-checkpoint solver promotion, and fine numerical gates. These are
   diagnostics, not validation of the canonical finite-inertia formulation.
   That formulation and its independently observed LMX/FreeMHD tiny inputs are
-  implemented; executing the exact two-update smoke remains open. The fine
-  pressure curve misses every frozen ALEX literature-error limit. A checksummed
+  implemented. Its exact two-update LMX/FreeMHD harness passes every frozen
+  smoke gate, and its production path has exact restart plus equivalent
+  observables on 1/2/4 CPU devices and 1/2 deterministic GPUs. These tiny runs
+  establish orchestration and sharding correctness, not production parity or
+  strong scaling. The fine pressure curve misses every frozen ALEX
+  literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from
   15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not
   validation evidence; exact matched-field FreeMHD and three-mesh gates remain

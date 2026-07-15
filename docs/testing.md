@@ -11,7 +11,7 @@ external solvers, long physics campaigns, and hardware scaling.
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
 and a hard ten-minute timeout. The last committed Apple M4 record is 823 passed,
-8 expected external-data skips, 95.01% combined line/branch coverage, and 154.1
+8 expected external-data skips, 95.00% combined line/branch coverage, and 160.7
 seconds with six workers. The default warning threshold is five minutes,
 leaving another five minutes before the hard failure. The record keeps the ten
 slowest node IDs for critical-path review.
@@ -45,11 +45,11 @@ Exact benchmark node IDs and source hashes remain in the
 | Operators, mesh, and conservation | operator, mesh, physics, and convergence tests | manufactured solutions and observed order | stable |
 | Ducts and high Ha | solver, physics, and validation tests | A1/A2/A3 analytical and FreeMHD records | accepted |
 | Linear algebra and SOLVAX | linear plus focused solver/fringing tests | frozen SOLVAX CPU/GPU acceptance records | accepted |
-| B1/B2 fringing | benchmark, fringing, and independence-runner tests | B1/B2 ALEX evidence | exact FreeMHD open |
+| B1/B2 fringing | benchmark, fringing, and independence-runner tests | exact B2 smoke plus B1/B2 ALEX evidence | production FreeMHD parity open |
 | Fields, geometry, walls, and blanket models | field, mesh, wall, and blanket tests | limiting cases and convergence | scoped external status |
 | Differentiability | autodiff and gradient-focused solver tests | finite-difference and transpose evidence | stable paths accepted |
 | Q2D and external adapters | Q2D and external-validation tests | independent-data readiness | quantitative parity open |
-| Sharding and scaling | scaling and placement tests | Mac and GPU records | accepted-case scaling open |
+| Sharding and scaling | scaling and placement tests | exact tiny CPU/GPU equivalence records | larger accepted-case scaling open |
 | Plots, examples, and packaging | plotting, showcase, repository, and reporting tests | media, docs, wheel, and provenance gates | stable |
 
 Coverage is a floor, not a validation claim. Physics acceptance requires

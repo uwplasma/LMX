@@ -1,12 +1,14 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The tested code baseline is `a87a28b`; the exact two-update
-LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence, and portable
-coverage gate are green. The smoke closes bounded orchestration and comparison,
-not production B2 acceptance. This single active plan records accepted baselines,
-active gates, and stop/go criteria—not campaign history. Completed campaign
-details belong in checksummed result records and the validation or performance
-documentation.
+Status: 2026-07-15. The source-tested baseline is `3a22078`; test-only restart
+coverage followed at `de18ee2`, and compact evidence was refreshed at `9f1ddb7`.
+The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
+deterministic one-/two-GPU equivalence, and portable coverage gate are green.
+The smoke closes bounded orchestration and comparison, not production B2
+acceptance; the tiny shared-host runs close sharding correctness, not strong
+scaling. This single active plan records accepted baselines, active gates, and
+stop/go criteria—not campaign history. Completed campaign details belong in
+checksummed result records and the validation or performance documentation.
 
 ## Product outcome
 
@@ -85,7 +87,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, and exact smoke equivalence on one/two/four forced CPU devices have bounded gates | production parity and measured scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, and exact smoke equivalence on 1/2/4 forced CPU devices and 1/2 deterministic GPUs have bounded gates | production parity and measured scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
@@ -98,22 +100,23 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,745 | stay below 34,850 through the scaling tranche | 35,100 |
+| package lines | 34,839 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,275 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,446,643 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,469,216 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `a87a28b` records 823 passes, 8 expected
-external-data skips, 95.0108% combined line/branch coverage, and 154.1 seconds on
+The portable-gate artifact keyed to `3a22078` records 823 passes, 8 expected
+external-data skips, 95.0020% combined line/branch coverage, and 160.7 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The shortened weighted-modal node now takes 30.9
-seconds selectively; the last recorded full-gate leader is the reduced B2 node
-at 40.9 seconds, so no known portable node exceeds the 45-second warning level.
+95.5% engineering target. The six-worker record reports 64.7 seconds for the
+weighted-modal node and 43.5 seconds for reduced B2. Parallel JUnit durations
+are diagnostic rather than isolated timings, but weighted-modal now exceeds the
+45-second warning level and is the next CI critical-path target.
 
 ## Priority 0: solver-free matched B2 harness — complete
 
@@ -164,9 +167,9 @@ one complete portable gate are green and pushed.
 
 ## Priority 1: matched B2 smoke — complete
 
-The exact external bundle keyed to LMX source commit `a7693c8` passed every
+The refreshed external bundle keyed to LMX source commit `3a22078` passed every
 permitted schema-3 gate under a shared 600-second deadline. LMX ran first on one
-JAX device in 13.31 seconds; native FreeMHD then ran with two MPI ranks in 5.48
+JAX device in 13.12 seconds; native FreeMHD then ran with two MPI ranks in 7.06
 seconds. Both executed two fixed Euler updates and stopped at `step_limit`.
 
 The independent observers report zero LMX restart difference, machine-precision
@@ -194,12 +197,12 @@ measurements themselves run alone.
 
 ### CI critical path
 
-The modal pipe test now reuses one physical projection and verifies direct
-mode-factor algebra without a second integration run. Its selective time fell
-from 74.3 to 30.9 seconds; the base path is 7.3 seconds and reduced B1 is 12.4
-seconds. The full gate fell from 165.7 to 154.1 seconds while adding the device-cut
-regression. Next profile the 40.9-second reduced B2 node, then the autodiff nodes,
-without weakening their physics, gradient, or restart assertions.
+The modal pipe test reuses one physical projection and verifies direct
+mode-factor algebra without a second integration run. In the latest six-worker
+gate it nevertheless reports 64.7 seconds, versus 43.5 seconds for reduced B2
+and 26.8 seconds for reduced B1. First measure weighted-modal in isolation and
+remove redundant setup or compilation; then profile reduced B2 and the autodiff
+nodes without weakening their physics, gradient, or restart assertions.
 
 Add the top ten node durations to the portable-gate record and warn on any
 portable node above 45 seconds. Preserve the 300-second engineering target,
@@ -210,16 +213,23 @@ another test file merely to move lines.
 ### Canonical sharding and performance
 
 Exact accepted-smoke observables now agree on one, two, and four forced Mac CPU
-devices. A fused indexed outlet update had inserted a false coefficient zero at
-the device cut; an axial-mask update fixes it, and the five-second forced-device
-test fails against the old implementation. The compact evidence is
-`benchmarks/results/b2-cpu-device-equivalence-20260715.json`.
+devices and on one and two deterministic RTX A4000 GPUs. The repair makes flux,
+vector, embedding, initialization, CFL, and relaxation layouts explicit and
+keeps compact flux components separate until explicit packing. Both device
+ladders have exact restart replay; the GPU pressure observable differs by at
+most `1.05e-14`. Deterministic GPU correctness uses
+`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode remains a diagnostic
+performance lane because derived fields can vary at roundoff scale. Compact
+records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
-Next add the exact matched input/observer to the scaling worker and measure a
-larger fixed, physics-identical B2 case with warm repeats on:
+Do not publish the tiny apparent speedups: compilation-cache effects contaminate
+the CPU samples and the GPU host was shared. Measure the next fixed,
+physics-identical B2 ladder with separate cold and warm repeats:
 
-- Mac CPU: 1, 2, and 4 JAX devices;
-- office GPUs: 1 and 2 GPUs.
+- `16 x 7 x 7` sentinel on each device count;
+- `64 x 15 x 15` calibration only if the sentinel passes;
+- `128 x 31 x 31` on Mac CPU with 1/2/4 devices;
+- `128 x 67 x 67` on office GPUs with 1/2 devices only after calibration.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -292,7 +302,9 @@ No tag or publication is authorized here.
 
 The device-cut audit compared released 0.8.3 with the pending 0.8.4 PCG and
 found identical Krylov code; generic two-device standard and single-reduction
-PCG both pass. The B2 failure was finite-volume boundary assembly owned by LMX,
+PCG both pass. The B2 failure was in LMX-owned layout transitions: eager
+embedding, component extraction, slicing, packing, relaxation, and restart
+staging across production shards. It was not a generic Krylov or SOLVAX defect,
 so no SOLVAX patch or dependency bump is warranted for this fix.
 
 LMX owns MHD equations, finite-volume stencils and limiters, geometry,

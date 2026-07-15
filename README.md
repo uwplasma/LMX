@@ -88,8 +88,8 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-B2 conservation and two-GPU results are experimental diagnostics from a
-superseded formulation; canonical finite-inertia validation remains open.
+The canonical B2 smoke has exact restart and deterministic 1/2-GPU equivalence.
+Its plotted large-grid result is from a superseded formulation; validation remains open.
 [Fringing status →](docs/fringing.md)
 
 ## Differentiate selected workflows
@@ -113,14 +113,14 @@ These visuals demonstrate implemented workflows, not quantitative validation.
 
 ![Experimental B2 GPU strong scaling](docs/_static/strong_scaling.webp)
 
-The exact B2 smoke agrees on 1/2/4 CPU devices. A superseded checkpoint measured
-1.66× on two RTX A4000 GPUs; canonical warm scaling remains open.
+The exact B2 smoke agrees on 1/2/4 CPU devices and 1/2 deterministic GPUs. A
+superseded checkpoint measured 1.66×; canonical warm scaling remains open.
 [Protocol and results →](docs/performance.md)
 
 ## Quality and citation
 
-The portable gate records **823 passing tests**, **95.01% combined line/branch
-coverage**, and **154.1 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **823 passing tests**, **95.00% combined line/branch
+coverage**, and **160.7 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

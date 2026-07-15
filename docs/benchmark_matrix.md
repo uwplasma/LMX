@@ -12,7 +12,7 @@ records live in `benchmarks/`; large fields and movies live in releases.
 | A2 Shercliff/Hunt ducts | analytical profiles and Samper Table I | all eight frozen rows pass | verified |
 | A3 FreeMHD closed channel | audited inputs and four mesh levels | finest finite-grid observables below 1% | verified for frozen cases |
 | B1 ALEX pipe fringe | digitized pressure data and 3D solver | conservation passes; steady pressure gate open | research-stage |
-| B2 ALEX square fringe | digitized pressure data and 3D solver | conservation and two-GPU equivalence pass | research-stage |
+| B2 ALEX square fringe | digitized pressure data and 3D solver | canonical smoke has conservation and deterministic 1/2-GPU equivalence; production parity and scaling remain open | research-stage |
 | Q2D turbulence | reduced-model and adapter checks | independent turbulent parity required | staged |
 | Magnetic obstacle | qualitative topology checks | quantitative experimental parity required | staged |
 

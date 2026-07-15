@@ -85,7 +85,7 @@ The retained specifications and references are:
 | Case | Geometry | Reference | Status |
 |---|---|---|---|
 | B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure solver accepted; experimental observable open |
-| B2 | conducting square duct | `alex-b2-square.csv` | physics research-stage; 2-GPU scaling passes |
+| B2 | conducting square duct | `alex-b2-square.csv` | physics research-stage; deterministic 1/2-GPU smoke equivalence passes, scaling open |
 
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
@@ -106,8 +106,10 @@ The compatible retained-modal solver is the sole frozen B1 pressure path after
 small factor parity, medium and large field/pressure-observable parity, and a
 large solve/restart gate passed. No B1 environment switch is required.
 
-B2 supports named axial sharding. On two RTX A4000 GPUs the fixed-size scaling
-gate improves from 36.96 s to 22.23 s. The fine-checkpoint transverse Galerkin
+B2 supports named axial sharding. The canonical tiny path has equivalent
+observables and exact restart on one and two deterministic GPUs. A superseded
+formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
+current scaling claim. The fine-checkpoint transverse Galerkin
 gate separately reduces electric iterations 5.18x and matched two-update time
 1.87x with equivalent fields and residuals. The resulting fine baseline plus
 doubled-iteration and wall confirmations pass; its tighter-tolerance variant

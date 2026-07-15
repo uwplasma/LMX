@@ -98,8 +98,10 @@ fluid and 192 wall cells, applies both region dictionaries, and initializes the
 same field samples. Ten one-sided mutations attribute mesh, field, material,
 boundary, scheme, stopping, and source drift while leaving the LMX observation
 unchanged. This solver-free gate is not a parity result: `harness-smoke` can
-never grant production acceptance. No medium or production campaign starts
-until the exact tiny solve passes.
+never grant production acceptance. The exact two-update execution now passes
+that bounded role with pressure differences of 0.00452 RMS and 0.01092 maximum.
+No medium or production campaign starts until its own predeclared mesh,
+convergence, and acceptance gates are ready.
 
 ## ALEX experiments
 
