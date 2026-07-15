@@ -911,6 +911,9 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
         jnp.asarray([4.0, 3.0, 2.0, 1.0])[:, None, None], shape
     )
     rhs = jnp.broadcast_to(jnp.asarray([-16.0, 0.0, 0.0, -16.0])[:, None, None], shape)
+    with pytest.raises(ValueError, match="Unsupported axial pressure mode"):
+        _solvax_pressure_poisson_duct(rhs, jnp.ones(shape), **settings,
+            axial_pressure_mode="periodic")
     pressure, *_ = _solvax_pressure_poisson_duct(
         rhs,
         jnp.ones(shape),
