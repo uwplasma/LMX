@@ -102,9 +102,9 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | package modules | 35 | no new module | 35 |
 | package lines | 34,839 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,283 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,469,216 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,469,480 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -200,9 +200,12 @@ measurements themselves run alone.
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
 gate it nevertheless reports 64.7 seconds, versus 43.5 seconds for reduced B2
-and 26.8 seconds for reduced B1. First measure weighted-modal in isolation and
-remove redundant setup or compilation; then profile reduced B2 and the autodiff
-nodes without weakening their physics, gradient, or restart assertions.
+and 26.8 seconds for reduced B1. Isolated measurement attributed roughly half
+of that modal duration to worker contention. Reducing only its manufactured
+radial grid, while preserving every physical and independent-factor assertion,
+lowered the isolated weighted path from 33.7 to 23.5--26.1 seconds and the base
+path to 7.5--8.9 seconds. Next profile reduced B2, then the autodiff nodes; refresh the
+full-gate wall time only after the next coherent test tranche.
 
 Add the top ten node durations to the portable-gate record and warn on any
 portable node above 45 seconds. Preserve the 300-second engineering target,

@@ -1256,9 +1256,10 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
 def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
     modal_stabilization,
 ):
-    nx, nr, ntheta = 5, 4, 8
-    r_faces = jnp.asarray([0.0, 0.15, 0.4, 0.7, 1.0])
+    nx, nr, ntheta = 5, 3, 8
+    r_faces = jnp.asarray([0.0, 0.2, 0.55, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
+    wall_width = jnp.diff(r_faces)[-1]
     dtheta = 2.0 * jnp.pi / ntheta
     # This tiny manufactured system reaches the strict gates within 32 steps;
     # a larger budget only lengthens compilation in routine coverage runs.
@@ -1351,7 +1352,7 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
         wall_sink = (
             jnp.zeros(shape)
             .at[:, -1, :]
-            .set(0.07 * r_faces[-1] / (r_centers[-1] * 0.5 * (1.0 - 0.7) ** 2))
+            .set(0.07 * r_faces[-1] / (r_centers[-1] * 0.5 * wall_width**2))
         )
         retained = fringing_impl._pipe_retained_modal_factors(
             jnp.ones(shape),
