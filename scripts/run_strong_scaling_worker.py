@@ -106,7 +106,8 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         inlet = velocity0[0].at[..., 0].set(
             _flow_rate_inlet_profile(velocity0[0, ..., 0], area, target_flow))
         return _initialize_duct_mass_flux(
-            velocity0, density0, inlet, dx=dx, dy=dy, dz=dz)
+            velocity0, density0, inlet, dx=dx, dy=dy, dz=dz,
+            sharding=field_sharding)
 
     initialize = jax.jit(initialize,
         in_shardings=(vector_sharding, field_sharding),
@@ -146,7 +147,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
     mixed_pressure = jax.jit(mixed_pressure,
         in_shardings=(field_sharding, field_sharding),
         out_shardings=(field_sharding,) + (replicated,) * 6)
-    mixed = mixed_pressure(*(jax.device_put(value, field_sharding)
+    mixed = mixed_pressure(*(jax.device_put(np.asarray(value), field_sharding)
         for value in (probe_rhs, probe_mobility)))
 
     def momentum(velocity0, force0, density0, viscosity0, plus0, inlet0):
