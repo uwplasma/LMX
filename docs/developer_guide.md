@@ -126,23 +126,21 @@ based on observable outputs, not source-coupled behavior.
 
 ## CI strategy
 
-The repository uses a split CI model:
+The repository uses a bounded CI model:
 
-- fast default CI
-  - runs on pushes and pull requests
-  - covers unit and validation tests
+- complete portable CI
+  - runs on pushes, pull requests, and manual dispatch
+  - runs all portable unit, numerics, physics, workflow, and branch-coverage tests on Python 3.10 and 3.13
 - dedicated docs workflow
   - runs on pushes, pull requests, and manual dispatch
   - builds the Sphinx site as an independent status surface
 - manual research-artifact workflows
   - run only through GitHub Actions `workflow_dispatch`
-  - run the heavier regression and physics suites
-  - generate benchmark, validation-artifact, and extended coverage outputs
+  - run hardware, FreeMHD, large-data, and long benchmark lanes
+  - generate external validation and research artifacts
 
-This separation is intentional. The fast lane protects the `1.0` public
-surface, the docs lane keeps the documentation badge honest, and the manual
-lane preserves reproducible research artifacts without exhausting routine CI
-runtime.
+This separation keeps all portable functionality in the routine gate while
+leaving hardware- or data-dependent campaigns explicit.
 
 ## Release and publishing
 
@@ -153,8 +151,9 @@ artifact gates before package artifacts are built.
 
 - default push/PR CI:
   - install `.[dev]`
-  - run `python -m pytest -m "unit or validation"`
-  - keep the lane below five minutes
+  - run `python scripts/run_full_test_suite.py --budget-seconds 600`
+  - enforce at least 95% combined line/branch coverage on Python 3.13
+  - run the same battery without coverage on Python 3.10
 - docs CI:
   - install `.[docs]`
   - run `python -m sphinx -W -b html docs docs/_build/html`

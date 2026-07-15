@@ -475,7 +475,7 @@ def test_write_strong_scaling_plots_writes_png_and_pdf(tmp_path: Path):
     records = [
         {"platform": "CPU", "num_devices": 1, "mean_seconds": 4.0},
         {"platform": "CPU", "num_devices": 2, "mean_seconds": 2.4},
-        {"platform": "GPU", "num_devices": 1, "mean_seconds": 1.8},
+        {"platform": "GPU", "num_devices": 1, "warm_seconds": 1.8},
         {"platform": "GPU", "num_devices": 2, "mean_seconds": 1.0},
     ]
     outputs = write_strong_scaling_plots(records, tmp_path, case_title="Scaling")

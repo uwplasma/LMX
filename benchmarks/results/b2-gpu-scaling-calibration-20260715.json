@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "commit": "da8a53b021d81b13700d379462d14053b7250a89",
+  "source_fingerprint": "50863abf661bd730132f68c1a6c854fe1dad1b7d34ef4aa9ac85f87b424c53cd",
+  "case_id": "B2-fringing-square",
+  "acceptance_role": "scaling-calibration",
+  "environment": {
+    "hardware": "1/2 NVIDIA RTX A4000, shared host without NVLink",
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "solvax": "0.8.3",
+    "solvax_tree_sha256": "1b2e3275677ee1c997dc7eab90bf0a888166111e29a3388a5e11ca3898c020fd",
+    "precision": "float64"
+  },
+  "problem": {
+    "shape": [128, 67, 67],
+    "cells": 574592,
+    "updates": 2,
+    "restart_replay_updates": 1,
+    "repeats": 4,
+    "input_sha256": "c448b4cf684605ac83e7333bb16381072f53d47883a10b4ac03d361d4990be6e",
+    "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
+  },
+  "deterministic_lane": {
+    "xla_flags": "--xla_gpu_exclude_nondeterministic_ops",
+    "runs": {
+      "1": {
+        "cold_seconds": 46.690861294046044,
+        "warm_samples_seconds": [21.793267042026855, 21.830483788973652, 21.98238046700135],
+        "warm_median_seconds": 21.830483788973652,
+        "warm_cv": 0.003740516927220035,
+        "peak_device_bytes": 1006477312,
+        "restart_max_abs": 0.0
+      },
+      "2": {
+        "cold_seconds": 41.39549177698791,
+        "warm_samples_seconds": [15.061074547993485, 15.15763800899731, 14.926415568974335],
+        "warm_median_seconds": 15.061074547993485,
+        "warm_cv": 0.0063011627217760754,
+        "peak_device_bytes": [655860224, 661968384],
+        "restart_max_abs": 0.0
+      }
+    },
+    "speedup": 1.4494638957803991,
+    "parallel_efficiency": 0.7247319478901996,
+    "equivalence": {
+      "pressure_observable_max_abs": 5.72022984535181e-12,
+      "courant_mean_max_abs": 2.25727199247832e-14,
+      "courant_max_abs": 2.7203987760376913e-16,
+      "dt_max_abs": 0.0,
+      "velocity_l2_relative": 4.1137427250976627e-10,
+      "potential_l2_relative": 1.5216079861867826e-12,
+      "current_l2_relative": 6.573480912813067e-9,
+      "rtol": 2e-8,
+      "atol": 2e-9,
+      "pass": true
+    }
+  },
+  "default_xla_lane": {
+    "devices_completed": [1],
+    "warm_median_seconds": 21.201392849034164,
+    "warm_cv": 0.0037722020806713165,
+    "validation_passed": false,
+    "restart_max_abs": 1.0,
+    "two_device_run_started": false,
+    "stop_rule": "The failed one-GPU restart gate stops the timing ladder."
+  },
+  "gates": {
+    "deterministic_validation": true,
+    "placement": true,
+    "restart_exact": true,
+    "device_equivalence": true,
+    "warm_cv_below_0.05": true,
+    "default_xla_validation": false
+  },
+  "interpretation": {
+    "deterministic_correctness": true,
+    "deterministic_two_update_speedup": 1.4494638957803991,
+    "accepted_fast_scaling": false,
+    "production_speedup_claim": false,
+    "reason": "The deterministic current formulation scales across two real GPU shards, but the separate default-XLA one-GPU restart gate failed and the shared host precludes a publishable timing claim."
+  },
+  "raw_assets": {
+    "location": "external workspace",
+    "gpu1_deterministic_sha256": "d3083a8d0f313ed58d3eaf27275a26d221cb67e5ef5e14fa2ddc6b16a1907283",
+    "gpu2_deterministic_sha256": "717a776cd4fe9c4e84a1e32b833028dc4502d067b55ebb71716c3eeb326fe0d3",
+    "gpu1_fast_diagnostic_sha256": "d5bdba3138103d10e360868f209f1ec300829297e8f030979cf3a9b8dd66c912"
+  }
+}

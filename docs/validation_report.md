@@ -41,13 +41,15 @@ are authoritative when prose and results differ.
   implemented. Its exact two-update LMX/FreeMHD harness passes every frozen
   smoke gate, and its production path has exact restart plus equivalent
   observables on 1/2/4 CPU devices and 1/2 deterministic GPUs. These tiny runs
-  establish orchestration and sharding correctness, not production parity or
-  strong scaling. The fine pressure curve misses every frozen ALEX
+  establish orchestration and sharding correctness. A current `128 x 67 x 67`
+  deterministic two-GPU calibration reaches 1.45x with exact replay and
+  equivalent observables; the default-XLA replay gate fails, so this is not
+  production parity or fast/steady scaling. The fine pressure curve misses every frozen ALEX
   literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from
   15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not
-  validation evidence; exact matched-field FreeMHD and three-mesh gates remain
-  required.
+  validation evidence; production-mesh matched-field FreeMHD and three-mesh
+  gates remain required.
 - Q2D turbulence, magnetic-obstacle, mapped blanket, and Dean-vortex workflows
   provide model or adapter checks but do not yet support quantitative claims.
 

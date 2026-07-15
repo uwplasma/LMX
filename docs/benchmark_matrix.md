@@ -12,7 +12,7 @@ records live in `benchmarks/`; large fields and movies live in releases.
 | A2 Shercliff/Hunt ducts | analytical profiles and Samper Table I | all eight frozen rows pass | verified |
 | A3 FreeMHD closed channel | audited inputs and four mesh levels | finest finite-grid observables below 1% | verified for frozen cases |
 | B1 ALEX pipe fringe | digitized pressure data and 3D solver | conservation passes; steady pressure gate open | research-stage |
-| B2 ALEX square fringe | digitized pressure data and 3D solver | canonical smoke has conservation and deterministic 1/2-GPU equivalence; production parity and scaling remain open | research-stage |
+| B2 ALEX square fringe | digitized pressure data and 3D solver | canonical smoke and deterministic 1/2-GPU calibration pass; production parity and fast/steady scaling remain open | research-stage |
 | Q2D turbulence | reduced-model and adapter checks | independent turbulent parity required | staged |
 | Magnetic obstacle | qualitative topology checks | quantitative experimental parity required | staged |
 
@@ -97,8 +97,8 @@ tight variant is preserved at a durable 48-update checkpoint with residual
 or oscillated, and componentwise Aitken diverged. The fine curve also misses all
 three frozen ALEX literature limits (weighted RMS `1.389`, weighted maximum
 `4.218`, integrated error `0.251`). Fine numerical independence remains open;
-matched-FreeMHD and observable/model normalization are the next validation
-priority.
+the tiny matched-FreeMHD smoke is complete, while production-mesh FreeMHD and
+observable/model normalization are the next validation priority.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

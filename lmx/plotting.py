@@ -2055,7 +2055,8 @@ def write_strong_scaling_plots(
     legend_labels: list[str] = []
     for color, (platform_name, values) in zip(palette, groups.items(), strict=False):
         device_counts = np.asarray([int(item["num_devices"]) for item in values], dtype=float)
-        runtimes = np.asarray([float(item.get("warm_seconds", item["mean_seconds"])) for item in values], dtype=float)
+        runtimes = np.asarray([float(item["warm_seconds"] if "warm_seconds" in item
+            else item["mean_seconds"]) for item in values], dtype=float)
         baseline = runtimes[0]
         speedup = baseline / np.maximum(runtimes, 1.0e-12)
         ny_value = values[0].get("ny")
@@ -2096,6 +2097,7 @@ def write_strong_scaling_plots(
     axes[0].set_title("Warm runtime", fontsize=13)
     axes[0].set_xlabel("Device count")
     axes[0].set_ylabel("Runtime [s]")
+    axes[0].set_yscale("log")
     axes[0].set_xscale("log", base=2)
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())

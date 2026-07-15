@@ -4,7 +4,7 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Experimental B2 strong scaling across two GPUs](_static/strong_scaling.webp)
+![Current B2 two-update CPU and deterministic GPU scaling calibration](_static/strong_scaling.webp)
 
 ## Current evidence
 
@@ -14,6 +14,7 @@ devices alone is not evidence of parallel execution.
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.768/0.649/0.647 s; 1.18x/1.19x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
+| B2 scaling calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, deterministic XLA | 21.83/15.06 s; 1.45x speedup; CV below 0.7%, exact restart and device equivalence pass | current real solver, two fixed updates; shared-host calibration only |
 | SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | timing refresh remains open |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
@@ -23,9 +24,12 @@ devices alone is not evidence of parallel execution.
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-The exact CPU/GPU results and fixed-size CPU calibration are recorded in
+The exact CPU/GPU results and fixed-size calibrations are recorded in
 `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
-`benchmarks/results/b2-cpu-strong-scaling-20260715.json`. The older,
+`benchmarks/results/b2-{cpu-strong-scaling,gpu-scaling-calibration}-20260715.json`.
+The default-XLA one-GPU diagnostic had a stable 21.20-second warm median but
+failed exact restart (`restart_max_abs = 1`), so the two-GPU fast lane did not
+run and GPU production scaling remains open. The older,
 larger GPU B2 result passes its historical two-device equivalence gate, but
 the measured path omits canonical inertia and uses stationwise flow forcing.
 It therefore does not establish scaling for the matched formulation. The B1
@@ -156,7 +160,9 @@ starting another expensive solve.
 
 Authoritative records:
 
-- `benchmarks/results/gpu-strong-scaling-20260713.json`
+- `benchmarks/results/b2-cpu-strong-scaling-20260715.json`
+- `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`
+- `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`
 - `benchmarks/results/b1-retained-modal-blocks-20260713.json`
 - `benchmarks/results/portable-gate-20260715.json`
 
@@ -243,10 +249,10 @@ than silently reused.
 
 ## Next performance work
 
-1. Re-measure the accepted B1 physical-pilot path on an otherwise idle GPU.
-2. Close B1/B2 mesh and experimental-observable acceptance.
-3. Add a four-GPU B2 point on suitable hardware.
-4. Keep compilation-cache and memory measurements in every accelerator report.
+1. Isolate the default-XLA B2 restart mismatch on a tiny GPU probe.
+2. Rerun the bounded default-XLA 1/2-GPU ladder only after one-GPU replay passes.
+3. Close B1/B2 mesh and experimental-observable acceptance.
+4. Add larger or four-GPU points only after the current fast lane is accepted.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)
 for physics promotion criteria.

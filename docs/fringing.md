@@ -85,7 +85,7 @@ The retained specifications and references are:
 | Case | Geometry | Reference | Status |
 |---|---|---|---|
 | B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure solver accepted; experimental observable open |
-| B2 | conducting square duct | `alex-b2-square.csv` | physics research-stage; deterministic 1/2-GPU smoke equivalence passes, scaling open |
+| B2 | conducting square duct | `alex-b2-square.csv` | research-stage; deterministic 1/2-GPU calibration passes, fast/steady scaling open |
 
 Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
@@ -93,8 +93,8 @@ observable extraction are implemented in `lmx/benchmarks.py`.
 ![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
 The panel uses only frozen, checksummed evidence. Both LMX curves are
-diagnostics; B2 experimental, three-mesh, and exact matched-FreeMHD acceptance
-remain open.
+diagnostics; B2 experimental, three-mesh, and production-mesh matched-FreeMHD
+acceptance remain open. The exact tiny matched smoke is complete.
 
 B1 uses SOLVAX's exact cyclic azimuthal line solve and retained modal factors. A
 one-cycle physical-convergence pilot now reduces the large solve-plus-restart
@@ -107,7 +107,9 @@ small factor parity, medium and large field/pressure-observable parity, and a
 large solve/restart gate passed. No B1 environment switch is required.
 
 B2 supports named axial sharding. The canonical tiny path has equivalent
-observables and exact restart on one and two deterministic GPUs. A superseded
+observables and exact restart on one and two deterministic GPUs. The current
+`128 x 67 x 67` two-update calibration reaches 1.45x on two deterministic GPUs;
+default-XLA replay still fails, so fast and production scaling remain open. A superseded
 formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
 current scaling claim. The fine-checkpoint transverse Galerkin
 gate separately reduces electric iterations 5.18x and matched two-update time
@@ -119,8 +121,8 @@ validation.
 The ALEX tap and normalization audit passes. A bounded, checksummed B2 pilot
 with the full Maxwell-consistent field improved peak-pressure underprediction
 from 15.6% to 8.2%, but a far-field offset worsened the aggregate experimental
-error. It therefore remains diagnostic pending matched-field FreeMHD and
-three-mesh evidence.
+error. It therefore remains diagnostic pending production-mesh matched-field
+FreeMHD and three-mesh evidence.
 
 ## Limitations
 
