@@ -325,6 +325,54 @@ expressions
 """
 
 
+def _b2_function_objects(sample_x: list[float]) -> str:
+    """Return compact, replayable B2 pressure and boundary-flux observations."""
+
+    points = "\n  ".join(
+        f"({x:.17g} {y:.17g} {z:.17g})"
+        for y, z in ((0.8, 0.0), (0.0, 0.8))
+        for x in sample_x
+    )
+
+    def surface(name: str, region: str, patch: str, field: str, scale: float = 1.0) -> str:
+        return f"""{name}
+ {{
+  type surfaceFieldValue; libs (fieldFunctionObjects); region {region};
+  executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
+  regionType patch; name {patch}; operation sum; fields ({field});
+  scaleFactor {scale:.17g}; writeFields false;
+ }}"""
+
+    blocks = [
+        f"""b2PressureTaps
+ {{
+  type probes; libs (sampling); region liquid;
+  executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
+  fixedLocations true; interpolationScheme cell; fields (p);
+  probeLocations\n (\n  {points}\n );
+ }}""",
+        surface("massIn", "liquid", "inlet", "rhoPhi"),
+        surface("massOut", "liquid", "sink", "rhoPhi"),
+        surface("currentIn", "liquid", "inlet", "jn"),
+        surface("currentOut", "liquid", "sink", "jn"),
+        surface("currentInterfaceFluid", "liquid", "liquid_to_solidWalls", "jn"),
+        """solidPotentialGradient
+ {
+  type grad; libs (fieldFunctionObjects); region solidWalls; field potE; result solidGradPotE;
+  executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
+ }
+ solidPotentialFlux
+ {
+  type flux; libs (fieldFunctionObjects); region solidWalls; field solidGradPotE;
+  result solidGradPotEFlux; rho none;
+  executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
+ }""",
+        surface("currentInterfaceSolid", "solidWalls", "solidWalls_to_liquid", "solidGradPotEFlux", -3.5),
+        surface("currentOuter", "solidWalls", "outerWalls", "solidGradPotEFlux", -3.5),
+    ]
+    return "functions\n{\n " + "\n ".join(blocks) + "\n}"
+
+
 def materialize_matched_b2_freemhd_input(
     template_dir: str | Path,
     output_dir: str | Path,
@@ -381,13 +429,15 @@ elcond 3.5;
 """
     _write_foam(destination / "constant/solidWalls/thermophysicalProperties", solid_body)
 
+    reference = load_benchmark_b_reference("B2-fringing-square", spec_root)
+    sample_x = np.linspace(-15.0 + 25.0 / 16.0, 10.0 - 25.0 / 16.0, 8).tolist()
     dt = 1.0 / 540000.0
     control = f"""
 application epotMultiRegionInterFoam; startFrom startTime; startTime 0; stopAt endTime;
 endTime {2 * dt:.17g}; deltaT {dt:.17g}; adjustTimeStep off; maxDeltaT {dt:.17g};
 writeControl timeStep; writeInterval 2; purgeWrite 0; writeFormat ascii; writePrecision 16;
 runTimeModifiable false; BtStartTime 0; BtDuration 0; JConservativeForm true;
-lmxSteadyStepsRequired 3; functions {{}}
+lmxSteadyStepsRequired 3; {_b2_function_objects(sample_x)}
 """
     _write_foam(destination / "system/controlDict", control)
     _write_foam(destination / "system/blockMeshDict", _b2_block_mesh())
@@ -447,7 +497,7 @@ B0 { internalField uniform (0 23.2379000772445 0); boundaryField { ".*" { type z
 potE { internalField uniform 0; boundaryField { outerWalls { type zeroGradient; value uniform 0; } "solidWalls_to_.*" { type compressible::turbulentTemperatureCoupledBaffleMixed; Tnbr potE; kappaMethod lookup; kappa elcond; kappaName elcond; value uniform 0; } } }
 """
     _write_foam(destination / "system/solidWalls/changeDictionaryDict", solid_change)
-    field_dict = _b2_set_expr(load_benchmark_b_reference("B2-fringing-square", spec_root))
+    field_dict = _b2_set_expr(reference)
     for region in ("liquid", "solidWalls"):
         _write_foam(destination / "system" / region / "setExprFieldsDict", field_dict)
 

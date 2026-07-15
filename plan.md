@@ -178,6 +178,13 @@ Complete the remaining small solver-free tranche before launching either solver:
 5. Rematerialize a clean external bundle, verify every hash and both input
    observations, and stop if any byte or contract fact differs.
 
+The instrumentation checkpoint is now materialized and setup-valid in the
+FreeMHD container. Sixteen pressure taps use the same adjacent-cell centers as
+LMX; liquid mass/current sums use registered `rhoPhi`/`jn`. FreeMHD does not
+register `jn` in the solid region, so outer and interface wall current are
+derived as `-sigma_wall grad(potE) . Sf` through ordered native function
+objects. Requesting a nonexistent solid `jn` is forbidden.
+
 Then declare one ten-minute wall budget for both codes. Run LMX first as one
 uninterrupted two-update path and as one update, restart, and one update; require
 their compact outputs to agree. Run FreeMHD only if the LMX execution and output

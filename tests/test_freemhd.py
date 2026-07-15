@@ -484,6 +484,10 @@ def test_matched_b2_freemhd_input_is_deterministic_slim_and_solver_free(tmp_path
     assert not any("insulator" in path.parts or path.name == "cellToRegion" for path in first.rglob("*"))
     assert "hex (0 1 2 3 4 5 6 7) liquid ($Nx $Ny $Nz)" in (first / "system/blockMeshDict").read_text()
     assert "xa=-15" in (first / "system/liquid/setExprFieldsDict").read_text()
+    functions = (first / "system/controlDict").read_text()
+    assert functions.count("type probes;") == 1 and functions.count("type surfaceFieldValue;") == 7
+    assert "field solidGradPotE;" in functions and "scaleFactor -3.5;" in functions
+    assert "region solidWalls;" in functions and "fields (jn);" in functions
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, first)
 
