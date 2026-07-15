@@ -405,7 +405,8 @@ def _decode_matched_b2_lmx_input(path: str | Path):
     } or mesh_payload["coordinate_system"] != "Cartesian x-y-z faces in duct-half-width units":
         raise ValueError("Invalid matched B2 mesh schema")
     if any(
-        not np.array_equal(np.asarray(mesh_payload[f"{axis}_faces"], dtype=float), np.asarray(getattr(mesh, f"{axis}_faces")))
+        not np.allclose(np.asarray(mesh_payload[f"{axis}_faces"], dtype=float),
+            np.asarray(getattr(mesh, f"{axis}_faces")), rtol=0.0, atol=1.0e-15)
         for axis in "xyz"
     ):
         raise ValueError("Matched B2 stored mesh faces do not reproduce the case")

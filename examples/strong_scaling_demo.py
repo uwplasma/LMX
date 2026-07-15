@@ -141,6 +141,8 @@ def run_local_cpu_scaling(
             timeout_seconds=timeout_seconds,
         )
         records.append(record)
+        if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
+            raise RuntimeError(f"Matched B2 CPU gate failed; evidence: {output_path}")
     return records
 
 
@@ -270,7 +272,8 @@ def run_remote_gpu_scaling(
             profile_arg = f" --profile-dir {shlex.quote(str(remote_profile))}"
         remote_command = (
             f"cd {shlex.quote(remote_dir)} && "
-            f"PYTHONPATH={shlex.quote(remote_dir)} CUDA_VISIBLE_DEVICES={shlex.quote(visible_devices)} JAX_PLATFORMS=cuda "
+            f"PYTHONPATH={shlex.quote(remote_dir)} CUDA_VISIBLE_DEVICES={shlex.quote(visible_devices)} "
+            "JAX_PLATFORMS=cuda JAX_ENABLE_X64=true XLA_PYTHON_CLIENT_PREALLOCATE=false "
             f"{shlex.quote(python_executable)} scripts/run_strong_scaling_worker.py "
             f"--benchmark-kind {shlex.quote(benchmark_kind)} --platform GPU --num-devices {count} "
             f"{'' if nx is None else f'--nx {nx} '}--ny {ny} --nz {nz} "
@@ -284,7 +287,10 @@ def run_remote_gpu_scaling(
         subprocess.run(
             ["scp", f"{remote_host}:{remote_json}", str(local_output)], check=True
         )
-        local_records.append(json.loads(local_output.read_text()))
+        record = json.loads(local_output.read_text())
+        local_records.append(record)
+        if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
+            raise RuntimeError(f"Matched B2 GPU gate failed; evidence: {local_output}")
     return local_records
 
 

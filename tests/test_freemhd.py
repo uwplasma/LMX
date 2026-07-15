@@ -557,6 +557,9 @@ def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path)
     assert payload["mesh"]["x_faces"] == [-15.0, -11.875, -8.75, -5.625, -2.5, 0.625, 3.75, 6.875, 10.0]
     assert payload["field_profile"]["sample_b_over_B0"] == [1.0, 1.0, 0.991875, 0.9371875, 0.69, 0.16125, 0.00875, 0.0]
     assert problem.case.name == "alex_b2-fringing-square_harness-smoke"
+    payload["mesh"]["y_faces"][2] += np.finfo(float).eps
+    first.write_text(json.dumps(payload))
+    assert load_matched_b2_lmx_input(first).case == problem.case
     groups = contract["nondimensional_groups"]
     assert {name: groups[name] for name in ("hartmann_number", "interaction_parameter", "reynolds_number")} == pytest.approx(
         {"hartmann_number": 2900.0, "interaction_parameter": 540.0, "reynolds_number": 2900.0**2 / 540.0}
