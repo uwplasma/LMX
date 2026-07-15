@@ -635,6 +635,78 @@ def observe_lmx_b2_contract(path: str | Path, evaluator: str | Path | None = Non
     return contract
 
 
+def observe_lmx_b2_output(
+    output_dir: str | Path, input_path: str | Path, evaluator: str | Path
+) -> dict[str, object]:
+    """Replay compact LMX B2 restart evidence without trusting summary metrics."""
+
+    from types import SimpleNamespace
+    from .benchmarks import benchmark_b_pressure_observable
+    from .io import (
+        _EXTRUDED_ARRAY_FIELDS,
+        _EXTRUDED_HISTORY_WIDTHS,
+        load_extruded_restart_bundle,
+        validate_extruded_restart_bundle,
+    )
+
+    root = Path(output_dir)
+    required = {"run.json", "checkpoint.npz", "direct.npz", "resumed.npz"}
+    if not root.is_dir() or {path.name for path in root.iterdir()} != required:
+        raise ValueError("LMX B2 output tree is incomplete")
+    metadata = json.loads((root / "run.json").read_text())
+    keys = {
+        "schema_version", "code", "case_id", "input_sha256", "evaluator_sha256",
+        "wall_seconds", "num_devices", "float_precision",
+    }
+    if set(metadata) != keys or metadata.get("schema_version") != 1 or metadata.get("code") != "LMX":
+        raise ValueError("LMX B2 output metadata are invalid")
+    if (
+        metadata.get("case_id") != "B2-fringing-square"
+        or metadata.get("input_sha256") != artifact_sha256(input_path, "file")
+        or metadata.get("evaluator_sha256") != artifact_sha256(evaluator, "file")
+        or metadata.get("float_precision") != "float64"
+        or int(metadata.get("num_devices", 0)) < 1
+        or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
+    ):
+        raise ValueError("LMX B2 output provenance differs")
+    problem = load_matched_b2_lmx_input(input_path)
+    checkpoint, direct, resumed = (
+        load_extruded_restart_bundle(root / name)
+        for name in ("checkpoint.npz", "direct.npz", "resumed.npz")
+    )
+    for restart in (checkpoint, direct, resumed):
+        validate_extruded_restart_bundle(restart, case=problem.case)
+    if checkpoint.bundle.stopping_state[0] != 1 or direct.bundle.stopping_state != resumed.bundle.stopping_state:
+        raise ValueError("LMX B2 restart stopping state differs")
+    names = [*_EXTRUDED_ARRAY_FIELDS, *(name for name, _ in _EXTRUDED_HISTORY_WIDTHS)]
+    differences = []
+    for name in names:
+        left, right = np.asarray(getattr(direct.bundle, name)), np.asarray(getattr(resumed.bundle, name))
+        if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
+            raise ValueError(f"LMX B2 output array {name} is invalid")
+        if left.size:
+            differences.append(float(np.max(np.abs(left - right))))
+    courant = np.asarray(direct.bundle.iteration_courant_history, dtype=float)
+    pressure = np.asarray(benchmark_b_pressure_observable(
+        SimpleNamespace(bundle=direct.bundle), "B2-fringing-square"
+    ))
+    if courant.shape != (2, 3) or pressure.shape != (8,) or direct.bundle.stopping_state[0] != 2:
+        raise ValueError("LMX B2 output execution shape differs")
+    return {
+        "steps": 2, "stop_reason": direct.bundle.stopping_state[2],
+        "steady_streak": direct.bundle.stopping_state[1],
+        "dt": courant[:, 0].tolist(), "courant_mean": courant[:, 1].tolist(),
+        "courant_max": courant[:, 2].tolist(),
+        "mass_balance": float(np.max(np.abs(np.asarray(direct.bundle.volumetric_flow_rate) - 4.0)) / 4.0),
+        "current_balance": float(np.max(np.abs(np.asarray(direct.bundle.boundary_current_residual)))),
+        "interface_current_balance": float(np.max(np.abs(np.asarray(direct.bundle.charge_balance_residual)))),
+        "interface_current_activity": float(max(np.max(np.abs(np.asarray(direct.bundle.jx))), np.max(np.abs(np.asarray(direct.bundle.jz))))),
+        "x_over_L": np.asarray(direct.bundle.x).tolist(), "pressure_observable": pressure.tolist(),
+        "restart_max_abs": max(differences, default=0.0),
+        "wall_seconds": float(metadata["wall_seconds"]),
+    }
+
+
 def observe_freemhd_b2_contract(
     case_dir: str | Path, source_dir: str | Path, evaluator: str | Path | None = None
 ) -> dict[str, object]:

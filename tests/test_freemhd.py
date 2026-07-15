@@ -10,6 +10,7 @@ import pytest
 
 import examples
 import lmx.benchmarks as benchmarks
+from lmx._fringing_types import ExtrudedFieldBundle
 from lmx.benchmarks import (
     BENCHMARK_B_SPEC_FILES,
     canonical_matched_b_contract,
@@ -29,8 +30,10 @@ from lmx.freemhd import (
     load_samper_table_i,
     observe_freemhd_b2_contract,
     observe_lmx_b2_contract,
+    observe_lmx_b2_output,
     validate_matched_b_record,
 )
+from lmx.io import write_extruded_bundle_restart_npz
 from scripts import run_freemhd_parity_suite
 
 
@@ -162,6 +165,47 @@ def _write_observer_source_snapshot(root: Path) -> dict[str, object]:
     manifest = {"commit": "fixture", "openfoam_release": "v2206", "files": files}
     (root / "source-pin.json").write_text(json.dumps(manifest, sort_keys=True))
     return manifest
+
+
+def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
+    payload = json.loads(input_path.read_text())
+    x = benchmarks.jnp.asarray(payload["field_profile"]["sample_x_over_L"])
+    faces = benchmarks.jnp.asarray(payload["mesh"]["y_faces"])
+    y = z = 0.5 * (faces[1:] + faces[:-1])
+    shape, dt = (8, 7, 7), payload["effective_controls"]["dt"]
+
+    def bundle(steps: int) -> ExtrudedFieldBundle:
+        zeros = benchmarks.jnp.zeros(shape)
+        return ExtrudedFieldBundle(
+            x=x, y=y, z=z, field_scale=benchmarks.jnp.asarray(payload["field_profile"]["sample_b_over_B0"]),
+            u=zeros, v=zeros, w=zeros, p=zeros, phi=zeros,
+            geometry_kind="layered_duct", solver_kind="extruded_inductionless",
+            rho_phi_plus=benchmarks.jnp.zeros((3, 8, 5, 5)), rho_phi_inlet=benchmarks.jnp.zeros((5, 5)),
+            aitken_state=(benchmarks.jnp.zeros((4, *shape)), 1.0, 0),
+            stopping_state=(steps, 0, "step_limit" if steps == 2 else "in_progress"),
+            jx=benchmarks.jnp.ones(shape), jz=benchmarks.jnp.ones(shape),
+            volumetric_flow_rate=benchmarks.jnp.full(8, 4.0),
+            charge_balance_residual=benchmarks.jnp.full(8, 1.0e-5),
+            boundary_current_residual=benchmarks.jnp.full(8, 1.0e-5),
+            transverse_pressure_difference=benchmarks.jnp.asarray([0, 0, 1, 2, 3, 2, 0, 0]),
+            iteration_residual_history=benchmarks.jnp.zeros(steps),
+            iteration_component_residual_history=benchmarks.jnp.zeros((steps, 6)),
+            iteration_pressure_residual_history=benchmarks.jnp.zeros(steps),
+            iteration_electric_linear_history=benchmarks.jnp.zeros((steps, 6)),
+            iteration_potential_residual_history=benchmarks.jnp.zeros(steps),
+            iteration_courant_history=benchmarks.jnp.tile(benchmarks.jnp.asarray([dt, 1e-6, 2e-6]), (steps, 1)),
+        )
+
+    root.mkdir()
+    case = load_matched_b2_lmx_input(input_path).case
+    for name, value in (("checkpoint.npz", bundle(1)), ("direct.npz", bundle(2)), ("resumed.npz", bundle(2))):
+        write_extruded_bundle_restart_npz(value, case, root / name)
+    (root / "run.json").write_text(json.dumps({
+        "schema_version": 1, "code": "LMX", "case_id": "B2-fringing-square",
+        "input_sha256": artifact_sha256(input_path, "file"),
+        "evaluator_sha256": artifact_sha256(evaluator, "file"),
+        "wall_seconds": 1.0, "num_devices": 1, "float_precision": "float64",
+    }))
 
 
 def _matched_b2_smoke_record(root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
@@ -513,6 +557,20 @@ def test_independent_matched_b2_input_observers_agree(tmp_path: Path, monkeypatc
 
     assert summary["status"] == "preflight-pass"
     assert observe_freemhd_b2_contract(case, source, evaluator) == observe_lmx_b2_contract(lmx_input, evaluator)
+
+
+def test_lmx_b2_output_observer_replays_restart_evidence(tmp_path: Path):
+    input_path, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path)
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+    _write_lmx_b2_output(tmp_path / "output", input_path, evaluator)
+
+    observed = observe_lmx_b2_output(tmp_path / "output", input_path, evaluator)
+
+    assert observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
+    assert observed["restart_max_abs"] == observed["mass_balance"] == 0.0
+    assert observed["current_balance"] == observed["interface_current_balance"] == pytest.approx(1.0e-5)
+    assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
 
 
 def test_matched_b2_smoke_observation_passes_without_claiming_acceptance(

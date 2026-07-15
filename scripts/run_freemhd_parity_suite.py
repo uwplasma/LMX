@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -28,6 +29,8 @@ from lmx.freemhd import (
     infer_solid_conductivities,
     infer_uniform_b0,
     load_benchmark_a_spec,
+    load_matched_b2_lmx_input,
+    observe_lmx_b2_output,
 )
 from lmx.reference_data import default_closed_channel_reference_root
 from lmx.units import hartmann_number
@@ -629,6 +632,68 @@ def materialize_matched_b2_preflight(
     }
     _write_json(destination / "preflight.json", summary)
     return summary
+
+
+def run_matched_b2_lmx_smoke(
+    input_path: str | Path,
+    evaluator: str | Path,
+    output_dir: str | Path,
+    *,
+    num_devices: int = 1,
+) -> dict[str, object]:
+    """Run direct and checkpoint-resumed LMX paths and write replayable evidence."""
+
+    from lmx.fringing import solve_extruded_inductionless
+    from lmx.io import write_extruded_bundle_restart_npz
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True)
+    problem = load_matched_b2_lmx_input(input_path)
+    one_step = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(
+                problem.case.time_stepper,
+                t_final=problem.case.time_stepper.dt,
+                max_steps=1,
+            ),
+        ),
+    )
+    started = time.perf_counter()
+    direct = solve_extruded_inductionless(problem, num_devices=num_devices)
+    progress = []
+    solve_extruded_inductionless(
+        one_step,
+        num_devices=num_devices,
+        progress_callback=progress.append,
+        checkpoint_interval=1,
+    )
+    if len(progress) != 1 or progress[0].checkpoint is None:
+        raise ValueError("LMX B2 one-step path did not emit its exact checkpoint")
+    checkpoint = progress[0].checkpoint
+    resumed = solve_extruded_inductionless(
+        one_step, initial_bundle=checkpoint, num_devices=num_devices
+    )
+    if np.asarray(direct.bundle.u).dtype != np.float64:
+        raise ValueError("LMX B2 smoke requires float64 execution")
+    for name, bundle in (
+        ("checkpoint.npz", checkpoint),
+        ("direct.npz", direct.bundle),
+        ("resumed.npz", resumed.bundle),
+    ):
+        write_extruded_bundle_restart_npz(bundle, problem.case, destination / name)
+    _write_json(
+        destination / "run.json",
+        {
+            "schema_version": 1, "code": "LMX", "case_id": "B2-fringing-square",
+            "input_sha256": artifact_sha256(input_path, "file"),
+            "evaluator_sha256": artifact_sha256(evaluator, "file"),
+            "wall_seconds": time.perf_counter() - started,
+            "num_devices": num_devices, "float_precision": "float64",
+        },
+    )
+    return observe_lmx_b2_output(destination, input_path, evaluator)
 
 
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:

@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15, through ownership checkpoint `9996de2` and the execution
-tolerance freeze recorded here. This is the single active
+Status: 2026-07-15, through tolerance checkpoint `e875542` and the LMX replay
+observer recorded here. This is the single active
 plan. It records accepted baselines, active gates, and stop/go criteria—not
 campaign history. Completed campaign details belong in checksummed result
 records and the validation or performance documentation.
@@ -95,11 +95,11 @@ package:
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,958 | below 34,850 after smoke cleanup | 35,100 |
+| package lines | 35,030 | below 34,850 after smoke cleanup | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,229 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,287 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,422,838 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,432,839 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -194,6 +194,13 @@ acceptance. They require exact two-step controls, `Co_max <= 0.4`, the existing
 `1e-3` mass/current bounds, `1e-12` restart agreement, 5% cross-code CFL
 agreement, and coarse-grid pressure differences below one second-order
 truncation scale (`h^2 = 0.16` RMS and `2h^2 = 0.32` maximum for `h = 0.4`).
+
+The LMX output path is now replayable: it writes one-step, uninterrupted
+two-step, and resumed two-step `b2_diagnostics_v2` restart records. The observer
+reloads and validates every record, recomputes pressure and closure metrics, and
+compares all retained state/history arrays rather than trusting reported pass
+booleans. Only the synthetic observer fixture has run; the physical smoke has
+not started.
 
 Then declare one ten-minute wall budget for both codes. Run LMX first as one
 uninterrupted two-update path and as one update, restart, and one update; require
