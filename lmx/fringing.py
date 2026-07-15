@@ -2269,6 +2269,7 @@ def _bundle_station_history(
     )
 
 
+@jax.jit
 def _conservative_current_fluxes_3d(
     sigma: jnp.ndarray,
     phi: jnp.ndarray,
@@ -2291,7 +2292,7 @@ def _conservative_current_fluxes_3d(
     dz_centers = 0.5 * (dz_widths[:-1] + dz_widths[1:])
 
     sigma_x = _harmonic_mean(sigma[1:], sigma[:-1])
-    phi_grad_x = (phi[1:] - phi[:-1]) / max(dx, 1.0e-12)
+    phi_grad_x = (phi[1:] - phi[:-1]) / jnp.maximum(dx, 1.0e-12)
     uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
     fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
 
@@ -2335,6 +2336,7 @@ def _conservative_current_fluxes_3d(
     return fx, fy, fz
 
 
+@jax.jit
 def _station_axial_current_from_fluxes(
     fx: jnp.ndarray, cell_area: jnp.ndarray
 ) -> jnp.ndarray:
