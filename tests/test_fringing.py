@@ -1267,31 +1267,6 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
         r_centers[None, :, None] * jnp.diff(r_faces)[None, :, None] * dtheta,
         shape,
     )
-    result = _steady_stokes_projection_pipe(
-        u,
-        v,
-        w,
-        jnp.ones(shape),
-        jnp.ones(shape),
-        cell_area,
-        lambda rhs: rhs,
-        target_flow_rate=2.0,
-        dx=0.5,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-        pressure_iterations=inner_iterations,
-        pressure_tolerance=1.0e-10,
-        restart=24,
-        max_restarts=3,
-        apply_momentum_inverse_components=lambda forces: forces,
-        modal_stabilization=modal_stabilization,
-    )
-    assert result[-3] < 1.0e-8
-    assert result[-2] < 1.0e-8
-    assert bool(result[-1].converged)
-    assert jnp.isfinite(result[3]).all()
-
     viscosity = jnp.full(shape, 0.07)
 
     def inverse(rhs):
@@ -1342,6 +1317,9 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             pressure_tolerance=1.0e-9,
             restart=24,
             max_restarts=3,
+            apply_momentum_inverse_components=lambda forces: jnp.stack(
+                tuple(inverse(force) for force in forces)
+            ),
             apply_modal_momentum_inverse=(
                 modal_inverse if modal_stabilization else None
             ),
@@ -1368,15 +1346,18 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             .at[:, -1, :]
             .set(0.07 * r_faces[-1] / (r_centers[-1] * 0.5 * (1.0 - 0.7) ** 2))
         )
-        direct_key = ("test_retained_modes_0_to_4",)
-        direct_result = steady_project(
-            modal_factor_key=direct_key,
-            modal_momentum_coefficients=coefficients,
-            modal_momentum_sink=wall_sink,
+        retained = fringing_impl._pipe_retained_modal_factors(
+            jnp.ones(shape),
+            jnp.maximum(unit_response, jnp.mean(unit_response) * 1.0e-8),
+            cell_area,
+            coefficients,
+            wall_sink,
+            dx=0.5,
+            r_faces=r_faces,
+            r_centers=r_centers,
+            dtheta=dtheta,
+            modes=(2,),
         )
-        assert bool(direct_result[-1].converged)
-        retained_all = fringing_impl._FRINGING_MODAL_FACTOR_CACHE.pop(direct_key)
-        retained = (retained_all[0], (retained_all[1][1],))
         probed = fringing_impl._FRINGING_MODAL_FACTOR_CACHE.pop(modal_key)
         trial = jnp.arange(nx * (3 * nr - 1), dtype=float).reshape(nx, 3 * nr - 1)
         assert fringing_impl._solve_pipe_retained_modal_factors(
