@@ -173,7 +173,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
             velocity0, corrected_force, density0, viscosity0,
             _unpack_duct_mass_flux(plus0, inlet0), boundaries,
             dt=dt, dx=dx, dy=dy, dz=dz, iterations=iterations,
-            tolerance=1.0e-10, include_axial_line=False)
+            tolerance=1.0e-10)
 
     momentum = jax.jit(momentum,
         in_shardings=(vector_sharding,) * 2 + (field_sharding,) * 2

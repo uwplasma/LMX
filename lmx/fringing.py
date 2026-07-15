@@ -1526,7 +1526,6 @@ def _solvax_implicit_momentum_duct(
     dz: jnp.ndarray,
     iterations: int,
     tolerance: float,
-    include_axial_line: bool = True,
     prescribed_inlet: bool = True,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve one frozen, conservative three-component momentum system.
@@ -1547,7 +1546,6 @@ def _solvax_implicit_momentum_duct(
     coefficients = _variable_diffusion_coefficients_3d(
         dynamic_viscosity, dx=dx, dy=dy_widths, dz=dz_widths, validated_spacing=True
     )
-    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
     wall_sink = jnp.zeros_like(density)
     wall_sink = wall_sink.at[:, 0, :].add(dynamic_viscosity[:, 0, :] / (0.5 * dy_widths[0] ** 2))
     wall_sink = wall_sink.at[:, -1, :].add(dynamic_viscosity[:, -1, :] / (0.5 * dy_widths[-1] ** 2))
@@ -1583,18 +1581,11 @@ def _solvax_implicit_momentum_duct(
         return volume[..., None] * (density[..., None] * field + dt * (convection - diffusion))
 
     diagonal = volume * (density + dt * (sum(coefficients) + diffusion_sink))
-    directions = (
-        (0, -volume * dt * coef_x_w, -volume * dt * coef_x_e),
-        (1, -volume * dt * coef_y_s, -volume * dt * coef_y_n),
-        (2, -volume * dt * coef_z_b, -volume * dt * coef_z_t),
-    )
-    if not include_axial_line:
-        directions = directions[1:]
-    scalar_precondition = _additive_line_preconditioner_3d(diagonal, directions)
 
     def precondition(flat: jnp.ndarray) -> jnp.ndarray:
-        return jax.vmap(scalar_precondition, in_axes=-1, out_axes=-1)(
-            flat.reshape(shape)).reshape(-1)
+        # The transient mass term dominates this operator; diagonal scaling
+        # avoids thousands of GPU line solves while GMRES certifies the result.
+        return (flat.reshape(shape) / diagonal[..., None]).reshape(-1)
 
     inlet_velocity = jnp.where(inlet_cells[..., None], boundary_velocity[0], 0.0)
     source = force - boundary_action + inlet_sink[..., None] * inlet_velocity
@@ -7361,7 +7352,6 @@ def _solve_extruded_projection(
                 _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet), boundary_velocity,
                 dt=dt, dx=dx, dy=local_dy, dz=local_dz,
                 iterations=momentum_iterations, tolerance=momentum_tolerance,
-                include_axial_line=False,
             )
 
         def embed_velocity(local_velocity, mask):
