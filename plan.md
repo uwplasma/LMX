@@ -181,9 +181,11 @@ Complete the remaining small solver-free tranche before launching either solver:
 The instrumentation checkpoint is now materialized and setup-valid in the
 FreeMHD container. Sixteen pressure taps use the same adjacent-cell centers as
 LMX; liquid mass/current sums use registered `rhoPhi`/`jn`. FreeMHD does not
-register `jn` in the solid region, so outer and interface wall current are
-derived as `-sigma_wall grad(potE) . Sf` through ordered native function
-objects. Requesting a nonexistent solid `jn` is forbidden.
+register solid `jn`, and the native `flux(grad(potE))` function-object chain is
+not identical to the solver's face-normal `snGrad` flux. Therefore the harness
+measures signed and absolute liquid-to-solid interface current and treats zero
+outer-wall current as an independently observed boundary-contract fact; it
+does not claim a reconstructed solid face flux.
 
 Then declare one ten-minute wall budget for both codes. Run LMX first as one
 uninterrupted two-update path and as one update, restart, and one update; require

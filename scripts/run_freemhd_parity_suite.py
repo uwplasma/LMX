@@ -334,13 +334,12 @@ def _b2_function_objects(sample_x: list[float]) -> str:
         for x in sample_x
     )
 
-    def surface(name: str, region: str, patch: str, field: str, scale: float = 1.0) -> str:
+    def surface(name: str, patch: str, field: str, operation: str = "sum") -> str:
         return f"""{name}
  {{
-  type surfaceFieldValue; libs (fieldFunctionObjects); region {region};
+  type surfaceFieldValue; libs (fieldFunctionObjects); region liquid;
   executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
-  regionType patch; name {patch}; operation sum; fields ({field});
-  scaleFactor {scale:.17g}; writeFields false;
+  regionType patch; name {patch}; operation {operation}; fields ({field}); writeFields false;
  }}"""
 
     blocks = [
@@ -351,24 +350,12 @@ def _b2_function_objects(sample_x: list[float]) -> str:
   fixedLocations true; interpolationScheme cell; fields (p);
   probeLocations\n (\n  {points}\n );
  }}""",
-        surface("massIn", "liquid", "inlet", "rhoPhi"),
-        surface("massOut", "liquid", "sink", "rhoPhi"),
-        surface("currentIn", "liquid", "inlet", "jn"),
-        surface("currentOut", "liquid", "sink", "jn"),
-        surface("currentInterfaceFluid", "liquid", "liquid_to_solidWalls", "jn"),
-        """solidPotentialGradient
- {
-  type grad; libs (fieldFunctionObjects); region solidWalls; field potE; result solidGradPotE;
-  executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
- }
- solidPotentialFlux
- {
-  type flux; libs (fieldFunctionObjects); region solidWalls; field solidGradPotE;
-  result solidGradPotEFlux; rho none;
-  executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;
- }""",
-        surface("currentInterfaceSolid", "solidWalls", "solidWalls_to_liquid", "solidGradPotEFlux", -3.5),
-        surface("currentOuter", "solidWalls", "outerWalls", "solidGradPotEFlux", -3.5),
+        surface("massIn", "inlet", "rhoPhi"),
+        surface("massOut", "sink", "rhoPhi"),
+        surface("currentIn", "inlet", "jn"),
+        surface("currentOut", "sink", "jn"),
+        surface("currentIntoSolid", "liquid_to_solidWalls", "jn"),
+        surface("currentIntoSolidMagnitude", "liquid_to_solidWalls", "jn", "sumMag"),
     ]
     return "functions\n{\n " + "\n ".join(blocks) + "\n}"
 
