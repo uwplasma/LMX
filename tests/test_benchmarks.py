@@ -552,6 +552,10 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     continuation_case = replace(
         case, time_stepper=replace(case.time_stepper, max_steps=2)
     )
+    with pytest.raises(ValueError, match="both compact flux arrays"):
+        solve_extruded_inductionless(
+            replace(problem, case=continuation_case, profile=profile),
+            initial_bundle=replace(restart.bundle, rho_phi_inlet=None))
     resumed = solve_extruded_inductionless(
         replace(problem, case=continuation_case, profile=profile),
         initial_bundle=restart.bundle,
