@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The source-tested baseline is `3a22078`; test-only restart
-coverage followed at `de18ee2`, and compact evidence was refreshed at `9f1ddb7`.
+Status: 2026-07-15. The complete portable-gate baseline is `3a22078`; current
+matched-B2 scaling code and focused gates are at `3b50da5`.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
@@ -87,7 +87,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, and exact smoke equivalence on 1/2/4 forced CPU devices and 1/2 deterministic GPUs have bounded gates | production parity and measured scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, exact restart/CFL/stopping state, exact smoke device equivalence, and a current-formulation CPU scaling calibration have bounded gates | production parity and GPU/steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, corrected sourced comparison table, feature-specific visuals, and a seven-second Hunt loop | refresh B2/scaling panels only from accepted canonical records |
@@ -100,11 +100,11 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,839 | stay below 35,000 through the scaling tranche | 35,100 |
+| package lines | 34,842 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,283 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,279 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,469,480 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,475,587 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -225,14 +225,20 @@ most `1.05e-14`. Deterministic GPU correctness uses
 performance lane because derived fields can vary at roundoff scale. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
-Do not publish the tiny apparent speedups: compilation-cache effects contaminate
-the CPU samples and the GPU host was shared. Measure the next fixed,
-physics-identical B2 ladder with separate cold and warm repeats:
+An explicit one-device request now uses the same named-sharding kernels as the
+multi-device path. With that fair baseline, the current-formulation CPU ladder
+passes validation, placement, exact restart, and device-equivalence gates at
+`16 x 7 x 7`, `64 x 15 x 15`, and `128 x 31 x 31`. The two smaller grids are
+communication-bound. At `128 x 31 x 31`, warm medians are 0.768, 0.649, and
+0.647 seconds on 1/2/4 devices: 1.18x and 1.19x speedups, with no useful gain
+beyond two devices. This is a two-update scaling calibration, not a steady
+production-speed claim. The compact record is
+`benchmarks/results/b2-cpu-strong-scaling-20260715.json`.
 
-- `16 x 7 x 7` sentinel on each device count;
-- `64 x 15 x 15` calibration only if the sentinel passes;
-- `128 x 31 x 31` on Mac CPU with 1/2/4 devices;
-- `128 x 67 x 67` on office GPUs with 1/2 devices only after calibration.
+Next run `128 x 67 x 67` on office GPUs with 1/2 devices under deterministic
+correctness and uncontended fast timing lanes. Stop if the one-GPU gate fails,
+if warm CV exceeds 5%, or if two-GPU observables exceed the frozen equivalence
+tolerance. Only then choose whether a larger GPU grid is justified.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -246,8 +252,9 @@ the physics-valid path.
 
 Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
-uncertainty-aware speedup on its target hardware. CPU correctness is complete;
-warm CPU/GPU scaling and memory evidence remain open.
+uncertainty-aware speedup on its target hardware. CPU correctness and bounded
+CPU scaling calibration are complete; GPU and steady-production scaling remain
+open.
 
 ## Priority 3: canonical B2 validation
 

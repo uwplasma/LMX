@@ -13,6 +13,7 @@ devices alone is not evidence of parallel execution.
 | portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.00% combined line/branch coverage, 160.7 s | below the five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
+| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.768/0.649/0.647 s; 1.18x/1.19x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
 | SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | timing refresh remains open |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
@@ -22,8 +23,9 @@ devices alone is not evidence of parallel execution.
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-The exact CPU and deterministic GPU results are recorded in
-`benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`. The older,
+The exact CPU/GPU results and fixed-size CPU calibration are recorded in
+`benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
+`benchmarks/results/b2-cpu-strong-scaling-20260715.json`. The older,
 larger GPU B2 result passes its historical two-device equivalence gate, but
 the measured path omits canonical inertia and uses stationwise flow forcing.
 It therefore does not establish scaling for the matched formulation. The B1

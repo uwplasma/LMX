@@ -35,6 +35,16 @@ from scripts import run_strong_scaling_worker
 pytestmark = pytest.mark.unit
 
 
+def _worker_record(**updates) -> StrongScalingRecord:
+    values = dict(
+        backend="cpu", device_kind="cpu", num_devices=1, nx=48, ny=64, nz=32,
+        iterations=5, repeats=2, cold_seconds=0.2, warm_seconds=0.1,
+        mean_seconds=0.15, python_version="3.x", jax_version="0.x",
+        benchmark_kind="extruded3d",
+    )
+    return StrongScalingRecord(**(values | updates))
+
+
 def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     with pytest.raises(SystemExit):
         strong_scaling_demo.main(["--benchmark-kind", "extruded_solve"])
@@ -96,7 +106,6 @@ def test_write_scaling_report_writes_json(tmp_path: Path):
     )
     path = write_scaling_report([record], tmp_path / "scaling.json")
 
-    assert path.exists()
     assert '"num_devices": 1' in path.read_text()
 
 
@@ -153,7 +162,6 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert rows[0]["warm_mcell_updates_per_second"] == pytest.approx(9.6e-5)
     assert rows[0]["memory_mib"] == pytest.approx(2.0)
     assert rows[1]["physics_equivalent"]
-    assert table.exists()
     assert "parallel_efficiency" in table.read_text()
 
 
@@ -516,22 +524,7 @@ def test_scaling_worker_writes_expected_json(
             "repeats": 2,
             "num_devices": 1,
         }
-        return StrongScalingRecord(
-            backend="cpu",
-            device_kind="cpu",
-            num_devices=1,
-            ny=64,
-            nz=32,
-            iterations=5,
-            repeats=2,
-            cold_seconds=0.2,
-            warm_seconds=0.1,
-            mean_seconds=0.15,
-            python_version="3.x",
-            jax_version="0.x",
-            nx=48,
-            benchmark_kind="extruded3d",
-        )
+        return _worker_record()
 
     monkeypatch.setattr(
         run_strong_scaling_worker,
@@ -568,20 +561,9 @@ def test_scaling_worker_covers_solver_faithful_branch(
             "profile_dir": tmp_path / "profile",
             "restart_path": tmp_path / "steady.npz",
         }
-        return StrongScalingRecord(
-            backend="cpu",
-            device_kind="cpu",
-            num_devices=1,
-            ny=10,
-            nz=8,
-            iterations=6,
-            repeats=1,
-            cold_seconds=0.5,
-            warm_seconds=0.5,
-            mean_seconds=0.5,
-            python_version="3.x",
-            jax_version="0.x",
-            nx=12,
+        return _worker_record(
+            nx=12, ny=10, nz=8, iterations=6, repeats=1,
+            cold_seconds=0.5, warm_seconds=0.5, mean_seconds=0.5,
             benchmark_kind="extruded_solve",
             operator_path="solve_extruded_inductionless",
         )

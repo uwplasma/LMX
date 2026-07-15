@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "commit": "3b50da5a1ed7075986afd3a5f443d9570206e871",
+  "source_fingerprint": "6c6f6b98150f2ae41274210057db849d327f39250b438f27cd7236231cb742b8",
+  "case_id": "B2-fringing-square",
+  "acceptance_role": "scaling-calibration",
+  "environment": {
+    "hardware": "Apple M4",
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "solvax": "0.8.3",
+    "precision": "float64",
+    "forced_cpu_devices": [1, 2, 4]
+  },
+  "protocol": {
+    "updates": 2,
+    "repeats": 4,
+    "cold_samples": 1,
+    "warm_samples": 3,
+    "fixed_global_problem": true,
+    "explicit_named_sharding_at_one_device": true
+  },
+  "ladders": [
+    {
+      "shape": [16, 7, 7],
+      "input_sha256": "cb27060b444c25e6f741dff4159d1bf7c69f076b2e3aaa57a107900ab734e4b7",
+      "warm_seconds": {"1": 0.011160042020492256, "2": 0.02790916699450463, "4": 0.04207883297931403},
+      "warm_cv_max": 0.07615800642349597,
+      "best_speedup": 1.0,
+      "pressure_observable_max_abs": 3.186047346087628e-14
+    },
+    {
+      "shape": [64, 15, 15],
+      "input_sha256": "fbad1d4c015f843ca964844cdcd24400e86814a522d3aa09b89c2a8eaf9ac562",
+      "warm_seconds": {"1": 0.04517179203685373, "2": 0.052804250037297606, "4": 0.07302591600455344},
+      "warm_cv_max": 0.021661480775203426,
+      "best_speedup": 1.0,
+      "pressure_observable_max_abs": 1.1778464488465534e-12
+    },
+    {
+      "shape": [128, 31, 31],
+      "input_sha256": "a073900b9dead2de204eeb90deb8eb455e03b1404ec7380c3f22352c2b1602b8",
+      "warm_seconds": {"1": 0.7675526250386611, "2": 0.6491476249648258, "4": 0.6466866659466177},
+      "warm_cv_max": 0.02299149133681616,
+      "speedup": {"2": 1.1824007290795389, "4": 1.1869003420924416},
+      "parallel_efficiency": {"2": 0.5912003645397694, "4": 0.2967250855231104},
+      "pressure_observable_max_abs": 8.62243918334281e-14
+    }
+  ],
+  "gates": {
+    "validation": true,
+    "placement": true,
+    "restart_exact": true,
+    "device_equivalence": true,
+    "shared_input_per_ladder": true
+  },
+  "interpretation": {
+    "strong_scaling_calibration": true,
+    "production_speedup_claim": false,
+    "reason": "The real solver path executes only two fixed updates; 128x31x31 shows modest positive scaling, while smaller grids remain communication-bound."
+  },
+  "raw_assets": "external workspace; per-device worker JSON only"
+}
