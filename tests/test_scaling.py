@@ -535,26 +535,9 @@ def test_scaling_worker_writes_expected_json(
     )
     output_path = tmp_path / "worker.json"
     rc = run_strong_scaling_worker.main(
-        [
-            "--benchmark-kind",
-            "extruded3d",
-            "--nx",
-            "48",
-            "--ny",
-            "64",
-            "--nz",
-            "32",
-            "--iterations",
-            "5",
-            "--repeats",
-            "2",
-            "--num-devices",
-            "1",
-            "--platform",
-            "CPU",
-            "--output",
-            str(output_path),
-        ]
+        ["--benchmark-kind", "extruded3d", "--nx", "48", "--ny", "64",
+         "--nz", "32", "--iterations", "5", "--repeats", "2",
+         "--num-devices", "1", "--platform", "CPU", "--output", str(output_path)]
     )
 
     assert rc == 0
@@ -605,28 +588,10 @@ def test_scaling_worker_covers_solver_faithful_branch(
     )
     output_path = tmp_path / "worker_solve.json"
     rc = run_strong_scaling_worker.main(
-        [
-            "--benchmark-kind",
-            "extruded_solve",
-            "--nx",
-            "12",
-            "--ny",
-            "10",
-            "--nz",
-            "8",
-            "--iterations",
-            "6",
-            "--repeats",
-            "1",
-            "--num-devices",
-            "1",
-            "--profile-dir",
-            str(tmp_path / "profile"),
-            "--restart",
-            str(tmp_path / "steady.npz"),
-            "--output",
-            str(output_path),
-        ]
+        ["--benchmark-kind", "extruded_solve", "--nx", "12", "--ny", "10",
+         "--nz", "8", "--iterations", "6", "--repeats", "1",
+         "--num-devices", "1", "--profile-dir", str(tmp_path / "profile"),
+         "--restart", str(tmp_path / "steady.npz"), "--output", str(output_path)]
     )
 
     assert rc == 0
@@ -643,5 +608,6 @@ def test_scaling_worker_covers_solver_faithful_branch(
         "--benchmark-kind", "matched_b2_smoke", "--matched-input", str(tmp_path / "input.json"),
         "--evaluator", str(tmp_path / "evaluator.json"), "--repeats", "4",
         "--num-devices", "1", "--output", str(output_path)]) == 0
-    assert json.loads(output_path.read_text())["validation_passed"]
-    assert len(payload["source_fingerprint"]) == 64
+    matched = json.loads(output_path.read_text())
+    assert matched["validation_passed"]
+    assert len(matched["source_fingerprint"]) == 64
