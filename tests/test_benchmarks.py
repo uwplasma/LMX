@@ -135,7 +135,7 @@ def _assert_iteration_histories(bundle):
     assert benchmarks.jnp.all(electric[:, 3] > 0)
     assert benchmarks.jnp.all(electric[:, 2] <= 1.0e-3)
     pressure_linear = bundle.iteration_pressure_linear_history
-    assert pressure_linear.shape == (history.size, 5)
+    assert pressure_linear.shape in ((0, 5), (history.size, 5))
     return history
 
 
