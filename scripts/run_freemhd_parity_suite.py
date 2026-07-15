@@ -30,6 +30,7 @@ from lmx.freemhd import (
     infer_uniform_b0,
     load_benchmark_a_spec,
     load_matched_b2_lmx_input,
+    observe_freemhd_b2_output,
     observe_lmx_b2_output,
 )
 from lmx.reference_data import default_closed_channel_reference_root
@@ -694,6 +695,75 @@ def run_matched_b2_lmx_smoke(
         },
     )
     return observe_lmx_b2_output(destination, input_path, evaluator)
+
+
+def run_matched_b2_freemhd_smoke(
+    input_dir: str | Path,
+    evaluator: str | Path,
+    output_dir: str | Path,
+    *,
+    image: str = "freemhd-install:latest",
+    nproc: int = 2,
+    timeout_seconds: float = 300.0,
+) -> dict[str, object]:
+    """Run the exact FreeMHD smoke without reconstruction, VTK, or plotting."""
+
+    source, destination = Path(input_dir).resolve(), Path(output_dir).resolve()
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FreeMHD output {destination}")
+    if nproc < 1 or timeout_seconds <= 0.0 or not image.strip():
+        raise ValueError("FreeMHD smoke resources are invalid")
+    input_sha = artifact_sha256(source, "tree")
+    destination.mkdir(parents=True)
+    cidfile = destination.parent / f".{destination.name}.cid"
+    container = f"lmx-b2-{os.getpid()}-{time.time_ns()}"
+    objects = "b2PressureTaps massIn massOut currentIn currentOut currentIntoSolid currentIntoSolidMagnitude"
+    shell = f"""
+set -euo pipefail
+source /usr/lib/openfoam/openfoam2206/etc/bashrc
+work=/tmp/lmx-b2-case
+rm -rf "$work" && mkdir -p "$work"
+rsync -a /input/ "$work/" && cd "$work"
+blockMesh -fileHandler collated
+splitMeshRegions -cellZonesOnly -overwrite -fileHandler collated
+for region in liquid solidWalls; do
+  changeDictionary -region "$region" -fileHandler collated
+  setExprFields -region "$region" -fileHandler collated
+done
+decomposePar -allRegions -force -fileHandler collated
+cp system/controlDict /output/controlDict.used
+export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+mpirun -np {nproc} epotMultiRegionInterFoam -parallel 2>&1 | tee /output/run.log
+mkdir /output/postProcessing
+for name in {objects}; do cp -a "postProcessing/$name" /output/postProcessing/; done
+"""
+    command = [
+        "docker", "run", "--rm", "--name", container, "--cidfile", str(cidfile),
+        "--mount", f"type=bind,src={source},dst=/input,readonly",
+        "--mount", f"type=bind,src={destination},dst=/output",
+        "--entrypoint", "/bin/bash", image, "-lc", shell,
+    ]
+    started = time.perf_counter()
+    try:
+        try:
+            subprocess.run(command, check=True, timeout=timeout_seconds, text=True, capture_output=True)
+        except subprocess.TimeoutExpired as error:
+            raise TimeoutError(f"FreeMHD B2 smoke exceeded {timeout_seconds:g} seconds") from error
+    finally:
+        try:
+            subprocess.run(["docker", "rm", "-f", container], check=False, capture_output=True, text=True)
+        except OSError:
+            pass
+        cidfile.unlink(missing_ok=True)
+    if artifact_sha256(source, "tree") != input_sha:
+        raise ValueError("FreeMHD B2 input changed during execution")
+    _write_json(destination / "run.json", {
+        "schema_version": 1, "code": "FreeMHD", "case_id": "B2-fringing-square",
+        "input_sha256": input_sha, "evaluator_sha256": artifact_sha256(evaluator, "file"),
+        "wall_seconds": time.perf_counter() - started, "nproc": nproc,
+        "image": image, "float_precision": "float64",
+    })
+    return observe_freemhd_b2_output(destination, source, evaluator)
 
 
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:

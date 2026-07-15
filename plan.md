@@ -2,8 +2,9 @@
 
 Status: 2026-07-15. The pushed baseline is `e3e4813`; the strict FreeMHD output
 observer and non-accepting schema-3 execution gate are green under focused
-tests. Docker timeout/cleanup orchestration and both physical smoke executions
-remain open. This is the single active plan. It records accepted baselines,
+tests. Direct Docker timeout/cleanup orchestration is green under mocks; the
+end-to-end command and both physical smoke executions remain open. This is the
+single active plan. It records accepted baselines,
 active gates, and stop/go criteria—not campaign history. Completed campaign
 details belong in checksummed result records and the validation or performance
 documentation.
@@ -100,9 +101,9 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | package modules | 35 | no new module | 35 |
 | package lines | 34,736 | stay below 34,850 through smoke implementation | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 31 / 21,231 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
+| test files / lines | 31 / 21,271 | no new file; below 21,000 after observer consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,424,389 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,429,570 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -214,6 +215,11 @@ and all 16 tap coordinates. Schema 3 independently replays both output trees,
 applies the frozen execution and cross-code gates, and remains ineligible for
 production acceptance. These paths are green only on synthetic native-format
 fixtures; no FreeMHD B2 solver process has run.
+
+The direct Docker runner is also mock-validated: it uses a read-only input
+mount, named container and cidfile, fixed deadline, and unconditional forced
+cleanup, while bypassing reconstruction, VTK, and plotting. The end-to-end CLI
+record assembly remains the last solver-free gate before launch.
 
 Then declare one ten-minute wall budget for both codes. Run LMX first as one
 uninterrupted two-update path and as one update, restart, and one update; require

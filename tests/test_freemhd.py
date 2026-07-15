@@ -833,6 +833,46 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
     ) == 0
 
 
+@pytest.mark.parametrize("times_out", [False, True])
+def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, times_out: bool
+):
+    source, evaluator, output = tmp_path / "input", tmp_path / "evaluator", tmp_path / "output"
+    source.mkdir()
+    (source / "input.txt").write_text("immutable\n")
+    evaluator.write_text("evaluator\n")
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        if command[1] == "run" and times_out:
+            raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+        if command[1] == "rm" and times_out:
+            raise OSError("cleanup race")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(run_freemhd_parity_suite.subprocess, "run", run)
+    monkeypatch.setattr(
+        run_freemhd_parity_suite, "observe_freemhd_b2_output", lambda *args: {"observed": args}
+    )
+    invoke = lambda: run_freemhd_parity_suite.run_matched_b2_freemhd_smoke(
+        source, evaluator, output, image="freemhd:test", nproc=2, timeout_seconds=7.0
+    )
+    if times_out:
+        with pytest.raises(TimeoutError, match="exceeded 7 seconds"):
+            invoke()
+    else:
+        assert "observed" in invoke()
+        assert json.loads((output / "run.json").read_text())["image"] == "freemhd:test"
+
+    docker, cleanup = calls
+    assert docker[1]["timeout"] == 7.0
+    rendered = " ".join(docker[0])
+    assert {"--rm", "--name", "--cidfile"} <= set(rendered.split()) and "readonly" in rendered
+    assert cleanup[0][1:3] == ["rm", "-f"]
+    assert (source / "input.txt").read_text() == "immutable\n"
+
+
 def test_parity_command_portably_skips_missing_references(tmp_path: Path):
     output = tmp_path / "parity"
     assert run_freemhd_parity_suite.main(
