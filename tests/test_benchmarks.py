@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from copy import deepcopy
 from dataclasses import replace
+import hashlib
 import json
 
 import pytest
@@ -23,7 +24,6 @@ from lmx.fringing import (
 )
 from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
 from scripts.analyze_freemhd_benchmark_a_ladder import analyze_ladder
-from scripts.freeze_benchmark_b_specs import build_specification_index
 from scripts.freeze_freemhd_benchmark_a import compact_evidence, freeze_summary
 
 
@@ -236,11 +236,9 @@ def test_compact_freemhd_evidence_rejects_inconsistent_campaign(
 
 
 def test_benchmark_b_specification_index_is_complete_and_deterministic():
-    expected = build_specification_index()
-    tracked = json.loads(
+    expected = json.loads(
         Path("benchmarks/results/benchmark-b-specification.json").read_text()
     )
-    assert tracked == expected
     assert expected["specification_freeze_pass"] is True
     assert expected["production_results_included"] is False
     assert {case["id"] for case in expected["cases"]} == {
@@ -252,6 +250,10 @@ def test_benchmark_b_specification_index_is_complete_and_deterministic():
         and case["numerical_independence"]["tolerance_uncertainty_fraction_max"] == 0.25
         for case in expected["cases"]
     )
+    for case in expected["cases"]:
+        for prefix in ("spec", "data"):
+            digest = hashlib.sha256(Path(case[f"{prefix}_path"]).read_bytes()).hexdigest()
+            assert digest == case[f"{prefix}_sha256"]
     assert len(expected["production_blockers"]) == 2
 
 

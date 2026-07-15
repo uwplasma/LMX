@@ -97,17 +97,18 @@ large reusable artifacts go in checksummed releases.
 
 Current structure after moving the script-only Benchmark-A auditor out of the
 package, retiring the undocumented non-projection rectangular autodiff lane,
-and deleting the superseded SOLVAX acceptance freezer and its sole test (the
-immutable evidence, richer projection, and target-driven paths remain):
+deleting the superseded SOLVAX acceptance freezer and its sole test, and
+replacing the single-owner Benchmark-B freeze generator with direct hash gates
+(the immutable evidence, richer projection, and target-driven paths remain):
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
 | package lines | 34,864 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 30 / 21,026 | no new file; below 21,000 after fixture consolidation | 31 / 21,100 |
-| maintenance scripts | 17 | no new script without retiring an owner | 17 |
-| tracked checkout | 3,480,305 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| test files / lines | 30 / 21,028 | no new file; below 21,000 after fixture consolidation | 31 / 21,100 |
+| maintenance scripts | 16 | no new script without retiring an owner | 16 |
+| tracked checkout | 3,476,260 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
