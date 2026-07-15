@@ -282,7 +282,9 @@ def _matched_b2_smoke_benchmark(
         and all(observed[name] <= limits[f"{name}_max"] for name in (
             "mass_balance", "current_balance", "interface_current_balance"))
         and observed["interface_current_activity"] >= limits["interface_current_activity_min"]
-        and observed["restart_max_abs"] <= limits["restart_absolute_tolerance"]
+        # Fast timing permits nondeterministic diagnostic reductions only; the
+        # velocity/pressure/flux/Aitken/CFL state must still replay exactly.
+        and observed["restart_state_max_abs"] <= limits["restart_absolute_tolerance"]
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
