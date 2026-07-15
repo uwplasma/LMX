@@ -835,7 +835,8 @@ def test_compact_duct_mass_flux_codec_and_initializer_match_fv_faces():
     def initialize(scale):
         return fringing_impl._initialize_duct_mass_flux(
             scale * velocity, density, scale * inlet_velocity, dx=dx, dy=dy, dz=dz)
-    plus, initialized_inlet = jax.jit(initialize)(jnp.asarray(1.0))
+    *components, initialized_inlet = jax.jit(initialize)(jnp.asarray(1.0))
+    plus = jnp.stack(components)
     momentum = np.asarray(density[..., None] * velocity)
     expected_x = np.concatenate((0.5 * (momentum[:-1, ..., 0] + momentum[1:, ..., 0]),
         momentum[-1:, ..., 0])) * np.outer(dy, dz)
@@ -856,7 +857,8 @@ def test_compact_duct_mass_flux_codec_and_initializer_match_fv_faces():
         (np.sum(cell_courant * volume) / np.sum(volume), np.max(cell_courant))
     )
     tangent = jax.jvp(initialize, (1.0,), (1.0,))[1]
-    assert all(jnp.allclose(a, b) for a, b in zip(tangent, (plus, initialized_inlet), strict=True))
+    assert jnp.allclose(jnp.stack(tangent[:3]), plus)
+    assert jnp.allclose(tangent[-1], initialized_inlet)
 
 
 def test_nonuniform_face_flux_projection_closes_discrete_divergence():
@@ -925,7 +927,9 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     projected = _face_flux_pressure_projection_duct(
         zeros, zeros, zeros, jnp.ones(shape), jnp.ones(shape, dtype=bool),
         inlet_flow_rate=0.2, dt=0.1, **settings)
-    _, _, _, projected_pressure, pressure_loss, divergence, flow_error, plus, inlet = projected
+    (_, _, _, projected_pressure, pressure_loss, divergence, flow_error,
+        flux_x, flux_y, flux_z, inlet) = projected
+    plus = jnp.stack((flux_x, flux_y, flux_z))
     assert divergence < 1.0e-8
     assert flow_error < 1.0e-8
     fx, fy, fz = fringing_impl._unpack_duct_mass_flux(plus, inlet)

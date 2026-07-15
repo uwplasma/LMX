@@ -1412,7 +1412,7 @@ def _solvax_pressure_poisson_duct(
             sharding=field_sharding,
         )
         if mixed_axial_pressure:
-            x_east = x_east.at[-1].set(0.0)
+            x_east = jnp.where(outlet, 0.0, x_east)
         return (
             coef_x_w * (x_west - field)
             + coef_x_e * (x_east - field)
@@ -1553,9 +1553,9 @@ def _solvax_implicit_momentum_duct(
     wall_sink = wall_sink.at[:, -1, :].add(dynamic_viscosity[:, -1, :] / (0.5 * dy_widths[-1] ** 2))
     wall_sink = wall_sink.at[:, :, 0].add(dynamic_viscosity[:, :, 0] / (0.5 * dz_widths[0] ** 2))
     wall_sink = wall_sink.at[:, :, -1].add(dynamic_viscosity[:, :, -1] / (0.5 * dz_widths[-1] ** 2))
-    inlet_sink = jnp.zeros_like(density)
-    if prescribed_inlet:
-        inlet_sink = inlet_sink.at[0].set(2.0 * dynamic_viscosity[0] / dx**2)
+    inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
+    inlet_sink = (jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
+        if prescribed_inlet else jnp.zeros_like(density))
     diffusion_sink = wall_sink + inlet_sink
     widths = (dx_widths, dy_widths, dz_widths)
     weights = _limited_linear_vector_face_weights_duct(
@@ -1596,7 +1596,7 @@ def _solvax_implicit_momentum_duct(
         return jax.vmap(scalar_precondition, in_axes=-1, out_axes=-1)(
             flat.reshape(shape)).reshape(-1)
 
-    inlet_velocity = jnp.zeros_like(velocity).at[0].set(boundary_velocity[0])
+    inlet_velocity = jnp.where(inlet_cells[..., None], boundary_velocity[0], 0.0)
     source = force - boundary_action + inlet_sink[..., None] * inlet_velocity
     linear_rhs = volume[..., None] * (density[..., None] * velocity + dt * source)
     flat_rhs = linear_rhs.reshape(-1)
@@ -1797,23 +1797,37 @@ def _compact_duct_courant_numbers(
 
     east, north, top = rho_phi_plus
     west = _neighbor_fields(east, mode_x="dirichlet", mode_y="neumann",
-        mode_z="neumann", sharding=sharding)[0].at[0].set(rho_phi_inlet)
+        mode_z="neumann", sharding=sharding)[0]
+    west = jnp.where(jnp.arange(density.shape[0])[:, None, None] == 0,
+        rho_phi_inlet, west)
     south = jnp.concatenate((jnp.zeros_like(north[:, :1]), north[:, :-1]), axis=1)
     bottom = jnp.concatenate((jnp.zeros_like(top[:, :, :1]), top[:, :, :-1]), axis=2)
     widths = _coerce_spacing_vector(dx, density.shape[0], dtype=density.dtype)
-    volume = widths[:, None, None] * dy[None, :, None] * dz[None, None, :]
+    volume = (jnp.ones_like(density) * widths[:, None, None]
+        * dy[None, :, None] * dz[None, None, :])
     sum_phi = sum(map(jnp.abs, (west, east, south, north, bottom, top))) / density
+    if sharding is not None:  # pragma: no cover - forced-device/hardware gates
+        def reduce(local_sum, local_volume):
+            total_sum = jax.lax.psum(jnp.sum(local_sum), "x")
+            total_volume = jax.lax.psum(jnp.sum(local_volume), "x")
+            maximum = jax.lax.pmax(jnp.max(local_sum / local_volume), "x")
+            return 0.5 * dt * total_sum / total_volume, 0.5 * dt * maximum
+        return jax.shard_map(reduce, mesh=sharding.mesh,
+            in_specs=(sharding.spec, sharding.spec), out_specs=(P(), P()),
+            check_vma=False)(sum_phi, volume)
     return 0.5 * dt * jnp.sum(sum_phi) / jnp.sum(volume), 0.5 * dt * jnp.max(sum_phi / volume)
 
 
-def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz):
+def _initialize_duct_mass_flux(
+    velocity, density, inlet_velocity, *, dx, dy, dz, sharding=None
+):
     """Pack oriented, area-integrated ``linearInterpolate(rho*U)&Sf`` faces."""
     momentum = density[..., None] * velocity
     area_x = dy[:, None] * dz[None, :]
     inlet = density[0] * inlet_velocity[..., 0] * area_x
-    plus_x = jnp.concatenate(
-        (0.5 * (momentum[:-1, ..., 0] + momentum[1:, ..., 0]), momentum[-1:, ..., 0])
-    ) * area_x
+    axial = momentum[..., 0]
+    plus_x = 0.5 * (axial + _neighbor_fields(axial, mode_x="neumann",
+        mode_y="neumann", mode_z="neumann", sharding=sharding)[1]) * area_x
     wy = (dy[1:] / (dy[:-1] + dy[1:]))[None, :, None]
     plus_y = jnp.concatenate((
         wy * momentum[:, :-1, :, 1] + (1.0 - wy) * momentum[:, 1:, :, 1],
@@ -1822,7 +1836,7 @@ def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz)
     plus_z = jnp.concatenate((
         wz * momentum[:, :, :-1, 2] + (1.0 - wz) * momentum[:, :, 1:, 2],
         jnp.zeros_like(momentum[:, :, :1, 2])), axis=2) * (dx * dy[None, :, None])
-    return jnp.stack((plus_x, plus_y, plus_z)), inlet
+    return plus_x, plus_y, plus_z, inlet
 
 
 def _flow_rate_inlet_profile(axial_velocity, face_area, target):
@@ -1870,6 +1884,8 @@ def _face_flux_pressure_projection_duct(
     dys = dy[y0:y1]
     dzs = dz[z0:z1]
     nx, ny, nz = us.shape
+    inlet_cells = jnp.arange(nx)[:, None, None] == 0
+    outlet_cells = jnp.arange(nx)[:, None, None] == nx - 1
 
     def axial_neighbors(value):
         return _neighbor_fields(value, mode_x="neumann", mode_y="neumann",
@@ -1887,7 +1903,7 @@ def _face_flux_pressure_projection_duct(
         uf_inlet = _flow_rate_inlet_profile(us[0], face_area, target)
 
     def axial_minus(plus, inlet):
-        return axial_neighbors(plus)[0].at[0].set(inlet)
+        return jnp.where(inlet_cells, inlet, axial_neighbors(plus)[0])
 
     divergence = (
         (uf_plus - axial_minus(uf_plus, uf_inlet)) / max(dx, 1.0e-12)
@@ -1919,9 +1935,9 @@ def _face_flux_pressure_projection_duct(
     correction_x = -_harmonic_mean(mobility_east, mobility) * (
         pressure_east - pressure) / max(dx, 1.0e-12)
     if mixed_axial_pressure:
-        correction_x = correction_x.at[-1].set(
-            -mobility[-1] * (0.0 - pressure[-1]) / max(0.5 * dx, 1.0e-12)
-        )
+        outlet_correction = -mobility[-1] * (0.0 - pressure[-1]) / max(
+            0.5 * dx, 1.0e-12)
+        correction_x = jnp.where(outlet_cells, outlet_correction, correction_x)
     uf_plus += correction_x
     mobility_y = _harmonic_mean(mobility[:, 1:, :], mobility[:, :-1, :])
     y_distance = 0.5 * (dys[:-1] + dys[1:])
@@ -1964,9 +1980,8 @@ def _face_flux_pressure_projection_duct(
     )
     mean_pressure_east = axial_neighbors(mean_pressure[:, None, None])[1][:, 0, 0]
     pressure_loss_plus = -(mean_pressure_east - mean_pressure) / max(dx, 1.0e-12)
-    pressure_loss_plus = pressure_loss_plus.at[-1].set(
-        mean_pressure[-1] / max(0.5 * dx, 1.0e-12)
-    )
+    pressure_loss_plus = jnp.where(outlet_cells[:, 0, 0],
+        mean_pressure[-1] / max(0.5 * dx, 1.0e-12), pressure_loss_plus)
     pressure_loss = 0.5 * (jnp.concatenate((jnp.zeros((1,), dtype=pressure.dtype),
         pressure_loss_plus[:-1])) + pressure_loss_plus)
     flow_error = jnp.maximum(
@@ -1977,12 +1992,12 @@ def _face_flux_pressure_projection_duct(
     rho_y = jnp.concatenate((wy * rhos[:, :-1] + (1.0 - wy) * rhos[:, 1:], rhos[:, -1:]), axis=1)
     wz = (dzs[1:] / (dzs[:-1] + dzs[1:]))[None, None, :]
     rho_z = jnp.concatenate((wz * rhos[:, :, :-1] + (1.0 - wz) * rhos[:, :, 1:], rhos[:, :, -1:]), axis=2)
-    rho_phi_plus = jnp.stack((rho_x * uf_plus * face_area, rho_y * vf[:, 1:]
-        * (dx * dzs[None, None, :]), rho_z * wf[:, :, 1:]
-        * (dx * dys[None, :, None])))
+    rho_phi_x = rho_x * uf_plus * face_area
+    rho_phi_y = rho_y * vf[:, 1:] * (dx * dzs[None, None, :])
+    rho_phi_z = rho_z * wf[:, :, 1:] * (dx * dys[None, :, None])
     rho_phi_inlet = rhos[0] * uf_inlet * face_area
     return (full_u, full_v, full_w, full_p, pressure_loss, divergence_norm,
-        flow_error, rho_phi_plus, rho_phi_inlet)
+        flow_error, rho_phi_x, rho_phi_y, rho_phi_z, rho_phi_inlet)
 
 
 def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
@@ -7288,6 +7303,12 @@ def _solve_extruded_projection(
         field_sharding = (
             u.sharding if num_devices is not None and num_devices > 1 else None
         )
+        replicated_sharding = (None if field_sharding is None else
+            NamedSharding(field_sharding.mesh, P()))
+        flux_sharding = (None if field_sharding is None else
+            NamedSharding(field_sharding.mesh, P(None, "x", None, None)))
+        vector_sharding = (None if field_sharding is None else
+            NamedSharding(field_sharding.mesh, P("x", None, None, None)))
         kernel_key = (
             field_sharding,
             u.shape,
@@ -7306,21 +7327,21 @@ def _solve_extruded_projection(
             target_flow_rate,
         )
 
-        fluid_velocity = jnp.stack((u[:, y0:y1, z0:z1], v[:, y0:y1, z0:z1], w[:, y0:y1, z0:z1]), -1)
         face_area = local_dy[:, None] * local_dz[None, :]
-        inlet_velocity = fluid_velocity[0].at[..., 0].set(_flow_rate_inlet_profile(
-            fluid_velocity[0, ..., 0], face_area, target_flow_rate))
         restart_flux = None if initial_bundle is None else initial_bundle.rho_phi_plus
         restart_inlet = None if initial_bundle is None else initial_bundle.rho_phi_inlet
         if (restart_flux is None) != (restart_inlet is None):
             raise ValueError("B2 restart requires both compact flux arrays")
-        if restart_flux is not None:
-            current_rho_phi_plus, current_rho_phi_inlet = (
-                jnp.asarray(value, dtype=u.dtype) for value in (restart_flux, restart_inlet))
-        else:
-            current_rho_phi_plus, current_rho_phi_inlet = _initialize_duct_mass_flux(
-                fluid_velocity, rho[:, y0:y1, z0:z1], inlet_velocity, dx=dx,
-                dy=local_dy, dz=local_dz)
+
+        def initialize_flux(u0, v0, w0, density):
+            velocity = jnp.stack((u0[:, y0:y1, z0:z1],
+                v0[:, y0:y1, z0:z1], w0[:, y0:y1, z0:z1]), axis=-1)
+            density = density[:, y0:y1, z0:z1]
+            inlet = velocity[0].at[..., 0].set(_flow_rate_inlet_profile(
+                velocity[0, ..., 0], face_area, target_flow_rate))
+            return _initialize_duct_mass_flux(
+                velocity, density, inlet, dx=dx, dy=local_dy, dz=local_dz,
+                sharding=field_sharding)
 
         def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet):
             local_velocity, local_density, local_viscosity = (field[:, y0:y1, z0:z1]
@@ -7342,19 +7363,83 @@ def _solve_extruded_projection(
                 include_axial_line=False,
             )
 
+        def embed_velocity(local_velocity, mask):
+            embedded = jnp.pad(local_velocity,
+                ((0, 0), (y0, ny - y1), (z0, nz - z1), (0, 0)))
+            return tuple(jnp.where(mask, embedded[..., i], 0.0) for i in range(3))
+
+        def courant_numbers(east, north, top, inlet, density):
+            return _compact_duct_courant_numbers(
+                (east, north, top), inlet, density[:, y0:y1, z0:z1], dt=dt, dx=dx,
+                dy=local_dy, dz=local_dz,
+                sharding=field_sharding)
+
+        def pack_flux(x, y, z):
+            return jnp.stack((x, y, z))
+
+        def pack_vector(x, y, z):
+            return jnp.stack((x, y, z), axis=-1)
+
+        def relax_flux(current_x, current_y, current_z, current_inlet,
+                       mapped_x, mapped_y, mapped_z, mapped_inlet, relaxation):
+            components = tuple(current + relaxation * (mapped - current)
+                for current, mapped in zip((current_x, current_y, current_z),
+                    (mapped_x, mapped_y, mapped_z), strict=True))
+            return (*components,
+                current_inlet + relaxation * (mapped_inlet - current_inlet))
+
         if field_sharding is not None:  # pragma: no cover - hardware gate
-            replicated_sharding = NamedSharding(field_sharding.mesh, P())
-            flux_sharding = NamedSharding(field_sharding.mesh, P(None, "x", None, None))
-            current_rho_phi_plus = jax.device_put(np.asarray(current_rho_phi_plus), flux_sharding)
-            current_rho_phi_inlet = jax.device_put(np.asarray(current_rho_phi_inlet), replicated_sharding)
+            initialize_flux = jax.jit(initialize_flux,
+                in_shardings=(field_sharding,) * 4,
+                out_shardings=(field_sharding,) * 3 + (replicated_sharding,))
+            initialize_flux = _reuse_fringing_jit(
+                ("initialize_flux", *kernel_key), initialize_flux)
             momentum_solve = jax.jit(
                 momentum_solve,
-                in_shardings=(field_sharding,) * 4 + (flux_sharding, replicated_sharding),
-                out_shardings=(field_sharding, replicated_sharding, replicated_sharding),
+                in_shardings=(vector_sharding,) * 2 + (field_sharding,) * 2
+                + (flux_sharding, replicated_sharding),
+                out_shardings=(vector_sharding, replicated_sharding, replicated_sharding),
             )
             momentum_solve = _reuse_fringing_jit(
                 ("momentum", *kernel_key), momentum_solve
             )
+            embed_velocity = jax.jit(embed_velocity,
+                in_shardings=(vector_sharding, field_sharding),
+                out_shardings=(field_sharding,) * 3)
+            embed_velocity = _reuse_fringing_jit(
+                ("embed_velocity", *kernel_key), embed_velocity)
+            courant_numbers = jax.jit(courant_numbers,
+                in_shardings=(field_sharding,) * 3
+                + (replicated_sharding, field_sharding),
+                out_shardings=(replicated_sharding, replicated_sharding))
+            courant_numbers = _reuse_fringing_jit(
+                ("courant", *kernel_key), courant_numbers)
+            pack_flux = jax.jit(pack_flux,
+                in_shardings=(field_sharding,) * 3, out_shardings=flux_sharding)
+            pack_flux = _reuse_fringing_jit(("pack_flux", *kernel_key), pack_flux)
+            pack_vector = jax.jit(pack_vector,
+                in_shardings=(field_sharding,) * 3, out_shardings=vector_sharding)
+            pack_vector = _reuse_fringing_jit(("pack_vector", *kernel_key), pack_vector)
+            relax_flux = jax.jit(relax_flux,
+                in_shardings=(field_sharding,) * 3 + (replicated_sharding,)
+                + (field_sharding,) * 3 + (replicated_sharding,) * 2,
+                out_shardings=(field_sharding,) * 3 + (replicated_sharding,))
+            relax_flux = _reuse_fringing_jit(("relax_flux", *kernel_key), relax_flux)
+
+        if restart_flux is None:
+            (*current_flux_components, current_rho_phi_inlet) = initialize_flux(
+                u, v, w, rho)
+        else:
+            restart_flux = np.asarray(restart_flux, dtype=np.dtype(u.dtype))
+            current_flux_components = tuple(
+                jnp.asarray(value) if field_sharding is None
+                else jax.device_put(value, field_sharding)
+                for value in restart_flux)
+            current_rho_phi_inlet = jnp.asarray(restart_inlet, dtype=u.dtype)
+            if replicated_sharding is not None:
+                current_rho_phi_inlet = jax.device_put(
+                    np.asarray(current_rho_phi_inlet), replicated_sharding)
+        current_rho_phi_plus = pack_flux(*current_flux_components)
 
     else:
         unit_pressure_response = _enforce_velocity_bc_3d(
@@ -7493,6 +7578,9 @@ def _solve_extruded_projection(
             state_sharding = NamedSharding(
                 field_sharding.mesh, P(None, "x", None, None)
             )
+            if previous_fixed_point_residual is not None:
+                previous_fixed_point_residual = jax.device_put(
+                    np.asarray(previous_fixed_point_residual), state_sharding)
             mixed_boundary_projection = jax.jit(
                 mixed_boundary_projection,
                 in_shardings=(field_sharding,) * 6,
@@ -7504,7 +7592,9 @@ def _solve_extruded_projection(
                     axial_sharding,
                     replicated_sharding,
                     replicated_sharding,
-                    flux_sharding,
+                    field_sharding,
+                    field_sharding,
+                    field_sharding,
                     replicated_sharding,
                 ),
             )
@@ -7569,10 +7659,9 @@ def _solve_extruded_projection(
     stop_step = completed_steps + outer_steps
     for step in range(completed_steps, stop_step):
         flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
-        step_courant = (_compact_duct_courant_numbers(
-            current_rho_phi_plus, current_rho_phi_inlet,
-            rho[:, y0:y1, z0:z1], dt=dt, dx=dx, dy=local_dy, dz=local_dz,
-            sharding=field_sharding) if use_alex_b2_finite_volume else (-1.0, -1.0))
+        step_courant = (courant_numbers(*current_flux_components,
+            current_rho_phi_inlet, rho)
+            if use_alex_b2_finite_volume else (-1.0, -1.0))
         phi_previous = phi
         pressure_observable_previous = (
             _cross_duct_pressure_difference(
@@ -7603,17 +7692,13 @@ def _solve_extruded_projection(
             laplacian_v = _laplacian_3d(v, dx=dx, dy=dy_momentum, dz=dz_momentum)
             laplacian_w = _laplacian_3d(w, dx=dx, dy=dy_momentum, dz=dz_momentum)
         if use_alex_b2_finite_volume:
-            velocity = jnp.stack((u, v, w), axis=-1)
-            momentum_force = jnp.stack(
-                (lorentz_x + forcing, lorentz_y, lorentz_z), axis=-1
-            )
+            velocity = pack_vector(u, v, w)
+            momentum_force = pack_vector(
+                lorentz_x + forcing, lorentz_y, lorentz_z)
             velocity_fluid, _, _ = momentum_solve(
                 velocity, momentum_force, rho, nu,
                 current_rho_phi_plus, current_rho_phi_inlet)
-            embedded = jnp.zeros((*fluid_mask.shape, 3), dtype=u.dtype)
-            embedded = embedded.at[:, y0:y1, z0:z1].set(velocity_fluid)
-            u_star, v_star, w_star = tuple(jnp.where(fluid_mask, embedded[..., i], 0.0)
-                for i in range(3))
+            u_star, v_star, w_star = embed_velocity(velocity_fluid, fluid_mask)
         else:
             u_star = u + dt * (
                 nu * laplacian_u + forcing / rho + lorentz_x / rho - dp_dx / rho
@@ -7630,9 +7715,12 @@ def _solve_extruded_projection(
 
         if use_alex_b2_finite_volume:
             (u_next, v_next, w_next, p_corr, axial_pressure_loss_gradient,
-                projected_divergence_norm, fixed_flow_error, mapped_rho_phi_plus,
+                projected_divergence_norm, fixed_flow_error, mapped_rho_phi_x,
+                mapped_rho_phi_y, mapped_rho_phi_z,
                 mapped_rho_phi_inlet) = mixed_boundary_projection(
                 u_star, v_star, w_star, p, rho, fluid_mask)
+            mapped_flux_components = (
+                mapped_rho_phi_x, mapped_rho_phi_y, mapped_rho_phi_z)
             valid = all(bool(jnp.all(jnp.isfinite(field)))
                 for field in (u_next, v_next, w_next, p_corr))
             valid &= all(bool(jnp.all(jnp.abs(field) <= velocity_limit))
@@ -7943,8 +8031,10 @@ def _solve_extruded_projection(
         else:
             u, v, w = u_next, v_next, w_next
         if use_alex_b2_finite_volume:
-            current_rho_phi_plus += flux_relaxation * (mapped_rho_phi_plus - current_rho_phi_plus)
-            current_rho_phi_inlet += flux_relaxation * (mapped_rho_phi_inlet - current_rho_phi_inlet)
+            (*current_flux_components, current_rho_phi_inlet) = relax_flux(
+                *current_flux_components, current_rho_phi_inlet,
+                *mapped_flux_components, mapped_rho_phi_inlet, flux_relaxation)
+            current_rho_phi_plus = pack_flux(*current_flux_components)
         _emit_iteration_progress(
             progress_callback,
             checkpoint_interval=checkpoint_interval,

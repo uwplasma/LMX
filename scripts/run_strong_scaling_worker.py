@@ -106,12 +106,16 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         inlet = velocity0[0].at[..., 0].set(
             _flow_rate_inlet_profile(velocity0[0, ..., 0], area, target_flow))
         return _initialize_duct_mass_flux(
-            velocity0, density0, inlet, dx=dx, dy=dy, dz=dz)
+            velocity0, density0, inlet, dx=dx, dy=dy, dz=dz,
+            sharding=field_sharding)
 
     initialize = jax.jit(initialize,
         in_shardings=(vector_sharding, field_sharding),
-        out_shardings=(flux_sharding, replicated))
-    initial_plus, initial_inlet = initialize(velocity, density)
+        out_shardings=(field_sharding,) * 3 + (replicated,))
+    *initial_components, initial_inlet = initialize(velocity, density)
+    pack_flux = jax.jit(lambda x, y, z: jnp.stack((x, y, z)),
+        in_shardings=(field_sharding,) * 3, out_shardings=flux_sharding)
+    initial_plus = pack_flux(*initial_components)
 
     def project(velocity0, pressure0, density0, mask0):
         return _face_flux_pressure_projection_duct(
@@ -124,10 +128,16 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
     project = jax.jit(project,
         in_shardings=(vector_sharding, field_sharding, field_sharding, field_sharding),
         out_shardings=(field_sharding,) * 4
-        + (axial_sharding, replicated, replicated, flux_sharding, replicated))
+        + (axial_sharding, replicated, replicated)
+        + (field_sharding,) * 3 + (replicated,))
     projected = project(velocity, pressure, density, mask)
-    projected_velocity = jnp.stack(projected[:3], axis=-1)
-    rho_phi_plus, rho_phi_inlet = projected[-2:]
+    projected_velocity, rho_phi_plus = jax.jit(
+        lambda u, v, w, x, y, z: (jnp.stack((u, v, w), axis=-1),
+            jnp.stack((x, y, z))),
+        in_shardings=(field_sharding,) * 6,
+        out_shardings=(vector_sharding, flux_sharding))(
+            *projected[:3], *projected[7:10])
+    rho_phi_inlet = projected[-1]
 
     probe_y, probe_z = (jnp.linspace(-0.7, 0.7, 5)[None, :, None],
         jnp.linspace(-0.6, 0.6, 5)[None, None, :])
@@ -168,8 +178,18 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         out_shardings=(vector_sharding, replicated, replicated))
     solved, momentum_residual, momentum_converged = momentum(
         projected_velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet)
-    jax.block_until_ready((projected, mixed, solved, momentum_residual))
-    full_flux = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
+    def flux_diagnostics(plus, inlet):
+        full_flux = _unpack_duct_mass_flux(plus, inlet)
+        return (sum(jnp.linalg.norm(value) for value in full_flux),
+            jnp.maximum(jnp.max(jnp.abs(full_flux[1][:, 0])),
+                jnp.max(jnp.abs(full_flux[2][:, :, 0]))))
+    flux_diagnostics = jax.jit(flux_diagnostics,
+        in_shardings=(flux_sharding, replicated),
+        out_shardings=(replicated, replicated))
+    convection_flux_l2, lower_wall_flux = flux_diagnostics(
+        rho_phi_plus, rho_phi_inlet)
+    jax.block_until_ready((projected, mixed, solved, momentum_residual,
+        convection_flux_l2))
     signature = np.concatenate([np.asarray(value).reshape(-1) for value in (
         initial_plus, initial_inlet, *projected[:5], rho_phi_plus, rho_phi_inlet,
         mixed[0], solved)])
@@ -181,9 +201,8 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         "mixed_pressure_l2": float(jnp.linalg.norm(mixed[0])),
         "mixed_pressure_converged": bool(mixed[2]),
         "mixed_pressure_local_residual": float(mixed[-1]),
-        "convection_flux_l2": float(sum(jnp.linalg.norm(value) for value in full_flux)),
-        "lower_wall_flux": float(max(jnp.max(jnp.abs(full_flux[1][:, 0])),
-            jnp.max(jnp.abs(full_flux[2][:, :, 0])))),
+        "convection_flux_l2": float(convection_flux_l2),
+        "lower_wall_flux": float(lower_wall_flux),
         "cut_boundary_separation": float(min(np.linalg.norm(cut - np.asarray(rho_phi_inlet)),
             np.linalg.norm(cut - np.asarray(rho_phi_plus[0, -1])))),
         "placement": {name: _placement(value) for name, value in (
