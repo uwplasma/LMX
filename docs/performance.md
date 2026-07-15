@@ -13,7 +13,7 @@ devices alone is not evidence of parallel execution.
 | portable test gate | Apple M4, six workers | 823 pass, 8 skip, 95.00% combined line/branch coverage, 154.0 s | below the five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
-| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.768/0.649/0.647 s; 1.18x/1.19x speedup; exact restart and device equivalence pass | pre-current-flux-JIT accepted calibration; refresh pending |
+| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.740/0.639/0.623 s; 1.16x/1.19x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
 | B2 scaling calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | 21.14/11.98 s; 1.76x speedup; CV below 0.4%, restart and device equivalence pass | current real solver, two fixed updates; shared-host calibration only |
 | historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | predates the 0.8.3 package minimum; refresh pending |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |

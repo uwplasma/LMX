@@ -1,7 +1,8 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The current source/scaling baseline is `9d28f99`; the latest
-complete portable-gate artifact is keyed to `9636fa7`.
+Status: 2026-07-15. The optimized source and GPU baseline is `9d28f99`, the
+current CPU scaling refresh is keyed to `d9d3f79`, and the latest complete
+portable-gate artifact is keyed to `9636fa7`.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The smoke closes bounded orchestration and comparison, not production B2
@@ -105,7 +106,7 @@ package and retiring the undocumented non-projection rectangular autodiff lane
 | maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 31 / 21,282 | no new file; below 21,000 after fixture consolidation | 32 / 21,300 |
 | maintenance scripts | 18 | 17 when the superseded SOLVAX acceptance freezer is retired | 18 |
-| tracked checkout | 3,490,502 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,489,557 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -183,13 +184,11 @@ most `1.05e-14`. Deterministic GPU correctness uses
 timing lane. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
-An explicit one-device request now uses the same named-sharding kernels as the
-multi-device path. With that fair baseline, the accepted pre-current-flux-JIT CPU ladder
-passes validation, placement, exact restart, and device-equivalence gates at
-`16 x 7 x 7`, `64 x 15 x 15`, and `128 x 31 x 31`. The two smaller grids are
-communication-bound. At `128 x 31 x 31`, warm medians are 0.768, 0.649, and
-0.647 seconds on 1/2/4 devices: 1.18x and 1.19x speedups, with no useful gain
-beyond two devices. This is a two-update scaling calibration, not a steady
+An explicit one-device request uses the same named-sharding kernels as the
+multi-device path. On the current source, the `128 x 31 x 31` rung passes
+validation, placement, exact restart, and device-equivalence gates. Warm
+medians are 0.740, 0.639, and 0.623 seconds on 1/2/4 devices: 1.16x and 1.19x
+speedups, with modest gain beyond two devices. This is a two-update scaling calibration, not a steady
 production-speed claim. The compact record is
 `benchmarks/results/b2-cpu-strong-scaling-20260715.json`.
 
@@ -213,9 +212,7 @@ device time was in cuSPARSE tridiagonal kernels reached through SOLVAX line
 preconditioning, versus 2.38% in NCCL. These are incomplete captured shares,
 not phase timings.
 
-First refresh the bounded `128 x 31 x 31` CPU rung on the current source; the
-accepted 1.19x record predates the diagnostic fusion that materially changed
-the sharded path. Then profile one warmed GPU phase at a time with explicit blocking and retain
+Next profile one warmed GPU phase at a time with explicit blocking and retain
 pressure iteration counts through a private diagnostic return only if the
 phase evidence requires them. Retain momentum auxiliary data only after the
 released SOLVAX API supports it without another solve. First reduce line-preconditioner calls
