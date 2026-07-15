@@ -23,6 +23,7 @@ from lmx.reference_data import default_closed_channel_reference_root
 
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
+DEFAULT_FREEMHD_SOURCE_REPO = Path("/Users/rogerio/local/tests/lmx_external_codes/FreeMHD")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
 
 _FREEMHD_SOURCE_NAMES = (
@@ -465,6 +466,49 @@ potE { internalField uniform 0; boundaryField { outerWalls { type zeroGradient; 
     return manifest
 
 
+def materialize_matched_b2_preflight(
+    template_dir: str | Path,
+    source_repo: str | Path,
+    output_dir: str | Path,
+) -> dict[str, object]:
+    """Materialize and independently observe the complete solver-free B2 bundle."""
+
+    from lmx.freemhd import observe_freemhd_b2_contract, observe_lmx_b2_contract
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True)
+    paths = {
+        "freemhd_input": destination / "freemhd_input",
+        "freemhd_source": destination / "freemhd_source",
+        "lmx_input": destination / "lmx_input.json",
+        "evaluator": destination / "evaluator.json",
+    }
+    materialize_matched_b2_freemhd_input(template_dir, paths["freemhd_input"])
+    materialize_freemhd_source_snapshot(source_repo, paths["freemhd_source"])
+    materialize_matched_b2_lmx_input(paths["lmx_input"])
+    materialize_matched_b2_evaluator(paths["evaluator"])
+    lmx_contract = observe_lmx_b2_contract(paths["lmx_input"], paths["evaluator"])
+    freemhd_contract = observe_freemhd_b2_contract(
+        paths["freemhd_input"], paths["freemhd_source"], paths["evaluator"]
+    )
+    if lmx_contract != freemhd_contract:
+        raise ValueError("Independent matched-B2 input observers disagree")
+    encoded = json.dumps(lmx_contract, sort_keys=True, separators=(",", ":")).encode()
+    artifacts = {}
+    for name, path in paths.items():
+        kind = "tree" if path.is_dir() else "file"
+        artifacts[name] = {"kind": kind, "sha256": artifact_sha256(path, kind)}
+    summary: dict[str, object] = {
+        "schema_version": 1,
+        "case_id": "B2-fringing-square",
+        "status": "preflight-pass",
+        "contract_sha256": hashlib.sha256(encoded).hexdigest(),
+        "artifacts": artifacts,
+    }
+    _write_json(destination / "preflight.json", summary)
+    return summary
+
+
 def _replace(path: Path, pattern: str, replacement: str, *, required: bool = True) -> int:
     updated, count = re.subn(pattern, replacement, path.read_text(encoding="utf-8"))
     if required and count == 0:
@@ -730,10 +774,16 @@ def run_suite(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run available FreeMHD parity artifact checks.")
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--materialize",
         choices=("shercliff", "hunt"),
         help="materialize an audited smoke case at --output and exit without running a solver",
+    )
+    mode.add_argument(
+        "--matched-b2-preflight",
+        action="store_true",
+        help="materialize and observe the matched-B2 inputs at --output without running a solver",
     )
     parser.add_argument(
         "--freemhd-install-dir",
@@ -745,6 +795,11 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path(os.environ.get("LMX_FREEMHD_PROCESSED_ROOT", DEFAULT_PROCESSED_ROOT)),
     )
+    parser.add_argument(
+        "--freemhd-source-repo",
+        type=Path,
+        default=Path(os.environ.get("LMX_FREEMHD_SOURCE_REPO", DEFAULT_FREEMHD_SOURCE_REPO)),
+    )
     args = parser.parse_args(argv)
 
     if args.materialize:
@@ -754,6 +809,14 @@ def main(argv: list[str] | None = None) -> int:
             case_kind=args.materialize,
         )
         print(json.dumps(manifest, indent=2, sort_keys=True))
+        return 0
+    if args.matched_b2_preflight:
+        summary = materialize_matched_b2_preflight(
+            args.freemhd_install_dir / "cases/hunt_demo",
+            args.freemhd_source_repo,
+            args.output,
+        )
+        print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
 
     summary = run_suite(

@@ -496,15 +496,19 @@ def test_matched_b2_freemhd_input_requires_complete_skeleton(tmp_path: Path):
         run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, tmp_path / "case")
 
 
-def test_independent_matched_b2_input_observers_agree(tmp_path: Path):
-    template, case, source = tmp_path / "hunt_demo", tmp_path / "freemhd", tmp_path / "source"
-    lmx_input, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
+def test_independent_matched_b2_input_observers_agree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    template, source = tmp_path / "hunt_demo", tmp_path / "source"
     _write_b2_skeleton(template)
-    _write_observer_source_snapshot(source)
-    run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, case)
-    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(lmx_input)
-    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "materialize_freemhd_source_snapshot",
+        lambda _, path: _write_observer_source_snapshot(Path(path)),
+    )
+    summary = run_freemhd_parity_suite.materialize_matched_b2_preflight(template, source, tmp_path / "bundle")
+    case, source = tmp_path / "bundle/freemhd_input", tmp_path / "bundle/freemhd_source"
+    lmx_input, evaluator = tmp_path / "bundle/lmx_input.json", tmp_path / "bundle/evaluator.json"
 
+    assert summary["status"] == "preflight-pass"
     assert observe_freemhd_b2_contract(case, source, evaluator) == observe_lmx_b2_contract(lmx_input, evaluator)
 
 
@@ -633,6 +637,16 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
         "destination": output,
         "case_kind": "hunt",
     }
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "materialize_matched_b2_preflight",
+        lambda template, source, destination: {
+            "template": str(template), "source": str(source), "output": str(destination)
+        },
+    )
+    assert run_freemhd_parity_suite.main(
+        ["--output", str(output), "--freemhd-install-dir", str(install), "--matched-b2-preflight"]
+    ) == 0
 
 
 def test_parity_command_portably_skips_missing_references(tmp_path: Path):

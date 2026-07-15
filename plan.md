@@ -156,11 +156,14 @@ one complete portable gate are green and pushed.
 ## Priority 1: freeze, then run one exact tiny B2 smoke
 
 The current parity command handles Benchmark A and materializes B2 inputs, but
-does not execute B2 or observe its outputs. Complete one small solver-free
-tranche in the existing script before launching either solver:
+does not execute B2 or observe its outputs. The first solver-free checkpoint now
+adds a real `--matched-b2-preflight` mode: the local bundle passes both
+independent observers with contract SHA-256
+`e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
+Complete the remaining small solver-free tranche before launching either solver:
 
-1. Add explicit B2 materialize, preflight, run, and postprocess modes without a
-   new script or package module.
+1. Extend the existing preflight with explicit B2 run and postprocess modes,
+   without a new script or package module.
 2. Define compact independent LMX and FreeMHD output observers for executed
    steps, effective `dt`, volume-mean and maximum Courant histories, stopping
    reason, mass/current closure, pressure gauge/orientation, restart identity,
