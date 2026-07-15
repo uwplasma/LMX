@@ -1390,7 +1390,10 @@ def _solvax_pressure_poisson_duct(
     )
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
     if mixed_axial_pressure:
-        coef_x_e = coef_x_e.at[-1].set(2.0 * mobility[-1] / max(dx**2, 1.0e-12))
+        outlet = jnp.arange(rhs.shape[0])[:, None, None] == rhs.shape[0] - 1
+        coef_x_e = jnp.where(
+            outlet, 2.0 * mobility[-1] / max(dx**2, 1.0e-12), coef_x_e
+        )
         coefficients = (
             coef_x_w,
             coef_x_e,

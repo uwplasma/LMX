@@ -186,12 +186,13 @@ def test_forced_cpu_duct_step_matches_one_and_two_devices(tmp_path: Path):
         timeout_seconds=50)
     np.testing.assert_allclose(one["signature"], two["signature"], rtol=2e-8, atol=2e-9)
     for record in (one, two):
-        assert record["momentum_converged"]
+        assert record["momentum_converged"] and record["mixed_pressure_converged"]
         assert max(record[key] for key in (
-            "divergence", "flow_error", "momentum_residual", "lower_wall_flux")) < 1e-8
-        assert min(record["convection_flux_l2"], record["gauge_response_l2"]) > 1e-3
+            "divergence", "flow_error", "momentum_residual", "lower_wall_flux",
+            "mixed_pressure_local_residual")) < 1e-8
+        assert min(record["convection_flux_l2"], record["mixed_pressure_l2"]) > 1e-3
         assert record["cut_boundary_separation"] > 1e-7
-    for name in ("initial_flux", "velocity", "pressure", "corrected_flux", "gauge_correction", "momentum"):
+    for name in ("initial_flux", "velocity", "pressure", "corrected_flux", "mixed_pressure", "momentum"):
         placement = two["placement"][name]
         assert (placement["global_shards"], placement["addressable_shards"]) == (2, 2)
         assert not placement["replicated"]

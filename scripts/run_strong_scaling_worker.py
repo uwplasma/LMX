@@ -18,13 +18,13 @@ sys.path.insert(0, str(ROOT))
 
 import lmx
 from lmx.fringing import (
-    _axial_mean_preconditioner_3d,
     _axial_field_sharding,
     _explicit_deviatoric_stress_duct,
     _face_flux_pressure_projection_duct,
     _flow_rate_inlet_profile,
     _initialize_duct_mass_flux,
     _solvax_implicit_momentum_duct,
+    _solvax_pressure_poisson_duct,
     _unpack_duct_mass_flux,
 )
 from lmx.scaling import (
@@ -121,16 +121,25 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
     projected_velocity = jnp.stack(projected[:3], axis=-1)
     rho_phi_plus, rho_phi_inlet = projected[-2:]
 
-    def gauge_precondition(residual):
-        volume = jnp.broadcast_to(area[None], residual.shape)
-        west = jnp.full_like(residual, 1.0 / dx**2).at[0].set(0.0)
-        east = jnp.full_like(residual, 1.0 / dx**2).at[-1].set(0.0)
-        return _axial_mean_preconditioner_3d(
-            volume, west, east, field_sharding=field_sharding)(residual)
+    probe_y, probe_z = (jnp.linspace(-0.7, 0.7, 5)[None, :, None],
+        jnp.linspace(-0.6, 0.6, 5)[None, None, :])
+    probe_rhs = jnp.broadcast_to(0.3 * jnp.sin(2.0 * jnp.linspace(-1.0, 1.0, nx)[:, None, None])
+        + 0.2 * probe_y - 0.1 * probe_z, (nx, 5, 5))
+    probe_mobility = jnp.full_like(probe_rhs, 0.02)
 
-    gauge_precondition = jax.jit(gauge_precondition, in_shardings=field_sharding,
-        out_shardings=field_sharding)
-    gauge_correction = gauge_precondition(force[..., 0])
+    def mixed_pressure(rhs0, mobility0):
+        return _solvax_pressure_poisson_duct(rhs0, mobility0, dx=0.25,
+            dy=jnp.asarray([0.15, 0.20, 0.30, 0.20, 0.15]),
+            dz=jnp.asarray([0.12, 0.22, 0.32, 0.22, 0.12]), iterations=96,
+            tolerance=1.0e-10, include_axial_line=False, single_reduction=True,
+            axial_pressure_mode="inlet_neumann_outlet_dirichlet_zero",
+            field_sharding=field_sharding)
+
+    mixed_pressure = jax.jit(mixed_pressure,
+        in_shardings=(field_sharding, field_sharding),
+        out_shardings=(field_sharding,) + (replicated,) * 6)
+    mixed = mixed_pressure(*(jax.device_put(value, field_sharding)
+        for value in (probe_rhs, probe_mobility)))
 
     def momentum(velocity0, force0, density0, viscosity0, plus0, inlet0):
         inlet_patch = velocity0[0].at[..., 0].set(inlet0 / (density0[0] * area))
@@ -151,17 +160,19 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         out_shardings=(vector_sharding, replicated, replicated))
     solved, momentum_residual, momentum_converged = momentum(
         projected_velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet)
-    jax.block_until_ready((projected, gauge_correction, solved, momentum_residual))
+    jax.block_until_ready((projected, mixed, solved, momentum_residual))
     full_flux = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
     signature = np.concatenate([np.asarray(value).reshape(-1) for value in (
         initial_plus, initial_inlet, *projected[:5], rho_phi_plus, rho_phi_inlet,
-        gauge_correction, solved)])
+        mixed[0], solved)])
     cut = np.asarray(rho_phi_plus[0, nx // 2 - 1])
     return {"benchmark_kind": "duct_step_gate", "num_devices": num_devices,
         "signature": signature.tolist(), "divergence": float(projected[5]),
         "flow_error": float(projected[6]), "momentum_residual": float(momentum_residual),
         "momentum_converged": bool(momentum_converged),
-        "gauge_response_l2": float(jnp.linalg.norm(gauge_correction)),
+        "mixed_pressure_l2": float(jnp.linalg.norm(mixed[0])),
+        "mixed_pressure_converged": bool(mixed[2]),
+        "mixed_pressure_local_residual": float(mixed[-1]),
         "convection_flux_l2": float(sum(jnp.linalg.norm(value) for value in full_flux)),
         "lower_wall_flux": float(max(jnp.max(jnp.abs(full_flux[1][:, 0])),
             jnp.max(jnp.abs(full_flux[2][:, :, 0])))),
@@ -170,7 +181,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         "placement": {name: _placement(value) for name, value in (
             ("initial_flux", initial_plus), ("velocity", projected[0]),
             ("pressure", projected[3]), ("corrected_flux", rho_phi_plus),
-            ("gauge_correction", gauge_correction),
+            ("mixed_pressure", mixed[0]),
             ("inlet_flux", rho_phi_inlet), ("momentum", solved))}}
 
 
