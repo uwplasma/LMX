@@ -48,6 +48,13 @@ class StrongScalingRecord:
     current_l2: float | None = None
     max_charge_balance_residual: float | None = None
     max_boundary_current_residual: float | None = None
+    max_pressure_linear_residual: float | None = None
+    max_pressure_linear_relative_residual: float | None = None
+    pressure_linear_iterations_max: int | None = None
+    pressure_linear_iterations_mean: float | None = None
+    pressure_linear_solve_count: int = 0
+    pressure_solves_converged: bool | None = None
+    pressure_linear_diagnostics_complete: bool = False
     max_electric_local_residual: float | None = None
     electric_solves_converged: bool | None = None
     validation_passed: bool | None = None
@@ -82,6 +89,12 @@ _SCALING_TABLE_COLUMNS = (
     "initialization",
     "validation_passed",
     "steady_state_passed",
+    "max_pressure_linear_relative_residual",
+    "pressure_linear_iterations_max",
+    "pressure_linear_iterations_mean",
+    "pressure_linear_solve_count",
+    "pressure_solves_converged",
+    "pressure_linear_diagnostics_complete",
     "signature_relative_tolerance",
     "physics_equivalent",
     "solver_faithful",
@@ -124,6 +137,34 @@ def _int_or_none(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def summarize_pressure_linear_history(
+    history: object, *, expected_steps: int | None = None
+) -> dict[str, float | int | bool | None]:
+    """Summarize valid mixed-pressure PCG rows without hiding legacy gaps."""
+
+    rows = np.asarray(history, dtype=float).reshape((-1, 5))
+    valid = rows[np.all(np.isfinite(rows), axis=1) & (rows[:, 4] >= 0.0)]
+    count = int(len(valid))
+    complete = count == (len(rows) if expected_steps is None else expected_steps)
+    return {
+        "max_pressure_linear_residual": (
+            float(np.max(np.abs(valid[:, 0]))) if count else None
+        ),
+        "max_pressure_linear_relative_residual": (
+            float(np.max(np.abs(valid[:, 1]))) if count else None
+        ),
+        "pressure_linear_iterations_max": int(np.max(valid[:, 2])) if count else None,
+        "pressure_linear_iterations_mean": (
+            float(np.mean(valid[:, 2])) if count else None
+        ),
+        "pressure_linear_solve_count": count,
+        "pressure_solves_converged": (
+            bool(np.all(valid[:, 3] == 1.0)) if count else None
+        ),
+        "pressure_linear_diagnostics_complete": complete,
+    }
 
 
 def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
@@ -228,6 +269,24 @@ def summarize_strong_scaling_records(
                     "validation_passed": bool(record.get("validation_passed", False)),
                     "steady_state_passed": bool(
                         record.get("steady_state_passed", False)
+                    ),
+                    "max_pressure_linear_relative_residual": _float_or_none(
+                        record.get("max_pressure_linear_relative_residual")
+                    ),
+                    "pressure_linear_iterations_max": _int_or_none(
+                        record.get("pressure_linear_iterations_max")
+                    ),
+                    "pressure_linear_iterations_mean": _float_or_none(
+                        record.get("pressure_linear_iterations_mean")
+                    ),
+                    "pressure_linear_solve_count": _int_or_none(
+                        record.get("pressure_linear_solve_count")
+                    ) or 0,
+                    "pressure_solves_converged": bool(
+                        record.get("pressure_solves_converged", False)
+                    ),
+                    "pressure_linear_diagnostics_complete": bool(
+                        record.get("pressure_linear_diagnostics_complete", False)
                     ),
                     "signature_relative_tolerance": signature_rtol,
                     "physics_equivalent": physics_equivalent,
@@ -587,6 +646,10 @@ def benchmark_extruded_inductionless_solve(
     electric_history = np.asarray(
         last_bundle.iteration_electric_linear_history, dtype=float
     ).reshape((-1, 6))
+    pressure_linear = summarize_pressure_linear_history(
+        last_bundle.iteration_pressure_linear_history,
+        expected_steps=executed_steps,
+    )
     max_charge_residual = float(np.max(np.abs(charge_residual)))
     max_boundary_residual = float(np.max(np.abs(boundary_residual)))
     max_electric_local_residual = float(np.max(np.abs(electric_history[:, 2])))
@@ -613,6 +676,8 @@ def benchmark_extruded_inductionless_solve(
         and max_charge_residual <= 1.0e-3
         and max_boundary_residual <= 1.0e-3
         and max_electric_local_residual <= 1.0e-3
+        and bool(pressure_linear["pressure_linear_diagnostics_complete"])
+        and bool(pressure_linear["pressure_solves_converged"])
         and electric_solves_converged
         and steady_state_passed
     )
@@ -621,6 +686,8 @@ def benchmark_extruded_inductionless_solve(
             "Production scaling solve failed conservation/linear-solve validation: "
             f"charge={max_charge_residual:.6e}, "
             f"boundary_current={max_boundary_residual:.6e}, "
+            f"pressure_iterations={pressure_linear['pressure_linear_iterations_max']}, "
+            f"pressure_converged={pressure_linear['pressure_solves_converged']}, "
             f"electric_local={max_electric_local_residual:.6e}, "
             f"electric_converged={electric_solves_converged}, "
             f"steady={steady_state_passed}."
@@ -655,6 +722,7 @@ def benchmark_extruded_inductionless_solve(
         current_l2=current_l2,
         max_charge_balance_residual=max_charge_residual,
         max_boundary_current_residual=max_boundary_residual,
+        **pressure_linear,
         max_electric_local_residual=max_electric_local_residual,
         electric_solves_converged=electric_solves_converged,
         validation_passed=validation_passed,

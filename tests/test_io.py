@@ -1,4 +1,5 @@
 from dataclasses import replace
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -483,6 +484,9 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         iteration_component_residual_history=jnp.asarray(
             [[1.0e-3, 2.0e-4, 3.0e-5, 1.0e-6, 2.0e-6, 3.0e-6]]),
         iteration_pressure_residual_history=jnp.asarray([2.0e-4]),
+        iteration_pressure_linear_history=jnp.asarray(
+            [[1.0e-9, 2.0e-10, 18.0, 1.0, 1.0]]
+        ),
         iteration_electric_linear_history=jnp.asarray(
             [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
         ),
@@ -502,17 +506,57 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
-    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v2"
+    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v3"
     for name in ("rho_phi_plus", "rho_phi_inlet", "axial_pressure_loss_gradient",
-                 "transverse_pressure_difference", "iteration_electric_linear_history",
+                 "transverse_pressure_difference", "iteration_pressure_linear_history",
+                 "iteration_electric_linear_history",
                  "iteration_potential_residual_history", "iteration_courant_history"):
         assert getattr(restart_bundle.bundle, name) == pytest.approx(getattr(bundle, name))
     assert restart_bundle.bundle.stopping_state == (1, 1, "in_progress")
     assert all(path.exists() for path in vars(layout).values())
+    bundle.iteration_pressure_linear_history = jnp.zeros((2, 5))
+    with pytest.raises(ValueError, match="inconsistent shape"):
+        write_extruded_restart_npz(
+            solution, case, tmp_path / "malformed.npz"
+        )
 
     with np.load(restart_path, allow_pickle=False) as data:
+        v3_missing = {key: data[key] for key in data.files
+                      if key != "iteration_pressure_linear_history"}
+        v3_short = {key: data[key] for key in data.files}
+        v3_short["iteration_pressure_linear_history"] = np.zeros((0, 5))
+        v2_metadata = json.loads(str(data["metadata_json"]))
+        v2_metadata["restart_schema"] = "b2_diagnostics_v2"
+        v2_payload = {key: data[key] for key in data.files
+                      if key != "iteration_pressure_linear_history"}
+        v2_payload["metadata_json"] = json.dumps(v2_metadata)
+        v1_metadata = {**v2_metadata, "restart_schema": "b2_aitken_v1"}
+        v1_payload = {key: value for key, value in v2_payload.items()
+                      if key != "iteration_courant_history"}
+        v1_payload["metadata_json"] = json.dumps(v1_metadata)
         legacy_payload = {key: data[key] for key in data.files if key not in {
             "metadata_json", "rho_phi_plus", "rho_phi_inlet", "iteration_courant_history"}}
+    missing_path = tmp_path / "restart" / "diagnostics_v3_missing.npz"
+    np.savez_compressed(missing_path, **v3_missing)
+    with pytest.raises(ValueError, match="missing pressure linear history"):
+        load_extruded_restart_bundle(missing_path)
+    short_path = tmp_path / "restart" / "diagnostics_v3_short.npz"
+    np.savez_compressed(short_path, **v3_short)
+    with pytest.raises(ValueError, match="inconsistent lengths"):
+        load_extruded_restart_bundle(short_path)
+
+    v2_path = tmp_path / "restart" / "diagnostics_v2.npz"
+    np.savez_compressed(v2_path, **v2_payload)
+    v2 = load_extruded_restart_bundle(v2_path)
+    assert v2.metadata["restart_schema"] == "b2_diagnostics_v2"
+    assert not v2.bundle.iteration_pressure_linear_history.size
+
+    v1_path = tmp_path / "restart" / "aitken_v1.npz"
+    np.savez_compressed(v1_path, **v1_payload)
+    v1 = load_extruded_restart_bundle(v1_path)
+    assert v1.metadata["restart_schema"] == "b2_aitken_v1"
+    assert not v1.bundle.iteration_pressure_linear_history.size
+
     legacy_path = tmp_path / "restart" / "legacy.npz"
     np.savez_compressed(legacy_path, **legacy_payload)
     legacy = load_extruded_restart_bundle(legacy_path)

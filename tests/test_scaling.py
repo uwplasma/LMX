@@ -24,6 +24,7 @@ from lmx.scaling import (
     _two_axis_mesh_and_sharding,
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
+    summarize_pressure_linear_history,
     summarize_strong_scaling_records,
     write_scaling_report,
     write_strong_scaling_summary_table,
@@ -162,7 +163,7 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert rows[0]["warm_mcell_updates_per_second"] == pytest.approx(9.6e-5)
     assert rows[0]["memory_mib"] == pytest.approx(2.0)
     assert rows[1]["physics_equivalent"]
-    assert "parallel_efficiency" in table.read_text()
+    assert "pressure_linear_iterations_mean" in table.read_text()
 
 
 def test_shard_placement_reports_partitioning_and_rejects_replication():
@@ -210,6 +211,7 @@ def test_forced_cpu_duct_step_matches_one_and_two_devices(tmp_path: Path):
     np.testing.assert_allclose(one["signature"], two["signature"], rtol=2e-8, atol=2e-9)
     for record in (one, two):
         assert record["momentum_converged"] and record["mixed_pressure_converged"]
+        assert record["pressure_solves_converged"] and record["pressure_linear_diagnostics_complete"]
         assert max(record[key] for key in (
             "divergence", "flow_error", "momentum_residual", "lower_wall_flux",
             "mixed_pressure_local_residual")) < 1e-8
@@ -269,6 +271,7 @@ def test_benchmark_extruded_inductionless_solve_records_solver_path(
             iteration_electric_linear_history=jnp.asarray(
                 [[1.0e-8, 1.0e-9, 3.0e-6, 4.0, 1.0, 1.0]]
             ),
+            iteration_pressure_linear_history=jnp.asarray([[1e-8, 1e-9, 7, 1, 1]] * 3),
             iteration_residual_history=jnp.asarray([5.0e-5, 4.0e-5, 3.0e-5]),
             iteration_component_residual_history=jnp.asarray(
                 [[3.0e-5, 0.0, 0.0, 1.0e-6, 0.0, 3.0e-6]] * 3
@@ -382,6 +385,7 @@ def test_solver_scaling_rejects_failed_conservation(monkeypatch: pytest.MonkeyPa
         iteration_electric_linear_history=jnp.asarray(
             [[1.0e-8, 1.0e-9, 2.0e-3, 4.0, 0.0, 1.0]]
         ),
+        iteration_pressure_linear_history=jnp.asarray([[1e-8, 1e-9, 7, 1, 1]]),
     )
     monkeypatch.setattr(
         scaling,
@@ -424,6 +428,10 @@ def test_scaling_helpers_handle_missing_and_invalid_values():
     assert tuple(map(_float_or_none, (None, "not-a-float"))) == (None, None)
     assert tuple(map(_int_or_none, (None, "not-an-int"))) == (None, None)
     assert _array_nbytes(InvalidArray()) == 0
+    summary = summarize_pressure_linear_history(
+        [[1e-8, 2e-9, 7, 1, 1], [np.nan, np.nan, 0, 0, -1]], expected_steps=2)
+    assert tuple(summary[key] for key in (
+        "pressure_linear_iterations_max", "pressure_linear_diagnostics_complete")) == (7, False)
 
 
 def test_row_or_replicated_sharding_covers_row_and_replicated_paths():

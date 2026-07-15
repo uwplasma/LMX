@@ -36,6 +36,7 @@ from lmx.scaling import (
     _bundle_memory_bytes,
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
+    summarize_pressure_linear_history,
 )
 
 _B2_RESTART_FLUX_ATOL = 1.0e-6
@@ -132,7 +133,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         in_shardings=(vector_sharding, field_sharding, field_sharding, field_sharding),
         out_shardings=(field_sharding,) * 4
         + (axial_sharding, replicated, replicated)
-        + (field_sharding,) * 3 + (replicated,))
+        + (field_sharding,) * 3 + (replicated,) * 6)
     projected = project(velocity, pressure, density, mask)
     projected_velocity, rho_phi_plus = jax.jit(
         lambda u, v, w, x, y, z: (jnp.stack((u, v, w), axis=-1),
@@ -140,7 +141,7 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         in_shardings=(field_sharding,) * 6,
         out_shardings=(vector_sharding, flux_sharding))(
             *projected[:3], *projected[7:10])
-    rho_phi_inlet = projected[-1]
+    rho_phi_inlet = projected[10]
 
     probe_y, probe_z = (jnp.linspace(-0.7, 0.7, 5)[None, :, None],
         jnp.linspace(-0.6, 0.6, 5)[None, None, :])
@@ -197,10 +198,14 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
         initial_plus, initial_inlet, *projected[:5], rho_phi_plus, rho_phi_inlet,
         mixed[0], solved)])
     cut = np.asarray(rho_phi_plus[0, nx // 2 - 1])
+    pressure_diagnostics = summarize_pressure_linear_history(
+        np.asarray(projected[11:16], dtype=float)[None, :], expected_steps=1
+    )
     return {"benchmark_kind": "duct_step_gate", "num_devices": num_devices,
         "signature": signature.tolist(), "divergence": float(projected[5]),
         "flow_error": float(projected[6]), "momentum_residual": float(momentum_residual),
         "momentum_converged": bool(momentum_converged),
+        **pressure_diagnostics,
         "mixed_pressure_l2": float(jnp.linalg.norm(mixed[0])),
         "mixed_pressure_converged": bool(mixed[2]),
         "mixed_pressure_local_residual": float(mixed[-1]),
@@ -278,6 +283,8 @@ def _matched_b2_smoke_benchmark(
             num_devices > 1 and value["replicated"] != expected_replicated
         ):
             raise RuntimeError(f"Matched B2 field {name} has invalid placement {value}")
+    pressure_diagnostics = summarize_pressure_linear_history(
+        direct.iteration_pressure_linear_history, expected_steps=observed["steps"])
     limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
     validation_passed = bool(
         observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
@@ -290,6 +297,8 @@ def _matched_b2_smoke_benchmark(
         and observed["restart_state_max_abs"] <= limits["restart_absolute_tolerance"]
         and observed["restart_flux_max_abs"] <= _B2_RESTART_FLUX_ATOL
         and observed["restart_flux_relative_l2"] <= _B2_RESTART_FLUX_RTOL
+        and pressure_diagnostics["pressure_linear_diagnostics_complete"]
+        and pressure_diagnostics["pressure_solves_converged"]
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -323,6 +332,7 @@ def _matched_b2_smoke_benchmark(
         "device_memory": device_memory, "placement": placement,
         "spatially_sharded": num_devices > 1, "global_shard_count": num_devices,
         "validation_passed": validation_passed, "steady_state_passed": False,
+        **pressure_diagnostics,
         "signature_relative_tolerance": 2.0e-8, "observables": observed,
         "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
         "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,

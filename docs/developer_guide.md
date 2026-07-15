@@ -9,15 +9,15 @@ dependency, or large generated-asset change:
 .venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current checkpoint records 35 package modules and 34,864 total
-package lines. The maintained stable core is 8,034 lines;
+The current checkpoint records 35 package modules and 34,997 total
+package lines. The maintained stable core is 8,052 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The current tracked checkout is 3,477,750 bytes, below its 4 MiB hard cap. Sixty-five
+The current tracked checkout is 3,490,241 bytes, below its 4 MiB hard cap. Sixty-five
 generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
@@ -65,6 +65,10 @@ When a large module is simplified, preserve its public import path and separate
 the structural commit from numerical changes. Docstrings should state array
 shape, units, solver assumptions, and literature anchors where these are not
 obvious from the type signature.
+
+Exact B2 restarts use schema `b2_diagnostics_v3`; the pressure-linear history
+has shape `(completed_steps, 5)`. The loader remains compatible with v2, and a
+continued v2 run marks its unknown earlier rows `[NaN, NaN, 0, 0, -1]`.
 
 ## Solver families
 

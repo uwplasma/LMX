@@ -134,6 +134,8 @@ def _assert_iteration_histories(bundle):
     assert electric.shape == (history.size, 6)
     assert benchmarks.jnp.all(electric[:, 3] > 0)
     assert benchmarks.jnp.all(electric[:, 2] <= 1.0e-3)
+    pressure_linear = bundle.iteration_pressure_linear_history
+    assert pressure_linear.shape == (history.size, 5)
     return history
 
 
@@ -535,6 +537,11 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     history = _assert_iteration_histories(solution.bundle)
     assert solution.bundle.iteration_courant_history.shape == (history.size, 3)
     assert benchmarks.jnp.all(solution.bundle.iteration_courant_history >= 0.0)
+    pressure_linear = solution.bundle.iteration_pressure_linear_history
+    assert benchmarks.jnp.all(pressure_linear[:, :2] >= 0.0)
+    assert benchmarks.jnp.all(pressure_linear[:, 2] > 0.0)
+    assert benchmarks.jnp.all(pressure_linear[:, 3] == 1.0)
+    assert benchmarks.jnp.all(pressure_linear[:, 4] > 0.0)
     assert solution.bundle.stopping_state[0] == history.size
 
     fx, fy, fz = _unpack_duct_mass_flux(
@@ -565,7 +572,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         replace(problem, case=continuation_case, profile=profile),
         initial_bundle=restart.bundle,
     )
-    assert restart.metadata["restart_schema"] == "b2_diagnostics_v2"
+    assert restart.metadata["restart_schema"] == "b2_diagnostics_v3"
     for name in (
         "u",
         "v",
@@ -577,6 +584,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         "iteration_residual_history",
         "iteration_component_residual_history",
         "iteration_pressure_residual_history",
+        "iteration_pressure_linear_history",
         "iteration_electric_linear_history",
         "iteration_potential_residual_history",
         "iteration_courant_history",

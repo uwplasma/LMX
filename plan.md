@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The optimized B2 source and current CPU calibration are
-keyed to `413185a`; the latest complete portable gate is keyed to `9b04d98`.
+keyed to `413185a`; the latest complete portable gate is keyed to `06075d1`.
 The GPU workers use the optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
@@ -105,16 +105,16 @@ immutable evidence, richer projection, and target-driven paths remain):
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,864 | stay below 35,000 through the scaling tranche | 35,100 |
-| maintained-core lines | 8,034 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 30 / 21,031 | no new file; below 21,000 after fixture consolidation | 31 / 21,100 |
+| package lines | 34,997 | stay below 35,000 through the scaling tranche | 35,100 |
+| maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
+| test files / lines | 30 / 20,960 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 15 | no new script without retiring an owner | 15 |
-| tracked checkout | 3,477,750 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,490,241 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `9b04d98` records 817 passes, 8 expected
+The portable-gate artifact keyed to `06075d1` records 817 passes, 8 expected
 external-data skips, 95.0023% combined line/branch coverage, and 157.0 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
@@ -238,11 +238,22 @@ batch for both equal-length transverse systems is also exact, symmetry-safe,
 gradient-safe, and restart-exact, but is 1.0% slower than its paired control;
 do not revive launch-only batching. Stop projection preconditioner
 micro-experiments until iteration/collective diagnostics identify a different
-algorithmic target; require at least a 15% small phase-timing win before a full
-rung. Electric remains second.
+algorithmic target. Pressure-PCG residuals, relative residuals, iterations,
+convergence, and status are now retained without another solve or synchronization
+phase; run one bounded current-source projection probe before selecting an
+algorithm, and require at least a 15% small phase-timing win before a full rung.
+Electric remains second.
+
+The bounded `8 x 4 x 3` current-source CPU probe is green on one and two forced
+devices: both converge in 24 PCG iterations, their maximum relative residuals
+agree to `6.2e-19`, and the full signatures differ by at most `5.33e-15`. For
+`k=24`, the source-level model is 26 global-reduction stages, 25 preconditioner
+applications, 50 transverse line solves, 25 axial-mean line solves, and 26
+pressure halo pairs per projection. These are algorithmic counts, not device
+kernel counts. Next measure diagnostic-retention overhead on the frozen small
+GPU phase before considering another pressure algorithm.
 Re-measure accepted rungs in an isolated GPU window before any publishable
-scaling claim. Retain solver auxiliary data only after a released SOLVAX API
-provides it without an extra solve.
+scaling claim.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing

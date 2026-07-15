@@ -194,6 +194,10 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
             iteration_residual_history=benchmarks.jnp.zeros(steps),
             iteration_component_residual_history=benchmarks.jnp.zeros((steps, 6)),
             iteration_pressure_residual_history=benchmarks.jnp.zeros(steps),
+            iteration_pressure_linear_history=benchmarks.jnp.tile(
+                benchmarks.jnp.asarray([1.0e-12, 1.0e-13, 4.0, 1.0, 1.0]),
+                (steps, 1),
+            ),
             iteration_electric_linear_history=benchmarks.jnp.zeros((steps, 6)),
             iteration_potential_residual_history=benchmarks.jnp.zeros(steps),
             iteration_courant_history=benchmarks.jnp.tile(benchmarks.jnp.asarray([dt, 1e-6, 2e-6]), (steps, 1)),

@@ -74,6 +74,12 @@ Every reported run should include:
 - viscous, Lorentz, pressure, and Joule power terms;
 - mesh, time-step, source, and restart fingerprints.
 
+B2 stores each mixed-pressure PCG result as
+`iteration_pressure_linear_history[step] = [residual, relative_residual,
+iterations, converged, status]`. The values come from the existing SOLVAX
+result, so recording them adds no solve or synchronization phase and only 40
+uncompressed bytes per float64 update.
+
 Small conservation residuals establish internal consistency, not agreement with
 an experiment. Experimental promotion additionally requires mesh/time
 convergence and a frozen pressure observable from independent data.

@@ -39,6 +39,7 @@ from lmx.io import (
     write_extruded_bundle_restart_npz,
     write_extruded_restart_npz,
 )
+from lmx.scaling import summarize_pressure_linear_history
 
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
@@ -465,6 +466,12 @@ def _run_record(
     courant_history = np.asarray(solution.bundle.iteration_courant_history, dtype=float)
     measured_courant = courant_history[:, 2][courant_history[:, 2] >= 0.0]
     completed_steps, final_streak, stop_reason = solution.bundle.stopping_state
+    pressure_linear_history = np.asarray(
+        solution.bundle.iteration_pressure_linear_history, dtype=float
+    ).reshape((-1, 5))
+    pressure_linear_diagnostics = summarize_pressure_linear_history(
+        pressure_linear_history, expected_steps=int(completed_steps)
+    )
     return {
         "case_id": case_id,
         "mesh_level": mesh_level,
@@ -513,6 +520,7 @@ def _run_record(
         "iteration_pressure_residual_history": np.asarray(
             solution.bundle.iteration_pressure_residual_history
         ).tolist(),
+        "iteration_pressure_linear_history": pressure_linear_history.tolist(),
         "iteration_electric_linear_history": np.asarray(
             solution.bundle.iteration_electric_linear_history
         ).tolist(),
@@ -531,6 +539,7 @@ def _run_record(
             "completed_steps": completed_steps,
             "final_steady_streak": final_streak,
             "stop_reason": stop_reason,
+            **pressure_linear_diagnostics,
         },
     }, solution
 

@@ -689,7 +689,8 @@ def observe_lmx_b2_output(
         wall_current_leakage current_scaled_pressure_proxy charge_balance_residual
         boundary_current_residual""".split()
     history_names = """iteration_component_residual_history
-        iteration_electric_linear_history iteration_potential_residual_history""".split()
+        iteration_pressure_linear_history iteration_electric_linear_history
+        iteration_potential_residual_history""".split()
     grouped_differences = {name: [] for name in ("state", "flux", "derived", "history")}
     flux_relative = []
     for group, names in (("state", state_names), ("flux", flux_names), ("derived", derived_names),

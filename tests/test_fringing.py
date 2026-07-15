@@ -928,7 +928,8 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
         zeros, zeros, zeros, jnp.ones(shape), jnp.ones(shape, dtype=bool),
         inlet_flow_rate=0.2, dt=0.1, **settings)
     (_, _, _, projected_pressure, pressure_loss, divergence, flow_error,
-        flux_x, flux_y, flux_z, inlet) = projected
+        flux_x, flux_y, flux_z, inlet, linear_residual, linear_relative_residual,
+        linear_iterations, linear_converged, linear_status) = projected
     plus = jnp.stack((flux_x, flux_y, flux_z))
     assert divergence < 1.0e-8
     assert flow_error < 1.0e-8
@@ -939,6 +940,11 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     assert jnp.isfinite(pressure_loss).all()
     assert jnp.isfinite(projected_pressure).all()
     assert jnp.max(jnp.abs(projected_pressure - projected_pressure[:, :1, :1])) < 1.0e-7
+    assert linear_residual < 1.0e-8
+    assert linear_relative_residual < 1.0e-8
+    assert linear_iterations > 0
+    assert linear_converged
+    assert linear_status > 0
 
 
 def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():

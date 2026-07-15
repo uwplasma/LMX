@@ -245,7 +245,8 @@ A publishable strong-scaling record contains:
 - cold time, warm time, throughput, speedup, and parallel efficiency;
 - compilation separated from repeated execution;
 - shard-placement evidence and per-device memory estimate;
-- numerical equivalence, conservation, and convergence results;
+- numerical equivalence, conservation, and convergence results, including B2
+  pressure-PCG iteration counts and all-solves-converged status;
 - one-device baseline measured in the same environment.
 
 Speedup and efficiency are

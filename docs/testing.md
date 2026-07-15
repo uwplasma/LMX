@@ -54,6 +54,8 @@ Exact benchmark node IDs and source hashes remain in the
 
 Coverage is a floor, not a validation claim. Physics acceptance requires
 quantitative reference and conservation gates even when code coverage is 100%.
+Exact B2 replay compares the pressure-PCG history as well as physical state and
+compact flux; I/O tests retain explicit v2 compatibility coverage.
 
 ## Test design rules
 
