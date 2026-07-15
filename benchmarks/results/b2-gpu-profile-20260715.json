@@ -162,6 +162,41 @@
       "sha256": "66a03f52cf6d7fa262e87a9c075df82e36907a3b7d88d6f8f78c3b934785fc6a"
     }
   ],
+  "rejected_projection_followups": {
+    "shape": [64, 15, 15],
+    "devices": 2,
+    "paired_control": {
+      "warm_median_seconds": 0.9599565254757181,
+      "warm_cv": 0.006494635080375353,
+      "sha256": "fdc8222dcd1870b06de627d032b4a879e1582d4e1a91372d169f98067782ff9e"
+    },
+    "candidates": [
+      {
+        "probe": "one transverse line plus axial mean",
+        "warm_median_seconds": 1.3438307375181466,
+        "warm_cv": 0.16661239696623165,
+        "validation_passed": true,
+        "decision": "reject slower and noisy",
+        "sha256": "20c96ad0eaf11684468a6e41872d7de4b93afdb2a3a93a75b54cc542767c613d"
+      },
+      {
+        "probe": "SOLVAX Jacobi plus axial mean",
+        "warm_median_seconds": 1.170010611996986,
+        "warm_cv": 0.06689685855118203,
+        "validation_passed": true,
+        "decision": "reject 21.9% slower than paired control",
+        "sha256": "f6d3402c9fa3ded1523b85f65374746446493fc8096c297c06ec19ce771f34d8"
+      },
+      {
+        "probe": "internal mixed-projection tolerance 1e-10",
+        "warm_median_seconds": 0.9500921500148252,
+        "warm_cv": 0.006903405013546791,
+        "validation_passed": true,
+        "decision": "reject 1.0% gain below promotion margin and frozen 1e-12 contract",
+        "sha256": "fd03ec9f1329020e53c1e43269977ae77b37a4e421cd4a6644d200ebe6feb528"
+      }
+    ]
+  },
   "raw_assets": {
     "location": "external workspace and office GPU host",
     "probe_sha256": "c6e67e442f252907d8a4c8e041557f2bb68521242036db3b7558bce6feff4200",

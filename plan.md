@@ -222,11 +222,16 @@ sum overlapping devices and streams and are not wall-time shares.
 The single trace-justified `256 x 67 x 67` calibration is complete. It passes
 validation, exact restart, placement, and device equivalence; warm medians are
 8.474 and 7.534 seconds with CV below 3.7%, a stable but sub-threshold 1.125x
-speedup. Stop larger blind rungs. Next reduce mixed-projection line-preconditioner
-calls or cost on the `64 x 15 x 15` forward/gradient/timing gate; electric is
-second. Re-measure the accepted rungs in an isolated GPU window before any
-publishable scaling claim. Retain solver auxiliary data only after a released
-SOLVAX API provides it without an extra solve.
+speedup. Stop larger blind rungs. Bounded `64 x 15 x 15` probes rejected one
+transverse line plus axial mean (40% slower), SOLVAX Jacobi plus axial mean
+(22% slower), and a relaxed internal projection tolerance (only 1.0% faster
+and outside the frozen `1e-12` contract). Do not drop the accepted line blocks
+or weaken tolerance. Next design a mixed-boundary coarse correction that keeps
+both transverse lines but reduces PCG work; require dense, mixed-gradient, and
+at least 15% phase-timing wins before a full rung. Electric remains second.
+Re-measure accepted rungs in an isolated GPU window before any publishable
+scaling claim. Retain solver auxiliary data only after a released SOLVAX API
+provides it without an extra solve.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing

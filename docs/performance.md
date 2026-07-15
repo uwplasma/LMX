@@ -56,6 +56,11 @@ stable 1.125x speedup, below the predeclared 1.2x promotion threshold; larger
 blind rungs therefore stop. The compact profile record is
 `benchmarks/results/b2-gpu-profile-20260715.json`.
 
+Small paired probes also reject one transverse projection line, SOLVAX Jacobi
+plus axial mean, and a relaxed projection tolerance: the first two are slower,
+while the tolerance change gains only 1.0% and violates the frozen numerical
+contract. The accepted source is unchanged.
+
 The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
 matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
 0.8.1 control and 1.184 for 0.8.2, so both miss the one-shot 1.10 threshold
@@ -271,8 +276,8 @@ than silently reused.
 
 ## Next performance work
 
-1. Re-measure the current GPU rungs in an isolated window.
-2. Reduce mixed-projection line-solve cost on a tiny forward/gradient/timing gate.
+1. Design a mixed-boundary coarse correction; gate it on dense, gradient, and phase timing.
+2. Re-measure the accepted GPU rungs in an isolated window.
 3. Close canonical B1/B2 mesh and experimental-observable acceptance.
 4. Add four-GPU points only with suitable hardware and a steady-production case.
 
