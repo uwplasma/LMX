@@ -342,19 +342,9 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
         lambda command, **kwargs: commands.append(command))
 
     strong_scaling_demo._run_worker(
-        python_executable="python",
-        repo_root=tmp_path,
-        output_path=output,
-        platform="CPU",
-        benchmark_kind="extruded_solve",
-        nx=8,
-        num_devices=2,
-        ny=6,
-        nz=4,
-        iterations=3,
-        repeats=1,
-        restart_path=tmp_path / "restart.npz",
-    )
+        python_executable="python", repo_root=tmp_path, output_path=output,
+        platform="CPU", benchmark_kind="extruded_solve", nx=8, num_devices=2,
+        ny=6, nz=4, iterations=3, repeats=1, restart_path=tmp_path / "restart.npz")
 
     assert commands[0][-2:] == ["--restart", str(tmp_path / "restart.npz")]
     strong_scaling_demo._run_worker(
@@ -363,8 +353,7 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
         ny=7, nz=7, iterations=6, repeats=4,
         matched_input=tmp_path / "input.json", evaluator=tmp_path / "evaluator.json",
         minimum_warm_seconds=120.0)
-    assert {commands[1][commands[1].index(flag) + 1] for flag in (
-        "--matched-input", "--evaluator")} == {
+    assert {commands[1][commands[1].index(flag) + 1] for flag in ("--matched-input", "--evaluator")} == {
             str(tmp_path / "input.json"), str(tmp_path / "evaluator.json")}
     assert commands[1][commands[1].index("--iterations") + 1] == "6"
     assert commands[1][commands[1].index("--minimum-warm-seconds") + 1] == "120.0"
@@ -375,18 +364,29 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
     assert "--xla_cpu_multi_thread_eigen=true" not in env["XLA_FLAGS"]
 
 
+def test_cpu_monitor_emits_fast_fail_closed_evidence(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(strong_scaling_demo, "_MONITOR_SAMPLE_SECONDS", 0.005)
+    monkeypatch.setattr(strong_scaling_demo, "_MONITOR_POSTFLIGHT_SECONDS", 0.015)
+    def probe(command, **kwargs):
+        text = "Swapouts: 0.\n" if command[0] == "vm_stat" else f"{strong_scaling_demo.os.getpid()} 0 0.0 python\n"
+        return SimpleNamespace(stdout=text)
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", probe)
+    affinity = tuple(sorted(getattr(strong_scaling_demo.os, "sched_getaffinity", lambda _: ())(0)))
+    raw, command = tmp_path / "cpu.monitor.jsonl", [sys.executable, "-c", "import time; time.sleep(.03)"]
+    code, evidence, timed_out = strong_scaling_demo._run_monitored_cpu_worker(command,
+        cwd=tmp_path, env={}, raw_path=raw, num_devices=1, expected_affinity=affinity, timeout_seconds=1)
+    assert code == 0 and not timed_out and evidence["verified"] and raw.stat().st_size
+
+
 def test_matched_scaling_worker_rejects_step_contract_mismatch(tmp_path: Path):
     matched_input = tmp_path / "matched.json"
-    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
-        matched_input, executed_steps=6
-    )
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(matched_input, executed_steps=6)
     evaluator = tmp_path / "evaluator.json"
     evaluator.write_text("{}")
 
     with pytest.raises(ValueError, match="executes 6 steps"):
-        run_strong_scaling_worker._matched_b2_smoke_benchmark(
-            matched_input, evaluator, repeats=4, num_devices=1, iterations=2
-        )
+        run_strong_scaling_worker._matched_b2_smoke_benchmark(matched_input, evaluator,
+            repeats=4, num_devices=1, iterations=2)
     with pytest.raises(ValueError, match="minimum_warm_seconds"):
         run_strong_scaling_worker._matched_b2_smoke_benchmark(
             matched_input, evaluator, repeats=4, num_devices=1, iterations=6,

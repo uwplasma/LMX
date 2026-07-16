@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -23,6 +24,8 @@ from lmx.scaling import (
     summarize_strong_scaling_records,
     write_strong_scaling_summary_table,
 )
+
+_MONITOR_SAMPLE_SECONDS, _MONITOR_POSTFLIGHT_SECONDS = 1.0, 15.0
 
 
 def _resource_environment(
@@ -65,6 +68,102 @@ def _resource_environment(
     }
 
 
+def _run_monitored_cpu_worker(
+    command: list[str], *, cwd: Path, env: dict[str, str], raw_path: Path,
+    num_devices: int, expected_affinity: tuple[int, ...], timeout_seconds: float | None,
+) -> tuple[int, dict[str, object], bool]:
+    """Run one sustained worker with fail-closed host evidence."""
+    period, postflight = _MONITOR_SAMPLE_SECONDS, _MONITOR_POSTFLIGHT_SECONDS
+    monitor_start, started = time.time(), time.monotonic()
+    process, worker_start = subprocess.Popen(command, cwd=cwd, env=env), time.time()
+    violations, sample_times, baseline_swapouts, timed_out = set(), [], None, False
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def sample(stream, phase: str) -> None:
+        nonlocal baseline_swapouts
+        now, current = time.monotonic(), []
+        evidence: dict[str, object] = {"unix_seconds": time.time(), "phase": phase,
+            "worker_pid": process.pid}
+        try:
+            output = subprocess.run(["ps", "-Ao", "pid=,ppid=,%cpu=,comm="],
+                check=True, capture_output=True, text=True).stdout
+            rows = [line.strip().split(maxsplit=3) for line in output.splitlines()]
+            processes = [(int(row[0]), int(row[1]), float(row[2]), row[3])
+                for row in rows if len(row) == 4]
+            if not processes:
+                raise RuntimeError("empty process probe")
+            owned = {process.pid, os.getpid()}
+            while children := {pid for pid, ppid, _, _ in processes
+                    if ppid in owned and pid not in owned}:
+                owned.update(children)
+            foreign = [(pid, cpu, name) for pid, _, cpu, name in processes
+                if pid not in owned and cpu > 25.0]
+            evidence["foreign_processes"] = foreign
+            if foreign:
+                current.append("foreign_process_above_25_percent_cpu")
+            if sys.platform == "darwin":
+                swap = subprocess.run(["vm_stat"], check=True, capture_output=True,
+                    text=True).stdout
+                line = next(item for item in swap.splitlines() if item.startswith("Swapouts:"))
+                swapouts = int(line.split(":", 1)[1].strip().rstrip("."))
+            else:
+                line = next(item for item in Path("/proc/vmstat").read_text().splitlines()
+                    if item.startswith("pswpout "))
+                swapouts = int(line.split()[1])
+            baseline_swapouts = swapouts if baseline_swapouts is None else baseline_swapouts
+            evidence["swapout_increase"] = swapouts - baseline_swapouts
+            if swapouts > baseline_swapouts:
+                current.append("swapout_increase")
+            affinity = None
+            if process.poll() is None and hasattr(os, "sched_getaffinity"):
+                affinity = sorted(os.sched_getaffinity(process.pid))
+                if tuple(affinity) != expected_affinity:
+                    current.append("worker_affinity_escape")
+            evidence["worker_affinity"] = affinity
+        except Exception as error:
+            evidence["probe_error"] = f"{type(error).__name__}: {error}"
+            current.append("probe_error")
+        violations.update(current)
+        evidence["violations"] = current
+        stream.write(json.dumps(evidence, sort_keys=True) + "\n")
+        stream.flush()
+        sample_times.append(now)
+
+    with raw_path.open("w") as stream:
+        next_sample = started
+        while process.poll() is None:
+            now = time.monotonic()
+            if timeout_seconds is not None and now - started >= timeout_seconds:
+                timed_out = True
+                process.kill()
+                process.wait()
+                break
+            if now < next_sample:
+                time.sleep(min(next_sample - now, 0.1))
+                continue
+            sample(stream, "worker")
+            next_sample += period
+        worker_end, worker_elapsed, postflight_started = time.time(), time.monotonic() - started, time.monotonic()
+        while time.monotonic() - postflight_started < postflight:
+            sample(stream, "postflight")
+            time.sleep(period)
+    monitor_end = time.time()
+    max_gap = max((b - a for a, b in zip(sample_times, sample_times[1:])), default=0.0)
+    if max_gap > 2.0:
+        violations.add("sampling_gap_above_2_seconds")
+    summary = {"schema_version": 2, "scope": "continuous-and-postflight",
+        "backend": "cpu", "num_devices": num_devices,
+        "verified": not violations and not timed_out,
+        "raw_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
+        "sample_period_seconds": period, "max_sample_gap_seconds": max_gap,
+        "monitored_worker_seconds": worker_elapsed,
+        "postflight_seconds": monitor_end - worker_end, "violation_count": len(violations),
+        "monitor_started_unix_seconds": monitor_start,
+        "worker_started_unix_seconds": worker_start, "worker_ended_unix_seconds": worker_end,
+        "monitor_ended_unix_seconds": monitor_end}
+    return int(process.returncode), summary, timed_out
+
+
 def _run_worker(
     *,
     python_executable: str,
@@ -86,6 +185,8 @@ def _run_worker(
     env: dict[str, str] | None = None,
     timeout_seconds: float | None = None,
     minimum_warm_seconds: float = 0.0,
+    resource_monitoring_path: Path | None = None,
+    expected_cpu_affinity: tuple[int, ...] = (),
 ) -> dict[str, object]:
     command = [
         python_executable,
@@ -124,10 +225,23 @@ def _run_worker(
         if not existing_pythonpath
         else f"{repo_root}:{existing_pythonpath}"
     )
-    subprocess.run(
-        command, check=True, cwd=repo_root, env=worker_env, timeout=timeout_seconds
-    )
-    return json.loads(output_path.read_text())
+    if resource_monitoring_path is None:
+        subprocess.run(command, check=True, cwd=repo_root, env=worker_env,
+            timeout=timeout_seconds)
+        return json.loads(output_path.read_text())
+    returncode, monitoring, timed_out = _run_monitored_cpu_worker(
+        command, cwd=repo_root, env=worker_env, raw_path=resource_monitoring_path,
+        num_devices=num_devices, expected_affinity=expected_cpu_affinity,
+        timeout_seconds=timeout_seconds)
+    if timed_out:
+        raise subprocess.TimeoutExpired(command, timeout_seconds)
+    record = json.loads(output_path.read_text())
+    monitoring["source_fingerprint"] = record.get("source_fingerprint")
+    record["resource_monitoring"] = monitoring
+    output_path.write_text(json.dumps(record, indent=2))
+    if returncode:
+        raise subprocess.CalledProcessError(returncode, command)
+    return record
 
 
 def _forced_cpu_environment(count: int) -> dict[str, str]:
@@ -213,6 +327,7 @@ def run_local_cpu_scaling(
         )
         env = _forced_cpu_environment(count)
         output_path = out_dir / f"cpu_{count}.json"
+        sustained = minimum_warm_seconds >= 120.0
         record = _run_worker(
             python_executable=python_executable,
             repo_root=repo_root,
@@ -235,6 +350,10 @@ def run_local_cpu_scaling(
             source_commit=source_commit,
             timeout_seconds=timeout_seconds,
             minimum_warm_seconds=minimum_warm_seconds,
+            resource_monitoring_path=(
+                out_dir / f"cpu_{count}.monitor.jsonl" if sustained else None),
+            expected_cpu_affinity=tuple(environment.get(
+                "resource_environment", {}).get("affinity_cpus", ())),
         )
         record.update(environment)
         if environment["resource_environment_verified"] and record.get(

@@ -372,8 +372,9 @@ example does not create that container. Its nested `cpuset` masks provide
 exact M4 P/E-core placement. GPU admission must be repeated between rungs and
 after the campaign. New timing evidence also needs a checksummed host-side
 continuous monitor through every rung and a clean postflight; the static
-preflight alone cannot detect work that starts later. Keep its raw trace as an
-ignored or release artifact. Each worker record must carry compact schema-2
+preflight alone cannot detect work that starts later. Sustained CPU runs create
+an ignored `cpu_N.monitor.jsonl` automatically; keep promoted raw traces as
+release artifacts. Each worker record must carry compact schema-2
 `resource_monitoring` evidence: matching backend/device count, a raw SHA-256,
 source fingerprint, bracketed worker timestamps, sample period and maximum gap
 at most five seconds, full cold-plus-warm coverage, at least 15 postflight

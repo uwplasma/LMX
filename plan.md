@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `2c4d8cd` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. LMX consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -233,91 +233,26 @@ measurements run alone.
 
 ### CI critical path
 
-The modal pipe test reuses one physical projection and verifies direct
-mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 48.4 seconds, versus 51.9 seconds for reduced B2 and 27.2
-seconds for reduced B1. Isolated measurement attributes most of that tail to
-worker contention: reducing only the manufactured modal grid lowered its
-weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
-physics node now measures 14.8 seconds alone. Preserve those coverage-rich
-tests. A fresh-process A/B of the same six expensive JAX nodes takes 37.69
-seconds with six workers and 36.41 with four. The 3.4% change misses the frozen
-10% promotion threshold, so retain six-worker work stealing; module grouping
-would imbalance the fringing and autodiff owners. Profile another node only if
-an isolated measurement crosses the 45-second trigger.
-
-A fresh-process example probe required a 25% isolated speedup without changing
-workflow assertions. The variable-field cut from `16 x 16 x 9` to
-`10 x 10 x 5` reduced 6.17 to 5.81 seconds (5.8%), so it is rejected. The
-operator baseline `(12, 24, 48)` took 3.96 seconds; `(8, 16, 32)` and
-`(10, 20, 40)` took 3.69 and 3.89 seconds but failed the unchanged observed-order
-gate (`gradient_z > 1.8`). Retain both original grids; their longer concurrent
-JUnit times are contention, not an isolated size bottleneck.
-
-Commit `d720d1e` removes redundant optimizer iterations from two high-level
-inverse-design wrapper-contract tests. Their isolated pair falls from 18.56 to
-15.01 seconds (19.1%), clearing the precommitted 15% promotion gate. The direct
-projection and fringing-surrogate convergence owners retain four steps and
-their loss-reduction assertions. The complete autodiff module passes in 78.46
-seconds after the change; no source path, test node, or assertion was removed.
-Commit `e404542` parameterizes six identical invalid-configuration setup and
-exception contracts, deleting 30 test lines while preserving six collected
-nodes and every message assertion; focused line/branch coverage remains 100%.
-
-Centralizing figure persistence permits one real PNG/PDF signature test and
-lightweight persistence stubs for the remaining plotting writers. Replacing
-two redundant bent-pipe solves with synthetic writer fields then reduces that
-node from 6.39 to a 1.24-second median and the isolated plotting module from
-9.84 to 5.43 seconds. Bent-pipe physics remains owned by its fringing tests.
-That plotting-focused gate reached 147.3 seconds; the current ownership-slimming
-gate is 152.8 seconds. The changed tests remove work, and the prior isolated B2
-measurement remains 14.8 seconds, so the shared-host variation does not
-justify a scheduling change or a speedup claim.
-
-Keep the top ten concurrent node durations in the portable-gate record and
-treat any node above 45 seconds as a critical-path review trigger. The suite
-driver's warning remains the separate 300-second wall-time warning. Preserve
-the 300-second engineering target,
+Prior optimizer, configuration, and plotting duplication has been removed
+without dropping physics ownership; rejected grid cuts and worker-count changes
+remain in checksummed CI evidence. Keep six-worker work stealing unless a fresh
+isolated A/B clears 10%. Record the top ten node durations and review any node
+above 45 seconds. Preserve the 300-second engineering target,
 600-second hard limit, and at least 95% combined line/branch coverage. Prefer
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
 ### Canonical sharding and performance
 
-The schema-6 `8 x 7 x 7` gate passes on one, two, and four forced JAX CPU
-devices. Direct two-update and serialized NPZ one-plus-one replay are exact;
-the global residual Gram matrix, Anderson weights, observables, conservation,
-linear status, and repeat signatures are equivalent. Cell-shaped fields,
-compact flux, and Anderson state shard axially; the inlet plane is replicated.
-This proves topology and restart correctness only. Its tiny timings are not a
-performance measurement.
+The schema-6 `8 x 7 x 7` 1/2/4-device gate proves exact topology, restart,
+placement, conservation, and Anderson equivalence only. Production fields,
+compact flux, and accelerator state shard axially; inlet state is replicated.
+The global restricted-grid pressure correction preserves conditioning across
+shards. Seconds-scale forced-XLA timings stay calibration evidence, never a
+physical-core claim or reason to add an 8-device rung.
 
-The isolated `256 x 67 x 67` fixed-grid calibration uses 1,149,184 cells, one
-cold plus five warm samples, and a 180-second worker ceiling. The partition-local
-control raised electric iterations from `109/89` to `159/129` and `193/157` by
-inserting artificial Neumann interfaces at axial shard boundaries. Commit
-`1437619` instead gathers only the restricted coarse grid, applies one global
-axial DCT, and reshards the correction. It passes SPD/JVP, exact replay,
-physics, placement, equivalence, and timing gates and restores `109/87`
-iterations on both multi-device paths.
-
-Optimized warm medians are 15.159, 12.337, and 11.146 seconds on one/two/four
-forced devices, with CVs below 1.24%. Point speedups are 1.229 and 1.360;
-seed-0 10,000-resample 95% lower bounds are 1.209 and 1.319. The two-device gate
-now passes, but four-device speedup and 34.0% efficiency still miss the frozen
-1.40 and 35% bounds. Correctness, conditioning, and timing improve; overall
-performance promotion still fails. Call this a two-update forced-XLA-device
-calibration, never physical-core or production strong scaling. Do not run a
-blind 8/10-device or larger rung. The next performance experiment must profile
-the remaining halo, Krylov/gauge reduction, and replicated axial-mean costs on
-an accepted longer workload; do not infer its priority from this two-step run.
-
-The rejected small probes—axial-mean deletion, anchored gauge, forced-macOS
-thread flags, batched transverse lines, and the unsteady `64 x 27 x 27` Docker
-lane—are preserved in checksummed evidence rather than repeated here. None met
-its frozen end-to-end promotion gate. Do not revive one without a new profile
-and hypothesis. Physical-core claims require verifiable affinity or partitioned
-worker pools; forced macOS devices share a runtime pool and prove topology only.
+Rejected small probes stay in checksummed evidence. Physical-core claims need
+verifiable affinity; forced macOS devices prove topology only.
 
 Seconds-scale affinity pilots established the nested 2/4/8-CPU allocation and
 correctness contract but remain debug evidence. A 20-update duration pilot was
@@ -335,6 +270,10 @@ solution evidence. Peak process RSS is
 4.65/5.22/5.43 GB and the solution-bundle estimate is 101.1 MB at every rung;
 CPU allocator bytes per device are unavailable. Apply the same protocol to
 GPUs only after the shared host passes the 60-second idle/no-foreign-work gate.
+The sustained CPU launcher now records one-second host samples through the
+worker plus a 15-second postflight and binds the ignored JSONL digest to the
+source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
+blocks promotion. Add the equivalent remote GPU supervisor before the next run.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
 that ladder. Three representative files match the current geometry and solver
@@ -353,10 +292,7 @@ The current GPU contract and decision are compact:
 
 | Evidence | Result | Decision |
 |---|---|---|
-| historical `8 x 7 x 7`, 1/2 RTX A4000 | pre-schema-6 repeat, restart, conservation, placement, and equivalence pass | historical only; no current Anderson GPU claim |
 | schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | current placement, exact flux replay, state replay to `2.22e-16`, conservation, linear, repeat, Gram, and Anderson gates pass | topology correctness accepted; discard shared-host timing and make no scaling claim |
-| `128 x 67 x 67`, 1/2 RTX A4000 | 2.780/2.400 s, CV below 1.2%, 1.159x end-to-end and 1.510x core-phase speedup | misses the 1.2x promotion gate; retain the smaller validation fusion and stop |
-| historical `256 x 67 x 67` | 8.474/7.534 s, CV below 3.7%, 1.125x | diagnostic only; no larger rung |
 | current `256 x 67 x 67`, 96 updates, 1/2 RTX A4000 | 258.913/159.234 s, 1.626x, 81.3% efficiency, every warm sample above 120 s; numerical/topology gates pass | accepted non-idle shared-host sustained calibration; four foreign contexts block authoritative timing |
 
 Every current calibration fails closed on physical repeat signatures, linear
@@ -364,18 +300,9 @@ status/history, placement, restart, conservation, and device equivalence.
 Replay-driving state must satisfy the frozen elementwise mixed ratio
 `|delta| / (2e-9 + 2e-8 |state|) <= 1`; corrected flux uses `1e-6` absolute and
 `1e-5` relative tolerances, while the tiny harness remains exact.
-The compiler trace attributes the remaining cost to transverse PCR work and
-post-map host transfers, not collectives; communication tuning therefore stops.
-
-Rejected variants remain rejected: weaker pressure tolerance, removing the
-axial-mean correction or line blocks, Jacobi substitutions, mixed-boundary
-coarse correction, additive correction, and launch-only SOLVAX batching. Each
-either violated the frozen numerical contract or missed its timing gate. Do
-not revive preconditioner microprobes or larger rungs without a new trace and a
-plan revision. Full data and rejection provenance are in
-`benchmarks/results/b2-gpu-scaling-calibration-20260715.json` and the performance
-documentation. Do not revive those variants while the global-coarse experiment
-is the active measured hypothesis.
+Rejected GPU variants and microprobes stay in
+`benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; do not revive
+one without a new trace, frozen hypothesis, and plan revision.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -387,14 +314,9 @@ plus one replicated inlet plane; exchange nonperiodic halos explicitly and do
 not checkpoint duplicated `nx+1` arrays. Optimize only a profiled bottleneck on
 the physics-valid path.
 
-Exit: the post-schema-6 portable suite remains below ten minutes with no
-critical-path surprise, CPU and GPU topology/restart correctness are current,
-and the current-source fixed global workload shows uncertainty-aware useful
-CPU-allocation speedup. Exact M4 host-core mapping remains open. Schema-6
-one/two-GPU correctness is current, and the old GPU
-ladder remains stopped. The explicit flux-unpack change now passes exact
-1/2/4-CPU and 1/2-GPU topology/replay gates; it is correctness evidence, not a
-GPU speedup claim.
+Exit: portable tests stay below ten minutes; CPU/GPU topology and replay remain
+exact; a clean continuously monitored sustained CPU/GPU ladder is published.
+Exact M4 core mapping and idle-host GPU timing remain open until then.
 
 ## Priority 3: canonical B2 validation
 
@@ -447,39 +369,13 @@ The accepted stopping/restart contract is:
 - the historical `iteration_momentum_defect_history` field is a post-map
   nonlinear momentum residual, not the split-map defect or a stopping gate.
 
-The bounded outcome study rejects `tau_map=0.05`: pressure, velocity, and
-pressure-gradient differences exceed every frozen QoI limit. The `0.005` path
-reaches only `0.01502` at step 96, so no threshold is calibrated. Relaxation
-factors through eight miss the 15% promotion gate; retain fixed relaxation 2
-as the paired control. The current-source six-update cold gate also rejects
-schema-6 Anderson depth two: its final normalized map rate is `0.5281` versus
-`0.1145` for fixed relaxation two, a 361% regression, while `max|weight|`
-reaches 24.39 against the frozen bound of 4. Linear, conservation, identical
-first-update, and exact serialized-replay gates pass, isolating the failure to
-the accelerator rather than the discretization or restart.
-A predeclared SOLVAX-level `max_abs_weight=4` newest-map fallback then bounds
-every applied weight and preserves the same linear, conservation, first-update,
-and exact-replay gates. It ends at `0.114718` versus `0.114466` for fixed
-relaxation two: 0.22% worse instead of the required 15% gain. Reject the API
-addition and do not substitute coefficient safety for acceleration evidence.
-The follow-up residual-spectrum audit reproduces all six map rates and rejects
-all five adjacent pairs under its predeclared 15% predicted-gain, `max|w| <= 4`,
-and condition-number `<= 1e6` rationale gate. Electric potential holds
-98.254--99.887% of the shared scaled residual energy, so the Euclidean
-accelerator is structurally misaligned with velocity-map acceptance. Close
-generic shared-norm Anderson tuning; a conditioning threshold cannot repair an
-objective mismatch.
-The current-source velocity-block minimax audit reproduces every raw weight and
-map rate and hashes all five residual pairs. The best possible bounded affine
-velocity gains are 99.998%, 0.0377%, 0.213%, 16.36%, and 78.38%. Because
-updates three and four cannot meet 15% under any depth-two residual metric,
-close the entire bounded depth-two affine family without a cold solve.
-The depth-three extension independently agrees under dual-simplex and
-interior-point linear programming. Its update-three through update-six gain
-ceilings are 99.998%, 0.555%, 19.85%, and 78.85%; update four therefore closes
-the bounded depth-three family without a cold solve as well.
-Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
-are diagnostic only. Exact histories and operator audits are in
+Frozen outcome gates retain fixed relaxation 2 and reject the tested pseudo-time
+changes, relaxation factors, Anderson depth two, bounded newest-map fallback,
+shared-norm tuning, and bounded depth-two/depth-three velocity families. The
+failures preserve linear, conservation, first-update, and replay contracts but
+cannot deliver the required 15% velocity-map gain; do not add or retune those
+APIs without a new residual objective. Exact histories, minimax certificates,
+and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
 `benchmarks/results/b2-momentum-defect-20260715.json`.
 
