@@ -370,7 +370,10 @@ The CPU lane still runs inside the affinity-controlled Docker allocation; the
 example does not create that container. Its nested `cpuset` masks provide
 2/4/8 guest CPUs for 1/2/4 JAX shards and establish CPU-allocation scaling, not
 exact M4 P/E-core placement. GPU admission must be repeated between rungs and
-after the campaign. This manual lane stays outside portable tests.
+after the campaign. New timing evidence also needs a checksummed host-side
+continuous monitor through every rung and a clean postflight; the static
+preflight alone cannot detect work that starts later. Keep its raw trace as an
+ignored or release artifact. This manual lane stays outside portable tests.
 
 The solver-faithful example requires a validated restart matching each timed
 grid; it fails before launching workers when one is missing:
