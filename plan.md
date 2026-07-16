@@ -180,7 +180,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,038 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,552,276 bytes | reclaim below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,544,206 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -188,126 +188,11 @@ The latest ownership audit removed one unreferenced superseded GPU record.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
-Three exact artifact/array consolidations remove 60 package lines and four
-private symbols: blanket numeric CSV persistence, mirrored multilayer wall
-faces, and ordered 2-D/3-D tabulated-field interpolation.
-Commit `a735cd7` removes another 66 lines by deleting three undocumented,
-unexported persistence/sampling wrappers and the duplicate direct-CLI guard;
-their generic owners remain. Commit `664da3c` adds 22 compact public-contract
-cases to the existing mesh and FreeMHD modules, with no new test file.
-Commit `26a6207` gives both scaling benchmarks one documented device-validation
-owner and removes two package lines. Commit `9d6e9fa` removes a single-owner B2
-table-parser symbol plus six package lines and deletes a behaviorally duplicate
-28-line Crank–Nicolson rejection test. Commit `f070445` inlines the sole B1
-Anderson wrapper into its released-SOLVAX call, deletes 18 package lines and one
-private symbol, and reuses an identical logging fixture to delete 35 test lines
-without removing a node or assertion. The current portable gate covers all of
-these ownership changes. Commit `7d8887a` routes 23 fixed PNG/PDF writers
-through the existing figure-persistence owner, removing 75 package lines with
-no new module or file while preserving lazy imports, path order, DPI, tight
-bounds, and figure closure. Its focused writer, signature, import, lint, and
-architecture gates are green.
-Commit `f9be23a` deletes the unused Sphinx template placeholder and its empty
-configuration hook, reducing the tracked topology by one file. Commit
-`2173f77` unifies scalar/vector NumPy Darcy friction under one private owner and
-deduplicates the two three-station extruded I/O fixtures, removing four package
-and 26 test lines while preserving every node, assertion, and output contract.
-Commit `aaa41b1` adds schema-6 B2 Anderson correctness and its scaling harness
-without adding a file: net +183 package, +128 test, and +205 script/example
-lines. Commit `ca7535e` then gives final-only and recorded differentiable
-rectangular projection one private MHD trajectory owner, deleting 56 package
-lines with no file, module, export, dependency, or public-result change. It
-retains `fori_loop` for memory-efficient final objectives and uses `scan` only
-when history is requested; terminal station fields agree within `7.3e-12`.
-Commit `5eb8d7c` gives six validation JSON writers one persistence owner and
-two profile writers one payload owner, deleting 30 more package lines without
-changing a public signature or serialized key. Commit `a98590f` returns
-GMRES's existing residual and convergence diagnostics through released
-`linear_solve(has_aux=True)`, removing one redundant full momentum matvec per
-solve. Dense reference, JVP, gradient, and reduced-B2 restart gates pass; a
-medium warm probe is timing-neutral at 18.115 versus 18.075 ms. Commit
-`2508487` selects one animation backend instead of rendering and overwriting
-each GIF twice; the 12-frame writer probe falls from 6.08 to 2.49 seconds.
-Commit `5ad03ec` keeps all 200 startup steps but stores a bounded presentation
-sample, defaulting to 42 frames at 6 fps, and makes 3-D rendering optional.
-Commit `497af1b` makes Q2D wall-driven frame sampling append-only, deleting 12
-package lines and removing 47 redundant Poisson solves from the 100-step,
-48-frame case. Final streamfunction, vorticity, and velocity are exact for two
-versus 48 requested frames; all 14 Q2D tests pass.
-Commit `6090cda` then reuses each nonlinear Q2D turbulence velocity state for
-turnover and sampled diagnostics. The portable 500-step case removes 1,007
-forward and 514 inverse FFTs while every returned array, spectrum, and turnover
-count remains bitwise identical; all 14 Q2D tests pass.
-Commit `de49a29` makes sustained scaling admission machine-readable and
-fail-closed before a long worker starts. Every rung now requires checksummed
-60-second affinity or idle-GPU evidence, exact source/runtime/input identity,
-positive memory measurements, and physical GPU UUID/PCI identity. Matched
-inputs are regenerated deterministically, and the default remote ceiling is
-1,800 seconds. All 35 scaling tests pass in 7.3 seconds.
-Commit `14c13be` additionally binds admitted CPU evidence to the worker's
-actual Linux affinity and GPU evidence to the launcher's selected device
-indices; a preflight record cannot be attached to another allocation. Commit
-`2c489be` closes the downstream duration loophole: the summary now re-derives
-the multi-minute contract, and generated plots use neutral fixed-work wording.
-Synthetic metadata checks stay instant; performance evidence still requires
-every warm trajectory to last at least 120 seconds. Commit `c1ca34f` gives
-field norms and synthetic solver bundles one owner each and consolidates the
-two safe numeric converters, deleting 20 package and 52 test lines while all
-36 scaling tests and the architecture gate pass. Commit `6629660` then
-replaces eight directional transverse-stencil helpers with four
-axis-parameterized owners, deleting 21 package lines and four private symbols.
-All solver tests and focused Hartmann differentiation checks pass. Commit
-`694e291` merges the two uniform-stencil test setups while retaining every
-unique assertion, deleting 16 test lines and restoring the 21,084-line test
-baseline.
-Commit `954e24e` replaces duplicated duct and pipe magnetic-field dispatch with
-one geometry-neutral sampler and removes the unused station-profile broadcaster.
-Constant, analytic, volume, 2-D table, and true 3-D table workflows remain green
-across ducts, layered ducts, straight/bent pipes, and WHAM; the change deletes
-68 package lines and two private owners. Commit `838e505` then delegates
-five-point point-Jacobi application to released SOLVAX, deleting eight
-package/core lines and two nested functions. All three accepted preconditioner
-aliases, the implicit gradient, and the velocity-mask integration gate pass;
-compiled work is unchanged, so this is ownership simplification, not speedup.
-The post-`838e505` SOLVAX audit rejects further ownership churn: every remaining
-candidate is smaller than five lines, changes compiled operations, retains
-LMX-owned gauge/physics semantics, or needs an unreleased performance-rejected
-API. Commit `1d8c5c3` shares one fresh extruded-solution fixture across three
-CLI tests, removing 20 test lines while all 25 CLI tests and assertions remain.
-Commit `4c4057b` delegates the analytic variable-field duct baseline to the
-square-duct problem owner, deleting 11 package lines; its real solve and runnable
-example contract pass. A post-slimming `8 x 7 x 7`, two-update B2 smoke at
-`3a4e037` passes repeat, pressure/electric, conservation, schema-6 Anderson, and
-exact serialized-replay gates; its millisecond warm timing is correctness only.
 
-The portable-gate artifact keyed to `acdefd9` records 861 passes, 8 expected
-external-data skips, 95.3866% combined line/branch coverage, and 172.5 seconds on
-the reference Apple M4. It is 20.2% above the prior 143.5-second record, but
-source, tests, and shared-host conditions changed, so the delta is not a speed
-regression claim. Do not promote a suite-speed claim from wall-time variance.
-The gate stays below 58% of the 300-second engineering target and 29% of the
-600-second hard limit.
-The 95.5%
-engineering target is not yet met; retain the 95% enforced floor while closing
-the remaining 0.1134-point gap and awaiting a second Python endpoint or hosted
-run. The
-six-worker record reports 64.7 seconds for weighted modal and 60.9 seconds for
-reduced B2; these concurrent durations still identify contention rather
-than isolated regressions, so no scheduling change is promoted from this run.
-
-The clean distribution audit at `ca7535e` produces a 315,709-byte wheel with
-48 members and a 298,648-byte source archive with 54 members. Both pass Twine;
-the wheel is limited to package source, seven frozen data files, and metadata,
-while the source archive adds only build metadata, README, license, and
-manifest. A Python 3.12 clean install resolves JAX 0.10.2 and SOLVAX 0.8.4,
-loads every packaged Benchmark A/B and Samper reference outside the checkout,
-and reaches a `9.9505e-9` residual on a tiny Hartmann solve. Matplotlib and Pillow
-are absent from the core environment, and importing the CLI, plotting facade,
-Q2D, blanket, field, showcase, and solver modules loads neither package. The
-`visualization` extra retains all tested plots and movies. The prior local
-Python 3.10 endpoint resolves JAX 0.6.2 and the same SOLVAX release. Hosted
-endpoint verification remains unavailable because Actions jobs execute zero
-steps.
+Completed slimming, distribution, SOLVAX, scaling-admission, and portable-gate
+history is preserved in Git, checksummed benchmark records, and the
+validation/performance documentation; only current ratchets and open gates
+remain authoritative here.
 
 ## Priority 0: solver-free matched B2 harness — complete
 
