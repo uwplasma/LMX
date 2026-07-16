@@ -14,7 +14,9 @@ from lmx.plotting import (
     _format_time_with_units,
     _movie_field_stack,
     _plot_field,
+    _prepare_plot_output,
     _safe_writer_candidates,
+    _save_figure_pair,
     write_autodiff_plots,
     write_bent_pipe_overview_plots,
     write_case_overview_plots,
@@ -137,6 +139,27 @@ def _assert_figure_pair(outputs: list[Path], out_dir: Path, stem: str) -> None:
     expected = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
     assert outputs == expected
     assert all(path.exists() for path in expected)
+
+
+@pytest.fixture(autouse=True)
+def _stub_repeated_figure_pair_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
+    def save(fig, out_dir: Path, stem: str) -> list[Path]:
+        paths = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
+        for path in paths:
+            path.write_bytes(b"plot")
+        plt.close(fig)
+        return paths
+
+    monkeypatch.setattr("lmx.plotting._save_figure_pair", save)
+
+
+def test_figure_pair_owner_writes_real_png_and_pdf(tmp_path: Path):
+    out_dir = _prepare_plot_output(tmp_path)
+    fig, ax = plt.subplots()
+    ax.plot([0.0, 1.0], [0.0, 1.0])
+    png, pdf = _save_figure_pair(fig, out_dir, "formats")
+    assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert pdf.read_bytes().startswith(b"%PDF")
 
 
 def test_write_case_overview_plots_writes_overview_and_diagnostics(tmp_path: Path):
