@@ -544,7 +544,7 @@ def sample_tabulated_cross_section_field(
     data = load_tabulated_field(path)
     if "x" in data:
         raise ValueError("3D tabulated field needs an x coordinate; use sample_tabulated_field_volume(...)")
-    return _interpolate_tabulated_field_2d(data, y=y, z=z)
+    return _interpolate_tabulated_field(data, y=y, z=z)
 
 
 def sample_tabulated_field_volume(
@@ -556,9 +556,9 @@ def sample_tabulated_field_volume(
 ) -> np.ndarray:
     data = load_tabulated_field(path)
     if "x" not in data:
-        sampled = _interpolate_tabulated_field_2d(data, y=y, z=z)
+        sampled = _interpolate_tabulated_field(data, y=y, z=z)
         return sampled
-    return _interpolate_tabulated_field_3d(data, x=x, y=y, z=z)
+    return _interpolate_tabulated_field(data, x=x, y=y, z=z)
 
 
 def _component_interpolator(points: tuple[np.ndarray, ...], values: np.ndarray) -> RegularGridInterpolator:
@@ -567,40 +567,18 @@ def _component_interpolator(points: tuple[np.ndarray, ...], values: np.ndarray) 
     return RegularGridInterpolator(points, values, bounds_error=False, fill_value=None)
 
 
-def _interpolate_tabulated_field_2d(data: dict[str, np.ndarray], *, y: np.ndarray, z: np.ndarray) -> np.ndarray:
-    y_axis = np.asarray(data["y"], dtype=float)
-    z_axis = np.asarray(data["z"], dtype=float)
-    points = np.stack([np.asarray(y, dtype=float).reshape(-1), np.asarray(z, dtype=float).reshape(-1)], axis=-1)
-    components: list[np.ndarray] = []
-    for key in ("bx", "by", "bz"):
-        interpolator = _component_interpolator((y_axis, z_axis), np.asarray(data[key], dtype=float))
-        sampled = np.asarray(interpolator(points), dtype=float).reshape(np.asarray(y).shape)
-        components.append(sampled)
-    return np.stack(components, axis=-1)
-
-
-def _interpolate_tabulated_field_3d(
-    data: dict[str, np.ndarray],
-    *,
-    x: np.ndarray,
-    y: np.ndarray,
-    z: np.ndarray,
+def _interpolate_tabulated_field(
+    data: dict[str, np.ndarray], **coordinates: np.ndarray
 ) -> np.ndarray:
-    x_axis = np.asarray(data["x"], dtype=float)
-    y_axis = np.asarray(data["y"], dtype=float)
-    z_axis = np.asarray(data["z"], dtype=float)
-    points = np.stack(
-        [
-            np.asarray(x, dtype=float).reshape(-1),
-            np.asarray(y, dtype=float).reshape(-1),
-            np.asarray(z, dtype=float).reshape(-1),
-        ],
-        axis=-1,
-    )
+    axes = tuple(np.asarray(data[name], dtype=float) for name in coordinates)
+    values = tuple(np.asarray(value, dtype=float) for value in coordinates.values())
+    points = np.stack([value.reshape(-1) for value in values], axis=-1)
     components: list[np.ndarray] = []
     for key in ("bx", "by", "bz"):
-        interpolator = _component_interpolator((x_axis, y_axis, z_axis), np.asarray(data[key], dtype=float))
-        sampled = np.asarray(interpolator(points), dtype=float).reshape(np.asarray(x).shape)
+        interpolator = _component_interpolator(
+            axes, np.asarray(data[key], dtype=float)
+        )
+        sampled = np.asarray(interpolator(points), dtype=float).reshape(values[0].shape)
         components.append(sampled)
     return np.stack(components, axis=-1)
 
