@@ -170,7 +170,14 @@ def _write_observer_source_snapshot(root: Path) -> dict[str, object]:
     return manifest
 
 
-def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
+def _write_lmx_b2_output(
+    root: Path,
+    input_path: Path,
+    evaluator: Path,
+    *,
+    direct_u: float = 0.0,
+    resumed_u_delta: float = 0.0,
+) -> None:
     payload = json.loads(input_path.read_text())
     x = benchmarks.jnp.asarray(payload["field_profile"]["sample_x_over_L"])
     faces = benchmarks.jnp.asarray(payload["mesh"]["y_faces"])
@@ -180,7 +187,7 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
     checkpoint_step = (executed_steps + 1) // 2
     case = load_matched_b2_lmx_input(input_path).case
 
-    def bundle(steps: int) -> ExtrudedFieldBundle:
+    def bundle(steps: int, *, u_value: float = 0.0) -> ExtrudedFieldBundle:
         zeros = benchmarks.jnp.zeros(shape)
         compact_flux = benchmarks.jnp.zeros((3, 8, 5, 5))
         inlet_flux = benchmarks.jnp.zeros((5, 5))
@@ -189,7 +196,7 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
             if case.solver.coupling_acceleration == "anderson" else None)
         return ExtrudedFieldBundle(
             x=x, y=y, z=z, field_scale=benchmarks.jnp.asarray(payload["field_profile"]["sample_b_over_B0"]),
-            u=zeros, v=zeros, w=zeros, p=zeros, phi=zeros,
+            u=benchmarks.jnp.full(shape, u_value), v=zeros, w=zeros, p=zeros, phi=zeros,
             geometry_kind="layered_duct", solver_kind="extruded_inductionless",
             rho_phi_plus=compact_flux, rho_phi_inlet=inlet_flux,
             aitken_state=((None, 1.0, 0)
@@ -218,8 +225,10 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
     root.mkdir()
     for name, value in (
         ("checkpoint.npz", bundle(checkpoint_step)),
-        ("direct.npz", bundle(executed_steps)),
-        ("resumed.npz", bundle(executed_steps)),
+        ("direct.npz", bundle(executed_steps, u_value=direct_u)),
+        ("resumed.npz", bundle(
+            executed_steps, u_value=direct_u + resumed_u_delta
+        )),
     ):
         write_extruded_bundle_restart_npz(value, case, root / name)
     (root / "run.json").write_text(json.dumps({
@@ -695,10 +704,40 @@ def test_lmx_b2_output_observer_replays_restart_evidence(
     assert len(observed["dt"]) == len(observed["courant_mean"]) == executed_steps
     assert all(observed[name] == 0.0 for name in (
         "restart_max_abs", "restart_state_max_abs", "restart_flux_max_abs",
-        "restart_flux_relative_l2", "restart_derived_max_abs",
+        "restart_state_relative_l2", "restart_flux_relative_l2", "restart_derived_max_abs",
         "restart_history_max_abs", "mass_balance"))
     assert observed["current_balance"] == observed["interface_current_balance"] == pytest.approx(1.0e-5)
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
+
+
+@pytest.mark.parametrize(
+    ("resumed_u_delta", "relative_replay_passes"),
+    ((1.0e-3, True), (1.0e6, False)),
+)
+def test_lmx_b2_output_observer_measures_relative_restart_state_corruption(
+    tmp_path: Path, resumed_u_delta: float, relative_replay_passes: bool
+):
+    input_path, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
+    output = tmp_path / "output"
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path)
+    run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
+    _write_lmx_b2_output(
+        output,
+        input_path,
+        evaluator,
+        direct_u=1.0e8,
+        resumed_u_delta=resumed_u_delta,
+    )
+
+    observed = observe_lmx_b2_output(output, input_path, evaluator)
+
+    assert observed["restart_state_max_abs"] == pytest.approx(
+        resumed_u_delta, rel=1.0e-5
+    )
+    assert observed["restart_state_relative_l2"] == pytest.approx(
+        resumed_u_delta / (1.0e8 + resumed_u_delta)
+    )
+    assert (observed["restart_state_relative_l2"] <= 1.0e-10) is relative_replay_passes
 
 
 @pytest.mark.parametrize("mutation", ("root", "metadata", "provenance"))

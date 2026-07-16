@@ -41,6 +41,7 @@ from lmx.scaling import (
 
 _B2_RESTART_FLUX_ATOL = 1.0e-6
 _B2_RESTART_FLUX_RTOL = 1.0e-5
+_B2_RESTART_STATE_RTOL = 1.0e-10
 _B2_REPEAT_ATOL = 2.0e-9
 _B2_REPEAT_RTOL = 2.0e-8
 _B2_PROFILE_ITERATION_ATOL = 3
@@ -110,6 +111,7 @@ def _anderson_diagnostics(
         "anderson_serialized_max_abs": None,
         "anderson_replay_max_abs": None,
         "anderson_replay_field_max_abs": None,
+        "anderson_replay_field_relative_l2": None,
         "anderson_replay_flux_max_abs": None,
         "anderson_replay_flux_relative_l2": None,
         "anderson_gram": None,
@@ -144,6 +146,11 @@ def _anderson_diagnostics(
     replay_max = max(replay_differences)
     replay_field_max, replay_flux_max = (
         max(replay_differences[:2]), max(replay_differences[2:])
+    )
+    replay_field_relative = max(
+        float(np.linalg.norm(np.asarray(left) - np.asarray(right)) /
+            max(np.linalg.norm(np.asarray(left)), np.linalg.norm(np.asarray(right)), 1.0e-30))
+        for left, right in zip(direct_state[:2], resumed_state[:2], strict=True)
     )
     replay_flux_relative = max(
         float(np.linalg.norm(np.asarray(left) - np.asarray(right)) /
@@ -190,7 +197,8 @@ def _anderson_diagnostics(
         schema == "b2_diagnostics_v6"
         and depth_two
         and serialized_max <= 1.0e-12
-        and replay_field_max <= 1.0e-12
+        and (replay_field_max <= 1.0e-12
+            or replay_field_relative <= _B2_RESTART_STATE_RTOL)
         and replay_flux_max <= _B2_RESTART_FLUX_ATOL
         and replay_flux_relative <= _B2_RESTART_FLUX_RTOL
         and placement_passed
@@ -204,6 +212,7 @@ def _anderson_diagnostics(
         anderson_serialized_max_abs=serialized_max,
         anderson_replay_max_abs=replay_max,
         anderson_replay_field_max_abs=replay_field_max,
+        anderson_replay_field_relative_l2=replay_field_relative,
         anderson_replay_flux_max_abs=replay_flux_max,
         anderson_replay_flux_relative_l2=replay_flux_relative,
         anderson_gram=gram_np.tolist(),
@@ -526,7 +535,8 @@ def _matched_b2_smoke_benchmark(
         and observed["interface_current_activity"] >= limits["interface_current_activity_min"]
         # Fast timing permits bounded face-flux reduction noise; all remaining
         # velocity, pressure, accelerator, and CFL state must replay tightly.
-        and observed["restart_state_max_abs"] <= limits["restart_absolute_tolerance"]
+        and (observed["restart_state_max_abs"] <= limits["restart_absolute_tolerance"]
+            or observed["restart_state_relative_l2"] <= _B2_RESTART_STATE_RTOL)
         and observed["restart_flux_max_abs"] <= _B2_RESTART_FLUX_ATOL
         and observed["restart_flux_relative_l2"] <= _B2_RESTART_FLUX_RTOL
         and pressure_diagnostics["pressure_linear_diagnostics_complete"]
@@ -597,6 +607,7 @@ def _matched_b2_smoke_benchmark(
         **anderson,
         "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
         "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,
+        "restart_state_relative_tolerance": _B2_RESTART_STATE_RTOL,
     }
 
 

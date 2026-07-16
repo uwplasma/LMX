@@ -714,7 +714,7 @@ def observe_lmx_b2_output(
         iteration_pressure_linear_history iteration_electric_linear_history
         iteration_potential_residual_history""".split()
     grouped_differences = {name: [] for name in ("state", "flux", "derived", "history")}
-    flux_relative = []
+    state_relative, flux_relative = [], []
     for group, names in (("state", state_names), ("flux", flux_names), ("derived", derived_names),
                          ("history", history_names)):
         for name in names:
@@ -724,9 +724,10 @@ def observe_lmx_b2_output(
                 raise ValueError(f"LMX B2 output array {name} is invalid")
             if left.size:
                 grouped_differences[group].append(float(np.max(np.abs(left - right))))
-                if group == "flux":
+                if group in {"state", "flux"}:
                     scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
-                    flux_relative.append(float(np.linalg.norm(left - right) / scale))
+                    relative = float(np.linalg.norm(left - right) / scale)
+                    (state_relative if group == "state" else flux_relative).append(relative)
     for left, right in zip(
             getattr(direct.bundle, acceleration_name),
             getattr(resumed.bundle, acceleration_name),
@@ -736,6 +737,8 @@ def observe_lmx_b2_output(
             raise ValueError(f"LMX B2 output {label} state is invalid")
         if left.size:
             grouped_differences["state"].append(float(np.max(np.abs(left - right))))
+            scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
+            state_relative.append(float(np.linalg.norm(left - right) / scale))
     restart_differences = {
         name: max(values, default=0.0) for name, values in grouped_differences.items()
     }
@@ -761,6 +764,7 @@ def observe_lmx_b2_output(
         "x_over_L": np.asarray(direct.bundle.x).tolist(), "pressure_observable": pressure.tolist(),
         "restart_max_abs": max(restart_differences.values()),
         **{f"restart_{name}_max_abs": value for name, value in restart_differences.items()},
+        "restart_state_relative_l2": max(state_relative, default=0.0),
         "restart_flux_relative_l2": max(flux_relative, default=0.0),
         "wall_seconds": float(metadata["wall_seconds"]),
     }

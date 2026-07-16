@@ -87,7 +87,55 @@ def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
     assert diagnostics["anderson_validation_passed"]
     assert diagnostics["anderson_serialized_max_abs"] == 0.0
     assert diagnostics["anderson_replay_max_abs"] == 0.0
+    assert diagnostics["anderson_replay_field_relative_l2"] == 0.0
     assert diagnostics["anderson_weights_sum_error"] <= 1.0e-12
+
+
+@pytest.mark.parametrize(
+    ("replay_delta", "validation_passed"),
+    ((5.0e-10, True), (1.0e-2, False)),
+)
+def test_schema6_anderson_diagnostics_gate_relative_field_replay(
+    replay_delta: float, validation_passed: bool
+):
+    mapped = jnp.full((4, 2, 2, 2), 10.0)
+    residual = jnp.full_like(mapped, 1.0)
+    flux = jnp.ones((3, 2, 2, 2))
+    inlet = jnp.ones((2, 2))
+    checkpoint = SimpleNamespace(
+        anderson_state=(mapped, residual, flux, inlet),
+        stopping_state=(1, 0, "in_progress"),
+    )
+    direct = SimpleNamespace(
+        anderson_state=(mapped, residual, flux, inlet),
+        stopping_state=(2, 0, "step_limit"),
+    )
+    resumed = SimpleNamespace(
+        anderson_state=(mapped + replay_delta, residual, flux, inlet),
+        stopping_state=direct.stopping_state,
+    )
+    serialized = SimpleNamespace(
+        bundle=SimpleNamespace(**checkpoint.__dict__),
+        metadata={"restart_schema": "b2_diagnostics_v6"},
+    )
+    problem = SimpleNamespace(case=SimpleNamespace(
+        solver=SimpleNamespace(
+            coupling_acceleration="anderson",
+            coupling_history_depth=2,
+            coupling_regularization=1.0e-8,
+        ),
+        time_stepper=SimpleNamespace(max_steps=2),
+    ))
+
+    diagnostics = run_strong_scaling_worker._anderson_diagnostics(
+        problem, checkpoint, direct, resumed, serialized, num_devices=1
+    )
+
+    assert diagnostics["anderson_replay_field_max_abs"] == pytest.approx(replay_delta)
+    assert diagnostics["anderson_replay_field_relative_l2"] == pytest.approx(
+        replay_delta / (10.0 + replay_delta)
+    )
+    assert diagnostics["anderson_validation_passed"] is validation_passed
 
 
 def test_matched_b2_topology_gate_compares_schema6_gram_and_contract():
