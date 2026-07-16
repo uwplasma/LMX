@@ -449,6 +449,130 @@ def _remote_worker_failure(
     return phase, message
 
 
+def _run_monitored_gpu_worker(
+    remote_host: str, remote_command: str, *, remote_pid_path: str,
+    raw_path: Path, num_devices: int, environment: dict[str, object],
+    timeout_seconds: float,
+) -> tuple[int, dict[str, object], bool]:
+    """Run one remote GPU worker while rejecting shared-host contamination."""
+    period, postflight = _MONITOR_SAMPLE_SECONDS, _MONITOR_POSTFLIGHT_SECONDS
+    identities = environment["gpu_identities"]
+
+    def normalize_pci(value: object) -> str:
+        return ":".join(str(value).lower().split(":")[-2:])
+
+    expected = {str(index): (item["uuid"], normalize_pci(item["pci_bus_id"]))
+        for index, item in zip(environment["visible_devices"], identities)}
+    selected_uuids = {identity[0] for identity in expected.values()}
+    monitor_start, started = time.time(), time.monotonic()
+    process, worker_start = subprocess.Popen(
+        ["ssh", remote_host, remote_command]), time.time()
+    violations, sample_times, timed_out = set(), [], False
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def sample(stream, phase: str) -> None:
+        now, current = time.monotonic(), []
+        evidence: dict[str, object] = {"unix_seconds": time.time(), "phase": phase}
+        probe = (
+            f"worker=$(cat {shlex.quote(remote_pid_path)} 2>/dev/null || echo -1); "
+            'echo "__META__ $worker $$"; '
+            "nvidia-smi --query-gpu=index,uuid,pci.bus_id,utilization.gpu,memory.used "
+            "--format=csv,noheader,nounits; echo __CONTEXTS__; "
+            "nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory "
+            "--format=csv,noheader,nounits; echo __PROCESSES__; "
+            'ps -eo pid=,ppid=,pcpu=,comm='
+        )
+        try:
+            output = subprocess.run(["ssh", remote_host, probe], check=True,
+                capture_output=True, text=True, timeout=1.0).stdout
+            head, contexts_text = output.split("__CONTEXTS__\n", 1)
+            contexts_text, processes_text = contexts_text.split("__PROCESSES__\n", 1)
+            lines = head.splitlines()
+            remote_pid, probe_pid = map(int, lines.pop(0).split()[1:])
+            gpus = [[part.strip() for part in line.split(",")]
+                for line in lines if line.strip()]
+            observed = {row[0]: (row[1], normalize_pci(row[2])) for row in gpus}
+            if any(observed.get(index) != identity
+                    for index, identity in expected.items()):
+                current.append("gpu_identity_remap")
+            processes = [line.strip().split(maxsplit=3)
+                for line in processes_text.splitlines() if line.strip()]
+            process_rows = [(int(row[0]), int(row[1]), float(row[2]), row[3])
+                for row in processes if len(row) == 4]
+            if remote_pid < 1 or not process_rows:
+                raise RuntimeError("missing remote worker or process inventory")
+            owned = {remote_pid, probe_pid}
+            while children := {pid for pid, ppid, _, _ in process_rows
+                    if ppid in owned and pid not in owned}:
+                owned.update(children)
+            contexts = [[part.strip() for part in line.split(",", 3)]
+                for line in contexts_text.splitlines() if line.strip()]
+            selected = [row for row in contexts if row[0] in selected_uuids]
+            foreign_gpu = [row for row in selected if int(row[1]) not in owned]
+            foreign_cpu = [(pid, cpu, name) for pid, _, cpu, name in process_rows
+                if pid not in owned and cpu > 25.0]
+            if foreign_gpu or (phase == "postflight" and selected):
+                current.append("foreign_or_postflight_gpu_context")
+            if foreign_cpu:
+                current.append("foreign_process_above_25_percent_cpu")
+            if phase == "postflight" and any(
+                    float(row[3]) > 5.0 for row in gpus if row[0] in expected):
+                current.append("postflight_gpu_utilization_above_5_percent")
+            evidence.update(remote_worker_pid=remote_pid, gpus=gpus,
+                selected_contexts=selected, foreign_gpu_contexts=foreign_gpu,
+                foreign_processes=foreign_cpu)
+        except Exception as error:
+            evidence["probe_error"] = f"{type(error).__name__}: {error}"
+            current.append("probe_error")
+        violations.update(current)
+        evidence["violations"] = current
+        stream.write(json.dumps(evidence, sort_keys=True) + "\n")
+        stream.flush()
+        sample_times.append(now)
+
+    with raw_path.open("w") as stream:
+        next_sample = started
+        while process.poll() is None:
+            now = time.monotonic()
+            if now - started >= timeout_seconds:
+                timed_out = True
+                stop = (f"pid=$(cat {shlex.quote(remote_pid_path)} 2>/dev/null); "
+                    'case "$pid" in ""|*[!0-9]*|0|1) exit 1;; esac; '
+                    'kill -TERM -- "$pid"')
+                subprocess.run(["ssh", remote_host, stop], check=False, timeout=1.0)
+                try:
+                    process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+                break
+            if now < next_sample:
+                time.sleep(min(next_sample - now, 0.1))
+                continue
+            sample(stream, "worker")
+            next_sample += period
+        worker_end, worker_elapsed = time.time(), time.monotonic() - started
+        postflight_started = time.monotonic()
+        while time.monotonic() - postflight_started < postflight:
+            sample(stream, "postflight")
+            time.sleep(period)
+    monitor_end = time.time()
+    max_gap = max((b - a for a, b in zip(sample_times, sample_times[1:])), default=0.0)
+    if max_gap > 2.0:
+        violations.add("sampling_gap_above_2_seconds")
+    summary = {"schema_version": 2, "scope": "continuous-and-postflight",
+        "backend": "gpu", "num_devices": num_devices,
+        "verified": not violations and not timed_out,
+        "raw_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
+        "sample_period_seconds": period, "max_sample_gap_seconds": max_gap,
+        "monitored_worker_seconds": worker_elapsed,
+        "postflight_seconds": monitor_end - worker_end, "violation_count": len(violations),
+        "monitor_started_unix_seconds": monitor_start,
+        "worker_started_unix_seconds": worker_start, "worker_ended_unix_seconds": worker_end,
+        "monitor_ended_unix_seconds": monitor_end}
+    return int(process.returncode), summary, timed_out
+
+
 def run_remote_gpu_scaling(
     *,
     repo_root: Path,
@@ -513,9 +637,8 @@ def run_remote_gpu_scaling(
                 / f"profile_gpu_{count}"
             )
             profile_arg = f" --profile-dir {shlex.quote(str(remote_profile))}"
-        remote_command = (
-            f"cd {shlex.quote(remote_dir)} && "
-            f"PYTHONPATH={shlex.quote(remote_dir)} CUDA_VISIBLE_DEVICES={shlex.quote(visible_devices)} "
+        worker_command = (
+            f"env PYTHONPATH={shlex.quote(remote_dir)} CUDA_VISIBLE_DEVICES={shlex.quote(visible_devices)} "
             "JAX_PLATFORMS=cuda JAX_ENABLE_X64=true XLA_PYTHON_CLIENT_PREALLOCATE=false "
             f"{shlex.quote(python_executable)} scripts/run_strong_scaling_worker.py "
             f"--benchmark-kind {shlex.quote(benchmark_kind)} --platform GPU --num-devices {count} "
@@ -527,12 +650,32 @@ def run_remote_gpu_scaling(
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
             f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
         )
+        sustained = minimum_warm_seconds >= 120.0
+        remote_pid_path = (f"{remote_dir}/artifacts/strong_scaling/"
+            f"gpu_{count}.{os.getpid()}.{time.time_ns()}.pid")
+        prefix = f"cd {shlex.quote(remote_dir)} && "
+        remote_command = prefix + worker_command
+        if sustained:
+            remote_command = (prefix + "mkdir -p artifacts/strong_scaling && "
+                f"echo $$ > {shlex.quote(remote_pid_path)} && exec {worker_command}")
         worker_error = None
-        try:
-            subprocess.run(["ssh", remote_host, remote_command], check=True,
-                timeout=timeout_seconds)
-        except subprocess.CalledProcessError as error:
-            worker_error = error
+        monitoring = None
+        if sustained:
+            returncode, monitoring, timed_out = _run_monitored_gpu_worker(
+                remote_host, remote_command, remote_pid_path=remote_pid_path,
+                raw_path=out_dir / f"gpu_{count}.monitor.jsonl",
+                num_devices=count, environment=environment["resource_environment"],
+                timeout_seconds=timeout_seconds)
+            if timed_out:
+                raise subprocess.TimeoutExpired(remote_command, timeout_seconds)
+            if returncode:
+                worker_error = subprocess.CalledProcessError(returncode, remote_command)
+        else:
+            try:
+                subprocess.run(["ssh", remote_host, remote_command], check=True,
+                    timeout=timeout_seconds)
+            except subprocess.CalledProcessError as error:
+                worker_error = error
         local_output = out_dir / f"gpu_{count}.json"
         try:
             subprocess.run(
@@ -546,6 +689,9 @@ def run_remote_gpu_scaling(
                 f"evidence could not be retrieved: {evidence_error}"
             ) from worker_error
         record = json.loads(local_output.read_text())
+        if monitoring is not None:
+            monitoring["source_fingerprint"] = record.get("source_fingerprint")
+            record["resource_monitoring"] = monitoring
         if worker_error is not None:
             phase, message = _remote_worker_failure(record, worker_error)
             raise RuntimeError(

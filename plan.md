@@ -1,84 +1,27 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. LMX consumes released SOLVAX 0.8.4;
-`aaa41b1` made the
-frozen B2 path Anderson depth two with one shared weight vector for mapped
-scaled fields and conservative compact flux. Restart schema 6 stores one raw
-mapped field, residual, plus flux, and inlet flux all-or-none; direct two-update
-and serialized NPZ one-plus-one replay are exact. Its six-update cold outcome
-gate is now rejected, so schema 6 is correctness evidence rather than a
-promoted B2 acceleration choice. A separately predeclared `max|weight| <= 4`
-newest-map fallback is also rejected: it is stable and exact but ends 0.22%
-worse than fixed relaxation two, so no SOLVAX or LMX API was added. Schemas
-1--5 remain readable. A six-update spectrum audit then closes generic
-shared-Euclidean Anderson tuning: 98.254--99.887% of its objective energy is
-electric potential, while B2 acceptance uses velocity-map convergence.
-A current-source velocity-block minimax audit then closes the bounded
-depth-two and depth-three affine families: depth-two updates three and four can
-improve by at most 0.0377% and 0.213%, while depth-three update four reaches
-only 0.555%, so neither family can meet the frozen 15% gate. Fixed relaxation
-two remains the control and no accelerator API is added.
-The installable-distribution contract is refreshed at `ca7535e`: frozen benchmark
-resources are package-owned, the wheel smoke runs outside the checkout,
-wheel/source membership and size are fail-closed, and the numerical core no
-longer installs or eagerly imports Matplotlib and Pillow.
-The post-map nonlinear momentum residual and
-restart schema 4 were keyed to `e6834ee`; schema 5 now versions normalized
-stopping. Its fixed-relaxation memory reduction
-is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
-Commit `3e731fa` removes the projection reconstruction floor and refreezes the
-64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `acdefd9`.
-CPU/GPU calibration at
-`413185a` remains historical; deterministic GPU equivalence at `3a22078` has
-been replaced by the current `8b6f97d` result and the refreshed calibration
-record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
-is historical and cannot attribute the current accepted path.
-The first fresh canonical-mesh coarse trajectory using the current formulation
-passes conservation and all linear-solver gates but reaches its 128-update
-bound before steady convergence. Its single authorized continuation preserves
-those gates but misses its precommitted residual target; it is not promoted.
-The smoke closes bounded orchestration and comparison, not production B2
-acceptance. Current schema-6 `8 x 7 x 7` one-/two-/four-forced-CPU-device
-topology passes exact replay, conservation, Gram/weight equivalence, and
-placement. The isolated `256 x 67 x 67` calibration also passes correctness and
-timing-stability gates. Its 1.229x/1.360x point speedups promote the two-device
-optimization but miss the four-device bound. It is a two-update forced-device
-calibration, not a physical-core or production strong-scaling claim. Schema-6
-topology, explicit component placement, and exact serialized replay pass on
-one and two GPUs; shared-host timing is excluded. The latest multi-minute,
-static-preflight Docker CPU-allocation path, keyed to `a92b4e6`, passes
-32-update sustained scaling:
-every warm trajectory lasts 147--269 s, speedup is 1.317x/1.684x on two/four
-versus one JAX device, and all confidence, efficiency, restart, physics,
-provenance, memory, and 60-second admission gates pass. A 96-update
-one/two-A4000 lane also passes 158--259 s duration, numerical, restart, and
-topology gates with 1.626x shared-host speedup, but persistent foreign contexts
-keep authoritative GPU scaling open. Peak device memory is 2.50 GB on one GPU
-and 1.41/1.31 GB on two. The fixed-work harness accepts
-an explicit update count, checkpoints at the deterministic midpoint, replays
-the remaining trajectory, and requires one cold plus at least three warm
-trajectories, with every warm sample lasting at least 120 s, for a sustained
-claim; the two-update default remains the bounded CI/debug gate. One
-`--sustained` preset selects `256 x 67 x 67`, 32 CPU or 96 GPU updates, four
-repeats, and an 1800-second ceiling. The summary re-derives duration, the
-explicit cold/compile timing contract, median, and warm CV (at most 5%); it
-never trusts a candidate boolean. It fails closed unless one exact 1/2/4-shard CPU or
-1/2-GPU group shares provenance and fixed work and passes sustained duration,
-real-solver numerics, placement, peak memory, explicit affinity/idle-host
-preflight, and checksummed continuous/postflight monitoring. Incomplete
-candidates remain visible without a sustained speedup or plot title. The
-earlier multi-minute CPU record passed its static preflight but
-is not promotable under the new continuous-monitor gate. Its confirmation was
-aborted without a timing record after unrelated local simulations raised host
-load above 135 following a clean preflight. A later check still found load 83,
-active SFINCS/Python work, and severe swapouts. Require continuous and
-postflight host admission before retrying. Retry the 96-update GPU campaign
-only after both office A4000s pass their clean-environment gates; idle-looking
-instantaneous utilization is insufficient while foreign contexts remain.
-This single active plan records accepted baselines, active gates, and stop/go
-criteria—not campaign history. Completed campaign details belong in
-checksummed result records and the validation or performance documentation.
+Status: 2026-07-16. LMX consumes released SOLVAX 0.8.4. Restart schema 6
+provides compact, exact one-plus-one replay and correct 1/2/4-CPU plus 1/2-GPU
+placement. Its tested Anderson and bounded affine variants miss the frozen 15%
+velocity-map gain, so fixed relaxation 2 remains the B2 control. The current
+coarse B2 trajectory passes linear, conservation, restart, and placement gates
+but misses steady acceptance; no continuation is authorized.
+
+Historical sustained calibrations use fixed `256 x 67 x 67` work. CPU warm
+trajectories last 147--269 seconds with 1.317x/1.684x two/four-device speedup;
+GPU warm trajectories last 158--259 seconds with 1.626x two-device speedup.
+They remain non-authoritative because CPU lacked continuous monitoring and the
+GPU host was not idle. The `--sustained` preset now runs 32 CPU or 96 GPU
+updates, one cold plus three warm trajectories, a 120-second warm minimum, an
+1800-second ceiling, and automatic checksummed continuous/postflight monitors.
+Promotion also requires fixed provenance, exact numerics/placement, memory,
+warm CV at most 5%, and clean affinity or GPU identity/context evidence.
+
+Both current hosts fail admission because of unrelated CPU/GPU work; retry only
+after a fresh 60-second clean preflight. Short runs remain correctness/debug
+evidence and cannot support a scaling claim. Completed history belongs in the
+checksummed benchmark records and performance documentation; this plan keeps
+only current decisions and stop/go criteria.
 
 ## Product outcome
 
@@ -181,10 +124,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,692 | stay below 34,700 | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,074 | no new file; stay below 21,075 | 31 / 21,100 |
+| test files / lines | 30 / 21,069 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,549,272 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,549,827 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -198,32 +141,14 @@ history is preserved in Git, checksummed benchmark records, and the
 validation/performance documentation; only current ratchets and open gates
 remain authoritative here.
 
-## Priority 0: solver-free matched B2 harness — complete
+## Completed foundations
 
-The schema-3 harness materializes deterministic LMX and 392-cell FreeMHD inputs,
-pins FreeMHD commit `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5`, verifies the
-source snapshot, and derives each observed contract independently. Frozen
-one-sided mutations cover geometry, materials, fields, boundaries, numerics,
-and source drift. The `harness-smoke` role is deliberately unable to promote
-itself to `b2-production`.
-
-Exit met: source, artifact, contract, observer-independence, and setup gates are
-green. Exact implementation history belongs in the tracked harness record and
-validation documentation.
-
-## Priority 1: matched B2 smoke — complete
-
-The record keyed to LMX `0ab33b2` and the pinned FreeMHD source runs two fixed
-Euler updates in 4.443 seconds on one JAX device and 7.467 seconds on two native
-FreeMHD MPI ranks. Restart, mass/current closure, interface-current activity,
-and Courant gates pass. Cross-code normalized pressure differences are 0.00452
-RMS and 0.01092 maximum, within the frozen 0.16 and 0.32 smoke limits.
-
-Authoritative evidence is
-`benchmarks/results/b2-freemhd-harness-smoke-20260715.json`; its 1.64 MB raw
-bundle remains outside Git. Exit met for orchestration and two-update numerical
-consistency only. Production parity, the canonical three-mesh ladder,
-experimental acceptance, and steady scaling remain open.
+The independently observed 392-cell LMX/FreeMHD harness pins FreeMHD
+`14b54a3e`, rejects source/contract drift, and passes two-update restart,
+closure, Courant, and pressure-consistency gates. It proves orchestration and
+bounded numerical consistency only; production parity and the canonical
+three-mesh ladder remain open. Evidence is
+`benchmarks/results/b2-freemhd-harness-smoke-20260715.json`.
 
 ## Priority 2: unblock fast iteration and real strong scaling
 
@@ -254,52 +179,27 @@ physical-core claim or reason to add an 8-device rung.
 Rejected small probes stay in checksummed evidence. Physical-core claims need
 verifiable affinity; forced macOS devices prove topology only.
 
-Seconds-scale affinity pilots established the nested 2/4/8-CPU allocation and
-correctness contract but remain debug evidence. A 20-update duration pilot was
-also too short, so the sustained protocol uses 32 updates. On identical
-`256 x 67 x 67` input,
-the current `a92b4e6` 1/2/4-device ladder uses 2/4/8 CPU allocations and reports
-246.702/187.307/146.524-second warm medians. Speedups are 1.317x/1.684x,
-empirical 95% lower bounds are 1.301x/1.661x, and efficiencies are 65.9%/42.1%.
-Every warm sample lasts at least 146 s, CVs are below 4.45%, midpoint replay is
-exact, and every placement, linear, conservation, Anderson, provenance, static
-admission, and cross-topology gate passes. Retain this as multi-minute
-fixed-work calibration; current promotion additionally requires a clean
-continuous/postflight trace. It is not exact M4 host-core, steady-state, or B2
-solution evidence. Peak process RSS is
-4.65/5.22/5.43 GB and the solution-bundle estimate is 101.1 MB at every rung;
-CPU allocator bytes per device are unavailable. Apply the same protocol to
-GPUs only after the shared host passes the 60-second idle/no-foreign-work gate.
+The current 32-update CPU calibration passes numerical/topology gates at
+246.702/187.307/146.524-second medians and 1.317x/1.684x speedup. It remains
+non-authoritative until repeated with continuous clean-host evidence; it is not
+exact M4-core, steady-state, or B2 acceptance evidence.
 The sustained CPU launcher now records one-second host samples through the
 worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
-blocks promotion. Add the equivalent remote GPU supervisor before the next run.
-
-The existing `101 x 77 x 77` coarse checkpoints were screened before launching
-that ladder. Three representative files match the current geometry and solver
-shape, but all normalize to `legacy_nonexact`, omit compact flux and schema-6
-Anderson state, and carry no source fingerprint. They may support a separately
-labelled warm-start diagnostic, but they cannot seed exact-restart, current-
-source, or steady-production exact-host-core evidence. That restart gate remains
-open independently of the matched two-update pilot.
+blocks promotion. The remote GPU supervisor additionally binds UUID/PCI
+identity, worker contexts, utilization, and safe own-PID timeout cleanup.
 
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
 plots remain ignored. The worker fingerprint must include package-owned frozen
 specifications before any cross-host comparison is accepted.
 
-The current GPU contract and decision are compact:
-
-| Evidence | Result | Decision |
-|---|---|---|
-| schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | current placement, exact flux replay, state replay to `2.22e-16`, conservation, linear, repeat, Gram, and Anderson gates pass | topology correctness accepted; discard shared-host timing and make no scaling claim |
-| current `256 x 67 x 67`, 96 updates, 1/2 RTX A4000 | 258.913/159.234 s, 1.626x, 81.3% efficiency, every warm sample above 120 s; numerical/topology gates pass | accepted non-idle shared-host sustained calibration; four foreign contexts block authoritative timing |
+GPU topology/replay is exact on 1/2 A4000s. The current 96-update calibration
+reports 258.913/159.234 seconds and 1.626x speedup, but foreign contexts block
+an authoritative timing claim.
 
 Every current calibration fails closed on physical repeat signatures, linear
 status/history, placement, restart, conservation, and device equivalence.
-Replay-driving state must satisfy the frozen elementwise mixed ratio
-`|delta| / (2e-9 + 2e-8 |state|) <= 1`; corrected flux uses `1e-6` absolute and
-`1e-5` relative tolerances, while the tiny harness remains exact.
 Rejected GPU variants and microprobes stay in
 `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; do not revive
 one without a new trace, frozen hypothesis, and plan revision.
@@ -550,17 +450,6 @@ Python/Pillow WebP compression, while source frames and full-quality MP4s stay
 in the checksummed release. Shared derivatives may appear on multiple pages
 without duplicating bytes.
 
-The visual backlog is evidence-ranked. The stale scaling panel, bounded
-operator-convergence gap, frozen Samper/Benchmark-A composite, exact restart,
-bounded fringing, mapped-pipe FreeMHD-profile diagnostic, and strict Votyakov
-obstacle mismatch are closed. Detailed Q2D external-diagnostic and blanket
-current/pressure composites are also closed and embedded directly on their
-owning pages. The Samper composite covers all eight high-Ha rows, mesh/order
-gates, and current/power residuals without rerunning a solver. Do not relabel
-the mapped-pipe transverse profiles as ALEX-B1 pressure evidence. Keep the
-README to at most one new concise accepted-validation composite; detailed
-evidence belongs on the owning pages.
-
 Comparison-table cells describe the named native workflow, not what could be
 implemented through arbitrary custom sources. Keep primary sources beside the
 table. The current audit uses the FreeMHD paper/source, FreeMHD2 preprint, NekRS
@@ -574,33 +463,17 @@ test-owned budget. Host source frames, full-quality media, meshes, and raw
 outputs stay in checksummed releases. Put provenance and acceptance status
 beside every asset.
 
-The README now displays three 7-second dynamics loops directly: an accepted
-side-by-side Hunt/Shercliff startup comparison plus research-stage blanket and
-Q2D flows. The duct comparison samples 35 paired physical frames at 5 fps from
-current 200-step sources (`934c9aea...` Hunt and `3188bd21...` Shercliff); the
-other loops use 42 physical frames. No solver-state interpolation or synthetic
-motion is involved. Full-quality sources remain outside Git.
+Current README/docs media already covers accepted ducts and analytical/FreeMHD
+comparisons plus research-stage blanket, Q2D, curved-pipe, fringing, obstacle,
+restart, autodiff, and scaling results. All media is directly embedded and the
+20 tracked derivatives remain below the 1.25 MiB cap. Do not create a B2 movie
+from bounded or rejected trajectories, relabel mapped-pipe profiles as ALEX-B1
+evidence, or add media without a new accepted physical result.
 
-The solver-free curved-pipe documentation tranche is complete: a 94,236-byte
-release-hosted WebP derives from the accepted bent-pipe overview and Dean
-comparison stills, and the README labels it a low-De inductionless baseline
-with Dean-vortex physics staged. No solver was rerun and no tracked media was
-added. Do not create a B2 movie from the bounded smoke or rejected coarse
-trajectories.
-
-The documentation source is now self-contained. The Hunt/Shercliff, blanket,
-and Q2D animations replace link-only posters and redundant tracked MP4s; all
-20 tracked derivatives, including the detailed Q2D and blanket composites,
-total 1,268,448 bytes, below the 1.25 MiB media cap. The closed-channel
-derivative now combines the released Ha=20/100 analytical ladder with accepted
-FreeMHD observables under its existing filename; no solver or new tracked file
-was needed. Read the Docs still serves the
-2026-05-01 build at `6be8622`. Build `33554636` failed with `commit: None` and
-Git exit 128 because the builder had no credentials to clone the private GitHub
-repository; the active repository webhook's latest response is HTTP 406. An
-account owner must reconnect the Read the Docs GitHub authorization, then build
-`be3ee82`. This is not a Sphinx or repository-configuration defect. Do not add
-another movie until an accepted physical trajectory exists.
+Read the Docs deployment remains externally blocked by stale GitHub
+authorization (clone exit 128/webhook 406); reconnect it before release. The
+local strict Sphinx build is green, so do not change repository configuration
+to mask that account-level failure.
 
 ## Release gate
 

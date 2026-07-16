@@ -281,34 +281,33 @@ def _solver_scaling_bundle(shape=(4, 4, 4), *, signature=True, charge=1.0e-6):
 def _sustained_ladder(counts, backend="cpu"):
     records = []
     for count in counts:
-        warm = 488.0 / count
+        warm, cold = 488.0 / count, 20.0 / count
         samples = [warm - 1.0 / count, warm, warm + 1.0 / count]
-        monitored = 20.0 / count + sum(samples)
+        monitored = cold + sum(samples)
         record = _worker_record(backend=backend, num_devices=count, repeats=4,
             device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
-            cold_seconds=20.0 / count, warm_seconds=warm, mean_seconds=warm,
+            cold_seconds=cold, warm_seconds=warm, mean_seconds=warm,
             benchmark_kind="matched_b2_smoke", operator_path="solve_extruded_inductionless",
             memory_bytes_estimate=2**21, spatially_sharded=count > 1,
             global_shard_count=count, velocity_l2=3.0, potential_l2=2.0,
             current_l2=1.0, validation_passed=True)
-        records.append({**record.__dict__, "source_fingerprint": "source", "source_commit": "commit",
-            "input_sha256": "input", "evaluator_sha256": "evaluator",
-            "precision": "float64", "jaxlib_version": "0.x", "solvax_version": "0.x",
+        records.append({**record.__dict__, "source_fingerprint": "source",
+            "source_commit": "commit", "input_sha256": "input",
+            "evaluator_sha256": "evaluator", "precision": "float64",
+            "jaxlib_version": "0.x", "solvax_version": "0.x",
             "peak_host_rss_bytes": 2**22, "resource_environment_verified": True,
             "device_memory": ([{"peak_bytes_in_use": 1024} for _ in range(count)]
                 if backend == "gpu" else []),
             "acceptance_role": "sustained-candidate", "minimum_warm_seconds": 120.0,
             "sustained_minimum_warm_seconds": 120.0, "warm_samples_seconds": samples,
             "timing_contract": run_strong_scaling_worker._B2_TIMING_CONTRACT,
-            "resource_monitoring": {"schema_version": 2,
-                "scope": "continuous-and-postflight", "backend": backend, "num_devices": count,
+            "resource_monitoring": {"schema_version": 2, "scope": "continuous-and-postflight",
+                "backend": backend, "num_devices": count,
                 "verified": True, "raw_sha256": "a" * 64, "source_fingerprint": "source",
                 "sample_period_seconds": 2.0, "max_sample_gap_seconds": 2.0,
-                "monitored_worker_seconds": monitored,
-                "monitor_started_unix_seconds": 99.0, "worker_started_unix_seconds": 100.0,
-                "worker_ended_unix_seconds": 100.0 + monitored,
-                "monitor_ended_unix_seconds": 115.0 + monitored,
-                "postflight_seconds": 15.0, "violation_count": 0},
+                "monitored_worker_seconds": monitored, "monitor_started_unix_seconds": 99.0,
+                "worker_started_unix_seconds": 100.0, "worker_ended_unix_seconds": 100.0 + monitored,
+                "monitor_ended_unix_seconds": 115.0 + monitored, "postflight_seconds": 15.0, "violation_count": 0},
             "requested_duration_passed": True, "sustained_duration_passed": True,
             "sustained_timing_eligible": True, "timed_signature_excluded": True})
     return records
@@ -323,40 +322,36 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
         "--cpu-nx", "16", "--worker-timeout", "45", "--source-commit", "abc"]
     assert strong_scaling_demo.main(arguments) == 0
-    assert options["cpu_problem"] == (16, 7, 7) and options["gpu_problem"] == (8, 7, 7)
+    assert (options["cpu_problem"], options["gpu_problem"]) == ((16, 7, 7), (8, 7, 7))
     assert options["timeout_seconds"] == 45.0 and options["source_commit"] == "abc"
     assert options["cpu_iterations"] == options["gpu_iterations"] == 2
     assert strong_scaling_demo.main([*arguments, "--iterations", "6", "--minimum-warm-seconds", "120"]) == 0
     assert (options["cpu_iterations"], options["gpu_iterations"], options["minimum_warm_seconds"]) == (6, 6, 120.0)
     assert strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke", "--sustained"]) == 0
     assert options["cpu_problem"] == options["gpu_problem"] == (256, 67, 67)
-    assert (options["cpu_iterations"], options["gpu_iterations"], options["repeats"]) == (32, 96, 4)
-    assert options["minimum_warm_seconds"] == 120.0 and options["timeout_seconds"] == 1800.0
+    assert (options["cpu_iterations"], options["gpu_iterations"], options["repeats"],
+        options["minimum_warm_seconds"], options["timeout_seconds"]) == (32, 96, 4, 120.0, 1800.0)
 
 
 def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) -> None:
     output = tmp_path / "record.json"
     output.write_text("{}")
     commands: list[list[str]] = []
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run",
-        lambda command, **kwargs: commands.append(command))
-
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda command, **kwargs: commands.append(command))
     strong_scaling_demo._run_worker(
         python_executable="python", repo_root=tmp_path, output_path=output,
         platform="CPU", benchmark_kind="extruded_solve", nx=8, num_devices=2,
         ny=6, nz=4, iterations=3, repeats=1, restart_path=tmp_path / "restart.npz")
-
     assert commands[0][-2:] == ["--restart", str(tmp_path / "restart.npz")]
-    strong_scaling_demo._run_worker(
-        python_executable="python", repo_root=tmp_path, output_path=output,
-        platform="CPU", benchmark_kind="matched_b2_smoke", nx=None, num_devices=1,
-        ny=7, nz=7, iterations=6, repeats=4,
+    strong_scaling_demo._run_worker(python_executable="python", repo_root=tmp_path,
+        output_path=output, platform="CPU", benchmark_kind="matched_b2_smoke", nx=None,
+        num_devices=1, ny=7, nz=7, iterations=6, repeats=4,
         matched_input=tmp_path / "input.json", evaluator=tmp_path / "evaluator.json",
         minimum_warm_seconds=120.0)
     assert {commands[1][commands[1].index(flag) + 1] for flag in ("--matched-input", "--evaluator")} == {
             str(tmp_path / "input.json"), str(tmp_path / "evaluator.json")}
-    assert commands[1][commands[1].index("--iterations") + 1] == "6"
-    assert commands[1][commands[1].index("--minimum-warm-seconds") + 1] == "120.0"
+    assert tuple(commands[1][commands[1].index(flag) + 1] for flag in
+        ("--iterations", "--minimum-warm-seconds")) == ("6", "120.0")
     monkeypatch.setenv("XLA_FLAGS", "--xla_dump_to=/tmp/lmx-safe --xla_cpu_multi_thread_eigen=true")
     env = strong_scaling_demo._forced_cpu_environment(2)
     assert "--xla_dump_to=/tmp/lmx-safe" in env["XLA_FLAGS"]
@@ -378,6 +373,27 @@ def test_cpu_monitor_emits_fast_fail_closed_evidence(tmp_path: Path, monkeypatch
     assert code == 0 and not timed_out and evidence["verified"] and raw.stat().st_size
 
 
+def test_gpu_monitor_parses_remote_identity_and_worker_context(tmp_path: Path, monkeypatch) -> None:
+    original, holder = strong_scaling_demo.subprocess.Popen, {}
+    def popen(*args, **kwargs):
+        holder["process"] = original([sys.executable, "-c", "import time; time.sleep(.03)"])
+        return holder["process"]
+    def probe(*args, **kwargs):
+        context = "uuid-1, 777, python, 100\n" if holder["process"].poll() is None else ""
+        return SimpleNamespace(stdout=("__META__ 777 888\n1, uuid-1, "
+            "00000000:65:00.0, 0, 100\n__CONTEXTS__\n" + context
+            + "__PROCESSES__\n777 1 1.0 python\n888 1 0.0 sh\n"))
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "Popen", popen)
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", probe)
+    for name, value in (("_MONITOR_SAMPLE_SECONDS", 0.005), ("_MONITOR_POSTFLIGHT_SECONDS", 0.015)):
+        monkeypatch.setattr(strong_scaling_demo, name, value)
+    code, evidence, timed_out = strong_scaling_demo._run_monitored_gpu_worker(
+        "office", "worker", remote_pid_path="/tmp/worker.pid",
+        raw_path=tmp_path / "gpu.monitor.jsonl", num_devices=1, timeout_seconds=1,
+        environment={"visible_devices": ["1"], "gpu_identities": [{"uuid": "uuid-1", "pci_bus_id": "65:00.0"}]})
+    assert code == 0 and not timed_out and evidence["verified"]
+
+
 def test_matched_scaling_worker_rejects_step_contract_mismatch(tmp_path: Path):
     matched_input = tmp_path / "matched.json"
     run_freemhd_parity_suite.materialize_matched_b2_lmx_input(matched_input, executed_steps=6)
@@ -388,10 +404,8 @@ def test_matched_scaling_worker_rejects_step_contract_mismatch(tmp_path: Path):
         run_strong_scaling_worker._matched_b2_smoke_benchmark(matched_input, evaluator,
             repeats=4, num_devices=1, iterations=2)
     with pytest.raises(ValueError, match="minimum_warm_seconds"):
-        run_strong_scaling_worker._matched_b2_smoke_benchmark(
-            matched_input, evaluator, repeats=4, num_devices=1, iterations=6,
-            minimum_warm_seconds=-1.0,
-        )
+        run_strong_scaling_worker._matched_b2_smoke_benchmark(matched_input, evaluator,
+            repeats=4, num_devices=1, iterations=6, minimum_warm_seconds=-1.0)
 
 
 def test_sustained_scaling_requires_predeclared_multiminute_samples():
@@ -432,30 +446,13 @@ def test_write_scaling_report_writes_json(tmp_path: Path):
 
 
 def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path):
-    baseline = StrongScalingRecord(
-        backend="cpu",
-        device_kind="cpu",
-        num_devices=1,
-        nx=8,
-        ny=6,
-        nz=4,
-        iterations=5,
-        repeats=2,
-        cold_seconds=11.0,
-        warm_seconds=10.0,
-        mean_seconds=10.5,
-        python_version="3.12",
-        jax_version="0.test",
-        benchmark_kind="extruded_solve",
-        operator_path="solve_extruded_inductionless",
-        total_cells=192,
-        cell_updates=960,
-        warm_cell_updates_per_second=96.0,
-        memory_bytes_estimate=2 * 1024 * 1024,
-        profile_path="profiles/cpu_1",
-        velocity_l2=3.0,
-        potential_l2=2.0,
-        current_l2=1.0,
+    baseline = _worker_record(
+        nx=8, ny=6, nz=4, cold_seconds=11.0, warm_seconds=10.0,
+        mean_seconds=10.5, python_version="3.12", jax_version="0.test",
+        benchmark_kind="extruded_solve", operator_path="solve_extruded_inductionless",
+        total_cells=192, cell_updates=960, warm_cell_updates_per_second=96.0,
+        memory_bytes_estimate=2 * 1024 * 1024, profile_path="profiles/cpu_1",
+        velocity_l2=3.0, potential_l2=2.0, current_l2=1.0,
         validation_passed=True,
     )
     two_device = {
@@ -473,7 +470,6 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     table = write_strong_scaling_summary_table(
         [baseline_record, two_device], tmp_path / "strong_scaling_table.csv"
     )
-
     assert summary["validation_status"] == "solver_faithful_records_present"
     assert summary["solver_faithful_record_count"] == 2
     assert summary["profiled_record_count"] == 1
