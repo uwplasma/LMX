@@ -142,14 +142,15 @@ Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
 the promotion gate. On affinity-controlled physical CPUs, 32-update warm
 trajectories last 148–246 s and reach 1.396×/1.658× on four/eight versus two
 CPUs; confidence, efficiency, restart, and physics gates pass. This is accepted
-fixed-work CPU strong scaling, not steady-state evidence. Two-GPU topology is
-current; sustained GPU timing awaits an idle host.
+fixed-work CPU strong scaling, not steady-state evidence. A 96-update shared-host
+GPU calibration reaches 1.626× on two A4000s with 159–259 s warm trajectories;
+foreign GPU contexts keep the authoritative timing claim open.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation
 
-The portable gate records **849 passing tests**, **95.33% combined line/branch
-coverage**, and **143.0 s** on six Apple-Silicon workers.
+The portable gate records **856 passing tests**, **95.33% combined line/branch
+coverage**, and **181.0 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

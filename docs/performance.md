@@ -7,20 +7,21 @@ devices alone is not evidence of parallel execution.
 ![Current B2 schema-6 calibration and sustained physical-CPU scaling](_static/strong_scaling.webp)
 
 This composite is generated from the accepted schema-6 CPU record. The upper
-panel is forced-device calibration; the lower panel is accepted sustained
-fixed-work scaling on affinity-controlled 2/4/8 CPUs. Current one/two-GPU
-topology is green but omitted because the shared host has not yet passed the
-idle gate for timing.
+panel is forced-device calibration; the middle panel is accepted sustained
+fixed-work scaling on affinity-controlled 2/4/8 CPUs; the lower panel is a
+multi-minute one/two-GPU shared-host calibration. GPU correctness is green, but
+the timing claim remains open because foreign contexts fail the idle gate.
 
 ## Current evidence
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 849 pass, 8 skip, 95.33% combined line/branch coverage, 143.0 s | timing delta treated as host variance; below five-minute target |
+| portable test gate | Apple M4, six workers | 856 pass, 8 skip, 95.33% combined line/branch coverage, 181.0 s | below five-minute target and one third of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 physical-core confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; not sustained or steady-production scaling |
 | B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 245.465/175.837/148.026 s; 1.396x/1.658x; 95% lower bounds 1.378x/1.655x; efficiency 69.8%/41.5%; CV below 0.71% | accepted fixed-work physical-CPU strong scaling; not steady-state evidence |
+| B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; 95% interval 1.626x–1.636x; efficiency 81.3%; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | physical-core restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
@@ -49,6 +50,12 @@ electric phases. Reusing the existing host station payload for validation cuts
 the two-GPU end-to-end median by 0.290 s and removes 12 source lines, but the
 remaining post-map transfer tail leaves the result below 1.2x. The fixed-grid
 ladder therefore stops without a larger run or production-speed claim.
+The later 96-update sustained GPU lane uses the current mixed replay contract
+and supersedes that conclusion only as a shared-host calibration: every warm
+trajectory lasts 158--259 s, one/two-GPU topology agrees, and the median ratio
+is 1.626x. Four persistent external service contexts were present before and
+after the run, so this result is visible but not promoted to authoritative GPU
+strong scaling.
 The large deterministic probe isolated restart variation to corrected face
 flux (`4.40e-6` relative). A three-update trajectory preserved every primary
 field exactly and reduced the flux difference to `6.25e-7`, within the frozen
@@ -397,7 +404,7 @@ than silently reused.
 
 ## Next performance work
 
-1. Run the same 120-second minimum protocol on one/two GPUs after the host passes the idle gate.
+1. Repeat the passing 96-update one/two-GPU lane after the host passes the idle gate.
 2. Compare six tiny Anderson updates with the fixed-relaxation control.
 3. If that passes, run the bounded step-29 then strict step-96 outcome gates.
 4. Close canonical coarse/medium/fine and experimental-observable acceptance.

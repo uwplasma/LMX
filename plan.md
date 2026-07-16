@@ -15,7 +15,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised schema-6 source `05a6f41`.
+The latest complete portable gate exercised replay-audit source `78858f5`.
 CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
@@ -36,8 +36,10 @@ topology, explicit component placement, and exact serialized replay pass on
 one and two GPUs; shared-host timing is excluded. The affinity-controlled
 physical-CPU path now passes accepted 32-update sustained scaling: every warm
 trajectory lasts 147--246 s, speedup is 1.396x/1.658x on 4/8 versus 2 CPUs,
-and all confidence, efficiency, restart, and physics gates pass. Sustained GPU
-scaling remains open pending the idle-host gate. The fixed-work harness accepts
+and all confidence, efficiency, restart, and physics gates pass. A 96-update
+one/two-A4000 lane also passes 158--259 s duration, numerical, restart, and
+topology gates with 1.626x shared-host speedup, but persistent foreign contexts
+keep authoritative GPU scaling open. The fixed-work harness accepts
 an explicit update count, checkpoints at the deterministic midpoint, replays
 the remaining trajectory, and can require every warm sample to exceed 120 s;
 the two-update default remains the bounded CI/debug gate. This
@@ -181,8 +183,8 @@ lines. These readable contracts remain inside every architecture ceiling, but
 they require an ownership-slimming pass after the parallel algorithm settles;
 do not hide the increase through dense formatting.
 
-The portable-gate artifact keyed to `4eb1f63` records 849 passes, 8 expected
-external-data skips, 95.3283% combined line/branch coverage, and 143.0 seconds on
+The portable-gate artifact keyed to `78858f5` records 856 passes, 8 expected
+external-data skips, 95.3337% combined line/branch coverage, and 181.0 seconds on
 the reference Apple M4. It is 7.9% faster than the prior 152.8-second record,
 but source and tests both changed, so the shared-host delta is not a speed claim.
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
@@ -405,11 +407,13 @@ The current GPU contract and decision are compact:
 | schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | current placement, exact flux replay, state replay to `2.22e-16`, conservation, linear, repeat, Gram, and Anderson gates pass | topology correctness accepted; discard shared-host timing and make no scaling claim |
 | `128 x 67 x 67`, 1/2 RTX A4000 | 2.780/2.400 s, CV below 1.2%, 1.159x end-to-end and 1.510x core-phase speedup | misses the 1.2x promotion gate; retain the smaller validation fusion and stop |
 | historical `256 x 67 x 67` | 8.474/7.534 s, CV below 3.7%, 1.125x | diagnostic only; no larger rung |
+| current `256 x 67 x 67`, 96 updates, 1/2 RTX A4000 | 258.913/159.234 s, 1.626x, 81.3% efficiency, every warm sample above 120 s; numerical/topology gates pass | accepted shared-idle-host sustained calibration; four foreign contexts block authoritative timing |
 
 Every current calibration fails closed on physical repeat signatures, linear
 status/history, placement, restart, conservation, and device equivalence.
-Nonflux restart state must agree within `1e-12`; corrected flux uses `1e-6`
-absolute and `1e-5` relative tolerances, while the tiny harness remains exact.
+Replay-driving state must satisfy the frozen elementwise mixed ratio
+`|delta| / (2e-9 + 2e-8 |state|) <= 1`; corrected flux uses `1e-6` absolute and
+`1e-5` relative tolerances, while the tiny harness remains exact.
 The compiler trace attributes the remaining cost to transverse PCR work and
 post-map host transfers, not collectives; communication tuning therefore stops.
 
@@ -524,8 +528,8 @@ The next validation sequence is fail-closed:
    sustained `tau_map=0.005` passes plus exact replay and the frozen pressure,
    velocity, pressure-gradient, linear, conservation, and sharding limits;
 5. only then authorize a fresh canonical coarse schema-6 run. Medium/fine,
-   production FreeMHD, sustained GPU timing, and steady-production scaling
-   remain blocked.
+   production FreeMHD, authoritative idle-host GPU timing, and steady-production
+   scaling remain blocked.
 
 Failure at any rung stops before a coarse run and retains fixed relaxation two
 as the historical control. After the parallel algorithm settles, consolidate

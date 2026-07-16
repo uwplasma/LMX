@@ -1,5 +1,5 @@
 {
-  "schema_version": 8,
+  "schema_version": 9,
   "date": "2026-07-16",
   "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -98,6 +98,68 @@
       "raw_sha256": "47c9615efceea9c8640a615865db01b38309d82f2a5d7d7e0fc560ff2c964a5d"
     },
     "decision": "Explicit stacked-flux component placement passes current 1/2/4-CPU and 1/2-GPU topology, schema-6 replay, conservation, linear, and repeat gates. The shared-host two-GPU timing is excluded; no scaling claim."
+  },
+  "sustained_shared_host_calibration": {
+    "acceptance_role": "sustained-calibration-only",
+    "source_commit": "78858f5597102ffe0b3b0c60a5c1efd7bab00a94",
+    "source_fingerprint": "c5bc45d7a0025f3c5c13ba14da3cf4bd0714909ac7bf1c4bd69f8b8a694ecf88",
+    "environment": {
+      "hardware": "1/2 NVIDIA RTX A4000, shared host without NVLink",
+      "python": "3.10.12",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "solvax": "0.8.4",
+      "precision": "float64",
+      "pre_run_utilization_percent": [0, 0],
+      "foreign_contexts": "four persistent stellarator_venv Python services reserving 162--166 MiB per GPU",
+      "authoritative_idle_gate": false
+    },
+    "problem": {
+      "shape": [256, 67, 67],
+      "cells": 1149184,
+      "updates_per_trajectory": 96,
+      "cell_updates_per_trajectory": 110321664,
+      "repeats": 4,
+      "measured_warm_samples": 3,
+      "minimum_warm_seconds": 120.0,
+      "input_sha256": "88e3a99d4add7bce94026e6e8f941e8ae81be295d0e7ddea8b0afc73a7d2cdd2",
+      "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
+    },
+    "duration_pilot": {
+      "updates": 48,
+      "two_gpu_warm_samples_seconds": [75.00400998897385, 75.12051750603132, 75.24430281098466],
+      "decision": "reject: every warm trajectory must be at least 120 seconds"
+    },
+    "runs": {
+      "1": {"visible_gpu": 1, "cold_seconds": 290.7827777810162, "warm_samples_seconds": [258.9126915970119, 258.9016204390209, 258.93602094997186], "warm_median_seconds": 258.9126915970119, "warm_cv": 5.537716954247372e-5, "speedup": 1.0, "parallel_efficiency": 1.0, "validation_passed": true, "restart_state_tolerance_ratio": 0.3212978451384472, "restart_flux_relative_l2": 5.3323850569168306e-12},
+      "2": {"visible_gpus": [0, 1], "cold_seconds": 192.64098487608135, "warm_samples_seconds": [158.28272578003816, 159.2580505310325, 159.23386372206733], "warm_median_seconds": 159.23386372206733, "warm_cv": 0.0028578216376772135, "speedup": 1.625990135169537, "speedup_ci95": [1.625673675997762, 1.6359082753591776], "parallel_efficiency": 0.8129950675847685, "validation_passed": true, "restart_state_tolerance_ratio": 0.1468145898345856, "restart_flux_relative_l2": 4.854265229185998e-12}
+    },
+    "equivalence": {
+      "velocity_l2_max_abs": 1.9503886505845003e-8,
+      "potential_l2_max_abs": 3.2781827030703425e-8,
+      "current_l2_max_abs": 8.507849997840822e-7,
+      "pressure_observable_max_abs": 1.592804154629951e-11,
+      "courant_mean_max_abs": 5.0381519702685784e-18,
+      "courant_max_abs": 1.3961610188274742e-14,
+      "anderson_gram_max_abs": 1.0470086169583892e-14,
+      "anderson_weights_max_abs": 6.913158934196417e-11,
+      "absolute_tolerance": 2e-9,
+      "relative_tolerance": 2e-8,
+      "passed": true
+    },
+    "gates": {
+      "minimum_duration": true,
+      "timing_stability": true,
+      "schema6_and_physics": true,
+      "mixed_restart_replay": true,
+      "placement": true,
+      "cross_topology": true,
+      "speedup_ci95_lower_at_least_1.2": true,
+      "parallel_efficiency_at_least_0.6": true,
+      "authoritative_idle_host": false,
+      "timing_claim": false
+    },
+    "classification": "accepted multi-minute shared-idle-host calibration; authoritative GPU strong scaling remains open"
   },
   "restart_gate": {
     "deterministic_evidence_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
@@ -321,13 +383,17 @@
     "doubled_axial_speedup_at_least_1.2": false,
     "current_trace_validation_and_equivalence": true,
     "current_warm_cv_below_0.05": true,
-    "current_speedup_at_least_1.2": false
+    "current_speedup_at_least_1.2": false,
+    "sustained_shared_host_validation_and_equivalence": true,
+    "sustained_shared_host_warm_cv_below_0.05": true,
+    "sustained_shared_host_speedup_at_least_1.2": true,
+    "sustained_authoritative_idle_gate": false
   },
   "interpretation": {
     "bounded_fast_scaling_calibration": false,
     "initial_two_update_speedup": 0.9677731284771768,
     "production_speedup_claim": false,
-    "reason": "The current trace-authorized validation fusion passes every correctness gate, removes 12 source lines, and raises fixed-grid speedup to 1.159x. It remains below the 1.2x promotion threshold, so the ladder stops without a larger run or production claim."
+    "reason": "The current trace-authorized short calibration remains below 1.2x. A 96-update multi-minute shared-idle-host calibration reaches 1.626x with all numerical gates green, but four persistent foreign GPU contexts fail the authoritative idle-host gate, so no production timing claim is made."
   },
   "raw_assets": {
     "location": "/Users/rogerio/local/tests/lmx_b2_gpu_scaling_413185a and office GPU host",
@@ -340,6 +406,9 @@
     "gpu1_deterministic_sha256": "2bd5904ee219429a3bee1b06c5a56eb23536713265664d1f36b658dc6aaaf6bf",
     "gpu2_deterministic_sha256": "e974d6de10d36c39f94b552490e08abaa5281c4ec90f4fdce70a365c0d0263ba",
     "restart_relative_probe_sha256": "6cb74ac7f3e99b63b0018c5a86ef1d884bf5370730831ef4da659e8d7afffbbc",
-    "trajectory_probe_sha256": "ece54a6f1d87898ac85a7e6f9dfc93f4a4561a3653a7acd541fbd4b2418952f4"
+    "trajectory_probe_sha256": "ece54a6f1d87898ac85a7e6f9dfc93f4a4561a3653a7acd541fbd4b2418952f4",
+    "sustained_gpu_worker_sha256": {"1": "25f3d21939a43a21b1d786f3ae0c63483008b8f305e78b0b70e71f8a8102519b", "2": "ccfefb311fc765288592ae83a027f01839cb867a6037b8f6e164442ecf4283"},
+    "sustained_input_sha256": "88e3a99d4add7bce94026e6e8f941e8ae81be295d0e7ddea8b0afc73a7d2cdd2",
+    "sustained_idle_snapshot_sha256": "c065eeeb41773ce1e797327477593c5511813fe96171fb2ec95bca3dcc13a893"
   }
 }
