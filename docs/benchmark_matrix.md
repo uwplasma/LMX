@@ -105,9 +105,11 @@ tight variant is preserved at a durable 48-update checkpoint with residual
 `3.4770e-5`, above the `2.5e-5` target. Bounded scalar probes either plateaued
 or oscillated, and componentwise Aitken diverged. The fine curve also misses all
 three frozen ALEX literature limits (weighted RMS `1.389`, weighted maximum
-`4.218`, integrated error `0.251`). Fine numerical independence remains open;
-the tiny matched-FreeMHD smoke is complete, while production-mesh FreeMHD and
-observable/model normalization are the next validation priority.
+`4.218`, integrated error `0.251`). Fine numerical independence remains open.
+The tiny matched-FreeMHD smoke is complete; the next prerequisite is the
+bounded schema-6 depth-two Anderson field/flux gate, while production-mesh
+FreeMHD and observable/model normalization remain blocked until the current
+coarse formulation converges.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

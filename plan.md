@@ -197,8 +197,8 @@ validation documentation.
 
 ## Priority 1: matched B2 smoke — complete
 
-The record keyed to LMX `45bff84` and the pinned FreeMHD source runs two fixed
-Euler updates in 3.32 seconds on one JAX device and 6.76 seconds on two native
+The record keyed to LMX `0ab33b2` and the pinned FreeMHD source runs two fixed
+Euler updates in 4.443 seconds on one JAX device and 7.467 seconds on two native
 FreeMHD MPI ranks. Restart, mass/current closure, interface-current activity,
 and Courant gates pass. Cross-code normalized pressure differences are 0.00452
 RMS and 0.01092 maximum, within the frozen 0.16 and 0.32 smoke limits.

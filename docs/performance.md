@@ -166,10 +166,12 @@ The fine curve has weighted RMS `1.389`, weighted maximum `4.218`, and
 integrated pressure error `0.251`, missing the frozen ALEX limits `1.0`, `2.0`,
 and `0.10`. A directional comparison to the accepted medium curve changes by
 `0.0319`, above the `0.02` mesh gate; the records have different source
-fingerprints, so this is diagnosis rather than formal acceptance. Exact-case
-FreeMHD and observable/model normalization now take priority over another outer
-acceleration search. Fine numerical independence and experimental acceptance
-remain open.
+fingerprints, so this is diagnosis rather than formal acceptance. Publishing
+the already-green SOLVAX Anderson-weight API and proving the bounded schema-6
+depth-two field/flux path now take priority. Production-mesh FreeMHD,
+observable/model normalization, fine numerical independence, and experimental
+acceptance remain blocked until the current coarse formulation converges for
+the correct reason.
 Enabling an axial line block across the sharded dimension was rejected: the
 same two updates took 209.75 rather than 109.18 seconds, with unchanged 1,200-
 iteration electric solves and equivalent residuals.
