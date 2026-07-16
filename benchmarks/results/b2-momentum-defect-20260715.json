@@ -230,6 +230,55 @@
     },
     "status": "rejected-stop-before-step-29"
   },
+  "bounded_weight_fallback_cold_gate": {
+    "execution_commit": "a619387fd62ca73d5d94bf873250f3ee30599039",
+    "shape": [7, 7, 7],
+    "updates": 6,
+    "mechanism": "SOLVAX max_abs_weight=4 newest-map fallback",
+    "candidate_normalized_map_rate": [
+      0.0000017835901644502883,
+      0.11481305691407595,
+      0.11484104370373949,
+      0.11482174652921451,
+      0.11477491136790974,
+      0.11471811430840972
+    ],
+    "fixed_relaxation_2_normalized_map_rate": [
+      0.0000017835901644502883,
+      0.11481305691407595,
+      0.11490193268137716,
+      0.11470296976456851,
+      0.11460443809230281,
+      0.11446639144585546
+    ],
+    "final_map_rate_relative_gain": -0.002199098437320135,
+    "raw_weight_max_abs": 248.05066159258283,
+    "applied_weights": [
+      [-0.000018748664569079892, 1.0000187486645689],
+      [0.0, 1.0],
+      [0.0, 1.0],
+      [0.0, 1.0],
+      [0.0, 1.0]
+    ],
+    "applied_weight_max_abs": 1.0000187486645689,
+    "weight_sum_max_abs": 2.220446049250313E-16,
+    "max_component_balance": 1.0361134172853781E-10,
+    "max_electric_local_residual": 1.0350146958235378E-10,
+    "serialized_replay_max_abs": {
+      "candidate": 0.0,
+      "fixed_relaxation_2": 0.0
+    },
+    "gates": {
+      "same_first_update": true,
+      "linear": true,
+      "conservation": true,
+      "serialized_replay": true,
+      "map_rate_not_worse_than_control": false,
+      "map_rate_gain_at_least_15_percent": false,
+      "stable_weights": true
+    },
+    "status": "rejected-no-solvax-or-lmx-api-change"
+  },
   "normalized_map_outcome_study": {
     "shape": [7, 7, 7],
     "sustained_passes": 3,
@@ -294,7 +343,7 @@
     "pseudotime_safety_frozen": true,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "design one bounded acceleration candidate with a stability mechanism; do not tune the rejected depth-two configuration or proceed to step 29",
+    "next_gate": "derive any new acceleration candidate from a residual-spectrum audit and predeclare its globalization rule; do not add the rejected bounded fallback, tune either failed depth-two configuration, or proceed to step 29",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,

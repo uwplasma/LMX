@@ -90,7 +90,9 @@ The default coupling remains unaccelerated for backward compatibility. Set
 SOLVAX accelerator. The compatible SOLVAX scalar Aitken update is useful for a
 single dominant slow mode. Bounded-memory Anderson mixing is available, but
 the current depth-two B2 configuration fails its six-update cold outcome gate
-and is not a promoted production choice. LMX checks the
+and is not a promoted production choice. A bounded newest-map fallback also
+fails the required acceleration gain despite stable coefficients and exact
+replay, so it is not exposed as an unused option. LMX checks the
 **unaccelerated** residual `max(abs(G(u)-u))` and the change across outer steady
 states, so neither relaxation nor a converged inner subsystem can manufacture
 a false steady pass. Tolerance-controlled potential CG reuses the previous

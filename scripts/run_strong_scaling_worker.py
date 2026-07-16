@@ -45,6 +45,7 @@ _B2_REPEAT_ATOL = 2.0e-9
 _B2_REPEAT_RTOL = 2.0e-8
 _B2_PROFILE_ITERATION_ATOL = 3
 _B2_SUSTAINED_WARM_SECONDS = 120.0
+_B2_SUSTAINED_WARM_SAMPLES = 3
 _B2_FIELD_NAMES = (
     "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus", "rho_phi_inlet"
 )
@@ -62,7 +63,7 @@ def _sustained_timing_passed(
 
     samples = np.asarray(warm_samples, dtype=float)
     return bool(
-        samples.size
+        samples.size >= _B2_SUSTAINED_WARM_SAMPLES
         and minimum_warm_seconds >= _B2_SUSTAINED_WARM_SECONDS
         and np.all(samples >= _B2_SUSTAINED_WARM_SECONDS)
     )

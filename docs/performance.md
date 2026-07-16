@@ -27,7 +27,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | CPU-allocation restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
-| B2 acceleration gate | Apple M4, cold `7 x 7 x 7`, six updates | Anderson depth 2 ends at `0.5281` map rate vs `0.1145` for fixed relaxation 2; `max|weight|=24.39`; linear, conservation, and replay pass | rejected before step 29; design one bounded stability mechanism |
+| B2 acceleration gates | Apple M4, cold `7 x 7 x 7`, six updates | raw Anderson ends at `0.5281` with `max|weight|=24.39`; bounded fallback ends at `0.114718` vs `0.114466` control; linear, conservation, and replay pass | both rejected before step 29; no unused fallback API added |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
 | B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7` | current schema-6 placement, replay, conservation, linear, and repeat gates pass; two-GPU state error `2.22e-16`, flux exact | topology correctness only; shared-host timing excluded |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
@@ -42,7 +42,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-![B2 field, pressure, and rejected Anderson depth-two acceleration gate](_static/readme-alex-b2-field-pressure.webp)
+![B2 field, pressure, and rejected raw and bounded acceleration gates](_static/readme-alex-b2-field-pressure.webp)
 
 The six-update gate is intentionally small: it rejects the accelerator before
 the step-29 trajectory while preserving exact restart and physics diagnostics.
@@ -245,7 +245,9 @@ and `0.10`. A directional comparison to the accepted medium curve changes by
 fingerprints, so this is diagnosis rather than formal acceptance. The released
 SOLVAX Anderson-weight API and bounded schema-6 depth-two field/flux path pass
 CPU and 1/2-GPU topology and exact-replay gates, but the current cold outcome
-gate rejects it for B2 acceleration. Production-mesh FreeMHD,
+gate rejects it for B2 acceleration. The bounded fallback passes safety but
+ends 0.22% worse than fixed relaxation two, so no unused API is added.
+Production-mesh FreeMHD,
 observable/model normalization, fine numerical independence, and experimental
 acceptance remain blocked until the current coarse formulation converges for
 the correct reason.
@@ -331,8 +333,9 @@ python scripts/run_strong_scaling_worker.py --help
 
 The matched-B2 worker keeps two updates as its fast debug/CI default. Such runs
 can verify numerics but are never scaling evidence. A sustained record must
-predeclare a 120-second minimum and every warm trajectory must meet it; direct
-and midpoint-restart paths must still finish identically. The accepted workload
+predeclare a two-minute minimum, run one cold plus at least three warm
+trajectories per rung, and require every warm trajectory to meet it; direct and
+midpoint-restart paths must still finish identically. The accepted workload
 uses 32 CPU updates and 96 GPU updates:
 
 ```bash
@@ -376,7 +379,8 @@ pass the same gates.
 A publishable strong-scaling record contains:
 
 - fixed global grid, physics, tolerance, precision, and update count;
-- a predeclared 120-second minimum met by every warm trajectory;
+- one cold plus at least three warm trajectories per rung, with a predeclared
+  two-minute minimum met by every warm trajectory;
 - backend, device model, device count, JAX version, and source fingerprint;
 - cold time, warm time, throughput, speedup, and parallel efficiency;
 - compilation separated from repeated execution;
@@ -419,9 +423,10 @@ than silently reused.
 ## Next performance work
 
 1. Repeat the passing 96-update one/two-GPU lane after the host passes the idle gate.
-2. Design one bounded acceleration stability mechanism; do not tune the rejected
-   depth-two configuration.
-3. Reapply the six-update cold gate; only a pass can authorize step 29 and 96.
+2. Audit the B2 residual spectrum before proposing another accelerator; do not
+   tune either rejected depth-two mechanism.
+3. Predeclare one globalization rule and reapply the six-update cold gate; only
+   a pass can authorize step 29 and 96.
 4. Close canonical coarse/medium/fine and experimental-observable acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)

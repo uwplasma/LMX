@@ -73,7 +73,9 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   parity or steady scaling. The current schema-6 depth-two Anderson path also
   fails its six-update cold outcome gate (`0.5281` versus `0.1145` fixed-control
   map rate; `max|weight|=24.39`), despite exact replay and green linear and
-  conservation gates. Step 29 is therefore blocked. The first fresh current-formulation coarse
+  conservation gates. Its predeclared bounded newest-map fallback is stable
+  but ends 0.22% worse than the control, so that API is also rejected. Step 29
+  is therefore blocked. The first fresh current-formulation coarse
   trajectory and one exact continuation pass conservation and all 256 pressure
   solves, but stop at step 256 with residual `7.1081e-4`, above both its
   precommitted continuation gate and the `5e-5` steady criterion. It is not

@@ -340,6 +340,7 @@ def test_matched_scaling_worker_rejects_step_contract_mismatch(tmp_path: Path):
 def test_sustained_scaling_requires_predeclared_multiminute_samples():
     classify = run_strong_scaling_worker._sustained_timing_passed
     assert not classify(0.0, [121.0, 122.0, 123.0])
+    assert not classify(120.0, [120.0, 121.0])
     assert not classify(120.0, [120.0, 119.999, 121.0])
     assert classify(120.0, [120.0, 121.0, 122.0])
 

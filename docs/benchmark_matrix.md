@@ -108,7 +108,9 @@ three frozen ALEX literature limits (weighted RMS `1.389`, weighted maximum
 `4.218`, integrated error `0.251`). Fine numerical independence remains open.
 The tiny matched-FreeMHD smoke is complete. The schema-6 depth-two Anderson
 field/flux path passes topology and replay but fails its cold outcome gate:
-final map rate regresses 361% versus fixed relaxation two. Step 29,
+final map rate regresses 361% versus fixed relaxation two. A predeclared bounded
+fallback is stable but ends 0.22% worse than the control, so it is also rejected
+without an API addition. Step 29,
 production-mesh FreeMHD, and observable/model normalization remain blocked.
 
 After all three source-identical mesh campaigns finish, assemble (without

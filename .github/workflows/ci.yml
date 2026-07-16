@@ -29,7 +29,7 @@ jobs:
         include:
           - python-version: "3.10"
             lane: compatibility
-            solvax-version: "0.8.3"
+            solvax-version: "0.8.4"
             coverage-args: --no-coverage
           - python-version: "3.13"
             lane: coverage

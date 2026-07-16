@@ -6,7 +6,10 @@ scaled fields and conservative compact flux. Restart schema 6 stores one raw
 mapped field, residual, plus flux, and inlet flux all-or-none; direct two-update
 and serialized NPZ one-plus-one replay are exact. Its six-update cold outcome
 gate is now rejected, so schema 6 is correctness evidence rather than a
-promoted B2 acceleration choice. Schemas 1--5 remain readable.
+promoted B2 acceleration choice. A separately predeclared `max|weight| <= 4`
+newest-map fallback is also rejected: it is stable and exact but ends 0.22%
+worse than fixed relaxation two, so no SOLVAX or LMX API was added. Schemas
+1--5 remain readable.
 The installable-distribution contract is keyed to `a207bf9`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
@@ -43,8 +46,9 @@ one/two-A4000 lane also passes 158--259 s duration, numerical, restart, and
 topology gates with 1.626x shared-host speedup, but persistent foreign contexts
 keep authoritative GPU scaling open. The fixed-work harness accepts
 an explicit update count, checkpoints at the deterministic midpoint, replays
-the remaining trajectory, and requires every warm sample to exceed 120 s for a
-sustained claim; the two-update default remains the bounded CI/debug gate. This
+the remaining trajectory, and requires one cold plus at least three warm
+trajectories, with every warm sample lasting at least 120 s, for a sustained
+claim; the two-update default remains the bounded CI/debug gate. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -85,8 +89,9 @@ a stop rule, and a go/no-go threshold before launch. Escalate in this order:
 A failed bounded probe stops. It does not trigger an open-ended parameter
 search. Reuse a checksummed accepted record whenever it answers the question.
 Short scaling runs are smoke or calibration only. A CPU or GPU strong-scaling
-claim must predeclare a fixed workload for which every warm sample lasts at
-least 120 seconds; compilation, restart I/O, and observers remain untimed.
+claim must predeclare a fixed workload, run one cold plus at least three warm
+trajectories per rung, and keep every warm trajectory at or above two minutes;
+compilation, restart I/O, and observers remain untimed.
 
 ### Test only what changed
 
@@ -512,6 +517,11 @@ schema-6 Anderson depth two: its final normalized map rate is `0.5281` versus
 reaches 24.39 against the frozen bound of 4. Linear, conservation, identical
 first-update, and exact serialized-replay gates pass, isolating the failure to
 the accelerator rather than the discretization or restart.
+A predeclared SOLVAX-level `max_abs_weight=4` newest-map fallback then bounds
+every applied weight and preserves the same linear, conservation, first-update,
+and exact-replay gates. It ends at `0.114718` versus `0.114466` for fixed
+relaxation two: 0.22% worse instead of the required 15% gain. Reject the API
+addition and do not substitute coefficient safety for acceleration evidence.
 Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
 are diagnostic only. Exact histories and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
@@ -531,10 +541,13 @@ The validation sequence is fail-closed:
 2. the six-update `7 x 7 x 7` Anderson-depth-two comparison is complete and
    rejected: final map rate regresses by 361%, `max|weight|=24.39`, and the 15%
    improvement and stable-weight gates fail;
-3. do not tune that rejected configuration. One future acceleration candidate
-   must predeclare its stability mechanism and pass this same cold gate before
-   regenerating both current-source trajectories to the
-   shared step-29 point; do not reinterpret a schema-5 restart;
+3. the one authorized bounded-weight fallback is also rejected: stability and
+   replay pass, but its final rate is 0.22% worse than the control. Do not add
+   that SOLVAX/LMX API or tune either failed configuration. Any future candidate
+   requires a residual-spectrum rationale and predeclared globalization rule,
+   then must pass this same cold gate before regenerating both current-source
+   trajectories to the shared step-29 point; do not reinterpret a schema-5
+   restart;
 4. only if step 29 passes, continue to strict step 96. Promotion requires three
    sustained `tau_map=0.005` passes plus exact replay and the frozen pressure,
    velocity, pressure-gradient, linear, conservation, and sharding limits;
@@ -543,8 +556,8 @@ The validation sequence is fail-closed:
    scaling remain blocked.
 
 This failure stops before step 29 and the coarse run. Fixed relaxation two is
-the control while one bounded stability mechanism is designed; it is not
-evidence that the provisional `5e-5` target is reachable. After the parallel
+the control; the one bounded fallback is rejected and does not establish that
+the provisional `5e-5` target is reachable. After the parallel
 algorithm settles, consolidate
 schema/scaling diagnostics inside existing owners; add no module, script, or
 test file.
@@ -617,7 +630,11 @@ now calls released SOLVAX directly and keeps its separately owned arbitrary-dept
 history.
 
 Released 0.8.4 owns the valuable generic linear solves, preconditioners, and
-Anderson weights. One manual additive composition remains, but migrating its few
+Anderson weights. Its scale-aware regularization, condition filtering, damping,
+and newest-map fallback were re-audited. Condition filtering cannot guarantee
+the frozen coefficient bound, while a proposed generic `max_abs_weight=4`
+fallback passed safety but failed LMX's acceleration outcome gate; therefore
+neither repository gains an unused API. One manual additive composition remains, but migrating its few
 lines could perturb parity trajectories and waits until B2 convergence closes.
 Momentum's single diagonal division remains clearer and smaller than wrapping
 `solvax.jacobi`; ownership movement without code deletion is not a performance

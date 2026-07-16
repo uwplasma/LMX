@@ -144,6 +144,13 @@ doubled-iteration and wall confirmations pass; its tighter-tolerance variant
 remains open. These are solver and numerical results, not experimental
 validation.
 
+The raw depth-two B2 Anderson path is not promoted: its six-update cold rate
+ends 4.61 times above fixed relaxation two and its largest coefficient is
+24.39. A separately predeclared newest-map fallback bounds all applied
+coefficients and preserves linear, conservation, and exact-replay gates, but
+ends 0.22% slower than the control. It is rejected without adding a SOLVAX or
+LMX option.
+
 The ALEX normalization and pressure-orientation audit passes: B2 compares the
 side and top walls at the same axial station using the sourced 4.39 cm
 half-width. Pressure-hole transfer remains open because the available reports
