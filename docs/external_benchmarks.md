@@ -118,6 +118,23 @@ Use:
 These cases remain research-stage until experimental observable, mesh/time,
 conservation, and steady-convergence gates pass together.
 
+### Mapped-pipe FreeMHD-profile diagnostic
+
+![Mapped-pipe FreeMHD-profile mismatch](_static/pipe_reference_diagnostic.webp)
+
+This research diagnostic compares transverse profiles digitized from the
+FreeMHD paper workflow, not the frozen ALEX-B1 excess-pressure observable. The
+large off-center potential errors and centerline velocity mismatch fail the
+comparison; ALEX-B1 acceptance remains open.
+
+### Magnetic-obstacle literature target
+
+![Votyakov reverse-flow target versus current LMX response](_static/magnetic_obstacle_votyakov.webp)
+
+The Votyakov target has reverse centerline flow near `-0.137`; the current
+localized-field result remains positive near `0.998`. This visible failure
+keeps inertial wake/recirculation physics research-stage.
+
 ## Q2D-MHDfoam and other OpenFOAM data
 
 ![Seven-second nonlinear Q2D research workflow](_static/readme-q2d-turbulence.webp)

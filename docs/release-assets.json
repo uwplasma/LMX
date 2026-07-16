@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 855524,
+    "bytes": 1012450,
     "files": [
       {
         "bytes": 71620,
@@ -580,14 +580,34 @@
         "sha256": "af02395951fe399d1bfed7462e897cebace6c79d5489a748f2359524ab8f5120"
       },
       {
+        "bytes": 24514,
+        "path": "docs/_static/extruded_restart_equivalence.webp",
+        "sha256": "955fdd0d31f1768224750214d4ed62b2f5f91b779ea62803b659b208ef8e4de5"
+      },
+      {
         "bytes": 21086,
         "path": "docs/_static/freemhd_closed_channel_observable_parity.webp",
         "sha256": "99f99b4b725860feaba8fc652ea5615ecc035bc8c6a7d3dcff5146358f01d2c7"
       },
       {
+        "bytes": 46678,
+        "path": "docs/_static/fringing_solver_family.webp",
+        "sha256": "2455757ae9488ea293b3eb583df6829a6cb8acbb437a5e7772e398a92a20ad34"
+      },
+      {
+        "bytes": 32966,
+        "path": "docs/_static/magnetic_obstacle_votyakov.webp",
+        "sha256": "387754600e407dd4d8ee49efded2e0221325269c40b61061307280b340317392"
+      },
+      {
         "bytes": 41120,
         "path": "docs/_static/operator_verification.webp",
         "sha256": "5a838ab23208a8e1f2bb0e6ea7d5419b45133e023186ab97eb7ce6f168817950"
+      },
+      {
+        "bytes": 52768,
+        "path": "docs/_static/pipe_reference_diagnostic.webp",
+        "sha256": "7a84d321e82f01e6c34949477986858e07ca6a8d378c17c1e35edc9dd4f5532a"
       },
       {
         "bytes": 43174,

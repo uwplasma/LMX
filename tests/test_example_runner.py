@@ -315,6 +315,15 @@ def test_operator_verification_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "operator_verification_summary.json").exists()
 
 
+def test_extruded_restart_demo_is_state_exact(tmp_path: Path):
+    module = _load_example_module("extruded_restart_demo.py")
+    summary = module.run_extruded_restart_demo(out_dir=tmp_path)
+    assert summary["max_state_difference"] == 0.0
+    assert summary["max_mean_velocity_difference"] == 0.0
+    assert summary["max_charge_balance_difference"] == 0.0
+    assert (tmp_path / "extruded_restart_demo.png").is_file()
+
+
 def test_freemhd_closed_channel_observable_parity_writes_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

@@ -23,30 +23,34 @@ or command, observable, and acceptance limit or uncertainty.
 | Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and Hunt startup | complete |
 | manufactured operators | observed-order convergence | complete |
 | FreeMHD closed-channel parity | accepted observable comparison | complete; add validation-ladder composite |
-| portable fringing workflow | B2 field/pressure panel | representative; portable six-panel result queued |
-| exact restart/replay | direct-versus-resumed writer | queued for the case cookbook |
+| portable fringing workflow | bounded solver-family response and B2 panel | complete; research-stage |
+| exact restart/replay | direct-versus-resumed state comparison | complete |
 | custom fields and mapped geometry | field response and geometry panels | complete |
 | differentiable design | checked sensitivity and bounded design trace | complete |
 | CPU/GPU parallelism | current schema-6 CPU calibration | CPU current; two-GPU replay open |
-| ALEX B1 pipe reference | mapped-pipe comparison writer | queued; research-stage |
+| mapped-pipe external profiles | visible FreeMHD-profile mismatch | complete; not ALEX-B1 acceptance |
 | Samper high-Ha literature ladder | frozen eight-row acceptance composite | complete |
-| Q2D, obstacle, and blanket studies | compressed loops/panels | workflow coverage complete; quantitative parity open |
+| Q2D, obstacle, and blanket studies | loops plus strict Votyakov mismatch | workflow coverage complete; quantitative parity open |
 
-The next tracked derivatives are ordered by evidentiary value: restart
-equivalence, the mapped-pipe comparison, and the portable fringing result.
+The next derivatives are evidence-driven: exact ALEX-B1 pressure only after its
+acceptance record exists, then one detailed blanket/Q2D diagnostic composite.
 Prefer existing writers and compact accepted JSON; do not rerun a solver merely
 to change presentation. One composite should serve one claim family.
 
 ## Tracked web set
 
-Fourteen files in `docs/_static/` total 855,524 bytes. The `showcase` section of
+Eighteen files in `docs/_static/` total 1,012,450 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
 | Derivative | Bytes | Display | Provenance |
 |---|---:|---|---|
 | duct profiles | 71,620 | 1,338 × 816 WebP | released analytical-profile PNG `f55c380c...` |
+| exact restart | 24,514 | 1,200 × 629 WebP | portable 3+3 versus direct six-step state; all field differences zero |
 | accepted FreeMHD observables | 21,086 | 1,200 × 641 WebP | acceptance record `9f94ea15...`; generated at `72f2049` |
+| fringing solver family | 46,678 | 1,200 × 843 WebP | released source `5fd83110...`; bounded internal diagnosis only |
+| mapped-pipe profiles | 52,768 | 1,100 × 655 WebP | released source `d3343a09...`; failing FreeMHD-profile diagnostic, not ALEX |
+| Votyakov obstacle target | 32,966 | 1,100 × 458 WebP | released source `7bb3ca51...`; strict reverse-flow mismatch |
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
 | B2 schema-6 CPU calibration | 31,616 | 1,400 × 653 WebP | accepted record `b2-schema6-cpu-scaling-20260716.json`; `test_plotting.py`; GPU replay omitted while open |

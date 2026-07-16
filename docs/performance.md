@@ -158,6 +158,13 @@ solve only 0.85% (`0.7437` to `0.7374` seconds). That fast path is rejected
 before the large rung. These results remain forced-device sharding evidence,
 not physical-core strong scaling.
 
+An ARM64 Docker probe supplies auditable Linux `cpuset` masks, but its tiny
+real-solver grid is not an acceptable scaling workload. One/two/four shards
+agree within `5.2e-14`, while warm time regresses from 0.530 s to 0.575/0.693 s
+and the residual never passes the `5e-5` steady gate. No speedup or plot is
+claimed; the next physical-core experiment requires a valid larger-grid
+restart first.
+
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
 The source-identical baseline, doubled-iteration, and confirmation-wall runs

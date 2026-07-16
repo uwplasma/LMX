@@ -70,13 +70,16 @@ def run_extruded_restart_demo(
     ny: int = 6,
     nz: int = 6,
     nx_stations: int = 5,
-    split_steps: int = 4,
-    resume_steps: int = 4,
+    split_steps: int = 3,
+    resume_steps: int = 3,
 ) -> dict[str, object]:
     out_dir.mkdir(parents=True, exist_ok=True)
     problem = _build_problem(
         geometry_kind, ha_peak=ha_peak, ny=ny, nz=nz, nx_stations=nx_stations
     )
+    # A nonzero initial velocity selects the same fixed-flow constraint before
+    # and after the checkpoint, making this a strict restart-equivalence demo.
+    problem = replace(problem, case=replace(problem.case, initial_velocity=1.0))
     base_problem = replace(
         problem,
         case=replace(
@@ -139,6 +142,17 @@ def run_extruded_restart_demo(
     resumed_charge = np.asarray(resumed_solution.bundle.charge_balance_residual)
     mean_difference = np.abs(direct_mean - resumed_mean)
     charge_difference = np.abs(direct_charge - resumed_charge)
+    max_state_difference = max(
+        float(
+            np.max(
+                np.abs(
+                    np.asarray(getattr(direct_solution.bundle, name))
+                    - np.asarray(getattr(resumed_solution.bundle, name))
+                )
+            )
+        )
+        for name in ("u", "v", "w", "p", "phi")
+    )
 
     _set_style()
     fig, axes = plt.subplots(1, 3, constrained_layout=True)
@@ -215,6 +229,7 @@ def run_extruded_restart_demo(
         },
         "max_mean_velocity_difference": float(np.max(mean_difference)),
         "max_charge_balance_difference": float(np.max(charge_difference)),
+        "max_state_difference": max_state_difference,
         "plots": [png_path.name, pdf_path.name],
     }
     (out_dir / "extruded_restart_summary.json").write_text(
@@ -239,8 +254,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ny", type=int, default=6)
     parser.add_argument("--nz", type=int, default=6)
     parser.add_argument("--nx-stations", type=int, default=5)
-    parser.add_argument("--split-steps", type=int, default=4)
-    parser.add_argument("--resume-steps", type=int, default=4)
+    parser.add_argument("--split-steps", type=int, default=3)
+    parser.add_argument("--resume-steps", type=int, default=3)
     args = parser.parse_args(argv)
     run_extruded_restart_demo(
         out_dir=args.output,

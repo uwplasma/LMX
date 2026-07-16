@@ -77,8 +77,8 @@ study.
 
 Plotting helpers live in `lmx.plotting`; solver fields and metadata are written
 by `lmx.io`. Bounded examples write into ignored `artifacts/` directories.
-Compressed showcase images and movies are linked from versioned releases; raw
-meshes and volume fields are not committed.
+Compressed showcase images and movies are embedded in their feature pages;
+source media, raw meshes, and volume fields remain in versioned releases.
 
 WHAM-specific blanket geometry and field adapters remain available through
 `lmx.blanket_geometry`, `lmx.blanket_flow`, and `lmx.field_models`, but they are

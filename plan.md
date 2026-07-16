@@ -343,6 +343,16 @@ Reject the added square-grid fast path before the large rung. A physical-core
 claim requires a runtime/host with verifiable affinity or partitioned worker
 pools; unsupported flag recipes are not evidence.
 
+A disposable native-ARM64 Docker lane now provides verifiable Linux CPU masks
+with JAX 0.10.2 and SOLVAX 0.8.4. Its bounded real-solver probe confirms one,
+two, and four physical shards and field-norm agreement within `5.2e-14`, but
+the small `64 x 27 x 27` total grid slows from 0.530 s to 0.575/0.693 s. It is
+also unsteady: continuation improves the update residual to `1.02e-4` at 256
+updates before rising to `1.72e-4` at 384, above the `5e-5` gate. Reject those
+timings and do not plot them as scaling evidence. The next affinity-controlled
+ladder requires a current, accepted larger-grid restart before its one-core
+baseline; no larger blind cold-start run is authorized.
+
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
 plots remain ignored. The worker fingerprint must include package-owned frozen
@@ -610,12 +620,13 @@ in the checksummed release. Shared derivatives may appear on multiple pages
 without duplicating bytes.
 
 The visual backlog is evidence-ranked. The stale scaling panel, bounded
-operator-convergence gap, and frozen Samper/Benchmark-A composite are closed;
+operator-convergence gap, frozen Samper/Benchmark-A composite, exact restart,
+bounded fringing, mapped-pipe FreeMHD-profile diagnostic, and strict Votyakov
+obstacle mismatch are closed;
 the latter covers all eight high-Ha rows, mesh/order gates, and current/power
-residuals without rerunning a solver. P1 next: surface exact restart replay,
-the research-stage mapped-pipe comparison, and the portable fringing result. P2:
-one detailed composite each for Q2D external diagnostics, magnetic-obstacle
-literature comparison, and blanket current/pressure evidence. Keep the README
+residuals without rerunning a solver. Do not relabel the mapped-pipe transverse
+profiles as ALEX-B1 pressure evidence. P2: one detailed composite each for Q2D
+external diagnostics and blanket current/pressure evidence. Keep the README
 to at most one new concise accepted-validation composite; detailed evidence
 belongs on the owning pages.
 

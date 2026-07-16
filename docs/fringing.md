@@ -65,6 +65,13 @@ one-dimensional station scale remains the simpler transverse-only option.
 
 ## Diagnostics and acceptance
 
+![Bounded rectangular and layered fringing response](_static/fringing_solver_family.webp)
+
+This internal solver-family check compares `Ha = 10/20` rectangular and
+layered ducts at two small cross-section resolutions. It exposes charge,
+current, velocity, and pressure changes; it is conservation/refinement
+diagnosis, not ALEX or FreeMHD parity and not production convergence.
+
 Every reported run should include:
 
 - normalized `div(J)` and boundary-normal current;

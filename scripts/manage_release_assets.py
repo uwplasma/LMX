@@ -333,6 +333,23 @@ def write_animated_webp(
     return output
 
 
+def write_static_webp(
+    source: Path, output: Path, *, width: int = 1200, quality: int = 82
+) -> Path:
+    """Compress one source figure to a bounded directly embeddable WebP."""
+
+    from PIL import Image
+
+    with Image.open(source) as image:
+        image = image.convert("RGB")
+        if image.width > width:
+            height = round(image.height * width / image.width)
+            image = image.resize((width, height), Image.Resampling.LANCZOS)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        image.save(output, format="WEBP", quality=quality, method=6)
+    return output
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
@@ -348,12 +365,19 @@ def main(argv: list[str] | None = None) -> int:
         nargs=2,
         metavar=("SOURCE", "OUTPUT"),
     )
+    action.add_argument(
+        "--write-static-webp", type=Path, nargs=2, metavar=("SOURCE", "OUTPUT")
+    )
     parser.add_argument("--width", type=int, default=520)
     parser.add_argument("--seconds", type=float, default=7.0)
     parser.add_argument("--fps", type=int, default=8)
     parser.add_argument("--quality", type=int, default=50)
     args = parser.parse_args(argv)
-    if args.write_animated_webp:
+    if args.write_static_webp:
+        source, output = args.write_static_webp
+        write_static_webp(source, output, width=args.width, quality=args.quality)
+        print(f"Static WebP: {output}")
+    elif args.write_animated_webp:
         source, output = args.write_animated_webp
         write_animated_webp(
             source,
