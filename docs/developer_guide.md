@@ -37,7 +37,7 @@ New generated files above 128 KiB fail the manifest check until deliberately
 assigned to a new versioned asset release.
 
 The live architecture gate caps the package at 35 modules, 35,100 source lines,
-8,100 maintained-core lines, 31 test files, 21,100 test lines, 14 maintenance
+8,100 maintained-core lines, 31 test files, 21,100 test lines, 13 maintenance
 scripts, 30 root exports, 12 curated examples, a 4 MiB tracked checkout, and a
 0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and
 reject benchmark, documentation, or generated payloads outside `lmx/` and

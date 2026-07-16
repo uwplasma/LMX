@@ -110,8 +110,8 @@ immutable evidence, richer projection, and target-driven paths remain):
 | package lines | 34,997 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 20,966 | no new file; stay below 21,000 | 31 / 21,100 |
-| maintenance scripts | 14 | no new script without retiring an owner | 14 |
-| tracked checkout | 3,507,788 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| maintenance scripts | 13 | no new script without retiring an owner | 13 |
+| tracked checkout | 3,507,728 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
