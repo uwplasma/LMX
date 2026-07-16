@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "implementation_commit": "e6834ee2a3c36bca936c558dcd0b935d92832a21",
+  "case_id": "B2-fringing-square",
+  "acceptance_role": "reduced-independent-steady-defect-diagnostic",
+  "status": "operator-replay-and-reduced-trajectory-passed-threshold-open",
+  "normalization": {
+    "formula": "L max_fluid,component |C-D-E-JxB-f+Gp|/(rho U0^2 N)",
+    "canonical_reduction": "max |discrete momentum residual|/540",
+    "reference_scale": "prescribed sigma B0^2 U0; never the local fringe-field magnitude",
+    "evaluation_state": "raw pressure-corrected map before Aitken or Anderson acceleration"
+  },
+  "implementation": {
+    "restart_schema": "b2_diagnostics_v4",
+    "history": "iteration_momentum_defect_history",
+    "pressure_operator": "exact face correction shared with the projection",
+    "momentum_operator": "limited-linear convection, implicit variable-viscosity diffusion, explicit deviatoric stress, fresh mapped Lorentz force",
+    "legacy_v3_policy": "readable for diagnostics; not resumable under the v4 stopping evidence contract",
+    "stopping_rule_changed": false
+  },
+  "reduced_four_update_probe": {
+    "shape": [7, 7, 7],
+    "physical_hartmann_number": 2900.0,
+    "interaction_parameter": 540.0,
+    "effective_dt": 0.00011851851851851852,
+    "map_update_history": [0.96294292, 0.03640128, 0.02050921, 0.01832822],
+    "momentum_defect_history": [0.97600645, 0.36827051, 0.33774943, 0.31031290],
+    "post_startup_momentum_defect_strictly_decreasing": true,
+    "four_update_wall_seconds": 14.2,
+    "note": "Different trajectories establish that the direct defect is not a restatement of the map update."
+  },
+  "focused_gates": {
+    "operator_jit_and_jvp": "passed",
+    "io_v4_and_v1_v2_v3_compatibility": "14 passed in about 3 seconds",
+    "direct_four_vs_serialized_two_plus_two": "state, compact flux, and all histories agree at 1e-12",
+    "reduced_b2_physics_restart": "passed",
+    "architecture": "35 modules; 35098 package lines; 7965 maintained-core lines"
+  },
+  "decision": {
+    "threshold_frozen": false,
+    "coarse_rerun_authorized": false,
+    "next_gate": "one bounded 96-update 7^3 trajectory with a 120-second deadline; compare three-update sustained crossings at candidate 0.1 and decade-tighter 0.01",
+    "outcome_limits": {
+      "normalized_transverse_pressure_linf": 0.0002,
+      "velocity_max_absolute_over_U0": 0.001,
+      "pressure_gradient_relative_l2": 0.005
+    },
+    "fail_closed": "freeze no threshold if 0.01 is not reached or any linear, conservation, replay, or outcome gate fails"
+  }
+}

@@ -2,7 +2,9 @@
 
 Status: 2026-07-15. The corrected two-update B2 smoke is keyed to `45bff84`;
 the current one-/two-/four-CPU-device equivalence and 64x pseudo-time cap are
-keyed to `2346d7f`. The latest complete portable gate is keyed to `45bff84`. CPU/GPU calibration at
+keyed to `c47ba09` and `2346d7f`. The independent electromagnetic momentum
+defect and restart schema 4 are keyed to `e6834ee`. The latest complete
+portable gate is committed at `c47ba09`. CPU/GPU calibration at
 `413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
 restart fix and remain historical until refreshed. The isolated compiler trace
 is keyed to `f379f6b`.
@@ -94,7 +96,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, strict smoke replay, and current CPU device equivalence have bounded gates | current GPU refresh, production parity, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, independent momentum defect, strict schema-4 replay, and current CPU device equivalence have bounded gates | defect threshold, current GPU refresh, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -113,11 +115,11 @@ immutable evidence, richer projection, and target-driven paths remain):
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,901 | stay below 35,000 through the scaling tranche | 35,100 |
-| maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,757 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 35,098 | return below 35,000 while preserving the direct defect | 35,100 |
+| maintained-core lines | 7,965 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,797 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,512,633 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,529,008 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -380,20 +382,44 @@ through a 4+4 restart, and keep CFL below `3.5e-5`. The magnetic pseudo-time cap
 is therefore raised from `0.001/N` to `0.064/N`; the existing reduced B2
 physics/restart test falls from the prior 45-second gate record to 14.8 seconds.
 
-Before rerunning coarse, implement and cross-check a direct discrete momentum
-defect under the same electromagnetic scale, then freeze its threshold through
-outcome insensitivity against a decade-tighter confirmation. Version the
-stopping contract; do not silently reinterpret the existing raw tolerance.
-Tolerance, wall, medium, fine, and production-FreeMHD work remain blocked until
-the corrected coarse baseline converges for the correct reason. The compact
-record is `benchmarks/results/b2-pseudotime-map-rate-20260715.json`.
+The direct post-map discrete momentum defect is now implemented independently
+of the map update as
+`L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`, which reduces to `max|R|/540` for B2.
+It shares the exact projection pressure-face stencil and diffusion boundary
+assembly, uses the prescribed electromagnetic scale, and evaluates fresh
+mapped Lorentz force before coupling acceleration. Schema 4 records the scalar
+history; schemas 1--3 remain readable but cannot resume a current B2 run.
+The reduced four-update history decreases from `0.9760` to `0.3103`, while the
+map update follows a distinct `0.9629` to `0.01833` trajectory. Operator
+JIT/JVP, I/O compatibility, and exact direct-four versus serialized-two-plus-two
+replay pass. This is monitoring evidence only; the stopping rule is unchanged.
 
-Production pressure acceptance also requires the ALEX observation operator,
-not only the fluid pressure field: the primary report applies a wall-current
-pressure-hole correction and a finite 15.2 cm axial difference. Audit the
-reported 4.39/4.8 cm length-scale discrepancy and obtain the authors' digitized
-data if possible. The current `0.004` curve band is repository
-digitization/marker-scatter allowance, not a literature uncertainty.
+Next run one bounded 96-update `7 x 7 x 7` trajectory with a 120-second hard
+deadline. Compare the third sustained crossings at candidate defect `0.1` and
+decade-tighter `0.01`, after startup or an intervening failure. Freeze neither
+threshold nor contract unless both crossings occur, all linear/conservation and
+replay gates pass, and the normalized transverse-pressure curve changes by at
+most `2e-4`, velocity by at most `1e-3 U0`, and pressure-gradient relative L2 by
+at most `0.5%`. Only then add the direct defect to the three-update stopping
+streak and authorize one corrected coarse run. Tolerance, wall, medium, fine,
+and production-FreeMHD work remain blocked until that coarse baseline converges
+for the correct reason. Compact evidence is in
+`benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
+`benchmarks/results/b2-momentum-defect-20260715.json`.
+
+The primary ALEX B2 pressure observable is same-station transverse pressure,
+side wall minus top wall; the current operator family and 4.39 cm half-width
+match the accessible primary sources. The earlier 15.2 cm axial-pressure and
+4.8 cm claims are unsupported and must not enter acceptance. Reed's explicit
+finite spacing is instead the side-wall voltage separation `1.73a = 7.59 cm`.
+A general pressure-hole correction `delta p=(t_w/d)(phi2-phi1)` exists, but the
+available ALEX reports do not supply the hole diameter, potential samples,
+sign, raw-versus-corrected marker status, or uncertainty budget. Do not invent
+these inputs: keep pressure-hole transfer as a blocked sensitivity until the
+raw table/drawing and reduction procedure are recovered. The current `0.004`
+band remains repository digitization/marker-scatter allowance, not experimental
+uncertainty. The tiny FreeMHD matched probes remain smoke observers, not
+experimental-acceptance operators.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
 experimental comparison with uncertainty, reproducible environments, and a

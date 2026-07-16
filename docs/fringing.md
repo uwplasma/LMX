@@ -80,6 +80,10 @@ iterations, converged, status]`. The values come from the existing SOLVAX
 result, so recording them adds no solve or synchronization phase and only 40
 uncompressed bytes per float64 update.
 
+Schema 4 also stores `iteration_momentum_defect_history`: the post-map discrete
+balance `L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`. It is an independent monitoring
+metric; its acceptance threshold has not yet been frozen and does not stop a run.
+
 Small conservation residuals establish internal consistency, not agreement with
 an experiment. Experimental promotion additionally requires mesh/time
 convergence and a frozen pressure observable from independent data.
@@ -129,7 +133,11 @@ doubled-iteration and wall confirmations pass; its tighter-tolerance variant
 remains open. These are solver and numerical results, not experimental
 validation.
 
-The ALEX tap and normalization audit passes. A bounded, checksummed B2 pilot
+The ALEX normalization and pressure-orientation audit passes: B2 compares the
+side and top walls at the same axial station using the sourced 4.39 cm
+half-width. Pressure-hole transfer remains open because the available reports
+do not specify hole diameter, voltage samples, sign, raw/corrected status, or
+instrument uncertainty. A bounded, checksummed B2 pilot
 with the full Maxwell-consistent field improved peak-pressure underprediction
 from 15.6% to 8.2%, but a far-field offset worsened the aggregate experimental
 error. It therefore remains diagnostic pending production-mesh matched-field
