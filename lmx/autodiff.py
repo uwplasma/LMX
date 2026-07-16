@@ -1015,6 +1015,22 @@ def hartmann_profile_loss_gradients(
     }
 
 
+_FRINGING_GRADIENT_KEYS = (
+    "d_peak_hartmann_number", "d_entry_center", "d_exit_center", "d_transition_width"
+)
+
+
+def _fringing_parameter_loss_gradients(
+    objective: Callable[..., jnp.ndarray],
+    values: tuple[float | jnp.ndarray, ...],
+) -> dict[str, jnp.ndarray]:
+    """Evaluate one four-control objective and its named gradients."""
+
+    loss = objective(*values)
+    gradients = jax.grad(objective, argnums=(0, 1, 2, 3))(*values)
+    return {"loss": loss, **dict(zip(_FRINGING_GRADIENT_KEYS, gradients, strict=True))}
+
+
 def fringing_history_loss_gradients(
     problem: FringingAutodiffProblem,
     *,
@@ -1034,20 +1050,9 @@ def fringing_history_loss_gradients(
         transition_width=width,
         target_mean_velocity=target_mean_velocity,
     )
-    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
-    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
-        peak_hartmann_number,
-        entry_center,
-        exit_center,
-        transition_width,
+    return _fringing_parameter_loss_gradients(
+        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
     )
-    return {
-        "loss": loss,
-        "d_peak_hartmann_number": d_peak_ha,
-        "d_entry_center": d_entry,
-        "d_exit_center": d_exit,
-        "d_transition_width": d_width,
-    }
 
 
 def fringing_response_loss_gradients(
@@ -1073,20 +1078,9 @@ def fringing_response_loss_gradients(
         target_current_proxy=target_current_proxy,
         current_weight=current_weight,
     )
-    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
-    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
-        peak_hartmann_number,
-        entry_center,
-        exit_center,
-        transition_width,
+    return _fringing_parameter_loss_gradients(
+        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
     )
-    return {
-        "loss": loss,
-        "d_peak_hartmann_number": d_peak_ha,
-        "d_entry_center": d_entry,
-        "d_exit_center": d_exit,
-        "d_transition_width": d_width,
-    }
 
 
 def extruded_rect_projection_loss_gradients(
@@ -1124,20 +1118,9 @@ def extruded_rect_projection_loss_gradients(
         boundary_current_weight=boundary_current_weight,
         pressure_span_weight=pressure_span_weight,
     )
-    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
-    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
-        peak_hartmann_number,
-        entry_center,
-        exit_center,
-        transition_width,
+    return _fringing_parameter_loss_gradients(
+        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
     )
-    return {
-        "loss": loss,
-        "d_peak_hartmann_number": d_peak_ha,
-        "d_entry_center": d_entry,
-        "d_exit_center": d_exit,
-        "d_transition_width": d_width,
-    }
 
 
 def extruded_rect_projection_field_loss_gradients(
@@ -1175,20 +1158,9 @@ def extruded_rect_projection_field_loss_gradients(
         jy_weight=jy_weight,
         pressure_weight=pressure_weight,
     )
-    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
-    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
-        peak_hartmann_number,
-        entry_center,
-        exit_center,
-        transition_width,
+    return _fringing_parameter_loss_gradients(
+        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
     )
-    return {
-        "loss": loss,
-        "d_peak_hartmann_number": d_peak_ha,
-        "d_entry_center": d_entry,
-        "d_exit_center": d_exit,
-        "d_transition_width": d_width,
-    }
 
 
 def extruded_rect_projection_trajectory_loss_gradients(
@@ -1234,20 +1206,9 @@ def extruded_rect_projection_trajectory_loss_gradients(
         charge_balance_weight=charge_balance_weight,
         boundary_current_weight=boundary_current_weight,
     )
-    loss = objective(peak_hartmann_number, entry_center, exit_center, transition_width)
-    d_peak_ha, d_entry, d_exit, d_width = jax.grad(objective, argnums=(0, 1, 2, 3))(
-        peak_hartmann_number,
-        entry_center,
-        exit_center,
-        transition_width,
+    return _fringing_parameter_loss_gradients(
+        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
     )
-    return {
-        "loss": loss,
-        "d_peak_hartmann_number": d_peak_ha,
-        "d_entry_center": d_entry,
-        "d_exit_center": d_exit,
-        "d_transition_width": d_width,
-    }
 
 
 def run_hartmann_profile_inverse_design(
