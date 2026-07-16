@@ -83,13 +83,6 @@ def processed_slice_reference_path(
     return _match_single(patterns, root)
 
 
-def _pressure_drop_from_name(path: Path) -> float | None:
-    match = re.search(r"PresDrop([0-9.]+)", path.name)
-    if match is None:
-        return None
-    return float(match.group(1).rstrip("."))
-
-
 def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
     """Load a bundled or user-supplied analytical closed-channel profile."""
 
@@ -104,13 +97,15 @@ def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str 
         coordinate.append(float(radius))
         midplane_z.append(float(u1))
         midplane_y.append(float(u2))
+    match = re.search(r"PresDrop([0-9.]+)", path.name)
+    pressure_drop = None if match is None else float(match.group(1).rstrip("."))
     return ClosedChannelAnalyticalReference(
         case_kind=case_kind,
         ha=ha,
         coordinate=jnp.asarray(coordinate),
         midplane_z=jnp.asarray(midplane_z),
         midplane_y=jnp.asarray(midplane_y),
-        pressure_drop=_pressure_drop_from_name(path),
+        pressure_drop=pressure_drop,
         path=str(path),
     )
 
