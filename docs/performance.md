@@ -16,7 +16,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 860 pass, 8 skip, 95.32% combined line/branch coverage, 145.0 s | below half of the five-minute target and 25% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 860 pass, 8 skip, 95.33% combined line/branch coverage, 144.4 s | below half of the five-minute target and 25% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |

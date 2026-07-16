@@ -147,6 +147,10 @@ banner is the governing status: geometry, forcing, and observables are not yet
 matched across the two workflows. This compressed composite reuses released
 PNGs; no solver was rerun.
 
+Frame sampling is passive in the LMX lid-driven integrator: the 100-step,
+48-frame case uses 101 rather than 148 Poisson solves, and two versus 48 frames
+produce identical final streamfunction, vorticity, and velocity.
+
 `lmx.external_validation` parses line profiles, force histories, probes, VTK
 fields, and case dictionaries from an external Q2D-MHDfoam tree. The former
 in-repository Docker build context was removed because it duplicated a large,
