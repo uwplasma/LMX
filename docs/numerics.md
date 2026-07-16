@@ -88,8 +88,9 @@ solver pipeline is:
 The default coupling remains unaccelerated for backward compatibility. Set
 `solver.coupling_acceleration = "aitken"` or `"anderson"` to enable a released
 SOLVAX accelerator. The compatible SOLVAX scalar Aitken update is useful for a
-single dominant slow mode; bounded-memory Anderson mixing is the production
-choice for the multimode high-Hartmann-number campaign. LMX checks the
+single dominant slow mode. Bounded-memory Anderson mixing is available, but
+the current depth-two B2 configuration fails its six-update cold outcome gate
+and is not a promoted production choice. LMX checks the
 **unaccelerated** residual `max(abs(G(u)-u))` and the change across outer steady
 states, so neither relaxation nor a converged inner subsystem can manufacture
 a false steady pass. Tolerance-controlled potential CG reuses the previous

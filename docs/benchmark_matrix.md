@@ -106,10 +106,10 @@ tight variant is preserved at a durable 48-update checkpoint with residual
 or oscillated, and componentwise Aitken diverged. The fine curve also misses all
 three frozen ALEX literature limits (weighted RMS `1.389`, weighted maximum
 `4.218`, integrated error `0.251`). Fine numerical independence remains open.
-The tiny matched-FreeMHD smoke is complete; the next prerequisite is the
-bounded schema-6 depth-two Anderson field/flux gate, while production-mesh
-FreeMHD and observable/model normalization remain blocked until the current
-coarse formulation converges.
+The tiny matched-FreeMHD smoke is complete. The schema-6 depth-two Anderson
+field/flux path passes topology and replay but fails its cold outcome gate:
+final map rate regresses 361% versus fixed relaxation two. Step 29,
+production-mesh FreeMHD, and observable/model normalization remain blocked.
 
 After all three source-identical mesh campaigns finish, assemble (without
 rerunning) their literature, independence, refinement, and exact-case FreeMHD

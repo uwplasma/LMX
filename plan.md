@@ -4,7 +4,9 @@ Status: 2026-07-16. LMX `aaa41b1` consumes released SOLVAX 0.8.4 and makes the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
 mapped field, residual, plus flux, and inlet flux all-or-none; direct two-update
-and serialized NPZ one-plus-one replay are exact. Schemas 1--5 remain readable.
+and serialized NPZ one-plus-one replay are exact. Its six-update cold outcome
+gate is now rejected, so schema 6 is correctness evidence rather than a
+promoted B2 acceleration choice. Schemas 1--5 remain readable.
 The installable-distribution contract is keyed to `a207bf9`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
@@ -504,7 +506,12 @@ The bounded outcome study rejects `tau_map=0.05`: pressure, velocity, and
 pressure-gradient differences exceed every frozen QoI limit. The `0.005` path
 reaches only `0.01502` at step 96, so no threshold is calibrated. Relaxation
 factors through eight miss the 15% promotion gate; retain fixed relaxation 2
-only as the paired historical control.
+as the paired control. The current-source six-update cold gate also rejects
+schema-6 Anderson depth two: its final normalized map rate is `0.5281` versus
+`0.1145` for fixed relaxation two, a 361% regression, while `max|weight|`
+reaches 24.39 against the frozen bound of 4. Linear, conservation, identical
+first-update, and exact serialized-replay gates pass, isolating the failure to
+the accelerator rather than the discretization or restart.
 Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
 are diagnostic only. Exact histories and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
@@ -516,16 +523,17 @@ about 35.8 MiB of prior state on the coarse grid instead of about 416.7 MiB for
 a depth-16 iterate/residual history. B1 retains its separate arbitrary-depth
 history.
 
-The next validation sequence is fail-closed:
+The validation sequence is fail-closed:
 
 1. the `8 x 7 x 7` schema-6 topology gate is complete on one/two A4000s:
    replay, Gram/weights/observables, sharded field/flux/state, and the replicated
    inlet plane pass; shared-host timing is excluded;
-2. next, compare six `7 x 7 x 7` updates from one cold state with Anderson depth two
-   versus fixed-relaxation two; require no residual growth, finite stable
-   weights, every linear/conservation/replay gate, and a predeclared meaningful
-   map-rate improvement;
-3. only if that passes, regenerate both current-source trajectories to the
+2. the six-update `7 x 7 x 7` Anderson-depth-two comparison is complete and
+   rejected: final map rate regresses by 361%, `max|weight|=24.39`, and the 15%
+   improvement and stable-weight gates fail;
+3. do not tune that rejected configuration. One future acceleration candidate
+   must predeclare its stability mechanism and pass this same cold gate before
+   regenerating both current-source trajectories to the
    shared step-29 point; do not reinterpret a schema-5 restart;
 4. only if step 29 passes, continue to strict step 96. Promotion requires three
    sustained `tau_map=0.005` passes plus exact replay and the frozen pressure,
@@ -534,8 +542,10 @@ The next validation sequence is fail-closed:
    production FreeMHD, authoritative idle-host GPU timing, and steady-production
    scaling remain blocked.
 
-Failure at any rung stops before a coarse run and retains fixed relaxation two
-as the historical control. After the parallel algorithm settles, consolidate
+This failure stops before step 29 and the coarse run. Fixed relaxation two is
+the control while one bounded stability mechanism is designed; it is not
+evidence that the provisional `5e-5` target is reachable. After the parallel
+algorithm settles, consolidate
 schema/scaling diagnostics inside existing owners; add no module, script, or
 test file.
 

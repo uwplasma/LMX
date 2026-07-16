@@ -89,10 +89,10 @@ observables pass the 1% finite-grid gate.
   <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform-field response and charge conservation" width="48%">
 </p>
 
-![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
+![B2 fringe field, pressure, and acceleration diagnostics](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-alex-b2-field-pressure.webp)
 
 B2 passes exact restart plus 1/2/4-CPU and 1/2-GPU schema-6 topology gates.
-Production parity and scaling promotion remain open.
+Acceleration outcome, production parity, and scaling promotion remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Follow curved pipes

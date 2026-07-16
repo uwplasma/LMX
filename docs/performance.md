@@ -27,7 +27,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | CPU-allocation restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
-| B2 relaxation probe | Apple M4, shared step-29 checkpoint, six updates | factors 5/6/8 gain at most 9.33% over factor 4 | below 15% gate; retain factor 2 |
+| B2 acceleration gate | Apple M4, cold `7 x 7 x 7`, six updates | Anderson depth 2 ends at `0.5281` map rate vs `0.1145` for fixed relaxation 2; `max|weight|=24.39`; linear, conservation, and replay pass | rejected before step 29; design one bounded stability mechanism |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
 | B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7` | current schema-6 placement, replay, conservation, linear, and repeat gates pass; two-GPU state error `2.22e-16`, flux exact | topology correctness only; shared-host timing excluded |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
@@ -41,6 +41,11 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
+
+![B2 field, pressure, and rejected Anderson depth-two acceleration gate](_static/readme-alex-b2-field-pressure.webp)
+
+The six-update gate is intentionally small: it rejects the accelerator before
+the step-29 trajectory while preserving exact restart and physics diagnostics.
 
 The current CPU/GPU correctness and `128 x 67 x 67` calibration, plus historical larger results, are recorded in
 `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
@@ -238,8 +243,9 @@ integrated pressure error `0.251`, missing the frozen ALEX limits `1.0`, `2.0`,
 and `0.10`. A directional comparison to the accepted medium curve changes by
 `0.0319`, above the `0.02` mesh gate; the records have different source
 fingerprints, so this is diagnosis rather than formal acceptance. The released
-SOLVAX Anderson-weight API and bounded schema-6 depth-two field/flux path now
-pass CPU and 1/2-GPU topology and exact-replay gates. Production-mesh FreeMHD,
+SOLVAX Anderson-weight API and bounded schema-6 depth-two field/flux path pass
+CPU and 1/2-GPU topology and exact-replay gates, but the current cold outcome
+gate rejects it for B2 acceleration. Production-mesh FreeMHD,
 observable/model normalization, fine numerical independence, and experimental
 acceptance remain blocked until the current coarse formulation converges for
 the correct reason.
@@ -413,8 +419,9 @@ than silently reused.
 ## Next performance work
 
 1. Repeat the passing 96-update one/two-GPU lane after the host passes the idle gate.
-2. Compare six tiny Anderson updates with the fixed-relaxation control.
-3. If that passes, run the bounded step-29 then strict step-96 outcome gates.
+2. Design one bounded acceleration stability mechanism; do not tune the rejected
+   depth-two configuration.
+3. Reapply the six-update cold gate; only a pass can authorize step 29 and 96.
 4. Close canonical coarse/medium/fine and experimental-observable acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)

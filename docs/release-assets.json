@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1243292,
+    "bytes": 1246402,
     "files": [
       {
         "bytes": 71620,
@@ -615,9 +615,9 @@
         "sha256": "7f6aecaf1844d18ebc66a6094e249c8e2ef307070af0406d93daa2725bd6cac4"
       },
       {
-        "bytes": 43174,
+        "bytes": 46284,
         "path": "docs/_static/readme-alex-b2-field-pressure.webp",
-        "sha256": "f186f109ed9f0dc25134baaee22069e521140134ff984be94a60fe1bc825bf2f"
+        "sha256": "4488a4734af0577d6a77d26357258d551b4b75f7b0a2c35667ffddc0687a7e2d"
       },
       {
         "bytes": 32612,
