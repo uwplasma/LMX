@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import jax.numpy as jnp
 import pytest
 
@@ -183,6 +185,37 @@ def test_centerline_pipe_mesh_rejects_invalid_centerline():
             },
             tube_radius=0.1,
         )
+
+
+def test_centerline_pipe_mesh_rejects_malformed_inputs():
+    base = {"x": [0, 1, 2], "y": [0, 0, 0], "z": [0, 0, 0]}
+    invalid = [
+        (base, {"tube_radius": 0.0}),
+        (base, {"tube_radius": 0.1, "nx": 1}),
+        (base | {"y": [0, 0]}, {"tube_radius": 0.1}),
+        ({key: [value] for key, value in base.items()}, {"tube_radius": 0.1}),
+        (base | {"station": [0, 1]}, {"tube_radius": 0.1}),
+        (base | {"x": [0, 1, float("nan")]}, {"tube_radius": 0.1}),
+    ]
+    for centerline, kwargs in invalid:
+        with pytest.raises(ValueError):
+            generate_centerline_pipe_mesh(centerline, **kwargs)
+
+
+def test_vertical_centerline_and_quality_input_validation():
+    mesh = generate_centerline_pipe_mesh(
+        {"x": [0, 0, 0], "y": [0, 0, 0], "z": [0, 1, 2]},
+        tube_radius=0.1,
+        nr=2,
+        ntheta=4,
+    )
+    assert centerline_pipe_mesh_quality_metrics(mesh)["validation_pass"] is True
+    with pytest.raises(ValueError, match="requires point_coordinates"):
+        centerline_pipe_mesh_quality_metrics(generate_rect_duct_mesh(width=1, height=1))
+    with pytest.raises(ValueError, match="must have shape"):
+        centerline_pipe_mesh_quality_metrics(
+            replace(mesh, point_coordinates=jnp.zeros((2, 3)))
+        )
     with pytest.raises(ValueError, match="strictly increasing"):
         generate_centerline_pipe_mesh(
             {
@@ -256,6 +289,48 @@ def test_generate_layered_duct_mesh_from_fluid_faces_adds_wall_regions():
     assert bool(mesh.fluid_mask[1, 1])
     assert not bool(mesh.fluid_mask[0, 1])
     assert not bool(mesh.fluid_mask[1, 0])
+
+
+def test_layered_meshes_support_fluid_only_and_hartmann_targeting():
+    explicit = generate_layered_duct_mesh_from_fluid_faces(
+        fluid_y_faces=jnp.asarray([-0.5, 0.0, 0.5]),
+        fluid_z_faces=jnp.asarray([-0.5, 0.0, 0.5]),
+        width=1.0,
+        height=1.0,
+    )
+    clustered = generate_layered_duct_mesh(width=1.0, height=1.0, ny=4, nz=4)
+    targeted = generate_multilayer_duct_mesh(
+        width=1.0, height=1.0, ny=12, nz=12, target_ha=20.0
+    )
+    assert bool(jnp.all(explicit.fluid_mask))
+    assert bool(jnp.all(clustered.fluid_mask))
+    assert bool(jnp.all(targeted.fluid_mask))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"width": 0.0},
+        {"nx": 0},
+        {"fluid_conductivity": 0.0},
+        {"wall_layers": {"left": [WallLayer("bad", 1.0, 0.0)]}},
+        {"wall_layers": {"left": [WallLayer("bad", 1.0, 0.1, 0)]}},
+        {"wall_layers": {"left": [WallLayer("bad", -1.0, 0.1)]}},
+        {"wall_layers": {"front": [WallLayer("bad", 1.0, 0.1)]}},
+    ],
+)
+def test_multilayer_duct_mesh_rejects_invalid_inputs(kwargs):
+    request = {"width": 1.0, "height": 1.0, "ny": 4, "nz": 4} | kwargs
+    with pytest.raises(ValueError):
+        generate_multilayer_duct_mesh(**request)
+
+
+@pytest.mark.parametrize("layer_cells", [0, 2])
+def test_pipe_ogrid_rejects_invalid_hartmann_layer_resolution(layer_cells):
+    with pytest.raises(ValueError, match="fit twice"):
+        generate_pipe_ogrid_mesh(
+            radius=1.0, nr=4, ntheta=8, target_ha=20.0, hartmann_layer_cells=layer_cells
+        )
 
 
 def test_generate_multilayer_duct_mesh_aligns_interfaces_and_sigma():

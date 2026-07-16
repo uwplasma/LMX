@@ -891,6 +891,14 @@ def test_matched_b2_smoke_attributes_one_sided_mutations(
 @pytest.mark.parametrize(
     ("path", "value"),
     [
+        (("schema_version",), 2),
+        (("case", "geometry"), None),
+        (("case", "boundary_conditions"), {}),
+        (("case", "name"), "not-the-canonical-case"),
+        (("mesh", "coordinate_system"), "unknown"),
+        (("field_profile", "axis"), "z"),
+        (("scaling", "length_scale"), "full width"),
+        (("case", "regions", 1, "kind"), "fluid"),
         (("mesh", "y_faces", 0), -2.0),
         (("field_profile", "anchor_b_over_B0", 2), 0.0),
         (("field_profile", "sample_b_over_B0", 2), 0.0),
@@ -1166,6 +1174,18 @@ def test_benchmark_a_spec_loader_rejects_unsupported_case():
             "conductance_ratio = 0.06",
             "do not reproduce the conductance ratio",
         ),
+        (
+            "shercliff",
+            "levels = [[37, 29], [49, 37], [65, 49], [85, 63]]",
+            "levels = [[37, 29], [49, 37]]",
+            "at least three 2D levels",
+        ),
+        (
+            "shercliff",
+            "levels = [[37, 29], [49, 37], [65, 49], [85, 63]]",
+            "levels = [[37, 29], [37, 29], [65, 49], [85, 63]]",
+            "not monotonically refined",
+        ),
     ],
 )
 def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(tmp_path: Path, case_kind: str, old: str, new: str, message: str):
@@ -1192,6 +1212,12 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
         load_samper_table_i(invalid)
     invalid.write_text(source.read_text().replace("schema_version = 1", "schema_version = 0"))
     with pytest.raises(ValueError, match="Invalid Samper Table I"):
+        load_samper_table_i(invalid)
+    invalid.write_text(source.read_text().replace("hartmann_wall_conductance = 0.01", "hartmann_wall_conductance = 0.02", 1))
+    with pytest.raises(ValueError, match="Incorrect hunt wall conductance"):
+        load_samper_table_i(invalid)
+    invalid.write_text(source.read_text().replace("analytical_flow_rate = 7.680e-3", "analytical_flow_rate = -1.0", 1))
+    with pytest.raises(ValueError, match="Non-positive shercliff flow-rate"):
         load_samper_table_i(invalid)
 
 
