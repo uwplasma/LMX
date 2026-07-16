@@ -21,6 +21,45 @@ def _fringing_pipe_root_or_skip() -> Path:
     return root
 
 
+def _stub_case_example_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, case_name: str
+) -> Path:
+    solution = SimpleNamespace(
+        state=SimpleNamespace(
+            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
+        ),
+        mesh=SimpleNamespace(),
+        case_name=case_name,
+    )
+    reference_root = tmp_path / "refs"
+    reference_root.mkdir()
+    monkeypatch.setattr(example_runner, "solve_steady", lambda case: solution)
+    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
+    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
+    monkeypatch.setattr(
+        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "extract_midplane_profile",
+        lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "validation_summary",
+        lambda solution, name, ha: {"u_max": 1.0},
+    )
+    monkeypatch.setattr(
+        example_runner,
+        "write_case_overview_plots",
+        lambda solution, out_dir, **kwargs: [out_dir / "overview.png"],
+    )
+    monkeypatch.setattr(
+        example_runner, "write_metrics_json", lambda payload, path: path.write_text("{}")
+    )
+    return reference_root
+
+
 def test_run_case_example_writes_hartmann_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -486,31 +525,8 @@ def test_run_case_example_cli_prints_report(
 def test_run_case_example_uses_reference_data_when_available(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    fake_solution = SimpleNamespace(
-        state=SimpleNamespace(
-            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
-        ),
-        mesh=SimpleNamespace(),
-        case_name="shercliff_ha5",
-    )
-    reference_root = tmp_path / "refs"
-    reference_root.mkdir()
-
-    monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
-    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
-    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(
-        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        example_runner,
-        "extract_midplane_profile",
-        lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
-    )
-    monkeypatch.setattr(
-        example_runner,
-        "validation_summary",
-        lambda solution, case_name, ha: {"u_max": 1.0},
+    reference_root = _stub_case_example_runtime(
+        tmp_path, monkeypatch, case_name="shercliff_ha5"
     )
     monkeypatch.setattr(
         example_runner,
@@ -525,17 +541,6 @@ def test_run_case_example_uses_reference_data_when_available(
             reference_path=Path("analytical.csv"),
         ),
     )
-    monkeypatch.setattr(
-        example_runner,
-        "write_case_overview_plots",
-        lambda solution, out_dir, **kwargs: [out_dir / "overview.png"],
-    )
-    monkeypatch.setattr(
-        example_runner,
-        "write_metrics_json",
-        lambda payload, path: path.write_text("{}"),
-    )
-
     report = run_case_example(
         case_kind="shercliff",
         ha=5.0,
@@ -552,48 +557,14 @@ def test_run_case_example_uses_reference_data_when_available(
 def test_run_case_example_handles_missing_reference_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    fake_solution = SimpleNamespace(
-        state=SimpleNamespace(
-            u=np.array([[1.0]]), phi=np.array([[0.0]]), time=0.0, residual=0.0
-        ),
-        mesh=SimpleNamespace(),
-        case_name="hunt_ha5",
-    )
-    reference_root = tmp_path / "refs"
-    reference_root.mkdir()
-
-    monkeypatch.setattr(example_runner, "solve_steady", lambda case: fake_solution)
-    monkeypatch.setattr(example_runner, "write_paraview", lambda solution, out_dir: [])
-    monkeypatch.setattr(example_runner, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(
-        example_runner, "extract_centerline", lambda solution: {"y": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        example_runner,
-        "extract_midplane_profile",
-        lambda solution, axis, fluid_only=True: {"coord": [0.0], "u": [1.0]},
-    )
-    monkeypatch.setattr(
-        example_runner,
-        "validation_summary",
-        lambda solution, case_name, ha: {"u_max": 1.0},
+    reference_root = _stub_case_example_runtime(
+        tmp_path, monkeypatch, case_name="hunt_ha5"
     )
     monkeypatch.setattr(
         example_runner,
         "closed_channel_validation",
         lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
     )
-    monkeypatch.setattr(
-        example_runner,
-        "write_case_overview_plots",
-        lambda solution, out_dir, **kwargs: [out_dir / "overview.png"],
-    )
-    monkeypatch.setattr(
-        example_runner,
-        "write_metrics_json",
-        lambda payload, path: path.write_text("{}"),
-    )
-
     report = run_case_example(
         case_kind="hunt",
         ha=5.0,

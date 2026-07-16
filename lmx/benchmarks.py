@@ -54,10 +54,6 @@ def _repository_root(root: str | Path | None = None) -> Path:
     return Path(root) if root is not None else Path(__file__).with_name("data")
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def canonical_matched_b_contract(spec: dict[str, Any], role: str) -> dict[str, Any]:
     """Compose one role without allowing execution settings to override physics."""
 
@@ -261,7 +257,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
 
     reference = spec["reference"]
     data_path = root / str(reference["data_path"])
-    if not data_path.is_file() or _sha256(data_path) != reference.get("data_sha256"):
+    if not data_path.is_file() or hashlib.sha256(data_path.read_bytes()).hexdigest() != reference.get("data_sha256"):
         raise ValueError("Benchmark B reference data are missing or fail SHA-256")
 
 
