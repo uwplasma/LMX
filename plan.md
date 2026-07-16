@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The optimized B2 source and current CPU calibration are
-keyed to `413185a`; the latest complete portable gate is keyed to `b2746fa`.
+keyed to `413185a`; the latest complete portable gate is keyed to `90953e2`.
 The isolated compiler trace is keyed to `f379f6b`; GPU workers use the
 optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
@@ -116,17 +116,17 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,922 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,509,027 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,509,083 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `b2746fa` records 817 passes, 8 expected
-external-data skips, 95.0156% combined line/branch coverage, and 167.6 seconds on
+The portable-gate artifact keyed to `90953e2` records 817 passes, 8 expected
+external-data skips, 95.0159% combined line/branch coverage, and 147.8 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 60.7 seconds for the
-weighted-modal node and 46.7 seconds for reduced B2. Parallel JUnit durations
+95.5% engineering target. The six-worker record reports 52.1 seconds for the
+weighted-modal node and 40.2 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
@@ -166,7 +166,7 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 60.7 seconds, versus 46.7 seconds for reduced B2 and 29.6
+gate it reports 52.1 seconds, versus 40.2 seconds for reduced B2 and 25.0
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
