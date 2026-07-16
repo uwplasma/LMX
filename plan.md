@@ -1,8 +1,8 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The corrected two-update B2 smoke and current
-one-/two-/four-CPU-device equivalence are keyed to `45bff84`/`d27bc13`; the
-latest complete portable gate is keyed to `45bff84`. CPU/GPU calibration at
+Status: 2026-07-15. The corrected two-update B2 smoke is keyed to `45bff84`;
+the current one-/two-/four-CPU-device equivalence and 64x pseudo-time cap are
+keyed to `2346d7f`. The latest complete portable gate is keyed to `45bff84`. CPU/GPU calibration at
 `413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
 restart fix and remain historical until refreshed. The isolated compiler trace
 is keyed to `f379f6b`.
@@ -113,11 +113,11 @@ immutable evidence, richer projection, and target-driven paths remain):
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,899 | stay below 35,000 through the scaling tranche | 35,100 |
+| package lines | 34,901 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,753 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,757 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,509,791 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,512,642 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -366,19 +366,34 @@ gate at `1e-12`; the exact current LMX/FreeMHD smoke also remains green with
 pressure RMS/Linf `0.004518/0.010917`.
 
 Pre-fix coarse restarts are diagnostic-only and cannot seed the corrected
-trajectory. The predeclared same-state `dt` versus `dt/2` reduced probe passes
-in 13.07 seconds: velocity map rates agree within `1.56e-5` relative, the raw
-update ratio is `2.000031`, both linear solves converge, and every conservation
-gate is below `1e-3`. This establishes timestep invariance of the unrelaxed
-velocity map rate, not a complete PDE residual or production tolerance.
+trajectory. The predeclared `dt` versus `dt/2` probe passes in 13.07 seconds.
+Müller and Bühler's electromagnetic scaling defines the B2 map defect as
+`max velocity update/(N dt)` because `L=U0=1` and `N=540`; FreeMHD/OpenFOAM and
+NekRS residual tolerances are linear-solver gates and cannot supply its steady
+threshold. The legacy raw `5e-5` threshold converts to a project-owned map
+defect of `0.05`, not a literature tolerance.
 
-Before rerunning coarse, define a dimensionless physical momentum scale,
-predeclare a mesh- and parameter-independent map-rate threshold with
-literature/FreeMHD rationale, and version the frozen stopping contract. Do not
-silently reinterpret the existing `5e-5` raw-update tolerance. Tolerance, wall,
-medium, fine, and production-FreeMHD work remain blocked until the corrected
-coarse baseline converges for the correct reason. The compact reduced record is
-`benchmarks/results/b2-pseudotime-map-rate-20260715.json`.
+A same-state 1x/2x/4x/16x/64x ladder keeps the normalized map defect within
+0.192%, with every linear and conservation gate green. From a warm checkpoint,
+eight 64x updates decrease strictly from `0.3530` to `0.1637`, replay bitwise
+through a 4+4 restart, and keep CFL below `3.5e-5`. The magnetic pseudo-time cap
+is therefore raised from `0.001/N` to `0.064/N`; the existing reduced B2
+physics/restart test falls from the prior 45-second gate record to 14.8 seconds.
+
+Before rerunning coarse, implement and cross-check a direct discrete momentum
+defect under the same electromagnetic scale, then freeze its threshold through
+outcome insensitivity against a decade-tighter confirmation. Version the
+stopping contract; do not silently reinterpret the existing raw tolerance.
+Tolerance, wall, medium, fine, and production-FreeMHD work remain blocked until
+the corrected coarse baseline converges for the correct reason. The compact
+record is `benchmarks/results/b2-pseudotime-map-rate-20260715.json`.
+
+Production pressure acceptance also requires the ALEX observation operator,
+not only the fluid pressure field: the primary report applies a wall-current
+pressure-hole correction and a finite 15.2 cm axial difference. Audit the
+reported 4.39/4.8 cm length-scale discrepancy and obtain the authors' digitized
+data if possible. The current `0.004` curve band is repository
+digitization/marker-scatter allowance, not a literature uncertainty.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
 experimental comparison with uncertainty, reproducible environments, and a

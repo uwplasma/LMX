@@ -1,8 +1,8 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "date": "2026-07-15",
-  "commit": "d27bc1312d978e98a05b8e9ee7f98fb90db7dee2",
-  "source_fingerprint": "38a86174f1d5af4617b121ca3eef9c2ce273c17de25a30125150829fc21d9e4e",
+  "commit": "2346d7f48f1925fcd2f3aa5237825c89e278b38d",
+  "source_fingerprint": "6009ec37ff6586351ee2c270322013e0cc5ac158e511be1c49145e958a22d058",
   "case_id": "B2-fringing-square",
   "role": "accepted-smoke-device-equivalence",
   "inputs": {
@@ -25,9 +25,9 @@
     "repeats": 4
   },
   "runs": {
-    "1": {"cold_seconds": 5.207499499898404, "warm_median_seconds": 0.01096099999267608, "warm_cv": 0.024367890713165596, "restart_max_abs": 0.0},
-    "2": {"cold_seconds": 5.859776625060476, "warm_median_seconds": 0.03470608405768871, "warm_cv": 0.17435219484915088, "restart_max_abs": 0.0},
-    "4": {"cold_seconds": 5.924776749918237, "warm_median_seconds": 0.03894395905081183, "warm_cv": 0.12211026056523296, "restart_max_abs": 0.0}
+    "1": {"cold_seconds": 5.1704364999895915, "warm_median_seconds": 0.01195704098790884, "warm_cv": 0.09568946461699238, "restart_max_abs": 0.0},
+    "2": {"cold_seconds": 5.8816129580372944, "warm_median_seconds": 0.03436995903030038, "warm_cv": 0.10987146789387668, "restart_max_abs": 0.0},
+    "4": {"cold_seconds": 5.881717082927935, "warm_median_seconds": 0.048166458029299974, "warm_cv": 0.12252894298984597, "restart_max_abs": 0.0}
   },
   "equivalence": {
     "pressure_observable_max_abs": 5.78096598369271e-15,
@@ -57,9 +57,9 @@
   "raw_assets": {
     "location": "external workspace; compact worker JSON only",
     "sha256": {
-      "1": "7ac980acabb6921450854ceaef792dca218d45f60bdf86a966bdf9f1f0d8a4b5",
-      "2": "00947826c46b860973baf7837d1dfb4430e2fe96393ee7c25573457892216774",
-      "4": "e9927b69b4d762f3be478ef65731f1f4378039f3ea767f6de404654b9f845b3f"
+      "1": "aa4b6eb5d45c1ecb82d13d94476dfa245206cbe5e40bf57ddf810f778c005b34",
+      "2": "ee85be57e352a4e10652b191ff4b9fd5510e62cc95ff303a2955bb352e4a3c8e",
+      "4": "f9245bf44e9cf58eed839c0f59ca8540a9621a3e1cd4879c1f3f60e841ee8c70"
     }
   }
 }

@@ -27,6 +27,10 @@ are authoritative when prose and results differ.
 - The portable package gate passes 817 tests with 8 expected external-data
   skips and 95.02% combined line/branch coverage in 149.3 seconds on the
   reference Mac.
+- The reduced B2 same-state ladder supports a 64x larger pseudo-time cap while
+  preserving the electromagnetic-scale map defect within 0.192%; eight warm
+  updates are monotone and restart bitwise. A direct momentum-defect threshold
+  and the ALEX pressure-hole observation operator remain open.
 
 ## Research-stage
 

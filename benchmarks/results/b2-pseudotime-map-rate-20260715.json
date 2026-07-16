@@ -1,62 +1,72 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "date": "2026-07-15",
-  "commit": "d27bc1312d978e98a05b8e9ee7f98fb90db7dee2",
+  "probe_commit": "4da75af646f7a9fad7b7b0d00af51114fe52aafb",
+  "implementation_commit": "2346d7f48f1925fcd2f3aa5237825c89e278b38d",
   "case_id": "B2-fringing-square",
-  "acceptance_role": "reduced-stopping-diagnostic",
-  "status": "map-rate-dt-invariance-passed",
+  "acceptance_role": "reduced-stopping-and-pseudotime-diagnostic",
+  "status": "map-rate-dt-invariance-and-64x-cap-passed",
   "problem": {
     "shape": [7, 7, 7],
-    "hartmann_number": 20.0,
+    "physical_hartmann_number": 2900.0,
+    "interaction_parameter": 540.0,
+    "geometry_target_ha_guard": 20.0,
     "warmup_updates": 1,
-    "branched_updates": 1,
-    "base_dt": 1.8518518518518519e-6,
-    "half_dt": 9.259259259259259e-7
+    "base_dt": 1.8518518518518519e-6
   },
-  "execution": {
-    "hardware": "Apple M4",
+  "normalization": {
+    "name": "B2 electromagnetic momentum map defect",
+    "formula": "L max(|delta u|,|delta v|,|delta w|)/(N U0^2 dt)",
+    "canonical_reduction": "max velocity update/(540 dt)",
+    "literature_basis": "Muller and Buhler electromagnetic inductionless scaling",
+    "threshold_source": "project-owned outcome-insensitivity study; not a literature, FreeMHD, OpenFOAM, or NekRS tolerance"
+  },
+  "dt_invariance": {
     "wall_seconds": 13.07241966703441,
-    "wall_seconds_max": 120.0
-  },
-  "base_dt_branch": {
-    "velocity_update": [0.00035231654122325207, 2.4251431345298677e-6, 1.0392042891706343e-6],
-    "velocity_map_rate": [190.2509322605561, 1.3095772926461284, 0.5611703161521425],
-    "pressure_converged": true,
-    "electric_converged": true,
-    "max_divergence": 1.1573330561966179e-11,
-    "flow_span": 4.796163466380676e-13,
-    "max_charge_balance": 2.800106813083403e-10,
-    "boundary_current_residual": 2.5235386983064676e-14
-  },
-  "half_dt_branch": {
-    "velocity_update": [0.00017615553473127044, 1.212569198287312e-6, 5.195966644441623e-7],
-    "velocity_map_rate": [190.24797750977206, 1.309574734150297, 0.5611643975996953],
-    "pressure_converged": true,
-    "electric_converged": true,
-    "max_divergence": 4.147723051642996e-11,
-    "flow_span": 1.5933920849420247e-12,
-    "max_charge_balance": 3.2719071896281093e-10,
-    "boundary_current_residual": 2.7861602291428404e-14
-  },
-  "comparison": {
-    "controlling_velocity_component": "u",
-    "velocity_map_rate_relative_difference": 1.553080843782417e-5,
-    "velocity_map_rate_relative_difference_max": 0.005,
+    "half_dt": 9.259259259259259e-7,
+    "base_velocity_map_rate": [190.2509322605561, 1.3095772926461284, 0.5611703161521425],
+    "half_velocity_map_rate": [190.24797750977206, 1.309574734150297, 0.5611643975996953],
+    "relative_difference": 1.553080843782417e-5,
+    "relative_difference_max": 0.005,
     "raw_update_ratio": 2.000031062099295,
-    "raw_update_ratio_absolute_error_max": 0.01
+    "passed": true
   },
-  "gates": {
-    "effective_dt_matches": true,
+  "same_state_safety_ladder": {
+    "factors": [1, 2, 4, 16, 64],
+    "effective_dt": [1.8518518518518519e-6, 3.7037037037037037e-6, 7.4074074074074075e-6, 2.962962962962963e-5, 0.00011851851851851852],
+    "normalized_map_defect": [0.3523165412232521, 0.3523272965959556, 0.352348716913281, 0.35247719040944897, 0.352993009890527],
+    "largest_relative_difference": 0.001916675463367049,
+    "relative_difference_max": 0.005,
+    "same_controlling_component": true,
     "linear_solves_converged_and_finite": true,
     "conservation_below_1e-3": true,
-    "same_controlling_velocity_component": true,
-    "map_rate_dt_invariant": true,
-    "raw_update_linear_in_dt": true,
     "passed": true
+  },
+  "warm_start_64x_trajectory": {
+    "wall_seconds": 26.169059916981496,
+    "ordinary_updates": 8,
+    "normalized_map_defect": [0.352993009890527, 0.33674782204929504, 0.3034580826693934, 0.2685820184025658, 0.23571087959516934, 0.20745391706540084, 0.1829204575204968, 0.1637184984493601],
+    "reduction_factor": 2.1560972842645,
+    "restart_max_absolute_difference": 0.0,
+    "max_courant": 3.4838585048703704e-5,
+    "max_divergence": 2.1355179777304834e-11,
+    "flow_span": 6.834532939592464e-13,
+    "max_charge_balance": 2.970566015392251e-10,
+    "boundary_current_residual": 2.591992277697705e-14,
+    "strictly_decreasing": true,
+    "linear_solves_converged_and_finite": true,
+    "passed": true
+  },
+  "implementation": {
+    "magnetic_stability_safety": 0.064,
+    "previous_safety": 0.001,
+    "speedup_in_effective_pseudotime_per_update": 64.0,
+    "matched_smoke_dt_unchanged": true,
+    "reduced_b2_physics_restart_test_seconds": 14.8
   },
   "decision": {
     "coarse_rerun_authorized": false,
-    "next_step": "define and predeclare a dimensionless momentum map-rate scale and production tolerance",
-    "reason": "the probe establishes timestep invariance but does not define a mesh- and parameter-independent normalization or acceptance threshold"
+    "next_step": "implement and cross-check a direct electromagnetic-scale discrete momentum defect, then freeze its threshold by outcome insensitivity",
+    "reason": "the map defect and larger pseudo-time cap are gated, but no paper or comparison code supplies a transferable steady threshold"
   }
 }

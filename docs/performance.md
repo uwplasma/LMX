@@ -12,6 +12,7 @@ devices alone is not evidence of parallel execution.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 817 pass, 8 skip, 95.02% combined line/branch coverage, 149.3 s | below the five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.8e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
+| B2 pseudo-time gate | Apple M4, `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x cap: eight warm updates reduce normalized map defect 2.16x; exact 4+4 restart; focused physics test 14.8 s | reduced numerical gate; production stopping threshold remains open |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | historical pre-terminal-fix evidence; current-source refresh pending |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
 | B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | initial medians 3.09/3.19 s; restart and device equivalence pass | historical pre-terminal-fix calibration; shared-host scaling remains open |
