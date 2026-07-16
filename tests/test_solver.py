@@ -973,10 +973,10 @@ def test_interface_and_face_conductances_match_uniform_rect_grid_symmetry():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     sigma = jnp.ones((4, 4))
 
-    conductance_y = solvers._interface_conductance_y(mesh, sigma)
-    west, east = solvers._face_conductance_y(mesh, sigma)
-    conductance_z = solvers._interface_conductance_z(mesh, sigma)
-    south, north = solvers._face_conductance_z(mesh, sigma)
+    conductance_y = solvers._interface_conductance(mesh, sigma, axis=0)
+    west, east = solvers._face_conductance(mesh, sigma, axis=0)
+    conductance_z = solvers._interface_conductance(mesh, sigma, axis=1)
+    south, north = solvers._face_conductance(mesh, sigma, axis=1)
 
     expected = 1.0 / (0.5 * mesh.dy[1] + 0.5 * mesh.dy[2])
     assert conductance_y[1, 2] == pytest.approx(expected)
@@ -994,7 +994,7 @@ def test_interface_and_face_conductances_match_uniform_rect_grid_symmetry():
 def test_zero_conductivity_cells_are_exactly_disconnected_and_well_scaled():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     sigma = jnp.ones((4, 4)).at[0, :].set(0.0)
-    assert jnp.all(solvers._interface_conductance_y(mesh, sigma)[0, :] == 0.0)
+    assert jnp.all(solvers._interface_conductance(mesh, sigma, axis=0)[0, :] == 0.0)
     diagonal, west, east, south, north = solvers._potential_coefficients(mesh, sigma)
     assert jnp.all(diagonal[0, :] == 1.0)
     assert jnp.all(west[0, :] + east[0, :] + south[0, :] + north[0, :] == 0.0)
@@ -1125,7 +1125,7 @@ def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
     source = source.at[3, 4].set(2.0)
     source = source.at[3, 5].set(-1.0)
 
-    emf_z = solvers._face_emf_z(mesh, sigma, source)
+    emf_z = solvers._face_emf(mesh, sigma, source, axis=1)
     left_distance = 0.5 * mesh.dz[4]
     right_distance = 0.5 * mesh.dz[5]
     conductance = 1.0 / (left_distance + right_distance)

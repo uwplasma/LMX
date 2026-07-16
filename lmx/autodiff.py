@@ -14,8 +14,7 @@ from .mesh import StructuredMesh, generate_rect_duct_mesh
 from .operators import gradient_scalar
 from .solvers import (
     _enforce_velocity_bc,
-    _face_emf_y,
-    _face_emf_z,
+    _face_emf,
     _fully_developed_rhs,
     _potential_coefficients,
     _velocity_system_coefficients,
@@ -440,8 +439,8 @@ def solve_differentiable_hartmann(
     def macro_body(_, u_iter):
         uxb_y = jnp.where(fluid_mask, -u_iter * bz, 0.0)
         uxb_z = jnp.where(fluid_mask, u_iter * by, 0.0)
-        conv_y = _face_emf_y(mesh, sigma, uxb_y)
-        conv_z = _face_emf_z(mesh, sigma, uxb_z)
+        conv_y = _face_emf(mesh, sigma, uxb_y, axis=0)
+        conv_z = _face_emf(mesh, sigma, uxb_z, axis=1)
         face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
         face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
         rhs_phi = -(
@@ -488,8 +487,8 @@ def solve_differentiable_hartmann(
 
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-    conv_y = _face_emf_y(mesh, sigma, uxb_y)
-    conv_z = _face_emf_z(mesh, sigma, uxb_z)
+    conv_y = _face_emf(mesh, sigma, uxb_y, axis=0)
+    conv_z = _face_emf(mesh, sigma, uxb_z, axis=1)
     face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
     face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
     rhs_phi = -(

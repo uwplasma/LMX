@@ -466,61 +466,46 @@ def _bounded_time_step_count(*, start_time: float, dt: float, t_final: float, ma
     return min(int(max_steps), max(0, allowed_steps))
 
 
-def _interface_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
-    left_distance = 0.5 * mesh.dy[:-1, None]
-    right_distance = 0.5 * mesh.dy[1:, None]
-    sigma_left = sigma[:-1, :]
-    sigma_right = sigma[1:, :]
+def _interface_conductance(
+    mesh: StructuredMesh, sigma: jnp.ndarray, *, axis: int
+) -> jnp.ndarray:
+    widths = (mesh.dy, mesh.dz)[axis]
+    field = jnp.moveaxis(sigma, axis, 0)
+    left_distance = 0.5 * widths[:-1, None]
+    right_distance = 0.5 * widths[1:, None]
+    sigma_left = field[:-1]
+    sigma_right = field[1:]
     connected = (sigma_left > 0.0) & (sigma_right > 0.0)
     safe_left = jnp.where(connected, sigma_left, 1.0)
     safe_right = jnp.where(connected, sigma_right, 1.0)
     resistance = left_distance / safe_left + right_distance / safe_right
-    return jnp.where(connected, 1.0 / jnp.maximum(resistance, 1e-30), 0.0)
+    conductance = jnp.where(connected, 1.0 / jnp.maximum(resistance, 1e-30), 0.0)
+    return jnp.moveaxis(conductance, 0, axis)
 
 
-def _face_conductance_y(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    conductance = _interface_conductance_y(mesh, sigma)
-    west = jnp.pad(conductance, ((1, 0), (0, 0))) / mesh.dy[:, None]
-    east = jnp.pad(conductance, ((0, 1), (0, 0))) / mesh.dy[:, None]
-    return west, east
+def _face_conductance(
+    mesh: StructuredMesh, sigma: jnp.ndarray, *, axis: int
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    conductance = _interface_conductance(mesh, sigma, axis=axis)
+    spacing = jnp.moveaxis((mesh.dy, mesh.dz)[axis][:, None], 0, axis)
+    lower_pad, upper_pad = [[(0, 0), (0, 0)] for _ in range(2)]
+    lower_pad[axis], upper_pad[axis] = (1, 0), (0, 1)
+    return jnp.pad(conductance, lower_pad) / spacing, jnp.pad(conductance, upper_pad) / spacing
 
 
-def _interface_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> jnp.ndarray:
-    left_distance = 0.5 * mesh.dz[None, :-1]
-    right_distance = 0.5 * mesh.dz[None, 1:]
-    sigma_left = sigma[:, :-1]
-    sigma_right = sigma[:, 1:]
-    connected = (sigma_left > 0.0) & (sigma_right > 0.0)
-    safe_left = jnp.where(connected, sigma_left, 1.0)
-    safe_right = jnp.where(connected, sigma_right, 1.0)
-    resistance = left_distance / safe_left + right_distance / safe_right
-    return jnp.where(connected, 1.0 / jnp.maximum(resistance, 1e-30), 0.0)
-
-
-def _face_conductance_z(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    conductance = _interface_conductance_z(mesh, sigma)
-    south = jnp.pad(conductance, ((0, 0), (1, 0))) / mesh.dz[None, :]
-    north = jnp.pad(conductance, ((0, 0), (0, 1))) / mesh.dz[None, :]
-    return south, north
-
-
-def _face_emf_y(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray) -> jnp.ndarray:
-    left_distance = 0.5 * mesh.dy[:-1, None]
-    right_distance = 0.5 * mesh.dy[1:, None]
-    conductance = _interface_conductance_y(mesh, sigma)
-    return conductance * (left_distance * source[:-1, :] + right_distance * source[1:, :])
-
-
-def _face_emf_z(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray) -> jnp.ndarray:
-    left_distance = 0.5 * mesh.dz[None, :-1]
-    right_distance = 0.5 * mesh.dz[None, 1:]
-    conductance = _interface_conductance_z(mesh, sigma)
-    return conductance * (left_distance * source[:, :-1] + right_distance * source[:, 1:])
+def _face_emf(
+    mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray, *, axis: int
+) -> jnp.ndarray:
+    widths = (mesh.dy, mesh.dz)[axis]
+    field = jnp.moveaxis(source, axis, 0)
+    conductance = jnp.moveaxis(_interface_conductance(mesh, sigma, axis=axis), axis, 0)
+    emf = conductance * (0.5 * widths[:-1, None] * field[:-1] + 0.5 * widths[1:, None] * field[1:])
+    return jnp.moveaxis(emf, 0, axis)
 
 
 def _potential_coefficients(mesh: StructuredMesh, sigma: jnp.ndarray) -> tuple[jnp.ndarray, ...]:
-    west, east = _face_conductance_y(mesh, sigma)
-    south, north = _face_conductance_z(mesh, sigma)
+    west, east = _face_conductance(mesh, sigma, axis=0)
+    south, north = _face_conductance(mesh, sigma, axis=1)
     diagonal = west + east + south + north
     diagonal = jnp.where(diagonal > 0.0, diagonal, 1.0)
     return diagonal, west, east, south, north
@@ -530,24 +515,19 @@ def _cell_metric(mesh: StructuredMesh) -> jnp.ndarray:
     return mesh.dy[:, None] * mesh.dz[None, :]
 
 
-def _connected_interface_diffusivity_y(mesh: StructuredMesh, diffusivity: jnp.ndarray, active_mask: jnp.ndarray) -> jnp.ndarray:
-    connected = active_mask[:-1, :] & active_mask[1:, :]
-    left_distance = 0.5 * mesh.dy[:-1, None]
-    right_distance = 0.5 * mesh.dy[1:, None]
-    diffusivity_left = jnp.maximum(diffusivity[:-1, :], 1e-12)
-    diffusivity_right = jnp.maximum(diffusivity[1:, :], 1e-12)
+def _connected_interface_diffusivity(
+    mesh: StructuredMesh, diffusivity: jnp.ndarray, active_mask: jnp.ndarray, *, axis: int
+) -> jnp.ndarray:
+    widths = (mesh.dy, mesh.dz)[axis]
+    field = jnp.moveaxis(diffusivity, axis, 0)
+    active = jnp.moveaxis(active_mask, axis, 0)
+    connected = active[:-1] & active[1:]
+    left_distance = 0.5 * widths[:-1, None]
+    right_distance = 0.5 * widths[1:, None]
+    diffusivity_left = jnp.maximum(field[:-1], 1e-12)
+    diffusivity_right = jnp.maximum(field[1:], 1e-12)
     conductance = 1.0 / jnp.maximum(left_distance / diffusivity_left + right_distance / diffusivity_right, 1e-12)
-    return jnp.where(connected, conductance, 0.0)
-
-
-def _connected_interface_diffusivity_z(mesh: StructuredMesh, diffusivity: jnp.ndarray, active_mask: jnp.ndarray) -> jnp.ndarray:
-    connected = active_mask[:, :-1] & active_mask[:, 1:]
-    left_distance = 0.5 * mesh.dz[None, :-1]
-    right_distance = 0.5 * mesh.dz[None, 1:]
-    diffusivity_left = jnp.maximum(diffusivity[:, :-1], 1e-12)
-    diffusivity_right = jnp.maximum(diffusivity[:, 1:], 1e-12)
-    conductance = 1.0 / jnp.maximum(left_distance / diffusivity_left + right_distance / diffusivity_right, 1e-12)
-    return jnp.where(connected, conductance, 0.0)
+    return jnp.moveaxis(jnp.where(connected, conductance, 0.0), 0, axis)
 
 
 def _velocity_system_coefficients(
@@ -565,8 +545,8 @@ def _velocity_system_coefficients(
     south_connected = active_mask & jnp.pad(active_mask[:, :-1], ((0, 0), (1, 0)))
     north_connected = active_mask & jnp.pad(active_mask[:, 1:], ((0, 0), (0, 1)))
 
-    interface_y = _connected_interface_diffusivity_y(mesh, diffusivity, active_mask)
-    interface_z = _connected_interface_diffusivity_z(mesh, diffusivity, active_mask)
+    interface_y = _connected_interface_diffusivity(mesh, diffusivity, active_mask, axis=0)
+    interface_z = _connected_interface_diffusivity(mesh, diffusivity, active_mask, axis=1)
     west = jnp.where(
         west_connected,
         jnp.pad(interface_y, ((1, 0), (0, 0))) / jnp.maximum(dy, 1e-12),
@@ -709,8 +689,8 @@ def _solve_potential(
 ) -> tuple[jnp.ndarray, ...]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-    conv_y = _face_emf_y(mesh, sigma, uxb_y)
-    conv_z = _face_emf_z(mesh, sigma, uxb_z)
+    conv_y = _face_emf(mesh, sigma, uxb_y, axis=0)
+    conv_z = _face_emf(mesh, sigma, uxb_z, axis=1)
     face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
     face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
     rhs = -(
@@ -863,8 +843,8 @@ def _compute_current_and_lorentz(
     if use_face_currents:
         uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
         uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-        face_jy = _interface_conductance_y(mesh, sigma) * (phi[:-1, :] - phi[1:, :]) + _face_emf_y(mesh, sigma, uxb_y)
-        face_jz = _interface_conductance_z(mesh, sigma) * (phi[:, :-1] - phi[:, 1:]) + _face_emf_z(mesh, sigma, uxb_z)
+        face_jy = _interface_conductance(mesh, sigma, axis=0) * (phi[:-1, :] - phi[1:, :]) + _face_emf(mesh, sigma, uxb_y, axis=0)
+        face_jz = _interface_conductance(mesh, sigma, axis=1) * (phi[:, :-1] - phi[:, 1:]) + _face_emf(mesh, sigma, uxb_z, axis=1)
         face_jy_centered = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
         face_jz_centered = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
     if reconstruction == "face_averaged":
@@ -893,10 +873,10 @@ def _face_current_components(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-    emf_y = _face_emf_y(mesh, sigma, uxb_y)
-    emf_z = _face_emf_z(mesh, sigma, uxb_z)
-    face_jy = _interface_conductance_y(mesh, sigma) * (phi[:-1, :] - phi[1:, :]) + emf_y
-    face_jz = _interface_conductance_z(mesh, sigma) * (phi[:, :-1] - phi[:, 1:]) + emf_z
+    emf_y = _face_emf(mesh, sigma, uxb_y, axis=0)
+    emf_z = _face_emf(mesh, sigma, uxb_z, axis=1)
+    face_jy = _interface_conductance(mesh, sigma, axis=0) * (phi[:-1, :] - phi[1:, :]) + emf_y
+    face_jz = _interface_conductance(mesh, sigma, axis=1) * (phi[:, :-1] - phi[:, 1:]) + emf_z
     return face_jy, face_jz, emf_y, emf_z
 
 
@@ -1020,8 +1000,8 @@ def fully_developed_power_balance(case: CaseSpec, solution: Solution) -> dict[st
         by,
         bz,
     )
-    conductance_y = _interface_conductance_y(mesh, materials.conductivity)
-    conductance_z = _interface_conductance_z(mesh, materials.conductivity)
+    conductance_y = _interface_conductance(mesh, materials.conductivity, axis=0)
+    conductance_z = _interface_conductance(mesh, materials.conductivity, axis=1)
     face_area_y = mesh.dz[None, :]
     face_area_z = mesh.dy[:, None]
     joule_dissipation = jnp.sum(
