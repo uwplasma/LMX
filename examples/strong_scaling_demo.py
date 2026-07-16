@@ -558,9 +558,9 @@ def run_strong_scaling_demo(
         )
 
     diagnostics = summarize_strong_scaling_records(records)
-    plots = write_strong_scaling_plots(records, out_dir, case_title=(
-        "LMX sustained fixed-work scaling" if diagnostics["sustained_claim_eligible"]
-        else "LMX scaling smoke / calibration"))
+    plots = write_strong_scaling_plots(
+        records, out_dir, case_title="LMX fixed-work scaling evidence"
+    )
     table_path = write_strong_scaling_summary_table(
         records, out_dir / "strong_scaling_table.csv"
     )

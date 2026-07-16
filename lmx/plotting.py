@@ -1993,7 +1993,6 @@ def write_strong_scaling_plots(
     """Plot warm runtime and speedup against a named execution-resource count."""
 
     out_dir = _prepare_plot_output(out_dir)
-
     groups: dict[str, list[dict[str, object]]] = {}
     for record in records:
         groups.setdefault(str(record["platform"]), []).append(record)
@@ -2030,7 +2029,6 @@ def write_strong_scaling_plots(
             else:
                 suffix = "" if not benchmark_kind else f", {benchmark_kind}"
                 label = f"{platform_label}: {shape_text}, {int(iteration_value)} iters{suffix}"
-
         axes[0].plot(device_counts, runtimes, marker="o", color=color, label=label)
         axes[1].plot(device_counts, speedup, marker="o", color=color, label=label)
         legend_handles.append(Line2D([0], [0], color=color, marker="o", label=label))
@@ -2055,7 +2053,7 @@ def write_strong_scaling_plots(
     axes[0].set_xscale("log", base=2)
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
-    axes[1].set_title("Strong-scaling speedup", fontsize=13)
+    axes[1].set_title("Fixed-work speedup", fontsize=13)
     axes[1].set_xlabel(resource_label)
     axes[1].set_ylabel("Warm-runtime speedup")
     axes[1].set_xscale("log", base=2)

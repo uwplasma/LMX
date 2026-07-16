@@ -187,6 +187,38 @@ _SUSTAINED_RUNTIME_IDENTITY = (
     "source_commit", "source_fingerprint", "precision", "python_version",
     "jax_version", "jaxlib_version", "solvax_version",
 )
+_SUSTAINED_WARM_SECONDS = 120.0
+_SUSTAINED_WARM_SAMPLES = 3
+
+
+def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
+    """Re-derive multi-minute eligibility instead of trusting a worker flag."""
+
+    try:
+        samples = np.asarray(record.get("warm_samples_seconds", ()), dtype=float)
+        repeats = int(record.get("repeats", 0))
+        requested = float(record.get("minimum_warm_seconds", 0.0))
+        declared = float(record.get("sustained_minimum_warm_seconds", 0.0))
+        median = float(record.get("warm_seconds", np.nan))
+    except (TypeError, ValueError):
+        return False
+    return bool(
+        record.get("benchmark_kind") == "matched_b2_smoke"
+        and record.get("acceptance_role") == "sustained-candidate"
+        and samples.ndim == 1
+        and samples.size >= _SUSTAINED_WARM_SAMPLES
+        and repeats == samples.size + 1
+        and requested >= declared >= _SUSTAINED_WARM_SECONDS
+        and np.all(np.isfinite(samples))
+        and np.all(samples >= requested)
+        and np.isfinite(median)
+        and median > 0.0
+        and np.isclose(median, np.median(samples), rtol=1.0e-12, atol=1.0e-12)
+        and all(bool(record.get(name)) for name in (
+            "requested_duration_passed", "sustained_duration_passed",
+            "sustained_timing_eligible", "timed_signature_excluded",
+        ))
+    )
 
 
 def _sustained_identity_fields(record: Mapping[str, object]) -> tuple[str, ...]:
@@ -355,9 +387,7 @@ def summarize_strong_scaling_records(
                     "signature_relative_tolerance": signature_rtol,
                     "physics_equivalent": physics_equivalent,
                     "solver_faithful": operator_path == "solve_extruded_inductionless",
-                    "sustained_timing_eligible": bool(
-                        record.get("sustained_timing_eligible", False)
-                    ),
+                    "sustained_timing_eligible": _sustained_timing_evidence(record),
                 }
             )
         group = _sustained_group(sorted_records, group_rows)

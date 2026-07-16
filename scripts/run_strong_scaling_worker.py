@@ -34,6 +34,8 @@ from lmx.fringing import (
     _unpack_duct_mass_flux,
 )
 from lmx.scaling import (
+    _SUSTAINED_WARM_SAMPLES,
+    _SUSTAINED_WARM_SECONDS,
     _bundle_memory_bytes,
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
@@ -45,8 +47,6 @@ _B2_RESTART_FLUX_RTOL = 1.0e-5
 _B2_REPEAT_ATOL = 2.0e-9
 _B2_REPEAT_RTOL = 2.0e-8
 _B2_PROFILE_ITERATION_ATOL = 3
-_B2_SUSTAINED_WARM_SECONDS = 120.0
-_B2_SUSTAINED_WARM_SAMPLES = 3
 _B2_FIELD_NAMES = (
     "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus", "rho_phi_inlet"
 )
@@ -64,9 +64,9 @@ def _sustained_timing_passed(
 
     samples = np.asarray(warm_samples, dtype=float)
     return bool(
-        samples.size >= _B2_SUSTAINED_WARM_SAMPLES
-        and minimum_warm_seconds >= _B2_SUSTAINED_WARM_SECONDS
-        and np.all(samples >= _B2_SUSTAINED_WARM_SECONDS)
+        samples.size >= _SUSTAINED_WARM_SAMPLES
+        and minimum_warm_seconds >= _SUSTAINED_WARM_SECONDS
+        and np.all(samples >= _SUSTAINED_WARM_SECONDS)
     )
 
 
@@ -494,7 +494,7 @@ def _matched_b2_smoke_benchmark(
             for left, right, offset in profile_histories)))
     if direct.u.shape == (8, 7, 7) and executed_steps == 2:
         acceptance_role = "harness-smoke"
-    elif minimum_warm_seconds >= _B2_SUSTAINED_WARM_SECONDS:
+    elif minimum_warm_seconds >= _SUSTAINED_WARM_SECONDS:
         acceptance_role = "sustained-candidate"
     else:
         acceptance_role = "fixed-work-debug"
@@ -525,7 +525,7 @@ def _matched_b2_smoke_benchmark(
             "repeats": repeats, "cold_seconds": timings[0],
             "warm_samples_seconds": warm.tolist(),
             "warm_seconds": float(np.median(warm)), "validation_passed": False,
-            "sustained_minimum_warm_seconds": _B2_SUSTAINED_WARM_SECONDS,
+            "sustained_minimum_warm_seconds": _SUSTAINED_WARM_SECONDS,
             "sustained_duration_passed": sustained,
             "sustained_timing_eligible": False,
             "failure": {"phase": "restart", "type": type(error).__name__,
@@ -608,7 +608,7 @@ def _matched_b2_smoke_benchmark(
         "minimum_warm_seconds": minimum_warm_seconds,
         "requested_duration_passed": bool(
             all(sample >= minimum_warm_seconds for sample in warm)),
-        "sustained_minimum_warm_seconds": _B2_SUSTAINED_WARM_SECONDS,
+        "sustained_minimum_warm_seconds": _SUSTAINED_WARM_SECONDS,
         "sustained_duration_passed": sustained,
         "sustained_timing_eligible": bool(validation_passed and sustained),
         "velocity_l2": velocity_l2, "potential_l2": float(np.linalg.norm(np.asarray(direct.phi))),

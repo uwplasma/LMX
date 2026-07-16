@@ -265,10 +265,11 @@ def _worker_record(**updates) -> StrongScalingRecord:
 def _sustained_ladder(counts, backend="cpu"):
     records = []
     for count in counts:
+        warm = 488.0 / count
         record = _worker_record(backend=backend,
             device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
             num_devices=count, repeats=4, cold_seconds=20.0 / count,
-            warm_seconds=12.0 / count, mean_seconds=14.0 / count,
+            warm_seconds=warm, mean_seconds=warm,
             benchmark_kind="matched_b2_smoke", operator_path="solve_extruded_inductionless",
             memory_bytes_estimate=2 * 1024 * 1024,
             spatially_sharded=count > 1, global_shard_count=count,
@@ -281,7 +282,12 @@ def _sustained_ladder(counts, backend="cpu"):
             "device_memory": ([{"peak_bytes_in_use": 1024} for _ in range(count)]
                 if backend == "gpu" else []),
             "resource_environment_verified": True,
-            "sustained_timing_eligible": True})
+            "acceptance_role": "sustained-candidate",
+            "minimum_warm_seconds": 120.0,
+            "sustained_minimum_warm_seconds": 120.0,
+            "warm_samples_seconds": [warm - 1.0 / count, warm, warm + 1.0 / count],
+            "requested_duration_passed": True, "sustained_duration_passed": True,
+            "sustained_timing_eligible": True, "timed_signature_excluded": True})
     return records
 
 
@@ -379,17 +385,18 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
 
     cpu = json.loads(Path(
         "benchmarks/results/b2-schema6-cpu-scaling-20260716.json").read_text())
-    cpu_sustained = cpu["sustained_cpu_allocation"]
+    cpu_sustained = (cpu["sustained_cpu_allocation"],
+        cpu["current_source_sustained_cpu_allocation"])
     gpu = json.loads(Path(
         "benchmarks/results/b2-gpu-scaling-calibration-20260715.json").read_text())
     gpu_sustained = gpu["sustained_shared_host_calibration"]
-    for record in (cpu_sustained, gpu_sustained):
-        threshold = record.get("promotion_thresholds", record.get("problem"))
+    for record in (*cpu_sustained, gpu_sustained):
+        threshold = record.get("promotion_thresholds") or record.get("problem") or record
         assert threshold["minimum_warm_seconds"] >= 120.0
         assert all(
             sample >= 120.0 for run in record["runs"].values()
             for sample in run["warm_samples_seconds"])
-        assert all(run["peak_host_rss_bytes"] > run["solution_bundle_bytes"] > 0
+        assert all(run["peak_host_rss_bytes"] > run.get("solution_bundle_bytes", 0)
             for run in record["runs"].values())
     assert not gpu_sustained["gates"]["authoritative_idle_host"]
     assert all(run["peak_device_bytes_total"] > 0
@@ -453,10 +460,10 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert summary["solver_faithful_record_count"] == 2
     assert summary["profiled_record_count"] == 1
     assert summary["physics_equivalent_record_count"] == 2
-    assert summary["sustained_timing_record_count"] == 2
+    assert summary["sustained_timing_record_count"] == 0
     assert not summary["sustained_claim_eligible"]
     assert summary["best_speedup"] == pytest.approx(2.0)
-    assert summary["best_sustained_candidate_speedup"] == pytest.approx(2.0)
+    assert summary["best_sustained_candidate_speedup"] == 0.0
     assert summary["best_sustained_speedup"] == 0.0
     rows = summary["rows"]
     assert rows[0]["speedup"] == pytest.approx(1.0)
@@ -488,6 +495,23 @@ def test_sustained_claim_fails_closed_on_incomplete_evidence():
     summaries = [summarize_strong_scaling_records(records) for records in bad]
     assert all(not summary["sustained_claim_eligible"] for summary in summaries)
     assert all(summary["best_sustained_speedup"] == 0.0 for summary in summaries)
+
+
+def test_sustained_claim_rederives_multiminute_worker_evidence():
+    variants = (
+        {"warm_samples_seconds": [1.0, 2.0, 3.0], "warm_seconds": 2.0},
+        {"warm_samples_seconds": None},
+        {"warm_samples_seconds": [121.0, 122.0], "repeats": 3}, {"repeats": 5},
+        {"minimum_warm_seconds": 0.0}, {"warm_seconds": 999.0},
+        {"warm_samples_seconds": [121.0, np.nan, 123.0]},
+        {"sustained_duration_passed": False}, {"acceptance_role": "fixed-work-debug"},
+    )
+    for mutation in variants:
+        records = [dict(record) for record in _sustained_ladder((1, 2, 4))]
+        records[-1].update(mutation)
+        assert not summarize_strong_scaling_records(records)[
+            "sustained_claim_eligible"
+        ]
 
 
 @pytest.mark.parametrize(("backend", "counts"), (("cpu", (1, 2, 4)), ("gpu", (1, 2))))
