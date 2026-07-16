@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 576945,
+    "bytes": 622321,
     "files": [
       {
         "bytes": 71620,
@@ -583,6 +583,11 @@
         "bytes": 21086,
         "path": "docs/_static/freemhd_closed_channel_observable_parity.webp",
         "sha256": "99f99b4b725860feaba8fc652ea5615ecc035bc8c6a7d3dcff5146358f01d2c7"
+      },
+      {
+        "bytes": 41120,
+        "path": "docs/_static/operator_verification.webp",
+        "sha256": "5a838ab23208a8e1f2bb0e6ea7d5419b45133e023186ab97eb7ce6f168817950"
       },
       {
         "bytes": 43174,
@@ -630,9 +635,9 @@
         "sha256": "a4ada2e53c72cd2a57da99db072fc47a5477784aaf4938fc8efa83318b3456a4"
       },
       {
-        "bytes": 27360,
+        "bytes": 31616,
         "path": "docs/_static/strong_scaling.webp",
-        "sha256": "b277641b4725c0f3712babc281582972b5e3ce6fa6f0fd206240f79e91404026"
+        "sha256": "46007ff07176785a4bb5a37a8a3fec3d80b6e22aa88ef476ccbd996b8727ee10"
       }
     ]
   },

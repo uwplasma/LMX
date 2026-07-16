@@ -30,6 +30,16 @@ are written in vectorized `jax.numpy` form and provide:
 These operators are used by both the standard solver lane and the
 differentiable lane.
 
+### Manufactured-solution verification
+
+![Second-order gradient and Laplacian convergence](_static/operator_verification.webp)
+
+The portable operator example refines a smooth manufactured solution from
+`16 x 16` to `64 x 64`. The measured orders are 2.00 for the y-gradient, 1.94
+for the z-gradient, and 1.91 for the Laplacian. Run
+`python examples/operator_verification_demo.py`; raw PNG, PDF, and JSON outputs
+remain under ignored `artifacts/`.
+
 ## Material and magnetic-field assembly
 
 `lmx/physics.py` assembles:

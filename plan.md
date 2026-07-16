@@ -593,6 +593,26 @@ and short visual sections for verified ducts, fields/geometries,
 differentiation, research workflows, and scaling. There is no generic
 “selected media” gallery; each plot or movie explains a specific feature.
 
+Visual evidence is part of the acceptance contract. Every curated example and
+every important physics, numerics, literature, differentiation, restart, or
+parallel result with meaningful spatial, transient, convergence, comparison,
+sensitivity, or scaling structure must map to a plot or movie in the README or
+its feature page. Configuration/CLI mechanics and scalar-only invariants may
+share the result they drive and do not require decorative charts. Every visual
+labels maturity, generating record or command, observable, tolerance or
+uncertainty, and test owner. Prefer an existing writer and accepted compact
+record over a rerun; keep raw data and full-quality media outside Git.
+
+The visual backlog is evidence-ranked. The stale scaling panel and bounded
+operator-convergence gap are closed. P0 next: build one Samper/Benchmark-A
+composite from frozen JSON covering all eight high-Ha rows, mesh/order gates,
+and current/power residuals. P1: surface exact restart replay, the
+research-stage mapped-pipe comparison, and the portable fringing result. P2:
+one detailed composite each for Q2D external diagnostics, magnetic-obstacle
+literature comparison, and blanket current/pressure evidence. Keep the README
+to at most one new concise accepted-validation composite; detailed evidence
+belongs on the owning pages.
+
 Comparison-table cells describe the named native workflow, not what could be
 implemented through arbitrary custom sources. Keep primary sources beside the
 table. The current audit uses the FreeMHD paper/source, FreeMHD2 preprint, NekRS

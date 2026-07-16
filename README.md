@@ -138,7 +138,7 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![B2 two-update CPU and GPU scaling evidence](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
+![Current B2 schema-6 CPU sharding calibration](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
 Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
 `256 × 67 × 67`, two/four devices reach 1.229×/1.360×; four devices still miss

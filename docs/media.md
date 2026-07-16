@@ -9,9 +9,37 @@ where the compressed derivatives live. The checksummed source bundle is in the
 versioned [research-assets release](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1);
 other raw intermediates remain outside Git. The package wheel contains no media.
 
+## Visual evidence coverage
+
+Every curated journey and every accepted result with meaningful spatial,
+transient, convergence, comparison, sensitivity, or scaling structure owns a
+visual in its feature page. CLI/configuration mechanics and scalar-only
+contracts may share the physical result they drive; they do not receive
+decorative charts. Each published visual must name its maturity, source record
+or command, observable, and acceptance limit or uncertainty.
+
+| Workflow or claim | Documentation visual | Coverage |
+|---|---|---|
+| Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and Hunt startup | complete |
+| manufactured operators | observed-order convergence | complete |
+| FreeMHD closed-channel parity | accepted observable comparison | complete; add validation-ladder composite |
+| portable fringing workflow | B2 field/pressure panel | representative; portable six-panel result queued |
+| exact restart/replay | direct-versus-resumed writer | queued for the case cookbook |
+| custom fields and mapped geometry | field response and geometry panels | complete |
+| differentiable design | checked sensitivity and bounded design trace | complete |
+| CPU/GPU parallelism | current schema-6 CPU calibration | CPU current; two-GPU replay open |
+| ALEX B1 pipe reference | mapped-pipe comparison writer | queued; research-stage |
+| Samper high-Ha literature ladder | frozen eight-row result records | priority composite queued |
+| Q2D, obstacle, and blanket studies | compressed loops/panels | workflow coverage complete; quantitative parity open |
+
+The next tracked derivatives are ordered by evidentiary value: the frozen
+Samper/Benchmark-A ladder, restart equivalence, and the mapped-pipe comparison.
+Prefer existing writers and compact accepted JSON; do not rerun a solver merely
+to change presentation. One composite should serve one claim family.
+
 ## Tracked web set
 
-Twelve files in `docs/_static/` total 576,945 bytes. The `showcase` section of
+Thirteen files in `docs/_static/` total 622,321 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -19,7 +47,8 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 |---|---:|---|---|
 | duct profiles | 71,620 | 1,338 × 816 WebP | released analytical-profile PNG `f55c380c...` |
 | accepted FreeMHD observables | 21,086 | 1,200 × 641 WebP | acceptance record `9f94ea15...`; generated at `72f2049` |
-| B2 scaling evidence | 27,360 | 1,400 × 661 WebP | CPU/GPU records `cf9fafb8...` / `5f032be4...`; generated at `72f2049` |
+| manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
+| B2 schema-6 CPU calibration | 31,616 | 1,400 × 653 WebP | accepted record `b2-schema6-cpu-scaling-20260716.json`; `test_plotting.py`; GPU replay omitted while open |
 | Hunt startup | 35,171 | 640 × 416 H.264, 7 s | existing 24.08-second transient; no solver rerun |
 | Hunt poster | 13,000 | 640 × 416 WebP | released poster PNG `cac2125e...` |
 | checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |

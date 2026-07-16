@@ -4,7 +4,13 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![B2 two-update CPU and GPU scaling evidence](_static/strong_scaling.webp)
+![Current B2 schema-6 CPU sharding calibration](_static/strong_scaling.webp)
+
+This panel is generated from the accepted schema-6 CPU calibration record. It
+demonstrates correct fixed-grid sharding and monotonic warm-time improvement,
+but not promoted strong scaling; the four-device confidence and efficiency
+gates remain open. Current two-GPU replay is also open and is deliberately not
+shown.
 
 ## Current evidence
 
@@ -12,6 +18,7 @@ devices alone is not evidence of parallel execution.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 849 pass, 8 skip, 95.33% combined line/branch coverage, 143.0 s | timing delta treated as host variance; below five-minute target |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
+| B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
