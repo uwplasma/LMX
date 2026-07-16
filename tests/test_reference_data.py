@@ -41,6 +41,14 @@ def _fringing_pipe_root_or_skip() -> Path:
     return root
 
 
+def _processed_slice(tmp_path: Path, rows: list[str] | str) -> ProcessedSliceReference:
+    root = tmp_path / "ClosedChannel"
+    root.mkdir(parents=True)
+    text = rows if isinstance(rows, str) else "\n".join(rows)
+    (root / "hunt_exactBL_Ha20_XSlice1m_4s.csv").write_text(text)
+    return load_processed_slice("hunt", 20, reference_root=root)
+
+
 def test_load_closed_channel_analytical_parses_axes_and_pressure_drop(tmp_path: Path):
     analytical_root = tmp_path / "ClosedChannel" / "AnalyticalSolutions"
     analytical_root.mkdir(parents=True)
@@ -55,22 +63,17 @@ def test_load_closed_channel_analytical_parses_axes_and_pressure_drop(tmp_path: 
 
 
 def test_extract_processed_midplane_profile_returns_sorted_cut(tmp_path: Path):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "Points:1,Points:2,U:0,potE",
-                "0.0,-1.0,1.0,0.1",
-                "0.0,0.0,2.0,0.2",
-                "0.0,1.0,3.0,0.3",
-                "-1.0,0.0,4.0,0.4",
-                "1.0,0.0,5.0,0.5",
-            ]
-        )
+    reference = _processed_slice(
+        tmp_path,
+        [
+            "Points:1,Points:2,U:0,potE",
+            "0.0,-1.0,1.0,0.1",
+            "0.0,0.0,2.0,0.2",
+            "0.0,1.0,3.0,0.3",
+            "-1.0,0.0,4.0,0.4",
+            "1.0,0.0,5.0,0.5",
+        ],
     )
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
     y_profile = extract_processed_midplane_profile(reference, axis="y")
     z_profile = extract_processed_midplane_profile(reference, axis="z")
     assert y_profile["y"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
@@ -80,22 +83,17 @@ def test_extract_processed_midplane_profile_returns_sorted_cut(tmp_path: Path):
 
 
 def test_extract_processed_profile_returns_requested_field_component(tmp_path: Path):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "Points:1,Points:2,U:0,J:1,J:2,potE",
-                "0.0,-1.0,1.0,10.0,11.0,0.1",
-                "0.0,0.0,2.0,20.0,21.0,0.2",
-                "0.0,1.0,3.0,30.0,31.0,0.3",
-                "-1.0,0.0,4.0,40.0,41.0,0.4",
-                "1.0,0.0,5.0,50.0,51.0,0.5",
-            ]
-        )
+    reference = _processed_slice(
+        tmp_path,
+        [
+            "Points:1,Points:2,U:0,J:1,J:2,potE",
+            "0.0,-1.0,1.0,10.0,11.0,0.1",
+            "0.0,0.0,2.0,20.0,21.0,0.2",
+            "0.0,1.0,3.0,30.0,31.0,0.3",
+            "-1.0,0.0,4.0,40.0,41.0,0.4",
+            "1.0,0.0,5.0,50.0,51.0,0.5",
+        ],
     )
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
     y_profile = extract_processed_profile(
         reference, axis="y", field_name="J", component=1
     )
@@ -107,22 +105,17 @@ def test_extract_processed_profile_returns_requested_field_component(tmp_path: P
 
 
 def test_processed_slice_field_grid_averages_duplicate_points(tmp_path: Path):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "Points:1,Points:2,U:0",
-                "0.0,0.0,1.0",
-                "0.0,1.0,2.0",
-                "1.0,0.0,3.0",
-                "1.0,1.0,5.0",
-                "1.0,1.0,7.0",
-            ]
-        )
+    reference = _processed_slice(
+        tmp_path,
+        [
+            "Points:1,Points:2,U:0",
+            "0.0,0.0,1.0",
+            "0.0,1.0,2.0",
+            "1.0,0.0,3.0",
+            "1.0,1.0,5.0",
+            "1.0,1.0,7.0",
+        ],
     )
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
     grid = processed_slice_field_grid(reference, field_name="U", component=0)
 
     assert grid["y"].tolist() == pytest.approx([0.0, 1.0])
@@ -132,9 +125,6 @@ def test_processed_slice_field_grid_averages_duplicate_points(tmp_path: Path):
 
 
 def test_processed_slice_area_mean_uses_nonuniform_quadrature(tmp_path: Path):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
     y_values = [-1.0, -0.25, 1.0]
     z_values = [-2.0, 0.0, 2.0]
     rows = ["Points:1,Points:2,U:0"]
@@ -142,9 +132,7 @@ def test_processed_slice_area_mean_uses_nonuniform_quadrature(tmp_path: Path):
         for point_z in z_values:
             rows.append(f"{point_y},{point_z},{2.0 + point_y + 0.5 * point_z}")
     rows.append("-0.25,0.0,1.75")
-    path.write_text("\n".join(rows))
-
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+    reference = _processed_slice(tmp_path, rows)
 
     assert processed_slice_area_mean(reference) == pytest.approx(2.0)
 
@@ -152,20 +140,15 @@ def test_processed_slice_area_mean_uses_nonuniform_quadrature(tmp_path: Path):
 def test_processed_slice_grid_fills_missing_values_and_reports_bad_field(
     tmp_path: Path,
 ):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "Points:1,Points:2,U:0",
-                "0.0,0.0,1.0",
-                "0.0,1.0,3.0",
-                "1.0,0.0,5.0",
-            ]
-        )
+    reference = _processed_slice(
+        tmp_path,
+        [
+            "Points:1,Points:2,U:0",
+            "0.0,0.0,1.0",
+            "0.0,1.0,3.0",
+            "1.0,0.0,5.0",
+        ],
     )
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
 
     grid = processed_slice_field_grid(reference, field_name="U", component=0)
 
@@ -175,33 +158,26 @@ def test_processed_slice_grid_fills_missing_values_and_reports_bad_field(
 
 
 def test_processed_slice_area_mean_handles_single_sample(tmp_path: Path):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text("Points:1,Points:2,U:0\n0.0,0.0,4.0\n")
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
+    reference = _processed_slice(
+        tmp_path, "Points:1,Points:2,U:0\n0.0,0.0,4.0\n"
+    )
 
     assert processed_slice_area_mean(reference) == pytest.approx(4.0)
 
 
 def test_processed_slice_point_mesh_uses_unique_slice_coordinates(tmp_path: Path):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "Points:1,Points:2,U:0",
-                "-0.1,-0.1,0.0",
-                "-0.1,0.0,1.0",
-                "-0.1,0.1,0.0",
-                "0.0,-0.1,1.0",
-                "0.0,0.0,2.0",
-                "0.1,0.1,0.0",
-            ]
-        )
+    reference = _processed_slice(
+        tmp_path,
+        [
+            "Points:1,Points:2,U:0",
+            "-0.1,-0.1,0.0",
+            "-0.1,0.0,1.0",
+            "-0.1,0.1,0.0",
+            "0.0,-0.1,1.0",
+            "0.0,0.0,2.0",
+            "0.1,0.1,0.0",
+        ],
     )
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
 
     mesh = processed_slice_point_mesh(reference, length=2.0, nx=2)
 
@@ -230,25 +206,20 @@ def test_fill_missing_structured_values_covers_column_and_fallback_paths():
 def test_extract_processed_profile_interpolates_symmetric_near_center_planes(
     tmp_path: Path,
 ):
-    closed_channel_root = tmp_path / "ClosedChannel"
-    closed_channel_root.mkdir(parents=True)
-    path = closed_channel_root / "hunt_exactBL_Ha20_XSlice1m_4s.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "Points:1,Points:2,U:0,J:1,potE",
-                "-1.0,-0.1,1.0,10.0,-2.0",
-                "0.0,-0.1,2.0,20.0,-4.0",
-                "1.0,-0.1,3.0,30.0,-6.0",
-                "-1.0,0.1,5.0,50.0,2.0",
-                "0.0,0.1,6.0,60.0,4.0",
-                "1.0,0.1,7.0,70.0,6.0",
-                "0.0,-1.0,11.0,110.0,-8.0",
-                "0.0,1.0,13.0,130.0,8.0",
-            ]
-        )
+    reference = _processed_slice(
+        tmp_path,
+        [
+            "Points:1,Points:2,U:0,J:1,potE",
+            "-1.0,-0.1,1.0,10.0,-2.0",
+            "0.0,-0.1,2.0,20.0,-4.0",
+            "1.0,-0.1,3.0,30.0,-6.0",
+            "-1.0,0.1,5.0,50.0,2.0",
+            "0.0,0.1,6.0,60.0,4.0",
+            "1.0,0.1,7.0,70.0,6.0",
+            "0.0,-1.0,11.0,110.0,-8.0",
+            "0.0,1.0,13.0,130.0,8.0",
+        ],
     )
-    reference = load_processed_slice("hunt", 20, reference_root=closed_channel_root)
 
     y_profile = extract_processed_profile(
         reference, axis="y", field_name="J", component=1

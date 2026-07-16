@@ -517,21 +517,6 @@ def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
     )
 
 
-def test_active_velocity_mask_excludes_boundaries():
-    mask = jnp.ones((3, 3), dtype=bool)
-    active = solvers._active_velocity_mask(mask)
-    assert jnp.array_equal(
-        active,
-        jnp.asarray(
-            [
-                [False, False, False],
-                [False, True, False],
-                [False, False, False],
-            ]
-        ),
-    )
-
-
 def test_concat_history_handles_append_and_empty_inputs():
     current = jnp.asarray([1.0, 2.0])
 
@@ -591,17 +576,6 @@ def test_scaled_pressure_proxy_value_uses_available_current_source():
     )
     assert reference == pytest.approx(0.25)
     assert value == pytest.approx(8.0)
-
-
-def test_active_velocity_mask_excludes_enforced_outer_boundary_cells():
-    fluid_mask = jnp.ones((5, 5), dtype=bool)
-    active = solvers._active_velocity_mask(fluid_mask)
-
-    assert not bool(active[0, 2])
-    assert not bool(active[-1, 2])
-    assert not bool(active[2, 0])
-    assert not bool(active[2, -1])
-    assert bool(active[2, 2])
 
 
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
@@ -1419,7 +1393,9 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
         coupling_tolerance=1.0e-6,
     )
 
-    active_mask = solvers._active_velocity_mask(materials.fluid_mask)
+    active_mask = (
+        materials.fluid_mask.at[[0, -1], :].set(False).at[:, [0, -1]].set(False)
+    )
     assert call_counter["velocity"] == 1
     assert jnp.allclose(u_next[active_mask], 0.25)
     assert jnp.isfinite(u_next[~active_mask]).all()
@@ -1620,7 +1596,9 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
         coupling_tolerance=1.0e-6,
     )
 
-    active_mask = solvers._active_velocity_mask(materials.fluid_mask)
+    active_mask = (
+        materials.fluid_mask.at[[0, -1], :].set(False).at[:, [0, -1]].set(False)
+    )
     assert velocity_calls["count"] == 2
     fluid_weight = jnp.where(
         materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0
@@ -2930,7 +2908,6 @@ for _unit_test_name in (
     "test_transient_restart_can_append_diagnostics",
     "test_target_mean_velocity_only_uses_inlet_flow_rate",
     "test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity",
-    "test_active_velocity_mask_excludes_enforced_outer_boundary_cells",
     "test_magnetic_ramp_scale_disables_when_duration_is_zero",
     "test_magnetic_ramp_scale_matches_reference_startup_formula",
     "test_magnetic_ramp_delays_short_transient_lorentz_response",

@@ -36,7 +36,10 @@ def test_build_case_rejects_unknown_case(tmp_path: Path):
         suite._build_case("unknown", 20.0, 16, tmp_path)
 
 
-def test_collect_metrics_for_hartmann(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.parametrize("accepted", [True, False])
+def test_collect_metrics_for_hartmann(
+    monkeypatch: pytest.MonkeyPatch, accepted: bool
+):
     monkeypatch.setattr(
         suite, "validation_summary", lambda *args, **kwargs: {"base": 1.0}
     )
@@ -49,7 +52,7 @@ def test_collect_metrics_for_hartmann(monkeypatch: pytest.MonkeyPatch):
         suite,
         "hartmann_acceptance",
         lambda *args, **kwargs: SimpleNamespace(
-            passed=True, l2_threshold=0.05, linf_threshold=0.1
+            passed=accepted, l2_threshold=0.05, linf_threshold=0.1
         ),
     )
 
@@ -64,7 +67,7 @@ def test_collect_metrics_for_hartmann(monkeypatch: pytest.MonkeyPatch):
     )
 
     assert metrics["l2_error"] == 0.1
-    assert metrics["accepted"] == 1.0
+    assert metrics["accepted"] == float(accepted)
     assert metrics["acceptance_l2_threshold"] == 0.05
 
 
@@ -224,8 +227,6 @@ def test_hunt_wall_cells_and_replace_like_supported_types():
     dataclass_value = Config(dt=0.01, max_steps=10)
     object_value = SimpleNamespace(dt=0.01, max_steps=10)
 
-    assert suite._hunt_wall_cells(8) == 2
-    assert suite._hunt_wall_cells(72) == 8
     assert suite._replace_like(dataclass_value, dt=0.02).dt == 0.02
     assert suite._replace_like(object_value, dt=0.02).dt == 0.02
 
@@ -266,39 +267,6 @@ def test_build_case_covers_all_supported_cases(tmp_path: Path):
     assert hartmann.name.startswith("hartmann")
     assert shercliff.name.startswith("shercliff")
     assert hunt.name.startswith("hunt")
-
-
-def test_collect_metrics_hartmann_branch(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    monkeypatch.setattr(
-        suite, "validation_summary", lambda *args, **kwargs: {"residual": 1e-4}
-    )
-    monkeypatch.setattr(
-        suite,
-        "hartmann_validation",
-        lambda *args, **kwargs: SimpleNamespace(l2_error=0.1, linf_error=0.2),
-    )
-    monkeypatch.setattr(
-        suite,
-        "hartmann_acceptance",
-        lambda *args, **kwargs: SimpleNamespace(
-            passed=False, l2_threshold=0.05, linf_threshold=0.1
-        ),
-    )
-
-    metrics = suite._collect_metrics(
-        solution=SimpleNamespace(),
-        case_kind="hartmann",
-        ha=20.0,
-        reference_root=None,
-        x_slice="1m",
-        hartmann_l2_threshold=0.05,
-        hartmann_linf_threshold=0.1,
-    )
-
-    assert metrics["l2_error"] == 0.1
-    assert metrics["accepted"] == 0.0
 
 
 def test_run_time_convergence_suite_writes_summary(

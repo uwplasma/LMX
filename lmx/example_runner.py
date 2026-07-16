@@ -6,7 +6,7 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from .io import write_paraview
+from .io import _portable_path, write_paraview
 from .physics import build_material_fields
 from .plotting import write_case_overview_plots
 from .reference_data import default_closed_channel_reference_root
@@ -21,18 +21,6 @@ from .validation import (
     write_metrics_json,
     write_profile_csv,
 )
-
-
-def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
-    candidate = Path(path)
-    base = Path(relative_to) if relative_to is not None else Path.cwd()
-    try:
-        return str(candidate.relative_to(base))
-    except ValueError:
-        try:
-            return str(candidate.resolve().relative_to(base.resolve()))
-        except ValueError:
-            return candidate.name if candidate.name else str(candidate)
 
 
 def _default_reference_root() -> Path | None:

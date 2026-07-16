@@ -17,6 +17,15 @@ from scripts.summarize_ci_artifacts import (
 pytestmark = pytest.mark.unit
 
 
+def _benchmark_report(tmp_path: Path) -> Path:
+    path = tmp_path / "benchmark.json"
+    path.write_text(
+        '{"case":"hartmann_ha20","cold_seconds":1.5,"warm_seconds":0.8,'
+        '"mean_seconds":1.0,"repeats":2.0}'
+    )
+    return path
+
+
 def test_summarize_validation_summary(tmp_path: Path):
     path = tmp_path / "summary.json"
     path.write_text(
@@ -51,18 +60,7 @@ def test_summarize_validation_summary(tmp_path: Path):
 
 
 def test_summarize_benchmark_report(tmp_path: Path):
-    path = tmp_path / "benchmark.json"
-    path.write_text(
-        """
-        {
-          "case": "hartmann_ha20",
-          "cold_seconds": 1.5,
-          "warm_seconds": 0.8,
-          "mean_seconds": 1.0,
-          "repeats": 2.0
-        }
-        """
-    )
+    path = _benchmark_report(tmp_path)
     summary = summarize_benchmark_report(path)
     assert summary.case == "hartmann_ha20"
     assert summary.warm_seconds == pytest.approx(0.8)
@@ -77,18 +75,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
         }
         """
     )
-    benchmark = tmp_path / "benchmark.json"
-    benchmark.write_text(
-        """
-        {
-          "case": "hartmann_ha20",
-          "cold_seconds": 1.5,
-          "warm_seconds": 0.8,
-          "mean_seconds": 1.0,
-          "repeats": 2.0
-        }
-        """
-    )
+    benchmark = _benchmark_report(tmp_path)
     parity = tmp_path / "parity.json"
     parity.write_text(
         """
@@ -191,18 +178,7 @@ def test_render_markdown_and_build_summary(tmp_path: Path):
 
 
 def test_build_summary_allows_benchmark_only(tmp_path: Path):
-    benchmark = tmp_path / "benchmark.json"
-    benchmark.write_text(
-        """
-        {
-          "case": "hartmann_ha20",
-          "cold_seconds": 1.5,
-          "warm_seconds": 0.8,
-          "mean_seconds": 1.0,
-          "repeats": 2.0
-        }
-        """
-    )
+    benchmark = _benchmark_report(tmp_path)
     summary = build_summary(None, benchmark)
     assert summary["validation"] == []
     assert summary["benchmark"]["case"] == "hartmann_ha20"
@@ -296,18 +272,7 @@ def test_main_writes_json_and_markdown(tmp_path: Path):
         }
         """
     )
-    benchmark = tmp_path / "benchmark.json"
-    benchmark.write_text(
-        """
-        {
-          "case": "hartmann_ha20",
-          "cold_seconds": 1.5,
-          "warm_seconds": 0.8,
-          "mean_seconds": 1.0,
-          "repeats": 2.0
-        }
-        """
-    )
+    benchmark = _benchmark_report(tmp_path)
     parity = tmp_path / "parity.json"
     parity.write_text(
         """

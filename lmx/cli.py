@@ -20,6 +20,7 @@ from .fringing import (
     solve_extruded_inductionless,
 )
 from .io import (
+    _portable_path,
     load_extruded_restart_bundle,
     load_restart_bundle,
     prepare_extruded_output_layout,
@@ -63,18 +64,6 @@ class _EmptyDiagnostics:
     charge_balance_residual_history = jnp.asarray([])
     gauge_residual_history = jnp.asarray([])
     interface_current_residual_history = jnp.asarray([])
-
-
-def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
-    candidate = Path(path)
-    base = Path(relative_to) if relative_to is not None else Path.cwd()
-    try:
-        return str(candidate.relative_to(base))
-    except ValueError:
-        try:
-            return str(candidate.resolve().relative_to(base.resolve()))
-        except ValueError:
-            return candidate.name if candidate.name else str(candidate)
 
 
 def _build_case(args: argparse.Namespace):

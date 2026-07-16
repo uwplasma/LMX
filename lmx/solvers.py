@@ -1187,15 +1187,6 @@ def _enforce_target_mean_velocity(
     return jnp.where(fluid_mask, scaled, 0.0)
 
 
-def _active_velocity_mask(fluid_mask: jnp.ndarray) -> jnp.ndarray:
-    active = jnp.array(fluid_mask, copy=True)
-    active = active.at[0, :].set(False)
-    active = active.at[-1, :].set(False)
-    active = active.at[:, 0].set(False)
-    active = active.at[:, -1].set(False)
-    return active
-
-
 def _inlet_speed(boundary: BoundaryCondition, case: CaseSpec) -> float | None:
     if boundary.kind == "inlet_velocity":
         value = boundary.value

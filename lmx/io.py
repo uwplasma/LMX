@@ -20,6 +20,18 @@ residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage c
 charge_balance_residual boundary_current_residual""".split()
 
 
+def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
+    candidate = Path(path)
+    base = Path(relative_to) if relative_to is not None else Path.cwd()
+    try:
+        return str(candidate.relative_to(base))
+    except ValueError:
+        try:
+            return str(candidate.resolve().relative_to(base.resolve()))
+        except ValueError:
+            return candidate.name if candidate.name else str(candidate)
+
+
 def enable_compilation_cache(
     cache_dir: str | Path | None = None,
     *,

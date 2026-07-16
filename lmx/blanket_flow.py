@@ -702,7 +702,7 @@ def write_wham_blanket_flow_plots(
     mhd_gradient = np.asarray(flow["pressure_gradient_mhd"], dtype=float)
     curvature_gradient = np.asarray(flow["pressure_gradient_curvature"], dtype=float)
 
-    section_indices = _representative_station_indices(b_perp)
+    section_indices = (0, int(np.argmax(b_perp)), int(len(b_perp) - 1))
     fig = plt.figure(figsize=(13.2, 8.4), constrained_layout=True)
     gs = fig.add_gridspec(2, 3, height_ratios=[1.02, 1.0])
     ax3d = fig.add_subplot(gs[0, 0], projection="3d")
@@ -1279,10 +1279,6 @@ def _section_inboard_outboard_means(flow: dict[str, object], index: int) -> tupl
     inboard = float(np.nanmean(np.where(inboard_mask, velocity, np.nan))) if np.any(inboard_mask) else fallback
     outboard = float(np.nanmean(np.where(outboard_mask, velocity, np.nan))) if np.any(outboard_mask) else fallback
     return inboard, outboard
-
-
-def _representative_station_indices(b_perp: np.ndarray) -> tuple[int, int, int]:
-    return 0, int(np.argmax(b_perp)), int(len(b_perp) - 1)
 
 
 def _plot_flow_route(ax, flow: dict[str, object], *, color_values: np.ndarray, label: str) -> None:
