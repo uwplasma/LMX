@@ -17,10 +17,10 @@ updates, one cold plus three warm trajectories, a 120-second warm minimum, an
 Promotion also requires fixed provenance, exact numerics/placement, memory,
 warm CV at most 5%, and clean affinity or GPU identity/context evidence.
 
-Both current hosts fail admission because of unrelated CPU/GPU work; retry only
-after a fresh 60-second clean preflight. Short runs remain correctness/debug
-evidence and cannot support a scaling claim. Completed history belongs in the
-checksummed benchmark records and performance documentation; this plan keeps
+Both current hosts fail admission because of unrelated CPU/GPU work. Every rung
+needs a new 60-second record, at most 120 seconds old and bound to host, backend,
+device count, and source commit. Short runs remain debug evidence. History
+belongs in checksummed records and performance docs; this plan keeps
 only current decisions and stop/go criteria.
 
 ## Product outcome
@@ -110,7 +110,7 @@ large reusable artifacts go in checksummed releases.
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/blanket/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
-| SOLVAX | released 0.8.4 owns generic algebra, point Jacobi, Anderson weights, and accepted `linear_solve(has_aux=True)` diagnostics consumed by LMX | no worthwhile ownership deletion remains; re-audit new compatible releases |
+| SOLVAX | published 0.8.4 owns generic algebra and Anderson weights; main `d0623a2` prepares 0.8.5 with the accepted additive line builder | consume and delete LMX's duplicate only after 0.8.5 is tagged and published |
 | Distribution | lean installed wheel loads all frozen A/B references and runs a tiny solve without Matplotlib/Pillow; plotting is an explicit extra; source artifact excludes repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
 Current structure reflects completed ownership moves: frozen resources are
@@ -122,12 +122,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,692 | stay below 34,700 | 35,100 |
+| package lines | 34,726 | do not grow before SOLVAX adoption | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,069 | no new file; stay below 21,075 | 31 / 21,100 |
+| test files / lines | 30 / 21,074 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,549,827 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,547,665 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -360,72 +360,21 @@ self-promote unrelated features.
 
 ## SOLVAX ownership
 
-LMX requires `solvax>=0.8.4,<1`. SOLVAX PR 21 merged at
-`0fcc017f45a5c55befa36afbfe21a0a21b1f4837`; tag, GitHub Release, trusted PyPI
-publication, minimum/current Linux, current macOS, docs, lint, and clean import
-gates are green. The exact release wheel SHA-256 is
-`76614c4148f230138c9b992bc0178efccf6b1e8374f5ff62f17a65a6f076a10d` and
-the sdist is
-`5445b7fba6b3ad19886a80800d468020a09bc4b53159c2760dd949604bc954ac`.
-Do not pin LMX to exactly 0.8.4; test the declared minimum and newest compatible
-release.
+LMX remains on the published range `solvax>=0.8.4,<1`. SOLVAX main `d0623a2`
+prepares 0.8.5: 269 tests pass at 98.13% branch coverage, docs/lint pass, and
+the built wheel reports version 0.8.5. No `v0.8.5` tag or PyPI release exists,
+so LMX must not import the new API or use a Git dependency.
 
-The device-cut audit compared 0.8.3 with 0.8.4 PCG and found identical Krylov
-code; generic two-device standard and single-reduction PCG both pass. The B2
-failure was in LMX-owned layout transitions: eager
-embedding, component extraction, slicing, packing, relaxation, and restart
-staging across production shards. It was not a generic Krylov or SOLVAX defect.
-The 0.8.4 dependency bump is solely for the reusable Anderson-weight owner.
+After publication, raise the tested minimum to 0.8.5, adopt
+`additive_tridiagonal_line_preconditioner`, and delete LMX's duplicate 3D
+builder only after exact primal, gradient, JIT, physics, and timing gates pass.
+Then audit the smaller 2D potential-line duplicate under the same gates.
 
-LMX owns MHD equations, finite-volume stencils and limiters, geometry,
-materials, interfaces, open-boundary and gauge semantics, corrected flux,
-physical residuals, stopping/restart state, sharding policy, observables, and
-acceptance. SOLVAX owns generic linear algebra after primal, residual,
-transpose/gradient, JIT, placement, memory, and repeated timing gates pass.
-Commit `f070445` already deleted LMX's private B1 Anderson wrapper; the B1 path
-now calls released SOLVAX directly and keeps its separately owned arbitrary-depth
-history.
-
-Released 0.8.4 owns the valuable generic linear solves, preconditioners, and
-Anderson weights. Its scale-aware regularization, condition filtering, damping,
-and newest-map fallback were re-audited. Condition filtering cannot guarantee
-the frozen coefficient bound, while a proposed generic `max_abs_weight=4`
-fallback passed safety but failed LMX's acceleration outcome gate; therefore
-neither repository gains an unused API. One manual additive composition remains, but migrating its few
-lines could perturb parity trajectories and waits until B2 convergence closes.
-Momentum's single diagonal division remains clearer and smaller than wrapping
-`solvax.jacobi`; ownership movement without code deletion is not a performance
-win. LMX now uses one `anderson_weights` result for scaled fields and
-compact-flux histories. The bounded `linear_solve(has_aux=True)` momentum probe
-is accepted at `a98590f`: it preserves the dense reference, JVP, gradient, and
-B2 restart gates, is timing-neutral within noise, and deletes the final
-diagnostic matvec. It does not alter schema 6.
-The complex-tridiagonal candidate is now closed as an LMX no-go under its
-precommitted performance gate. SOLVAX draft PR 22 at `b059e18` provides the
-transparent complex API, current/minimum-JAX differentiation, and genuinely
-complex Thomas fallback without a new module. Both Python/JAX endpoints pass
-274 tests at 98.90% coverage, strict docs and lint pass, and complex64/128
-correctness, JVP, gradient, and actual two-A4000 batch sharding pass. The first
-packed-right-hand-side design was rejected before review: it was about 604x
-slower on one GPU and 485x slower on two with no memory reduction. The safe
-revision is bit-exact with the explicit pair and restores baseline performance,
-but its measured gains are only 1.053x on one GPU and 1.070x on two, with
-identical compiled memory. That misses the required 1.10x speedup or 10% memory
-reduction. Retain LMX's two explicit pairs and the released dependency even
-though the transparent call would remove four lines. PR 22 may proceed as a
-reviewed SOLVAX capability; it does not self-authorize LMX adoption, merge, tag,
-or publication.
-
-The released `block_thomas_factor_fn` B1 prototype is exact against the current
-materialized retained-modal factors and through JVP. At `7 x 9 x 16` and
-`11 x 17 x 32`, however, it is 27--29% slower cold and 38--39% slower warm;
-device peak falls by at most 1.2% while host peak rises about 4%. Reject it
-before a production run. Reconsider generated factors or `chunked_jacfwd` only
-if a measured production B1 memory blocker outweighs that setup regression.
-Do not move finite-volume assembly into SOLVAX, and do not substitute
-Fourier–Helmholtz, Newton–Krylov, generic multigrid, or affine fixed-point GMRES
-into parity-critical paths without new topology, stopping, gradient, and timing
-evidence. No credible SOLVAX-driven module deletion exists today.
+LMX owns MHD equations, discretization, geometry, boundaries/gauges, corrected
+flux, physical residuals, restart, sharding policy, observables, and acceptance.
+SOLVAX owns reusable algebra that passes LMX's primal, transpose/gradient, JIT,
+placement, memory, and repeated-timing gates. Rejected Anderson variants and
+slower block-factor or packing prototypes remain history, not planned APIs.
 
 ## README, documentation, and media contract
 

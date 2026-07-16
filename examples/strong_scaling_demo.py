@@ -26,22 +26,30 @@ from lmx.scaling import (
 )
 
 _MONITOR_SAMPLE_SECONDS, _MONITOR_POSTFLIGHT_SECONDS = 1.0, 15.0
+_ADMISSION_MAX_AGE_SECONDS = 120.0
 
 
 def _resource_environment(
-    path: Path | None, *, backend: str, num_devices: int, required: bool
+    path: Path | None, *, backend: str, num_devices: int, host: str,
+    source_commit: str | None, required: bool,
 ) -> dict[str, object]:
-    """Validate a 60-second admission record before an expensive worker starts."""
+    """Validate fresh, source-bound admission immediately before a worker."""
 
     if path is None:
         if required:
             raise ValueError(f"Sustained {backend} scaling requires environment evidence")
         return {"resource_environment_verified": False}
-    payload = json.loads(path.read_text())
+    raw = path.read_bytes()
+    payload = json.loads(raw)
     rung = payload.get("rungs", {}).get(str(num_devices), {})
+    age = time.time() - float(rung.get("admission_ended_unix_seconds", -1.0))
     verified = bool(
         payload.get("backend") == backend
+        and payload.get("host") == host
+        and source_commit not in (None, "")
+        and payload.get("source_commit") == source_commit
         and float(payload.get("sample_seconds", 0.0)) >= 60.0
+        and -5.0 <= age <= _ADMISSION_MAX_AGE_SECONDS
         and rung.get("num_devices") == num_devices
         and rung.get("verified") is True
     )
@@ -63,7 +71,7 @@ def _resource_environment(
         raise ValueError(f"Invalid {backend} environment evidence for {num_devices} device(s)")
     return {
         "resource_environment_verified": True,
-        "resource_environment_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "resource_environment_sha256": hashlib.sha256(raw).hexdigest(),
         "resource_environment": rung,
     }
 
@@ -323,6 +331,7 @@ def run_local_cpu_scaling(
     for count in device_counts:
         environment = _resource_environment(
             environment_evidence, backend="cpu", num_devices=count,
+            host=os.uname().nodename, source_commit=source_commit,
             required=minimum_warm_seconds >= 120.0,
         )
         env = _forced_cpu_environment(count)
@@ -622,6 +631,7 @@ def run_remote_gpu_scaling(
         visible_devices = _default_visible_devices(remote_host, count)
         environment = _resource_environment(
             environment_evidence, backend="gpu", num_devices=count,
+            host=remote_host, source_commit=source_commit,
             required=minimum_warm_seconds >= 120.0,
         )
         if environment["resource_environment_verified"] and environment[

@@ -40,14 +40,10 @@ def test_b2_repeat_signature_ignores_gauge_and_detects_shard_changes():
     reference = run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes))
     attributes["phi"] += 7.0
     np.testing.assert_array_equal(
-        run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes)),
-        reference,
-    )
+        run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes)), reference)
     attributes["u"][2] += 1.0
     assert not np.allclose(
-        run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes)),
-        reference,
-    )
+        run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes)), reference)
 
 
 def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
@@ -82,13 +78,12 @@ def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
         problem, checkpoint, direct, resumed, serialized, num_devices=1
     )
 
-    assert diagnostics["schema6_active"]
-    assert diagnostics["anderson_depth_two_update_executed"]
-    assert diagnostics["anderson_validation_passed"]
-    assert diagnostics["anderson_serialized_max_abs"] == 0.0
-    assert diagnostics["anderson_replay_max_abs"] == 0.0
-    assert diagnostics["anderson_replay_field_relative_l2"] == 0.0
-    assert diagnostics["anderson_replay_field_tolerance_ratio"] == 0.0
+    assert all(diagnostics[name] for name in (
+        "schema6_active", "anderson_depth_two_update_executed",
+        "anderson_validation_passed"))
+    assert all(diagnostics[name] == 0.0 for name in (
+        "anderson_serialized_max_abs", "anderson_replay_max_abs",
+        "anderson_replay_field_relative_l2", "anderson_replay_field_tolerance_ratio"))
     assert diagnostics["anderson_weights_sum_error"] <= 1.0e-12
     for delta, expected in ((5.0e-10, True), (1.0e-2, False)):
         resumed.anderson_state = (mapped1 + delta, residual1, flux0 + 0.5, inlet0 + 0.5)
@@ -180,21 +175,36 @@ def test_remote_scaling_archive_has_one_package_resource_owner(
     assert not any(arcname.startswith("benchmarks/") for _, arcname in added)
 
 
-def test_sustained_environment_evidence_is_physical_and_fail_closed(tmp_path: Path):
+def test_sustained_environment_evidence_is_fresh_bound_and_physical(tmp_path, monkeypatch):
+    now = 1_721_000_000.0
+    monkeypatch.setattr(strong_scaling_demo.time, "time", lambda: now)
     for backend, extra in (
         ("cpu", {"affinity_cpus": [2, 3, 4, 5], "allocated_cpu_count": 4}),
         ("gpu", {"visible_devices": ["0", "1"], "foreign_compute_process_count": 0,
             "max_gpu_utilization_percent": 4.0, "gpu_identities": [{"uuid": v, "pci_bus_id": v} for v in "ab"]}),
     ):
-        rung = {"num_devices": 2, "verified": True, **extra}
+        rung = {"num_devices": 2, "verified": True, "admission_ended_unix_seconds": now - 1, **extra}
+        payload = {"backend": backend, "host": "host", "source_commit": "commit",
+            "sample_seconds": 60, "rungs": {"2": rung}}
         path = tmp_path / f"{backend}.json"
-        path.write_text(json.dumps({"backend": backend, "sample_seconds": 60, "rungs": {"2": rung}}))
-        strong_scaling_demo._resource_environment(
-            path, backend=backend, num_devices=2, required=True)
-    rung["verified"] = False
-    path.write_text(json.dumps({"backend": backend, "sample_seconds": 60, "rungs": {"2": rung}}))
-    with pytest.raises(ValueError, match="Invalid"):
-        strong_scaling_demo._resource_environment(path, backend=backend, num_devices=2, required=True)
+        path.write_text(json.dumps(payload))
+        strong_scaling_demo._resource_environment(path, backend=backend, num_devices=2,
+            host="host", source_commit="commit", required=True)
+    for owner, field, invalid in (
+        (payload, "backend", "other"), (payload, "host", "other"),
+        (payload, "source_commit", "other"), (payload, "sample_seconds", 59),
+        (rung, "num_devices", 1), (rung, "verified", False),
+        (rung, "admission_ended_unix_seconds", now - 121),
+        (rung, "admission_ended_unix_seconds", None),
+    ):
+        original = owner.pop(field) if invalid is None else owner.setdefault(field, invalid)
+        if invalid is not None:
+            owner[field] = invalid
+        path.write_text(json.dumps(payload))
+        with pytest.raises(ValueError, match="Invalid"):
+            strong_scaling_demo._resource_environment(path, backend=backend, num_devices=2,
+                host="host", source_commit="commit", required=True)
+        owner[field] = original
 
 
 @pytest.mark.parametrize(
@@ -470,23 +480,18 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     table = write_strong_scaling_summary_table(
         [baseline_record, two_device], tmp_path / "strong_scaling_table.csv"
     )
-    assert summary["validation_status"] == "solver_faithful_records_present"
-    assert summary["solver_faithful_record_count"] == 2
-    assert summary["profiled_record_count"] == 1
-    assert summary["physics_equivalent_record_count"] == 2
-    assert summary["sustained_timing_record_count"] == 0
+    assert tuple(summary[name] for name in (
+        "validation_status", "solver_faithful_record_count", "profiled_record_count",
+        "physics_equivalent_record_count", "sustained_timing_record_count")) == (
+        "solver_faithful_records_present", 2, 1, 2, 0)
     assert not summary["sustained_claim_eligible"]
     assert summary["best_speedup"] == pytest.approx(2.0)
-    assert summary["best_sustained_candidate_speedup"] == 0.0
-    assert summary["best_sustained_speedup"] == 0.0
+    assert summary["best_sustained_candidate_speedup"] == summary["best_sustained_speedup"] == 0.0
     rows = summary["rows"]
-    assert rows[0]["speedup"] == pytest.approx(1.0)
-    assert rows[1]["speedup"] == pytest.approx(2.0)
-    assert rows[1]["parallel_efficiency"] == pytest.approx(1.0)
-    assert rows[0]["warm_mcell_updates_per_second"] == pytest.approx(9.6e-5)
-    assert rows[0]["memory_mib"] == pytest.approx(2.0)
-    assert rows[1]["physics_equivalent"]
-    assert "pressure_linear_iterations_mean" in table.read_text()
+    np.testing.assert_allclose((rows[0]["speedup"], rows[1]["speedup"],
+        rows[1]["parallel_efficiency"], rows[0]["warm_mcell_updates_per_second"],
+        rows[0]["memory_mib"]), (1.0, 2.0, 1.0, 9.6e-5, 2.0))
+    assert rows[1]["physics_equivalent"] and "pressure_linear_iterations_mean" in table.read_text()
 
 
 def test_sustained_claim_fails_closed_on_incomplete_evidence():

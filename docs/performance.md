@@ -357,21 +357,23 @@ python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
   --gpu-environment-evidence artifacts/gpu-admission.json
 ```
 
-Sustained mode validates a checksummed 60-second admission JSON before each
-worker starts. Its `backend`, `sample_seconds`, and `rungs` map must identify
-each device count. CPU rungs require `verified`, `num_devices`, the exact
-2/4/8-entry `affinity_cpus`, and matching `allocated_cpu_count`. GPU rungs
-require unique `visible_devices` and `gpu_identities` (`uuid` plus
-`pci_bus_id`), `foreign_compute_process_count = 0`, and
-`max_gpu_utilization_percent <= 5`. Missing or inconsistent evidence stops
-before the multi-minute solve.
+Sustained mode rereads a checksummed 60-second admission JSON immediately before
+each worker. Top-level `backend`, `host`, and `source_commit` must match the
+requested run. The selected rung must match `num_devices`, be verified, and set
+`admission_ended_unix_seconds`; at launch it must satisfy
+`-5 <= now - admission_end <= 120` seconds. CPU `host` is `os.uname().nodename`;
+GPU `host` is the exact `--remote-host` value. CPU rungs also bind the exact
+2/4/8-entry affinity allocation. GPU rungs bind unique visible UUID/PCI pairs,
+zero foreign compute processes, and at most 5% utilization. Missing, stale, or
+mismatched evidence stops before the multi-minute solve.
 
 The CPU lane still runs inside the affinity-controlled Docker allocation; the
 example does not create that container. Its nested `cpuset` masks provide
 2/4/8 guest CPUs for 1/2/4 JAX shards and establish CPU-allocation scaling, not
-exact M4 P/E-core placement. GPU admission must be repeated between rungs and
-after the campaign. New timing evidence also needs a checksummed host-side
-continuous monitor through every rung and a clean postflight; the static
+exact M4 P/E-core placement. Regenerate and atomically replace the evidence
+after each prior worker's 60-second clean observation; a file prepared once for
+the whole ladder will expire. New timing evidence also needs a checksummed
+host-side continuous monitor through every rung and a clean postflight; the static
 preflight alone cannot detect work that starts later. Sustained runs create an
 ignored `<backend>_N.monitor.jsonl` automatically; keep promoted raw traces as
 release artifacts. Each worker record must carry compact schema-2
