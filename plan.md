@@ -127,9 +127,9 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,809 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,544 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,484 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,325,967 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,324,418 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

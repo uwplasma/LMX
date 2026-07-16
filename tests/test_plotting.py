@@ -133,6 +133,12 @@ def _sample_frames(case, *, signed: bool) -> list[dict[str, object]]:
     return frames
 
 
+def _assert_figure_pair(outputs: list[Path], out_dir: Path, stem: str) -> None:
+    expected = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
+    assert outputs == expected
+    assert all(path.exists() for path in expected)
+
+
 def test_write_case_overview_plots_writes_overview_and_diagnostics(tmp_path: Path):
     solution = _sample_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
     outputs = write_case_overview_plots(
@@ -144,11 +150,8 @@ def test_write_case_overview_plots_writes_overview_and_diagnostics(tmp_path: Pat
         z_reference_coordinate=jnp.asarray([-1.0, 0.0, 1.0]),
         z_reference_values=jnp.asarray([0.0, 1.0, 0.0]),
     )
-    assert (tmp_path / "overview.png").exists()
-    assert (tmp_path / "overview.pdf").exists()
-    assert (tmp_path / "diagnostics.png").exists()
-    assert (tmp_path / "diagnostics.pdf").exists()
-    assert len(outputs) == 4
+    _assert_figure_pair(outputs[:2], tmp_path, "overview")
+    _assert_figure_pair(outputs[2:], tmp_path, "diagnostics")
 
 
 def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(
@@ -167,7 +170,7 @@ def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(
         case_name=solution.case_name,
     )
     outputs = write_case_overview_plots(solution, tmp_path, case_title="No diagnostics")
-    assert outputs == [tmp_path / "overview.png", tmp_path / "overview.pdf"]
+    _assert_figure_pair(outputs, tmp_path, "overview")
     assert not (tmp_path / "diagnostics.png").exists()
 
 
@@ -178,12 +181,7 @@ def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(
     rect_outputs = write_geometry_preview_plots(
         rect_mesh, tmp_path / "rect", case_title="Rectangular geometry"
     )
-    assert rect_outputs == [
-        tmp_path / "rect" / "geometry_preview.png",
-        tmp_path / "rect" / "geometry_preview.pdf",
-    ]
-    assert rect_outputs[0].exists()
-    assert rect_outputs[1].exists()
+    _assert_figure_pair(rect_outputs, tmp_path / "rect", "geometry_preview")
 
     pipe_mesh = rect_mesh.__class__(
         **{
@@ -206,8 +204,7 @@ def test_write_geometry_preview_plots_writes_rectangular_and_pipe_outputs(
     pipe_outputs = write_geometry_preview_plots(
         pipe_mesh, tmp_path / "pipe", case_title="Pipe preview"
     )
-    assert pipe_outputs[0].exists()
-    assert pipe_outputs[1].exists()
+    _assert_figure_pair(pipe_outputs, tmp_path / "pipe", "geometry_preview")
 
 
 def test_write_geometry_gallery_plots_writes_panel_outputs(tmp_path: Path):
@@ -240,12 +237,7 @@ def test_write_geometry_gallery_plots_writes_panel_outputs(tmp_path: Path):
         tmp_path,
         title="Geometry gallery",
     )
-    assert outputs == [
-        tmp_path / "geometry_gallery.png",
-        tmp_path / "geometry_gallery.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "geometry_gallery")
 
 
 def test_plot_field_handles_negative_only_field():
@@ -339,12 +331,7 @@ def test_write_freemhd_parity_plots_writes_outputs(tmp_path: Path):
         },
     ]
     outputs = write_freemhd_parity_plots(records, tmp_path, case_title="Parity demo")
-    assert outputs == [
-        tmp_path / "freemhd_closed_channel_parity.png",
-        tmp_path / "freemhd_closed_channel_parity.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "freemhd_closed_channel_parity")
 
 
 def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
@@ -374,12 +361,9 @@ def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
     outputs = write_freemhd_observable_parity_plots(
         records, tmp_path, case_title="Observable parity"
     )
-    assert outputs == [
-        tmp_path / "freemhd_closed_channel_observable_parity.png",
-        tmp_path / "freemhd_closed_channel_observable_parity.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(
+        outputs, tmp_path, "freemhd_closed_channel_observable_parity"
+    )
 
 
 def test_safe_writer_candidates_prefers_imagemagick_when_available(
@@ -480,9 +464,7 @@ def test_write_strong_scaling_plots_writes_png_and_pdf(tmp_path: Path):
     ]
     outputs = write_strong_scaling_plots(records, tmp_path, case_title="Scaling")
 
-    assert outputs == [tmp_path / "strong_scaling.png", tmp_path / "strong_scaling.pdf"]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "strong_scaling")
 
 
 def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
@@ -502,12 +484,7 @@ def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
         target_parameter=8.0,
     )
 
-    assert outputs == [
-        tmp_path / "autodiff_summary.png",
-        tmp_path / "autodiff_summary.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "autodiff_summary")
 
 
 def test_write_operator_verification_plots_writes_png_and_pdf(tmp_path: Path):
@@ -538,12 +515,7 @@ def test_write_operator_verification_plots_writes_png_and_pdf(tmp_path: Path):
         records, tmp_path, case_title="Operator verification"
     )
 
-    assert outputs == [
-        tmp_path / "operator_verification.png",
-        tmp_path / "operator_verification.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "operator_verification")
 
 
 def test_write_interface_verification_plots_writes_png_and_pdf(tmp_path: Path):
@@ -576,12 +548,7 @@ def test_write_interface_verification_plots_writes_png_and_pdf(tmp_path: Path):
         records, profile, tmp_path, case_title="Interface verification"
     )
 
-    assert outputs == [
-        tmp_path / "interface_verification.png",
-        tmp_path / "interface_verification.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "interface_verification")
 
 
 def test_write_cross_section_field_plots_writes_png_and_pdf(tmp_path: Path):
@@ -592,9 +559,7 @@ def test_write_cross_section_field_plots_writes_png_and_pdf(tmp_path: Path):
     outputs = write_cross_section_field_plots(
         y=y, z=z, field=field, out_dir=tmp_path, title="Field preview"
     )
-    assert outputs == [tmp_path / "field_preview.png", tmp_path / "field_preview.pdf"]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "field_preview")
 
 
 def test_write_tabulated_field_reconstruction_plots_writes_png_and_pdf(tmp_path: Path):
@@ -610,12 +575,7 @@ def test_write_tabulated_field_reconstruction_plots_writes_png_and_pdf(tmp_path:
         tabulated_field=sampled,
         out_dir=tmp_path,
     )
-    assert outputs == [
-        tmp_path / "tabulated_field_reconstruction.png",
-        tmp_path / "tabulated_field_reconstruction.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "tabulated_field_reconstruction")
 
 
 def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
@@ -636,12 +596,7 @@ def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
     outputs = write_bent_pipe_overview_plots(
         bent_solution, tmp_path, straight_solution=straight_solution
     )
-    assert outputs == [
-        tmp_path / "bent_pipe_overview.png",
-        tmp_path / "bent_pipe_overview.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "bent_pipe_overview")
 
 
 def test_write_magnetic_obstacle_schematic_plots_writes_png_and_pdf(tmp_path: Path):
@@ -669,12 +624,7 @@ def test_write_magnetic_obstacle_schematic_plots_writes_png_and_pdf(tmp_path: Pa
     outputs = write_magnetic_obstacle_schematic_plots(
         solution, reference_solution, tmp_path
     )
-    assert outputs == [
-        tmp_path / "magnetic_obstacle_schematic.png",
-        tmp_path / "magnetic_obstacle_schematic.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "magnetic_obstacle_schematic")
 
     benchmark_outputs = write_magnetic_obstacle_benchmark_plots(
         solution, reference_solution, tmp_path, case_title="Magnetic obstacle"
@@ -719,12 +669,7 @@ def test_write_wham_mirror_overview_plots_writes_png_and_pdf(tmp_path: Path):
         case_title="WHAM overview",
         autodiff_summary=autodiff_summary,
     )
-    assert outputs == [
-        tmp_path / "wham_mirror_overview.png",
-        tmp_path / "wham_mirror_overview.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "wham_mirror_overview")
 
 
 def test_write_magnetic_obstacle_regime_plots_writes_png_and_pdf(tmp_path: Path):
@@ -769,9 +714,4 @@ def test_write_magnetic_obstacle_regime_plots_writes_png_and_pdf(tmp_path: Path)
     outputs = write_magnetic_obstacle_regime_plots(
         records, tmp_path, case_title="Obstacle regime scan"
     )
-    assert outputs == [
-        tmp_path / "magnetic_obstacle_regime_scan.png",
-        tmp_path / "magnetic_obstacle_regime_scan.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "magnetic_obstacle_regime_scan")
