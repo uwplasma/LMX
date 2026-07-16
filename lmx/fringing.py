@@ -8392,66 +8392,54 @@ def validate_extruded_inductionless_solution(
     | tuple[dict[str, float], ...]
     | None = None,
 ) -> ExtrudedInductionlessValidation:
-    field_scale = jnp.asarray(bundle.field_scale, dtype=float)
-    mean_velocity = jnp.asarray(bundle.mean_velocity, dtype=float)
-    volumetric_flow_rate = jnp.asarray(bundle.volumetric_flow_rate, dtype=float)
-    axial_current = jnp.asarray(bundle.axial_current, dtype=float)
-    wall_current_leakage = jnp.asarray(bundle.wall_current_leakage, dtype=float)
-    residual = jnp.asarray(bundle.residual, dtype=float)
-    charge_balance_residual = jnp.asarray(bundle.charge_balance_residual, dtype=float)
-    boundary_current_residual = jnp.asarray(
-        bundle.boundary_current_residual, dtype=float
+    required = (
+        "field_scale", "u_max", "mean_velocity", "volumetric_flow_rate",
+        "axial_current", "wall_current_leakage", "residual",
+        "charge_balance_residual", "boundary_current_residual", "pressure_span",
     )
-    peak_velocity = jnp.max(jnp.abs(bundle.u), axis=(1, 2))
-    pressure_span = jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2))
-    correlation = _safe_correlation(field_scale, mean_velocity)
-    axial_current_mirror_residual = _mirror_residual(axial_current, odd=True)
-    pressure_span_mirror_residual = _mirror_residual(pressure_span, odd=False)
-    center_axial_current = _center_station_value(axial_current)
-    center_pressure_span = _center_station_value(pressure_span)
-    component_history = jnp.asarray(
+    history = tuple(station_history or ())
+    if (len(history) != bundle.x.shape[0]
+            or any(any(name not in row for name in required) for row in history)):
+        history = _bundle_station_history(bundle)
+    values = {name: np.asarray([row[name] for row in history], dtype=float)
+        for name in required}
+    field_scale, mean_velocity = values["field_scale"], values["mean_velocity"]
+    centered_field = field_scale - np.mean(field_scale)
+    centered_velocity = mean_velocity - np.mean(mean_velocity)
+    correlation_scale = np.sqrt(
+        np.sum(centered_field**2) * np.sum(centered_velocity**2)
+    )
+    correlation = (float(np.sum(centered_field * centered_velocity) / correlation_scale)
+        if correlation_scale > 0.0 else 0.0)
+    axial_current, pressure_span = values["axial_current"], values["pressure_span"]
+    component_history = np.asarray(
         getattr(bundle, "iteration_component_residual_history", jnp.zeros((0, 6)))
     )
-    max_divergence_residual = (
-        float(component_history[-1, 3])
-        if component_history.ndim == 2 and component_history.shape[0]
-        else 0.0
-    )
+    def center(array):
+        return float(np.mean(array[(array.size - 1) // 2:array.size // 2 + 1]))
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
-        max_residual=float(jnp.max(jnp.abs(residual))) if residual.size else 0.0,
-        max_charge_balance_residual=float(jnp.max(jnp.abs(charge_balance_residual)))
-        if charge_balance_residual.size
-        else 0.0,
-        mean_velocity_span=float(jnp.max(mean_velocity) - jnp.min(mean_velocity))
-        if mean_velocity.size
-        else 0.0,
-        volumetric_flow_rate_span=float(
-            jnp.max(volumetric_flow_rate) - jnp.min(volumetric_flow_rate)
-        )
-        if volumetric_flow_rate.size
-        else 0.0,
-        axial_current_span=float(jnp.max(axial_current) - jnp.min(axial_current))
-        if axial_current.size
-        else 0.0,
-        axial_current_mirror_residual=axial_current_mirror_residual,
-        max_wall_current_leakage=float(jnp.max(jnp.abs(wall_current_leakage)))
-        if wall_current_leakage.size
-        else 0.0,
-        net_boundary_current_residual=float(jnp.max(jnp.abs(boundary_current_residual)))
-        if boundary_current_residual.size
-        else 0.0,
+        max_residual=float(np.max(np.abs(values["residual"]))),
+        max_charge_balance_residual=float(np.max(np.abs(
+            values["charge_balance_residual"]))),
+        mean_velocity_span=float(np.ptp(mean_velocity)),
+        volumetric_flow_rate_span=float(np.ptp(values["volumetric_flow_rate"])),
+        axial_current_span=float(np.ptp(axial_current)),
+        axial_current_mirror_residual=float(np.max(np.abs(
+            axial_current + axial_current[::-1]))),
+        max_wall_current_leakage=float(np.max(np.abs(
+            values["wall_current_leakage"]))),
+        net_boundary_current_residual=float(np.max(np.abs(
+            values["boundary_current_residual"]))),
         field_mean_velocity_correlation=correlation,
-        peak_velocity_span=float(jnp.max(peak_velocity) - jnp.min(peak_velocity))
-        if peak_velocity.size
-        else 0.0,
-        pressure_span_range=float(jnp.max(pressure_span) - jnp.min(pressure_span))
-        if pressure_span.size
-        else 0.0,
-        pressure_span_mirror_residual=pressure_span_mirror_residual,
-        center_axial_current=center_axial_current,
-        center_pressure_span=center_pressure_span,
-        max_divergence_residual=max_divergence_residual,
+        peak_velocity_span=float(np.ptp(values["u_max"])),
+        pressure_span_range=float(np.ptp(pressure_span)),
+        pressure_span_mirror_residual=float(np.max(np.abs(
+            pressure_span - pressure_span[::-1]))),
+        center_axial_current=center(axial_current),
+        center_pressure_span=center(pressure_span),
+        max_divergence_residual=(float(component_history[-1, 3])
+            if component_history.ndim == 2 and component_history.shape[0] else 0.0),
     )
 
 

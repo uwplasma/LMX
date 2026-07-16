@@ -125,11 +125,11 @@ deleting stale test-only velocity-statistics and solver-mask wrappers:
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,034 | return below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 35,022 | return below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,890 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,563,141 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,562,607 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -316,26 +316,25 @@ passes exactly on the repaired CPU and GPU paths. The frozen failing record
 retains the pre-fix `3183.12` signature for regression provenance.
 
 The isolated current-source `128 x 67 x 67` rung passes physical-repeat,
-restart-state/flux, placement, convergence, and device-equivalence gates. Warm
-medians are 2.787 and 2.761 seconds with CV below 0.6%, only 1.009x speedup and
-50.5% parallel efficiency. The matched trace later showed that those medians
-included a host-side repeat-signature gather whose two-GPU overhead masked the
-solver path; retain them only as superseded calibration evidence and retime
-with validation outside the synchronized solver interval. Stop larger blind
-rungs until that corrected contract and its trace attribution are accepted.
-Schema-6 Anderson and one matched profile of the accepted current path are the
-next bounded workstreams. For each device count, run one untraced accepted
-two-update solve and one traced solve, then compare momentum, projection,
-electric, post-map/other critical-path time, line work, communication, launch
-gaps, and iteration counts. The trace must preserve convergence/status exactly
-and may change a pressure/electric iteration count by at most three, matching
-the accepted default-XLA variation. The 1.2x gate requires two-GPU wall time at or
-below 2.3225 seconds, a 0.4387-second recovery. Continue only if one bounded,
-actionable category contributes at least 0.439 seconds of excess
-`T2_phase - T1_phase / 2`; tune communication only if it is at least 15% of
-the two-GPU critical path. Reject a perturbing or internally inconsistent trace
-and stop if no category can recover the promotion budget. A new scaling rung
-requires that trace-backed hypothesis.
+restart-state/flux, placement, convergence, and device-equivalence gates. The
+corrected end-to-end public-solve medians at `e3923a2` are 2.797 and 2.690
+seconds with CV below 0.4%, only 1.040x speedup. The external repeat signature
+is outside timing, while public station history and validation remain inside.
+The matched trace passes physical signature and convergence/status gates, with
+iteration drift at most one. Its 1/2-GPU spans are 2.925/2.790 seconds, but the
+three core phases total 2.647/1.771 seconds, a 1.495x speedup. Two-GPU post-map
+work is 0.685 seconds versus 0.040 on one GPU; repeated validation transfers
+account for about 0.520 seconds. The 1.2x end-to-end gate requires at most
+2.330 seconds, so the actionable recovery budget is 0.360 seconds.
+
+This trace authorizes exactly one behavior-preserving validation-transfer
+optimization: reuse the already materialized station history for host metrics
+instead of repeatedly gathering sharded scalars. It also deletes 12 package
+lines. Run one matched 1/2-GPU confirmation with the same fail-closed trace
+gates; promote only if end-to-end speedup reaches 1.2x. Otherwise retain the
+smaller implementation, report the remaining attribution, and stop. No larger
+rung or kernel tuning is authorized. Schema-6 Anderson remains the other
+bounded workstream after this confirmation.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -351,8 +350,8 @@ Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
 CPU/GPU calibration methods and current CPU/GPU correctness are green. Current
-fixed-grid GPU scaling misses its promotion threshold, so profile before
-another rung.
+fixed-grid GPU scaling misses its promotion threshold; confirm only the
+trace-authorized validation fusion before another rung.
 
 ## Priority 3: canonical B2 validation
 
