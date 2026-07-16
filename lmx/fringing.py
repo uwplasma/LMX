@@ -220,24 +220,6 @@ def _thin_wall_interface_mean(
     return jnp.where(interface, collapsed, base)
 
 
-def _anderson_extruded_state(
-    iterates: list[jnp.ndarray],
-    residuals: list[jnp.ndarray],
-    *,
-    history_size: int,
-    regularization: float,
-    damping: float,
-) -> jnp.ndarray:
-    """Accelerate an ALEX outer map while retaining its affine constraints."""
-
-    return anderson_mixing(
-        jnp.stack(iterates[-history_size:]),
-        jnp.stack(residuals[-history_size:]),
-        regularization=regularization,
-        damping=damping,
-    )
-
-
 def _coerce_spacing_vector(
     spacing: float | jnp.ndarray, size: int, *, dtype
 ) -> jnp.ndarray:
@@ -7028,10 +7010,10 @@ def _solve_extruded_projection(
                     fixed_point_residuals.append(fixed_point_residual)
                     del fixed_point_iterates[: -case.solver.coupling_history_depth]
                     del fixed_point_residuals[: -case.solver.coupling_history_depth]
-                    accelerated = _anderson_extruded_state(
-                        fixed_point_iterates,
-                        fixed_point_residuals,
-                        history_size=case.solver.coupling_history_depth,
+                    depth = case.solver.coupling_history_depth
+                    accelerated = anderson_mixing(
+                        jnp.stack(fixed_point_iterates[-depth:]),
+                        jnp.stack(fixed_point_residuals[-depth:]),
                         regularization=case.solver.coupling_regularization,
                         damping=case.solver.coupling_damping,
                     )

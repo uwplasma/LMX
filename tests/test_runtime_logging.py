@@ -37,42 +37,7 @@ def test_streaming_solver_logger_prints_live_solver_sections():
         reference_mean_velocity=None,
         restart=RestartLogInfo(enabled=False),
     )
-    logger.emit_step(
-        SolverStepRecord(
-            step_index=1,
-            time=0.1,
-            dt=0.1,
-            u_max=1.0,
-            mean_velocity=0.5,
-            current_max=0.2,
-            face_current_max=0.18,
-            emf_max=0.12,
-            lorentz_max=0.08,
-            face_lorentz_max=0.07,
-            residual=1e-6,
-            potential_residual=1e-5,
-            potential_iterations=12.0,
-            linear_residual=1e-6,
-            linear_iterations=8.0,
-            applied_forcing=1.0,
-            pressure_proxy=0.4,
-            current_scaled_pressure_proxy=0.3,
-            raw_update_max=0.02,
-            limiter_scale=1.0,
-            limited_fraction=0.0,
-            courant_like=0.05,
-            ohmic_power=0.01,
-            volumetric_flow_rate=0.9,
-            mean_current_magnitude=0.11,
-            lorentz_power=0.02,
-            div_current_max=1e-8,
-            charge_balance_residual=2e-9,
-            gauge_residual=1e-10,
-            interface_current_residual=1e-8,
-            potential_initial_residual=2e-5,
-            linear_initial_residual=3e-6,
-        )
-    )
+    logger.emit_step(_sample_record())
     logger.emit_footer(
         Solution(
             mesh=mesh,
