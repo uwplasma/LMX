@@ -8,7 +8,6 @@ import jax.numpy as jnp
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from .io import _portable_path, write_paraview
 from .physics import build_material_fields
-from .plotting import write_case_overview_plots
 from .reference_data import default_closed_channel_reference_root
 from .solvers import solve_steady
 import lmx.solvers as solvers
@@ -21,6 +20,12 @@ from .validation import (
     write_metrics_json,
     write_profile_csv,
 )
+
+
+def write_case_overview_plots(*args, **kwargs):
+    from .plotting import write_case_overview_plots as writer
+
+    return writer(*args, **kwargs)
 
 
 def _default_reference_root() -> Path | None:

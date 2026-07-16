@@ -4,10 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 
 from .cases import make_hunt_case, make_shercliff_case
 from .example_runner import solve_case_snapshots
@@ -21,6 +18,11 @@ from .core import MHDState
 
 
 def _set_showcase_style() -> None:
+    global plt, Line2D, Rectangle
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Rectangle
+
     plt.style.use("default")
     plt.rcParams.update(
         {

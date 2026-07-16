@@ -251,6 +251,7 @@ side = "max"
     bundles for the selected axial stations
 - `write_json_summary`
 - `write_plots`
+  - requires the `visualization` install extra (`pip install 'lmx[visualization]'`)
   - for `extruded_inductionless`, writes `overview.png` / `overview.pdf`
     summarizing station response, conservation histories, and peak-field
     cross-sections

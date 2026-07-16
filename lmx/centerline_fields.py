@@ -7,12 +7,6 @@ import csv
 import json
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
 import numpy as np
 
 from .field_models import sample_wham_mirror_field
@@ -580,6 +574,13 @@ def _parabolic_pipe_velocity_profile(
 
 
 def _set_field_plot_style() -> None:
+    global plt, Line3DCollection
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
     plt.style.use("default")
     plt.rcParams.update(
         {

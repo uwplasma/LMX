@@ -6,6 +6,8 @@ import hashlib
 import inspect
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tarfile
 import zipfile
 
@@ -118,6 +120,17 @@ def test_root_import_is_lazy_and_within_budget() -> None:
     payload = build_inventory()
     payload["import_measurement"] = measure_import(repeats=3)
     assert architecture_budget_errors(payload) == []
+
+
+def test_numerical_modules_do_not_import_optional_visualization() -> None:
+    code = """
+import sys
+import lmx.blanket_flow, lmx.blanket_geometry, lmx.centerline_fields
+import lmx.example_runner, lmx.plotting, lmx.q2d, lmx.showcase
+assert not any(name == 'matplotlib' or name.startswith('matplotlib.') for name in sys.modules)
+assert not any(name == 'PIL' or name.startswith('PIL.') for name in sys.modules)
+"""
+    subprocess.run([sys.executable, "-c", code], check=True)
 
 
 def test_wheel_audit_rejects_nonpackage_payload(tmp_path: Path) -> None:

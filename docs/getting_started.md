@@ -9,8 +9,11 @@ workflow is understood.
 ```bash
 git clone https://github.com/uwplasma/LMX.git
 cd LMX
-python -m pip install -e .
+python -m pip install -e '.[visualization]'
 ```
+
+The bundled TOML cases write plots. For a lean numerical-only installation,
+use `python -m pip install -e .` and set `write_plots = false`.
 
 For tests and documentation:
 

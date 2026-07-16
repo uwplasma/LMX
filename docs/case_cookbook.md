@@ -87,6 +87,9 @@ independent transpose reference at the final mesh and solver tolerance.
 
 ## Plotting
 
+Install `lmx[visualization]` to enable plots and movies. Numerical solves and
+non-plot outputs do not require Matplotlib or Pillow.
+
 `lmx.plotting` writes bounded plots from solution and validation objects. The
 Python examples demonstrate the supported plotting API. Showcase media in the
 README and docs is compressed and served from releases; new runs write under

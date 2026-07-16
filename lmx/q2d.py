@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from matplotlib import animation
-import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -1420,6 +1418,8 @@ def write_q2d_wall_driven_comparison_plots(
 ) -> list[Path]:
     """Write a publication-facing matched side-wall Q2D comparison panel."""
 
+    import matplotlib.pyplot as plt
+
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     ux = np.asarray(solution.ux_frames[-1], dtype=float)
@@ -1516,6 +1516,9 @@ def write_q2d_turbulence_decay_movie(
 ) -> list[Path]:
     """Write a GIF movie and poster for a Q2D multi-mode decay solution."""
 
+    from matplotlib import animation
+    import matplotlib.pyplot as plt
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = np.asarray(solution.frames, dtype=float)
@@ -1575,6 +1578,8 @@ def write_q2d_turbulence_observable_plots(
     values = np.asarray(field, dtype=float)
     if values.ndim != 2:
         raise ValueError("Q2D turbulence observable plots expect a 2D field")
+    import matplotlib.pyplot as plt
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     metrics = q2d_turbulence_observables(
@@ -1655,6 +1660,8 @@ def write_q2d_decay_plots(
     *,
     title: str = "Q2D Hartmann-friction decay baseline",
 ) -> list[Path]:
+    import matplotlib.pyplot as plt
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     x_edges = np.linspace(0.0, case.lx, case.nx + 1)
@@ -1704,6 +1711,8 @@ def write_q2d_forced_plots(
     *,
     title: str = "Q2D forced Hartmann-friction duct baseline",
 ) -> list[Path]:
+    import matplotlib.pyplot as plt
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     x_edges = np.linspace(0.0, case.lx, case.nx + 1)
@@ -1748,6 +1757,8 @@ def write_q2d_wall_bounded_forced_plots(
     *,
     title: str = "Wall-bounded Q2D duct forced baseline",
 ) -> list[Path]:
+    import matplotlib.pyplot as plt
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     x_edges = np.linspace(0.0, case.lx, case.nx + 1)

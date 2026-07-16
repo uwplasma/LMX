@@ -24,7 +24,7 @@ selected differentiable workflows, and research-stage extruded flows.
 
 ```bash
 git clone https://github.com/uwplasma/LMX.git
-cd LMX && python -m pip install -e .
+cd LMX && python -m pip install -e '.[visualization]'
 lmx examples/hartmann_case.toml
 ```
 
@@ -37,6 +37,7 @@ print(solution.diagnostics.volumetric_flow_rate_history[-1])
 
 TOML and Python inputs support restarts, diagnostics, plotting, and checksummed
 artifacts. See the [case cookbook](https://lmx.readthedocs.io/en/latest/case_cookbook.html).
+Use `pip install -e .` for the lean numerical core without plotting packages.
 
 ## Capabilities
 

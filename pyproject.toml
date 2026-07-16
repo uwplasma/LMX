@@ -13,7 +13,6 @@ license = "MIT"
 keywords = ["magnetohydrodynamics", "liquid-metal", "jax", "differentiable-simulation"]
 dependencies = [
   "jax",
-  "matplotlib",
   "numpy",
   "scipy",
   "solvax>=0.8.3,<1",
@@ -35,6 +34,8 @@ Source = "https://github.com/uwplasma/LMX"
 
 [project.optional-dependencies]
 dev = [
+  "matplotlib",
+  "pillow",
   "pytest",
   "pytest-cov",
   "pytest-timeout",
@@ -53,6 +54,10 @@ release = [
 ]
 magnetic = [
   "magpylib-jax",
+]
+visualization = [
+  "matplotlib",
+  "pillow",
 ]
 
 [project.scripts]

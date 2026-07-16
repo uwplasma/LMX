@@ -5,18 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import jax.numpy as jnp
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-from matplotlib import animation
-from matplotlib import colors
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch, Rectangle
-from matplotlib.ticker import ScalarFormatter
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 import numpy as np
 
 from .core import Solution
@@ -25,7 +13,22 @@ from .validation import hartmann_analytic_profile
 from .validation import extract_midplane_profile
 
 
+def _load_matplotlib() -> None:
+    global plt, animation, colors, Line2D, Patch, Rectangle, ScalarFormatter, inset_axes, mark_inset
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import animation, colors
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch, Rectangle
+    from matplotlib.ticker import ScalarFormatter
+    from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+
 def _set_plot_style() -> None:
+    _load_matplotlib()
     plt.style.use("default")
     plt.rcParams.update(
         {
@@ -172,6 +175,7 @@ def _draw_profile_slab(
 
 
 def _plot_field(ax: plt.Axes, solution: Solution, field: jnp.ndarray, *, title: str, cmap: str) -> None:
+    _load_matplotlib()
     mesh = solution.mesh
     field_min = float(jnp.min(field))
     field_max = float(jnp.max(field))
@@ -324,6 +328,7 @@ def write_case_overview_plots(
 
 
 def _safe_writer_candidates() -> list[tuple[str, str]]:
+    _load_matplotlib()
     available = set(animation.writers.list())
     candidates: list[tuple[str, str]] = []
     if "imagemagick" in available:

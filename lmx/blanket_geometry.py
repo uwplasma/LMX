@@ -6,15 +6,18 @@ from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
 from .mesh import StructuredMesh, centerline_pipe_mesh_quality_metrics
+
+
+def _load_visualization() -> None:
+    global plt, Poly3DCollection
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,7 @@ def write_wham_blanket_geometry_preview(
 ) -> list[Path]:
     """Write a publication-style WHAM blanket geometry preview panel."""
 
+    _load_visualization()
     spec = geometry or WhamBlanketLoop()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -224,6 +228,7 @@ def write_centerline_pipe_mesh_preview(
 ) -> list[Path]:
     """Write a mesh-QA panel for a mapped pipe following a 3D centerline."""
 
+    _load_visualization()
     if mesh.point_coordinates is None:
         raise ValueError("centerline pipe mesh preview requires point_coordinates")
     out = Path(out_dir)

@@ -16,15 +16,7 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
-import matplotlib
-
-matplotlib.use("Agg")
-
-from matplotlib import colors
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
 import numpy as np
-from PIL import Image
 
 from .blanket_geometry import WhamBlanketLoop, build_wham_blanket_centerline, tube_surface_from_centerline
 from .field_models import sample_wham_mirror_field
@@ -860,6 +852,7 @@ def write_wham_blanket_flow_movie(
 ) -> list[Path]:
     """Write a compact GIF of the reduced flow filling the blanket route."""
 
+    _set_flow_plot_style()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     frames = []
@@ -981,6 +974,7 @@ def write_wham_blanket_transient_flow_movie(
 ) -> list[Path]:
     """Write a longer GIF showing filling, acceleration, and steady-state flow."""
 
+    _set_flow_plot_style()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     frames = []
@@ -1342,7 +1336,7 @@ def _render_movie_frame(
     time_value: float,
     frame_index: int,
     frame_count: int,
-) -> Image.Image:
+):
     _set_flow_plot_style()
     fig = plt.figure(figsize=(8.2, 4.8), dpi=115, constrained_layout=True)
     gs = fig.add_gridspec(1, 3, width_ratios=[1.28, 0.95, 0.92])
@@ -1415,7 +1409,7 @@ def _render_transient_movie_frame(
     time_value: float,
     frame_index: int,
     frame_count: int,
-) -> Image.Image:
+):
     _set_flow_plot_style()
     base_flow = transient["base_flow"]
     fig = plt.figure(figsize=(10.8, 5.0), dpi=115, constrained_layout=True)
@@ -1827,6 +1821,15 @@ def _json_ready(value):
 
 
 def _set_flow_plot_style() -> None:
+    global plt, colors, Line3DCollection, Image
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib import colors
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+    from PIL import Image
+
     plt.style.use("default")
     plt.rcParams.update(
         {
