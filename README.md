@@ -90,7 +90,8 @@ observables pass the 1% finite-grid gate.
 
 The current B2 smoke has exact schema-5 restart, a post-map physical momentum
 diagnostic, and 1/2/4-CPU equivalence. Its projection-consistent stopping rule
-remains open; its 64x pseudo-time cap is refrozen, while the last 1/2-GPU ladder predates the terminal-
+is versioned but its threshold remains open; its 64x pseudo-time cap is refrozen,
+while the last 1/2-GPU ladder predates the terminal-
 restart fix and is being refreshed.
 [Fringing status →](docs/fringing.md)
 

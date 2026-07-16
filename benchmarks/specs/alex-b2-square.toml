@@ -122,6 +122,7 @@ electric_iterations_min = 600
 electric_tolerance_max = 1.0e-12
 projection_iterations_min = 4000
 projection_tolerance_max = 1.0e-12
+# Provisional fail-closed normalized-map bound; production remains blocked.
 steady_residual_max = 5.0e-5
 steady_steps_min = 3
 

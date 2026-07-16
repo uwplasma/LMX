@@ -618,6 +618,17 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
             atol=1.0e-12,
         )
     assert resumed.bundle.stopping_state == solution.bundle.stopping_state
+    convergence_problem = replace(
+        continuation_problem,
+        case=replace(
+            continuation_problem.case,
+            time_stepper=replace(continuation_problem.case.time_stepper, max_steps=1),
+        ),
+    )
+    converged = solve_extruded_inductionless(
+        convergence_problem, initial_bundle=resumed.bundle
+    )
+    assert converged.bundle.stopping_state == (5, 3, "converged")
 
 
 def test_benchmark_b_primary_pressure_observables_use_direct_fields():

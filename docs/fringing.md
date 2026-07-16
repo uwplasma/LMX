@@ -85,7 +85,8 @@ balance `L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`. Despite the historical field name,
 this is a nonlinear physical residual evaluated on the raw mapped state—not the
 exact predictor/projection fixed-point defect. It remains a validation diagnostic
 and does not stop a run. B2 stopping uses the normalized velocity-map rate with
-three sustained passes; pressure and potential updates remain diagnostics.
+three sustained passes; pressure and potential updates remain diagnostics. The
+metric is implemented, but no physical threshold is accepted yet.
 
 Small conservation residuals establish internal consistency, not agreement with
 an experiment. Experimental promotion additionally requires mesh/time

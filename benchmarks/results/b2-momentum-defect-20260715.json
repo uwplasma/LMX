@@ -1,13 +1,14 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-07-15",
   "implementation_commit": "e6834ee2a3c36bca936c558dcd0b935d92832a21",
   "operator_audit_commit": "2d0fb5044217b9848b7e13666f8865a4eb05f466",
   "case_id": "B2-fringing-square",
   "optimization_commit": "791e496",
   "projection_fix_commit": "3e731fa54a7048ebc179e61e424830a5b066f471",
-  "acceptance_role": "reduced-post-map-nonlinear-physical-residual-diagnostic",
-  "status": "projection-floor-removed-cap-refrozen-stopping-contract-open",
+  "stopping_commit": "0ab33b2d4870e784d946cc7181b17fcfba55738d",
+  "acceptance_role": "reduced-b2-stopping-and-residual-diagnostic",
+  "status": "schema5-loose-threshold-rejected-strict-threshold-not-crossed",
   "normalization": {
     "formula": "L max_fluid,component |C-D-E-JxB-f+Gp|/(rho U0^2 N)",
     "canonical_reduction": "max |discrete momentum residual|/540",
@@ -179,20 +180,73 @@
     "four_update_trajectory_unchanged": true,
     "restart_exact": true
   },
+  "fixed_relaxation_microprobe": {
+    "shared_checkpoint_step": 29,
+    "updates": 6,
+    "relaxation": [2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0],
+    "final_normalized_map_rate": [
+      0.0327524631529609,
+      0.030317305003363035,
+      0.02803059313261254,
+      0.024674005727519724,
+      0.024085244508094406,
+      0.02350678966659553,
+      0.02237302779355306
+    ],
+    "promotion_reference": 4.0,
+    "promotion_gain_min": 0.15,
+    "largest_observed_gain_over_reference": 0.09325,
+    "all_monotone_and_balance_green": true,
+    "status": "rejected-insufficient-incremental-gain"
+  },
+  "normalized_map_outcome_study": {
+    "shape": [7, 7, 7],
+    "sustained_passes": 3,
+    "shared_preterminal_step": 29,
+    "loose": {
+      "threshold": 0.05,
+      "stop_step": 30,
+      "final_normalized_map_rate": 0.04412327231640041,
+      "status": "crossed-and-rejected-by-outcomes"
+    },
+    "strict": {
+      "threshold": 0.005,
+      "bounded_step": 96,
+      "final_normalized_map_rate": 0.015016583516670387,
+      "threshold_ratio": 3.0033167033340774,
+      "status": "not-crossed-not-calibrated"
+    },
+    "max_balance": 5.012452675146051e-10,
+    "pressure_linear_histories_green": true,
+    "electric_linear_histories_green": true,
+    "diagnostic_loose_vs_step_96": {
+      "normalized_transverse_pressure_linf": 0.0016756098415045065,
+      "velocity_max_absolute_over_U0": 0.17141194632520584,
+      "pressure_gradient_relative_l2": 0.005613747697098778
+    },
+    "limits": {
+      "normalized_transverse_pressure_linf": 0.0002,
+      "velocity_max_absolute_over_U0": 0.001,
+      "pressure_gradient_relative_l2": 0.005
+    },
+    "passed": false,
+    "interpretation": "The endpoints are not both converged: step 96 rejects 0.05 by all outcome limits, while 0.005 remains uncalibrated."
+  },
   "focused_gates": {
     "operator_jit_and_jvp": "passed",
     "exact_split_identity": "passed against independently assembled dense momentum algebra",
     "nonzero_face_reconstruction": "manufactured mixed-boundary projection passed",
-    "io_v4_and_v1_v2_v3_compatibility": "14 passed in about 3 seconds",
+    "io_v5_and_v1_v2_v3_v4_compatibility": "passed",
     "direct_four_vs_serialized_two_plus_two": "state, compact flux, and all histories agree at 1e-12",
-    "reduced_b2_physics_restart": "passed",
+    "reduced_b2_physics_restart": "direct 4 versus serialized 2+2 and positive fifth-update convergence pass",
     "architecture": "35 modules; 35100 package lines; 7957 maintained-core lines"
   },
   "decision": {
     "threshold_frozen": false,
-    "stopping_eligible": false,
+    "physical_residual_stopping_eligible": false,
+    "normalized_map_metric_implemented": true,
     "coarse_rerun_authorized": false,
-    "outcome_study_attempt": {
+    "superseded_physical_residual_outcome_attempt": {
       "shape": [7, 7, 7],
       "requested_updates": 96,
       "deadline_seconds": 120,
@@ -209,7 +263,7 @@
     "pseudotime_safety_frozen": true,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "implement and version direct normalized velocity-map stopping, then compare sustained 0.05 and 0.005 crossings on one shared trajectory",
+    "next_gate": "release consistent SOLVAX Anderson weights, then run a bounded field-and-flux acceleration experiment before any tighter-reference stopping calibration",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,

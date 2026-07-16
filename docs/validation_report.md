@@ -31,7 +31,8 @@ are authoritative when prose and results differ.
   pressure correction. The corrected warm 64x/32x/16x map-rate ladder spans
   0.0768% against the 0.5% gate, raw updates halve, restart is exact, and the
   current native FreeMHD smoke passes. The 64x cap is refrozen; its versioned
-  normalized stopping rule remains open. A post-map nonlinear physical
+  normalized metric is implemented, but `0.05` fails all three outcome limits
+  and `0.005` does not cross by step 96. No threshold is accepted. A post-map nonlinear physical
   momentum residual replays exactly and decreases from 0.976 to 0.310, but it
   is not the split fixed-point defect and does not stop the solve. The normalized
   map-rate threshold and ALEX pressure-hole metadata remain open.

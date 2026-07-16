@@ -1,7 +1,8 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The current two-update B2/FreeMHD smoke is keyed to
-`dad8b60`; one-/two-/four-CPU-device equivalence is keyed to `c47ba09`.
+Status: 2026-07-15. The current two-update B2/FreeMHD smoke and schema-5
+stopping contract are keyed to `0ab33b2`; one-/two-/four-CPU-device equivalence
+is keyed to `c47ba09`.
 The post-map nonlinear momentum residual and
 restart schema 4 were keyed to `e6834ee`; schema 5 now versions normalized
 stopping. Its fixed-relaxation memory reduction
@@ -101,7 +102,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-5 replay, refrozen 64x cap, and current CPU device equivalence have bounded gates | stopping-outcome sensitivity, current GPU refresh, production parity, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-5 replay, refrozen 64x cap, and current CPU device equivalence have bounded gates | tighter-reference stopping calibration, current GPU refresh, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -122,9 +123,9 @@ immutable evidence, richer projection, and target-driven paths remain):
 | package modules | 35 | no new module | 35 |
 | package lines | 35,100 | return below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,824 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,869 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,544,428 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,548,451 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -441,17 +442,31 @@ The corrected warm ladder gives map rates `0.265699`, `0.265773`, and `0.265903`
 at 64x/32x/16x: 0.0768% spread versus the frozen 0.5% limit, raw updates halve,
 `u` remains controlling, and balance stays below `3.4e-10`. Refreeze 64x. The
 current two-update native FreeMHD smoke also passes every schema-3 execution and
-comparison gate at `dad8b60`, with pressure RMS/Linf `0.004518/0.010917`.
+comparison gate at `0ab33b2`, with pressure RMS/Linf `0.004518/0.010917`.
 
 Schema 5 now versions direct normalized velocity-map stopping with three
 sustained passes, leaving pressure/potential updates as diagnostics and retaining
-momentum, pressure, electric, and conservation gates. Next compare sustained
-`0.05` versus decade-tighter
-`0.005` outcome insensitivity, requiring pressure Linf at most `2e-4`, velocity at most
-`1e-3 U0`, pressure-gradient relative L2 at most `0.5%`, and every
-linear/conservation/restart gate green. Implement the frozen comparison directly
-in normalized units, or derive raw update tolerance as `tau_map N dt`, and
-version the stopping contract. Only then authorize one corrected coarse run.
+momentum, pressure, electric, and conservation gates. The bounded outcome study
+rejects `tau_map=0.05`: it converges at step 30, but versus the more-converged
+step-96 state its pressure Linf, velocity Linf, and pressure-gradient relative
+L2 differences are `1.676e-3`, `0.1714`, and `0.561%`, exceeding all frozen
+limits. The `0.005` branch remains monotone but reaches only `0.01502` at its
+96-update ceiling, so it is not calibrated. These are not two converged
+endpoints. A positive serialized schema-5 path reaches its third sustained pass
+on update five, closing convergence/restart semantics without promoting a
+physical threshold.
+
+Fixed-relaxation probes through 8 remain monotone, but improve only 9.33% over
+the relaxation-4 control, below the predeclared 15% promotion gate. Retain 2.
+Released SOLVAX 0.8.3 remains the supported floor. Before LMX uses coupled
+Anderson acceleration, reconcile and release SOLVAX 0.8.4's weight API, then
+apply identical weights and damping to fields and conservative compact flux.
+Do not store a production-scale full-state history without a measured benefit.
+
+The production spec's `5e-5` is now an explicitly provisional, fail-closed
+normalized-map bound, not an accepted threshold. Do not authorize a corrected
+coarse run until acceleration reaches a tighter reference and the frozen QoI,
+linear, conservation, restart, and sharding gates pass.
 Tolerance, wall, medium, fine, and production-FreeMHD work remain blocked until
 that coarse baseline converges for the correct reason. Evidence is in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
