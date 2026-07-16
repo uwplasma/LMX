@@ -184,7 +184,7 @@ def run_local_cpu_scaling(
         records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 CPU gate failed; evidence: {output_path}")
-    if benchmark_kind == "matched_b2_smoke":
+    if benchmark_kind == "matched_b2_smoke" and records:
         _validate_matched_b2_topologies(records)
     return records
 

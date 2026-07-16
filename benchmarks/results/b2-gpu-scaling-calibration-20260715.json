@@ -1,6 +1,6 @@
 {
-  "schema_version": 6,
-  "date": "2026-07-15",
+  "schema_version": 7,
+  "date": "2026-07-16",
   "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "source_fingerprint": "fff3a0a190d21a413bd0bcac73fef50812811f3f1837299d547b40a57cd9a3d3",
@@ -23,6 +23,43 @@
     "repeats": 4,
     "input_sha256": "c448b4cf684605ac83e7333bb16381072f53d47883a10b4ac03d361d4990be6e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
+  },
+  "schema6_topology_refresh": {
+    "acceptance_role": "topology-correctness-only",
+    "environment": {
+      "hardware": "1/2 NVIDIA RTX A4000, shared host without NVLink",
+      "python": "3.10.12",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "solvax": "0.8.4",
+      "precision": "float64",
+      "xla_flags": "default"
+    },
+    "one_gpu_current": {
+      "execution_commit": "29de6518af81908501a9d382feb2d3c784a4440a",
+      "source_fingerprint": "c1319a3a9d80d51ee9da3b16001730e06fd86799a43562ab334634c3b24341ab",
+      "validation_passed": true,
+      "restart_state_max_abs": 1.1102230246251565e-16,
+      "restart_flux_max_abs": 0.0,
+      "anderson_replay_max_abs": 1.1102230246251565e-16,
+      "repeat_signature_max_abs": 3.637978807091713e-12,
+      "pressure_solves_converged": true,
+      "raw_sha256": "0d9d3773ca8839802d163a93542dc72c4a994d917b802b189ab5e1bce12c7f5a"
+    },
+    "two_gpu_pre_layout_fix": {
+      "execution_commit": "f556f93c077ac185e8b415c0855a6f1d007a7298",
+      "source_fingerprint": "e1c37f795205db1d3b488bdc179da446d8fe2deb31be696205ad82c6c9459bbe",
+      "validation_passed": false,
+      "restart_state_max_abs": 5.097353042298087e-05,
+      "restart_flux_max_abs": 0.0,
+      "restart_derived_max_abs": 3.694822225952521e-13,
+      "restart_history_max_abs": 4.9203432704553076e-17,
+      "anderson_replay_max_abs": 2.7755575615628914e-17,
+      "second_step_courant_max": 5.156612301627844e-05,
+      "expected_second_step_courant_max": 5.925925932975698e-07,
+      "raw_sha256": "47c9615efceea9c8640a615865db01b38309d82f2a5d7d7e0fc560ff2c964a5d"
+    },
+    "decision": "Explicitly shard stacked-flux component unpacking. Current 1/2/4-CPU and one-GPU topology pass; rerun only the two-GPU tiny gate when both devices are idle. No timing claim."
   },
   "restart_gate": {
     "deterministic_evidence_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",

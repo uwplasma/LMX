@@ -137,6 +137,12 @@ correction when the global modal basis is active: four-device time regressed
 targets the Neumann electric gauge reduction; no larger scaling rung is
 authorized from the rejected variant.
 
+The resulting four-device trace records one all-reduce, one coarse all-gather,
+and two halo permutations per electric PCG iteration. Each contributes under
+2% of the 744 ms profiled solve, and no distinct second gauge collective exists.
+This misses the 3% trigger for an anchored-gauge prototype; the remaining local
+gap is compute/scheduling dominated rather than a single communication defect.
+
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
 The source-identical baseline, doubled-iteration, and confirmation-wall runs

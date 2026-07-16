@@ -323,12 +323,14 @@ and iteration counts stayed identical, but the warm median regressed from
 0.8138 to 0.8740 seconds (7.4%). Reject that deletion and do not launch the
 large rung from it; the first apparent gain was shared-worktree/cache-order
 noise. The next optimization requires an isolated profile, not another
-preconditioner hypothesis. Profile the Neumann electric matvec's rank-one gauge
-reduction first; prototype an anchored symmetric gauge only if that dependent
-collective exceeds 3% of wall time. Its fail-closed ladder is manufactured
-SPD/symmetry/JVP, tiny 1/2/4 topology, paired `128 x 35 x 35` one/four-device
-timing, provisional `256 x 67 x 67` one/two/four-device scaling, and only then
-the frozen six-repeat promotion gate.
+preconditioner hypothesis. A four-device `128 x 35 x 35` trace then records 139
+electric PCG iterations with one all-reduce, one coarse all-gather, and two halo
+permutations per iteration. Their per-device totals are each about 13 ms over a
+744 ms solve, below 2% and the predeclared 3% gauge trigger; there is no separate
+second gauge collective. Reject the mathematically valid anchored-gauge
+prototype for this tranche. The remaining local gap is compute/scheduling
+dominated, so do not launch another large forced-device rung without a new
+profiled target or a controlled physical-core execution method.
 
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and

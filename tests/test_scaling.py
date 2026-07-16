@@ -167,6 +167,13 @@ def test_remote_scaling_archive_has_one_package_resource_owner(
     assert not any(arcname.startswith("benchmarks/") for _, arcname in added)
 
 
+def test_matched_scaling_allows_a_gpu_only_run(tmp_path: Path):
+    assert strong_scaling_demo.run_local_cpu_scaling(
+        repo_root=tmp_path, out_dir=tmp_path, device_counts=(),
+        benchmark_kind="matched_b2_smoke", nx=None, ny=7, nz=7,
+        iterations=2, repeats=4, python_executable=sys.executable) == []
+
+
 @pytest.mark.parametrize(
     ("record", "expected"),
     [
