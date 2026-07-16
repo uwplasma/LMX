@@ -88,7 +88,10 @@ python scripts/run_strong_scaling_worker.py --help
 ```
 
 Each lane must emit a compact JSON or CSV summary with input, source, dependency,
-and hardware fingerprints. Large raw fields belong in a versioned release.
+and hardware fingerprints. Scaling stays a calibration unless its complete
+fixed-work ladder, three two-minute warm samples per rung, memory, placement,
+and affinity or idle-host gates all pass. Large raw fields belong in a
+versioned release.
 
 ## CI contract
 

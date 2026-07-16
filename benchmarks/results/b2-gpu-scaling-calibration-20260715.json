@@ -1,5 +1,5 @@
 {
-  "schema_version": 9,
+  "schema_version": 10,
   "date": "2026-07-16",
   "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -131,8 +131,41 @@
       "decision": "reject: every warm trajectory must be at least 120 seconds"
     },
     "runs": {
-      "1": {"visible_gpu": 1, "cold_seconds": 290.7827777810162, "warm_samples_seconds": [258.9126915970119, 258.9016204390209, 258.93602094997186], "warm_median_seconds": 258.9126915970119, "warm_cv": 5.537716954247372e-5, "speedup": 1.0, "parallel_efficiency": 1.0, "validation_passed": true, "restart_state_tolerance_ratio": 0.3212978451384472, "restart_flux_relative_l2": 5.3323850569168306e-12},
-      "2": {"visible_gpus": [0, 1], "cold_seconds": 192.64098487608135, "warm_samples_seconds": [158.28272578003816, 159.2580505310325, 159.23386372206733], "warm_median_seconds": 159.23386372206733, "warm_cv": 0.0028578216376772135, "speedup": 1.625990135169537, "speedup_ci95": [1.625673675997762, 1.6359082753591776], "parallel_efficiency": 0.8129950675847685, "validation_passed": true, "restart_state_tolerance_ratio": 0.1468145898345856, "restart_flux_relative_l2": 4.854265229185998e-12}
+      "1": {
+        "visible_gpu": 1,
+        "cold_seconds": 290.7827777810162,
+        "warm_samples_seconds": [258.9126915970119, 258.9016204390209, 258.93602094997186],
+        "warm_median_seconds": 258.9126915970119,
+        "warm_cv": 5.537716954247372e-5,
+        "speedup": 1.0,
+        "parallel_efficiency": 1.0,
+        "validation_passed": true,
+        "restart_state_tolerance_ratio": 0.3212978451384472,
+        "restart_flux_relative_l2": 5.3323850569168306e-12,
+        "solution_bundle_bytes": 101128192,
+        "peak_host_rss_bytes": 3059544064,
+        "peak_device_bytes_total": 2501090816,
+        "peak_device_bytes_each": [2501090816],
+        "raw_sha256": "25f3d21939a43a21b1d786f3ae0c63483008b8f305e78b0b70e71f8a8102519b"
+      },
+      "2": {
+        "visible_gpus": [0, 1],
+        "cold_seconds": 192.64098487608135,
+        "warm_samples_seconds": [158.28272578003816, 159.2580505310325, 159.23386372206733],
+        "warm_median_seconds": 159.23386372206733,
+        "warm_cv": 0.0028578216376772135,
+        "speedup": 1.625990135169537,
+        "speedup_ci95": [1.625673675997762, 1.6359082753591776],
+        "parallel_efficiency": 0.8129950675847685,
+        "validation_passed": true,
+        "restart_state_tolerance_ratio": 0.1468145898345856,
+        "restart_flux_relative_l2": 4.854265229185998e-12,
+        "solution_bundle_bytes": 101128192,
+        "peak_host_rss_bytes": 4154281984,
+        "peak_device_bytes_total": 2720245248,
+        "peak_device_bytes_each": [1406647552, 1313597696],
+        "raw_sha256": "ccfefb311fc765288592ae83a027f01839cb867a603e9d4ed64562440577d641"
+      }
     },
     "equivalence": {
       "velocity_l2_max_abs": 1.9503886505845003e-8,
@@ -153,6 +186,7 @@
       "schema6_and_physics": true,
       "mixed_restart_replay": true,
       "placement": true,
+      "memory_recorded": true,
       "cross_topology": true,
       "speedup_ci95_lower_at_least_1.2": true,
       "parallel_efficiency_at_least_0.6": true,

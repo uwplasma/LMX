@@ -99,6 +99,7 @@ _SCALING_TABLE_COLUMNS = (
     "physics_equivalent",
     "solver_faithful",
     "sustained_timing_eligible",
+    "sustained_claim_eligible",
 )
 
 _BUNDLE_FIELD_NAMES = (
@@ -182,6 +183,54 @@ def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
     )
 
 
+_SUSTAINED_PROVENANCE = ("source_commit", "source_fingerprint", "input_sha256",
+    "evaluator_sha256", "restart_sha256")
+_SUSTAINED_IDENTITY = (*_SUSTAINED_PROVENANCE, "precision", "python_version",
+    "jax_version")
+
+
+def _sustained_group(records: Sequence[Mapping[str, object]],
+    rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Fail closed unless fixed work forms one publishable device ladder."""
+
+    backend = str(records[0].get("backend", "")).lower()
+    kind = str(records[0].get("device_kind", "")).lower()
+    gpu = backend in {"gpu", "cuda", "rocm"} or any(
+        name in kind for name in ("gpu", "nvidia", "amd"))
+    required = (1, 2, 4) if backend == "cpu" or kind == "cpu" else ((1, 2) if gpu else ())
+    observed = sorted(int(row["num_devices"]) for row in rows)
+    values = {name: [record.get(name) for record in records]
+        for name in _SUSTAINED_IDENTITY}
+    identity = (any(all(value not in (None, "") for value in values[name])
+        for name in _SUSTAINED_PROVENANCE) and all(
+            not any(value not in (None, "") for value in field)
+            or all(value == field[0] and value not in (None, "") for value in field)
+            for field in values.values()))
+    memory = all(record.get("memory_bytes_estimate") is not None
+        and record.get("peak_host_rss_bytes") is not None for record in records)
+    if gpu:
+        memory = memory and all(len(devices := record.get("device_memory", ()))
+            == int(row["num_devices"]) and all(
+                device.get("peak_bytes_in_use") is not None for device in devices)
+            for record, row in zip(records, rows, strict=True))
+    gates = {
+        "complete_topology": bool(required) and tuple(observed) == required,
+        "fixed_work_identity": identity,
+        "all_rows_sustained": all(bool(row["sustained_timing_eligible"]) for row in rows),
+        "numerical_equivalence": all(bool(row["validation_passed"])
+            and bool(row["physics_equivalent"]) and bool(row["solver_faithful"])
+            for row in rows),
+        "placement": all(int(row["global_shard_count"]) == int(row["num_devices"])
+            and (int(row["num_devices"]) == 1 or bool(row["spatially_sharded"]))
+            for row in rows),
+        "memory_complete": memory,
+        "environment_verified": all(bool(record.get("resource_environment_verified"))
+            for record in records),
+    }
+    return {"backend": backend, "required_device_counts": list(required),
+        "observed_device_counts": observed, **gates, "eligible": all(gates.values())}
+
+
 def summarize_strong_scaling_records(
     records: Sequence[StrongScalingRecordLike],
 ) -> dict[str, object]:
@@ -199,7 +248,7 @@ def summarize_strong_scaling_records(
     for record in normalized:
         grouped.setdefault(_scaling_group_key(record), []).append(record)
 
-    rows: list[dict[str, object]] = []
+    rows, sustained_groups = [], []
     for _, group_records in sorted(
         grouped.items(), key=lambda item: tuple(str(value) for value in item[0])
     ):
@@ -219,6 +268,7 @@ def summarize_strong_scaling_records(
             _float_or_none(baseline.get(name))
             for name in ("velocity_l2", "potential_l2", "current_l2")
         )
+        group_rows = []
         for record in sorted_records:
             num_devices = max(_int_or_none(record.get("num_devices")) or 1, 1)
             warm_seconds = max(
@@ -242,7 +292,7 @@ def summarize_strong_scaling_records(
                 and np.isclose(value, reference, rtol=signature_rtol, atol=1.0e-10)
                 for value, reference in zip(signature, baseline_signature, strict=True)
             ) and bool(record.get("validation_passed", False))
-            rows.append(
+            group_rows.append(
                 {
                     "benchmark_kind": str(record.get("benchmark_kind", "")),
                     "operator_path": operator_path,
@@ -297,16 +347,23 @@ def summarize_strong_scaling_records(
                     ),
                 }
             )
+        group = _sustained_group(sorted_records, group_rows)
+        for row in group_rows:
+            row["sustained_claim_eligible"] = group["eligible"]
+        rows.extend(group_rows)
+        sustained_groups.append(group)
 
     solver_faithful_count = sum(1 for row in rows if row["solver_faithful"])
     profiled_count = sum(1 for row in rows if row["profile_path"])
     physics_equivalent_count = sum(1 for row in rows if row["physics_equivalent"])
     sustained_count = sum(1 for row in rows if row["sustained_timing_eligible"])
     best_speedup = max((float(row["speedup"]) for row in rows), default=0.0)
-    best_sustained_speedup = max(
+    best_sustained_candidate_speedup = max(
         (float(row["speedup"]) for row in rows if row["sustained_timing_eligible"]),
         default=0.0,
     )
+    best_sustained_speedup = max((float(row["speedup"]) for row in rows
+        if row["sustained_claim_eligible"]), default=0.0)
     best_parallel_efficiency = max(
         (float(row["parallel_efficiency"]) for row in rows), default=0.0
     )
@@ -316,7 +373,13 @@ def summarize_strong_scaling_records(
         "profiled_record_count": profiled_count,
         "physics_equivalent_record_count": physics_equivalent_count,
         "sustained_timing_record_count": sustained_count,
+        "sustained_claim_group_count": sum(bool(group["eligible"])
+            for group in sustained_groups),
+        "sustained_claim_eligible": any(bool(group["eligible"])
+            for group in sustained_groups),
+        "sustained_groups": sustained_groups,
         "best_speedup": best_speedup,
+        "best_sustained_candidate_speedup": best_sustained_candidate_speedup,
         "best_sustained_speedup": best_sustained_speedup,
         "best_parallel_efficiency": best_parallel_efficiency,
         "validation_status": "solver_faithful_records_present"

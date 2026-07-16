@@ -148,9 +148,10 @@ Every promoted physics benchmark must define:
 7. a bounded reproducer and a machine-readable result.
 
 Differentiable benchmarks additionally compare automatic derivatives with
-finite differences or an independent transpose solve. Scaling benchmarks must
-compare identical physics, report cold and warm timings, and prove actual shard
-placement.
+finite differences or an independent transpose solve. A scaling claim also
+requires a complete fixed-work 1/2/4-shard CPU or 1/2-GPU ladder, one excluded
+cold run plus three warm runs of at least 120 seconds per rung, placement,
+memory, and a clean affinity or idle-host gate.
 
 ## Source map
 

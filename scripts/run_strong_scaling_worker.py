@@ -494,7 +494,7 @@ def _matched_b2_smoke_benchmark(
     if direct.u.shape == (8, 7, 7) and executed_steps == 2:
         acceptance_role = "harness-smoke"
     elif minimum_warm_seconds >= _B2_SUSTAINED_WARM_SECONDS:
-        acceptance_role = "sustained-scaling-calibration"
+        acceptance_role = "sustained-candidate"
     else:
         acceptance_role = "fixed-work-debug"
     try:

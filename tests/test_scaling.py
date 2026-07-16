@@ -252,6 +252,28 @@ def _worker_record(**updates) -> StrongScalingRecord:
     return StrongScalingRecord(**(values | updates))
 
 
+def _sustained_ladder(counts, backend="cpu"):
+    records = []
+    for count in counts:
+        record = _worker_record(backend=backend,
+            device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
+            num_devices=count, repeats=4, cold_seconds=20.0 / count,
+            warm_seconds=12.0 / count, mean_seconds=14.0 / count,
+            operator_path="solve_extruded_inductionless",
+            memory_bytes_estimate=2 * 1024 * 1024,
+            spatially_sharded=count > 1, global_shard_count=count,
+            velocity_l2=3.0, potential_l2=2.0, current_l2=1.0,
+            validation_passed=True)
+        records.append({**record.__dict__, "source_fingerprint": "source",
+            "input_sha256": "input", "evaluator_sha256": "evaluator",
+            "precision": "float64", "peak_host_rss_bytes": 4 * 1024 * 1024,
+            "device_memory": ([{"peak_bytes_in_use": 1024} for _ in range(count)]
+                if backend == "gpu" else []),
+            "resource_environment_verified": True,
+            "sustained_timing_eligible": True})
+    return records
+
+
 def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     with pytest.raises(SystemExit):
         strong_scaling_demo.main(["--benchmark-kind", "extruded_solve"])
@@ -346,7 +368,7 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
 
     cpu = json.loads(Path(
         "benchmarks/results/b2-schema6-cpu-scaling-20260716.json").read_text())
-    cpu_sustained = cpu["physical_core_sustained_confirmation"]
+    cpu_sustained = cpu["sustained_cpu_allocation"]
     gpu = json.loads(Path(
         "benchmarks/results/b2-gpu-scaling-calibration-20260715.json").read_text())
     gpu_sustained = gpu["sustained_shared_host_calibration"]
@@ -356,7 +378,11 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
         assert all(
             sample >= 120.0 for run in record["runs"].values()
             for sample in run["warm_samples_seconds"])
+        assert all(run["peak_host_rss_bytes"] > run["solution_bundle_bytes"] > 0
+            for run in record["runs"].values())
     assert not gpu_sustained["gates"]["authoritative_idle_host"]
+    assert all(run["peak_device_bytes_total"] > 0
+        for run in gpu_sustained["runs"].values())
     assert not gpu_sustained["gates"]["timing_claim"]
 
 
@@ -417,8 +443,10 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert summary["profiled_record_count"] == 1
     assert summary["physics_equivalent_record_count"] == 2
     assert summary["sustained_timing_record_count"] == 2
+    assert not summary["sustained_claim_eligible"]
     assert summary["best_speedup"] == pytest.approx(2.0)
-    assert summary["best_sustained_speedup"] == pytest.approx(2.0)
+    assert summary["best_sustained_candidate_speedup"] == pytest.approx(2.0)
+    assert summary["best_sustained_speedup"] == 0.0
     rows = summary["rows"]
     assert rows[0]["speedup"] == pytest.approx(1.0)
     assert rows[1]["speedup"] == pytest.approx(2.0)
@@ -427,6 +455,40 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
     assert rows[0]["memory_mib"] == pytest.approx(2.0)
     assert rows[1]["physics_equivalent"]
     assert "pressure_linear_iterations_mean" in table.read_text()
+
+
+def test_sustained_claim_fails_closed_on_incomplete_evidence():
+    bad = [_sustained_ladder((1, 2)), _sustained_ladder((1, 2, 4, 8))]
+    for field in ("input_sha256", "memory_bytes_estimate",
+            "resource_environment_verified"):
+        records = _sustained_ladder((1, 2, 4))
+        records[-1].pop(field)
+        bad.append(records)
+    mismatched = _sustained_ladder((1, 2, 4))
+    mismatched[-1]["input_sha256"] = "other"
+    bad.append(mismatched)
+    no_provenance = _sustained_ladder((1, 2, 4))
+    for record in no_provenance:
+        for field in ("source_fingerprint", "input_sha256", "evaluator_sha256"):
+            record.pop(field)
+    bad.append(no_provenance)
+    gpu_memory = _sustained_ladder((1, 2), "gpu")
+    gpu_memory[-1]["device_memory"][0].pop("peak_bytes_in_use")
+    bad.append(gpu_memory)
+
+    summaries = [summarize_strong_scaling_records(records) for records in bad]
+    assert all(not summary["sustained_claim_eligible"] for summary in summaries)
+    assert all(summary["best_sustained_speedup"] == 0.0 for summary in summaries)
+
+
+@pytest.mark.parametrize(("backend", "counts"), (("cpu", (1, 2, 4)), ("gpu", (1, 2))))
+def test_complete_sustained_ladder_passes_group_gate(backend, counts):
+    summary = summarize_strong_scaling_records(_sustained_ladder(counts, backend))
+    assert summary["sustained_claim_eligible"]
+    assert summary["best_sustained_speedup"] == pytest.approx(float(counts[-1]))
+    assert all(summary["sustained_groups"][0][gate] for gate in (
+        "complete_topology", "fixed_work_identity", "memory_complete",
+        "environment_verified", "placement"))
 
 
 def test_shard_placement_reports_partitioning_and_rejects_replication():

@@ -1,5 +1,5 @@
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "date": "2026-07-16",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
@@ -208,7 +208,7 @@
     },
     "classification": "accepted repeated two-update calibration; not sustained strong scaling"
   },
-  "physical_core_sustained_confirmation": {
+  "sustained_cpu_allocation": {
     "source_commit": "afd17d6d21b0e27453706cb5d5211c09daee05d4",
     "source_fingerprint": "ffff3cf5ea60872ce768d93b03068c6fa0890d95461ece4111a3174b82637dc5",
     "shape": [256, 67, 67],
@@ -229,9 +229,51 @@
       "decision": "reject: every warm trajectory must be at least 120 seconds"
     },
     "runs": {
-      "2": {"jax_devices": 1, "cpuset": "0-1", "cold_seconds": 255.3421791589999, "warm_samples_seconds": [245.43027340199978, 245.77016573799983, 245.464749321], "warm_median_seconds": 245.464749321, "warm_cv": 0.0006220623147092807, "speedup": 1.0, "speedup_ci95": [0.9986170317500522, 1.001384883499858], "parallel_efficiency": 1.0, "affinity_verified": true},
-      "4": {"jax_devices": 2, "cpuset": "0-3", "cold_seconds": 179.871692123, "warm_samples_seconds": [175.24282712199988, 178.1385998730002, 175.83746474700024], "warm_median_seconds": 175.83746474700024, "warm_cv": 0.007078810652683032, "speedup": 1.395975252908596, "speedup_ci95": [1.3777489751068754, 1.4024549236865513], "parallel_efficiency": 0.697987626454298, "affinity_verified": true},
-      "8": {"jax_devices": 4, "cpuset": "0-7", "cold_seconds": 155.47747269500007, "warm_samples_seconds": [148.02571960900002, 148.26196623400006, 147.36438344299995], "warm_median_seconds": 148.02571960900002, "warm_cv": 0.002568822651516432, "speedup": 1.6582574296505947, "speedup_ci95": [1.65538256126079, 1.6677718183719943], "parallel_efficiency": 0.4145643574126487, "affinity_verified": true}
+      "2": {
+        "jax_devices": 1,
+        "cpuset": "0-1",
+        "cold_seconds": 255.3421791589999,
+        "warm_samples_seconds": [245.43027340199978, 245.77016573799983, 245.464749321],
+        "warm_median_seconds": 245.464749321,
+        "warm_cv": 0.0006220623147092807,
+        "speedup": 1.0,
+        "speedup_ci95": [0.9986170317500522, 1.001384883499858],
+        "parallel_efficiency": 1.0,
+        "affinity_verified": true,
+        "solution_bundle_bytes": 101128192,
+        "peak_host_rss_bytes": 4692123648,
+        "raw_sha256": "70931f0bca1a1b30610740abe9c3a6710b46b34beed979fad967a987d9efb8fe"
+      },
+      "4": {
+        "jax_devices": 2,
+        "cpuset": "0-3",
+        "cold_seconds": 179.871692123,
+        "warm_samples_seconds": [175.24282712199988, 178.1385998730002, 175.83746474700024],
+        "warm_median_seconds": 175.83746474700024,
+        "warm_cv": 0.007078810652683032,
+        "speedup": 1.395975252908596,
+        "speedup_ci95": [1.3777489751068754, 1.4024549236865513],
+        "parallel_efficiency": 0.697987626454298,
+        "affinity_verified": true,
+        "solution_bundle_bytes": 101128192,
+        "peak_host_rss_bytes": 5229338624,
+        "raw_sha256": "810d468877e7a875341f58ed9891d690dfe7bf6dda4e97815b3b342a494928d4"
+      },
+      "8": {
+        "jax_devices": 4,
+        "cpuset": "0-7",
+        "cold_seconds": 155.47747269500007,
+        "warm_samples_seconds": [148.02571960900002, 148.26196623400006, 147.36438344299995],
+        "warm_median_seconds": 148.02571960900002,
+        "warm_cv": 0.002568822651516432,
+        "speedup": 1.6582574296505947,
+        "speedup_ci95": [1.65538256126079, 1.6677718183719943],
+        "parallel_efficiency": 0.4145643574126487,
+        "affinity_verified": true,
+        "solution_bundle_bytes": 101128192,
+        "peak_host_rss_bytes": 5621698560,
+        "raw_sha256": "a38bc006aec4cfbd8cf1a6da5bfb81b0d75051149dd8a4b2dc835a691cbf5ed5"
+      }
     },
     "equivalence": {
       "velocity_l2_max_abs": 3.866034603561275e-9,
@@ -255,13 +297,15 @@
       "schema6_and_physics": true,
       "cross_topology": true,
       "affinity": true,
+      "memory_recorded": true,
       "minimum_duration": true,
       "timing_stability": true,
       "confidence_bounds": true,
       "parallel_efficiency": true,
       "sustained_strong_scaling": true
     },
-    "classification": "sustained fixed-work Docker CPU-allocation strong scaling; exact host-core mapping and steady-state evidence remain open"
+    "memory_note": "Peak RSS is the worker process high-water mark; the CPU backend exposes no per-device allocator bytes.",
+    "classification": "sustained fixed-work Docker CPU-allocation strong scaling at afd17d6; exact host-core mapping, current-source timing, and steady-state evidence remain open"
   },
   "post_profile_decisions": {
     "axial_mean_omission": {

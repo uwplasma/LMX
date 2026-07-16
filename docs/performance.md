@@ -20,8 +20,8 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |
-| B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 245.465/175.837/148.026 s; 1.396x/1.658x; 95% lower bounds 1.378x/1.655x; efficiency 69.8%/41.5%; CV below 0.71% | fixed-work Docker CPU-allocation strong scaling; not host-core or steady-state evidence |
-| B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; 95% interval 1.626x–1.636x; efficiency 81.3%; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
+| B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 245.465/175.837/148.026 s; 1.396x/1.658x; peak process RSS 4.69/5.23/5.62 GB; CV below 0.71% | accepted at `afd17d6` as Docker CPU-allocation scaling; current-source, host-core, and steady-state timing remain open |
+| B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | CPU-allocation restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
@@ -354,9 +354,11 @@ python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
 ```
 
 Run CPU topologies with controlled affinity and GPU topologies only on an idle
-host. The command above is a sustained-workload example; the accepted CPU
-record additionally used Docker `cpuset` masks, which verify guest allocations
-but not M4 P/E-core placement. This manual lane stays outside portable tests.
+host. The command above generates the sustained workload but does not reproduce
+the accepted CPU allocation by itself. That record used nested Docker `cpuset`
+masks for 2/4/8 guest CPUs and 1/2/4 JAX shards; the masks verify guest
+allocations, not M4 P/E-core placement. This manual lane stays outside portable
+tests.
 
 The solver-faithful example requires a validated restart matching each timed
 grid; it fails before launching workers when one is missing:
@@ -392,10 +394,17 @@ A publishable strong-scaling record contains:
 - backend, device model, device count, JAX version, and source fingerprint;
 - cold time, warm time, throughput, speedup, and parallel efficiency;
 - compilation separated from repeated execution;
-- shard-placement evidence and per-device memory estimate;
+- shard-placement evidence, peak host RSS, and per-device accelerator memory
+  when the backend exposes it;
 - numerical equivalence, conservation, and convergence results, including B2
   pressure-PCG iteration counts and all-solves-converged status;
 - one-device baseline measured in the same environment.
+
+The summary grants a sustained claim only to a complete CPU 1/2/4-shard or
+GPU 1/2-device group whose provenance, memory, placement, numerics, and
+affinity or idle-host evidence all pass. Individual long runs remain visible as
+candidates but cannot set the sustained plot title or reported sustained
+speedup.
 
 Speedup and efficiency are
 

@@ -42,18 +42,29 @@ optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
 one and two GPUs; shared-host timing is excluded. The affinity-controlled
-Docker CPU-allocation path now passes 32-update sustained scaling: every warm
-trajectory lasts 147--246 s, speedup is 1.396x/1.658x on 4/8 versus 2 CPUs,
-and all confidence, efficiency, restart, and physics gates pass. A 96-update
+Docker CPU-allocation path at `afd17d6` passes 32-update sustained scaling:
+every warm trajectory lasts 147--246 s, speedup is 1.396x/1.658x on 4/8 versus 2 CPUs,
+and all confidence, efficiency, restart, and physics gates pass. The current
+source has since changed, so those timings are historical until a clean-host
+rerun. A 96-update
 one/two-A4000 lane also passes 158--259 s duration, numerical, restart, and
 topology gates with 1.626x shared-host speedup, but persistent foreign contexts
-keep authoritative GPU scaling open. The fixed-work harness accepts
+keep authoritative GPU scaling open. Peak device memory is 2.50 GB on one GPU
+and 1.41/1.31 GB on two. The fixed-work harness accepts
 an explicit update count, checkpoints at the deterministic midpoint, replays
 the remaining trajectory, and requires one cold plus at least three warm
 trajectories, with every warm sample lasting at least 120 s, for a sustained
-claim; the two-update default remains the bounded CI/debug gate. This
-single active plan records accepted baselines, active gates, and
-stop/go criteria—not campaign history. Completed campaign details belong in
+claim; the two-update default remains the bounded CI/debug gate. The scaling
+summary now fails closed unless one exact 1/2/4-shard CPU or
+1/2-GPU group shares provenance and fixed work and passes sustained duration,
+real-solver numerics, placement, peak memory, and explicit affinity/idle-host
+evidence. Incomplete candidates remain visible without a sustained speedup or
+plot title. A current-source rerun was not launched on July 16 because macOS
+indexing and security services occupied multiple local cores and both office
+A4000s were at 100% foreign utilization. Retry the 32-update CPU campaign and
+88-update GPU campaign only after their clean-environment gates pass.
+This single active plan records accepted baselines, active gates, and stop/go
+criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
 
 ## Product outcome
@@ -153,12 +164,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,739 | stay below 34,775 while preserving the physical residual | 35,100 |
+| package lines | 34,802 | stay below 34,825 while preserving the scaling claim gate | 35,100 |
 | maintained-core lines | 7,908 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 21,018 | no new file; stay below 21,025 | 31 / 21,100 |
+| test files / lines | 30 / 21,080 | no new file; stay below 21,090 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,480,612 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
+| tracked checkout | 4,490,335 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -385,7 +396,7 @@ also unsteady: continuation improves the update residual to `1.02e-4` at 256
 updates before rising to `1.72e-4` at 384, above the `5e-5` gate. Reject those
 timings and do not plot them as scaling evidence.
 
-A current-source `128 x 67 x 67` matched schema-6 pilot then establishes the
+An `afd17d6`-source `128 x 67 x 67` matched schema-6 pilot then establishes the
 bounded CPU-allocation path without a blind steady solve. One guest CPU per JAX
 device is invalid: two devices on two CPUs hit the 40-second all-reduce rendezvous
 abort. The tiny preflight passes with two guest CPUs per device, so the
@@ -408,7 +419,9 @@ The generalized fixed-work worker then rejected a 20-update duration pilot at
 efficiency. CVs are below 0.71%; midpoint replay is exact and every placement,
 linear, conservation, Anderson, and cross-topology gate passes. Accept this as
 sustained fixed-work Docker CPU-allocation strong scaling, not exact M4
-host-core, steady-state, or B2 solution evidence. Apply the same protocol to
+host-core, current-source, steady-state, or B2 solution evidence. Peak process
+RSS is 4.69/5.23/5.62 GB and the solution-bundle estimate is 101.1 MB at every
+rung; CPU allocator bytes per device are unavailable. Apply the same protocol to
 GPUs only after the shared host passes the 60-second idle/no-foreign-work gate.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
@@ -464,9 +477,9 @@ the physics-valid path.
 
 Exit: the post-schema-6 portable suite remains below ten minutes with no
 critical-path surprise, CPU and GPU topology/restart correctness are current,
-and one accepted fixed global workload shows uncertainty-aware useful speedup
-on its target hardware. CPU correctness is green but CPU performance promotion
-is incomplete; schema-6 one/two-GPU correctness is current, and the old GPU
+and one historical accepted fixed global workload shows uncertainty-aware
+useful CPU-allocation speedup. CPU correctness is green; current-source exact
+host-core timing remains open. Schema-6 one/two-GPU correctness is current, and the old GPU
 ladder remains stopped. The explicit flux-unpack change now passes exact
 1/2/4-CPU and 1/2-GPU topology/replay gates; it is correctness evidence, not a
 GPU speedup claim.
