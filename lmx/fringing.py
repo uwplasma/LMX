@@ -4511,39 +4511,28 @@ def build_variable_field_duct_extruded_problem(
         base_bz=base_bz,
         perturbation=perturbation,
     )
-    case = make_shercliff_case(ha=1.0, width=width, height=height, ny=ny, nz=nz)
+    problem = build_square_duct_extruded_problem(
+        ha_peak=1.0,
+        width=width,
+        height=height,
+        ny=ny,
+        nz=nz,
+        length=length,
+        nx_stations=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+    )
     case = replace(
-        case,
+        problem.case,
         name=f"variable_field_duct_bz{int(base_bz)}",
-        geometry=replace(case.geometry, length=length, nx=nx_stations),
         magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=min(case.time_stepper.max_steps, 80),
-            potential_iterations=min(case.time_stepper.potential_iterations, 80),
-            steady_tolerance=1.0e-6,
-        ),
-        solver=replace(
-            case.solver,
-            kind="extruded_inductionless",
-            coupling_iterations=min(case.solver.coupling_iterations, 8),
-            coupling_tolerance=1.0e-7,
-        ),
         notes=(
             "Rectangular extruded inductionless solve with analytic divergence-free "
             "cross-sectional magnetic field variation."
         ),
     )
-    profile = smooth_fringing_profile(
-        length=length,
-        nx=nx_stations,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-        axis="z",
-    )
-    return ExtrudedInductionlessProblem(case=case, profile=profile)
+    return replace(problem, case=case)
 
 
 def build_variable_field_layered_extruded_problem(
