@@ -591,6 +591,19 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     )
     expected_rhs = expected_rhs.at[0].add(dt * inlet_source * boundary[0])
     assert rhs.reshape((*shape, 3)) == pytest.approx(expected_rhs)
+    mass = np.repeat(np.asarray(volume * density).reshape(-1), 3)
+    cell_volume = np.repeat(np.broadcast_to(np.asarray(volume), shape).reshape(-1), 3)
+    old, star = map(np.asarray, (velocity.reshape(-1), solved.reshape(-1)))
+    mapped = star + 0.01 * np.asarray(probe := jnp.linspace(
+        -0.2, 0.3, velocity.size)).reshape(-1)
+    source = (np.asarray(rhs) - mass * old) / (cell_volume * dt)
+    transport = (np.asarray(matrix) @ star - mass * star) / (cell_volume * dt)
+    split_residual = transport - source - np.repeat(
+        np.asarray(density).reshape(-1), 3) * (mapped - star) / dt
+    linear_residual = (np.asarray(matrix) @ star - np.asarray(rhs)) / (cell_volume * dt)
+    assert split_residual == pytest.approx(
+        linear_residual - np.repeat(np.asarray(density).reshape(-1), 3)
+        * (mapped - old) / dt, abs=2.0e-12)
     monkeypatch.setattr(fringing_impl, "linear_solve", actual_linear_solve)
     neutral = tuple(jnp.zeros_like(value) for value in boundary)
     def solve_alpha(alpha):
@@ -601,7 +614,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     convection = np.kron(dense_scalar(2.0, neutral) - dense_scalar(1.0, neutral), np.eye(3))
     expected_tangent = -np.linalg.solve(matrix_alpha, convection @ np.asarray(primal).reshape(-1))
     assert tangent.reshape(-1) == pytest.approx(expected_tangent, abs=3e-7)
-    probe = jnp.linspace(-0.2, 0.3, velocity.size).reshape(velocity.shape)
+    probe = probe.reshape(velocity.shape)
     gradient = jax.grad(lambda alpha: jnp.sum(solve_alpha(alpha) * probe))(1.0)
     adjoint = np.linalg.solve(matrix_alpha.T, np.asarray(probe).reshape(-1))
     assert gradient == pytest.approx(-adjoint @ convection @ np.asarray(primal).reshape(-1), rel=2e-6)
@@ -957,6 +970,18 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     assert linear_iterations > 0
     assert linear_converged
     assert linear_status > 0
+    correction_x, correction_y, correction_z = (
+        fringing_impl._duct_pressure_face_corrections(
+            projected_pressure, jnp.full(shape, 0.1), dx=dx, dy=widths, dz=widths,
+            mixed_axial_pressure=True))
+    correction_x_west = jnp.concatenate(
+        (jnp.zeros_like(correction_x[:1]), correction_x[:-1]), axis=0)
+    pressure_velocity = jnp.stack((
+        0.5 * (correction_x_west + correction_x),
+        0.5 * (correction_y[:, :-1] + correction_y[:, 1:]),
+        0.5 * (correction_z[:, :, :-1] + correction_z[:, :, 1:])), axis=-1)
+    projected_velocity = jnp.stack(projected[:3], axis=-1)
+    assert jnp.max(jnp.abs(projected_velocity - pressure_velocity)) > 1.0e-3
 
 
 def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():

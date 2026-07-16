@@ -81,8 +81,10 @@ result, so recording them adds no solve or synchronization phase and only 40
 uncompressed bytes per float64 update.
 
 Schema 4 also stores `iteration_momentum_defect_history`: the post-map discrete
-balance `L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`. It is an independent monitoring
-metric; its acceptance threshold has not yet been frozen and does not stop a run.
+balance `L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`. Despite the historical field name,
+this is a nonlinear physical residual evaluated on the raw mapped state—not the
+exact predictor/projection fixed-point defect. It remains a validation diagnostic
+and does not stop a run; stopping uses the normalized unrelaxed map rate.
 
 Small conservation residuals establish internal consistency, not agreement with
 an experiment. Experimental promotion additionally requires mesh/time

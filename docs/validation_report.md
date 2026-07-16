@@ -29,10 +29,10 @@ are authoritative when prose and results differ.
   reference Mac.
 - The reduced B2 same-state ladder supports a 64x larger pseudo-time cap while
   preserving the electromagnetic-scale map defect within 0.192%; eight warm
-  updates are monotone and restart bitwise. An independent post-map momentum
-  defect now replays exactly and decreases from 0.976 to 0.310 in four reduced
-  updates. Its outcome-insensitive threshold and the ALEX pressure-hole
-  measurement metadata remain open.
+  updates are monotone and restart bitwise. A post-map nonlinear physical
+  momentum residual replays exactly and decreases from 0.976 to 0.310, but it
+  is not the split fixed-point defect and does not stop the solve. The normalized
+  map-rate threshold and ALEX pressure-hole metadata remain open.
 
 ## Research-stage
 

@@ -2,8 +2,9 @@
 
 Status: 2026-07-15. The corrected two-update B2 smoke is keyed to `45bff84`;
 the current one-/two-/four-CPU-device equivalence and 64x pseudo-time cap are
-keyed to `c47ba09` and `2346d7f`. The independent electromagnetic momentum
-defect and restart schema 4 are keyed to `e6834ee`. The latest complete
+keyed to `c47ba09` and `2346d7f`. The post-map nonlinear momentum residual and
+restart schema 4 are keyed to `e6834ee`; its fixed-relaxation memory reduction
+is keyed to `791e496`. The latest complete
 portable gate on the current source is keyed to `2ec7eb6`. CPU/GPU calibration at
 `413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
 restart fix and remain historical until refreshed. The isolated compiler trace
@@ -96,7 +97,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, independent momentum defect, strict schema-4 replay, and current CPU device equivalence have bounded gates | defect threshold, current GPU refresh, production parity, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-4 replay, and current CPU device equivalence have bounded gates | normalized map-rate threshold, current GPU refresh, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -115,11 +116,11 @@ immutable evidence, richer projection, and target-driven paths remain):
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,098 | return below 35,000 while preserving the direct defect | 35,100 |
-| maintained-core lines | 7,965 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,797 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 35,100 | return below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,824 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,529,008 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,535,873 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -382,41 +383,46 @@ through a 4+4 restart, and keep CFL below `3.5e-5`. The magnetic pseudo-time cap
 is therefore raised from `0.001/N` to `0.064/N`; the existing reduced B2
 physics/restart test falls from the prior 45-second gate record to 14.8 seconds.
 
-The direct post-map discrete momentum defect is now implemented independently
-of the map update as
-`L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`, which reduces to `max|R|/540` for B2.
-It shares the exact projection pressure-face stencil and diffusion boundary
-assembly, uses the prescribed electromagnetic scale, and evaluates fresh
-mapped Lorentz force before coupling acceleration. Schema 4 records the scalar
-history; schemas 1--3 remain readable but cannot resume a current B2 run.
-The reduced four-update history decreases from `0.9760` to `0.3103`, while the
-map update follows a distinct `0.9629` to `0.01833` trajectory. Operator
-JIT/JVP, I/O compatibility, and exact direct-four versus serialized-two-plus-two
-replay pass. This is monitoring evidence only; the stopping rule is unchanged.
+Schema 4 records the post-map nonlinear physical momentum residual
+`L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`, or `max|R|/540` for B2. It shares the
+projection pressure-face stencil and diffusion boundary assembly, uses the
+prescribed electromagnetic scale, and evaluates fresh mapped Lorentz force
+before coupling acceleration. The reduced history decreases from `0.9760` to
+`0.3103` in four updates and reaches `0.03870` at step 90. JIT/JVP, schema
+compatibility, and exact direct-four versus serialized-two-plus-two replay pass.
 
-The predeclared 96-update `7 x 7 x 7` outcome study failed closed at its
-120-second deadline. A 16-update profile completed in 28.66 seconds (11.51
-seconds through the first compiled update, then 1.07--1.19 seconds/update), but
-its early log-linear projection was optimistic. The guarded follow-up crossed
-candidate `0.1` but reported defect `0.03870` at step 90 and 115.24 seconds;
-decade-tighter `0.01` was not reached before the deadline. It produced no
-promotable outcome comparison, froze no threshold, and authorizes no repeat of
-the same slow trajectory.
+The operator audit proves this is not the exact split-map fixed-point defect.
+Momentum acts on the predictor with old-state weights, Lorentz force, and
+relaxed flux; projection interpolates predictor cells to faces and back; the
+diagnostic re-evaluates nonlinear operators on the raw mapped state and includes
+only the pressure-face correction. At reduced step 4, the pressure-force
+contribution is `0.0664` and the omitted face-reconstruction contribution is
+`0.0880`; the projection identity closes exactly. The omitted term already
+exceeds the observed `~0.04` tail, so a coarse split/discretization floor is
+plausible. Retain the historical field name
+`iteration_momentum_defect_history` for schema compatibility, but call it the
+post-map nonlinear momentum residual in user-facing material. It is a validation
+diagnostic, not a stopping condition, and receives no `0.01` threshold. The
+failed 120-second outcome study remains runtime/floor evidence only.
 
-The first larger-cap same-state probe is complete: from one four-update checkpoint, 64x,
-128x, and 256x updates all keep linear solves green, balance below `4e-10`, and
-CFL below `1.4e-4`, while the direct defect improves from `0.2861` to `0.2490`.
-The normalized map rate shifts by 6.78%, however, failing the existing 0.5%
-invariance gate. Reject 128x/256x and retain the 64x cap. Next use bounded
-acceleration and operator-consistency probes to determine whether the slow tail
-is a split/discretization floor or a coupled fixed-point mode; do not launch
-another trajectory first. Repeat outcome insensitivity only after this diagnosis
-predicts the tighter three-update crossing below 110 seconds. Then require all outcome
-gates and normalized transverse-pressure change at most `2e-4`, velocity at
-most `1e-3 U0`, and pressure-gradient relative L2 at most `0.5%`. Only then add
-the direct defect to the three-update stopping streak and authorize one corrected
-coarse run. Tolerance, wall, medium, fine, and production-FreeMHD work remain
-blocked until that coarse baseline converges for the correct reason. Evidence is in
+The larger-cap same-state probe keeps all solves green, balance below `4e-10`,
+and CFL below `1.4e-4`, but 128x/256x change normalized map rate by 6.78%.
+Reject them and retain the 64x cap. The exact split fixed-point metric is the
+normalized unrelaxed velocity map rate, up to the gated momentum linear
+residual. Raising pseudo-time by 64x while retaining raw
+`coupling_tolerance=5e-5` accidentally tightened this normalized gate from
+`0.05` to `7.8125e-4`. Stopping must not depend on the pseudo-time cap.
+
+Next add the manufactured split-operator identity and `dt/dt2/dt4`
+reconstruction-decomposition gates. Then freeze a normalized map-rate threshold
+through sustained candidate `0.05` versus decade-tighter `0.005` outcome
+insensitivity, requiring pressure Linf at most `2e-4`, velocity at most
+`1e-3 U0`, pressure-gradient relative L2 at most `0.5%`, and every
+linear/conservation/restart gate green. Implement the frozen comparison directly
+in normalized units, or derive raw update tolerance as `tau_map N dt`, and
+version the stopping contract. Only then authorize one corrected coarse run.
+Tolerance, wall, medium, fine, and production-FreeMHD work remain blocked until
+that coarse baseline converges for the correct reason. Evidence is in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
 `benchmarks/results/b2-momentum-defect-20260715.json`.
 
