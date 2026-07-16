@@ -266,10 +266,26 @@ kind = "no_slip"
     assert config.fringing.axis == "z"
 
 
-def test_load_run_config_rejects_analytic_callable_fields(tmp_path: Path):
-    input_file = _write_minimal_config(tmp_path, "bad", magnetic_kind="analytic")
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"magnetic_kind": "analytic"}, "analytic magnetic-field"),
+        (
+            {"case_extra": 'solve_mode = "steady"', "solver": 'mode = "transient"'},
+            "disagree",
+        ),
+        ({"solver": 'kind = "reduced_inductionless"'}, "no longer supported"),
+        ({"geometry_kind": None}, "Missing required TOML key 'kind'"),
+        ({"geometry_extra": "wall_thickness = [0.1, 0.2]"}, "must have length 4"),
+        ({"solver": 'mode = "invalid"'}, "Unsupported solve mode"),
+    ],
+)
+def test_load_run_config_rejects_invalid_inputs(
+    tmp_path: Path, kwargs: dict[str, str | None], message: str
+):
+    input_file = _write_minimal_config(tmp_path, "rejected", **kwargs)
 
-    with pytest.raises(ValueError, match="analytic magnetic-field"):
+    with pytest.raises(ValueError, match=message):
         load_run_config(input_file)
 
 
@@ -315,43 +331,6 @@ def test_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):
     assert config.case.solver.mode == "transient"
 
 
-def test_conflicting_case_and_solver_modes_are_rejected(tmp_path: Path):
-    input_file = _write_minimal_config(
-        tmp_path,
-        "conflict",
-        case_extra='solve_mode = "steady"',
-        solver='mode = "transient"',
-    )
-
-    with pytest.raises(ValueError, match="disagree"):
-        load_run_config(input_file)
-
-
-def test_removed_reduced_solver_kind_is_rejected(tmp_path: Path):
-    input_file = _write_minimal_config(
-        tmp_path, "removed_reduced_solver", solver='kind = "reduced_inductionless"'
-    )
-
-    with pytest.raises(ValueError, match="no longer supported"):
-        load_run_config(input_file)
-
-
-def test_load_run_config_rejects_missing_required_key(tmp_path: Path):
-    input_file = _write_minimal_config(tmp_path, "missing", geometry_kind=None)
-
-    with pytest.raises(ValueError, match="Missing required TOML key 'kind'"):
-        load_run_config(input_file)
-
-
-def test_load_run_config_rejects_invalid_tuple_length(tmp_path: Path):
-    input_file = _write_minimal_config(
-        tmp_path, "bad_length", geometry_extra="wall_thickness = [0.1, 0.2]"
-    )
-
-    with pytest.raises(ValueError, match="must have length 4"):
-        load_run_config(input_file)
-
-
 def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs():
     assert _parse_boundary_value(None) is None
     assert _parse_boundary_value(1.25) == pytest.approx(1.25)
@@ -362,15 +341,6 @@ def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs()
 
     with pytest.raises(ValueError, match="Unsupported boundary-condition value"):
         _parse_boundary_value({"bad": True})
-
-
-def test_load_run_config_rejects_unsupported_solver_mode(tmp_path: Path):
-    input_file = _write_minimal_config(
-        tmp_path, "bad_mode", solver='mode = "invalid"'
-    )
-
-    with pytest.raises(ValueError, match="Unsupported solve mode"):
-        load_run_config(input_file)
 
 
 def test_logging_spec_from_user_controls_supports_verbose_alias_and_quiet():
