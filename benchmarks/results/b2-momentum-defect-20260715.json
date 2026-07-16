@@ -5,8 +5,9 @@
   "operator_audit_commit": "2d0fb5044217b9848b7e13666f8865a4eb05f466",
   "case_id": "B2-fringing-square",
   "optimization_commit": "791e496",
+  "projection_fix_commit": "3e731fa54a7048ebc179e61e424830a5b066f471",
   "acceptance_role": "reduced-post-map-nonlinear-physical-residual-diagnostic",
-  "status": "operator-audits-pass-cell-map-rate-contract-rejected",
+  "status": "projection-floor-removed-cap-refrozen-stopping-contract-open",
   "normalization": {
     "formula": "L max_fluid,component |C-D-E-JxB-f+Gp|/(rho U0^2 N)",
     "canonical_reduction": "max |discrete momentum residual|/540",
@@ -28,11 +29,12 @@
     "physical_hartmann_number": 2900.0,
     "interaction_parameter": 540.0,
     "effective_dt": 0.00011851851851851852,
-    "map_update_history": [0.96294292, 0.03640128, 0.02050921, 0.01832822],
-    "momentum_defect_history": [0.97600645, 0.36827051, 0.33774943, 0.31031290],
+    "map_update_history": [0.96294291, 0.03640119, 0.02052581, 0.01867739],
+    "normalized_velocity_map_rate": [0.00102821, 0.35246595, 0.32071579, 0.29183417],
+    "momentum_defect_history": [0.97600645, 0.36829498, 0.33782843, 0.31010893],
     "post_startup_momentum_defect_strictly_decreasing": true,
     "four_update_wall_seconds": 14.2,
-    "note": "Different trajectories establish that the nonlinear residual is not a restatement of the exact map defect."
+    "note": "Corrected projection trajectory; different histories establish that the nonlinear residual is not a restatement of the velocity map defect."
   },
   "bounded_runtime_probe": {
     "updates": 16,
@@ -125,6 +127,37 @@
     "interpretation": "Below safety 0.016 the raw pressure-corrected cell update approaches a dt-independent reconstruction contribution, so division by N*dt diverges.",
     "status": "failed-closed-no-pseudotime-cap-frozen"
   },
+  "corrected_projection_same_state_ladder": {
+    "warm_checkpoint_updates": 4,
+    "safety_factors": [0.064, 0.032, 0.016, 0.008, 0.004, 0.002, 0.001],
+    "normalized_cell_velocity_map_rate": [
+      0.26569889960500853,
+      0.265772701928766,
+      0.26590322524337046,
+      0.26615576113314665,
+      0.3523051282316957,
+      0.7377232605498013,
+      1.508559637642776
+    ],
+    "raw_cell_velocity_update": [
+      0.017004729574720545,
+      0.008504726461720513,
+      0.004254451603893927,
+      0.002129246089065173,
+      0.0014092205129267827,
+      0.0014754465210996028,
+      0.0015085596376427758
+    ],
+    "largest_cap_three_level_relative_spread": 0.0007684210606129846,
+    "next_three_level_relative_spread": 0.0014392294299765838,
+    "predeclared_three_level_relative_limit": 0.005,
+    "largest_passing_safety": 0.064,
+    "largest_passing_controlling_component": "u",
+    "all_linear_solves_green": true,
+    "max_balance": 4.3155523599125445e-10,
+    "total_wall_seconds": 23.490290957968682,
+    "status": "projection-floor-removed-64x-cap-refrozen"
+  },
   "operator_consistency_audit": {
     "conclusion": "The recorded nonlinear residual is not the exact predictor-projection fixed-point residual.",
     "exact_split_identity": "R_split = momentum_linear_residual - rho*(U_map-U_old)/dt",
@@ -173,10 +206,10 @@
       "crossings_or_outcomes_promoted": false
     },
     "implemented_pseudotime_safety": 0.064,
-    "pseudotime_safety_frozen": false,
+    "pseudotime_safety_frozen": true,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "remove or exactly account for the dt-independent projection-reconstruction cell-map contribution, then define and gate a face-consistent fixed-point observable before any threshold study",
+    "next_gate": "implement and version direct normalized velocity-map stopping, then compare sustained 0.05 and 0.005 crossings on one shared trajectory",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,

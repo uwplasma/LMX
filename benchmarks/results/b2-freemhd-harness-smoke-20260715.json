@@ -1,11 +1,11 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-07-15",
   "case_id": "B2-fringing-square",
   "acceptance_role": "harness-smoke",
-  "execution_commit": "45bff84f4eb02feae24b373ce1d4ddbed7104ad6",
+  "execution_commit": "dad8b6048551ab726017f5b186d2d8278270eea5",
   "source_pins": {
-    "lmx": "45bff84f4eb02feae24b373ce1d4ddbed7104ad6",
+    "lmx": "dad8b6048551ab726017f5b186d2d8278270eea5",
     "freemhd": "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5",
     "openfoam": "v2206",
     "docker_image": "freemhd-install:latest",
@@ -31,26 +31,26 @@
     "restart_absolute": 1e-12
   },
   "comparison": {
-    "pressure_rms": 0.004517977101775242,
-    "pressure_linf": 0.010917245284651452
+    "pressure_rms": 0.004517977100483966,
+    "pressure_linf": 0.010917245284754377
   },
   "lmx": {
     "devices": 1,
     "steps": 2,
     "stop_reason": "step_limit",
-    "wall_seconds": 3.323599750059657,
+    "wall_seconds": 3.8082935420097783,
     "restart_max_abs": 0.0,
-    "mass_balance": 5.551115123125783e-14,
-    "current_balance": 2.0055778925736333e-14,
-    "interface_current_balance": 3.6479264053923544e-11,
-    "interface_current_activity": 74.7667483352138,
-    "pressure_observable": [-0.00011028279165020344, 0.0003434425389417067, 0.0029945043453279644, 0.012581581631898537, 0.022314508133150945, 0.0040497593739892285, -9.934750853979419e-05, -0.00013381223875170902]
+    "mass_balance": 6.661338147750939e-16,
+    "current_balance": 3.0037969503312945e-14,
+    "interface_current_balance": 1.673328142715036e-10,
+    "interface_current_activity": 74.77082694475091,
+    "pressure_observable": [-0.00011028280929939833, 0.00034344255639269137, 0.0029945043456583425, 0.012581581631986543, 0.02231450813325387, 0.004049759374084994, -9.934750844177044e-05, -0.00013381223865152261]
   },
   "freemhd": {
     "mpi_ranks": 2,
     "steps": 2,
     "stop_reason": "step_limit",
-    "wall_seconds": 6.763759708032012,
+    "wall_seconds": 6.8825307500083,
     "mass_balance": 0.0,
     "current_balance": 2.954356274787756e-17,
     "interface_current_balance": 6.555685285272496e-14,
@@ -61,19 +61,19 @@
   "raw_assets": {
     "location": "external workspace; release asset pending",
     "files": 97,
-    "logical_bytes": 1648260,
-    "tree_sha256": "79f8a7ac67a7e0b0e9fc8678b303fdbbe39272df72867bcb87a09abb4a9ce43b",
+    "logical_bytes": 1642754,
+    "tree_sha256": "7f737ed97e9abb612f1bde13ef315ff5c0808cf72c46a6016d3f580f308d067e",
     "preflight_sha256": "f40ec10955e43bc04165e8b11d607cd77d2886562530b2b1136401366c347a77",
-    "record_sha256": "c51b35952be4537734bd793cb84261e1dd9f7c823c5fc9f6a72cb06aca51ab71",
-    "report_sha256": "184020a4932d7d67a9efb2a6a0beff56182d58c2d0e41092535ad8900e41112e"
+    "record_sha256": "85ebb96626fec54a958865b55a8fabc9ad43d32c56eaef5d104e8fa3716f8da9",
+    "report_sha256": "3a9cb198fe587edbd2f017c5e5a6e39e30954666f8ae8ac9a3f1d125348356eb"
   },
   "artifact_sha256": {
-    "lmx_source": "5ca97de0960f8b7b5e714e231a1424c69e1dcc894c0d5a947b226cab711fbc80",
+    "lmx_source": "8833d4feaad3137bb1f4e606fd8df96385327638243a283502585010d54f20a6",
     "freemhd_source": "18c33bda110e92ad9d0e1872b776af373a18ba75075baffb88a9838432fcb333",
     "lmx_input": "b5cc1d5457d554bf5a32f7db09637799f901e8fee03e83bb51c75a32dbfaaa3e",
     "freemhd_input": "a25e437a765c06f3b5c72015d8cd76c49cc5a20280d35ff703d9d24c3ba7930e",
     "evaluator": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
-    "lmx_output": "eebf98bb83aafeeabc1c4047a405370a63640a05c713f50418fb4f90729d7d0b",
-    "freemhd_output": "9b8ccb8c7b93f1f50debc69a9589493f81581c6a10e5ac6441d7f8e1e61a9613"
+    "lmx_output": "1e85c9f3f75690233c95e0b9b72429a095dec4343f60b39cb6b782d125cfb56f",
+    "freemhd_output": "ddcb8702055e054426d60b5c697c4da77554213ba0b776529314c17b31f8c481"
   }
 }

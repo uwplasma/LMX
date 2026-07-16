@@ -5,7 +5,7 @@
   "implementation_commit": "2346d7f48f1925fcd2f3aa5237825c89e278b38d",
   "case_id": "B2-fringing-square",
   "acceptance_role": "reduced-stopping-and-pseudotime-diagnostic",
-  "status": "startup-state-pass-superseded-by-warm-state-cell-map-failure",
+  "status": "historical-startup-pass-superseded-by-projection-fix-record",
   "problem": {
     "shape": [7, 7, 7],
     "physical_hartmann_number": 2900.0,
@@ -67,7 +67,7 @@
   },
   "decision": {
     "coarse_rerun_authorized": false,
-    "next_step": "resolve the warm-state projection-reconstruction contribution before defining a fixed-point observable or running outcome insensitivity",
-    "reason": "the startup state passed, but the later same-state lower-cap ladder found a dt-independent pressure-corrected cell update and no passing three-level cap"
+    "next_step": "use b2-momentum-defect-20260715.json for the corrected projection and refrozen cap",
+    "reason": "this historical operator passed at startup but failed later; commit 3e731fa removes the reconstruction floor and has its own warm-state ladder"
   }
 }
