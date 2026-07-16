@@ -464,12 +464,14 @@ def run_strong_scaling_demo(
     minimum_warm_seconds: float = 0.0,
     cpu_environment_evidence: Path | None = None,
     gpu_environment_evidence: Path | None = None,
+    source_commit: str | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
-    source_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo_root, check=True,
-        capture_output=True, text=True,
-    ).stdout.strip()
+    if source_commit is None:
+        source_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo_root, check=True,
+            capture_output=True, text=True,
+        ).stdout.strip()
     out_dir.mkdir(parents=True, exist_ok=True)
     matched_input = gpu_matched_input = evaluator = None
     if benchmark_kind == "matched_b2_smoke":
@@ -617,6 +619,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cpu-environment-evidence", type=Path)
     parser.add_argument("--gpu-environment-evidence", type=Path)
     parser.add_argument(
+        "--source-commit", help="Commit represented by this source tree."
+    )
+    parser.add_argument(
         "--cpu-restart",
         type=Path,
         help="Validated restart matching the CPU production-solve grid.",
@@ -696,6 +701,7 @@ def main(argv: list[str] | None = None) -> int:
         minimum_warm_seconds=args.minimum_warm_seconds,
         cpu_environment_evidence=args.cpu_environment_evidence,
         gpu_environment_evidence=args.gpu_environment_evidence,
+        source_commit=args.source_commit,
     )
     return 0
 

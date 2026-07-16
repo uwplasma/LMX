@@ -293,10 +293,10 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     options = {}
     monkeypatch.setattr(strong_scaling_demo, "run_strong_scaling_demo", options.update)
     arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
-        "--cpu-nx", "16", "--worker-timeout", "45"]
+        "--cpu-nx", "16", "--worker-timeout", "45", "--source-commit", "abc"]
     assert strong_scaling_demo.main(arguments) == 0
     assert options["cpu_problem"] == (16, 7, 7) and options["gpu_problem"] == (8, 7, 7)
-    assert options["timeout_seconds"] == 45.0
+    assert options["timeout_seconds"] == 45.0 and options["source_commit"] == "abc"
     assert options["cpu_iterations"] == options["gpu_iterations"] == 2
     assert strong_scaling_demo.main([
         *arguments, "--iterations", "6", "--minimum-warm-seconds", "120",
