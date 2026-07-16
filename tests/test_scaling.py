@@ -118,6 +118,68 @@ def test_matched_b2_topology_gate_compares_schema6_gram_and_contract():
         ])
 
 
+def test_scaling_fingerprint_owns_packaged_benchmark_resources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    paths = run_strong_scaling_worker._source_fingerprint_paths()
+    relative = {path.relative_to(run_strong_scaling_worker.ROOT).as_posix()
+        for path in paths}
+    assert any(name.startswith("lmx/data/benchmarks/specs/") for name in relative)
+    assert any(name.startswith("lmx/data/benchmarks/references/") for name in relative)
+
+    probe = tmp_path / "resource.toml"
+    probe.write_text("value = 1")
+    monkeypatch.setattr(run_strong_scaling_worker, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        run_strong_scaling_worker, "_source_fingerprint_paths", lambda: (probe,)
+    )
+    first = run_strong_scaling_worker._source_fingerprint()
+    probe.write_text("value = 2")
+    assert run_strong_scaling_worker._source_fingerprint() != first
+
+
+def test_remote_scaling_archive_has_one_package_resource_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    added = []
+
+    class Archive:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def add(self, path, *, arcname):
+            added.append((Path(path), arcname))
+
+    monkeypatch.setattr(strong_scaling_demo.tarfile, "open", lambda *args: Archive())
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: None)
+
+    strong_scaling_demo._sync_repo_to_remote(
+        repo_root=tmp_path, remote_host="office", remote_dir="/tmp/lmx"
+    )
+
+    assert [arcname for _, arcname in added] == [
+        "lmx", "scripts/run_strong_scaling_worker.py",
+        "scripts/run_freemhd_parity_suite.py",
+    ]
+    assert not any(arcname.startswith("benchmarks/") for _, arcname in added)
+
+
+def test_strong_scaling_demo_supports_direct_help(tmp_path: Path):
+    script = Path(strong_scaling_demo.__file__).resolve()
+    environment = strong_scaling_demo.os.environ.copy()
+    environment["PYTHONPATH"] = ""
+    completed = subprocess.run(
+        [sys.executable, str(script), "--help"], cwd=tmp_path, env=environment,
+        capture_output=True, text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "matched_b2_smoke" in completed.stdout
+
+
 pytestmark = pytest.mark.unit
 
 

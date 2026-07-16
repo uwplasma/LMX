@@ -54,21 +54,22 @@ if ROOT not in Path(lmx.__file__).resolve().parents:
     )
 
 
-def _source_fingerprint() -> str:
-    """Hash the source and frozen specifications used by this worker."""
+def _source_fingerprint_paths() -> tuple[Path, ...]:
+    """Return package source and data files that define scaling numerics."""
 
+    data = ROOT / "lmx" / "data" / "benchmarks"
     paths = [*sorted((ROOT / "lmx").glob("*.py")), Path(__file__).resolve(),
         ROOT / "scripts" / "run_freemhd_parity_suite.py"]
-    paths.extend(
-        sorted(
-            path
-            for path in (ROOT / "benchmarks" / "specs").rglob("*")
-            if path.is_file()
-        )
-    )
-    paths.extend(sorted((ROOT / "benchmarks" / "references").glob("*.csv")))
+    paths.extend(sorted(path for path in (data / "specs").rglob("*") if path.is_file()))
+    paths.extend(sorted(path for path in (data / "references").rglob("*") if path.is_file()))
+    return tuple(paths)
+
+
+def _source_fingerprint() -> str:
+    """Hash the source and packaged specifications used by this worker."""
+
     digest = hashlib.sha256()
-    for path in paths:
+    for path in _source_fingerprint_paths():
         digest.update(path.relative_to(ROOT).as_posix().encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()

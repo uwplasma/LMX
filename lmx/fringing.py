@@ -1126,11 +1126,10 @@ def _transverse_modal_correction_3d(
     stride: int,
     sharding: NamedSharding | None = None,
 ):
-    """Return a shard-local fast-diagonalization Galerkin correction.
+    """Return a global fast-diagonalization Galerkin correction.
 
-    A DCT diagonalizes each local Neumann axial block. One generalized
-    transverse eigendecomposition then inverts every axial mode, avoiding a
-    dense factorization per mode and all communication inside the correction.
+    Only the restricted coarse grid is replicated when the fine field is
+    sharded; the solved correction is repartitioned before prolongation.
     """
 
     nx = volume.shape[0]
@@ -1187,28 +1186,32 @@ def _transverse_modal_correction_3d(
     whitened_gauge = solve_triangular(mass_factor, coarse_volume, lower=True)
     gauge_eigenvalue = jnp.dot(modes[:, 0], whitened_gauge) ** 2 / jnp.sum(volume_cross)
 
-    partitions = 1 if sharding is None else sharding.mesh.size
-    local_nx = nx // partitions
     axial_eigenvalues = 2.0 - 2.0 * jnp.cos(
-        jnp.pi * jnp.arange(local_nx, dtype=volume.dtype) / local_nx
+        jnp.pi * jnp.arange(nx, dtype=volume.dtype) / nx
     )
     denominators = axial_eigenvalues[:, None] + jnp.maximum(eigenvalues[None], 0.0)
     denominators = denominators.at[0, 0].add(gauge_eigenvalue)
 
-    def solve_local(rhs: jnp.ndarray) -> jnp.ndarray:
-        transformed = dct(rhs, type=2, axis=0, norm="ortho").reshape(local_nx, -1)
+    def solve_global(rhs: jnp.ndarray) -> jnp.ndarray:
+        transformed = dct(rhs, type=2, axis=0, norm="ortho").reshape(nx, -1)
         spectral = transformed @ inverse_modes
         solved = (spectral / denominators) @ inverse_modes.T
-        return idct(solved.reshape((local_nx, ncy, ncz)), type=2, axis=0, norm="ortho")
+        return idct(solved.reshape(coarse_shape), type=2, axis=0, norm="ortho")
 
-    coarse_solve = solve_local
+    coarse_solve = solve_global
+
+    def reshard_coarse(value):
+        return value
+
     if sharding is not None:  # pragma: no cover - exercised by hardware gates
-        coarse_solve = jax.shard_map(
-            solve_local,
-            mesh=sharding.mesh,
-            in_specs=sharding.spec,
-            out_specs=sharding.spec,
-            check_vma=False,
+        replicated = NamedSharding(sharding.mesh, P())
+        coarse_solve = jax.jit(
+            solve_global, in_shardings=replicated, out_shardings=replicated
+        )
+        reshard_coarse = jax.jit(
+            lambda value: value,
+            in_shardings=replicated,
+            out_shardings=sharding,
         )
     coarse_zero = jnp.zeros(coarse_shape, dtype=volume.dtype)
 
@@ -1219,7 +1222,7 @@ def _transverse_modal_correction_3d(
         return jax.linear_transpose(prolong, coarse_zero)(fine)[0]
 
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
-        return prolong(coarse_solve(restrict(residual)))
+        return prolong(reshard_coarse(coarse_solve(restrict(residual))))
 
     return apply
 

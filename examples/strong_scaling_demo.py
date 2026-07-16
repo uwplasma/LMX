@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402 -- repository-root bootstrap must precede project imports.
+
 import argparse
 import json
 import os
@@ -9,6 +11,9 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 import numpy as np
 
@@ -190,14 +195,6 @@ def _sync_repo_to_remote(*, repo_root: Path, remote_host: str, remote_dir: str) 
     try:
         with tarfile.open(archive_path, "w") as archive:
             archive.add(repo_root / "lmx", arcname="lmx")
-            archive.add(
-                repo_root / "lmx" / "data" / "benchmarks" / "specs",
-                arcname="benchmarks/specs",
-            )
-            archive.add(
-                repo_root / "lmx" / "data" / "benchmarks" / "references",
-                arcname="benchmarks/references",
-            )
             archive.add(
                 repo_root / "scripts" / "run_strong_scaling_worker.py",
                 arcname="scripts/run_strong_scaling_worker.py",

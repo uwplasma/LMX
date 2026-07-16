@@ -235,6 +235,20 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
     assert sharded_correction(jax.device_put(right, sharding)) == pytest.approx(
         correction(right), rel=1.0e-10, abs=1.0e-10
     )
+    sharded_left, sharded_right = (
+        jax.device_put(value, sharding) for value in (left, right)
+    )
+    assert jnp.vdot(sharded_left, sharded_correction(sharded_right)) == pytest.approx(
+        jnp.vdot(sharded_correction(sharded_left), sharded_right),
+        rel=1.0e-10,
+        abs=1.0e-10,
+    )
+    _, sharded_tangent = jax.jvp(
+        sharded_correction, (sharded_right,), (sharded_left,)
+    )
+    assert sharded_tangent == pytest.approx(
+        sharded_correction(sharded_left), rel=1.0e-10, abs=1.0e-10
+    )
 
     _, tangent = jax.jvp(correction, (right,), (left,))
     assert tangent == pytest.approx(correction(left), rel=1.0e-10, abs=1.0e-10)
