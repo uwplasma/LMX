@@ -3,7 +3,7 @@
 Status: 2026-07-16. The current two-update B2/FreeMHD smoke and schema-5
 stopping contract are keyed to `0ab33b2`; current one-/two-/four-CPU-device
 equivalence is keyed to `4c94389`.
-The installable-distribution contract is keyed to `2c11b0e`: frozen benchmark
+The installable-distribution contract is keyed to `2f49e65`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
 longer installs or eagerly imports Matplotlib and Pillow.
@@ -13,7 +13,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `2c11b0e`. CPU/GPU calibration at
+The latest complete portable gate exercised source `2f49e65`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -129,23 +129,23 @@ shared without removing cases or assertions.
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,553 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,329,587 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,329,540 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `2c11b0e` records 816 passes, 8 expected
-external-data skips, 95.0990% combined line/branch coverage, and 151.9 seconds on
-the reference Apple M4. The 2.2% wall-time change from the prior 148.6-second
-record is ordinary concurrent-node variation; the gate remains below the 300-second engineering
+The portable-gate artifact keyed to `2f49e65` records 816 passes, 8 expected
+external-data skips, 95.0952% combined line/branch coverage, and 151.0 seconds on
+the reference Apple M4. It is 0.6% faster than the prior 151.9-second record;
+the gate remains below the 300-second engineering
 target and 600-second hard limit. Coverage
 remains above the enforced floor but below the 95.5% engineering target. The
-six-worker record reports 52.9 seconds for weighted modal and 48.1 seconds for
+six-worker record reports 52.5 seconds for weighted modal and 46.7 seconds for
 reduced B2; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
 
-The clean distribution audit at `2c11b0e` produces a 314,090-byte wheel with
-48 members and a 296,895-byte source archive with 54 members. Both pass Twine;
+The clean distribution audit at `2f49e65` produces a 313,977-byte wheel with
+48 members and a 296,787-byte source archive with 54 members. Both pass Twine;
 the wheel is limited to package source, seven frozen data files, and metadata,
 while the source archive adds only build metadata, README, license, and
 manifest. A Python 3.12 clean install resolves JAX 0.10.2 and SOLVAX 0.8.3,
@@ -195,7 +195,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 52.9 seconds, versus 48.1 seconds for reduced B2 and 26.5
+gate it reports 52.5 seconds, versus 46.7 seconds for reduced B2 and 26.7
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -478,7 +478,7 @@ provenance and acceptance status beside every asset.
 ## Release gate
 
 Distribution ownership, metadata, clean-install resource loading, lazy CLI and
-numerical imports, and tiny-solve smoke are green at `2c11b0e`. Version `1.1.3` matches the latest
+numerical imports, and tiny-solve smoke are green at `2f49e65`. Version `1.1.3` matches the latest
 tag and must be bumped consistently in `pyproject.toml`, `CITATION.cff`, and
 `docs/conf.py` before publishing a new release; do not bump merely for local
 development builds.
