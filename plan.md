@@ -3,6 +3,9 @@
 Status: 2026-07-16. The current two-update B2/FreeMHD smoke and schema-5
 stopping contract are keyed to `0ab33b2`; current one-/two-/four-CPU-device
 equivalence is keyed to `4c94389`.
+The installable-distribution contract is keyed to `56e9685`: frozen benchmark
+resources are package-owned, the wheel smoke runs outside the checkout, and
+wheel plus source-distribution membership and size are fail-closed.
 The post-map nonlinear momentum residual and
 restart schema 4 were keyed to `e6834ee`; schema 5 now versions normalized
 stopping. Its fixed-relaxation memory reduction
@@ -110,6 +113,7 @@ large reusable artifacts go in checksummed releases.
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
+| Distribution | installed wheel loads all frozen A/B references and runs a tiny solve; source artifact excludes incomplete repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
 Current structure after moving the script-only Benchmark-A auditor out of the
 package, retiring the undocumented non-projection rectangular autodiff lane,
@@ -121,17 +125,18 @@ the single owner of standard NPZ/restart diagnostic fields, and consolidating
 four manual-validation workflow stubs into one behavior-preserving fixture (the
 immutable evidence, richer projection, and target-driven paths remain), and
 deleting stale test-only velocity-statistics, solver-mask, pipe-Laplacian,
-symmetry, sharding, compact-flux, and explicit-forcing wrappers, and inlining
-the single-use benchmark gradient:
+symmetry, sharding, compact-flux, and explicit-forcing wrappers, inlining the
+single-use benchmark gradient, and moving seven frozen benchmark resources
+into the installed package without duplication:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,943 | stay below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,927 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,869 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 34,946 | stay below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,929 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,884 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,329,894 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,336,212 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -145,6 +150,17 @@ remains above the enforced floor but below the 95.5% engineering target. The
 six-worker record reports 48.8 seconds for reduced B2 and 52.6 seconds for
 weighted modal; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
+
+The clean distribution audit at `56e9685` produces a 314,012-byte wheel with
+48 members and a 296,617-byte source archive with 54 members. Both pass Twine;
+the wheel is limited to package source, seven frozen data files, and metadata,
+while the source archive adds only build metadata, README, license, and
+manifest. A Python 3.12 clean install resolves JAX 0.10.2 and SOLVAX 0.8.3,
+loads every packaged Benchmark A/B and Samper reference outside the checkout,
+and reaches a `9.95e-9` residual on a tiny Hartmann solve. The prior local
+Python 3.10 endpoint resolves JAX 0.6.2 and the same SOLVAX release. Hosted
+endpoint verification remains unavailable because Actions jobs execute zero
+steps.
 
 ## Priority 0: solver-free matched B2 harness — complete
 
@@ -453,6 +469,12 @@ full-quality media, meshes, and raw outputs in checksummed releases. Put
 provenance and acceptance status beside every asset.
 
 ## Release gate
+
+Distribution ownership, metadata, clean-install resource loading, CLI import,
+and tiny-solve smoke are green at `56e9685`. Version `1.1.3` matches the latest
+tag and must be bumped consistently in `pyproject.toml`, `CITATION.cff`, and
+`docs/conf.py` before publishing a new release; do not bump merely for local
+development builds.
 
 Before release:
 
