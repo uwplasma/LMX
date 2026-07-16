@@ -1419,6 +1419,7 @@ def write_q2d_wall_driven_comparison_plots(
     """Write a publication-facing matched side-wall Q2D comparison panel."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1500,11 +1501,7 @@ def write_q2d_wall_driven_comparison_plots(
     )
 
     fig.suptitle("LMX/Q2DmhdFoam matched side-wall Q2D comparison", fontsize=15.0, fontweight="bold")
-    paths = [out_dir / f"{output_stem}.png", out_dir / f"{output_stem}.pdf"]
-    for path in paths:
-        fig.savefig(path, dpi=190, bbox_inches="tight")
-    plt.close(fig)
-    return paths
+    return _save_figure_pair(fig, out_dir, output_stem, dpi=190)
 
 
 def write_q2d_turbulence_decay_movie(
@@ -1579,6 +1576,7 @@ def write_q2d_turbulence_observable_plots(
     if values.ndim != 2:
         raise ValueError("Q2D turbulence observable plots expect a 2D field")
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1645,12 +1643,7 @@ def write_q2d_turbulence_observable_plots(
         bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.9},
     )
 
-    png = out_dir / "q2d_turbulence_observables.png"
-    pdf = out_dir / "q2d_turbulence_observables.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "q2d_turbulence_observables")
 
 
 def write_q2d_decay_plots(
@@ -1661,6 +1654,7 @@ def write_q2d_decay_plots(
     title: str = "Q2D Hartmann-friction decay baseline",
 ) -> list[Path]:
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1696,12 +1690,7 @@ def write_q2d_decay_plots(
     axes[1, 1].set_ylabel("|u| max")
     axes[1, 1].legend(loc="upper right")
 
-    png = out_dir / "q2d_decay_overview.png"
-    pdf = out_dir / "q2d_decay_overview.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "q2d_decay_overview")
 
 
 def write_q2d_forced_plots(
@@ -1712,6 +1701,7 @@ def write_q2d_forced_plots(
     title: str = "Q2D forced Hartmann-friction duct baseline",
 ) -> list[Path]:
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1742,12 +1732,7 @@ def write_q2d_forced_plots(
     axes[2].set_ylabel("|u| max")
     axes[2].legend(loc="lower right")
 
-    png = out_dir / "q2d_forced_overview.png"
-    pdf = out_dir / "q2d_forced_overview.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "q2d_forced_overview")
 
 
 def write_q2d_wall_bounded_forced_plots(
@@ -1758,6 +1743,7 @@ def write_q2d_wall_bounded_forced_plots(
     title: str = "Wall-bounded Q2D duct forced baseline",
 ) -> list[Path]:
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1797,9 +1783,4 @@ def write_q2d_wall_bounded_forced_plots(
         bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.9},
     )
 
-    png = out_dir / "q2d_wall_bounded_overview.png"
-    pdf = out_dir / "q2d_wall_bounded_overview.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "q2d_wall_bounded_overview")

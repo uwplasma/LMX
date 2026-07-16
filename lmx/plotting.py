@@ -63,13 +63,25 @@ def _prepare_plot_output(out_dir: str | Path) -> Path:
     return output
 
 
-def _save_figure_pair(fig, out_dir: Path, stem: str) -> list[Path]:
+def _save_figure_pair(
+    fig,
+    out_dir: Path,
+    stem: str,
+    *,
+    dpi: int | None = None,
+    tight: bool = True,
+) -> list[Path]:
     """Save one figure as PNG and PDF, then release its Matplotlib state."""
 
+    import matplotlib.pyplot as pyplot
+
+    save_options = {"bbox_inches": "tight"} if tight else {}
+    if dpi is not None:
+        save_options["dpi"] = dpi
     paths = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
     for path in paths:
-        fig.savefig(path, bbox_inches="tight")
-    plt.close(fig)
+        fig.savefig(path, **save_options)
+    pyplot.close(fig)
     return paths
 
 

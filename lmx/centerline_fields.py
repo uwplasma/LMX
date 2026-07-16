@@ -171,13 +171,9 @@ def write_centerline_field_preview(
     _plot_field_metrics(ax_text, metrics)
     fig.suptitle(title, fontsize=17)
 
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
     csv_path = out / f"{filename_stem}_centerline.csv"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
     summary.write_text(
         json.dumps({"metrics": metrics, "artifacts": [png.name, pdf.name, csv_path.name]}, indent=2) + "\n",
         encoding="utf-8",
@@ -453,13 +449,9 @@ def write_centerline_current_closure_preview(
     _plot_current_metrics(ax_text, metrics, pressure_metrics)
     fig.suptitle(title, fontsize=17)
 
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
     csv_path = out / f"{filename_stem}_station_data.csv"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
     summary.write_text(
         json.dumps(
             {"metrics": metrics, "pressure_metrics": pressure_metrics, "artifacts": [png.name, pdf.name, csv_path.name]},
@@ -533,12 +525,13 @@ def _parabolic_pipe_velocity_profile(
 
 
 def _set_field_plot_style() -> None:
-    global plt, Line3DCollection
+    global plt, Line3DCollection, _save_figure_pair
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d.art3d import Line3DCollection
+    from .plotting import _save_figure_pair
 
     plt.style.use("default")
     plt.rcParams.update(

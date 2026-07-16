@@ -9,7 +9,7 @@ import numpy as np
 from .cases import make_hunt_case, make_shercliff_case
 from .example_runner import solve_case_snapshots
 from .mesh import StructuredMesh
-from .plotting import write_transient_movies
+from .plotting import _save_figure_pair, write_transient_movies
 from .reference_data import load_hunt_analytical, load_shercliff_analytical
 from .solvers import _build_mesh, solve_steady
 from .specs import BoundaryCondition
@@ -373,12 +373,7 @@ def write_closed_channel_profile_comparison_figure(
         bbox={"facecolor": "#f8fafc", "edgecolor": "#cbd5e1", "alpha": 0.98, "boxstyle": "round,pad=0.45"},
     )
 
-    png_path = out_dir / "analytic_velocity_profiles.png"
-    pdf_path = out_dir / "analytic_velocity_profiles.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "analytic_velocity_profiles")
 
 
 def write_closed_channel_validation_ladder_figure(
@@ -475,12 +470,7 @@ def write_closed_channel_validation_ladder_figure(
         bbox={"facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.92},
     )
 
-    png_path = out_dir / "closed_channel_validation_ladder.png"
-    pdf_path = out_dir / "closed_channel_validation_ladder.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "closed_channel_validation_ladder")
 
 
 def write_hartmann_validation_ladder_figure(
@@ -609,12 +599,7 @@ def write_hartmann_validation_ladder_figure(
         bbox={"facecolor": "#f8fafc", "edgecolor": "#cbd5e1", "alpha": 0.98, "boxstyle": "round,pad=0.45"},
     )
 
-    png_path = out_dir / "hartmann_validation_ladder.png"
-    pdf_path = out_dir / "hartmann_validation_ladder.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "hartmann_validation_ladder")
 
 
 def write_closed_channel_startup_movies(

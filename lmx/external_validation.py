@@ -168,6 +168,7 @@ def write_scalar_reference_comparison_plots(
     """Write PNG/PDF scalar-observable comparison plots."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -245,12 +246,7 @@ def write_scalar_reference_comparison_plots(
             if not np.isfinite(ratio):
                 axes[1].text(xi, fallback_height, "inf", ha="center", va="bottom", fontsize=8)
 
-    png_path = out_dir / f"{output_stem}.png"
-    pdf_path = out_dir / f"{output_stem}.pdf"
-    for path in (png_path, pdf_path):
-        fig.savefig(path, dpi=180)
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, output_stem, dpi=180, tight=False)
 
 
 def write_scalar_reference_template(path: str | Path, rows: list[dict[str, str]]) -> Path:
@@ -809,6 +805,7 @@ def write_q2dmhdfoam_docker_reference_panel(
     """Write a publication-facing panel for the Docker Q2DmhdFoam rerun."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -858,11 +855,7 @@ def write_q2dmhdfoam_docker_reference_panel(
     axes[1].set_title("Executable external-code gate")
 
     fig.suptitle("Docker-rerun Q2DmhdFoam reference artifact", fontsize=14.5, fontweight="bold")
-    paths = [out_dir / f"{output_stem}.png", out_dir / f"{output_stem}.pdf"]
-    for path in paths:
-        fig.savefig(path, dpi=190, bbox_inches="tight")
-    plt.close(fig)
-    return paths
+    return _save_figure_pair(fig, out_dir, output_stem, dpi=190)
 
 
 def load_q2dmhdfoam_vtk_vector_field(
@@ -1047,6 +1040,7 @@ def write_q2dmhdfoam_vtk_velocity_panel(
     """Write a publication-facing panel for a Q2DmhdFoam VTK velocity field."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1117,11 +1111,7 @@ def write_q2dmhdfoam_vtk_velocity_panel(
     axes[1, 1].set_title("Executable external-code field observables")
 
     fig.suptitle("Q2DmhdFoam lid-driven rerun: VTK field ingestion", fontsize=15.0, fontweight="bold")
-    paths = [out_dir / f"{output_stem}.png", out_dir / f"{output_stem}.pdf"]
-    for path in paths:
-        fig.savefig(path, dpi=190, bbox_inches="tight")
-    plt.close(fig)
-    return paths
+    return _save_figure_pair(fig, out_dir, output_stem, dpi=190)
 
 
 def write_q2dmhdfoam_external_reference_panel(
@@ -1137,6 +1127,7 @@ def write_q2dmhdfoam_external_reference_panel(
     """Write a publication-facing Q2DmhdFoam external-reference panel."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     if not profiles:
         raise ValueError("At least one Q2DmhdFoam profile is required")
@@ -1246,12 +1237,7 @@ def write_q2dmhdfoam_external_reference_panel(
         )
 
     fig.suptitle("Executable Q2DmhdFoam reference-data adapter", fontsize=15, fontweight="bold")
-    png_path = out_dir / f"{output_stem}.png"
-    pdf_path = out_dir / f"{output_stem}.pdf"
-    for path in (png_path, pdf_path):
-        fig.savefig(path, dpi=180, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, output_stem, dpi=180)
 
 
 def _latest_openfoam_time_dir(case_dir: Path) -> Path:
@@ -1489,14 +1475,13 @@ def write_q2dmhdfoam_lmx_turbulence_match_audit(
     """Write JSON/CSV/PNG/PDF artifacts for Q2DmhdFoam-vs-LMX match audits."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     audit_rows = [dict(audit) for audit in audits]
     json_path = out_dir / f"{output_stem}.json"
     csv_path = out_dir / f"{output_stem}.csv"
-    png_path = out_dir / f"{output_stem}.png"
-    pdf_path = out_dir / f"{output_stem}.pdf"
     json_path.write_text(json.dumps({"case": output_stem, "audits": audit_rows}, indent=2) + "\n", encoding="utf-8")
     _write_q2dmhdfoam_match_audit_csv(audit_rows, csv_path)
 
@@ -1534,9 +1519,7 @@ def write_q2dmhdfoam_lmx_turbulence_match_audit(
     )
     axes[1].text(0.02, 0.98, "\n".join(lines), va="top", fontsize=10.0, transform=axes[1].transAxes)
     fig.suptitle("Q2DmhdFoam-to-LMX nonlinear Q2D match audit", fontsize=15, fontweight="bold")
-    for path in (png_path, pdf_path):
-        fig.savefig(path, dpi=185, bbox_inches="tight")
-    plt.close(fig)
+    png_path, pdf_path = _save_figure_pair(fig, out_dir, output_stem, dpi=185)
     return [json_path, csv_path, png_path, pdf_path]
 
 
@@ -1943,6 +1926,7 @@ def write_magnetic_obstacle_votyakov_curve_comparison(
     """Write a literature-curve magnetic-obstacle comparison panel and CSV."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -2032,11 +2016,7 @@ def write_magnetic_obstacle_votyakov_curve_comparison(
         bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.9},
     )
     fig.suptitle("Magnetic-obstacle literature target versus current LMX response", fontsize=14.5, fontweight="bold")
-    png_path = out_dir / f"{output_stem}.png"
-    pdf_path = out_dir / f"{output_stem}.pdf"
-    for path in (png_path, pdf_path):
-        fig.savefig(path, dpi=185, bbox_inches="tight")
-    plt.close(fig)
+    png_path, pdf_path = _save_figure_pair(fig, out_dir, output_stem, dpi=185)
     return [csv_path, png_path, pdf_path]
 
 

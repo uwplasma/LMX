@@ -646,14 +646,10 @@ def write_wham_blanket_autodiff_research_plots(
     axes[1, 1].legend(handles, [line.get_label() for line in handles], loc="best", fontsize=8)
 
     fig.suptitle("LMX WHAM blanket differentiable pressure-drop research study", fontsize=17)
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
     station_csv = out / f"{filename_stem}_station_data.csv"
     design_csv = out / f"{filename_stem}_design_data.csv"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
     summary.write_text(json.dumps(_json_ready_study(study, [png.name]), indent=2) + "\n", encoding="utf-8")
     _write_numeric_csv(
         station_csv,
@@ -730,13 +726,9 @@ def write_wham_blanket_flow_plots(
         _plot_velocity_section(axis, flow, index, title=title)
 
     fig.suptitle("WHAM blanket reduced liquid-metal flow preview", fontsize=17)
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
     csv = out / f"{filename_stem}_station_data.csv"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
 
     summary.write_text(json.dumps(_json_summary(flow, [png.name, pdf.name]), indent=2) + "\n", encoding="utf-8")
     _write_numeric_csv(
@@ -831,13 +823,9 @@ def write_wham_blanket_pressure_sweep_plots(
         f"WHAM blanket pressure sweep at U={velocity:.2f} m/s, R={radius:.2f} m",
         fontsize=16,
     )
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
     csv = out / f"{filename_stem}_data.csv"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
 
     summary.write_text(json.dumps(_json_pressure_sweep_summary(runs, [png.name, pdf.name, csv.name]), indent=2) + "\n", encoding="utf-8")
     _write_pressure_sweep_csv(csv, runs)
@@ -955,13 +943,9 @@ def write_wham_blanket_transient_flow_plots(
         f"(steady={metrics['steady_state_reached']}, t={metrics['simulated_time_s']:.0f} s)",
         fontsize=16,
     )
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
     csv = out / f"{filename_stem}_history.csv"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
     summary.write_text(json.dumps(_json_transient_summary(transient, [png.name, pdf.name, csv.name]), indent=2) + "\n", encoding="utf-8")
     _write_numeric_csv(
         csv,
@@ -1778,7 +1762,7 @@ def _json_ready(value):
 
 
 def _set_flow_plot_style() -> None:
-    global plt, colors, Line3DCollection, Image
+    global plt, colors, Line3DCollection, Image, _save_figure_pair
     import matplotlib
 
     matplotlib.use("Agg")
@@ -1786,6 +1770,7 @@ def _set_flow_plot_style() -> None:
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d.art3d import Line3DCollection
     from PIL import Image
+    from .plotting import _save_figure_pair
 
     plt.style.use("default")
     plt.rcParams.update(

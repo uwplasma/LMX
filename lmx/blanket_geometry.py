@@ -12,12 +12,13 @@ from .mesh import StructuredMesh, centerline_pipe_mesh_quality_metrics
 
 
 def _load_visualization() -> None:
-    global plt, Poly3DCollection
+    global plt, Poly3DCollection, _save_figure_pair
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    from .plotting import _save_figure_pair
 
 
 @dataclass(frozen=True)
@@ -192,12 +193,8 @@ def write_wham_blanket_geometry_preview(
     _plot_blanket_metrics(ax_text, spec, metrics)
 
     fig.suptitle("LMX WHAM liquid-metal blanket pipe geometry preview", fontsize=17)
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
     summary.write_text(
         json.dumps(
             {
@@ -328,12 +325,8 @@ def write_centerline_pipe_mesh_preview(
         bbox={"boxstyle": "round,pad=0.55", "facecolor": "#f8fafc", "edgecolor": "#cbd5e1"},
     )
     fig.suptitle(title, fontsize=16)
-    png = out / f"{filename_stem}.png"
-    pdf = out / f"{filename_stem}.pdf"
+    png, pdf = _save_figure_pair(fig, out, filename_stem)
     summary = out / f"{filename_stem}_summary.json"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
     summary.write_text(
         json.dumps(
             {

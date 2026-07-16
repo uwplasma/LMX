@@ -182,6 +182,7 @@ def write_dean_literature_validation_plots(
     """Write a publication-facing Dean correlation and secondary-flow panel."""
 
     import matplotlib.pyplot as plt
+    from .plotting import _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -233,9 +234,4 @@ def write_dean_literature_validation_plots(
     fig.colorbar(contour, ax=axes[2], fraction=0.046, pad=0.04, label="secondary speed")
     fig.suptitle("Dean-vortex literature gate for curved-pipe validation", fontsize=15, fontweight="bold")
 
-    png_path = out_dir / f"{output_stem}.png"
-    pdf_path = out_dir / f"{output_stem}.pdf"
-    for path in (png_path, pdf_path):
-        fig.savefig(path, dpi=185, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, output_stem, dpi=185)
