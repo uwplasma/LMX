@@ -135,14 +135,15 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Current B2 schema-6 forced-device calibration and physical-core pilot](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
+![Current B2 schema-6 calibration and sustained physical-CPU scaling](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
 Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
 `256 × 67 × 67`, two/four devices reach 1.229×/1.360×; four devices still miss
-the promotion gate. An affinity-controlled 256×67×67 repeated calibration
-reaches 1.606× on eight versus two physical CPUs with its confidence and
-efficiency gates green. Each trajectory is only two updates, so sustained and
-production scaling remain open. Two-GPU topology is current.
+the promotion gate. On affinity-controlled physical CPUs, 32-update warm
+trajectories last 148–246 s and reach 1.396×/1.658× on four/eight versus two
+CPUs; confidence, efficiency, restart, and physics gates pass. This is accepted
+fixed-work CPU strong scaling, not steady-state evidence. Two-GPU topology is
+current; sustained GPU timing awaits an idle host.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation

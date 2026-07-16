@@ -4,14 +4,13 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Current B2 schema-6 forced-device calibration and physical-core pilot](_static/strong_scaling.webp)
+![Current B2 schema-6 calibration and sustained physical-CPU scaling](_static/strong_scaling.webp)
 
 This composite is generated from the accepted schema-6 CPU record. The upper
-panel is forced-device calibration; the lower panel is an affinity-controlled
-2/4/8-CPU repeated confirmation. Both use two solver updates, so neither is
-sustained or steady-production strong scaling. Current one/two-GPU topology is
-green but omitted because the shared-host replay is correctness evidence, not
-a timing curve.
+panel is forced-device calibration; the lower panel is accepted sustained
+fixed-work scaling on affinity-controlled 2/4/8 CPUs. Current one/two-GPU
+topology is green but omitted because the shared host has not yet passed the
+idle gate for timing.
 
 ## Current evidence
 
@@ -21,6 +20,7 @@ a timing curve.
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 physical-core confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; not sustained or steady-production scaling |
+| B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 245.465/175.837/148.026 s; 1.396x/1.658x; 95% lower bounds 1.378x/1.655x; efficiency 69.8%/41.5%; CV below 0.71% | accepted fixed-work physical-CPU strong scaling; not steady-state evidence |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | physical-core restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
@@ -172,12 +172,16 @@ The preflight therefore fixed two physical CPUs per device and reran nested
 2/4/8-CPU masks. Warm medians fall from 7.351 to 5.546/4.574 seconds, giving
 1.325x/1.607x speedups and 66.3%/40.2% efficiency. All affinity, placement,
 restart, repeat, conservation, linear, Anderson, and cross-topology gates pass.
-The six-repeat `256 x 67 x 67` confirmation reports 22.894, 15.953, and 14.252
+The six-repeat `256 x 67 x 67` calibration reports 22.894, 15.953, and 14.252
 second warm medians. Its 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds,
-and 71.8%/40.2% efficiencies pass the frozen calibration gates. These are
-repeated short trajectories, not one sustained multi-minute solve. The worker
-must next support configurable update counts and an exact split restart so each
-measured warm trajectory lasts at least 120 seconds on every topology.
+and 71.8%/40.2% efficiencies pass the frozen calibration gates, but the runs
+are short. A 20-update duration pilot then failed closed at 95.63–97.51 s.
+The promoted 32-update workload measures 245.465, 175.837, and 148.026 s on
+2/4/8 CPUs, with every warm sample above 120 s. Speedups are 1.396x/1.658x,
+their 95% lower bounds are 1.378x/1.655x, and efficiencies are 69.8%/41.5%.
+CVs remain below 0.71%; midpoint restart is exact and all schema-6, physics,
+placement, and cross-topology gates pass. This accepts sustained fixed-work CPU
+strong scaling, not steady convergence or B2 solution acceptance.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
@@ -393,11 +397,10 @@ than silently reused.
 
 ## Next performance work
 
-1. Generalize the matched worker to exact split restart for sustained update counts.
-2. Run at least 120 measured seconds per CPU and GPU topology on identical state/input.
-3. Compare six tiny Anderson updates with the fixed-relaxation control.
-4. If that passes, run the bounded step-29 then strict step-96 outcome gates.
-5. Close canonical coarse/medium/fine and experimental-observable acceptance.
+1. Run the same 120-second minimum protocol on one/two GPUs after the host passes the idle gate.
+2. Compare six tiny Anderson updates with the fixed-relaxation control.
+3. If that passes, run the bounded step-29 then strict step-96 outcome gates.
+4. Close canonical coarse/medium/fine and experimental-observable acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)
 for physics promotion criteria.

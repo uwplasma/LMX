@@ -34,8 +34,10 @@ optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
 one and two GPUs; shared-host timing is excluded. The affinity-controlled
-physical-CPU path passes repeated two-update calibration, but sustained
-multi-minute CPU/GPU scaling remains open. The fixed-work harness now accepts
+physical-CPU path now passes accepted 32-update sustained scaling: every warm
+trajectory lasts 147--246 s, speedup is 1.396x/1.658x on 4/8 versus 2 CPUs,
+and all confidence, efficiency, restart, and physics gates pass. Sustained GPU
+scaling remains open pending the idle-host gate. The fixed-work harness accepts
 an explicit update count, checkpoints at the deterministic midpoint, replays
 the remaining trajectory, and can require every warm sample to exceed 120 s;
 the two-update default remains the bounded CI/debug gate. This
@@ -372,12 +374,15 @@ That confirmation is complete. Its 22.894/15.953/14.252-second warm medians
 give 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds, and
 71.8%/40.2% efficiency; all correctness and calibration gates pass. These are
 five repeated samples of a two-update trajectory, not sustained strong scaling.
-The next implementation must generalize the matched input and worker to a
-configurable update count with an exact split restart. Actual CPU and GPU
-scaling rungs must each measure at least 120 post-warm-up seconds in one
-trajectory on identical state/input, while preserving the same placement,
-restart, linear, conservation, Anderson, and cross-topology gates. Do not claim
-production scaling from accumulated short repeats.
+The generalized fixed-work worker then rejected a 20-update duration pilot at
+95.63--97.51 s and promoted 32 updates. On identical `256 x 67 x 67` input,
+2/4/8-CPU warm medians are 245.465/175.837/148.026 s, giving
+1.396x/1.658x speedups, 1.378x/1.655x 95% lower bounds, and 69.8%/41.5%
+efficiency. CVs are below 0.71%; midpoint replay is exact and every placement,
+linear, conservation, Anderson, and cross-topology gate passes. Accept this as
+sustained fixed-work physical-CPU strong scaling, not steady-state or B2
+solution acceptance. Apply the same protocol to GPUs only after the shared
+host passes the 60-second idle/no-foreign-work gate.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
 that ladder. Three representative files match the current geometry and solver
@@ -519,7 +524,8 @@ The next validation sequence is fail-closed:
    sustained `tau_map=0.005` passes plus exact replay and the frozen pressure,
    velocity, pressure-gradient, linear, conservation, and sharding limits;
 5. only then authorize a fresh canonical coarse schema-6 run. Medium/fine,
-   production FreeMHD, and accepted-workload strong scaling remain blocked.
+   production FreeMHD, sustained GPU timing, and steady-production scaling
+   remain blocked.
 
 Failure at any rung stops before a coarse run and retains fixed relaxation two
 as the historical control. After the parallel algorithm settles, consolidate
