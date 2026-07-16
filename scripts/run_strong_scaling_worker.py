@@ -22,7 +22,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import lmx
-from lmx._fringing_types import EXTRUDED_HISTORY_WIDTHS
 from lmx.fringing import (
     _axial_field_sharding,
     _explicit_deviatoric_stress_duct,
@@ -90,8 +89,6 @@ def _b2_repeat_signature(bundle) -> np.ndarray:
         values.append(np.stack((np.min(stations, axis=1), np.max(stations, axis=1),
             np.mean(stations, axis=1), np.linalg.norm(stations, axis=1))).reshape(-1))
     values.append(np.asarray(bundle.rho_phi_inlet, dtype=float).reshape(-1))
-    values.extend(np.asarray(getattr(bundle, name), dtype=float).reshape(-1)
-        for name, _ in EXTRUDED_HISTORY_WIDTHS)
     return np.concatenate(values)
 
 
