@@ -30,6 +30,16 @@
     "four_update_wall_seconds": 14.2,
     "note": "Different trajectories establish that the direct defect is not a restatement of the map update."
   },
+  "bounded_runtime_probe": {
+    "updates": 16,
+    "deadline_seconds": 45,
+    "wall_seconds": 28.662001,
+    "compile_and_first_update_seconds": 11.506143,
+    "steady_update_seconds_range": [1.065685, 1.192176],
+    "defect_step_1": 0.976006450453,
+    "defect_step_16": 0.157335682542,
+    "status": "passed-runtime-projection-only"
+  },
   "focused_gates": {
     "operator_jit_and_jvp": "passed",
     "io_v4_and_v1_v2_v3_compatibility": "14 passed in about 3 seconds",
@@ -44,11 +54,16 @@
       "shape": [7, 7, 7],
       "requested_updates": 96,
       "deadline_seconds": 120,
-      "status": "failed-closed-at-deadline",
-      "interrupted_phase": "pressure solve",
+      "status": "failed-closed-tighter-crossing-not-reached",
+      "last_reported_step": 90,
+      "wall_seconds_at_last_report": 115.239,
+      "defect_at_last_report": 0.0387027108954,
+      "candidate_0.1_crossed": true,
+      "confirmation_0.01_crossed": false,
+      "interrupted_phase": "electric solve at 120-second deadline",
       "crossings_or_outcomes_promoted": false
     },
-    "next_gate": "profile and reduce bounded per-update diagnostic/pressure cost; repeat the outcome study only after a short probe projects at most 110 seconds",
+    "next_gate": "use same-state one-update probes to distinguish a discrete residual floor from slow pseudo-time convergence; test larger stable pseudo-time or acceleration only through predeclared linear, conservation, restart, and direct-defect gates",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,

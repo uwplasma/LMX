@@ -395,16 +395,22 @@ JIT/JVP, I/O compatibility, and exact direct-four versus serialized-two-plus-two
 replay pass. This is monitoring evidence only; the stopping rule is unchanged.
 
 The predeclared 96-update `7 x 7 x 7` outcome study failed closed at its
-120-second deadline while executing a pressure solve. It produced no promotable
-crossing or outcome comparison, froze no threshold, and authorizes no repeat of
-the same slow run. First profile a short bounded trajectory, reduce the measured
-diagnostic/pressure cost, and project the complete study at no more than 110
-seconds. Only then repeat the study and compare the third sustained crossings
-at candidate defect `0.1` and decade-tighter `0.01`, after startup or an
-intervening failure. Freeze neither threshold nor contract unless both crossings
-occur, all linear/conservation and replay gates pass, and the normalized
-transverse-pressure curve changes by at most `2e-4`, velocity by at most
-`1e-3 U0`, and pressure-gradient relative L2 by at most `0.5%`. Only then add
+120-second deadline. A 16-update profile completed in 28.66 seconds (11.51
+seconds through the first compiled update, then 1.07--1.19 seconds/update), but
+its early log-linear projection was optimistic. The guarded follow-up crossed
+candidate `0.1` but reported defect `0.03870` at step 90 and 115.24 seconds;
+decade-tighter `0.01` was not reached before the deadline. It produced no
+promotable outcome comparison, froze no threshold, and authorizes no repeat of
+the same slow trajectory.
+
+Before more stepping, use one-update same-state probes to distinguish slow
+pseudo-time convergence from a discretization or split-operator residual floor.
+Test a larger pseudo-time cap or changed acceleration only with predeclared
+direct-defect, map-rate, linear-solver, conservation, CFL, and exact-restart
+gates. Repeat outcome insensitivity only after this bounded diagnosis predicts
+the tighter three-update crossing below 110 seconds. Then require all outcome
+gates and normalized transverse-pressure change at most `2e-4`, velocity at
+most `1e-3 U0`, and pressure-gradient relative L2 at most `0.5%`. Only then add
 the direct defect to the three-update stopping streak and authorize one corrected
 coarse run. Tolerance, wall, medium, fine, and production-FreeMHD work remain
 blocked until that coarse baseline converges for the correct reason. Evidence is in
