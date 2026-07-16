@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `838e505` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `4c4057b` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -41,8 +41,9 @@ timing-stability gates. Its 1.229x/1.360x point speedups promote the two-device
 optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
-one and two GPUs; shared-host timing is excluded. The current affinity-controlled
-Docker CPU-allocation path at `a92b4e6` passes 32-update sustained scaling:
+one and two GPUs; shared-host timing is excluded. The latest accepted
+affinity-controlled Docker CPU-allocation path, keyed to `a92b4e6`, passes
+32-update sustained scaling:
 every warm trajectory lasts 147--269 s, speedup is 1.317x/1.684x on two/four
 versus one JAX device, and all confidence, efficiency, restart, physics,
 provenance, memory, and 60-second admission gates pass. A 96-update
@@ -162,12 +163,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,702 | stay below 34,710 while preserving the scaling and Q2D gates | 35,100 |
+| package lines | 34,691 | stay below 34,700 while preserving the scaling and Q2D gates | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,086 | no new file; stay below 21,090 | 31 / 21,100 |
+| test files / lines | 30 / 21,066 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,548,144 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
+| tracked checkout | 4,547,515 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -249,6 +250,16 @@ five-point point-Jacobi application to released SOLVAX, deleting eight
 package/core lines and two nested functions. All three accepted preconditioner
 aliases, the implicit gradient, and the velocity-mask integration gate pass;
 compiled work is unchanged, so this is ownership simplification, not speedup.
+The post-`838e505` SOLVAX audit rejects further ownership churn: every remaining
+candidate is smaller than five lines, changes compiled operations, retains
+LMX-owned gauge/physics semantics, or needs an unreleased performance-rejected
+API. Commit `1d8c5c3` shares one fresh extruded-solution fixture across three
+CLI tests, removing 20 test lines while all 25 CLI tests and assertions remain.
+Commit `4c4057b` delegates the analytic variable-field duct baseline to the
+square-duct problem owner, deleting 11 package lines; its real solve and runnable
+example contract pass. A post-slimming `8 x 7 x 7`, two-update B2 smoke at
+`3a4e037` passes repeat, pressure/electric, conservation, schema-6 Anderson, and
+exact serialized-replay gates; its millisecond warm timing is correctness only.
 
 The portable-gate artifact keyed to `28c4fa2` records 859 passes, 8 expected
 external-data skips, 95.3219% combined line/branch coverage, and 143.5 seconds on
