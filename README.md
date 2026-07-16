@@ -137,8 +137,8 @@ optimization evidence, not current production-scaling claims.
 
 ## Quality and citation
 
-The portable gate records **817 passing tests**, **95.03% combined line/branch
-coverage**, and **166.5 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **818 passing tests**, **95.01% combined line/branch
+coverage**, and **154.5 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 
