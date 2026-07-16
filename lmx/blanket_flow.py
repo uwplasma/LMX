@@ -655,13 +655,14 @@ def write_wham_blanket_autodiff_research_plots(
     fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
     summary.write_text(json.dumps(_json_ready_study(study, [png.name]), indent=2) + "\n", encoding="utf-8")
-    _write_autodiff_station_csv(
+    _write_numeric_csv(
         station_csv,
-        station=station,
-        total_pressure=pressure,
-        hydraulic_pressure=hydraulic,
-        mhd_pressure=mhd,
-        curvature_pressure=curvature,
+        "station_m,total_pressure_kpa,hydraulic_pressure_kpa,mhd_pressure_kpa,curvature_pressure_kpa",
+        station,
+        pressure,
+        hydraulic,
+        mhd,
+        curvature,
     )
     _write_autodiff_design_csv(
         design_csv,
@@ -738,13 +739,14 @@ def write_wham_blanket_flow_plots(
     plt.close(fig)
 
     summary.write_text(json.dumps(_json_summary(flow, [png.name, pdf.name]), indent=2) + "\n", encoding="utf-8")
-    _write_station_csv(
+    _write_numeric_csv(
         csv,
-        station=station,
-        b_perp=b_perp,
-        hartmann=hartmann,
-        pressure=pressure,
-        total_gradient=total_gradient,
+        "station_m,b_perp_t,hartmann,pressure_drop_pa,total_pressure_gradient_pa_per_m",
+        station,
+        b_perp,
+        hartmann,
+        pressure,
+        total_gradient,
     )
     return [png, pdf, summary, csv]
 
@@ -961,7 +963,18 @@ def write_wham_blanket_transient_flow_plots(
     fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
     summary.write_text(json.dumps(_json_transient_summary(transient, [png.name, pdf.name, csv.name]), indent=2) + "\n", encoding="utf-8")
-    _write_transient_history_csv(csv, transient)
+    _write_numeric_csv(
+        csv,
+        "time_s,mean_velocity_m_per_s,bend_inboard_velocity_m_per_s,"
+        "bend_outboard_velocity_m_per_s,pressure_drop_pa,relative_update,courant",
+        np.asarray(transient["time"], dtype=float),
+        np.asarray(transient["velocity_mean_history"], dtype=float),
+        np.asarray(transient["bend_inboard_velocity_history"], dtype=float),
+        np.asarray(transient["bend_outboard_velocity_history"], dtype=float),
+        np.asarray(transient["pressure_drop_history"], dtype=float),
+        np.asarray(transient["relative_update_history"], dtype=float),
+        np.asarray(transient["courant_history"], dtype=float),
+    )
     return [png, pdf, summary, csv]
 
 
@@ -1590,17 +1603,9 @@ def _json_pressure_sweep_summary(flows: Sequence[dict[str, object]], artifacts: 
     }
 
 
-def _write_station_csv(
-    path: Path,
-    *,
-    station: np.ndarray,
-    b_perp: np.ndarray,
-    hartmann: np.ndarray,
-    pressure: np.ndarray,
-    total_gradient: np.ndarray,
-) -> None:
-    rows = ["station_m,b_perp_t,hartmann,pressure_drop_pa,total_pressure_gradient_pa_per_m"]
-    for values in zip(station, b_perp, hartmann, pressure, total_gradient, strict=True):
+def _write_numeric_csv(path: Path, header: str, *columns: np.ndarray) -> None:
+    rows = [header]
+    for values in zip(*columns, strict=True):
         rows.append(",".join(f"{float(value):.12e}" for value in values))
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
@@ -1635,40 +1640,6 @@ def _write_pressure_sweep_csv(path: Path, flows: Sequence[dict[str, object]]) ->
             strict=True,
         ):
             rows.append(f"{scale:.12e}," + ",".join(f"{float(value):.12e}" for value in values))
-    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-
-def _write_transient_history_csv(path: Path, transient: dict[str, object]) -> None:
-    rows = [
-        "time_s,mean_velocity_m_per_s,bend_inboard_velocity_m_per_s,"
-        "bend_outboard_velocity_m_per_s,pressure_drop_pa,relative_update,courant"
-    ]
-    for values in zip(
-        np.asarray(transient["time"], dtype=float),
-        np.asarray(transient["velocity_mean_history"], dtype=float),
-        np.asarray(transient["bend_inboard_velocity_history"], dtype=float),
-        np.asarray(transient["bend_outboard_velocity_history"], dtype=float),
-        np.asarray(transient["pressure_drop_history"], dtype=float),
-        np.asarray(transient["relative_update_history"], dtype=float),
-        np.asarray(transient["courant_history"], dtype=float),
-        strict=True,
-    ):
-        rows.append(",".join(f"{float(value):.12e}" for value in values))
-    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-
-def _write_autodiff_station_csv(
-    path: Path,
-    *,
-    station: np.ndarray,
-    total_pressure: np.ndarray,
-    hydraulic_pressure: np.ndarray,
-    mhd_pressure: np.ndarray,
-    curvature_pressure: np.ndarray,
-) -> None:
-    rows = ["station_m,total_pressure_kpa,hydraulic_pressure_kpa,mhd_pressure_kpa,curvature_pressure_kpa"]
-    for values in zip(station, total_pressure, hydraulic_pressure, mhd_pressure, curvature_pressure, strict=True):
-        rows.append(",".join(f"{float(value):.12e}" for value in values))
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
