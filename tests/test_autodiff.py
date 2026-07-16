@@ -549,6 +549,17 @@ def test_extruded_rect_projection_iteration_history_and_gradients_are_finite(
     station_indices, target = trajectory_target
     assert target["u_field"].shape[0] == 3
     assert target["u_field"].shape[1] == 2
+    terminal = extruded_rect_projection_history(
+        trajectory_problem, forcing=1.0, peak_hartmann_number=9.0,
+        entry_center=1.2, exit_center=4.0, transition_width=0.4,
+    )
+    for name in (
+        "u_field", "phi_field", "jy_field", "pressure_field",
+        "charge_balance_residual", "boundary_current_residual",
+    ):
+        assert jnp.allclose(
+            target[name][-1], terminal[name][station_indices], rtol=0.0, atol=1.0e-11
+        )
     gradients = extruded_rect_projection_trajectory_loss_gradients(
         trajectory_problem,
         forcing=1.0,
