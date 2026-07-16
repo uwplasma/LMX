@@ -517,7 +517,7 @@ def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
     )
 
 
-def test_explicit_forcing_and_active_velocity_mask_helpers():
+def test_active_velocity_mask_excludes_boundaries():
     mask = jnp.ones((3, 3), dtype=bool)
     active = solvers._active_velocity_mask(mask)
     assert jnp.array_equal(
@@ -530,9 +530,6 @@ def test_explicit_forcing_and_active_velocity_mask_helpers():
             ]
         ),
     )
-    forcing = solvers._explicit_forcing(1.25, jnp.float32)
-    assert forcing.dtype == jnp.float32
-    assert float(forcing) == pytest.approx(1.25)
 
 
 def test_concat_history_handles_append_and_empty_inputs():
@@ -2737,12 +2734,6 @@ def test_initial_solver_state_without_restart_zeros_auxiliary_fields():
     assert jnp.allclose(jy0, 0.0)
     assert jnp.allclose(jz0, 0.0)
     assert jnp.allclose(lorentz0, 0.0)
-
-
-def test_explicit_forcing_preserves_dtype():
-    value = solvers._explicit_forcing(1.25, jnp.float32)
-    assert value.dtype == jnp.float32
-    assert float(value) == pytest.approx(1.25)
 
 
 def test_scaled_pressure_proxy_value_falls_back_to_unity_reference_for_zero_currents():

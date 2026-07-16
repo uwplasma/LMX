@@ -72,7 +72,7 @@ timeout = 120
 timeout_method = "signal"
 filterwarnings = ["error"]
 markers = [
-  "unit: fast local checks for isolated functionality",
+  "unit: isolated functionality; not a runtime classification",
   "numerical: discretization, solver, conservation, and convergence checks",
   "regression: deterministic golden-profile and serialized-output checks",
   "physics: physics-level invariants for the current solver implementation",

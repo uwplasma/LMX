@@ -5,9 +5,9 @@ orphan: true
 # Media provenance
 
 Feature pages embed the relevant figures directly. This compact index records
-where the compressed derivatives live; raw fields, meshes, and full-resolution
-media remain in the versioned [research-assets release](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1).
-The package wheel contains no media.
+where the compressed derivatives live. The checksummed source bundle is in the
+versioned [research-assets release](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1);
+other raw intermediates remain outside Git. The package wheel contains no media.
 
 ## Tracked web set
 
@@ -28,7 +28,8 @@ The 35,171-byte Hunt H.264 loop (SHA-256
 compresses the complete 24.08-second tracked transient into 7.00 seconds at
 640 × 416 and 12 fps. Its 13,000-byte WebP poster has SHA-256
 `a4ada2e53c72cd2a57da99db072fc47a5477784aaf4938fc8efa83318b3456a4`.
-No solver was rerun.
+The 10,635,673-byte source GIF (`12f30a38...`) remains outside Git and the
+release; no solver was rerun.
 
 ## Release-hosted showcase set
 

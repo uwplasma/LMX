@@ -1234,10 +1234,6 @@ def _reference_mean_velocity(case: CaseSpec) -> float | None:
     return None
 
 
-def _explicit_forcing(explicit_forcing: float, dtype: jnp.dtype) -> jnp.ndarray:
-    return jnp.asarray(explicit_forcing, dtype=dtype)
-
-
 def _emit_solver_header(
     logger,
     *,
@@ -1442,7 +1438,7 @@ def _fully_developed_case_step(
     jnp.ndarray,
 ]:
     _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
-    forcing = _explicit_forcing(case.forcing, by.dtype)
+    forcing = jnp.asarray(case.forcing, dtype=by.dtype)
     fluid_mask = materials.fluid_mask
     active_mask = fluid_mask
     u_iter = u_previous

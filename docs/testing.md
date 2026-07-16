@@ -36,7 +36,7 @@ python -m pytest tests/test_fringing.py::test_b2_steady_gate_requires_three_cons
 
 Prefer direct node IDs or narrow `-k` expressions while developing. The current
 module-level `unit` marker includes some expensive fringing and autodiff tests,
-so it is not yet a guaranteed fast lane. Markers describe cost or external
+so it is not a guaranteed fast lane. Markers describe scope or external
 requirements, not correctness importance. Avoid adding a new test file when a
 compact test belongs naturally in an existing module-level family.
 
