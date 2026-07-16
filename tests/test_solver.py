@@ -125,27 +125,6 @@ def test_bounded_time_step_count_covers_zero_and_invalid_dt_cases():
         )
 
 
-def test_active_velocity_mask_for_solver_switches_between_fluid_and_extended_masks():
-    fluid_mask = jnp.asarray(
-        [[True, True, True], [True, True, True], [True, True, True]]
-    )
-
-    fully_developed = solvers._active_velocity_mask_for_solver(
-        fluid_mask, "fully_developed_inductionless"
-    )
-    extruded = solvers._active_velocity_mask_for_solver(
-        fluid_mask, "extruded_inductionless"
-    )
-
-    assert jnp.array_equal(extruded, fluid_mask)
-    assert jnp.array_equal(
-        fully_developed,
-        jnp.asarray(
-            [[False, False, False], [False, True, False], [False, False, False]]
-        ),
-    )
-
-
 def test_potential_coefficients_stay_positive_for_low_conductivity_cells():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     sigma = jnp.asarray(
@@ -1306,7 +1285,7 @@ def test_bounded_time_step_count_does_not_round_up_fractional_end_times():
     )
 
 
-def test_build_mesh_and_mask_helpers_cover_unsupported_and_passthrough_paths():
+def test_build_mesh_rejects_unsupported_geometry():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     bad_case = replace(
         case,
@@ -1316,16 +1295,6 @@ def test_build_mesh_and_mask_helpers_cover_unsupported_and_passthrough_paths():
     )
     with pytest.raises(NotImplementedError, match="not supported"):
         solvers._build_mesh(bad_case)
-    fluid_mask = jnp.asarray([[True, True], [True, True]])
-    assert (
-        solvers._active_velocity_mask_for_solver(
-            fluid_mask, "fully_developed_inductionless"
-        ).shape
-        == fluid_mask.shape
-    )
-    assert jnp.array_equal(
-        solvers._active_velocity_mask_for_solver(fluid_mask, "other"), fluid_mask
-    )
 
 
 def test_fully_developed_solver_rejects_pipe_geometry():

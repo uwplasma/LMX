@@ -530,12 +530,6 @@ def _cell_metric(mesh: StructuredMesh) -> jnp.ndarray:
     return mesh.dy[:, None] * mesh.dz[None, :]
 
 
-def _active_velocity_mask_for_solver(fluid_mask: jnp.ndarray, solver_kind: str) -> jnp.ndarray:
-    if solver_kind == "fully_developed_inductionless":
-        return _active_velocity_mask(fluid_mask)
-    return fluid_mask
-
-
 def _connected_interface_diffusivity_y(mesh: StructuredMesh, diffusivity: jnp.ndarray, active_mask: jnp.ndarray) -> jnp.ndarray:
     connected = active_mask[:-1, :] & active_mask[1:, :]
     left_distance = 0.5 * mesh.dy[:-1, None]

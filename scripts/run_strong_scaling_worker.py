@@ -239,7 +239,8 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
 
 
 def _matched_b2_smoke_benchmark(
-    input_path: Path, evaluator: Path, *, repeats: int, num_devices: int
+    input_path: Path, evaluator: Path, *, repeats: int, num_devices: int,
+    profile_dir: Path | None = None,
 ) -> dict[str, object]:
     """Time the exact direct smoke; replay, I/O, and observation stay untimed."""
 
@@ -262,6 +263,30 @@ def _matched_b2_smoke_benchmark(
         )
         signatures.append(_b2_repeat_signature(direct))
         timings.append(time.perf_counter() - started)
+    profiled = profile_signature = None
+    if profile_dir is not None:
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        options = jax.profiler.ProfileOptions()
+        options.python_tracer_level = 0
+        options.raise_error_on_start_failure = True
+        options.advanced_configuration["gpu_max_activity_api_events"] = 4_000_000
+        jax.profiler.start_trace(
+            str(profile_dir), create_perfetto_trace=True, profiler_options=options
+        )
+        try:
+            _, profiled = _run_matched_b2_lmx_direct(problem, num_devices=num_devices)
+            profile_signature = _b2_repeat_signature(profiled)
+        finally:
+            jax.profiler.stop_trace()
+    profile_signature_max_abs = (None if profile_signature is None else
+        float(np.max(np.abs(profile_signature - signatures[0]))))
+    profile_signature_passed = (None if profile_signature is None else bool(np.allclose(
+        profile_signature, signatures[0], rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL)))
+    profile_linear_history_passed = (None if profiled is None else all(np.array_equal(
+        np.asarray(getattr(profiled, name))[:, offset:],
+        np.asarray(getattr(direct, name))[:, offset:]) for name, offset in (
+            ("iteration_pressure_linear_history", 2),
+            ("iteration_electric_linear_history", 3))))
     acceptance_role = (
         "harness-smoke" if direct.u.shape == (8, 7, 7) else "scaling-calibration"
     )
@@ -325,6 +350,8 @@ def _matched_b2_smoke_benchmark(
         and pressure_diagnostics["pressure_linear_diagnostics_complete"]
         and pressure_diagnostics["pressure_solves_converged"]
         and repeat_signature_passed
+        and profile_signature_passed is not False
+        and profile_linear_history_passed is not False
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -363,6 +390,13 @@ def _matched_b2_smoke_benchmark(
         "signature_relative_tolerance": _B2_REPEAT_RTOL,
         "repeat_signature_max_abs": repeat_signature_max_abs,
         "repeat_signature_passed": repeat_signature_passed,
+        "profile_signature_max_abs": profile_signature_max_abs,
+        "profile_signature_passed": profile_signature_passed,
+        "profile_linear_history_passed": profile_linear_history_passed,
+        "profile_pressure_linear_history": (None if profiled is None else
+            np.asarray(profiled.iteration_pressure_linear_history).tolist()),
+        "profile_electric_linear_history": (None if profiled is None else
+            np.asarray(profiled.iteration_electric_linear_history).tolist()),
         "observables": observed,
         "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
         "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,
@@ -403,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             payload = _matched_b2_smoke_benchmark(
                 args.matched_input, args.evaluator, repeats=args.repeats,
-                num_devices=args.num_devices)
+                num_devices=args.num_devices, profile_dir=args.profile_dir)
         except Exception as error:
             payload = {
                 "benchmark_kind": "matched_b2_smoke", "num_devices": args.num_devices,

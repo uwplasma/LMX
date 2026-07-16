@@ -120,16 +120,16 @@ single-owner Samper freezer into its campaign runner, and making `Diagnostics`
 the single owner of standard NPZ/restart diagnostic fields, and consolidating
 four manual-validation workflow stubs into one behavior-preserving fixture (the
 immutable evidence, richer projection, and target-driven paths remain), and
-deleting the stale test-only velocity-update statistics helper:
+deleting stale test-only velocity-statistics and solver-mask wrappers:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,040 | return below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,937 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,919 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 35,034 | return below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,890 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,559,320 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,561,522 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -506,10 +506,11 @@ clean 0.8.4 weight API and corrected release metadata; its supported
 Python/JAX, lint, and docs matrix is green. It is mergeable with no reviews,
 comments, or technical blocker; review, ready-for-review, merge, rebuild from
 the merged SHA, tag, and publication remain procedural and require explicit
-authorization. Then
-replace B2's arbitrary-depth lists and duplicated CPU/sharded mixing paths with
+authorization. Then add one sharding-aware B2 path shared by CPU and GPU with
 exact depth two, one prior raw mapped record, one weight calculation shared by
-scaled mapped fields and compact plus/inlet flux, and restart schema 6. Keep
+scaled mapped fields and compact plus/inlet flux, and restart schema 6. B2 has
+no Anderson lists today; the existing arbitrary-depth lists are B1-only and
+must not be repurposed. Keep
 schema 6 separate from the Aitken-only diagnostic loader; require all restart
 arrays together and prove the distributed residual Gram reduction on every
 target device topology. This retains about
@@ -584,7 +585,8 @@ materials, interfaces, open-boundary and gauge semantics, corrected flux,
 physical residuals, stopping/restart state, sharding policy, observables, and
 acceptance. SOLVAX owns generic linear algebra after primal, residual,
 transpose/gradient, JIT, placement, memory, and repeated timing gates pass.
-Delete an LMX duplicate in the same tranche that adopts SOLVAX.
+Delete LMX's private B1 `_anderson_extruded_state` wrapper in the same tranche
+that adopts the published SOLVAX API.
 
 Released 0.8.3 already owns the valuable generic linear solves and
 preconditioners. One manual additive composition remains, but migrating its few
