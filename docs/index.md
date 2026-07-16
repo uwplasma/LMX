@@ -73,7 +73,7 @@ developer_guide
 
 ## What is next
 
-- improve the accepted SOLVAX PCG/implicit-solve backend as SOLVAX evolves
+- adopt published SOLVAX Anderson weights for sharding-aware B2 schema 6
 - extend the passing primal and transpose gradient gates to new objectives
 - freeze and close the published pipe and square-duct fringing-field cases
 - profile and strongly scale only the externally accepted 3D path

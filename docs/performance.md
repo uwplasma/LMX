@@ -4,25 +4,25 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Historical B2 two-update CPU and GPU scaling calibration](_static/strong_scaling.webp)
+![B2 two-update CPU and GPU scaling evidence](_static/strong_scaling.webp)
 
 ## Current evidence
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 818 pass, 8 skip, 95.03% combined line/branch coverage, 157.4 s | within run-to-run noise; below five-minute target |
-| exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
+| B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
 | B2 relaxation probe | Apple M4, shared step-29 checkpoint, six updates | factors 5/6/8 gain at most 9.33% over factor 4 | below 15% gate; retain factor 2 |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
-| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | current repeats and restart are exact; pressure observable agrees within `1.02e-14`; closure and placement pass | production sharding correctness; too small for scaling claims |
+| B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | current repeats and restart are exact; pressure observable agrees within `1.02e-14`; closure and placement pass | production sharding correctness; too small for scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
 | B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | current medians 2.780/2.400 s; repeat, trace, restart, placement, and equivalence pass | 1.159x misses the 1.2x promotion gate; no scaling claim |
 | B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
-| historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | predates the 0.8.3 package minimum; refresh pending |
+| historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | archival; PCG is unchanged and no refresh is planned |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
 | legacy B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | superseded no-inertia/stationwise-flow formulation |
@@ -109,8 +109,8 @@ matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
 0.8.1 control and 1.184 for 0.8.2, so both miss the one-shot 1.10 threshold
 despite passing every forward, gradient, transpose, residual, memory, device,
 and Hartmann gate. SOLVAX PCG is unchanged between those releases; this is not
-evidence of a 0.8.2 regression. A repeated, interleaved protocol must replace
-the noisy one-shot promotion before the compact timing record is refreshed.
+evidence of a 0.8.2 regression, and no refresh is planned. The next upstream
+work is the published Anderson-weight API required by B2 restart schema 6.
 The raw [0.8.1 control](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-control-gpu.json)
 (`ab54c5aa4a4787e1024d72d29ac5cd1c465c951bcaed82f179539cf75544fc7b`)
 and [0.8.2 probe](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.2-equivalence-gpu.json)
@@ -320,10 +320,10 @@ than silently reused.
 
 ## Next performance work
 
-1. Design a mixed-boundary coarse correction; gate it on dense, gradient, and phase timing.
-2. Re-measure the accepted GPU rungs in an isolated window.
-3. Close canonical B1/B2 mesh and experimental-observable acceptance.
-4. Add four-GPU points only with suitable hardware and a steady-production case.
+1. Publish SOLVAX 0.8.4 from a reviewed merged SHA after explicit authorization.
+2. Gate one sharding-aware depth-two B2 Anderson path with restart schema 6.
+3. Close the canonical B2 mesh and experimental-observable acceptance ladder.
+4. Revisit production scaling and four-GPU points only after that acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)
 for physics promotion criteria.

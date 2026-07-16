@@ -77,6 +77,8 @@ observables pass the 1% finite-grid gate.
   <a href="docs/_static/readme_hunt_startup_2d.mp4"><img src="docs/_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt-flow startup loop" width="38%"></a>
 </p>
 
+▶ [Watch the 7-second Hunt startup](docs/_static/readme_hunt_startup_2d.mp4)
+
 [Validation evidence →](docs/validation_report.md)
 
 ## Real geometries and nonuniform fields
@@ -88,11 +90,8 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-The current B2 smoke has exact schema-5 restart, a post-map physical momentum
-diagnostic, and 1/2/4-CPU equivalence. Its projection-consistent stopping rule
-is versioned but its threshold remains open; its 64x pseudo-time cap is
-refrozen. Current 1/2-GPU repeat, restart, conservation, and equivalence gates
-pass; the larger GPU scaling ladder remains historical.
+B2 passes exact restart and 1/2/4-CPU plus 1/2-GPU equivalence. Its stopping
+threshold, production parity, and scaling promotion remain open.
 [Fringing status →](docs/fringing.md)
 
 ## Model conducting multilayer walls
@@ -121,6 +120,9 @@ Promoted objectives pass finite-difference or independent-transpose checks.
   <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence-poster.webp" alt="Seven-second nonlinear Q2D vorticity loop" width="58%"></a>
 </p>
 
+▶ [Watch blanket flow](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4) ·
+[Q2D turbulence · 7 s](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4)
+
 These visuals demonstrate implemented workflows. Quantitative turbulent
 Q2D-MHDfoam parity and blanket validation remain open.
 [Geometry and fields →](docs/geometry.md) ·
@@ -128,7 +130,7 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Historical B2 two-update CPU and GPU scaling calibration](docs/_static/strong_scaling.webp)
+![B2 two-update CPU and GPU scaling evidence](docs/_static/strong_scaling.webp)
 
 The current B2 smoke agrees on 1/2/4 CPU and 1/2 GPU devices. At
 `128 × 67 × 67`, two GPUs reduce 2.780 s to 2.400 s (1.159×); this misses the

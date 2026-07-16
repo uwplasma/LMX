@@ -130,7 +130,7 @@ symmetry wrappers:
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,882 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,565,237 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,341,224 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -210,8 +210,8 @@ equivalence gates. The repair makes flux,
 vector, embedding, initialization, CFL, and relaxation layouts explicit and
 keeps compact flux components separate until explicit packing. The CPU ladder
 has exact restart replay. Deterministic GPU probes use
-`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode remains a separate
-timing lane and needs a fresh isolated calibration before promotion. Compact
+`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode is calibrated below
+and misses its promotion threshold. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
 An explicit one-device request uses the same named-sharding kernels as the
