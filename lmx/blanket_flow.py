@@ -1065,16 +1065,12 @@ def _centerline_curvature(points: np.ndarray, station: np.ndarray) -> np.ndarray
     return np.clip(curvature, 0.0, None)
 
 
-def _darcy_friction_factor(reynolds: float) -> float:
-    reynolds = max(float(reynolds), 1.0e-12)
-    if reynolds < 2300.0:
-        return 64.0 / reynolds
-    return 0.3164 / reynolds**0.25
-
-
-def _darcy_friction_factor_array(reynolds: np.ndarray) -> np.ndarray:
+def _darcy_friction_factor(
+    reynolds: float | np.ndarray,
+) -> float | np.ndarray:
     re = np.maximum(np.asarray(reynolds, dtype=float), 1.0e-12)
-    return np.where(re < 2300.0, 64.0 / re, 0.3164 / re**0.25)
+    result = np.where(re < 2300.0, 64.0 / re, 0.3164 / re**0.25)
+    return result.item() if result.ndim == 0 else result
 
 
 def _blanket_loss_gradients_for_velocity(
@@ -1094,7 +1090,7 @@ def _blanket_loss_gradients_for_velocity(
     diameter = 2.0 * float(radius)
     abs_u = np.abs(u)
     reynolds = density * abs_u * diameter / max(dynamic_viscosity, 1.0e-30)
-    friction = _darcy_friction_factor_array(reynolds)
+    friction = _darcy_friction_factor(reynolds)
     hydraulic = friction * density * u * abs_u / max(2.0 * diameter, 1.0e-30)
     mhd = mhd_drag_factor * electrical_conductivity * u * np.asarray(b_perp, dtype=float) ** 2
     curvature_integral = _trapz(np.asarray(curvature, dtype=float), np.asarray(station, dtype=float))

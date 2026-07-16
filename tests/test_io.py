@@ -93,6 +93,45 @@ def _extruded_rect_case(*, nx=3, write_plots=False, write_stride=1):
     )
 
 
+def _extruded_bundle(**updates) -> SimpleNamespace:
+    values = {
+        "x": jnp.asarray([0.0, 1.0, 2.0]),
+        "y": jnp.asarray([-0.5, 0.5]),
+        "z": jnp.asarray([-0.5, 0.5]),
+        "field_scale": jnp.asarray([0.0, 1.0, 0.0]),
+        "u": jnp.ones((3, 2, 2)),
+        "v": jnp.zeros((3, 2, 2)),
+        "w": jnp.zeros((3, 2, 2)),
+        "p": jnp.zeros((3, 2, 2)),
+        "phi": jnp.zeros((3, 2, 2)),
+        "rho_phi_plus": jnp.ones((3, 3, 1, 2)),
+        "rho_phi_inlet": jnp.ones((1, 2)),
+        "jx": jnp.zeros((3, 2, 2)),
+        "jy": jnp.zeros((3, 2, 2)),
+        "jz": jnp.zeros((3, 2, 2)),
+        "lorentz_x": jnp.zeros((3, 2, 2)),
+        "lorentz_y": jnp.zeros((3, 2, 2)),
+        "lorentz_z": jnp.zeros((3, 2, 2)),
+        "residual": jnp.asarray([1.0e-3, 2.0e-4, 3.0e-5]),
+        "volumetric_flow_rate": jnp.asarray([1.0, 1.1, 1.2]),
+        "mean_velocity": jnp.asarray([0.5, 0.55, 0.6]),
+        "axial_current": jnp.asarray([0.0, 0.1, 0.0]),
+        "wall_current_leakage": jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
+        "current_scaled_pressure_proxy": jnp.asarray([0.1, 0.2, 0.1]),
+        "axial_pressure_loss_gradient": jnp.asarray([1.0, 1.5, 1.0]),
+        "transverse_pressure_difference": jnp.asarray([0.0, 0.25, 0.0]),
+        "charge_balance_residual": jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
+        "boundary_current_residual": jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
+        "iteration_electric_linear_history": jnp.asarray(
+            [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
+        ),
+        "iteration_potential_residual_history": jnp.asarray([3.0e-5]),
+        "geometry_kind": "rect_duct",
+        "solver_kind": "extruded_inductionless",
+    }
+    return SimpleNamespace(**(values | updates))
+
+
 def test_paraview_writer(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=16, nz=16)
     solution = _sample_solution(case)
@@ -290,41 +329,7 @@ def test_write_solution_outputs_respects_output_flags(
 
 def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
     case = _extruded_rect_case(write_plots=True)
-    bundle = SimpleNamespace(
-        x=jnp.asarray([0.0, 1.0, 2.0]),
-        y=jnp.asarray([-0.5, 0.5]),
-        z=jnp.asarray([-0.5, 0.5]),
-        field_scale=jnp.asarray([0.0, 1.0, 0.0]),
-        u=jnp.ones((3, 2, 2)),
-        v=jnp.zeros((3, 2, 2)),
-        w=jnp.zeros((3, 2, 2)),
-        p=jnp.zeros((3, 2, 2)),
-        phi=jnp.zeros((3, 2, 2)),
-        rho_phi_plus=jnp.ones((3, 3, 1, 2)),
-        rho_phi_inlet=jnp.ones((1, 2)),
-        jx=jnp.zeros((3, 2, 2)),
-        jy=jnp.zeros((3, 2, 2)),
-        jz=jnp.zeros((3, 2, 2)),
-        lorentz_x=jnp.zeros((3, 2, 2)),
-        lorentz_y=jnp.zeros((3, 2, 2)),
-        lorentz_z=jnp.zeros((3, 2, 2)),
-        residual=jnp.asarray([1.0e-3, 2.0e-4, 3.0e-5]),
-        volumetric_flow_rate=jnp.asarray([1.0, 1.1, 1.2]),
-        mean_velocity=jnp.asarray([0.5, 0.55, 0.6]),
-        axial_current=jnp.asarray([0.0, 0.1, 0.0]),
-        wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
-        current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
-        axial_pressure_loss_gradient=jnp.asarray([1.0, 1.5, 1.0]),
-        transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
-        charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
-        boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
-        iteration_electric_linear_history=jnp.asarray(
-            [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
-        ),
-        iteration_potential_residual_history=jnp.asarray([3.0e-5]),
-        geometry_kind="rect_duct",
-        solver_kind="extruded_inductionless",
-    )
+    bundle = _extruded_bundle()
     validation = SimpleNamespace(
         station_count=3,
         max_residual=1.0e-3,
@@ -392,36 +397,11 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
 
 def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     case = _extruded_rect_case()
-    bundle = SimpleNamespace(
-        x=jnp.asarray([0.0, 1.0, 2.0]),
-        y=jnp.asarray([-0.5, 0.5]),
-        z=jnp.asarray([-0.5, 0.5]),
-        field_scale=jnp.asarray([0.0, 1.0, 0.0]),
-        u=jnp.ones((3, 2, 2)),
-        v=jnp.zeros((3, 2, 2)),
-        w=jnp.zeros((3, 2, 2)),
-        p=jnp.zeros((3, 2, 2)),
-        phi=jnp.zeros((3, 2, 2)),
+    bundle = _extruded_bundle(
         rho_phi_plus=jnp.arange(18.0).reshape((3, 3, 1, 2)),
         rho_phi_inlet=jnp.asarray([[0.4, 0.6]]),
         aitken_state=(jnp.ones((4, 3, 2, 2)), 0.75, 1),
         stopping_state=(1, 1, "in_progress"),
-        jx=jnp.zeros((3, 2, 2)),
-        jy=jnp.zeros((3, 2, 2)),
-        jz=jnp.zeros((3, 2, 2)),
-        lorentz_x=jnp.zeros((3, 2, 2)),
-        lorentz_y=jnp.zeros((3, 2, 2)),
-        lorentz_z=jnp.zeros((3, 2, 2)),
-        residual=jnp.asarray([1.0e-3, 2.0e-4, 3.0e-5]),
-        volumetric_flow_rate=jnp.asarray([1.0, 1.1, 1.2]),
-        mean_velocity=jnp.asarray([0.5, 0.55, 0.6]),
-        axial_current=jnp.asarray([0.0, 0.1, 0.0]),
-        wall_current_leakage=jnp.asarray([1.0e-6, 2.0e-6, 1.0e-6]),
-        current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.1]),
-        axial_pressure_loss_gradient=jnp.asarray([1.0, 1.5, 1.0]),
-        transverse_pressure_difference=jnp.asarray([0.0, 0.25, 0.0]),
-        charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
-        boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
         iteration_residual_history=jnp.asarray([1.0e-3]),
         iteration_momentum_defect_history=jnp.asarray([4.0e-5]),
         iteration_component_residual_history=jnp.asarray(
@@ -430,13 +410,7 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         iteration_pressure_linear_history=jnp.asarray(
             [[1.0e-9, 2.0e-10, 18.0, 1.0, 1.0]]
         ),
-        iteration_electric_linear_history=jnp.asarray(
-            [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
-        ),
-        iteration_potential_residual_history=jnp.asarray([3.0e-5]),
         iteration_courant_history=jnp.asarray([[1.0e-3, 0.02, 0.04]]),
-        geometry_kind="rect_duct",
-        solver_kind="extruded_inductionless",
     )
     solution = SimpleNamespace(bundle=bundle, station_history=({"x": 0.0},))
 
