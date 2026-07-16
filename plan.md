@@ -13,7 +13,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `29cac8e`. CPU/GPU calibration at
+The latest complete portable gate exercised source `a50b868`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -129,18 +129,18 @@ shared without removing cases or assertions.
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,544 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,325,944 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,325,967 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `29cac8e` records 815 passes, 8 expected
-external-data skips, 95.0943% combined line/branch coverage, and 151.0 seconds on
-the reference Apple M4. It is unchanged from the prior 151.0-second record;
+The portable-gate artifact keyed to `a50b868` records 815 passes, 8 expected
+external-data skips, 95.0622% combined line/branch coverage, and 150.7 seconds on
+the reference Apple M4. It is 0.2% faster than the prior 151.0-second record;
 the gate remains below the 300-second engineering
 target and 600-second hard limit. Coverage
 remains above the enforced floor but below the 95.5% engineering target. The
-six-worker record reports 51.6 seconds for weighted modal and 47.9 seconds for
+six-worker record reports 52.5 seconds for weighted modal and 47.9 seconds for
 reduced B2; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
 
@@ -195,7 +195,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 51.6 seconds, versus 47.9 seconds for reduced B2 and 25.9
+gate it reports 52.5 seconds, versus 47.9 seconds for reduced B2 and 26.4
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
