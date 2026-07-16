@@ -9,6 +9,58 @@ from lmx.cases import _wall_conductivity_from_conductance_ratio
 pytestmark = pytest.mark.unit
 
 
+def _write_minimal_config(
+    tmp_path: Path,
+    name: str,
+    *,
+    case_extra: str = "",
+    geometry_kind: str | None = "rect_duct",
+    geometry_extra: str = "",
+    magnetic_kind: str = "constant",
+    solver: str = "",
+) -> Path:
+    geometry_type = "" if geometry_kind is None else f'kind = "{geometry_kind}"'
+    magnetic_value = "value = [0.0, 0.0, 1.0]" if magnetic_kind == "constant" else ""
+    solver_table = f"[solver]\n{solver}" if solver else ""
+    path = tmp_path / f"{name}.toml"
+    path.write_text(
+        f"""
+[case]
+name = "{name}"
+{case_extra}
+
+[geometry]
+{geometry_type}
+width = 1.0
+height = 1.0
+ny = 4
+nz = 4
+{geometry_extra}
+
+[magnetic_field]
+kind = "{magnetic_kind}"
+{magnetic_value}
+
+{solver_table}
+
+[time_stepper]
+dt = 0.1
+t_final = 0.1
+max_steps = 1
+
+[[regions]]
+name = "fluid"
+kind = "fluid"
+conductivity = 1.0
+
+[[boundary_conditions]]
+name = "wall"
+kind = "no_slip"
+""".strip()
+    )
+    return path
+
+
 def test_load_run_config_reads_complete_toml(tmp_path: Path):
     input_file = tmp_path / "hartmann.toml"
     input_file.write_text(
@@ -215,37 +267,7 @@ kind = "no_slip"
 
 
 def test_load_run_config_rejects_analytic_callable_fields(tmp_path: Path):
-    input_file = tmp_path / "bad.toml"
-    input_file.write_text(
-        """
-[case]
-name = "bad"
-
-[geometry]
-kind = "rect_duct"
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-
-[magnetic_field]
-kind = "analytic"
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-
-[[regions]]
-name = "fluid"
-kind = "fluid"
-conductivity = 1.0
-
-[[boundary_conditions]]
-name = "wall"
-kind = "no_slip"
-""".strip()
-    )
+    input_file = _write_minimal_config(tmp_path, "bad", magnetic_kind="analytic")
 
     with pytest.raises(ValueError, match="analytic magnetic-field"):
         load_run_config(input_file)
@@ -284,38 +306,8 @@ def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann
 
 
 def test_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):
-    input_file = tmp_path / "compatibility.toml"
-    input_file.write_text(
-        """
-[case]
-name = "compatibility"
-solve_mode = "transient"
-
-[geometry]
-kind = "rect_duct"
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 1.0]
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-
-[[regions]]
-name = "fluid"
-kind = "fluid"
-conductivity = 1.0
-
-[[boundary_conditions]]
-name = "wall"
-kind = "no_slip"
-""".strip()
+    input_file = _write_minimal_config(
+        tmp_path, "compatibility", case_extra='solve_mode = "transient"'
     )
 
     config = load_run_config(input_file)
@@ -324,41 +316,11 @@ kind = "no_slip"
 
 
 def test_conflicting_case_and_solver_modes_are_rejected(tmp_path: Path):
-    input_file = tmp_path / "conflict.toml"
-    input_file.write_text(
-        """
-[case]
-name = "conflict"
-solve_mode = "steady"
-
-[geometry]
-kind = "rect_duct"
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 1.0]
-
-[solver]
-mode = "transient"
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-
-[[regions]]
-name = "fluid"
-kind = "fluid"
-conductivity = 1.0
-
-[[boundary_conditions]]
-name = "wall"
-kind = "no_slip"
-""".strip()
+    input_file = _write_minimal_config(
+        tmp_path,
+        "conflict",
+        case_extra='solve_mode = "steady"',
+        solver='mode = "transient"',
     )
 
     with pytest.raises(ValueError, match="disagree"):
@@ -366,40 +328,8 @@ kind = "no_slip"
 
 
 def test_removed_reduced_solver_kind_is_rejected(tmp_path: Path):
-    input_file = tmp_path / "removed_reduced_solver.toml"
-    input_file.write_text(
-        """
-[case]
-name = "removed_reduced_solver"
-
-[geometry]
-kind = "rect_duct"
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 1.0]
-
-[solver]
-kind = "reduced_inductionless"
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-
-[[regions]]
-name = "fluid"
-kind = "fluid"
-conductivity = 1.0
-
-[[boundary_conditions]]
-name = "wall"
-kind = "no_slip"
-""".strip()
+    input_file = _write_minimal_config(
+        tmp_path, "removed_reduced_solver", solver='kind = "reduced_inductionless"'
     )
 
     with pytest.raises(ValueError, match="no longer supported"):
@@ -407,57 +337,15 @@ kind = "no_slip"
 
 
 def test_load_run_config_rejects_missing_required_key(tmp_path: Path):
-    input_file = tmp_path / "missing.toml"
-    input_file.write_text(
-        """
-[case]
-name = "missing"
-
-[geometry]
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 1.0]
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-""".strip()
-    )
+    input_file = _write_minimal_config(tmp_path, "missing", geometry_kind=None)
 
     with pytest.raises(ValueError, match="Missing required TOML key 'kind'"):
         load_run_config(input_file)
 
 
 def test_load_run_config_rejects_invalid_tuple_length(tmp_path: Path):
-    input_file = tmp_path / "bad_length.toml"
-    input_file.write_text(
-        """
-[case]
-name = "bad_length"
-
-[geometry]
-kind = "rect_duct"
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-wall_thickness = [0.1, 0.2]
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 1.0]
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-""".strip()
+    input_file = _write_minimal_config(
+        tmp_path, "bad_length", geometry_extra="wall_thickness = [0.1, 0.2]"
     )
 
     with pytest.raises(ValueError, match="must have length 4"):
@@ -477,31 +365,8 @@ def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs()
 
 
 def test_load_run_config_rejects_unsupported_solver_mode(tmp_path: Path):
-    input_file = tmp_path / "bad_mode.toml"
-    input_file.write_text(
-        """
-[case]
-name = "bad_mode"
-
-[geometry]
-kind = "rect_duct"
-width = 1.0
-height = 1.0
-ny = 4
-nz = 4
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 1.0]
-
-[solver]
-mode = "invalid"
-
-[time_stepper]
-dt = 0.1
-t_final = 0.1
-max_steps = 1
-""".strip()
+    input_file = _write_minimal_config(
+        tmp_path, "bad_mode", solver='mode = "invalid"'
     )
 
     with pytest.raises(ValueError, match="Unsupported solve mode"):

@@ -116,28 +116,20 @@ large reusable artifacts go in checksummed releases.
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 | Distribution | lean installed wheel loads all frozen A/B references and runs a tiny solve without Matplotlib/Pillow; plotting is an explicit extra; source artifact excludes repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
-Current structure after moving the script-only Benchmark-A auditor out of the
-package, retiring the undocumented non-projection rectangular autodiff lane,
-deleting the superseded SOLVAX acceptance freezer and its sole test, and
-replacing the single-owner Benchmark-B freeze generator with direct hash gates,
-folding Benchmark-A evidence freezing into its ladder analyzer, and folding the
-single-owner Samper freezer into its campaign runner, and making `Diagnostics`
-the single owner of standard NPZ/restart diagnostic fields, and consolidating
-four manual-validation workflow stubs into one behavior-preserving fixture (the
-immutable evidence, richer projection, and target-driven paths remain), and
-deleting stale test-only velocity-statistics, solver-mask, pipe-Laplacian,
-symmetry, sharding, compact-flux, and explicit-forcing wrappers, inlining the
-single-use benchmark gradient, and moving seven frozen benchmark resources
-into the installed package without duplication:
+Current structure reflects completed ownership moves: frozen resources are
+package-owned, evidence freezing lives with its campaign analyzers, diagnostics
+have one NPZ/restart owner, stale private wrappers are gone, and repeated CLI,
+example, validation, reporting, convergence, and minimal-TOML test setup is
+shared without removing cases or assertions.
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
 | package lines | 34,936 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,688 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,553 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,330,750 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,329,587 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -213,6 +205,14 @@ seconds with six workers and 36.41 with four. The 3.4% change misses the frozen
 10% promotion threshold, so retain six-worker work stealing; module grouping
 would imbalance the fringing and autodiff owners. Profile another node only if
 an isolated measurement crosses the 45-second trigger.
+
+A fresh-process example probe required a 25% isolated speedup without changing
+workflow assertions. The variable-field cut from `16 x 16 x 9` to
+`10 x 10 x 5` reduced 6.17 to 5.81 seconds (5.8%), so it is rejected. The
+operator baseline `(12, 24, 48)` took 3.96 seconds; `(8, 16, 32)` and
+`(10, 20, 40)` took 3.69 and 3.89 seconds but failed the unchanged observed-order
+gate (`gradient_z > 1.8`). Retain both original grids; their longer concurrent
+JUnit times are contention, not an isolated size bottleneck.
 
 Keep the top ten concurrent node durations in the portable-gate record and
 treat any node above 45 seconds as a critical-path review trigger. The suite
