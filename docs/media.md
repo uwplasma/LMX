@@ -45,6 +45,7 @@ release; no solver was rerun.
 | `readme-q2d-turbulence-poster.webp` | `97a9e5c418012f1591344ea131a846933a2c60fc2ba47eaf9f93f86e79e1bfb5` |
 | `readme-q2d-turbulence.mp4` | `fd6e60bfdeb99f1c0123a8dc68f2198cfde91904b09cfdcde7caa34667492a62` |
 | `readme-li-aln-multilayer-convergence.webp` | `e3c8bc3c143cca9c0e1a30c2892005b2be6e0d3c46efda4c00704d81f57e66e6` |
+| `readme-curved-pipes.webp` | `d32d666a3bb34b2845c549ff303a3865b06b543e00e3364a0c705fddc831ebb6` |
 
 The 71,043-byte Q2D H.264 loop and 13,724-byte poster derive from the existing
 72-frame source GIF (SHA-256
@@ -61,6 +62,13 @@ The 95,818-byte Li/AlN WebP derives from the 2,532 × 1,732 convergence figure
 (SHA-256 `0a5d4d0a9a97cff78eb15efdb79934515fcabb5918c23148c8c0653ce198ea94`).
 It reports research-stage mesh-step evidence; no experimental-validation claim
 is attached to it.
+
+The 94,236-byte curved-pipe WebP stacks resized copies of the released
+`bent_pipe_overview.png` (`20d2ea12...`) and
+`dean_literature_validation.png` (`06a214ab...`). Only deterministic layout,
+resizing, metadata removal, and WebP compression were applied; no solve was
+rerun. It shows a low-De inductionless baseline and the still-open Dean-vortex
+literature gate.
 
 New examples write beneath ignored `artifacts/`. Publish new large media only
 with the generating commit, command, environment, input hashes, and output

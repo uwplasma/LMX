@@ -95,6 +95,13 @@ B2 passes exact restart and 1/2/4-CPU plus 1/2-GPU equivalence. Its stopping
 threshold, production parity, and scaling promotion remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
+## Follow curved pipes
+
+![Bent-pipe baseline and Dean-vortex literature gate](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-curved-pipes.webp)
+
+Mapped pipes support a low-De inductionless baseline; Dean-vortex physics is
+staged behind a literature gate. [Geometry status →](https://lmx.readthedocs.io/en/latest/geometry.html)
+
 ## Model conducting multilayer walls
 
 ![Li/AlN multilayer pressure and current mesh convergence](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-li-aln-multilayer-convergence.webp)
@@ -140,8 +147,8 @@ The current B2 smoke agrees on 1/2/4 CPU and 1/2 GPU devices. At
 
 ## Quality and citation
 
-The portable gate records **816 passing tests**, **95.05% combined line/branch
-coverage**, and **148.9 s** on six Apple-Silicon workers.
+The portable gate records **838 passing tests**, **95.55% combined line/branch
+coverage**, and **148.4 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

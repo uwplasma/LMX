@@ -502,12 +502,12 @@ Hunt startup plus research-stage blanket and Q2D flows. The 86,808-byte blanket
 derivative retimes its existing 5.75-second H.264 with motion interpolation;
 physical frames are unchanged and no solver rerun or tracked media was added.
 
-The next documentation tranche is solver-free: derive one sub-100-KiB,
-release-hosted WebP from the already accepted bent-pipe overview and Dean
-comparison stills, then add a short “Curved pipes” feature block. Label it a
-low-De inductionless baseline with Dean-vortex physics staged; do not imply
-production validation and do not rerun the solver. Do not create a B2 movie
-from the bounded smoke or rejected coarse trajectories.
+The solver-free curved-pipe documentation tranche is complete: a 94,236-byte
+release-hosted WebP derives from the accepted bent-pipe overview and Dean
+comparison stills, and the README labels it a low-De inductionless baseline
+with Dean-vortex physics staged. No solver was rerun and no tracked media was
+added. Do not create a B2 movie from the bounded smoke or rejected coarse
+trajectories.
 
 ## Release gate
 

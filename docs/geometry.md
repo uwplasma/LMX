@@ -28,6 +28,16 @@ solution = solve_steady(case)
 TOML inputs under `examples/cases/` expose the same concepts without Python
 boilerplate.
 
+### Curved-pipe status
+
+![Bent-pipe baseline and Dean-vortex literature gate](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-curved-pipes.webp)
+
+The mapped-pipe workflow currently provides a low-De inductionless baseline
+with geometry, charge-balance, and straight-pipe-limit checks. The lower panel
+records the Dean-vortex literature gate required before secondary-flow physics
+can be promoted; it is not a claim that the current baseline resolves those
+vortices.
+
 ## Imposed magnetic fields
 
 `lmx.field_models` supports analytical, divergence-free, tabulated, and
