@@ -89,6 +89,8 @@ def _record(observable, *, residual=1.0e-9, coupling_tolerance=None):
             "net_boundary_current_residual": 0.0,
             "final_steady_streak": 3,
             "stop_reason": "converged",
+            "pressure_linear_diagnostics_complete": True,
+            "pressure_solves_converged": True,
         },
     }
 
@@ -139,6 +141,18 @@ def test_comparison_applies_uncertainty_and_thin_wall_gates():
     failed = campaign._comparison("B2-fringing-square", records)
     assert failed["pass"] is False
     assert failed["gates"]["thin-wall_sustained_stopping"] is False
+
+    records["thin_wall"] = _record([0.1001, 0.2001, 0.1001])
+    records["baseline"]["diagnostics"]["pressure_solves_converged"] = False
+    failed = campaign._comparison("B2-fringing-square", records)
+    assert failed["gates"]["pressure_solve_convergence"] is False
+
+    records["baseline"] = _record([0.1, 0.2, 0.1])
+    del records["tight_tolerance"]["diagnostics"][
+        "pressure_linear_diagnostics_complete"
+    ]
+    failed = campaign._comparison("B2-fringing-square", records)
+    assert failed["gates"]["tight-tolerance_pressure_linear_diagnostics"] is False
 
     incomplete = campaign._comparison(
         "B2-fringing-square", {"baseline": records["baseline"]}

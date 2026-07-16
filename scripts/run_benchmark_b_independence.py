@@ -584,6 +584,12 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
             base_diagnostics.get("stop_reason") == "converged"
             and int(base_diagnostics.get("final_steady_streak", -1)) >= steady_steps
         ),
+        "pressure_linear_diagnostics": base_diagnostics.get(
+            "pressure_linear_diagnostics_complete"
+        )
+        is True,
+        "pressure_solve_convergence": base_diagnostics.get("pressure_solves_converged")
+        is True,
     }
     for variant, record in records.items():
         if variant == "baseline":
@@ -606,6 +612,12 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         gates[f"{prefix}_sustained_stopping"] = (
             diagnostics.get("stop_reason") == "converged"
             and int(diagnostics.get("final_steady_streak", -1)) >= steady_steps
+        )
+        gates[f"{prefix}_pressure_linear_diagnostics"] = (
+            diagnostics.get("pressure_linear_diagnostics_complete") is True
+        )
+        gates[f"{prefix}_pressure_solve_convergence"] = (
+            diagnostics.get("pressure_solves_converged") is True
         )
     result: dict[str, Any] = {
         "case_id": case_id,
