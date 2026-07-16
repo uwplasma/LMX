@@ -151,8 +151,8 @@ runs in the top panel are correctness calibration only.
 
 ## Quality and citation
 
-The portable gate records **857 passing tests**, **95.31% combined line/branch
-coverage**, and **146.1 s** on six Apple-Silicon workers.
+The portable gate records **860 passing tests**, **95.32% combined line/branch
+coverage**, and **145.0 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

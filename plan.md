@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `5ad03ec` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `f8f9670` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -23,7 +23,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `5ad03ec`.
+The latest complete portable gate exercised source `f8f9670`.
 CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
@@ -169,7 +169,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,080 | no new file; stay below 21,090 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,490,335 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
+| tracked checkout | 4,490,362 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -220,17 +220,17 @@ each GIF twice; the 12-frame writer probe falls from 6.08 to 2.49 seconds.
 Commit `5ad03ec` keeps all 200 startup steps but stores a bounded presentation
 sample, defaulting to 42 frames at 6 fps, and makes 3-D rendering optional.
 
-The portable-gate artifact keyed to `5ad03ec` records 857 passes, 8 expected
-external-data skips, 95.3099% combined line/branch coverage, and 146.1 seconds on
-the reference Apple M4. It is 5.7% below the prior 154.9-second record, but
+The portable-gate artifact keyed to `f8f9670` records 860 passes, 8 expected
+external-data skips, 95.3169% combined line/branch coverage, and 145.0 seconds on
+the reference Apple M4. It is 0.8% below the prior 146.1-second record, but
 source and tests both changed, so the shared-host delta is not a speed claim.
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
 49% of the 300-second engineering target and 25% of the 600-second hard limit.
 The 95.5%
 engineering target is not yet met; retain the 95% enforced floor while closing
-the remaining 0.1901-point gap and awaiting a second Python endpoint or hosted
+the remaining 0.1831-point gap and awaiting a second Python endpoint or hosted
 run. The
-six-worker record reports 53.6 seconds for weighted modal and 51.5 seconds for
+six-worker record reports 51.4 seconds for weighted modal and 50.8 seconds for
 reduced B2; these concurrent durations still identify contention rather
 than isolated regressions, so no scheduling change is promoted from this run.
 
