@@ -244,7 +244,7 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
         "targets": {
             "package_module_count_max": 35,
             "total_package_lines_max": 35100,
-            "maintained_core_lines_max": 8100,
+            "maintained_core_lines_max": 8000,
             "test_file_count_max": 31,
             "test_lines_max": 21100,
             "maintenance_script_count_max": 13,

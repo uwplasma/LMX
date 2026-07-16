@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import json
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from .core import Diagnostics, MHDState, Solution
 from .mesh import StructuredMesh
 
 
+_DIAGNOSTIC_FIELDS = tuple(item.name for item in fields(Diagnostics))
 _EXTRUDED_HISTORY_WIDTHS = (
     ("iteration_residual_history", 0), ("iteration_component_residual_history", 6),
     ("iteration_pressure_residual_history", 0), ("iteration_pressure_linear_history", 5),
@@ -219,39 +220,7 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         density=np.asarray(materials.density),
         viscosity=np.asarray(materials.viscosity),
         fluid_mask=np.asarray(materials.fluid_mask),
-        time_history=np.asarray(diag.time_history),
-        residual_history=np.asarray(diag.residual_history),
-        potential_residual_history=np.asarray(diag.potential_residual_history),
-        potential_iterations_history=np.asarray(diag.potential_iterations_history),
-        u_max_history=np.asarray(diag.u_max_history),
-        mean_velocity_history=np.asarray(diag.mean_velocity_history),
-        current_max_history=np.asarray(diag.current_max_history),
-        face_current_max_history=np.asarray(diag.face_current_max_history),
-        emf_max_history=np.asarray(diag.emf_max_history),
-        lorentz_max_history=np.asarray(diag.lorentz_max_history),
-        applied_forcing_history=np.asarray(diag.applied_forcing_history),
-        pressure_proxy_history=np.asarray(diag.pressure_proxy_history),
-        current_scaled_pressure_proxy_history=np.asarray(
-            diag.current_scaled_pressure_proxy_history
-        ),
-        raw_update_max_history=np.asarray(diag.raw_update_max_history),
-        limiter_scale_history=np.asarray(diag.limiter_scale_history),
-        limited_fraction_history=np.asarray(diag.limited_fraction_history),
-        linear_residual_history=np.asarray(diag.linear_residual_history),
-        linear_iterations_history=np.asarray(diag.linear_iterations_history),
-        volumetric_flow_rate_history=np.asarray(diag.volumetric_flow_rate_history),
-        mean_current_magnitude_history=np.asarray(diag.mean_current_magnitude_history),
-        lorentz_power_history=np.asarray(diag.lorentz_power_history),
-        div_current_max_history=np.asarray(diag.div_current_max_history),
-        charge_balance_residual_history=np.asarray(
-            diag.charge_balance_residual_history
-        ),
-        gauge_residual_history=np.asarray(diag.gauge_residual_history),
-        interface_current_residual_history=np.asarray(
-            diag.interface_current_residual_history
-        ),
-        courant_like=np.asarray(diag.courant_like),
-        ohmic_power=np.asarray(diag.ohmic_power),
+        **{name: np.asarray(getattr(diag, name)) for name in _DIAGNOSTIC_FIELDS},
     )
     return path
 
@@ -417,77 +386,10 @@ def load_restart_bundle(path: str | Path) -> RestartBundle:
             residual=state_residual,
         )
         diagnostics = Diagnostics(
-            time_history=jnp.asarray(_load_optional_array(data, "time_history")),
-            u_max_history=jnp.asarray(_load_optional_array(data, "u_max_history")),
-            mean_velocity_history=jnp.asarray(
-                _load_optional_array(data, "mean_velocity_history")
-            ),
-            applied_forcing_history=jnp.asarray(
-                _load_optional_array(data, "applied_forcing_history")
-            ),
-            pressure_proxy_history=jnp.asarray(
-                _load_optional_array(data, "pressure_proxy_history")
-            ),
-            current_scaled_pressure_proxy_history=jnp.asarray(
-                _load_optional_array(data, "current_scaled_pressure_proxy_history")
-            ),
-            raw_update_max_history=jnp.asarray(
-                _load_optional_array(data, "raw_update_max_history")
-            ),
-            limiter_scale_history=jnp.asarray(
-                _load_optional_array(data, "limiter_scale_history")
-            ),
-            limited_fraction_history=jnp.asarray(
-                _load_optional_array(data, "limited_fraction_history")
-            ),
-            residual_history=jnp.asarray(
-                _load_optional_array(data, "residual_history")
-            ),
-            courant_like=jnp.asarray(_load_optional_array(data, "courant_like")),
-            ohmic_power=jnp.asarray(_load_optional_array(data, "ohmic_power")),
-            current_max_history=jnp.asarray(
-                _load_optional_array(data, "current_max_history")
-            ),
-            face_current_max_history=jnp.asarray(
-                _load_optional_array(data, "face_current_max_history")
-            ),
-            emf_max_history=jnp.asarray(_load_optional_array(data, "emf_max_history")),
-            lorentz_max_history=jnp.asarray(
-                _load_optional_array(data, "lorentz_max_history")
-            ),
-            potential_residual_history=jnp.asarray(
-                _load_optional_array(data, "potential_residual_history")
-            ),
-            potential_iterations_history=jnp.asarray(
-                _load_optional_array(data, "potential_iterations_history")
-            ),
-            linear_residual_history=jnp.asarray(
-                _load_optional_array(data, "linear_residual_history")
-            ),
-            linear_iterations_history=jnp.asarray(
-                _load_optional_array(data, "linear_iterations_history")
-            ),
-            volumetric_flow_rate_history=jnp.asarray(
-                _load_optional_array(data, "volumetric_flow_rate_history")
-            ),
-            mean_current_magnitude_history=jnp.asarray(
-                _load_optional_array(data, "mean_current_magnitude_history")
-            ),
-            lorentz_power_history=jnp.asarray(
-                _load_optional_array(data, "lorentz_power_history")
-            ),
-            div_current_max_history=jnp.asarray(
-                _load_optional_array(data, "div_current_max_history")
-            ),
-            charge_balance_residual_history=jnp.asarray(
-                _load_optional_array(data, "charge_balance_residual_history")
-            ),
-            gauge_residual_history=jnp.asarray(
-                _load_optional_array(data, "gauge_residual_history")
-            ),
-            interface_current_residual_history=jnp.asarray(
-                _load_optional_array(data, "interface_current_residual_history")
-            ),
+            **{
+                name: jnp.asarray(_load_optional_array(data, name))
+                for name in _DIAGNOSTIC_FIELDS
+            }
         )
         return RestartBundle(
             path=path,

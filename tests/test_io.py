@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import fields, replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -60,6 +60,7 @@ def _sample_solution(case) -> Solution:
         face_current_max_history=jnp.asarray([1.6, 1.5, 1.4]),
         emf_max_history=jnp.asarray([0.9, 0.8, 0.7]),
         lorentz_max_history=jnp.asarray([0.7, 0.6, 0.5]),
+        face_lorentz_max_history=jnp.asarray([0.75, 0.65, 0.55]),
         potential_residual_history=jnp.asarray([1.0e-3, 1.0e-4, 1.0e-5]),
         potential_iterations_history=jnp.asarray([10.0, 8.0, 6.0]),
         linear_residual_history=jnp.asarray([1.0e-2, 1.0e-4, 1.0e-6]),
@@ -135,19 +136,7 @@ def test_write_solution_npz(tmp_path: Path):
         assert "phi" in data
         assert "state_time" in data
         assert "state_residual" in data
-        assert "current_scaled_pressure_proxy_history" in data
-        assert "linear_residual_history" in data
-        assert "linear_iterations_history" in data
-        assert "volumetric_flow_rate_history" in data
-        assert "mean_current_magnitude_history" in data
-        assert "lorentz_power_history" in data
-        assert "div_current_max_history" in data
-        assert "charge_balance_residual_history" in data
-        assert "gauge_residual_history" in data
-        assert "interface_current_residual_history" in data
-        assert "raw_update_max_history" in data
-        assert "limiter_scale_history" in data
-        assert "limited_fraction_history" in data
+        assert {item.name for item in fields(Diagnostics)} <= set(data.files)
         assert data["u"].shape == solution.state.u.shape
 
 
@@ -169,58 +158,11 @@ def test_load_restart_bundle_round_trips_solution_npz(tmp_path: Path):
     assert bundle.state.u.shape == solution.state.u.shape
     assert float(bundle.state.time) == pytest.approx(float(solution.state.time))
     assert float(bundle.state.residual) == pytest.approx(float(solution.state.residual))
-    assert (
-        bundle.diagnostics.current_scaled_pressure_proxy_history.shape
-        == solution.diagnostics.current_scaled_pressure_proxy_history.shape
-    )
-    assert (
-        bundle.diagnostics.linear_residual_history.shape
-        == solution.diagnostics.linear_residual_history.shape
-    )
-    assert (
-        bundle.diagnostics.linear_iterations_history.shape
-        == solution.diagnostics.linear_iterations_history.shape
-    )
-    assert (
-        bundle.diagnostics.volumetric_flow_rate_history.shape
-        == solution.diagnostics.volumetric_flow_rate_history.shape
-    )
-    assert (
-        bundle.diagnostics.mean_current_magnitude_history.shape
-        == solution.diagnostics.mean_current_magnitude_history.shape
-    )
-    assert (
-        bundle.diagnostics.lorentz_power_history.shape
-        == solution.diagnostics.lorentz_power_history.shape
-    )
-    assert (
-        bundle.diagnostics.div_current_max_history.shape
-        == solution.diagnostics.div_current_max_history.shape
-    )
-    assert (
-        bundle.diagnostics.charge_balance_residual_history.shape
-        == solution.diagnostics.charge_balance_residual_history.shape
-    )
-    assert (
-        bundle.diagnostics.gauge_residual_history.shape
-        == solution.diagnostics.gauge_residual_history.shape
-    )
-    assert (
-        bundle.diagnostics.interface_current_residual_history.shape
-        == solution.diagnostics.interface_current_residual_history.shape
-    )
-    assert (
-        bundle.diagnostics.raw_update_max_history.shape
-        == solution.diagnostics.raw_update_max_history.shape
-    )
-    assert (
-        bundle.diagnostics.limiter_scale_history.shape
-        == solution.diagnostics.limiter_scale_history.shape
-    )
-    assert (
-        bundle.diagnostics.limited_fraction_history.shape
-        == solution.diagnostics.limited_fraction_history.shape
-    )
+    for item in fields(Diagnostics):
+        np.testing.assert_allclose(
+            getattr(bundle.diagnostics, item.name),
+            getattr(solution.diagnostics, item.name),
+        )
 
 
 def test_load_restart_bundle_falls_back_to_metadata_and_residual_history(
