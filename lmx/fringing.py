@@ -152,13 +152,6 @@ ALEX_B2_MAGNETIC_STABILITY_SAFETY = 0.064
 ALEX_B2_SETTLED_RELAXATION = 2.0
 
 
-def _sustained_convergence(streak: int, passed: bool) -> tuple[int, bool]:
-    """Require repeated passing updates before accepting an oscillatory B2 map."""
-
-    streak = streak + 1 if passed else 0
-    return streak, streak >= ALEX_B2_STEADY_STEPS
-
-
 def _canonical_shell_widths(widths: jnp.ndarray, lower: int, upper: int) -> jnp.ndarray:
     """Map explicit wall cells to the frozen B2 mixed-dimensional shell."""
 
@@ -8092,9 +8085,9 @@ def _solve_extruded_projection(
             <= case.time_stepper.steady_tolerance
         )
         if use_alex_b2_finite_volume:
-            steady_streak, converged = _sustained_convergence(
-                steady_streak, instantaneous_convergence
-            )
+            # Require repeated passing updates before accepting an oscillatory map.
+            steady_streak = steady_streak + 1 if instantaneous_convergence else 0
+            converged = steady_streak >= ALEX_B2_STEADY_STEPS
         else:
             converged = instantaneous_convergence
         if use_alex_b2_finite_volume and not converged:

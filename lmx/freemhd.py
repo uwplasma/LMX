@@ -134,15 +134,6 @@ def _resolve_artifact(root: Path, entry: object) -> tuple[Path, str, str]:
     return resolved, kind, expected
 
 
-def _candidate_u_paths(case_dir: str | Path):
-    root = Path(case_dir)
-    return (
-        root / base / region / "U"
-        for base in ("case/0", "0", "latestTime")
-        for region in ("liquid", "fluid", "")
-    )
-
-
 def _first_existing(case_dir: str | Path, *relative_paths: str) -> Path | None:
     for relative in relative_paths:
         path = Path(case_dir) / relative
@@ -176,20 +167,19 @@ def _extract_foam_block(text: str, name: str) -> str | None:
     return None if depth else text[start : index - 1]
 
 
-def _extract_inlet_block(text: str) -> str | None:
-    boundary = _extract_foam_block(text, "boundaryField")
-    return None if boundary is None else _extract_foam_block(boundary, "inlet")
-
-
 def _infer_inlet_value(case_dir: str | Path, pattern: str) -> str | None:
+    root = Path(case_dir)
     expression = re.compile(pattern)
-    for path in _candidate_u_paths(case_dir):
-        if not path.exists():
-            continue
-        inlet_block = _extract_inlet_block(path.read_text())
-        match = expression.search(inlet_block) if inlet_block is not None else None
-        if match is not None:
-            return match.group(1)
+    for base in ("case/0", "0", "latestTime"):
+        for region in ("liquid", "fluid", ""):
+            path = root / base / region / "U"
+            if not path.exists():
+                continue
+            boundary = _extract_foam_block(path.read_text(), "boundaryField")
+            inlet = None if boundary is None else _extract_foam_block(boundary, "inlet")
+            match = expression.search(inlet) if inlet is not None else None
+            if match is not None:
+                return match.group(1)
     return None
 
 

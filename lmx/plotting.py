@@ -24,7 +24,6 @@ def _load_matplotlib() -> None:
     from matplotlib.patches import Patch, Rectangle
     from matplotlib.ticker import ScalarFormatter
     from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 
 def _set_plot_style() -> None:
