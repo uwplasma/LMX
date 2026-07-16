@@ -1925,7 +1925,6 @@ def _face_flux_pressure_projection_duct(
     field_sharding: NamedSharding | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Project duct face fluxes; mixed boundaries also return flow diagnostics."""
-
     mixed_axial_pressure = inlet_flow_rate is not None
     if inlet_flow_rate is not None and inlet_flow_rate <= 0.0:
         raise ValueError("Inlet flow rate must be positive")
@@ -1942,7 +1941,6 @@ def _face_flux_pressure_projection_duct(
     nx, ny, nz = us.shape
     inlet_cells = jnp.arange(nx)[:, None, None] == 0
     outlet_cells = jnp.arange(nx)[:, None, None] == nx - 1
-
     def axial_neighbors(value):
         return _neighbor_fields(value, mode_x="neumann", mode_y="neumann",
             mode_z="neumann", sharding=field_sharding)[:2]
@@ -1952,7 +1950,6 @@ def _face_flux_pressure_projection_duct(
     vf = vf.at[:, 1:-1, :].set(0.5 * (vs[:, 1:, :] + vs[:, :-1, :]))
     wf = jnp.zeros((nx, ny, nz + 1), dtype=w.dtype)
     wf = wf.at[:, :, 1:-1].set(0.5 * (ws[:, :, 1:] + ws[:, :, :-1]))
-
     face_area = dys[:, None] * dzs[None, :]
     if inlet_flow_rate is not None:
         target = jnp.asarray(inlet_flow_rate, dtype=u.dtype)
@@ -2004,10 +2001,14 @@ def _face_flux_pressure_projection_duct(
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
-
-    projected_u = 0.5 * (axial_minus(uf_plus, uf_inlet) + uf_plus)
-    projected_v = 0.5 * (vf[:, :-1, :] + vf[:, 1:, :])
-    projected_w = 0.5 * (wf[:, :, :-1] + wf[:, :, 1:])
+    # Reconstruct only pressure correction; reconstructing the predictor filters it.
+    correction_x_west = axial_minus(correction_x, jnp.zeros_like(uf_inlet))
+    projected_u = us + 0.5 * (correction_x_west + correction_x)
+    projected_v = vs + 0.5 * (correction_y[:, :-1, :] + correction_y[:, 1:, :])
+    projected_w = ws + 0.5 * (correction_z[:, :, :-1] + correction_z[:, :, 1:])
+    if mixed_axial_pressure:
+        cell_flow = jnp.sum(projected_u * face_area, axis=(1, 2))
+        projected_u += ((target - cell_flow) / jnp.sum(face_area))[:, None, None]
     full_u = jnp.zeros_like(u).at[:, y0:y1, z0:z1].set(projected_u)
     full_v = jnp.zeros_like(v).at[:, y0:y1, z0:z1].set(projected_v)
     full_w = jnp.zeros_like(w).at[:, y0:y1, z0:z1].set(projected_w)
@@ -2015,7 +2016,6 @@ def _face_flux_pressure_projection_duct(
     divergence_norm = jnp.max(jnp.abs(divergence_after))
     if not mixed_axial_pressure:
         return full_u, full_v, full_w, full_p, divergence_norm
-
     inlet_flow = jnp.sum(uf_inlet * face_area)
     outlet_flow = jnp.sum(uf_plus[-1] * face_area)
     active_mask = fluid_mask[:, y0:y1, z0:z1]

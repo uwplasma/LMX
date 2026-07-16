@@ -919,6 +919,27 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
         for field in (projected_u, projected_v, projected_w, pressure)
     )
 
+    # A divergence-free predictor needs no pressure correction and must not be
+    # filtered by a cell-to-face-to-cell round trip.
+    repeated_u = jnp.broadcast_to((1.0 + 0.2 * y) * (1.0 - 0.1 * z), u.shape)
+    preserved = _face_flux_pressure_projection_duct(
+        repeated_u,
+        jnp.zeros_like(v),
+        jnp.zeros_like(w),
+        jnp.ones_like(u),
+        jnp.ones((nx, ny, nz), dtype=bool),
+        dt=0.05,
+        dx=0.25,
+        dy=dy,
+        dz=dz,
+        fluid_bounds=(0, ny, 0, nz),
+        iterations=200,
+        tolerance=1.0e-10,
+    )
+    assert preserved[0] == pytest.approx(repeated_u, abs=1.0e-12)
+    assert preserved[1] == pytest.approx(0.0, abs=1.0e-12)
+    assert preserved[2] == pytest.approx(0.0, abs=1.0e-12)
+
     def objective(amplitude):
         projected = project(amplitude)
         return jnp.mean(projected[0] ** 2) + 0.01 * jnp.mean(projected[3] ** 2)
@@ -981,7 +1002,10 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
         0.5 * (correction_y[:, :-1] + correction_y[:, 1:]),
         0.5 * (correction_z[:, :, :-1] + correction_z[:, :, 1:])), axis=-1)
     projected_velocity = jnp.stack(projected[:3], axis=-1)
-    assert jnp.max(jnp.abs(projected_velocity - pressure_velocity)) > 1.0e-3
+    flow_adjustment = projected_velocity - pressure_velocity
+    assert flow_adjustment[..., 1:] == pytest.approx(0.0, abs=1.0e-12)
+    assert jnp.ptp(flow_adjustment[..., 0], axis=(1, 2)) == pytest.approx(0.0)
+    assert jnp.sum(projected[0] * 0.25, axis=(1, 2)) == pytest.approx(0.2)
 
 
 def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():
