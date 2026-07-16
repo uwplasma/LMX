@@ -464,8 +464,9 @@ apply identical weights and damping to fields and conservative compact flux.
 Do not store a production-scale full-state history without a measured benefit.
 
 The next bounded tranche is upstream-first. SOLVAX draft PR 21 now carries the
-clean 0.8.4 weight API and corrected release metadata; merge, tag, and publish
-only after its supported Python/JAX matrix is green and review closes. Then
+clean 0.8.4 weight API and corrected release metadata; its supported
+Python/JAX, lint, and docs matrix is green, while review, merge, tag, and
+publication remain open. Then
 replace B2's arbitrary-depth lists and duplicated CPU/sharded mixing paths with
 one prior depth-two record, one weight calculation shared by scaled mapped
 fields and compact plus/inlet flux, and restart schema 6. This retains about
@@ -524,8 +525,9 @@ release. SOLVAX draft PR 21 proposes `release/0.8.4` at `a8603dc` into
 `origin/main` at `255d280`; the reusable Anderson-weight implementation is
 commit `4808695`, followed only by corrected citation/changelog metadata. Local
 gates report 264 passes, 98.10% combined coverage, warning-free docs, lint, and
-artifact import checks. Do not tag or publish until the final hosted matrix and
-review are green; rebuild artifacts from the merged SHA.
+artifact import checks; the hosted minimum/current Linux and current macOS
+matrix is also green. Do not tag or publish until review closes; rebuild
+artifacts from the merged SHA.
 
 The device-cut audit compared released 0.8.3 with the pending 0.8.4 PCG and
 found identical Krylov code; generic two-device standard and single-reduction
