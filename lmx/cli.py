@@ -624,7 +624,3 @@ def main(argv: list[str] | None = None) -> int:
         config = RunConfig(case=case, solve_mode=args.mode, logging=logging)
     _run_config(config)
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

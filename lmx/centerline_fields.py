@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 
-from .field_models import sample_wham_mirror_field
 from .mesh import StructuredMesh
 
 
@@ -83,46 +82,6 @@ def sample_field_on_centerline_pipe_mesh(
         "B_perp": b_perp,
         "B_magnitude": b_mag,
     }
-
-
-def sample_wham_field_on_centerline_pipe_mesh(
-    mesh: StructuredMesh,
-    *,
-    coil_parameters: dict[str, float | int] | None = None,
-    field_scale: float = 1.0,
-    max_points_per_call: int | None = None,
-) -> dict[str, np.ndarray | StructuredMesh | str]:
-    """Sample the WHAM-like mirror field on a mapped pipe mesh in local coordinates."""
-
-    params = dict(coil_parameters or {})
-
-    def sampler(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
-        field = sample_wham_mirror_field(
-            x,
-            y,
-            z,
-            coil_separation=float(params.get("coil_separation", 1.96)),
-            current_scale=float(params.get("current_scale", 100323.62459546926)),
-            inner_radius=float(params.get("inner_radius", 0.043)),
-            outer_radius=float(params.get("outer_radius", 0.365)),
-            coil_axial_thickness=float(params.get("coil_axial_thickness", 0.1144)),
-            radial_loops=int(params.get("radial_loops", 12)),
-            axial_loops=int(params.get("axial_loops", 4)),
-            x_offset=float(params.get("x_offset", 0.0)),
-            y_offset=float(params.get("y_offset", 0.0)),
-            z_offset=float(params.get("z_offset", 0.0)),
-        )
-        return field_scale * np.asarray(field, dtype=float)
-
-    sample = sample_field_on_centerline_pipe_mesh(
-        mesh,
-        sampler,
-        max_points_per_call=max_points_per_call,
-    )
-    sample["case"] = "wham_centerline_pipe_field_sample"
-    sample["field_scale"] = float(field_scale)
-    sample["coil_parameters"] = params
-    return sample
 
 
 def centerline_field_quality_metrics(sample: dict[str, object]) -> dict[str, float | int | bool | str]:

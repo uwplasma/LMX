@@ -1020,20 +1020,6 @@ def write_wham_blanket_transient_flow_movie(
     return [gif, poster]
 
 
-def write_wham_blanket_flow_summary(
-    flow: dict[str, object],
-    path: str | Path,
-    *,
-    artifacts: list[str] | None = None,
-) -> Path:
-    """Write a machine-readable summary for docs and regression checks."""
-
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(_json_summary(flow, artifacts or []), indent=2) + "\n", encoding="utf-8")
-    return out
-
-
 def _sample_blanket_field(
     points: np.ndarray,
     geometry: WhamBlanketLoop,

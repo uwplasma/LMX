@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Callable
-import json
 import re
 import warnings
 from pathlib import Path
@@ -363,12 +362,6 @@ def cross_section_divergence_metrics(
         "rms_divergence": float(np.sqrt(np.mean(div**2))),
         "mean_field_magnitude": float(np.mean(magnitude)),
     }
-
-
-def save_cross_section_divergence_report(metrics: dict[str, float], path: str | Path) -> Path:
-    out = Path(path)
-    out.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
-    return out
 
 
 def write_tabulated_field_npz(
