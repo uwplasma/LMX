@@ -431,6 +431,49 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         assert getattr(restart_bundle.bundle, name) == pytest.approx(getattr(bundle, name))
     assert restart_bundle.bundle.stopping_state == (1, 1, "in_progress")
     assert all(path.exists() for path in vars(layout).values())
+
+    anderson_values = (
+        jnp.full((4, 3, 2, 2), 2.0),
+        jnp.full((4, 3, 2, 2), 3.0),
+        jnp.full((3, 3, 1, 2), 4.0),
+        jnp.full((1, 2), 5.0),
+    )
+    anderson_bundle = SimpleNamespace(**(
+        bundle.__dict__ | {"aitken_state": None, "anderson_state": anderson_values}
+    ))
+    anderson_path = write_extruded_restart_npz(
+        SimpleNamespace(bundle=anderson_bundle, station_history=()),
+        case,
+        tmp_path / "restart" / "anderson.npz",
+    )
+    anderson = load_extruded_restart_bundle(anderson_path)
+    assert anderson.metadata["restart_schema"] == "b2_diagnostics_v6"
+    assert all(actual == pytest.approx(expected) for actual, expected in
+               zip(anderson.bundle.anderson_state, anderson_values, strict=True))
+    with np.load(anderson_path, allow_pickle=False) as data:
+        anderson_payload = {key: data[key] for key in data.files}
+    for missing in (
+        "anderson_mapped_state", "anderson_residual",
+        "anderson_mapped_flux", "anderson_mapped_inlet",
+    ):
+        partial_path = tmp_path / "restart" / f"missing_{missing}.npz"
+        np.savez_compressed(partial_path, **{
+            key: value for key, value in anderson_payload.items() if key != missing
+        })
+        with pytest.raises(ValueError, match="all-or-none"):
+            load_extruded_restart_bundle(partial_path)
+    malformed_anderson = SimpleNamespace(**(
+        anderson_bundle.__dict__ | {"anderson_state": (
+            anderson_values[0][:, :-1], *anderson_values[1:]
+        )}
+    ))
+    with pytest.raises(ValueError, match="inconsistent shape"):
+        write_extruded_restart_npz(
+            SimpleNamespace(bundle=malformed_anderson, station_history=()),
+            case,
+            tmp_path / "restart" / "malformed_anderson.npz",
+        )
+
     bundle.iteration_pressure_linear_history = jnp.zeros((2, 5))
     with pytest.raises(ValueError, match="inconsistent shape"):
         write_extruded_restart_npz(solution, case, tmp_path / "malformed.npz")

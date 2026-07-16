@@ -250,13 +250,13 @@ axial_cells_per_field_transition_min = 16
 geometric_quality_required = true
 
 [solver]
-coupling_acceleration = "aitken"
-coupling_history_depth = 16
+coupling_acceleration = "anderson"
+coupling_history_depth = 2
 coupling_regularization = 1.0e-8
 coupling_damping = 1.0
 coupling_min_relaxation = 2.0
 coupling_max_relaxation = 2.0
-coupling_damping_basis = "checkpoint-matched exact coarse probes selected SOLVAX Aitken cap 2: caps 1.5 and 2 were monotone while caps 3 and 4 developed late oscillations"
+coupling_damping_basis = "schema-6 bounded B2 study uses one SOLVAX depth-two weight vector for fields and conservative compact fluxes"
 electric_iterations_min = 600
 electric_tolerance_max = 1.0e-12
 projection_iterations_min = 4000

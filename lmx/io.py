@@ -14,7 +14,14 @@ from .mesh import StructuredMesh
 
 
 _DIAGNOSTIC_FIELDS = tuple(item.name for item in fields(Diagnostics))
-_B2_DIAGNOSTIC_SCHEMAS = tuple(f"b2_diagnostics_v{version}" for version in (2, 3, 4, 5))
+_B2_DIAGNOSTIC_SCHEMAS = tuple(
+    f"b2_diagnostics_v{version}" for version in (2, 3, 4, 5, 6)
+)
+_B2_AITKEN_SCHEMAS = ("b2_aitken_v1", *_B2_DIAGNOSTIC_SCHEMAS[:-1])
+_B2_ANDERSON_FIELDS = (
+    "anderson_mapped_state", "anderson_residual",
+    "anderson_mapped_flux", "anderson_mapped_inlet",
+)
 _EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
 residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
 charge_balance_residual boundary_current_residual""".split()
@@ -292,6 +299,21 @@ def write_extruded_bundle_restart_npz(
     rho_phi_plus, rho_phi_inlet = _compact_flux_restart_arrays(bundle)
     has_compact_flux = rho_phi_plus is not None
     aitken_state = getattr(bundle, "aitken_state", None)
+    anderson_state = getattr(bundle, "anderson_state", None)
+    if aitken_state is not None and anderson_state is not None:
+        raise ValueError("Restart cannot contain both Aitken and Anderson state")
+    if anderson_state is not None:
+        if len(anderson_state) != 4 or any(value is None for value in anderson_state):
+            raise ValueError("B2 Anderson restart state must be all-or-none")
+        anderson_arrays = tuple(np.asarray(value) for value in anderson_state)
+        if (anderson_arrays[0].shape != (4, *np.asarray(bundle.u).shape)
+                or anderson_arrays[0].shape != anderson_arrays[1].shape
+                or not has_compact_flux
+                or anderson_arrays[2].shape != np.asarray(rho_phi_plus).shape
+                or anderson_arrays[3].shape != np.asarray(rho_phi_inlet).shape):
+            raise ValueError("B2 Anderson restart state has inconsistent shape")
+    else:
+        anderson_arrays = (np.zeros(0),) * 4
     courant_history = np.asarray(getattr(
         bundle, "iteration_courant_history", np.zeros((0, 3))))
     pressure_linear_history = np.asarray(getattr(
@@ -299,7 +321,8 @@ def write_extruded_bundle_restart_npz(
     momentum_defect_history = np.asarray(getattr(
         bundle, "iteration_momentum_defect_history", np.zeros(0)))
     stopping_state = getattr(bundle, "stopping_state", (0, 0, "not_recorded"))
-    has_diagnostics = (aitken_state is not None and courant_history.shape[1:] == (3,)
+    has_diagnostics = ((aitken_state is not None or anderson_state is not None)
+                       and courant_history.shape[1:] == (3,)
                        and stopping_state[0] == len(courant_history))
     has_pressure_diagnostics = pressure_linear_history.shape == (len(courant_history), 5)
     has_momentum_diagnostics = momentum_defect_history.shape == (len(courant_history),)
@@ -307,12 +330,18 @@ def write_extruded_bundle_restart_npz(
         raise ValueError("Pressure linear history has inconsistent shape")
     if momentum_defect_history.size and not has_momentum_diagnostics:
         raise ValueError("Momentum defect history has inconsistent shape")
+    if anderson_state is not None and not (
+            has_diagnostics and has_pressure_diagnostics and has_momentum_diagnostics):
+        raise ValueError("B2 Anderson restart requires complete diagnostic histories")
     metadata = {
         "case": case.name,
         "geometry_kind": case.geometry.kind,
         "solver_kind": case.solver.kind,
         "station_count": int(bundle.x.shape[0]),
-        "restart_schema": ("b2_diagnostics_v5" if has_compact_flux and has_diagnostics
+        "restart_schema": ("b2_diagnostics_v6" if has_compact_flux
+                           and anderson_state is not None and has_diagnostics
+                           and has_pressure_diagnostics and has_momentum_diagnostics
+                           else "b2_diagnostics_v5" if has_compact_flux and has_diagnostics
                            and has_pressure_diagnostics and has_momentum_diagnostics
                            else "b2_diagnostics_v3" if has_compact_flux and has_diagnostics
                            and has_pressure_diagnostics
@@ -330,7 +359,9 @@ def write_extruded_bundle_restart_npz(
         rho_phi_inlet=np.asarray(rho_phi_inlet) if has_compact_flux else np.zeros(0),
         aitken_residual=np.asarray(aitken_state[0]) if aitken_state is not None and aitken_state[0] is not None else np.zeros(0),
         aitken_relaxation=np.asarray(aitken_state[1] if aitken_state is not None else 1.0),
-        steady_streak=np.asarray(aitken_state[2] if aitken_state is not None else 0),
+        steady_streak=np.asarray(aitken_state[2] if aitken_state is not None
+                                 else stopping_state[1]),
+        **dict(zip(_B2_ANDERSON_FIELDS, anderson_arrays, strict=True)),
         axial_pressure_loss_gradient=np.asarray(
             getattr(bundle, "axial_pressure_loss_gradient", np.zeros_like(bundle.x))
         ),
@@ -426,9 +457,21 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         has_plus = "rho_phi_plus" in data and data["rho_phi_plus"].size > 0
         has_inlet = "rho_phi_inlet" in data and data["rho_phi_inlet"].size > 0
         schema = metadata.get("restart_schema")
-        has_aitken = schema in ("b2_aitken_v1", *_B2_DIAGNOSTIC_SCHEMAS)
+        has_aitken = schema in _B2_AITKEN_SCHEMAS
         if has_aitken and not {"aitken_residual", "aitken_relaxation", "steady_streak"} <= set(data.files):
             raise ValueError("B2 Aitken restart is missing accelerator state")
+        anderson_present = tuple(
+            field in data and data[field].size > 0 for field in _B2_ANDERSON_FIELDS
+        )
+        if any(anderson_present) and not all(anderson_present):
+            raise ValueError("B2 Anderson restart state must be all-or-none")
+        has_anderson = schema == _B2_DIAGNOSTIC_SCHEMAS[-1]
+        if has_anderson and not all(anderson_present):
+            raise ValueError("B2 Anderson restart is missing accelerator state")
+        if has_anderson and not (has_plus and has_inlet):
+            raise ValueError("B2 Anderson restart is missing compact flux state")
+        if all(anderson_present) and not has_anderson:
+            raise ValueError("B2 Anderson restart schema is inconsistent")
         required = (
             (_B2_DIAGNOSTIC_SCHEMAS, "iteration_courant_history", "CFL"),
             (_B2_DIAGNOSTIC_SCHEMAS[1:], "iteration_pressure_linear_history", "pressure linear"),
@@ -437,7 +480,8 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         for schemas, field, label in required:
             if schema in schemas and field not in data:
                 raise ValueError(f"B2 diagnostic restart is missing {label} history")
-        metadata["restart_schema"] = (schema if has_plus and has_inlet and has_aitken
+        has_accelerator = has_anderson if schema == _B2_DIAGNOSTIC_SCHEMAS[-1] else has_aitken
+        metadata["restart_schema"] = (schema if has_plus and has_inlet and has_accelerator
                                       else "compact_flux_v1" if has_plus and has_inlet else "legacy_nonexact")
         station_history = (
             tuple(json.loads(str(data["station_history_json"])))
@@ -457,14 +501,23 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             else jnp.asarray(_load_optional_array(data, name))
             for name, width in EXTRUDED_HISTORY_WIDTHS
         }
-        if schema != "b2_diagnostics_v5":
+        if schema not in _B2_DIAGNOSTIC_SCHEMAS[3:]:
             histories["iteration_momentum_defect_history"] = jnp.zeros((0,))
+        anderson_state = (tuple(jnp.asarray(data[field])
+            for field in _B2_ANDERSON_FIELDS) if has_anderson else None)
+        if has_anderson and (
+                anderson_state[0].shape != (4, *data["u"].shape)
+                or anderson_state[0].shape != anderson_state[1].shape
+                or anderson_state[2].shape != data["rho_phi_plus"].shape
+                or anderson_state[3].shape != data["rho_phi_inlet"].shape):
+            raise ValueError("B2 Anderson restart state has inconsistent shape")
         bundle = ExtrudedFieldBundle(
             **{name: jnp.asarray(data[name]) for name in _EXTRUDED_ARRAY_FIELDS},
             rho_phi_plus=jnp.asarray(data["rho_phi_plus"]) if has_plus else None,
             rho_phi_inlet=jnp.asarray(data["rho_phi_inlet"]) if has_inlet else None,
             aitken_state=((jnp.asarray(data["aitken_residual"]) if data["aitken_residual"].size else None,
                            float(data["aitken_relaxation"]), int(data["steady_streak"])) if has_aitken else None),
+            anderson_state=anderson_state,
             stopping_state=(int(stopping_state[0]), int(stopping_state[1]), str(stopping_state[2])),
             geometry_kind=str(metadata.get("geometry_kind", "unknown")),
             solver_kind=str(metadata.get("solver_kind", "extruded_inductionless")),
@@ -480,7 +533,8 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             history = getattr(bundle, field)
             if schema in schemas and history.shape[0] != completed_steps:
                 raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
-        if schema == _B2_DIAGNOSTIC_SCHEMAS[-1] and history.ndim != 1:
+        if (schema in _B2_DIAGNOSTIC_SCHEMAS[3:]
+                and bundle.iteration_momentum_defect_history.ndim != 1):
             raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
         return ExtrudedRestartBundle(
             path=path,

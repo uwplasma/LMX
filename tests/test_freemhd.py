@@ -176,15 +176,23 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
     faces = benchmarks.jnp.asarray(payload["mesh"]["y_faces"])
     y = z = 0.5 * (faces[1:] + faces[:-1])
     shape, dt = (8, 7, 7), payload["effective_controls"]["dt"]
+    case = load_matched_b2_lmx_input(input_path).case
 
     def bundle(steps: int) -> ExtrudedFieldBundle:
         zeros = benchmarks.jnp.zeros(shape)
+        compact_flux = benchmarks.jnp.zeros((3, 8, 5, 5))
+        inlet_flux = benchmarks.jnp.zeros((5, 5))
+        anderson_state = ((benchmarks.jnp.zeros((4, *shape)),
+            benchmarks.jnp.zeros((4, *shape)), compact_flux, inlet_flux)
+            if case.solver.coupling_acceleration == "anderson" else None)
         return ExtrudedFieldBundle(
             x=x, y=y, z=z, field_scale=benchmarks.jnp.asarray(payload["field_profile"]["sample_b_over_B0"]),
             u=zeros, v=zeros, w=zeros, p=zeros, phi=zeros,
             geometry_kind="layered_duct", solver_kind="extruded_inductionless",
-            rho_phi_plus=benchmarks.jnp.zeros((3, 8, 5, 5)), rho_phi_inlet=benchmarks.jnp.zeros((5, 5)),
-            aitken_state=(None, 1.0, 0),
+            rho_phi_plus=compact_flux, rho_phi_inlet=inlet_flux,
+            aitken_state=((None, 1.0, 0)
+                if case.solver.coupling_acceleration == "aitken" else None),
+            anderson_state=anderson_state,
             stopping_state=(steps, 0, "step_limit" if steps == 2 else "in_progress"),
             jx=benchmarks.jnp.ones(shape), jz=benchmarks.jnp.ones(shape),
             volumetric_flow_rate=benchmarks.jnp.full(8, 4.0),
@@ -192,6 +200,7 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
             boundary_current_residual=benchmarks.jnp.full(8, 1.0e-5),
             transverse_pressure_difference=benchmarks.jnp.asarray([0, 0, 1, 2, 3, 2, 0, 0]),
             iteration_residual_history=benchmarks.jnp.zeros(steps),
+            iteration_momentum_defect_history=benchmarks.jnp.zeros(steps),
             iteration_component_residual_history=benchmarks.jnp.zeros((steps, 6)),
             iteration_pressure_residual_history=benchmarks.jnp.zeros(steps),
             iteration_pressure_linear_history=benchmarks.jnp.tile(
@@ -204,7 +213,6 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
         )
 
     root.mkdir()
-    case = load_matched_b2_lmx_input(input_path).case
     for name, value in (("checkpoint.npz", bundle(1)), ("direct.npz", bundle(2)), ("resumed.npz", bundle(2))):
         write_extruded_bundle_restart_npz(value, case, root / name)
     (root / "run.json").write_text(json.dumps({
@@ -630,9 +638,16 @@ def test_independent_matched_b2_input_observers_agree(tmp_path: Path, monkeypatc
     assert observe_freemhd_b2_contract(case, source, evaluator) == observe_lmx_b2_contract(lmx_input, evaluator)
 
 
-def test_lmx_b2_output_observer_replays_restart_evidence(tmp_path: Path):
+@pytest.mark.parametrize("acceleration", ("anderson", "aitken"))
+def test_lmx_b2_output_observer_replays_restart_evidence(
+    tmp_path: Path, acceleration: str
+):
     input_path, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
     run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path)
+    if acceleration == "aitken":
+        payload = json.loads(input_path.read_text())
+        payload["case"]["solver"]["coupling_acceleration"] = acceleration
+        input_path.write_text(json.dumps(payload, sort_keys=True))
     run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
     _write_lmx_b2_output(tmp_path / "output", input_path, evaluator)
 

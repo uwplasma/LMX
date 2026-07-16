@@ -10,6 +10,8 @@ import sys
 import tarfile
 import tempfile
 
+import numpy as np
+
 from lmx.plotting import write_strong_scaling_plots
 from lmx.scaling import (
     summarize_strong_scaling_records,
@@ -97,6 +99,40 @@ def _forced_cpu_environment(count: int) -> dict[str, str]:
     return env
 
 
+def _validate_matched_b2_topologies(records: list[dict[str, object]]) -> None:
+    """Fail closed when fixed-grid device topologies change B2 numerics."""
+
+    if not records:
+        raise RuntimeError("Matched B2 topology gate produced no records")
+    reference = records[0]
+    identity = ("source_fingerprint", "input_sha256", "evaluator_sha256",
+        "restart_schema", "coupling_acceleration", "coupling_history_depth")
+    for record in records:
+        if not record.get("validation_passed", False):
+            raise RuntimeError("Matched B2 topology failed its worker validation")
+        if any(record.get(name) != reference.get(name) for name in identity):
+            raise RuntimeError("Matched B2 topology records do not share one contract")
+        for name in ("velocity_l2", "potential_l2", "current_l2"):
+            if not np.isclose(
+                record[name], reference[name], rtol=2.0e-8, atol=2.0e-9
+            ):
+                raise RuntimeError(f"Matched B2 topology changed {name}")
+        for name in ("pressure_observable", "courant_mean", "courant_max"):
+            if not np.allclose(
+                record["observables"][name], reference["observables"][name],
+                rtol=2.0e-8, atol=2.0e-9,
+            ):
+                raise RuntimeError(f"Matched B2 topology changed {name}")
+        if record.get("schema6_active"):
+            if not record.get("anderson_validation_passed", False):
+                raise RuntimeError("Matched B2 topology failed schema-6 validation")
+            for name in ("anderson_gram", "anderson_weights"):
+                if not np.allclose(
+                    record[name], reference[name], rtol=2.0e-8, atol=2.0e-9
+                ):
+                    raise RuntimeError(f"Matched B2 topology changed {name}")
+
+
 def run_local_cpu_scaling(
     *,
     repo_root: Path,
@@ -143,6 +179,8 @@ def run_local_cpu_scaling(
         records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 CPU gate failed; evidence: {output_path}")
+    if benchmark_kind == "matched_b2_smoke":
+        _validate_matched_b2_topologies(records)
     return records
 
 
@@ -296,6 +334,8 @@ def run_remote_gpu_scaling(
         local_records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 GPU gate failed; evidence: {local_output}")
+    if benchmark_kind == "matched_b2_smoke":
+        _validate_matched_b2_topologies(local_records)
     return local_records
 
 
@@ -316,6 +356,7 @@ def run_strong_scaling_demo(
     profile_dir: Path | None = None,
     cpu_restart_path: Path | None = None,
     gpu_restart_path: Path | None = None,
+    timeout_seconds: float | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -366,6 +407,7 @@ def run_strong_scaling_demo(
         restart_path=cpu_restart_path,
         matched_input=matched_input,
         evaluator=evaluator,
+        timeout_seconds=timeout_seconds,
     )
     if remote_host is not None:
         records.extend(
@@ -386,6 +428,7 @@ def run_strong_scaling_demo(
                 restart_path=gpu_restart_path,
                 matched_input=gpu_matched_input,
                 evaluator=evaluator,
+                timeout_seconds=(600.0 if timeout_seconds is None else timeout_seconds),
             )
         )
 
@@ -436,6 +479,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gpu-nx", type=int, default=6144)
     parser.add_argument("--gpu-ny", type=int, default=96)
     parser.add_argument("--gpu-nz", type=int, default=96)
+    parser.add_argument(
+        "--worker-timeout",
+        type=float,
+        default=None,
+        help="Hard wall-time ceiling in seconds for each isolated scaling worker.",
+    )
     parser.add_argument(
         "--cpu-restart",
         type=Path,
@@ -512,6 +561,7 @@ def main(argv: list[str] | None = None) -> int:
         profile_dir=args.output / "profiles" if args.profile else None,
         cpu_restart_path=args.cpu_restart,
         gpu_restart_path=args.gpu_restart,
+        timeout_seconds=args.worker_timeout,
     )
     return 0
 

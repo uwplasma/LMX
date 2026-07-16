@@ -668,6 +668,23 @@ def observe_lmx_b2_output(
     )
     for restart in (checkpoint, direct, resumed):
         validate_extruded_restart_bundle(restart, case=problem.case)
+    acceleration = problem.case.solver.coupling_acceleration
+    if acceleration == "anderson":
+        acceleration_name, schemas, label = (
+            "anderson_state", {"b2_diagnostics_v6"}, "Anderson"
+        )
+    elif acceleration == "aitken":
+        acceleration_name, schemas, label = (
+            "aitken_state",
+            {"b2_aitken_v1", *(f"b2_diagnostics_v{version}" for version in range(2, 6))},
+            "Aitken",
+        )
+    else:
+        raise ValueError("LMX B2 output acceleration is unsupported")
+    if any(restart.metadata.get("restart_schema") not in schemas
+           or getattr(restart.bundle, acceleration_name) is None
+           for restart in (checkpoint, direct, resumed)):
+        raise ValueError(f"LMX B2 output {label} restart state is invalid")
     if checkpoint.bundle.stopping_state[0] != 1 or direct.bundle.stopping_state != resumed.bundle.stopping_state:
         raise ValueError("LMX B2 restart stopping state differs")
     # Keep replay-driving state separate from recomputed fields and solver histories.
@@ -696,10 +713,13 @@ def observe_lmx_b2_output(
                 if group == "flux":
                     scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
                     flux_relative.append(float(np.linalg.norm(left - right) / scale))
-    for left, right in zip(direct.bundle.aitken_state, resumed.bundle.aitken_state, strict=True):
+    for left, right in zip(
+            getattr(direct.bundle, acceleration_name),
+            getattr(resumed.bundle, acceleration_name),
+            strict=True):
         left, right = (np.asarray(()) if value is None else np.asarray(value) for value in (left, right))
         if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
-            raise ValueError("LMX B2 output Aitken state is invalid")
+            raise ValueError(f"LMX B2 output {label} state is invalid")
         if left.size:
             grouped_differences["state"].append(float(np.max(np.abs(left - right))))
     restart_differences = {

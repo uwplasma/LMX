@@ -348,7 +348,7 @@ def test_benchmark_b_field_profile_rejects_degenerate_station_count():
     ("case_id", "expected_shape", "expected_conductance", "expected_acceleration"),
     [
         ("B1-fringing-pipe", (101, 64, 128), 0.027, "anderson"),
-        ("B2-fringing-square", (101, 65, 65), 0.07, "aitken"),
+        ("B2-fringing-square", (101, 65, 65), 0.07, "anderson"),
     ],
 )
 def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
@@ -369,23 +369,11 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
     assert recovered_conductance == pytest.approx(expected_conductance)
     assert case.solver.coupling_acceleration == expected_acceleration
     if case_id == "B2-fringing-square":
-        assert case.solver.coupling_max_relaxation == pytest.approx(2.0)
+        assert case.solver.coupling_history_depth == 2
     assert case.initial_velocity == 1.0
     assert case.forcing == 0.0
     assert case.geometry.axial_origin == -15.0
     assert problem.profile.axis == "y"
-    if case_id == "B2-fringing-square":
-        unsupported = replace(
-            problem,
-            case=replace(
-                case,
-                solver=replace(case.solver, coupling_acceleration="anderson"),
-            ),
-        )
-        with pytest.raises(
-            NotImplementedError, match="B2 conservative Anderson mixing requires"
-        ):
-            solve_extruded_inductionless(unsupported)
     inlet, outlet = case.boundary_conditions[1:3]
     expected_flow = 3.141592653589793 if case_id == "B1-fringing-pipe" else 4.0
     assert (inlet.name, inlet.kind, inlet.axis, inlet.value) == (
@@ -403,6 +391,11 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
 
     mesh = _cross_section_mesh(case)
     assert mesh.x_centers.tolist() == pytest.approx(problem.profile.x.tolist())
+    if case_id == "B2-fringing-square":
+        invalid = replace(problem, case=replace(
+            case, solver=replace(case.solver, coupling_history_depth=3)))
+        with pytest.raises(ValueError, match="requires history depth 2"):
+            solve_extruded_inductionless(invalid)
 
 
 def test_benchmark_b_pipe_mesh_resolves_frozen_hartmann_layer():
@@ -560,7 +553,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert benchmarks.jnp.all(benchmarks.jnp.isfinite(momentum_defect))
     assert benchmarks.jnp.all(momentum_defect >= 0.0)
     assert solution.bundle.stopping_state[0] == history.size
-    assert solution.bundle.stopping_state == (4, 2, "step_limit")
+    assert solution.bundle.stopping_state[::2] == (4, "step_limit")
 
     fx, fy, fz = _unpack_duct_mass_flux(
         solution.bundle.rho_phi_plus, solution.bundle.rho_phi_inlet
@@ -576,18 +569,24 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert float(benchmarks.jnp.max(benchmarks.jnp.abs(flux_divergence))) < 1.0e-8
 
     continuation_case = replace(
-        case, time_stepper=replace(case.time_stepper, max_steps=2)
+        case, time_stepper=replace(case.time_stepper, max_steps=1)
     )
     continuation_problem = replace(
         problem, case=continuation_case, profile=profile
     )
+    direct_two_problem = replace(continuation_problem, case=replace(
+        continuation_case,
+        time_stepper=replace(continuation_case.time_stepper, max_steps=2),
+    ))
+    direct_two = solve_extruded_inductionless(direct_two_problem)
     terminal = solve_extruded_inductionless(continuation_problem)
     path = write_extruded_bundle_restart_npz(
         terminal.bundle, continuation_case, tmp_path / "b2.npz"
     )
     restart = load_extruded_restart_bundle(path)
-    assert terminal.bundle.aitken_state[0] is None
-    assert restart.bundle.aitken_state[0] is None
+    assert terminal.bundle.aitken_state is None
+    assert restart.bundle.aitken_state is None
+    assert all(value is not None for value in restart.bundle.anderson_state)
     with pytest.raises(ValueError, match="both compact flux arrays"):
         solve_extruded_inductionless(
             continuation_problem,
@@ -604,8 +603,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         continuation_problem,
         initial_bundle=restart.bundle,
     )
-    assert restart.metadata["restart_schema"] == "b2_diagnostics_v5"
-    assert restart.bundle.aitken_state[1] == pytest.approx(2.0)
+    assert restart.metadata["restart_schema"] == "b2_diagnostics_v6"
     for name in (
         "u",
         "v",
@@ -623,24 +621,26 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         "iteration_potential_residual_history",
         "iteration_courant_history",
     ):
-        assert benchmarks.jnp.allclose(
-            getattr(resumed.bundle, name),
-            getattr(solution.bundle, name),
-            rtol=0.0,
-            atol=1.0e-12,
+        assert benchmarks.jnp.array_equal(
+            getattr(resumed.bundle, name), getattr(direct_two.bundle, name)
         )
-    assert resumed.bundle.stopping_state == solution.bundle.stopping_state
+    assert all(benchmarks.jnp.array_equal(resumed_value, direct_value)
+               for resumed_value, direct_value in zip(
+                   resumed.bundle.anderson_state,
+                   direct_two.bundle.anderson_state,
+                   strict=True))
+    assert resumed.bundle.stopping_state == direct_two.bundle.stopping_state
     convergence_problem = replace(
         continuation_problem,
         case=replace(
             continuation_problem.case,
-            time_stepper=replace(continuation_problem.case.time_stepper, max_steps=1),
+            time_stepper=replace(continuation_problem.case.time_stepper, max_steps=2),
         ),
     )
     converged = solve_extruded_inductionless(
-        convergence_problem, initial_bundle=resumed.bundle
+        convergence_problem, initial_bundle=solution.bundle
     )
-    assert converged.bundle.stopping_state == (5, 3, "converged")
+    assert converged.bundle.stopping_state == (6, 3, "converged")
 
 
 def test_benchmark_b_primary_pressure_observables_use_direct_fields():

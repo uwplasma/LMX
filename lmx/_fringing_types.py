@@ -45,6 +45,10 @@ class ExtrudedFieldBundle:
     rho_phi_plus: jnp.ndarray | None = None
     rho_phi_inlet: jnp.ndarray | None = None
     aitken_state: tuple[jnp.ndarray | None, float, int] | None = None
+    # Previous raw mapped field, residual, compact plus flux, and inlet flux.
+    anderson_state: tuple[
+        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
+    ] | None = None
     stopping_state: tuple[int, int, str] = (0, 0, "not_recorded")
     jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))

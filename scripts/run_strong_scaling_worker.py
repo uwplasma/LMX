@@ -80,6 +80,142 @@ def _placement(array) -> dict[str, int | bool]:
         "replicated": bool(array.sharding.is_fully_replicated)}
 
 
+def _max_abs_difference(left, right) -> float:
+    """Return a fail-closed maximum difference for restart state arrays."""
+
+    left, right = np.asarray(left), np.asarray(right)
+    if left.shape != right.shape or not (
+        np.all(np.isfinite(left)) and np.all(np.isfinite(right))
+    ):
+        return float("inf")
+    return float(np.max(np.abs(left - right), initial=0.0))
+
+
+def _anderson_diagnostics(
+    problem, checkpoint, direct, resumed, serialized, *, num_devices: int
+) -> dict[str, object]:
+    """Audit the bounded B2 depth-two state without timing serialization."""
+
+    acceleration = problem.case.solver.coupling_acceleration
+    depth = int(problem.case.solver.coupling_history_depth)
+    schema = str(serialized.metadata.get("restart_schema", "unknown"))
+    result: dict[str, object] = {
+        "coupling_acceleration": acceleration,
+        "coupling_history_depth": depth,
+        "restart_schema": schema,
+        "schema6_active": acceleration == "anderson",
+        "anderson_state_all_or_none": True,
+        "anderson_depth_two_update_executed": False,
+        "anderson_serialized_max_abs": None,
+        "anderson_replay_max_abs": None,
+        "anderson_replay_field_max_abs": None,
+        "anderson_replay_flux_max_abs": None,
+        "anderson_replay_flux_relative_l2": None,
+        "anderson_gram": None,
+        "anderson_weights": None,
+        "anderson_weights_sum_error": None,
+        "anderson_state_placement": {},
+        "anderson_validation_passed": True,
+    }
+    if acceleration != "anderson":
+        return result
+
+    states = tuple(getattr(bundle, "anderson_state", None) for bundle in (
+        checkpoint, direct, resumed, serialized.bundle))
+    all_or_none = all(
+        state is not None and len(state) == 4 and all(value is not None for value in state)
+        for state in states
+    )
+    result["anderson_state_all_or_none"] = all_or_none
+    if not all_or_none:
+        result["anderson_validation_passed"] = False
+        return result
+
+    checkpoint_state, direct_state, resumed_state, serialized_state = states
+    serialized_max = max(
+        _max_abs_difference(left, right)
+        for left, right in zip(checkpoint_state, serialized_state, strict=True)
+    )
+    replay_differences = tuple(
+        _max_abs_difference(left, right)
+        for left, right in zip(direct_state, resumed_state, strict=True)
+    )
+    replay_max = max(replay_differences)
+    replay_field_max, replay_flux_max = (
+        max(replay_differences[:2]), max(replay_differences[2:])
+    )
+    replay_flux_relative = max(
+        float(np.linalg.norm(np.asarray(left) - np.asarray(right)) /
+            max(np.linalg.norm(np.asarray(left)), np.linalg.norm(np.asarray(right)), 1.0e-30))
+        for left, right in zip(direct_state[2:], resumed_state[2:], strict=True)
+    )
+    from solvax import anderson_weights
+
+    residuals = jnp.stack((checkpoint_state[1], direct_state[1]))
+    flat = residuals.reshape((2, -1))
+    gram = flat @ flat.T
+    weights = anderson_weights(
+        residuals,
+        regularization=problem.case.solver.coupling_regularization,
+    )
+    jax.block_until_ready((gram, weights))
+    gram_np, weights_np = np.asarray(gram), np.asarray(weights)
+    state_placement = {
+        name: _placement(value)
+        for name, value in zip(
+            ("mapped", "residual", "rho_phi_plus", "rho_phi_inlet"),
+            direct_state,
+            strict=True,
+        )
+    }
+    placement_passed = all(
+        value["global_shards"] == num_devices
+        and (num_devices == 1 or value["replicated"] == (name == "rho_phi_inlet"))
+        for name, value in state_placement.items()
+    )
+    depth_two = (
+        depth == 2
+        and checkpoint.stopping_state[0] == 1
+        and direct.stopping_state[0] == resumed.stopping_state[0] == 2
+    )
+    weights_sum_error = float(abs(np.sum(weights_np) - 1.0))
+    valid = bool(
+        schema == "b2_diagnostics_v6"
+        and depth_two
+        and serialized_max <= 1.0e-12
+        and replay_field_max <= 1.0e-12
+        and replay_flux_max <= _B2_RESTART_FLUX_ATOL
+        and replay_flux_relative <= _B2_RESTART_FLUX_RTOL
+        and placement_passed
+        and np.all(np.isfinite(gram_np))
+        and np.allclose(gram_np, gram_np.T, rtol=0.0, atol=1.0e-12)
+        and np.all(np.isfinite(weights_np))
+        and weights_sum_error <= 1.0e-12
+    )
+    result.update(
+        anderson_depth_two_update_executed=depth_two,
+        anderson_serialized_max_abs=serialized_max,
+        anderson_replay_max_abs=replay_max,
+        anderson_replay_field_max_abs=replay_field_max,
+        anderson_replay_flux_max_abs=replay_flux_max,
+        anderson_replay_flux_relative_l2=replay_flux_relative,
+        anderson_gram=gram_np.tolist(),
+        anderson_weights=weights_np.tolist(),
+        anderson_weights_sum_error=weights_sum_error,
+        anderson_state_placement=state_placement,
+        anderson_validation_passed=valid,
+    )
+    return result
+
+
+def _b2_ready_arrays(bundle) -> tuple[object, ...]:
+    """Include accelerator state in the timed completion barrier when present."""
+
+    fields = tuple(getattr(bundle, name) for name in _B2_FIELD_NAMES)
+    anderson = getattr(bundle, "anderson_state", None)
+    return fields if anderson is None else (*fields, *anderson)
+
+
 def _b2_repeat_signature(bundle) -> np.ndarray:
     """Compress every sharded B2 field by axial station for repeat gates."""
 
@@ -252,6 +388,11 @@ def _matched_b2_smoke_benchmark(
         raise ValueError("matched_b2_smoke requires one cold and three warm runs")
     from lmx.benchmarks import load_benchmark_b_spec
     from lmx.freemhd import load_matched_b2_lmx_input, observe_lmx_b2_output
+    from lmx.io import (
+        load_extruded_restart_bundle,
+        validate_extruded_restart_bundle,
+        write_extruded_bundle_restart_npz,
+    )
     from scripts.run_freemhd_parity_suite import (
         _resume_matched_b2_lmx,
         _run_matched_b2_lmx_direct,
@@ -265,7 +406,7 @@ def _matched_b2_smoke_benchmark(
         checkpoint, direct = _run_matched_b2_lmx_direct(
             problem, num_devices=num_devices
         )
-        jax.block_until_ready(tuple(getattr(direct, name) for name in _B2_FIELD_NAMES))
+        jax.block_until_ready(_b2_ready_arrays(direct))
         timings.append(time.perf_counter() - started)
         signatures.append(_b2_repeat_signature(direct))
     profiled = profile_signature = None
@@ -280,8 +421,7 @@ def _matched_b2_smoke_benchmark(
         )
         try:
             _, profiled = _run_matched_b2_lmx_direct(problem, num_devices=num_devices)
-            jax.block_until_ready(tuple(
-                getattr(profiled, name) for name in _B2_FIELD_NAMES))
+            jax.block_until_ready(_b2_ready_arrays(profiled))
         finally:
             jax.profiler.stop_trace()
         profile_signature = _b2_repeat_signature(profiled)
@@ -308,9 +448,18 @@ def _matched_b2_smoke_benchmark(
         "harness-smoke" if direct.u.shape == (8, 7, 7) else "scaling-calibration"
     )
     try:
-        resumed = _resume_matched_b2_lmx(
-            problem, checkpoint, num_devices=num_devices
-        )
+        with tempfile.TemporaryDirectory(prefix="lmx-b2-serialized-restart-") as temporary:
+            restart_path = Path(temporary) / "checkpoint.npz"
+            write_extruded_bundle_restart_npz(checkpoint, problem.case, restart_path)
+            serialized = load_extruded_restart_bundle(restart_path)
+            validate_extruded_restart_bundle(serialized, case=problem.case)
+            resumed = _resume_matched_b2_lmx(
+                problem, serialized.bundle, num_devices=num_devices
+            )
+            anderson = _anderson_diagnostics(
+                problem, checkpoint, direct, resumed, serialized,
+                num_devices=num_devices,
+            )
     except Exception as error:
         warm = np.asarray(timings[1:])
         return {
@@ -358,7 +507,7 @@ def _matched_b2_smoke_benchmark(
             "mass_balance", "current_balance", "interface_current_balance"))
         and observed["interface_current_activity"] >= limits["interface_current_activity_min"]
         # Fast timing permits bounded face-flux reduction noise; all remaining
-        # velocity/pressure/Aitken/CFL state must still replay exactly.
+        # velocity, pressure, accelerator, and CFL state must replay tightly.
         and observed["restart_state_max_abs"] <= limits["restart_absolute_tolerance"]
         and observed["restart_flux_max_abs"] <= _B2_RESTART_FLUX_ATOL
         and observed["restart_flux_relative_l2"] <= _B2_RESTART_FLUX_RTOL
@@ -367,6 +516,7 @@ def _matched_b2_smoke_benchmark(
         and repeat_signature_passed
         and profile_signature_passed is not False
         and profile_linear_history_passed is not False
+        and anderson["anderson_validation_passed"]
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -418,6 +568,7 @@ def _matched_b2_smoke_benchmark(
         "profile_electric_linear_history": (None if profiled is None else
             np.asarray(profiled.iteration_electric_linear_history).tolist()),
         "observables": observed,
+        **anderson,
         "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
         "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,
     }
@@ -501,6 +652,10 @@ def main(argv: list[str] | None = None) -> int:
     printed = payload if args.benchmark_kind != "duct_step_gate" else {
         key: value for key, value in payload.items() if key != "signature"}
     print(json.dumps(printed, indent=2))
+    if args.benchmark_kind == "matched_b2_smoke" and not payload.get(
+        "validation_passed", False
+    ):
+        return 1
     return 0
 
 

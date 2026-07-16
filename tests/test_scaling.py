@@ -50,6 +50,74 @@ def test_b2_repeat_signature_ignores_gauge_and_detects_shard_changes():
     )
 
 
+def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
+    mapped0 = jnp.arange(32.0).reshape(4, 2, 2, 2)
+    residual0 = mapped0 * 1.0e-3 + 1.0e-4
+    mapped1, residual1 = mapped0 + 0.25, residual0 * 0.8
+    flux0 = jnp.arange(24.0).reshape(3, 2, 2, 2)
+    inlet0 = jnp.arange(4.0).reshape(2, 2)
+    checkpoint = SimpleNamespace(
+        anderson_state=(mapped0, residual0, flux0, inlet0),
+        stopping_state=(1, 0, "in_progress"),
+    )
+    direct = SimpleNamespace(
+        anderson_state=(mapped1, residual1, flux0 + 0.5, inlet0 + 0.5),
+        stopping_state=(2, 0, "step_limit"),
+    )
+    resumed = SimpleNamespace(**direct.__dict__)
+    serialized = SimpleNamespace(
+        bundle=SimpleNamespace(**checkpoint.__dict__),
+        metadata={"restart_schema": "b2_diagnostics_v6"},
+    )
+    problem = SimpleNamespace(case=SimpleNamespace(solver=SimpleNamespace(
+        coupling_acceleration="anderson",
+        coupling_history_depth=2,
+        coupling_regularization=1.0e-8,
+    )))
+
+    diagnostics = run_strong_scaling_worker._anderson_diagnostics(
+        problem, checkpoint, direct, resumed, serialized, num_devices=1
+    )
+
+    assert diagnostics["schema6_active"]
+    assert diagnostics["anderson_depth_two_update_executed"]
+    assert diagnostics["anderson_validation_passed"]
+    assert diagnostics["anderson_serialized_max_abs"] == 0.0
+    assert diagnostics["anderson_replay_max_abs"] == 0.0
+    assert diagnostics["anderson_weights_sum_error"] <= 1.0e-12
+
+
+def test_matched_b2_topology_gate_compares_schema6_gram_and_contract():
+    base = {
+        "validation_passed": True,
+        "source_fingerprint": "source",
+        "input_sha256": "input",
+        "evaluator_sha256": "evaluator",
+        "restart_schema": "b2_diagnostics_v6",
+        "coupling_acceleration": "anderson",
+        "coupling_history_depth": 2,
+        "schema6_active": True,
+        "anderson_validation_passed": True,
+        "anderson_gram": [[2.0, 1.0], [1.0, 2.0]],
+        "anderson_weights": [0.5, 0.5],
+        "velocity_l2": 3.0,
+        "potential_l2": 2.0,
+        "current_l2": 1.0,
+        "observables": {
+            "pressure_observable": [1.0, 2.0],
+            "courant_mean": [1.0e-5, 1.1e-5],
+            "courant_max": [2.0e-5, 2.1e-5],
+        },
+    }
+    strong_scaling_demo._validate_matched_b2_topologies([
+        base, base | {"velocity_l2": 3.0 + 1.0e-10}
+    ])
+    with pytest.raises(RuntimeError, match="anderson_weights"):
+        strong_scaling_demo._validate_matched_b2_topologies([
+            base, base | {"anderson_weights": [0.6, 0.4]}
+        ])
+
+
 pytestmark = pytest.mark.unit
 
 
@@ -70,9 +138,11 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
         strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke"])
     options = {}
     monkeypatch.setattr(strong_scaling_demo, "run_strong_scaling_demo", options.update)
-    arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4", "--cpu-nx", "16"]
+    arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
+        "--cpu-nx", "16", "--worker-timeout", "45"]
     assert strong_scaling_demo.main(arguments) == 0
     assert options["cpu_problem"] == (16, 7, 7) and options["gpu_problem"] == (8, 7, 7)
+    assert options["timeout_seconds"] == 45.0
 
 
 def test_scaling_worker_command_forwards_restart(
@@ -621,5 +691,5 @@ def test_scaling_worker_covers_solver_faithful_branch(
     assert run_strong_scaling_worker.main([
         "--benchmark-kind", "matched_b2_smoke", "--matched-input", str(tmp_path / "input.json"),
         "--evaluator", str(tmp_path / "evaluator.json"), "--repeats", "4",
-        "--num-devices", "1", "--output", str(output_path)]) == 0
+        "--num-devices", "1", "--output", str(output_path)]) == 1
     assert json.loads(output_path.read_text())["failure"]["message"] == "stopped"

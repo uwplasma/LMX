@@ -19,6 +19,7 @@ from solvax import (
     additive_preconditioner,
     aitken_relaxation,
     anderson_mixing,
+    anderson_weights,
     block_thomas_factor,
     block_thomas_solve,
     cyclic_tridiagonal_solve,
@@ -6107,6 +6108,9 @@ def _iteration_checkpoint_bundle(
     rho_phi_plus: jnp.ndarray | None = None,
     rho_phi_inlet: jnp.ndarray | None = None,
     aitken_state: tuple[jnp.ndarray | None, float, int] | None = None,
+    anderson_state: tuple[
+        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
+    ] | None = None,
     stopping_state: tuple[int, int, str] = (0, 0, "not_recorded"),
     courant_history: list[tuple[float, float, float]] | None = None,
     momentum_defect_history: list[float] | None = None,
@@ -6126,6 +6130,7 @@ def _iteration_checkpoint_bundle(
         rho_phi_plus=rho_phi_plus,
         rho_phi_inlet=rho_phi_inlet,
         aitken_state=aitken_state,
+        anderson_state=anderson_state,
         stopping_state=stopping_state,
         geometry_kind=case.geometry.kind,
         solver_kind=case.solver.kind,
@@ -6220,8 +6225,10 @@ def _solve_extruded_projection(
         raise NotImplementedError(
             "Production spatial sharding currently supports the ALEX B2 duct path"
         )
-    if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "anderson":
-        raise NotImplementedError("B2 conservative Anderson mixing requires SOLVAX 0.8.4")
+    if (use_alex_b2_finite_volume
+            and case.solver.coupling_acceleration == "anderson"
+            and case.solver.coupling_history_depth != 2):
+        raise ValueError("B2 conservative Anderson mixing requires history depth 2")
     if case.geometry.kind in {"pipe_ogrid", "bent_pipe"}:
         materials = build_material_fields(case, mesh)
         x = jnp.asarray(mesh.x_centers, dtype=float)
@@ -7349,6 +7356,24 @@ def _solve_extruded_projection(
             previous_fixed_point_residual = jnp.asarray(previous_fixed_point_residual, dtype=u.dtype)
             if previous_fixed_point_residual.shape != (4, nx, ny, nz):
                 raise ValueError("B2 restart Aitken residual has inconsistent shape")
+    previous_anderson_mapped = previous_anderson_residual = None
+    previous_anderson_flux = previous_anderson_inlet = None
+    restart_anderson = (None if initial_bundle is None else
+        getattr(initial_bundle, "anderson_state", None))
+    if (use_alex_b2_finite_volume
+            and case.solver.coupling_acceleration == "anderson"):
+        if completed_steps and restart_anderson is None:
+            raise ValueError("B2 Anderson restart is missing accelerator state")
+        if restart_anderson is not None:
+            if len(restart_anderson) != 4 or any(
+                    value is None for value in restart_anderson):
+                raise ValueError("B2 Anderson restart state must be all-or-none")
+            (previous_anderson_mapped, previous_anderson_residual,
+                previous_anderson_flux, previous_anderson_inlet) = (
+                    jnp.asarray(value, dtype=u.dtype) for value in restart_anderson)
+            if (previous_anderson_mapped.shape != (4, nx, ny, nz)
+                    or previous_anderson_residual.shape != (4, nx, ny, nz)):
+                raise ValueError("B2 restart Anderson field state has inconsistent shape")
     fixed_point_scale = jnp.asarray(
         [
             velocity_limit,
@@ -7396,7 +7421,8 @@ def _solve_extruded_projection(
             * sum(float(component) ** 2 for component in prescribed_field))
         if electromagnetic_force_scale <= 0.0:
             raise ValueError("ALEX B2 requires a positive electromagnetic force scale")
-        kernel_key = (*kernel_key, electromagnetic_force_scale)
+        kernel_key = (*kernel_key, electromagnetic_force_scale,
+            case.solver.coupling_regularization, case.solver.coupling_damping)
         restart_flux = None if initial_bundle is None else initial_bundle.rho_phi_plus
         restart_inlet = None if initial_bundle is None else initial_bundle.rho_phi_inlet
         if (restart_flux is None) != (restart_inlet is None):
@@ -7528,6 +7554,15 @@ def _solve_extruded_projection(
                 current_rho_phi_inlet = jax.device_put(
                     np.asarray(current_rho_phi_inlet), replicated_sharding)
         current_rho_phi_plus = pack_flux(*current_flux_components)
+        if previous_anderson_flux is not None:
+            if (previous_anderson_flux.shape != current_rho_phi_plus.shape
+                    or previous_anderson_inlet.shape != current_rho_phi_inlet.shape):
+                raise ValueError("B2 restart Anderson flux state has inconsistent shape")
+            if flux_sharding is not None:  # pragma: no cover - hardware gate
+                previous_anderson_flux = jax.device_put(
+                    np.asarray(previous_anderson_flux), flux_sharding)
+                previous_anderson_inlet = jax.device_put(
+                    np.asarray(previous_anderson_inlet), replicated_sharding)
 
     else:
         unit_pressure_response = _enforce_velocity_bc_3d(
@@ -7661,6 +7696,28 @@ def _solve_extruded_projection(
             values = state * fixed_point_scale
             return values[0], values[1], values[2], values[3]
 
+        def mix_anderson(mapped0, residual0, flux0, inlet0,
+                         mapped1, residual1, flux1, inlet1):
+            """Apply one shared SOLVAX weight vector to the coupled B2 record."""
+
+            weights = anderson_weights(
+                jnp.stack((residual0, residual1)),
+                regularization=case.solver.coupling_regularization,
+            )
+            damping = case.solver.coupling_damping
+
+            def mix(previous, current):
+                weighted = jnp.tensordot(
+                    weights, jnp.stack((previous, current)), axes=(0, 0)
+                )
+                return current + damping * (weighted - current)
+
+            return (
+                mix(mapped0, mapped1),
+                mix(flux0, flux1),
+                mix(inlet0, inlet1),
+            )
+
         if field_sharding is not None:  # pragma: no cover - hardware gate
             axial_sharding = NamedSharding(field_sharding.mesh, P("x"))
             state_sharding = NamedSharding(
@@ -7669,6 +7726,11 @@ def _solve_extruded_projection(
             if previous_fixed_point_residual is not None:
                 previous_fixed_point_residual = jax.device_put(
                     np.asarray(previous_fixed_point_residual), state_sharding)
+            if previous_anderson_mapped is not None:
+                previous_anderson_mapped = jax.device_put(
+                    np.asarray(previous_anderson_mapped), state_sharding)
+                previous_anderson_residual = jax.device_put(
+                    np.asarray(previous_anderson_residual), state_sharding)
             mixed_boundary_projection = jax.jit(
                 mixed_boundary_projection,
                 in_shardings=(field_sharding,) * 6,
@@ -7726,6 +7788,12 @@ def _solve_extruded_projection(
                 in_shardings=state_sharding,
                 out_shardings=(field_sharding,) * 4,
             )
+            mix_anderson = jax.jit(
+                mix_anderson,
+                in_shardings=(state_sharding, state_sharding, flux_sharding,
+                    replicated_sharding) * 2,
+                out_shardings=(state_sharding, flux_sharding, replicated_sharding),
+            )
             (
                 mixed_boundary_projection,
                 electric_solve,
@@ -7735,6 +7803,7 @@ def _solve_extruded_projection(
                 scaled_state,
                 state_difference,
                 unscaled_state,
+                mix_anderson,
             ) = tuple(
                 _reuse_fringing_jit((name, *kernel_key), function)
                 for name, function in (
@@ -7746,6 +7815,7 @@ def _solve_extruded_projection(
                     ("scale_state", scaled_state),
                     ("state_difference", state_difference),
                     ("unscale_state", unscaled_state),
+                    ("anderson", mix_anderson),
                 )
             )
 
@@ -8110,15 +8180,42 @@ def _solve_extruded_projection(
                 if not accepted_state_converged and fixed_aitken_relaxation is None:
                     previous_fixed_point_residual = fixed_point_residual
             else:
-                accelerated = mapped_state
+                mapped_flux = pack_flux(*mapped_flux_components)
+                if previous_anderson_mapped is None:
+                    accelerated = mapped_state
+                    accelerated_flux = mapped_flux
+                    accelerated_inlet = mapped_rho_phi_inlet
+                else:
+                    accelerated, accelerated_flux, accelerated_inlet = mix_anderson(
+                        previous_anderson_mapped,
+                        previous_anderson_residual,
+                        previous_anderson_flux,
+                        previous_anderson_inlet,
+                        mapped_state,
+                        fixed_point_residual,
+                        mapped_flux,
+                        mapped_rho_phi_inlet,
+                    )
+                # Keep only the latest raw map: schema 6 is exactly depth two.
+                previous_anderson_mapped = mapped_state
+                previous_anderson_residual = fixed_point_residual
+                previous_anderson_flux = mapped_flux
+                previous_anderson_inlet = mapped_rho_phi_inlet
             u, v, w, phi = unscaled_state(accelerated)
         else:
             u, v, w = u_next, v_next, w_next
         if use_alex_b2_finite_volume:
-            (*current_flux_components, current_rho_phi_inlet) = relax_flux(
-                *current_flux_components, current_rho_phi_inlet,
-                *mapped_flux_components, mapped_rho_phi_inlet, flux_relaxation)
-            current_rho_phi_plus = pack_flux(*current_flux_components)
+            if case.solver.coupling_acceleration == "anderson":
+                current_rho_phi_plus = (pack_flux(*mapped_flux_components)
+                    if converged else accelerated_flux)
+                current_flux_components = tuple(current_rho_phi_plus)
+                current_rho_phi_inlet = (mapped_rho_phi_inlet
+                    if converged else accelerated_inlet)
+            else:
+                (*current_flux_components, current_rho_phi_inlet) = relax_flux(
+                    *current_flux_components, current_rho_phi_inlet,
+                    *mapped_flux_components, mapped_rho_phi_inlet, flux_relaxation)
+                current_rho_phi_plus = pack_flux(*current_flux_components)
         _emit_iteration_progress(
             progress_callback,
             checkpoint_interval=checkpoint_interval,
@@ -8153,6 +8250,10 @@ def _solve_extruded_projection(
                 aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
                     steady_streak) if use_alex_b2_finite_volume and
                     case.solver.coupling_acceleration == "aitken" else None),
+                anderson_state=((previous_anderson_mapped, previous_anderson_residual,
+                    previous_anderson_flux, previous_anderson_inlet)
+                    if use_alex_b2_finite_volume and
+                    case.solver.coupling_acceleration == "anderson" else None),
                 stopping_state=(step + 1, steady_streak,
                     "converged" if converged else
                     "step_limit" if step + 1 == stop_step else "in_progress"),
@@ -8264,6 +8365,10 @@ def _solve_extruded_projection(
         aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
             steady_streak) if use_alex_b2_finite_volume and
             case.solver.coupling_acceleration == "aitken" else None),
+        anderson_state=((previous_anderson_mapped, previous_anderson_residual,
+            previous_anderson_flux, previous_anderson_inlet)
+            if use_alex_b2_finite_volume and
+            case.solver.coupling_acceleration == "anderson" else None),
         stopping_state=(len(residual_by_step), steady_streak,
             "converged" if converged else "step_limit"),
         jx=jx,
