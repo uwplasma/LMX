@@ -120,6 +120,8 @@ conservation, and steady-convergence gates pass together.
 
 ## Q2D-MHDfoam and other OpenFOAM data
 
+![Seven-second nonlinear Q2D research workflow](_static/readme-q2d-turbulence.webp)
+
 `lmx.external_validation` parses line profiles, force histories, probes, VTK
 fields, and case dictionaries from an external Q2D-MHDfoam tree. The former
 in-repository Docker build context was removed because it duplicated a large,

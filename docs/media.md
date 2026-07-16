@@ -29,17 +29,17 @@ or command, observable, and acceptance limit or uncertainty.
 | differentiable design | checked sensitivity and bounded design trace | complete |
 | CPU/GPU parallelism | current schema-6 CPU calibration | CPU current; two-GPU replay open |
 | ALEX B1 pipe reference | mapped-pipe comparison writer | queued; research-stage |
-| Samper high-Ha literature ladder | frozen eight-row result records | priority composite queued |
+| Samper high-Ha literature ladder | frozen eight-row acceptance composite | complete |
 | Q2D, obstacle, and blanket studies | compressed loops/panels | workflow coverage complete; quantitative parity open |
 
-The next tracked derivatives are ordered by evidentiary value: the frozen
-Samper/Benchmark-A ladder, restart equivalence, and the mapped-pipe comparison.
+The next tracked derivatives are ordered by evidentiary value: restart
+equivalence, the mapped-pipe comparison, and the portable fringing result.
 Prefer existing writers and compact accepted JSON; do not rerun a solver merely
 to change presentation. One composite should serve one claim family.
 
 ## Tracked web set
 
-Thirteen files in `docs/_static/` total 622,321 bytes. The `showcase` section of
+Fourteen files in `docs/_static/` total 855,524 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -48,31 +48,33 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | duct profiles | 71,620 | 1,338 × 816 WebP | released analytical-profile PNG `f55c380c...` |
 | accepted FreeMHD observables | 21,086 | 1,200 × 641 WebP | acceptance record `9f94ea15...`; generated at `72f2049` |
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
+| Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
 | B2 schema-6 CPU calibration | 31,616 | 1,400 × 653 WebP | accepted record `b2-schema6-cpu-scaling-20260716.json`; `test_plotting.py`; GPU replay omitted while open |
-| Hunt startup | 35,171 | 640 × 416 H.264, 7 s | existing 24.08-second transient; no solver rerun |
-| Hunt poster | 13,000 | 640 × 416 WebP | released poster PNG `cac2125e...` |
+| Hunt startup | 114,866 | 440 × 287 animated WebP, 7 s | Python/Pillow derivative of source GIF `12f30a38...`; 42 frames |
 | checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |
 | variable-field response | 41,648 | compressed WebP | released derivative `5d4b593c...` |
 | magnetic obstacle | 48,630 | compressed WebP | released derivative `6e351e80...` |
-| blanket-flow loop | 86,808 | 1,000 × 462 H.264, 7 s | released derivative `ca7d72ce...` |
+| blanket-flow loop | 61,776 | 480 × 222 animated WebP, 7 s | Python/Pillow derivative of released GIF `1a23d23...`; 42 frames |
+| Q2D loop | 117,102 | 440 × 381 animated WebP, 7 s | Python/Pillow derivative of released GIF `feb9e145...`; 42 frames |
 | B2 field and pressure | 43,174 | compressed WebP | released derivative `f186f109...` |
 | curved-pipe validation | 94,236 | compressed WebP | released derivative `d32d666a...` |
 
-The 35,171-byte Hunt H.264 loop (SHA-256
-`ad1095279f4af84ebdb5c2b1d4677aed322c8b54a11107cdc7ceda40268563b7`)
-compresses the complete 24.08-second tracked transient into 7.00 seconds at
-640 × 416 and 12 fps. Its 13,000-byte WebP poster has SHA-256
-`a4ada2e53c72cd2a57da99db072fc47a5477784aaf4938fc8efa83318b3456a4`.
-The 10,635,673-byte source GIF (`12f30a38...`) remains outside Git and the
-release; no solver was rerun.
+Regenerate the Samper derivative from tracked evidence only with
+`python scripts/manage_release_assets.py --write-benchmark-a-plot docs/_static/samper_benchmark_a.webp`.
+The plot path is covered by `test_acceptance_plot_uses_only_frozen_json`.
+
+The three directly embedded motion derivatives are regenerated with
+`python scripts/manage_release_assets.py --write-animated-webp SOURCE OUTPUT`.
+They sample existing physical frames to 42 frames over 7 seconds and use lossy
+animated WebP compression; no solver or motion interpolation is involved. The
+full-quality MP4s and source GIFs remain in the release or ignored artifacts.
 
 ## Release-hosted README set
 
-The README retains release URLs so GitHub readers can inspect the versioned
-asset collection. The eight derivatives used by the standalone documentation
-are mirrored locally above so a public docs build does not depend on private
-release authentication.
+The README embeds every plot and motion derivative directly. Release URLs are
+retained only for full-quality source inspection; the standalone documentation
+does not depend on release authentication.
 
 | Derivative | SHA-256 |
 |---|---|

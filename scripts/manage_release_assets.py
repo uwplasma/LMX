@@ -193,7 +193,147 @@ def verify_archive(path: Path, manifest: dict[str, Any] | None = None) -> None:
                 raise ValueError(f"Release archive checksum mismatch for {relative}")
 
 
-def main() -> int:
+def write_benchmark_a_validation_plot(
+    acceptance: dict[str, object],
+    output: Path,
+    *,
+    flow_error_target: float,
+    mesh_change_target: float,
+    order_target: float = 0.5,
+) -> Path:
+    """Render the accepted Samper ladder from frozen JSON without a solve."""
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    from lmx.plotting import _set_plot_style
+
+    literature = acceptance.get("literature_table_i")
+    rows = literature.get("rows") if isinstance(literature, dict) else None
+    if not isinstance(rows, list) or len(rows) != 8 or not literature.get("pass"):
+        raise ValueError("Benchmark A plot requires eight accepted literature rows")
+    grouped = {
+        case: sorted(
+            (row for row in rows if row.get("case") == case),
+            key=lambda row: int(row["hartmann_number"]),
+        )
+        for case in ("shercliff", "hunt")
+    }
+    if any(len(case_rows) != 4 for case_rows in grouped.values()):
+        raise ValueError("Benchmark A plot requires four Shercliff and four Hunt rows")
+
+    def balance(row: dict[str, object], key: str) -> tuple[float, float]:
+        values = row[key]
+        if not isinstance(values, dict):
+            raise ValueError(f"Benchmark A row lacks {key}")
+        residuals = [
+            float(value)
+            for name, value in values.items()
+            if name != "acceptance_target"
+            and (name.endswith("_normalized") or name.endswith("_relative_error"))
+        ]
+        return max(residuals), float(values["acceptance_target"])
+
+    _set_plot_style()
+    fig, axes = plt.subplots(2, 2, figsize=(11.6, 7.5), constrained_layout=True)
+    fig.suptitle("Benchmark A: frozen high-Hartmann validation", fontsize=16)
+    for case, case_rows in grouped.items():
+        ha = np.asarray([row["hartmann_number"] for row in case_rows], dtype=float)
+        color, marker = {"shercliff": ("#0f766e", "o"), "hunt": ("#b45309", "s")}[case]
+        label = case.capitalize()
+        metrics = (
+            100 * np.asarray([row["analytical_flow_relative_error"] for row in case_rows]),
+            100 * np.asarray([row["finest_mesh_change_relative"] for row in case_rows]),
+            np.asarray([row["observed_order"] for row in case_rows]),
+        )
+        for ax, values in zip((axes[0, 0], axes[0, 1], axes[1, 0]), metrics, strict=True):
+            ax.semilogx(ha, values, marker=marker, color=color, label=label)
+        for key, fill, linestyle in (
+            ("current_balance", "white", "-"),
+            ("power_balance", color, "--"),
+        ):
+            axes[1, 1].loglog(
+                ha,
+                100 * np.asarray([balance(row, key)[0] for row in case_rows]),
+                marker=marker,
+                markerfacecolor=fill,
+                linestyle=linestyle,
+                color=color,
+                label=f"{label}: {key.removesuffix('_balance')}",
+            )
+
+    balance_target = min(
+        balance(row, key)[1]
+        for case_rows in grouped.values()
+        for row in case_rows
+        for key in ("current_balance", "power_balance")
+    )
+    panels = (
+        (axes[0, 0], "Flow rate vs analytical solution", "Relative error [%]", 100 * flow_error_target, "gate 1%"),
+        (axes[0, 1], "Finest-grid change", "Relative change [%]", 100 * mesh_change_target, "gate 0.25%"),
+        (axes[1, 0], "Observed order (dashed guide: p = 2)", "Observed order", order_target, "gate p ≥ 0.5"),
+        (axes[1, 1], "Current and power closure", "Maximum normalized residual [%]", 100 * balance_target, "gate 0.1%"),
+    )
+    for ax, title, ylabel, target, gate_label in panels:
+        ax.axhline(target, color="#475569", linestyle=":", linewidth=1.4)
+        ax.set(title=title, xlabel="Hartmann number", ylabel=ylabel)
+        y = 0.06 if ax is axes[1, 0] else 0.94
+        ax.text(0.98, y, gate_label, transform=ax.transAxes, ha="right", va="top")
+    axes[0, 0].legend(fontsize=10)
+    axes[0, 0].text(
+        0.02, 0.94, "ACCEPTED | frozen JSON", transform=axes[0, 0].transAxes,
+        color="#166534", weight="bold", fontsize=9, va="top",
+    )
+    axes[1, 0].axhline(2.0, color="#94a3b8", linestyle="--", linewidth=1.0)
+    axes[1, 1].legend(fontsize=8.5, ncol=2)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, dpi=120, bbox_inches="tight", pil_kwargs={"quality": 82, "method": 6})
+    plt.close(fig)
+    return output
+
+
+def write_animated_webp(
+    source: Path,
+    output: Path,
+    *,
+    width: int = 520,
+    seconds: float = 7.0,
+    fps: int = 8,
+    quality: int = 50,
+) -> Path:
+    """Downsample an existing animation to a small, directly embeddable WebP."""
+
+    from PIL import Image
+
+    with Image.open(source) as image:
+        frame_count = max(2, round(seconds * fps))
+        indices = [
+            round(index * (image.n_frames - 1) / (frame_count - 1))
+            for index in range(frame_count)
+        ]
+        height = round(image.height * width / image.width)
+        frames = []
+        for index in indices:
+            image.seek(index)
+            frames.append(
+                image.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
+            )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frames[0].save(
+        output,
+        format="WEBP",
+        save_all=True,
+        append_images=frames[1:],
+        duration=round(1000 / fps),
+        loop=0,
+        quality=quality,
+        method=6,
+        minimize_size=True,
+    )
+    return output
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write", action="store_true")
@@ -201,8 +341,45 @@ def main() -> int:
     action.add_argument("--build-archive", type=Path)
     action.add_argument("--verify-archive", type=Path)
     action.add_argument("--require-uploaded", action="store_true")
-    args = parser.parse_args()
-    if args.write:
+    action.add_argument("--write-benchmark-a-plot", type=Path)
+    action.add_argument(
+        "--write-animated-webp",
+        type=Path,
+        nargs=2,
+        metavar=("SOURCE", "OUTPUT"),
+    )
+    parser.add_argument("--width", type=int, default=520)
+    parser.add_argument("--seconds", type=float, default=7.0)
+    parser.add_argument("--fps", type=int, default=8)
+    parser.add_argument("--quality", type=int, default=50)
+    args = parser.parse_args(argv)
+    if args.write_animated_webp:
+        source, output = args.write_animated_webp
+        write_animated_webp(
+            source,
+            output,
+            width=args.width,
+            seconds=args.seconds,
+            fps=args.fps,
+            quality=args.quality,
+        )
+        print(f"Animated WebP: {output}")
+    elif args.write_benchmark_a_plot:
+        results = ROOT / "benchmarks" / "results"
+        acceptance = json.loads(
+            (results / "benchmark-a-acceptance.json").read_text(encoding="utf-8")
+        )
+        table = json.loads(
+            (results / "samper-table-i-accepted.json").read_text(encoding="utf-8")
+        )
+        write_benchmark_a_validation_plot(
+            acceptance,
+            args.write_benchmark_a_plot,
+            flow_error_target=float(table["flow_error_target"]),
+            mesh_change_target=float(table["finest_mesh_change_target"]),
+        )
+        print(f"Benchmark A plot: {args.write_benchmark_a_plot}")
+    elif args.write:
         payload = write_manifest()
         print(
             f"release assets: {payload['summary']['logical_file_count']} files inventoried"

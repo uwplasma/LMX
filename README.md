@@ -73,12 +73,12 @@ extension. Sources: [FreeMHD paper](https://doi.org/10.1063/5.0230242) and
 Eight frozen high-Hartmann rows pass, and audited closed-channel FreeMHD
 observables pass the 1% finite-grid gate.
 
+![Accepted eight-row Samper Benchmark A validation](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/samper_benchmark_a.webp)
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="58%">
-  <a href="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme_hunt_startup_2d.mp4"><img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt-flow startup loop" width="38%"></a>
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-hunt-startup.webp" alt="Seven-second Hunt-flow startup loop" width="38%">
 </p>
-
-▶ [Watch the 7-second Hunt startup](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme_hunt_startup_2d.mp4)
 
 [Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)
 
@@ -121,15 +121,12 @@ Promoted objectives pass finite-difference or independent-transpose checks.
 
 <p align="center">
   <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
-  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-7s.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Seven-second reduced blanket-flow movie" width="48%"></a>
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-blanket-flow.webp" alt="Seven-second reduced blanket-flow movie" width="48%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence-poster.webp" alt="Seven-second nonlinear Q2D vorticity loop" width="58%"></a>
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-q2d-turbulence.webp" alt="Seven-second nonlinear Q2D vorticity loop" width="58%">
 </p>
-
-▶ [Blanket flow · 7 s](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-7s.mp4) ·
-[Q2D turbulence · 7 s](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4)
 
 These visuals demonstrate implemented workflows. Quantitative turbulent
 Q2D-MHDfoam parity and blanket validation remain open.

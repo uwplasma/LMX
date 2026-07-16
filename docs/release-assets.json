@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 622321,
+    "bytes": 855524,
     "files": [
       {
         "bytes": 71620,
@@ -600,9 +600,9 @@
         "sha256": "f2add9fe96a044a082a3b0ca28a3de50b71a0961399ac362caf2ebcaa049aa28"
       },
       {
-        "bytes": 86808,
-        "path": "docs/_static/readme-blanket-flow-7s.mp4",
-        "sha256": "ca7d72cebb564a28bc6f91b395824cd1a9417ad271dc8ba3c0cbf2c365f18c51"
+        "bytes": 61776,
+        "path": "docs/_static/readme-blanket-flow.webp",
+        "sha256": "43d28f5c7d75b31b9247562faa3d0661f51d47d6836a9ec7694d98de01344927"
       },
       {
         "bytes": 94236,
@@ -615,9 +615,19 @@
         "sha256": "e844f069475fa625279e229a3e8499ae816308b88c8d1d33afb4fb14077bf700"
       },
       {
+        "bytes": 114866,
+        "path": "docs/_static/readme-hunt-startup.webp",
+        "sha256": "d5d7af48435106ea12dd4604e5701bc6e707920c0b4e148ed1a2901ed220a4f6"
+      },
+      {
         "bytes": 48630,
         "path": "docs/_static/readme-magnetic-obstacle.webp",
         "sha256": "6e351e80531742b1aed6f951d6155cc55d3f5fd4f3e9b556a15336f76a74bc84"
+      },
+      {
+        "bytes": 117102,
+        "path": "docs/_static/readme-q2d-turbulence.webp",
+        "sha256": "56a89dca6f64d5f0e22600cbbc9473671f0faed6355f7fd223727819519831e5"
       },
       {
         "bytes": 41648,
@@ -625,14 +635,9 @@
         "sha256": "5d4b593c26a55cb031678988133ba2f6ddeae5e0cbee16a0e166282584bce569"
       },
       {
-        "bytes": 35171,
-        "path": "docs/_static/readme_hunt_startup_2d.mp4",
-        "sha256": "ad1095279f4af84ebdb5c2b1d4677aed322c8b54a11107cdc7ceda40268563b7"
-      },
-      {
-        "bytes": 13000,
-        "path": "docs/_static/readme_hunt_startup_2d_poster.webp",
-        "sha256": "a4ada2e53c72cd2a57da99db072fc47a5477784aaf4938fc8efa83318b3456a4"
+        "bytes": 74438,
+        "path": "docs/_static/samper_benchmark_a.webp",
+        "sha256": "c21b3385220a89da03321284dd14a3525a37bb37d592ab7dfc9354112895c21f"
       },
       {
         "bytes": 31616,

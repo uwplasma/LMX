@@ -12,7 +12,15 @@ The FreeMHD panel is generated from the accepted `85 x 63` primary observables
 in `benchmarks/results/benchmark-a-acceptance.json`.
 
 <p align="center">
-  <a href="_static/readme_hunt_startup_2d.mp4"><img src="_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt startup loop" width="55%"></a>
+  <img src="_static/samper_benchmark_a.webp" alt="Accepted Samper Benchmark A high-Hartmann validation ladder" width="82%">
+</p>
+
+The accepted Benchmark A composite reads the frozen eight-row Samper Table I
+aggregate only. It shows the analytical-flow, refinement, observed-order,
+current-closure, and power-closure gates; no solver was rerun for presentation.
+
+<p align="center">
+  <img src="_static/readme-hunt-startup.webp" alt="Seven-second Hunt startup loop" width="55%">
 </p>
 
 ## Accepted

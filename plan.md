@@ -603,11 +603,17 @@ labels maturity, generating record or command, observable, tolerance or
 uncertainty, and test owner. Prefer an existing writer and accepted compact
 record over a rerun; keep raw data and full-quality media outside Git.
 
-The visual backlog is evidence-ranked. The stale scaling panel and bounded
-operator-convergence gap are closed. P0 next: build one Samper/Benchmark-A
-composite from frozen JSON covering all eight high-Ha rows, mesh/order gates,
-and current/power residuals. P1: surface exact restart replay, the
-research-stage mapped-pipe comparison, and the portable fringing result. P2:
+Plots and movies are embedded directly in the README or owning docs page;
+poster-only links do not satisfy coverage. Small animations use reproducible
+Python/Pillow WebP compression, while source frames and full-quality MP4s stay
+in the checksummed release. Shared derivatives may appear on multiple pages
+without duplicating bytes.
+
+The visual backlog is evidence-ranked. The stale scaling panel, bounded
+operator-convergence gap, and frozen Samper/Benchmark-A composite are closed;
+the latter covers all eight high-Ha rows, mesh/order gates, and current/power
+residuals without rerunning a solver. P1 next: surface exact restart replay,
+the research-stage mapped-pipe comparison, and the portable fringing result. P2:
 one detailed composite each for Q2D external diagnostics, magnetic-obstacle
 literature comparison, and blanket current/pressure evidence. Keep the README
 to at most one new concise accepted-validation composite; detailed evidence
@@ -624,10 +630,11 @@ Aim for readable 6–8-second loops, stills below 100 KiB, tracked movies below
 full-quality media, meshes, and raw outputs in checksummed releases. Put
 provenance and acceptance status beside every asset.
 
-The README now links three dynamics loops at exactly 7.00 seconds: accepted
-Hunt startup plus research-stage blanket and Q2D flows. The 86,808-byte blanket
-derivative retimes its existing 5.75-second H.264 with motion interpolation;
-physical frames are unchanged and no solver rerun or tracked media was added.
+The README now displays three 7-second dynamics loops directly: accepted Hunt
+startup plus research-stage blanket and Q2D flows. Reproducible Python/Pillow
+compression samples existing physical frames to 42-frame animated WebPs; no
+solver or synthetic motion interpolation is involved. Full-quality MP4s remain
+release assets.
 
 The solver-free curved-pipe documentation tranche is complete: a 94,236-byte
 release-hosted WebP derives from the accepted bent-pipe overview and Dean
@@ -636,11 +643,9 @@ with Dean-vortex physics staged. No solver was rerun and no tracked media was
 added. Do not create a B2 movie from the bounded smoke or rejected coarse
 trajectories.
 
-The documentation source is now self-contained: seven already-compressed
-release derivatives are mirrored into `docs/_static/`, and the blanket page
-embeds its 7-second MP4 directly instead of tracking a redundant poster. The
-tracked set is 576,945 bytes across 12 files, below the 1 MiB media cap; no
-simulation or recompression was performed. Read the Docs still serves the
+The documentation source is now self-contained. The Hunt, blanket, and Q2D
+animations replace link-only posters and redundant tracked MP4s; all 14 tracked
+derivatives total 855,524 bytes, below the 1 MiB media cap. Read the Docs still serves the
 2026-05-01 build at `6be8622`. Build `33554636` failed with `commit: None` and
 Git exit 128 because the builder had no credentials to clone the private GitHub
 repository; the active repository webhook's latest response is HTTP 406. An

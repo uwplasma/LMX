@@ -52,7 +52,7 @@ These workflows are research-stage. Begin with the rectangular case, then add
 layers, mapped geometry, or tabulated fields one change at a time.
 
 <p align="center">
-  <video src="_static/readme-blanket-flow-7s.mp4" controls muted loop preload="metadata" width="62%">Seven-second reduced blanket-flow research workflow</video>
+  <img src="_static/readme-blanket-flow.webp" alt="Seven-second reduced blanket-flow research workflow" width="62%">
 </p>
 
 ## Restart

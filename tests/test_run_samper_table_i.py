@@ -8,6 +8,7 @@ import shutil
 import jax.numpy as jnp
 import pytest
 
+import scripts.manage_release_assets as release_assets
 import scripts.run_samper_table_i as samper_runner
 from lmx.freemhd import load_samper_table_i
 from scripts.build_benchmark_a_acceptance import build_acceptance, write_acceptance
@@ -342,6 +343,27 @@ def test_write_acceptance_is_deterministic(tmp_path: Path) -> None:
     write_acceptance(RESULTS, first)
     write_acceptance(RESULTS, second)
     assert first.read_bytes() == second.read_bytes()
+
+
+def test_acceptance_plot_uses_only_frozen_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        samper_runner,
+        "solve_steady",
+        lambda *args, **kwargs: pytest.fail("validation plot ran a solver"),
+    )
+    plot = tmp_path / "acceptance.webp"
+    assert (
+        release_assets.main(
+            [
+                "--write-benchmark-a-plot",
+                str(plot),
+            ]
+        )
+        == 0
+    )
+    assert plot.is_file() and plot.stat().st_size < 100_000
 
 
 @pytest.mark.parametrize("failure", ("fingerprint", "row"))

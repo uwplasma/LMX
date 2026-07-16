@@ -29,6 +29,7 @@ from scripts.manage_release_assets import (
     build_manifest,
     check_manifest,
     verify_archive,
+    write_animated_webp,
     write_manifest,
 )
 
@@ -256,6 +257,25 @@ def test_tracked_release_asset_manifest_matches_sources() -> None:
     assert showcase["bytes"] < 1024 * 1024
     assert len(showcase["files"]) <= 16
     assert check_manifest() == tracked
+
+
+def test_animated_webp_is_bounded_and_preserves_motion(tmp_path: Path) -> None:
+    from PIL import Image
+
+    source = tmp_path / "source.gif"
+    frames = [Image.new("RGB", (12, 8), (value, 0, 0)) for value in (0, 80, 160)]
+    frames[0].save(
+        source,
+        save_all=True,
+        append_images=frames[1:],
+        duration=80,
+        loop=0,
+    )
+    output = write_animated_webp(source, tmp_path / "motion.webp", width=24, fps=2)
+    with Image.open(output) as animation:
+        assert animation.size == (24, 16)
+        assert animation.n_frames >= 3
+    assert output.stat().st_size < 16_000
 
 
 def test_release_asset_archive_is_deterministic_and_verified(tmp_path: Path) -> None:
