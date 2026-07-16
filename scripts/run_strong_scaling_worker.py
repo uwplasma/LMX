@@ -43,6 +43,7 @@ _B2_RESTART_FLUX_ATOL = 1.0e-6
 _B2_RESTART_FLUX_RTOL = 1.0e-5
 _B2_REPEAT_ATOL = 2.0e-9
 _B2_REPEAT_RTOL = 2.0e-8
+_B2_PROFILE_ITERATION_ATOL = 3
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(
@@ -282,11 +283,21 @@ def _matched_b2_smoke_benchmark(
         float(np.max(np.abs(profile_signature - signatures[0]))))
     profile_signature_passed = (None if profile_signature is None else bool(np.allclose(
         profile_signature, signatures[0], rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL)))
-    profile_linear_history_passed = (None if profiled is None else all(np.array_equal(
-        np.asarray(getattr(profiled, name))[:, offset:],
-        np.asarray(getattr(direct, name))[:, offset:]) for name, offset in (
-            ("iteration_pressure_linear_history", 2),
+    profile_histories = (() if profiled is None else tuple((
+        np.asarray(getattr(profiled, name)), np.asarray(getattr(direct, name)), offset)
+        for name, offset in (("iteration_pressure_linear_history", 2),
             ("iteration_electric_linear_history", 3))))
+    profile_history_shapes_passed = all(left.shape == right.shape
+        for left, right, _ in profile_histories)
+    profile_linear_iteration_max_abs = (None if profiled is None else float(max(
+        (np.max(np.abs(left[:, offset] - right[:, offset]))
+            for left, right, offset in profile_histories), default=0.0))
+        if profile_history_shapes_passed else float("inf"))
+    profile_linear_history_passed = (None if profiled is None else bool(
+        profile_history_shapes_passed
+        and profile_linear_iteration_max_abs <= _B2_PROFILE_ITERATION_ATOL
+        and all(np.array_equal(left[:, offset + 1:], right[:, offset + 1:])
+            for left, right, offset in profile_histories)))
     acceptance_role = (
         "harness-smoke" if direct.u.shape == (8, 7, 7) else "scaling-calibration"
     )
@@ -393,6 +404,10 @@ def _matched_b2_smoke_benchmark(
         "profile_signature_max_abs": profile_signature_max_abs,
         "profile_signature_passed": profile_signature_passed,
         "profile_linear_history_passed": profile_linear_history_passed,
+        "profile_linear_iteration_max_abs": profile_linear_iteration_max_abs,
+        "profile_linear_iteration_absolute_tolerance": _B2_PROFILE_ITERATION_ATOL,
+        "electric_linear_history": np.asarray(
+            direct.iteration_electric_linear_history).tolist(),
         "profile_pressure_linear_history": (None if profiled is None else
             np.asarray(profiled.iteration_pressure_linear_history).tolist()),
         "profile_electric_linear_history": (None if profiled is None else

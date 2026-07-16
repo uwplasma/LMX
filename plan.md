@@ -129,7 +129,7 @@ deleting stale test-only velocity-statistics and solver-mask wrappers:
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,890 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,561,522 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,562,646 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -324,7 +324,9 @@ Schema-6 Anderson and one matched profile of the accepted current path are the
 next bounded workstreams. For each device count, run one untraced accepted
 two-update solve and one traced solve, then compare momentum, projection,
 electric, post-map/other critical-path time, line work, communication, launch
-gaps, and iteration counts. The 1.2x gate requires two-GPU wall time at or
+gaps, and iteration counts. The trace must preserve convergence/status exactly
+and may change a pressure/electric iteration count by at most three, matching
+the accepted default-XLA variation. The 1.2x gate requires two-GPU wall time at or
 below 2.3225 seconds, a 0.4387-second recovery. Continue only if one bounded,
 actionable category contributes at least 0.439 seconds of excess
 `T2_phase - T1_phase / 2`; tune communication only if it is at least 15% of
