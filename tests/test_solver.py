@@ -912,14 +912,20 @@ def test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting
 def test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid():
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
     sigma = jnp.ones((4, 4))
+    conductance_y = solvers._interface_conductance(mesh, sigma, axis=0)
+    conductance_z = solvers._interface_conductance(mesh, sigma, axis=1)
     diagonal, west, east, south, north = solvers._potential_coefficients(mesh, sigma)
 
-    expected = 1.0 / (mesh.dy[1] * 0.5 * (mesh.dy[1] + mesh.dy[2]))
-    assert west[2, 2] == pytest.approx(expected)
-    assert east[1, 2] == pytest.approx(expected)
-    assert south[2, 2] == pytest.approx(expected)
-    assert north[2, 1] == pytest.approx(expected)
-    assert diagonal[2, 2] == pytest.approx(4.0 * expected)
+    interface = 1.0 / (0.5 * mesh.dy[1] + 0.5 * mesh.dy[2])
+    coefficient = interface / mesh.dy[2]
+    assert conductance_y[1, 2] == pytest.approx(interface)
+    assert conductance_z[2, 1] == pytest.approx(interface)
+    assert all(field.shape == sigma.shape for field in (west, east, south, north))
+    assert west[2, 2] == pytest.approx(coefficient)
+    assert east[1, 2] == pytest.approx(coefficient)
+    assert south[2, 2] == pytest.approx(coefficient)
+    assert north[2, 1] == pytest.approx(coefficient)
+    assert diagonal[2, 2] == pytest.approx(4.0 * coefficient)
 
 
 def test_fully_developed_rhs_uses_lorentz_source_only_inside_fluid(
@@ -967,28 +973,6 @@ def test_fully_developed_rhs_uses_lorentz_source_only_inside_fluid(
     assert jnp.allclose(lorentz_source, lorentz)
     assert jnp.allclose(rhs[~fluid_mask], 0.0)
     assert jnp.allclose(rhs[fluid_mask], (0.5 + lorentz[fluid_mask]) / 2.0)
-
-
-def test_interface_and_face_conductances_match_uniform_rect_grid_symmetry():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=4, nz=4)
-    sigma = jnp.ones((4, 4))
-
-    conductance_y = solvers._interface_conductance(mesh, sigma, axis=0)
-    west, east = solvers._face_conductance(mesh, sigma, axis=0)
-    conductance_z = solvers._interface_conductance(mesh, sigma, axis=1)
-    south, north = solvers._face_conductance(mesh, sigma, axis=1)
-
-    expected = 1.0 / (0.5 * mesh.dy[1] + 0.5 * mesh.dy[2])
-    assert conductance_y[1, 2] == pytest.approx(expected)
-    assert conductance_z[2, 1] == pytest.approx(expected)
-    assert west.shape == sigma.shape
-    assert east.shape == sigma.shape
-    assert south.shape == sigma.shape
-    assert north.shape == sigma.shape
-    assert west[2, 2] == pytest.approx(expected / mesh.dy[2])
-    assert east[1, 2] == pytest.approx(expected / mesh.dy[1])
-    assert south[2, 2] == pytest.approx(expected / mesh.dz[2])
-    assert north[2, 1] == pytest.approx(expected / mesh.dz[1])
 
 
 def test_zero_conductivity_cells_are_exactly_disconnected_and_well_scaled():
