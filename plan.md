@@ -125,7 +125,7 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,683 | stay below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,681 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,618 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
@@ -145,6 +145,9 @@ Commit `a735cd7` removes another 66 lines by deleting three undocumented,
 unexported persistence/sampling wrappers and the duplicate direct-CLI guard;
 their generic owners remain. Commit `664da3c` adds 22 compact public-contract
 cases to the existing mesh and FreeMHD modules, with no new test file.
+Commit `26a6207` gives both scaling benchmarks one documented device-validation
+owner, removes two more package lines, and passes the five affected scaling
+tests; the next coherent code gate will fold it into the portable record.
 
 The portable-gate artifact keyed to `664da3c` records 838 passes, 8 expected
 external-data skips, 95.5539% combined line/branch coverage, and 148.4 seconds on
