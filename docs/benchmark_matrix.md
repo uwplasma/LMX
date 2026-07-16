@@ -12,7 +12,7 @@ records live in `benchmarks/`; large fields and movies live in releases.
 | A2 Shercliff/Hunt ducts | analytical profiles and Samper Table I | all eight frozen rows pass | verified |
 | A3 FreeMHD closed channel | audited inputs and four mesh levels | finest finite-grid observables below 1% | verified for frozen cases |
 | B1 ALEX pipe fringe | digitized pressure data and 3D solver | conservation passes; steady pressure gate open | research-stage |
-| B2 ALEX square fringe | digitized pressure data and 3D solver | canonical smoke, pressure-linear diagnostics, and bounded 1/2-GPU calibration pass; production parity and steady scaling remain open | research-stage |
+| B2 ALEX square fringe | digitized pressure data and 3D solver | canonical smoke and sharding pass; fresh current-formulation coarse conservation passes but steady convergence remains open | research-stage |
 | Q2D turbulence | reduced-model and adapter checks | independent turbulent parity required | staged |
 | Magnetic obstacle | qualitative topology checks | quantitative experimental parity required | staged |
 
@@ -78,6 +78,13 @@ B2 has exact-parity axial sharding on two RTX A4000 GPUs. B1 now uses its
 accepted compatible retained-modal pressure solver; experimental-observable,
 mesh-ladder, and final steady-response acceptance remain open. This is not yet
 a claim that the experimental pressure curve has passed.
+The first fresh current-formulation coarse trajectory (`102 x 77 x 77`) reaches
+its 128-update bound in 131.22 seconds on two RTX A4000 shards. All pressure
+solves and conservation gates pass, and the residual decreases monotonically,
+but its final `1.4302e-3` residual is above the frozen `5e-5` criterion. It is a
+bounded failed steady gate, not an accepted coarse result. Only exact restart
+continuations of that baseline are authorized; independence variants and
+larger meshes remain blocked.
 The legacy no-inertia, stationwise-flow B2 coarse campaign passes steady, conservation, tighter
 tolerance, doubled-iteration, and confirmation-wall gates. Its coarse ALEX
 curve alone does not pass the frozen literature limits (`weighted RMS 1.221`,

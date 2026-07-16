@@ -47,7 +47,11 @@ are authoritative when prose and results differ.
   variance leaves that fixed-grid ratio open. A stable doubled-axial rung
   reaches only 1.125x, below the scaling-promotion threshold. A three-update
   trajectory preserves all primary fields exactly. This is not production
-  parity or steady scaling. The fine pressure curve misses every frozen ALEX
+  parity or steady scaling. The first fresh current-formulation coarse
+  trajectory passes conservation and all 128 pressure solves, but stops at its
+  128-update bound with residual `1.4302e-3`, above the `5e-5` steady criterion.
+  It is therefore not promoted, and larger or independence runs remain blocked.
+  The legacy fine pressure curve misses every frozen ALEX
   literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from
   15.6% to 8.2% but worsens the plateau-sensitive aggregate error, so it is not

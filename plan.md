@@ -6,6 +6,9 @@ The isolated compiler trace is keyed to `f379f6b`; GPU workers use the
 optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
+The first fresh canonical-mesh coarse trajectory using the current formulation
+passes conservation and all linear-solver gates but reaches its 128-update
+bound before steady convergence; it is not promoted.
 The smoke closes bounded orchestration and comparison, not production B2
 acceptance. The current `128/256 x 67 x 67` GPU rungs close deterministic
 sharding and bounded two-update calibration, not production scaling. This
@@ -109,9 +112,9 @@ immutable evidence, richer projection, and target-driven paths remain):
 | package modules | 35 | no new module | 35 |
 | package lines | 34,997 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
-| test files / lines | 30 / 20,966 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,980 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,507,728 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,511,197 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -324,6 +327,26 @@ study, not a replacement acceptance case.
 Refresh README/docs B2 and scaling visuals only from compact accepted records.
 Every image states validation status and provenance; no superseded result is
 silently relabelled.
+
+The first fresh current-formulation coarse baseline at `102 x 77 x 77` runs on
+two RTX A4000 shards in 131.22 seconds. All 128 pressure solves converge with
+complete diagnostics; mass, divergence, charge, and boundary-current gates
+pass. The nonlinear residual falls monotonically from `0.9621` to `1.4302e-3`
+but does not reach `5e-5`, so the run correctly stops at the 128-update bound
+with no steady streak. Its last 16 updates are strictly decreasing with a
+log-linear fit of `R^2=0.9999998`; extrapolation suggests a first crossing near
+step 519 but is not acceptance evidence. The compact record is
+`benchmarks/results/b2-current-coarse-baseline-20260715.json`; the 45.7 MB
+restart remains outside Git.
+
+Run one exact 128-update continuation from restart hash `1d6491e3...` and stop
+again unless its step-256 residual is at most `5.5e-4`, every pressure solve
+converges with complete diagnostics, conservation remains within `1e-3`, and
+the residual tail remains decreasing. A passing continuation authorizes only
+the next baseline continuation, in the same bounded increments, until the
+`5e-5` criterion holds for three updates. It does not authorize tolerance,
+wall, medium, fine, or production-FreeMHD work; those remain blocked until the
+fresh coarse baseline converges.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
 experimental comparison with uncertainty, reproducible environments, and a

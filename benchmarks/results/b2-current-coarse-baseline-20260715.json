@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "case_id": "B2-fringing-square",
+  "acceptance_role": "canonical-coarse-current-formulation",
+  "status": "bounded-step-limit",
+  "promoted": false,
+  "source": {
+    "git_commit": "84386648349953efc4aa857163971bda6a215265",
+    "fingerprint": "4269b84600d9fd15c1151d7acfbd7e8550dbf283c8d142e88f8b17505d326ef9",
+    "runner_sha256": "fd9754c8f5ba88fa7aac715a9d80c8094a777020573903e9a029d3f8457de980",
+    "spec_sha256": "ff25b098e656671e605485ff771a89fe787a70c1c32cb67a5ea97461337f557c"
+  },
+  "environment": {
+    "python": "3.13.12",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "solvax": "0.8.3",
+    "precision": "float64",
+    "devices": ["NVIDIA RTX A4000", "NVIDIA RTX A4000"],
+    "driver": "580.119.02"
+  },
+  "execution": {
+    "mesh_shape": [102, 77, 77],
+    "initialization": "frozen_initial_state",
+    "spatial_shards": 2,
+    "completed_steps": 128,
+    "runner_seconds": 131.21998131799046,
+    "stop_reason": "step_limit",
+    "final_steady_streak": 0
+  },
+  "nonlinear": {
+    "tolerance": 0.00005,
+    "first_residual": 0.9621080296186603,
+    "final_and_minimum_residual": 0.0014302057484858466,
+    "last_16_strictly_decreasing": true,
+    "last_16_log_slope_per_step": -0.008584362,
+    "last_16_log_fit_r_squared": 0.999999842,
+    "extrapolated_first_crossing_step": 519,
+    "extrapolation_is_acceptance_evidence": false,
+    "final_component_residuals_u_v_w_div_flow_charge": [
+      0.0014302057484858466,
+      0.000001691934618651414,
+      0.0000004268434203326648,
+      0.0000008823174474925644,
+      8.881784197001252e-16,
+      0.0003084130585193634
+    ]
+  },
+  "linear_solves": {
+    "pressure_solve_count": 128,
+    "pressure_all_converged": true,
+    "pressure_diagnostics_complete": true,
+    "pressure_iterations_min_mean_max": [95, 102.3828125, 191],
+    "pressure_absolute_residual_max": 9.987739040881144e-13,
+    "electric_solve_count": 128,
+    "electric_all_converged": true,
+    "electric_iterations_min_mean_max": [62, 63.6875, 88]
+  },
+  "conservation": {
+    "final_divergence_residual": 8.823174474925644e-7,
+    "volumetric_flow_rate_span": 3.68594044175552e-14,
+    "max_charge_balance_residual": 0.0003084130585193634,
+    "net_boundary_current_residual": 3.1754189938746327e-14,
+    "max_wall_current_leakage": 0.0,
+    "max_courant": 0.000008016831892457443
+  },
+  "gates": {
+    "steady_residual": false,
+    "mass_balance": true,
+    "current_balance": true,
+    "boundary_current": true,
+    "sustained_stopping": false,
+    "pressure_linear_diagnostics": true,
+    "pressure_solve_convergence": true
+  },
+  "external_artifacts": {
+    "run_json_bytes": 85101,
+    "run_json_sha256": "18d1d63a39636167d1a1f24c1fd70c3f83c5d4a427626b9fc8991b06ecf48bb0",
+    "restart_bytes": 45717394,
+    "restart_sha256": "1d6491e372db0deb1f1e2363caba4d07efc9105a379fea98aa95b0bc589612a1",
+    "disposition": "untracked working checkpoint; incomplete evidence is not a release asset"
+  },
+  "decision": {
+    "independence_variants_authorized": false,
+    "medium_or_fine_authorized": false,
+    "freemhd_production_run_authorized": false,
+    "next_probe": "one exact 128-update continuation from the checksummed current-formulation restart",
+    "next_probe_residual_max": 0.00055,
+    "next_probe_requires_all_existing_gates": true
+  }
+}
