@@ -39,7 +39,7 @@ serve one claim family.
 
 ## Tracked web set
 
-Twenty files in `docs/_static/` total 1,268,448 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,259,960 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -54,7 +54,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | Q2D external diagnostics | 87,350 | 1,000 × 1,509 WebP | released sources `5bc14089...` and `11f452c1...`; external parity explicitly open |
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
-| B2 schema-6 scaling evidence | 85,752 | 1,400 × 1,860 WebP | forced-device CPU calibration, sustained Docker CPU-allocation scaling, and sustained shared-host GPU calibration; exact host-core and GPU idle-host claims remain open |
+| B2 schema-6 scaling evidence | 77,264 | 1,400 × 1,860 WebP | forced-device CPU calibration, sustained Docker CPU-allocation scaling, and sustained shared-host GPU calibration; exact host-core and GPU idle-host claims remain open |
 | Hunt/Shercliff startup | 75,998 | 800 × 260 animated WebP, 7 s | 35 physical samples from current-source Hunt `934c9aea...` and Shercliff `3188bd21...` GIFs; no interpolation |
 | checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |

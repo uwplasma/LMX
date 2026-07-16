@@ -86,8 +86,8 @@ observables pass the 1% finite-grid gate.
 ## Real geometries and nonuniform fields
 
 <p align="center">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-geometries.webp" alt="Rectangular, layered, and mapped-pipe geometries" width="48%">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform-field response and charge conservation" width="48%">
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-geometries.webp" alt="Rectangular, layered, and mapped-pipe geometries" width="48%">
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-variable-field.webp" alt="Nonuniform-field response and charge conservation" width="48%">
 </p>
 
 ![B2 fringe field, pressure, and acceleration diagnostics](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-alex-b2-field-pressure.webp)
@@ -99,7 +99,7 @@ remain open.
 
 ## Follow curved pipes
 
-![Bent-pipe baseline and Dean-vortex literature gate](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-curved-pipes.webp)
+![Bent-pipe baseline and Dean-vortex literature gate](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-curved-pipes.webp)
 
 Mapped pipes support a low-De inductionless baseline; Dean-vortex physics is
 staged behind a literature gate. [Geometry status →](https://lmx.readthedocs.io/en/latest/geometry.html)
@@ -114,7 +114,7 @@ below 10% at `Ha = 220`; experimental and blanket-level validation remain open.
 
 ## Differentiate selected workflows
 
-![LMX sensitivity and inverse design](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-autodiff.webp)
+![LMX sensitivity and inverse design](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-autodiff.webp)
 
 Promoted objectives pass finite-difference or independent-transpose checks.
 [Differentiable workflows →](https://lmx.readthedocs.io/en/latest/autodiff.html)
@@ -122,7 +122,7 @@ Promoted objectives pass finite-difference or independent-transpose checks.
 ## Explore research flows
 
 <p align="center">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
   <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-blanket-flow.webp" alt="Seven-second reduced blanket-flow movie" width="48%">
 </p>
 
