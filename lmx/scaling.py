@@ -182,6 +182,7 @@ _SUSTAINED_WARM_SAMPLES = 3
 def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
     """Re-derive multi-minute eligibility instead of trusting a worker flag."""
 
+    contract = record.get("timing_contract")
     try:
         samples = np.asarray(record.get("warm_samples_seconds", ()), dtype=float)
         repeats = int(record.get("repeats", 0))
@@ -193,6 +194,12 @@ def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
     return bool(
         record.get("benchmark_kind") == "matched_b2_smoke"
         and record.get("acceptance_role") == "sustained-candidate"
+        and isinstance(contract, Mapping)
+        and contract.get("cold_sample_count") == 1
+        and contract.get("compile_in_cold_sample") is True
+        and contract.get("warm_samples_exclude_compilation") is True
+        and contract.get("synchronization") == "jax.block_until_ready"
+        and contract.get("timed_observers_excluded") is True
         and samples.ndim == 1
         and samples.size >= _SUSTAINED_WARM_SAMPLES
         and repeats == samples.size + 1
@@ -229,22 +236,48 @@ def _continuous_environment_evidence(record: Mapping[str, object]) -> bool:
             monitor["sample_period_seconds"], monitor["max_sample_gap_seconds"]))
         monitored = float(monitor["monitored_worker_seconds"])
         postflight = float(monitor["postflight_seconds"])
+        monitor_start, worker_start, worker_end, monitor_end = map(float, (
+            monitor["monitor_started_unix_seconds"],
+            monitor["worker_started_unix_seconds"],
+            monitor["worker_ended_unix_seconds"],
+            monitor["monitor_ended_unix_seconds"],
+        ))
         required = float(record.get("cold_seconds", 0.0)) + float(np.sum(
             np.asarray(record.get("warm_samples_seconds", ()), dtype=float)))
     except (KeyError, TypeError, ValueError):
         return False
     return bool(
-        monitor.get("schema_version") == 1
+        monitor.get("schema_version") == 2
         and monitor.get("scope") == "continuous-and-postflight"
         and monitor.get("backend") == str(record.get("backend", "")).lower()
         and monitor.get("num_devices") == record.get("num_devices")
+        and monitor.get("source_fingerprint") == record.get("source_fingerprint")
+        and record.get("source_fingerprint") not in (None, "")
         and monitor.get("verified") is True
         and len(digest) == 64 and set(digest) <= set("0123456789abcdef")
         and 0.0 < period <= gap <= 5.0
         and monitored >= required > 0.0
         and postflight >= 15.0
+        and np.all(np.isfinite((monitor_start, worker_start, worker_end, monitor_end)))
+        and 0.0 <= monitor_start <= worker_start < worker_end <= monitor_end
+        and monitored >= worker_end - worker_start
+        and monitor_end - worker_end >= postflight
         and monitor.get("violation_count") == 0
     )
+
+
+def _warm_timing_stable(record: Mapping[str, object]) -> bool:
+    """Recompute a bounded warm coefficient of variation from raw samples."""
+
+    try:
+        samples = np.asarray(record.get("warm_samples_seconds", ()), dtype=float)
+        if samples.ndim != 1 or not samples.size:
+            return False
+        mean = float(np.mean(samples))
+        cv = float(np.std(samples) / mean)
+    except (TypeError, ValueError):
+        return False
+    return bool(mean > 0.0 and np.isfinite(cv) and cv <= 0.05)
 
 
 def _sustained_group(records: Sequence[Mapping[str, object]],
@@ -278,6 +311,7 @@ def _sustained_group(records: Sequence[Mapping[str, object]],
         "complete_topology": bool(required) and tuple(observed) == required,
         "fixed_work_identity": identity,
         "all_rows_sustained": all(bool(row["sustained_timing_eligible"]) for row in rows),
+        "timing_stability": all(_warm_timing_stable(record) for record in records),
         "numerical_equivalence": all(bool(row["validation_passed"])
             and bool(row["physics_equivalent"]) and bool(row["solver_faithful"])
             for row in rows),

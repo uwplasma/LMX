@@ -59,10 +59,11 @@ and 1.41/1.31 GB on two. The fixed-work harness accepts
 an explicit update count, checkpoints at the deterministic midpoint, replays
 the remaining trajectory, and requires one cold plus at least three warm
 trajectories, with every warm sample lasting at least 120 s, for a sustained
-claim; the two-update default remains the bounded CI/debug gate. The scaling
-summary re-derives duration from finite warm samples, repeat count, the declared
-threshold, median, role, and worker assertions; it never trusts a candidate
-boolean. It fails closed unless one exact 1/2/4-shard CPU or
+claim; the two-update default remains the bounded CI/debug gate. One
+`--sustained` preset selects `256 x 67 x 67`, 32 CPU or 96 GPU updates, four
+repeats, and an 1800-second ceiling. The summary re-derives duration, the
+explicit cold/compile timing contract, median, and warm CV (at most 5%); it
+never trusts a candidate boolean. It fails closed unless one exact 1/2/4-shard CPU or
 1/2-GPU group shares provenance and fixed work and passes sustained duration,
 real-solver numerics, placement, peak memory, explicit affinity/idle-host
 preflight, and checksummed continuous/postflight monitoring. Incomplete
@@ -311,58 +312,17 @@ blind 8/10-device or larger rung. The next performance experiment must profile
 the remaining halo, Krylov/gauge reduction, and replicated axial-mean costs on
 an accepted longer workload; do not infer its priority from this two-step run.
 
-A paired `128 x 35 x 35` four-device probe tested removing the separate
-axial-mean correction when the global transverse modal basis is active. Fields
-and iteration counts stayed identical, but the warm median regressed from
-0.8138 to 0.8740 seconds (7.4%). Reject that deletion and do not launch the
-large rung from it; the first apparent gain was shared-worktree/cache-order
-noise. The next optimization requires an isolated profile, not another
-preconditioner hypothesis. A four-device `128 x 35 x 35` trace then records 139
-electric PCG iterations with one all-reduce, one coarse all-gather, and two halo
-permutations per iteration. Their per-device totals are each about 13 ms over a
-744 ms solve, below 2% and the predeclared 3% gauge trigger; there is no separate
-second gauge collective. Reject the mathematically valid anchored-gauge
-prototype for this tranche. The remaining local gap is compute/scheduling
-dominated, so do not launch another large forced-device rung without a new
-profiled target or a controlled physical-core execution method.
+The rejected small probes—axial-mean deletion, anchored gauge, forced-macOS
+thread flags, batched transverse lines, and the unsteady `64 x 27 x 27` Docker
+lane—are preserved in checksummed evidence rather than repeated here. None met
+its frozen end-to-end promotion gate. Do not revive one without a new profile
+and hypothesis. Physical-core claims require verifiable affinity or partitioned
+worker pools; forced macOS devices share a runtime pool and prove topology only.
 
-The common macOS single-thread XLA recipe does not provide that control: paired
-one-device profiles use 11 HLO worker threads both with and without the flags,
-and medians are indistinguishable at 0.995 and 1.000 seconds. Forced devices
-therefore share one runtime pool and remain a sharding calibration. HLO then
-identified the two transverse SOLVAX Thomas traversals as a 6.7% candidate.
-Batching them is algebraically exact and halves the isolated traversal, but the
-full four-device median improves only 0.85% (`0.7437` to `0.7374` seconds).
-Reject the added square-grid fast path before the large rung. A physical-core
-claim requires a runtime/host with verifiable affinity or partitioned worker
-pools; unsupported flag recipes are not evidence.
-
-A disposable native-ARM64 Docker lane now provides verifiable Linux CPU masks
-with JAX 0.10.2 and SOLVAX 0.8.4. Its bounded real-solver probe confirms one,
-two, and four physical shards and field-norm agreement within `5.2e-14`, but
-the small `64 x 27 x 27` total grid slows from 0.530 s to 0.575/0.693 s. It is
-also unsteady: continuation improves the update residual to `1.02e-4` at 256
-updates before rising to `1.72e-4` at 384, above the `5e-5` gate. Reject those
-timings and do not plot them as scaling evidence.
-
-An `afd17d6`-source `128 x 67 x 67` matched schema-6 pilot then establishes the
-bounded CPU-allocation path without a blind steady solve. One guest CPU per JAX
-device is invalid: two devices on two CPUs hit the 40-second all-reduce rendezvous
-abort. The tiny preflight passes with two guest CPUs per device, so the
-measured ladder uses nested 2/4/8-CPU masks for 1/2/4 devices. Warm medians are
-7.351, 5.546, and 4.574 seconds, giving 1.325x/1.607x speedups and
-66.3%/40.2% efficiency; CVs are below 2.2%. Schema-6, affinity, placement,
-restart, repeat, conservation, linear, Anderson, and cross-topology gates all
-pass. Accept this as a two-update affinity-controlled pilot only. It authorizes one
-six-repeat `256 x 67 x 67` confirmation with the frozen 1.20x/1.40x
-confidence-bound and 60%/35% efficiency gates, not a steady-production claim.
-
-That confirmation is complete. Its 22.894/15.953/14.252-second warm medians
-give 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds, and
-71.8%/40.2% efficiency; all correctness and calibration gates pass. These are
-five repeated samples of a two-update trajectory, not sustained strong scaling.
-The generalized fixed-work worker then rejected a 20-update duration pilot at
-95.63--97.51 s and promoted 32 updates. On identical `256 x 67 x 67` input,
+Seconds-scale affinity pilots established the nested 2/4/8-CPU allocation and
+correctness contract but remain debug evidence. A 20-update duration pilot was
+also too short, so the sustained protocol uses 32 updates. On identical
+`256 x 67 x 67` input,
 the current `a92b4e6` 1/2/4-device ladder uses 2/4/8 CPU allocations and reports
 246.702/187.307/146.524-second warm medians. Speedups are 1.317x/1.684x,
 empirical 95% lower bounds are 1.301x/1.661x, and efficiencies are 65.9%/42.1%.

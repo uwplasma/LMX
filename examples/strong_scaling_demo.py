@@ -595,7 +595,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--iterations", type=int, default=None)
     parser.add_argument("--cpu-iterations", type=int, default=None)
     parser.add_argument("--gpu-iterations", type=int, default=None)
-    parser.add_argument("--repeats", type=int, default=2)
+    parser.add_argument("--repeats", type=int)
     parser.add_argument("--cpu-counts", type=str, default="1,2,4")
     parser.add_argument("--gpu-counts", type=str, default="1,2")
     parser.add_argument("--cpu-nx", type=int, default=2048)
@@ -613,8 +613,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--minimum-warm-seconds",
         type=float,
-        default=0.0,
         help="Require every warm fixed-work trajectory to meet this duration.",
+    )
+    parser.add_argument(
+        "--sustained", action="store_true",
+        help="Use the multi-minute matched-B2 CPU/GPU scaling contract.",
     )
     parser.add_argument("--cpu-environment-evidence", type=Path)
     parser.add_argument("--gpu-environment-evidence", type=Path)
@@ -637,7 +640,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Collect a JAX trace for the first repeat of each worker.",
     )
     args = parser.parse_args(argv)
-    if args.benchmark_kind == "matched_b2_smoke" and args.repeats < 4:
+    if args.sustained and args.benchmark_kind != "matched_b2_smoke":
+        parser.error("--sustained requires --benchmark-kind matched_b2_smoke")
+    repeats = args.repeats if args.repeats is not None else (4 if args.sustained else 2)
+    minimum_warm_seconds = (
+        args.minimum_warm_seconds if args.minimum_warm_seconds is not None
+        else (120.0 if args.sustained else 0.0)
+    )
+    if args.sustained and minimum_warm_seconds < 120.0:
+        parser.error("--sustained requires --minimum-warm-seconds >= 120")
+    if args.benchmark_kind == "matched_b2_smoke" and repeats < 4:
         parser.error("matched_b2_smoke requires --repeats 4 or greater")
     if args.benchmark_kind == "matched_b2_smoke" and args.profile:
         parser.error("profile matched_b2_smoke in a separate untimed run")
@@ -650,20 +662,23 @@ def main(argv: list[str] | None = None) -> int:
         args.gpu_iterations if args.gpu_iterations is not None else shared_iterations
     )
     if cpu_iterations is None:
-        cpu_iterations = 2 if args.benchmark_kind == "matched_b2_smoke" else 1024
+        cpu_iterations = 32 if args.sustained else (
+            2 if args.benchmark_kind == "matched_b2_smoke" else 1024)
     if gpu_iterations is None:
-        gpu_iterations = 2 if args.benchmark_kind == "matched_b2_smoke" else 2048
+        gpu_iterations = 96 if args.sustained else (
+            2 if args.benchmark_kind == "matched_b2_smoke" else 2048)
 
     cpu_problem = (args.cpu_nx, args.cpu_ny, args.cpu_nz)
     gpu_problem = (args.gpu_nx, args.gpu_ny, args.gpu_nz)
     if args.benchmark_kind == "matched_b2_smoke":
+        defaults = (256, 67, 67) if args.sustained else (8, 7, 7)
         cpu_problem = tuple(
             default if value == old else value
-            for value, old, default in zip(cpu_problem, (2048, 64, 64), (8, 7, 7))
+            for value, old, default in zip(cpu_problem, (2048, 64, 64), defaults)
         )
         gpu_problem = tuple(
             default if value == old else value
-            for value, old, default in zip(gpu_problem, (6144, 96, 96), (8, 7, 7))
+            for value, old, default in zip(gpu_problem, (6144, 96, 96), defaults)
         )
     if args.benchmark_kind == "extruded_solve":
         if args.cpu_restart is None:
@@ -693,12 +708,13 @@ def main(argv: list[str] | None = None) -> int:
         python_executable=args.python,
         remote_host=args.remote_host,
         remote_dir=args.remote_dir,
-        repeats=args.repeats,
+        repeats=repeats,
         profile_dir=args.output / "profiles" if args.profile else None,
         cpu_restart_path=args.cpu_restart,
         gpu_restart_path=args.gpu_restart,
-        timeout_seconds=args.worker_timeout,
-        minimum_warm_seconds=args.minimum_warm_seconds,
+        timeout_seconds=1800.0 if args.worker_timeout is None and args.sustained
+        else args.worker_timeout,
+        minimum_warm_seconds=minimum_warm_seconds,
         cpu_environment_evidence=args.cpu_environment_evidence,
         gpu_environment_evidence=args.gpu_environment_evidence,
         source_commit=args.source_commit,

@@ -283,31 +283,31 @@ def _sustained_ladder(counts, backend="cpu"):
     for count in counts:
         warm = 488.0 / count
         samples = [warm - 1.0 / count, warm, warm + 1.0 / count]
-        record = _worker_record(backend=backend,
+        monitored = 20.0 / count + sum(samples)
+        record = _worker_record(backend=backend, num_devices=count, repeats=4,
             device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
-            num_devices=count, repeats=4, cold_seconds=20.0 / count,
-            warm_seconds=warm, mean_seconds=warm,
+            cold_seconds=20.0 / count, warm_seconds=warm, mean_seconds=warm,
             benchmark_kind="matched_b2_smoke", operator_path="solve_extruded_inductionless",
-            memory_bytes_estimate=2 * 1024 * 1024,
-            spatially_sharded=count > 1, global_shard_count=count,
-            velocity_l2=3.0, potential_l2=2.0, current_l2=1.0,
-            validation_passed=True)
+            memory_bytes_estimate=2**21, spatially_sharded=count > 1,
+            global_shard_count=count, velocity_l2=3.0, potential_l2=2.0,
+            current_l2=1.0, validation_passed=True)
         records.append({**record.__dict__, "source_fingerprint": "source", "source_commit": "commit",
             "input_sha256": "input", "evaluator_sha256": "evaluator",
             "precision": "float64", "jaxlib_version": "0.x", "solvax_version": "0.x",
-            "peak_host_rss_bytes": 4 * 1024 * 1024,
+            "peak_host_rss_bytes": 2**22, "resource_environment_verified": True,
             "device_memory": ([{"peak_bytes_in_use": 1024} for _ in range(count)]
                 if backend == "gpu" else []),
-            "resource_environment_verified": True,
-            "acceptance_role": "sustained-candidate",
-            "minimum_warm_seconds": 120.0,
-            "sustained_minimum_warm_seconds": 120.0,
-            "warm_samples_seconds": samples,
-            "resource_monitoring": {"schema_version": 1,
-                "scope": "continuous-and-postflight", "backend": backend,
-                "num_devices": count, "verified": True, "raw_sha256": "a" * 64,
+            "acceptance_role": "sustained-candidate", "minimum_warm_seconds": 120.0,
+            "sustained_minimum_warm_seconds": 120.0, "warm_samples_seconds": samples,
+            "timing_contract": run_strong_scaling_worker._B2_TIMING_CONTRACT,
+            "resource_monitoring": {"schema_version": 2,
+                "scope": "continuous-and-postflight", "backend": backend, "num_devices": count,
+                "verified": True, "raw_sha256": "a" * 64, "source_fingerprint": "source",
                 "sample_period_seconds": 2.0, "max_sample_gap_seconds": 2.0,
-                "monitored_worker_seconds": record.cold_seconds + sum(samples),
+                "monitored_worker_seconds": monitored,
+                "monitor_started_unix_seconds": 99.0, "worker_started_unix_seconds": 100.0,
+                "worker_ended_unix_seconds": 100.0 + monitored,
+                "monitor_ended_unix_seconds": 115.0 + monitored,
                 "postflight_seconds": 15.0, "violation_count": 0},
             "requested_duration_passed": True, "sustained_duration_passed": True,
             "sustained_timing_eligible": True, "timed_signature_excluded": True})
@@ -315,10 +315,9 @@ def _sustained_ladder(counts, backend="cpu"):
 
 
 def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
-    with pytest.raises(SystemExit):
-        strong_scaling_demo.main(["--benchmark-kind", "extruded_solve"])
-    with pytest.raises(SystemExit):
-        strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke"])
+    for kind in ("extruded_solve", "matched_b2_smoke"):
+        with pytest.raises(SystemExit):
+            strong_scaling_demo.main(["--benchmark-kind", kind])
     options = {}
     monkeypatch.setattr(strong_scaling_demo, "run_strong_scaling_demo", options.update)
     arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
@@ -327,24 +326,20 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     assert options["cpu_problem"] == (16, 7, 7) and options["gpu_problem"] == (8, 7, 7)
     assert options["timeout_seconds"] == 45.0 and options["source_commit"] == "abc"
     assert options["cpu_iterations"] == options["gpu_iterations"] == 2
-    assert strong_scaling_demo.main([
-        *arguments, "--iterations", "6", "--minimum-warm-seconds", "120",
-    ]) == 0
-    assert options["cpu_iterations"] == options["gpu_iterations"] == 6
-    assert options["minimum_warm_seconds"] == 120.0
+    assert strong_scaling_demo.main([*arguments, "--iterations", "6", "--minimum-warm-seconds", "120"]) == 0
+    assert (options["cpu_iterations"], options["gpu_iterations"], options["minimum_warm_seconds"]) == (6, 6, 120.0)
+    assert strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke", "--sustained"]) == 0
+    assert options["cpu_problem"] == options["gpu_problem"] == (256, 67, 67)
+    assert (options["cpu_iterations"], options["gpu_iterations"], options["repeats"]) == (32, 96, 4)
+    assert options["minimum_warm_seconds"] == 120.0 and options["timeout_seconds"] == 1800.0
 
 
-def test_scaling_worker_command_forwards_restart(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) -> None:
     output = tmp_path / "record.json"
     output.write_text("{}")
     commands: list[list[str]] = []
-    monkeypatch.setattr(
-        strong_scaling_demo.subprocess,
-        "run",
-        lambda command, **kwargs: commands.append(command),
-    )
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run",
+        lambda command, **kwargs: commands.append(command))
 
     strong_scaling_demo._run_worker(
         python_executable="python",
@@ -514,6 +509,9 @@ def test_sustained_claim_fails_closed_on_incomplete_evidence():
     gpu_memory = _sustained_ladder((1, 2), "gpu")
     gpu_memory[-1]["device_memory"][0].pop("peak_bytes_in_use")
     bad.append(gpu_memory)
+    noisy = _sustained_ladder((1, 2, 4))
+    noisy[-1].update(warm_samples_seconds=[120.0, 121.0, 180.0], warm_seconds=121.0)
+    bad.append(noisy)
     for field, value in (("schema_version", 0), ("scope", "preflight"),
             ("backend", "gpu"), ("num_devices", 8), ("verified", False),
             ("raw_sha256", "A" * 64), ("sample_period_seconds", 0.0),
@@ -563,7 +561,8 @@ def test_complete_sustained_ladder_passes_group_gate(backend, counts):
     assert summary["best_sustained_speedup"] == pytest.approx(float(counts[-1]))
     assert all(summary["sustained_groups"][0][gate] for gate in (
         "complete_topology", "fixed_work_identity", "memory_complete",
-        "environment_verified", "continuous_environment_verified", "placement"))
+        "environment_verified", "continuous_environment_verified", "timing_stability",
+        "placement"))
 
 
 def test_shard_placement_reports_partitioning_and_rejects_replication():

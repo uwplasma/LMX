@@ -345,17 +345,16 @@ The matched-B2 worker keeps two updates as its fast debug/CI default. Such runs
 can verify numerics but are never scaling evidence. A sustained record must
 predeclare a two-minute minimum, run one cold plus at least three warm
 trajectories per rung, and require every warm trajectory to meet it; direct and
-midpoint-restart paths must still finish identically. The accepted workload
-uses 32 CPU updates and 96 GPU updates:
+midpoint-restart paths must still finish identically. The sustained preset uses
+256 × 67 × 67, 32 CPU updates, 96 GPU updates, four repeats, a 120-second warm
+minimum, and an 1800-second worker ceiling:
 
 ```bash
 python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
-  --cpu-nx 256 --cpu-ny 67 --cpu-nz 67 --cpu-iterations 32 \
-  --gpu-nx 256 --gpu-ny 67 --gpu-nz 67 --gpu-iterations 96 \
-  --repeats 4 --minimum-warm-seconds 120 --worker-timeout 1800 \
+  --sustained --remote-host office \
   --source-commit "$(git rev-parse HEAD)" \
   --cpu-environment-evidence artifacts/cpu-admission.json \
-  --gpu-environment-evidence artifacts/gpu-admission.json --remote-host office
+  --gpu-environment-evidence artifacts/gpu-admission.json
 ```
 
 Sustained mode validates a checksummed 60-second admission JSON before each
@@ -374,11 +373,12 @@ exact M4 P/E-core placement. GPU admission must be repeated between rungs and
 after the campaign. New timing evidence also needs a checksummed host-side
 continuous monitor through every rung and a clean postflight; the static
 preflight alone cannot detect work that starts later. Keep its raw trace as an
-ignored or release artifact. Each worker record must carry compact schema-1
+ignored or release artifact. Each worker record must carry compact schema-2
 `resource_monitoring` evidence: matching backend/device count, a raw SHA-256,
-sample period and maximum gap at most five seconds, full cold-plus-warm worker
-coverage, at least 15 postflight seconds, and zero violations. Missing or
-malformed monitoring leaves timings visible as candidates but blocks promotion.
+source fingerprint, bracketed worker timestamps, sample period and maximum gap
+at most five seconds, full cold-plus-warm coverage, at least 15 postflight
+seconds, and zero violations. Missing or malformed monitoring leaves timings
+visible as candidates but blocks promotion.
 This manual lane stays outside portable tests.
 
 The solver-faithful example requires a validated restart matching each timed
