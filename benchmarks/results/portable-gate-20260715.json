@@ -1,5 +1,5 @@
 {
-  "schema_version": 14,
+  "schema_version": 15,
   "date": "2026-07-16",
   "commit": "a50b8681ab866970066113492510832ff076446b",
   "hardware": {
@@ -67,19 +67,20 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
+    "source_commit": "a207bf9c3e9fd2a29b5dc754941ce2656330ccdf",
     "package_modules": 35,
     "package_lines": 34809,
     "maintained_core_lines": 7896,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 3325967,
+    "tracked_checkout_bytes": 3324483,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
   "distribution": {
-    "source_commit": "2f49e659f41fa819b7d30e3e52c932c984d62a25",
-    "wheel_bytes": 313977,
+    "source_commit": "a207bf9c3e9fd2a29b5dc754941ce2656330ccdf",
+    "wheel_bytes": 313854,
     "wheel_members": 48,
-    "sdist_bytes": 296787,
+    "sdist_bytes": 296630,
     "sdist_members": 54,
     "twine_passed": true,
     "clean_python": "3.12.13",
@@ -87,7 +88,7 @@
     "clean_solvax": "0.8.3",
     "matplotlib_in_core_install": false,
     "pillow_in_core_install": false,
-    "tiny_hartmann_residual": 9.992044608386763e-9,
+    "tiny_hartmann_residual": 9.950455126528368e-9,
     "numerical_modules_import_without_visualization": true
   },
   "hosted_ci": {

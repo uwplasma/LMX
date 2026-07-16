@@ -3,7 +3,7 @@
 Status: 2026-07-16. The current two-update B2/FreeMHD smoke and schema-5
 stopping contract are keyed to `0ab33b2`; current one-/two-/four-CPU-device
 equivalence is keyed to `4c94389`.
-The installable-distribution contract is keyed to `2f49e65`: frozen benchmark
+The installable-distribution contract is keyed to `a207bf9`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
 longer installs or eagerly imports Matplotlib and Pillow.
@@ -129,7 +129,7 @@ shared without removing cases or assertions.
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,484 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,324,418 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,324,483 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -144,13 +144,13 @@ six-worker record reports 52.5 seconds for weighted modal and 47.9 seconds for
 reduced B2; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
 
-The clean distribution audit at `2f49e65` produces a 313,977-byte wheel with
-48 members and a 296,787-byte source archive with 54 members. Both pass Twine;
+The clean distribution audit at `a207bf9` produces a 313,854-byte wheel with
+48 members and a 296,630-byte source archive with 54 members. Both pass Twine;
 the wheel is limited to package source, seven frozen data files, and metadata,
 while the source archive adds only build metadata, README, license, and
 manifest. A Python 3.12 clean install resolves JAX 0.10.2 and SOLVAX 0.8.3,
 loads every packaged Benchmark A/B and Samper reference outside the checkout,
-and reaches a `9.99e-9` residual on a tiny Hartmann solve. Matplotlib and Pillow
+and reaches a `9.95e-9` residual on a tiny Hartmann solve. Matplotlib and Pillow
 are absent from the core environment, and importing the CLI, plotting facade,
 Q2D, blanket, field, showcase, and solver modules loads neither package. The
 `visualization` extra retains all tested plots and movies. The prior local
@@ -483,7 +483,7 @@ physical frames are unchanged and no solver rerun or tracked media was added.
 ## Release gate
 
 Distribution ownership, metadata, clean-install resource loading, lazy CLI and
-numerical imports, and tiny-solve smoke are green at `2f49e65`. Version `1.1.3` matches the latest
+numerical imports, and tiny-solve smoke are green at `a207bf9`. Version `1.1.3` matches the latest
 tag and must be bumped consistently in `pyproject.toml`, `CITATION.cff`, and
 `docs/conf.py` before publishing a new release; do not bump merely for local
 development builds.
