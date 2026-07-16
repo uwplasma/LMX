@@ -91,8 +91,8 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-B2 passes exact restart and 1/2/4-CPU equivalence. One-GPU schema-6 topology is
-green; two-GPU replay, production parity, and scaling promotion remain open.
+B2 passes exact restart plus 1/2/4-CPU and 1/2-GPU schema-6 topology gates.
+Production parity and scaling promotion remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Follow curved pipes
@@ -139,7 +139,7 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
 `256 × 67 × 67`, two/four devices reach 1.229×/1.360×; four devices still miss
-the promotion gate, and schema-6 GPU topology remains pending.
+the promotion gate. Two-GPU topology is current; GPU scaling remains open.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation

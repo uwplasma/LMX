@@ -27,7 +27,7 @@ or command, observable, and acceptance limit or uncertainty.
 | exact restart/replay | direct-versus-resumed state comparison | complete |
 | custom fields and mapped geometry | field response and geometry panels | complete |
 | differentiable design | checked sensitivity and bounded design trace | complete |
-| CPU/GPU parallelism | current schema-6 CPU calibration | CPU current; two-GPU replay open |
+| CPU/GPU parallelism | current schema-6 CPU calibration | CPU calibration and 1/2-GPU topology current; scaling promotion open |
 | mapped-pipe external profiles | visible FreeMHD-profile mismatch | complete; not ALEX-B1 acceptance |
 | Samper high-Ha literature ladder | frozen eight-row acceptance composite | complete |
 | Q2D, obstacle, and blanket studies | loops, detailed diagnostic composites, and strict Votyakov mismatch | complete; quantitative parity remains open |
@@ -54,7 +54,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | Q2D external diagnostics | 87,350 | 1,000 × 1,509 WebP | released sources `5bc14089...` and `11f452c1...`; external parity explicitly open |
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
-| B2 schema-6 CPU calibration | 31,616 | 1,400 × 653 WebP | accepted record `b2-schema6-cpu-scaling-20260716.json`; `test_plotting.py`; GPU replay omitted while open |
+| B2 schema-6 CPU calibration | 31,616 | 1,400 × 653 WebP | accepted record `b2-schema6-cpu-scaling-20260716.json`; `test_plotting.py`; GPU topology is scalar correctness evidence, not a timing curve |
 | Hunt startup | 114,866 | 440 × 287 animated WebP, 7 s | Python/Pillow derivative of source GIF `12f30a38...`; 42 frames |
 | checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |

@@ -131,8 +131,8 @@ large solve/restart gate passed. No B1 environment switch is required.
 B2 supports named axial sharding. The current canonical tiny path has equivalent
 observables and exact restart on one, two, and four CPU devices. The
 pre-schema-6 replacement passed exact 1/2-GPU repeat/restart, conservation,
-placement, and equivalence gates. Current schema-6 topology passes on one GPU;
-two-GPU replay remains open. The `128 x 67 x 67` pre-schema-6 calibration has low-variance warm medians of 2.780
+placement, and equivalence gates. Current schema-6 topology, placement, and
+exact serialized replay pass on one and two GPUs. The `128 x 67 x 67` pre-schema-6 calibration has low-variance warm medians of 2.780
 and 2.400 seconds. Its 1.159x speedup misses the 1.2x promotion gate.
 The doubled-axial `256 x 67 x 67` rung is stable but reaches only 1.125x, below
 the promotion threshold. Production scaling remains open. A superseded

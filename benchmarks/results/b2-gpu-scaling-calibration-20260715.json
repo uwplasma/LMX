@@ -1,5 +1,5 @@
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "date": "2026-07-16",
   "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -46,6 +46,44 @@
       "pressure_solves_converged": true,
       "raw_sha256": "0d9d3773ca8839802d163a93542dc72c4a994d917b802b189ab5e1bce12c7f5a"
     },
+    "two_gpu_current": {
+      "numerical_source_commit": "29de6518af81908501a9d382feb2d3c784a4440a",
+      "source_fingerprint": "c1319a3a9d80d51ee9da3b16001730e06fd86799a43562ab334634c3b24341ab",
+      "validation_passed": true,
+      "timing_excluded_shared_host": true,
+      "timing_claim": false,
+      "steady_state_passed": false,
+      "spatially_sharded": true,
+      "restart_state_max_abs": 2.220446049250313e-16,
+      "restart_flux_max_abs": 0.0,
+      "restart_derived_max_abs": 3.694822225952521e-13,
+      "restart_history_max_abs": 1.9748031562073744e-16,
+      "anderson_validation_passed": true,
+      "anderson_serialized_max_abs": 0.0,
+      "anderson_replay_max_abs": 2.220446049250313e-16,
+      "anderson_replay_flux_max_abs": 0.0,
+      "repeat_signature_max_abs": 2.7284841053187847e-12,
+      "pressure_solves_converged": true,
+      "mass_balance": 4.440892098500626e-16,
+      "current_balance": 2.4510299212268362e-14,
+      "interface_current_balance": 3.319655661471188e-11,
+      "global_shard_count": 2,
+      "anderson_state_sharded": true,
+      "inlet_plane_replicated": true,
+      "raw_sha256": "5907027639668d95554a5e862756e0bcbd027e9605563ee3c02adc9b6964cccd"
+    },
+    "one_two_gpu_equivalence": {
+      "velocity_l2_absolute_difference": 3.552713678800501e-15,
+      "potential_l2_absolute_difference": 5.684341886080802e-14,
+      "current_l2_absolute_difference": 1.1368683772161603e-13,
+      "pressure_observable_max_abs": 1.1894565193903972e-14,
+      "courant_max_abs": 2.117582368135751e-22,
+      "anderson_gram_max_abs": 1.4210854715202004e-14,
+      "anderson_weights_max_abs": 2.220446049250313e-16,
+      "absolute_tolerance": 2e-9,
+      "relative_tolerance": 2e-8,
+      "passed": true
+    },
     "two_gpu_pre_layout_fix": {
       "execution_commit": "f556f93c077ac185e8b415c0855a6f1d007a7298",
       "source_fingerprint": "e1c37f795205db1d3b488bdc179da446d8fe2deb31be696205ad82c6c9459bbe",
@@ -59,7 +97,7 @@
       "expected_second_step_courant_max": 5.925925932975698e-07,
       "raw_sha256": "47c9615efceea9c8640a615865db01b38309d82f2a5d7d7e0fc560ff2c964a5d"
     },
-    "decision": "Explicitly shard stacked-flux component unpacking. Current 1/2/4-CPU and one-GPU topology pass; rerun only the two-GPU tiny gate when both devices are idle. No timing claim."
+    "decision": "Explicit stacked-flux component placement passes current 1/2/4-CPU and 1/2-GPU topology, schema-6 replay, conservation, linear, and repeat gates. The shared-host two-GPU timing is excluded; no scaling claim."
   },
   "restart_gate": {
     "deterministic_evidence_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",

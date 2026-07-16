@@ -29,11 +29,11 @@ The smoke closes bounded orchestration and comparison, not production B2
 acceptance. Current schema-6 `8 x 7 x 7` one-/two-/four-forced-CPU-device
 topology passes exact replay, conservation, Gram/weight equivalence, and
 placement. The isolated `256 x 67 x 67` calibration also passes correctness and
-timing-stability gates, but 1.132x/1.178x point speedups miss their frozen
-promotion bounds. It is a rejected two-update forced-device calibration, not a
-physical-core or production strong-scaling claim. Schema-6 topology passes on
-one GPU; two-GPU confirmation of the explicit component-layout transition is
-pending. This
+timing-stability gates. Its 1.229x/1.360x point speedups promote the two-device
+optimization but miss the four-device bound. It is a two-update forced-device
+calibration, not a physical-core or production strong-scaling claim. Schema-6
+topology, explicit component placement, and exact serialized replay pass on
+one and two GPUs; shared-host timing is excluded. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -115,7 +115,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-6 Anderson replay, refrozen 64x cap, and current CPU topology have bounded gates | schema-6 GPU topology, tighter-reference stopping calibration, production parity, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-6 Anderson replay, refrozen 64x cap, and current CPU/GPU topology have bounded gates | tighter-reference stopping calibration, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/blanket/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -371,7 +371,7 @@ The current GPU contract and decision are compact:
 | Evidence | Result | Decision |
 |---|---|---|
 | historical `8 x 7 x 7`, 1/2 RTX A4000 | pre-schema-6 repeat, restart, conservation, placement, and equivalence pass | historical only; no current Anderson GPU claim |
-| schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | one GPU passes; the first two-GPU run isolates a `5.097353e-5` second-step CFL replay mismatch while flux, Anderson, derived fields, and solver histories remain equivalent | explicitly normalize stacked-flux component placement, then rerun only the tiny topology gate on an idle host |
+| schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | current placement, exact flux replay, state replay to `2.22e-16`, conservation, linear, repeat, Gram, and Anderson gates pass | topology correctness accepted; discard shared-host timing and make no scaling claim |
 | `128 x 67 x 67`, 1/2 RTX A4000 | 2.780/2.400 s, CV below 1.2%, 1.159x end-to-end and 1.510x core-phase speedup | misses the 1.2x promotion gate; retain the smaller validation fusion and stop |
 | historical `256 x 67 x 67` | 8.474/7.534 s, CV below 3.7%, 1.125x | diagnostic only; no larger rung |
 
@@ -406,10 +406,10 @@ Exit: the post-schema-6 portable suite remains below ten minutes with no
 critical-path surprise, CPU and GPU topology/restart correctness are current,
 and one accepted fixed global workload shows uncertainty-aware useful speedup
 on its target hardware. CPU correctness is green but CPU performance promotion
-is not; schema-6 two-GPU correctness is pending, and the old GPU ladder remains
-stopped. The current explicit flux-unpack change preserves exact 1/2/4-CPU
-topology and awaits the focused two-GPU gate; it is not yet accepted GPU
-evidence.
+is incomplete; schema-6 one/two-GPU correctness is current, and the old GPU
+ladder remains stopped. The explicit flux-unpack change now passes exact
+1/2/4-CPU and 1/2-GPU topology/replay gates; it is correctness evidence, not a
+GPU speedup claim.
 
 ## Priority 3: canonical B2 validation
 
@@ -480,11 +480,10 @@ history.
 
 The next validation sequence is fail-closed:
 
-1. complete the `8 x 7 x 7` schema-6 topology gate on one/two A4000s; one GPU
-   passes, while two-GPU confirmation of explicit stacked-flux component
-   placement remains. Require exact replay, equivalent Gram/weights/observables,
-   sharded field/flux/state, and a replicated inlet plane; make no timing claim;
-2. compare six `7 x 7 x 7` updates from one cold state with Anderson depth two
+1. the `8 x 7 x 7` schema-6 topology gate is complete on one/two A4000s:
+   replay, Gram/weights/observables, sharded field/flux/state, and the replicated
+   inlet plane pass; shared-host timing is excluded;
+2. next, compare six `7 x 7 x 7` updates from one cold state with Anderson depth two
    versus fixed-relaxation two; require no residual growth, finite stable
    weights, every linear/conservation/replay gate, and a predeclared meaningful
    map-rate improvement;
