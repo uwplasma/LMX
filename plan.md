@@ -394,16 +394,20 @@ map update follows a distinct `0.9629` to `0.01833` trajectory. Operator
 JIT/JVP, I/O compatibility, and exact direct-four versus serialized-two-plus-two
 replay pass. This is monitoring evidence only; the stopping rule is unchanged.
 
-Next run one bounded 96-update `7 x 7 x 7` trajectory with a 120-second hard
-deadline. Compare the third sustained crossings at candidate defect `0.1` and
-decade-tighter `0.01`, after startup or an intervening failure. Freeze neither
-threshold nor contract unless both crossings occur, all linear/conservation and
-replay gates pass, and the normalized transverse-pressure curve changes by at
-most `2e-4`, velocity by at most `1e-3 U0`, and pressure-gradient relative L2 by
-at most `0.5%`. Only then add the direct defect to the three-update stopping
-streak and authorize one corrected coarse run. Tolerance, wall, medium, fine,
-and production-FreeMHD work remain blocked until that coarse baseline converges
-for the correct reason. Compact evidence is in
+The predeclared 96-update `7 x 7 x 7` outcome study failed closed at its
+120-second deadline while executing a pressure solve. It produced no promotable
+crossing or outcome comparison, froze no threshold, and authorizes no repeat of
+the same slow run. First profile a short bounded trajectory, reduce the measured
+diagnostic/pressure cost, and project the complete study at no more than 110
+seconds. Only then repeat the study and compare the third sustained crossings
+at candidate defect `0.1` and decade-tighter `0.01`, after startup or an
+intervening failure. Freeze neither threshold nor contract unless both crossings
+occur, all linear/conservation and replay gates pass, and the normalized
+transverse-pressure curve changes by at most `2e-4`, velocity by at most
+`1e-3 U0`, and pressure-gradient relative L2 by at most `0.5%`. Only then add
+the direct defect to the three-update stopping streak and authorize one corrected
+coarse run. Tolerance, wall, medium, fine, and production-FreeMHD work remain
+blocked until that coarse baseline converges for the correct reason. Evidence is in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
 `benchmarks/results/b2-momentum-defect-20260715.json`.
 

@@ -4,7 +4,7 @@
   "implementation_commit": "e6834ee2a3c36bca936c558dcd0b935d92832a21",
   "case_id": "B2-fringing-square",
   "acceptance_role": "reduced-independent-steady-defect-diagnostic",
-  "status": "operator-replay-and-reduced-trajectory-passed-threshold-open",
+  "status": "operator-replay-passed-outcome-study-timed-out-threshold-open",
   "normalization": {
     "formula": "L max_fluid,component |C-D-E-JxB-f+Gp|/(rho U0^2 N)",
     "canonical_reduction": "max |discrete momentum residual|/540",
@@ -40,7 +40,15 @@
   "decision": {
     "threshold_frozen": false,
     "coarse_rerun_authorized": false,
-    "next_gate": "one bounded 96-update 7^3 trajectory with a 120-second deadline; compare three-update sustained crossings at candidate 0.1 and decade-tighter 0.01",
+    "outcome_study_attempt": {
+      "shape": [7, 7, 7],
+      "requested_updates": 96,
+      "deadline_seconds": 120,
+      "status": "failed-closed-at-deadline",
+      "interrupted_phase": "pressure solve",
+      "crossings_or_outcomes_promoted": false
+    },
+    "next_gate": "profile and reduce bounded per-update diagnostic/pressure cost; repeat the outcome study only after a short probe projects at most 110 seconds",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,
