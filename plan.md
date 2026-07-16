@@ -125,12 +125,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,582 | stay below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,578 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,552 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,526 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked files | 180 | no new file without retiring another owner | 180 |
-| tracked checkout | 3,735,320 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked files | 179 | no new file without retiring another owner | 180 |
+| tracked checkout | 3,734,496 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -157,6 +157,11 @@ through the existing figure-persistence owner, removing 75 package lines with
 no new module or file while preserving lazy imports, path order, DPI, tight
 bounds, and figure closure. Its focused writer, signature, import, lint, and
 architecture gates are green.
+Commit `f9be23a` deletes the unused Sphinx template placeholder and its empty
+configuration hook, reducing the tracked topology by one file. Commit
+`2173f77` unifies scalar/vector NumPy Darcy friction under one private owner and
+deduplicates the two three-station extruded I/O fixtures, removing four package
+and 26 test lines while preserving every node, assertion, and output contract.
 
 The portable-gate artifact keyed to `7d8887a` records 840 passes, 8 expected
 external-data skips, 95.5572% combined line/branch coverage, and 152.8 seconds on
@@ -396,7 +401,11 @@ clean 0.8.4 weight API and corrected release metadata; its supported
 Python/JAX, lint, and docs matrix is green. It is mergeable with no reviews,
 comments, or technical blocker; review, ready-for-review, merge, rebuild from
 the merged SHA, tag, and publication remain procedural and require explicit
-authorization. Then add one sharding-aware B2 path shared by CPU and GPU with
+authorization. Do not land an LMX conditional fallback or vendored copy before
+publication: either would create a second numerical contract while 0.8.3
+remains supported. After publication, land the dependency bump, B2 activation,
+restart schema, specification, and tests as one atomic correctness tranche.
+Add one sharding-aware B2 path shared by CPU and GPU with
 exact depth two, one prior raw mapped record, one weight calculation shared by
 scaled mapped fields and compact plus/inlet flux, and restart schema 6. B2 has
 no Anderson lists today; the existing arbitrary-depth lists are B1-only and
@@ -478,8 +487,9 @@ materials, interfaces, open-boundary and gauge semantics, corrected flux,
 physical residuals, stopping/restart state, sharding policy, observables, and
 acceptance. SOLVAX owns generic linear algebra after primal, residual,
 transpose/gradient, JIT, placement, memory, and repeated timing gates pass.
-Delete LMX's private B1 `_anderson_extruded_state` wrapper in the same tranche
-that adopts the published SOLVAX API.
+Commit `f070445` already deleted LMX's private B1 Anderson wrapper; the B1 path
+now calls released SOLVAX directly and keeps its separately owned arbitrary-depth
+history.
 
 Released 0.8.3 already owns the valuable generic linear solves and
 preconditioners. One manual additive composition remains, but migrating its few
