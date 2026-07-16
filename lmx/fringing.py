@@ -144,6 +144,8 @@ def _reuse_modal_factors(key: tuple[object, ...], factory: Callable):
 ALEX_BALANCE_TOLERANCE = 1.0e-3
 ALEX_B2_STEADY_STEPS = 3
 ALEX_B2_CANONICAL_SHELL_THICKNESS = 0.02
+# Same-state and restart probes preserve the B2 map through this 64x cap.
+ALEX_B2_MAGNETIC_STABILITY_SAFETY = 0.064
 # The frozen Aitken ceiling is monotone on the accepted medium B2 restart and
 # shortens tight-tolerance continuation without changing unconverged states.
 ALEX_B2_SETTLED_RELAXATION = 2.0
@@ -7201,7 +7203,7 @@ def _solve_extruded_projection(
         )
     )
     stability_safety = (
-        0.001
+        ALEX_B2_MAGNETIC_STABILITY_SAFETY
         if use_alex_b2_finite_volume
         else (0.01 if float(case.geometry.target_ha or 0.0) >= 100.0 else 0.1)
     )

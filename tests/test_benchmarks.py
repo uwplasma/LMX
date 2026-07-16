@@ -438,6 +438,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
             nr=7,
             ntheta=12,
             wall_cells=(1, 1, 1, 1),
+            # This reduces mesh/guard metadata; Re and N remain canonical B2.
             target_ha=20.0,
             hartmann_layer_cells=2,
         ),
@@ -534,6 +535,9 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     history = _assert_iteration_histories(solution.bundle)
     assert solution.bundle.iteration_courant_history.shape == (history.size, 3)
     assert benchmarks.jnp.all(solution.bundle.iteration_courant_history >= 0.0)
+    assert solution.bundle.iteration_courant_history[:, 0] == pytest.approx(
+        0.064 / 540.0
+    )
     pressure_linear = solution.bundle.iteration_pressure_linear_history
     assert benchmarks.jnp.all(pressure_linear[:, :2] >= 0.0)
     assert benchmarks.jnp.all(pressure_linear[:, 2] > 0.0)
