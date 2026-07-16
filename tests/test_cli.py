@@ -44,6 +44,23 @@ def _stub_validation_cli(
     return recorded
 
 
+def _extruded_solution() -> SimpleNamespace:
+    return SimpleNamespace(
+        bundle=SimpleNamespace(
+            x=cli.jnp.asarray([0.0, 1.0]),
+            u=cli.jnp.asarray([[[1.0]], [[0.5]]]),
+        ),
+        validation=SimpleNamespace(
+            max_residual=1.0e-4,
+            max_charge_balance_residual=1.0e-6,
+            max_wall_current_leakage=2.0e-6,
+            net_boundary_current_residual=3.0e-6,
+            field_mean_velocity_correlation=-0.8,
+        ),
+        station_history=(),
+    )
+
+
 @pytest.mark.parametrize(
     ("arguments", "expected"),
     (
@@ -188,19 +205,7 @@ def test_cli_run_branch_dispatches_extruded_case(
         ),
     )
     problem = SimpleNamespace(case=case, profile=SimpleNamespace())
-    solution = SimpleNamespace(
-        bundle=SimpleNamespace(
-            x=cli.jnp.asarray([0.0, 1.0]), u=cli.jnp.asarray([[[1.0]], [[0.5]]])
-        ),
-        validation=SimpleNamespace(
-            max_residual=1.0e-4,
-            max_charge_balance_residual=1.0e-6,
-            max_wall_current_leakage=2.0e-6,
-            net_boundary_current_residual=3.0e-6,
-            field_mean_velocity_correlation=-0.8,
-        ),
-        station_history=(),
-    )
+    solution = _extruded_solution()
     recorded: dict[str, object] = {}
 
     monkeypatch.setattr(cli, "_build_extruded_problem", lambda args: problem)
@@ -424,20 +429,7 @@ def test_run_config_dispatches_extruded_solver_kind(
         ),
     )
     recorded: dict[str, object] = {}
-    solution = SimpleNamespace(
-        bundle=SimpleNamespace(
-            x=cli.jnp.asarray([0.0, 1.0]),
-            u=cli.jnp.asarray([[[1.0]], [[0.5]]]),
-        ),
-        validation=SimpleNamespace(
-            max_residual=1.0e-4,
-            max_charge_balance_residual=1.0e-6,
-            max_wall_current_leakage=2.0e-6,
-            net_boundary_current_residual=3.0e-6,
-            field_mean_velocity_correlation=-0.8,
-        ),
-        station_history=(),
-    )
+    solution = _extruded_solution()
 
     monkeypatch.setattr(
         cli,
@@ -598,19 +590,7 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
             z=cli.jnp.asarray([0.0]),
         ),
     )
-    solution = SimpleNamespace(
-        bundle=SimpleNamespace(
-            x=cli.jnp.asarray([0.0, 1.0]), u=cli.jnp.asarray([[[1.0]], [[0.5]]])
-        ),
-        validation=SimpleNamespace(
-            max_residual=1.0e-4,
-            max_charge_balance_residual=1.0e-6,
-            max_wall_current_leakage=2.0e-6,
-            net_boundary_current_residual=3.0e-6,
-            field_mean_velocity_correlation=-0.8,
-        ),
-        station_history=(),
-    )
+    solution = _extruded_solution()
     recorded: dict[str, object] = {}
 
     monkeypatch.setattr(
