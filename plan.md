@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `acdefd9` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `2c489be` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -13,6 +13,10 @@ worse than fixed relaxation two, so no SOLVAX or LMX API was added. Schemas
 1--5 remain readable. A six-update spectrum audit then closes generic
 shared-Euclidean Anderson tuning: 98.254--99.887% of its objective energy is
 electric potential, while B2 acceptance uses velocity-map convergence.
+A current-source velocity-block minimax audit then closes the full bounded
+depth-two affine family: updates three and four can improve by at most 0.0377%
+and 0.213%, so no residual metric can meet the frozen 15% per-pair gate. Fixed
+relaxation two remains the control and no accelerator API is added.
 The installable-distribution contract is refreshed at `ca7535e`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
@@ -55,11 +59,16 @@ an explicit update count, checkpoints at the deterministic midpoint, replays
 the remaining trajectory, and requires one cold plus at least three warm
 trajectories, with every warm sample lasting at least 120 s, for a sustained
 claim; the two-update default remains the bounded CI/debug gate. The scaling
-summary now fails closed unless one exact 1/2/4-shard CPU or
+summary re-derives duration from finite warm samples, repeat count, the declared
+threshold, median, role, and worker assertions; it never trusts a candidate
+boolean. It fails closed unless one exact 1/2/4-shard CPU or
 1/2-GPU group shares provenance and fixed work and passes sustained duration,
 real-solver numerics, placement, peak memory, and explicit affinity/idle-host
 evidence. Incomplete candidates remain visible without a sustained speedup or
-plot title. The CPU rerun is complete. Retry the 96-update GPU campaign only
+plot title. The accepted CPU rerun is complete. A post-slimming rerun was
+aborted without a timing record after unrelated local simulations raised host
+load above 135 following a clean preflight. Require continuous and postflight
+host admission before retrying. Retry the 96-update GPU campaign only
 after both office A4000s pass their clean-environment gates; they remained at
 100% foreign utilization during this tranche.
 This single active plan records accepted baselines, active gates, and stop/go
@@ -104,7 +113,9 @@ search. Reuse a checksummed accepted record whenever it answers the question.
 Short scaling runs are smoke or calibration only. A CPU or GPU strong-scaling
 claim must predeclare a fixed workload, run one cold plus at least three warm
 trajectories per rung, and keep every warm trajectory at or above two minutes;
-compilation, restart I/O, and observers remain untimed.
+compilation, restart I/O, and observers remain untimed. Admission must remain
+clean through a continuous monitor and postflight; a clean preflight alone is
+not sufficient evidence.
 
 ### Test only what changed
 
@@ -163,9 +174,9 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,691 | stay below 34,700 while preserving the scaling and Q2D gates | 35,100 |
+| package lines | 34,719 | reclaim below 34,700 after the scaling record is sealed | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,066 | no new file; stay below 21,075 | 31 / 21,100 |
+| test files / lines | 30 / 21,090 | no new file; reclaim below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
 | tracked checkout | 4,548,359 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
@@ -235,7 +246,11 @@ inputs are regenerated deterministically, and the default remote ceiling is
 Commit `14c13be` additionally binds admitted CPU evidence to the worker's
 actual Linux affinity and GPU evidence to the launcher's selected device
 indices; a preflight record cannot be attached to another allocation. Commit
-`6629660` then replaces eight directional transverse-stencil helpers with four
+`2c489be` closes the downstream duration loophole: the summary now re-derives
+the multi-minute contract, and generated plots use neutral fixed-work wording.
+Synthetic metadata checks stay instant; performance evidence still requires
+every warm trajectory to last at least 120 seconds. Commit `6629660` then
+replaces eight directional transverse-stencil helpers with four
 axis-parameterized owners, deleting 21 package lines and four private symbols.
 All solver tests and focused Hartmann differentiation checks pass. Commit
 `694e291` merges the two uniform-stencil test setups while retaining every
@@ -601,6 +616,11 @@ and condition-number `<= 1e6` rationale gate. Electric potential holds
 accelerator is structurally misaligned with velocity-map acceptance. Close
 generic shared-norm Anderson tuning; a conditioning threshold cannot repair an
 objective mismatch.
+The current-source velocity-block minimax audit reproduces every raw weight and
+map rate and hashes all five residual pairs. The best possible bounded affine
+velocity gains are 99.998%, 0.0377%, 0.213%, 16.36%, and 78.38%. Because
+updates three and four cannot meet 15% under any depth-two residual metric,
+close the entire bounded depth-two affine family without a cold solve.
 Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
 are diagnostic only. Exact histories and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
@@ -626,15 +646,16 @@ The validation sequence is fail-closed:
 4. the residual-spectrum rationale gate is complete: zero of five pairs pass,
    and potential dominates the norm. Do not pursue another shared-Euclidean
    Anderson configuration;
-5. any future accelerator first requires a solver-free, predeclared
-   block-balanced physics-aligned inner-product rationale and globalization
-   rule, then must pass this same cold gate before regenerating both
-   current-source trajectories to the shared step-29 point; do not reinterpret
-   a schema-5 restart;
-6. only if step 29 passes, continue to strict step 96. Promotion requires three
+5. the velocity-block minimax gate is complete: two pairs cannot reach 15%
+   under any bounded depth-two affine metric. Do not implement or tune that
+   family;
+6. a materially different accelerator first requires a predeclared solver-free
+   rationale and independent holdout, then must pass this same cold gate before
+   regenerating both current-source trajectories to the shared step-29 point;
+7. only if step 29 passes, continue to strict step 96. Promotion requires three
    sustained `tau_map=0.005` passes plus exact replay and the frozen pressure,
    velocity, pressure-gradient, linear, conservation, and sharding limits;
-7. only then authorize a fresh canonical coarse schema-6 run. Medium/fine,
+8. only then authorize a fresh canonical coarse schema-6 run. Medium/fine,
    production FreeMHD, authoritative idle-host GPU timing, and steady-production
    scaling remain blocked.
 

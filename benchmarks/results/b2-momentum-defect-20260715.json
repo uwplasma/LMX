@@ -319,8 +319,31 @@
       "gram_condition_number_max": 1000000.0
     },
     "rationale_pass": [false, false, false, false, false],
+    "block_balanced_velocity_minimax": {
+      "reconstruction_commit": "2c489be082be5bbe4777577de1ac84b949e01314",
+      "raw_pairs_bytes": 110992,
+      "raw_pairs_sha256": "3a7390a84b96a9b4e289339b3742ff5a1713ddd218e065701ace42c48be7c02f",
+      "pair_c_order_sha256": [
+        "2e71c6c47c8a7ed9c29b48c09a0561283e2db83d4f0b6fad3172a8b0202ebac6",
+        "777229f16b6cffa9c6c90da441389d9905c4e25314001dc1aa01685d5f057157",
+        "e7c0f29906562d003dcb58250c87305abcbc353f20866d5d0d785a258af21199",
+        "62ced11b33dcd6aa36b259841caf13e3e74940660499bfe302d5f7b4ff02c968",
+        "20bfef2c689eb7dd6a63b918d30873bd8a87452d232606f54834d5d1d2769382"
+      ],
+      "objective": "minimize ||r1_U+t(r0_U-r1_U)||_inf over t in [-3,4]",
+      "maximum_predicted_velocity_gain": [
+        0.9999844652678501,
+        0.00037657434476612295,
+        0.0021253799662126482,
+        0.16363741866593717,
+        0.7837542366589249
+      ],
+      "gain_min": 0.15,
+      "every_pair_pass": false,
+      "interpretation": "Updates 3 and 4 cannot reach the frozen 15% velocity-map gain under any bounded depth-two affine residual metric."
+    },
     "interpretation": "The shared Euclidean residual is 98.254%-99.887% electric-potential energy while B2 promotion uses velocity-map convergence; conditioning safeguards cannot correct this objective mismatch.",
-    "decision": "close generic shared-norm Anderson tuning; retain fixed relaxation 2; require a block-balanced physics-aligned rationale before any new accelerator"
+    "decision": "close the bounded depth-two affine accelerator family; retain fixed relaxation 2; require an independent holdout rationale before testing a materially different accelerator"
   },
   "normalized_map_outcome_study": {
     "shape": [7, 7, 7],
@@ -386,7 +409,7 @@
     "pseudotime_safety_frozen": true,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "derive any new acceleration candidate from a residual-spectrum audit and predeclare its globalization rule; do not add the rejected bounded fallback, tune either failed depth-two configuration, or proceed to step 29",
+    "next_gate": "retain fixed relaxation 2; do not add or tune another bounded depth-two affine accelerator or proceed to step 29; a materially different accelerator requires an independent holdout rationale",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,

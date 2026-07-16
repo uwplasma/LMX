@@ -153,6 +153,11 @@ LMX option. Zero of five adjacent residual pairs then passes the frozen
 gain/stability/conditioning rationale gate; potential contributes
 98.254--99.887% of the minimized energy. Shared-norm Anderson is therefore
 closed as physically misaligned with velocity-map acceptance.
+An exact velocity-block minimax check closes the broader bounded depth-two
+affine family: the best possible predicted gains at updates three and four are
+only 0.0377% and 0.213%, below the predeclared 15% per-pair gate regardless of
+the residual metric. Fixed relaxation two remains the control; no new LMX or
+SOLVAX accelerator API is justified by this trajectory.
 
 The ALEX normalization and pressure-orientation audit passes: B2 compares the
 side and top walls at the same axial station using the sourced 4.39 cm
