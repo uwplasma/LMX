@@ -385,14 +385,6 @@ def _bundle_memory_bytes(bundle: object) -> int:
     )
 
 
-def _row_or_replicated_sharding(
-    mesh: Mesh, shape: tuple[int, ...], num_devices: int
-) -> NamedSharding:
-    if shape and shape[0] >= num_devices and shape[0] % num_devices == 0:
-        return NamedSharding(mesh, P("d", None))
-    return NamedSharding(mesh, P())
-
-
 def _factor_device_mesh(num_devices: int) -> tuple[int, int]:
     for rows in range(int(np.sqrt(num_devices)), 0, -1):
         if num_devices % rows == 0:

@@ -120,17 +120,17 @@ single-owner Samper freezer into its campaign runner, and making `Diagnostics`
 the single owner of standard NPZ/restart diagnostic fields, and consolidating
 four manual-validation workflow stubs into one behavior-preserving fixture (the
 immutable evidence, richer projection, and target-driven paths remain), and
-deleting stale test-only velocity-statistics, solver-mask, pipe-Laplacian, and
-symmetry wrappers:
+deleting stale test-only velocity-statistics, solver-mask, pipe-Laplacian,
+symmetry, sharding, and compact-flux wrappers:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,968 | stay below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,954 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,882 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,868 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,341,224 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,340,212 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

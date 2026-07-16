@@ -19,7 +19,6 @@ from lmx.scaling import (
     _factor_device_mesh,
     _float_or_none,
     _int_or_none,
-    _row_or_replicated_sharding,
     _shard_placement,
     _two_axis_mesh_and_sharding,
     benchmark_extruded_inductionless_solve,
@@ -450,17 +449,6 @@ def test_scaling_helpers_handle_missing_and_invalid_values():
         [[1e-8, 2e-9, 7, 1, 1], [np.nan, np.nan, 0, 0, -1]], expected_steps=2)
     assert tuple(summary[key] for key in (
         "pressure_linear_iterations_max", "pressure_linear_diagnostics_complete")) == (7, False)
-
-
-def test_row_or_replicated_sharding_covers_row_and_replicated_paths():
-    devices = np.asarray(jax.devices()[:1], dtype=object)
-    mesh = Mesh(devices, ("d",))
-
-    row = _row_or_replicated_sharding(mesh, (4, 3), 1)
-    repl = _row_or_replicated_sharding(mesh, (), 1)
-
-    assert isinstance(row, NamedSharding)
-    assert isinstance(repl, NamedSharding)
 
 
 def test_two_axis_mesh_and_sharding_covers_elongated_and_replicated_paths():

@@ -1796,12 +1796,6 @@ def _limited_linear_convection_matrix_action_duct(
     return action
 
 
-def _pack_duct_mass_flux(rho_phi):
-    """Pack coordinate-oriented duct fluxes as positive faces plus the inlet."""
-    fx, fy, fz = rho_phi
-    return jnp.stack((fx[1:], fy[:, 1:], fz[:, :, 1:])), fx[0]
-
-
 def _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet):
     """Restore full face fluxes; lower transverse walls are implicit zeros."""
     return (

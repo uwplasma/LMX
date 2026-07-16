@@ -843,13 +843,11 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
     assert jnp.sum(affine_stress[..., 0]) * volume == pytest.approx(-0.7 * 1.2 * 4 * 0.3 * 3 * 0.4 / 3)
 
 
-def test_compact_duct_mass_flux_codec_and_initializer_match_fv_faces():
+def test_compact_duct_mass_flux_initializer_matches_fv_faces():
     shape = (2, 2, 2)
     compact = jnp.arange(24.0).reshape((3, *shape))
     inlet = jnp.arange(4.0).reshape(shape[1:])
     full = jax.jit(fringing_impl._unpack_duct_mass_flux)(compact, inlet)
-    repacked = jax.jit(fringing_impl._pack_duct_mass_flux)(full)
-    assert all(jnp.array_equal(a, b) for a, b in zip(repacked, (compact, inlet), strict=True))
     assert jnp.all(full[1][:, 0] == 0.0) and jnp.all(full[2][:, :, 0] == 0.0)
     assert compact.size + inlet.size == 3 * np.prod(shape) + np.prod(shape[1:])
     velocity = jnp.arange(24.0).reshape((*shape, 3)) / 7.0

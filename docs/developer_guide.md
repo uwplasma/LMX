@@ -9,7 +9,7 @@ dependency, or large generated-asset change:
 .venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current checkpoint records 35 package modules and 34,968 total
+The current checkpoint records 35 package modules and 34,954 total
 package lines. The maintained stable core is 7,931 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
@@ -17,7 +17,7 @@ exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The current tracked checkout is 3,341,224 bytes, below its 4 MiB hard cap.
+The current tracked checkout is 3,340,212 bytes, below its 4 MiB hard cap.
 Sixty-five generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
