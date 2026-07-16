@@ -332,6 +332,17 @@ prototype for this tranche. The remaining local gap is compute/scheduling
 dominated, so do not launch another large forced-device rung without a new
 profiled target or a controlled physical-core execution method.
 
+The common macOS single-thread XLA recipe does not provide that control: paired
+one-device profiles use 11 HLO worker threads both with and without the flags,
+and medians are indistinguishable at 0.995 and 1.000 seconds. Forced devices
+therefore share one runtime pool and remain a sharding calibration. HLO then
+identified the two transverse SOLVAX Thomas traversals as a 6.7% candidate.
+Batching them is algebraically exact and halves the isolated traversal, but the
+full four-device median improves only 0.85% (`0.7437` to `0.7374` seconds).
+Reject the added square-grid fast path before the large rung. A physical-core
+claim requires a runtime/host with verifiable affinity or partitioned worker
+pools; unsupported flag recipes are not evidence.
+
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
 plots remain ignored. The worker fingerprint must include package-owned frozen

@@ -143,6 +143,14 @@ and two halo permutations per electric PCG iteration. Each contributes under
 This misses the 3% trigger for an anchored-gauge prototype; the remaining local
 gap is compute/scheduling dominated rather than a single communication defect.
 
+The usual macOS single-thread XLA flags also fail as a core-control method:
+default and flagged one-device profiles both use 11 HLO worker threads and take
+1.000 and 0.995 seconds. A subsequent HLO-owned batching probe halved the two
+isolated transverse SOLVAX Thomas traversals, but improved the full four-device
+solve only 0.85% (`0.7437` to `0.7374` seconds). That fast path is rejected
+before the large rung. These results remain forced-device sharding evidence,
+not physical-core strong scaling.
+
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
 The source-identical baseline, doubled-iteration, and confirmation-wall runs

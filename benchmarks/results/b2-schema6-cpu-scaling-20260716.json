@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "date": "2026-07-16",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
@@ -16,7 +16,7 @@
     "solvax": "0.8.4",
     "precision": "float64",
     "forced_cpu_devices": [1, 2, 4],
-    "thread_contract": "one host thread per forced XLA CPU device"
+    "thread_contract": "forced logical devices share the XLA CPU runtime pool; cores are not pinned or partitioned"
   },
   "protocol": {
     "updates": 2,
@@ -103,6 +103,47 @@
       "performance_promotion": false
     },
     "classification": "accepted-calibration-rejected-performance-promotion"
+  },
+  "post_profile_decisions": {
+    "axial_mean_omission": {
+      "shape": [128, 35, 35],
+      "devices": 4,
+      "baseline_warm_median_seconds": 0.8138,
+      "candidate_warm_median_seconds": 0.8740,
+      "relative_change": 0.074,
+      "iterations_and_fields_identical": true,
+      "decision": "reject"
+    },
+    "gauge_collective_trace": {
+      "shape": [128, 35, 35],
+      "devices": 4,
+      "profiled_seconds": 0.7446464580716565,
+      "electric_pcg_iterations": 139,
+      "per_iteration": {"all_reduce": 1, "coarse_all_gather": 1, "halo_permute": 2},
+      "per_device_milliseconds": {"all_reduce": 13.595, "coarse_all_gather": 13.151, "halo_permute_total": 13.377},
+      "distinct_second_gauge_collective": false,
+      "each_collective_fraction_below": 0.02,
+      "promotion_trigger": 0.03,
+      "decision": "reject anchored-gauge prototype"
+    },
+    "mac_physical_core_control": {
+      "shape": [128, 35, 35],
+      "devices": 1,
+      "default_warm_median_seconds": 0.9998192910570651,
+      "single_thread_flags_warm_median_seconds": 0.9949859170010313,
+      "hlo_worker_threads": {"default": 11, "single_thread_flags": 11},
+      "decision": "flags do not create a controlled one-core baseline; retain forced-device classification"
+    },
+    "batched_transverse_line_solve": {
+      "shape": [128, 35, 35],
+      "devices": 4,
+      "baseline_warm_median_seconds": 0.7436671670293435,
+      "candidate_warm_median_seconds": 0.7373706250218675,
+      "relative_improvement": 0.008467,
+      "iterations_and_outputs_identical": true,
+      "candidate_source_fingerprint": "4bfafeb829cb105dc25e65cd633eb0dddbdbc786180ae8ca78e729979c74d12f",
+      "decision": "reject before the large rung; insufficient end-to-end benefit for the added fast path"
+    }
   },
   "claim_limits": {
     "production_sharding_correctness": true,
