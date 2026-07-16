@@ -9,6 +9,13 @@ import jax.numpy as jnp
 
 from .specs import CaseSpec
 
+EXTRUDED_HISTORY_WIDTHS = (
+    ("iteration_residual_history", 0), ("iteration_momentum_defect_history", 0),
+    ("iteration_component_residual_history", 6), ("iteration_pressure_residual_history", 0),
+    ("iteration_pressure_linear_history", 5), ("iteration_electric_linear_history", 6),
+    ("iteration_potential_residual_history", 0), ("iteration_courant_history", 3),
+)
+
 
 @dataclass(frozen=True)
 class FringingProfile:

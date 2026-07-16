@@ -58,6 +58,7 @@ from .specs import (
 from .solvers import solve_steady
 from .validation import validation_summary
 from ._fringing_types import (
+    EXTRUDED_HISTORY_WIDTHS,
     ExtrudedFieldBundle,
     ExtrudedInductionlessProblem,
     ExtrudedInductionlessSolution,
@@ -6161,20 +6162,11 @@ def _shard_extruded_fields(
 def _iteration_history_arrays(residual, component, pressure, electric, potential,
                               courant=None, pressure_linear=None, momentum_defect=None):
     """Build consistently shaped outer-iteration histories."""
-    return {
-        "iteration_residual_history": jnp.asarray(residual, dtype=float),
-        "iteration_component_residual_history": jnp.asarray(component, dtype=float).reshape((-1, 6)),
-        "iteration_pressure_residual_history": jnp.asarray(pressure, dtype=float),
-        "iteration_pressure_linear_history": jnp.asarray(
-            () if pressure_linear is None else pressure_linear, dtype=float
-        ).reshape((-1, 5)),
-        "iteration_electric_linear_history": jnp.asarray(electric, dtype=float).reshape((-1, 6)),
-        "iteration_potential_residual_history": jnp.asarray(potential, dtype=float),
-        "iteration_courant_history": jnp.asarray(courant or (), dtype=float).reshape((-1, 3)),
-        "iteration_momentum_defect_history": jnp.asarray(
-            () if momentum_defect is None else momentum_defect, dtype=float
-        ),
-    }
+    values = (residual, momentum_defect or (), component, pressure,
+        pressure_linear or (), electric, potential, courant or ())
+    return {name: jnp.asarray(value, dtype=float).reshape((-1, width)) if width
+        else jnp.asarray(value, dtype=float) for (name, width), value in
+        zip(EXTRUDED_HISTORY_WIDTHS, values, strict=True)}
 
 
 def _iteration_checkpoint_bundle(
@@ -7420,6 +7412,10 @@ def _solve_extruded_projection(
     fixed_point_iterates: list[jnp.ndarray] = []
     fixed_point_residuals: list[jnp.ndarray] = []
     previous_fixed_point_residual: jnp.ndarray | None = None
+    fixed_aitken_relaxation = (float(case.solver.coupling_min_relaxation)
+        if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "aitken"
+        and case.solver.coupling_min_relaxation == case.solver.coupling_max_relaxation
+        else None)
     restart_stopping = ((0, 0, "not_recorded") if initial_bundle is None else
         getattr(initial_bundle, "stopping_state", (0, 0, "not_recorded")))
     if restart_stopping[0] not in (0, completed_steps):
@@ -7433,11 +7429,13 @@ def _solve_extruded_projection(
             steady_streak = legacy_streak
         elif steady_streak != legacy_streak:
             raise ValueError("B2 restart stopping and Aitken streaks disagree")
-        previous_fixed_point_residual = (None if previous_fixed_point_residual is None
-            else jnp.asarray(previous_fixed_point_residual, dtype=u.dtype))
         fixed_point_relaxation = jnp.asarray(fixed_point_relaxation, dtype=u.dtype)
-        if previous_fixed_point_residual is not None and previous_fixed_point_residual.shape != (4, nx, ny, nz):
-            raise ValueError("B2 restart Aitken residual has inconsistent shape")
+        if fixed_aitken_relaxation is not None:
+            previous_fixed_point_residual = None
+        elif previous_fixed_point_residual is not None:
+            previous_fixed_point_residual = jnp.asarray(previous_fixed_point_residual, dtype=u.dtype)
+            if previous_fixed_point_residual.shape != (4, nx, ny, nz):
+                raise ValueError("B2 restart Aitken residual has inconsistent shape")
     fixed_point_scale = jnp.asarray(
         [
             velocity_limit,
@@ -8205,7 +8203,12 @@ def _solve_extruded_projection(
                     )
                     accelerated = mix_history(iterates, residuals)
             elif case.solver.coupling_acceleration == "aitken":
-                if accepted_state_converged:
+                if fixed_aitken_relaxation is not None:
+                    fixed_point_relaxation = jnp.asarray(
+                        1.0 if step == 0 else fixed_aitken_relaxation, dtype=u.dtype)
+                    accelerated = current_state + fixed_point_relaxation * fixed_point_residual
+                    flux_relaxation = fixed_point_relaxation
+                elif accepted_state_converged:
                     # Avoid reduction noise after settling while retaining a
                     # conservative, empirically monotone coupled acceleration.
                     accelerated = (
@@ -8229,7 +8232,7 @@ def _solve_extruded_projection(
                     flux_relaxation = fixed_point_relaxation
                 else:
                     accelerated = mapped_state
-                if not accepted_state_converged:
+                if not accepted_state_converged and fixed_aitken_relaxation is None:
                     previous_fixed_point_residual = fixed_point_residual
             else:
                 accelerated = mapped_state

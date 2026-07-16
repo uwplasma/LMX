@@ -9,17 +9,11 @@ import jax.numpy as jnp
 import numpy as np
 
 from .core import Diagnostics, MHDState, Solution
+from ._fringing_types import EXTRUDED_HISTORY_WIDTHS
 from .mesh import StructuredMesh
 
 
 _DIAGNOSTIC_FIELDS = tuple(item.name for item in fields(Diagnostics))
-_EXTRUDED_HISTORY_WIDTHS = (
-    ("iteration_residual_history", 0), ("iteration_momentum_defect_history", 0),
-    ("iteration_component_residual_history", 6),
-    ("iteration_pressure_residual_history", 0), ("iteration_pressure_linear_history", 5),
-    ("iteration_electric_linear_history", 6),
-    ("iteration_potential_residual_history", 0), ("iteration_courant_history", 3),
-)
 _B2_DIAGNOSTIC_SCHEMAS = tuple(f"b2_diagnostics_v{version}" for version in (2, 3, 4))
 _EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
 residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
@@ -306,8 +300,6 @@ def write_extruded_bundle_restart_npz(
         "geometry_kind": case.geometry.kind,
         "solver_kind": case.solver.kind,
         "station_count": int(bundle.x.shape[0]),
-        "description": "LMX extruded inductionless restart bundle",
-        "restart_capable": True,
         "restart_schema": ("b2_diagnostics_v4" if has_compact_flux and has_diagnostics
                            and has_pressure_diagnostics and has_momentum_diagnostics
                            else "b2_diagnostics_v3" if has_compact_flux and has_diagnostics
@@ -334,7 +326,7 @@ def write_extruded_bundle_restart_npz(
             getattr(bundle, "transverse_pressure_difference", np.zeros_like(bundle.x))
         ),
         **{name: np.asarray(getattr(bundle, name, np.zeros((0, width)) if width
-            else np.zeros(0))) for name, width in _EXTRUDED_HISTORY_WIDTHS},
+            else np.zeros(0))) for name, width in EXTRUDED_HISTORY_WIDTHS},
     )
     return path
 
@@ -451,7 +443,7 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             name: jnp.asarray(_load_optional_array(data, name)).reshape((-1, width))
             if width
             else jnp.asarray(_load_optional_array(data, name))
-            for name, width in _EXTRUDED_HISTORY_WIDTHS
+            for name, width in EXTRUDED_HISTORY_WIDTHS
         }
         if schema != "b2_diagnostics_v4":
             histories["iteration_momentum_defect_history"] = jnp.zeros((0,))

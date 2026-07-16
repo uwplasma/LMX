@@ -573,6 +573,8 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         terminal.bundle, continuation_case, tmp_path / "b2.npz"
     )
     restart = load_extruded_restart_bundle(path)
+    assert terminal.bundle.aitken_state[0] is None
+    assert restart.bundle.aitken_state[0] is None
     with pytest.raises(ValueError, match="both compact flux arrays"):
         solve_extruded_inductionless(
             continuation_problem,
