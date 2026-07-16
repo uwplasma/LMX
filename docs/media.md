@@ -30,16 +30,16 @@ or command, observable, and acceptance limit or uncertainty.
 | CPU/GPU parallelism | current schema-6 CPU calibration | CPU current; two-GPU replay open |
 | mapped-pipe external profiles | visible FreeMHD-profile mismatch | complete; not ALEX-B1 acceptance |
 | Samper high-Ha literature ladder | frozen eight-row acceptance composite | complete |
-| Q2D, obstacle, and blanket studies | loops plus strict Votyakov mismatch | workflow coverage complete; quantitative parity open |
+| Q2D, obstacle, and blanket studies | loops, detailed diagnostic composites, and strict Votyakov mismatch | complete; quantitative parity remains open |
 
-The next derivatives are evidence-driven: exact ALEX-B1 pressure only after its
-acceptance record exists, then one detailed blanket/Q2D diagnostic composite.
-Prefer existing writers and compact accepted JSON; do not rerun a solver merely
-to change presentation. One composite should serve one claim family.
+The next derivative is evidence-driven: exact ALEX-B1 pressure only after its
+acceptance record exists. Prefer existing writers and compact accepted JSON;
+do not rerun a solver merely to change presentation. One composite should
+serve one claim family.
 
 ## Tracked web set
 
-Eighteen files in `docs/_static/` total 1,012,450 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,189,156 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -51,6 +51,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | fringing solver family | 46,678 | 1,200 × 843 WebP | released source `5fd83110...`; bounded internal diagnosis only |
 | mapped-pipe profiles | 52,768 | 1,100 × 655 WebP | released source `d3343a09...`; failing FreeMHD-profile diagnostic, not ALEX |
 | Votyakov obstacle target | 32,966 | 1,100 × 458 WebP | released source `7bb3ca51...`; strict reverse-flow mismatch |
+| Q2D external diagnostics | 87,350 | 1,000 × 1,509 WebP | released sources `5bc14089...` and `11f452c1...`; external parity explicitly open |
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
 | B2 schema-6 CPU calibration | 31,616 | 1,400 × 653 WebP | accepted record `b2-schema6-cpu-scaling-20260716.json`; `test_plotting.py`; GPU replay omitted while open |
@@ -63,6 +64,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | Q2D loop | 117,102 | 440 × 381 animated WebP, 7 s | Python/Pillow derivative of released GIF `feb9e145...`; 42 frames |
 | B2 field and pressure | 43,174 | compressed WebP | released derivative `f186f109...` |
 | curved-pipe validation | 94,236 | compressed WebP | released derivative `d32d666a...` |
+| blanket current and pressure | 89,356 | 1,476 × 1,573 WebP | released sources `48f4ba58...` and `4be86176...`; research-stage |
 
 Regenerate the Samper derivative from tracked evidence only with
 `python scripts/manage_release_assets.py --write-benchmark-a-plot docs/_static/samper_benchmark_a.webp`.

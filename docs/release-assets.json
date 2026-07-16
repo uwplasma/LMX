@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1012450,
+    "bytes": 1189156,
     "files": [
       {
         "bytes": 71620,
@@ -608,6 +608,11 @@
         "bytes": 52768,
         "path": "docs/_static/pipe_reference_diagnostic.webp",
         "sha256": "7a84d321e82f01e6c34949477986858e07ca6a8d378c17c1e35edc9dd4f5532a"
+      },
+      {
+        "bytes": 87350,
+        "path": "docs/_static/q2d_external_diagnostics.webp",
+        "sha256": "7f6aecaf1844d18ebc66a6094e249c8e2ef307070af0406d93daa2725bd6cac4"
       },
       {
         "bytes": 43174,
@@ -663,6 +668,11 @@
         "bytes": 31616,
         "path": "docs/_static/strong_scaling.webp",
         "sha256": "46007ff07176785a4bb5a37a8a3fec3d80b6e22aa88ef476ccbd996b8727ee10"
+      },
+      {
+        "bytes": 89356,
+        "path": "docs/_static/wham_blanket_evidence.webp",
+        "sha256": "cdd4c8ca41229ae8670d924cbc87dc205d9bac0defb142f0fe9e41f13a872e70"
       }
     ]
   },

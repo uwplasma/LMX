@@ -55,6 +55,14 @@ layers, mapped geometry, or tabulated fields one change at a time.
   <img src="_static/readme-blanket-flow.webp" alt="Seven-second reduced blanket-flow research workflow" width="62%">
 </p>
 
+<p align="center">
+  <img src="_static/wham_blanket_evidence.webp" alt="Research-stage WHAM blanket current-closure and pressure-sweep diagnostics" width="96%">
+</p>
+
+The reduced blanket workflow includes a conservative current-closure gate and
+a magnetic-field pressure-budget sweep. These are research-stage diagnostics,
+not a validated blanket design prediction.
+
 ## Restart
 
 ```bash

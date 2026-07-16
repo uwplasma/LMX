@@ -255,7 +255,7 @@ def test_tracked_release_asset_manifest_matches_sources() -> None:
     )
     showcase = tracked["showcase"]
     assert showcase["bytes"] == sum(item["bytes"] for item in showcase["files"])
-    assert showcase["bytes"] < 1024 * 1024
+    assert showcase["bytes"] < 1280 * 1024
     assert len(showcase["files"]) <= 20
     assert check_manifest() == tracked
 

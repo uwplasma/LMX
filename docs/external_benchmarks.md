@@ -139,6 +139,14 @@ keeps inertial wake/recirculation physics research-stage.
 
 ![Seven-second nonlinear Q2D research workflow](_static/readme-q2d-turbulence.webp)
 
+![Q2D-MHDfoam external diagnostics with parity explicitly open](_static/q2d_external_diagnostics.webp)
+
+The released lid-driven observable check (top) and turbulence audit (bottom)
+exercise the external-data path without establishing end-to-end parity. The
+banner is the governing status: geometry, forcing, and observables are not yet
+matched across the two workflows. This compressed composite reuses released
+PNGs; no solver was rerun.
+
 `lmx.external_validation` parses line profiles, force histories, probes, VTK
 fields, and case dictionaries from an external Q2D-MHDfoam tree. The former
 in-repository Docker build context was removed because it duplicated a large,

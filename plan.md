@@ -353,6 +353,14 @@ timings and do not plot them as scaling evidence. The next affinity-controlled
 ladder requires a current, accepted larger-grid restart before its one-core
 baseline; no larger blind cold-start run is authorized.
 
+The existing `101 x 77 x 77` coarse checkpoints were screened before launching
+that ladder. Three representative files match the current geometry and solver
+shape, but all normalize to `legacy_nonexact`, omit compact flux and schema-6
+Anderson state, and carry no source fingerprint. They may support a separately
+labelled warm-start diagnostic, but they cannot seed exact-restart, current-
+source, or promoted physical-core evidence. The accepted larger-grid restart
+gate therefore remains open.
+
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
 plots remain ignored. The worker fingerprint must include package-owned frozen
@@ -622,13 +630,13 @@ without duplicating bytes.
 The visual backlog is evidence-ranked. The stale scaling panel, bounded
 operator-convergence gap, frozen Samper/Benchmark-A composite, exact restart,
 bounded fringing, mapped-pipe FreeMHD-profile diagnostic, and strict Votyakov
-obstacle mismatch are closed;
-the latter covers all eight high-Ha rows, mesh/order gates, and current/power
-residuals without rerunning a solver. Do not relabel the mapped-pipe transverse
-profiles as ALEX-B1 pressure evidence. P2: one detailed composite each for Q2D
-external diagnostics and blanket current/pressure evidence. Keep the README
-to at most one new concise accepted-validation composite; detailed evidence
-belongs on the owning pages.
+obstacle mismatch are closed. Detailed Q2D external-diagnostic and blanket
+current/pressure composites are also closed and embedded directly on their
+owning pages. The Samper composite covers all eight high-Ha rows, mesh/order
+gates, and current/power residuals without rerunning a solver. Do not relabel
+the mapped-pipe transverse profiles as ALEX-B1 pressure evidence. Keep the
+README to at most one new concise accepted-validation composite; detailed
+evidence belongs on the owning pages.
 
 Comparison-table cells describe the named native workflow, not what could be
 implemented through arbitrary custom sources. Keep primary sources beside the
@@ -637,9 +645,11 @@ table. The current audit uses the FreeMHD paper/source, FreeMHD2 preprint, NekRS
 capabilities before every release.
 
 Aim for readable 6–8-second loops, stills below 100 KiB, tracked movies below
-150 KiB where practical, and all tracked media below 1 MiB. Host source frames,
-full-quality media, meshes, and raw outputs in checksummed releases. Put
-provenance and acceptance status beside every asset.
+150 KiB where practical, and all tracked media below 1.25 MiB. The 1.25 MiB
+cap admits the two evidence-rich P2 composites while preserving a hard,
+test-owned budget. Host source frames, full-quality media, meshes, and raw
+outputs stay in checksummed releases. Put provenance and acceptance status
+beside every asset.
 
 The README now displays three 7-second dynamics loops directly: accepted Hunt
 startup plus research-stage blanket and Q2D flows. Reproducible Python/Pillow
@@ -655,8 +665,9 @@ added. Do not create a B2 movie from the bounded smoke or rejected coarse
 trajectories.
 
 The documentation source is now self-contained. The Hunt, blanket, and Q2D
-animations replace link-only posters and redundant tracked MP4s; all 14 tracked
-derivatives total 855,524 bytes, below the 1 MiB media cap. Read the Docs still serves the
+animations replace link-only posters and redundant tracked MP4s; all 20 tracked
+derivatives, including the detailed Q2D and blanket composites, total 1,189,156
+bytes, below the 1.25 MiB media cap. Read the Docs still serves the
 2026-05-01 build at `6be8622`. Build `33554636` failed with `commit: None` and
 Git exit 128 because the builder had no credentials to clone the private GitHub
 repository; the active repository webhook's latest response is HTTP 406. An
