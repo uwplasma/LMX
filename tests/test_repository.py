@@ -71,11 +71,25 @@ def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) 
     assert first.read_bytes() == second.read_bytes()
 
 
-def test_stable_root_api_is_small_lazy_and_resolvable() -> None:
+def test_stable_root_api_is_small_lazy_and_resolvable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     assert set(lmx.__all__) == EXPECTED_ROOT_API
     assert EXPECTED_ROOT_API <= set(dir(lmx))
     assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
     assert all(inspect.getdoc(getattr(lmx, name)) for name in lmx.__all__)
+
+    updates = []
+    monkeypatch.setattr("lmx.io.jax.config.update", lambda *args: updates.append(args))
+    cache = lmx.enable_compilation_cache(
+        tmp_path / "jax-cache", min_compile_time_secs=2.0, min_entry_size_bytes=4096
+    )
+    assert cache.is_dir()
+    assert updates == [
+        ("jax_compilation_cache_dir", str(cache)),
+        ("jax_persistent_cache_min_entry_size_bytes", 4096),
+        ("jax_persistent_cache_min_compile_time_secs", 2.0),
+    ]
 
 
 def test_advanced_api_uses_owning_module() -> None:

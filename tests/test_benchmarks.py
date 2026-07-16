@@ -670,6 +670,7 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
         ),
         (_FREEMHD_COMMIT, "0" * 40, "FreeMHD discretization reference differs"),
         (("matched_contract", "roles"), {}, "matched production role differs"),
+        (("matched_contract", "shared"), {}, "matched shared contract is incomplete"),
         (_STEADY_STEPS, 2, _STOPPING),
         (("harness_smoke_execution", "restart_absolute_tolerance"), 1.0e-6, "smoke execution contract"),
         (("sources",), [], "both review"),

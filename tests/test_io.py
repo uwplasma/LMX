@@ -467,6 +467,16 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     bundle.iteration_momentum_defect_history = jnp.asarray([4.0e-5])
 
     with np.load(restart_path, allow_pickle=False) as data:
+        v5_payload = {key: data[key] for key in data.files}
+        v5_metadata = json.loads(str(data["metadata_json"]))
+        bad_stopping_payload = dict(v5_payload)
+        bad_stopping_payload["metadata_json"] = json.dumps(
+            {**v5_metadata, "stopping_state": [0, 1, "corrupt"]}
+        )
+        bad_momentum_rank_payload = dict(v5_payload)
+        bad_momentum_rank_payload["iteration_momentum_defect_history"] = np.asarray(
+            [[4.0e-5]]
+        )
         missing_v4 = [(message, {key: data[key] for key in data.files if key != field})
                       for field, message in (
                           ("steady_streak", "missing accelerator state"),
@@ -494,6 +504,16 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         v1_payload["metadata_json"] = json.dumps(v1_metadata)
         legacy_payload = {key: data[key] for key in data.files if key not in {
             "metadata_json", "rho_phi_plus", "rho_phi_inlet", "iteration_courant_history"}}
+    bad_stopping_path = tmp_path / "restart" / "bad_stopping.npz"
+    np.savez_compressed(bad_stopping_path, **bad_stopping_payload)
+    with pytest.raises(ValueError, match="stopping state has inconsistent step count"):
+        load_extruded_restart_bundle(bad_stopping_path)
+    bad_rank_path = tmp_path / "restart" / "bad_momentum_rank.npz"
+    np.savez_compressed(bad_rank_path, **bad_momentum_rank_payload)
+    with pytest.raises(
+        ValueError, match="diagnostic restart histories have inconsistent lengths"
+    ):
+        load_extruded_restart_bundle(bad_rank_path)
     for index, (message, payload) in enumerate(missing_v4):
         missing_path = tmp_path / "restart" / f"diagnostics_v4_missing_{index}.npz"
         np.savez_compressed(missing_path, **payload)
