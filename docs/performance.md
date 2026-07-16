@@ -4,18 +4,18 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Current B2 two-update CPU and GPU scaling calibration](_static/strong_scaling.webp)
+![Historical B2 two-update CPU and GPU scaling calibration](_static/strong_scaling.webp)
 
 ## Current evidence
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 817 pass, 8 skip, 95.02% combined line/branch coverage, 149.3 s | below the five-minute target |
-| exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | pressure observable agrees within `5.3e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
-| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | production sharding correctness; shared host and tiny grid preclude scaling claims |
-| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | current real solver, two fixed updates; not a steady-production claim |
-| B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | initial medians 3.09/3.19 s; restart and device equivalence pass | shared-host confirmations are noisy, so no current scaling claim |
-| B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | stable but below the 1.2x promotion threshold |
+| exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.8e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
+| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | historical pre-terminal-fix evidence; current-source refresh pending |
+| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
+| B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | initial medians 3.09/3.19 s; restart and device equivalence pass | historical pre-terminal-fix calibration; shared-host scaling remains open |
+| B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
 | historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | predates the 0.8.3 package minimum; refresh pending |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
 | B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
@@ -25,7 +25,7 @@ devices alone is not evidence of parallel execution.
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-The exact CPU/GPU results and fixed-size calibrations are recorded in
+The current CPU result and historical GPU/fixed-size calibrations are recorded in
 `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
 `benchmarks/results/b2-{cpu-strong-scaling,gpu-scaling-calibration}-20260715.json`.
 The large deterministic probe isolated restart variation to corrected face

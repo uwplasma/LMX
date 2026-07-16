@@ -112,9 +112,10 @@ The compatible retained-modal solver is the sole frozen B1 pressure path after
 small factor parity, medium and large field/pressure-observable parity, and a
 large solve/restart gate passed. No B1 environment switch is required.
 
-B2 supports named axial sharding. The canonical tiny path has equivalent
-observables and exact restart on one and two deterministic GPUs. The current
-`128 x 67 x 67` two-update calibration preserves primary-state replay and
+B2 supports named axial sharding. The current canonical tiny path has equivalent
+observables and exact restart on one, two, and four CPU devices. The last GPU
+equivalence and `128 x 67 x 67` two-update calibration predate the terminal
+restart fix; they preserve primary-state replay and
 bounded face-flux noise. Diagonal momentum preconditioning reduces its warm
 runtime from 21.14 to 3.09 seconds on one GPU and from 11.98 to 3.19 seconds on
 two; shared-host variance prevents a stable scaling claim.

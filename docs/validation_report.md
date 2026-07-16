@@ -39,9 +39,10 @@ are authoritative when prose and results differ.
   diagnostics, not validation of the canonical finite-inertia formulation.
   That formulation and its independently observed LMX/FreeMHD tiny inputs are
   implemented. Its exact two-update LMX/FreeMHD harness passes every frozen
-  smoke gate, and its production path has exact restart plus equivalent
-  observables on 1/2/4 CPU devices and 1/2 deterministic GPUs. These tiny runs
-  establish orchestration and sharding correctness. A current `128 x 67 x 67`
+  smoke gate, and its current production path has exact restart plus equivalent
+  observables on 1/2/4 CPU devices. The prior 1/2 deterministic-GPU ladder
+  predates the terminal-restart fix and awaits refresh. These tiny runs establish
+  orchestration and sharding correctness. A historical `128 x 67 x 67`
   calibration has equivalent observables and bounded face-flux replay; diagonal
   momentum preconditioning cuts its GPU runtime by 3.75–6.84x, but shared-host
   variance leaves that fixed-grid ratio open. A stable doubled-axial rung

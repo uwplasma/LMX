@@ -1,8 +1,8 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-07-15",
-  "commit": "3a2207804781f7b3f6383becdc82039480729cac",
-  "source_fingerprint": "87a35608a2aec145e5094aea8df4a3517f530519cd4fab4eac2b9c852f60e639",
+  "commit": "d27bc1312d978e98a05b8e9ee7f98fb90db7dee2",
+  "source_fingerprint": "38a86174f1d5af4617b121ca3eef9c2ce273c17de25a30125150829fc21d9e4e",
   "case_id": "B2-fringing-square",
   "role": "accepted-smoke-device-equivalence",
   "inputs": {
@@ -25,17 +25,17 @@
     "repeats": 4
   },
   "runs": {
-    "1": {"cold_seconds": 12.053969042026438, "warm_median_seconds": 2.124394415994175, "warm_cv": 0.006161783832524191, "restart_max_abs": 0.0},
-    "2": {"cold_seconds": 4.450521207996644, "warm_median_seconds": 0.026591875008307397, "warm_cv": 0.03839879967775234, "restart_max_abs": 0.0},
-    "4": {"cold_seconds": 4.505194124998525, "warm_median_seconds": 0.04057349998038262, "warm_cv": 0.02413420862934828, "restart_max_abs": 0.0}
+    "1": {"cold_seconds": 5.207499499898404, "warm_median_seconds": 0.01096099999267608, "warm_cv": 0.024367890713165596, "restart_max_abs": 0.0},
+    "2": {"cold_seconds": 5.859776625060476, "warm_median_seconds": 0.03470608405768871, "warm_cv": 0.17435219484915088, "restart_max_abs": 0.0},
+    "4": {"cold_seconds": 5.924776749918237, "warm_median_seconds": 0.03894395905081183, "warm_cv": 0.12211026056523296, "restart_max_abs": 0.0}
   },
   "equivalence": {
-    "pressure_observable_max_abs": 5.1833537462186996e-15,
+    "pressure_observable_max_abs": 5.78096598369271e-15,
     "courant_mean_max_abs": 9.529120656610879e-22,
     "courant_max_abs": 1.0587911840678754e-22,
-    "velocity_l2_max_abs": 0.0,
-    "potential_l2_max_abs": 2.842170943040401e-14,
-    "current_l2_max_abs": 1.7053025658242404e-13,
+    "velocity_l2_max_abs": 8.881784197001252e-15,
+    "potential_l2_max_abs": 8.526512829121202e-14,
+    "current_l2_max_abs": 0.0,
     "rtol": 2e-8,
     "atol": 2e-9,
     "pass": true
@@ -45,12 +45,21 @@
     "placement": true,
     "conservation": true,
     "restart_exact": true,
-    "device_equivalence": true
+    "device_equivalence": true,
+    "pressure_solves_converged": true,
+    "pressure_linear_diagnostics_complete": true
   },
   "interpretation": {
     "production_sharding_correctness": true,
     "strong_scaling_claim": false,
     "reason": "The tiny warm samples include unequal compilation-cache effects and are retained only as diagnostic timings."
   },
-  "raw_assets": "external workspace; compact worker JSON only"
+  "raw_assets": {
+    "location": "external workspace; compact worker JSON only",
+    "sha256": {
+      "1": "7ac980acabb6921450854ceaef792dca218d45f60bdf86a966bdf9f1f0d8a4b5",
+      "2": "00947826c46b860973baf7837d1dfb4430e2fe96393ee7c25573457892216774",
+      "4": "e9927b69b4d762f3be478ef65731f1f4378039f3ea767f6de404654b9f845b3f"
+    }
+  }
 }

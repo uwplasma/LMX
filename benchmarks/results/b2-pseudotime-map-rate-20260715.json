@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-15",
+  "commit": "d27bc1312d978e98a05b8e9ee7f98fb90db7dee2",
+  "case_id": "B2-fringing-square",
+  "acceptance_role": "reduced-stopping-diagnostic",
+  "status": "map-rate-dt-invariance-passed",
+  "problem": {
+    "shape": [7, 7, 7],
+    "hartmann_number": 20.0,
+    "warmup_updates": 1,
+    "branched_updates": 1,
+    "base_dt": 1.8518518518518519e-6,
+    "half_dt": 9.259259259259259e-7
+  },
+  "execution": {
+    "hardware": "Apple M4",
+    "wall_seconds": 13.07241966703441,
+    "wall_seconds_max": 120.0
+  },
+  "base_dt_branch": {
+    "velocity_update": [0.00035231654122325207, 2.4251431345298677e-6, 1.0392042891706343e-6],
+    "velocity_map_rate": [190.2509322605561, 1.3095772926461284, 0.5611703161521425],
+    "pressure_converged": true,
+    "electric_converged": true,
+    "max_divergence": 1.1573330561966179e-11,
+    "flow_span": 4.796163466380676e-13,
+    "max_charge_balance": 2.800106813083403e-10,
+    "boundary_current_residual": 2.5235386983064676e-14
+  },
+  "half_dt_branch": {
+    "velocity_update": [0.00017615553473127044, 1.212569198287312e-6, 5.195966644441623e-7],
+    "velocity_map_rate": [190.24797750977206, 1.309574734150297, 0.5611643975996953],
+    "pressure_converged": true,
+    "electric_converged": true,
+    "max_divergence": 4.147723051642996e-11,
+    "flow_span": 1.5933920849420247e-12,
+    "max_charge_balance": 3.2719071896281093e-10,
+    "boundary_current_residual": 2.7861602291428404e-14
+  },
+  "comparison": {
+    "controlling_velocity_component": "u",
+    "velocity_map_rate_relative_difference": 1.553080843782417e-5,
+    "velocity_map_rate_relative_difference_max": 0.005,
+    "raw_update_ratio": 2.000031062099295,
+    "raw_update_ratio_absolute_error_max": 0.01
+  },
+  "gates": {
+    "effective_dt_matches": true,
+    "linear_solves_converged_and_finite": true,
+    "conservation_below_1e-3": true,
+    "same_controlling_velocity_component": true,
+    "map_rate_dt_invariant": true,
+    "raw_update_linear_in_dt": true,
+    "passed": true
+  },
+  "decision": {
+    "coarse_rerun_authorized": false,
+    "next_step": "define and predeclare a dimensionless momentum map-rate scale and production tolerance",
+    "reason": "the probe establishes timestep invariance but does not define a mesh- and parameter-independent normalization or acceptance threshold"
+  }
+}

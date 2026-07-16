@@ -88,8 +88,8 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-The canonical B2 smoke has exact restart and deterministic 1/2-GPU equivalence.
-These smoke checks do not establish steady-production scaling or B2 validation.
+The current canonical B2 smoke has exact restart and 1/2/4-CPU equivalence.
+The last 1/2-GPU ladder predates the terminal-restart fix and is being refreshed.
 [Fringing status →](docs/fringing.md)
 
 ## Model conducting multilayer walls
@@ -125,13 +125,11 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Current B2 two-update CPU and GPU scaling calibration](docs/_static/strong_scaling.webp)
+![Historical B2 two-update CPU and GPU scaling calibration](docs/_static/strong_scaling.webp)
 
-The exact B2 smoke agrees on 1/2/4 CPU devices and 1/2 deterministic GPUs.
-The two-update CPU calibration reaches 1.35× on four devices. On the same GPU
-device counts, diagonal momentum preconditioning cuts warm runtime by
-3.75–6.84×; this is an optimization result, not multi-GPU speedup. The
-doubled-axial calibration reaches 1.125×; production scaling remains open.
+The current B2 smoke agrees on 1/2/4 CPU devices. Pre-fix calibrations reached
+1.35× on four CPU devices and 1.125× on two GPUs; they remain useful historical
+optimization evidence, not current production-scaling claims.
 [Protocol and results →](docs/performance.md)
 
 ## Quality and citation

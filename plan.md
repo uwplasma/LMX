@@ -1,11 +1,11 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The optimized B2 source and current CPU calibration are
-keyed to `413185a`; the latest complete portable gate is keyed to `45bff84`.
-The isolated compiler trace is keyed to `f379f6b`; GPU workers use the
-optimized source's matching fingerprint.
-The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
-deterministic one-/two-GPU equivalence, and portable coverage gate are green.
+Status: 2026-07-15. The corrected two-update B2 smoke and current
+one-/two-/four-CPU-device equivalence are keyed to `45bff84`/`d27bc13`; the
+latest complete portable gate is keyed to `45bff84`. CPU/GPU calibration at
+`413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
+restart fix and remain historical until refreshed. The isolated compiler trace
+is keyed to `f379f6b`.
 The first fresh canonical-mesh coarse trajectory using the current formulation
 passes conservation and all linear-solver gates but reaches its 128-update
 bound before steady convergence. Its single authorized continuation preserves
@@ -94,7 +94,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, strict smoke replay, exact device equivalence, and current CPU/GPU two-update calibrations have bounded gates | production parity and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, strict smoke replay, and current CPU device equivalence have bounded gates | current GPU refresh, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -117,7 +117,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,753 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,506,106 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,509,791 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -146,8 +146,8 @@ validation documentation.
 
 ## Priority 1: matched B2 smoke — complete
 
-The record keyed to LMX `3a22078` and the pinned FreeMHD source runs two fixed
-Euler updates in 13.12 seconds on one JAX device and 7.06 seconds on two native
+The record keyed to LMX `45bff84` and the pinned FreeMHD source runs two fixed
+Euler updates in 3.32 seconds on one JAX device and 6.76 seconds on two native
 FreeMHD MPI ranks. Restart, mass/current closure, interface-current activity,
 and Courant gates pass. Cross-code normalized pressure differences are 0.00452
 RMS and 0.01092 maximum, within the frozen 0.16 and 0.32 smoke limits.
@@ -188,8 +188,9 @@ another test file merely to move lines.
 
 ### Canonical sharding and performance
 
-Exact accepted-smoke observables now agree on one, two, and four forced Mac CPU
-devices and on one and two deterministic RTX A4000 GPUs. The repair makes flux,
+Current accepted-smoke observables agree on one, two, and four forced Mac CPU
+devices within `5.8e-15`, with exact restart and all pressure solves green. The
+last one-/two-GPU equivalence predates the terminal fix and awaits refresh. The repair makes flux,
 vector, embedding, initialization, CFL, and relaxation layouts explicit and
 keeps compact flux components separate until explicit packing. Both device
 ladders have exact restart replay; the GPU pressure observable differs by at
@@ -199,14 +200,14 @@ timing lane. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
 An explicit one-device request uses the same named-sharding kernels as the
-multi-device path. On the current source, the `128 x 31 x 31` rung passes
+multi-device path. On the pre-terminal-fix source, the `128 x 31 x 31` rung passes
 validation, placement, exact restart, and device-equivalence gates. Warm
 medians are 0.857, 0.652, and 0.633 seconds on 1/2/4 devices: 1.31x and 1.35x
 speedups, with modest gain beyond two devices. This is a two-update scaling calibration, not a steady
 production-speed claim. The compact record is
 `benchmarks/results/b2-cpu-strong-scaling-20260715.json`.
 
-The current `128 x 67 x 67` default-XLA rung passes validation, placement,
+The pre-terminal-fix `128 x 67 x 67` default-XLA rung passes validation, placement,
 restart, and device equivalence on one and two RTX A4000 GPUs. Diagonal momentum
 preconditioning reduced its initial warm medians from 21.14 to 3.09 seconds on
 one GPU and from 11.98 to 3.19 seconds on two: 6.84x and 3.75x absolute
@@ -299,8 +300,8 @@ the physics-valid path.
 Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
-CPU scaling calibration and bounded GPU state/flux calibration are complete;
-steady-production scaling remains open.
+CPU/GPU calibration methods are complete; current CPU correctness is green,
+while current-source GPU equivalence and calibration refresh remain open.
 
 ## Priority 3: canonical B2 validation
 
@@ -365,11 +366,19 @@ gate at `1e-12`; the exact current LMX/FreeMHD smoke also remains green with
 pressure RMS/Linf `0.004518/0.010917`.
 
 Pre-fix coarse restarts are diagnostic-only and cannot seed the corrected
-trajectory. Before rerunning coarse, use a sub-two-minute reduced grid to
-separate the effective pseudo-time clip from the timestep-dependent stopping
-observable and define an equation-error convergence gate. Tolerance, wall,
+trajectory. The predeclared same-state `dt` versus `dt/2` reduced probe passes
+in 13.07 seconds: velocity map rates agree within `1.56e-5` relative, the raw
+update ratio is `2.000031`, both linear solves converge, and every conservation
+gate is below `1e-3`. This establishes timestep invariance of the unrelaxed
+velocity map rate, not a complete PDE residual or production tolerance.
+
+Before rerunning coarse, define a dimensionless physical momentum scale,
+predeclare a mesh- and parameter-independent map-rate threshold with
+literature/FreeMHD rationale, and version the frozen stopping contract. Do not
+silently reinterpret the existing `5e-5` raw-update tolerance. Tolerance, wall,
 medium, fine, and production-FreeMHD work remain blocked until the corrected
-coarse baseline converges for the correct reason.
+coarse baseline converges for the correct reason. The compact reduced record is
+`benchmarks/results/b2-pseudotime-map-rate-20260715.json`.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
 experimental comparison with uncertainty, reproducible environments, and a
@@ -410,14 +419,17 @@ acceptance. SOLVAX owns generic linear algebra after primal, residual,
 transpose/gradient, JIT, placement, memory, and repeated timing gates pass.
 Delete an LMX duplicate in the same tranche that adopts SOLVAX.
 
-The released-0.8.3 additive-preconditioner migration is complete in the
-remaining line-preconditioner owners. Momentum's single diagonal division is
-clearer and smaller than wrapping `solvax.jacobi`; ownership movement without
-code deletion is not a performance win.
-After 0.8.4 is published, use one
+Released 0.8.3 already owns the valuable generic linear solves and
+preconditioners. One manual additive composition remains, but migrating its few
+lines could perturb parity trajectories and waits until B2 convergence closes.
+Momentum's single diagonal division remains clearer and smaller than wrapping
+`solvax.jacobi`; ownership movement without code deletion is not a performance
+win. After 0.8.4 is published, use one
 `anderson_weights` result for scaled fields and compact-flux histories, and use
 `linear_solve(has_aux=True)` to retain momentum diagnostics without a final
 extra matvec. Raise the minimum dependency in that same correctness tranche.
+The next upstream slimming candidate is a released, CPU/GPU/gradient-gated
+complex tridiagonal solve, replacing paired real/imaginary calls in LMX.
 
 The released `block_thomas_factor_fn` B1 prototype is exact against the current
 materialized retained-modal factors and through JVP. At `7 x 9 x 16` and
