@@ -54,6 +54,25 @@ def _set_plot_style() -> None:
     )
 
 
+def _prepare_plot_output(out_dir: str | Path) -> Path:
+    """Load plotting dependencies, apply the house style, and create output."""
+
+    _set_plot_style()
+    output = Path(out_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    return output
+
+
+def _save_figure_pair(fig, out_dir: Path, stem: str) -> list[Path]:
+    """Save one figure as PNG and PDF, then release its Matplotlib state."""
+
+    paths = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
+    for path in paths:
+        fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    return paths
+
+
 def _draw_duct_wireframe(
     ax,
     *,
@@ -249,9 +268,7 @@ def write_case_overview_plots(
     z_reference_values: jnp.ndarray | None = None,
     reference_label: str = "Reference",
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     y_profile = extract_midplane_profile(solution, axis="y", fluid_only=True)
     z_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
@@ -282,11 +299,7 @@ def write_case_overview_plots(
         reference_label=reference_label,
     )
 
-    png_path = out_dir / "overview.png"
-    pdf_path = out_dir / "overview.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
+    overview_paths = _save_figure_pair(fig, out_dir, "overview")
 
     diagnostics_paths: list[Path] = []
     if solution.diagnostics.time_history.size > 0:
@@ -316,14 +329,9 @@ def write_case_overview_plots(
         axes[1].set_yscale("log")
         axes[1].legend(loc="upper left", bbox_to_anchor=(0.02, 0.98))
 
-        diag_png = out_dir / "diagnostics.png"
-        diag_pdf = out_dir / "diagnostics.pdf"
-        fig.savefig(diag_png, bbox_inches="tight")
-        fig.savefig(diag_pdf, bbox_inches="tight")
-        plt.close(fig)
-        diagnostics_paths.extend([diag_png, diag_pdf])
+        diagnostics_paths = _save_figure_pair(fig, out_dir, "diagnostics")
 
-    return [png_path, pdf_path, *diagnostics_paths]
+    return [*overview_paths, *diagnostics_paths]
 
 
 def _safe_writer_candidates() -> list[tuple[str, str]]:
@@ -503,9 +511,7 @@ def write_transient_movies(
 ) -> list[Path]:
     if not frames:
         return []
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     mesh = frames[0]["mesh"]
     display_fields, frame_peaks, movie_label, colorbar_label = _movie_field_stack(frames, field_mode=field_mode)
@@ -835,9 +841,7 @@ def write_geometry_preview_plots(
     case_title: str,
     fluid_mask: jnp.ndarray | None = None,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     fig = plt.figure(figsize=(12, 5.8), constrained_layout=True)
     grid = fig.add_gridspec(1, 2, width_ratios=(1.0, 1.15))
@@ -846,12 +850,7 @@ def write_geometry_preview_plots(
     fig.suptitle(case_title, fontsize=16)
     _draw_geometry_preview(ax2d, ax3d, mesh, case_title=case_title, fluid_mask=fluid_mask)
 
-    png_path = out_dir / "geometry_preview.png"
-    pdf_path = out_dir / "geometry_preview.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "geometry_preview")
 
 
 def write_geometry_gallery_plots(
@@ -860,9 +859,7 @@ def write_geometry_gallery_plots(
     *,
     title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     fig = plt.figure(figsize=(14.2, 7.6), constrained_layout=True)
     grid = fig.add_gridspec(2, len(items), height_ratios=(1.0, 1.15))
@@ -873,12 +870,7 @@ def write_geometry_gallery_plots(
         ax3d = fig.add_subplot(grid[1, column], projection="3d")
         _draw_geometry_preview(ax2d, ax3d, mesh, case_title=item_title, fluid_mask=fluid_mask)
 
-    png_path = out_dir / "geometry_gallery.png"
-    pdf_path = out_dir / "geometry_gallery.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "geometry_gallery")
 
 
 def write_cross_section_field_plots(
@@ -889,9 +881,7 @@ def write_cross_section_field_plots(
     out_dir: str | Path,
     title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
     yy, zz = np.meshgrid(y, z, indexing="ij")
     by = field[..., 1]
     bz = field[..., 2]
@@ -927,12 +917,7 @@ def write_cross_section_field_plots(
     axq.set_xlabel("z")
     axq.set_ylabel("y")
     axq.set_aspect("equal")
-    png = out_dir / "field_preview.png"
-    pdf = out_dir / "field_preview.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "field_preview")
 
 
 def write_tabulated_field_reconstruction_plots(
@@ -946,9 +931,7 @@ def write_tabulated_field_reconstruction_plots(
 ) -> list[Path]:
     """Write a diagnostic panel comparing table interpolation with reference values."""
 
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
     y_values = np.asarray(y, dtype=float)
     z_values = np.asarray(z, dtype=float)
     reference = np.asarray(reference_field, dtype=float)
@@ -987,12 +970,7 @@ def write_tabulated_field_reconstruction_plots(
         ax.set_aspect("equal")
         plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
-    png = out_dir / "tabulated_field_reconstruction.png"
-    pdf = out_dir / "tabulated_field_reconstruction.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "tabulated_field_reconstruction")
 
 
 def write_bent_pipe_overview_plots(
@@ -1005,6 +983,7 @@ def write_bent_pipe_overview_plots(
     geometry = solution.problem.case.geometry
     if geometry.kind != "bent_pipe":
         raise ValueError("Bent-pipe overview plots require a bent_pipe solution")
+    out_dir = _prepare_plot_output(out_dir)
 
     mesh = generate_bent_pipe_mesh(
         tube_radius=geometry.radius or 0.5 * geometry.width,
@@ -1036,7 +1015,6 @@ def write_bent_pipe_overview_plots(
     norm = colors.Normalize(vmin=0.0, vmax=1.0)
     cmap = plt.get_cmap("coolwarm")
 
-    _set_plot_style()
     fig = plt.figure(figsize=(13.4, 9.4), constrained_layout=True)
     grid = fig.add_gridspec(2, 2, height_ratios=(1.05, 1.0))
     ax3d = fig.add_subplot(grid[0, 0], projection="3d")
@@ -1141,12 +1119,7 @@ def write_bent_pipe_overview_plots(
     inset.tick_params(labelsize=9)
     mark_inset(ax_cmp, inset, loc1=2, loc2=4, fc="none", ec="#6b7280", linewidth=0.8)
 
-    png = out_dir / "bent_pipe_overview.png"
-    pdf = out_dir / "bent_pipe_overview.pdf"
-    fig.savefig(png, bbox_inches="tight")
-    fig.savefig(pdf, bbox_inches="tight")
-    plt.close(fig)
-    return [png, pdf]
+    return _save_figure_pair(fig, out_dir, "bent_pipe_overview")
 
 
 def _centers_to_edges(values: np.ndarray) -> np.ndarray:
@@ -1428,9 +1401,7 @@ def write_extruded_overview_plots(
     *,
     case_title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     bundle = solution.bundle
     validation = solution.validation
@@ -1487,12 +1458,7 @@ def write_extruded_overview_plots(
     axes[1, 1].set_xlabel(coord_y_label)
     axes[1, 1].set_ylabel(coord_x_label)
 
-    png_path = out_dir / "extruded_overview.png"
-    pdf_path = out_dir / "extruded_overview.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "extruded_overview")
 
 
 def write_magnetic_obstacle_benchmark_plots(
@@ -1502,9 +1468,7 @@ def write_magnetic_obstacle_benchmark_plots(
     *,
     case_title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     bundle = solution.bundle
     reference_bundle = reference_solution.bundle
@@ -1593,12 +1557,7 @@ def write_magnetic_obstacle_benchmark_plots(
     ax.set_ylabel(r"$u/u_{ref,peak}$")
     ax.legend(loc="lower center", ncol=2, fontsize=9)
 
-    png_path = out_dir / "magnetic_obstacle_benchmark.png"
-    pdf_path = out_dir / "magnetic_obstacle_benchmark.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "magnetic_obstacle_benchmark")
 
 
 def write_magnetic_obstacle_schematic_plots(
@@ -1610,9 +1569,7 @@ def write_magnetic_obstacle_schematic_plots(
 ) -> list[Path]:
     """Write a setup-first magnetic-obstacle panel for docs and README use."""
 
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     bundle = solution.bundle
     reference_bundle = reference_solution.bundle
@@ -1742,12 +1699,7 @@ def write_magnetic_obstacle_schematic_plots(
     ax_response.set_ylabel("normalized response")
     ax_response.legend(loc="upper right")
 
-    png_path = out_dir / "magnetic_obstacle_schematic.png"
-    pdf_path = out_dir / "magnetic_obstacle_schematic.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "magnetic_obstacle_schematic")
 
 
 def write_wham_mirror_overview_plots(
@@ -1764,9 +1716,7 @@ def write_wham_mirror_overview_plots(
 ) -> list[Path]:
     from .field_models import load_tabulated_field, sample_tabulated_field_volume
 
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     table = load_tabulated_field(table_path)
     x_axis = np.asarray(table["x"], dtype=float)
@@ -1967,12 +1917,7 @@ def write_wham_mirror_overview_plots(
         ax_autodiff.text(0.5, 0.5, "Autodiff summary not provided", ha="center", va="center", transform=ax_autodiff.transAxes)
         ax_autodiff.set_axis_off()
 
-    png_path = out_dir / "wham_mirror_overview.png"
-    pdf_path = out_dir / "wham_mirror_overview.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "wham_mirror_overview")
 
 
 def write_magnetic_obstacle_regime_plots(
@@ -1981,9 +1926,7 @@ def write_magnetic_obstacle_regime_plots(
     *,
     case_title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
     if not records:
         raise ValueError("Need at least one record to write magnetic-obstacle regime plots")
 
@@ -2026,12 +1969,7 @@ def write_magnetic_obstacle_regime_plots(
                     ax.text(ix, iy, f"{value:.2e}", ha="center", va="center", fontsize=9, color="white")
         plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
-    png_path = out_dir / "magnetic_obstacle_regime_scan.png"
-    pdf_path = out_dir / "magnetic_obstacle_regime_scan.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "magnetic_obstacle_regime_scan")
 
 
 def write_strong_scaling_plots(
@@ -2040,9 +1978,7 @@ def write_strong_scaling_plots(
     *,
     case_title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     groups: dict[str, list[dict[str, object]]] = {}
     for record in records:
@@ -2121,12 +2057,7 @@ def write_strong_scaling_plots(
         fontsize=9.5,
     )
 
-    png_path = out_dir / "strong_scaling.png"
-    pdf_path = out_dir / "strong_scaling.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "strong_scaling")
 
 
 def write_autodiff_plots(
@@ -2140,9 +2071,7 @@ def write_autodiff_plots(
     parameter_label: str = "Recovered parameter",
     target_label: str = "Target parameter",
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     fig, axes = plt.subplots(1, 2, figsize=(13.5, 5.4), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)
@@ -2202,12 +2131,7 @@ def write_autodiff_plots(
         ncol=3,
     )
 
-    png_path = out_dir / "autodiff_summary.png"
-    pdf_path = out_dir / "autodiff_summary.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "autodiff_summary")
 
 
 def write_operator_verification_plots(
@@ -2216,9 +2140,7 @@ def write_operator_verification_plots(
     *,
     case_title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     resolution = np.asarray([float(item["resolution"]) for item in records], dtype=float)
     spacing = np.asarray([float(item["max_spacing"]) for item in records], dtype=float)
@@ -2267,12 +2189,7 @@ def write_operator_verification_plots(
     axes[1].set_title("Error decay with refinement")
     axes[1].legend(loc="upper right")
 
-    png_path = out_dir / "operator_verification.png"
-    pdf_path = out_dir / "operator_verification.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "operator_verification")
 
 
 def write_interface_verification_plots(
@@ -2283,9 +2200,7 @@ def write_interface_verification_plots(
     case_title: str,
     interface_location: float = 0.0,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     spacing = np.asarray([float(item["max_spacing"]) for item in records], dtype=float)
     profile_error = np.asarray([float(item["profile_l2_error"]) for item in records], dtype=float)
@@ -2340,12 +2255,7 @@ def write_interface_verification_plots(
             bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.92},
         )
 
-    png_path = out_dir / "interface_verification.png"
-    pdf_path = out_dir / "interface_verification.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "interface_verification")
 
 
 def write_freemhd_parity_plots(
@@ -2354,9 +2264,7 @@ def write_freemhd_parity_plots(
     *,
     case_title: str,
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     fig, axes = plt.subplots(2, 2, figsize=(13.5, 9.2), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)
@@ -2441,12 +2349,7 @@ def write_freemhd_parity_plots(
         )
     ax.legend(loc="upper right", fontsize=10)
 
-    png_path = out_dir / "freemhd_closed_channel_parity.png"
-    pdf_path = out_dir / "freemhd_closed_channel_parity.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, "freemhd_closed_channel_parity")
 
 
 def write_freemhd_observable_parity_plots(
@@ -2456,9 +2359,7 @@ def write_freemhd_observable_parity_plots(
     case_title: str,
     output_stem: str = "freemhd_closed_channel_observable_parity",
 ) -> list[Path]:
-    _set_plot_style()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _prepare_plot_output(out_dir)
 
     fig, axes = plt.subplots(2, 4, figsize=(18.0, 8.8), constrained_layout=True)
     fig.suptitle(case_title, fontsize=16)
@@ -2508,9 +2409,4 @@ def write_freemhd_observable_parity_plots(
             if row_index == 0 and column_index == 3:
                 ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.30), ncol=2, fontsize=9.5)
 
-    png_path = out_dir / f"{output_stem}.png"
-    pdf_path = out_dir / f"{output_stem}.pdf"
-    fig.savefig(png_path, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
-    return [png_path, pdf_path]
+    return _save_figure_pair(fig, out_dir, output_stem)
