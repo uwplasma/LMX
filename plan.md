@@ -9,8 +9,8 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate is keyed to `e87df4c` and exercised source
-`2ec7eb6`; a current-source refresh is pending. CPU/GPU calibration at
+The latest complete portable gate is keyed to `3065021` and exercised source
+`ef2d2b1`. CPU/GPU calibration at
 `413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
 restart fix and remain historical until refreshed. The isolated compiler trace
 is keyed to `f379f6b`.
@@ -123,19 +123,19 @@ immutable evidence, richer projection, and target-driven paths remain):
 | package modules | 35 | no new module | 35 |
 | package lines | 35,100 | return below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,869 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,904 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,548,451 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,550,112 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `2ec7eb6` records 817 passes, 8 expected
-external-data skips, 95.0316% combined line/branch coverage, and 166.5 seconds on
-the reference Apple M4: 11.6% faster than the previous 188.4-second gate and
+The portable-gate artifact keyed to `ef2d2b1` records 818 passes, 8 expected
+external-data skips, 95.0101% combined line/branch coverage, and 154.5 seconds on
+the reference Apple M4: 7.2% faster than the previous 166.5-second gate and
 below the 300-second engineering target and 600-second hard limit. Coverage
 remains above the enforced floor but below the 95.5% engineering target. The
-six-worker record reports 51.5 seconds for reduced B2 and 60.4 seconds for
+six-worker record reports 49.5 seconds for reduced B2 and 53.4 seconds for
 weighted modal; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
 
@@ -175,7 +175,7 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 37.4 seconds, versus 48.3 seconds for reduced B2 and 29.6
+gate it reports 53.4 seconds, versus 49.5 seconds for reduced B2 and 24.9
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -462,6 +462,14 @@ Released SOLVAX 0.8.3 remains the supported floor. Before LMX uses coupled
 Anderson acceleration, reconcile and release SOLVAX 0.8.4's weight API, then
 apply identical weights and damping to fields and conservative compact flux.
 Do not store a production-scale full-state history without a measured benefit.
+
+The next bounded tranche is upstream-first: prepare the clean SOLVAX 0.8.4
+weight API for review, then test restart-exact depth-two coupled Anderson from
+the shared step-29 and strict step-96 checkpoints. Promote it only if both paths
+cross `tau_map=0.005`, preserve every linear, conservation, restart, and
+sharding gate, and agree within the frozen pressure, velocity, and
+pressure-gradient outcome limits. Otherwise retain fixed relaxation and stop
+before a coarse run.
 
 The production spec's `5e-5` is now an explicitly provisional, fail-closed
 normalized-map bound, not an accepted threshold. Do not authorize a corrected
