@@ -40,7 +40,7 @@ release; no solver was rerun.
 | `readme-variable-field.webp` | `5d4b593c26a55cb031678988133ba2f6ddeae5e0cbee16a0e166282584bce569` |
 | `readme-magnetic-obstacle.webp` | `6e351e80531742b1aed6f951d6155cc55d3f5fd4f3e9b556a15336f76a74bc84` |
 | `readme-blanket-flow-poster.webp` | `f40dff36a41bdfc1fa9df7371cf9c4907a367d70c5603a4658a18d27f708260d` |
-| `readme-blanket-flow.mp4` | `fb426241143c3e6f4d726b0d40b9918de55271b5990888077d9181834035b2cc` |
+| `readme-blanket-flow-7s.mp4` | `ca7d72cebb564a28bc6f91b395824cd1a9417ad271dc8ba3c0cbf2c365f18c51` |
 | `readme-alex-b2-field-pressure.webp` | `f186f109ed9f0dc25134baaee22069e521140134ff984be94a60fe1bc825bf2f` |
 | `readme-q2d-turbulence-poster.webp` | `97a9e5c418012f1591344ea131a846933a2c60fc2ba47eaf9f93f86e79e1bfb5` |
 | `readme-q2d-turbulence.mp4` | `fd6e60bfdeb99f1c0123a8dc68f2198cfde91904b09cfdcde7caa34667492a62` |
@@ -51,6 +51,11 @@ The 71,043-byte Q2D H.264 loop and 13,724-byte poster derive from the existing
 `feb9e145cee2a5a87f13381803855a34ad16d44f4d63d0c31c155ad07f74bd96`),
 stretched from 5.04 to 7.00 seconds at 600 × 520 and 12 fps. No solver was
 rerun; quantitative Q2D-MHDfoam parity remains open.
+
+The 86,808-byte blanket H.264 loop is exactly 7.00 seconds at 1,000 × 462 and
+12 fps. Motion interpolation retimes the existing 5.75-second derivative
+(`fb426241...`) without changing its physical frames; no solver was rerun. The
+underlying centerline pressure-velocity model remains research-stage.
 
 The 95,818-byte Li/AlN WebP derives from the 2,532 × 1,732 convergence figure
 (SHA-256 `0a5d4d0a9a97cff78eb15efdb79934515fcabb5918c23148c8c0653ce198ea94`).

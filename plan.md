@@ -112,7 +112,7 @@ large reusable artifacts go in checksummed releases.
 | B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-5 replay, refrozen 64x cap, and current CPU/GPU device equivalence have bounded gates | tighter-reference stopping calibration, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
-| README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
+| README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/blanket/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
 | SOLVAX | released 0.8.3 owns the generic algebra consumed by LMX | no further solver migration is required for the B2 smoke |
 | Distribution | lean installed wheel loads all frozen A/B references and runs a tiny solve without Matplotlib/Pillow; plotting is an explicit extra; source artifact excludes repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
@@ -129,7 +129,7 @@ shared without removing cases or assertions.
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,553 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,329,540 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,330,201 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -474,6 +474,11 @@ Aim for readable 6–8-second loops, stills below 100 KiB, tracked movies below
 150 KiB where practical, and all tracked media below 1 MiB. Host source frames,
 full-quality media, meshes, and raw outputs in checksummed releases. Put
 provenance and acceptance status beside every asset.
+
+The README now links three dynamics loops at exactly 7.00 seconds: accepted
+Hunt startup plus research-stage blanket and Q2D flows. The 86,808-byte blanket
+derivative retimes its existing 5.75-second H.264 with motion interpolation;
+physical frames are unchanged and no solver rerun or tracked media was added.
 
 ## Release gate
 

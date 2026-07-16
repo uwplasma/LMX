@@ -114,14 +114,14 @@ Promoted objectives pass finite-difference or independent-transpose checks.
 
 <p align="center">
   <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
-  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Reduced blanket-flow movie" width="48%"></a>
+  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-7s.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Seven-second reduced blanket-flow movie" width="48%"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence-poster.webp" alt="Seven-second nonlinear Q2D vorticity loop" width="58%"></a>
 </p>
 
-▶ [Watch blanket flow](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow.mp4) ·
+▶ [Blanket flow · 7 s](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-7s.mp4) ·
 [Q2D turbulence · 7 s](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-q2d-turbulence.mp4)
 
 These visuals demonstrate implemented workflows. Quantitative turbulent
