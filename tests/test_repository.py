@@ -6,6 +6,7 @@ import hashlib
 import inspect
 import json
 from pathlib import Path
+import tarfile
 import zipfile
 
 import lmx
@@ -16,6 +17,7 @@ from scripts.audit_architecture import (
     _checkout_size,
     architecture_budget_errors,
     build_inventory,
+    inspect_sdist,
     inspect_wheel,
     measure_import,
     write_inventory,
@@ -127,6 +129,19 @@ def test_wheel_audit_rejects_nonpackage_payload(tmp_path: Path) -> None:
     assert inspect_wheel(wheel)["forbidden_members"] == ["benchmarks/raw.bin"]
     assert "outside lmx/" in architecture_budget_errors(
         build_inventory(), wheel=wheel
+    )[0]
+
+
+def test_sdist_audit_rejects_repository_tests(tmp_path: Path) -> None:
+    source = tmp_path / "lmx-1" / "tests" / "test_solver.py"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"large output")
+    sdist = tmp_path / "lmx-test.tar.gz"
+    with tarfile.open(sdist, "w:gz") as archive:
+        archive.add(source, arcname="lmx-1/tests/test_solver.py")
+    assert inspect_sdist(sdist)["forbidden_members"] == ["tests/test_solver.py"]
+    assert "outside its source payload" in architecture_budget_errors(
+        build_inventory(), sdist=sdist
     )[0]
 
 

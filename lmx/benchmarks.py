@@ -49,7 +49,9 @@ _FREEMHD_DISCRETIZATION_REFERENCE = {
 
 
 def _repository_root(root: str | Path | None = None) -> Path:
-    return Path(root) if root is not None else Path(__file__).resolve().parents[1]
+    """Return an override root or the benchmark data shipped with LMX."""
+
+    return Path(root) if root is not None else Path(__file__).with_name("data")
 
 
 def _sha256(path: Path) -> str:

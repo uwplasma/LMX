@@ -62,7 +62,7 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
     role = role or ("b1-production" if case_id.startswith("B1") else "b2-production")
     manifest = canonical_matched_b_contract(load_benchmark_b_spec(case_id), role)
     reference = load_benchmark_b_reference(case_id)
-    spec_path = Path("benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
+    spec_path = Path("lmx/data/benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
     artifacts = {}
     for name in ("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"):
         kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} else "file"
@@ -292,7 +292,7 @@ def _matched_b2_smoke_record(
         "contract": {"lmx": deepcopy(contract), "freemhd": deepcopy(contract)},
         "comparison": {"source": "independent-output-observers"} if executed else {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
         "provenance": {
-            "benchmark_spec_sha256": hashlib.sha256(Path("benchmarks/specs/alex-b2-square.toml").read_bytes()).hexdigest(),
+            "benchmark_spec_sha256": hashlib.sha256(Path("lmx/data/benchmarks/specs/alex-b2-square.toml").read_bytes()).hexdigest(),
             "artifacts": artifacts,
         },
     }
@@ -1169,7 +1169,7 @@ def test_benchmark_a_spec_loader_rejects_unsupported_case():
     ],
 )
 def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(tmp_path: Path, case_kind: str, old: str, new: str, message: str):
-    source = Path("benchmarks/specs") / f"{case_kind}-ha20.toml"
+    source = Path("lmx/data/benchmarks/specs") / f"{case_kind}-ha20.toml"
     (tmp_path / source.name).write_text(source.read_text().replace(old, new, 1))
     with pytest.raises(ValueError, match=message):
         load_benchmark_a_spec(case_kind, tmp_path)
@@ -1185,7 +1185,7 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
     assert rows[("hunt", 500)]["hartmann_wall_conductance"] == pytest.approx(0.01)
     assert rows[("hunt", 15000)]["analytical_flow_rate"] == pytest.approx(2.425e-6)
 
-    source = Path("benchmarks/references/samper-table-i.toml")
+    source = Path("lmx/data/benchmarks/references/samper-table-i.toml")
     invalid = tmp_path / "invalid.toml"
     invalid.write_text(source.read_text().replace('case_kind = "hunt"', 'case_kind = "other"', 1))
     with pytest.raises(ValueError, match="Incomplete hunt Hartmann ladder"):

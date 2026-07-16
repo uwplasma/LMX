@@ -101,7 +101,8 @@ The retained specifications and references are:
 | B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure solver accepted; experimental observable open |
 | B2 | conducting square duct | `alex-b2-square.csv` | research-stage; bounded 1/2-GPU calibration passes, steady scaling open |
 
-Files live in `benchmarks/specs/` and `benchmarks/references/`. Construction and
+Files live in `lmx/data/benchmarks/specs/` and
+`lmx/data/benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
 
 ![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)

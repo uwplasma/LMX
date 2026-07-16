@@ -1,9 +1,9 @@
 # LMX
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Python](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://github.com/uwplasma/LMX/blob/main/pyproject.toml)
 [![JAX](https://img.shields.io/badge/JAX-CPU%20%7C%20GPU-orange.svg)](https://docs.jax.dev/)
 [![Docs](https://img.shields.io/badge/docs-read%20online-blue.svg)](https://lmx.readthedocs.io/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/uwplasma/LMX/blob/main/LICENSE)
 
 **LMX is a JAX-native code for inductionless liquid-metal MHD on CPUs and
 GPUs.** It combines verified duct solvers, conducting walls, imposed 3D fields,
@@ -13,12 +13,12 @@ selected differentiable workflows, and research-stage extruded flows.
 > obstacles, Q2D turbulence, and blanket models remain research-stage.
 
 [Documentation](https://lmx.readthedocs.io/) ·
-[Quickstart](docs/getting_started.md) ·
-[Examples](docs/case_cookbook.md) ·
-[Validation](docs/benchmark_matrix.md) ·
-[Roadmap](plan.md)
+[Quickstart](https://lmx.readthedocs.io/en/latest/getting_started.html) ·
+[Examples](https://lmx.readthedocs.io/en/latest/case_cookbook.html) ·
+[Validation](https://lmx.readthedocs.io/en/latest/benchmark_matrix.html) ·
+[Roadmap](https://github.com/uwplasma/LMX/blob/main/plan.md)
 
-![Analytical and LMX duct-flow profiles](docs/_static/analytic_velocity_profiles.webp)
+![Analytical and LMX duct-flow profiles](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/analytic_velocity_profiles.webp)
 
 ## Install and run
 
@@ -36,7 +36,7 @@ print(solution.diagnostics.volumetric_flow_rate_history[-1])
 ```
 
 TOML and Python inputs support restarts, diagnostics, plotting, and checksummed
-artifacts. See the [case cookbook](docs/case_cookbook.md).
+artifacts. See the [case cookbook](https://lmx.readthedocs.io/en/latest/case_cookbook.html).
 
 ## Capabilities
 
@@ -73,13 +73,13 @@ Eight frozen high-Hartmann rows pass, and audited closed-channel FreeMHD
 observables pass the 1% finite-grid gate.
 
 <p align="center">
-  <img src="docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="58%">
-  <a href="docs/_static/readme_hunt_startup_2d.mp4"><img src="docs/_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt-flow startup loop" width="38%"></a>
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="58%">
+  <a href="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme_hunt_startup_2d.mp4"><img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme_hunt_startup_2d_poster.webp" alt="Seven-second Hunt-flow startup loop" width="38%"></a>
 </p>
 
-▶ [Watch the 7-second Hunt startup](docs/_static/readme_hunt_startup_2d.mp4)
+▶ [Watch the 7-second Hunt startup](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme_hunt_startup_2d.mp4)
 
-[Validation evidence →](docs/validation_report.md)
+[Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)
 
 ## Real geometries and nonuniform fields
 
@@ -92,7 +92,7 @@ observables pass the 1% finite-grid gate.
 
 B2 passes exact restart and 1/2/4-CPU plus 1/2-GPU equivalence. Its stopping
 threshold, production parity, and scaling promotion remain open.
-[Fringing status →](docs/fringing.md)
+[Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Model conducting multilayer walls
 
@@ -100,14 +100,14 @@ threshold, production parity, and scaling promotion remain open.
 
 Research-stage Li/AlN wall results retain pressure and current mesh-step changes
 below 10% at `Ha = 220`; experimental and blanket-level validation remain open.
-[Wall models →](docs/wall_models.md)
+[Wall models →](https://lmx.readthedocs.io/en/latest/wall_models.html)
 
 ## Differentiate selected workflows
 
 ![LMX sensitivity and inverse design](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-autodiff.webp)
 
 Promoted objectives pass finite-difference or independent-transpose checks.
-[Differentiable workflows →](docs/autodiff.md)
+[Differentiable workflows →](https://lmx.readthedocs.io/en/latest/autodiff.html)
 
 ## Explore research flows
 
@@ -125,23 +125,27 @@ Promoted objectives pass finite-difference or independent-transpose checks.
 
 These visuals demonstrate implemented workflows. Quantitative turbulent
 Q2D-MHDfoam parity and blanket validation remain open.
-[Geometry and fields →](docs/geometry.md) ·
-[External benchmarks →](docs/external_benchmarks.md)
+[Geometry and fields →](https://lmx.readthedocs.io/en/latest/geometry.html) ·
+[External benchmarks →](https://lmx.readthedocs.io/en/latest/external_benchmarks.html)
 
 ## Scale on CPUs and GPUs
 
-![B2 two-update CPU and GPU scaling evidence](docs/_static/strong_scaling.webp)
+![B2 two-update CPU and GPU scaling evidence](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
 The current B2 smoke agrees on 1/2/4 CPU and 1/2 GPU devices. At
 `128 × 67 × 67`, two GPUs reduce 2.780 s to 2.400 s (1.159×); this misses the
 1.2× promotion gate, so no production-scaling speedup is claimed.
-[Protocol and results →](docs/performance.md)
+[Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation
 
 The portable gate records **816 passing tests**, **95.11% combined line/branch
-coverage**, and **149.5 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
-[Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
-[Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
+coverage**, and **149.5 s** on six Apple-Silicon workers.
+[Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
+[Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
+[Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·
+[Contributing](https://github.com/uwplasma/LMX/blob/main/CONTRIBUTING.md) ·
+[Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 
-LMX is MIT licensed. Cite it with [CITATION.cff](CITATION.cff).
+LMX is MIT licensed. Cite it with
+[CITATION.cff](https://github.com/uwplasma/LMX/blob/main/CITATION.cff).

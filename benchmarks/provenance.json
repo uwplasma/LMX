@@ -70,7 +70,7 @@
         "muller-buhler-book",
         "freemhd"
       ],
-      "spec_path": "benchmarks/specs/shercliff-ha20.toml",
+      "spec_path": "lmx/data/benchmarks/specs/shercliff-ha20.toml",
       "status": "verified-bounded",
       "tests": [
         "tests/test_benchmarks.py::test_compact_freemhd_evidence_is_portable_and_deterministic",
@@ -111,7 +111,7 @@
         "muller-buhler-book",
         "freemhd"
       ],
-      "spec_path": "benchmarks/specs/hunt-ha20.toml",
+      "spec_path": "lmx/data/benchmarks/specs/hunt-ha20.toml",
       "status": "verified-bounded",
       "tests": [
         "tests/test_benchmarks.py::test_compact_freemhd_evidence_is_portable_and_deterministic",
@@ -166,7 +166,7 @@
         "smolentsev-vv",
         "muller-buhler-book"
       ],
-      "spec_path": "benchmarks/references/samper-table-i.toml",
+      "spec_path": "lmx/data/benchmarks/references/samper-table-i.toml",
       "status": "verified-bounded",
       "tests": [
         "tests/test_freemhd.py::test_samper_table_i_reference_is_complete_and_exact",
@@ -213,7 +213,7 @@
         "abdou-apex",
         "freemhd"
       ],
-      "spec_path": "benchmarks/specs/alex-b1-pipe.toml",
+      "spec_path": "lmx/data/benchmarks/specs/alex-b1-pipe.toml",
       "status": "specification-frozen",
       "tests": [
         "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
@@ -257,7 +257,7 @@
         "muller-buhler-book",
         "freemhd"
       ],
-      "spec_path": "benchmarks/specs/alex-b2-square.toml",
+      "spec_path": "lmx/data/benchmarks/specs/alex-b2-square.toml",
       "status": "specification-frozen",
       "tests": [
         "tests/test_benchmarks.py::test_frozen_benchmark_b_specs_and_reference_data",
@@ -280,7 +280,7 @@
       "id": "lmx-benchmark-matrix",
       "kind": "repository_document",
       "path": "docs/benchmark_matrix.md",
-      "sha256": "bc7b0780aefe9eb50bf2adca6b18ffe2a0473cdc8503e87348ab9813ecfa3b98",
+      "sha256": "af0dacb785e25c2b2a6dde2599cc0e9a325a1c5e2e21997c3e9d0b83a335f68a",
       "title": "LMX Benchmark Matrix"
     },
     {
@@ -288,7 +288,7 @@
       "id": "benchmark-b-specification",
       "kind": "repository_document",
       "path": "benchmarks/results/benchmark-b-specification.json",
-      "sha256": "da9ff08878377f2cbfcecd1e42f81d35771fd614fd65d827a981a9ebac1ee47b",
+      "sha256": "fb22311f37026440232659eab06cb895964ba50bad5395801f95c84e7bb80aec",
       "title": "LMX frozen Benchmark B specifications and extracted ALEX data index"
     },
     {
@@ -338,7 +338,7 @@
       "availability": "repository",
       "id": "samper-table-i",
       "kind": "repository_document",
-      "path": "benchmarks/references/samper-table-i.toml",
+      "path": "lmx/data/benchmarks/references/samper-table-i.toml",
       "sha256": "8140a5a19438baea503112be6247c4394fea0c4c7ce0f4bd75a81e74bc664105",
       "title": "LMX extraction of Samper Table I"
     },

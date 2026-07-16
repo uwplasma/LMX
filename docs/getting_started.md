@@ -28,7 +28,7 @@ uv pip install -e '.[dev,docs]'
 CI resolves the declared compatible ranges and tests both the minimum supported
 and newest compatible SOLVAX releases.
 
-LMX supports Python 3.10 and newer. Install the JAX wheel appropriate for your
+LMX supports Python 3.10–3.13. Install the JAX wheel appropriate for your
 accelerator before installing LMX when using CUDA.
 
 ## First run

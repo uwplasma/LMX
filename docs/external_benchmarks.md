@@ -106,7 +106,8 @@ convergence, and acceptance gates are ready.
 ## ALEX experiments
 
 Digitized pipe and square-duct pressure references live in
-`benchmarks/references/`; frozen case definitions live in `benchmarks/specs/`.
+`lmx/data/benchmarks/references/`; frozen case definitions live in
+`lmx/data/benchmarks/specs/`.
 Use:
 
 ```bash
@@ -148,7 +149,7 @@ cannot replace current, power, convergence, and uncertainty gates.
 
 ## Data policy
 
-Small independently sourced tables may live in `benchmarks/references/` with
+Small independently sourced tables may live in `lmx/data/benchmarks/references/` with
 provenance. Large meshes, complete OpenFOAM/FreeMHD cases, raw transient fields,
 restarts, logs, VTK, and generated movies stay in an external workspace or a
 release with checksums. This keeps cloning and installation lightweight without

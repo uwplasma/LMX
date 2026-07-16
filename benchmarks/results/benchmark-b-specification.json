@@ -3,7 +3,7 @@
   "cases": [
     {
       "combined_uncertainty_absolute": 0.002,
-      "data_path": "benchmarks/references/alex-b1-pipe.csv",
+      "data_path": "lmx/data/benchmarks/references/alex-b1-pipe.csv",
       "data_sha256": "a687df23973852f32a8c0e9f88fcc0df1725cb518f3fb908ed507f604865cc0d",
       "id": "B1-fringing-pipe",
       "mesh_levels": [
@@ -37,13 +37,13 @@
         "smolentsev-vv",
         "alex-results-1987"
       ],
-      "spec_path": "benchmarks/specs/alex-b1-pipe.toml",
+      "spec_path": "lmx/data/benchmarks/specs/alex-b1-pipe.toml",
       "spec_sha256": "1607c21c3e968d687219266ec89a9839922335d7628339e96ff43295cd489a2c",
       "tolerances_frozen_before_production": true
     },
     {
       "combined_uncertainty_absolute": 0.004,
-      "data_path": "benchmarks/references/alex-b2-square.csv",
+      "data_path": "lmx/data/benchmarks/references/alex-b2-square.csv",
       "data_sha256": "6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483",
       "harness_smoke_execution": {
         "courant_max": 0.4,
@@ -94,7 +94,7 @@
         "smolentsev-vv",
         "alex-results-1987"
       ],
-      "spec_path": "benchmarks/specs/alex-b2-square.toml",
+      "spec_path": "lmx/data/benchmarks/specs/alex-b2-square.toml",
       "spec_sha256": "29b5b1af2c3eea535cb1f8c24366192e4d6ea97a219977a5b47f9eae824dcb79",
       "tolerances_frozen_before_production": true
     }

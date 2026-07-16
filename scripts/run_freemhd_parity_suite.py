@@ -918,7 +918,7 @@ def run_matched_b2_smoke_bundle(
             "kind": kind,
             "sha256": artifact_sha256(path, kind),
         }
-    spec_path = Path(__file__).resolve().parents[1] / "benchmarks/specs/alex-b2-square.toml"
+    spec_path = Path(__file__).resolve().parents[1] / "lmx/data/benchmarks/specs/alex-b2-square.toml"
     record = {
         "schema_version": 3, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
         "contract": {

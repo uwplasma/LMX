@@ -152,9 +152,12 @@ def _sync_repo_to_remote(*, repo_root: Path, remote_host: str, remote_dir: str) 
     try:
         with tarfile.open(archive_path, "w") as archive:
             archive.add(repo_root / "lmx", arcname="lmx")
-            archive.add(repo_root / "benchmarks" / "specs", arcname="benchmarks/specs")
             archive.add(
-                repo_root / "benchmarks" / "references",
+                repo_root / "lmx" / "data" / "benchmarks" / "specs",
+                arcname="benchmarks/specs",
+            )
+            archive.add(
+                repo_root / "lmx" / "data" / "benchmarks" / "references",
                 arcname="benchmarks/references",
             )
             archive.add(

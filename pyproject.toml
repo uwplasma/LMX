@@ -13,7 +13,6 @@ license = "MIT"
 keywords = ["magnetohydrodynamics", "liquid-metal", "jax", "differentiable-simulation"]
 dependencies = [
   "jax",
-  "jaxlib",
   "matplotlib",
   "numpy",
   "scipy",
@@ -41,7 +40,6 @@ dev = [
   "pytest-timeout",
   "pytest-xdist",
   "magpylib-jax",
-  "interpax",
 ]
 docs = [
   "sphinx",
@@ -63,6 +61,9 @@ lmx = "lmx.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["lmx*"]
+
+[tool.setuptools.package-data]
+lmx = ["data/benchmarks/specs/*.toml", "data/benchmarks/references/*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers"

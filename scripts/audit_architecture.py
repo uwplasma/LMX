@@ -10,6 +10,7 @@ import json
 import statistics
 import subprocess
 import sys
+import tarfile
 import time
 import zipfile
 from pathlib import Path
@@ -252,6 +253,7 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             "curated_examples_max": 12,
             "checkout_bytes_max": 4 * 1024 * 1024,
             "root_import_median_seconds_max": 0.25,
+            "sdist_bytes_max": 512 * 1024,
             "wheel_bytes_max": 384 * 1024,
         },
     }
@@ -302,10 +304,37 @@ def inspect_wheel(path: str | Path) -> dict[str, Any]:
     }
 
 
+def inspect_sdist(path: str | Path) -> dict[str, Any]:
+    """Return sdist size and flag files outside its reproducibility payload."""
+
+    sdist = Path(path)
+    with tarfile.open(sdist) as archive:
+        members = [member.name for member in archive.getmembers() if member.isfile()]
+    relative = [name.split("/", 1)[1] if "/" in name else name for name in members]
+    allowed_files = {
+        "LICENSE", "MANIFEST.in", "PKG-INFO", "README.md", "pyproject.toml", "setup.cfg"
+    }
+    allowed_roots = ("lmx/", "lmx.egg-info/")
+    forbidden = [
+        name
+        for name in relative
+        if name not in allowed_files and not name.startswith(allowed_roots)
+    ]
+    return {
+        "path": sdist.name,
+        "bytes": sdist.stat().st_size,
+        "member_count": len(members),
+        "forbidden_members": forbidden,
+    }
+
+
 def architecture_budget_errors(
-    payload: dict[str, Any], *, wheel: str | Path | None = None
+    payload: dict[str, Any],
+    *,
+    wheel: str | Path | None = None,
+    sdist: str | Path | None = None,
 ) -> list[str]:
-    """Validate inventory, optional import timing, and optional wheel budgets."""
+    """Validate inventory, import timing, and optional distribution budgets."""
 
     inventory = payload["inventory"]
     targets = payload["targets"]
@@ -347,6 +376,18 @@ def architecture_budget_errors(
                 "wheel contains files outside lmx/ and dist-info/: "
                 + ", ".join(wheel_record["forbidden_members"])
             )
+    if sdist is not None:
+        sdist_record = inspect_sdist(sdist)
+        if sdist_record["bytes"] > targets["sdist_bytes_max"]:
+            errors.append(
+                f"sdist bytes={sdist_record['bytes']} exceeds "
+                f"sdist_bytes_max={targets['sdist_bytes_max']}"
+            )
+        if sdist_record["forbidden_members"]:
+            errors.append(
+                "sdist contains files outside its source payload: "
+                + ", ".join(sdist_record["forbidden_members"])
+            )
     return errors
 
 
@@ -372,6 +413,7 @@ def main() -> int:
     )
     parser.add_argument("--measure-import", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--sdist", type=Path)
     parser.add_argument("--wheel", type=Path)
     args = parser.parse_args()
     payload = build_inventory()
@@ -379,7 +421,7 @@ def main() -> int:
         payload["import_measurement"] = measure_import()
     if args.output is not None:
         write_inventory(args.output, measure=args.measure_import)
-    errors = architecture_budget_errors(payload, wheel=args.wheel)
+    errors = architecture_budget_errors(payload, wheel=args.wheel, sdist=args.sdist)
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
@@ -395,6 +437,9 @@ def main() -> int:
     if args.wheel is not None:
         wheel = inspect_wheel(args.wheel)
         print(f"wheel_bytes={wheel['bytes']} wheel_members={wheel['member_count']}")
+    if args.sdist is not None:
+        sdist = inspect_sdist(args.sdist)
+        print(f"sdist_bytes={sdist['bytes']} sdist_members={sdist['member_count']}")
     return 0
 
 

@@ -45,12 +45,28 @@ jobs:
         run: |
           python -m build
           python -m twine check dist/*
-          python scripts/audit_architecture.py --check --wheel dist/*.whl
+          python scripts/audit_architecture.py --check \
+            --wheel dist/*.whl --sdist dist/*.tar.gz
       - name: Smoke-test the wheel
         run: |
           python -m venv /tmp/lmx-wheel-check
-          /tmp/lmx-wheel-check/bin/python -m pip install dist/*.whl
-          /tmp/lmx-wheel-check/bin/python -c "import lmx; import lmx.solvers"
+          /tmp/lmx-wheel-check/bin/python -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
+          cd /tmp
+          /tmp/lmx-wheel-check/bin/lmx --help >/dev/null
+          /tmp/lmx-wheel-check/bin/python - <<'PY'
+          from lmx import make_hartmann_case, solve_steady
+          from lmx.benchmarks import load_benchmark_b_reference, load_benchmark_b_spec
+          from lmx.freemhd import load_benchmark_a_spec, load_samper_table_i
+
+          for name in ("shercliff", "hunt"):
+              load_benchmark_a_spec(name)
+          for name in ("B1-fringing-pipe", "B2-fringing-square"):
+              load_benchmark_b_spec(name)
+              load_benchmark_b_reference(name)
+          load_samper_table_i()
+          solution = solve_steady(make_hartmann_case(ha=5, ny=4, nz=4))
+          assert solution.state.residual < 1e-7
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: python-distributions

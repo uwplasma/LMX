@@ -25,8 +25,9 @@ from .units import (
 )
 
 
-BENCHMARK_A_SPEC_DIR = Path(__file__).resolve().parents[1] / "benchmarks" / "specs"
-SAMPER_TABLE_I_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "references" / "samper-table-i.toml"
+_PACKAGE_DATA = Path(__file__).with_name("data")
+BENCHMARK_A_SPEC_DIR = _PACKAGE_DATA / "benchmarks" / "specs"
+SAMPER_TABLE_I_PATH = _PACKAGE_DATA / "benchmarks" / "references" / "samper-table-i.toml"
 _MATCHED_B_ARTIFACT_NAMES = (
     "lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"
 )

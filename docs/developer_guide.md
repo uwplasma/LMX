@@ -39,9 +39,13 @@ assigned to a new versioned asset release.
 The live architecture gate caps the package at 35 modules, 35,100 source lines,
 8,000 maintained-core lines, 31 test files, 21,100 test lines, 13 maintenance
 scripts, 30 root exports, 12 curated examples, a 4 MiB tracked checkout, and a
-0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and
-reject benchmark, documentation, or generated payloads outside `lmx/` and
-wheel metadata. The [media provenance index](media.md) records the web
+0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and the
+source distribution at 512 KiB. The wheel contains only `lmx/` and metadata;
+the source distribution adds the README, license, and build metadata. Tests
+remain in the repository because their scripts and external fixtures are not
+part of the slim user distribution.
+Both reject benchmark, documentation, or generated payloads. The
+[media provenance index](media.md) records the web
 derivatives without adding a gallery to the primary navigation.
 
 ## Architecture
@@ -174,9 +178,9 @@ artifact gates before package artifacts are built.
 
 Release workflow behavior:
 
-- `workflow_dispatch` with `publish_target = none` runs the selected
-  validation gate, bounded solver/convergence/Q2D artifact jobs, docs build,
-  wheel/sdist build, metadata check, and artifact upload.
+- `workflow_dispatch` with `publish_target = none` runs the portable validation
+  gate, docs build, wheel/sdist audits, installed-wheel smoke, metadata check,
+  and artifact upload.
 - `workflow_dispatch` with `publish_target = testpypi` does the same checks and
   publishes to TestPyPI through Trusted Publishing.
 - `workflow_dispatch` with `publish_target = pypi` does the same checks and
@@ -204,6 +208,8 @@ python -m pip install --upgrade build twine
 rm -rf dist build lmx.egg-info
 python -m build
 python -m twine check dist/*
+python scripts/audit_architecture.py --check \
+  --wheel dist/*.whl --sdist dist/*.tar.gz
 python scripts/run_full_test_suite.py --budget-seconds 600
 python -m sphinx -W -b html docs docs/_build/html
 ```

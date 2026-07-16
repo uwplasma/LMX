@@ -62,10 +62,10 @@ Richardson-extrapolated observable is not presented as a raw mesh result.
 
 Frozen specifications and digitized references are:
 
-- `benchmarks/specs/alex-b1-pipe.toml`
-- `benchmarks/specs/alex-b2-square.toml`
-- `benchmarks/references/alex-b1-pipe.csv`
-- `benchmarks/references/alex-b2-square.csv`
+- `lmx/data/benchmarks/specs/alex-b1-pipe.toml`
+- `lmx/data/benchmarks/specs/alex-b2-square.toml`
+- `lmx/data/benchmarks/references/alex-b1-pipe.csv`
+- `lmx/data/benchmarks/references/alex-b2-square.csv`
 
 The portable example exercises construction, current closure, restart, and
 observable extraction:
@@ -155,7 +155,7 @@ placement.
 | benchmark construction | `lmx/benchmarks.py` |
 | FreeMHD input observers and audits | `lmx/freemhd.py` |
 | external observable adapters | `lmx/external_validation.py` |
-| frozen specs and references | `benchmarks/specs/`, `benchmarks/references/` |
+| frozen specs and references | `lmx/data/benchmarks/` |
 | accepted compact results | `benchmarks/results/` |
 
 The literature basis and governing equations are summarized in
