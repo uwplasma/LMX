@@ -1607,16 +1607,16 @@ def _solvax_implicit_momentum_duct(
     restart = min(12, flat_rhs.size)
 
     def krylov(operator, rhs):
-        return gmres(
+        solution = gmres(
             operator, rhs, x0=jnp.zeros_like(rhs), precond=precondition,
             restart=restart, rtol=tolerance, atol=tolerance,
-            max_restarts=max(1, math.ceil(iterations / restart))
-        ).x
+            max_restarts=max(1, math.ceil(iterations / restart)))
+        return solution.x, (solution.residual_norm, solution.converged)
 
-    solved = linear_solve(flat_matvec, flat_rhs, krylov).reshape(shape)
-    residual = jnp.linalg.norm(flat_rhs - flat_matvec(solved.reshape(-1)))
-    target = jnp.maximum(tolerance, tolerance * jnp.linalg.norm(flat_rhs))
-    return solved, residual, residual <= target
+    solved, (residual, converged) = linear_solve(
+        flat_matvec, flat_rhs, krylov, has_aux=True
+    )
+    return solved.reshape(shape), residual, converged
 
 
 def _cell_limited_least_squares_gradient_duct(

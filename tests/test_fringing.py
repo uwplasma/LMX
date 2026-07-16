@@ -572,6 +572,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     def capture(matvec, rhs, solver, **kwargs):
         captured["matrix"] = jax.jacfwd(matvec)(jnp.zeros_like(rhs))
         captured["rhs"], captured["zero"] = rhs, matvec(jnp.zeros_like(rhs))
+        captured["has_aux"] = kwargs.get("has_aux", False)
         return actual_linear_solve(matvec, rhs, solver, **kwargs)
     monkeypatch.setattr(fringing_impl, "linear_solve", capture)
 
@@ -587,6 +588,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert matrix == pytest.approx(reference) and solved.sharding == velocity.sharding
     assert solved.reshape(-1) == pytest.approx(np.linalg.solve(reference, rhs), abs=2e-7)
     assert residual < 1e-8 and bool(converged) and solved.shape == (*shape, 3)
+    assert captured["has_aux"]
     assert captured["zero"] == pytest.approx(0.0) and not jnp.allclose(matrix, matrix.T)
     volume = dx * dy[None, :, None] * dz[None, None, :]
     expected_rhs = volume[..., None] * (density[..., None] * velocity + dt * force)
