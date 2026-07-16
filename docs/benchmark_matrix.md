@@ -78,13 +78,14 @@ B2 has exact-parity axial sharding on two RTX A4000 GPUs. B1 now uses its
 accepted compatible retained-modal pressure solver; experimental-observable,
 mesh-ladder, and final steady-response acceptance remain open. This is not yet
 a claim that the experimental pressure curve has passed.
-The first fresh current-formulation coarse trajectory (`102 x 77 x 77`) reaches
-its 128-update bound in 131.22 seconds on two RTX A4000 shards. All pressure
-solves and conservation gates pass, and the residual decreases monotonically,
-but its final `1.4302e-3` residual is above the frozen `5e-5` criterion. It is a
-bounded failed steady gate, not an accepted coarse result. Only exact restart
-continuations of that baseline are authorized; independence variants and
-larger meshes remain blocked.
+The first fresh current-formulation coarse trajectory (`102 x 77 x 77`) and
+one exact restart continuation reach step 256 in two bounded 131-second runs on
+two RTX A4000 shards. All pressure/electric solves and conservation gates pass,
+and the residual decreases monotonically. Its final `7.1081e-4` residual is
+still above the frozen `5e-5` criterion and misses the continuation's
+precommitted `5.5e-4` stop/go gate. It is not an accepted coarse result; more
+stepping, independence variants, and larger meshes remain blocked while the
+convergence slowdown is diagnosed.
 The legacy no-inertia, stationwise-flow B2 coarse campaign passes steady, conservation, tighter
 tolerance, doubled-iteration, and confirmation-wall gates. Its coarse ALEX
 curve alone does not pass the frozen literature limits (`weighted RMS 1.221`,

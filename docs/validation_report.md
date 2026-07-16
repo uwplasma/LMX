@@ -48,9 +48,10 @@ are authoritative when prose and results differ.
   reaches only 1.125x, below the scaling-promotion threshold. A three-update
   trajectory preserves all primary fields exactly. This is not production
   parity or steady scaling. The first fresh current-formulation coarse
-  trajectory passes conservation and all 128 pressure solves, but stops at its
-  128-update bound with residual `1.4302e-3`, above the `5e-5` steady criterion.
-  It is therefore not promoted, and larger or independence runs remain blocked.
+  trajectory and one exact continuation pass conservation and all 256 pressure
+  solves, but stop at step 256 with residual `7.1081e-4`, above both its
+  precommitted continuation gate and the `5e-5` steady criterion. It is not
+  promoted, and more stepping, larger, or independence runs remain blocked.
   The legacy fine pressure curve misses every frozen ALEX
   literature-error limit. A checksummed
   Maxwell-consistent coarse-field diagnostic improves peak underprediction from

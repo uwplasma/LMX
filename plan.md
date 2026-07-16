@@ -8,7 +8,8 @@ The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence
 deterministic one-/two-GPU equivalence, and portable coverage gate are green.
 The first fresh canonical-mesh coarse trajectory using the current formulation
 passes conservation and all linear-solver gates but reaches its 128-update
-bound before steady convergence; it is not promoted.
+bound before steady convergence. Its single authorized continuation preserves
+those gates but misses its precommitted residual target; it is not promoted.
 The smoke closes bounded orchestration and comparison, not production B2
 acceptance. The current `128/256 x 67 x 67` GPU rungs close deterministic
 sharding and bounded two-update calibration, not production scaling. This
@@ -114,7 +115,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 8,052 | below 8,000 after smoke cleanup | 8,100 |
 | test files / lines | 30 / 20,980 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,511,197 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,516,324 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -339,14 +340,21 @@ step 519 but is not acceptance evidence. The compact record is
 `benchmarks/results/b2-current-coarse-baseline-20260715.json`; the 45.7 MB
 restart remains outside Git.
 
-Run one exact 128-update continuation from restart hash `1d6491e3...` and stop
-again unless its step-256 residual is at most `5.5e-4`, every pressure solve
-converges with complete diagnostics, conservation remains within `1e-3`, and
-the residual tail remains decreasing. A passing continuation authorizes only
-the next baseline continuation, in the same bounded increments, until the
-`5e-5` criterion holds for three updates. It does not authorize tolerance,
-wall, medium, fine, or production-FreeMHD work; those remain blocked until the
-fresh coarse baseline converges.
+The one authorized exact continuation from restart hash `1d6491e3...` reaches
+step 256 in another 130.92 seconds. All 256 pressure and electric solves,
+two-shard placement, and conservation remain green; the residual remains
+strictly decreasing. It ends at `7.1081e-4`, however, 29.24% above the
+precommitted `5.5e-4` gate. Its tail log slope is only `0.5003` of the first
+chunk's, moving the non-authoritative crossing estimate from step 519 to about
+874. No further continuation is authorized.
+
+Next, use the existing 256-step histories and source to identify whether the
+slowdown belongs to physical transient advancement, fixed-point scaling,
+constant Aitken relaxation, flux relaxation, or the stopping observable. This
+is a solver-free analysis first. Any later numerical probe must state one
+hypothesis and a sub-two-minute reduced-grid gate before touching the coarse
+restart. Tolerance, wall, medium, fine, and production-FreeMHD work remain
+blocked until the current coarse baseline converges for the correct reason.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
 experimental comparison with uncertainty, reproducible environments, and a
