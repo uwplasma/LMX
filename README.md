@@ -141,8 +141,8 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 Actual scaling evidence uses matched multi-minute trajectories. With
 affinity-controlled Docker CPU allocations, fixed `256 × 67 × 67`, 32-update
-warm trajectories last 147–246 s and reach 1.396×/1.658× on four/eight versus
-two CPUs; confidence, efficiency, restart, and physics gates pass. This is
+warm trajectories last 147–269 s and reach 1.317×/1.684× on two/four versus
+one JAX device; confidence, efficiency, restart, and physics gates pass. This is
 fixed-work CPU-allocation strong scaling; Docker does not expose the M4 host's
 exact P/E-core mapping. A 96-update shared-host
 GPU calibration reaches 1.626× on two A4000s with 159–259 s warm trajectories;

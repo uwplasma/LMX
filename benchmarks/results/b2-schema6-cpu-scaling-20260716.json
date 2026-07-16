@@ -307,6 +307,96 @@
     "memory_note": "Peak RSS is the worker process high-water mark; the CPU backend exposes no per-device allocator bytes.",
     "classification": "sustained fixed-work Docker CPU-allocation strong scaling at afd17d6; exact host-core mapping, current-source timing, and steady-state evidence remain open"
   },
+  "current_source_sustained_cpu_allocation": {
+    "source_commit": "a92b4e684b8a3e269e5ac74de7270b184ff0be3b",
+    "source_fingerprint": "c73de7efb418fa05ab1362c8d20646e6f837a8f33e4187f09f3a1c6006e30a12",
+    "shape": [256, 67, 67],
+    "total_cells": 1149184,
+    "updates_per_trajectory": 32,
+    "repeats": 4,
+    "minimum_warm_seconds": 120.0,
+    "runtime": "native ARM64 Docker with nested Linux cpuset masks",
+    "thread_contract": "two Docker guest CPUs per forced JAX CPU device",
+    "environment": {
+      "python": "3.12.13",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "solvax": "0.8.4",
+      "precision": "float64",
+      "admission_sample_seconds": 60.00526652799999,
+      "admission_max_cpu_utilization_percent": 0.11664722546241846,
+      "admission_sha256": "9f214afa08f34dba1d35de7b4be2c739ac9141a3a990bdc7e6c71e15f4426538",
+      "host_core_mapping_verified": false
+    },
+    "runs": {
+      "1": {
+        "allocated_cpus": 2,
+        "cpuset": "0-1",
+        "cold_seconds": 252.32283490600003,
+        "warm_samples_seconds": [246.7016195690003, 244.36920836199988, 269.37336308099975],
+        "warm_median_seconds": 246.7016195690003,
+        "warm_cv": 0.044490790191070724,
+        "speedup": 1.0,
+        "parallel_efficiency": 1.0,
+        "peak_host_rss_bytes": 4652355584,
+        "raw_sha256": "6aa6beb1e2cb6ba2dba4a2f81f64df87bd7aabfd2ba29b09ecc659bb9c6f58b9"
+      },
+      "2": {
+        "allocated_cpus": 4,
+        "cpuset": "0-3",
+        "cold_seconds": 177.81381416399995,
+        "warm_samples_seconds": [187.92982462700002, 187.3066020020001, 177.136477496],
+        "warm_median_seconds": 187.3066020020001,
+        "warm_cv": 0.026871433233885182,
+        "speedup": 1.3171005022362532,
+        "speedup_empirical_ci95": [1.3011868983223591, 1.504196942377493],
+        "parallel_efficiency": 0.6585502511181266,
+        "peak_host_rss_bytes": 5215068160,
+        "raw_sha256": "4d1161b84a88d2386b7d24e3d3f6c71d690e4c1ddf2d33eb7856fa74ec109f25"
+      },
+      "4": {
+        "allocated_cpus": 8,
+        "cpuset": "0-7",
+        "cold_seconds": 154.40827994500006,
+        "warm_samples_seconds": [146.46788735899997, 147.30307589999995, 146.52432435899993],
+        "warm_median_seconds": 146.52432435899993,
+        "warm_cv": 0.0025967102559377826,
+        "speedup": 1.6836905452268491,
+        "speedup_empirical_ci95": [1.6607186436259898, 1.8389874869298826],
+        "parallel_efficiency": 0.4209226363067123,
+        "peak_host_rss_bytes": 5434310656,
+        "raw_sha256": "dc4651ca5d646fcb62513ef503781cdb40afbd72b913c7fb39a12c914af8238f"
+      }
+    },
+    "equivalence": {
+      "velocity_l2_max_abs": 1.4580109564121813e-08,
+      "potential_l2_max_abs": 1.2672899174503982e-08,
+      "current_l2_max_abs": 3.7553400034084916e-07,
+      "pressure_observable_max_abs": 8.655256416092993e-14,
+      "courant_mean_max_abs": 8.063753657860939e-19,
+      "courant_max_abs": 2.827277393322239e-15,
+      "anderson_gram_max_abs": 3.365604778378384e-14,
+      "anderson_weights_max_abs": 1.5285589460845017e-10,
+      "cross_topology_gate": true
+    },
+    "gates": {
+      "complete_topology": true,
+      "fixed_work_identity": true,
+      "minimum_duration": true,
+      "timing_stability": true,
+      "confidence_bounds": true,
+      "parallel_efficiency": true,
+      "schema6_and_physics": true,
+      "cross_topology": true,
+      "placement": true,
+      "memory_recorded": true,
+      "environment_verified": true,
+      "sustained_strong_scaling": true
+    },
+    "input_sha256": "bf61afda96beb7e1feeec4cbb7406ed35047329a19ec31c0a93d819cfbb2108e",
+    "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
+    "classification": "current-source sustained fixed-work Docker CPU-allocation strong scaling; exact M4 host-core placement, steady convergence, and B2 solution acceptance remain open"
+  },
   "post_profile_decisions": {
     "axial_mean_omission": {
       "shape": [128, 35, 35],
@@ -354,10 +444,10 @@
     "steady_state_evidence": false,
     "physical_core_scaling": false,
     "docker_cpu_allocation_scaling": "sustained fixed-work 2/4/8-guest-CPU strong scaling",
-    "reason": "The 256 x 67 x 67, 32-update trajectories pass the 120-second-per-warm-sample, correctness, guest-affinity, stability, confidence, and efficiency gates. They establish fixed-work Docker CPU-allocation scaling, not exact M4 host-core placement, steady-state convergence, or solution acceptance."
+    "reason": "The current-source 256 x 67 x 67, 32-update trajectories pass the 120-second-per-warm-sample, correctness, guest-affinity, stability, confidence, provenance, memory, and efficiency gates. They establish fixed-work Docker CPU-allocation scaling, not exact M4 host-core placement, steady-state convergence, or solution acceptance."
   },
   "raw_assets": {
-    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716 and artifacts/docker-physical-core-schema6-{128,sustained-256}; publish only as checksummed release assets if needed",
+    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716, artifacts/docker-physical-core-schema6-{128,sustained-256}, and artifacts/current-source-sustained-cpu-20260716; publish only as checksummed release assets if needed",
     "input_sha256": {"topology": "5382c1d68d9fb3508a408bb20befe6675ade77b852e6a80204781debab3aab2a", "scaling": "4721eb114966e55e08928098f944abbd0b07ed94a6c7fed0de82f707ccdd5978", "physical_core_pilot": "1aa490a56bbbd56dcaa2b7b7aa1b117efc10c5a0799eade47de38cb6ab3190b3", "physical_core_sustained": "1c7aba8ad0691898333116814c8be3ba235e714065b1b49603ca80e668023186"},
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
     "summary_sha256": {"baseline_topology": "dccd2bf1d8b5ad375daa32189c3affeb1850b699846588983381608b2b39c1ef", "baseline_scaling": "9fa2c4e4654a40e3f8f604d018467c5ebdc47fbd9d066f5fddcb39a1571635d5", "optimized_topology": "f85ec4b55f147e2285be66bcb6fc099345f69e4abba797f5d0ee9ae9e987bc57", "optimized_scaling": "ad70bdb17c06120a154c2cffb2a8521e1c929a0345af4307713bc62580990818"},

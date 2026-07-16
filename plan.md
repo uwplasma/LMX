@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `28c4fa2` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `a92b4e6` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -41,12 +41,11 @@ timing-stability gates. Its 1.229x/1.360x point speedups promote the two-device
 optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
-one and two GPUs; shared-host timing is excluded. The affinity-controlled
-Docker CPU-allocation path at `afd17d6` passes 32-update sustained scaling:
-every warm trajectory lasts 147--246 s, speedup is 1.396x/1.658x on 4/8 versus 2 CPUs,
-and all confidence, efficiency, restart, and physics gates pass. The current
-source has since changed, so those timings are historical until a clean-host
-rerun. A 96-update
+one and two GPUs; shared-host timing is excluded. The current affinity-controlled
+Docker CPU-allocation path at `a92b4e6` passes 32-update sustained scaling:
+every warm trajectory lasts 147--269 s, speedup is 1.317x/1.684x on two/four
+versus one JAX device, and all confidence, efficiency, restart, physics,
+provenance, memory, and 60-second admission gates pass. A 96-update
 one/two-A4000 lane also passes 158--259 s duration, numerical, restart, and
 topology gates with 1.626x shared-host speedup, but persistent foreign contexts
 keep authoritative GPU scaling open. Peak device memory is 2.50 GB on one GPU
@@ -59,10 +58,9 @@ summary now fails closed unless one exact 1/2/4-shard CPU or
 1/2-GPU group shares provenance and fixed work and passes sustained duration,
 real-solver numerics, placement, peak memory, and explicit affinity/idle-host
 evidence. Incomplete candidates remain visible without a sustained speedup or
-plot title. A current-source rerun was not launched on July 16 because macOS
-indexing and security services occupied multiple local cores and both office
-A4000s were at 100% foreign utilization. Retry the 32-update CPU campaign and
-96-update GPU campaign only after their clean-environment gates pass.
+plot title. The CPU rerun is complete. Retry the 96-update GPU campaign only
+after both office A4000s pass their clean-environment gates; they remained at
+100% foreign utilization during this tranche.
 This single active plan records accepted baselines, active gates, and stop/go
 criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -437,14 +435,16 @@ give 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds, and
 five repeated samples of a two-update trajectory, not sustained strong scaling.
 The generalized fixed-work worker then rejected a 20-update duration pilot at
 95.63--97.51 s and promoted 32 updates. On identical `256 x 67 x 67` input,
-2/4/8-CPU warm medians are 245.465/175.837/148.026 s, giving
-1.396x/1.658x speedups, 1.378x/1.655x 95% lower bounds, and 69.8%/41.5%
-efficiency. CVs are below 0.71%; midpoint replay is exact and every placement,
-linear, conservation, Anderson, and cross-topology gate passes. Accept this as
+the current `a92b4e6` 1/2/4-device ladder uses 2/4/8 CPU allocations and reports
+246.702/187.307/146.524-second warm medians. Speedups are 1.317x/1.684x,
+empirical 95% lower bounds are 1.301x/1.661x, and efficiencies are 65.9%/42.1%.
+Every warm sample lasts at least 146 s, CVs are below 4.45%, midpoint replay is
+exact, and every placement, linear, conservation, Anderson, provenance,
+admission, and cross-topology gate passes. Accept this as current-source
 sustained fixed-work Docker CPU-allocation strong scaling, not exact M4
-host-core, current-source, steady-state, or B2 solution evidence. Peak process
-RSS is 4.69/5.23/5.62 GB and the solution-bundle estimate is 101.1 MB at every
-rung; CPU allocator bytes per device are unavailable. Apply the same protocol to
+host-core, steady-state, or B2 solution evidence. Peak process RSS is
+4.65/5.22/5.43 GB and the solution-bundle estimate is 101.1 MB at every rung;
+CPU allocator bytes per device are unavailable. Apply the same protocol to
 GPUs only after the shared host passes the 60-second idle/no-foreign-work gate.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
@@ -500,9 +500,9 @@ the physics-valid path.
 
 Exit: the post-schema-6 portable suite remains below ten minutes with no
 critical-path surprise, CPU and GPU topology/restart correctness are current,
-and one historical accepted fixed global workload shows uncertainty-aware
-useful CPU-allocation speedup. CPU correctness is green; current-source exact
-host-core timing remains open. Schema-6 one/two-GPU correctness is current, and the old GPU
+and the current-source fixed global workload shows uncertainty-aware useful
+CPU-allocation speedup. Exact M4 host-core mapping remains open. Schema-6
+one/two-GPU correctness is current, and the old GPU
 ladder remains stopped. The explicit flux-unpack change now passes exact
 1/2/4-CPU and 1/2-GPU topology/replay gates; it is correctness evidence, not a
 GPU speedup claim.
