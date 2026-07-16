@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass, replace
+from functools import partial
 import hashlib
 import json
 import platform
@@ -117,28 +118,15 @@ _BUNDLE_FIELD_NAMES = (
 )
 
 
-def _record_mapping(record: StrongScalingRecordLike) -> dict[str, Any]:
-    if isinstance(record, StrongScalingRecord):
-        return asdict(record)
-    return dict(record)
-
-
-def _float_or_none(value: object) -> float | None:
-    if value is None:
-        return None
+def _number_or_none(value: object, *, conversion):
     try:
-        return float(value)
+        return conversion(value)
     except (TypeError, ValueError):
         return None
 
 
-def _int_or_none(value: object) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+_float_or_none = partial(_number_or_none, conversion=float)
+_int_or_none = partial(_number_or_none, conversion=int)
 
 
 def summarize_pressure_linear_history(
@@ -211,8 +199,6 @@ def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
         and requested >= declared >= _SUSTAINED_WARM_SECONDS
         and np.all(np.isfinite(samples))
         and np.all(samples >= requested)
-        and np.isfinite(median)
-        and median > 0.0
         and np.isclose(median, np.median(samples), rtol=1.0e-12, atol=1.0e-12)
         and all(bool(record.get(name)) for name in (
             "requested_duration_passed", "sustained_duration_passed",
@@ -288,7 +274,8 @@ def summarize_strong_scaling_records(
     and iteration count so CPU and GPU studies are not mixed.
     """
 
-    normalized = [_record_mapping(record) for record in records]
+    normalized = [asdict(row) if isinstance(row, StrongScalingRecord) else dict(row)
+        for row in records]
     grouped: dict[tuple[object, ...], list[dict[str, Any]]] = {}
     for record in normalized:
         grouped.setdefault(_scaling_group_key(record), []).append(record)
@@ -500,6 +487,11 @@ def _bundle_memory_bytes(bundle: object) -> int:
     return sum(
         _array_nbytes(getattr(bundle, name, None)) for name in _BUNDLE_FIELD_NAMES
     )
+
+
+def _field_l2(bundle: object, *names: str) -> float:
+    squares = (np.sum(np.asarray(getattr(bundle, name)) ** 2) for name in names)
+    return float(np.sqrt(sum(squares)))
 
 
 def _factor_device_mesh(num_devices: int) -> tuple[int, int]:
@@ -726,21 +718,9 @@ def benchmark_extruded_inductionless_solve(
     )
     cell_updates = total_cells * executed_steps
     warm_seconds = min(timings[1:] or timings)
-    velocity_l2 = float(
-        np.sqrt(
-            np.sum(np.asarray(last_bundle.u) ** 2)
-            + np.sum(np.asarray(last_bundle.v) ** 2)
-            + np.sum(np.asarray(last_bundle.w) ** 2)
-        )
-    )
-    potential_l2 = float(np.linalg.norm(np.asarray(last_bundle.phi)))
-    current_l2 = float(
-        np.sqrt(
-            np.sum(np.asarray(last_bundle.jx) ** 2)
-            + np.sum(np.asarray(last_bundle.jy) ** 2)
-            + np.sum(np.asarray(last_bundle.jz) ** 2)
-        )
-    )
+    velocity_l2 = _field_l2(last_bundle, "u", "v", "w")
+    potential_l2 = _field_l2(last_bundle, "phi")
+    current_l2 = _field_l2(last_bundle, "jx", "jy", "jz")
     if not all(
         np.isfinite(value) and value > 0.0
         for value in (velocity_l2, potential_l2, current_l2)
