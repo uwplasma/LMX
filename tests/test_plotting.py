@@ -15,7 +15,7 @@ from lmx.plotting import (
     _movie_field_stack,
     _plot_field,
     _prepare_plot_output,
-    _safe_writer_candidates,
+    _preferred_animation_writer,
     _save_figure_pair,
     write_autodiff_plots,
     write_bent_pipe_overview_plots,
@@ -415,13 +415,15 @@ def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
     )
 
 
-def test_safe_writer_candidates_prefers_imagemagick_when_available(
+def test_preferred_animation_writer_selects_one_backend(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(
-        "matplotlib.animation.writers.list", lambda: ["ffmpeg", "imagemagick", "pillow"]
+        "matplotlib.animation.writers.list", lambda: ["imagemagick", "pillow"]
     )
-    assert _safe_writer_candidates() == [("gif", "imagemagick"), ("gif", "pillow")]
+    assert _preferred_animation_writer() == ("gif", "pillow")
+    monkeypatch.setattr("matplotlib.animation.writers.list", lambda: ["imagemagick"])
+    assert _preferred_animation_writer() == ("gif", "imagemagick")
 
 
 def test_small_plot_helpers_cover_units_and_safe_fallback(monkeypatch):
@@ -431,7 +433,7 @@ def test_small_plot_helpers_cover_units_and_safe_fallback(monkeypatch):
         "2.00 s",
     ]
     monkeypatch.setattr("matplotlib.animation.writers.list", lambda: [])
-    assert _safe_writer_candidates() == [("gif", "pillow")]
+    assert _preferred_animation_writer() == ("gif", "pillow")
 
     def reject_contour(*args, **kwargs):
         raise ValueError("constant mask")
@@ -448,9 +450,12 @@ def test_write_transient_movies_writes_posters_and_stubbed_gifs(
         make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1), signed=True
     )
 
+    saved = []
+
     def fake_save(self, filename, *args, **kwargs):
         self._draw_was_started = True
         Path(filename).write_bytes(b"gif")
+        saved.append(Path(filename))
 
     monkeypatch.setattr("matplotlib.animation.FuncAnimation.save", fake_save)
 
@@ -472,6 +477,7 @@ def test_write_transient_movies_writes_posters_and_stubbed_gifs(
         tmp_path / "hunt_demo_3d.gif",
     }
     assert expected.issubset(set(outputs))
+    assert saved == [tmp_path / "hunt_demo_2d.gif", tmp_path / "hunt_demo_3d.gif"]
     for path in expected:
         assert path.exists()
 

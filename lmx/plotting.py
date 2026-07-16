@@ -346,15 +346,14 @@ def write_case_overview_plots(
     return [*overview_paths, *diagnostics_paths]
 
 
-def _safe_writer_candidates() -> list[tuple[str, str]]:
+def _preferred_animation_writer() -> tuple[str, str]:
     _load_matplotlib()
     available = set(animation.writers.list())
-    candidates: list[tuple[str, str]] = []
-    if "imagemagick" in available:
-        candidates.append(("gif", "imagemagick"))
     if "pillow" in available:
-        candidates.append(("gif", "pillow"))
-    return candidates or [("gif", "pillow")]
+        return "gif", "pillow"
+    if "imagemagick" in available:
+        return "gif", "imagemagick"
+    return "gif", "pillow"
 
 
 def _format_time_with_units(value: float) -> str:
@@ -827,17 +826,17 @@ def write_transient_movies(
         fig3d.savefig(poster_3d_pdf, bbox_inches="tight")
         outputs.extend([poster_3d, poster_3d_pdf])
 
-    for suffix, writer_name in _safe_writer_candidates():
-        if include_2d and anim2d is not None:
-            writer = animation.writers[writer_name](fps=fps)
-            path2d = out_dir / f"{output_stem}_2d.{suffix}"
-            anim2d.save(path2d, writer=writer, dpi=110)
-            outputs.append(path2d)
-        if include_3d and anim3d is not None:
-            path3d = out_dir / f"{output_stem}_3d.{suffix}"
-            writer3d = animation.writers[writer_name](fps=fps)
-            anim3d.save(path3d, writer=writer3d, dpi=110)
-            outputs.append(path3d)
+    suffix, writer_name = _preferred_animation_writer()
+    if include_2d and anim2d is not None:
+        writer = animation.writers[writer_name](fps=fps)
+        path2d = out_dir / f"{output_stem}_2d.{suffix}"
+        anim2d.save(path2d, writer=writer, dpi=110)
+        outputs.append(path2d)
+    if include_3d and anim3d is not None:
+        path3d = out_dir / f"{output_stem}_3d.{suffix}"
+        writer3d = animation.writers[writer_name](fps=fps)
+        anim3d.save(path3d, writer=writer3d, dpi=110)
+        outputs.append(path3d)
 
     if fig2d is not None:
         plt.close(fig2d)
