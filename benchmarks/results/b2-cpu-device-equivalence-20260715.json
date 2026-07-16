@@ -1,8 +1,8 @@
 {
   "schema_version": 4,
   "date": "2026-07-15",
-  "commit": "2346d7f48f1925fcd2f3aa5237825c89e278b38d",
-  "source_fingerprint": "6009ec37ff6586351ee2c270322013e0cc5ac158e511be1c49145e958a22d058",
+  "commit": "4c9438926613b095e9c6419fde66b8305ad6059e",
+  "source_fingerprint": "da0a0199cc53ace80744ae63c457a135f8dbd1259adb0c99d583f35d18491e23",
   "case_id": "B2-fringing-square",
   "role": "accepted-smoke-device-equivalence",
   "inputs": {
@@ -25,17 +25,17 @@
     "repeats": 4
   },
   "runs": {
-    "1": {"cold_seconds": 5.1704364999895915, "warm_median_seconds": 0.01195704098790884, "warm_cv": 0.09568946461699238, "restart_max_abs": 0.0},
-    "2": {"cold_seconds": 5.8816129580372944, "warm_median_seconds": 0.03436995903030038, "warm_cv": 0.10987146789387668, "restart_max_abs": 0.0},
-    "4": {"cold_seconds": 5.881717082927935, "warm_median_seconds": 0.048166458029299974, "warm_cv": 0.12252894298984597, "restart_max_abs": 0.0}
+    "1": {"cold_seconds": 3.642390292021446, "warm_median_seconds": 0.009215208003297448, "warm_cv": 0.07988946029394157, "restart_max_abs": 0.0},
+    "2": {"cold_seconds": 4.430558374966495, "warm_median_seconds": 0.020798917044885457, "warm_cv": 0.04218723013449997, "restart_max_abs": 0.0},
+    "4": {"cold_seconds": 5.566066500032321, "warm_median_seconds": 0.041590459062717855, "warm_cv": 0.08247986237038823, "restart_max_abs": 0.0}
   },
   "equivalence": {
-    "pressure_observable_max_abs": 5.78096598369271e-15,
+    "pressure_observable_max_abs": 5.922345946984819e-15,
     "courant_mean_max_abs": 9.529120656610879e-22,
     "courant_max_abs": 1.0587911840678754e-22,
-    "velocity_l2_max_abs": 8.881784197001252e-15,
-    "potential_l2_max_abs": 8.526512829121202e-14,
-    "current_l2_max_abs": 0.0,
+    "velocity_l2_max_abs": 1.7763568394002505e-15,
+    "potential_l2_max_abs": 2.842170943040401e-14,
+    "current_l2_max_abs": 1.1368683772161603e-13,
     "rtol": 2e-8,
     "atol": 2e-9,
     "pass": true
@@ -57,9 +57,9 @@
   "raw_assets": {
     "location": "external workspace; compact worker JSON only",
     "sha256": {
-      "1": "aa4b6eb5d45c1ecb82d13d94476dfa245206cbe5e40bf57ddf810f778c005b34",
-      "2": "ee85be57e352a4e10652b191ff4b9fd5510e62cc95ff303a2955bb352e4a3c8e",
-      "4": "f9245bf44e9cf58eed839c0f59ca8540a9621a3e1cd4879c1f3f60e841ee8c70"
+      "1": "464f384d8aac74f22d0c964e1819bfd8a9c56c0bae223ba8ec35b45066e28c04",
+      "2": "50b3f967c9c198b52cb0413f5a9da0d7f0bca8ad78f90388967289b55261914d",
+      "4": "fb723a52c71c934a010149ea60bb0de54880b491045f27e7a7438af9a97ed53c"
     }
   }
 }

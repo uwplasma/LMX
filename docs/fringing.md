@@ -123,8 +123,9 @@ large solve/restart gate passed. No B1 environment switch is required.
 B2 supports named axial sharding. The current canonical tiny path has equivalent
 observables and exact restart on one, two, and four CPU devices. The last GPU
 equivalence and `128 x 67 x 67` two-update calibration predate the terminal
-restart fix; they preserve primary-state replay and
-bounded face-flux noise. Diagonal momentum preconditioning reduces its warm
+restart fix. The current two-GPU refresh alternates at the axial shard boundary
+and fails restart/current gates, so those records are historical. Diagonal
+momentum preconditioning reduced the historical calibration's warm
 runtime from 21.14 to 3.09 seconds on one GPU and from 11.98 to 3.19 seconds on
 two; shared-host variance prevents a stable scaling claim.
 The doubled-axial `256 x 67 x 67` rung is stable but reaches only 1.125x, below

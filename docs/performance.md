@@ -11,14 +11,14 @@ devices alone is not evidence of parallel execution.
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 818 pass, 8 skip, 95.01% combined line/branch coverage, 154.5 s | 7.2% faster; below five-minute target |
-| exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.8e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
+| exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
 | B2 relaxation probe | Apple M4, shared step-29 checkpoint, six updates | factors 5/6/8 gain at most 9.33% over factor 4 | below 15% gate; retain factor 2 |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
-| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | historical pre-terminal-fix evidence; current-source refresh pending |
+| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | historical pressure observable agreed within `1.1e-14`; current one-GPU refresh passes | current two-GPU refresh fails repeat, interface-current, and restart gates; no current scaling claim |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
 | B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | initial medians 3.09/3.19 s; restart and device equivalence pass | historical pre-terminal-fix calibration; shared-host scaling remains open |
 | B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
@@ -31,7 +31,7 @@ devices alone is not evidence of parallel execution.
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-The current CPU result and historical GPU/fixed-size calibrations are recorded in
+The current CPU result, failed current GPU refresh, and historical GPU/fixed-size calibrations are recorded in
 `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
 `benchmarks/results/b2-{cpu-strong-scaling,gpu-scaling-calibration}-20260715.json`.
 The large deterministic probe isolated restart variation to corrected face

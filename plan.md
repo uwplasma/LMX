@@ -1,8 +1,8 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The current two-update B2/FreeMHD smoke and schema-5
-stopping contract are keyed to `0ab33b2`; one-/two-/four-CPU-device equivalence
-is keyed to `c47ba09`.
+stopping contract are keyed to `0ab33b2`; current one-/two-/four-CPU-device
+equivalence is keyed to `4c94389`.
 The post-map nonlinear momentum residual and
 restart schema 4 were keyed to `e6834ee`; schema 5 now versions normalized
 stopping. Its fixed-relaxation memory reduction
@@ -19,8 +19,9 @@ passes conservation and all linear-solver gates but reaches its 128-update
 bound before steady convergence. Its single authorized continuation preserves
 those gates but misses its precommitted residual target; it is not promoted.
 The smoke closes bounded orchestration and comparison, not production B2
-acceptance. The current `128/256 x 67 x 67` GPU rungs close deterministic
-sharding and bounded two-update calibration, not production scaling. This
+acceptance. The historical `128/256 x 67 x 67` GPU rungs close only bounded
+two-update calibration. Current-source two-GPU correctness is blocked by a
+reproducible shard-boundary defect, so no GPU scaling result is current. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -121,7 +122,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,100 | return below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 35,059 | return below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,904 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
@@ -197,14 +198,14 @@ another test file merely to move lines.
 ### Canonical sharding and performance
 
 Current accepted-smoke observables agree on one, two, and four forced Mac CPU
-devices within `5.8e-15`, with exact restart and all pressure solves green. The
-last one-/two-GPU equivalence predates the terminal fix and awaits refresh. The repair makes flux,
+devices within `5.93e-15`, with exact restart and all pressure solves green. The
+one-/two-GPU equivalence predates the terminal fix and is historical. Its
+current-source refresh fails on two GPUs. The repair makes flux,
 vector, embedding, initialization, CFL, and relaxation layouts explicit and
-keeps compact flux components separate until explicit packing. Both device
-ladders have exact restart replay; the GPU pressure observable differs by at
-most `1.05e-14`. Deterministic GPU correctness uses
-`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode is the separate
-timing lane. Compact
+keeps compact flux components separate until explicit packing. The CPU ladder
+has exact restart replay. Deterministic GPU probes use
+`--xla_gpu_exclude_nondeterministic_ops`; default GPU mode remains a separate
+timing lane, but neither lane may be promoted until correctness passes. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
 An explicit one-device request uses the same named-sharding kernels as the
@@ -292,8 +293,21 @@ B2 preconditioner microprobes rather than replace the vendor kernel with an
 unevidenced sequential implementation. The next physics work is Priority 3,
 not another small solver variant.
 
-Re-measure accepted rungs in an isolated GPU window before any publishable
-scaling claim.
+The current `8 x 7 x 7` refresh passes validation and exact restart on one RTX
+A4000. On two RTX A4000s it places every production field on two real shards
+and every pressure solve converges, but interface-current balance rises to
+`55.28` and restart state/flux errors reach `2.44e-6`/`8.75e-5`. Four identical
+same-process solves alternate A/B/A/B; the first difference is a `1.55e-9`
+step-one axial-velocity perturbation confined to the second shard, which the
+high-Ha second update amplifies. The failure persists on an idle host, with
+standard electric PCG, without the electric coarse correction, and after full
+output synchronization. Treat this as an LMX-owned shard-boundary/layout
+defect, not a SOLVAX defect. Add a warm-repeat signature gate and isolate the
+first momentum/projection map at the cut before changing solver tolerances.
+
+Only after that gate passes, re-measure accepted rungs in an isolated GPU
+window before any publishable scaling claim. Schema-6 Anderson work and larger
+GPU calibration are sequenced behind this correctness repair.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -309,7 +323,8 @@ Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
 CPU/GPU calibration methods are complete; current CPU correctness is green,
-while current-source GPU equivalence and calibration refresh remain open.
+while current-source multi-GPU equivalence is the blocking gate for every GPU
+calibration refresh.
 
 ## Priority 3: canonical B2 validation
 

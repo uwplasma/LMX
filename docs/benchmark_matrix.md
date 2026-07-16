@@ -74,7 +74,9 @@ observable extraction:
 python examples/fringing_benchmark_demo.py --help
 ```
 
-B2 has exact-parity axial sharding on two RTX A4000 GPUs. B1 now uses its
+B2 has exact-parity axial sharding on 1/2/4 forced CPU devices. Its prior
+two-RTX-A4000 result is historical: the current-source refresh exposes an
+alternating shard-boundary defect and is not accepted. B1 now uses its
 accepted compatible retained-modal pressure solver; experimental-observable,
 mesh-ladder, and final steady-response acceptance remain open. This is not yet
 a claim that the experimental pressure curve has passed.

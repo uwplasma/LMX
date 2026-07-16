@@ -1,10 +1,10 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "date": "2026-07-15",
   "commit": "3a2207804781f7b3f6383becdc82039480729cac",
   "source_fingerprint": "87a35608a2aec145e5094aea8df4a3517f530519cd4fab4eac2b9c852f60e639",
   "case_id": "B2-fringing-square",
-  "role": "accepted-smoke-device-equivalence",
+  "role": "historical-smoke-device-equivalence",
   "inputs": {
     "lmx_input_sha256": "b5cc1d5457d554bf5a32f7db09637799f901e8fee03e83bb51c75a32dbfaaa3e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
@@ -47,9 +47,56 @@
     "device_equivalence": true
   },
   "interpretation": {
-    "production_sharding_correctness": true,
+    "production_sharding_correctness": false,
     "strong_scaling_claim": false,
-    "reason": "The host was shared and the smoke is too small; the apparent 2.28x timing ratio is noncanonical."
+    "reason": "This accepted result predates the terminal restart fix. Current-source refresh exposes a deterministic two-GPU repeat defect, so it is historical evidence only."
   },
-  "raw_assets": "external workspace; compact worker JSON only"
+  "raw_assets": "external workspace; compact worker JSON only",
+  "current_refresh": {
+    "commit": "4c9438926613b095e9c6419fde66b8305ad6059e",
+    "source_fingerprint": "da0a0199cc53ace80744ae63c457a135f8dbd1259adb0c99d583f35d18491e23",
+    "environment": {
+      "hardware": "1/2 NVIDIA RTX A4000",
+      "python": "3.13.12",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "solvax": "0.8.3",
+      "precision": "float64",
+      "xla_flags": "--xla_gpu_exclude_nondeterministic_ops"
+    },
+    "one_gpu": {
+      "validation": true,
+      "restart_exact": true,
+      "pressure_solves_converged": true,
+      "interface_current_balance": 1.6711965145077556e-10
+    },
+    "two_gpu": {
+      "validation": false,
+      "placement": true,
+      "pressure_solves_converged": true,
+      "interface_current_balance": 55.28034999811253,
+      "restart_state_max_abs": 2.438539967397624e-6,
+      "restart_flux_max_abs": 8.750654198093905e-5,
+      "restart_derived_max_abs": 5.876772648999918,
+      "restart_flux_relative_l2": 1.4660336908780855e-4
+    },
+    "repeat_diagnostic": {
+      "pattern": "A/B/A/B across four identical same-process solves",
+      "first_difference": "step-one axial velocity on the second shard",
+      "checkpoint_velocity_max_abs": 1.5475279946386422e-9,
+      "direct_pressure_max_abs": 643.4117750222716,
+      "direct_potential_max_abs": 11.925913229109918,
+      "conclusion": "current multi-GPU correctness and timing promotion are blocked pending a shard-boundary/layout fix"
+    },
+    "diagnostics_rejected": [
+      "shared-host contention",
+      "SOLVAX standard versus single-reduction electric PCG",
+      "electric transverse coarse correction",
+      "incomplete host synchronization between repeats"
+    ],
+    "raw_sha256": {
+      "one_gpu_worker": "82e4eb1555b9d7e293aa267418da44c0496996b40870e49f9e6db9b96d71506e",
+      "two_gpu_worker": "3adf657496c7e9c92adbb0681846419708a53c29fbc99e2b1cdc9ddb588606e6"
+    }
+  }
 }

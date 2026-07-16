@@ -12,7 +12,7 @@ The package wheel contains no media.
 ## Tracked web set
 
 Six files in `docs/_static/` total 390,625 bytes: duct profiles, FreeMHD parity,
-the B1 comparison, current CPU/GPU scaling, and the Hunt movie/poster pair. The
+the B1 comparison, current CPU plus historical GPU scaling, and the Hunt movie/poster pair. The
 44,582-byte scaling WebP has SHA-256
 `60c83033c11239384cbf4a6fea7bb5ca5a4a7b98f1e1224b56961730637f4740`.
 
