@@ -127,7 +127,7 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,657 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,555 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,525 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 180 | no new file without retiring another owner | 180 |
 | tracked checkout | 3,736,451 bytes | do not increase without a user-facing need | 4,194,304 bytes |
@@ -244,6 +244,9 @@ inverse-design wrapper-contract tests. Their isolated pair falls from 18.56 to
 projection and fringing-surrogate convergence owners retain four steps and
 their loss-reduction assertions. The complete autodiff module passes in 78.46
 seconds after the change; no source path, test node, or assertion was removed.
+Commit `e404542` parameterizes six identical invalid-configuration setup and
+exception contracts, deleting 30 test lines while preserving six collected
+nodes and every message assertion; focused line/branch coverage remains 100%.
 
 Centralizing figure persistence permits one real PNG/PDF signature test and
 lightweight persistence stubs for the remaining plotting writers. Replacing
