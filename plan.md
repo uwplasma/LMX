@@ -376,12 +376,14 @@ NekRS residual tolerances are linear-solver gates and cannot supply its steady
 threshold. The legacy raw `5e-5` threshold converts to a project-owned map
 defect of `0.05`, not a literature tolerance.
 
-A same-state 1x/2x/4x/16x/64x ladder keeps the normalized map defect within
+A startup-state 1x/2x/4x/16x/64x ladder keeps the normalized map defect within
 0.192%, with every linear and conservation gate green. From a warm checkpoint,
 eight 64x updates decrease strictly from `0.3530` to `0.1637`, replay bitwise
 through a 4+4 restart, and keep CFL below `3.5e-5`. The magnetic pseudo-time cap
 is therefore raised from `0.001/N` to `0.064/N`; the existing reduced B2
 physics/restart test falls from the prior 45-second gate record to 14.8 seconds.
+This is a stability and runtime result, not a claim that transient map rates are
+pseudo-time invariant.
 
 Schema 4 records the post-map nonlinear physical momentum residual
 `L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`, or `max|R|/540` for B2. It shares the
@@ -413,9 +415,15 @@ residual. Raising pseudo-time by 64x while retaining raw
 `coupling_tolerance=5e-5` accidentally tightened this normalized gate from
 `0.05` to `7.8125e-4`. Stopping must not depend on the pseudo-time cap.
 
-Next add the manufactured split-operator identity and `dt/dt2/dt4`
-reconstruction-decomposition gates. Then freeze a normalized map-rate threshold
-through sustained candidate `0.05` versus decade-tighter `0.005` outcome
+The manufactured split-operator identity and mixed-boundary reconstruction gate
+now pass. A warm same-state `dt/dt2/dt4` decomposition closes the split identity
+below `4e-10` with every linear solve green, but its normalized map rates span
+8.30%, rejecting the predeclared 0.5% transient-invariance limit. The growing
+face-reconstruction contribution as `dt` falls confirms that this decomposition
+is an operator audit, not a tolerance calibration.
+
+Next freeze a normalized map-rate threshold through sustained candidate `0.05`
+versus decade-tighter `0.005` outcome
 insensitivity, requiring pressure Linf at most `2e-4`, velocity at most
 `1e-3 U0`, pressure-gradient relative L2 at most `0.5%`, and every
 linear/conservation/restart gate green. Implement the frozen comparison directly

@@ -56,6 +56,46 @@
     "all_linear_solves_green": true,
     "status": "128x-and-256x-rejected-map-rate-invariance-failed"
   },
+  "same_state_dt_decomposition_probe": {
+    "warm_checkpoint_updates": 4,
+    "safety_factors": [0.064, 0.032, 0.016],
+    "effective_dt": [
+      0.00011851851851851852,
+      0.00005925925925925926,
+      0.00002962962962962963
+    ],
+    "normalized_map_rate": [
+      0.2507149414658575,
+      0.2299115760020197,
+      0.24204068571605925
+    ],
+    "post_map_nonlinear_momentum_residual": [
+      0.2861042461844982,
+      0.2922343921310624,
+      0.29526344003047106
+    ],
+    "pressure_force_metric": [
+      0.06648638975896562,
+      0.06639224467669522,
+      0.06620244101359372
+    ],
+    "face_reconstruction_force_metric": [
+      0.0911821135750041,
+      0.13461678221432147,
+      0.24417772348771108
+    ],
+    "total_projection_force_metric": [
+      0.13067303570022532,
+      0.18810677015624125,
+      0.3029731559913429
+    ],
+    "split_identity_balance_max": 3.902371759068046e-10,
+    "normalized_map_rate_relative_spread": 0.08297616943851273,
+    "predeclared_invariance_limit": 0.005,
+    "all_linear_solves_green": true,
+    "total_wall_seconds": 18.3519519160036,
+    "status": "operator-balance-passed-transient-dt-invariance-rejected"
+  },
   "operator_consistency_audit": {
     "conclusion": "The recorded nonlinear residual is not the exact predictor-projection fixed-point residual.",
     "exact_split_identity": "R_split = momentum_linear_residual - rho*(U_map-U_old)/dt",
@@ -106,7 +146,7 @@
     "accepted_pseudotime_safety": 0.064,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "add exact split-identity and dt/dt2/dt4 decomposition tests, then compare sustained normalized map-rate crossings at 0.05 and 0.005",
+    "next_gate": "compare sustained normalized map-rate crossings at 0.05 and 0.005 on one shared trajectory",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,

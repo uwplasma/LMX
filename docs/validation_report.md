@@ -27,9 +27,11 @@ are authoritative when prose and results differ.
 - The portable package gate passes 817 tests with 8 expected external-data
   skips and 95.03% combined line/branch coverage in 166.5 seconds on the
   reference Mac.
-- The reduced B2 same-state ladder supports a 64x larger pseudo-time cap while
-  preserving the electromagnetic-scale map defect within 0.192%; eight warm
-  updates are monotone and restart bitwise. A post-map nonlinear physical
+- The reduced B2 startup-state ladder supports a stable 64x larger pseudo-time
+  cap while preserving the electromagnetic-scale map defect within 0.192%;
+  eight warm updates are monotone and restart bitwise. A warm `dt/dt2/dt4`
+  audit closes the split identity below `4e-10` but rejects general transient
+  map-rate invariance. A post-map nonlinear physical
   momentum residual replays exactly and decreases from 0.976 to 0.310, but it
   is not the split fixed-point defect and does not stop the solve. The normalized
   map-rate threshold and ALEX pressure-hole metadata remain open.
