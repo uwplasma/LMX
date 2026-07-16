@@ -966,89 +966,63 @@ def compare_with_reference_outputs(case_spec: CaseSpec, reference_run_dir: str |
     return ValidationReport(case_name=case_spec.name, metrics=metrics, artifacts=artifacts)
 
 
-def write_validation_report(report: ValidationReport, path: str | Path) -> Path:
+def _write_json(payload: object, path: str | Path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "case_name": report.case_name,
-        "metrics": report.metrics,
-        "artifacts": report.artifacts,
-    }
     path.write_text(json.dumps(payload, indent=2))
     return path
 
 
-def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, axis_name: str = "coordinate") -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+def _comparison_payload(
+    comparison: AnalyticComparison, axis_name: str = "coordinate"
+) -> dict[str, object]:
+    return {
         axis_name: jnp.asarray(comparison.coordinate).tolist(),
         "simulated": jnp.asarray(comparison.simulated).tolist(),
         "reference": jnp.asarray(comparison.reference).tolist(),
         "l2_error": comparison.l2_error,
         "linf_error": comparison.linf_error,
     }
-    path.write_text(json.dumps(payload, indent=2))
-    return path
+
+
+def write_validation_report(report: ValidationReport, path: str | Path) -> Path:
+    payload = {
+        "case_name": report.case_name,
+        "metrics": report.metrics,
+        "artifacts": report.artifacts,
+    }
+    return _write_json(payload, path)
+
+
+def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, axis_name: str = "coordinate") -> Path:
+    return _write_json(_comparison_payload(comparison, axis_name), path)
 
 
 def write_closed_channel_validation(report: ClosedChannelValidation, path: str | Path) -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "case_kind": report.case_kind,
         "ha": report.ha,
         "reference_pressure_drop": report.reference_pressure_drop,
         "reference_path": report.reference_path,
-        "y_profile": {
-            "coordinate": jnp.asarray(report.y_profile.coordinate).tolist(),
-            "simulated": jnp.asarray(report.y_profile.simulated).tolist(),
-            "reference": jnp.asarray(report.y_profile.reference).tolist(),
-            "l2_error": report.y_profile.l2_error,
-            "linf_error": report.y_profile.linf_error,
-        },
-        "z_profile": {
-            "coordinate": jnp.asarray(report.z_profile.coordinate).tolist(),
-            "simulated": jnp.asarray(report.z_profile.simulated).tolist(),
-            "reference": jnp.asarray(report.z_profile.reference).tolist(),
-            "l2_error": report.z_profile.l2_error,
-            "linf_error": report.z_profile.linf_error,
-        },
+        "y_profile": _comparison_payload(report.y_profile),
+        "z_profile": _comparison_payload(report.z_profile),
     }
-    path.write_text(json.dumps(payload, indent=2))
-    return path
+    return _write_json(payload, path)
 
 
 def write_processed_slice_validation(report: ProcessedSliceValidation, path: str | Path) -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "case_kind": report.case_kind,
         "ha": report.ha,
         "x_slice": report.x_slice,
         "reference_path": report.reference_path,
-        "y_profile": {
-            "coordinate": jnp.asarray(report.y_profile.coordinate).tolist(),
-            "simulated": jnp.asarray(report.y_profile.simulated).tolist(),
-            "reference": jnp.asarray(report.y_profile.reference).tolist(),
-            "l2_error": report.y_profile.l2_error,
-            "linf_error": report.y_profile.linf_error,
-        },
-        "z_profile": {
-            "coordinate": jnp.asarray(report.z_profile.coordinate).tolist(),
-            "simulated": jnp.asarray(report.z_profile.simulated).tolist(),
-            "reference": jnp.asarray(report.z_profile.reference).tolist(),
-            "l2_error": report.z_profile.l2_error,
-            "linf_error": report.z_profile.linf_error,
-        },
+        "y_profile": _comparison_payload(report.y_profile),
+        "z_profile": _comparison_payload(report.z_profile),
     }
-    path.write_text(json.dumps(payload, indent=2))
-    return path
+    return _write_json(payload, path)
 
 
 def write_acceptance_report(report: AcceptanceReport, path: str | Path) -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "case_name": report.case_name,
         "l2_error": report.l2_error,
@@ -1059,15 +1033,11 @@ def write_acceptance_report(report: AcceptanceReport, path: str | Path) -> Path:
         "passed_linf": report.passed_linf,
         "passed": report.passed,
     }
-    path.write_text(json.dumps(payload, indent=2))
-    return path
+    return _write_json(payload, path)
 
 
 def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Path:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(metrics, indent=2))
-    return path
+    return _write_json(metrics, path)
 
 
 def read_field_minmax(path: str | Path) -> tuple[FieldMinMaxRecord, ...]:
