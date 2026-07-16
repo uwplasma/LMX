@@ -403,12 +403,15 @@ decade-tighter `0.01` was not reached before the deadline. It produced no
 promotable outcome comparison, froze no threshold, and authorizes no repeat of
 the same slow trajectory.
 
-Before more stepping, use one-update same-state probes to distinguish slow
-pseudo-time convergence from a discretization or split-operator residual floor.
-Test a larger pseudo-time cap or changed acceleration only with predeclared
-direct-defect, map-rate, linear-solver, conservation, CFL, and exact-restart
-gates. Repeat outcome insensitivity only after this bounded diagnosis predicts
-the tighter three-update crossing below 110 seconds. Then require all outcome
+The first larger-cap same-state probe is complete: from one four-update checkpoint, 64x,
+128x, and 256x updates all keep linear solves green, balance below `4e-10`, and
+CFL below `1.4e-4`, while the direct defect improves from `0.2861` to `0.2490`.
+The normalized map rate shifts by 6.78%, however, failing the existing 0.5%
+invariance gate. Reject 128x/256x and retain the 64x cap. Next use bounded
+acceleration and operator-consistency probes to determine whether the slow tail
+is a split/discretization floor or a coupled fixed-point mode; do not launch
+another trajectory first. Repeat outcome insensitivity only after this diagnosis
+predicts the tighter three-update crossing below 110 seconds. Then require all outcome
 gates and normalized transverse-pressure change at most `2e-4`, velocity at
 most `1e-3 U0`, and pressure-gradient relative L2 at most `0.5%`. Only then add
 the direct defect to the three-update stopping streak and authorize one corrected

@@ -40,6 +40,19 @@
     "defect_step_16": 0.157335682542,
     "status": "passed-runtime-projection-only"
   },
+  "extended_pseudotime_same_state_probe": {
+    "warm_checkpoint_updates": 4,
+    "total_wall_seconds": 18.38452316704206,
+    "safety_factors": [0.064, 0.128, 0.256],
+    "effective_dt": [0.00011851851851851852, 0.00023703703703703704, 0.0004740740740740741],
+    "normalized_map_rate": [0.2507149414658575, 0.26151412417666897, 0.2677202948081154],
+    "momentum_defect_after_update": [0.2861042461844982, 0.27377655883236535, 0.24896001360901987],
+    "largest_map_rate_relative_change": 0.06782744276361242,
+    "max_cfl": 0.00013695826125152035,
+    "max_balance": 3.902371759068046e-10,
+    "all_linear_solves_green": true,
+    "status": "128x-and-256x-rejected-map-rate-invariance-failed"
+  },
   "focused_gates": {
     "operator_jit_and_jvp": "passed",
     "io_v4_and_v1_v2_v3_compatibility": "14 passed in about 3 seconds",
@@ -63,7 +76,8 @@
       "interrupted_phase": "electric solve at 120-second deadline",
       "crossings_or_outcomes_promoted": false
     },
-    "next_gate": "use same-state one-update probes to distinguish a discrete residual floor from slow pseudo-time convergence; test larger stable pseudo-time or acceleration only through predeclared linear, conservation, restart, and direct-defect gates",
+    "accepted_pseudotime_safety": 0.064,
+    "next_gate": "keep the 64x cap; use bounded acceleration/operator-consistency probes to distinguish a discrete residual floor from slow pseudo-time convergence before another trajectory",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,
