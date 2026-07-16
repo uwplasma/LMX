@@ -88,6 +88,7 @@ def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
     assert diagnostics["anderson_serialized_max_abs"] == 0.0
     assert diagnostics["anderson_replay_max_abs"] == 0.0
     assert diagnostics["anderson_replay_field_relative_l2"] == 0.0
+    assert diagnostics["anderson_replay_field_tolerance_ratio"] == 0.0
     assert diagnostics["anderson_weights_sum_error"] <= 1.0e-12
     for delta, expected in ((5.0e-10, True), (1.0e-2, False)):
         resumed.anderson_state = (mapped1 + delta, residual1, flux0 + 0.5, inlet0 + 0.5)
@@ -95,6 +96,7 @@ def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
             problem, checkpoint, direct, resumed, serialized, num_devices=1
         )
         assert noisy["anderson_replay_field_relative_l2"] > 0.0
+        assert (noisy["anderson_replay_field_tolerance_ratio"] <= 1.0) is expected
         assert noisy["anderson_validation_passed"] is expected
 
 

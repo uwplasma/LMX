@@ -714,7 +714,7 @@ def observe_lmx_b2_output(
         iteration_pressure_linear_history iteration_electric_linear_history
         iteration_potential_residual_history""".split()
     grouped_differences = {name: [] for name in ("state", "flux", "derived", "history")}
-    state_relative, flux_relative = [], []
+    state_relative, state_tolerance_ratio, flux_relative = [], [], []
     for group, names in (("state", state_names), ("flux", flux_names), ("derived", derived_names),
                          ("history", history_names)):
         for name in names:
@@ -728,6 +728,9 @@ def observe_lmx_b2_output(
                     scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
                     relative = float(np.linalg.norm(left - right) / scale)
                     (state_relative if group == "state" else flux_relative).append(relative)
+                    if group == "state":
+                        tolerance = 2.0e-9 + 2.0e-8 * np.maximum(np.abs(left), np.abs(right))
+                        state_tolerance_ratio.append(float(np.max(np.abs(left - right) / tolerance)))
     for left, right in zip(
             getattr(direct.bundle, acceleration_name),
             getattr(resumed.bundle, acceleration_name),
@@ -739,6 +742,8 @@ def observe_lmx_b2_output(
             grouped_differences["state"].append(float(np.max(np.abs(left - right))))
             scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
             state_relative.append(float(np.linalg.norm(left - right) / scale))
+            tolerance = 2.0e-9 + 2.0e-8 * np.maximum(np.abs(left), np.abs(right))
+            state_tolerance_ratio.append(float(np.max(np.abs(left - right) / tolerance)))
     restart_differences = {
         name: max(values, default=0.0) for name, values in grouped_differences.items()
     }
@@ -765,6 +770,7 @@ def observe_lmx_b2_output(
         "restart_max_abs": max(restart_differences.values()),
         **{f"restart_{name}_max_abs": value for name, value in restart_differences.items()},
         "restart_state_relative_l2": max(state_relative, default=0.0),
+        "restart_state_tolerance_ratio": max(state_tolerance_ratio, default=0.0),
         "restart_flux_relative_l2": max(flux_relative, default=0.0),
         "wall_seconds": float(metadata["wall_seconds"]),
     }

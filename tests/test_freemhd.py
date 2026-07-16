@@ -704,7 +704,8 @@ def test_lmx_b2_output_observer_replays_restart_evidence(
     assert len(observed["dt"]) == len(observed["courant_mean"]) == executed_steps
     assert all(observed[name] == 0.0 for name in (
         "restart_max_abs", "restart_state_max_abs", "restart_flux_max_abs",
-        "restart_state_relative_l2", "restart_flux_relative_l2", "restart_derived_max_abs",
+        "restart_state_relative_l2", "restart_state_tolerance_ratio",
+        "restart_flux_relative_l2", "restart_derived_max_abs",
         "restart_history_max_abs", "mass_balance"))
     assert observed["current_balance"] == observed["interface_current_balance"] == pytest.approx(1.0e-5)
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
@@ -729,6 +730,7 @@ def test_lmx_b2_output_observer_measures_relative_restart_state_corruption(
 
     assert observed["restart_state_max_abs"] == pytest.approx(1.0e-3, rel=1.0e-5)
     assert 0.0 < observed["restart_state_relative_l2"] <= 1.0e-10
+    assert observed["restart_state_tolerance_ratio"] < 1.0
 
 
 @pytest.mark.parametrize("mutation", ("root", "metadata", "provenance"))
