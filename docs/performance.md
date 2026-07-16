@@ -20,7 +20,7 @@ devices alone is not evidence of parallel execution.
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | current repeats and restart are exact; pressure observable agrees within `1.02e-14`; closure and placement pass | production sharding correctness; too small for scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
-| B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | current medians 2.787/2.761 s; repeat, restart, placement, and equivalence pass; CV below 0.6% | 1.009x misses the 1.2x promotion gate; no scaling claim |
+| B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | current medians 2.780/2.400 s; repeat, trace, restart, placement, and equivalence pass | 1.159x misses the 1.2x promotion gate; no scaling claim |
 | B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
 | historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | predates the 0.8.3 package minimum; refresh pending |
 | sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
@@ -34,6 +34,11 @@ devices alone is not evidence of parallel execution.
 The current CPU/GPU correctness and `128 x 67 x 67` calibration, plus historical larger results, are recorded in
 `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
 `benchmarks/results/b2-{cpu-strong-scaling,gpu-scaling-calibration}-20260715.json`.
+The current trace measures 1.510x scaling across momentum, projection, and
+electric phases. Reusing the existing host station payload for validation cuts
+the two-GPU end-to-end median by 0.290 s and removes 12 source lines, but the
+remaining post-map transfer tail leaves the result below 1.2x. The fixed-grid
+ladder therefore stops without a larger run or production-speed claim.
 The large deterministic probe isolated restart variation to corrected face
 flux (`4.40e-6` relative). A three-update trajectory preserved every primary
 field exactly and reduced the flux difference to `6.25e-7`, within the frozen

@@ -21,7 +21,8 @@ bound before steady convergence. Its single authorized continuation preserves
 those gates but misses its precommitted residual target; it is not promoted.
 The smoke closes bounded orchestration and comparison, not production B2
 acceptance. Current-source 1/2-GPU correctness and the `128 x 67 x 67`
-calibration pass. Its 1.009x speedup misses the 1.2x promotion gate; the
+calibration pass. The trace-authorized validation fusion reaches 1.159x but
+misses the 1.2x promotion gate; the
 `256 x 67 x 67` rung remains historical, so no production scaling speedup is
 claimed. This
 single active plan records accepted baselines, active gates, and
@@ -129,7 +130,7 @@ deleting stale test-only velocity-statistics and solver-mask wrappers:
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,890 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,562,607 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,565,237 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -327,14 +328,15 @@ work is 0.685 seconds versus 0.040 on one GPU; repeated validation transfers
 account for about 0.520 seconds. The 1.2x end-to-end gate requires at most
 2.330 seconds, so the actionable recovery budget is 0.360 seconds.
 
-This trace authorizes exactly one behavior-preserving validation-transfer
-optimization: reuse the already materialized station history for host metrics
-instead of repeatedly gathering sharded scalars. It also deletes 12 package
-lines. Run one matched 1/2-GPU confirmation with the same fail-closed trace
-gates; promote only if end-to-end speedup reaches 1.2x. Otherwise retain the
-smaller implementation, report the remaining attribution, and stop. No larger
-rung or kernel tuning is authorized. Schema-6 Anderson remains the other
-bounded workstream after this confirmation.
+The single authorized validation-transfer optimization reuses the already
+materialized station history for host metrics and deletes 12 package lines.
+Its matched confirmation passes every fail-closed gate and reduces two-GPU
+time by 0.290 seconds, but 2.780/2.400-second medians yield only 1.159x. The
+two-GPU promotion limit is 2.317 seconds, missed by 0.083. Retain the smaller
+implementation and stop: no larger rung, further validation tweak, or kernel
+tuning is authorized without revising this plan. Core phases scale at 1.510x;
+the public end-to-end API remains post-map host-transfer limited. Schema-6
+Anderson is now the next bounded workstream after SOLVAX publication.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -350,8 +352,8 @@ Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
 CPU/GPU calibration methods and current CPU/GPU correctness are green. Current
-fixed-grid GPU scaling misses its promotion threshold; confirm only the
-trace-authorized validation fusion before another rung.
+fixed-grid GPU scaling misses its promotion threshold after the single
+trace-authorized confirmation, so the ladder is stopped.
 
 ## Priority 3: canonical B2 validation
 

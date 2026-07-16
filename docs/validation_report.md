@@ -53,8 +53,9 @@ are authoritative when prose and results differ.
   predates the terminal-restart fix. Its current replacement passes exact
   repeat/restart and 1/2-GPU equivalence, so the tiny CPU and GPU ladders
   establish sharding correctness. The current `128 x 67 x 67` calibration has
-  equivalent observables and exact state/flux replay, but its low-variance
-  1.009x speedup fails the promotion gate. A historical doubled-axial rung
+  equivalent observables and exact state/flux replay. A trace-authorized
+  validation fusion raises its low-variance speedup to 1.159x, still below the
+  promotion gate. A historical doubled-axial rung
   reaches only 1.125x, below the scaling-promotion threshold. A three-update
   trajectory preserves all primary fields exactly. This is not production
   parity or steady scaling. The first fresh current-formulation coarse

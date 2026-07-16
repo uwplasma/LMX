@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "date": "2026-07-15",
   "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -143,10 +143,10 @@
     "timing_claim": false
   },
   "current_refresh": {
-    "commit": "57e50616ff16110bd6a0ff306fcd4e957e326d88",
-    "source_fingerprint": "d630731498502f38efbbd788b885965081ff80b6b5bddc255beaa9c337619bb0",
+    "commit": "7cf6d656627483454d905954adb04eb97aea9233",
+    "source_fingerprint": "748c4d5451de48568f8159365e1bbdd5b70beee72c31790608e33b0e8a1e1abc",
     "environment": {
-      "hardware": "1/2 NVIDIA RTX A4000, isolated idle host without NVLink",
+      "hardware": "1/2 NVIDIA RTX A4000, idle host without NVLink",
       "python": "3.13.12",
       "jax": "0.10.2",
       "jaxlib": "0.10.2",
@@ -154,38 +154,56 @@
       "precision": "float64",
       "xla_flags": "default"
     },
+    "timing_contract": "Synchronized end-to-end public solve; external repeat signature, restart replay, serialization, and observation excluded; public station history and validation included.",
     "runs": {
       "1": {
-        "cold_seconds": 25.81367143499665,
-        "warm_samples_seconds": [2.819427223992534, 2.7870364009868354, 2.785769735928625],
-        "warm_median_seconds": 2.7870364009868354,
-        "warm_cv": 0.005568120547141923,
-        "repeat_signature_max_abs": 1.0523945093154907e-7,
+        "cold_seconds": 25.014289382030256,
+        "warm_samples_seconds": [2.8368632450001314, 2.7804340079892427, 2.7653228380950168],
+        "warm_median_seconds": 2.7804340079892427,
+        "warm_cv": 0.011018206899716809,
+        "repeat_signature_max_abs": 6.577465683221817e-9,
+        "profile_signature_max_abs": 9.937502909451723e-8,
+        "profile_linear_iteration_max_abs": 2.0,
         "restart_state_max_abs": 0.0,
         "restart_flux_max_abs": 0.0
       },
       "2": {
-        "cold_seconds": 29.53999393095728,
-        "warm_samples_seconds": [2.761250711977482, 2.769358483958058, 2.754703219048679],
-        "warm_median_seconds": 2.761250711977482,
-        "warm_cv": 0.002170447643792375,
-        "repeat_signature_max_abs": 5.376932676881552e-9,
+        "cold_seconds": 27.74431697104592,
+        "warm_samples_seconds": [2.3997985469177365, 2.413906999048777, 2.3954479129752144],
+        "warm_median_seconds": 2.3997985469177365,
+        "warm_cv": 0.0032787675001904187,
+        "repeat_signature_max_abs": 1.2973032426089048e-8,
+        "profile_signature_max_abs": 1.8053469830192626e-9,
+        "profile_linear_iteration_max_abs": 1.0,
         "restart_state_max_abs": 0.0,
         "restart_flux_max_abs": 0.0
       }
     },
-    "speedup": 1.0093384091844695,
-    "parallel_efficiency": 0.5046692045922347,
+    "speedup": 1.1586114224297654,
+    "parallel_efficiency": 0.5793057112148827,
+    "promotion_threshold": 1.2,
+    "two_gpu_target_seconds": 2.317028339991036,
+    "remaining_recovery_seconds": 0.08277020692670067,
     "equivalence": {
-      "pressure_observable_max_abs": 2.5759597363159137e-13,
-      "courant_mean_max_abs": 2.371692252312041e-20,
-      "courant_max_abs": 2.875058521876854e-15,
+      "pressure_observable_max_abs": 6.131536522003406e-13,
+      "courant_mean_max_abs": 1.1858461261560205e-20,
+      "courant_max_abs": 1.2870038829148125e-15,
       "velocity_l2_relative": 0.0,
-      "potential_l2_relative": 4.614736064920569e-15,
-      "current_l2_relative": 5.2810311628297866e-14,
+      "potential_l2_relative": 3.076490709947039e-15,
+      "current_l2_relative": 5.780934598145693e-14,
       "rtol": 2e-8,
       "atol": 2e-9,
       "pass": true
+    },
+    "trace_attribution": {
+      "critical_span_seconds": {"1": 2.825536272, "2": 2.438716262},
+      "core_phase_seconds": {"1": 2.618228966, "2": 1.734267897},
+      "core_phase_speedup": 1.50970,
+      "post_map_seconds": {"1": 0.010025969, "2": 0.364354165},
+      "validation_proxy_seconds": {"1": 0.004814665, "2": 0.199660224},
+      "pre_fusion_two_gpu_span_reduction_seconds": 0.351221153,
+      "pre_fusion_two_gpu_post_map_reduction_seconds": 0.320458413,
+      "remaining_attribution": "Core phases scale well; end-to-end public API remains limited by two-GPU post-map host transfers. The single authorized fusion is complete, so tuning stops."
     },
     "gates": {
       "validation": true,
@@ -193,6 +211,8 @@
       "restart_state": true,
       "restart_flux": true,
       "physical_repeat": true,
+      "profile_physical_repeat": true,
+      "profile_linear_history": true,
       "device_equivalence": true,
       "pressure_solves_converged": true,
       "warm_cv_below_0.05": true,
@@ -201,11 +221,16 @@
     "interpretation": {
       "bounded_fast_scaling_calibration": false,
       "production_speedup_claim": false,
-      "reason": "Current correctness and repeat gates pass with low timing variance, but 1.009x fixed-grid speedup misses the 1.2x promotion threshold."
+      "decision": "Retain the 12-line-smaller validation fusion and stop this fixed-grid ladder; do not run a larger rung or another optimization without revising the plan.",
+      "reason": "The trace-authorized fusion raises end-to-end speedup from 1.040x to 1.159x and all correctness gates pass, but it still misses the precommitted 1.2x threshold."
     },
     "raw_sha256": {
-      "one_gpu_worker": "3c48c40cfd775212eb55c5487004a55a384e6a586c3653470ee8304eb1701f72",
-      "two_gpu_worker": "a86ba5606cfb87f348b29d1368b6d649dfd7f1e4e68382e8e735fafe0d6cf490"
+      "one_gpu_worker": "929b641c746d7b893895e2e867d0705b35bed900211d242b5003b44942808d09",
+      "two_gpu_worker": "2d52732f397aa12326f703312ba2c654f047fc55c0b12326fff8d61653a954bb",
+      "one_gpu_trace_json_gzip": "f4fbf1ebd5666a4aa27318bfd67adaf40cb36dc6bf67cc69cf0dbd43817e9e61",
+      "two_gpu_trace_json_gzip": "38703b92d8085e3de0f3ab1836daadcc436b6d3fcac9da0c7fd9acf3023ae19f",
+      "one_gpu_perfetto_gzip": "c721b0aa5304d995e328da9b8af14513ffcd05452bcfc9aa363a54a5a58c0657",
+      "two_gpu_perfetto_gzip": "4f083853b792d4c384f2bc56bf1334be8a46055f1ae389b121e66385411087b3"
     }
   },
   "gates": {
@@ -218,13 +243,16 @@
     "deterministic_warm_cv_below_0.05": false,
     "doubled_axial_validation_and_equivalence": true,
     "doubled_axial_warm_cv_below_0.05": true,
-    "doubled_axial_speedup_at_least_1.2": false
+    "doubled_axial_speedup_at_least_1.2": false,
+    "current_trace_validation_and_equivalence": true,
+    "current_warm_cv_below_0.05": true,
+    "current_speedup_at_least_1.2": false
   },
   "interpretation": {
     "bounded_fast_scaling_calibration": false,
     "initial_two_update_speedup": 0.9677731284771768,
     "production_speedup_claim": false,
-    "reason": "Diagonal momentum preconditioning passes every correctness gate and cuts absolute runtime by 3.75--6.84x. The stable doubled-axial rung reaches only 1.125x, below the 1.2x promotion threshold; optimize mixed projection before another larger rung."
+    "reason": "The current trace-authorized validation fusion passes every correctness gate, removes 12 source lines, and raises fixed-grid speedup to 1.159x. It remains below the 1.2x promotion threshold, so the ladder stops without a larger run or production claim."
   },
   "raw_assets": {
     "location": "/Users/rogerio/local/tests/lmx_b2_gpu_scaling_413185a and office GPU host",
