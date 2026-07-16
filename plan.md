@@ -130,7 +130,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 20,555 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 180 | no new file without retiring another owner | 180 |
-| tracked checkout | 3,736,259 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,736,451 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -539,10 +539,12 @@ release derivatives are mirrored into `docs/_static/`, and the blanket page
 embeds its 7-second MP4 directly instead of tracking a redundant poster. The
 tracked set is 576,945 bytes across 12 files, below the 1 MiB media cap; no
 simulation or recompression was performed. Read the Docs still serves the
-2026-05-01 build at `6be8622`, and recent builds fail before acquiring a commit,
-so repairing that integration and publishing the current self-contained build
-is the remaining delivery step. Do not add another movie until an accepted
-physical trajectory exists.
+2026-05-01 build at `6be8622`. Build `33554636` failed with `commit: None` and
+Git exit 128 because the builder had no credentials to clone the private GitHub
+repository; the active repository webhook's latest response is HTTP 406. An
+account owner must reconnect the Read the Docs GitHub authorization, then build
+`be3ee82`. This is not a Sphinx or repository-configuration defect. Do not add
+another movie until an accepted physical trajectory exists.
 
 ## Release gate
 
