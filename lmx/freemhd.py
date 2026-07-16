@@ -732,21 +732,6 @@ def observe_lmx_b2_output(
     }
 
 
-def _foam_numeric_rows(path: Path, width: int) -> np.ndarray:
-    rows = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        values = [float(value) for value in re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", line)]
-        if len(values) != width:
-            raise ValueError(f"FreeMHD B2 table width differs: {path.name}")
-        rows.append(values)
-    result = np.asarray(rows, dtype=float)
-    if result.shape != (2, width) or not np.all(np.isfinite(result)) or np.any(np.diff(result[:, 0]) <= 0.0):
-        raise ValueError(f"FreeMHD B2 table rows differ: {path.name}")
-    return result
-
-
 def observe_freemhd_b2_output(
     output_dir: str | Path, input_dir: str | Path, evaluator: str | Path
 ) -> dict[str, object]:
@@ -831,7 +816,16 @@ def observe_freemhd_b2_output(
             raise ValueError(f"FreeMHD B2 output table {name} is unavailable")
         if header is not None and re.search(rf"(?m)^# Time\s+{re.escape(header)}\s*$", matches[0].read_text()) is None:
             raise ValueError(f"FreeMHD B2 output table {name} header differs")
-        values = _foam_numeric_rows(matches[0], width)
+        rows = [
+            [float(value) for value in re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", line)]
+            for line in matches[0].read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        if any(len(row) != width for row in rows):
+            raise ValueError(f"FreeMHD B2 table width differs: {matches[0].name}")
+        values = np.asarray(rows, dtype=float)
+        if values.shape != (2, width) or not np.all(np.isfinite(values)) or np.any(np.diff(values[:, 0]) <= 0.0):
+            raise ValueError(f"FreeMHD B2 table rows differ: {matches[0].name}")
         if not np.array_equal(values[:, 0], times):
             raise ValueError(f"FreeMHD B2 output table {name} times differ")
         return values[:, 1:]

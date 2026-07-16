@@ -2460,34 +2460,6 @@ def test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries():
     assert solvers._inlet_speed(flow_bc, case) == pytest.approx(0.25)
 
 
-def test_fully_developed_case_step_rejects_crank_nicolson_in_transient_mode():
-    case = replace(
-        make_hartmann_case(ha=5.0, ny=6, nz=6),
-        solver=replace(
-            make_hartmann_case(ha=5.0, ny=6, nz=6).solver,
-            mode="transient",
-            time_scheme="crank_nicolson",
-        ),
-    )
-    mesh = solvers._build_mesh(case)
-    materials = build_material_fields(case, mesh)
-
-    with pytest.raises(NotImplementedError, match="implicit_euler only"):
-        solvers._fully_developed_case_step(
-            case=case,
-            mesh=mesh,
-            materials=materials,
-            u_previous=jnp.zeros(mesh.yz_shape),
-            step_time=0.0,
-            potential_solver="cg",
-            target_mean_velocity=None,
-            linear_solver="cg",
-            preconditioner="jacobi",
-            coupling_iterations=1,
-            coupling_tolerance=1e-8,
-        )
-
-
 def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
     forcing_case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     mesh = solvers._build_mesh(forcing_case)
@@ -2927,7 +2899,7 @@ for _unit_test_name in (
     "test_enforce_velocity_bc_supports_direct_wall_interpolation",
     "test_velocity_update_limiters_cover_local_clip_and_validation_errors",
     "test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries",
-    "test_fully_developed_case_step_rejects_crank_nicolson_in_transient_mode",
+    "test_fully_developed_case_step_rejects_non_implicit_transient_scheme",
     "test_steady_solver_supports_opt_in_solvax_aitken_coupling",
     "test_steady_solver_supports_opt_in_solvax_anderson_coupling",
     "test_steady_solver_rejects_invalid_coupling_acceleration_controls",
